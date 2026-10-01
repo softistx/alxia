@@ -8,7 +8,7 @@
         "@biomejs/biome": "^2.5.9",
         "@changesets/changelog-github": "^1.0.1",
         "@changesets/cli": "^3.0.1",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "typescript": "~6.0.3",
       },
     },
@@ -18,7 +18,7 @@
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
@@ -30,7 +30,7 @@
       "version": "0.0.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.1.0",
       },
       "peerDependencies": {
@@ -44,7 +44,7 @@
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
       },
       "peerDependencies": {
@@ -57,7 +57,7 @@
       "version": "0.0.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.6.5",
       },
       "peerDependencies": {
@@ -69,7 +69,7 @@
       "name": "@alxia/core",
       "version": "0.0.0",
       "devDependencies": {
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.1.0",
       },
       "peerDependencies": {
@@ -82,7 +82,7 @@
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
       },
       "peerDependencies": {
@@ -94,7 +94,7 @@
       "name": "@alxia/env",
       "version": "0.0.0",
       "devDependencies": {
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
       },
       "peerDependencies": {
@@ -106,7 +106,7 @@
       "version": "0.0.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "graphql": "^16.11.0",
         "graphql-yoga": "^5.16.0",
       },
@@ -124,7 +124,7 @@
         "@alxia/core": "workspace:^",
         "@alxia/language": "workspace:^",
         "@nxgt/i18n": "^2.0.0",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
@@ -140,7 +140,7 @@
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@nxgt/janus": "^0.17.1",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.6.5",
       },
       "peerDependencies": {
@@ -155,7 +155,7 @@
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
       },
       "peerDependencies": {
@@ -168,7 +168,7 @@
       "version": "0.0.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
@@ -181,7 +181,7 @@
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
       },
       "peerDependencies": {
@@ -194,7 +194,7 @@
       "version": "0.0.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.1.0",
       },
       "peerDependencies": {
@@ -208,7 +208,7 @@
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
       },
       "peerDependencies": {
@@ -226,7 +226,7 @@
         "@alxia/rate-limit": "workspace:^",
         "@nxgt/redis": "^0.3.1",
         "@nxgt/redis-guard": "^0.3.1",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.6.5",
       },
       "peerDependencies": {
@@ -249,7 +249,7 @@
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
       },
       "peerDependencies": {
@@ -264,7 +264,7 @@
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@nxgt/telemetry": "^0.2.1",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.6.5",
       },
       "peerDependencies": {
@@ -280,7 +280,7 @@
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@alxia/openapi": "workspace:^",
-        "@types/bun": "^1.3.0",
+        "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
       },
       "peerDependencies": {

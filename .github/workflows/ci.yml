@@ -53,7 +53,8 @@ jobs:
       # clean checkout `@alxia/core` resolves to nothing for the client and
       # typecheck reports phantom TS2307s. A developer's tree always has a
       # stale `dist/` lying around, which hides this locally — it only ever
-      # shows up in CI. `bun run --filter` builds in dependency order, so
+      # shows up in CI. `bun run build` goes through scripts/workspace.ts,
+      # which builds each package after the siblings it depends on, so
       # building from nothing works.
       - name: Build packages
         run: bun run build
