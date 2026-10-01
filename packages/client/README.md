@@ -85,8 +85,12 @@ JSON.
 | export | |
 | --- | --- |
 | `client<App>(target, options?)` | the client of an app: a base URL, or anything with a `fetch(request)` |
+| `ClientOptions` | its options: `headers`, sent with every call, and `fetch` |
+| `Target` | where a client sends its calls: a base URL, or a fetch handler such as an app |
 | `fillPath(path, params)` | a path with its parameters encoded in |
 | `readEvents(body)` | a `text/event-stream` body as the values of its events |
 | `TypedSocket<Send, Receive>` | what `api.ws()` returns |
 | `Client<App>` | the client's type: one method per HTTP method the app answers |
 | `CallResult<Output>` | what a call resolves to: `status`, `ok`, `data`, `response` |
+| `CallOptions` | what every call may add: `init`, `signal` |
+| `AppLike`, `RoutesOf<App>`, `PathsFor<Routes, M>`, `InputOf`, `OutputOf`, `CallArgs<Input>`, `CallMethod`, `SocketMethod` | the types `Client` is built from: an app, its routes, the paths that answer a method, a call's input and output |

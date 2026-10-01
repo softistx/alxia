@@ -92,5 +92,9 @@ across every process. A store of your own implements `CacheStore`: `get`,
 | export | |
 | --- | --- |
 | `cache(options)` | the plugin, with `invalidate(path)`, `invalidateTag(tag)` and `store`; routes after it read `cache.tag()` and `cache.skip()` |
-| `MemoryCacheStore` | the in-process store |
+| `CacheOptions` | its options: `ttl`, `staleWhileRevalidate`, `store`, `key`, `vary`, `statuses`, `tags`, `honorClientNoCache`, `debugHeaders` |
+| `defaultKey(path, vary, headers)` | the default key: the path and query, then each varying header's value |
+| `MemoryCacheStore` | the in-process store: least recently used |
+| `MemoryCacheOptions` | its options: `maxEntries`, `maxBytes` |
 | `CacheStore`, `CachedResponse` | a store's contract |
+| `Cache`, `CacheControls` | the plugin's handles, and what the routes behind it read |

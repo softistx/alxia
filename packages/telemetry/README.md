@@ -83,4 +83,5 @@ A hook that throws costs its answer, never the request.
 | export | |
 | --- | --- |
 | `telemetry(options)` | the plugin, with the telemetry it writes to as `.telemetry`; routes after it read `span` and `telemetry` |
-| `HTTP_ROUTE`, `HTTP_STATUS`, … | the attribute names |
+| `TelemetryPluginOptions` | its options: `service` and `@nxgt/telemetry`'s options, or an `instance`; `traced`, `spanName`, `traceResponse` |
+| `HTTP_METHOD`, `URL_PATH`, `URL_SCHEME`, `HTTP_ROUTE`, `HTTP_STATUS`, `SERVER_ADDRESS`, `SERVER_PORT`, `CLIENT_ADDRESS` | the attribute names a server span carries: `http.request.method`, `url.path`, `url.scheme`, `http.route`, `http.response.status_code`, `server.address`, `server.port`, `client.address` |

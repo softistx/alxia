@@ -51,7 +51,8 @@ more than it does; `@alxia/zod` exports one for Zod.
 
 | export | |
 | --- | --- |
-| `openapi(app, options)` | the document. `info`, `servers`, `convert`, `exclude` |
-| `docs(app, options)` | a plugin serving it, and a reference page. `path`, `ui` too |
+| `openapi(app, options)`, `OpenApiOptions` | the document. `info`, `servers`, `convert`, `exclude` |
+| `docs(app, options)`, `DocsOptions` | a plugin serving it, and a reference page. `path`, `ui` too |
 | `toJsonSchema(schema, side, convert?)` | one schema as JSON Schema 2020-12 |
 | `openApiPath(path)`, `operationId(method, path)` | the naming the document uses |
+| `OpenApiDocument`, `OpenApiInfo`, `Operation`, `JsonSchema`, `Side`, `Converter` | its types: `convert` is a `Converter` |

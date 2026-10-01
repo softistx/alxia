@@ -115,8 +115,8 @@ The package's specs run against `$REDIS_URL`, or a `redis-server` on
 
 | export | |
 | --- | --- |
-| `redisStore(client, { name })` | an `@alxia/rate-limit` store |
-| `redisCacheStore(client, { name })` | an `@alxia/cache` store |
+| `redisStore(client, { name })`, `RedisStoreOptions` | an `@alxia/rate-limit` store |
+| `redisCacheStore(client, { name })`, `RedisCacheStoreOptions` | an `@alxia/cache` store |
 | `idempotency(client, options)` | the plugin |
-| `redis(client, { caches? })` | the plugin: `redis`, `cache`, `lock` in the context |
+| `redis(client, { caches? })`, `RedisContextOptions` | the plugin: `redis`, `cache`, `lock` in the context |
 | `IdempotencyOptions`, `IdempotencyErrorBody`, `RedisContext`, `BoundCaches` | its types |
