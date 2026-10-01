@@ -52,5 +52,7 @@ With `persist`, a language the query named is kept in the cookie.
 | export | |
 | --- | --- |
 | `language(options)` | the plugin: `language`, `languageSource` |
+| `LanguageOptions` | its options: `supported`, `fallback`, `order`, `query`, `cookie`, `pathIndex`, `persist`, `contentLanguage`, `resolve` |
 | `negotiate(header, supported)` | the supported language `Accept-Language` prefers |
 | `parseAcceptLanguage(header)`, `match(tag, supported)` | its parts |
+| `LanguageContext`, `LanguageSource`, `Accepted` | its types |

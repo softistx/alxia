@@ -61,4 +61,5 @@ A response in the request's language varies by what decided it: give
 | export | |
 | --- | --- |
 | `createI18n({ resources, fallback, …languageOptions })` | the plugin — routes after it read `t` and `language` — with `t()`, `language()` and `supported` |
-| `KeyOf<Catalogue>`, `Translate<Key>`, `Catalogues` | its types |
+| `I18nOptions` | its options: `resources`, `fallback`, and every `@alxia/language` option but `supported` |
+| `KeyOf<Catalogue>`, `Translate<Key>`, `Catalogues`, `I18nContext<Key>` | its types |

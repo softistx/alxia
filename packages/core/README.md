@@ -283,14 +283,29 @@ global hooks become this app's.
 
 | export | |
 | --- | --- |
-| `alxia(options?)` | a new app: `prefix`, `validateResponses`, `ip` |
+| `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip` |
 | `Alxia` | `get` `post` `put` `patch` `delete` `options` `head` `ws`, `static` `file` `page`, `decorate` `derive` `wrap` `onError`, `around` `onRequest` `onResponse` `onStart` `onStop` `parser`, `group` `use`, `fetch` `request` `listen` `stop`, `routes` `sockets` `server` |
-| `eventStream(schema)` | the response schema of a stream of events |
+| `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
+| `isEventStreamSchema(schema)` | whether a schema is one `eventStream` made |
 | `FileSource`, `StaticOptions`, `FileOptions`, `StaticReply`, `parseRange` | static files |
+| `Precompressed`, `FileNotFoundBody`, `RangeNotSatisfiableBody` | a coding stored beside a file, the bodies of the 404 and 416 |
 | `Reply`, `HttpError`, `ResponseValidationError` | what a handler returns or throws |
+| `ReplyInit` | a reply's options: `headers` |
+| `AnyReply`, `FreeReplyFunction`, `TypedReplyFunction`, `DeclaredReply`, `RedirectFunction` | any reply, `reply` without and with schemas, every reply a route with schemas may return, `redirect` |
 | `Plugin`, `AnyAlxia` | a function plugin, any app |
+| `ListenOptions` | the options of `listen`: `port`, `hostname`, `development`, `idleTimeout`, `maxRequestBodySize`, `tls` |
+| `RequestHook`, `ResponseHook`, `AroundHook`, `StartHook`, `StopHook`, `BodyParser` | the hooks of `onRequest`, `onResponse`, `around`, `onStart`, `onStop`, and a body parser |
 | `withHeaders`, `vary`, `check` | for plugins: edit a response's headers, add to `Vary`, run a schema |
+| `Checked` | what `check` returns: the value, or its issues |
 | `RoutesOf<App>`, `Jsonify<T>` | the route table the client reads, and what a value is on the wire |
+| `RouteTable`, `RouteRecord`, `RouteEntryOf`, `RouteInput`, `RouteOutput`, `Outcome`, `OutcomeOf` | a route as the client knows it: the entry one route adds to `RoutesOf`, what it sends, every outcome it may read |
 | `ContextOf<App>` | what a route declared next on `App` reads: to type a GraphQL schema, a service |
-| `StandardSchemaV1`, `InferInput`, `InferOutput` | the Standard Schema types |
+| `RequestContext`, `BaseContext`, `Context`, `ResponseSettings`, `HandlerResult` | what every hook reads, what a handler reads, what a route sets on its response, what a handler may return |
+| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, what OpenAPI says of it, the checks its schema's type cannot express, a route method, a route and a socket as the app runs them |
+| `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage`, `SocketRecord`, `SocketEntryOf` | sockets: what a socket route validates, what its handlers read, send and receive, the entry one socket adds to `RoutesOf` |
+| `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema types |
 | `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426 |
+| `ValidationIssue`, `ValidationTarget` | one issue of a 400, and where the refused value was read from |
+| `RoutePath`, `JoinPath`, `PathParams`, `PathParamName` | paths: an absolute path, a prefix joined to a path, the parameters a path declares |
+| `StatusCode`, `InformationalStatus`, `SuccessStatus`, `RedirectStatus`, `ClientErrorStatus`, `ServerErrorStatus` | every status a route may declare, and each class of them |
+| `Method`, `Empty`, `MaybePromise`, `Simplify` | an HTTP method, no properties, a value or its promise, an object type with its intersections flattened |

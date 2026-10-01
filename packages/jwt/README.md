@@ -47,5 +47,8 @@ Bearer` and `{ error: 'unauthorized', reason }`, part of each route's type.
 | export | |
 | --- | --- |
 | `createJwt(options)` | `sign(claims, { expiresIn? })`, `verify(token)` |
+| `JwtOptions` | its options: `algorithm` with `secret`, or with `privateKey` and `publicKey`; `issuer`, `audience`, `expiresIn`, `clockTolerance` |
 | `bearer({ jwt, schema?, cookie? })` | the guard: an app that derives `user` |
-| `JwtOptions`, `JwtClaims`, `VerifyResult`, `UnauthorizedBody`, `Algorithm` | its types |
+| `BearerOptions` | its options: `jwt`, `schema`, `cookie` |
+| `base64url(bytes)` | bytes as base64url |
+| `Jwt`, `JwtClaims`, `VerifyResult`, `UnauthorizedBody`, `Algorithm`, `HmacAlgorithm`, `KeyAlgorithm` | its types |

@@ -59,5 +59,6 @@ plugin, `NOT_ROUTED`. Declare it before the routes whose code reads it.
 | export | |
 | --- | --- |
 | `contextStorage<App>()` | the plugin, with `get()` and `tryGet()` typed by `App` |
+| `ContextStoragePlugin<App>` | its type |
 | `getContext`, `tryGetContext`, `getRequestContext`, `runWithContext` | the store, untyped |
 | `ContextStorageError`, `ContextStorageErrorCode` | why there is no context |

@@ -103,5 +103,6 @@ graphql(app, {
 | --- | --- |
 | `graphql(app, options)` | the endpoint: `schema`, `path`, `ide`, `sandbox`, and every Yoga option |
 | `renderSandbox(endpoint, options?)`, `SANDBOX_POLICY` | the Sandbox page, and the policy it loads under |
+| `SandboxOptions` | its options: `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
 | `GraphQLContext<App, UserContext?>` | what a resolver reads |
 | `ServerContext<Ctx>`, `GraphQLOptions`, `GraphQLRoutes` | its types |
