@@ -1,0 +1,274 @@
+# Routes and schemas
+
+This page covers declaring a route: its path, what its schema validates,
+how each part of the request is read, and what the app answers when a
+request matches nothing or is refused.
+
+```ts
+import { alxia } from '@alxia/core';
+import { z } from 'zod';
+
+const app = alxia().get(
+	'/users/:id/posts',
+	{
+		params: z.object({ id: z.coerce.number().int() }),
+		query: z.object({ tag: z.string().optional() }),
+		response: { 200: z.array(z.object({ id: z.number(), title: z.string() })) },
+	},
+	({ params, query, reply }) => reply(200, findPosts(params.id, query.tag)),
+);
+```
+
+## The route methods
+
+```ts
+app.get(path, schema, handler);
+app.get(path, handler); // no schema: nothing validated, any reply
+```
+
+`get`, `post`, `put`, `patch`, `delete`, `options` and `head` take the same
+arguments. `ws` declares a socket ([WebSockets](websockets.md)); `static`,
+`file` and `page` serve files ([Static files](static-files.md)).
+
+```ts
+interface RouteMethod<M, Ctx, Routes, Prefix, Shortcuts> {
+	<const Path extends RoutePath, Schema extends RouteSchema, Result extends HandlerResult<Schema>>(
+		path: Path,
+		schema: Schema & ValidSchema<JoinPath<Prefix, Path>, Schema>,
+		handler: (ctx: Context<Ctx, JoinPath<Prefix, Path>, Schema>) => MaybePromise<Result>,
+	): Alxia</* … the route added … */>;
+	<const Path extends RoutePath, Result extends AnyReply>(
+		path: Path,
+		handler: (ctx: Context<Ctx, JoinPath<Prefix, Path>, Empty>) => MaybePromise<Result>,
+	): Alxia</* … */>;
+}
+```
+
+A handler must return a reply. One that returns anything else is answered
+with a 500, and the server logs
+`GET /path: the handler returned no reply. Return ctx.reply(status, body).`
+
+## Paths
+
+| Segment | Matches | Read as |
+| --- | --- | --- |
+| `/users` | that segment | — |
+| `/:id` | one segment | `params.id`, a string, URL-decoded |
+| `/*` | the rest of the path, possibly empty; last segment only | `params['*']` |
+
+```ts
+app.get('/files/*', ({ params, reply }) => reply(200, params['*']));
+// GET /files/a/b.txt → "a/b.txt"
+```
+
+Paths are checked when the route is declared, and a mistake throws a
+`TypeError` at startup:
+
+| Declared | Thrown |
+| --- | --- |
+| `'users'` | `The route path "users" must start with "/"` |
+| `'/a/*/b'` | `"/a/*/b": "*" may only end a path` |
+| `'/a/:id/:id'` | `"/a/:id/:id" declares ":id" twice` |
+| `'/users/:userId'` after `'/users/:id'` | `"/users/:userId" has the shape of "/users/:id" with other parameter names. Use the same names: the two would match the same requests.` |
+| the same method and path twice | `GET /a is declared twice` |
+| a method with no handler | `GET /a: the handler is missing` |
+
+When two paths match a request, a path without parameters wins — `/users/me`
+over `/users/:id` — then the one declared first.
+
+## The schema
+
+Every part is optional, and each one is any Standard Schema.
+
+| Part | Validates | What the handler reads without it |
+| --- | --- | --- |
+| `params` | the path parameters, which arrive as strings | `{ readonly id: string }`, from the path |
+| `query` | the query string | `Readonly<Record<string, string \| readonly string[]>>` |
+| `headers` | the request headers, names lowercased | `Readonly<Record<string, string>>` |
+| `cookies` | the `Cookie` header, by name | `Readonly<Record<string, string>>` |
+| `body` | the body, parsed by its `content-type` | `undefined`: read `ctx.request` yourself |
+| `response` | the body of each status the route may answer | any status, any body ([Replies](replies.md)) |
+| `detail` | nothing at runtime: what [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) says of the route | — |
+
+The handler reads each part as its schema's **output**: a schema that
+coerces turns `"7"` into `7`, a default fills a missing key.
+
+```ts
+app.get(
+	'/search',
+	{
+		query: z.object({ q: z.string(), page: z.coerce.number().int().default(1) }),
+		headers: z.object({ 'accept-language': z.string().optional() }),
+		cookies: z.object({ session: z.string() }),
+		detail: { summary: 'Search', tags: ['search'] },
+	},
+	({ query, headers, reply }) =>
+		reply(200, { q: query.q, page: query.page, language: headers['accept-language'] ?? 'en' }),
+);
+```
+
+`detail` takes `summary`, `description`, `operationId`, `tags` and
+`deprecated`.
+
+### Query strings
+
+A key given once is a string; given more than once, an array. So
+`?tag=a&tag=b` reads `{ tag: ['a', 'b'] }` and `?tag=a` reads
+`{ tag: 'a' }`. A list that may hold one item has to accept both:
+
+```ts
+const Tags = z.union([z.string().transform((tag) => [tag]), z.array(z.string())]);
+
+app.get('/posts', { query: z.object({ tag: Tags.optional() }) }, ({ query, reply }) =>
+	reply(200, query.tag ?? []), // string[]
+);
+```
+
+`zq` in [`@alxia/zod`](https://www.npmjs.com/package/@alxia/zod) has
+ready-made coercions for this, and keeps the client's side typed as the
+value it means to send — `{ page: 2 }` rather than `unknown`.
+
+### Bodies
+
+The body is read only when the route has a `body` schema, by its
+`content-type`:
+
+| `content-type` | Read as |
+| --- | --- |
+| one a [`parser`](#body-parsers) was added for | what the parser returns |
+| any containing `json` | `JSON.parse` of the text; an empty body is `undefined` |
+| `multipart/form-data`, `application/x-www-form-urlencoded` | an object of its fields; a field given more than once an array; a file a `File` |
+| `text/*` | the text |
+| anything else | an `ArrayBuffer`, or `undefined` when there is no body |
+
+```ts
+app.post(
+	'/avatar',
+	{ body: z.object({ name: z.string(), file: z.instanceof(File) }) },
+	async ({ body, reply }) => {
+		await Bun.write(`uploads/${body.name}`, body.file);
+		return reply(204);
+	},
+);
+```
+
+### Body parsers
+
+`parser(type, parse)` reads a `content-type` the built-in parsers do not —
+a prefix, or a pattern — and is tried before them, for every route of the
+app, wherever it is declared.
+
+```ts
+const app = alxia()
+	.parser('application/csv', async (request) => (await request.text()).split(','))
+	.post('/csv', { body: z.array(z.string()) }, ({ body, reply }) => reply(200, body.length));
+// POST /csv, content-type: application/csv, body "a,b,c" → 3
+```
+
+A parser that throws is a 400 with the code `unreadable_body` and the
+error's message.
+
+## The 400
+
+A request any part refuses is answered with a 400 before the handler runs,
+naming every issue in every part at once. `GET /users/abc?upper=maybe`, to a
+route with a numeric `id` and `upper: z.enum(['yes', 'no']).optional()`:
+
+```json
+{
+	"error": "validation",
+	"issues": [
+		{ "target": "params", "path": ["id"], "code": "invalid_type", "message": "…" },
+		{ "target": "query", "path": ["upper"], "code": "invalid_value", "message": "…" }
+	]
+}
+```
+
+```ts
+interface ValidationErrorBody {
+	readonly error: 'validation';
+	readonly issues: readonly ValidationIssue[];
+}
+interface ValidationIssue {
+	readonly target: 'params' | 'query' | 'headers' | 'cookies' | 'body' | 'message';
+	readonly path: readonly (string | number)[];
+	readonly code: string; // the validator's own; `custom` for a vendor without one
+	readonly message: string;
+}
+```
+
+Two codes are the framework's: `invalid_json` (the body is not JSON) and
+`unreadable_body` (a parser threw). The 400 is in the type of every route
+that validates part of its request, so a client reads it.
+
+## What the types refuse
+
+The schema argument is checked against the path and against
+`RouteSchema`. Each of these is a compile error; the comment is what
+TypeScript reports:
+
+```ts
+// the params schema must accept the parameters of "/users/:id", which arrive as strings
+app.get('/users/:id', { params: z.object({ name: z.string() }) }, ({ reply }) => reply(200));
+
+// the same, for a schema that does not coerce: the path gives "7", not 7
+app.get('/users/:id', { params: z.object({ id: z.number() }) }, ({ reply }) => reply(200));
+
+// 'quey' does not exist in type 'RouteSchema'. Did you mean to write 'query'?
+app.get('/users', { quey: z.object({}) }, ({ reply }) => reply(200));
+
+// '999' does not exist in type 'ResponseSchemas'
+app.get('/users', { response: { 999: z.string() } }, ({ reply }) => reply(200, ''));
+```
+
+A params schema with an optional key the path does not declare —
+`/users/:id` with `{ id, extra? }` — is refused with
+`the params schema reads keys "/users/:id" does not declare`. What
+`reply` refuses is on [Replies](replies.md#with-response-schemas).
+
+## Answered outside every route
+
+| Request | Status | Body |
+| --- | --- | --- |
+| a path no route declares | 404 | `{ "error": "not_found" }` |
+| a declared path, by a method it does not have | 405, with `Allow` | `{ "error": "method_not_allowed" }` |
+| a socket's path, without an upgrade | 426 | `{ "error": "upgrade_required" }` |
+
+`HEAD` on a path with a `GET` and no `HEAD` of its own runs the `GET` route
+and sends its headers without the body.
+
+## Any Standard Schema
+
+The core calls `~standard.validate` and nothing else. A schema written by
+hand types the route like a Zod one:
+
+```ts
+import { alxia, type StandardSchemaV1 } from '@alxia/core';
+
+const Page: StandardSchemaV1<unknown, { page: number }> = {
+	'~standard': {
+		version: 1,
+		vendor: 'hand',
+		validate: (value) => {
+			const page = Number((value as { page?: unknown }).page);
+			return Number.isInteger(page) && page > 0
+				? { value: { page } }
+				: { issues: [{ message: 'Expected a positive page', path: ['page'] }] };
+		},
+	},
+};
+
+const app = alxia().get('/items', { query: Page }, ({ query, reply }) =>
+	reply(200, query.page), // number
+);
+```
+
+`InferInput<Schema>` is what a schema accepts — what a client sends, what a
+handler passes to `reply` — and `InferOutput<Schema>` what it gives back.
+
+## See also
+
+- [Replies](replies.md): what a handler returns.
+- [Hooks](hooks.md): what runs before validation, and what it adds to the
+  context.
+- [The app's type](types.md): what a client reads of each route.

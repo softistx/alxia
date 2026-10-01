@@ -309,3 +309,9 @@ global hooks become this app's.
 | `RoutePath`, `JoinPath`, `PathParams`, `PathParamName` | paths: an absolute path, a prefix joined to a path, the parameters a path declares |
 | `StatusCode`, `InformationalStatus`, `SuccessStatus`, `RedirectStatus`, `ClientErrorStatus`, `ServerErrorStatus` | every status a route may declare, and each class of them |
 | `Method`, `Empty`, `MaybePromise`, `Simplify` | an HTTP method, no properties, a value or its promise, an object type with its intersections flattened |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/core/docs): a page per area — routes and schemas, replies, hooks, groups and plugins, static files, server-sent events, WebSockets, serving, and the app's type.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md): an error message, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/core/docs/roadmap.md): what is coming, and what is not planned.
