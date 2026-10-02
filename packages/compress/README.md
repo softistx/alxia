@@ -38,3 +38,9 @@ ETag becomes weak.
 | `compress(options?)` | the plugin |
 | `negotiate(accept, offered)` | the encoding an `Accept-Encoding` gets |
 | `CompressOptions`, `Encoding` | its types |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/compress/docs): what is compressed and what is not, every option, the headers written, the order among other hooks, testing, and `negotiate`.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/compress/docs/troubleshooting.md): an error message, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/compress/docs/roadmap.md): what is coming, and what is not planned.

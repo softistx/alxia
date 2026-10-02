@@ -42,3 +42,9 @@ blocks the call.
 | --- | --- |
 | `cors(options?)` | the plugin |
 | `CorsOptions`, `CorsOrigin` | its options |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/cors/docs): every option with its default and an example, what a refused origin gets, and where the plugin sits among an app's hooks.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/cors/docs/troubleshooting.md): a browser's CORS message, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/cors/docs/roadmap.md): what is coming, and what is not planned.

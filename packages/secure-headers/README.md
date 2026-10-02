@@ -46,3 +46,9 @@ Each option takes a value, or `false` to leave the header out.
 | --- | --- |
 | `secureHeaders(options?)` | the plugin |
 | `SecureHeadersOptions` | its options |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/secure-headers/docs): every option and its default, which responses get the headers, a page's own policy, the order with other hooks, and recipes.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/secure-headers/docs/troubleshooting.md): an error message or a browser refusal, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/secure-headers/docs/roadmap.md): what is coming, and what is not planned.
