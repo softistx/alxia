@@ -7,6 +7,7 @@ OpenAPI conversion of what Zod alone knows how to say.
 
 ```sh
 bun add @alxia/zod zod
+bun add -d typescript@^6.0.3
 ```
 
 `zod` is a peer: your app's own copy is the one used.

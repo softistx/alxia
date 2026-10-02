@@ -7,7 +7,8 @@ everything the request runs, named for its route — and every log written
 inside it carrying its trace id.
 
 ```sh
-bun add @alxia/telemetry @nxgt/telemetry
+bun add @alxia/telemetry @nxgt/telemetry @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 `@nxgt/telemetry` is a peer: the app's own copy, shared with its loggers.

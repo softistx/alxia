@@ -5,7 +5,8 @@ app, made from the schemas its routes already declare. Nothing is written
 twice: the document cannot drift from the code.
 
 ```sh
-bun add @alxia/openapi
+bun add @alxia/openapi @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 ## Serving it

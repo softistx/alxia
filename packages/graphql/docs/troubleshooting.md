@@ -53,7 +53,7 @@ dependency, so the app installs them.
 **Fix:**
 
 ```sh
-bun add @alxia/graphql graphql-yoga graphql
+bun add @alxia/graphql graphql-yoga graphql@^16
 ```
 
 ## Types

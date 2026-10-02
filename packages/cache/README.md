@@ -8,7 +8,8 @@ ETags and 304s. In memory, or in Redis with
 `redisCacheStore`.
 
 ```sh
-bun add @alxia/cache
+bun add @alxia/cache @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 ## Usage

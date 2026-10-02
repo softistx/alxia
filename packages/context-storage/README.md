@@ -6,7 +6,8 @@ three calls down — without passing it: [alxia](https://www.npmjs.com/package/@
 dependency.
 
 ```sh
-bun add @alxia/context-storage
+bun add @alxia/context-storage @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 ## Usage

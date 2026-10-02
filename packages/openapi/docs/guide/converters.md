@@ -67,7 +67,7 @@ in. `@alxia/zod` exports a converter that documents them as they cross
 the wire:
 
 ```sh
-bun add @alxia/zod
+bun add @alxia/zod zod
 ```
 
 ```ts

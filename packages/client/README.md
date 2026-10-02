@@ -6,7 +6,8 @@ parameter, query, header and body is checked as you write the call, and the
 result is a union by status, so checking `status` tells you what `data` is.
 
 ```sh
-bun add @alxia/client
+bun add @alxia/client @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 ## Calling an app

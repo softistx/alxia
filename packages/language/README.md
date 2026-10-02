@@ -5,7 +5,8 @@ typed as the languages you support — never a string a client made up. No
 dependency.
 
 ```sh
-bun add @alxia/language
+bun add @alxia/language @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 ## Usage
