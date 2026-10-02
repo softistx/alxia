@@ -62,3 +62,9 @@ plugin, `NOT_ROUTED`. Declare it before the routes whose code reads it.
 | `ContextStoragePlugin<App>` | its type |
 | `getContext`, `tryGetContext`, `getRequestContext`, `runWithContext` | the store, untyped |
 | `ContextStorageError`, `ContextStorageErrorCode` | why there is no context |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/context-storage/docs): what the plugin stores and when, reading it from a service or a logger, its typing, where it sits among hooks, what a timer or a detached callback sees, and jobs and tests with `runWithContext`.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/troubleshooting.md): a `ContextStorageError` or a `tsc` error, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/roadmap.md): what is coming, and what is not planned.

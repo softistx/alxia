@@ -15,21 +15,29 @@ bun add @alxia/cache
 
 ```ts
 import { cache } from '@alxia/cache';
+import { alxia } from '@alxia/core';
+import { z } from 'zod'; // any Standard Schema validates a body; zod is one
 
-const products = cache({ ttl: 60, staleWhileRevalidate: 300, tags: () => ['products'] });
+const Product = z.object({ id: z.string(), name: z.string() });
+const catalogue = new Map<string, z.infer<typeof Product>>();
+
+const products = cache({ ttl: 60, staleWhileRevalidate: 300, statuses: [200, 404], tags: () => ['products'] });
 
 const app = alxia()
-	.post('/products', async ({ body, reply }) => {
-		await save(body);
+	.post('/products', { body: Product }, async ({ body, reply }) => {
+		catalogue.set(body.id, body);
 		await products.invalidateTag('products');           // the next GET runs the route
-		return reply(201, …);
+		return reply(201, body);
 	})
 	.use(products)                                         // the GETs after it are cached
-	.get('/products', ({ reply }) => reply(200, list()))
+	.get('/products', ({ reply }) => reply(200, [...catalogue.values()]))
 	.get('/products/:id', ({ params, cache, reply }) => {
 		cache.tag(`product:${params.id}`);                // a tag of its own
-		return reply(200, find(params.id));
+		const product = catalogue.get(params.id);
+		return product ? reply(200, product) : reply(404, { error: 'not_found' });
 	});
+
+app.listen({ port: 3000 });
 ```
 
 ## What it does
@@ -43,7 +51,9 @@ const app = alxia()
   copy is current gets a 304.
 - **Never kept**: a status outside `statuses` (`200`), a response that says
   `Cache-Control: private` or `no-store`, sets a cookie, or streams events —
-  and one whose route called `cache.skip()`.
+  and one whose route called `cache.skip()`. Not kept is not unshared:
+  concurrent requests for one URL still wait on one run of the route, so
+  declare a personal route (`/me`) **before** the plugin.
 - Only `GET` and `HEAD`; only the routes declared after the plugin.
 
 ## The key
@@ -98,3 +108,9 @@ across every process. A store of your own implements `CacheStore`: `get`,
 | `MemoryCacheOptions` | its options: `maxEntries`, `maxBytes` |
 | `CacheStore`, `CachedResponse` | a store's contract |
 | `Cache`, `CacheControls` | the plugin's handles, and what the routes behind it read |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/cache/docs): a page per area — caching responses and its options, keys and `Vary`, invalidation by path and by tag, and stores, the memory one, Redis, or your own.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/cache/docs/troubleshooting.md): an error message, or a cache that does not hit, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/cache/docs/roadmap.md): what is coming, and what is not planned.
