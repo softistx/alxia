@@ -66,3 +66,9 @@ default conversion.
 | --- | --- |
 | `zq` | `number`, `int`, `boolean`, `date`, `array`, `json` |
 | `zodConverter(schema, side)` | a `Converter` for `@alxia/openapi` |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/zod/docs): what each coercion accepts, refuses and lets a client send, and what the OpenAPI converter changes in a document.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/zod/docs/troubleshooting.md): a validation message or a `tsc` error, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/zod/docs/roadmap.md): what is coming, and what is not planned.

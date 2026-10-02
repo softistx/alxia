@@ -56,3 +56,9 @@ more than it does; `@alxia/zod` exports one for Zod.
 | `toJsonSchema(schema, side, convert?)` | one schema as JSON Schema 2020-12 |
 | `openApiPath(path)`, `operationId(method, path)` | the naming the document uses |
 | `OpenApiDocument`, `OpenApiInfo`, `Operation`, `JsonSchema`, `Side`, `Converter` | its types: `convert` is a `Converter` |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/openapi/docs): a page per area — the document and its options, how a route is documented, schemas and converters, and serving the document and its reference page.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/troubleshooting.md): an error message, or a document that says less than your routes, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/roadmap.md): what is coming, and what is not planned.

@@ -1,0 +1,59 @@
+# Roadmap
+
+What `@alxia/openapi` gives an app, and what is coming. This page is a
+direction, not a commitment: the version something shipped in is the only
+number on it. Every release, with each change it made, is in
+[`CHANGELOG.md`](https://github.com/softistx/alxia/blob/develop/packages/openapi/CHANGELOG.md).
+
+## Now
+
+Nothing scheduled yet.
+
+## Next
+
+Nothing scheduled yet.
+
+## Later
+
+Nothing scheduled yet.
+
+## Not planned
+
+- **Knowing a validator by name.** `@alxia/openapi` reads every schema
+  through Standard Schema and Standard JSON Schema, and names no library:
+  what only one validator needs lives beside it, as Zod's converter lives
+  in `@alxia/zod`. A validator is supported by carrying Standard JSON
+  Schema, or by a `convert` function.
+- **A runtime dependency.** The package installs nothing beside itself and
+  its `@alxia/core` and `typescript` peers: no validator, no JSON Schema library, and no
+  reference page bundled in it — the page served at `/docs` loads its
+  viewer from a CDN in the browser.
+
+## Shipped
+
+### 0.1.0
+
+- **An OpenAPI 3.1 document from the routes you already wrote.**
+  `openapi(app, options)` documents every HTTP route of an `@alxia/core`
+  app from its schemas — paths, parameters, request body, each reply — so
+  the document cannot drift from the code. `info`, `servers` and an
+  `exclude` filter shape it.
+- **Each side of a schema where it belongs.** Parameters and bodies are
+  documented by what their schema accepts, replies by what it gives back;
+  an event stream is `text/event-stream` by the schema of one event, a
+  string reply is `text/plain`.
+- **The errors every route can answer.** A `400` with the validation error
+  body on every route that validates its request, and a `500` on every
+  route, as shared components.
+- **Any validator.** Schemas convert through Standard JSON Schema, which
+  Zod 4.2 and later, ArkType and Valibot carry; a `convert` function runs
+  first, for a validator that carries none or to say more than it does.
+  `toJsonSchema` converts a single schema the same way.
+- **Names a client generator can use.** Paths as OpenAPI writes them
+  (`/users/{id}`), operation ids from the method and path (`getUsersById`)
+  unless `detail.operationId` sets one, and `detail`'s summary,
+  description, tags and deprecation copied onto each operation.
+- **The document served, with a page to read it.** The `docs` plugin
+  serves the document at `/openapi.json` and an API reference page at
+  `/docs`, both movable and the page optional, and leaves its own routes
+  out of the document.
