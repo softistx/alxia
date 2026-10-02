@@ -150,7 +150,7 @@ them:
 | Export | Signature | For |
 | --- | --- | --- |
 | `withHeaders` | `(response: Response, edit: (headers: Headers) => void) => Response` | editing a response's headers, copying it when they are immutable; an error of `edit` is thrown with the body unread (on a mutable response, headers set before it stay); on immutable headers `edit` runs twice, so keep it free of side effects |
-| `vary` | `(headers: Headers, value: string) => void` | adding to `Vary` once, leaving `*` alone |
+| `vary` | `(headers: Headers, value: string) => void` | adding to `Vary` once, leaving `*` alone; `*` itself replaces every name, and an empty name adds nothing |
 | `check` | `(schema: StandardSchemaV1, value: unknown, target: ValidationTarget) => Promise<Checked>` | running a schema as a route does: its output, or its issues |
 
 ```ts

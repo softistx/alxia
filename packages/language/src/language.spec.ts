@@ -70,6 +70,28 @@ describe('language', () => {
 		).toBe('fr');
 	});
 
+	test('the headers a resolver reads are in Vary', async () => {
+		const app = alxia()
+			.use(
+				language({
+					supported: ['en', 'fr'],
+					fallback: 'en',
+					order: ['header'],
+					resolve: ({ request }) =>
+						request.headers.get('authorization') === 'Bearer ada'
+							? 'fr'
+							: undefined,
+					vary: ['Authorization'],
+				}),
+			)
+			.get('/', ({ language: lang, reply }) => reply(200, lang));
+		const response = await app.request('/', {
+			headers: { authorization: 'Bearer ada' },
+		});
+		expect(await response.text()).toBe('fr');
+		expect(response.headers.get('vary')).toBe('Accept-Language, Authorization');
+	});
+
 	test('a fallback it does not support is refused', () => {
 		// @ts-expect-error: 'de' is not one of the supported languages
 		expect(() => language({ supported: ['en', 'fr'], fallback: 'de' })).toThrow(

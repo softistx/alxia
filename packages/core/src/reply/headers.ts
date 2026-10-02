@@ -35,15 +35,17 @@ function immutable(headers: Headers): boolean {
 	}
 }
 
-/** Adds `value` to the `Vary` header, once. */
+/** Adds `value` to the `Vary` header, once; `*` replaces every name. */
 export function vary(headers: Headers, value: string): void {
+	const name = value.trim();
+	if (name === '') return;
 	const current = headers.get('vary');
-	if (current === null) {
-		headers.set('vary', value);
+	if (current === null || name === '*') {
+		headers.set('vary', name);
 		return;
 	}
 	const names = current.split(',').map((name) => name.trim().toLowerCase());
-	if (!names.includes('*') && !names.includes(value.toLowerCase())) {
-		headers.set('vary', `${current}, ${value}`);
+	if (!names.includes('*') && !names.includes(name.toLowerCase())) {
+		headers.set('vary', `${current}, ${name}`);
 	}
 }

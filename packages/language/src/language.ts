@@ -28,6 +28,11 @@ export interface LanguageOptions<L extends string> {
 	readonly contentLanguage?: boolean;
 	/** Decides itself, after every source: a user's saved preference. */
 	readonly resolve?: (ctx: BaseContext) => string | undefined;
+	/**
+	 * The request headers `resolve` reads, added to `Vary` so a cache keeps
+	 * one response per value: `['authorization']`. None by default.
+	 */
+	readonly vary?: readonly string[];
 }
 
 /** What the routes behind the plugin read. */
@@ -108,6 +113,7 @@ export function language<const L extends string>(options: LanguageOptions<L>) {
 
 		if (order.includes('header')) vary(ctx.set.headers, 'Accept-Language');
 		if (order.includes('cookie')) vary(ctx.set.headers, 'Cookie');
+		for (const name of options.vary ?? []) vary(ctx.set.headers, name);
 		if (options.contentLanguage !== false) {
 			ctx.set.headers.set('content-language', found.language);
 		}

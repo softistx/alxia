@@ -2,7 +2,10 @@ import { isAsyncIterable, toEventStream } from '../sse/event-stream';
 import { BODILESS, type StatusCode } from '../types/status';
 
 export interface ReplyInit {
-	/** Headers added to this reply, over those set on `ctx.set.headers`. */
+	/**
+	 * Headers added to this reply, over those set on `ctx.set.headers` —
+	 * except `Vary`, whose names are added to theirs.
+	 */
 	readonly headers?: HeadersInit;
 }
 

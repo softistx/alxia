@@ -277,31 +277,38 @@ language({
 ### A cache serves one language to every visitor
 
 **When:** behind a CDN, a reverse proxy, or `@alxia/cache`, the first
-visitor's language is served to everyone after; the response says
-`Vary: Accept-Encoding`, or no `Vary`, instead of
-`Vary: Accept-Language, Cookie`.
+visitor's language is served to everyone after.
 
-**Why:** the plugin adds its `Vary` to `ctx.set.headers`, and a reply's own
-headers replace those: `reply(200, body, { headers: { vary: 'Accept-Encoding' } })`
-sends `Vary: Accept-Encoding` alone. And what `resolve` reads is never
-added to `Vary`.
+**Why:** the response depends on what the plugin read, and a cache keyed
+on the URL alone ignores it. The plugin says `Vary: Accept-Language,
+Cookie` with the default `order`, and a reply's own `Vary` adds to it. Two
+things still leave a header out:
 
-**Fix:** add to `Vary` with `@alxia/core`'s `vary` instead of setting it,
+- what `resolve` reads, unless the `vary` option names it;
+- an `onResponse` hook that sets `Vary` with `headers.set` instead of
+  `@alxia/core`'s `vary`, which replaces every name before it.
+
+**Fix:** name what `resolve` reads, add to `Vary` rather than setting it,
 and give a cache the same headers:
 
 ```ts
-import { alxia, vary } from '@alxia/core';
+import { alxia, vary, withHeaders } from '@alxia/core';
 
 alxia()
-	.use(language({ supported: ['en', 'fr'], fallback: 'en' }))
-	.get('/', ({ set, reply }) => {
-		vary(set.headers, 'Accept-Encoding'); // Vary: Accept-Language, Cookie, Accept-Encoding
-		return reply(200, 'ok');
-	});
+	.use(
+		language({
+			supported: ['en', 'fr'],
+			fallback: 'en',
+			resolve: (ctx) => ctx.request.headers.get('x-preferred-language') ?? undefined,
+			vary: ['X-Preferred-Language'],
+		}),
+	)
+	.onResponse((response) => withHeaders(response, (headers) => vary(headers, 'Accept-Encoding')));
+// Vary: Accept-Language, Cookie, X-Preferred-Language, Accept-Encoding
 ```
 
 ```ts
-cache({ ttl: 60, vary: ['accept-language', 'cookie'] }); // @alxia/cache
+cache({ ttl: 60, vary: ['accept-language', 'cookie', 'x-preferred-language'] }); // @alxia/cache
 ```
 
 ### `404 {"error":"not_found"}` on `/fr/products`
