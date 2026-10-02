@@ -1,0 +1,165 @@
+# API ergonomics before 0.1.0
+
+Status: **proposed**. Nothing here is built yet. Each slice below is one PR,
+started only once the owner approves this note.
+
+Nothing is published yet (PR #1 is held), so breaking the API costs no
+consumer anything. These changes are made now so that 0.1.0 starts with the
+shape we intend to keep.
+
+## Decided, not changing
+
+- **The context stays `ctx`, typed `Context`.** There is no rename to
+  `call`, and no `application` or `app.services` object. Services stay
+  where `decorate` puts them, read flat in a handler (`({ db, reply })`).
+  The owner chose the simpler shape.
+- **A route stays `get(path, options?, handler)`.** We keep one order only.
+  Accepting both orders would double every overload and make tsc's errors
+  unreadable. The options are expected to go away anyway once routes come
+  from codegen-alxia.
+
+## Slice 1: shortcuts on `reply`
+
+Today a handler answers `reply(200, body)`, `reply(201, body)`,
+`reply(204)`. The shortcuts are methods of `reply` itself, not new keys on
+the context. That leaves the context to what the app and its plugins add,
+with no collision with a plugin that derives `ok` or `json`, and there is
+one name to destructure.
+
+```ts
+app.get('/users/:id', ({ params, reply }) => {
+	const user = users.get(params.id);
+	return user ? reply.ok(user) : reply.notFound({ error: 'not_found' });
+});
+
+app.post('/users', { body: NewUser, response: { 201: User } }, ({ body, reply }) =>
+	reply.created(insert(body)),
+);
+
+app.delete('/users/:id', ({ reply }) => reply.noContent());
+```
+
+| Shortcut | Is |
+| --- | --- |
+| `reply.ok(body, init?)` | `reply(200, body, init)` |
+| `reply.created(body, init?)` | `reply(201, body, init)` |
+| `reply.accepted(body?, init?)` | `reply(202, body, init)` |
+| `reply.noContent(init?)` | `reply(204, undefined, init)` |
+| `reply.badRequest(body, init?)` | `reply(400, body, init)` |
+| `reply.unauthorized(body, init?)` | `reply(401, body, init)` |
+| `reply.forbidden(body, init?)` | `reply(403, body, init)` |
+| `reply.notFound(body, init?)` | `reply(404, body, init)` |
+| `reply.conflict(body, init?)` | `reply(409, body, init)` |
+| `reply.html(status, html, init?)` | a `text/html` body |
+
+There is no `reply.json` and no `reply.text`. A string is already sent as
+`text/plain`, an async iterable as `text/event-stream`, and anything else as
+JSON. Only HTML needs saying.
+
+**Typing.** Each shortcut returns the same `Reply<Status, Body>` as
+`reply(status, …)`, so the client and OpenAPI see no difference. With
+`response` schemas, a shortcut exists only for a status the route declares:
+`reply.notFound` is a compile error on a route that declares no 404, just as
+`reply(404, …)` is. That needs a probe before the slice is written. The
+`TypedReplyFunction` would become a function type intersected with a mapped
+type over the declared statuses. Expected cost: one type in
+`core/src/app/types.ts`, plus `createReply` attaching the methods.
+
+**Not breaking.** `reply(status, …)` stays. The shortcuts are sugar over it.
+
+## Slice 2: what a plugin's routes call lives on the context
+
+The rule: a plugin that gives its routes something to **do** puts it on the
+context, already bound to the request. A route should never have to import
+a function and pass it `ctx` and the plugin's own handle.
+
+### janus
+
+Today a sign-in route imports three things and passes them `ctx` and `auth`:
+
+```ts
+const signedIn = await auth.signIn(body, { device: deviceOf(ctx) });
+return reply(200, { id: sendSession(ctx, auth, signedIn).id });
+// and elsewhere
+await signOut(ctx, auth);
+```
+
+Proposed: `session(auth, …)` also derives `auth`, bound to the request:
+
+```ts
+app.use(session(auth)).post('/sign-in', { body: Credentials }, async ({ body, auth, reply }) => {
+	const user = await auth.signIn(body); // signs in, sets the cookie, keeps the device
+	return reply.ok({ id: user.id });
+});
+
+app.post('/sign-out', async ({ auth, reply }) => {
+	await auth.signOut(); // revokes, clears the cookie whatever the answer
+	return reply.noContent();
+});
+```
+
+- `user` and `session` stay flat, as today.
+- `sendSession`, `signOut` and `deviceOf` stay exported for code outside a
+  route (a job, a test) until we know nobody needs them.
+- **Open: the name.** Code that uses janus already names its `Auth` instance
+  `auth` (every example does). So `({ auth })` would shadow it inside the
+  handler, the same trap `@alxia/language`'s docs record for `language`. The
+  alternatives are `ctx.janus` or `ctx.account`. Recommended: `auth`
+  anyway, as asked. The handler then no longer needs the imported one, and
+  the guide says so.
+- A sign-in route usually runs without a session. It reads `ctx.auth`
+  after `session(auth)` (not required), or after a smaller `janus(auth)`
+  plugin that only adds `auth`. That choice is made in the slice.
+
+### The other packages
+
+To inventory in the same slice, package by package, against the rule
+above:
+
+- `@alxia/cache` already gives `ctx.cache`.
+- `@alxia/language` gives `language`.
+- `@alxia/i18n` gives `t`.
+- `@alxia/redis` gives `redis` and `cache`. These two collide with
+  `@alxia/cache`'s `cache`; that collision is already queued as a fix.
+- To check: `@alxia/jwt` (`bearer`), `@alxia/rate-limit` (resetting a key
+  from a route), `@alxia/logger` (a request-bound logger), and
+  `@alxia/telemetry` (the span).
+
+## Slice 3: extending the context, typed
+
+What exists, and stays, is `decorate` (once per app), `derive` (per
+request) and `ContextOf<typeof app>`. Each types what the routes declared
+after it read. That is the "order is meaning" principle in `AGENTS.md`.
+
+Rejected: global augmentation (`declare module '@alxia/core' { interface
+Context { … } }`). It would type `user` on routes declared before the plugin
+that adds it, which is a lie the compiler would then repeat.
+
+The gap is a plugin that **needs** what an earlier one added: a permission
+check that reads `user`, a tenant scope that reads `session`. Today it is
+typed by hand, with `contextStorage<typeof base>()` and janus's
+`permission()` generics. The slice proposes one helper, a sketch to be
+probed:
+
+```ts
+const tenant = definePlugin<{ user: { tenantId: string } }>()((app) =>
+	app.derive(({ user }) => ({ tenant: tenants.get(user.tenantId) })),
+);
+
+base.use(session(auth, { required: true })).use(tenant); // ok
+alxia().use(tenant); // compile error: the app gives no `user`
+```
+
+It also adds a guide page, "Writing a plugin", covering an app plugin, a
+`Plugin` function, and `definePlugin` with requirements.
+
+## Order
+
+1. Slice 1. It is self-contained, it breaks nothing, and slice 2's
+   examples use it.
+2. Slice 2, janus first, then the inventory.
+3. Slice 3, starting with a probe of `definePlugin`, then the guide page.
+
+Each slice ships with its specs, including a `@ts-expect-error` for every
+new compile error, the docs of every package it touches, an empty
+changeset, and a review.
