@@ -73,6 +73,62 @@ describe('i18n', () => {
 	});
 });
 
+describe('onError', () => {
+	test("an error hook speaks the request's language", async () => {
+		const failing = alxia()
+			.use(i18n)
+			.onError((_error, { reply }) =>
+				reply(500, { message: i18n.t('home.title'), nxgt: getLanguage() }),
+			)
+			.get('/boom', async () => {
+				await Bun.sleep(1);
+				throw new Error('boom');
+			});
+		const answer = await failing.request('/boom?lang=fr');
+		expect(await answer.json()).toEqual({ message: 'Bienvenue', nxgt: 'fr' });
+	});
+});
+
+describe('several plugins, and requests within requests', () => {
+	test('two instances on one app keep their own language', async () => {
+		const de = { home: { title: 'Willkommen' } } as const;
+		const other = createI18n({
+			resources: { en: { home: { title: 'Welcome' } }, de },
+			fallback: 'en',
+		});
+		const both = alxia()
+			.use(i18n)
+			.use(other)
+			.get('/', async ({ reply }) => {
+				await Bun.sleep(1);
+				return reply(200, [i18n.language(), other.language(), getLanguage()]);
+			});
+		expect(await (await both.request('/?lang=fr')).json()).toEqual([
+			'fr',
+			'en',
+			'fr',
+		]);
+	});
+
+	test('a request made from inside another leaves its language alone', async () => {
+		const inner = alxia()
+			.use(i18n)
+			.get('/', ({ reply }) => reply(200, i18n.language()));
+		const outer = alxia()
+			.use(i18n)
+			.get('/', async ({ reply }) => {
+				const before = i18n.language();
+				const nested = await (await inner.request('/?lang=en')).text();
+				return reply(200, [before, nested, i18n.language()]);
+			});
+		expect(await (await outer.request('/?lang=fr')).json()).toEqual([
+			'fr',
+			'en',
+			'fr',
+		]);
+	});
+});
+
 describe("@nxgt/i18n's own getLanguage", () => {
 	test("speaks the alxia request's language", async () => {
 		const spoken = alxia()

@@ -36,6 +36,15 @@ export interface I18nOptions<
 	readonly fallback: Fallback;
 }
 
+/**
+ * The request's language as `@nxgt/i18n` hears it: the first an i18n plugin
+ * read, when an app uses several. Opened fresh by each plugin's `around`.
+ */
+const requests = new AsyncLocalStorage<{ language?: string }>();
+
+/** `@nxgt/i18n`'s source: one function, so registering it again keeps one. */
+const requestLanguage = () => requests.getStore()?.language;
+
 /** What the routes behind the plugin read. */
 export interface I18nContext<Key extends string> {
 	/** Translates into the request's language. */
@@ -72,29 +81,38 @@ export function createI18n<
 	const translator = createTranslator<Key>(
 		resources as Record<string, unknown>,
 	);
-	const current = new AsyncLocalStorage<Language>();
+	/**
+	 * This plugin's language for the request running, once `@alxia/language`
+	 * has read it. A global `around` hook opens it fresh for each request —
+	 * one made from inside another included — so it holds for everything the
+	 * request runs, `onError` hooks too, which run after the route failed.
+	 */
+	const current = new AsyncLocalStorage<{ language?: Language }>();
+	const spoken = (): Language => current.getStore()?.language ?? fallback;
 	const translate =
 		(lang: Language): Translate<Key> =>
 		(key, context) =>
 			translator(key, context, lang as never);
 
 	// nxgt's own getLanguage() and translate speak the request's language too.
-	registerLanguageSource(() => current.getStore());
+	registerLanguageSource(requestLanguage);
 
 	const plugin = alxia()
+		.around((_ctx, next) => current.run({}, () => requests.run({}, next)))
 		.use(language<Language>({ ...detect, supported, fallback }))
-		.wrap(({ language: lang }, next) => current.run(lang, next))
-		.derive(({ language: lang }): I18nContext<Key> => ({ t: translate(lang) }));
+		.derive(({ language: lang }): I18nContext<Key> => {
+			const own = current.getStore();
+			if (own !== undefined) own.language = lang;
+			const heard = requests.getStore();
+			if (heard !== undefined) heard.language ??= lang;
+			return { t: translate(lang) };
+		});
 
 	return Object.assign(plugin, {
 		/** Translates into the current request's language, or the fallback outside one. */
-		t: ((key, context) =>
-			translate(current.getStore() ?? fallback)(
-				key,
-				context,
-			)) as Translate<Key>,
+		t: ((key, context) => translate(spoken())(key, context)) as Translate<Key>,
 		/** The current request's language, or the fallback outside one. */
-		language: (): Language => current.getStore() ?? fallback,
+		language: spoken,
 		supported,
 	});
 }

@@ -45,9 +45,11 @@ export const describeCart = (count: number) => i18n.t('cart.items', { count });
 ```
 
 `i18n.t()` translates in the language of the request it runs in — through
-every `await` — and in the fallback outside one. `i18n.language()` says
-which. An `onError` hook runs outside it: read `t` from its context there
-([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/troubleshooting.md#i18nt-answers-in-the-fallback-in-an-onerror-hook)).
+every `await`, an `onError` hook included — and in the fallback outside
+one, or before the language is read: in an `onRequest` hook, or a route
+declared before the plugin
+([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/troubleshooting.md#i18nt-answers-in-the-fallback-before-the-language-is-read)).
+`i18n.language()` says which.
 
 ### `@nxgt/i18n`'s own `translate`
 

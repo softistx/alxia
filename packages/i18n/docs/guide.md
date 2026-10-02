@@ -60,8 +60,9 @@ interface I18nContext<Key extends string> {
 - **`t()`, `language()` and `supported`**, to call where no context is at
   hand: a service, a model, a job. See [Outside a route](#outside-a-route).
 
-It also registers the request's language with `@nxgt/i18n`, once per call;
-see [`@nxgt/i18n`'s own `translate`](#nxgti18ns-own-translate).
+It also registers the request's language with `@nxgt/i18n` — one source,
+however many times `createI18n()` is called, so building an app per test
+does not grow `@nxgt/i18n`'s list; see [`@nxgt/i18n`'s own `translate`](#nxgti18ns-own-translate).
 
 ## Options
 
@@ -345,17 +346,22 @@ export const app = alxia()
 i18n.language(); // 'en': no request here
 ```
 
-Where the request's language is **not** known to `i18n.t()` and
-`i18n.language()`, which then answer in the fallback:
+The plugin reads the request's language in a route hook; from then on,
+everything the request runs knows it. Before that, `i18n.t()` and
+`i18n.language()` answer in the fallback:
 
-| Where | Why | Instead |
-| --- | --- | --- |
-| a route declared before `.use(i18n)` | the plugin does not run for it | declare the route after |
-| an `onError` hook | it runs once the route has thrown, outside the plugin | `ctx.t` and `ctx.language` — set when the plugin ran, so optional |
-| `around`, `onRequest`, `onResponse` | global hooks run outside every route hook | translate in the route |
-| code outside any request: start-up, a timer, a queue consumer | there is no request | pass the language: see below |
+| Where | `i18n.t()` answers in |
+| --- | --- |
+| a route, `derive` or `wrap` declared after `.use(i18n)`, and what they call | the request's language |
+| an `onError` hook, for what a route after the plugin threw | the request's language |
+| an `onResponse` hook, for a request the plugin ran for | the request's language |
+| an `around` hook declared after `.use(i18n)`, once `next()` has resolved | the request's language |
+| an `onRequest` hook; an `around` hook declared before `.use(i18n)`; one declared after it, before `next()` | the fallback: the language is not read yet |
+| a route or route hook declared before `.use(i18n)`, or a `404` no route matched | the fallback: the plugin does not run for it |
+| code outside any request: start-up, a timer, a queue consumer | the fallback: pass the language, see below |
 
-In an `onError` hook, read `t` from the context:
+An `onError` hook translates an error's message with `i18n.t()`, or with
+`t` from its context:
 
 ```ts
 import { alxia, HttpError } from '@alxia/core';
@@ -366,9 +372,9 @@ const i18n = createI18n({ resources: { en: shared.en, fr: shared.fr }, fallback:
 
 export const app = alxia()
 	.use(i18n)
-	.onError((error, { t, reply }) =>
+	.onError((error, { reply }) =>
 		error instanceof HttpError && error.status === 404
-			? reply(404, { error: t?.('errors.not-found') ?? 'Not found' })
+			? reply(404, { error: i18n.t('errors.not-found') })
 			: undefined,
 	)
 	.get('/users/:id', () => {
@@ -423,9 +429,12 @@ Its limits are `@nxgt/i18n`'s:
 - **It speaks `en` and `fr` only.** A request in a language your
   catalogues add — `de` — is not one of them, and `getLanguage()` answers
   as if no source had: `'en'`.
-- **Its fallback is `'en'`, not yours.** Outside a request, or in the hooks
-  listed above, `getLanguage()` answers `'en'` even when your `fallback` is
-  `'fr'`.
+- **Its fallback is `'en'`, not yours.** Outside a request, or before the
+  language is read, `getLanguage()` answers `'en'` even when your
+  `fallback` is `'fr'`.
+- **It hears one plugin.** With two `createI18n()` on one app, it follows
+  the language the first one read — its fallback included, when the
+  request named a language only the second supports.
 
 ## Caching
 
