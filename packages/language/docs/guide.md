@@ -40,6 +40,7 @@ interface LanguageOptions<L extends string> {
 	readonly persist?: boolean | { readonly maxAge?: number; readonly secure?: boolean };
 	readonly contentLanguage?: boolean;
 	readonly resolve?: (ctx: BaseContext) => string | undefined;
+	readonly vary?: readonly string[];
 }
 
 type LanguageSource = 'query' | 'cookie' | 'path' | 'header';
@@ -75,6 +76,7 @@ for when they cannot.
 | `persist` | `boolean \| { maxAge?, secure? }` | `false` | a language the query named is written to the cookie |
 | `contentLanguage` | `boolean` | `true` | `Content-Language` on every response the plugin runs for |
 | `resolve` | `(ctx: BaseContext) => string \| undefined` | none | decides after every source, before `fallback` |
+| `vary` | `readonly string[]` | none | the request headers `resolve` reads, added to `Vary` |
 
 ### `supported` and `fallback`
 
@@ -199,8 +201,12 @@ language({
 	fallback: 'en',
 	order: ['query', 'cookie'],
 	resolve: (ctx) => ctx.request.headers.get('x-preferred-language') ?? undefined,
+	vary: ['X-Preferred-Language'],
 });
 ```
+
+`vary` names the request headers `resolve` reads, so a shared cache keeps
+one response per value; the plugin cannot see what a function reads.
 
 It receives the request's `BaseContext` — `request`, `url`, `ip`,
 `pathParams`, `set` — and returns a tag, or `undefined` for none. The tag is
@@ -367,34 +373,21 @@ the handler; rename it (`language: current`) where both are needed.
 | `Content-Language: <language>` | unless `contentLanguage: false`; a route's own wins |
 | `Vary: Accept-Language` | when `order` lists `'header'` |
 | `Vary: Cookie` | when `order` lists `'cookie'` |
+| `Vary: <each of vary>` | when `vary` names headers |
 | `Set-Cookie: <cookie>=<language>; …` | with `persist`, when the query decided |
 
 With the default `order`, every response says `Vary: Accept-Language, Cookie`,
 so a shared cache keeps one copy per language rather than serving the first
 one to everyone. The query and the path are part of the URL, and need no
-`Vary`. What `resolve` reads is not added: when it reads a header, add it
-yourself — `vary` is `@alxia/core`'s:
+`Vary`. What `resolve` reads is added only when the `vary` option names it.
+
+The plugin adds to `ctx.set.headers`, and a reply's own `Vary` adds to it
+rather than replacing it:
 
 ```ts
-import { alxia, vary } from '@alxia/core';
-
-alxia()
-	.use(language({ supported: ['en', 'fr'], fallback: 'en', resolve: (ctx) => ctx.request.headers.get('x-preferred-language') ?? undefined }))
-	.derive(({ set }) => {
-		vary(set.headers, 'X-Preferred-Language');
-		return {};
-	});
-```
-
-The plugin adds to `ctx.set.headers`, which a reply's own headers replace:
-a route that answers with `reply(200, body, { headers: { vary: 'Accept-Encoding' } })`
-sends `Vary: Accept-Encoding` alone. Add to the `Vary` instead:
-
-```ts
-.get('/', ({ set, reply }) => {
-	vary(set.headers, 'Accept-Encoding'); // Vary: Accept-Language, Cookie, Accept-Encoding
-	return reply(200, 'ok');
-});
+.get('/', ({ reply }) =>
+	reply(200, 'ok', { headers: { vary: 'Accept-Encoding' } }),
+); // Vary: Accept-Language, Cookie, Accept-Encoding
 ```
 
 Behind [`@alxia/cache`](https://www.npmjs.com/package/@alxia/cache), give

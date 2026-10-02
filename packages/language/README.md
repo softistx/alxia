@@ -53,13 +53,14 @@ With `persist`, a language the query named is kept in the cookie.
 | `persist` | `false` | `true`, or `{ maxAge, secure }` |
 | `contentLanguage` | `true` | |
 | `resolve` | none | `(ctx) => string \| undefined` |
+| `vary` | none | the headers `resolve` reads, added to `Vary` |
 
 ## API
 
 | export | |
 | --- | --- |
 | `language(options)` | the plugin: `language`, `languageSource` |
-| `LanguageOptions` | its options: `supported`, `fallback`, `order`, `query`, `cookie`, `pathIndex`, `persist`, `contentLanguage`, `resolve` |
+| `LanguageOptions` | its options: `supported`, `fallback`, `order`, `query`, `cookie`, `pathIndex`, `persist`, `contentLanguage`, `resolve`, `vary` |
 | `negotiate(header, supported)` | the supported language `Accept-Language` prefers |
 | `parseAcceptLanguage(header)`, `match(tag, supported)` | its parts |
 | `LanguageContext`, `LanguageSource`, `Accepted` | its types |

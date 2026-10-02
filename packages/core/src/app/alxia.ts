@@ -6,6 +6,7 @@ import {
 	type ValidationErrorBody,
 	type ValidationIssue,
 } from '../errors/errors';
+import { vary } from '../reply/headers';
 import { type AnyReply, createReply, Reply, toResponse } from '../reply/reply';
 import {
 	type BodyParser,
@@ -1338,7 +1339,10 @@ function send(
 	const headers = new Headers(set.headers);
 	if (reply.headers !== undefined) {
 		for (const [key, value] of new Headers(reply.headers)) {
-			headers.set(key, value);
+			// A reply's Vary adds to the plugins': each said what it read.
+			if (key === 'vary') {
+				for (const name of value.split(',')) vary(headers, name);
+			} else headers.set(key, value);
 		}
 	}
 	if ((set as { touched?: () => boolean }).touched?.()) {

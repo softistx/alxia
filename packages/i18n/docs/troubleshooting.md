@@ -353,7 +353,7 @@ alxia()
 	.use(cache({ ttl: 60, vary: ['accept-language', 'cookie'] }));
 ```
 
-A reply that sets its own `Vary` replaces the plugin's: see
-`@alxia/language`'s [troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#a-cache-serves-one-language-to-every-visitor),
+An `onResponse` hook that sets `Vary` with `headers.set` replaces the
+plugin's: see `@alxia/language`'s [troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#a-cache-serves-one-language-to-every-visitor),
 which also covers a response in the wrong language — `curl` getting the
 fallback, a `?lang=` that does not stick, a `404` on `/fr/products`.

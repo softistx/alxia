@@ -33,7 +33,7 @@ reply(200, csv, { headers: { 'content-type': 'text/csv' } });
 | --- | --- | --- |
 | `status` | a `StatusCode` | the response status |
 | `body` | depends on the route, below | encoded as in [Bodies](#how-a-body-is-sent) |
-| `init.headers` | `HeadersInit` | headers of this reply, over those on `set.headers` |
+| `init.headers` | `HeadersInit` | headers of this reply, over those on `set.headers` — except `Vary`, whose names are added to theirs |
 
 It returns a `Reply<Status, Body>`: a value, not a `Response`. A handler
 cannot return a raw `Response`; that keeps every outcome in the route's

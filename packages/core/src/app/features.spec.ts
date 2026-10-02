@@ -1,5 +1,6 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
+import { vary } from '../reply/headers';
 import type { StandardSchemaV1 } from '../schema/standard-schema';
 import { eventStream } from '../sse/event-stream';
 import { type AnyAlxia, alxia, type Plugin, type RoutesOf } from './alxia';
@@ -488,5 +489,39 @@ describe('wrap', () => {
 		} finally {
 			console.error = original;
 		}
+	});
+});
+
+describe('Vary', () => {
+	test("a reply's Vary adds to the one set on set.headers", async () => {
+		const app = alxia()
+			.derive(({ set }) => {
+				vary(set.headers, 'Accept-Language');
+				return {};
+			})
+			.get('/', ({ reply }) =>
+				reply(200, 'ok', {
+					headers: { vary: 'Accept-Encoding, accept-language', etag: '"1"' },
+				}),
+			)
+			.get('/plain', ({ reply }) => reply(200, 'ok'));
+		const response = await app.request('/');
+		expect(response.headers.get('vary')).toBe(
+			'Accept-Language, Accept-Encoding',
+		);
+		expect(response.headers.get('etag')).toBe('"1"');
+		expect((await app.request('/plain')).headers.get('vary')).toBe(
+			'Accept-Language',
+		);
+	});
+
+	test('`*` replaces the names, and an empty name adds nothing', () => {
+		const headers = new Headers({ vary: 'Accept-Language' });
+		vary(headers, ' ');
+		expect(headers.get('vary')).toBe('Accept-Language');
+		vary(headers, '*');
+		expect(headers.get('vary')).toBe('*');
+		vary(headers, 'Cookie');
+		expect(headers.get('vary')).toBe('*');
 	});
 });
