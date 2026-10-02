@@ -24,7 +24,6 @@ goes wrong prints nothing at all, and is under [Traps](#traps), by symptom.
 
 - [`TypeError: cache.tag is not a function. (In 'cache.tag("…")', 'cache.tag' is undefined)`](#typeerror-cachetag-is-not-a-function-in-cachetag-cachetag-is-undefined)
 - [`TypeError: undefined is not an object (evaluating 'cache.….…')`](#typeerror-undefined-is-not-an-object-evaluating-cache)
-- [`TypeError: Response body already used. A Response body can only be sent once; create a new Response for each request.`](#typeerror-response-body-already-used-a-response-body-can-only-be-sent-once-create-a-new-response-for-each-request)
 - [`500 {"error":"internal"}` from a cached route, with the store's error in the log](#500-errorinternal-from-a-cached-route-with-the-stores-error-in-the-log)
 - [The route's error is logged, yet the client got a `200` with `X-Cache: STALE`](#the-routes-error-is-logged-yet-the-client-got-a-200-with-x-cache-stale)
 
@@ -121,7 +120,7 @@ it is synchronous.
 
 **Fix:** compute the key from the request alone. A route whose answer
 needs a lookup — a session, a tenant from a database — is personal:
-declare it before the cache
+declare it before the cache, or answer `Cache-Control: private`
 ([Personal responses](guide/keys-and-vary.md#personal-responses)).
 
 ```ts
@@ -274,54 +273,6 @@ other plugin's.
 
 **Fix:** the `derive` above, between the two.
 
-### `TypeError: Response body already used. A Response body can only be sent once; create a new Response for each request.`
-
-**When:** several requests for one URL arrive together — a page under
-load — and the route behind the cache answers
-something that is not kept: `Cache-Control: private` or `no-store`, a
-`Set-Cookie`, `cache.skip()`, or a status outside `statuses`. Over
-`Bun.serve`, one request gets the response and the others get a 500, with
-this message in the log. In process, `app.request()` rejects with
-`TypeError [ERR_BODY_ALREADY_USED]: Body already used`.
-
-```text
-TypeError: Response body already used. A Response body can only be sent once; create a new Response for each request.
-```
-
-**Why:** concurrent misses of one key wait on a single run of the route,
-and whether its response may be kept is only known once it has run. A
-response that is not kept is handed, as the one `Response` object it is, to
-every waiting request: the first to send it consumes its body, the others
-cannot. The route ran once, with **one** of the requests — so the one that
-got a 200 may have been sent another visitor's answer. curl, one request at
-a time, never shows it.
-
-**Fix:** a personal route — or one that often answers what is not kept —
-goes before the cache, so it never joins a shared run:
-
-```ts
-import { alxia } from '@alxia/core';
-import { cache } from '@alxia/cache';
-
-alxia()
-	.get('/me', ({ request, reply }) => reply(200, { cookie: request.headers.get('cookie') }))
-	.use(cache({ ttl: 60 }))
-	.get('/products', ({ reply }) => reply(200, []));
-```
-
-Or give such requests no key — a request whose `key` is `undefined` runs
-the route on its own:
-
-```ts
-cache({
-	ttl: 60,
-	key: ({ url, request }) => (request.headers.has('cookie') ? undefined : `${url.pathname}${url.search}`),
-});
-```
-
-For a public route whose occasional 404 or `cache.skip()` is the trigger,
-keeping that answer too (`statuses: [200, 404]`) also avoids it.
-
 ### `500 {"error":"internal"}` from a cached route, with the store's error in the log
 
 **When:** the store throws — a Redis that is down, a store of your own
@@ -367,10 +318,11 @@ fails is what stale-while-revalidate is for. Fix the route; keep
 | --- | --- |
 | the route is declared before `use(cache(…))` | declare it after |
 | the response sets a cookie — a session plugin that touches every response, say | move the routes that set it before the cache, or stop it setting a cookie on public pages |
-| the response says `Cache-Control: private` or `no-store` | if it is personal, declare the route before the cache: [concurrent requests still share it](#typeerror-response-body-already-used-a-response-body-can-only-be-sent-once-create-a-new-response-for-each-request) |
+| the response says `Cache-Control: private` or `no-store` | intended: it is personal |
 | its status is not in `statuses` (`[200]`) | `statuses: [200, 404]` |
 | it is `text/event-stream` | intended: a stream is never kept |
-| the route called `cache.skip()` | intended, for an answer not worth keeping; not for a personal one |
+| the route called `cache.skip()` | intended |
+| it arrived while a concurrent request for the same key was answered with something not kept, or failed | intended: it ran the route itself, and the next request is a miss |
 | `key` returned `undefined` | intended: see [Personal responses](guide/keys-and-vary.md#personal-responses) |
 | the method is not `GET` or `HEAD` | intended |
 | `honorClientNoCache: true`, and the request said `Cache-Control: no-cache` | see [below](#a-hard-reload-shows-new-data-a-plain-reload-the-old) |
@@ -433,27 +385,23 @@ cache({
 ### One visitor sees another visitor's page
 
 **When:** a route that answers by who is asking — a `Cookie`, an
-`Authorization` header — is behind the cache with the default key. curl,
-with no cookie, shows nothing wrong; a signed-in browser does.
+`Authorization` header — is behind the cache with the default key, and its
+response says nothing about it. curl, with no cookie, shows nothing wrong;
+a signed-in browser does.
 
 **Why:** the default key is the path and query only. The first visitor's
-response is kept, and served to everyone after. Answering
-`Cache-Control: private` stops it being kept, but not being shared: two
-visitors whose requests arrive together still wait on one run of the
-route, made for one of them
-([`Response body already used`](#typeerror-response-body-already-used-a-response-body-can-only-be-sent-once-create-a-new-response-for-each-request)).
+response is kept, and served to everyone after.
 
-**Fix:** keep personal routes out of the cache by declaring them before it:
+**Fix:** say the response is personal — it is then never kept, nor handed
+to a concurrent request:
 
 ```ts
-alxia()
-	.get('/me', ({ request, reply }) => reply(200, { cookie: request.headers.get('cookie') }))
-	.use(cache({ ttl: 60 }))
-	.get('/products', ({ reply }) => reply(200, []));
+app.get('/me', ({ reply }) =>
+	reply(200, { name: 'Grace' }, { headers: { 'cache-control': 'private' } }),
+);
 ```
 
-When they cannot move — a group mounted behind the cache — give their
-requests no key: `key: (ctx) => (ctx.request.headers.has('cookie') ? undefined : …)`
+Or declare the route before the cache, which also saves the lookup
 ([Personal responses](guide/keys-and-vary.md#personal-responses)).
 
 Then empty what was already kept: `await products.invalidateTag(…)`, or

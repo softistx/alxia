@@ -138,19 +138,21 @@ deletes the default key of a path, which your key may not be.
 
 The default key does not read who is asking. A route that answers by the
 `Cookie` or `Authorization` header, behind a cache with the default key,
-serves the first visitor's answer to every later one. curl, sending no
-cookie, never shows it; a signed-in browser does.
+and says nothing about it, serves the first visitor's answer to every later
+one. curl, sending no cookie, never shows it; a signed-in browser does.
 
-Two ways keep them out, the first one being the way to choose:
+A personal response that says so is never kept, nor shared with a
+concurrent request: it answers `Cache-Control: private` (or `no-store`),
+or sets a cookie. Three ways, from the cheapest:
 
 ```ts
-// 1. Declare them before the cache: it never sees them.
+// 1. Declare them before the cache: it never sees them, and no lookup is made.
 alxia()
 	.get('/me', ({ reply }) => reply(200, { name: 'Grace' }))
 	.use(cache({ ttl: 60 }))
 	.get('/products', ({ reply }) => reply(200, []));
 
-// 2. No key for a request that carries a session: it is neither looked up, nor kept, nor shared.
+// 2. No key for a request that carries a session: it is neither looked up nor kept.
 cache({
 	ttl: 60,
 	key: ({ url, request }) =>
@@ -158,20 +160,18 @@ cache({
 			? undefined
 			: `${url.pathname}${url.search}`,
 });
+
+// 3. Behind the cache, the route says its response is private: it is never kept.
+app.get('/me', ({ reply }) =>
+	reply(200, { name: 'Grace' }, { headers: { 'cache-control': 'private' } }),
+);
 ```
 
 The second skips the cache for **every** request with a cookie, which in a
-browser is most of them once any cookie is set. Prefer it for an API whose
-callers sign every request, and the first for everything else.
-
-**`Cache-Control: private` is not enough.** A route behind the cache that
-answers `private` (or calls `cache.skip()`, or sets a cookie) is not kept,
-but concurrent requests for its URL still wait on one run of the route,
-built from one of them. One visitor gets that response, perhaps someone
-else's, and the others fail with a 500
-([Not kept is not the same as not shared](caching.md#not-kept-is-not-the-same-as-not-shared)).
-Say `private` anyway, for the browser and any proxy in front, but keep the
-route out of the cache by declaring it first.
+browser is most of them once any cookie is set: prefer it for an API whose
+callers sign every request. The third is enough on its own, and worth
+sending anyway, for the browser and any proxy in front; the first also
+saves the store lookup.
 
 ## See also
 

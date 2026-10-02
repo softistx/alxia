@@ -51,9 +51,8 @@ app.listen({ port: 3000 });
   copy is current gets a 304.
 - **Never kept**: a status outside `statuses` (`200`), a response that says
   `Cache-Control: private` or `no-store`, sets a cookie, or streams events —
-  and one whose route called `cache.skip()`. Not kept is not unshared:
-  concurrent requests for one URL still wait on one run of the route, so
-  declare a personal route (`/me`) **before** the plugin.
+  and one whose route called `cache.skip()`. Nor is it handed to a
+  concurrent request: each runs the route itself.
 - Only `GET` and `HEAD`; only the routes declared after the plugin.
 
 ## The key
