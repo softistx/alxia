@@ -18,7 +18,7 @@ import {
 import { z } from 'zod';
 import { type JanusErrorBody, janusErrors } from './errors';
 import { byParam, permission } from './permission';
-import { sendSession, session, signOut } from './session';
+import { type SessionOptions, sendSession, session, signOut } from './session';
 
 const ada = { email: 'ada@example.test', name: 'Ada Lovelace' };
 const password = 'correct horse';
@@ -165,6 +165,30 @@ describe('session', () => {
 			>();
 		}
 		expect((await app.request('/whoami')).status).toBe(200);
+	});
+
+	test('required as a boolean: user may be null, and the 401 is in the type', async () => {
+		const { auth } = setup();
+		for (const required of [true, false]) {
+			const app = alxia()
+				.use(session(auth, { required }))
+				.get('/me', ({ user, reply }) => {
+					const anonymous: typeof user = null; // compiles only if user may be null
+					void anonymous;
+					return reply(200, { signedIn: user !== null });
+				});
+			const anonymous = await client(app).get('/me');
+			if (anonymous.status === 401) {
+				expectTypeOf(anonymous.data).toEqualTypeOf<{
+					error: 'unauthenticated';
+				}>();
+			}
+			expect(anonymous.status).toBe(required ? 401 : 200);
+		}
+		// A wrapper forwarding the options as they are typed compiles too.
+		const forwarded = (options: SessionOptions<'patient'>) =>
+			session(auth, options);
+		expect(forwarded({}).routes).toEqual([]);
 	});
 
 	test('a renewed session is sent again, only to a cookie client', async () => {

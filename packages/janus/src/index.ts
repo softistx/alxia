@@ -15,6 +15,7 @@ export {
 	type Awaitable,
 	byParam,
 	type ObjectData,
+	type OptionsArgs,
 	type PermissionOptions,
 	type PermissionRefusedBody,
 	permission,

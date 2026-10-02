@@ -8,7 +8,6 @@ symptom, under [Traps](#traps).
 
 - [`Property 'user' does not exist on type 'Context<…>'`](#property-user-does-not-exist-on-type-context)
 - [`'user' is possibly 'null'`](#user-is-possibly-null)
-- [`Type 'boolean' is not assignable to type 'true'`](#type-boolean-is-not-assignable-to-type-true)
 - [`Type '"admin"' is not assignable to type '"user"'`](#type-admin-is-not-assignable-to-type-user)
 - [`Type 'SecondFactorRequired' is missing the following properties from type '{ … }': token, session, user`](#type-secondfactorrequired-is-missing-the-following-properties-from-type----token-session-user)
 - [`Property 'error' is missing in type '{ code: JanusErrorCode; … }'`](#property-error-is-missing-in-type--code-januserrorcode--)
@@ -69,37 +68,15 @@ alxia()
 error TS18047: 'user' is possibly 'null'.
 ```
 
-**Why:** without `required`, an anonymous request reaches the route with
+**Why:** without `required`, or with `required` given a `boolean` known
+only at run time, an anonymous request may reach the route with
 `user: null`.
 
-**Fix:** answer the anonymous case, or require the session so the plugin
-answers it with a 401 and `user` is never `null`:
+**Fix:** answer the anonymous case, or require the session with a literal
+`true`, so the plugin answers it with a 401 and `user` is never `null`:
 
 ```ts
 alxia().use(session(auth, { required: true })).get('/me', ({ user, reply }) => reply(200, user.email));
-```
-
-### `Type 'boolean' is not assignable to type 'true'`
-
-**When:** passing `required` a `boolean` computed at run time.
-
-```text
-error TS2769: No overload matches this call.
-  Overload 1 of 2, '(auth: Janus<…>, options: SessionOptions<…> & { …; }): Alxia<…>', gave the following error.
-    Type 'boolean' is not assignable to type 'true'.
-  Overload 2 of 2, '(auth: Janus<…>, options?: (SessionOptions<…> & { …; }) | undefined): Alxia<…>', gave the following error.
-    Type 'boolean' is not assignable to type 'false'.
-```
-
-**Why:** `required` decides the type of every route after the plugin —
-whether `user` may be `null`, whether a 401 is a possible answer — so it
-must be known at compile time: a literal `true`, or `false` or nothing.
-
-**Fix:** choose between the two calls; the routes then read `user` as
-possibly `null`:
-
-```ts
-const guard = strict ? session(auth, { required: true }) : session(auth);
 ```
 
 ### `Type '"admin"' is not assignable to type '"user"'`

@@ -23,8 +23,9 @@ export interface SessionOptions<T extends string> {
 	readonly type?: T;
 	/**
 	 * `true`: an anonymous request is answered 401 and the route never runs,
-	 * so `user` is never `null` in it — and the 401 is in its type. Only a
-	 * literal `true` types it so.
+	 * so `user` is never `null` in it — and the 401 is in its type. A
+	 * `boolean` known only at runtime keeps the 401 in the type, and `user`
+	 * may be `null`.
 	 */
 	readonly required?: boolean;
 }
@@ -75,6 +76,18 @@ export function session<
 	Empty,
 	'',
 	never
+>;
+export function session<
+	A extends Auth<{ readonly type: string }>,
+	const T extends UserOfAuth<A>['type'] = UserOfAuth<A>['type'],
+>(
+	auth: A,
+	options?: SessionOptions<T>,
+): Alxia<
+	{ readonly user: UserOf<A, T> | null; readonly session: Session | null },
+	Empty,
+	'',
+	Reply<401, UnauthenticatedBody>
 >;
 export function session(
 	auth: Auth<{ readonly type: string }>,

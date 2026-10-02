@@ -244,7 +244,7 @@ function permission<
 	permission: P,
 	type: T,
 	load: (ctx: BaseContext) => Awaitable<O | null>,
-	...options: [options?: PermissionOptions<C, T, P, O>] // required when P has a condition
+	...options: OptionsArgs<C, T, P, O>
 ): Alxia<
 	Empty & { object: O },
 	Empty,
@@ -270,6 +270,12 @@ interface PermissionRefusedBody {
 
 type Awaitable<V> = V | Promise<V>;
 ```
+
+`OptionsArgs<C, T, P, O>` is the rest of the arguments, exported for a
+wrapper that forwards them: `[options?: PermissionOptions<C, T, P, O>]`, or
+`[options: PermissionOptions<C, T, P, O>]` when the permission has a
+condition — and a looser `[options?]` when `type` or `permission` is typed
+as the union of several, not one literal.
 
 `ModelConfig`, `ObjectTypeOf`, `CheckableOf`, `CtxOf`, `FieldsOf`,
 `SubjectRef` and `Permissions` are `@nxgt/janus/permissions`'s; its
