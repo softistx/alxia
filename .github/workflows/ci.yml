@@ -80,3 +80,43 @@ jobs:
       - name: Changeset present
         if: github.head_ref != 'changeset-release/develop'
         run: bun run changeset:status
+
+  newest-peers:
+    # The job above runs the lockfile's toolchain: the first alternative of
+    # each peer range. This one runs the last — TypeScript 7 for
+    # `typescript: ^6.0.3 || ^7.0.0`, graphql 17 for @alxia/graphql — so a
+    # widened range stays true after the one check that widened it. It
+    # resolves without a lockfile, so an upstream release can turn it red
+    # with no change here: read it, do not make it a required check.
+    name: Newest peers
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    services:
+      redis:
+        image: redis:7.4
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 10
+    env:
+      REDIS_URL: redis://localhost:6379
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup
+        uses: ./.github/actions/setup
+      # Rewrites the manifests in this checkout only, then installs what they
+      # now name: the lockfile is for the other end, so no --frozen-lockfile.
+      - name: Use the newest peers
+        run: bun scripts/newest-peers.ts && bun install
+      - name: Build packages
+        run: bun run build
+      - name: Type checking
+        run: bun run typecheck
+      - name: Run tests
+        run: bun run test
+      - name: Verify the built artifacts load
+        run: bun run verify:artifacts
