@@ -52,7 +52,10 @@ Everything else — `ttl`, `staleWhileRevalidate`, `key`, `vary`, `statuses`,
   base64, and the plugin's `storedAt`, `ttl` and `stale`. Redis expires it
   when `ttl + staleWhileRevalidate` has passed, rounded up to the second.
 - **A tag** is a Redis set at `<name>:tag:<tag>`, of the response keys it
-  names.
+  names. It expires with the longest-kept response it names: each `set`
+  gives a new tag set its expiry, and only ever lengthens it after that.
+  On a Redis older than 7, which cannot compare expiries, the last
+  response written sets it.
 - **Reading** checks the record against its schema: a record that no
   longer reads as a response — written by another version, or by hand — is
   a miss, and is deleted.
@@ -62,7 +65,7 @@ Measured with `cache({ ttl: 2, tags: () => ['products'] })` after one
 
 ```text
 shop:response:/products   string   TTL 2
-shop:tag:products         set      TTL -1
+shop:tag:products         set      TTL 2
 ```
 
 ## Invalidating across processes
@@ -106,11 +109,6 @@ give each app or deployment its own `name`.
   a Redis that is down makes a cached route answer `500 {"error":"internal"}`
   where it would have answered. `@alxia/cache`'s guide shows a wrapper that
   turns the store's errors into misses.
-- **Tag sets do not expire.** A tag's set is kept until `invalidateTag`
-  deletes it, even after every response it names has expired. With a few
-  stable tags this is a handful of small sets; with a tag per id, the sets
-  pile up
-  ([troubleshooting](../troubleshooting.md#tag-sets-pile-up-in-redis-with-no-ttl)).
 
 ## Next
 
