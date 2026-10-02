@@ -5,7 +5,8 @@ Secure HTTP headers on every response of an
 no dependency.
 
 ```sh
-bun add @alxia/secure-headers
+bun add @alxia/secure-headers @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 ## Usage

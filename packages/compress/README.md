@@ -5,7 +5,8 @@ zstd, Brotli, gzip and deflate, negotiated from `Accept-Encoding` and
 streamed with Bun's and Node's own codecs. No dependency.
 
 ```sh
-bun add @alxia/compress
+bun add @alxia/compress @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 ## Usage

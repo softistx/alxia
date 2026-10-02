@@ -5,7 +5,8 @@ dependency: a preflight is answered before routing, and every response to an
 allowed origin carries the headers a browser needs.
 
 ```sh
-bun add @alxia/cors
+bun add @alxia/cors @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 ## Usage

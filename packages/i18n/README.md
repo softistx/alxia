@@ -6,7 +6,8 @@ request's language, keys typed by your catalogue, ICU messages — plurals,
 selects, numbers.
 
 ```sh
-bun add @alxia/i18n @alxia/language @nxgt/i18n@^2
+bun add @alxia/i18n @alxia/language @nxgt/i18n@^2 @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 ## Usage

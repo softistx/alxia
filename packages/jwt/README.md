@@ -5,7 +5,8 @@ Web Crypto, with no dependency: HS256/384/512 with a secret, ES256/384,
 RS256/384/512 and EdDSA with a key pair, and a typed bearer guard.
 
 ```sh
-bun add @alxia/jwt
+bun add @alxia/jwt @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 ## Tokens

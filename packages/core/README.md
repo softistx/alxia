@@ -10,6 +10,7 @@ calls.
 
 ```sh
 bun add @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 Everything else is a package of its own, to take or leave:

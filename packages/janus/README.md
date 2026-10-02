@@ -7,7 +7,8 @@ renewed, janus's refusals answered — every one typed for the client. No
 dependency.
 
 ```sh
-bun add @alxia/janus @nxgt/janus
+bun add @alxia/janus @nxgt/janus @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 It mirrors [`@nxgt/janus-hono`](https://www.npmjs.com/package/@nxgt/janus-hono):

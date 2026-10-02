@@ -5,7 +5,8 @@ no dependency: a request id, one structured entry per request,
 `Server-Timing`, and a log bound to the request.
 
 ```sh
-bun add @alxia/logger
+bun add @alxia/logger @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 ## Usage

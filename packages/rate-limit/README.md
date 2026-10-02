@@ -6,7 +6,8 @@ the 429 is part of every route behind the limit, so
 dependency.
 
 ```sh
-bun add @alxia/rate-limit
+bun add @alxia/rate-limit @alxia/core
+bun add -d typescript@^6.0.3
 ```
 
 ## Usage
