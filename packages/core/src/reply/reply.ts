@@ -39,20 +39,96 @@ export class Reply<Status extends number = number, Body = unknown> {
 export type AnyReply = Reply<any, any>;
 
 /**
- * `reply` without schemas: any status, any body. The body's type is kept, so
- * the client still reads it.
+ * The statuses `reply` has a shortcut for: `reply.ok(body)` is
+ * `reply(200, body)`. `noContent` takes no body.
  */
-export type FreeReplyFunction = <
+export const SHORTCUTS = {
+	ok: 200,
+	created: 201,
+	accepted: 202,
+	noContent: 204,
+	badRequest: 400,
+	unauthorized: 401,
+	forbidden: 403,
+	notFound: 404,
+	conflict: 409,
+} as const;
+
+/** The status a shortcut answers: `Shortcuts['notFound']` is `404`. */
+export type Shortcuts = typeof SHORTCUTS;
+
+/** The shortcuts of `reply` without schemas: any body, its type kept. */
+export type FreeShortcuts = {
+	readonly [Name in keyof Shortcuts]: Name extends 'noContent'
+		? (init?: ReplyInit) => Reply<204, undefined>
+		: <const Body = undefined>(
+				body?: Body,
+				init?: ReplyInit,
+			) => Reply<Shortcuts[Name], Body>;
+} & {
+	/** An HTML page: the body sent as `text/html;charset=utf-8`. */
+	readonly html: <const Status extends StatusCode>(
+		status: Status,
+		html: string,
+		init?: ReplyInit,
+	) => Reply<Status, string>;
+};
+
+/**
+ * `reply` without schemas: any status, any body. The body's type is kept, so
+ * the client still reads it. Its shortcuts — `reply.ok(body)`,
+ * `reply.notFound(body)`, `reply.noContent()` — are the same replies.
+ */
+export type FreeReplyFunction = (<
 	const Status extends StatusCode,
 	const Body = undefined,
 >(
 	status: Status,
 	body?: Body,
 	init?: ReplyInit,
-) => Reply<Status, Body>;
+) => Reply<Status, Body>) &
+	FreeShortcuts;
 
-export const createReply: FreeReplyFunction = (status, body, init) =>
-	new Reply(status, body as never, init);
+/** `init`'s headers, with `content-type` set unless they set one. */
+function withContentType(type: string, init?: ReplyInit): ReplyInit {
+	const headers = new Headers(init?.headers);
+	if (!headers.has('content-type')) headers.set('content-type', type);
+	return { ...init, headers };
+}
+
+/** A shortcut: `reply(status, body, init)` with its status fixed. */
+const shortcut =
+	<const Status extends StatusCode>(status: Status) =>
+	<const Body = undefined>(body?: Body, init?: ReplyInit) =>
+		new Reply(status, body as Body, init);
+
+const shortcuts = {
+	ok: shortcut(SHORTCUTS.ok),
+	created: shortcut(SHORTCUTS.created),
+	accepted: shortcut(SHORTCUTS.accepted),
+	noContent: (init?: ReplyInit) =>
+		new Reply(SHORTCUTS.noContent, undefined, init),
+	badRequest: shortcut(SHORTCUTS.badRequest),
+	unauthorized: shortcut(SHORTCUTS.unauthorized),
+	forbidden: shortcut(SHORTCUTS.forbidden),
+	notFound: shortcut(SHORTCUTS.notFound),
+	conflict: shortcut(SHORTCUTS.conflict),
+	html: <const Status extends StatusCode>(
+		status: Status,
+		html: string,
+		init?: ReplyInit,
+	) =>
+		new Reply(status, html, withContentType('text/html;charset=utf-8', init)),
+} satisfies FreeShortcuts;
+
+export const createReply: FreeReplyFunction = Object.assign(
+	<const Status extends StatusCode, const Body = undefined>(
+		status: Status,
+		body?: Body,
+		init?: ReplyInit,
+	) => new Reply(status, body as Body, init),
+	shortcuts,
+);
 
 const BINARY = (value: unknown): value is BodyInit =>
 	value instanceof Blob ||

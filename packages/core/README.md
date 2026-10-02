@@ -95,7 +95,10 @@ and `server` the Bun server, when there is one. `HEAD` runs the `GET` route.
 
 A handler returns `reply(status, body, init?)`. With `response` schemas,
 only a declared status, with a body its schema accepts. Without, any status
-and any body — the client still reads the type of the body.
+and any body — the client still reads the type of the body. Shortcuts —
+`reply.ok(body)`, `reply.created(body)`, `reply.noContent()`,
+`reply.notFound(body)`, `reply.html(status, html)`, … — are the same
+replies; with schemas, a route has one only for a status it declares.
 
 The body sent is the **output** of the schema: an unknown key it strips — a
 password hash — never leaves the server. A reply its schema refuses is a
@@ -293,6 +296,7 @@ global hooks become this app's.
 | `Reply`, `HttpError`, `ResponseValidationError` | what a handler returns or throws |
 | `ReplyInit` | a reply's options: `headers` |
 | `AnyReply`, `FreeReplyFunction`, `TypedReplyFunction`, `DeclaredReply`, `RedirectFunction` | any reply, `reply` without and with schemas, every reply a route with schemas may return, `redirect` |
+| `FreeShortcuts`, `TypedShortcuts`, `SHORTCUTS`, `Shortcuts` | `reply`'s shortcuts without and with schemas, and the status of each |
 | `Plugin`, `AnyAlxia` | a function plugin, any app |
 | `ListenOptions` | the options of `listen`: `port`, `hostname`, `development`, `idleTimeout`, `maxRequestBodySize`, `tls` |
 | `RequestHook`, `ResponseHook`, `AroundHook`, `StartHook`, `StopHook`, `BodyParser` | the hooks of `onRequest`, `onResponse`, `around`, `onStart`, `onStop`, and a body parser |
