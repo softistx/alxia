@@ -57,7 +57,9 @@ if (ticks.status === 200) {
 ```ts
 const socket = api.ws('/rooms/:room', { params: { room: 'lobby' } });
 socket.send({ text: 'hi' });                    // typed by the route's `message`
-socket.on((chat) => console.log(chat.text));    // typed by its `send`
+socket.on((chat) => {                           // typed by its `send`, or the 400 of a refused message
+	if (!('error' in chat)) console.log(chat.text);
+});
 for await (const chat of socket) { ... }        // or as an async iterable
 socket.close();
 ```
@@ -94,3 +96,9 @@ JSON.
 | `CallResult<Output>` | what a call resolves to: `status`, `ok`, `data`, `response` |
 | `CallOptions` | what every call may add: `init`, `signal` |
 | `AppLike`, `RoutesOf<App>`, `PathsFor<Routes, M>`, `InputOf`, `OutputOf`, `CallArgs<Input>`, `CallMethod`, `SocketMethod` | the types `Client` is built from: an app, its routes, the paths that answer a method, a call's input and output |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/client/docs): a page per area — calling routes, reading results, events and sockets, and testing.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/client/docs/troubleshooting.md): an error message, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/client/docs/roadmap.md): what is coming, and what is not planned.

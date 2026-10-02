@@ -92,7 +92,7 @@ graphql(app, {
   | `ide` | |
   | --- | --- |
   | `'graphiql'` (default) | Yoga's GraphiQL; `graphiql` takes its options |
-  | `'apollo-sandbox'` | [Apollo Sandbox](https://www.apollographql.com/docs/graphos/platform/sandbox), embedded, pointed at the URL the page was asked at — a prefix, a proxy, HTTPS included. `sandbox` takes `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
+  | `'apollo-sandbox'` | [Apollo Sandbox](https://www.apollographql.com/docs/graphos/platform/sandbox), embedded, pointed at the URL the page was asked at, prefix included (behind a proxy that terminates TLS it sees `http://`: see the [IDE guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/ide.md#apollo-sandbox)). `sandbox` takes `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
   | `false` | none |
 - **CORS** is `@alxia/cors`'s for the whole app: Yoga's own is off unless
   `cors` is given.
@@ -106,3 +106,9 @@ graphql(app, {
 | `SandboxOptions` | its options: `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
 | `GraphQLContext<App, UserContext?>` | what a resolver reads |
 | `ServerContext<Ctx>`, `GraphQLOptions`, `GraphQLRoutes` | its types |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/graphql/docs): a page per area — mounting the endpoint, the typed context, Yoga's plugins and options, and GraphiQL and Apollo Sandbox.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/troubleshooting.md): an error message, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/roadmap.md): what is coming, and what is not planned.

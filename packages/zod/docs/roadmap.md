@@ -1,0 +1,48 @@
+# Roadmap
+
+What `@alxia/zod` gives an app, and what is coming. This page is a
+direction, not a commitment: the version something shipped in is the only
+number on it. Every release, with each change it made, is in
+[`CHANGELOG.md`](https://github.com/softistx/alxia/blob/develop/packages/zod/CHANGELOG.md).
+
+## Now
+
+Nothing scheduled yet.
+
+## Next
+
+Nothing scheduled yet.
+
+## Later
+
+Nothing scheduled yet.
+
+## Not planned
+
+- **Zod inside `@alxia/core` or `@alxia/openapi`.** Both read any Standard
+  Schema and name no validator, so an app can use Zod, Valibot, ArkType or
+  its own; what only Zod can do lives in this package.
+- **A runtime dependency.** `@alxia/zod` declares no dependency, only
+  peers: the app's own `zod` is the one used, and the converter fits
+  `@alxia/openapi` without importing it.
+
+## Shipped
+
+### 0.1.0
+
+- **Coercions a client can type.** `zq.number()`, `zq.int()`,
+  `zq.boolean()` and `zq.date()` read the text of the path, the query
+  string, headers and cookies as a number, an integer, a boolean or a
+  `Date`, while a typed client sends the value itself — `{ page: 2 }`, not
+  `{ page: '2' }`, and never `unknown`.
+- **Strict reading.** An empty value is not `0`, `'false'` is `false`,
+  and a date and time without an offset is refused rather than guessed.
+- **Lists of one.** `zq.array(item)` reads `?tag=a` as `['a']` and
+  `?tag=a&tag=b` as `['a', 'b']`, where `z.array` refuses the first.
+- **JSON in the query string.** `zq.json(schema)` reads a filter sent as
+  JSON, validates it with the schema, and lets the client send the object.
+- **OpenAPI that matches the wire.** `zodConverter`, given to
+  `@alxia/openapi`'s `openapi` or `docs`, documents a `Date` as a
+  `date-time` string and a `bigint` as an integer, and documents the rest
+  of a schema when one field has no JSON Schema, instead of losing all of
+  it.
