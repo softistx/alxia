@@ -52,6 +52,9 @@ export interface Cache {
 /** Response headers that make a response someone's own. */
 const PRIVATE = /\b(no-store|private)\b/i;
 
+/** What a run of the route gives: a response it kept, or its own when it kept nothing. */
+type Loaded = { kept: CachedResponse } | { own: Response };
+
 /**
  * Responses kept and served again, as a plugin: a `GET` to a route declared
  * after it is answered from the store while fresh, and from the route
@@ -83,18 +86,30 @@ export function cache(options: CacheOptions) {
 				vary,
 				ctx.request.headers,
 			));
-	const loading = new Map<string, Promise<CachedResponse | Response>>();
+	/** The run of each key being loaded: what it kept, or `undefined` when it kept nothing. */
+	const loading = new Map<string, Promise<CachedResponse | undefined>>();
 	const controls = new WeakMap<Request, { tags: string[]; skipped: boolean }>();
 
-	/** Runs the route once for every concurrent miss of a key, and keeps what it answers. */
+	/**
+	 * Runs the route once for every concurrent miss of a key, and keeps what
+	 * it answers. Only a response that is kept is shared: one that is not —
+	 * private, skipped, a cookie, another status — answers the request that
+	 * ran the route, and every other waiting request runs the route itself.
+	 */
 	const load = (
 		key: string,
 		ctx: BaseContext,
 		next: () => Promise<Response>,
 	): Promise<CachedResponse | Response> => {
 		const running = loading.get(key);
-		if (running !== undefined) return running;
-		const run = (async () => {
+		if (running !== undefined) {
+			return running.then(
+				(cached): Promise<CachedResponse | Response> | CachedResponse =>
+					cached ?? next(),
+				(): Promise<CachedResponse | Response> => next(),
+			);
+		}
+		const run = (async (): Promise<Loaded> => {
 			const response = await next();
 			const control = controls.get(ctx.request);
 			if (
@@ -104,7 +119,7 @@ export function cache(options: CacheOptions) {
 				response.headers.has('set-cookie') ||
 				response.headers.get('content-type')?.startsWith('text/event-stream')
 			) {
-				return response;
+				return { own: response };
 			}
 			const body = new Uint8Array(await response.arrayBuffer());
 			const headers = new Headers(response.headers);
@@ -124,11 +139,14 @@ export function cache(options: CacheOptions) {
 				tags: [...(options.tags?.(ctx) ?? []), ...(control?.tags ?? [])],
 			};
 			await store.set(key, cached, ttl + stale);
-			return cached;
+			return { kept: cached };
 		})();
-		loading.set(key, run);
-		run.finally(() => loading.delete(key)).catch(() => {});
-		return run;
+		const shared = run.then((loaded) =>
+			'kept' in loaded ? loaded.kept : undefined,
+		);
+		loading.set(key, shared);
+		shared.finally(() => loading.delete(key)).catch(() => {});
+		return run.then((loaded) => ('kept' in loaded ? loaded.kept : loaded.own));
 	};
 
 	const plugin = alxia()
@@ -167,8 +185,13 @@ export function cache(options: CacheOptions) {
 			}
 			if (found !== undefined && age < found.ttl + found.stale) {
 				if (!loading.has(key)) {
-					// Refreshed behind the response: the route's own error is its to log.
-					load(key, ctx, next).catch((error) => console.error(error));
+					// Refreshed behind the response: the route's own error is its to log,
+					// and a response it does not keep is read by no one.
+					load(key, ctx, next)
+						.then((loaded) =>
+							loaded instanceof Response ? loaded.body?.cancel() : undefined,
+						)
+						.catch((error) => console.error(error));
 				}
 				return respond(request, found, debug ? 'STALE' : undefined);
 			}

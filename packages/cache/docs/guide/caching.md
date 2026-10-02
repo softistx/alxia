@@ -69,12 +69,16 @@ test('ten concurrent misses run the route once', async () => {
 });
 ```
 
-The waiting starts before the route has answered, so it applies to
-responses that are then not kept, too:
-[Not kept is not the same as not shared](#not-kept-is-not-the-same-as-not-shared).
+Only a response that is kept is shared this way:
+[Not kept is not shared](#not-kept-is-not-shared).
 
-A route that throws during a miss answers its 500 to every request waiting
-on it, and nothing is kept. A route that throws while refreshing a stale
+A route that throws during a miss answers its 500 to the request that ran
+it, and nothing is kept; every request that was waiting on it runs the
+route itself.
+
+A request that ran the route itself, after waiting on a run that was not
+kept or that threw, gets its answer as the route made it: not kept, with
+no `X-Cache`. The next request is a miss. A route that throws while refreshing a stale
 response is logged with `console.error`; the stale copy keeps being served,
 and the next stale request tries again, until `ttl + staleWhileRevalidate`
 has passed.
@@ -93,44 +97,27 @@ A response is kept only when all of these hold:
 
 Otherwise it is sent as the route answered it, with no `X-Cache`.
 
-### Not kept is not the same as not shared
+### Not kept is not shared
 
-Whether a response may be kept is decided **after** the route has run.
-Until then, concurrent misses of one key wait on that one run, as above,
-even when its response turns out not to be kept. So when several requests
-for one key arrive together and the response is not kept, the route runs
-once, for one of those requests, and its single `Response` is handed to
-all of them:
-
-- one of them gets it, which may have been built for **another** request;
-- the others fail: over `Bun.serve`, with a 500 and
-  `TypeError: Response body already used. …` in the log; in process,
-  `app.request()` rejects with `TypeError [ERR_BODY_ALREADY_USED]: Body already used`.
-
-This holds for every reason a response is not kept: `Cache-Control:
-private` or `no-store`, a cookie, `cache.skip()`, a status outside
-`statuses`. A rarely hit route never shows it; a personal page under load
-does.
-
-What avoids the shared run is not reaching it. Declare a route that is
-personal, or that may answer what is not kept, **before** the plugin. A
-request whose [`key`](keys-and-vary.md#personal-responses) is `undefined`
-avoids it too:
+Concurrent misses wait on one run of the route, but only a response that is
+**kept** is handed to them. A response that is not kept answers the request
+that ran the route, and every other waiting request runs the route itself:
+three visitors asking `/me` together, behind the cache, each get their own
+answer.
 
 ```ts
 import { alxia } from '@alxia/core';
 import { cache } from '@alxia/cache';
 
 const app = alxia()
-	.get('/me', ({ request, reply }) => reply(200, { cookie: request.headers.get('cookie') })) // before: never shared
 	.use(cache({ ttl: 60 }))
-	.get('/products', ({ reply }) => reply(200, []));
+	.get('/me', ({ request, reply }) =>
+		reply(200, { cookie: request.headers.get('cookie') }, { headers: { 'cache-control': 'private' } }),
+	); // concurrent requests: one run each, each with its own answer
 ```
 
-`Cache-Control: private` and `cache.skip()` keep a response out of the
-store, and that is all they do: two concurrent requests for the same URL
-still share it. Use them for a response that is *sometimes* not worth
-keeping, not to separate one visitor's answer from another's.
+A route that is always personal still belongs before the plugin: it saves
+the store lookup, and the wait on another request's run.
 
 ## Options
 
@@ -266,7 +253,7 @@ const app = alxia()
 	})
 	.get('/products/:id/stock', ({ params, cache, reply }) => {
 		const stock = params.id === '1' ? 0 : 5;
-		if (stock === 0) cache.skip();                   // "sold out" is not kept (concurrent requests still share it)
+		if (stock === 0) cache.skip();                   // "sold out" is not kept
 		return reply(200, { stock });
 	});
 ```

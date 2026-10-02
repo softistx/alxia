@@ -41,7 +41,7 @@ Nothing scheduled yet.
   response is still served at once, as `X-Cache: STALE`, while one request
   refreshes it behind: no client waits for a slow route.
 - **One run for many misses.** Concurrent requests for a missing response
-  wait for one run of the route, not one each.
+  wait for one run of the route, not one each, when its response is kept.
 - **Only what may be shared.** A response is kept only with a status in
   `statuses` (`200` by default), and never when it says
   `Cache-Control: private` or `no-store`, sets a cookie, streams events, or
