@@ -1,7 +1,7 @@
 # API ergonomics before 0.1.0
 
-Status: **proposed**. Nothing here is built yet. Each slice below is one PR,
-started only once the owner approves this note.
+Status: **approved** by the owner on 2026-10-02. Each slice below is one
+PR, built in the order given at the end.
 
 Nothing is published yet (PR #1 is held), so breaking the API costs no
 consumer anything. These changes are made now so that 0.1.0 starts with the
