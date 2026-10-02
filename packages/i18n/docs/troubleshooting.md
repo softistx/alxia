@@ -26,7 +26,7 @@ nothing — what the response does that you did not expect.
 
 **Language**
 
-- [`i18n.t()` answers in the fallback in an `onError` hook](#i18nt-answers-in-the-fallback-in-an-onerror-hook)
+- [`i18n.t()` answers in the fallback before the language is read](#i18nt-answers-in-the-fallback-before-the-language-is-read)
 - [`@nxgt/i18n`'s `translate` answers in English on a German request](#nxgti18ns-translate-answers-in-english-on-a-german-request)
 - [`getLanguage()` answers `en` although the fallback is `fr`](#getlanguage-answers-en-although-the-fallback-is-fr)
 - [A cache serves one language to every visitor](#a-cache-serves-one-language-to-every-visitor)
@@ -184,6 +184,10 @@ alxia()
 	);
 ```
 
+Or call the plugin's own `i18n.t()`, which answers in the request's
+language there too, and in the fallback when the error was thrown before
+the language was read.
+
 ### `t()` accepts any key, typos included
 
 **When:** the catalogues are built at runtime, read with
@@ -264,27 +268,28 @@ export const i18n = createI18n({ resources: { en, de }, fallback: 'en' });
 
 ## Language
 
-### `i18n.t()` answers in the fallback in an `onError` hook
+### `i18n.t()` answers in the fallback before the language is read
 
-**When:** a route answers in French, but the error it throws is rendered
-in the fallback's language by an `onError` hook, an `onRequest`, `around`
-or `onResponse` hook, through `i18n.t()`, `i18n.language()`, or
-`@nxgt/i18n`'s `translate`.
+**When:** a request is in French, but `i18n.t()`, `i18n.language()` or
+`@nxgt/i18n`'s `translate` answers in the fallback's language in an
+`onRequest` hook, an `around` hook declared before `.use(i18n)`, a route
+or `derive` declared before it, or the `onError` hook of an error one of
+those threw.
 
-**Why:** `i18n.t()` reads the language the plugin keeps while the route
-runs. `onError` runs after the route has thrown, and the global hooks
-outside every route hook, so none of them is inside it.
+**Why:** the plugin reads the request's language in a route hook, after
+the global hooks and the route hooks declared before it. Until then there
+is none to answer in. From there on — the route, what it calls, its
+`onError` and `onResponse` hooks — every call answers in it.
 
-**Fix:** in `onError`, read `t` and `language` from the context, which the
-plugin set; in the global hooks, translate in the route instead:
+**Fix:** translate after the plugin: declare the routes and hooks that
+translate after `.use(i18n)`, and move what an `onRequest` hook renders
+into a `derive` declared after it:
 
 ```ts
 alxia()
 	.use(i18n)
-	.onError((error, { t, reply }) =>
-		error instanceof HttpError && error.status === 404
-			? reply(404, { error: t?.('errors.not-found') ?? 'Not found' })
-			: undefined,
+	.derive(({ request, reply }) =>
+		request.headers.has('x-busy') ? reply(503, { error: i18n.t('errors.service-unavailable') }) : undefined,
 	);
 ```
 
@@ -314,7 +319,7 @@ alxia()
 ### `getLanguage()` answers `en` although the fallback is `fr`
 
 **When:** outside a request — at start-up, in a timer, a queue consumer —
-or in a hook [outside the plugin](#i18nt-answers-in-the-fallback-in-an-onerror-hook),
+or in a hook [before the language is read](#i18nt-answers-in-the-fallback-before-the-language-is-read),
 `@nxgt/i18n`'s `getLanguage()` answers `'en'` while `i18n.language()`
 answers `'fr'`.
 
