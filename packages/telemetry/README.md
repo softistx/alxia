@@ -8,7 +8,7 @@ inside it carrying its trace id.
 
 ```sh
 bun add @alxia/telemetry @nxgt/telemetry @alxia/core
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 `@nxgt/telemetry` is a peer: the app's own copy, shared with its loggers.

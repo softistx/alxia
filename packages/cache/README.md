@@ -9,7 +9,7 @@ ETags and 304s. In memory, or in Redis with
 
 ```sh
 bun add @alxia/cache @alxia/core
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 ## Usage

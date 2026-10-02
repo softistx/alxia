@@ -8,7 +8,7 @@ dependency.
 
 ```sh
 bun add @alxia/janus @nxgt/janus @alxia/core
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 It mirrors [`@nxgt/janus-hono`](https://www.npmjs.com/package/@nxgt/janus-hono):

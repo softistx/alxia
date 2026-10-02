@@ -48,6 +48,6 @@
 	},
 	"peerDependencies": {
 		"@alxia/core": "workspace:^",
-		"typescript": "^6.0.3"
+		"typescript": "^6.0.3 || ^7.0.0"
 	}
 }

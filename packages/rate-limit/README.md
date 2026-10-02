@@ -7,7 +7,7 @@ dependency.
 
 ```sh
 bun add @alxia/rate-limit @alxia/core
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 ## Usage
