@@ -19,7 +19,7 @@ app.use(docs(app, { info: { title: 'Users', version: '1.0.0' } }));
 // GET /openapi.json, and an API reference page at GET /docs
 ```
 
-`path` and `ui` move them; `ui: false` serves the document alone.
+`path` and `ui` move them, under the app's prefix; `ui: false` serves the document alone.
 
 ## Writing it
 
@@ -38,7 +38,8 @@ await Bun.write('openapi.json', JSON.stringify(openapi(app, { info }), null, 2))
   (with Zod, give it `zodConverter` from `@alxia/zod`: a `Date` is then a `date-time` string)
 - an event stream as `text/event-stream`, by the schema of one event
 - `cookies` as cookie parameters
-- the 400 of a route that validates its request, and the 500 of every route
+- the 400 of a route that validates its request, and the 500 of every route —
+  beside the route's own 400 or 500, when it declares one
 - `detail`: `summary`, `description`, `tags`, `operationId`, `deprecated`. An
   operation id is otherwise made from the method and path: `getUsersById`
 

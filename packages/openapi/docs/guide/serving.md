@@ -89,7 +89,7 @@ every route before `listen`.
 
 The page at `ui` is a small HTML document that loads
 [Scalar](https://scalar.com) from `cdn.jsdelivr.net` and points it at
-`path`. It is served with:
+`path`, under the same prefix as the page. It is served with:
 
 ```text
 content-type: text/html;charset=utf-8
@@ -135,19 +135,24 @@ if (Bun.env['NODE_ENV'] !== 'production') {
 }
 ```
 
-**With a prefix**, mount the prefixed app in an unprefixed one, and use
-`docs` there. Used on an `alxia({ prefix: '/api' })` app directly, the
-page asks for `/openapi.json` instead of `/api/openapi.json`, and the two
-routes show up in the document
-([Troubleshooting](../troubleshooting.md#the-reference-page-finds-no-document-on-a-prefixed-app)):
+**With a prefix**, or inside a group — one with a parameter too, such as
+`/:tenant` — `path` and `ui` are under it like any route, and the page asks
+for the document under the path it was itself asked at:
 
 ```ts
 const api = alxia({ prefix: '/api' }).get('/ping', ({ reply }) => reply(200, 'pong'));
+api.use(docs(api, { info: { title: 'Ping', version: '1.0.0' } }));
+// GET /api/openapi.json lists /api/ping; GET /api/docs reads /api/openapi.json
 
-const app = alxia().use(api);
-app.use(docs(app, { info: { title: 'Ping', version: '1.0.0' } }));
-// GET /openapi.json lists /api/ping; GET /docs reads it
+const app = alxia().get('/ping', ({ reply }) => reply(200, 'pong'));
+app.group('/v1', (group) =>
+	group.use(docs(app, { info: { title: 'Ping', version: '1.0.0' }, ui: '/' })),
+);
+// GET /v1 reads /v1/openapi.json
 ```
+
+Two `docs` plugins on one app, in two groups, each leave both out of
+their document.
 
 ## Testing it
 

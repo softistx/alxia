@@ -104,6 +104,55 @@ describe('openapi', () => {
 		]);
 	});
 
+	test('a route’s own 400 and 500 are kept', () => {
+		const own = openapi(
+			alxia().post(
+				'/orders',
+				{
+					body: z.object({ sku: z.string() }),
+					response: {
+						201: z.object({ id: z.string() }),
+						400: z.object({ error: z.literal('out_of_stock') }),
+						500: z.object({ error: z.literal('payment_down') }),
+					},
+				},
+				({ reply }) => reply(201, { id: '1' }),
+			),
+			{ info: { title: 'Orders', version: '1' } },
+		);
+		const responses = own.paths['/orders']?.post?.responses ?? {};
+		const json = (status: string) =>
+			responses[status]?.content?.['application/json']?.schema;
+		expect(json('400')?.['anyOf']).toEqual([
+			{
+				type: 'object',
+				properties: { error: { type: 'string', const: 'out_of_stock' } },
+				required: ['error'],
+				additionalProperties: false,
+			},
+			{ $ref: '#/components/schemas/ValidationError' },
+		]);
+		expect(JSON.stringify(json('500'))).toContain('payment_down');
+		expect(JSON.stringify(json('500'))).toContain('InternalError');
+	});
+
+	test('a route’s own 400 as text: the framework’s JSON 400 beside it', () => {
+		const own = openapi(
+			alxia().post(
+				'/notes',
+				{ body: z.string(), response: { 201: z.string(), 400: z.string() } },
+				({ reply }) => reply(201, 'ok'),
+			),
+			{ info: { title: 'Notes', version: '1' } },
+		);
+		expect(own.paths['/notes']?.post?.responses['400']?.content).toEqual({
+			'text/plain': { schema: { type: 'string' } },
+			'application/json': {
+				schema: { $ref: '#/components/schemas/ValidationError' },
+			},
+		});
+	});
+
 	test('operation ids: the route’s own, or one from its method and path', () => {
 		expect(document.paths['/users']?.post?.operationId).toBe('createUser');
 		expect(document.paths['/users/{id}']?.get?.operationId).toBe(
@@ -126,5 +175,53 @@ describe('docs', () => {
 		const page = await served.fetch(new Request('http://localhost/docs'));
 		expect(page.headers.get('content-type')).toContain('text/html');
 		expect(await page.text()).toContain('data-url="/openapi.json"');
+	});
+
+	test('on a prefixed app: its own paths, and a page that finds them', async () => {
+		const api = alxia({ prefix: '/api' }).get('/ping', ({ reply }) =>
+			reply(200, 'pong'),
+		);
+		api.use(docs(api, { info: { title: 'Ping', version: '1' } }));
+		const json = await api.fetch(
+			new Request('http://localhost/api/openapi.json'),
+		);
+		const body = await json.json();
+		expect(Object.keys(body.paths)).toEqual(['/api/ping']);
+		const page = await api.fetch(new Request('http://localhost/api/docs'));
+		expect(await page.text()).toContain('data-url="/api/openapi.json"');
+	});
+
+	test('in a group: the page finds the document under the group', async () => {
+		const app = alxia().get('/ping', ({ reply }) => reply(200, 'pong'));
+		app.group('/v1', (group) =>
+			group.use(docs(app, { info: { title: 'Ping', version: '1' }, ui: '/' })),
+		);
+		const page = await app.fetch(new Request('http://localhost/v1'));
+		expect(await page.text()).toContain('data-url="/v1/openapi.json"');
+	});
+
+	test('under a group with a parameter: the page asks where it is served', async () => {
+		const app = alxia().get('/ping', ({ reply }) => reply(200, 'pong'));
+		app.group('/:tenant', (group) =>
+			group.use(docs(app, { info: { title: 'Ping', version: '1' } })),
+		);
+		const page = await app.fetch(new Request('http://localhost/acme/docs'));
+		expect(await page.text()).toContain('data-url="/acme/openapi.json"');
+	});
+
+	test('two docs plugins: neither lists the other', async () => {
+		const app = alxia().get('/a', ({ reply }) => reply(200, 'a'));
+		app.group('/v1', (group) =>
+			group.use(docs(app, { info: { title: 'A', version: '1' } })),
+		);
+		app.group('/v2', (group) =>
+			group.use(docs(app, { info: { title: 'A', version: '2' } })),
+		);
+		for (const version of ['v1', 'v2']) {
+			const json = await app.fetch(
+				new Request(`http://localhost/${version}/openapi.json`),
+			);
+			expect(Object.keys((await json.json()).paths)).toEqual(['/a']);
+		}
 	});
 });

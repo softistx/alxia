@@ -1,4 +1,4 @@
-import { alxia, type RouteDefinition } from '@alxia/core';
+import { alxia, type BaseContext, type RouteDefinition } from '@alxia/core';
 import { type OpenApiDocument, type OpenApiOptions, openapi } from './document';
 
 export interface DocsOptions extends OpenApiOptions {
@@ -27,29 +27,52 @@ export function docs(
 ) {
 	const path = options.path ?? '/openapi.json';
 	const ui = options.ui ?? '/docs';
-	const own = new Set<string>([path, ...(ui === false ? [] : [ui])]);
 	let document: OpenApiDocument | undefined;
-	const plugin = alxia().get(
-		path,
-		{ detail: { tags: ['docs'] } },
-		({ reply }) => {
-			document ??= openapi(app, {
-				...options,
-				exclude: (route) =>
-					own.has(route.path) || (options.exclude?.(route) ?? false),
-			});
-			return reply(200, document);
-		},
-	);
+	const serve = ({ reply }: BaseContext) => {
+		document ??= openapi(app, {
+			...options,
+			exclude: (route) =>
+				served.has(route.handler) || (options.exclude?.(route) ?? false),
+		});
+		return reply(200, document);
+	};
+	served.add(serve);
+	const plugin = alxia().get(path, { detail: { tags: ['docs'] } }, serve);
 	if (ui === false) return plugin;
-	return plugin.get(ui, ({ reply }) =>
-		reply(200, page(options.info.title, path), {
-			headers: {
-				'content-type': 'text/html;charset=utf-8',
-				'content-security-policy': PAGE_POLICY,
+	const show = ({ url, reply }: BaseContext) =>
+		reply(
+			200,
+			page(options.info.title, join(prefixOf(url.pathname, ui), path)),
+			{
+				headers: {
+					'content-type': 'text/html;charset=utf-8',
+					'content-security-policy': PAGE_POLICY,
+				},
 			},
-		}),
-	);
+		);
+	served.add(show);
+	return plugin.get(ui, show);
+}
+
+/**
+ * The handlers of every `docs` plugin, known by identity: under a prefix or
+ * a group their paths are not the ones given, and no document lists them.
+ */
+const served = new WeakSet<object>();
+
+/** The prefix before `declared` in the path the page was asked at. */
+function prefixOf(pathname: string, declared: string): string {
+	const asked =
+		pathname.length > 1 && pathname.endsWith('/')
+			? pathname.slice(0, -1)
+			: pathname;
+	if (declared === '/') return asked === '/' ? '' : asked;
+	return asked.slice(0, asked.length - declared.length);
+}
+
+function join(prefix: string, path: string): string {
+	if (prefix === '') return path;
+	return path === '/' ? prefix : `${prefix}${path}`;
 }
 
 /** What the reference page loads: Scalar from jsDelivr, and the document from here. */

@@ -47,8 +47,8 @@ const get = openapi(app, { info: { title: 'Users', version: '1.0.0' } }).paths['
 | `body` | a required `application/json` request body: what the schema **accepts** |
 | `response` | one reply per status: what the schema **gives back** |
 | no `response` | a single `default` reply, `The reply of the handler` |
-| any of `params`, `query`, `headers`, `cookies`, `body` | a `400`, `ValidationError` |
-| every route | a `500`, `InternalError` |
+| any of `params`, `query`, `headers`, `cookies`, `body` | a `400`, `ValidationError` — beside the route's own `400`, when it declares one |
+| every route | a `500`, `InternalError` — beside the route's own `500`, when it declares one |
 | `detail` | `summary`, `description`, `tags`, `deprecated`, `operationId` |
 
 WebSocket routes (`app.ws`) are not in `app.routes`, and are not
@@ -188,8 +188,60 @@ at `components.schemas`:
 { error: 'internal' }
 ```
 
-These replace a `400` or `500` the route declares in `response`: see
-[Troubleshooting](../troubleshooting.md#a-routes-own-400-or-500-is-not-in-the-document).
+A route that declares its own `400` or `500` in `response` keeps it. The
+app can still answer its own 400 when validation fails, and its 500 when
+the handler throws, so a JSON reply is documented as either of the two —
+the reply's `description` is the route's:
+
+```ts
+alxia().post(
+	'/orders',
+	{
+		body: z.object({ sku: z.string() }),
+		response: {
+			201: z.object({ id: z.string() }),
+			400: z.object({ error: z.literal('out_of_stock') }),
+		},
+	},
+	({ reply }) => reply(201, { id: '1' }),
+);
+```
+
+```json
+"400": {
+  "description": "Bad request",
+  "content": {
+    "application/json": {
+      "schema": {
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": { "error": { "type": "string", "const": "out_of_stock" } },
+            "required": ["error"],
+            "additionalProperties": false
+          },
+          { "$ref": "#/components/schemas/ValidationError" }
+        ]
+      }
+    }
+  }
+}
+```
+
+A `500` declared the same way is `anyOf` its schema and `InternalError`.
+An own reply that is not JSON — a `z.string()`, documented as
+`text/plain` — keeps its content type, and the framework's error is
+documented beside it under `application/json`:
+
+```json
+"400": {
+  "description": "Bad request",
+  "content": {
+    "text/plain": { "schema": { "type": "string" } },
+    "application/json": { "schema": { "$ref": "#/components/schemas/ValidationError" } }
+  }
+}
+```
 
 ## `detail`
 

@@ -25,8 +25,6 @@ symptom.
 - [Every schema in the document is `{}`](#every-schema-in-the-document-is-)
 - [A reply with a `Date` is documented as `{}`](#a-reply-with-a-date-is-documented-as-)
 - [A route has no parameters](#a-route-has-no-parameters)
-- [A route's own 400 or 500 is not in the document](#a-routes-own-400-or-500-is-not-in-the-document)
-- [The reference page finds no document on a prefixed app](#the-reference-page-finds-no-document-on-a-prefixed-app)
 - [`GET /openapi.json` answers 401](#get-openapijson-answers-401)
 - [A route is missing from the served document](#a-route-is-missing-from-the-served-document)
 - [The reference page at `/docs` stays blank](#the-reference-page-at-docs-stays-blank)
@@ -242,43 +240,6 @@ optional:
 
 ```ts
 query: z.object({ email: z.string().optional(), phone: z.string().optional() }),
-```
-
-### A route's own 400 or 500 is not in the document
-
-**When:** a route that validates its request declares a `400` in
-`response`, or any route declares a `500`.
-
-**Why:** the package documents the `400` of every validating route as
-`ValidationError`, and the `500` of every route as `InternalError`, and
-these replace what `response` declares for those statuses.
-
-**Fix:** answer your own refusals with a status the package does not
-write — `409` for a conflict, `422` for a request that validated but
-cannot be applied:
-
-```ts
-response: { 201: User, 409: z.object({ error: z.literal('taken') }) },
-```
-
-### The reference page finds no document on a prefixed app
-
-**When:** `docs` is used on an app made with `alxia({ prefix: '/api' })`.
-The routes are served at `/api/openapi.json` and `/api/docs`, but the page
-asks for `/openapi.json`, and the document lists `/api/openapi.json` and
-`/api/docs` among its paths.
-
-**Why:** `docs` writes its own path, unprefixed, into the page, and leaves
-its routes out of the document by that unprefixed path.
-
-**Fix:** mount the prefixed app in an unprefixed one, and use `docs` there
-([Serving](guide/serving.md#where-to-use-it)):
-
-```ts
-const api = alxia({ prefix: '/api' }).get('/ping', ({ reply }) => reply(200, 'pong'));
-
-const app = alxia().use(api);
-app.use(docs(app, { info }));
 ```
 
 ### `GET /openapi.json` answers 401
