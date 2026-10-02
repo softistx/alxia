@@ -154,11 +154,24 @@ function routeOf(span: SpanRecord): string {
 }
 ```
 
-The first six are given to the span when it opens, as `@nxgt/telemetry`
-span attributes: every log and every child span inside the request
-inherits them. A `log.info` in a route carries `url.path` and
-`client.address`; `http.route` and the status, set later, stay on the
-server span.
+All of them are the server span's own: a child span — a database call, an
+outgoing request — and a log written inside the request carry its trace
+and span ids, not the request's path, method or the client's address. An
+attribute every log of a request should carry is yours to give, with
+`@nxgt/telemetry`'s `withAttributes`: it reaches what runs inside it, so
+an `around` hook declared after the plugin covers the whole request:
+
+```ts
+import { alxia } from '@alxia/core';
+import { telemetry } from '@alxia/telemetry';
+import { withAttributes } from '@nxgt/telemetry';
+
+const app = alxia()
+	.use(telemetry({ service: 'shop' }))
+	.around((ctx, next) =>
+		withAttributes({ 'tenant.id': ctx.request.headers.get('x-tenant') ?? 'none' }, next),
+	);
+```
 
 ## Across services
 

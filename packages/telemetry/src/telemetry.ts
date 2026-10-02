@@ -76,11 +76,13 @@ export function telemetry(options: TelemetryPluginOptions) {
 				continuing(
 					ctx.request.headers.get('traceparent'),
 					spanName(ctx),
-					{
-						kind: 'server',
-						attributes: requestAttributes(ctx.url, ctx.request.method, ctx.ip),
-					},
+					{ kind: 'server' },
 					async (scope) => {
+						// The span's own, not `SpanOptions.attributes`: those every span
+						// and log inside inherits, and a database call is not the request.
+						scope.attributes(
+							requestAttributes(ctx.url, ctx.request.method, ctx.ip),
+						);
 						scopes.set(ctx.request, scope);
 						let response: Response;
 						try {
