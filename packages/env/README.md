@@ -24,13 +24,13 @@ export const env = parseEnv(
 	}),
 );
 
-app.listen(env.PORT);
+Bun.serve({ port: env.PORT, fetch: () => new Response(env.LOG_LEVEL) });
 ```
 
 ```
 EnvError: The environment is invalid:
-  DATABASE_URL: Invalid input: expected string, received undefined
   PORT: Invalid input: expected number, received NaN
+  DATABASE_URL: Invalid input: expected string, received undefined
 ```
 
 The result is frozen. `source` defaults to `Bun.env`; pass another object
@@ -42,3 +42,9 @@ in a test. The schema must validate synchronously.
 | --- | --- |
 | `parseEnv(schema, source?)` | the variables, checked and typed |
 | `EnvError` | thrown with every `issues` entry: `path`, `message` |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/env/docs): how the environment is read, Zod, Valibot and ArkType side by side, coercing strings, defaults, the error at startup, and testing with your own variables.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/env/docs/troubleshooting.md): an error message, or a variable read wrong, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/env/docs/roadmap.md): what is coming, and what is not planned.
