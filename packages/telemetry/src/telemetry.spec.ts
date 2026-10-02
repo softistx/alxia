@@ -8,6 +8,7 @@ import {
 	type Signal,
 	type SpanRecord,
 	type SpanScope,
+	span,
 	uninstallTelemetry,
 } from '@nxgt/telemetry';
 import { telemetry } from './telemetry';
@@ -78,6 +79,26 @@ describe('telemetry', () => {
 			'user.id': '7',
 		});
 		expect(logs()[0]?.span?.traceId).toBe(span?.context.traceId);
+	});
+
+	test('the request’s attributes are the server span’s own, not its children’s', async () => {
+		const { instance, spans, logs } = collecting();
+		await alxia()
+			.use(telemetry({ instance }))
+			.get('/orders/:id', async ({ reply }) => {
+				await span('db.find', { kind: 'client' }, () => log.info('found'));
+				return reply(200, 'ok');
+			})
+			.request('/orders/7');
+		await instance.close();
+		const server = spans().find((record) => record.kind === 'server');
+		const db = spans().find((record) => record.name === 'db.find');
+		expect(server?.attributes['url.path']).toBe('/orders/7');
+		expect(db?.parent).toBe(server?.context.spanId);
+		expect(logs()).toHaveLength(1);
+		expect(db?.attributes['url.path']).toBeUndefined();
+		expect(db?.attributes['http.request.method']).toBeUndefined();
+		expect(logs()[0]?.attributes['url.path']).toBeUndefined();
 	});
 
 	test('an inbound traceparent is continued, and can be said back', async () => {
