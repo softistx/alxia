@@ -53,8 +53,12 @@ dependency, so the app installs them.
 **Fix:**
 
 ```sh
-bun add @alxia/graphql graphql-yoga graphql@^16
+bun add @alxia/graphql graphql-yoga graphql
 ```
+
+With `graphql` 17, `graphql-yoga` must be 5.22 or later: an older Yoga
+declares `graphql ^15.2.0 || ^16.0.0`, and `bun install` warns about an
+incorrect peer. `bun add graphql-yoga@latest` updates it.
 
 ## Types
 

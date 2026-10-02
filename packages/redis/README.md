@@ -12,7 +12,7 @@ Bun's own Redis client, no driver, no dependency:
 
 ```sh
 bun add @alxia/redis @nxgt/redis @nxgt/redis-guard zod @alxia/core
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 They are peers, with `@alxia/rate-limit` for `redisStore` and `@alxia/cache`

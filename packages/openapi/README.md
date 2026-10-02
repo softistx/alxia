@@ -6,7 +6,7 @@ twice: the document cannot drift from the code.
 
 ```sh
 bun add @alxia/openapi @alxia/core
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 ## Serving it

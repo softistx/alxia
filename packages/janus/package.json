@@ -50,6 +50,6 @@
 	"peerDependencies": {
 		"@alxia/core": "workspace:^",
 		"@nxgt/janus": "^0.17.1",
-		"typescript": "^6.0.3"
+		"typescript": "^6.0.3 || ^7.0.0"
 	}
 }

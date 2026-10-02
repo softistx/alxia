@@ -5,7 +5,7 @@ and points at the page that goes deeper at each step.
 
 ```sh
 bun add @alxia/core zod
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 `@alxia/core` has no dependency and knows no validator: it reads any

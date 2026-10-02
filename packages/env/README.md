@@ -8,7 +8,7 @@ of alxia.
 
 ```sh
 bun add @alxia/env
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 ## Usage

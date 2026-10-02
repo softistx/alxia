@@ -22,7 +22,7 @@
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/client": {
@@ -35,7 +35,7 @@
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/compress": {
@@ -49,7 +49,7 @@
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/context-storage": {
@@ -62,7 +62,7 @@
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/core": {
@@ -73,7 +73,7 @@
         "zod": "^4.1.0",
       },
       "peerDependencies": {
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/cors": {
@@ -87,7 +87,7 @@
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/env": {
@@ -98,7 +98,7 @@
         "zod": "^4.2.0",
       },
       "peerDependencies": {
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/graphql": {
@@ -112,9 +112,9 @@
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
-        "graphql": "^16.11.0",
+        "graphql": "^16.11.0 || ^17.0.0",
         "graphql-yoga": "^5.16.0",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/i18n": {
@@ -130,7 +130,7 @@
         "@alxia/core": "workspace:^",
         "@alxia/language": "workspace:^",
         "@nxgt/i18n": "^2.0.0",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/janus": {
@@ -146,7 +146,7 @@
       "peerDependencies": {
         "@alxia/core": "workspace:^",
         "@nxgt/janus": "^0.17.1",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/jwt": {
@@ -160,7 +160,7 @@
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/language": {
@@ -172,7 +172,7 @@
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/logger": {
@@ -186,7 +186,7 @@
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/openapi": {
@@ -199,7 +199,7 @@
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/rate-limit": {
@@ -213,7 +213,7 @@
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/redis": {
@@ -235,7 +235,7 @@
         "@alxia/rate-limit": "workspace:^",
         "@nxgt/redis": "^0.3.1",
         "@nxgt/redis-guard": "^0.3.1",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
         "zod": "^4.6.5",
       },
       "optionalPeers": [
@@ -254,7 +254,7 @@
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/telemetry": {
@@ -270,7 +270,7 @@
       "peerDependencies": {
         "@alxia/core": "workspace:^",
         "@nxgt/telemetry": "^0.2.1",
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
       },
     },
     "packages/zod": {
@@ -284,7 +284,7 @@
         "zod": "^4.2.0",
       },
       "peerDependencies": {
-        "typescript": "^6.0.3",
+        "typescript": "^6.0.3 || ^7.0.0",
         "zod": "^4.2.0",
       },
     },

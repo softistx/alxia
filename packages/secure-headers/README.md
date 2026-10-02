@@ -6,7 +6,7 @@ no dependency.
 
 ```sh
 bun add @alxia/secure-headers @alxia/core
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 ## Usage

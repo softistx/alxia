@@ -6,7 +6,7 @@ RS256/384/512 and EdDSA with a key pair, and a typed bearer guard.
 
 ```sh
 bun add @alxia/jwt @alxia/core
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 ## Tokens

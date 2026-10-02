@@ -7,7 +7,7 @@ result is a union by status, so checking `status` tells you what `data` is.
 
 ```sh
 bun add @alxia/client @alxia/core
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 ## Calling an app

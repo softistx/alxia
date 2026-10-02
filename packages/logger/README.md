@@ -6,7 +6,7 @@ no dependency: a request id, one structured entry per request,
 
 ```sh
 bun add @alxia/logger @alxia/core
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 ## Usage

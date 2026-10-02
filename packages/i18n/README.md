@@ -7,7 +7,7 @@ selects, numbers.
 
 ```sh
 bun add @alxia/i18n @alxia/language @nxgt/i18n@^2 @alxia/core
-bun add -d typescript@^6.0.3
+bun add -d typescript
 ```
 
 ## Usage

@@ -7,11 +7,13 @@ resolvers reading the context those hooks built — typed, and checked.
 Yoga's plugin system is yours whole: Envelop's plugins and Yoga's own.
 
 ```sh
-bun add @alxia/graphql graphql-yoga graphql@^16 @alxia/core
-bun add -d typescript@^6.0.3
+bun add @alxia/graphql graphql-yoga graphql @alxia/core
+bun add -d typescript
 ```
 
 `graphql-yoga` and `graphql` are peers: the package declares no dependency.
+`graphql` 16 and 17 both work; with 17, `graphql-yoga` must be 5.22 or
+later, the first to accept it.
 
 ## Usage
 
