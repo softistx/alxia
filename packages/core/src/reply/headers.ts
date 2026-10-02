@@ -1,7 +1,10 @@
 /**
  * `response` with its headers edited. A response's headers may be
- * immutable — one from `fetch`, a `Response.redirect` — and then the
- * response is copied, its body untouched.
+ * immutable — one from `fetch`, a `Response.redirect` — and then the edit
+ * runs on a copy of them, and the response is rebuilt only once it
+ * succeeds. An error of `edit` is thrown as it is, the body unread:
+ * headers it set before throwing stay, but the caller can still send the
+ * response.
  */
 export function withHeaders(
 	response: Response,
@@ -10,10 +13,25 @@ export function withHeaders(
 	try {
 		edit(response.headers);
 		return response;
+	} catch (error) {
+		if (!immutable(response.headers)) throw error;
+		const headers = new Headers(response.headers);
+		edit(headers);
+		return new Response(response.body, {
+			status: response.status,
+			statusText: response.statusText,
+			headers,
+		});
+	}
+}
+
+/** Whether `headers` refuse every edit; deleting an absent name changes nothing. */
+function immutable(headers: Headers): boolean {
+	try {
+		headers.delete('x-alxia-immutable');
+		return false;
 	} catch {
-		const copy = new Response(response.body, response);
-		edit(copy.headers);
-		return copy;
+		return true;
 	}
 }
 

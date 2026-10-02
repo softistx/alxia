@@ -83,4 +83,26 @@ describe('cors', () => {
 			'https://c.example',
 		);
 	});
+
+	test('an origin function that throws: the response sent whole, without the headers', async () => {
+		const app = alxia()
+			.use(
+				cors({
+					origin: (origin) => new URL(origin).hostname === 'a.example',
+				}),
+			)
+			.use(route);
+		const original = console.error;
+		console.error = () => {};
+		try {
+			const response = await app.request('/data', {
+				headers: { origin: 'not a url' },
+			});
+			expect(response.status).toBe(200);
+			expect(await response.json()).toEqual({ ok: true });
+			expect(response.headers.get('access-control-allow-origin')).toBeNull();
+		} finally {
+			console.error = original;
+		}
+	});
 });

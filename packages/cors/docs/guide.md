@@ -101,7 +101,7 @@ cors({ origin: (origin) => allowed.has(origin) });             // your own decis
 | a string | that origin, compared exactly: `'https://app.example.com/'` never matches, nor does `http://` for `https://` |
 | a `RegExp` | every origin it `test`s true on: anchor it with `^` and `$`, or `/example\.com/` also matches `https://example.com.evil.net` |
 | a list | any of its strings or patterns |
-| a function | every origin it returns `true` for; it must not throw — see [the troubleshooting entry](troubleshooting.md#typeerror-invalid-url-then-stream-already-used-please-create-a-new-one) |
+| a function | every origin it returns `true` for; a throw is logged, and the origin is refused (a preflight gets a 500) — see [the troubleshooting entry](troubleshooting.md#typeerror-invalid-url) |
 
 What the response carries depends on the form and on `credentials`:
 
