@@ -12,6 +12,7 @@ bun add @alxia/i18n @alxia/language @nxgt/i18n@^2
 ## Usage
 
 ```ts
+import { alxia } from '@alxia/core';
 import { createI18n } from '@alxia/i18n';
 import { resources as shared } from '@nxgt/i18n';
 
@@ -22,7 +23,9 @@ export const i18n = createI18n({ resources: { en, fr }, fallback: 'en' });
 
 const app = alxia()
 	.use(i18n)
-	.get('/cart', ({ t, language, reply }) => reply(200, t('cart.items', { count: 3 }))); // '3 articles'
+	.get('/cart', ({ t, reply }) => reply(200, t('cart.items', { count: 3 }))); // '3 articles' in French
+
+app.listen(3000);
 ```
 
 - **The language** is `@alxia/language`'s, among the catalogues' languages:
@@ -42,7 +45,8 @@ export const describeCart = (count: number) => i18n.t('cart.items', { count });
 
 `i18n.t()` translates in the language of the request it runs in — through
 every `await` — and in the fallback outside one. `i18n.language()` says
-which.
+which. An `onError` hook runs outside it: read `t` from its context there
+([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/troubleshooting.md#i18nt-answers-in-the-fallback-in-an-onerror-hook)).
 
 ### `@nxgt/i18n`'s own `translate`
 
@@ -63,3 +67,9 @@ A response in the request's language varies by what decided it: give
 | `createI18n({ resources, fallback, …languageOptions })` | the plugin — routes after it read `t` and `language` — with `t()`, `language()` and `supported` |
 | `I18nOptions` | its options: `resources`, `fallback`, and every `@alxia/language` option but `supported` |
 | `KeyOf<Catalogue>`, `Translate<Key>`, `Catalogues`, `I18nContext<Key>` | its types |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/i18n/docs): the catalogues and every option, what the routes read, ICU messages and typed keys, `t()` outside a route, and `@nxgt/i18n`'s own `translate`.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/troubleshooting.md): an error, a key shown instead of a message, or a response in the wrong language, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/roadmap.md): what is coming, and what is not planned.
