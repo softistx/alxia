@@ -17,13 +17,12 @@ bun add @alxia/telemetry @nxgt/telemetry
 ```ts
 import { alxia } from '@alxia/core';
 import { telemetry } from '@alxia/telemetry';
-import { createLogger } from '@nxgt/telemetry';
-import { otlpExporter } from '@nxgt/telemetry-otlp';
+import { consoleExporter, createLogger } from '@nxgt/telemetry';
 
 const tracing = telemetry({
 	service: 'checkout',
 	version: '1.4.0',
-	exporters: [otlpExporter({ endpoint: 'http://localhost:4318' })],
+	exporters: [consoleExporter()], // or @nxgt/telemetry-otlp's otlpExporter
 	traced: (ctx) => ctx.url.pathname !== '/health',
 });
 
@@ -34,9 +33,11 @@ const app = alxia()
 	.get('/orders/:id', ({ params, span, reply }) => {
 		span?.attribute('order.id', params.id);
 		log.info('order read');                 // carries this request's traceId
-		return reply(200, ...);
+		return reply(200, { id: params.id });
 	})
 	.onStop(() => tracing.telemetry.close()); // awaited, or the last batch is lost
+
+app.listen(3000);
 ```
 
 ## The span
@@ -85,3 +86,9 @@ A hook that throws costs its answer, never the request.
 | `telemetry(options)` | the plugin, with the telemetry it writes to as `.telemetry`; routes after it read `span` and `telemetry` |
 | `TelemetryPluginOptions` | its options: `service` and `@nxgt/telemetry`'s options, or an `instance`; `traced`, `spanName`, `traceResponse` |
 | `HTTP_METHOD`, `URL_PATH`, `URL_SCHEME`, `HTTP_ROUTE`, `HTTP_STATUS`, `SERVER_ADDRESS`, `SERVER_PORT`, `CLIENT_ADDRESS` | the attribute names a server span carries: `http.request.method`, `url.path`, `url.scheme`, `http.route`, `http.response.status_code`, `server.address`, `server.port`, `client.address` |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/telemetry/docs): the span each request gets and what it records, how a trace crosses services, every option with its default, shutting down, and testing.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/telemetry/docs/troubleshooting.md): a `tsc` error, an export failure, or a span or a log that is missing.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/telemetry/docs/roadmap.md): what is coming, and what is not planned.

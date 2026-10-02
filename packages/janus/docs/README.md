@@ -1,0 +1,16 @@
+# @alxia/janus documentation
+
+The [package README](../README.md) is the short version. This folder is
+the long one: a guide page per area, with the options, defaults, errors and
+a realistic example for each.
+
+## Guide
+
+| Page | Read it when |
+| --- | --- |
+| [Sessions](guide/sessions.md) | reading who a request belongs to, requiring a session, narrowing to one user type, knowing where the token is read from and when a renewed cookie is sent, or testing a signed-in route |
+| [Signing in and out](guide/sign-in-and-out.md) | setting the session cookie after a sign-up or a sign-in, handling a second factor, signing out, or remembering devices with the device cookie |
+| [Errors](guide/errors.md) | answering janus's refusals with their status and a safe body, knowing which code is which status, reporting the 5xx, or reading a refusal on the client |
+| [Permissions](guide/permissions.md) | guarding routes with a permission on an object, loading it by a path parameter, passing a condition's context, or checking for another subject than the session's user |
+| [Troubleshooting](troubleshooting.md) | something went wrong and you have the message, or a request is anonymous, refused or a 404 when you did not expect it |
+| [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |

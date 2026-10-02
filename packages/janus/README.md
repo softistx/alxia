@@ -19,6 +19,7 @@ the same cookie, the same rules, the same bodies.
 import { alxia } from '@alxia/core';
 import { janusErrors, sendSession, session, signOut } from '@alxia/janus';
 import { createMemoryStores, janus, scryptHasher } from '@nxgt/janus';
+import { z } from 'zod';
 
 const auth = janus({
 	user: z.object({ email: z.email(), name: z.string() }),
@@ -26,6 +27,8 @@ const auth = janus({
 	store: createMemoryStores(),       // your database's adapter in production
 	hasher: scryptHasher(),
 });
+
+const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
 	.use(janusErrors())                                  // janus's refusals, typed
@@ -74,6 +77,8 @@ called for the 5xx.
 | 403 | `USER_INACTIVE`, `STEP_UP_REQUIRED` |
 | 404 | `NOT_FOUND` |
 | 409 | `LOGIN_TAKEN`, `VERSION_CONFLICT`, `SECOND_FACTOR_*` |
+| 500 | `PERMISSION_DEPTH` |
+| 501 | `UNSUPPORTED` |
 | 503 | `STORE_FAILED` |
 
 ## `permission(access, permission, type, load, options?)`
@@ -85,11 +90,39 @@ Anonymous is a 401, nothing loaded a 404, a denial a 403, each typed. Scope
 it with `group`:
 
 ```ts
-app.use(session(auth)).group('/records/:id', (records) =>
-	records
-		.use(permission(access, 'view', 'record', byParam('id', findRecord)))
-		.get('/', ({ object, reply }) => reply(200, object)),
-);
+import { alxia } from '@alxia/core';
+import { byParam, janusErrors, permission, session } from '@alxia/janus';
+import { createMemoryStores, janus, scryptHasher } from '@nxgt/janus';
+import { createMemoryRelations, defineModel, permissions } from '@nxgt/janus/permissions';
+import { z } from 'zod';
+
+const relations = createMemoryRelations();
+const auth = janus({
+	user: z.object({ email: z.email() }),
+	password: { login: 'email' },
+	store: createMemoryStores(),
+	relations,
+	hasher: scryptHasher(),
+});
+const access = permissions({
+	model: defineModel({
+		subjects: auth.types,
+		types: { record: { related: { owners: ['user'] }, permits: { view: ['owners'] } } },
+	}),
+	store: relations,
+});
+
+const records = new Map([['r1', { id: 'r1', title: 'Blood test' }]]);
+const findRecord = (id: string) => records.get(id) ?? null;
+
+const app = alxia()
+	.use(janusErrors())
+	.use(session(auth))
+	.group('/records/:id', (record) =>
+		record
+			.use(permission(access, 'view', 'record', byParam('id', findRecord)))
+			.get('/', ({ object, reply }) => reply(200, object)), // object: what findRecord found
+	);
 ```
 
 `byParam(name, find)` loads by a path parameter. A permission whose
@@ -112,3 +145,9 @@ types exactly then.
 | `bodyOf`, `statusOf` | a refusal's body and status |
 | `UnauthenticatedBody`, `JanusErrorBody`, `PermissionRefusedBody` | their types |
 | `Auth`, `UserOfAuth`, `ObjectData`, `Awaitable` | the part of `janus()` this package calls, the users it knows, an object as the application loads it, a value or its promise |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/janus/docs): a page per area — sessions, signing in and out with the session and device cookies, janus's errors and their statuses, and the permission guard.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/janus/docs/troubleshooting.md): an error message, or a request anonymous, refused or a 404 when it should not be, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/janus/docs/roadmap.md): what is coming, and what is not planned.

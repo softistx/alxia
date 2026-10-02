@@ -21,28 +21,42 @@ later**: Bun's `RedisClient` is what the nxgt packages run on.
 ## A shared rate limit
 
 ```ts
-import { connectRedis } from '@nxgt/redis';
+import { alxia } from '@alxia/core';
 import { rateLimit } from '@alxia/rate-limit';
 import { redisStore } from '@alxia/redis';
+import { connectRedis } from '@nxgt/redis';
 
-const connection = await connectRedis(Bun.env.REDIS_URL!);
+const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
-app.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }));
+const app = alxia()
+	.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
+	.get('/search', ({ reply }) => reply(200, []));
 ```
 
 GCRA, in one atomic script, timed by the Redis server's clock: every
 process behind the load balancer counts together, and a refused request
 counts nothing. The 429 stays typed, as `@alxia/rate-limit` types it.
+GCRA refills continuously: an idle client may send `limit` at once, then
+one more every `windowMs / limit`.
 
 ## A shared response cache
 
 ```ts
 import { cache } from '@alxia/cache';
+import { alxia } from '@alxia/core';
 import { redisCacheStore } from '@alxia/redis';
+import { connectRedis } from '@nxgt/redis';
 
+const connection = await connectRedis(Bun.env['REDIS_URL']!);
 const products = cache({ ttl: 60, store: redisCacheStore(connection.client, { name: 'shop' }), tags: () => ['products'] });
-app.use(products).get('/products', ...);
-await products.invalidateTag('products');   // forgotten in every process
+
+const app = alxia()
+	.post('/products', async ({ reply }) => {
+		await products.invalidateTag('products');   // forgotten in every process
+		return reply(201, { ok: true });
+	})
+	.use(products)
+	.get('/products', ({ reply }) => reply(200, [{ id: '1', name: 'Kettle' }]));
 ```
 
 Responses are `@nxgt/redis` cache records, checked by their schema when
@@ -52,11 +66,19 @@ set of the keys it names.
 ## Idempotent routes
 
 ```ts
+import { alxia } from '@alxia/core';
 import { idempotency } from '@alxia/redis';
+import { connectRedis } from '@nxgt/redis';
+import { z } from 'zod';
 
-app
+const connection = await connectRedis(Bun.env['REDIS_URL']!);
+const Payment = z.object({ amount: z.number().int().positive() });
+
+const app = alxia()
 	.use(idempotency(connection.client, { name: 'payments', required: true }))
-	.post('/payments', { body: Payment }, async ({ body, reply }) => reply(201, await charge(body)));
+	.post('/payments', { body: Payment }, ({ body, reply }) =>
+		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
+	);
 ```
 
 A `POST` or `PATCH` with an `Idempotency-Key` runs once; every repeat gets
@@ -67,13 +89,16 @@ the first response back — status, headers, body — with
 | --- | --- |
 | a repeat while the first runs | `409 { error: 'idempotency_in_progress', retryAfter }`, `Retry-After` |
 | the same key, another request (method, path or body) | `422 { error: 'idempotency_key_reused' }` |
+| a key that is not 1 to 255 printable ASCII characters | `400 { error: 'idempotency_key_invalid' }` |
 | no key, with `required` | `400 { error: 'idempotency_key_missing' }` |
 | the route answers a 5xx, or streams | answered, not kept: the key is free again |
 
 Every one is part of the guarded routes' types. Keys are scoped by the
 route and by `scope(ctx)` — the client's address by default, a user id
 when there is one — so two clients choosing the same key never see each
-other's response. A replay never repeats `Set-Cookie`.
+other's response. A replay never repeats `Set-Cookie`. Every response
+below 500 is kept, a 4xx included: declare a rate limit or an auth check
+**before** `idempotency`, or its refusal is replayed.
 
 | option | default | |
 | --- | --- | --- |
@@ -89,12 +114,18 @@ other's response. A replay never repeats `Set-Cookie`.
 ## Caches and locks in the context
 
 ```ts
-import { defineCache } from '@nxgt/redis';
+import { alxia } from '@alxia/core';
 import { redis } from '@alxia/redis';
+import { connectRedis, defineCache } from '@nxgt/redis';
+import { z } from 'zod';
 
+const connection = await connectRedis(Bun.env['REDIS_URL']!);
+const User = z.object({ id: z.string(), name: z.string() });
 const users = defineCache({ name: 'user', key: (id: string) => id, ttl: 300, schema: User });
+const loadUser = async (id: string) => ({ id, name: 'Ada' });   // your database
+const touch = async (user: z.infer<typeof User>) => user;
 
-app
+const app = alxia()
 	.use(redis(connection.client, { caches: { users } }))
 	.get('/users/:id', async ({ cache, lock, params, reply }) => {
 		const user = await cache.users.remember(params.id, () => loadUser(params.id)); // typed by User
@@ -104,7 +135,11 @@ app
 ```
 
 `cache.<name>` is `@nxgt/redis`'s bound cache; `redis` the client itself,
-for everything else.
+for everything else. `@alxia/cache`'s `cache()` also adds `cache` to the
+context: with both on one route, the later one replaces the other at
+runtime — rename one with a `derive`, as
+[the guide](https://github.com/softistx/alxia/blob/develop/packages/redis/docs/guide/caches-and-locks.md#with-alxiacache-two-plugins-named-cache)
+shows.
 
 ## Testing
 
@@ -120,3 +155,9 @@ The package's specs run against `$REDIS_URL`, or a `redis-server` on
 | `idempotency(client, options)` | the plugin |
 | `redis(client, { caches? })`, `RedisContextOptions` | the plugin: `redis`, `cache`, `lock` in the context |
 | `IdempotencyOptions`, `IdempotencyErrorBody`, `RedisContext`, `BoundCaches` | its types |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/redis/docs): a page per area — connecting, rate limits, the response cache, idempotency, caches and locks, and testing against a real Redis.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/redis/docs/troubleshooting.md): an error message, a refusal a client got, or a limit, cache or replay that does not behave as expected, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/redis/docs/roadmap.md): what is coming, and what is not planned.
