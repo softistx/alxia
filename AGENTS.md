@@ -142,3 +142,10 @@ package is public and MIT, with its own copy of `LICENSE`.
   are organised in folders by role.
 - A package's `README.md` is its npm page: by section, a copy-paste example
   each, and an **API** table of every export.
+- A package's `docs/`, where it has one, is the long version, listed in
+  `files` so it ships: `README.md` (an index of the pages), a guide
+  (`guide/<area>.md` for a large package, a single `guide.md` for a small
+  one), `troubleshooting.md` (one entry per error, headed by its exact
+  message, or by its symptom for a trap that prints none) and `roadmap.md`.
+  The README ends with a **Documentation** section linking them by full
+  GitHub URL on `develop`, since npm does not resolve relative links.

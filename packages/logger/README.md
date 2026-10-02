@@ -48,3 +48,9 @@ A 4xx is a `warn`, a 5xx an `error`. The routes after the plugin read
 | --- | --- |
 | `logger(options?)` | the plugin: an app that derives `requestId` and `log` |
 | `LogEntry`, `RequestLog`, `LoggerOptions` | its types |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/logger/docs): every option and default, the entry's fields, `log` and `requestId`, where the plugin sits among other hooks, and testing.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/logger/docs/troubleshooting.md): an error message or a missing header, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/logger/docs/roadmap.md): what is coming, and what is not planned.

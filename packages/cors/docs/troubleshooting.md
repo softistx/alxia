@@ -1,0 +1,301 @@
+# Troubleshooting
+
+Each entry is headed by the text you see: a line in the browser's console,
+a response, a line in the server log, or an error from `tsc`. The browser
+lines are Chrome's wording, which prefixes them with
+`Access to fetch at '…' from origin '…' has been blocked by CORS policy:`;
+Firefox and Safari say the same thing in other words.
+
+**In the browser**
+
+- [`No 'Access-Control-Allow-Origin' header is present on the requested resource.`](#no-access-control-allow-origin-header-is-present-on-the-requested-resource)
+- [`Response to preflight request doesn't pass access control check: It does not have HTTP ok status.`](#response-to-preflight-request-doesnt-pass-access-control-check-it-does-not-have-http-ok-status)
+- [`The value of the 'Access-Control-Allow-Origin' header in the response must not be the wildcard '*' when the request's credentials mode is 'include'.`](#the-value-of-the-access-control-allow-origin-header-in-the-response-must-not-be-the-wildcard--when-the-requests-credentials-mode-is-include)
+- [`The value of the 'Access-Control-Allow-Credentials' header in the response is '' which must be 'true' when the request's credentials mode is 'include'.`](#the-value-of-the-access-control-allow-credentials-header-in-the-response-is--which-must-be-true-when-the-requests-credentials-mode-is-include)
+- [`Request header field x-token is not allowed by Access-Control-Allow-Headers in preflight response.`](#request-header-field-x-token-is-not-allowed-by-access-control-allow-headers-in-preflight-response)
+- [`Method PUT is not allowed by Access-Control-Allow-Methods in preflight response.`](#method-put-is-not-allowed-by-access-control-allow-methods-in-preflight-response)
+- [`response.headers.get('x-total')` is `null`](#responseheadersgetx-total-is-null)
+
+**Responses**
+
+- [`405 {"error":"method_not_allowed"}` on an `OPTIONS` request](#405-errormethod_not_allowed-on-an-options-request)
+- [`Access-Control-Allow-Origin: https://example.com.evil.net`](#access-control-allow-origin-httpsexamplecomevilnet)
+- [A refused origin's request still ran the route](#a-refused-origins-request-still-ran-the-route)
+
+**Server log**
+
+- [`TypeError: Invalid URL`, then `Stream already used, please create a new one`](#typeerror-invalid-url-then-stream-already-used-please-create-a-new-one)
+
+**Types**
+
+- [`Type 'false' is not assignable to type 'CorsOrigin | undefined'`](#type-false-is-not-assignable-to-type-corsorigin--undefined)
+- [`Type 'Alxia<…>' has no properties in common with type 'CorsOptions'`](#type-alxia-has-no-properties-in-common-with-type-corsoptions)
+- [`Type 'string' is not assignable to type 'readonly string[]'`](#type-string-is-not-assignable-to-type-readonly-string)
+
+## In the browser
+
+### `No 'Access-Control-Allow-Origin' header is present on the requested resource.`
+
+Also as `Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.`
+
+**When:** the page's origin is not one `origin` allows, or the app does not
+use `cors()` at all.
+
+**Why:** a refused origin gets no `Access-Control-Allow-Origin` — its
+preflight is a bare `204` — and the browser blocks the script. The usual
+cause is an origin that does not match exactly: a trailing slash, `http`
+for `https`, a missing port, `www.` on one side only. The page's origin is
+in the console line, after `from origin`.
+
+**Fix:** list the origin exactly as the browser sends it — scheme, host and
+port, nothing after:
+
+```ts
+cors({ origin: ['https://app.example.com', 'http://localhost:5173'] });
+```
+
+### `Response to preflight request doesn't pass access control check: It does not have HTTP ok status.`
+
+**When:** a call that needs a preflight — a `PUT` or `DELETE`, a JSON
+body, an `Authorization` header — and the preflight is answered with an
+error status.
+
+**Why:** one of two things answered the preflight instead of `cors()`:
+
+- the app does not use `cors()`, and routing answers the `OPTIONS` with a
+  `405` — see [the next section](#405-errormethod_not_allowed-on-an-options-request);
+- an `onRequest` hook added **before** `cors()` returned a response — a
+  `401` for a missing token, a `429` — and `onRequest` hooks run in the
+  order they were added. A browser never sends credentials on a preflight,
+  so an authentication hook refuses every one.
+
+**Fix:** use `cors()` before any hook that can answer early:
+
+```ts
+const app = alxia()
+	.use(cors({ origin: 'https://app.example.com' }))   // first
+	.onRequest(({ request }) =>
+		request.headers.has('authorization') ? undefined : new Response(null, { status: 401 }),
+	)
+	.get('/data', ({ reply }) => reply(200, { ok: true }));
+```
+
+### `The value of the 'Access-Control-Allow-Origin' header in the response must not be the wildcard '*' when the request's credentials mode is 'include'.`
+
+**When:** the page calls with `credentials: 'include'`, and the app uses
+`cors()` with no `origin` and no `credentials`.
+
+**Why:** with every origin allowed and no `credentials`, the response
+carries `Access-Control-Allow-Origin: *`, which a browser never accepts on a
+call with cookies.
+
+**Fix:** turn `credentials` on, and name the origins — with `credentials`
+alone, every site on the web may call the app with its user's cookies:
+
+```ts
+cors({ origin: 'https://app.example.com', credentials: true });
+```
+
+### `The value of the 'Access-Control-Allow-Credentials' header in the response is '' which must be 'true' when the request's credentials mode is 'include'.`
+
+**When:** the page calls with `credentials: 'include'`, and the app names
+its origins but does not set `credentials`.
+
+**Why:** `Access-Control-Allow-Credentials: true` is only sent with
+`credentials: true`.
+
+**Fix:**
+
+```ts
+cors({ origin: ['https://app.example.com'], credentials: true });
+```
+
+### `Request header field x-token is not allowed by Access-Control-Allow-Headers in preflight response.`
+
+**When:** `allowedHeaders` is a list, and the page sends a header that is
+not in it.
+
+**Why:** with a list, the preflight allows those headers and no other.
+Without `allowedHeaders`, the plugin allows whatever the preflight asks
+for, and this cannot happen.
+
+**Fix:** add the header, or drop `allowedHeaders` to allow what is asked:
+
+```ts
+cors({
+	origin: 'https://app.example.com',
+	allowedHeaders: ['content-type', 'authorization', 'x-token'],
+});
+```
+
+### `Method PUT is not allowed by Access-Control-Allow-Methods in preflight response.`
+
+**When:** `methods` is a list without the method the page calls with.
+
+**Why:** the preflight's `Access-Control-Allow-Methods` is that list. The
+default lists every method but `CONNECT` and `TRACE`.
+
+**Fix:** add the method, or drop `methods`:
+
+```ts
+cors({ origin: 'https://app.example.com', methods: ['GET', 'POST', 'PUT'] });
+```
+
+### `response.headers.get('x-total')` is `null`
+
+**When:** a script reads a response header the route sets — `x-total`,
+`etag`, `location` — and gets `null`, although the header is in the
+network panel.
+
+**Why:** a cross-origin script only reads the safelisted headers
+(`Cache-Control`, `Content-Language`, `Content-Length`, `Content-Type`,
+`Expires`, `Last-Modified`, `Pragma`) and those the response exposes.
+
+**Fix:** expose it:
+
+```ts
+cors({ origin: 'https://app.example.com', exposedHeaders: ['x-total', 'etag'] });
+```
+
+## Responses
+
+### `405 {"error":"method_not_allowed"}` on an `OPTIONS` request
+
+**When:** an `OPTIONS` request to a path that has routes for other
+methods.
+
+**Why:** either the app does not use `cors()`, or the request is not a
+preflight: `cors()` only answers an `OPTIONS` that carries
+`Access-Control-Request-Method`, as a browser's does. A plain `OPTIONS` —
+from `curl`, or a test that forgets the header — goes to routing like any
+other method.
+
+**Fix:** use `cors()`, and send a preflight the way a browser does:
+
+```ts
+const response = await app.fetch(
+	new Request('http://localhost/data', {
+		method: 'OPTIONS',
+		headers: {
+			origin: 'https://app.example.com',
+			'access-control-request-method': 'POST',
+		},
+	}),
+);
+response.status; // 204
+```
+
+### `Access-Control-Allow-Origin: https://example.com.evil.net`
+
+**When:** `origin` is a `RegExp`, or a list holding one, that is not
+anchored, such as `/example\.com/`.
+
+**Why:** a pattern is matched with `test`, which finds it anywhere in the
+origin, so `https://example.com.evil.net` and `https://notexample.com`
+pass too.
+
+**Fix:** anchor it, and escape the dots:
+
+```ts
+cors({ origin: /^https:\/\/([a-z0-9-]+\.)?example\.com$/ });
+```
+
+### A refused origin's request still ran the route
+
+**When:** a `GET`, or a `POST` with a form or plain-text body, from an
+origin `cors()` refuses. The route runs, and its side effects happen; only
+the script cannot read the answer.
+
+**Why:** such a request needs no preflight, so the browser sends it as it
+is, and the CORS headers only decide whether the page may read the
+response. CORS protects the user's browser, not the server.
+
+**Fix:** authenticate and authorise the route itself, and keep anything
+that changes state off `GET`:
+
+```ts
+app.derive(({ request, reply }) =>
+	request.headers.has('authorization') ? {} : reply(401, { error: 'unauthenticated' as const }),
+);
+```
+
+## Server log
+
+### `TypeError: Invalid URL`, then `Stream already used, please create a new one`
+
+**When:** an `origin` function throws — typically `new URL(origin)` on the
+`Origin: null` that a sandboxed iframe or a page opened from a file sends.
+
+**Why:** the function runs in the plugin's hooks. On a preflight, the throw
+becomes a `500 {"error":"internal"}` without CORS headers. On any other
+request, the route has already answered, and the throw while adding the
+headers leaves a response whose body cannot be sent: the call fails with a
+`500`, and the server logs both errors.
+
+**Fix:** make the function total — it returns `false` for what it cannot
+read:
+
+```ts
+cors({
+	origin: (origin) =>
+		URL.canParse(origin) && new URL(origin).hostname.endsWith('.example.com'),
+});
+```
+
+## Types
+
+### `Type 'false' is not assignable to type 'CorsOrigin | undefined'`
+
+```text
+error TS2322: Type 'false' is not assignable to type 'CorsOrigin | undefined'.
+```
+
+**When:** `cors({ origin: false })`, to turn CORS off.
+
+**Why:** `origin` is `true`, a string, a `RegExp`, a list or a function;
+there is no off switch inside the plugin.
+
+**Fix:** do not use the plugin where CORS should be off:
+
+```ts
+const origins = process.env['CORS_ORIGINS']?.split(',');
+
+const app = alxia().use((app) => (origins ? cors({ origin: origins })(app) : app));
+```
+
+### `Type 'Alxia<…>' has no properties in common with type 'CorsOptions'`
+
+```text
+error TS2769: No overload matches this call.
+  Overload 1 of 2, '(plugin: (app: Alxia<Empty, Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
+    Argument of type '(options?: CorsOptions | undefined) => Plugin' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => AnyAlxia'.
+      Types of parameters 'options' and 'app' are incompatible.
+        Type 'Alxia<Empty, Empty, "", never>' has no properties in common with type 'CorsOptions'.
+```
+
+**When:** `app.use(cors)`, without calling it.
+
+**Why:** `cors` makes the plugin; it is not the plugin.
+
+**Fix:** call it, with no options for the defaults:
+
+```ts
+alxia().use(cors());
+```
+
+### `Type 'string' is not assignable to type 'readonly string[]'`
+
+```text
+error TS2322: Type 'string' is not assignable to type 'readonly string[]'.
+```
+
+**When:** `methods`, `allowedHeaders` or `exposedHeaders` is given as a
+string, such as `methods: 'GET, POST'`.
+
+**Why:** each is a list; the plugin joins it.
+
+**Fix:**
+
+```ts
+cors({ methods: ['GET', 'POST'] });
+```

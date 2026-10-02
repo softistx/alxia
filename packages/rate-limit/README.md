@@ -66,3 +66,9 @@ nothing.
 | `MemoryStore` | a fixed window in one process's memory |
 | `RateLimitStore`, `Decision`, `Policy` | a store's contract |
 | `RateLimitedBody`, `RateLimitInfo`, `RateLimitOptions` | its types |
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/rate-limit/docs): the options and their defaults, which requests are counted, the headers, the 429 on the client, stores, and testing.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/troubleshooting.md): an error message, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/roadmap.md): what is coming, and what is not planned.
