@@ -211,13 +211,42 @@ function operation(route: RouteDefinition, convert?: Converter): Operation {
 		schema.cookies !== undefined ||
 		schema.body !== undefined
 	) {
-		op.responses['400'] = errorResponse(
+		op.responses['400'] = withError(
+			op.responses['400'],
 			'The request was refused',
 			'ValidationError',
 		);
 	}
-	op.responses['500'] = errorResponse('The server failed', 'InternalError');
+	op.responses['500'] = withError(
+		op.responses['500'],
+		'The server failed',
+		'InternalError',
+	);
 	return op;
+}
+
+/**
+ * The response for a status the framework itself may answer: its error
+ * alone, or, when the route declares that status too, the route's beside
+ * it — either of the two as JSON, or each under its own content type.
+ */
+function withError(
+	own: Response | undefined,
+	description: string,
+	component: string,
+): Response {
+	if (own === undefined) return errorResponse(description, component);
+	const error: JsonSchema = { $ref: `#/components/schemas/${component}` };
+	const schema = own.content?.['application/json']?.schema;
+	return {
+		description: own.description,
+		content: {
+			...own.content,
+			'application/json': {
+				schema: schema === undefined ? error : { anyOf: [schema, error] },
+			},
+		},
+	};
 }
 
 function errorResponse(description: string, component: string): Response {

@@ -44,7 +44,7 @@ Nothing scheduled yet.
   string reply is `text/plain`.
 - **The errors every route can answer.** A `400` with the validation error
   body on every route that validates its request, and a `500` on every
-  route, as shared components.
+  route, as shared components — beside a route's own `400` or `500`.
 - **Any validator.** Schemas convert through Standard JSON Schema, which
   Zod 4.2 and later, ArkType and Valibot carry; a `convert` function runs
   first, for a validator that carries none or to say more than it does.
@@ -55,5 +55,5 @@ Nothing scheduled yet.
   description, tags and deprecation copied onto each operation.
 - **The document served, with a page to read it.** The `docs` plugin
   serves the document at `/openapi.json` and an API reference page at
-  `/docs`, both movable and the page optional, and leaves its own routes
-  out of the document.
+  `/docs`, both movable and the page optional, under any prefix or group,
+  and leaves its own routes out of the document.
