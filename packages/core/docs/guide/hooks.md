@@ -222,8 +222,11 @@ const app = alxia().onResponse((response) =>
 ```
 
 A response's headers may be immutable — one from `fetch`, a
-`Response.redirect` — and `withHeaders` copies it then. An `onResponse`
-hook that throws is logged and skipped.
+`Response.redirect` — and `withHeaders` copies it then. An error the edit
+itself throws is thrown as it is, the body unread, so an `onResponse` hook
+that throws is logged and skipped, and the response still goes out with its
+body (and, when its headers are mutable, any header the edit set before
+throwing).
 
 ### `onStart` and `onStop`
 

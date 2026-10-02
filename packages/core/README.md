@@ -295,7 +295,7 @@ global hooks become this app's.
 | `Plugin`, `AnyAlxia` | a function plugin, any app |
 | `ListenOptions` | the options of `listen`: `port`, `hostname`, `development`, `idleTimeout`, `maxRequestBodySize`, `tls` |
 | `RequestHook`, `ResponseHook`, `AroundHook`, `StartHook`, `StopHook`, `BodyParser` | the hooks of `onRequest`, `onResponse`, `around`, `onStart`, `onStop`, and a body parser |
-| `withHeaders`, `vary`, `check` | for plugins: edit a response's headers, add to `Vary`, run a schema |
+| `withHeaders`, `vary`, `check` | for plugins: edit a response's headers (copied when immutable; an error of the edit leaves the body unread), add to `Vary`, run a schema |
 | `Checked` | what `check` returns: the value, or its issues |
 | `RoutesOf<App>`, `Jsonify<T>` | the route table the client reads, and what a value is on the wire |
 | `RouteTable`, `RouteRecord`, `RouteEntryOf`, `RouteInput`, `RouteOutput`, `Outcome`, `OutcomeOf` | a route as the client knows it: the entry one route adds to `RoutesOf`, what it sends, every outcome it may read |

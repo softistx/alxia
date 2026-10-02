@@ -24,7 +24,7 @@ Firefox and Safari say the same thing in other words.
 
 **Server log**
 
-- [`TypeError: Invalid URL`, then `Stream already used, please create a new one`](#typeerror-invalid-url-then-stream-already-used-please-create-a-new-one)
+- [`TypeError: Invalid URL`](#typeerror-invalid-url)
 
 **Types**
 
@@ -221,16 +221,16 @@ app.derive(({ request, reply }) =>
 
 ## Server log
 
-### `TypeError: Invalid URL`, then `Stream already used, please create a new one`
+### `TypeError: Invalid URL`
 
 **When:** an `origin` function throws — typically `new URL(origin)` on the
 `Origin: null` that a sandboxed iframe or a page opened from a file sends.
 
 **Why:** the function runs in the plugin's hooks. On a preflight, the throw
 becomes a `500 {"error":"internal"}` without CORS headers. On any other
-request, the route has already answered, and the throw while adding the
-headers leaves a response whose body cannot be sent: the call fails with a
-`500`, and the server logs both errors.
+request, the route has already answered: the error is logged and the
+response is sent as the route made it, without CORS headers, so the browser
+refuses it as it would a refused origin.
 
 **Fix:** make the function total — it returns `false` for what it cannot
 read:
