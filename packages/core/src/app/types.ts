@@ -8,6 +8,7 @@ import type {
 	FreeReplyFunction,
 	Reply,
 	ReplyInit,
+	Shortcuts,
 } from '../reply/reply';
 import type {
 	InferInput,
@@ -100,14 +101,45 @@ type ReplyRest<Body> = undefined extends Body
 
 /**
  * `reply` with schemas: only a status the route declares, with a body its
- * schema accepts.
+ * schema accepts. A shortcut exists only for a status the route declares:
+ * `reply.notFound` is a compile error on a route with no 404.
  */
-export type TypedReplyFunction<Responses extends ResponseSchemas> = <
+export type TypedReplyFunction<Responses extends ResponseSchemas> = (<
 	const Status extends StatusOf<Responses>,
 >(
 	status: Status,
 	...rest: ReplyRest<InferInput<ResponseSchemaAt<Responses, Status>>>
-) => Reply<Status, InferInput<ResponseSchemaAt<Responses, Status>>>;
+) => Reply<Status, InferInput<ResponseSchemaAt<Responses, Status>>>) &
+	TypedShortcuts<Responses>;
+
+/** The shortcuts of `reply` with schemas: the declared statuses only. */
+export type TypedShortcuts<Responses extends ResponseSchemas> = {
+	readonly [Name in keyof Shortcuts as Shortcuts[Name] extends StatusOf<Responses>
+		? Name extends 'noContent'
+			? undefined extends InferInput<ResponseSchemaAt<Responses, 204>>
+				? Name
+				: never
+			: Name
+		: never]: Name extends 'noContent'
+		? (
+				init?: ReplyInit,
+			) => Reply<204, InferInput<ResponseSchemaAt<Responses, 204>>>
+		: (
+				...rest: ReplyRest<
+					InferInput<ResponseSchemaAt<Responses, Shortcuts[Name]>>
+				>
+			) => Reply<
+				Shortcuts[Name],
+				InferInput<ResponseSchemaAt<Responses, Shortcuts[Name]>>
+			>;
+} & {
+	/** An HTML page, for a declared status whose schema takes a string. */
+	readonly html: <const Status extends StatusOf<Responses>>(
+		status: Status,
+		html: string & InferInput<ResponseSchemaAt<Responses, Status>>,
+		init?: ReplyInit,
+	) => Reply<Status, InferInput<ResponseSchemaAt<Responses, Status>>>;
+};
 
 /** Every reply a route with schemas may return. */
 export type DeclaredReply<Responses extends ResponseSchemas> = {

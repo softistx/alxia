@@ -38,6 +38,7 @@ export type {
 	RouteSchema,
 	RouteTable,
 	TypedReplyFunction,
+	TypedShortcuts,
 	ValidSchema,
 } from './app/types';
 export {
@@ -53,8 +54,11 @@ export { vary, withHeaders } from './reply/headers';
 export {
 	type AnyReply,
 	type FreeReplyFunction,
+	type FreeShortcuts,
 	Reply,
 	type ReplyInit,
+	SHORTCUTS,
+	type Shortcuts,
 } from './reply/reply';
 export type { BodyParser } from './request/read';
 export type {

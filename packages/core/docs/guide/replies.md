@@ -88,6 +88,57 @@ app.get('/health', ({ reply }) => reply(200, { ok: true as const }));
 // the client reads { status: 200, data: { ok: true } }
 ```
 
+### Shortcuts
+
+`reply` has one method per common status. Each one is the same reply as
+`reply(status, body, init)`, checked and typed the same way, so the client
+and the OpenAPI document cannot tell them apart:
+
+| Shortcut | Is |
+| --- | --- |
+| `reply.ok(body?, init?)` | `reply(200, body, init)` |
+| `reply.created(body?, init?)` | `reply(201, body, init)` |
+| `reply.accepted(body?, init?)` | `reply(202, body, init)` |
+| `reply.noContent(init?)` | `reply(204, undefined, init)` |
+| `reply.badRequest(body?, init?)` | `reply(400, body, init)` |
+| `reply.unauthorized(body?, init?)` | `reply(401, body, init)` |
+| `reply.forbidden(body?, init?)` | `reply(403, body, init)` |
+| `reply.notFound(body?, init?)` | `reply(404, body, init)` |
+| `reply.conflict(body?, init?)` | `reply(409, body, init)` |
+| `reply.html(status, html, init?)` | `reply(status, html, init)`, sent as `text/html;charset=utf-8` unless `init` sets a `content-type` |
+
+```ts
+app.get(
+	'/users/:id',
+	{ params: z.object({ id: z.coerce.number() }), response: { 200: User, 404: NotFound } },
+	({ params, reply }) => {
+		const user = users.get(params.id);
+		return user ? reply.ok(user) : reply.notFound({ error: 'not_found' });
+	},
+);
+
+app.delete('/users/:id', { response: { 204: z.undefined() } }, ({ reply }) => reply.noContent());
+app.get('/', ({ reply }) => reply.html(200, '<h1>Welcome</h1>'));
+```
+
+The body may be left out where `reply(status)` may: always without
+schemas, and where the status's schema takes `undefined` with them. With
+`response` schemas, a route has a shortcut only for a status it declares —
+`noContent` only when its 204 takes `undefined` — and its body is checked
+the same way:
+
+```ts
+// response: { 200: User }
+({ reply }) => reply.notFound({ error: 'not_found' }); // Property 'notFound' does not exist
+({ reply }) => reply.html(200, '<p>…</p>');            // 200's schema takes no string
+```
+
+There is no `reply.json` and no `reply.text`: a string is already sent as
+`text/plain` and an object as JSON ([How a body is sent](#how-a-body-is-sent)).
+A hook's `reply` has the shortcuts too: `return reply.unauthorized({ error:
+'unauthenticated' as const })` in a `derive` ends the request, and is added
+to the type of every route after it, like `reply(401, …)`.
+
 ### `validateResponses`
 
 ```ts
@@ -225,7 +276,9 @@ interface ReplyInit { readonly headers?: HeadersInit }
 ```
 
 `TypedReplyFunction<Responses>` is `reply` with schemas,
-`FreeReplyFunction` without, and `DeclaredReply<Responses>` every reply a
+`FreeReplyFunction` without — each with its shortcuts,
+`TypedShortcuts<Responses>` and `FreeShortcuts`; `SHORTCUTS` maps each
+shortcut to its status, and `Shortcuts` is its type — and `DeclaredReply<Responses>` every reply a
 route with schemas may return. `HandlerResult<Schema>` is what its handler
 may return.
 
