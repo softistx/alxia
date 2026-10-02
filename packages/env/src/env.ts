@@ -54,7 +54,8 @@ export class EnvError extends Error {
 }
 
 /**
- * `source` — `Bun.env` by default — checked by `schema`, its output typed.
+ * `source` — `Bun.env` by default — checked by `schema`, its output typed
+ * and frozen: `readonly`, in its type too.
  * Throws an `EnvError` naming every refused variable. The schema must be
  * synchronous: the environment is read before anything awaits.
  *
@@ -65,7 +66,7 @@ export class EnvError extends Error {
 export function parseEnv<Schema extends StandardSchema<unknown>>(
 	schema: Schema,
 	source: Record<string, string | undefined> = Bun.env,
-): OutputOf<Schema> {
+): Readonly<OutputOf<Schema>> {
 	const result = schema['~standard'].validate({ ...source });
 	if (result instanceof Promise) {
 		throw new TypeError('parseEnv(): the schema must validate synchronously');
@@ -81,5 +82,5 @@ export function parseEnv<Schema extends StandardSchema<unknown>>(
 			})),
 		);
 	}
-	return Object.freeze(checked.value) as OutputOf<Schema>;
+	return Object.freeze(checked.value) as Readonly<OutputOf<Schema>>;
 }

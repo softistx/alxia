@@ -29,7 +29,7 @@ imported, before the server starts.
 function parseEnv<Schema extends StandardSchema<unknown>>(
 	schema: Schema,
 	source?: Record<string, string | undefined>, // Bun.env by default
-): OutputOf<Schema>;
+): Readonly<OutputOf<Schema>>;
 
 class EnvError extends Error {
 	readonly name: 'EnvError';
@@ -67,7 +67,8 @@ PORT=8080
 DATABASE_URL=postgres://localhost/app
 ```
 
-What comes back is the schema's output, frozen with `Object.freeze`:
+What comes back is the schema's output, frozen with `Object.freeze` and
+typed `Readonly`:
 
 ```ts
 import { parseEnv } from '@alxia/env';
@@ -76,13 +77,13 @@ import { z } from 'zod';
 const env = parseEnv(z.object({ PORT: z.coerce.number() }), { PORT: '8080' });
 
 Object.isFrozen(env); // true
-env.PORT = 1; // TypeError at runtime: Attempted to assign to readonly property.
+// @ts-expect-error TS2540: Cannot assign to 'PORT' because it is a read-only property.
+env.PORT = 1; // and at runtime, TypeError: Attempted to assign to readonly property.
 ```
 
-The freeze is shallow: an array or object a transform builds stays
-mutable. And the type does not say `readonly`, so `tsc` lets the
-assignment above through — see
-[Troubleshooting](troubleshooting.md#typeerror-attempted-to-assign-to-readonly-property).
+The freeze and the type are both shallow: an array or object a transform
+builds stays mutable — see
+[Troubleshooting](troubleshooting.md#cannot-assign-to-port-because-it-is-a-read-only-property).
 
 Which other variables come back depends on the validator. Zod's
 `z.object` and Valibot's `v.object` drop every key they do not declare;

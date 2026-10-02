@@ -36,5 +36,5 @@ Nothing scheduled yet.
   the schema's output, its defaults and coercions applied.
 - **Every issue at once.** An `EnvError` lists each refused variable with
   the validator's message, in its message and in `issues`.
-- **Frozen, and testable.** The result is frozen; a second argument
-  replaces `Bun.env`, for a test or another runtime.
+- **Frozen, and testable.** The result is frozen, and typed `Readonly`; a
+  second argument replaces `Bun.env`, for a test or another runtime.

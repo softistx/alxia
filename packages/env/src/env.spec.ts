@@ -18,10 +18,12 @@ describe('parseEnv', () => {
 			PORT: '8080',
 		});
 		expectTypeOf(env).toEqualTypeOf<{
-			PORT: number;
-			DATABASE_URL: string;
-			DEBUG: boolean;
+			readonly PORT: number;
+			readonly DATABASE_URL: string;
+			readonly DEBUG: boolean;
 		}>();
+		// @ts-expect-error frozen, and its type says so
+		expect(() => (env.PORT = 1)).toThrow(TypeError);
 		expect(env).toEqual({
 			PORT: 8080,
 			DATABASE_URL: 'postgres://localhost/db',

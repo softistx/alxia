@@ -34,14 +34,15 @@ EnvError: The environment is invalid:
   DATABASE_URL: Invalid input: expected string, received undefined
 ```
 
-The result is frozen. `source` defaults to `Bun.env`; pass another object
-in a test. The schema must validate synchronously.
+The result is frozen, and typed `Readonly`. `source` defaults to
+`Bun.env`; pass another object in a test.
+The schema must validate synchronously.
 
 ## API
 
 | export | |
 | --- | --- |
-| `parseEnv(schema, source?)` | the variables, checked and typed |
+| `parseEnv(schema, source?)` | the variables, checked, typed and frozen |
 | `EnvError` | thrown with every `issues` entry: `path`, `message` |
 
 ## Documentation

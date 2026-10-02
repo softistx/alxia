@@ -18,7 +18,6 @@ wording; Valibot and ArkType say the same thing in other words.
 
 **At runtime**
 
-- [`TypeError: Attempted to assign to readonly property.`](#typeerror-attempted-to-assign-to-readonly-property)
 - [`DEBUG=false` is read as `true`](#debugfalse-is-read-as-true)
 - [`PORT=` is read as `0`, not as the default](#port-is-read-as-0-not-as-the-default)
 
@@ -27,7 +26,8 @@ wording; Valibot and ArkType say the same thing in other words.
 - [`Object literal may only specify known properties, and 'PORT' does not exist in type 'StandardSchema<unknown>'.`](#object-literal-may-only-specify-known-properties-and-port-does-not-exist-in-type-standardschemaunknown)
 - [`Argument of type '…' is not assignable to parameter of type 'StandardSchema<unknown>'.`](#argument-of-type--is-not-assignable-to-parameter-of-type-standardschemaunknown)
 - [`Type 'number' is not assignable to type 'string'.`](#type-number-is-not-assignable-to-type-string)
-- [`Property 'HOME' does not exist on type '{ PORT: number; }'.`](#property-home-does-not-exist-on-type--port-number-)
+- [`Property 'HOME' does not exist on type 'Readonly<{ PORT: number; }>'.`](#property-home-does-not-exist-on-type-readonly-port-number-)
+- [`Cannot assign to 'PORT' because it is a read-only property.`](#cannot-assign-to-port-because-it-is-a-read-only-property)
 
 ## At startup
 
@@ -177,21 +177,6 @@ export const env = parseEnv(Env, process.env);
 
 ## At runtime
 
-### `TypeError: Attempted to assign to readonly property.`
-
-**When:** code assigns to a property of the parsed environment:
-`env.PORT = 4000`. `tsc` does not catch it.
-
-**Why:** the result is frozen with `Object.freeze`, but its type is the
-schema's output, which does not say `readonly`.
-
-**Fix:** parse a second environment instead of changing the first — in a
-test, pass the variables as `source`:
-
-```ts
-const env = parseEnv(Env, { ...Bun.env, PORT: '4000' });
-```
-
 ### `DEBUG=false` is read as `true`
 
 **When:** a boolean declared with `z.coerce.boolean()`. Nothing is thrown.
@@ -270,12 +255,12 @@ them in production.
 parseEnv(Env, { PORT: '8080' });
 ```
 
-### `Property 'HOME' does not exist on type '{ PORT: number; }'.`
+### `Property 'HOME' does not exist on type 'Readonly<{ PORT: number; }>'.`
 
 **When:** code reads a variable the schema does not declare.
 
-**Why:** the result's type is the schema's output, and only what it
-declares is there. With Zod's `z.object` or Valibot's `v.object`, the
+**Why:** the result's type is `Readonly` of the schema's output, and only
+what it declares is there. With Zod's `z.object` or Valibot's `v.object`, the
 variable is not there at runtime either.
 
 **Fix:** declare it:
@@ -284,4 +269,21 @@ variable is not there at runtime either.
 const env = parseEnv(
 	z.object({ PORT: z.coerce.number().default(3000), HOME: z.string() }),
 );
+```
+
+### `Cannot assign to 'PORT' because it is a read-only property.`
+
+**When:** code assigns to a property of the parsed environment:
+`env.PORT = 4000`. This is TS2540.
+
+**Why:** the result is frozen with `Object.freeze`, and its type is
+`Readonly` of the schema's output, so the assignment would throw
+`TypeError: Attempted to assign to readonly property.` at runtime. Both
+are shallow: an array or object a transform builds stays mutable.
+
+**Fix:** parse a second environment instead of changing the first. In a
+test, pass the variables as `source`:
+
+```ts
+const env = parseEnv(Env, { ...Bun.env, PORT: '4000' });
 ```
