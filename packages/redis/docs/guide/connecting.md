@@ -147,8 +147,8 @@ apps and several features can share one Redis:
 
 | Export | Keys it writes |
 | --- | --- |
-| `redisStore(client, { name })` | `<name>:<limit>/<windowMs>:<key>` |
-| `redisCacheStore(client, { name })` | `<name>:response:<key>` and `<name>:tag:<tag>` |
+| `redisStore(client, { name })` | `<name>:<limit>/<windowMs>:<key>`, and `<name>:policies` |
+| `redisCacheStore(client, { name })` | `<name>:response:<key>`, and `<name>:tag:<tag>`, which expires with its longest-kept response |
 | `idempotency(client, { name })` | `<name>:<route>:<scope>:<Idempotency-Key>` |
 | `redis(client, { caches })` | each cache's own `<name>:<key>`, and `lock:<key>` |
 

@@ -38,7 +38,7 @@ interface RedisStoreOptions {
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `name` | `string` | required | the prefix of every key it counts: `<name>:<limit>/<windowMs>:<key>` |
+| `name` | `string` | required | the prefix of every key it writes: `<name>:<limit>/<windowMs>:<key>` for a count, and `<name>:policies` for the policies counted under the name |
 
 `limit`, `windowMs`, the `key` counted (the client's address by default),
 `skip` and the headers are `rateLimit`'s options, not the store's: see
@@ -163,11 +163,28 @@ const app = alxia().group('/auth', (auth) =>
 );
 ```
 
-`reset` forgets the key under each policy **this store object has counted
-since the process started**. Called from the same store the limit counts
-with, as above, it always works. Called from another store object, or
-from a process that has not counted that policy yet, it forgets nothing
-([troubleshooting](../troubleshooting.md#reset-forgets-nothing-and-the-client-is-still-refused)).
+`reset` forgets the key under **every policy ever counted under the
+store's `name`**, by any store object and any process: each policy is
+recorded in a Redis set, `<name>:policies`, the first time a process counts
+under it. So a process that only resets — an admin endpoint, a worker —
+needs no count of its own:
+
+```ts
+import { redisStore } from '@alxia/redis';
+import { connectRedis } from '@nxgt/redis';
+
+const connection = await connectRedis(Bun.env['REDIS_URL']!);
+
+// Another process: the login limit above is counted elsewhere.
+export async function unblock(ip: string) {
+	await redisStore(connection.client, { name: 'login' }).reset(ip);
+}
+```
+
+The policies set holds one short member per `limit`/`windowMs` pair and is
+kept without an expiry. A name used for several policies over time — a
+limit you tuned — keeps the old ones in it; `reset` then also deletes the
+key under them, which costs a command each and nothing else.
 
 ## Next
 

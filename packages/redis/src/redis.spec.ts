@@ -40,6 +40,27 @@ describe('redisStore', () => {
 		await store.reset('k');
 		expect((await store.consume('k', policy)).allowed).toBe(true);
 	});
+
+	test('reset forgets a key counted by another store, or another process', async () => {
+		const policy = { limit: 1, windowMs: 60_000 };
+		const counting = redisStore(db.client, { name: 'shared' });
+		expect((await counting.consume('k', policy)).allowed).toBe(true);
+		expect((await counting.consume('k', policy)).allowed).toBe(false);
+		await redisStore(db.client, { name: 'shared' }).reset('k');
+		expect((await counting.consume('k', policy)).allowed).toBe(true);
+	});
+
+	test('reset skips what it did not record under the name', async () => {
+		const store = redisStore(db.client, { name: 'odd' });
+		const policy = { limit: 1, windowMs: 60_000 };
+		await store.consume('k', policy);
+		await db.client.send('SADD', ['odd:policies', 'a/b', '0/1000', '1/2/3']);
+		await store.reset('k');
+		expect((await store.consume('k', policy)).allowed).toBe(true);
+		expect(
+			((await db.client.send('SMEMBERS', ['odd:policies'])) as string[]).sort(),
+		).toEqual(['0/1000', '1/2/3', '1/60000', 'a/b']);
+	});
 });
 
 let runs = 0;
@@ -188,5 +209,26 @@ describe('redisCacheStore', () => {
 		expect(await (await one.app.request('/products')).json()).toEqual({
 			runs: 2,
 		});
+	});
+
+	test('a tag lives as long as its longest-kept response', async () => {
+		const { redisCacheStore } = await import('./cache-store');
+		const store = redisCacheStore(db.client, { name: 'shop' });
+		const value = {
+			status: 200,
+			headers: [],
+			body: new Uint8Array(),
+			storedAt: Date.now(),
+			ttl: 0,
+			stale: 0,
+			tags: ['products'],
+		};
+		const ttl = () => db.client.send('TTL', ['shop:tag:products']);
+		await store.set('/a', value, 60_000);
+		expect(await ttl()).toBeWithin(55, 61);
+		await store.set('/b', value, 600_000);
+		expect(await ttl()).toBeWithin(595, 601);
+		await store.set('/c', value, 30_000);
+		expect(await ttl()).toBeWithin(595, 601);
 	});
 });

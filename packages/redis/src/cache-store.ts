@@ -18,6 +18,9 @@ const Stored = z.object({
 	tags: z.array(z.string()),
 });
 
+/** What a Redis older than 7 answers to `EXPIRE … NX`. */
+const REFUSED_ARGUMENTS = /wrong number of arguments|syntax error/i;
+
 /**
  * An `@alxia/cache` store in Redis, on `@nxgt/redis`'s typed caches: every
  * process sharing the Redis serves what one of them kept. A record that no
@@ -44,6 +47,28 @@ export function redisCacheStore(
 		}),
 	);
 	const tagKey = (tag: string) => `${options.name}:tag:${tag}`;
+	/**
+	 * Keeps a tag's set as long as its longest-kept response: `NX` gives a
+	 * new set its first expiry — `GT` alone never would, a key without one
+	 * counting as kept forever — and `GT` then only ever lengthens it. A
+	 * Redis older than 7 refuses both arguments: it gets the plain `EXPIRE`,
+	 * from then on. Any other error is the caller's.
+	 */
+	let flagsKnown = true;
+	const keepTag = async (key: string, seconds: number) => {
+		const ttl = String(seconds);
+		if (flagsKnown) {
+			try {
+				await client.send('EXPIRE', [key, ttl, 'NX']);
+				await client.send('EXPIRE', [key, ttl, 'GT']);
+				return;
+			} catch (error) {
+				if (!REFUSED_ARGUMENTS.test(String(error))) throw error;
+				flagsKnown = false;
+			}
+		}
+		await client.send('EXPIRE', [key, ttl]);
+	};
 
 	return {
 		async get(key) {
@@ -71,9 +96,7 @@ export function redisCacheStore(
 			);
 			for (const tag of value.tags) {
 				await client.send('SADD', [tagKey(tag), records.keyFor(key)]);
-				await client
-					.send('EXPIRE', [tagKey(tag), String(seconds), 'GT'])
-					.catch(() => client.send('EXPIRE', [tagKey(tag), String(seconds)]));
+				await keepTag(tagKey(tag), seconds);
 			}
 		},
 		async delete(key) {

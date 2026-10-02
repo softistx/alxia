@@ -42,11 +42,9 @@ each through. What prints nothing is under [Traps](#traps), by symptom.
 **Traps**
 
 - [A rate limit lets more than `limit` requests through](#a-rate-limit-lets-more-than-limit-requests-through)
-- [`reset` forgets nothing, and the client is still refused](#reset-forgets-nothing-and-the-client-is-still-refused)
 - [Two limits count each other's requests](#two-limits-count-each-others-requests)
 - [A `401` or a `429` is replayed, with `Idempotent-Replayed: true`, after the client fixed it](#a-401-or-a-429-is-replayed-with-idempotent-replayed-true-after-the-client-fixed-it)
 - [One client gets another client's response](#one-client-gets-another-clients-response)
-- [Tag sets pile up in Redis with no TTL](#tag-sets-pile-up-in-redis-with-no-ttl)
 
 ## Install and types
 
@@ -469,33 +467,6 @@ through at once. For a smaller burst at the same rate, divide `limit` and
 rateLimit({ limit: 10, windowMs: 6_000, store });   // 100 a minute, at most 10 at once
 ```
 
-### `reset` forgets nothing, and the client is still refused
-
-**When:** `store.reset(key)` is called on a `redisStore` object that has
-not itself counted that key's policy since the process started — another
-`redisStore(…)` with the same name, or a process that only handles the
-reset.
-
-**Why:** the store's keys hold the policy — `<name>:<limit>/<windowMs>:<key>`
-— and `reset` forgets the key under each policy that store object has
-counted so far. A store that has counted nothing knows no policy, and
-deletes nothing.
-
-**Fix:** reset through the same store object the `rateLimit` counts with:
-
-```ts
-const attempts = redisStore(connection.client, { name: 'login' });
-app.use(rateLimit({ limit: 5, windowMs: 900_000, store: attempts }));
-// …in the login route, on success:
-await attempts.reset(ip);
-```
-
-From another process, delete the Redis key itself:
-
-```ts
-await connection.client.send('DEL', [`login:5/900000:${ip}`]);
-```
-
 ### Two limits count each other's requests
 
 **When:** two `rateLimit`s with the same `limit` and `windowMs` are given
@@ -558,23 +529,3 @@ idempotency(connection.client, {
 
 [Scope](guide/idempotency.md#scope-whose-key-it-is) shows the `ip` option
 behind a proxy.
-
-### Tag sets pile up in Redis with no TTL
-
-**When:** `redisCacheStore` with `tags`; `<name>:tag:<tag>` keys stay in
-Redis after the responses they name have expired, with `TTL -1`.
-
-**Why:** a tag's set is given an expiry only when it can be extended, and
-Redis never extends a key that has none — so a new tag set keeps no
-expiry. It is deleted by `invalidateTag(tag)`. With a few stable tags this
-is a handful of small sets; with a tag per id, one set per id stays.
-
-**Fix:** keep tags few and stable, and invalidate by them; or clear the
-sets now and then:
-
-```sh
-redis-cli --scan --pattern 'shop:tag:*' | xargs -r redis-cli del
-```
-
-Deleting a tag set only forgets which responses it named: they still
-expire on their own.
