@@ -51,7 +51,7 @@ another type than `type` is anonymous.
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `required` | `boolean` (a literal `true` or `false`) | `false` | `true`: an anonymous request is answered `401 { error: 'unauthenticated' }`, the route never runs, and `user` is never `null` in it |
+| `required` | `boolean` | `false` | `true`: an anonymous request is answered `401 { error: 'unauthenticated' }` and the route never runs; a literal `true` also types `user` as never `null` |
 | `type` | one of the user types of `janus()` | every type | only a user of this type is authenticated; any other is anonymous, and `user` is narrowed to it |
 
 ### `required`
@@ -74,21 +74,24 @@ client generated from the app reads it:
 401 {"error":"unauthenticated"}
 ```
 
-Pass a literal. A `boolean` computed at run time matches neither overload,
-and is a compile error
-([troubleshooting](../troubleshooting.md#type-boolean-is-not-assignable-to-type-true)).
-Choose between the two calls instead; the routes then read `user` as
-possibly `null`, the looser of the two:
+A `boolean` known only at run time is accepted too — and so is a whole
+`SessionOptions` value, for a wrapper that forwards it. The compiler cannot
+tell which it will be, so the routes get both answers: the 401 is in their
+type, and `user` may be `null`. At run time, `true` answers an anonymous
+request 401 and `false` lets it through with `user: null`:
 
 ```ts
 const strict = Bun.env['STRICT'] === '1';
-// session(auth, { required: strict });  // does not compile
-const guard = strict ? session(auth, { required: true }) : session(auth);
 
 const app = alxia()
-	.use(guard)
+	.use(session(auth, { required: strict }))
 	.get('/me', ({ user, reply }) => reply(200, user === null ? 'anonymous' : user.name));
+
+// STRICT=1: 401 {"error":"unauthenticated"}; otherwise: 200 "anonymous"
 ```
+
+Write the literal `true` when the session is always required: only then
+does the compiler know `user` is never `null`.
 
 ### `type`
 
@@ -134,10 +137,11 @@ A patient's session on `/staff/me` is a 401, as if they had sent none. A
 
 ## What the routes read
 
-| Field | Without `required` | With `required: true` |
-| --- | --- | --- |
-| `user` | the user, typed by its schema and narrowed by `type`, or `null` | the user |
-| `session` | `Session` or `null` | `Session` |
+| Field | Without `required`, or `false` | With a `boolean` | With `required: true` |
+| --- | --- | --- | --- |
+| `user` | the user, typed by its schema and narrowed by `type`, or `null` | the user, or `null` | the user |
+| `session` | `Session` or `null` | `Session` or `null` | `Session` |
+| a 401 in the routes' type | no | yes | yes |
 
 `Session` is `@nxgt/janus`'s: `id`, `userId`, `authenticatedAt`,
 `expiresAt`, `revokedAt`, `createdAt`. The token is never in it.
@@ -247,6 +251,11 @@ function session<A extends Auth<{ readonly type: string }>, const T extends User
 	auth: A,
 	options?: SessionOptions<T> & { readonly required?: false },
 ): Alxia<{ readonly user: UserOf<A, T> | null; readonly session: Session | null }, Empty, '', never>;
+
+function session<A extends Auth<{ readonly type: string }>, const T extends UserOfAuth<A>['type']>(
+	auth: A,
+	options?: SessionOptions<T>,
+): Alxia<{ readonly user: UserOf<A, T> | null; readonly session: Session | null }, Empty, '', Reply<401, UnauthenticatedBody>>;
 
 interface SessionOptions<T extends string> {
 	readonly type?: T;

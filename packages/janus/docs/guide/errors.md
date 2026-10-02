@@ -111,9 +111,9 @@ const app = alxia().use(
 | --- | --- | --- | --- |
 | `report` | `(error: JanusError, ctx: BaseContext) => unknown` | none | called with every `JanusError` answered 500, 501 or 503 — `STORE_FAILED`, `UNSUPPORTED`, `PERMISSION_DEPTH` — the server's to fix |
 
-`report` is called, not awaited: it cannot delay or change the answer. One
-that throws or rejects is a process warning, and the 503 is sent all the
-same:
+`report` is started as the error is answered, not awaited: a slow report
+never holds the response, and it cannot change the answer. One that throws
+or rejects is a process warning, and the 503 is sent all the same:
 
 ```text
 (node:13837) Warning: janusErrors(): report failed: Error: boom

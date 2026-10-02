@@ -46,7 +46,9 @@ const app = alxia()
 
 The routes after it read `user` and `session`. With `required: true`, an
 anonymous request is a 401 `{ error: 'unauthenticated' }` and `user` is
-never `null`; without, it is `null` for an anonymous request. `type` narrows
+never `null`; without, it is `null` for an anonymous request. A `boolean`
+known only at run time types both: the 401, and a `user` that may be
+`null`. `type` narrows
 to one user type of a multi-type `janus()`.
 
 The session is read from `Authorization: Bearer`, `X-Session-Token`, or the
@@ -142,7 +144,7 @@ types exactly then.
 | `janusErrors(options?)` | the plugin: janus's refusals answered |
 | `JanusErrorsOptions` | its options: `report`, called with every error answered 5xx |
 | `permission(…)`, `byParam(…)` | the guard |
-| `PermissionOptions` | its options: `subject`, `ctx` |
+| `PermissionOptions`, `OptionsArgs` | its options: `subject`, `ctx`; and the rest of its arguments, the options required exactly when the permission has a condition |
 | `bodyOf`, `statusOf` | a refusal's body and status |
 | `UnauthenticatedBody`, `JanusErrorBody`, `PermissionRefusedBody` | their types |
 | `Auth`, `UserOfAuth`, `ObjectData`, `Awaitable` | the part of `janus()` this package calls, the users it knows, an object as the application loads it, a value or its promise |

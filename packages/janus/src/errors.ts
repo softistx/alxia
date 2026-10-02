@@ -43,8 +43,9 @@ export function bodyOf(error: JanusError): JanusErrorBody {
 export interface JanusErrorsOptions {
 	/**
 	 * Called with every `JanusError` answered 5xx — `STORE_FAILED` and the
-	 * like, the server's to fix — before it is answered. It cannot stop the
-	 * answer: one that throws is a warning, and the 503 is sent all the same.
+	 * like, the server's to fix — as it is answered: started, not awaited,
+	 * so a slow report never holds the response. It cannot change the
+	 * answer: one that throws or rejects is a warning.
 	 */
 	readonly report?: (error: JanusError, ctx: BaseContext) => unknown;
 }
