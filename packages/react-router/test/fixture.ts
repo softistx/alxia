@@ -39,9 +39,11 @@ export function fixtureBuild(): Promise<ServerBuild> {
 
 /**
  * A copy of the fixture the `/vite` specs may edit and build, beside it so
- * that it resolves the same `node_modules`. Removed by `remove`.
+ * that it resolves the same `node_modules`. Removed by `remove`. With
+ * `server: false`, the copy has no `app/server.ts`: the plugin's default
+ * server serves it.
  */
-export async function copyFixture(): Promise<{
+export async function copyFixture({ server = true } = {}): Promise<{
 	readonly root: string;
 	readonly remove: () => Promise<void>;
 }> {
@@ -54,5 +56,6 @@ export async function copyFixture(): Promise<{
 		recursive: true,
 		filter: (source) => !/[\\/](build|\.react-router)$/.test(source),
 	});
+	if (!server) await rm(join(root, 'app', 'server.ts'));
 	return { root, remove: () => rm(root, { recursive: true, force: true }) };
 }

@@ -34,10 +34,12 @@ Nothing scheduled yet.
 - **The pages in the route table.** Documents and single-fetch data are not
   something the typed client calls, so the catch-all stays out of
   `RoutesOf`.
-- **A global `Register` augmentation** sparing `alxiaOf`'s type argument: a
-  process may hold more than one app.
 - **A runtime dependency.** The package declares none: `@alxia/core` and
   `react-router` are peers.
+- **A `react-router-serve` of its own.** `bun build/server/index.js` is the
+  server; there is no separate command to serve a build.
+- **Several runtimes from one plugin.** react-router-hono-server picks Node,
+  Bun, Deno or Cloudflare with a `runtime` option; alxia is Bun's.
 
 ## Shipped
 
@@ -58,9 +60,16 @@ Nothing scheduled yet.
   body.
 - **OpenAPI.** `isReactRouterRoute` leaves the catch-all and the client's
   files out of `@alxia/openapi`'s document.
-- **One server entry, with Vite.** `@alxia/react-router/vite`'s
-  `alxiaServer()`: under `react-router dev` the entry is loaded through
-  Vite's SSR runner and answers what Vite does not, with HMR, the entry's
-  own edits live and the app's context keys shared; `react-router build`
-  makes it the server build, prerendering included, and writes
-  `build/server/serve.js`, which listens on `PORT` and `HOST`.
+- **Zero config, with Vite.** `@alxia/react-router/vite`'s `alxia()`,
+  anywhere in `plugins`, is all an app from the official template needs.
+  Without `app/server.ts` a default server serves the pages; with it,
+  `createServer({ beforeAll, configure, getLoadContext, … })` customises
+  the app, and the plugin wires React Router's build, the mode and the
+  client folder. Under `react-router dev` the server is loaded through
+  Vite's SSR runner, with HMR, its own edits live and the app's context keys
+  shared. `react-router build` makes `build/server/index.js` the server,
+  prerendering included: run, it listens on `PORT` and `HOST` and stops on
+  `SIGTERM`; imported, it starts nothing.
+- **Loaders typed with no type argument.** A `Register` declaration beside
+  the server types `alxiaOf(context)`; `alxiaOf<typeof server>` and an app
+  still work, and with neither it is `BaseContext`.

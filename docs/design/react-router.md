@@ -1,11 +1,77 @@
 # alxia as the server of a React Router app
 
-Status: **shipped** — slices 1–4 merged as #70, #71, #72 and #74 (and #73, paths Bun.serve refuses). Approved by the owner on 2026-10-03, with the recommended
+Status: **shipped** — slices 1–4 merged as #70, #71, #72 and #74 (and #73, paths Bun.serve refuses); revised for zero config on 2026-10-03, below. Approved by the owner on 2026-10-03, with the recommended
 option of every decision below: a Vite plugin for dev (1a), the package's
 `alxiaContext` read through `alxiaOf` (2a), both prerequisites in core and
 `@alxia/compress` (3a, 4a), React Router `^8.0.0` only (5a), `HEAD` as `GET`
 (6a), the catch-all outside the contract (7a) and a generated `serve.js`
 (8a). One PR per slice, in the order given at the end.
+
+## Revised 2026-10-03: zero config
+
+The owner asked for an integration "almost zero config, like
+react-router-hono-server, with room to customise", set up as a minimal
+diff on the official `bunx create-react-router@latest` template. Probed
+on that template (React Router 8.4.0, Vite 8.3.2, TypeScript 5.9.3, Bun
+1.4.2, no Node), with the packages installed from their packed tarballs.
+
+**What changed.** The setup is now three changes to the template:
+`bun add @alxia/core @alxia/react-router`, `alxia()` in `vite.config.ts`'s
+plugins, and `"start": "bun build/server/index.js"`. The template's `dev`,
+`build` and `typecheck` scripts run unchanged through `bun run`.
+
+- **`alxia()`** replaces `alxiaServer({ entry })`. It is `enforce: 'pre'`,
+  so it runs before React Router's plugin wherever it is listed: React
+  Router reads the server build's input from the config it got, and adds
+  its own SSR middleware after this one's. It reads React Router's config
+  from `__reactRouterPluginContext`, as hono-server does, and steps aside
+  in React Router's child compiler and for `ssr: false`. It imports
+  nothing from `vite` at runtime: the dev check duck-types
+  `environments.ssr.runner.import` instead of `isRunnableDevEnvironment`,
+  so an app whose Vite is another copy than the package's still works.
+- **No server file needed.** Without `app/server.ts` the plugin generates
+  `createServer()` with no options. In dev the choice is made on each
+  request, so creating or deleting the file takes effect at once.
+- **`createServer({ beforeAll, configure, getLoadContext, build, mode,
+  client, listen, onListen })`** describes the server and returns
+  `{ create(wiring), start(app) }`. The plugin's generated module calls
+  `create` with React Router's build, the mode (from the command, not
+  `NODE_ENV`, which removes the old "assets 404 under `NODE_ENV=test`"
+  trap) and the client folder (from React Router's `buildDirectory`,
+  relative to the built file). A test calls `create` with a build. The
+  layers run as hono-server's do: `beforeAll`, the client's files,
+  `configure`, the pages, so a guard in `configure` leaves the assets
+  alone.
+- **`build/server/index.js` listens when run** (`import.meta.main`) and
+  starts nothing when imported, so prerendering and tests import it
+  safely. That replaces both `serve.js` (decision 8a) and hono-server's
+  `IS_RR_BUILD_REQUEST` flag. SIGINT and SIGTERM stop the app and run its
+  `onStop` hooks.
+- **Typing: a `Register` augmentation, now recommended.** `declare module
+  '@alxia/react-router' { interface Register { server: typeof server } }`
+  types `alxiaOf(context)` with no type argument; `alxiaOf<typeof server>`
+  and an app still work; with neither it is `BaseContext`. The objection
+  above ("Not a global augmentation") was that a module cannot know which
+  of several apps serves it. Under the plugin it can: one build has one
+  server entry, and `Register` names the app at its catch-all, which is
+  exactly what every loader runs behind. That is not the augmentation the
+  API ergonomics note rejected, which would have typed a plugin's context
+  on routes declared before it. Two apps in one TypeScript program
+  conflict loudly (TS2717), and never lie.
+
+**What hono-server does that alxia does not:**
+
+- a `runtime` option (Node, Deno, Cloudflare, AWS Lambda): alxia is Bun's;
+- a default logger in the default server: alxia's default server is bare,
+  and the logger is one `configure` away;
+- `reveal`, a CLI that writes `app/server.ts`: the file is three lines;
+- WebSockets in dev through `@hono/node-server` and `ws`: still on the
+  roadmap, as a dependency the package will not take;
+- `vite preview` support, Chrome DevTools' workspace file, socket info
+  headers in dev, a `react-dom/server.browser` alias for Bun (React
+  Router's default entry already streams under Bun), and the build path
+  passed through `import.meta.env` defines (alxia resolves the client
+  folder against the built file instead).
 
 The owner wants `@alxia/react-router`: alxia as the HTTP server of a React
 Router **framework-mode** app with SSR. Under it, the loaders read what

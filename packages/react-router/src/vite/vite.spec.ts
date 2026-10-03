@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { createServer, type ViteDevServer } from 'vite';
@@ -6,6 +7,8 @@ import { BROWSER, copyFixture } from '../../test/fixture';
 
 const browser = { 'user-agent': BROWSER };
 const text = (html: string) => html.replaceAll('<!-- -->', '');
+
+type Fixture = Awaited<ReturnType<typeof copyFixture>>;
 
 /** Vite's dev server on a copy of the fixture, in this process, on a free port. */
 async function devServer(
@@ -27,6 +30,20 @@ async function devServer(
 	return { server, base: `http://127.0.0.1:${address.port}` };
 }
 
+/** A Vite config beside the fixture's, edited by `edit`. React Router's plugin insists on a file. */
+async function configFile(
+	root: string,
+	name: string,
+	edit: (source: string) => string,
+): Promise<string> {
+	const file = join(root, `vite.${name}.config.ts`);
+	await Bun.write(
+		file,
+		edit(await Bun.file(join(root, 'vite.alxia.config.ts')).text()),
+	);
+	return file;
+}
+
 /** Polls `check` until it holds, or fails after `ms`. */
 async function eventually(check: () => Promise<boolean>, ms = 5_000) {
 	const until = performance.now() + ms;
@@ -37,8 +54,53 @@ async function eventually(check: () => Promise<boolean>, ms = 5_000) {
 	throw new Error(`not within ${ms} ms`);
 }
 
-describe('react-router dev', () => {
-	let fixture: Awaited<ReturnType<typeof copyFixture>>;
+/** `react-router build` on a copy of the fixture, with the plugin. */
+async function build(root: string): Promise<void> {
+	const result =
+		await $`${process.execPath} --bun react-router build --config vite.alxia.config.ts`
+			.cwd(root)
+			// `bun test` sets NODE_ENV=test, which Vite would build as development.
+			.env({ ...process.env, NODE_ENV: 'production' })
+			.quiet()
+			.nothrow();
+	if (result.exitCode !== 0) {
+		throw new Error(
+			`react-router build failed:\n${result.stdout}\n${result.stderr}`,
+		);
+	}
+}
+
+/** `bun build/server/index.js` on a free port, once it printed `<who> listening on <url>`. */
+async function start(root: string, who: string) {
+	const child = Bun.spawn(
+		[process.execPath, join(root, 'build', 'server', 'index.js')],
+		{
+			cwd: root,
+			env: { ...process.env, PORT: '0', HOST: '127.0.0.1' },
+			stdout: 'pipe',
+			stderr: 'pipe',
+		},
+	);
+	const reader = child.stdout.getReader();
+	let out = '';
+	const pattern = new RegExp(`${who} listening on (\\S+)`);
+	for (;;) {
+		const { done, value } = await reader.read();
+		if (done) {
+			child.kill();
+			throw new Error(`index.js exited: ${out}`);
+		}
+		out += new TextDecoder().decode(value);
+		const url = out.match(pattern)?.[1];
+		if (url !== undefined) {
+			reader.releaseLock();
+			return { child, url };
+		}
+	}
+}
+
+describe('react-router dev, with app/server.ts', () => {
+	let fixture: Fixture;
 	let server: ViteDevServer;
 	let base: string;
 
@@ -51,7 +113,7 @@ describe('react-router dev', () => {
 		await fixture?.remove();
 	});
 
-	test("a page is rendered by the entry, its loader reading alxiaOf and the app's own key", async () => {
+	test("a page is rendered by the server, its loader reading alxiaOf and the app's own key", async () => {
 		const response = await fetch(`${base}/`, {
 			headers: { ...browser, 'x-user': 'Ada' },
 		});
@@ -59,7 +121,7 @@ describe('react-router dev', () => {
 		const html = text(await response.text());
 		expect(html).toContain('<h1>Hello Ada</h1>');
 		expect(html).toContain('<p id="route">/*</p>');
-		// One module graph: the entry's getLoadContext sets the routes' own key.
+		// One module graph: the server's getLoadContext sets the routes' own key.
 		expect(html).toContain('<p id="greeting">from the entry</p>');
 		// React Router's HMR runtime: the page is the dev server's.
 		expect(html).toContain('virtual:react-router/inject-hmr-runtime');
@@ -168,25 +230,36 @@ describe('react-router dev', () => {
 		}
 	});
 
-	test('an entry whose default export is not an app is a 500 saying so', async () => {
+	test('a server file whose default export is not createServer() is a 500 saying so', async () => {
 		await Bun.write(
-			join(fixture.root, 'app', 'not-an-app.ts'),
-			'export default {};\n',
+			join(fixture.root, 'app', 'not-a-server.ts'),
+			"import { alxia } from '@alxia/core';\nexport default alxia();\n",
 		);
-		// React Router's plugin insists on a config file.
-		const config = join(fixture.root, 'vite.not-an-app.config.ts');
-		await Bun.write(
-			config,
-			(
-				await Bun.file(join(fixture.root, 'vite.alxia.config.ts')).text()
-			).replace('app/server.ts', 'app/not-an-app.ts'),
+		const config = await configFile(fixture.root, 'not-a-server', (source) =>
+			source.replace('alxia()]', "alxia({ entry: 'app/not-a-server.ts' })]"),
 		);
 		const other = await devServer(fixture.root, { configFile: config });
 		try {
 			const response = await fetch(`${other.base}/`, { headers: browser });
 			expect(response.status).toBe(500);
 			expect(await response.text()).toContain(
-				'app/not-an-app.ts must export the alxia app as its default export',
+				'app/not-a-server.ts must export createServer() from @alxia/react-router as its default export',
+			);
+		} finally {
+			await other.server.close();
+		}
+	});
+
+	test('an entry that does not exist is a 500 naming it', async () => {
+		const config = await configFile(fixture.root, 'nowhere', (source) =>
+			source.replace('alxia()]', "alxia({ entry: 'app/nowhere.ts' })]"),
+		);
+		const other = await devServer(fixture.root, { configFile: config });
+		try {
+			const response = await fetch(`${other.base}/`, { headers: browser });
+			expect(response.status).toBe(500);
+			expect(await response.text()).toContain(
+				'the entry app/nowhere.ts does not exist',
 			);
 		} finally {
 			await other.server.close();
@@ -194,10 +267,8 @@ describe('react-router dev', () => {
 	});
 
 	test('an ssr environment that runs elsewhere is a 500 saying so', async () => {
-		const config = join(fixture.root, 'vite.elsewhere.config.ts');
-		await Bun.write(
-			config,
-			(await Bun.file(join(fixture.root, 'vite.alxia.config.ts')).text())
+		const config = await configFile(fixture.root, 'elsewhere', (source) =>
+			source
 				.replace(
 					"import { defineConfig } from 'vite';",
 					"import { DevEnvironment, defineConfig } from 'vite';",
@@ -220,10 +291,68 @@ describe('react-router dev', () => {
 			await other.server.close();
 		}
 	});
+
+	test("without React Router's plugin, Vite refuses to start, saying so", async () => {
+		const config = await configFile(fixture.root, 'alone', (source) =>
+			source.replace('plugins: [reactRouter(), alxia()]', 'plugins: [alxia()]'),
+		);
+		await expect(
+			devServer(fixture.root, { configFile: config }),
+		).rejects.toThrow("React Router's Vite plugin is not in this config");
+	});
 });
 
-describe('react-router build', () => {
-	let fixture: Awaited<ReturnType<typeof copyFixture>>;
+describe('react-router dev, with no server file', () => {
+	let fixture: Fixture;
+	let server: ViteDevServer;
+	let base: string;
+
+	beforeAll(async () => {
+		fixture = await copyFixture({ server: false });
+		// Before React Router's plugin this time: the order does not matter.
+		const config = await configFile(fixture.root, 'first', (source) =>
+			source.replace('[reactRouter(), alxia()]', '[alxia(), reactRouter()]'),
+		);
+		({ server, base } = await devServer(fixture.root, { configFile: config }));
+	}, 30_000);
+	afterAll(async () => {
+		await server?.close();
+		await fixture?.remove();
+	});
+
+	test('the default server renders the pages behind alxia, with BaseContext', async () => {
+		const response = await fetch(`${base}/`, {
+			headers: { ...browser, 'x-user': 'Ada' },
+		});
+		expect(response.status).toBe(200);
+		const html = text(await response.text());
+		// No hook derives `user`: the loader falls back.
+		expect(html).toContain('<h1>Hello anonymous</h1>');
+		expect(html).toContain('<p id="route">/*</p>');
+		expect(html).toContain('virtual:react-router/inject-hmr-runtime');
+	});
+
+	test('a server file created while the dev server runs is used from the next request, and dropped when deleted', async () => {
+		const file = join(fixture.root, 'app', 'server.ts');
+		await Bun.write(
+			file,
+			"import { createServer } from '@alxia/react-router';\nimport { configure } from '../base';\nexport default createServer({ configure });\n",
+		);
+		try {
+			const health = await fetch(`${base}/api/health`);
+			expect(await health.json()).toEqual({ ok: true });
+		} finally {
+			await rm(file);
+		}
+		const after = await fetch(`${base}/api/health`, { headers: browser });
+		// The default server has no `/api/health`: React Router's 404 page.
+		expect(after.status).toBe(404);
+		expect(after.headers.get('content-type')).toBe('text/html');
+	});
+});
+
+describe('react-router build, with app/server.ts', () => {
+	let fixture: Fixture;
 
 	beforeAll(async () => {
 		fixture = await copyFixture();
@@ -232,25 +361,14 @@ describe('react-router build', () => {
 			join(fixture.root, 'react-router.config.ts'),
 			"import type { Config } from '@react-router/dev/config';\n\nexport default { ssr: true, prerender: ['/login'] } satisfies Config;\n",
 		);
-		// A name a server build exports, exported by the entry: it stays the
-		// entry's, out of the build.
+		// A name a server build exports, exported by the server file: it stays
+		// the file's, out of the build.
 		const entry = join(fixture.root, 'app', 'server.ts');
 		await Bun.write(
 			entry,
 			`${await Bun.file(entry).text()}\nexport const routes = 'not a server build';\n`,
 		);
-		const result =
-			await $`${process.execPath} --bun react-router build --config vite.alxia.config.ts`
-				.cwd(fixture.root)
-				// `bun test` sets NODE_ENV=test, which Vite would build as development.
-				.env({ ...process.env, NODE_ENV: 'production' })
-				.quiet()
-				.nothrow();
-		if (result.exitCode !== 0) {
-			throw new Error(
-				`react-router build failed:\n${result.stdout}\n${result.stderr}`,
-			);
-		}
+		await build(fixture.root);
 	}, 60_000);
 	afterAll(async () => {
 		await fixture?.remove();
@@ -271,26 +389,10 @@ describe('react-router build', () => {
 		).toBe(true);
 	});
 
-	test('serve.js listens on PORT and HOST, and serves the pages, the API and the assets', async () => {
-		const child = Bun.spawn(
-			[process.execPath, join(fixture.root, 'build', 'server', 'serve.js')],
-			{
-				cwd: fixture.root,
-				env: { ...process.env, PORT: '0', HOST: '127.0.0.1' },
-				stdout: 'pipe',
-				stderr: 'pipe',
-			},
-		);
+	test('bun build/server/index.js listens on PORT and HOST, serves the pages, the API and the assets, and stops on SIGTERM', async () => {
+		// The fixture's onListen prints its own line.
+		const { child, url } = await start(fixture.root, 'fixture');
 		try {
-			const reader = child.stdout.getReader();
-			let out = '';
-			let url: string | undefined;
-			while (url === undefined) {
-				const { done, value } = await reader.read();
-				if (done) throw new Error(`serve.js exited: ${out}`);
-				out += new TextDecoder().decode(value);
-				url = out.match(/alxia listening on (\S+)/)?.[1];
-			}
 			expect(url).toStartWith('http://127.0.0.1:');
 			const page = await fetch(url, {
 				headers: { ...browser, 'x-user': 'Bo' },
@@ -309,6 +411,39 @@ describe('react-router build', () => {
 			expect(served.headers.get('cache-control')).toBe(
 				'public, max-age=31536000, immutable',
 			);
+			child.kill('SIGTERM');
+			expect(await child.exited).toBe(0);
+		} finally {
+			child.kill();
+		}
+	});
+});
+
+describe('react-router build, with no server file', () => {
+	let fixture: Fixture;
+
+	beforeAll(async () => {
+		fixture = await copyFixture({ server: false });
+		await build(fixture.root);
+	}, 60_000);
+	afterAll(async () => {
+		await fixture?.remove();
+	});
+
+	test('bun build/server/index.js serves the pages and the client build on the default server', async () => {
+		const { child, url } = await start(fixture.root, 'alxia');
+		try {
+			const page = await fetch(url, { headers: browser });
+			expect(page.status).toBe(200);
+			const html = await page.text();
+			expect(text(html)).toContain('<h1>Hello anonymous</h1>');
+			const asset = html.match(/\/assets\/entry\.client-[\w-]+\.js/)?.[0];
+			const served = await fetch(new URL(asset as string, url));
+			expect(served.headers.get('cache-control')).toBe(
+				'public, max-age=31536000, immutable',
+			);
+			const robots = await fetch(new URL('/robots.txt', url));
+			expect(robots.headers.get('cache-control')).toBe('public, max-age=3600');
 			child.kill('SIGTERM');
 			expect(await child.exited).toBe(0);
 		} finally {
