@@ -23,8 +23,8 @@ a trap that prints nothing is headed by its symptom.
 - [`Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`](#type-reply500--is-not-assignable-to-type-maybepromisevoid--replyclienterrorstatus-any--undefined)
 - [`'500' does not exist in type 'RefusalResponses'`](#500-does-not-exist-in-type-refusalresponses)
 - [`The inferred type of '…' cannot be named without a reference to '…' from '…/@alxia/core/dist/…'`](#the-inferred-type-of--cannot-be-named-without-a-reference-to--from-alxiacoredist)
-- [`Property 'part' does not exist on type 'Refusal'`](#property-part-does-not-exist-on-type-refusal)
 - [`Argument of type '"validation" | "body_limit"' is not assignable to parameter of type 'never'`](#argument-of-type-validation--body_limit-is-not-assignable-to-parameter-of-type-never)
+- [`Property 'part' does not exist on type 'Refusal'`](#property-part-does-not-exist-on-type-refusal)
 
 **Building the app**
 
