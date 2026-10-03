@@ -131,15 +131,16 @@ Two consequences of that split:
 
 - On a route with a `cookies` schema, the handler's context is a copy of
   the hooks' whose `cookies` is the schema's output. `getContext()` from
-  `@alxia/context-storage` and React Router's `alxiaContext` hold the
-  hooks' one, with the cookies as strings.
+  `@alxia/context-storage` holds the hooks' one, with the cookies as
+  strings.
 - A handler's context on a route whose `cookies` schema outputs anything
   but strings — `{ visits: number }` — is no longer a `BaseContext`, whose
   `cookies` are strings. Pass a helper typed `(ctx: BaseContext) => …` the
   fields it reads, or type it `Omit<BaseContext, 'cookies'>`.
 
 A `derive` that returns `cookies` replaces the map for the hooks and the
-handler after it, unless the route's schema validates them.
+handler after it; a route's `cookies` schema then validates the map it
+returned, not the `Cookie` header.
 
 `set.cookies` is the other side: the cookies the **response** sets, empty
 when the request starts. `set.cookies.get('sid')` reads back what this
