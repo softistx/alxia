@@ -1,5 +1,5 @@
 import { Duplex } from 'node:stream';
-import { createBrotliCompress } from 'node:zlib';
+import { constants, createBrotliCompress } from 'node:zlib';
 import { type Plugin, vary, withHeaders } from '@alxia/core';
 
 export type Encoding = 'zstd' | 'br' | 'gzip' | 'deflate';
@@ -12,6 +12,13 @@ export interface CompressOptions {
 	/** Whether a `content-type` is worth compressing. Text, JSON, JavaScript, XML and SVG by default. */
 	readonly compressible?: (type: string) => boolean;
 }
+
+/**
+ * zlib's default, 11, is meant for compressing once ahead of time: on a
+ * response compressed per request it costs many times gzip's CPU for a few
+ * percent. 4 is still smaller than gzip's default, at about its speed.
+ */
+const BROTLI_QUALITY = 4;
 
 const COMPRESSIBLE =
 	/^(text\/(?!event-stream)|application\/(.+\+)?(json|javascript|xml)|image\/svg\+xml)/i;
@@ -57,6 +64,8 @@ export function compress(options: CompressOptions = {}): Plugin {
 			const headers = new Headers(response.headers);
 			headers.set('content-encoding', encoding);
 			headers.delete('content-length');
+			// A range of the encoded body is not a range of the file.
+			headers.delete('accept-ranges');
 			const etag = headers.get('etag');
 			if (etag !== null && !etag.startsWith('W/'))
 				headers.set('etag', `W/${etag}`);
@@ -73,7 +82,9 @@ function compressor(
 ): ReadableWritablePair<Uint8Array, Uint8Array> {
 	if (encoding === 'br') {
 		return Duplex.toWeb(
-			createBrotliCompress(),
+			createBrotliCompress({
+				params: { [constants.BROTLI_PARAM_QUALITY]: BROTLI_QUALITY },
+			}),
 		) as unknown as ReadableWritablePair<Uint8Array, Uint8Array>;
 	}
 	return new CompressionStream(

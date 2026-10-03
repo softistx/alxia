@@ -69,6 +69,24 @@ function objectOf<
 }
 
 describe('global hooks', () => {
+	test('onResponse sees the length of a binary body; one set by the handler wins', async () => {
+		const seen: (string | null)[] = [];
+		const app = alxia()
+			.onResponse((response) => {
+				seen.push(response.headers.get('content-length'));
+				return response;
+			})
+			.get('/view', ({ reply }) =>
+				reply(200, new Uint8Array(2000).subarray(10, 20)),
+			)
+			.get('/blob', ({ reply }) => reply(200, new Blob(['abc'])))
+			.get('/own', ({ reply }) =>
+				reply(200, new Blob(['abc']), { headers: { 'content-length': '3' } }),
+			);
+		for (const path of ['/view', '/blob', '/own']) await app.request(path);
+		expect(seen).toEqual(['10', '3', '3']);
+	});
+
 	test('onRequest answers before routing, onResponse sees every response', async () => {
 		const seen: number[] = [];
 		const app = alxia()

@@ -54,6 +54,7 @@ describe('app.static', () => {
 		expect(response.headers.get('cache-control')).toBe('no-cache');
 		expect(response.headers.get('x-kind')).toBe('text');
 		expect(response.headers.get('accept-ranges')).toBe('bytes');
+		expect(response.headers.get('content-length')).toBe('5');
 	});
 
 	test('an index, an extension, a content type of its own', async () => {
@@ -147,6 +148,7 @@ describe('app.static', () => {
 		expect(await deep.text()).toBe('<h1>app</h1>');
 		const head = await spa.request('/hello.txt', { method: 'HEAD' });
 		expect(head.status).toBe(200);
+		expect(head.headers.get('content-length')).toBe('5');
 		expect(await head.text()).toBe('');
 	});
 
