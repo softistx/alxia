@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { compilePath, Router } from './router';
+import { compilePath } from './compile';
+import { Router } from './router';
 
 describe('compilePath', () => {
 	test('erases parameter names from the shape', () => {
@@ -19,10 +20,12 @@ describe('Router', () => {
 		router.add('GET', '/users/:id', 'one');
 		router.add('GET', '/users/me', 'me');
 		expect(router.match('GET', '/users/me')).toEqual({
+			path: '/users/me',
 			value: 'me',
 			params: {},
 		});
 		expect(router.match('GET', '/users/7')).toEqual({
+			path: '/users/:id',
 			value: 'one',
 			params: { id: '7' },
 		});
@@ -32,6 +35,7 @@ describe('Router', () => {
 		const router = new Router<string>();
 		router.add('GET', '/tags/:tag', 'tag');
 		expect(router.match('GET', '/tags/a%20b')).toEqual({
+			path: '/tags/:tag',
 			value: 'tag',
 			params: { tag: 'a b' },
 		});
@@ -55,6 +59,61 @@ describe('Router', () => {
 		const router = new Router<string>();
 		router.add('GET', '/a', 'a');
 		router.add('PUT', '/a', 'a');
-		expect(router.match('POST', '/a')).toEqual({ allowed: ['GET', 'PUT'] });
+		expect(router.match('POST', '/a')).toEqual({
+			path: '/a',
+			allowed: ['GET', 'PUT'],
+		});
+	});
+
+	test('ranks as Bun.serve does, whatever the order of declaration', () => {
+		const router = new Router<string>();
+		router.add('GET', '/*', 'all');
+		router.add('GET', '/a/:id', 'param');
+		router.add('GET', '/a/*', 'rest');
+		router.add('GET', '/:x/b', 'second');
+		const path = (pathname: string) => router.match('GET', pathname)?.path;
+		expect(path('/a/b')).toBe('/a/:id');
+		expect(path('/a/b/c')).toBe('/a/*');
+		expect(path('/z/b')).toBe('/:x/b');
+		expect(path('/z/b/c')).toBe('/*');
+	});
+
+	test('the best path decides, even without the method', () => {
+		const router = new Router<string>();
+		router.add('GET', '/users/:id', 'one');
+		router.add('POST', '/users/me', 'me');
+		expect(router.match('GET', '/users/me')).toEqual({
+			path: '/users/me',
+			allowed: ['POST'],
+		});
+	});
+
+	test('forgives a trailing slash only when nothing matches strictly', () => {
+		const router = new Router<string>();
+		router.add('GET', '/a', 'a');
+		router.add('GET', '/f/*', 'f');
+		expect(router.match('GET', '/a/')?.path).toBe('/a');
+		expect(router.match('GET', '/f')).toEqual({
+			path: '/f/*',
+			value: 'f',
+			params: { '*': '' },
+		});
+		router.add('GET', '/a/*', 'rest');
+		expect(router.match('GET', '/a/')?.path).toBe('/a/*');
+	});
+
+	test('a path served elsewhere that ranks first matches nothing', () => {
+		const router = new Router<string>();
+		router.add('GET', '/*', 'all');
+		expect(router.match('GET', '/', ['/'])).toBeUndefined();
+		expect(router.match('GET', '/x', ['/'])?.path).toBe('/*');
+		expect(router.match('GET', '/x/', ['/x'])?.path).toBe('/*');
+	});
+
+	test('a page matching strictly wins over a trailing slash forgiven', () => {
+		const router = new Router<string>();
+		router.add('GET', '/s', 's');
+		expect(router.match('GET', '/s/', ['/s/'])).toBeUndefined();
+		expect(router.match('GET', '/s/')?.path).toBe('/s');
 	});
 });

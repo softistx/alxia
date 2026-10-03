@@ -619,9 +619,11 @@ no file.
 
 - The path lacks the app's or the group's prefix: with
   `alxia({ prefix: '/api' })`, the route is `/api/users`.
-- The path is a `page(…)`. Pages are served by `Bun.serve` itself, so
-  `app.fetch` and `app.request` answer 404 for them. Only `listen` serves
-  them.
+- The path is a `page(…)`, or a page's path ranks before the route's
+  ([Which route answers](guide/routes.md#which-route-answers)): with
+  `page('/', index)` and a `/*` route, `GET /` is the page. Pages are
+  served by `Bun.serve` itself, so `app.fetch` and `app.request` answer 404
+  for them. Only `listen` serves them.
 - `static` was given a relative directory, which is resolved from the
   process's working directory, not from the file that declares it.
 - The file is a dotfile (`.env`, `.well-known/…`), or the path leaves the
@@ -647,8 +649,34 @@ path: `static('/.well-known', dir)` serves the files in `dir` without it.
 **When:** the path matches a route, but not with that method. The `Allow`
 header lists the methods it does take.
 
+**Why**, when another route takes that method: the path is chosen before
+the method, as `Bun.serve` chooses it. With `GET /users/:id` and
+`POST /users/me`, `GET /users/me` reaches `/users/me`, which has no `GET`.
+
 **Fix:** call it with a method in `Allow`, or declare the route for the
-method you call. `HEAD` is answered by the `GET` route.
+method you call at the path that answers. `HEAD` is answered by the `GET`
+route.
+
+### A route other than the one declared first answers
+
+**When:** two routes match a request, and the one that answers is not the
+one declared first: `/api/*` answers `GET /api/users` although `/*` was
+declared before it, or `/a/*` answers `/a/` rather than `/a`.
+
+**Why:** `app.fetch`, `app.request` and `listen` all rank the matching
+paths as `Bun.serve`'s router does: segment by segment, a literal before a
+parameter before a wildcard, with a trailing slash as a segment of its own.
+The order of declaration plays no part
+([Which route answers](guide/routes.md#which-route-answers)).
+
+**Fix:** make the path you mean to answer the more specific one, rather
+than declaring it first:
+
+```ts
+app
+	.get('/*', ({ reply }) => reply(200, 'page'))
+	.get('/api/*', ({ reply }) => reply(200, 'api')); // answers /api/…, declared last
+```
 
 ### `426 {"error":"upgrade_required"}`
 

@@ -1,5 +1,5 @@
 import type { JoinPath } from '../types/path';
-import { compilePath } from './router';
+import { compilePath } from './compile';
 
 /**
  * `prefix` then `path`, as the app joins them: a prefix, a group, a plugin

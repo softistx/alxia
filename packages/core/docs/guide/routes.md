@@ -179,8 +179,33 @@ Paths are checked when the route is declared, and a mistake throws a
 | the same method and path twice | `GET /a is declared twice` |
 | a method with no handler | `GET /a: the handler is missing` |
 
-When two paths match a request, a path without parameters wins — `/users/me`
-over `/users/:id` — then the one declared first.
+### Which route answers
+
+When several paths match a request, the one chosen is the one `Bun.serve`'s
+router chooses under `listen`, and `app.fetch` and `app.request` choose it
+the same way, so a test, a dev server going through `fetch` and production
+route alike. The order of declaration plays no part:
+
+- **Segment by segment, a literal beats a parameter, which beats a
+  wildcard.** The first segment where two paths differ decides: `/users/me`
+  over `/users/:id`, `/users/:id` over `/users/*`, `/api/*` over `/*`, and
+  `/a/:id` over `/:x/b` for `/a/b`.
+- **A path that leads nowhere gives way.** For `/a/b/d`, `/a/b/c` does not
+  match, so `/:x/b/d` answers.
+- **A trailing slash is a segment of its own.** `/a/*` matches `/a/` and
+  `/a/x`, not `/a`; `/:id` does not match an empty segment. Only when no
+  path matches that strictly is a trailing slash forgiven: `/users/`
+  reaches `/users`, `/files` reaches `/files/*`.
+- **The path is chosen before the method.** With `GET /users/:id` and
+  `POST /users/me`, `GET /users/me` is a 405 that allows `POST`: `/users/me`
+  is the path, and it has no `GET`.
+
+```ts
+app
+	.get('/*', ({ reply }) => reply(200, 'page'))
+	.get('/api/*', ({ reply }) => reply(200, 'api'));
+// GET /api/users → "api", through fetch and listen alike
+```
 
 ## The schema
 
@@ -337,7 +362,7 @@ A params schema with an optional key the path does not declare —
 | Request | Status | Body |
 | --- | --- | --- |
 | a path no route declares | 404 | `{ "error": "not_found" }` |
-| a declared path, by a method it does not have | 405, with `Allow` | `{ "error": "method_not_allowed" }` |
+| the path that answers ([Which route answers](#which-route-answers)), by a method it does not have | 405, with `Allow` | `{ "error": "method_not_allowed" }` |
 | a socket's path, without an upgrade | 426 | `{ "error": "upgrade_required" }` |
 
 `HEAD` on a path with a `GET` and no `HEAD` of its own runs the `GET` route
