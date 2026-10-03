@@ -1,4 +1,12 @@
-import { type Plugin, withHeaders } from '@alxia/core';
+import {
+	type Alxia,
+	definePlugin,
+	type Empty,
+	type Plugin,
+	type Requiring,
+	withHeaders,
+} from '@alxia/core';
+import { NONCE, type NonceContext, nonceStore, policyWithNonce } from './nonce';
 
 /** A header's value, or `false` to leave it out. An empty value is refused. */
 export type Setting = string | false;
@@ -20,7 +28,20 @@ export interface SecureHeadersOptions {
 	readonly permissionsPolicy?: Setting;
 	/** Whether `X-Powered-By` and `Server` are removed. On by default. */
 	readonly hidePoweredBy?: boolean;
+	/**
+	 * A fresh nonce for each request, in `contentSecurityPolicy` and on the
+	 * context as `nonce`. Placed where the policy names `NONCE`, or added to
+	 * its `script-src`. Off by default.
+	 */
+	readonly nonce?: boolean;
 }
+
+/**
+ * What `secureHeaders({ nonce: true })` returns: an app plugin, whose routes
+ * after it read `nonce`, and whose hook sets the header with the same one.
+ */
+export type NoncePlugin = Alxia<NonceContext, Empty, '', never> &
+	Requiring<Empty>;
 
 const DEFAULTS = {
 	'content-security-policy':
@@ -61,9 +82,56 @@ const OPTION: Record<keyof typeof DEFAULTS, keyof SecureHeadersOptions> = {
  * ```ts
  * app.use(secureHeaders({ contentSecurityPolicy: "default-src 'self'" }));
  * ```
+ *
+ * With `nonce: true`, each request gets a nonce of its own, in the policy
+ * and on the context of the routes declared after it:
+ *
+ * ```ts
+ * app
+ *   .use(secureHeaders({ nonce: true, contentSecurityPolicy: "script-src 'self'" }))
+ *   .get('/', ({ nonce, reply }) => reply(200, `<script nonce="${nonce}">…</script>`));
+ * ```
  */
-export function secureHeaders(options: SecureHeadersOptions = {}): Plugin {
-	const headers: [string, string][] = [];
+export function secureHeaders(
+	options: SecureHeadersOptions & { readonly nonce: true },
+): NoncePlugin;
+export function secureHeaders(
+	options?: SecureHeadersOptions & { readonly nonce?: false },
+): Plugin;
+export function secureHeaders(
+	options: SecureHeadersOptions = {},
+): Plugin | NoncePlugin {
+	const headers = fixedHeaders(options);
+	const hide = options.hidePoweredBy ?? true;
+	const policy = headers.get('content-security-policy');
+	if (!options.nonce) {
+		if (policy?.includes(NONCE)) {
+			throw new TypeError(
+				'secureHeaders: contentSecurityPolicy names NONCE, but nonce is off: give nonce: true',
+			);
+		}
+		const set = setter(headers, hide);
+		return (app) => app.onResponse((response) => set(response));
+	}
+	if (policy === undefined) {
+		throw new TypeError(
+			'secureHeaders: nonce is on, but contentSecurityPolicy is false: a nonce is only read through the content-security-policy header',
+		);
+	}
+	headers.delete('content-security-policy');
+	const withNonce = policyWithNonce(policy);
+	const nonceOf = nonceStore();
+	const set = setter(headers, hide);
+	return definePlugin()((app) =>
+		app
+			.onResponse((response, ctx) => set(response, withNonce(nonceOf(ctx.url))))
+			.derive(({ url }): NonceContext => ({ nonce: nonceOf(url) })),
+	) as unknown as NoncePlugin;
+}
+
+/** Each header the options leave in, by name, with its value. Throws on an empty one. */
+function fixedHeaders(options: SecureHeadersOptions): Map<string, string> {
+	const headers = new Map<string, string>();
 	for (const [name, fallback] of Object.entries(DEFAULTS) as [
 		keyof typeof DEFAULTS,
 		Setting,
@@ -76,19 +144,24 @@ export function secureHeaders(options: SecureHeadersOptions = {}): Plugin {
 			);
 		}
 		const value = setting === undefined ? fallback : setting;
-		if (typeof value === 'string') headers.push([name, value]);
+		if (typeof value === 'string') headers.set(name, value);
 	}
-	const hide = options.hidePoweredBy ?? true;
-	return (app) =>
-		app.onResponse((response) =>
-			withHeaders(response, (current) => {
-				for (const [name, value] of headers) {
-					if (!current.has(name)) current.set(name, value);
-				}
-				if (hide) {
-					current.delete('x-powered-by');
-					current.delete('server');
-				}
-			}),
-		);
+	return headers;
+}
+
+/** The `onResponse` hook: every header the response lacks, then the policy given per request. */
+function setter(headers: ReadonlyMap<string, string>, hide: boolean) {
+	return (response: Response, policy?: string) =>
+		withHeaders(response, (current) => {
+			for (const [name, value] of headers) {
+				if (!current.has(name)) current.set(name, value);
+			}
+			if (policy !== undefined && !current.has('content-security-policy')) {
+				current.set('content-security-policy', policy);
+			}
+			if (hide) {
+				current.delete('x-powered-by');
+				current.delete('server');
+			}
+		});
 }
