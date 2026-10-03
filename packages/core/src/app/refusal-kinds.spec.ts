@@ -2,8 +2,8 @@ import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
 import type {
 	BodyLimitRefusal,
-	RefusalKind,
 	ContentTooLargeBody,
+	RefusalKind,
 	RequestPart,
 	ValidationErrorBody,
 	ValidationRefusal,
@@ -191,6 +191,20 @@ describe('onRefusal(kind, hook): at runtime', () => {
 		});
 		expect(response.status).toBe(422);
 		expect(await response.json()).toEqual({ status: 422, detail: 'query' });
+	});
+
+	test("a kind hook reads the request's cookies from its context", async () => {
+		const app = alxia()
+			.onRefusal('validation', (refusal, { cookies }) => {
+				expectTypeOf(refusal).toEqualTypeOf<ValidationRefusal>();
+				return problem({ status: 422, detail: cookies['lang'] ?? 'none' });
+			})
+			.post('/a', both, ({ reply }) => reply(200, 'ok'));
+		const response = await app.request('/a', {
+			...INVALID,
+			headers: { 'content-type': 'application/json', cookie: 'lang=fr' },
+		});
+		expect(await response.json()).toEqual({ status: 422, detail: 'fr' });
 	});
 
 	test('a reply its schemas do not declare is a 500, as for the general hook', async () => {
