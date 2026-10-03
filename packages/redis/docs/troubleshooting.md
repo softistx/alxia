@@ -422,6 +422,13 @@ startup, with [`TypeError: rateLimit: windowMs must be a whole number of 1 or mo
 **Fix:** a whole number of milliseconds, at least 1:
 
 ```ts
+import { redisStore } from '@alxia/redis';
+import { connectRedis } from '@nxgt/redis';
+
+const connection = await connectRedis(Bun.env['REDIS_URL']!);
+const store = redisStore(connection.client, { name: 'api' });
+const key = '203.0.113.7';
+
 await store.consume(key, { limit: 5, windowMs: 1_500 });
 ```
 
@@ -443,6 +450,13 @@ To shut a route, answer it yourself.
 **Fix:** a whole number, at least 1:
 
 ```ts
+import { redisStore } from '@alxia/redis';
+import { connectRedis } from '@nxgt/redis';
+
+const connection = await connectRedis(Bun.env['REDIS_URL']!);
+const store = redisStore(connection.client, { name: 'api' });
+const key = '203.0.113.7';
+
 await store.consume(key, { limit: 1, windowMs: 60_000 });
 ```
 

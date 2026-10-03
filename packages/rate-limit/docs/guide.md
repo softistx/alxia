@@ -54,6 +54,11 @@ A `limit` or a `windowMs` that is not a whole number of 1 or more makes
 `rateLimit()` throw a `TypeError` when it is called, so the app fails at
 startup ([troubleshooting](troubleshooting.md#typeerror-ratelimit--must-be-a-whole-number-of-1-or-more-not-)).
 
+A store may refuse larger values than `rateLimit` does: `redisStore`
+refuses a `limit × windowMs` above 9,007,199,254,740 and a refill longer
+than ten years, on the first request it counts rather than at startup
+([`@alxia/redis`: Policies Redis refuses](https://github.com/softistx/alxia/blob/develop/packages/redis/docs/guide/rate-limits.md#policies-redis-refuses)).
+
 ### `key`
 
 By default a limit counts per client address, `ctx.ip`, which is what the
