@@ -4,11 +4,12 @@
  * `onError` hooks when any of it throws.
  */
 import {
+	ContentTooLargeError,
 	HttpError,
 	type RequestPart,
 	type ValidationIssue,
 } from '../errors/errors';
-import { createReply, Reply } from '../reply/reply';
+import { Reply } from '../reply/reply';
 import {
 	type BodyParser,
 	readBody,
@@ -17,47 +18,11 @@ import {
 	readQuery,
 } from '../request/read';
 import { check } from '../schema/standard-schema';
-import type { RedirectStatus } from '../types/status';
+import { routeContext } from './context';
 import type { RouteDefinition, SocketDefinition } from './definition';
 import { refuse } from './refusal';
 import { internalError, send, sendDeclared } from './send';
-import type {
-	BaseContext,
-	RedirectFunction,
-	RequestContext,
-	ResponseSettings,
-} from './types';
-
-const redirect: RedirectFunction = (location, status) =>
-	new Reply(status ?? (302 as RedirectStatus), undefined, {
-		headers: { location: String(location) },
-	}) as never;
-
-/** The context a route's hooks and handler read, and what they set on its response. */
-export function routeContext(
-	definition: RouteDefinition | SocketDefinition,
-	request: RequestContext,
-	pathParams: Record<string, string>,
-): { ctx: Record<string, unknown> & BaseContext; set: ResponseSettings } {
-	let cookies: Bun.CookieMap | undefined;
-	const set: ResponseSettings & { readonly touched: () => boolean } = {
-		headers: new Headers(),
-		get cookies() {
-			cookies ??= new Bun.CookieMap();
-			return cookies;
-		},
-		touched: () => cookies !== undefined,
-	};
-	const ctx: Record<string, unknown> & BaseContext = {
-		...request,
-		route: definition.path,
-		pathParams,
-		set,
-		reply: createReply,
-		redirect,
-	};
-	return { ctx, set };
-}
+import type { BaseContext, RequestContext, ResponseSettings } from './types';
 
 /**
  * Runs the hooks of a route in order — a `derive` adds to the context or
@@ -144,7 +109,7 @@ async function validate(
 	ctx['body'] = undefined;
 	const bodySchema = 'body' in schema ? schema.body : undefined;
 	if (bodySchema !== undefined) {
-		const body = await readBody(request.request, parsers);
+		const body = await readBody(ctx.request, parsers);
 		if (!body.ok) {
 			part ??= 'body';
 			issues.push(body.issue);
@@ -205,19 +170,37 @@ export async function handle(
 		);
 	} catch (error) {
 		(request as { error: unknown }).error = error;
-		return fail(route, error, ctx);
+		return fail(route, error, ctx, validateResponses);
 	}
 }
 
 /**
  * An error a route threw, answered by its `onError` hooks in order; past
- * the last, an `HttpError` as it says and anything else as a 500.
+ * the last, an `HttpError` as it says and anything else as a 500. A body
+ * past the route's `bodyLimit` is a refusal instead, answered as
+ * `refuse` answers one: by the `onRefusal` hook in force, or its 413.
  */
 export async function fail(
 	definition: RouteDefinition | SocketDefinition,
 	error: unknown,
 	ctx: BaseContext,
+	validateResponses = true,
 ): Promise<Response> {
+	if (error instanceof ContentTooLargeError) {
+		try {
+			return await refuse(
+				definition,
+				{ kind: 'body_limit', limit: error.limit },
+				ctx.set,
+				ctx,
+				validateResponses,
+			);
+		} catch (thrown) {
+			// The hook threw answering it: a 500, as a validation refusal's is.
+			console.error(thrown);
+			return internalError();
+		}
+	}
 	for (const hook of definition.onError) {
 		let handled = hook(error, ctx);
 		if (handled instanceof Promise) handled = await handled;

@@ -243,6 +243,7 @@ Every part is optional, and each one is any Standard Schema.
 | `cookies` | the `Cookie` header, by name | `Readonly<Record<string, string>>` |
 | `body` | the body, parsed by its `content-type` | `undefined`: read `ctx.request` yourself |
 | `response` | the body of each status the route may answer | any status, any body ([Replies](replies.md)) |
+| `bodyLimit` | not a schema: the most bytes the body may hold, a 413 past it ([Body size](#body-size-bodylimit)) | no limit beyond `listen`'s `maxRequestBodySize` |
 | `detail` | nothing at runtime: what [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) says of the route | — |
 
 The handler reads each part as its schema's **output**: a schema that
@@ -321,7 +322,115 @@ const app = alxia()
 ```
 
 A parser that throws is a 400 with the code `unreadable_body` and the
-error's message.
+error's message. A parser that reads past the route's
+[`bodyLimit`](#body-size-bodylimit) gets a 413.
+
+### Body size: `bodyLimit`
+
+`listen`'s `maxRequestBodySize` caps every body the server takes. A route can
+cap its own body below that limit:
+
+| Where | Applies to |
+| --- | --- |
+| `bodyLimit` in a route's schema | that route, whatever `bodyLimit()` was called before it |
+| `app.bodyLimit(bytes)` | every route declared after it on the app, a group's included |
+| `group.bodyLimit(bytes)` inside a group | the group's routes declared after it, never the app's |
+| a plugin's routes, given to `use` | their own limit only: the app's `bodyLimit()` never reaches them. A `bodyLimit()` the plugin calls applies to the app's routes declared after `use`, as its hooks do |
+
+```ts
+import { alxia } from '@alxia/core';
+import { z } from 'zod';
+
+const Note = z.object({ text: z.string() });
+
+const app = alxia()
+	.bodyLimit(64 * 1024) // the app's default: 64 KiB
+	.post('/notes', { body: Note }, ({ body, reply }) => reply(201, body))
+	.group('/import', (bulk) =>
+		bulk
+			.bodyLimit(4 * 1024 * 1024) // this group only: 4 MiB
+			.post('/notes', { body: z.array(Note) }, ({ body, reply }) => reply(200, body.length)),
+	)
+	.post(
+		'/upload',
+		{ bodyLimit: 25 * 1024 * 1024 }, // this route only: 25 MiB
+		async ({ request, reply }) => {
+			let bytes = 0;
+			for await (const chunk of request.body ?? []) bytes += chunk.byteLength;
+			return reply(200, bytes);
+		},
+	);
+```
+
+The limit is a whole number of bytes, 0 or more. Any other value throws a
+`TypeError` when the route is declared:
+`POST /upload: bodyLimit must be a whole number of bytes, 0 or more; got -1`.
+
+How a body is held to it, without reading it whole:
+
+1. **`Content-Length` first.** A declared length over the limit is refused
+   without reading a byte.
+2. **Then a count.** Without a `Content-Length`, as with a chunked upload,
+   or with a false one, the bytes are counted as they arrive. The read fails
+   at the first chunk that passes the limit and the rest is never pulled. A
+   body of exactly `bodyLimit` bytes is read.
+
+The count covers every reader of the body. That means the built-in JSON,
+form and text parsers, a [`parser`](#body-parsers) of the app's, a route
+hook (`derive`, `wrap`), and a handler that reads `ctx.request.body` as a stream, as `/upload` does
+above. That handler sees a stream like any other, and the stream fails once
+the count passes the limit. Measured on a 25 MiB limit through `listen`,
+with 256 MiB offered: the handler read 25 MiB, the client had sent about
+25.3 MiB when the request was refused, and the process grew by about 2 MiB.
+[`body-limit.spec.ts`](https://github.com/softistx/alxia/blob/develop/packages/core/src/app/body-limit.spec.ts)
+repeats that run: it holds the read and the growth under the limit, and the
+bytes sent within 8 MiB of it.
+
+A global hook, `onRequest` or `around`, runs before the route is known, so
+it reads the body whole. If one has read it, the route's limit is skipped:
+cap such a hook with `maxRequestBodySize`.
+
+Past the limit the request is answered with a 413:
+
+```json
+{ "error": "content_too_large", "limit": 65536 }
+```
+
+Its body is the exported `ContentTooLargeBody`. The 413 is in the type of
+every route under a limit, so a typed client reads it, and
+[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
+it. A route with no limit has no default 413 in its type, and reads its
+body as it always has.
+
+What the read throws is a `ContentTooLargeError`, an `HttpError` with the
+route's `limit`. The route answers it as a refusal, as it answers a 400:
+the [`onRefusal`](hooks.md#onrefusal) hook in force reads
+`{ kind: 'body_limit', limit }` and may answer in another format, such as
+an RFC 9457 problem. The `onError` hooks never see it.
+
+```ts
+import { alxia, problem } from '@alxia/core';
+import { z } from 'zod';
+
+const api = alxia()
+	.onRefusal((refusal) =>
+		refusal.kind === 'body_limit'
+			? problem({ type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: 'maxSizeRequest' })
+			: undefined,
+	)
+	.post('/api', { body: z.unknown(), bodyLimit: 10_000_000 }, ({ reply }) => reply(200, 'ok'));
+// a body past 10 MB → 413, application/problem+json:
+// { "type": "urn:ietf:params:jmap:error:limit", "status": 413, "limit": "maxSizeRequest" }
+```
+
+The hook's replies then take the default 413's place in the type of every
+route under a limit. A hook that returns nothing for a `body_limit` sends
+the default 413, which stays in the type beside them
+([Hooks](hooks.md#onrefusal)).
+
+A handler that streams its own response while it reads the body may have
+sent its headers before the count passes the limit. In that case its
+response stream fails instead of answering a 413.
 
 ## The 400
 

@@ -44,6 +44,10 @@ Nothing scheduled yet.
   `eventStream({ state, ping })`, is documented as `text/event-stream`
   with one object per event name in its `itemSchema`: the name as a
   `const`, the data by its schema, the `id` and `retry` fields.
+- **The 413 of a body limit.** A route under a `bodyLimit`, its own or
+  inherited from `bodyLimit()`, documents a `413` with the
+  `ContentTooLargeError` body, its description naming the limit — or,
+  behind an `onRefusal` hook given schemas, the hook's `413`.
 
 ### 0.1.0
 

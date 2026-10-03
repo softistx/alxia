@@ -6,7 +6,12 @@ import type { Jsonify, Simplify } from '../../types/json';
 import type { PathParamName } from '../../types/path';
 import type { RedirectStatus } from '../../types/status';
 import type { Empty, Method } from './common';
-import type { RefusalOutcome, Refusing } from './refusal';
+import type {
+	BodyLimited,
+	IsLimited,
+	RefusalOutcome,
+	Refusing,
+} from './refusal';
 import type {
 	ResponseSchemaAt,
 	ResponsesOf,
@@ -46,8 +51,12 @@ export type RouteOutput<Schema, Result, Shortcuts> =
 							>;
 					  }[StatusOf<ResponsesOf<Schema>>]
 					| OutcomeOf<Extract<Result, Reply<RedirectStatus, undefined>>>)
-	| OutcomeOf<Exclude<Shortcuts, Refusing>>
-	| (ValidatesRequest<Schema> extends true ? RefusalOutcome<Shortcuts> : never)
+	| OutcomeOf<Exclude<Shortcuts, Refusing | BodyLimited>>
+	| RefusalOutcome<
+			Shortcuts,
+			ValidatesRequest<Schema>,
+			IsLimited<Schema, Shortcuts>
+	  >
 	| Outcome<500, InternalErrorBody>;
 
 type PartInput<Schema, Key extends 'query' | 'headers' | 'cookies' | 'body'> = [

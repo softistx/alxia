@@ -48,6 +48,7 @@ const get = openapi(app, { info: { title: 'Users', version: '1.0.0' } }).paths['
 | `response` | one reply per status: what the schema **gives back** |
 | no `response` | a single `default` reply, `The reply of the handler` |
 | any of `params`, `query`, `headers`, `cookies`, `body` | a `400`, `ValidationError` — beside the route's own `400`, when it declares one. Behind an `onRefusal` hook, what the hook declares ([below](#behind-an-onrefusal-hook)) |
+| a `bodyLimit`, its own or inherited | a `413`, `ContentTooLargeError`, its description naming the limit — beside the route's own `413`, when it declares one |
 | every route | a `500`, `InternalError` — beside the route's own `500`, when it declares one |
 | `detail` | `summary`, `description`, `tags`, `deprecated`, `operationId` |
 
@@ -259,7 +260,8 @@ alxia().post(
 }
 ```
 
-A `500` declared the same way is `anyOf` its schema and `InternalError`.
+A `500` declared the same way is `anyOf` its schema and `InternalError`,
+and a `413` `anyOf` its schema and `ContentTooLargeError`.
 An own reply that is not JSON — a `z.string()`, documented as
 `text/plain` — keeps its content type, and the framework's error is
 documented beside it under `application/json`:
@@ -288,8 +290,8 @@ route declares one:
 const Problem = z.object({ type: z.string(), status: z.literal(400), detail: z.string() });
 
 alxia()
-	.onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' }, ({ part }, { reply }) =>
-		reply(400, { type: 'urn:ietf:params:jmap:error:notRequest', status: 400, detail: `the ${part} is invalid` }),
+	.onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' }, (refusal, { reply }) =>
+		reply(400, { type: 'urn:ietf:params:jmap:error:notRequest', status: 400, detail: refusal.kind }),
 	)
 	.post('/jmap', { body: z.object({ using: z.array(z.string()) }) }, ({ reply }) => reply(200, 'ok'));
 ```
@@ -319,6 +321,41 @@ document a `4XX`, `The request was refused`, with no content. Give the
 hook schemas to document its body. A hook that returns nothing for some
 refusals still answers the default 400 then, which the document does not
 show beside the hook's.
+
+## The 413
+
+A route under a `bodyLimit` documents a `413`. That covers its own
+`bodyLimit` and one it inherits from a `bodyLimit()` called before it, on
+the app or a group. The response carries the body
+core answers when the request body is larger than the limit, and its
+description names the limit:
+
+```ts
+const app = alxia()
+	.post('/notes', { body: z.string(), bodyLimit: 1024 }, ({ reply }) => reply(200, 'ok'));
+// paths['/notes'].post.responses['413']
+```
+
+```json
+"413": {
+  "description": "The body is larger than 1024 bytes",
+  "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ContentTooLargeError" } } }
+}
+```
+
+```ts
+// components.schemas.ContentTooLargeError
+{ error: 'content_too_large', limit: integer }
+```
+
+A route with no limit, behind no hook that declares one, documents no
+`413`. Behind an `onRefusal` hook, a
+route under a limit documents what the hook declares in place of
+`ContentTooLargeError`, under the hook's `contentType`, as a validating
+route does for its 400. The hook's 413 is then on every route it may
+refuse, limited or not; on a limited one its description names the limit.
+A hook that returns nothing for a `body_limit` still answers the default
+413 then, which the document does not show beside the hook's.
 
 ## `detail`
 

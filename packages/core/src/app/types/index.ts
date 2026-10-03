@@ -12,9 +12,13 @@ export type {
 } from './context';
 export type {
 	BehindShortcuts,
+	BodyLimited,
+	BodyLimitShortcut,
 	DeclaredRefusal,
+	DefaultLimitOutcome,
 	DefaultRefusalOutcome,
 	FallsBack,
+	IsLimited,
 	RefusalOutcome,
 	RefusalResponses,
 	RefusalSchema,

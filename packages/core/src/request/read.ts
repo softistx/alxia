@@ -1,4 +1,4 @@
-import type { ValidationIssue } from '../errors/errors';
+import { ContentTooLargeError, type ValidationIssue } from '../errors/errors';
 
 /**
  * The query string as an object. A key given once is a string, a key given
@@ -55,7 +55,8 @@ export type ReadBody =
 /**
  * The request body, read by its `content-type`: by a parser the app added,
  * else JSON, a form (an object of its fields, a field given more than once
- * an array), text, or the bytes.
+ * an array), text, or the bytes. A body past the route's `bodyLimit` throws
+ * a `ContentTooLargeError`, a custom parser's included.
  */
 export async function readBody(
 	request: Request,
@@ -67,6 +68,7 @@ export async function readBody(
 		try {
 			return { ok: true, value: await custom.parse(request) };
 		} catch (error) {
+			if (error instanceof ContentTooLargeError) throw error;
 			return {
 				ok: false,
 				issue: {

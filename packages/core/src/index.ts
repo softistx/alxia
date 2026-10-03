@@ -29,12 +29,16 @@ export type {
 export type {
 	BaseContext,
 	BehindShortcuts,
+	BodyLimited,
+	BodyLimitShortcut,
 	Context,
 	DeclaredReply,
+	DefaultLimitOutcome,
 	DefaultRefusalOutcome,
 	Empty,
 	FallsBack,
 	HandlerResult,
+	IsLimited,
 	MaybePromise,
 	Method,
 	Outcome,
@@ -62,6 +66,9 @@ export type {
 	ValidSchema,
 } from './app/types';
 export {
+	type BodyLimitRefusal,
+	type ContentTooLargeBody,
+	ContentTooLargeError,
 	HttpError,
 	type InternalErrorBody,
 	type Refusal,

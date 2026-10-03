@@ -29,11 +29,22 @@ export interface ValidationRefusal {
 }
 
 /**
- * Why the app refused a request before its handler ran, as an `onRefusal`
- * hook reads it, told apart by `kind`. Only `validation` today; a kind
- * added later reaches a hook that returns nothing for it as its default.
+ * A request body larger than its route's `bodyLimit`, as an `onRefusal`
+ * hook reads it: the limit, in bytes. Its default is the 413 of
+ * `ContentTooLargeBody`.
  */
-export type Refusal = ValidationRefusal;
+export interface BodyLimitRefusal {
+	readonly kind: 'body_limit';
+	readonly limit: number;
+}
+
+/**
+ * Why the app refused a request before its handler ran, as an `onRefusal`
+ * hook reads it, told apart by `kind`: `validation` or `body_limit`. A
+ * kind added later reaches a hook that returns nothing for it as its
+ * default.
+ */
+export type Refusal = ValidationRefusal | BodyLimitRefusal;
 
 /** The body of the 400 every route that validates its request may answer. */
 export interface ValidationErrorBody {
@@ -62,7 +73,7 @@ export class HttpError<
 	Status extends number = number,
 	Body = unknown,
 > extends Error {
-	override readonly name = 'HttpError';
+	override readonly name: string = 'HttpError';
 	readonly status: Status;
 	readonly body: Body;
 
@@ -70,6 +81,34 @@ export class HttpError<
 		super(message ?? `HTTP ${status}`);
 		this.status = status;
 		this.body = body;
+	}
+}
+
+/** The body of the 413 a route with a `bodyLimit` answers to a larger body. */
+export interface ContentTooLargeBody {
+	readonly error: 'content_too_large';
+	/** The route's limit, in bytes. */
+	readonly limit: number;
+}
+
+/**
+ * A request body larger than its route's `bodyLimit`: what reading it
+ * throws, as soon as its `Content-Length` or the bytes counted pass the
+ * limit. It is answered as a `body_limit` refusal: by the route's
+ * `onRefusal` hook, or with its 413. The `onError` hooks never see it.
+ */
+export class ContentTooLargeError extends HttpError<413, ContentTooLargeBody> {
+	override readonly name = 'ContentTooLargeError';
+	/** The route's limit, in bytes. */
+	readonly limit: number;
+
+	constructor(limit: number) {
+		super(
+			413,
+			{ error: 'content_too_large', limit },
+			`The request body is larger than the route's limit of ${limit} bytes`,
+		);
+		this.limit = limit;
 	}
 }
 

@@ -33,7 +33,7 @@ a `Bun.serve` given [`websocket`](#websocket).
 | `hostname` | `string` | Bun's | the interface to listen on |
 | `development` | `boolean` | Bun's | Bun's development mode, which hot-reloads `page` bundles |
 | `idleTimeout` | `number` | Bun's | seconds before an idle connection is closed |
-| `maxRequestBodySize` | `number` | Bun's | the largest body accepted, in bytes |
+| `maxRequestBodySize` | `number` | Bun's | the largest body the server accepts, in bytes; a route's [`bodyLimit`](routes.md#body-size-bodylimit) caps its own below it |
 | `tls` | `Bun.TLSOptions` | none | serve HTTPS |
 
 ```ts

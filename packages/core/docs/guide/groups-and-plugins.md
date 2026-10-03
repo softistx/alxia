@@ -73,8 +73,11 @@ A plugin is either an **app** or a **function**.
 
 | | Adds | Type of the app after `use` |
 | --- | --- | --- |
-| an app, `use(otherApp)` | routes, route hooks, context, typed replies, global hooks | grows: its routes and context are added |
+| an app, `use(otherApp)` | routes, route hooks, context, typed replies, global hooks, its [`bodyLimit()`](routes.md#body-size-bodylimit) | grows: its routes and context are added |
 | a function, `use(plugin)` | global hooks | unchanged |
+
+The app's own `bodyLimit()` does not reach an app plugin's routes: they
+keep the limit they were declared with ([Routes](routes.md#body-size-bodylimit)).
 
 ### An app as a plugin
 

@@ -42,8 +42,9 @@ await Bun.write('openapi.json', JSON.stringify(openapi(app, { info }), null, 2))
   a named one, `eventStream({ state, ping })`, as a `oneOf` with an object per name —
   its `event` as a `const`, its `data`, its `id` and `retry`
 - `cookies` as cookie parameters
-- the 400 of a route that validates its request, and the 500 of every route —
-  beside the route's own 400 or 500, when it declares one. Behind an
+- the 400 of a route that validates its request, the 413 of a route under a
+  `bodyLimit`, and the 500 of every route — beside the route's own 400, 413
+  or 500, when it declares one. Behind an
   `onRefusal` hook given schemas, the refusal is each status those schemas
   declare, under the hook's `contentType`, such as `application/problem+json`.
   Behind a hook without schemas, it is a `4XX` whose body is not documented

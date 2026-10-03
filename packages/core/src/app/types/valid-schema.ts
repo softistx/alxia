@@ -23,7 +23,7 @@ type UnknownKeys<Schema> = [Exclude<keyof Schema, keyof RouteSchema>] extends [
 			readonly [Key in Exclude<
 				keyof Schema,
 				keyof RouteSchema
-			>]: `"${Key & string}" is not a part of a route: params, query, headers, cookies, body, response or detail`;
+			>]: `"${Key & string}" is not a part of a route: params, query, headers, cookies, body, response, bodyLimit or detail`;
 		};
 
 /** One message per key the path does not declare, or one for them all when no key can be named. */

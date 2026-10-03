@@ -43,6 +43,11 @@ around (first declared outermost)
    onResponse hooks          ← every response, 404s included
 ```
 
+A body read past its route's `bodyLimit` is a `body_limit` refusal,
+answered by [`onRefusal`](#onrefusal) or with a 413, wherever it is read: a
+route hook, validation or the handler ([Routes](routes.md#body-size-bodylimit)). A global hook reads it
+unbounded, and the route's limit is then skipped.
+
 Route hooks run **before validation**: they read `pathParams`, the path
 parameters as they arrived, not `params`.
 
@@ -165,10 +170,15 @@ onRefusal<Responses extends RefusalResponses, Result extends DeclaredReply<Respo
 ```
 
 Answers a request that a route declared after it refuses before its
-handler runs. Today that is a request its schemas refuse, by default
-`400 { "error": "validation", "issues": […] }` ([The 400](routes.md#the-400)).
+handler runs. There are two kinds of refusal, each with its default:
+
+| `kind` | When | Default |
+| --- | --- | --- |
+| `validation` | the route's schemas refuse the request | `400 { "error": "validation", "issues": […] }` ([The 400](routes.md#the-400)) |
+| `body_limit` | the body is larger than the route's [`bodyLimit`](routes.md#body-size-bodylimit) | `413 { "error": "content_too_large", "limit": … }` |
+
 The hook reads the refusal and the context. It returns a reply with a 4xx
-status, or nothing to send the default.
+status, or nothing to send that kind's default.
 
 ```ts
 interface ValidationRefusal {
@@ -176,14 +186,16 @@ interface ValidationRefusal {
 	readonly part: 'params' | 'query' | 'headers' | 'cookies' | 'body'; // the first that failed
 	readonly issues: readonly ValidationIssue[];                         // every one, each with its target
 }
-type Refusal = ValidationRefusal; // told apart by `kind`
+interface BodyLimitRefusal {
+	readonly kind: 'body_limit';
+	readonly limit: number; // the route's limit, in bytes
+}
+type Refusal = ValidationRefusal | BodyLimitRefusal; // told apart by `kind`
 ```
 
-`validation` is the only kind today. A kind added later reaches every
-hook, and only a `validation` refusal has a `part` and `issues`. A hook
-that reads them unchecked, like the one below, will then need
-`if (refusal.kind !== 'validation') return;` first. Returning nothing sends
-that kind's default.
+Only a `validation` refusal has a `part` and `issues`: check `kind` before
+reading them. A kind added later reaches every hook too, and a hook that
+returns nothing for it sends its default.
 
 An API whose errors are RFC 9457 problems, as JMAP's are, answers them
 with [`problem`](replies.md#problem-details-problem):
@@ -192,18 +204,20 @@ with [`problem`](replies.md#problem-details-problem):
 import { alxia, problem, type Refusal } from '@alxia/core';
 import { z } from 'zod';
 
-const jmapProblem = ({ part, issues }: Refusal) =>
-	problem({
-		type: issues.some((issue) => issue.code === 'invalid_json')
-			? 'urn:ietf:params:jmap:error:notJSON'
-			: 'urn:ietf:params:jmap:error:notRequest',
-		status: 400,
-		detail: `the ${part} is invalid`,
-	});
+const jmapProblem = (refusal: Refusal) =>
+	refusal.kind === 'body_limit'
+		? problem({ type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: 'maxSizeRequest' })
+		: problem({
+				type: refusal.issues.some((issue) => issue.code === 'invalid_json')
+					? 'urn:ietf:params:jmap:error:notJSON'
+					: 'urn:ietf:params:jmap:error:notRequest',
+				status: 400,
+				detail: `the ${refusal.part} is invalid`,
+			});
 
 const app = alxia()
 	.onRefusal(jmapProblem)
-	.post('/jmap', { body: z.object({ using: z.array(z.string()) }) }, ({ reply }) =>
+	.post('/jmap', { body: z.object({ using: z.array(z.string()) }), bodyLimit: 10_000_000 }, ({ reply }) =>
 		reply(200, { methodResponses: [] }),
 	)
 	.get('/download/:blobId', { params: z.object({ blobId: z.string().min(1) }) }, ({ reply }) =>
@@ -212,7 +226,10 @@ const app = alxia()
 ```
 
 A body that is not JSON gets `notJSON`, and a body or a path parameter its
-schema refuses gets `notRequest`. Each is sent as
+schema refuses gets `notRequest`. A body past 10 MB gets JMAP's `limit`
+problem, whether its `Content-Length` says so or the bytes counted do. It
+is sent with 413 here, the app's choice; RFC 8620's own example of that
+problem answers 400. Each is sent as
 `application/problem+json`, with its `detail` naming the part.
 
 **Order is meaning.** The last `onRefusal` declared before a route is the
@@ -225,10 +242,16 @@ the routes declared after `use`, as its `derive`s do.
 **Typed.** The hook's reply replaces the default 400 in the type of every
 route after it that validates part of its request, so
 [`@alxia/client`](https://www.npmjs.com/package/@alxia/client) reads the
-problem. A route that validates nothing is never refused, and its type
-gains nothing. A hook that may return nothing keeps the default 400 in the
-type beside its own reply. A status other than 400 replaces it: a hook that
-answers 422 makes the route's outcomes 422 and no 400.
+problem. A route under a `bodyLimit` may be refused too, and its type
+gains the hook's replies in place of the default 413. A route that neither
+validates nor has a `bodyLimit` is never refused, and its type gains
+nothing. A hook that may return nothing keeps the default of each kind the
+route may refuse with — the 400, the 413 — in the type beside its own
+reply. A status other than 400 replaces it: a hook that answers 422 makes
+the route's outcomes 422 and no 400. The hook's type does not say which
+reply answers which kind, so every reply it may return is in the type of
+every route it may refuse: the JMAP hook above puts its 413 in the type of
+`/download/:blobId` too, though only `/jmap` has a limit.
 
 **With schemas.** Given `{ response, contentType? }` first, the hook's
 `reply` is typed by those schemas, as a route's is. Its reply is checked by
@@ -243,8 +266,8 @@ a `4XX` whose body it does not know.
 const Problem = z.object({ type: z.string(), status: z.literal(400), detail: z.string() });
 
 const documented = alxia()
-	.onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' }, ({ part }, { reply }) =>
-		reply(400, { type: 'urn:ietf:params:jmap:error:notRequest', status: 400, detail: `the ${part} is invalid` }),
+	.onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' }, (refusal, { reply }) =>
+		reply(400, { type: 'urn:ietf:params:jmap:error:notRequest', status: 400, detail: refusal.kind }),
 	)
 	.post('/jmap', { body: z.object({ using: z.array(z.string()) }) }, ({ reply }) => reply(200, 'ok'));
 ```

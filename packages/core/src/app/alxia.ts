@@ -1,5 +1,6 @@
 import type { Refusal } from '../errors/errors';
 import type { AnyReply, Reply } from '../reply/reply';
+import { checkLimit } from '../request/limit';
 import type { BodyParser } from '../request/read';
 import { joinPath, shapeOf } from '../router/paths';
 import { Router } from '../router/router';
@@ -42,6 +43,7 @@ import { type SocketData, websocketHandler } from './socket';
 import type {
 	BaseContext,
 	BehindShortcuts,
+	BodyLimitShortcut,
 	Context,
 	DeclaredRefusal,
 	DeclaredReply,
@@ -193,6 +195,8 @@ export class Alxia<
 	#derive: ChainHook[] = [];
 	#onError: ErrorHook[] = [];
 	#refusal: RefusalHandler | undefined;
+	/** The `bodyLimit` of the routes declared next, unless theirs says otherwise. */
+	#bodyLimit: number | undefined;
 	#server: Bun.Server<unknown> | undefined;
 	#websocket: Bun.WebSocketHandler<SocketData> | undefined;
 
@@ -489,6 +493,27 @@ export class Alxia<
 	}
 
 	/**
+	 * The most bytes the request body of every route declared after it may
+	 * hold, unless the route's own `bodyLimit` says otherwise. Inside a
+	 * group, only the group's routes. A body past it is refused with a 413
+	 * as soon as its `Content-Length` or the bytes counted pass the limit,
+	 * which is added to the type of every such route.
+	 *
+	 * ```ts
+	 * alxia()
+	 *   .bodyLimit(64 * 1024) // every route below: 64 KiB
+	 *   .post('/notes', { body: Note }, handler)
+	 *   .post('/upload', { bodyLimit: 25 * 1024 * 1024 }, handler); // its own
+	 * ```
+	 */
+	bodyLimit(
+		bytes: number,
+	): Alxia<Ctx, Routes, Prefix, Shortcuts | BodyLimitShortcut> {
+		this.#bodyLimit = checkLimit(bytes, 'bodyLimit()');
+		return this as never;
+	}
+
+	/**
 	 * A hook that turns an error thrown by a route declared after it into a
 	 * reply. Returning nothing lets the next one try; past the last, an
 	 * `HttpError` is answered as it says and anything else as a 500.
@@ -505,17 +530,21 @@ export class Alxia<
 
 	/**
 	 * A hook that answers a request a route declared after it refuses
-	 * before its handler runs: today, one its schemas refuse, the default
-	 * of which is `400 { error: 'validation', issues }`. The hook reads
-	 * the refusal — its `kind`, the `part` that failed, the `issues` —
-	 * and returns a reply with a 4xx status, or nothing for the default.
+	 * before its handler runs: one its schemas refuse, the default of which
+	 * is `400 { error: 'validation', issues }`, or one whose body passes its
+	 * `bodyLimit`, the default of which is
+	 * `413 { error: 'content_too_large', limit }`. The hook reads
+	 * the refusal — its `kind`: `validation`, with the `part` that failed
+	 * and the `issues`, or `body_limit`, with the route's `limit` — and
+	 * returns a reply with a 4xx status, or nothing for that kind's default.
 	 * The last one declared before a route is the one in force; a group's
 	 * stays inside it. Its reply replaces the default 400 in the type of
 	 * every such route that validates, so the client reads it:
 	 *
 	 * ```ts
-	 * .onRefusal(({ part, issues }) =>
-	 *   problem({ type: 'urn:example:invalid', status: 400, detail: `the ${part} is invalid`, issues }))
+	 * .onRefusal((refusal) => refusal.kind === 'validation'
+	 *   ? problem({ type: 'urn:example:invalid', status: 400, detail: `the ${refusal.part} is invalid` })
+	 *   : problem({ type: 'urn:example:limit', status: 413, limit: refusal.limit }))
 	 * ```
 	 *
 	 * Given schemas first, its `reply` is typed by them, its reply is
@@ -523,7 +552,7 @@ export class Alxia<
 	 *
 	 * ```ts
 	 * .onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' },
-	 *   ({ part }, { reply }) => reply(400, { type: 'urn:example:invalid', status: 400, detail: part }))
+	 *   (refusal, { reply }) => reply(400, { type: 'urn:example:invalid', status: 400, detail: refusal.kind }))
 	 * ```
 	 */
 	onRefusal<Result extends Reply<ClientErrorStatus, any> | undefined | void>(
@@ -679,6 +708,7 @@ export class Alxia<
 		child.#derive = [...this.#derive];
 		child.#onError = [...this.#onError];
 		child.#refusal = this.#refusal;
+		child.#bodyLimit = this.#bodyLimit;
 		child.#runtime = { ...child.#runtime, globals: this.#runtime.globals };
 		const before = new Set(this.#runtime.globals.pages.keys());
 		const built = build(child);
@@ -744,6 +774,7 @@ export class Alxia<
 		this.#derive = [...this.#derive, ...plugin.#derive];
 		this.#onError = [...plugin.#onError, ...this.#onError];
 		this.#refusal = plugin.#refusal ?? this.#refusal;
+		this.#bodyLimit = plugin.#bodyLimit ?? this.#bodyLimit;
 		if (plugin.#runtime.globals !== this.#runtime.globals) {
 			const globals = plugin.#runtime.globals;
 			this.#runtime.globals.around.push(...globals.around);
@@ -865,10 +896,16 @@ export class Alxia<
 			if (typeof handler !== 'function') {
 				throw new TypeError(`${method} ${path}: the handler is missing`);
 			}
+			const full = joinPath(this.#prefix, path);
+			const bodyLimit =
+				schema.bodyLimit === undefined
+					? this.#bodyLimit
+					: checkLimit(schema.bodyLimit, `${method} ${full}`);
 			this.#register({
 				method,
-				path: joinPath(this.#prefix, path),
+				path: full,
 				schema,
+				...(bodyLimit === undefined ? {} : { bodyLimit }),
 				handler,
 				derive: [...this.#derive],
 				onError: [...this.#onError],

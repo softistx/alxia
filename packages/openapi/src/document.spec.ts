@@ -223,11 +223,11 @@ describe('openapi', () => {
 						response: { 400: Problem },
 						contentType: 'application/problem+json',
 					},
-					({ part }, { reply }) =>
+					(refusal, { reply }) =>
 						reply(400, {
 							type: 'urn:example:invalid',
 							status: 400,
-							detail: part,
+							detail: refusal.kind === 'validation' ? refusal.part : 'body',
 						}),
 				)
 				.post('/after', { body: z.string() }, ({ reply }) => reply(201, 'ok'))
@@ -274,6 +274,69 @@ describe('openapi', () => {
 			description: 'The request was refused',
 		});
 		expect(refused.paths['/a']?.post?.responses['400']).toBeUndefined();
+	});
+
+	test('a 413 for a route under a bodyLimit, its own or inherited, and no other', () => {
+		const limited = openapi(
+			alxia()
+				.post('/free', { body: z.string() }, ({ reply }) => reply(200, 'ok'))
+				.post('/notes', { body: z.string(), bodyLimit: 1024 }, ({ reply }) =>
+					reply(200, 'ok'),
+				)
+				.bodyLimit(64)
+				.post('/raw', ({ reply }) => reply(200, 'ok')),
+			{ info: { title: 'Notes', version: '1' } },
+		);
+		expect(limited.paths['/free']?.post?.responses['413']).toBeUndefined();
+		expect(limited.paths['/notes']?.post?.responses['413']).toEqual({
+			description: 'The body is larger than 1024 bytes',
+			content: {
+				'application/json': {
+					schema: { $ref: '#/components/schemas/ContentTooLargeError' },
+				},
+			},
+		});
+		expect(limited.paths['/raw']?.post?.responses['413']?.description).toBe(
+			'The body is larger than 64 bytes',
+		);
+		expect(limited.components?.schemas?.['ContentTooLargeError']).toEqual({
+			type: 'object',
+			properties: {
+				error: { const: 'content_too_large' },
+				limit: { type: 'integer' },
+			},
+			required: ['error', 'limit'],
+		});
+	});
+
+	test('an onRefusal hook’s 413: on every route it may refuse, naming the limit where there is one', () => {
+		const Problem = (status: 400 | 413) =>
+			z.object({ type: z.string(), status: z.literal(status) });
+		const refused = openapi(
+			alxia()
+				.onRefusal(
+					{
+						response: { 400: Problem(400), 413: Problem(413) },
+						contentType: 'application/problem+json',
+					},
+					(refusal, { reply }) =>
+						refusal.kind === 'body_limit'
+							? reply(413, { type: 'urn:example:limit', status: 413 })
+							: reply(400, { type: 'urn:example:invalid', status: 400 }),
+				)
+				.post('/free', { body: z.string() }, ({ reply }) => reply(200, 'ok'))
+				.post('/raw', { bodyLimit: 2048 }, ({ reply }) => reply(200, 'ok')),
+			{ info: { title: 'Problems', version: '1' } },
+		);
+		const free = refused.paths['/free']?.post?.responses ?? {};
+		expect(Object.keys(free).sort()).toEqual(['400', '413', '500', 'default']);
+		expect(free['413']?.description).toBe('The request was refused');
+		const raw = refused.paths['/raw']?.post?.responses ?? {};
+		expect(Object.keys(raw).sort()).toEqual(['400', '413', '500', 'default']);
+		expect(raw['413']?.description).toBe('The body is larger than 2048 bytes');
+		expect(Object.keys(raw['413']?.content ?? {})).toEqual([
+			'application/problem+json',
+		]);
 	});
 
 	test('operation ids: the route’s own, or one from its method and path', () => {

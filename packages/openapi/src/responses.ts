@@ -9,14 +9,15 @@ import type { ResponseObject } from './types';
 
 /**
  * A route's responses: each reply its schema declares, `default` when it
- * declares none, its refusal when it validates its request — the 400, or
- * what the `onRefusal` hook in force declares — and the 500 any route may
- * answer.
+ * declares none, its refusals — the 400 when it validates its request, the
+ * 413 when it has a `bodyLimit`, or what the `onRefusal` hook in force
+ * declares — and the 500 any route may answer.
  */
 export function responses(
 	schema: RouteSchema,
 	convert?: Converter,
 	refusal?: RefusalHandler,
+	bodyLimit?: number,
 ): Record<string, ResponseObject> {
 	const byStatus: Record<string, ResponseObject> = {};
 	for (const [status, responseSchema] of Object.entries(
@@ -39,14 +40,14 @@ export function responses(
 	if (schema.response === undefined) {
 		byStatus['default'] = { description: 'The reply of the handler' };
 	}
-	if (
+	const validates =
 		schema.params !== undefined ||
 		schema.query !== undefined ||
 		schema.headers !== undefined ||
 		schema.cookies !== undefined ||
-		schema.body !== undefined
-	) {
-		refused(byStatus, refusal, convert);
+		schema.body !== undefined;
+	if (validates || bodyLimit !== undefined) {
+		refused(byStatus, refusal, convert, validates, bodyLimit);
 	}
 	byStatus['500'] = withError(byStatus['500'], 'The server failed', {
 		$ref: '#/components/schemas/InternalError',
@@ -57,19 +58,30 @@ export function responses(
 const REFUSED = 'The request was refused';
 
 /**
- * The responses of a refused request: the default 400; each status the
- * route's `onRefusal` hook declares, under its content type; or, for a hook
- * that declares none, a client error whose body it does not say.
+ * The responses of a refused request: the default 400 of a route that
+ * validates and 413 of one under a `bodyLimit`; each status the route's
+ * `onRefusal` hook declares, under its content type; or, for a hook that
+ * declares none, a client error whose body it does not say.
  */
 function refused(
 	byStatus: Record<string, ResponseObject>,
 	refusal: RefusalHandler | undefined,
 	convert: Converter | undefined,
+	validates: boolean,
+	bodyLimit: number | undefined,
 ): void {
+	const tooLarge = `The body is larger than ${bodyLimit} bytes`;
 	if (refusal === undefined) {
-		byStatus['400'] = withError(byStatus['400'], REFUSED, {
-			$ref: '#/components/schemas/ValidationError',
-		});
+		if (validates) {
+			byStatus['400'] = withError(byStatus['400'], REFUSED, {
+				$ref: '#/components/schemas/ValidationError',
+			});
+		}
+		if (bodyLimit !== undefined) {
+			byStatus['413'] = withError(byStatus['413'], tooLarge, {
+				$ref: '#/components/schemas/ContentTooLargeError',
+			});
+		}
 		return;
 	}
 	if (refusal.response === undefined) {
@@ -80,7 +92,7 @@ function refused(
 		if (schema === undefined) continue;
 		byStatus[status] = withError(
 			byStatus[status],
-			REFUSED,
+			status === '413' && bodyLimit !== undefined ? tooLarge : REFUSED,
 			toJsonSchema(schema, 'output', convert),
 			refusal.contentType,
 		);

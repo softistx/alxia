@@ -39,6 +39,13 @@ export interface RouteSchema {
 	readonly body?: StandardSchemaV1;
 	/** The body of each status the route may answer. Its handler can answer no other. */
 	readonly response?: ResponseSchemas;
+	/**
+	 * The most bytes the request body may hold, past which it is refused
+	 * with a 413: checked on its `Content-Length`, then counted as it is
+	 * read, by core's parsers or by the handler reading `request.body`.
+	 * Overrides a `bodyLimit()` declared before the route.
+	 */
+	readonly bodyLimit?: number;
 	readonly detail?: RouteDetail;
 }
 

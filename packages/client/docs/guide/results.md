@@ -79,7 +79,8 @@ Every status the route may answer, as `@alxia/core` types it:
 | a redirect (`302`, `308`…), with `data: undefined` | the handler may return `redirect` |
 | each reply of a `derive`, `wrap` or `onError` declared before the route | always: a guard's 401 is there |
 | `400`, `ValidationErrorBody` | the route validates a part of its request, and no `onRefusal` hook is declared before it |
-| each reply of the `onRefusal` hook declared before the route, in place of the 400 | the route validates a part of its request |
+| each reply of the `onRefusal` hook declared before the route, in place of the 400 and the 413 | the route validates a part of its request, or has a `bodyLimit` |
+| `413`, `ContentTooLargeBody` | the route has a `bodyLimit`, its own or from a `bodyLimit()` before it, and no `onRefusal` hook is declared before it, or one that may return nothing |
 | `500`, `InternalErrorBody` | always |
 
 So a route with no schema still reads its 500:
@@ -156,7 +157,7 @@ gives the client that format in place of `ValidationErrorBody`. A problem
 sent as `application/problem+json` is read as JSON, its members typed:
 
 ```ts
-// server: .onRefusal(({ part }) => problem({ type: 'urn:ietf:params:jmap:error:notRequest', status: 400, detail: `the ${part} is invalid` }))
+// server: .onRefusal((refusal) => refusal.kind === 'validation' ? problem({ type: 'urn:ietf:params:jmap:error:notRequest', status: 400, detail: `the ${refusal.part} is invalid` }) : undefined)
 const sent = await api.post('/jmap', { body: { using: [] } });
 if (sent.status === 400) {
 	sent.data.type;   // 'urn:ietf:params:jmap:error:notRequest'

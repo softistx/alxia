@@ -21,6 +21,14 @@ export const COMPONENTS: Record<string, JsonSchema> = {
 		},
 		required: ['error', 'issues'],
 	},
+	ContentTooLargeError: {
+		type: 'object',
+		properties: {
+			error: { const: 'content_too_large' },
+			limit: { type: 'integer' },
+		},
+		required: ['error', 'limit'],
+	},
 	InternalError: {
 		type: 'object',
 		properties: { error: { const: 'internal' } },

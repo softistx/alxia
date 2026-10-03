@@ -89,8 +89,9 @@ whatever part it is in:
 ```
 
 `onRefusal(hook)` answers it in your format instead, for the routes declared
-after it: the hook reads the `part` that failed and the `issues`, and
-returns a reply with a 4xx status — or nothing, for the default.
+after it: the hook reads the refusal's `kind` — for a `validation`, the
+`part` that failed and the `issues` — and returns a reply with a 4xx
+status, or nothing, for the default.
 `problem(details)` builds an RFC 9457 problem, sent as
 `application/problem+json`, its extension members typed:
 
@@ -101,14 +102,16 @@ import { z } from 'zod';
 const JmapRequest = z.object({ using: z.array(z.string()), methodCalls: z.array(z.unknown()) });
 
 const app = alxia()
-	.onRefusal(({ part, issues }) =>
-		problem({
-			type: issues.some((issue) => issue.code === 'invalid_json')
-				? 'urn:ietf:params:jmap:error:notJSON'
-				: 'urn:ietf:params:jmap:error:notRequest',
-			status: 400,
-			detail: `the ${part} is invalid`,
-		}),
+	.onRefusal((refusal) =>
+		refusal.kind === 'body_limit'
+			? problem({ type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: 'maxSizeRequest' })
+			: problem({
+					type: refusal.issues.some((issue) => issue.code === 'invalid_json')
+						? 'urn:ietf:params:jmap:error:notJSON'
+						: 'urn:ietf:params:jmap:error:notRequest',
+					status: 400,
+					detail: `the ${refusal.part} is invalid`,
+				}),
 	)
 	.post('/jmap', { body: JmapRequest }, ({ reply }) => reply(200, { methodResponses: [] }));
 ```
@@ -149,6 +152,39 @@ const getUser = {
 
 app.route(getUser, async ({ params, reply }) => reply.ok(await findUser(params.id)));
 ```
+
+### Body size
+
+`bodyLimit`, in bytes, caps a route's request body below the server's
+`maxRequestBodySize`. Set it on a route, or call `bodyLimit(bytes)` for
+every route declared after the call: on the app, for every later route; in a
+group, for the group's routes alone. A route's own limit wins.
+
+```ts
+const app = alxia()
+	.bodyLimit(64 * 1024)
+	.post('/notes', { body: z.object({ text: z.string() }) }, ({ body, reply }) => reply.created(body))
+	.post('/upload', { bodyLimit: 25 * 1024 * 1024 }, async ({ request, reply }) => {
+		await Bun.write('upload.bin', new Response(request.body));
+		return reply.noContent();
+	});
+```
+
+A `Content-Length` over the limit is refused without reading the body.
+Without one, the bytes are counted as they arrive, and reading stops once
+they pass the limit, so a chunked upload is never buffered whole. The
+limit applies to JSON, forms, text, an app's own parsers, and a handler
+reading `request.body` as a stream. Either way the answer is a 413, which
+the route's type and its OpenAPI document include:
+
+```json
+{ "error": "content_too_large", "limit": 65536 }
+```
+
+It is a refusal, as a 400 is: the `onRefusal` hook above reads it as `{ kind: 'body_limit', limit }` and may answer it in its
+own format, JMAP's `limit` problem there, sent with 413 by that app's
+choice. A route with no limit reads its
+body as before.
 
 ## Replies
 
@@ -320,7 +356,8 @@ Hooks run before validation: `pathParams` holds the path's parameters as
 they arrived. `onError` turns a thrown
 error into a reply the same way; an `HttpError` is answered as it says, and
 anything else is a 500 that leaks nothing. `onRefusal` answers a request
-the route's schemas refuse ([Requests](#requests)); the last one declared
+the route's schemas refuse, or whose body passes its `bodyLimit`
+([Requests](#requests)); the last one declared
 before a route is the one it uses.
 
 Global hooks apply to the whole app, wherever they are declared:
@@ -404,7 +441,7 @@ covers all three kinds.
 | export | |
 | --- | --- |
 | `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip` |
-| `Alxia` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `decorate` `derive` `wrap` `onError` `onRefusal`, `around` `onRequest` `onResponse` `onStart` `onStop` `parser`, `group` `use`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server` |
+| `Alxia` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `decorate` `derive` `wrap` `onError` `onRefusal` `bodyLimit`, `around` `onRequest` `onResponse` `onStart` `onStop` `parser`, `group` `use`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server` |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream(schema)` made |
 | `eventStream({ name: schema })`, `NamedEventStreamSchema`, `EventSchemas` | the response schema of a stream of named events, its `event(name, data, fields?)` builder, its schemas by name under `~events` |
@@ -413,6 +450,7 @@ covers all three kinds.
 | `FileSource`, `StaticOptions`, `FileOptions`, `StaticReply`, `parseRange` | static files |
 | `Precompressed`, `FileNotFoundBody`, `RangeNotSatisfiableBody` | a coding stored beside a file, the bodies of the 404 and 416 |
 | `Reply`, `HttpError`, `ResponseValidationError` | what a handler returns or throws |
+| `ContentTooLargeError`, `ContentTooLargeBody` | what reading a body past its route's `bodyLimit` throws — answered as a `body_limit` refusal — and the body of its default 413: `{ error: 'content_too_large', limit }` |
 | `ReplyInit` | a reply's options: `headers` |
 | `AnyReply`, `FreeReplyFunction`, `TypedReplyFunction`, `DeclaredReply`, `RedirectFunction` | any reply, `reply` without and with schemas, every reply a route with schemas may return, `redirect` |
 | `FreeShortcuts`, `TypedShortcuts`, `SHORTCUTS`, `Shortcuts` | `reply`'s shortcuts without and with schemas, and the status of each |
@@ -436,10 +474,10 @@ covers all three kinds.
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema types |
 | `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426 |
 | `ValidationIssue`, `ValidationTarget` | one issue of a 400, and where the refused value was read from |
-| `Refusal`, `ValidationRefusal`, `RequestPart` | what an `onRefusal` hook reads: the refusal by `kind` — `validation` today — the `part` that failed first, its `issues` |
+| `Refusal`, `ValidationRefusal`, `BodyLimitRefusal`, `RequestPart` | what an `onRefusal` hook reads: the refusal by `kind` — `validation`, with the `part` that failed first and its `issues`, or `body_limit`, with the route's `limit` |
 | `RefusalSchema`, `RefusalResponses` | what an `onRefusal` hook may declare: the schema of each 4xx it answers, and its `contentType` |
 | `RefusalHook`, `RefusalHandler` | an `onRefusal` hook, and the one in force for a route: `RouteDefinition['refusal']`, what `@alxia/openapi` documents |
-| `Refusing`, `FallsBack`, `DefaultRefusalOutcome`, `ThenShortcuts`, `BehindShortcuts` | how an app's type carries its `onRefusal` hook: the mark of its replies, of the default it falls back to, the default 400 a plugin's route keeps, and how a later scope's and a using app's hooks replace it. Exported so an app's type can be named in a declaration file |
+| `Refusing`, `FallsBack`, `DefaultRefusalOutcome`, `DefaultLimitOutcome`, `RefusalOutcome`, `ThenShortcuts`, `BehindShortcuts`, `BodyLimited`, `BodyLimitShortcut`, `IsLimited` | how an app's type carries its `onRefusal` hook and its `bodyLimit()`: the mark of the hook's replies, of the default it falls back to, the default 400 and 413 a plugin's route keeps, how a later scope's and a using app's hooks replace them, the mark of a `bodyLimit()` in force and the shortcut it adds, and whether a route is under a limit. Exported so an app's type can be named in a declaration file |
 | `problem(details, init?)`, `ProblemDetails` | a reply whose body is an RFC 9457 problem — `type`, `title`, `status`, `detail`, `instance` and typed extension members — sent with its `status` as `application/problem+json` |
 | `RoutePath`, `JoinPath`, `PathParams`, `PathParamName` | paths: an absolute path, a prefix joined to a path, the parameters a path declares |
 | `StatusCode`, `InformationalStatus`, `SuccessStatus`, `RedirectStatus`, `ClientErrorStatus`, `ServerErrorStatus` | every status a route may declare, and each class of them |

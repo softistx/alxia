@@ -11,16 +11,23 @@ import { type AnyAlxia, alxia, type RoutesOf } from './alxia';
 const Id = z.object({ id: z.coerce.number().int().positive() });
 const Name = z.object({ name: z.string().min(1) });
 
-/** A JMAP-like problem for a refused request: what the part was, as `detail`. */
-const jmapProblem = ({ part, issues }: Refusal) =>
-	problem({
-		type:
-			part === 'body' && issues.some((issue) => issue.code === 'invalid_json')
-				? 'urn:ietf:params:jmap:error:notJSON'
-				: 'urn:ietf:params:jmap:error:notRequest',
-		status: 400,
-		detail: `the ${part} is invalid`,
-	});
+/** A JMAP-like problem for a refused request: what the part was, as `detail`; a body too large, its limit. */
+const jmapProblem = (refusal: Refusal) =>
+	refusal.kind === 'body_limit'
+		? problem({
+				type: 'urn:ietf:params:jmap:error:limit',
+				status: 413,
+				limit: 'maxSizeRequest',
+			})
+		: problem({
+				type:
+					refusal.part === 'body' &&
+					refusal.issues.some((issue) => issue.code === 'invalid_json')
+						? 'urn:ietf:params:jmap:error:notJSON'
+						: 'urn:ietf:params:jmap:error:notRequest',
+				status: 400,
+				detail: `the ${refusal.part} is invalid`,
+			});
 
 /** As the client reads it: the problem `jmapProblem` builds, its `detail` typed by the part. */
 type Jmap400 = {
@@ -149,6 +156,7 @@ for (const [name, transport] of Object.entries(transports)) {
 			const seen: RequestPart[] = [];
 			const app = alxia()
 				.onRefusal((refusal) => {
+					if (refusal.kind !== 'validation') return undefined;
 					seen.push(refusal.part);
 					if (refusal.part === 'query') {
 						return problem({ status: 400, detail: 'query' });
@@ -182,11 +190,11 @@ for (const [name, transport] of Object.entries(transports)) {
 						response: { 400: Problem },
 						contentType: 'application/problem+json',
 					},
-					({ part }, { reply }) =>
+					(refusal, { reply }) =>
 						reply(400, {
 							type: 'urn:example:invalid',
 							status: 400,
-							detail: part,
+							detail: refusal.kind === 'validation' ? refusal.part : 'body',
 							// An unknown key the schema strips never leaves the server.
 							...({ secret: 'x' } as object),
 						}),
@@ -327,7 +335,8 @@ describe('onRefusal, typed', () => {
 	test('the hook’s reply replaces the default 400 of the routes after it', () => {
 		type Api = Output<typeof jmap, '/api', 'POST'>;
 		expectTypeOf<At<Api, 400>>().toEqualTypeOf<Jmap400>();
-		expectTypeOf<Api['status']>().toEqualTypeOf<200 | 400 | 500>();
+		// The hook answers 413 to a body_limit: its type does not say which kind, so the 413 is there too.
+		expectTypeOf<Api['status']>().toEqualTypeOf<200 | 400 | 413 | 500>();
 		type Download = Output<typeof jmap, '/download/:id', 'GET'>;
 		expectTypeOf<At<Download, 400>>().toEqualTypeOf<Jmap400>();
 		type Before = Output<typeof jmap, '/before', 'POST'>;
@@ -340,7 +349,7 @@ describe('onRefusal, typed', () => {
 	test('a hook that may return nothing keeps the default beside its reply; another status replaces 400', () => {
 		const app = alxia()
 			.onRefusal((refusal) =>
-				refusal.part === 'body'
+				refusal.kind === 'validation' && refusal.part === 'body'
 					? problem({ status: 422, detail: 'body' })
 					: undefined,
 			)
