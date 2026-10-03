@@ -35,7 +35,7 @@ Nothing scheduled yet.
   `X-Permitted-Cross-Domain-Policies` with strict defaults for an API, on
   every response — 404s, 405s and 500s included.
 - **Each header adjustable.** Every option takes the header's value, or
-  `false` to leave it out; `Cross-Origin-Embedder-Policy` and
+  `false` to leave it out, and an empty value is refused at startup; `Cross-Origin-Embedder-Policy` and
   `Permissions-Policy` are sent only when given.
 - **A route's own header wins.** A header a route sets on its reply is kept,
   so a page that needs its own policy sets it there.

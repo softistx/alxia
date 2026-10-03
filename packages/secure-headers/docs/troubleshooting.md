@@ -14,6 +14,7 @@ browser refusing what a header forbids, or a header in the wrong place.
 
 **Runtime**
 
+- [`TypeError: secureHeaders: … is empty; give false to leave the … header out`](#typeerror-secureheaders--is-empty-give-false-to-leave-the--header-out)
 - [`TypeError: alxia().use(secureHeaders).get is not a function`](#typeerror-alxiausesecureheadersget-is-not-a-function)
 
 **In the browser**
@@ -27,7 +28,6 @@ browser refusing what a header forbids, or a header in the wrong place.
 
 **Headers**
 
-- [A header is sent with an empty value](#a-header-is-sent-with-an-empty-value)
 - [An option has no effect on a response](#an-option-has-no-effect-on-a-response)
 - [`X-Powered-By` or `Server` is still sent](#x-powered-by-or-server-is-still-sent)
 - [A response arrives without the headers](#a-response-arrives-without-the-headers)
@@ -48,7 +48,7 @@ error TS2322: Type '{ defaultSrc: string[]; }' is not assignable to type 'Settin
 `'boolean | undefined'`.
 
 **Why:** a header option is the header's value as a string, or `false` to
-leave it out (`Setting` is `string | false`). There is no `true` — leaving
+leave it out (`Setting`, exported, is `string | false`). There is no `true` — leaving
 the key out is the default — and no object form for a policy.
 
 **Fix:** write the header as it goes out, or leave the key out:
@@ -135,6 +135,25 @@ app.use(secureHeaders());
 ```
 
 ## Runtime
+
+### `TypeError: secureHeaders: … is empty; give false to leave the … header out`
+
+**When:** `secureHeaders()` is called with a header option set to `''`, or
+to spaces only, usually to turn a header off. It throws at once, so the app
+fails at startup:
+
+```text
+TypeError: secureHeaders: xFrameOptions is empty; give false to leave the x-frame-options header out
+```
+
+**Why:** a header with an empty value says nothing a browser can act on.
+Only `false` leaves a header out.
+
+**Fix:**
+
+```ts
+app.use(secureHeaders({ xFrameOptions: false }));
+```
 
 ### `TypeError: alxia().use(secureHeaders).get is not a function`
 
@@ -274,20 +293,6 @@ A browser that already stored the policy keeps it until it expires, or
 until it reads `max-age=0` from the host over HTTPS.
 
 ## Headers
-
-### A header is sent with an empty value
-
-**When:** an option was set to `''` to turn a header off, and the response
-carries it, empty.
-
-**Why:** any string is sent as the header's value. Only `false` leaves the
-header out.
-
-**Fix:**
-
-```ts
-app.use(secureHeaders({ xFrameOptions: false }));
-```
 
 ### An option has no effect on a response
 

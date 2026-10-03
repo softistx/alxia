@@ -98,8 +98,10 @@ app.use(
 app.use(secureHeaders({ xFrameOptions: false, strictTransportSecurity: false }));
 ```
 
-An empty string is **not** the same: `''` sends the header with an empty
-value. Use `false` to drop it.
+An empty string is refused: `secureHeaders({ xFrameOptions: '' })` throws a
+`TypeError` at startup
+([troubleshooting](troubleshooting.md#typeerror-secureheaders--is-empty-give-false-to-leave-the--header-out)).
+Use `false` to drop a header.
 
 ### The defaults, explicitly
 
