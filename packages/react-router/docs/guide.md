@@ -5,7 +5,8 @@ server rendering from an alxia app, under Bun. This page walks an app
 author through it: the setup, what happens in dev, in a build and under
 `vite preview`,
 customising the server, typing the loaders, the app's own context keys,
-the escape hatches, the client's files, OpenAPI, testing and deploying.
+the escape hatches, WebSockets, the client's files, OpenAPI, testing and
+deploying.
 
 - [Setup](#setup)
 - [How it works](#how-it-works)
@@ -15,6 +16,7 @@ the escape hatches, the client's files, OpenAPI, testing and deploying.
 - [Escape hatches](#escape-hatches)
 - [Hooks around the pages](#hooks-around-the-pages)
 - [Routes beside the pages](#routes-beside-the-pages)
+- [WebSockets](#websockets)
 - [The client's files](#the-clients-files)
 - [OpenAPI](#openapi)
 - [Testing](#testing)
@@ -108,10 +110,12 @@ routes. The server is loaded through Vite's SSR runner, so:
 - **The app's own context keys work**: the server and the routes are one
   module graph. See [The app's own context keys](#the-apps-own-context-keys).
 - **Errors** go to Vite's error page, with the stack mapped to the source.
+- **alxia's `ws` routes connect**: an upgrade Vite's HMR does not claim
+  goes to the app, as from the build. See [WebSockets](#websockets).
 
-Requests reach the app through `app.fetch`, as in a test, not through
-`listen`. So alxia's `ws` routes, `page()` and `ctx.server` are absent in
-dev; see [the troubleshooting entry](troubleshooting.md#a-websocket-route-does-not-connect-under-react-router-dev).
+HTTP requests reach the app through `app.fetch`, as in a test, not
+through `listen`. So `page()` and an HTTP request's `ctx.server` are
+absent in dev; see [the troubleshooting entry](troubleshooting.md#ctxserver-is-undefined-under-react-router-dev).
 
 ### In a build
 
@@ -172,9 +176,13 @@ What differs from `bun run start`:
 - **Vite listens**, on `preview.port` (4173), `preview.host` and
   `preview.https`. `listen`, `onListen`, `PORT` and `HOST` are not read.
 - **Requests arrive through `app.fetch`**, as under `react-router dev`:
-  alxia's `ws` routes, `page()` and `ctx.server` are absent.
+  `page()` and an HTTP request's `ctx.server` are absent. alxia's `ws`
+  routes connect, relayed to a `Bun.serve` of the built app as in dev
+  ([WebSockets](#websockets)); an upgrade `preview.proxy` relays stays
+  Vite's.
 - **Vite's preview options that come after the plugin never run**:
-  `preview.proxy`, `preview.headers` and Vite's file serving.
+  `preview.proxy` for HTTP requests, `preview.headers` and Vite's file
+  serving.
   `preview.cors` and `preview.allowedHosts` still apply.
 - **The build is loaded once**: after `bun run build` again, restart the
   preview.
@@ -636,6 +644,95 @@ What React Router answers comes back as it sent it: documents,
 single-fetch data (`/_.data`, `/login.data`), lazy route discovery
 (`/__manifest`), redirects with every `Set-Cookie` they carry, and the
 error pages, a 404 or a 500 rendered by the app's `ErrorBoundary`.
+
+## WebSockets
+
+A `ws` route declared in `configure` (or `beforeAll`) is a socket under
+`react-router dev`, under `vite preview` and from
+`bun build/server/index.js` alike. There is
+nothing to add: no option, no package, no second server to start.
+
+```ts
+// app/server.ts
+import { createServer } from '@alxia/react-router';
+
+export default createServer({
+	configure: (app) =>
+		app
+			.derive(({ request }) => {
+				const name = request.headers.get('x-user');
+				return { user: name === null ? null : { name } };
+			})
+			.ws('/api/echo', {}, {
+				open: (socket) => socket.send({ hello: socket.data.user?.name ?? 'anonymous' }),
+				message: (socket, message) => socket.send({ echo: String(message) }),
+			})
+			.group((guarded) =>
+				guarded
+					.derive(({ user, reply }) =>
+						user === null ? reply(401, { error: 'unauthenticated' as const }) : { user },
+					)
+					.ws('/api/rooms/:room', {}, {
+						open: (socket) => socket.subscribe(socket.data.params.room),
+						message: (socket, message) =>
+							socket.publish(socket.data.params.room, {
+								from: socket.data.user.name,
+								text: String(message),
+							}),
+					}),
+			),
+});
+```
+
+The upgrade runs the hooks declared before the route, and the route's
+validation, as any request does. A hook's reply refuses it: the client
+gets the 401 and its body, and no socket opens. `socket.data` holds the
+validated request and what each hook derived, typed. See
+[`@alxia/core`'s WebSockets](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/websockets.md)
+for the schemas and the rest of the socket.
+
+The guard sits in a `group` so it refuses the sockets alone: declared on
+`app` itself, it would apply to every route after it, the pages'
+catch-all included.
+
+### Under `react-router dev`
+
+Vite's dev server is a `node:http` server, and an alxia socket is
+`Bun.serve`'s upgrade. The plugin listens for Vite's `upgrade` event and
+leaves Vite's own socket alone: an upgrade asking for the `vite-hmr` or
+`vite-ping` subprotocol is Vite's, and HMR works as before. Any other
+upgrade, except one Vite's `server.proxy` relays itself (an entry with
+`ws: true` or a `ws:` target, matched as Vite matches it), is relayed,
+byte for byte, to a `Bun.serve` of the app on a loopback port of its
+own, started on the first upgrade and given
+`app.fetch` and `app.websocket`, as `listen` gives them. So in dev:
+
+- **The same hooks, refusals and handlers run** as from the build:
+  `open`, `message`, `close`, `drain`, the `message` and `send` schemas,
+  `subscribe` and `publish`.
+- **An edit to `app/server.ts`, or to a module it imports, is used from
+  the next connection.** The edit makes a new app, and the next upgrade
+  starts a new `Bun.serve` for it. A socket opened before the edit keeps
+  the handlers it opened with until it closes.
+- **A `publish` reaches the sockets opened since the same edit**: the
+  sockets opened before it are on the previous server. Reload the pages
+  after an edit to reconnect them.
+- **A socket's `ctx.ip` is the loopback address**, the relay's. The
+  browser is local in dev, so that is usually its address anyway.
+- **An upgrade to a path with no `ws` route** gets what the build answers
+  it too, never a socket: alxia's 404 where nothing matches, the page
+  where the catch-all does.
+- **Another plugin that listens for upgrades** competes with the relay
+  on the paths it shares with it: give its socket a path under a
+  `server.proxy` entry with `ws: true` or a `ws:` target, or outside the
+  app's.
+- **With Vite in middleware mode**, there is no `node:http` server of
+  Vite's to listen on: serve the app yourself, as in
+  [A server of your own](#a-server-of-your-own-without-the-plugin).
+
+Under `vite preview` the same relay runs, to a `Bun.serve` of the built
+app, loaded once. Under `bun build/server/index.js`, nothing of this runs:
+`listen` serves the sockets itself, as any alxia app's.
 
 ## The client's files
 

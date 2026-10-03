@@ -1,11 +1,11 @@
 /**
- * Vite and the built server, for the `/vite` specs: Vite's dev server in
- * process on a copy of the fixture, `react-router build` on one, and
- * `bun build/server/index.js` on a free port.
+ * Vite and the built server, for the `/vite` specs: Vite's dev server and
+ * its preview in process on a copy of the fixture, `react-router build` on
+ * one, and `bun build/server/index.js` on a free port.
  */
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { createServer } from 'vite';
+import { createServer, preview } from 'vite';
 import type { copyFixture } from './fixture';
 
 export type Fixture = Awaited<ReturnType<typeof copyFixture>>;
@@ -97,4 +97,19 @@ export async function start(root: string, who: string) {
 			return { child, url };
 		}
 	}
+}
+
+/** Vite's preview server on a copy of the fixture, in this process, on a free port. */
+export async function previewServer(root: string) {
+	const server = await preview({
+		root,
+		configFile: join(root, 'vite.alxia.config.ts'),
+		logLevel: 'silent',
+		preview: { port: 0, host: '127.0.0.1' },
+	});
+	const address = server.httpServer.address();
+	if (address === null || typeof address !== 'object') {
+		throw new Error('Vite did not listen');
+	}
+	return { server, base: `http://127.0.0.1:${address.port}` };
 }

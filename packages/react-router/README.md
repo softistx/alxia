@@ -47,7 +47,7 @@ The template's `dev`, `build` and `typecheck` scripts are unchanged. They
 run through `bun run`, with no Node installed:
 
 - **`bun run dev`**: every request Vite does not answer itself (pages,
-  data, `/api`) reaches alxia, with HMR.
+  data, `/api`, an upgrade to a `ws` route) reaches alxia, with HMR.
 - **`bun run build`** writes `build/server/index.js`, a server you can run.
 - **`bun run start`** serves the pages and the client build. It listens on
   `PORT` (3000) and `HOST` (`0.0.0.0`), and stops on `SIGTERM`.
@@ -137,6 +137,32 @@ How `alxiaOf(context)` is typed:
 
 [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#typing-the-loaders)
 
+## WebSockets
+
+A `ws` route in `configure` connects under `react-router dev`, under
+`vite preview` and from the build alike, with nothing else to write:
+
+```ts
+// app/server.ts
+import { createServer } from '@alxia/react-router';
+
+export default createServer({
+	configure: (app) =>
+		app
+			.derive(({ request }) => ({ user: request.headers.get('x-user') }))
+			.ws('/api/echo', {}, {
+				open: (socket) => socket.send({ hello: socket.data.user ?? 'anonymous' }),
+				message: (socket, message) => socket.send({ echo: String(message) }),
+			}),
+});
+```
+
+In dev, the plugin hands each upgrade Vite does not claim (its HMR, its
+`server.proxy`) to the app, run by `Bun.serve` as `listen` runs it: the
+hooks before the route, a refusal's status, `socket.data`, `publish`. An
+edit to the server is used from the next connection.
+[More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#websockets)
+
 ## Options
 
 ```ts
@@ -202,9 +228,9 @@ files, so `@alxia/openapi` can leave them out.
   Router's 405. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
 - **`@alxia/secure-headers`' default policy blocks the page's scripts**
   and forms: give the pages a policy of their own. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
-- **Under `react-router dev`, alxia's `ws` routes, `page()` and
-  `ctx.server` are absent**: requests arrive through `app.fetch`. Try
-  sockets against the build. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-websocket-route-does-not-connect-under-react-router-dev)
+- **Under `react-router dev`, `page()` and an HTTP request's
+  `ctx.server` are absent**: requests arrive through `app.fetch`. A
+  socket's upgrade has its server. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#ctxserver-is-undefined-under-react-router-dev)
 - **An alxia route whose path covers a page takes it**, wherever it is
   declared: `GET /:slug` answers `/about`. Keep alxia's routes under
   `/api`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-page-answers-alxias-json-404-or-405-instead-of-rendering)
@@ -244,7 +270,7 @@ The `alxia-react-router` bin, run with `bunx`:
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev, the build and `vite preview` work, customising the server, typing the loaders, the app's own keys, escape hatches, the client's files, OpenAPI, testing and deploying.
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev, the build and `vite preview` work, customising the server, typing the loaders, the app's own keys, escape hatches, WebSockets, the client's files, OpenAPI, testing and deploying.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these three lines, then an `app/server.ts` with a session, an `/api`, secure headers and a streamed page.

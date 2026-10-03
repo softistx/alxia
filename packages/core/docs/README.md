@@ -17,7 +17,7 @@ a realistic example for each.
 | [Static files](guide/static-files.md) | serving a directory, one file, a single-page app, or a Bun HTML bundle |
 | [Server-sent events](guide/server-sent-events.md) | streaming typed events to a client |
 | [WebSockets](guide/websockets.md) | opening typed sockets, validated both ways |
-| [Serving](guide/serving.md) | choosing a port or TLS, running behind a proxy, testing through `fetch`, or stopping cleanly |
+| [Serving](guide/serving.md) | choosing a port or TLS, running behind a proxy, testing through `fetch`, serving the sockets from a `Bun.serve` of your own with `websocket`, or stopping cleanly |
 | [The app's type](guide/types.md) | typing a client, a service or a type test from `typeof app` |
 | [Troubleshooting](troubleshooting.md) | something went wrong and you have the message |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |

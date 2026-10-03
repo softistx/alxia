@@ -9,8 +9,10 @@ import { relative } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { PreviewServer } from 'vite';
 import { serverBuildPath } from './config';
+import type { DevApp } from './dev';
 import { NAME } from './entry';
 import { send, toRequest } from './node';
+import { bridgeSockets } from './socket';
 
 /** What the built server's default export is: the alxia app. */
 interface Fetcher {
@@ -37,7 +39,8 @@ async function load(file: string, label: string): Promise<Fetcher> {
 
 /**
  * Hands every request to the built server, before Vite's own files: the
- * app serves `build/client` itself, with its hooks and cache headers.
+ * app serves `build/client` itself, with its hooks and cache headers. Its
+ * WebSocket routes connect too, relayed as under `react-router dev`.
  */
 export function servePreview(server: PreviewServer): void {
 	const file = serverBuildPath(server.config);
@@ -45,9 +48,22 @@ export function servePreview(server: PreviewServer): void {
 	// Loaded on the first request, as `bun build/server/index.js` would be
 	// at startup; a failed load is tried again on the next, after a build.
 	let app: Promise<Fetcher> | undefined;
-	server.middlewares.use((req, res, next) => {
+	const current = (): Promise<Fetcher> => {
 		app ??= load(file, label);
-		app.then(
+		return app;
+	};
+	bridgeSockets(server.httpServer, {
+		proxy: server.config.preview.proxy,
+		// The built server's default export is the alxia app, `websocket` and all.
+		load: () =>
+			current().catch((error: unknown) => {
+				app = undefined;
+				throw error;
+			}) as Promise<DevApp>,
+		logger: server.config.logger,
+	});
+	server.middlewares.use((req, res, next) => {
+		current().then(
 			async (loaded) => {
 				try {
 					await send(res, await loaded.fetch(toRequest(req, res)));

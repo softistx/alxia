@@ -27,8 +27,10 @@ const app = alxia()
 app.listen(3000);
 ```
 
-Sockets need **`listen`**: through `app.fetch` alone — `app.request`, a
-test without a server — a socket route answers `426 upgrade_required`.
+Sockets need **a server**: `listen`, or a `Bun.serve` of your own given
+`fetch` and [`websocket`](serving.md#websocket). Through `app.fetch` alone
+— `app.request`, a test without a server — a socket route answers
+`426 upgrade_required`.
 
 ## `ws(path, schema, handlers)`
 

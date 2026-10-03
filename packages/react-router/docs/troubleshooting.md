@@ -14,6 +14,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`alxia-react-router: React Router's Vite plugin is not in this config. …`](#alxia-react-router-react-routers-vite-plugin-is-not-in-this-config-)
 - [`alxia-react-router: serverBundles splits React Router's server build in several, and alxia serves one. …`](#alxia-react-router-serverbundles-splits-react-routers-server-build-in-several-and-alxia-serves-one-)
 - [`alxia-react-router: Vite's ssr environment does not run modules in this process, so the server cannot be loaded.`](#alxia-react-router-vites-ssr-environment-does-not-run-modules-in-this-process-so-the-server-cannot-be-loaded)
+- [`alxia-react-router: a WebSocket upgrade failed: …`](#alxia-react-router-a-websocket-upgrade-failed-)
 - [`The React Router Vite plugin requires the use of a Vite config file`](#the-react-router-vite-plugin-requires-the-use-of-a-vite-config-file)
 - [`No route matches URL "/assets/…"`](#no-route-matches-url-assets)
 - [``You made a POST request to "/" but did not provide an `action` for route "root", so there is no way to handle the request.``](#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
@@ -46,7 +47,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [A page answers alxia's JSON 404 or 405 instead of rendering](#a-page-answers-alxias-json-404-or-405-instead-of-rendering)
 - [A streamed page arrives in one piece](#a-streamed-page-arrives-in-one-piece)
 - [The logger times a streamed page at a few milliseconds](#the-logger-times-a-streamed-page-at-a-few-milliseconds)
-- [A WebSocket route does not connect under `react-router dev`](#a-websocket-route-does-not-connect-under-react-router-dev)
+- [`ctx.server` is `undefined` under `react-router dev`](#ctxserver-is-undefined-under-react-router-dev)
+- [A `publish` under `react-router dev` misses the sockets opened before an edit](#a-publish-under-react-router-dev-misses-the-sockets-opened-before-an-edit)
 
 ## Thrown or printed
 
@@ -226,6 +228,28 @@ the one this package was tested with passes it.
 
 **Fix:** drop the plugin that replaces the `ssr` environment. alxia runs
 under Bun, not in a worker runtime.
+
+### `alxia-react-router: a WebSocket upgrade failed: …`
+
+Printed by Vite's logger, followed by the error's stack.
+
+**When:** under `react-router dev`, a client opens a WebSocket to the app,
+and loading the server throws: `app/server.ts`, or a module it imports,
+throws when it runs or does not compile, or the plugin itself fails (the
+prefix is then followed by its own message, such as `Vite's ssr
+environment does not run modules in this process`). Under `vite preview`,
+the built server failed to load: the prefix is followed by
+[`… does not exist. Run react-router build before vite preview.`](#alxia-react-router-buildserverindexjs-does-not-exist-run-react-router-build-before-vite-preview)
+or [`… is not alxia's server: …`](#alxia-react-router-buildserverindexjs-is-not-alxias-server-its-default-export-has-no-fetch-),
+whose fixes apply. The client's handshake gets a `500`, and no socket.
+
+**Why:** the plugin loads the server, through Vite's SSR runner, on each
+upgrade as on each request, so that an edit is used from the next
+connection. An HTTP request with the same error goes to Vite's error
+page; an upgrade has no page to show, so the error is printed.
+
+**Fix:** fix the error the stack names. The next connection loads the
+server again, with no restart.
 
 ### `The React Router Vite plugin requires the use of a Vite config file`
 
@@ -721,16 +745,47 @@ deferred value later. If the whole page comes at once:
 page that streams for 800 ms is logged at its first byte. The duration is
 the server's time to first byte, not the page's.
 
-### A WebSocket route does not connect under `react-router dev`
+### `ctx.server` is `undefined` under `react-router dev`
 
-The same route connects from `bun build/server/index.js`.
+A hook or a route reads `ctx.server`, or the app declares a `page()`,
+under `react-router dev` or `vite preview`; the same code works from
+`bun build/server/index.js`.
 
 **Why:** under `@alxia/react-router/vite`, Vite owns the dev server, and
-the app gets requests through `app.fetch`, as in a test. An upgrade goes
-to Vite's server, which keeps its own socket for HMR: alxia's `ws`
-routes, `page()` and `ctx.server` are not there in dev.
+the preview server under `vite preview`. An HTTP request reaches the app
+through `app.fetch`, as in a test, not through `listen`: there is no
+`Bun.serve` behind it, so `ctx.server` is `undefined`, the default
+`ctx.ip` too, and a `page()` (Bun's HTML bundle) is not served. A socket's upgrade is the exception: the plugin relays it
+to a `Bun.serve` of the app, so its hooks read a server
+([WebSockets](guide.md#under-react-router-dev)).
 
-**Fix:** test sockets against the build (`bun run build && bun run
-start`), or serve the build with
-[a server of your own](guide.md#a-server-of-your-own-without-the-plugin)
-while working on them.
+**Fix:** read `ctx.server` as optional, and publish to sockets from the
+sockets themselves (`socket.publish`), which works in dev too:
+
+```ts
+// app/server.ts
+import { createServer } from '@alxia/react-router';
+
+export default createServer({
+	configure: (app) =>
+		app.get('/api/uptime', ({ server, reply }) =>
+			reply.ok({ pending: server?.pendingRequests ?? null }),
+		),
+});
+```
+
+Let Vite and React Router serve the HTML in dev; a `page()` is for an app
+without React Router.
+
+### A `publish` under `react-router dev` misses the sockets opened before an edit
+
+Two clients in one room; after an edit to `app/server.ts`, a message one
+sends no longer reaches the other.
+
+**Why:** an edit to the server makes a new app, and the plugin starts a
+new `Bun.serve` for it on the next upgrade, so that new connections use
+the new handlers. A socket opened before the edit stays on the previous
+server, with the handlers it opened with, and a topic is one server's.
+
+**Fix:** reconnect the clients after an edit: reload their pages. From
+the build there is one server, and every socket shares its topics.

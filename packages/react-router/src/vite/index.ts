@@ -16,7 +16,7 @@ import {
 	serverBuildOptions,
 	serverFile,
 } from './config';
-import { serveFromEntry } from './dev';
+import { serveDev } from './dev';
 import { NAME, PASS_THROUGH, serverEntry } from './entry';
 import { servePreview } from './preview';
 
@@ -43,8 +43,8 @@ const RESOLVED_DEFAULT = `\0${DEFAULT}`;
  *
  * - **`react-router dev`**: every request Vite does not answer itself —
  *   pages, data, `/api` — goes to the server, loaded through Vite's SSR
- *   runner. HMR, an edit to the server, and the app's own context keys
- *   work, with no restart.
+ *   runner. HMR, an edit to the server, the app's own context keys and
+ *   its WebSocket routes work, with no restart.
  * - **`react-router build`**: `build/server/index.js` is the server, with
  *   React Router's build inside it. `bun build/server/index.js` listens on
  *   `PORT` (3000) and `HOST` (`0.0.0.0`); importing it starts nothing.
@@ -111,17 +111,7 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 		},
 		configureServer(server) {
 			if (!enabled) return;
-			// After Vite's own middlewares: what Vite leaves is the app's.
-			return () => {
-				server.middlewares.use((req, res, next) => {
-					serveFromEntry(server, options.entry, req, res).catch(
-						(error: unknown) => {
-							if (error instanceof Error) server.ssrFixStacktrace(error);
-							next(error);
-						},
-					);
-				});
-			};
+			return serveDev(server, options.entry);
 		},
 		configurePreviewServer(server) {
 			if (!enabled) return;
