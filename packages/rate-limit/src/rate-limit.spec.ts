@@ -59,4 +59,18 @@ describe('rateLimit', () => {
 		await Bun.sleep(30);
 		expect(store.consume('a', policy).remaining).toBe(1);
 	});
+
+	test('a limit or a window that cannot work is refused at once', () => {
+		expect(() => rateLimit({ limit: 0, windowMs: 1000 })).toThrow(
+			'rateLimit: limit must be a whole number of 1 or more, not 0',
+		);
+		expect(() => rateLimit({ limit: 10, windowMs: -5 })).toThrow(
+			'rateLimit: windowMs must be a whole number of 1 or more, not -5',
+		);
+		expect(() => rateLimit({ limit: 1.5, windowMs: 1000 })).toThrow(TypeError);
+		expect(() => rateLimit({ limit: 10, windowMs: Number.NaN })).toThrow(
+			TypeError,
+		);
+		expect(() => rateLimit({ limit: 1, windowMs: 1 })).not.toThrow();
+	});
 });
