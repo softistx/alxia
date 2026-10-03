@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { alxia, type ContextOf, type RoutesOf } from './alxia';
+import { type Alxia, alxia, type ContextOf, type RoutesOf } from './alxia';
 import { definePlugin } from './define-plugin';
 
 interface User {
@@ -98,7 +98,47 @@ describe('definePlugin', () => {
 			const maybe = alxia().derive(() => ({ user: null as User | null }));
 			// @ts-expect-error the plugin reads "user", which this app's context gives with another type
 			maybe.use(tenant);
+			const both = definePlugin<{ user: User; session: string }>()(
+				(app) => app,
+			);
+			// @ts-expect-error one message per key: "user" of another type, "session" not given
+			maybe.use(both);
+			// @ts-expect-error inside a group, the same check
+			alxia().group('/t', (group) => group.use(tenant));
+			// @ts-expect-error through a function plugin, the same check
+			alxia().use((app) => app.use(tenant));
 		};
 		expect(_refused).toBeFunction();
+	});
+
+	test('an optional requirement passes on an app without the key', () => {
+		const greeting = definePlugin<{ user?: { id: string } }>()((app) =>
+			app.derive(({ user }) => ({ greeting: `hi ${user?.id ?? 'guest'}` })),
+		);
+		alxia().use(greeting);
+		alxia().use(session).use(greeting);
+		const _refused = () => {
+			const numeric = alxia().derive(() => ({ user: 1 }));
+			// @ts-expect-error the plugin reads "user", which this app's context gives with another type
+			numeric.use(greeting);
+		};
+		expect(_refused).toBeFunction();
+	});
+
+	test('the limits of the check, pinned', () => {
+		const _limits = () => {
+			// A context that is a type parameter defers the check, so even a
+			// bound that gives `user` is refused: type the host concretely.
+			const generic = <C extends { user: { tenantId: string } }>(
+				app: Alxia<C>,
+			) =>
+				// @ts-expect-error a generic context cannot be checked
+				app.use(tenant);
+			// What is chained onto the plugin after `definePlugin` returns is a
+			// plain app, unchecked: finish the plugin inside `build`.
+			alxia().use(tenant.get('/x', ({ reply }) => reply(200, 'x')));
+			return generic;
+		};
+		expect(_limits).toBeFunction();
 	});
 });

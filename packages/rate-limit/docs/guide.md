@@ -25,7 +25,7 @@ app.listen({ port: 3000 });
 ```ts
 function rateLimit<Requires extends object = Empty>(
 	options: RateLimitOptions<Requires>,
-): Alxia<…>; // an app, given to `use`
+): Alxia<…> & Requiring<Requires>; // an app, given to `use`, which checks `Requires`
 
 interface RateLimitOptions<Requires extends object = Empty> {
 	readonly limit: number;
@@ -90,7 +90,8 @@ app.use(
 ```
 
 `key` is typed with `BaseContext`, what every route hook reads: the request,
-`url`, `ip`, `server`, `route` and `pathParams`. To read what an earlier
+`url`, `ip`, `server`, `route` and `pathParams`, and with `Requires`, empty
+by default. To read what an earlier
 plugin added, see [Reading the app's context](#reading-the-apps-context).
 
 ### `skip`

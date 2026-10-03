@@ -15,6 +15,8 @@ thrown when the app is built, a response body, or a line in the server log.
 - [`Property 'user' does not exist on type 'Context<…>'`](#property-user-does-not-exist-on-type-context)
 - [`the plugin reads "…", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
 - [`the plugin reads "…", which this app's context gives with another type`](#the-plugin-reads--which-this-apps-context-gives-with-another-type)
+- [`this app's context does not give what the plugin reads`](#this-apps-context-does-not-give-what-the-plugin-reads)
+- [`… is not assignable to type 'ProvidedBy<C, …>'`](#-is-not-assignable-to-type-providedbyc-)
 - [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
 
 **Building the app**
@@ -243,8 +245,9 @@ message on the last line is the one that matters.
 
 **Why:** the plugin's hooks read `user`, and on this app no plugin or
 `derive` before it adds one, so at runtime `user` would be `undefined`. The
-message names each missing key; with several, TypeScript lists one message
-per key.
+message names each key at fault; with several, the error lists one message
+per key, joined by `|`, and a key of another type gets the message of the
+entry below.
 
 **Fix:** use the plugin that adds the key first:
 
@@ -287,6 +290,37 @@ alxia()
 
 If you wrote the plugin, you can instead widen its requirement
 (`{ user: { tenantId: string } | null }`) and handle the `null` in it.
+
+### `this app's context does not give what the plugin reads`
+
+**When:** as for the two entries above, but the plugin's `Requires` has no
+key the message can name: a symbol key, or a union such as
+`{ a: string } | { b: string }`.
+
+**Fix:** give what the plugin requires before using it, or, if you wrote
+the plugin, name its requirement with string keys.
+
+### `… is not assignable to type 'ProvidedBy<C, …>'`
+
+**When:** `use(plugin)` with a `definePlugin` plugin, on an app whose
+context is a type parameter:
+
+```ts
+const withTenant = <C extends { user: { tenantId: string } }>(app: Alxia<C>) =>
+	app.use(tenant);
+```
+
+```text
+error TS2769: No overload matches this call.
+  …
+      Type 'Alxia<{ user: { tenantId: string; }; }, Empty, "", never> & Requiring<{ user: { tenantId: string; }; }>' is not assignable to type 'ProvidedBy<C, { user: { tenantId: string; }; }>'.
+```
+
+**Why:** the check is a conditional type, and TypeScript does not decide a
+conditional type on a type parameter, even when its bound would pass.
+
+**Fix:** type the app with a concrete context, or as `AnyAlxia` and give
+the function's return type yourself. `AnyAlxia` is not checked.
 
 ### `route() needs one method: declare the operation as const`
 

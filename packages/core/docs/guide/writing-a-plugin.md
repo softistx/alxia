@@ -100,6 +100,11 @@ already has `Requires`:
 ```ts
 import { definePlugin } from '@alxia/core';
 
+interface Tenant {
+	readonly id: string;
+	readonly name: string;
+}
+
 const tenants = new Map<string, Tenant>();
 
 export const tenant = definePlugin<{ user: { tenantId: string } }>()((app) =>
@@ -118,7 +123,9 @@ definePlugin<Requires extends object = Empty>(): <Plugin extends AnyAlxia>(
   has a `tenantId`.
 - `build` receives an app whose context has `Requires`, and returns the
   plugin: `derive` and the rest, routes, replies, as in any app plugin.
-  `build` runs once, when `definePlugin` is called.
+  `build` runs once, when the function `definePlugin<…>()` returns is
+  called: for a factory such as `tenantOf` below, once per call of the
+  factory.
 - The result is an app, given to `use` like any other. `use` checks the
   app's context against `Requires` at compile time, so the plugin's hooks
   never run without what they read.
@@ -174,6 +181,22 @@ export const audit = <Requires extends object = Empty>(
 
 app.use(auth).use(audit<{ user: User }>(({ user }) => user.id));
 ```
+
+A key that may be absent is optional: `definePlugin<{ user?: User }>()`
+reads `user` as `User | undefined`, and any app may use it, so long as a
+`user` it gives is a `User`.
+
+### What the check does not see
+
+- **What is chained on after `definePlugin` returns.** The requirement is
+  carried by the value `definePlugin` returns. `tenant.get('/x', …)` is a
+  plain app again, and `use` no longer checks it. Declare everything inside
+  `build`.
+- **A context that is a type parameter.** In
+  `<C extends { user: User }>(app: Alxia<C>) => app.use(tenant)`, TypeScript
+  defers the check and refuses the call, even though the bound gives a
+  `user`. Type the host with a concrete context, or as `AnyAlxia`, which is
+  not checked at all.
 
 `definePlugin()` with no `Requires` builds a plugin any app may use, the
 same as `alxia()`.

@@ -315,11 +315,19 @@ A plugin that reads what an earlier one added names it with `definePlugin`,
 and an app that does not give it cannot use it:
 
 ```ts
+import { alxia, definePlugin } from '@alxia/core';
+
+const tenants = new Map<string, { name: string }>();
+const auth = alxia().derive(({ request, reply }) => {
+	const tenantId = request.headers.get('x-tenant');
+	return tenantId ? { user: { tenantId } } : reply(401, { error: 'unauthenticated' as const });
+});
+
 const tenant = definePlugin<{ user: { tenantId: string } }>()((app) =>
 	app.derive(({ user }) => ({ tenant: tenants.get(user.tenantId) ?? null })),
 );
 
-alxia().use(auth).use(tenant); // ok: auth adds user
+alxia().use(auth).use(tenant); // ok: auth adds a user, or answers 401
 alxia().use(tenant);           // compile error: the plugin reads "user", which this app's context does not give
 ```
 
@@ -342,7 +350,7 @@ covers all three kinds.
 | `FreeShortcuts`, `TypedShortcuts`, `SHORTCUTS`, `Shortcuts` | `reply`'s shortcuts without and with schemas, and the status of each |
 | `Plugin`, `AnyAlxia` | a function plugin, any app |
 | `definePlugin<Requires>()(build)` | an app plugin built on an app whose context has `Requires`; `use` refuses it on an app that does not give them |
-| `Requiring<Requires>`, `ProvidedBy<Ctx, Requires>` | what `definePlugin` returns carries, and the check `use` makes of it |
+| `Requiring<Requires>`, `ProvidedBy<Ctx, Requires>` | the marker on a `definePlugin` plugin, and the check `use` makes of it |
 | `ListenOptions` | the options of `listen`: `port`, `hostname`, `development`, `idleTimeout`, `maxRequestBodySize`, `tls` |
 | `RequestHook`, `ResponseHook`, `AroundHook`, `StartHook`, `StopHook`, `BodyParser` | the hooks of `onRequest`, `onResponse`, `around`, `onStart`, `onStop`, and a body parser |
 | `withHeaders`, `vary`, `check` | for plugins: edit a response's headers (copied when immutable; an error of the edit leaves the body unread), add to `Vary`, run a schema |

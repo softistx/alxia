@@ -10,7 +10,7 @@ import type { Empty, Requiring } from './types';
  *   app.derive(({ user }) => ({ tenant: tenants.get(user.tenantId) })),
  * );
  *
- * base.use(session(accounts, { required: true })).use(tenant); // compiles
+ * alxia().use(auth).use(tenant); // compiles: auth derives a user, or answers 401
  * alxia().use(tenant); // a compile error: this app gives no `user`
  * ```
  *
