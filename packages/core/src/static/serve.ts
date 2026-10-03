@@ -169,7 +169,13 @@ export function staticHandler(source: FileSource, options: StaticOptions = {}) {
 			ctx,
 			find,
 		);
-		return send(ctx, found, options, encoded);
+		return send(
+			ctx,
+			found,
+			options,
+			encoded,
+			(options.precompressed?.length ?? 0) > 0,
+		);
 	};
 }
 
@@ -195,7 +201,7 @@ export function fileHandler(
 			typeof file === 'string'
 				? file
 				: ((isBunFile(blob) ? blob.name : undefined) ?? ctx.route);
-		return send(ctx, { file: blob, path }, options, undefined);
+		return send(ctx, { file: blob, path }, options, undefined, false);
 	};
 }
 
@@ -227,6 +233,8 @@ function send(
 	found: Found,
 	options: FileOptions,
 	encoded: { readonly file: Blob; readonly coding: Precompressed } | undefined,
+	/** Whether a coded copy may be chosen by Accept-Encoding: then even the plain file varies by it. */
+	negotiated: boolean,
 ): AnyReply {
 	const { request } = ctx;
 	const served = encoded?.file ?? found.file;
@@ -236,8 +244,10 @@ function send(
 		options.types?.[extname(found.path).toLowerCase()] ?? found.file.type;
 	if (type) headers.set('content-type', type);
 	if (encoded !== undefined) headers.set('content-encoding', encoded.coding);
-	// A coding chosen by Accept-Encoding varies by it.
-	if (encoded !== undefined) vary(headers, 'Accept-Encoding');
+	// A coding chosen by Accept-Encoding varies by it, and so does the plain
+	// file a client that accepts none gets: a cache must not hand it to one
+	// that does.
+	if (negotiated) vary(headers, 'Accept-Encoding');
 
 	const cacheControl =
 		typeof options.cacheControl === 'function'
@@ -265,8 +275,8 @@ function send(
 	if (custom !== undefined) {
 		for (const [name, value] of new Headers(custom)) {
 			if (name === 'set-cookie') headers.append(name, value);
-			// A precompressed file varies by Accept-Encoding whatever else
-			// the option adds.
+			// What the file varies by — Accept-Encoding with precompressed
+			// copies — stays, whatever else the option adds.
 			else if (name === 'vary') {
 				for (const each of value.split(',')) vary(headers, each);
 			} else headers.set(name, value);

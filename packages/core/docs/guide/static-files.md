@@ -47,7 +47,7 @@ in `source`, then, for a path with no extension, with each of
 | `dotfiles` | `boolean` | `false` | whether a file or directory starting with `.` is served |
 | `precompressed` | `readonly ('br' \| 'zstd' \| 'gzip')[]` | none | codings stored beside each file (`app.js.br`, `app.js.zst`, `app.js.gz`), tried in this order for a client whose `Accept-Encoding` takes them |
 | `cacheControl` | `string \| false \| ((path) => string \| false)` | `'public, max-age=0'` | `Cache-Control`: a value, none, or one per path |
-| `headers` | `HeadersInit \| ((path, file) => HeadersInit \| undefined)` | none | headers added to every file, or to each; a `Vary` adds its names to the ones the file varies by — a precompressed copy's `Accept-Encoding` — (`*` replaces them), and each `Set-Cookie` is sent |
+| `headers` | `HeadersInit \| ((path, file) => HeadersInit \| undefined)` | none | headers added to every file, or to each; a `Vary` adds its names to the ones the file varies by — `Accept-Encoding` when `precompressed` names a coding — (`*` replaces them), and each `Set-Cookie` is sent |
 | `types` | `Record<string, string>` | Bun's | content types by extension, over the ones Bun knows |
 | `etag` | `boolean` | `true` | a weak `ETag`, answered 304 |
 | `lastModified` | `boolean` | `true` | `Last-Modified`, answered 304 |
@@ -145,7 +145,10 @@ that does not exist is a 404.
 - A request with several ranges, or a malformed one, gets the whole file.
 - A weak `If-Range` never validates a range: the whole file is sent.
 - A precompressed copy is sent with `Content-Encoding` and
-  `Vary: Accept-Encoding`, and without ranges.
+  `Vary: Accept-Encoding`, and without ranges. With `precompressed`
+  naming a coding, every reply for a file carries `Vary: Accept-Encoding` —
+  the plain file included, whether or not a copy exists — so a shared cache
+  never hands one client's answer to another.
 
 `parseRange(header, size)` is the parser the routes use, exported for a
 handler that serves ranges of its own:
