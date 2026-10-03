@@ -77,21 +77,40 @@ algorithm you name. Each algorithm takes these parameters, for
 | `RS512` | `{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' }` |
 | `EdDSA` | `{ name: 'Ed25519' }` |
 
+One pair per family, generated with Web Crypto:
+
 ```ts
-const { privateKey, publicKey } = await crypto.subtle.generateKey(
+import { createJwt } from '@alxia/jwt';
+
+// ES256 (P-384 for ES384)
+const ec = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
+createJwt({ algorithm: 'ES256', ...ec });
+
+// RS256 (SHA-384 for RS384, SHA-512 for RS512)
+const rsa = await crypto.subtle.generateKey(
 	{ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
 	true,
 	['sign', 'verify'],
 );
-const jwt = createJwt({ algorithm: 'RS256', privateKey, publicKey });
+createJwt({ algorithm: 'RS256', ...rsa });
+
+// EdDSA
+const ed = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+createJwt({ algorithm: 'EdDSA', ...ed });
 ```
 
-Match the key to the algorithm exactly. A key of another kind (an Ed25519
-key under `ES256`) throws `InvalidAccessError: Key algorithm mismatch` on
-`sign` and on `verify`. A key of the right kind but the wrong size or hash
-(a P-384 key under `ES256`, a SHA-512 RSA key under `RS256`) signs without
-an error, and other JWT libraries then refuse the token
-([Troubleshooting](../troubleshooting.md#another-library-refuses-the-token-as-an-invalid-signature)).
+`createJwt` checks each key against the algorithm when it is called, so a
+wrong key fails the app at startup rather than on a request. A key of
+another family, curve or hash — an Ed25519 key or a P-384 key under
+`ES256`, a SHA-512 or RSA-PSS key under `RS256` — throws:
+
+```text
+TypeError: createJwt: ES256 needs an ECDSA P-256 key; the publicKey is ECDSA P-384
+```
+
+([Troubleshooting](../troubleshooting.md#typeerror-createjwt-es256-needs-an-ecdsa-p-256-key-the-publickey-is-ecdsa-p-384)).
+The curve or hash matters even though Web Crypto would sign with it: a
+standard verifier refuses an `ES256` token signed on P-384.
 
 ### Loading a PEM key
 
@@ -99,8 +118,27 @@ A key pair made with OpenSSL is PEM: PKCS#8 for the private key, SPKI for
 the public one.
 
 ```sh
-openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -out private.pem
+# ES256 (P-384 for ES384)
+openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -pkeyopt ec_param_enc:named_curve -out private.pem
+# RS256, RS384, RS512
+openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out private.pem
+
 openssl pkey -in private.pem -pubout -out public.pem
+```
+
+`ec_param_enc:named_curve` keeps the curve as a name, which Web Crypto
+requires; LibreSSL (the `openssl` on macOS) otherwise writes the curve out
+in full, and `importKey('spki', …)` throws `DataError: Invalid keyData`. An
+Ed25519 pair can come from OpenSSL 3 (`openssl genpkey -algorithm ed25519`),
+or from Web Crypto, exported once:
+
+```ts
+const pair = await crypto.subtle.generateKey({ name: 'Ed25519' }, true, ['sign', 'verify']);
+const armour = (label: string, der: ArrayBuffer) =>
+	`-----BEGIN ${label}-----\n${Buffer.from(der).toString('base64').match(/.{1,64}/g)!.join('\n')}\n-----END ${label}-----\n`;
+
+await Bun.write('private.pem', armour('PRIVATE KEY', await crypto.subtle.exportKey('pkcs8', pair.privateKey)));
+await Bun.write('public.pem', armour('PUBLIC KEY', await crypto.subtle.exportKey('spki', pair.publicKey)));
 ```
 
 Strip the armour, decode the base64, and import:
@@ -113,6 +151,7 @@ function pem(text: string): Uint8Array<ArrayBuffer> {
 }
 
 const ES256 = { name: 'ECDSA', namedCurve: 'P-256' };
+// or: const RS256 = { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }; const EdDSA = { name: 'Ed25519' };
 
 const jwt = createJwt({
 	algorithm: 'ES256',
@@ -123,9 +162,15 @@ const jwt = createJwt({
 ```
 
 Import the private key with the `sign` usage and the public key with
-`verify`. A key without its usage, or a public key passed as `privateKey`,
-throws `InvalidAccessError: Unable to use this key to sign` (or `to verify`)
-on the first call ([Troubleshooting](../troubleshooting.md#invalidaccesserror-unable-to-use-this-key-to-sign)).
+`verify`, using the parameters of the table above. A key without its usage,
+or the two keys swapped, is refused by `createJwt` at once:
+
+```text
+TypeError: createJwt: the publicKey must be a public key that can verify; it is a private key that can sign
+TypeError: createJwt: the privateKey must be a private key that can sign; it is a public key that can verify
+```
+
+([Troubleshooting](../troubleshooting.md#typeerror-createjwt-the-publickey-must-be-a-public-key-that-can-verify-it-is-a-private-key-that-can-sign)).
 The keys can be non-extractable (`false`): the package never reads them.
 
 ### Loading a JWK
@@ -188,4 +233,4 @@ Drop `previous` once the longest `expiresIn` has passed since the switch.
 
 - [Signing and verifying](tokens.md): the options, `sign`, `verify` and each `reason`.
 - [The bearer guard](bearer-guard.md): putting a verifier in front of routes.
-- [Troubleshooting](../troubleshooting.md#runtime): key errors and their fixes.
+- [Troubleshooting](../troubleshooting.md#startup): key errors and their fixes.

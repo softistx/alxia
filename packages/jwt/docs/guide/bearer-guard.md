@@ -127,10 +127,14 @@ if (result.status === 401) result.data.reason; // 'missing' | 'expired' | … | 
 if (result.status === 200) result.data.role;   // 'admin' | 'user'
 ```
 
-A `verify` that throws — a key of the wrong kind, see
-[Algorithms and keys](algorithms-and-keys.md#a-key-pair) — is not a 401: it
-reaches the app's error handling, and is a `500 {"error":"internal"}` by
-default.
+With `claims`, each issue's `path` names the claim and its `target` where
+the token was read: `headers` for `Authorization: Bearer`, `cookies` for the
+cookie named by `cookie`.
+
+`verify` resolves for any token, whatever its content, so a request to a
+guarded route is either let through or answered this 401 — never a 500. A
+key that does not fit the algorithm is refused earlier, by `createJwt`, at
+startup ([Algorithms and keys](algorithms-and-keys.md#a-key-pair)).
 
 ## Roles after the guard
 

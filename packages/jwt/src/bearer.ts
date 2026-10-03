@@ -56,9 +56,11 @@ export function bearer<Schema extends StandardSchemaV1 | undefined = undefined>(
 	return alxia().derive(async ({ request, reply }) => {
 		const header = request.headers.get('authorization');
 		let token = header?.match(/^Bearer\s+(.+)$/i)?.[1];
+		let from: 'headers' | 'cookies' = 'headers';
 		if (token === undefined && options.cookie !== undefined) {
 			const cookies = new Bun.CookieMap(request.headers.get('cookie') ?? '');
 			token = cookies.get(options.cookie) ?? undefined;
+			from = 'cookies';
 		}
 		const challenge = { headers: { 'www-authenticate': 'Bearer' } };
 		if (token === undefined) return reply(401, refuse('missing'), challenge);
@@ -67,7 +69,7 @@ export function bearer<Schema extends StandardSchemaV1 | undefined = undefined>(
 		if (options.schema === undefined) {
 			return { user: verified.claims as User<Schema> };
 		}
-		const checked = await check(options.schema, verified.claims, 'headers');
+		const checked = await check(options.schema, verified.claims, from);
 		if (!checked.ok)
 			return reply(401, refuse('claims', checked.issues), challenge);
 		return { user: checked.value as User<Schema> };

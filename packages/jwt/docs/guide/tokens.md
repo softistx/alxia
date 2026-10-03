@@ -121,14 +121,14 @@ type VerifyResult =
 	  };
 ```
 
-`verify` does not throw for a bad token: it resolves to a result. It checks,
+`verify` does not throw, whatever the token holds: it resolves to a result. It checks,
 in this order, and stops at the first failure:
 
 | `reason` | The token… |
 | --- | --- |
-| `malformed` | is not three base64url parts, or its header or payload is not JSON, or its payload is not an object |
+| `malformed` | is not three base64url parts, or its header or payload is not JSON, or its header is not an object (`null`, an array, a number, a string or a boolean), or its payload is not an object |
 | `algorithm` | names another `alg` than the one configured — `none` included |
-| `signature` | was not signed by this secret or key, or was altered |
+| `signature` | was not signed by this secret or key, or was altered, or its signature is not one the key could produce (the wrong length) |
 | `expired` | has an `exp` at or before now − `clockTolerance` |
 | `not_yet_valid` | has an `nbf` after now + `clockTolerance` |
 | `issuer` | has an `iss` other than `issuer` (only when `issuer` is set) |

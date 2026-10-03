@@ -24,7 +24,9 @@ else result.reason; // 'malformed' | 'algorithm' | 'signature' | 'expired' | 'no
 
 The algorithm is fixed by the options, never read from the token: `alg:
 none` and algorithm confusion are refused. A secret holds at least 32 bytes.
-With a key pair, a verifier needs only the public key.
+With a key pair, a verifier needs only the public key, and `createJwt`
+refuses at once a key that does not fit the algorithm (a P-384 key under
+`ES256`), so a wrong key fails at startup.
 
 ## A guard
 
