@@ -74,6 +74,11 @@ Nothing scheduled yet.
   shared. `react-router build` makes `build/server/index.js` the server,
   prerendering included: run, it listens on `PORT` and `HOST` and stops on
   `SIGTERM`; imported, it starts nothing.
+- **`vite preview` serves the built server.** After `react-router build`,
+  `bunx --bun vite preview` hands every request to `build/server/index.js`,
+  as `bun run start` would answer it: the pages, `/api`, the client's files
+  and the app's hooks. React Router's prerendering runs on the same
+  server, so a prerendered page's loader reads `alxiaOf`.
 - **`bunx alxia-react-router reveal`.** The package's bin writes the
   default server into the app, `app/server.ts` or `alxia({ entry })`'s
   file: `createServer()` with `beforeAll`, `configure` and

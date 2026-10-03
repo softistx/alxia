@@ -18,6 +18,7 @@ import {
 } from './config';
 import { serveFromEntry } from './dev';
 import { NAME, PASS_THROUGH, serverEntry } from './entry';
+import { servePreview } from './preview';
 
 export interface AlxiaOptions {
 	/**
@@ -47,6 +48,8 @@ const RESOLVED_DEFAULT = `\0${DEFAULT}`;
  * - **`react-router build`**: `build/server/index.js` is the server, with
  *   React Router's build inside it. `bun build/server/index.js` listens on
  *   `PORT` (3000) and `HOST` (`0.0.0.0`); importing it starts nothing.
+ * - **`vite preview`**: every request goes to that built server, as it
+ *   would answer it; so does React Router's prerendering.
  *
  * The server is `app/server.ts`'s default export, `createServer()` from
  * `@alxia/react-router`, or without that file `createServer()` as it is.
@@ -119,6 +122,11 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 					);
 				});
 			};
+		},
+		configurePreviewServer(server) {
+			if (!enabled) return;
+			// Before Vite's own files: the built server answers every request.
+			servePreview(server);
 		},
 	};
 }

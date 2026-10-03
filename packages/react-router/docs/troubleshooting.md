@@ -27,6 +27,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [`alxia-react-router: unknown command ….`](#alxia-react-router-unknown-command-)
 - [`alxia-react-router: unknown option … for reveal.`](#alxia-react-router-unknown-option--for-reveal)
 - [`error: GET https://registry.npmjs.org/alxia-react-router - 404`](#error-get-httpsregistrynpmjsorgalxia-react-router---404)
+- [`alxia-react-router: build/server/index.js does not exist. Run react-router build before vite preview.`](#alxia-react-router-buildserverindexjs-does-not-exist-run-react-router-build-before-vite-preview)
+- [`alxia-react-router: build/server/index.js is not alxia's server: its default export has no fetch. …`](#alxia-react-router-buildserverindexjs-is-not-alxias-server-its-default-export-has-no-fetch-)
 - [`warn: incorrect peer dependency "typescript@5.9.3"`](#warn-incorrect-peer-dependency-typescript593)
 
 **Types**
@@ -461,6 +463,48 @@ package is named `alxia-react-router`.
 bun add @alxia/core @alxia/react-router
 bunx alxia-react-router reveal
 ```
+
+### `alxia-react-router: build/server/index.js does not exist. Run react-router build before vite preview.`
+
+With another `buildDirectory` or `serverBuildFile`, the message names
+that file.
+
+Under `vite preview`, every request is a 500 with this text, and Vite's
+terminal prints it.
+
+**When:** the preview server starts before a build, or after
+`build/server/index.js` was removed.
+
+**Why:** under the plugin, the preview serves the built server, and there
+is none yet.
+
+**Fix:** build, then preview:
+
+```sh
+bun run build
+bunx --bun vite preview
+```
+
+The next request after the build loads it, with no restart.
+
+### `alxia-react-router: build/server/index.js is not alxia's server: its default export has no fetch. …`
+
+With another `buildDirectory` or `serverBuildFile`, the message names
+that file.
+
+```text
+alxia-react-router: build/server/index.js is not alxia's server: its default export has no fetch. Build it with alxia() in vite.config.ts's plugins, then run vite preview again.
+```
+
+**When:** under `vite preview`, the build in `build/` was made without
+`alxia()`: before the plugin was added, or with another Vite config.
+
+**Why:** React Router's own server build exports the routes and no app.
+The plugin hands each request to the default export's `fetch`, which only
+a build made with the plugin has.
+
+**Fix:** add `alxia()` to `vite.config.ts`'s plugins, run `bun run build`,
+then restart `vite preview`: a build already loaded is not read again.
 
 ### `warn: incorrect peer dependency "typescript@5.9.3"`
 
