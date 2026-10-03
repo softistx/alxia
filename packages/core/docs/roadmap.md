@@ -42,10 +42,11 @@ Nothing scheduled yet.
 ### 0.1.0
 
 - **Typed routes on Bun.** `alxia()` declares `get`, `post`, `put`, `patch`,
-  `delete`, `options` and `head` routes whose `params`, `query`, `headers`,
+  `delete`, `options`, `head` and `query` routes whose `params`, `query`, `headers`,
   `cookies` and `body` are validated by any Standard Schema — Zod, Valibot,
   ArkType or one written by hand — and read as typed values; a refused
-  request is a 400 naming every issue. `listen` hands the routes to
+  request is a 400 naming every issue. A `QUERY` route is a safe read whose
+  criteria travel in a validated body. `listen` hands the routes to
   `Bun.serve`'s router, and `fetch` and `request` run the app in process.
 - **Replies the types hold to.** `reply(status, body)` accepts only a
   declared status with a body its schema accepts, and sends the schema's

@@ -31,8 +31,8 @@ Nothing scheduled yet.
 - **A client typed from the app's type alone.** `client<App>(url)` reads
   `typeof app` from an `@alxia/core` app, imported as a type: no OpenAPI
   document, no code generation, and none of the server's code in the
-  bundle. One method per HTTP method the app answers, and only its paths
-  compile.
+  bundle. One method per HTTP method the app answers — `QUERY` included —
+  and only its paths compile.
 - **Calls checked as you write them.** `params`, `query`, `headers`,
   `cookies` and `body` are typed by the route's schemas, and required when
   the route requires them. Parameters are encoded into the path, arrays

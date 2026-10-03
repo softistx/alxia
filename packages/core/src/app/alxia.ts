@@ -347,6 +347,17 @@ export class Alxia<
 		Prefix,
 		Shortcuts
 	>;
+	/**
+	 * A `QUERY` route: a safe, idempotent read whose criteria travel in the
+	 * body, validated like a `POST`'s.
+	 */
+	readonly query = this.#method('QUERY') as RouteMethod<
+		'QUERY',
+		Ctx,
+		Routes,
+		Prefix,
+		Shortcuts
+	>;
 
 	/**
 	 * A WebSocket route. The upgrade request runs the hooks before it and is

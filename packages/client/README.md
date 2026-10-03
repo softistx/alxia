@@ -26,6 +26,9 @@ if (result.status === 200) {
 }
 ```
 
+A `QUERY` route, whose criteria travel in the body, is
+`api.query('/users/search', { body: { name: 'Ada' } })`.
+
 `data` is typed as it crosses the wire: a `Date` the server sends is a
 `string` here. Every call may also read the 500 any route may answer, and
 the 400 of a route that validates its request. `ok` is `true` for a 2xx and

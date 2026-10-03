@@ -25,7 +25,7 @@ export interface OpenApiOptions {
 }
 
 export interface OpenApiDocument {
-	readonly openapi: '3.1.0';
+	readonly openapi: '3.2.0';
 	readonly info: OpenApiInfo;
 	readonly servers?: readonly {
 		readonly url: string;
@@ -57,9 +57,15 @@ interface Parameter {
 	description?: string;
 }
 
+/** A body's schema; `itemSchema` for each item of a sequence, an event stream's events. */
+export interface MediaType {
+	schema?: JsonSchema;
+	itemSchema?: JsonSchema;
+}
+
 interface Response {
 	description: string;
-	content?: Record<string, { schema: JsonSchema }>;
+	content?: Record<string, MediaType>;
 }
 
 const ISSUE: JsonSchema = {
@@ -127,7 +133,7 @@ function capitalize(word: string): string {
 }
 
 /**
- * The OpenAPI 3.1 document of an app's routes. Every route is documented as
+ * The OpenAPI 3.2 document of an app's routes. Every route is documented as
  * it runs: its 400 when it validates its request, the 500 any route may
  * answer, and each reply its schema declares.
  *
@@ -148,7 +154,7 @@ export function openapi(
 		paths[path][methodKey] = operation(route, options.convert);
 	}
 	return {
-		openapi: '3.1.0',
+		openapi: '3.2.0',
 		info: options.info,
 		...(options.servers === undefined ? {} : { servers: options.servers }),
 		paths,
@@ -194,11 +200,9 @@ function operation(route: RouteDefinition, convert?: Converter): Operation {
 				? { description: describe(status) }
 				: {
 						description: describe(status),
-						content: {
-							[isEventStreamSchema(responseSchema)
-								? 'text/event-stream'
-								: contentType(json)]: { schema: json },
-						},
+						content: isEventStreamSchema(responseSchema)
+							? { 'text/event-stream': { itemSchema: json } }
+							: { [contentType(json)]: { schema: json } },
 					};
 	}
 	if (schema.response === undefined) {

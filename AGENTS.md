@@ -10,7 +10,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | --- | --- | --- |
 | `@alxia/core` | the framework: routes, hooks, groups, plugins, cookies, SSE, WebSockets | — |
 | `@alxia/client` | the client of an app, typed from `typeof app` alone | core |
-| `@alxia/openapi` | the OpenAPI 3.1 document of an app, from its route schemas | core |
+| `@alxia/openapi` | the OpenAPI 3.2 document of an app, from its route schemas | core |
 | `@alxia/zod` | Zod coercions (`zq`) and the OpenAPI converter | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's hooks and typed context, Yoga's plugins | core, graphql-yoga, graphql |
 | `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | function plugins: global hooks | core |

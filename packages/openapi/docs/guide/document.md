@@ -93,7 +93,7 @@ openapi(app, {
 
 ```ts
 interface OpenApiDocument {
-	readonly openapi: '3.1.0';
+	readonly openapi: '3.2.0';
 	readonly info: OpenApiInfo;
 	readonly servers?: readonly { readonly url: string; readonly description?: string }[];
 	readonly paths: Record<string, Partial<Record<Lowercase<Method>, Operation>>>;
@@ -101,10 +101,10 @@ interface OpenApiDocument {
 }
 ```
 
-- `openapi` is always `'3.1.0'`, and every schema in it is JSON Schema
-  2020-12, the dialect OpenAPI 3.1 uses.
+- `openapi` is always `'3.2.0'`, and every schema in it is JSON Schema
+  2020-12, the dialect of OpenAPI 3.1 and 3.2.
 - `paths` is keyed by the path as OpenAPI writes it (`/users/{id}`), then
-  by the lowercase method (`get`, `post`…). Each value is an `Operation`;
+  by the lowercase method (`get`, `post`…, `query` for a `QUERY` route). Each value is an `Operation`;
   what goes into one is on [How a route is documented](routes.md).
 - `components.schemas` holds exactly two schemas, `ValidationError` and
   `InternalError`: the bodies of the 400 and 500 every route may answer.

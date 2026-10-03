@@ -23,11 +23,11 @@ interface StandardJsonSchema {
 }
 
 /**
- * `schema` as JSON Schema 2020-12, the dialect of OpenAPI 3.1: by
+ * `schema` as JSON Schema 2020-12, the dialect of OpenAPI 3.1 and 3.2: by
  * `convert`, else through [Standard JSON Schema](https://standardschema.dev),
  * which Zod 4.2 and later, ArkType and Valibot carry. A schema neither
  * converts is documented as `{}`, anything. An event stream is documented
- * by the schema of one event.
+ * by the schema of one event, its `itemSchema`.
  */
 export function toJsonSchema(
 	schema: StandardSchemaV1,

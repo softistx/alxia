@@ -29,6 +29,11 @@ const app = alxia()
 		},
 		({ reply, body }) => reply(201, { id: 1, name: body.name }),
 	)
+	.query(
+		'/users',
+		{ body: z.object({ name: z.string() }), response: { 200: z.array(User) } },
+		({ reply }) => reply(200, []),
+	)
 	.delete('/files/*', ({ reply }) => reply(204));
 
 const document = openapi(app, { info: { title: 'Users', version: '1.0.0' } });
@@ -40,6 +45,17 @@ describe('openapi', () => {
 			'/users',
 			'/files/{path}',
 		]);
+	});
+
+	test('OpenAPI 3.2: a QUERY route is its path’s query operation, with its body', () => {
+		expect(document.openapi).toBe('3.2.0');
+		const query = document.paths['/users']?.query;
+		expect(query?.operationId).toBe('queryUsers');
+		expect(query?.requestBody?.content['application/json']?.schema).toEqual({
+			type: 'object',
+			properties: { name: { type: 'string' } },
+			required: ['name'],
+		});
 	});
 
 	test('parameters come from the schemas, required as they say', () => {
@@ -84,7 +100,7 @@ describe('openapi', () => {
 			in: 'cookie',
 		});
 		expect(
-			get?.responses['200']?.content?.['text/event-stream']?.schema,
+			get?.responses['200']?.content?.['text/event-stream']?.itemSchema,
 		).toMatchObject({
 			properties: { n: { type: 'number' } },
 		});

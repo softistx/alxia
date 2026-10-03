@@ -89,7 +89,8 @@ every route before `listen`.
 
 The page at `ui` is a small HTML document that loads
 [Scalar](https://scalar.com) from `cdn.jsdelivr.net` and points it at
-`path`, under the same prefix as the page. It is served with:
+`path`, under the same prefix as the page; it renders every operation of
+the document, a `QUERY` route's `query` included. It is served with:
 
 ```text
 content-type: text/html;charset=utf-8

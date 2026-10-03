@@ -91,6 +91,18 @@ whatever part it is in:
 `ip` is the client's address — the `ip` option reads it behind a proxy —
 and `server` the Bun server, when there is one. `HEAD` runs the `GET` route.
 
+`query` declares a `QUERY` route: a safe, idempotent read whose criteria are
+too long or too structured for a query string, so they travel in the body —
+validated like a `POST`'s, a 400 when refused.
+
+```ts
+app.query(
+	'/users/search',
+	{ body: z.object({ name: z.string().min(1) }), response: { 200: z.array(User) } },
+	async ({ body, reply }) => reply.ok(await searchUsers(body.name)),
+);
+```
+
 ## Replies
 
 A handler returns `reply(status, body, init?)`. With `response` schemas,
@@ -288,7 +300,7 @@ global hooks become this app's.
 | export | |
 | --- | --- |
 | `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip` |
-| `Alxia` | `get` `post` `put` `patch` `delete` `options` `head` `ws`, `static` `file` `page`, `decorate` `derive` `wrap` `onError`, `around` `onRequest` `onResponse` `onStart` `onStop` `parser`, `group` `use`, `fetch` `request` `listen` `stop`, `routes` `sockets` `server` |
+| `Alxia` | `get` `post` `put` `patch` `delete` `options` `head` `query` `ws`, `static` `file` `page`, `decorate` `derive` `wrap` `onError`, `around` `onRequest` `onResponse` `onStart` `onStop` `parser`, `group` `use`, `fetch` `request` `listen` `stop`, `routes` `sockets` `server` |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream` made |
 | `FileSource`, `StaticOptions`, `FileOptions`, `StaticReply`, `parseRange` | static files |

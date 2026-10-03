@@ -56,7 +56,8 @@ app.listen({ port: 3000 });
   concurrent request: each runs the route itself.
 - **A store that cannot answer** costs the cache, not the response: the
   route runs, nothing is kept, and the outage's first error is logged.
-- Only `GET` and `HEAD`; only the routes declared after the plugin.
+- Only `GET` and `HEAD` — not `QUERY`, whose key would have to include its
+  body; only the routes declared after the plugin.
 
 ## The key
 

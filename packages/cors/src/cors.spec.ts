@@ -33,6 +33,9 @@ describe('cors', () => {
 		expect(answered.headers.get('access-control-allow-methods')).toContain(
 			'POST',
 		);
+		expect(answered.headers.get('access-control-allow-methods')).toContain(
+			'QUERY',
+		);
 	});
 
 	test('a list of origins: the allowed one echoed, another refused', async () => {

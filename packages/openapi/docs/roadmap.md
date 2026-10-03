@@ -33,14 +33,15 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **An OpenAPI 3.1 document from the routes you already wrote.**
+- **An OpenAPI 3.2 document from the routes you already wrote.**
   `openapi(app, options)` documents every HTTP route of an `@alxia/core`
-  app from its schemas — paths, parameters, request body, each reply — so
+  app from its schemas — paths, parameters, request body, each reply, a
+  `QUERY` route as its path's `query` operation — so
   the document cannot drift from the code. `info`, `servers` and an
   `exclude` filter shape it.
 - **Each side of a schema where it belongs.** Parameters and bodies are
   documented by what their schema accepts, replies by what it gives back;
-  an event stream is `text/event-stream` by the schema of one event, a
+  an event stream is `text/event-stream` by the schema of one event, as its `itemSchema`, a
   string reply is `text/plain`.
 - **The errors every route can answer.** A `400` with the validation error
   body on every route that validates its request, and a `500` on every

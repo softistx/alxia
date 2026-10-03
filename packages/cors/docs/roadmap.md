@@ -38,6 +38,7 @@ Nothing scheduled yet.
   gets no CORS header, and `Vary: Origin` keeps caches from mixing them up.
 - **Credentials that work.** With `credentials`, the request's origin is
   sent instead of `*`, which a browser refuses on a call with cookies.
-- **The rest of the protocol.** `methods`, `allowedHeaders` (by default,
+- **The rest of the protocol.** `methods` (every method a route can have
+  by default, `QUERY` included), `allowedHeaders` (by default,
   those the browser asks for), `exposedHeaders`, `maxAge`, and Chrome's
   Private Network Access preflight with `privateNetwork`.

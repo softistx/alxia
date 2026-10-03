@@ -109,7 +109,7 @@ const api = client<App>('https://api.example.com', {
 ## The client's methods
 
 The client has one method per HTTP method the app answers — `get`, `post`,
-`put`, `patch`, `delete`, `options`, `head` — and `ws` when it declares a
+`put`, `patch`, `delete`, `options`, `head`, `query` — and `ws` when it declares a
 socket ([Events and sockets](events-and-sockets.md)). A method the app does
 not answer is not on the type: `api.put` on an app without a `PUT` route is
 a compile error.
@@ -199,6 +199,14 @@ await api.post('/users', { headers: { 'x-tenant': 'acme' }, body: { name: 'Grace
 | a `string` | as is | `text/plain;charset=utf-8` |
 | `FormData`, `URLSearchParams`, `Blob`, `ArrayBuffer`, a typed array, a `ReadableStream` | as is | what `fetch` sets for it, if anything |
 | anything else | `JSON.stringify(body)` | `application/json` |
+
+A `QUERY` route — a read whose criteria travel in the body — is called the
+same way, and its result is read like a `GET`'s:
+
+```ts
+const found = await api.query('/users/search', { body: { name: 'Ada' } });
+if (found.status === 200) found.data; // typed by the route's 200
+```
 
 A `content-type` you send — in `ClientOptions.headers`, `init.headers` or
 the route's typed `headers` — is never replaced.
