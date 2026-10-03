@@ -6,13 +6,13 @@ goes wrong prints nothing at all, and is under [Traps](#traps), by symptom.
 
 **Types**
 
-- [`Argument of type '{}' is not assignable to parameter of type 'CacheOptions'`](#argument-of-type--is-not-assignable-to-parameter-of-type-cacheoptions)
+- [`Argument of type '{}' is not assignable to parameter of type 'CacheOptions<Empty>'`](#argument-of-type--is-not-assignable-to-parameter-of-type-cacheoptionsempty)
 - [`Property 'cache' does not exist on type 'Context<…>'`](#property-cache-does-not-exist-on-type-context)
 - [`Property '…' does not exist on type 'CacheControls'`](#property--does-not-exist-on-type-cachecontrols)
-- [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
-- [`Type '(…) => Promise<string>' is not assignable to type '(ctx: BaseContext) => string | undefined'`](#type---promisestring-is-not-assignable-to-type-ctx-basecontext--string--undefined)
-- [`Type '(…) => string | null' is not assignable to type '(ctx: BaseContext) => string | undefined'`](#type---string--null-is-not-assignable-to-type-ctx-basecontext--string--undefined)
-- [`Type '() => string' is not assignable to type '(ctx: BaseContext) => readonly string[]'`](#type---string-is-not-assignable-to-type-ctx-basecontext--readonly-string)
+- [`Property 'user' does not exist on type 'BaseContext & Empty'`](#property-user-does-not-exist-on-type-basecontext--empty)
+- [`Type '(…) => Promise<string>' is not assignable to type '(ctx: BaseContext & Empty) => string | undefined'`](#type---promisestring-is-not-assignable-to-type-ctx-basecontext--empty--string--undefined)
+- [`Type '(…) => string | null' is not assignable to type '(ctx: BaseContext & Empty) => string | undefined'`](#type---string--null-is-not-assignable-to-type-ctx-basecontext--empty--string--undefined)
+- [`Type '() => string' is not assignable to type '(ctx: BaseContext & Empty) => readonly string[]'`](#type---string-is-not-assignable-to-type-ctx-basecontext--empty--readonly-string)
 - [`Type 'string' is not assignable to type 'readonly string[]'`](#type-string-is-not-assignable-to-type-readonly-string)
 
 **Writing a store**
@@ -39,13 +39,13 @@ goes wrong prints nothing at all, and is under [Traps](#traps), by symptom.
 
 ## Types
 
-### `Argument of type '{}' is not assignable to parameter of type 'CacheOptions'`
+### `Argument of type '{}' is not assignable to parameter of type 'CacheOptions<Empty>'`
 
 **When:** calling `cache()` without a `ttl`.
 
 ```text
-error TS2345: Argument of type '{}' is not assignable to parameter of type 'CacheOptions'.
-  Property 'ttl' is missing in type '{}' but required in type 'CacheOptions'.
+error TS2345: Argument of type '{}' is not assignable to parameter of type 'CacheOptions<Empty>'.
+  Property 'ttl' is missing in type '{}' but required in type 'CacheOptions<Empty>'.
 ```
 
 **Why:** `ttl` has no default: how long a response may be served again is
@@ -108,38 +108,53 @@ alxia()
 	});
 ```
 
-### `Property 'user' does not exist on type 'BaseContext'`
+### `Property 'user' does not exist on type 'BaseContext & Empty'`
 
-**When:** a `key` or `tags` function reads something an earlier `derive` or
-`decorate` added to the context.
+**When:** a `key` or `tags` function reads something an earlier `derive`,
+`decorate` or plugin added to the context, and `cache` is not told about it.
 
 ```text
-error TS2339: Property 'user' does not exist on type 'BaseContext'.
+error TS2339: Property 'user' does not exist on type 'BaseContext & Empty'.
 ```
 
 **Why:** `key` and `tags` are typed with `BaseContext` — `request`, `url`,
-`ip`, `server`, `route`, `pathParams` — not with the context of the app the
-plugin is mounted on.
+`ip`, `server`, `route`, `pathParams` — plus what you name as `cache`'s type
+argument, and nothing else. `cache` is built before it is used, so it
+cannot see the app it will be used on.
 
-**Fix:** read the request itself:
+**Fix:** name what `key` and `tags` read. The app that uses the cache must
+then give it, before the cache:
 
 ```ts
-cache({
+const perTenant = cache<{ user: { tenantId: string } }>({
 	ttl: 60,
-	key: ({ url, request }) =>
-		request.headers.has('authorization') ? undefined : `${url.pathname}${url.search}`,
+	key: ({ user, url }) => `${user.tenantId}:${url.pathname}${url.search}`,
+	tags: ({ user }) => [`tenant:${user.tenantId}`],
 });
+
+const auth = alxia().derive(({ request }) => ({
+	user: { tenantId: request.headers.get('x-tenant') ?? 'public' },
+}));
+
+alxia().use(auth).use(perTenant); // auth derives user
 ```
 
-To tag by what a route knows, tag from the route with `ctx.cache.tag(…)`
-instead ([Invalidation](guide/invalidation.md#by-tag-invalidatetag)).
+On an app that does not give `user`, `use(perTenant)` is a compile error:
+[`the plugin reads "user", which this app's context does not give`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first),
+or [`… gives with another type`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-gives-with-another-type)
+when its `user` is not `{ tenantId: string }`.
+See [Reading the app's context](guide/keys-and-vary.md#reading-the-apps-context).
 
-### `Type '(…) => Promise<string>' is not assignable to type '(ctx: BaseContext) => string | undefined'`
+To tag by what only the route knows — the product it loaded — tag from the
+route with `ctx.cache.tag(…)` instead
+([Invalidation](guide/invalidation.md#by-tag-invalidatetag)).
+
+### `Type '(…) => Promise<string>' is not assignable to type '(ctx: BaseContext & Empty) => string | undefined'`
 
 **When:** `key` is an `async` function.
 
 ```text
-error TS2322: Type '({ url }: BaseContext) => Promise<string>' is not assignable to type '(ctx: BaseContext) => string | undefined'.
+error TS2322: Type '({ url }: BaseContext & Empty) => Promise<string>' is not assignable to type '(ctx: BaseContext & Empty) => string | undefined'.
   Type 'Promise<string>' is not assignable to type 'string'.
 ```
 
@@ -155,13 +170,13 @@ declare it before the cache, or answer `Cache-Control: private`
 cache({ ttl: 60, key: ({ url }) => `${url.pathname}${url.search}` });
 ```
 
-### `Type '(…) => string | null' is not assignable to type '(ctx: BaseContext) => string | undefined'`
+### `Type '(…) => string | null' is not assignable to type '(ctx: BaseContext & Empty) => string | undefined'`
 
 **When:** `key` returns `request.headers.get(…)`, or anything else that may
 be `null`.
 
 ```text
-error TS2322: Type '({ request }: BaseContext) => string | null' is not assignable to type '(ctx: BaseContext) => string | undefined'.
+error TS2322: Type '({ request }: BaseContext & Empty) => string | null' is not assignable to type '(ctx: BaseContext & Empty) => string | undefined'.
   Type 'string | null' is not assignable to type 'string | undefined'.
     Type 'null' is not assignable to type 'string | undefined'.
 ```
@@ -175,12 +190,12 @@ it.
 cache({ ttl: 60, key: ({ request }) => request.headers.get('x-tenant') ?? undefined });
 ```
 
-### `Type '() => string' is not assignable to type '(ctx: BaseContext) => readonly string[]'`
+### `Type '() => string' is not assignable to type '(ctx: BaseContext & Empty) => readonly string[]'`
 
 **When:** `tags` returns one tag instead of a list.
 
 ```text
-error TS2322: Type '() => string' is not assignable to type '(ctx: BaseContext) => readonly string[]'.
+error TS2322: Type '() => string' is not assignable to type '(ctx: BaseContext & Empty) => readonly string[]'.
   Type 'string' is not assignable to type 'readonly string[]'.
 ```
 

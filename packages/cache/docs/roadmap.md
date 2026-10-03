@@ -51,6 +51,8 @@ Nothing scheduled yet.
 - **Keys your way.** The path and query by default; `vary` adds request
   headers to the key and to `Vary`; `key` replaces it, and `undefined`
   leaves a request uncached. `defaultKey` builds the default one.
+  `cache<{ user: User }>(…)` types `key` and `tags` with what an earlier
+  plugin adds, and an app that does not give it cannot use the cache.
 - **Invalidation.** `invalidate(path)` forgets every response kept for a
   path, whatever its key, and
   `invalidateTag(tag)` every response tagged by the plugin's `tags` or by
