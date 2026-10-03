@@ -91,8 +91,8 @@ app.use(
 
 `key` is typed with `BaseContext`, what every route hook reads: the request,
 `url`, `ip`, `server`, `route` and `pathParams`, and with `Requires`, empty
-by default. To read what an earlier
-plugin added, see [Reading the app's context](#reading-the-apps-context).
+by default. To read what an earlier plugin added, see [Reading the app's
+context](#reading-the-apps-context).
 
 ### `skip`
 

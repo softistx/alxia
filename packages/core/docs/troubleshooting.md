@@ -297,6 +297,13 @@ If you wrote the plugin, you can instead widen its requirement
 key the message can name: a symbol key, or a union such as
 `{ a: string } | { b: string }`.
 
+```text
+          Type '{ a: string; } | { b: string; }' is not assignable to type '"this app's context does not give what the plugin reads"'.
+```
+
+**Why:** the app's context fits no member of the union, or lacks the
+symbol key, and a message can only name a string or number key.
+
 **Fix:** give what the plugin requires before using it, or, if you wrote
 the plugin, name its requirement with string keys.
 
@@ -313,7 +320,7 @@ const withTenant = <C extends { user: { tenantId: string } }>(app: Alxia<C>) =>
 ```text
 error TS2769: No overload matches this call.
   …
-      Type 'Alxia<{ user: { tenantId: string; }; }, Empty, "", never> & Requiring<{ user: { tenantId: string; }; }>' is not assignable to type 'ProvidedBy<C, { user: { tenantId: string; }; }>'.
+      Type 'Alxia<{ user: { tenantId: string; }; } & { tenant: …; }, Empty, "", never> & Requiring<{ user: { tenantId: string; }; }>' is not assignable to type 'ProvidedBy<C, { user: { tenantId: string; }; }>'.
 ```
 
 **Why:** the check is a conditional type, and TypeScript does not decide a
