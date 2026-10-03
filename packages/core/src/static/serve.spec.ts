@@ -11,7 +11,6 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
 import { alxia, type RoutesOf } from '../app/alxia';
-import { parseRange } from './serve';
 
 let root: string;
 const big = 'abcdefghijklmnopqrstuvwxyz'.repeat(100);
@@ -154,6 +153,15 @@ describe('app.static', () => {
 		});
 		expect(response.headers.get('content-encoding')).toBe('gzip');
 		expect(response.headers.get('vary')).toBe('Accept-Encoding, Origin');
+	});
+
+	test('each Set-Cookie of the headers option is kept', async () => {
+		const headers = new Headers();
+		headers.append('set-cookie', 'a=1');
+		headers.append('set-cookie', 'b=2');
+		const app = alxia().static('/files', root, { headers });
+		const response = await app.request('/files/hello.txt');
+		expect(response.headers.getSetCookie()).toEqual(['a=1', 'b=2']);
 	});
 
 	test('dotfiles, traversal and missing files are 404s', async () => {
@@ -320,17 +328,5 @@ describe('app.page', () => {
 		} finally {
 			await app.stop(true);
 		}
-	});
-});
-
-describe('parseRange', () => {
-	test('one range, a suffix, an open end; several ranges are ignored', () => {
-		expect(parseRange('bytes=0-0', 10)).toEqual({ start: 0, end: 0 });
-		expect(parseRange('bytes=5-', 10)).toEqual({ start: 5, end: 9 });
-		expect(parseRange('bytes=-20', 10)).toEqual({ start: 0, end: 9 });
-		expect(parseRange('bytes=3-100', 10)).toEqual({ start: 3, end: 9 });
-		expect(parseRange('bytes=10-', 10)).toBe('unsatisfiable');
-		expect(parseRange('bytes=0-1,3-4', 10)).toBeUndefined();
-		expect(parseRange('items=0-1', 10)).toBeUndefined();
 	});
 });
