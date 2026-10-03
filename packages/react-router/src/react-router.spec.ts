@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
+import { compress } from '@alxia/compress';
 import { alxia, type BaseContext, type RoutesOf } from '@alxia/core';
 import { openapi } from '@alxia/openapi';
 // The package by its published name, `dist/`, not `./index`: the fixture's
@@ -379,14 +380,15 @@ describe('the context', () => {
 
 describe('streaming', () => {
 	/** The first chunk of `/slow`, and the whole page, read off a real server. */
-	async function slow(userAgent: string) {
-		const server = served().listen({ port: 0 });
+	async function slow(
+		app: { listen(options: { port: number }): Bun.Server<unknown> },
+		encoding: string,
+	) {
+		const server = app.listen({ port: 0 });
 		try {
 			const started = performance.now();
 			const response = await fetch(new URL('/slow', server.url), {
-				// Compression would hold the stream until it ends; streaming is
-				// measured on the bytes as React sends them.
-				headers: { 'user-agent': userAgent, 'accept-encoding': 'identity' },
+				headers: { 'user-agent': BROWSER, 'accept-encoding': encoding },
 			});
 			const reader = (response.body as ReadableStream<Uint8Array>).getReader();
 			const decoder = new TextDecoder();
@@ -399,19 +401,43 @@ describe('streaming', () => {
 				first ??= { at: performance.now() - started, text: chunk };
 				all += chunk;
 			}
-			return { first, all, ended: performance.now() - started };
+			return {
+				encoding: response.headers.get('content-encoding'),
+				first,
+				all,
+				ended: performance.now() - started,
+			};
 		} finally {
 			server.stop(true);
 		}
 	}
 
-	test('the shell arrives before the deferred value', async () => {
-		const { first, all, ended } = await slow(BROWSER);
+	/** The shell and its fallback first, the deferred value 600 ms later. */
+	function expectStreamed({
+		first,
+		all,
+		ended,
+	}: Awaited<ReturnType<typeof slow>>) {
 		expect(first?.text).toContain('immediate-value');
 		expect(first?.text).toContain('id="fallback"');
 		expect(first?.text).not.toContain('deferred-value');
 		expect(all).toContain('deferred-value');
-		// The deferred value takes 600 ms: the shell comes long before it.
 		expect(first?.at ?? Infinity).toBeLessThan(ended - 300);
+	}
+
+	test('the shell arrives before the deferred value', async () => {
+		expectStreamed(await slow(served(), 'identity'));
 	});
+
+	test.each(['gzip', 'br', 'zstd'])(
+		'and still does behind @alxia/compress, in %s',
+		async (encoding) => {
+			const app = makeBase()
+				.use(compress())
+				.use((app) => reactRouter(app, { build }));
+			const result = await slow(app, encoding);
+			expect(result.encoding).toBe(encoding);
+			expectStreamed(result);
+		},
+	);
 });

@@ -73,7 +73,7 @@ core ◄── client, openapi, openapi-routes, graphql, cors, secure-headers, c
          telemetry, janus, context-storage, cache, language
          i18n ◄── language
          redis ◄── rate-limit, cache (optional peers: the stores' contracts)
-         react-router   (peer: react-router; dev: openapi for its specs)
+         react-router   (peer: react-router; dev: openapi, compress for its specs)
 zod             (peer: zod; dev: core, client, openapi for its specs)
 env             (standalone)
 ```

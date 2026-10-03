@@ -233,6 +233,7 @@
       "name": "@alxia/react-router",
       "version": "0.0.0",
       "devDependencies": {
+        "@alxia/compress": "workspace:^",
         "@alxia/core": "workspace:^",
         "@alxia/openapi": "workspace:^",
         "@react-router/dev": "^8.4.0",

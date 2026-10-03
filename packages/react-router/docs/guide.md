@@ -251,9 +251,9 @@ around any route:
 - **`@alxia/logger`** writes one entry per request and sets `x-request-id`.
   It times a streamed page by its first byte: `onResponse` runs when the
   headers leave.
-- **`@alxia/compress`** compresses documents and data. It does not flush
-  a streamed body chunk by chunk yet, so a page streamed behind `<Await>`
-  is sent in one piece when compressed; that is planned. See [the troubleshooting entry](troubleshooting.md#a-streamed-page-arrives-in-one-piece).
+- **`@alxia/compress`** compresses documents and data, and flushes a
+  streamed page as React writes it: the shell and its `<Suspense>`
+  fallback still arrive first, in zstd, Brotli or gzip. See [the troubleshooting entry](troubleshooting.md#a-streamed-page-arrives-in-one-piece).
 - **`@alxia/secure-headers`**' default policy, `default-src 'none'`, blocks
   every script of the page, React Router's inline ones included, and its
   `form-action 'none'` blocks a `<Form>`'s post. Give the pages a policy of

@@ -268,12 +268,11 @@ deferred value later. If the whole page comes at once:
   await fetch(url, { headers: { 'user-agent': BROWSER } });
   ```
 
-- **`@alxia/compress` holds the stream.** It does not flush after each
-  chunk yet, so a compressed page is sent when it ends; flushing each chunk
-  of a streamed body is planned. Compare with `accept-encoding:
-  identity`: if only the compressed response arrives in one piece, the
-  compressor is the cause. Meanwhile, leave the pages that stream behind
-  `<Await>` uncompressed.
+- **A compressor holds the stream.** One that does not flush after each
+  chunk sends the page when it ends. `@alxia/compress` flushes a body with
+  no `Content-Length` as it comes, so the cause is elsewhere: a proxy or a
+  CDN in front of the server that buffers to compress. Compare with
+  `accept-encoding: identity`, then without the proxy.
 
 ### The logger times a streamed page at a few milliseconds
 
