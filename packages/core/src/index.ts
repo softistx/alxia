@@ -6,12 +6,16 @@ export {
 	type ContextOf,
 	type ListenOptions,
 	type Plugin,
+	type RefusalResponses,
+	type RefusalSchema,
 	type RouteMethod,
 	type RoutesOf,
 } from './app/alxia';
 export { definePlugin } from './app/define-plugin';
 export type {
 	AroundHook,
+	RefusalHandler,
+	RefusalHook,
 	RequestHook,
 	ResponseHook,
 	RouteDefinition,
@@ -26,9 +30,12 @@ export type {
 } from './app/route-operation';
 export type {
 	BaseContext,
+	BehindShortcuts,
 	Context,
 	DeclaredReply,
+	DefaultRefusalOutcome,
 	Empty,
+	FallsBack,
 	HandlerResult,
 	MaybePromise,
 	Method,
@@ -36,6 +43,7 @@ export type {
 	OutcomeOf,
 	ProvidedBy,
 	RedirectFunction,
+	Refusing,
 	RequestContext,
 	RequiresOf,
 	Requiring,
@@ -48,6 +56,7 @@ export type {
 	RouteRecord,
 	RouteSchema,
 	RouteTable,
+	ThenShortcuts,
 	TypedReplyFunction,
 	TypedShortcuts,
 	ValidSchema,
@@ -55,13 +64,17 @@ export type {
 export {
 	HttpError,
 	type InternalErrorBody,
+	type Refusal,
+	type RequestPart,
 	ResponseValidationError,
 	type RoutingErrorBody,
 	type ValidationErrorBody,
 	type ValidationIssue,
+	type ValidationRefusal,
 	type ValidationTarget,
 } from './errors/errors';
 export { vary, withHeaders } from './reply/headers';
+export { type ProblemDetails, problem } from './reply/problem';
 export {
 	type AnyReply,
 	type FreeReplyFunction,

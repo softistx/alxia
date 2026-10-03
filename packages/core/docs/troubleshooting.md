@@ -20,6 +20,8 @@ a trap that prints nothing is headed by its symptom.
 - [`the plugin's … reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins--reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 - [`… is not assignable to type 'ProvidedBy<C, …>'`](#-is-not-assignable-to-type-providedbyc-)
 - [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
+- [`Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`](#type-reply500--is-not-assignable-to-type-maybepromisevoid--replyclienterrorstatus-any--undefined)
+- [`'500' does not exist in type 'RefusalResponses'`](#500-does-not-exist-in-type-refusalresponses)
 
 **Building the app**
 
@@ -36,12 +38,14 @@ a trap that prints nothing is headed by its symptom.
 - [`GET /… is declared twice`](#get--is-declared-twice)
 - [`GET /…: the handler is missing`](#get--the-handler-is-missing)
 - [`group(): build is missing`](#group-build-is-missing)
+- [`onRefusal(): the hook is missing`](#onrefusal-the-hook-is-missing)
 - [`page(): /… is already served`](#page--is-already-served)
 - [`GET /… is already served by a page`](#get--is-already-served-by-a-page)
 
 **Responses**
 
 - [`400 {"error":"validation","issues":[…]}`](#400-errorvalidationissues)
+- [A route still answers `{"error":"validation"}` after `onRefusal`](#a-route-still-answers-errorvalidation-after-onrefusal)
 - [`404 {"error":"not_found"}`](#404-errornot_found)
 - [`405 {"error":"method_not_allowed"}`](#405-errormethod_not_allowed)
 - [`426 {"error":"upgrade_required"}`](#426-errorupgrade_required)
@@ -57,6 +61,7 @@ a trap that prints nothing is headed by its symptom.
 - [`ResponseValidationError: … the 200 reply does not match its schema`](#responsevalidationerror--the-200-reply-does-not-match-its-schema)
 - [`ResponseValidationError: … declares no 201 reply`](#responsevalidationerror--declares-no-201-reply)
 - [`TypeError: … the handler returned no reply. Return ctx.reply(status, body).`](#typeerror--the-handler-returned-no-reply-return-ctxreplystatus-body)
+- [`TypeError: … the onRefusal hook returned neither a reply nor nothing.`](#typeerror--the-onrefusal-hook-returned-neither-a-reply-nor-nothing)
 - [`TypeError: An event does not match its schema`](#typeerror-an-event-does-not-match-its-schema)
 
 **WebSockets**
@@ -420,6 +425,42 @@ export const getPet = {
 } as const;
 ```
 
+### `Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`
+
+**When:** an `onRefusal` hook returns a reply whose status is not a client
+error, such as a 500 or a 200.
+
+```text
+error TS2322: Type 'Reply<500, { readonly status: 500; }>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'.
+```
+
+**Why:** a refused request is the client's error. A 5xx would tell a client
+to retry a request that will be refused again, and a 2xx would say it
+succeeded.
+
+**Fix:** answer with a 4xx, such as 400 or 422:
+
+```ts
+app.onRefusal(({ part }) => problem({ status: 422, detail: `the ${part} is invalid` }));
+```
+
+### `'500' does not exist in type 'RefusalResponses'`
+
+**When:** the schemas given to `onRefusal` declare a status that is not a
+client error.
+
+```text
+error TS2353: Object literal may only specify known properties, and '500' does not exist in type 'RefusalResponses'.
+```
+
+**Fix:** declare the 4xx the hook answers:
+
+```ts
+app.onRefusal({ response: { 400: Problem } }, (_, { reply }) =>
+	reply(400, { type: 'urn:example:invalid', status: 400, detail: 'invalid' }),
+);
+```
+
 ## Building the app
 
 These are `TypeError`s thrown when a route is declared, so the app fails at
@@ -637,6 +678,19 @@ app.get('/a', { query: Query }, ({ query, reply }) => reply(200, query));
 app.group('/admin', (admin) => admin.derive(requireAdmin).get('/stats', stats));
 ```
 
+### `onRefusal(): the hook is missing`
+
+**When:** `onRefusal` is given its schemas but no hook. The types refuse
+that, so this comes from JavaScript or a cast.
+
+**Fix:** pass the hook after the schemas:
+
+```ts
+app.onRefusal({ response: { 400: Problem } }, (_, { reply }) =>
+	reply(400, { type: 'urn:example:invalid', status: 400, detail: 'invalid' }),
+);
+```
+
 ### `page(): /… is already served`
 
 **When:** `page(path, bundle)` names a path that another `page` or a
@@ -713,6 +767,31 @@ await fetch('/users', {
 
 [`@alxia/client`](https://www.npmjs.com/package/@alxia/client) sets the
 `content-type` for you.
+
+To answer it in another format, such as an RFC 9457 problem, declare
+[`onRefusal`](guide/hooks.md#onrefusal) before the routes.
+
+### A route still answers `{"error":"validation"}` after `onRefusal`
+
+**When:** an app declares `onRefusal`, and a refused request to one of its
+routes still gets the default 400.
+
+**Why**, by what you find:
+
+- The route is declared **before** the hook. A route hook applies to the
+  routes declared after it, never before: move the hook up the chain.
+- The hook is declared inside a `group`. A group's hooks stay inside it:
+  declare the hook on the app, before the group.
+- The hook returned nothing, `undefined`, for this refusal. Nothing means
+  the default: return a reply for every refusal you want answered.
+
+**Fix:** declare the hook first, and return a reply:
+
+```ts
+const app = alxia()
+	.onRefusal(({ part }) => problem({ status: 400, detail: `the ${part} is invalid` }))
+	.post('/users', { body: NewUser }, handler);
+```
 
 ### `404 {"error":"not_found"}`
 
@@ -861,6 +940,9 @@ at runtime. Data from a database, `JSON.parse` or `any` gets past the types.
 **Why:** what leaves the server is the schema's output. A body the schema
 refuses is never sent, so the client never reads an undeclared shape.
 
+An `onRefusal` hook given schemas is checked the same way: the message
+names the route that was refused and the status the hook replied with.
+
 **Fix:** map the data to the schema before replying. To skip the check in
 a hot path you trust, turn it off for the app; the declared status is still
 enforced:
@@ -878,7 +960,9 @@ ResponseValidationError: GET /u declares no 201 reply
 **When:** a route with `response` schemas replies with a status it did not
 declare. The types refuse that, so this comes from JavaScript or a cast.
 Redirects (3xx without a body) are exempt, and so is a reply returned by
-`onError` or a `derive`.
+`onError` or a `derive`. An `onRefusal` hook given schemas that replies
+with a status they do not declare fails the same way, naming the refused
+route: declare the status in the hook's `response`.
 
 **Fix:** declare the status in `response`:
 
@@ -899,6 +983,18 @@ app.get('/users', async ({ reply }) => {
 	const users = await listUsers();
 	return reply(200, users);
 });
+```
+
+### `TypeError: … the onRefusal hook returned neither a reply nor nothing.`
+
+**When:** an `onRefusal` hook returns something that is neither a `Reply`
+nor `undefined`, such as a plain object or a `Response`. TypeScript
+refuses it, so this comes from JavaScript or a cast.
+
+**Fix:** return `reply(…)` or `problem(…)`, or nothing for the default:
+
+```ts
+app.onRefusal(({ part }) => (part === 'body' ? problem({ status: 400, detail: 'bad body' }) : undefined));
 ```
 
 ### `TypeError: An event does not match its schema`

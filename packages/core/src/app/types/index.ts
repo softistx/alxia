@@ -12,13 +12,18 @@ export type {
 } from './context';
 export type { ProvidedBy, RequiresOf, Requiring } from './requires';
 export type {
+	BehindShortcuts,
+	DefaultRefusalOutcome,
+	FallsBack,
 	Outcome,
 	OutcomeOf,
+	Refusing,
 	RouteEntryOf,
 	RouteInput,
 	RouteOutput,
 	RouteRecord,
 	RouteTable,
+	ThenShortcuts,
 } from './route-table';
 export type { ResponseSchemas, RouteDetail, RouteSchema } from './schema';
 export type {

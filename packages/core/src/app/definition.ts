@@ -2,6 +2,7 @@
  * An app as it runs: its hooks, and the definition of each route and socket
  * route it holds, with the hooks declared before it.
  */
+import type { Refusal } from '../errors/errors';
 import type { AnyReply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
 import type { Router } from '../router/router';
@@ -11,6 +12,7 @@ import type {
 	MaybePromise,
 	Method,
 	RequestContext,
+	ResponseSchemas,
 	RouteSchema,
 } from './types';
 
@@ -30,6 +32,19 @@ export type ErrorHook = (
 	error: unknown,
 	ctx: BaseContext,
 ) => MaybePromise<AnyReply | undefined | void>;
+/** A hook that answers a request the app refused: a reply, or nothing for the default. */
+export type RefusalHook = (
+	refusal: Refusal,
+	ctx: BaseContext,
+) => MaybePromise<AnyReply | undefined | void>;
+/** The `onRefusal` hook in force for a route, and the schemas it declares. */
+export interface RefusalHandler {
+	readonly hook: RefusalHook;
+	/** The schema of each status the hook may answer: its reply is checked by it, and documented. */
+	readonly response?: ResponseSchemas;
+	/** The `content-type` of its reply, unless the reply sets one; documented too. */
+	readonly contentType?: string;
+}
 
 /** Runs on every request, before routing; a `Response` it returns is sent as it is. */
 export type RequestHook = (
@@ -61,6 +76,8 @@ export interface RouteDefinition {
 	readonly handler: (ctx: never) => MaybePromise<AnyReply>;
 	readonly derive: readonly ChainHook[];
 	readonly onError: readonly ErrorHook[];
+	/** The `onRefusal` hook declared last before it; none, and a refused request is the default 400. */
+	readonly refusal?: RefusalHandler | undefined;
 }
 
 /** A socket route as the app runs it. */
@@ -70,6 +87,8 @@ export interface SocketDefinition {
 	readonly handlers: SocketHandlers<never, never, never>;
 	readonly derive: readonly ChainHook[];
 	readonly onError: readonly ErrorHook[];
+	/** Answers a refused upgrade request, as a route's. */
+	readonly refusal?: RefusalHandler | undefined;
 }
 
 export type Definition =

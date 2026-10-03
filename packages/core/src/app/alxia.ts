@@ -1,7 +1,9 @@
-import type { AnyReply } from '../reply/reply';
+import type { Refusal, ValidationErrorBody } from '../errors/errors';
+import type { AnyReply, Reply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
 import { joinPath, shapeOf } from '../router/paths';
 import { Router } from '../router/router';
+import type { InferOutput, StandardSchemaV1 } from '../schema/standard-schema';
 import { fileHandler, staticHandler } from '../static/serve';
 import type {
 	FileOptions,
@@ -10,6 +12,7 @@ import type {
 	StaticReply,
 } from '../static/types';
 import type { JoinPath, RoutePath } from '../types/path';
+import type { ClientErrorStatus } from '../types/status';
 import type {
 	SocketContext,
 	SocketEntryOf,
@@ -23,6 +26,8 @@ import type {
 	ChainHook,
 	DeriveHook,
 	ErrorHook,
+	RefusalHandler,
+	RefusalHook,
 	RequestHook,
 	ResponseHook,
 	RouteDefinition,
@@ -37,17 +42,22 @@ import type { OperationMethod, RouteOperation } from './route-operation';
 import { type SocketData, websocketHandler } from './socket';
 import type {
 	BaseContext,
+	BehindShortcuts,
 	Context,
+	DeclaredReply,
 	Empty,
+	FallsBack,
 	HandlerResult,
 	MaybePromise,
 	Method,
 	Outcome,
-	OutcomeOf,
 	ProvidedBy,
+	Refusing,
 	RouteEntryOf,
 	RouteRecord,
 	RouteSchema,
+	ThenShortcuts,
+	TypedReplyFunction,
 	ValidSchema,
 } from './types';
 
@@ -129,10 +139,44 @@ type Prefixed<Prefix extends string, Routes, Shortcuts> = {
 			infer Input,
 			infer Output
 		>
-			? RouteRecord<Input, Output | OutcomeOf<Shortcuts>>
+			? RouteRecord<Input, BehindShortcuts<Output, Shortcuts>>
 			: Routes[Path][M];
 	};
 };
+
+/** The schema of each status an `onRefusal` hook may answer, client errors only. */
+export type RefusalResponses = {
+	readonly [Status in ClientErrorStatus]?: StandardSchemaV1;
+};
+
+/**
+ * What an `onRefusal` hook declares: the schema of each status it may
+ * answer — its reply is checked by it, typed and documented — and the
+ * `content-type` its reply is sent with unless it sets one.
+ */
+export interface RefusalSchema<
+	Responses extends RefusalResponses = RefusalResponses,
+> {
+	readonly response: Responses;
+	readonly contentType?: string;
+}
+
+/** The replies an `onRefusal` hook answers with, marked; the default 400 when it may return nothing. */
+type RefusalsOf<Replies, Result> =
+	| (Replies & Refusing)
+	| (undefined extends Result
+			? Reply<400, ValidationErrorBody> & FallsBack
+			: never);
+
+/** Every reply a hook declaring `Responses` may answer, as its schemas give it back. */
+type DeclaredRefusal<Responses> = {
+	[Status in keyof Responses & ClientErrorStatus]: Reply<
+		Status,
+		Responses[Status] extends StandardSchemaV1
+			? InferOutput<Responses[Status]>
+			: never
+	>;
+}[keyof Responses & ClientErrorStatus];
 
 /** Any app, whatever it holds. */
 export type AnyAlxia = Alxia<any, any, any, any>;
@@ -157,7 +201,7 @@ export type Plugin = <App extends AnyAlxia>(app: App) => App;
  * export type App = typeof app;
  * ```
  *
- * A route hook (`derive`, `decorate`, `onError`) applies to the routes
+ * A route hook (`derive`, `decorate`, `onError`, `onRefusal`) applies to the routes
  * declared after it, never before: the order of the chain is the order of
  * the request. A global hook (`onRequest`, `onResponse`, `onStart`,
  * `onStop`, `parser`) applies to the whole app, wherever it is declared.
@@ -180,6 +224,7 @@ export class Alxia<
 	readonly #sockets: SocketDefinition[] = [];
 	#derive: ChainHook[] = [];
 	#onError: ErrorHook[] = [];
+	#refusal: RefusalHandler | undefined;
 	#server: Bun.Server<unknown> | undefined;
 	#websocket: Bun.WebSocketHandler<SocketData> | undefined;
 
@@ -411,6 +456,7 @@ export class Alxia<
 			handlers: handlers as SocketDefinition['handlers'],
 			derive: [...this.#derive],
 			onError: [...this.#onError],
+			refusal: this.#refusal,
 		};
 		this.#mount(definition);
 		return this as never;
@@ -487,6 +533,75 @@ export class Alxia<
 	): Alxia<Ctx, Routes, Prefix, Shortcuts | Extract<Result, AnyReply>> {
 		this.#onError.push(hook as unknown as ErrorHook);
 		return this as never;
+	}
+
+	/**
+	 * A hook that answers a request a route declared after it refuses
+	 * before its handler runs: today, one its schemas refuse, the default
+	 * of which is `400 { error: 'validation', issues }`. The hook reads
+	 * the refusal — its `kind`, the `part` that failed, the `issues` —
+	 * and returns a reply with a 4xx status, or nothing for the default.
+	 * The last one declared before a route is the one in force; a group's
+	 * stays inside it. Its reply replaces the default 400 in the type of
+	 * every such route that validates, so the client reads it:
+	 *
+	 * ```ts
+	 * .onRefusal(({ part, issues }) =>
+	 *   problem({ type: 'urn:example:invalid', status: 400, detail: `the ${part} is invalid`, issues }))
+	 * ```
+	 *
+	 * Given schemas first, its `reply` is typed by them, its reply is
+	 * checked and sent as their output, and `@alxia/openapi` documents it:
+	 *
+	 * ```ts
+	 * .onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' },
+	 *   ({ part }, { reply }) => reply(400, { type: 'urn:example:invalid', status: 400, detail: part }))
+	 * ```
+	 */
+	onRefusal<Result extends Reply<ClientErrorStatus, any> | undefined | void>(
+		hook: (refusal: Refusal, ctx: BaseContext & Ctx) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes,
+		Prefix,
+		Exclude<Shortcuts, Refusing> | RefusalsOf<Extract<Result, AnyReply>, Result>
+	>;
+	onRefusal<
+		Responses extends RefusalResponses,
+		Result extends DeclaredReply<Responses> | undefined | void,
+	>(
+		schema: RefusalSchema<Responses>,
+		hook: (
+			refusal: Refusal,
+			ctx: Omit<BaseContext, 'reply'> &
+				Ctx & { readonly reply: TypedReplyFunction<Responses> },
+		) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes,
+		Prefix,
+		| Exclude<Shortcuts, Refusing>
+		| RefusalsOf<DeclaredRefusal<Responses>, Result>
+	>;
+	onRefusal(
+		schemaOrHook: RefusalSchema | ((refusal: Refusal, ctx: never) => unknown),
+		maybeHook?: (refusal: Refusal, ctx: never) => unknown,
+	): AnyAlxia {
+		if (typeof schemaOrHook === 'function') {
+			this.#refusal = { hook: schemaOrHook as RefusalHook };
+			return this;
+		}
+		if (typeof maybeHook !== 'function') {
+			throw new TypeError('onRefusal(): the hook is missing');
+		}
+		this.#refusal = {
+			hook: maybeHook as RefusalHook,
+			response: schemaOrHook.response,
+			...(schemaOrHook.contentType === undefined
+				? {}
+				: { contentType: schemaOrHook.contentType }),
+		};
+		return this;
 	}
 
 	/**
@@ -595,6 +710,7 @@ export class Alxia<
 		});
 		child.#derive = [...this.#derive];
 		child.#onError = [...this.#onError];
+		child.#refusal = this.#refusal;
 		child.#runtime = { ...child.#runtime, globals: this.#runtime.globals };
 		const before = new Set(this.#runtime.globals.pages.keys());
 		const built = build(child);
@@ -635,7 +751,7 @@ export class Alxia<
 		Ctx & PluginCtx,
 		Routes & Prefixed<Prefix, PluginRoutes, Shortcuts>,
 		Prefix,
-		Shortcuts | PluginShortcuts
+		ThenShortcuts<Shortcuts, PluginShortcuts>
 	>;
 	use(plugin: AnyAlxia | ((app: any) => AnyAlxia)): AnyAlxia {
 		if (!(plugin instanceof Alxia)) return plugin(this);
@@ -645,6 +761,7 @@ export class Alxia<
 				path: joinPath(this.#prefix, route.path),
 				derive: [...this.#derive, ...route.derive],
 				onError: [...route.onError, ...this.#onError],
+				refusal: route.refusal ?? this.#refusal,
 			});
 		}
 		for (const socket of plugin.sockets) {
@@ -653,10 +770,12 @@ export class Alxia<
 				path: joinPath(this.#prefix, socket.path),
 				derive: [...this.#derive, ...socket.derive],
 				onError: [...socket.onError, ...this.#onError],
+				refusal: socket.refusal ?? this.#refusal,
 			});
 		}
 		this.#derive = [...this.#derive, ...plugin.#derive];
 		this.#onError = [...plugin.#onError, ...this.#onError];
+		this.#refusal = plugin.#refusal ?? this.#refusal;
 		if (plugin.#runtime.globals !== this.#runtime.globals) {
 			const globals = plugin.#runtime.globals;
 			this.#runtime.globals.around.push(...globals.around);
@@ -785,6 +904,7 @@ export class Alxia<
 				handler,
 				derive: [...this.#derive],
 				onError: [...this.#onError],
+				refusal: this.#refusal,
 			});
 			return this;
 		};

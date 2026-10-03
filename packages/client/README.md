@@ -31,8 +31,9 @@ A `QUERY` route, whose criteria travel in the body, is
 
 `data` is typed as it crosses the wire: a `Date` the server sends is a
 `string` here. Every call may also read the 500 any route may answer, and
-the 400 of a route that validates its request. `ok` is `true` for a 2xx and
-narrows the same way.
+the 400 of a route that validates its request, or what the app's
+`onRefusal` hook answers in its place, such as an `application/problem+json`
+problem. `ok` is `true` for a 2xx and narrows the same way.
 
 ## Testing without a server
 

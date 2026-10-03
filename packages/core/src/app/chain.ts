@@ -5,6 +5,8 @@
  */
 import {
 	HttpError,
+	type Refusal,
+	type RequestPart,
 	type ValidationErrorBody,
 	type ValidationIssue,
 } from '../errors/errors';
@@ -19,7 +21,7 @@ import {
 import { check } from '../schema/standard-schema';
 import type { RedirectStatus } from '../types/status';
 import type { RouteDefinition, SocketDefinition } from './definition';
-import { internalError, send, sendDeclared } from './send';
+import { checkReply, internalError, send, sendDeclared } from './send';
 import type {
 	BaseContext,
 	RedirectFunction,
@@ -71,6 +73,7 @@ export async function chain<Last>(
 	set: ResponseSettings,
 	ctx: Record<string, unknown> & BaseContext,
 	parsers: readonly BodyParser[],
+	validateResponses: boolean,
 	last: () => Promise<Response | Last>,
 ): Promise<Response | Last> {
 	const hooks = definition.derive;
@@ -86,6 +89,7 @@ export async function chain<Last>(
 				set,
 				ctx,
 				parsers,
+				validateResponses,
 			);
 			return refused ?? last();
 		}
@@ -106,7 +110,7 @@ export async function chain<Last>(
 	return step(0);
 }
 
-/** The request checked by the route's schemas: the 400 that refuses it, or nothing. */
+/** The request checked by the route's schemas: the response that refuses it, or nothing. */
 async function validate(
 	definition: RouteDefinition | SocketDefinition,
 	request: RequestContext,
@@ -114,9 +118,11 @@ async function validate(
 	set: ResponseSettings,
 	ctx: Record<string, unknown> & BaseContext,
 	parsers: readonly BodyParser[],
+	validateResponses: boolean,
 ): Promise<Response | undefined> {
 	const { schema } = definition;
 	const issues: ValidationIssue[] = [];
+	let part: RequestPart | undefined;
 	const parts = [
 		['params', schema.params, () => rawParams],
 		['query', schema.query, () => readQuery(request.url)],
@@ -131,24 +137,86 @@ async function validate(
 		}
 		const checked = await check(partSchema, raw, target);
 		if (checked.ok) ctx[target] = checked.value;
-		else issues.push(...checked.issues);
+		else {
+			part ??= target;
+			issues.push(...checked.issues);
+		}
 	}
 	ctx['body'] = undefined;
 	const bodySchema = 'body' in schema ? schema.body : undefined;
 	if (bodySchema !== undefined) {
 		const body = await readBody(request.request, parsers);
-		if (!body.ok) issues.push(body.issue);
-		else {
+		if (!body.ok) {
+			part ??= 'body';
+			issues.push(body.issue);
+		} else {
 			const checked = await check(bodySchema, body.value, 'body');
 			if (checked.ok) ctx['body'] = checked.value;
-			else issues.push(...checked.issues);
+			else {
+				part ??= 'body';
+				issues.push(...checked.issues);
+			}
 		}
 	}
-	if (issues.length > 0) {
-		const body: ValidationErrorBody = { error: 'validation', issues };
-		return send(new Reply(400, body), set);
+	if (part === undefined) return undefined;
+	return refuse(
+		definition,
+		{ kind: 'validation', part, issues },
+		set,
+		ctx,
+		validateResponses,
+	);
+}
+
+/**
+ * A refused request, answered by the route's `onRefusal` hook — its reply
+ * checked by the schemas the hook declares — or, when it has none or
+ * returns nothing, by the default: a 400 with the issues.
+ */
+async function refuse(
+	definition: RouteDefinition | SocketDefinition,
+	refusal: Refusal,
+	set: ResponseSettings,
+	ctx: BaseContext,
+	validateResponses: boolean,
+): Promise<Response> {
+	const handler = definition.refusal;
+	if (handler !== undefined) {
+		let reply = handler.hook(refusal, ctx);
+		if (reply instanceof Promise) reply = await reply;
+		const method = 'method' in definition ? definition.method : 'WS';
+		if (reply instanceof Reply) {
+			if (handler.response !== undefined) {
+				reply = await checkReply(
+					method,
+					definition.path,
+					handler.response,
+					reply,
+					validateResponses,
+				);
+			}
+			return send(withContentType(reply, handler.contentType), set);
+		}
+		if (reply !== undefined) {
+			throw new TypeError(
+				`${method} ${definition.path}: the onRefusal hook returned neither a reply nor nothing.`,
+			);
+		}
 	}
-	return undefined;
+	const body: ValidationErrorBody = {
+		error: 'validation',
+		issues: refusal.issues,
+	};
+	return send(new Reply(400, body), set);
+}
+
+/** `reply` with `content-type` set to `type`, unless it sets one. */
+function withContentType(reply: Reply, type: string | undefined): Reply {
+	if (type === undefined) return reply;
+	const headers = new Headers(reply.headers);
+	if (headers.has('content-type')) return reply;
+	headers.set('content-type', type);
+	return new Reply(reply.status, reply.body, { headers });
 }
 
 /** A route's request, from its hooks to its handler's reply, sent. */
@@ -168,6 +236,7 @@ export async function handle(
 			set,
 			ctx,
 			parsers,
+			validateResponses,
 			async () => {
 				let reply = route.handler(ctx as never);
 				if (reply instanceof Promise) reply = await reply;

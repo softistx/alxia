@@ -10,8 +10,8 @@ a realistic example for each.
 | --- | --- |
 | [Getting started](guide/getting-started.md) | writing a first app, and testing it without a server |
 | [Routes and schemas](guide/routes.md) | declaring paths, validating params, query, headers, cookies or a body, or reading a 400 |
-| [Replies](guide/replies.md) | answering with a status, a file, a header, a cookie or a redirect, or turning an error into a response |
-| [Hooks](guide/hooks.md) | authenticating, adding to the context, timing or tracing a request, or editing every response |
+| [Replies](guide/replies.md) | answering with a status, a file, a header, a cookie, a redirect or an RFC 9457 problem, or turning an error into a response |
+| [Hooks](guide/hooks.md) | authenticating, adding to the context, answering a refused request in your own format, timing or tracing a request, or editing every response |
 | [Groups and plugins](guide/groups-and-plugins.md) | scoping hooks to some routes, splitting the app across files, or reading what `use` mounts |
 | [Writing a plugin](guide/writing-a-plugin.md) | writing a plugin: an app, a `Plugin` function, or a `definePlugin` that reads what an earlier plugin added |
 | [Static files](guide/static-files.md) | serving a directory, one file, a single-page app, or a Bun HTML bundle |

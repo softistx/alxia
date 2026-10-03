@@ -12,7 +12,7 @@ import { vary } from '../reply/headers';
 import { type AnyReply, Reply, toResponse } from '../reply/reply';
 import { check } from '../schema/standard-schema';
 import type { RouteDefinition } from './definition';
-import type { ResponseSettings } from './types';
+import type { ResponseSchemas, ResponseSettings } from './types';
 
 const internal: InternalErrorBody = { error: 'internal' };
 
@@ -63,29 +63,46 @@ export async function sendDeclared(
 	if (responses === undefined || isRedirect(reply)) {
 		return send(reply, set, signal);
 	}
+	const checked = await checkReply(
+		route.method,
+		route.path,
+		responses,
+		reply,
+		validateResponses,
+	);
+	return send(checked, set, signal);
+}
+
+/**
+ * `reply` checked against the schema `responses` declares for its status,
+ * as that schema's output: what a handler's reply and an `onRefusal`
+ * hook's go through. A status with no schema, or a body its schema
+ * refuses, throws a `ResponseValidationError`.
+ */
+export async function checkReply(
+	method: string,
+	path: string,
+	responses: ResponseSchemas,
+	reply: AnyReply,
+	validateResponses: boolean,
+): Promise<AnyReply> {
 	const schema = responses[reply.status as keyof typeof responses];
 	if (schema === undefined) {
-		throw ResponseValidationError.undeclared(
-			route.method,
-			route.path,
-			reply.status,
-		);
+		throw ResponseValidationError.undeclared(method, path, reply.status);
 	}
-	if (!validateResponses) return send(reply, set, signal);
+	if (!validateResponses) return reply;
 	const checked = await check(schema, reply.body, 'body');
 	if (!checked.ok) {
 		throw new ResponseValidationError(
-			route.method,
-			route.path,
+			method,
+			path,
 			reply.status,
 			checked.issues,
 		);
 	}
-	return send(
-		new Reply(reply.status, checked.value, { headers: reply.headers ?? {} }),
-		set,
-		signal,
-	);
+	return new Reply(reply.status, checked.value, {
+		headers: reply.headers ?? {},
+	});
 }
 
 /** What the router answers when no route takes the request. */

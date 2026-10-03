@@ -23,7 +23,7 @@ const app = alxia()
 
 | | Applies to | Declared with |
 | --- | --- | --- |
-| route hooks | the routes declared **after** them, in the same app or [group](groups-and-plugins.md#groups) | `decorate`, `derive`, `wrap`, `onError` |
+| route hooks | the routes declared **after** them, in the same app or [group](groups-and-plugins.md#groups) | `decorate`, `derive`, `wrap`, `onError`, `onRefusal` |
 | global hooks | every request to the app, wherever they are declared | `around`, `onRequest`, `onResponse`, `onStart`, `onStop`, `parser` |
 
 The order of the chain is the order of the request, at runtime and in the
@@ -37,7 +37,7 @@ around (first declared outermost)
 └─ onRequest hooks           ← a Response here is sent as it is
    └─ routing                ← 404, 405, 426
       └─ route hooks, in order: derive / decorate / wrap
-         └─ validation       ← 400
+         └─ validation       ← 400, or the onRefusal hook's reply
             └─ handler
          onError hooks       ← for what any of the above threw
    onResponse hooks          ← every response, 404s included
@@ -152,6 +152,102 @@ const app = alxia()
 The context is `Partial<Ctx>`: the error may have been thrown before a
 `derive` added its part.
 
+## `onRefusal`
+
+```ts
+onRefusal<Result extends Reply<ClientErrorStatus, any> | undefined | void>(
+	hook: (refusal: Refusal, ctx: BaseContext & Ctx) => MaybePromise<Result>,
+): Alxia<…>
+onRefusal<Responses extends RefusalResponses, Result extends DeclaredReply<Responses> | undefined | void>(
+	schema: { response: Responses; contentType?: string },
+	hook: (refusal: Refusal, ctx: Omit<BaseContext, 'reply'> & Ctx & { reply: TypedReplyFunction<Responses> }) => MaybePromise<Result>,
+): Alxia<…>
+```
+
+Answers a request that a route declared after it refuses before its
+handler runs. Today that is a request its schemas refuse, by default
+`400 { "error": "validation", "issues": […] }` ([The 400](routes.md#the-400)).
+The hook reads the refusal and the context. It returns a reply with a 4xx
+status, or nothing to send the default.
+
+```ts
+interface ValidationRefusal {
+	readonly kind: 'validation';
+	readonly part: 'params' | 'query' | 'headers' | 'cookies' | 'body'; // the first that failed
+	readonly issues: readonly ValidationIssue[];                         // every one, each with its target
+}
+type Refusal = ValidationRefusal; // told apart by `kind`
+```
+
+An API whose errors are RFC 9457 problems, as JMAP's are, answers them
+with [`problem`](replies.md#problem-details-problem):
+
+```ts
+import { alxia, problem, type Refusal } from '@alxia/core';
+import { z } from 'zod';
+
+const jmapProblem = ({ part, issues }: Refusal) =>
+	problem({
+		type: issues.some((issue) => issue.code === 'invalid_json')
+			? 'urn:ietf:params:jmap:error:notJSON'
+			: 'urn:ietf:params:jmap:error:notRequest',
+		status: 400,
+		detail: `the ${part} is invalid`,
+	});
+
+const app = alxia()
+	.onRefusal(jmapProblem)
+	.post('/jmap', { body: z.object({ using: z.array(z.string()) }) }, ({ reply }) =>
+		reply(200, { methodResponses: [] }),
+	)
+	.get('/download/:blobId', { params: z.object({ blobId: z.string().min(1) }) }, ({ reply }) =>
+		reply(200, 'blob'),
+	);
+```
+
+A body that is not JSON gets `notJSON`, and a body or a path parameter its
+schema refuses gets `notRequest`. Each is sent as
+`application/problem+json`, with its `detail` naming the part.
+
+**Order is meaning.** The last `onRefusal` declared before a route is the
+one in force. A route declared before any keeps the default, and a
+[group](groups-and-plugins.md#groups)'s hook stays inside the group. A
+plugin given to `use` keeps its own hook for its routes. Its routes without
+one take the hook of the app using it, and the plugin's hook then applies to
+the routes declared after `use`, as its `derive`s do.
+
+**Typed.** The hook's reply replaces the default 400 in the type of every
+route after it that validates part of its request, so
+[`@alxia/client`](https://www.npmjs.com/package/@alxia/client) reads the
+problem. A route that validates nothing is never refused, and its type
+gains nothing. A hook that may return nothing keeps the default 400 in the
+type beside its own reply. A status other than 400 replaces it: a hook that
+answers 422 makes the route's outcomes 422 and no 400.
+
+**With schemas.** Given `{ response, contentType? }` first, the hook's
+`reply` is typed by those schemas, as a route's is. Its reply is checked by
+the schema of its status and sent as that schema's output, and a reply the
+schema refuses is a 500, as a handler's is ([`validateResponses`](replies.md#validateresponses)).
+`contentType` is set on the reply unless it sets its own.
+[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
+each declared status under that content type. Without schemas it documents
+a `4XX` whose body it does not know.
+
+```ts
+const Problem = z.object({ type: z.string(), status: z.literal(400), detail: z.string() });
+
+const documented = alxia()
+	.onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' }, ({ part }, { reply }) =>
+		reply(400, { type: 'urn:ietf:params:jmap:error:notRequest', status: 400, detail: `the ${part} is invalid` }),
+	)
+	.post('/jmap', { body: z.object({ using: z.array(z.string()) }) }, ({ reply }) => reply(200, 'ok'));
+```
+
+A hook that throws reaches the route's `onError` hooks, as a handler's
+error does. A socket route's upgrade is refused through the same hook. A
+message the socket refuses is answered on the socket, as before
+([WebSockets](websockets.md)).
+
 ## Global hooks
 
 ### `around`
@@ -264,7 +360,7 @@ interface RequestContext {               // around, onRequest, onResponse
 	readonly error: unknown;                          // once a route has failed
 }
 
-interface BaseContext extends RequestContext {   // derive, wrap, onError, handlers
+interface BaseContext extends RequestContext {   // derive, wrap, onError, onRefusal, handlers
 	readonly route: string;                          // as declared: /users/:id
 	readonly pathParams: Readonly<Record<string, string>>;
 	readonly set: ResponseSettings;                  // { headers: Headers; cookies: Bun.CookieMap }

@@ -26,6 +26,13 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### Next release
+
+- **The 400 an app answers in its own format.** A route behind
+  `@alxia/core`'s `onRefusal` hook reads that hook's reply in place of
+  `ValidationErrorBody`, such as an `application/problem+json` problem with
+  its members typed.
+
 ### 0.1.0
 
 - **A client typed from the app's type alone.** `client<App>(url)` reads

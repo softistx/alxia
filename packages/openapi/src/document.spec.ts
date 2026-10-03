@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { alxia, eventStream } from '@alxia/core';
+import { alxia, eventStream, problem } from '@alxia/core';
 import { z } from 'zod';
 import { openApiPath, openapi, operationId } from './document';
 import { docs } from './plugin';
@@ -167,6 +167,73 @@ describe('openapi', () => {
 				schema: { $ref: '#/components/schemas/ValidationError' },
 			},
 		});
+	});
+
+	test('an onRefusal hook with schemas: its statuses, under its content type', () => {
+		const Problem = z.object({
+			type: z.string(),
+			status: z.literal(400),
+			detail: z.string(),
+		});
+		const refused = openapi(
+			alxia()
+				.post('/before', { body: z.string() }, ({ reply }) => reply(201, 'ok'))
+				.onRefusal(
+					{
+						response: { 400: Problem },
+						contentType: 'application/problem+json',
+					},
+					({ part }, { reply }) =>
+						reply(400, {
+							type: 'urn:example:invalid',
+							status: 400,
+							detail: part,
+						}),
+				)
+				.post('/after', { body: z.string() }, ({ reply }) => reply(201, 'ok'))
+				.get('/plain', ({ reply }) => reply(200, 'ok')),
+			{ info: { title: 'Problems', version: '1' } },
+		);
+		const after = refused.paths['/after']?.post?.responses ?? {};
+		expect(Object.keys(after).sort()).toEqual(['400', '500', 'default']);
+		expect(after['400']).toEqual({
+			description: 'The request was refused',
+			content: {
+				'application/problem+json': {
+					schema: {
+						type: 'object',
+						properties: {
+							type: { type: 'string' },
+							status: { type: 'number', const: 400 },
+							detail: { type: 'string' },
+						},
+						required: ['type', 'status', 'detail'],
+						additionalProperties: false,
+					},
+				},
+			},
+		});
+		expect(refused.paths['/before']?.post?.responses['400']?.content).toEqual({
+			'application/json': {
+				schema: { $ref: '#/components/schemas/ValidationError' },
+			},
+		});
+		expect(
+			Object.keys(refused.paths['/plain']?.get?.responses ?? {}).sort(),
+		).toEqual(['500', 'default']);
+	});
+
+	test('an onRefusal hook without schemas: a client error whose body it does not say', () => {
+		const refused = openapi(
+			alxia()
+				.onRefusal(() => problem({ status: 422, detail: 'invalid' }))
+				.post('/a', { body: z.string() }, ({ reply }) => reply(201, 'ok')),
+			{ info: { title: 'Problems', version: '1' } },
+		);
+		expect(refused.paths['/a']?.post?.responses['4XX']).toEqual({
+			description: 'The request was refused',
+		});
+		expect(refused.paths['/a']?.post?.responses['400']).toBeUndefined();
 	});
 
 	test('operation ids: the route’s own, or one from its method and path', () => {

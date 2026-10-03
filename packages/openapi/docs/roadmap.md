@@ -31,6 +31,13 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### Next release
+
+- **Refusals as the app answers them.** A route behind an `onRefusal`
+  hook documents what the hook declares — an RFC 9457 problem under
+  `application/problem+json`, for one — in place of the `ValidationError`
+  400; a hook without schemas, a `4XX`.
+
 ### 0.1.0
 
 - **An OpenAPI 3.2 document from the routes you already wrote.**

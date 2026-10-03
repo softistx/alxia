@@ -78,7 +78,8 @@ Every status the route may answer, as `@alxia/core` types it:
 | each reply the handler returns | it has none |
 | a redirect (`302`, `308`…), with `data: undefined` | the handler may return `redirect` |
 | each reply of a `derive`, `wrap` or `onError` declared before the route | always: a guard's 401 is there |
-| `400`, `ValidationErrorBody` | the route validates a part of its request |
+| `400`, `ValidationErrorBody` | the route validates a part of its request, and no `onRefusal` hook is declared before it |
+| each reply of the `onRefusal` hook declared before the route, in place of the 400 | the route validates a part of its request |
 | `500`, `InternalErrorBody` | always |
 
 So a route with no schema still reads its 500:
@@ -148,6 +149,23 @@ if (created.status === 400) {
 The types already refuse most of what the server would: a 400 is what a
 schema checks beyond its type — a minimum length, a format — or what came
 from outside the types.
+
+An app that answers refusals in its own format, with `@alxia/core`'s
+[`onRefusal`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/hooks.md#onrefusal),
+gives the client that format in place of `ValidationErrorBody`. A problem
+sent as `application/problem+json` is read as JSON, its members typed:
+
+```ts
+// server: .onRefusal(({ part }) => problem({ type: 'urn:ietf:params:jmap:error:notRequest', status: 400, detail: `the ${part} is invalid` }))
+const sent = await api.post('/jmap', { body: { using: [] } });
+if (sent.status === 400) {
+	sent.data.type;   // 'urn:ietf:params:jmap:error:notRequest'
+	sent.data.detail; // `the ${RequestPart} is invalid`
+}
+```
+
+A hook that may return nothing for some refusals leaves the default 400
+in the union beside its own.
 
 ## How `data` is read
 

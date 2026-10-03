@@ -31,6 +31,7 @@ export async function upgradeSocket(
 	request: RequestContext,
 	rawParams: Record<string, string>,
 	parsers: readonly BodyParser[],
+	validateResponses: boolean,
 ): Promise<Response | typeof UPGRADED> {
 	const { ctx, set } = routeContext(definition, request, rawParams);
 	const server = request.server;
@@ -42,6 +43,7 @@ export async function upgradeSocket(
 			set,
 			ctx,
 			parsers,
+			validateResponses,
 			async () => {
 				if (server === undefined) {
 					return routingError(426, 'upgrade_required');

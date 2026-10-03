@@ -88,6 +88,34 @@ whatever part it is in:
 { "error": "validation", "issues": [{ "target": "params", "path": ["id"], "code": "invalid_type", "message": "…" }] }
 ```
 
+`onRefusal(hook)` answers it in your format instead, for the routes declared
+after it: the hook reads the `part` that failed and the `issues`, and
+returns a reply with a 4xx status — or nothing, for the default.
+`problem(details)` builds an RFC 9457 problem, sent as
+`application/problem+json`, its extension members typed:
+
+```ts
+import { alxia, problem } from '@alxia/core';
+
+const app = alxia()
+	.onRefusal(({ part, issues }) =>
+		problem({
+			type: issues.some((issue) => issue.code === 'invalid_json')
+				? 'urn:ietf:params:jmap:error:notJSON'
+				: 'urn:ietf:params:jmap:error:notRequest',
+			status: 400,
+			detail: `the ${part} is invalid`,
+		}),
+	)
+	.post('/jmap', { body: JmapRequest }, ({ body, reply }) => reply(200, run(body)));
+```
+
+Its reply replaces the 400 in the type of every route after it that
+validates, so the client reads the problem. Given schemas first —
+`onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' }, hook)`
+— its `reply` is typed by them, its body checked and sent as their output,
+and `@alxia/openapi` documents it.
+
 `ip` is the client's address — the `ip` option reads it behind a proxy —
 and `server` the Bun server, when there is one. `HEAD` runs the `GET` route.
 
@@ -267,7 +295,9 @@ response, which the hook returns — or a reply of its own, typed like a
 Hooks run before validation: `pathParams` holds the path's parameters as
 they arrived. `onError` turns a thrown
 error into a reply the same way; an `HttpError` is answered as it says, and
-anything else is a 500 that leaks nothing.
+anything else is a 500 that leaks nothing. `onRefusal` answers a request
+the route's schemas refuse ([Requests](#requests)); the last one declared
+before a route is the one it uses.
 
 Global hooks apply to the whole app, wherever they are declared:
 
@@ -350,7 +380,7 @@ covers all three kinds.
 | export | |
 | --- | --- |
 | `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip` |
-| `Alxia` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `decorate` `derive` `wrap` `onError`, `around` `onRequest` `onResponse` `onStart` `onStop` `parser`, `group` `use`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server` |
+| `Alxia` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `decorate` `derive` `wrap` `onError` `onRefusal`, `around` `onRequest` `onResponse` `onStart` `onStop` `parser`, `group` `use`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server` |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream` made |
 | `FileSource`, `StaticOptions`, `FileOptions`, `StaticReply`, `parseRange` | static files |
@@ -379,6 +409,11 @@ covers all three kinds.
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema types |
 | `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426 |
 | `ValidationIssue`, `ValidationTarget` | one issue of a 400, and where the refused value was read from |
+| `Refusal`, `ValidationRefusal`, `RequestPart` | what an `onRefusal` hook reads: the refusal by `kind` — `validation` today — the `part` that failed first, its `issues` |
+| `RefusalSchema`, `RefusalResponses` | what an `onRefusal` hook may declare: the schema of each 4xx it answers, and its `contentType` |
+| `RefusalHook`, `RefusalHandler` | an `onRefusal` hook, and the one in force for a route: `RouteDefinition['refusal']`, what `@alxia/openapi` documents |
+| `Refusing`, `FallsBack`, `DefaultRefusalOutcome`, `ThenShortcuts`, `BehindShortcuts` | how an app's type carries its `onRefusal` hook: the mark of its replies, of the default it falls back to, the default 400 a plugin's route keeps, and how a later scope's and a using app's hooks replace it. Exported so an app's type can be named in a declaration file |
+| `problem(details, init?)`, `ProblemDetails` | a reply whose body is an RFC 9457 problem — `type`, `title`, `status`, `detail`, `instance` and typed extension members — sent with its `status` as `application/problem+json` |
 | `RoutePath`, `JoinPath`, `PathParams`, `PathParamName` | paths: an absolute path, a prefix joined to a path, the parameters a path declares |
 | `StatusCode`, `InformationalStatus`, `SuccessStatus`, `RedirectStatus`, `ClientErrorStatus`, `ServerErrorStatus` | every status a route may declare, and each class of them |
 | `Method`, `Empty`, `MaybePromise`, `Simplify` | an HTTP method, no properties, a value or its promise, an object type with its intersections flattened |

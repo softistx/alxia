@@ -114,7 +114,13 @@ async function route(
 			socket.value.kind === 'ws'
 		) {
 			(ctx as { route: string | undefined }).route = socket.value.path;
-			return upgradeSocket(socket.value, ctx, socket.params, globals.parsers);
+			return upgradeSocket(
+				socket.value,
+				ctx,
+				socket.params,
+				globals.parsers,
+				runtime.validateResponses,
+			);
 		}
 	}
 	let match = find(request.method);
