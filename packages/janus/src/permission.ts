@@ -1,94 +1,22 @@
-import { alxia, type BaseContext } from '@alxia/core';
+import { type BaseContext, definePlugin } from '@alxia/core';
 import type {
 	CheckableOf,
-	CtxOf,
-	FieldsOf,
 	ModelConfig,
 	ObjectTypeOf,
 	Permissions,
 	SubjectRef,
 } from '@nxgt/janus/permissions';
-
-/**
- * An object of type `T` as the application loads it: its id, every field a
- * `fromField` of its type reads, and whatever else it carries.
- */
-export type ObjectData<C extends ModelConfig, T extends ObjectTypeOf<C>> = {
-	readonly id: string;
-} & { readonly [F in FieldsOf<C, T>]: string | null };
-
-export type Awaitable<V> = V | Promise<V>;
+import type {
+	Awaitable,
+	ObjectData,
+	OptionsArgs,
+	RequiresOf,
+} from './permission-options';
 
 /** The body of each refusal. */
 export interface PermissionRefusedBody {
 	readonly error: 'unauthenticated' | 'not_found' | 'forbidden';
 }
-
-/**
- * The options of `permission()`: `ctx` required exactly when a condition of
- * the permission is reachable, as for `can()`. `@nxgt/janus-hono`'s, over
- * alxia's context, kept twice on purpose.
- */
-export type PermissionOptions<
-	C extends ModelConfig,
-	T extends ObjectTypeOf<C>,
-	P extends string,
-	O,
-> = {
-	/** Who asks. The `user` `session()` derived when absent. `null` is anonymous. */
-	readonly subject?: (ctx: BaseContext) => Awaitable<SubjectRef<C> | null>;
-} & ([CtxOf<C, T, P>] extends [never]
-	? { readonly ctx?: never }
-	: {
-			/** The condition's context, read from the request and the loaded object. */
-			readonly ctx: (ctx: BaseContext, object: O) => Awaitable<CtxOf<C, T, P>>;
-		});
-
-export type OptionsArgs<
-	C extends ModelConfig,
-	T extends ObjectTypeOf<C>,
-	P extends string,
-	O,
-> = [ObjectTypeOf<C>] extends [T]
-	? IsSingle<ObjectTypeOf<C>> extends true
-		? PermissionArgs<C, T, P, O>
-		: [options?: LooseOptions]
-	: PermissionArgs<C, T, P, O>;
-
-type PermissionArgs<
-	C extends ModelConfig,
-	T extends ObjectTypeOf<C>,
-	P extends string,
-	O,
-> = [CheckableOf<C, T>] extends [P]
-	? IsSingle<CheckableOf<C, T>> extends true
-		? StrictArgs<C, T, P, O>
-		: [options?: LooseOptions]
-	: StrictArgs<C, T, P, O>;
-
-type StrictArgs<
-	C extends ModelConfig,
-	T extends ObjectTypeOf<C>,
-	P extends string,
-	O,
-> = [CtxOf<C, T, P>] extends [never]
-	? [options?: PermissionOptions<C, T, P, O>]
-	: [options: PermissionOptions<C, T, P, O>];
-
-type LooseOptions = {
-	readonly subject?: (ctx: BaseContext) => unknown;
-	readonly ctx?: (ctx: BaseContext, object: never) => unknown;
-};
-
-type UnionToIntersection<U> = (
-	U extends unknown
-		? (union: U) => void
-		: never
-) extends (intersection: infer I) => void
-	? I
-	: never;
-
-type IsSingle<U> = [U] extends [UnionToIntersection<U>] ? true : false;
 
 type LooseCan = (
 	subject: SubjectRef<ModelConfig> | null,
@@ -124,13 +52,18 @@ export function permission<
 	const T extends ObjectTypeOf<C>,
 	const P extends CheckableOf<C, T>,
 	O extends ObjectData<C, T>,
+	LoadCtx extends object = BaseContext,
+	SubjectCtx extends object = BaseContext,
+	CheckCtx extends object = BaseContext,
 >(
 	access: Pick<Permissions<C>, 'can'>,
 	permission: P,
 	type: T,
-	load: (ctx: BaseContext) => Awaitable<O | null>,
-	...options: OptionsArgs<C, T, P, O>
+	load: (ctx: BaseContext & LoadCtx) => Awaitable<O | null>,
+	...options: OptionsArgs<C, T, P, O, SubjectCtx, CheckCtx>
 ) {
+	// `use` has checked that the app gives what `load`, `subject` and `ctx` read.
+	const loadOf = load as (ctx: BaseContext) => Awaitable<O | null>;
 	const { subject, ctx: ctxOf } = (options[0] ?? {}) as {
 		readonly subject?: (
 			ctx: BaseContext,
@@ -142,20 +75,22 @@ export function permission<
 		const body: PermissionRefusedBody = { error };
 		return body;
 	};
-	return alxia().derive(async (ctx) => {
-		const who = subject === undefined ? userOf(ctx) : await subject(ctx);
-		if (who === null) return ctx.reply(401, refuse('unauthenticated'));
-		const object = await load(ctx);
-		if (object === null) return ctx.reply(404, refuse('not_found'));
-		const allowed = await can(
-			who,
-			permission,
-			view(object, type),
-			ctxOf === undefined ? undefined : { ctx: await ctxOf(ctx, object) },
-		);
-		if (!allowed) return ctx.reply(403, refuse('forbidden'));
-		return { object };
-	});
+	return definePlugin<RequiresOf<LoadCtx & SubjectCtx & CheckCtx>>()((app) =>
+		app.derive(async (ctx) => {
+			const who = subject === undefined ? userOf(ctx) : await subject(ctx);
+			if (who === null) return ctx.reply(401, refuse('unauthenticated'));
+			const object = await loadOf(ctx);
+			if (object === null) return ctx.reply(404, refuse('not_found'));
+			const allowed = await can(
+				who,
+				permission,
+				view(object, type),
+				ctxOf === undefined ? undefined : { ctx: await ctxOf(ctx, object) },
+			);
+			if (!allowed) return ctx.reply(403, refuse('forbidden'));
+			return { object };
+		}),
+	);
 }
 
 /**

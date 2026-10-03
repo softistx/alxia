@@ -63,6 +63,10 @@ await access.grant({ type: 'record', id: 'r1' }, 'owners', user); // user: what 
 | `options.subject` | `(ctx: BaseContext) => SubjectRef \| null \| Promise<…>` | who asks; default: the `user` `session()` derived |
 | `options.ctx` | `(ctx: BaseContext, object: O) => …` | the context a condition of the permission reads; **required exactly when the permission has one**, refused otherwise |
 
+Each callback reads the request's `BaseContext`, and, when its parameter is
+annotated, what an earlier plugin added: see
+[Reading the app's context](#reading-the-apps-context).
+
 It runs once per request, before the route:
 
 1. the subject — `null` is a 401, **before** anything is loaded;
@@ -201,7 +205,9 @@ request throws a `TypeError` and answers 500
 
 `subject` names another — an API key's service account, a user read from a
 header set by a gateway. It reads the `BaseContext`, so the request, the
-URL and the path parameters, not the route's validated headers. `null` is
+URL and the path parameters, not the route's validated headers — and, when
+its parameter is annotated, what an earlier plugin added
+([Reading the app's context](#reading-the-apps-context)). `null` is
 anonymous, a 401:
 
 ```ts
@@ -212,6 +218,62 @@ permission(access, 'view', 'record', byParam('id', findRecord), {
 	},
 });
 ```
+
+## Reading the app's context
+
+`load`, `subject` and `ctx` read `BaseContext` — the request, the URL, the
+path parameters. To read what an earlier plugin added — a tenant, a member,
+a feature flag — annotate the callback's parameter. `permission()` infers
+what each one reads from its annotation, while `access`, `permission`,
+`type` and the object stay inferred as before, and the guard is a
+[`definePlugin`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
+plugin: an app that does not give it before the guard cannot use it.
+
+```ts
+import { alxia, type BaseContext } from '@alxia/core';
+
+interface Tenant {
+	readonly records: ReadonlyMap<string, { readonly id: string; readonly title: string; readonly locked: boolean }>;
+}
+
+const edit = permission(
+	access,
+	'edit',
+	'record',
+	({ tenant, pathParams }: BaseContext & { tenant: Tenant }) => tenant.records.get(pathParams['id'] ?? '') ?? null,
+	{
+		subject: ({ member }: { member: { type: 'user'; id: string } | null }) => member,
+		ctx: (_ctx, object) => ({ locked: object.locked }),
+	},
+);
+// requires { tenant: Tenant; member: { type: 'user'; id: string } | null }
+
+const app = alxia()
+	.use(janusErrors())
+	.use(tenancy) // derives tenant and member
+	.group('/records/:id', (record) =>
+		record.use(edit).put('/', ({ object, reply }) => reply(200, { title: object.title })),
+	);
+
+alxia().use(edit);
+// error: the plugin reads "member", which this app's context does not give: use the plugin that adds it first
+```
+
+What the guard requires is the union of what the three annotations read.
+An annotation may be `BaseContext & { member: Member }` or `{ member: Member }`
+alone. An app whose `member` has a type that does not fit is refused too —
+`the plugin reads "member", which this app's context gives with another type`
+— while a narrower one passes, and so is a key `BaseContext` already has
+annotated with a type it does not give, `({ pathParams }: { pathParams: string })`.
+A callback left unannotated reads `BaseContext` only, and adds nothing to
+what the guard requires.
+
+The default subject — no `subject` option — reads the `user`
+[`session()`](sessions.md) derived at runtime, and is not part of what the
+guard requires: without `session()` before it, each guarded request throws
+([troubleshooting](../troubleshooting.md#typeerror-permission-no-user-in-the-context--use-sessionauth-before-it-or-pass--subject-)).
+To have the types check it, annotate a `subject` that reads it:
+`subject: ({ user }: { user: User | null }) => user`.
 
 ## Testing it
 
@@ -239,26 +301,30 @@ function permission<
 	const T extends ObjectTypeOf<C>,
 	const P extends CheckableOf<C, T>,
 	O extends ObjectData<C, T>,
+	LoadCtx extends object = BaseContext,
+	SubjectCtx extends object = BaseContext,
+	CheckCtx extends object = BaseContext,
 >(
 	access: Pick<Permissions<C>, 'can'>,
 	permission: P,
 	type: T,
-	load: (ctx: BaseContext) => Awaitable<O | null>,
-	...options: OptionsArgs<C, T, P, O>
+	load: (ctx: BaseContext & LoadCtx) => Awaitable<O | null>,
+	...options: OptionsArgs<C, T, P, O, SubjectCtx, CheckCtx>
 ): Alxia<
-	Empty & { object: O },
+	RequiresOf<LoadCtx & SubjectCtx & CheckCtx> & { object: O },
 	Empty,
 	'',
 	Reply<401, PermissionRefusedBody> | Reply<404, PermissionRefusedBody> | Reply<403, PermissionRefusedBody>
->;
+> &
+	Requiring<RequiresOf<LoadCtx & SubjectCtx & CheckCtx>>;
 
 function byParam<O>(name: string, find: (id: string) => Awaitable<O | null>): (ctx: BaseContext) => Awaitable<O | null>;
 
-type PermissionOptions<C, T, P, O> = {
-	readonly subject?: (ctx: BaseContext) => Awaitable<SubjectRef<C> | null>;
+type PermissionOptions<C, T, P, O, SubjectCtx = BaseContext, CheckCtx = BaseContext> = {
+	readonly subject?: (ctx: BaseContext & SubjectCtx) => Awaitable<SubjectRef<C> | null>;
 } & ([CtxOf<C, T, P>] extends [never]
 	? { readonly ctx?: never }
-	: { readonly ctx: (ctx: BaseContext, object: O) => Awaitable<CtxOf<C, T, P>> });
+	: { readonly ctx: (ctx: BaseContext & CheckCtx, object: O) => Awaitable<CtxOf<C, T, P>> });
 
 type ObjectData<C extends ModelConfig, T extends ObjectTypeOf<C>> = {
 	readonly id: string;
@@ -271,11 +337,19 @@ interface PermissionRefusedBody {
 type Awaitable<V> = V | Promise<V>;
 ```
 
-`OptionsArgs<C, T, P, O>` is the rest of the arguments, exported for a
-wrapper that forwards them: `[options?: PermissionOptions<C, T, P, O>]`, or
-`[options: PermissionOptions<C, T, P, O>]` when the permission has a
-condition — and a looser `[options?]` when `type` or `permission` is typed
-as the union of several, not one literal.
+`LoadCtx`, `SubjectCtx` and `CheckCtx` are inferred from the types `load`,
+`subject` and `ctx`'s parameters are annotated with, `BaseContext` when they
+are not. `RequiresOf<X>` is what `X` adds to `BaseContext` — `{ tenant: Tenant }`
+for `BaseContext & { tenant: Tenant }` — and `Empty` when it adds nothing;
+see [Reading the app's context](#reading-the-apps-context).
+
+`OptionsArgs<C, T, P, O, SubjectCtx, CheckCtx>` is the rest of the
+arguments, exported for a wrapper that forwards them:
+`[options?: PermissionOptions<…>]`, or `[options: PermissionOptions<…>]`
+when the permission has a condition — and a looser `[options?]` when `type`
+or `permission` is typed as the union of several, not one literal. Its last
+two parameters default to `BaseContext`, so `OptionsArgs<C, T, P, O>` is
+the unannotated one.
 
 `ModelConfig`, `ObjectTypeOf`, `CheckableOf`, `CtxOf`, `FieldsOf`,
 `SubjectRef` and `Permissions` are `@nxgt/janus/permissions`'s; its

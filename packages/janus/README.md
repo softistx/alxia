@@ -142,6 +142,27 @@ const app = alxia()
 condition needs a context takes `ctx: (ctx, object) => …`, required by the
 types exactly then.
 
+### Reading the app's context
+
+Annotate `load`, `subject` or `ctx`'s parameter to read what an earlier
+plugin added. The guard then requires it: an app that does not give it
+before the guard cannot use it.
+
+```ts
+import type { BaseContext } from '@alxia/core';
+
+const byTenant = permission(
+	access,
+	'view',
+	'record',
+	({ tenant, pathParams }: BaseContext & { tenant: { records: Map<string, { id: string; title: string }> } }) =>
+		tenant.records.get(pathParams['id'] ?? '') ?? null,
+);
+
+alxia().use(tenancy).use(session(accounts)).use(byTenant); // tenancy derives tenant
+alxia().use(session(accounts)).use(byTenant); // a compile error: this app gives no `tenant`
+```
+
 ## API
 
 | export | |
@@ -155,13 +176,13 @@ types exactly then.
 | `janusErrors(options?)` | the plugin: janus's refusals answered |
 | `JanusErrorsOptions` | its options: `report`, called with every error answered 5xx |
 | `permission(…)`, `byParam(…)` | the guard |
-| `PermissionOptions`, `OptionsArgs` | its options: `subject`, `ctx`; and the rest of its arguments, the options required exactly when the permission has a condition |
+| `PermissionOptions`, `OptionsArgs` | its options: `subject`, `ctx`; and the rest of its arguments, the options required exactly when the permission has a condition; both take what `subject` and `ctx` read beyond `BaseContext` as their last two, defaulted, parameters |
 | `bodyOf`, `statusOf` | a refusal's body and status |
 | `UnauthenticatedBody`, `JanusErrorBody`, `PermissionRefusedBody` | their types |
 | `Auth`, `UserOfAuth`, `ObjectData`, `Awaitable` | the part of `janus()` this package calls, the users it knows, an object as the application loads it, a value or its promise |
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/janus/docs): a page per area — sessions, signing in and out with `ctx.auth` and the device cookie, janus's errors and their statuses, and the permission guard.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/janus/docs): a page per area — sessions, signing in and out with `ctx.auth` and the device cookie, janus's errors and their statuses, and the permission guard, reading what an earlier plugin added included.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/janus/docs/troubleshooting.md): an error message, or a request anonymous, refused or a 404 when it should not be, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/janus/docs/roadmap.md): what is coming, and what is not planned.
