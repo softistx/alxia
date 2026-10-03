@@ -142,7 +142,9 @@ onError<Result extends AnyReply | undefined | void>(
 Turns an error thrown by a route declared after it — its hooks or its
 handler — into a reply. Returning nothing lets the next `onError` try. Past
 the last one, an `HttpError` is answered as it says and anything else is a
-logged `500 { "error": "internal" }` ([Replies](replies.md#errors)).
+logged `500 { "error": "internal" }` ([Replies](replies.md#errors)). It
+never sees the client hanging up mid-request, which is answered a `499`
+with no hook.
 
 ```ts
 class NotFoundError extends Error {}

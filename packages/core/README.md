@@ -355,7 +355,8 @@ response, which the hook returns — or a reply of its own, typed like a
 Hooks run before validation: `pathParams` holds the path's parameters as
 they arrived. `onError` turns a thrown
 error into a reply the same way; an `HttpError` is answered as it says, and
-anything else is a 500 that leaks nothing. `onRefusal` answers a request
+anything else is a 500 that leaks nothing, but for a client that hung up
+mid-request, a 499 nobody reads. `onRefusal` answers a request
 the route's schemas refuse, or whose body passes its `bodyLimit`
 ([Requests](#requests)); the last one declared
 before a route is the one it uses.

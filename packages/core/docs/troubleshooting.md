@@ -995,6 +995,14 @@ The next section lists the messages it prints. An error thrown in a route
 first goes through that route's `onError` hooks. An `HttpError` is answered
 with its own status and body.
 
+A request that fails because its client hung up (its `request.signal`
+aborted, and the error is the `AbortError` a body read then throws) is
+not an error of the app: nothing is printed, no `onError` hook runs, and
+an `onResponse` hook, a logger's, sees a `499` with no body. Any other
+error is printed and answered 500, a bug thrown after the client left
+included. A handler that ignores the abort and replies gets its own
+status.
+
 **Fix:** read the server log for the real error. To answer a known failure
 with a status of your own, return a declared reply, or turn the error into
 one with `onError`:
@@ -1062,7 +1070,8 @@ app
 ## Server log
 
 Each of these is printed by `console.error`, and the request is answered
-`500 {"error":"internal"}`.
+`500 {"error":"internal"}`. A client that hung up mid-request prints
+nothing: see [`500 {"error":"internal"}`](#500-errorinternal).
 
 ### `ResponseValidationError: … the 200 reply does not match its schema`
 

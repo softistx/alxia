@@ -21,7 +21,7 @@ import { check } from '../schema/standard-schema';
 import { routeContext } from './context';
 import type { RouteDefinition, SocketDefinition } from './definition';
 import { refuse } from './refusal';
-import { internalError, send, sendDeclared } from './send';
+import { clientGone, failed, internalError, send, sendDeclared } from './send';
 import type { BaseContext, RequestContext, ResponseSettings } from './types';
 
 /**
@@ -186,6 +186,8 @@ export async function fail(
 	ctx: BaseContext,
 	validateResponses = true,
 ): Promise<Response> {
+	// The client left: no hook answers a request nobody reads.
+	if (clientGone(error, ctx.request)) return failed(error, ctx.request);
 	if (error instanceof ContentTooLargeError) {
 		try {
 			return await refuse(
@@ -209,6 +211,5 @@ export async function fail(
 	if (error instanceof HttpError) {
 		return send(new Reply(error.status, error.body), ctx.set);
 	}
-	console.error(error);
-	return internalError();
+	return failed(error, ctx.request);
 }

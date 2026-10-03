@@ -102,8 +102,9 @@ one per order. So `spanName` only names what routing did not match. A
 
 | The response | The span's status | Its exception |
 | --- | --- | --- |
-| `2xx`, `3xx`, `4xx` | `ok` | none |
+| `2xx`, `3xx`, `4xx` replied | `ok` | none |
 | a `4xx` an `onError` hook made of a thrown error | `ok` | the error |
+| `499`, the client hung up mid-request | `ok` | the `AbortError` |
 | a `5xx` from a throw | `error` | the error |
 | a `5xx` the route replied | `error` | none |
 
