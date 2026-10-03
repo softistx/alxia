@@ -11,6 +11,7 @@ is a package you add, or don't.
 | [`@alxia/zod`](packages/zod) | Zod 4: coercions a client can type (`zq.int()`, `zq.array()`…), and the OpenAPI converter |
 | [`@alxia/graphql`](packages/graphql) | GraphQL with Yoga and its plugins: behind the app's hooks, resolvers reading its typed context, subscriptions over SSE, GraphiQL or Apollo Sandbox |
 | [`@alxia/openapi`](packages/openapi) | the OpenAPI 3.2 document of an app, from its schemas, and a reference page |
+| [`@alxia/openapi-routes`](packages/openapi-routes) | the other direction: a test that every operation of an OpenAPI document has its route, and no other |
 | [`@alxia/cors`](packages/cors) | CORS: preflights before routing, headers on every response |
 | [`@alxia/secure-headers`](packages/secure-headers) | HSTS, CSP, nosniff and the rest |
 | [`@alxia/rate-limit`](packages/rate-limit) | a rate limit whose 429 is in the client's types; pluggable stores |

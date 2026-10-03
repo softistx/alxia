@@ -11,6 +11,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/core` | the framework: routes, hooks, groups, plugins, cookies, SSE, WebSockets | — |
 | `@alxia/client` | the client of an app, typed from `typeof app` alone | core |
 | `@alxia/openapi` | the OpenAPI 3.2 document of an app, from its route schemas | core |
+| `@alxia/openapi-routes` | `implemented` and `exactly`: every operation of an OpenAPI document has a route, read from `app.routes` | core |
 | `@alxia/zod` | Zod coercions (`zq`) and the OpenAPI converter | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's hooks and typed context, Yoga's plugins | core, graphql-yoga, graphql |
 | `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | function plugins: global hooks | core |
@@ -67,7 +68,7 @@ A check added there is a check to port here.
 ## Layering
 
 ```
-core ◄── client, openapi, graphql, cors, secure-headers, compress, rate-limit, jwt, logger,
+core ◄── client, openapi, openapi-routes, graphql, cors, secure-headers, compress, rate-limit, jwt, logger,
          telemetry, janus, context-storage, cache, language
          i18n ◄── language
          redis ◄── rate-limit, cache (optional peers: the stores' contracts)
@@ -100,6 +101,7 @@ below records what is kept twice.
 | --- | --- |
 | The HTTP attribute names, in `telemetry/src/attributes.ts` and `@nxgt/telemetry-hono`'s | importing them would depend on Hono; a server span from either must read the same in a dashboard. Change both together |
 | The Apollo Sandbox page, in `graphql/src/sandbox.ts` and `@nxgt/shared-graphql`'s `renderSandbox` | that one is Hono's `html`; both start the Sandbox at the URL the page was asked at (nxgt-core#171). alxia's passes the path, and the page resolves it against its own address, so a TLS proxy in front of the server changes nothing; that one still passes the server's URL. Importing it would depend on Hono. Change both together |
+| The prefix join and a path's shape, in `openapi-routes/src/routes.ts` (`join`, `keyOf`), `Alxia#join` and `compilePath`'s `shape` in `core/src/`, and `join` in `openapi/src/plugin.ts` | three lines each, of behaviour the core does not export; `openapi-routes` must match a route as the core registers and routes it. Change them together, or export them from the core |
 | `bodyOf`, the permission guard's option types, the device cookie, in `janus/src/` and `@nxgt/janus-hono` | the same refusals and cookies whichever server answers; importing them would depend on Hono. Change both together |
 
 ## The build
