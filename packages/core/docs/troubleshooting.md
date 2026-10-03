@@ -6,7 +6,7 @@ thrown when the app is built, a response body, or a line in the server log.
 **Types**
 
 - [`the params schema must accept the parameters of "…", which arrive as strings`](#the-params-schema-must-accept-the-parameters-of--which-arrive-as-strings)
-- [`the params schema reads keys "…" does not declare`](#the-params-schema-reads-keys--does-not-declare)
+- [`the params schema reads "…", which "…" does not declare`](#the-params-schema-reads--which--does-not-declare)
 - [`'quey' does not exist in type 'RouteSchema'`](#quey-does-not-exist-in-type-routeschema)
 - [`'299' does not exist in type 'ResponseSchemas'`](#299-does-not-exist-in-type-responseschemas)
 - [`Argument of type '201' is not assignable to parameter of type '200'`](#argument-of-type-201-is-not-assignable-to-parameter-of-type-200)
@@ -40,7 +40,7 @@ thrown when the app is built, a response body, or a line in the server log.
 **Server log**
 
 - [`ResponseValidationError: … the 200 reply does not match its schema`](#responsevalidationerror--the-200-reply-does-not-match-its-schema)
-- [`ResponseValidationError: … the route declares no 201 reply`](#responsevalidationerror--the-route-declares-no-201-reply)
+- [`ResponseValidationError: … declares no 201 reply`](#responsevalidationerror--declares-no-201-reply)
 - [`TypeError: … the handler returned no reply. Return ctx.reply(status, body).`](#typeerror--the-handler-returned-no-reply-return-ctxreplystatus-body)
 - [`TypeError: An event does not match its schema`](#typeerror-an-event-does-not-match-its-schema)
 
@@ -79,17 +79,19 @@ app.get('/users/:id', { params: z.object({ id: zq.int() }) }, ({ params, reply }
 );
 ```
 
-### `the params schema reads keys "…" does not declare`
+### `the params schema reads "…", which "…" does not declare`
 
 **When:** a route's `params` schema has an optional key the path does not
 declare.
 
 ```text
-error TS2322: Type 'ZodObject<{ id: ZodString; org: ZodOptional<ZodString>; }, $strip>' is not assignable to type 'ZodObject<{ id: ZodString; org: ZodOptional<ZodString>; }, $strip> & "the params schema reads keys \"/users/:id\" does not declare"'.
+error TS2322: Type 'ZodObject<{ id: ZodString; org: ZodOptional<ZodString>; }, $strip>' is not assignable to type 'ZodObject<{ id: ZodString; org: ZodOptional<ZodString>; }, $strip> & "the params schema reads \"org\", which \"/users/:id\" does not declare"'.
 ```
 
 **Why:** `org` is not a parameter of `/users/:id`, so it would always be
-`undefined`. A misspelt parameter name lands here too.
+`undefined`. A misspelt parameter name lands here too. The message names
+each key the path does not declare; with several, TypeScript lists one
+message per key.
 
 **Fix:** name the keys the path declares, or add the parameter to the path:
 
@@ -542,10 +544,10 @@ enforced:
 const app = alxia({ validateResponses: false });
 ```
 
-### `ResponseValidationError: … the route declares no 201 reply`
+### `ResponseValidationError: … declares no 201 reply`
 
 ```text
-ResponseValidationError: GET /u: the 201 reply does not match its schema: (root): the route declares no 201 reply
+ResponseValidationError: GET /u declares no 201 reply
 ```
 
 **When:** a route with `response` schemas replies with a status it did not

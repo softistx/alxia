@@ -1165,18 +1165,10 @@ export class Alxia<
 		}
 		const schema = responses[reply.status as keyof typeof responses];
 		if (schema === undefined) {
-			throw new ResponseValidationError(
+			throw ResponseValidationError.undeclared(
 				route.method,
 				route.path,
 				reply.status,
-				[
-					{
-						target: 'body',
-						path: [],
-						code: 'undeclared_status',
-						message: `the route declares no ${reply.status} reply`,
-					},
-				],
 			);
 		}
 		if (!this.#validateResponses) return send(reply, set, signal);

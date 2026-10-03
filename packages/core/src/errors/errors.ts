@@ -66,13 +66,40 @@ export class ResponseValidationError extends Error {
 		path: string,
 		status: number,
 		issues: readonly ValidationIssue[],
+		/** Set by `undeclared`, for a status the route has no schema for. */
+		message?: string,
 	) {
 		super(
-			`${method} ${path}: the ${status} reply does not match its schema: ${issues
-				.map((issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`)
-				.join('; ')}`,
+			message ??
+				`${method} ${path}: the ${status} reply does not match its schema: ${issues
+					.map(
+						(issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`,
+					)
+					.join('; ')}`,
 		);
 		this.status = status;
 		this.issues = issues;
+	}
+
+	/** A reply whose status the route declares no schema for. */
+	static undeclared(
+		method: string,
+		path: string,
+		status: number,
+	): ResponseValidationError {
+		return new ResponseValidationError(
+			method,
+			path,
+			status,
+			[
+				{
+					target: 'body',
+					path: [],
+					code: 'undeclared_status',
+					message: `the route declares no ${status} reply`,
+				},
+			],
+			`${method} ${path} declares no ${status} reply`,
+		);
 	}
 }

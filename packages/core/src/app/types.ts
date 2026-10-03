@@ -247,6 +247,13 @@ type UnknownKeys<Schema> = [Exclude<keyof Schema, keyof RouteSchema>] extends [
 			>]: `"${Key & string}" is not a part of a route: params, query, headers, cookies, body, response or detail`;
 		};
 
+/** One message per key the path does not declare, or one for them all when no key can be named. */
+type UndeclaredParams<Keys, Path extends string> = [
+	Keys & (string | number),
+] extends [never]
+	? `the params schema reads keys "${Path}" does not declare`
+	: `the params schema reads "${Keys & (string | number)}", which "${Path}" does not declare`;
+
 type ParamsMatchPath<Path extends string, Schema> = Schema extends {
 	readonly params: infer Params extends StandardSchemaV1;
 }
@@ -254,7 +261,10 @@ type ParamsMatchPath<Path extends string, Schema> = Schema extends {
 		? keyof InferInput<Params> extends PathParamName<Path>
 			? unknown
 			: {
-					readonly params: `the params schema reads keys "${Path}" does not declare`;
+					readonly params: UndeclaredParams<
+						Exclude<keyof InferInput<Params>, PathParamName<Path>>,
+						Path
+					>;
 				}
 		: {
 				readonly params: `the params schema must accept the parameters of "${Path}", which arrive as strings`;

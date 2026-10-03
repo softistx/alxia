@@ -73,8 +73,12 @@ GET /users/:id: the 200 reply does not match its schema: name: …
 ```
 
 The client never reads a shape the route did not declare. A status the
-route did not declare is refused the same way, with the issue code
-`undeclared_status`.
+route did not declare is a 500 too, and the server logs the route and the
+status, with the issue code `undeclared_status` in `issues`:
+
+```
+ResponseValidationError: GET /users/:id declares no 201 reply
+```
 
 When the body may be `undefined` — `z.undefined()`, `.optional()` — it may
 be left out: `reply(204)`.
