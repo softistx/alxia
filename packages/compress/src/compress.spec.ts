@@ -46,6 +46,25 @@ describe('compress', () => {
 		).toBeNull();
 	});
 
+	test('a file is measured too: a small one is left alone, a compressed one offers no ranges', async () => {
+		const files = alxia()
+			.use(compress())
+			.file('/small.txt', new Blob(['tiny'], { type: 'text/plain' }))
+			.file('/big.txt', new Blob([big], { type: 'text/plain' }));
+		const small = await files.request('/small.txt', {
+			headers: { 'accept-encoding': 'br' },
+		});
+		expect(small.headers.get('content-encoding')).toBeNull();
+		expect(small.headers.get('content-length')).toBe('4');
+		const large = await files.request('/big.txt', {
+			headers: { 'accept-encoding': 'br' },
+		});
+		expect(large.headers.get('content-encoding')).toBe('br');
+		expect(large.headers.get('accept-ranges')).toBeNull();
+		const bytes = new Uint8Array(await large.arrayBuffer());
+		expect(brotliDecompressSync(bytes).toString()).toBe(big);
+	});
+
 	test('negotiate', () => {
 		expect(negotiate('gzip, deflate, br, zstd', ['zstd', 'br', 'gzip'])).toBe(
 			'zstd',

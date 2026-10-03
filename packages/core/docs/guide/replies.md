@@ -159,7 +159,8 @@ its schema.
 | --- | --- | --- |
 | `undefined`, or a status `101`, `204`, `205`, `304` | no body | — |
 | a `string` | text | `content-type: text/plain;charset=utf-8` unless set, `content-length` |
-| a `Blob` (a `Bun.file`), `ReadableStream`, `ArrayBuffer`, typed array, `FormData`, `URLSearchParams` | as it is | what `Response` sets |
+| a `Blob` (a `Bun.file`), `ArrayBuffer`, typed array | as it is | `content-length` unless set, so an `onResponse` hook can read the size; the type `Response` sets |
+| a `ReadableStream`, `FormData`, `URLSearchParams` | as it is | what `Response` sets: no `content-length` while the hooks run |
 | an async iterable | [server-sent events](server-sent-events.md) | `content-type: text/event-stream`, `cache-control: no-cache`, `x-accel-buffering: no` |
 | anything else | JSON | `content-type: application/json` unless set, `content-length` |
 

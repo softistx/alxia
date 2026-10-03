@@ -19,10 +19,14 @@ app.use(compress({ encodings: ['br', 'gzip'], threshold: 2048 }));
 ```
 
 Compressed: text, JSON, JavaScript, XML and SVG of at least `threshold`
-bytes (1 KiB). Never: an event stream (it would wait for a block to fill),
-a `HEAD`, a 204, 206 or 304, a response already encoded, or one marked
-`Cache-Control: no-transform`. `Vary: Accept-Encoding` is set, and a strong
-ETag becomes weak.
+bytes (1 KiB), files included; a `ReadableStream` has no length, and is
+compressed whatever its size. Never: an event stream (it would wait for a
+block to fill), a `HEAD`, a 204, 206 or 304, a response already encoded, or
+one marked `Cache-Control: no-transform`. `Vary: Accept-Encoding` is set, a
+strong ETag becomes weak, and `Accept-Ranges` is dropped from a compressed
+response. Brotli runs at quality 4, near gzip's speed; for the smallest
+static assets, serve copies compressed at build time with `static`'s
+`precompressed` option.
 
 ## Options
 

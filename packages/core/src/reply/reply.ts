@@ -158,7 +158,18 @@ export function toResponse(
 		headers.set('content-length', String(Buffer.byteLength(body)));
 		return new Response(body, { status, headers });
 	}
-	if (BINARY(body)) return new Response(body, { status, headers });
+	if (BINARY(body)) {
+		// Known up front, so `onResponse` (compress's threshold) can read it.
+		const length =
+			body instanceof Blob
+				? body.size
+				: body instanceof ArrayBuffer || ArrayBuffer.isView(body)
+					? body.byteLength
+					: undefined;
+		if (length !== undefined && !headers.has('content-length'))
+			headers.set('content-length', String(length));
+		return new Response(body, { status, headers });
+	}
 	if (isAsyncIterable(body)) {
 		headers.set('content-type', 'text/event-stream');
 		headers.set('cache-control', 'no-cache');

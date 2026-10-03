@@ -66,23 +66,30 @@ app.use(compress({ encodings: ['br', 'gzip'] }));
 | `identity`, or no header | any | nothing |
 
 `zstd` and `gzip` and `deflate` go through the runtime's
-`CompressionStream`; `br` through `node:zlib`'s `createBrotliCompress`,
-at its default settings — quality 11, its highest. None of the codecs'
-levels is an option. An empty list never compresses.
+`CompressionStream`; `br` through `node:zlib`'s `createBrotliCompress`
+at quality 4, not zlib's default of 11. Quality 11 is meant for
+compressing once, ahead of time: paid on every request, it costs many
+times gzip's CPU for a few percent, while 4 is still smaller than gzip at
+about its speed. None of the codecs' levels is an option. For the smallest
+static assets, let the build write `.br` and `.gz` copies at the highest
+level and serve them with `static`'s
+[`precompressed`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/static-files.md#options)
+option; the plugin leaves them alone. An empty list never compresses.
 
 ### `threshold`
 
 Read from the response's `Content-Length`. A JSON or string reply has one
-when the hook runs; a stream does not, nor does a file — `reply(200,
-Bun.file(…))`, or what `static` and `file` serve — and **a body with no
-`Content-Length` is compressed whatever its size**:
+when the hook runs, and so does a binary one — a `Blob`, a `Bun.file(…)`,
+what `static` and `file` serve, an `ArrayBuffer` or a typed array. A
+`ReadableStream` does not: its size is unknown until it ends, and **a body
+with no `Content-Length` is compressed whatever its size**:
 
 ```ts
 app.use(compress({ threshold: 2048 }));
 // reply(200, 'x'.repeat(1500))          → sent as it is: 1500 < 2048
 // reply(200, { text: 'alxia '.repeat(1000) }) → compressed: 6011 bytes
+// static('/s', '.') for a 117-byte file → sent as it is: 117 < 2048
 // reply(200, readableStreamOfTwoBytes)  → compressed: no Content-Length
-// static('/s', '.') for a 117-byte file → compressed: no Content-Length
 ```
 
 `threshold: 0` compresses every compressible body.
@@ -139,6 +146,7 @@ On a compressed response:
 | --- | --- |
 | `Content-Encoding` | set to the encoding chosen |
 | `Content-Length` | removed: the body is streamed, its final size unknown |
+| `Accept-Ranges` | removed: a range of the encoded body is not a range of the file |
 | `ETag` | a strong one (`"v1"`) becomes weak (`W/"v1"`); a weak one is kept |
 | `Vary` | `Accept-Encoding` added |
 
@@ -219,10 +227,10 @@ app.listen(3000);
 ```
 
 A file `static` serves without a precompressed copy — `index.html`, an SVG
-— is compressed on the fly, whatever its size (see
-[`threshold`](#threshold)); one with a copy
-keeps its `Content-Encoding` and is left alone; a range request answered
-206 is left alone too.
+— is compressed on the fly when it is at least
+[`threshold`](#threshold) bytes, and sent without `Accept-Ranges`; one
+with a copy keeps its `Content-Encoding` and is left alone; a range
+request answered 206 is never compressed.
 
 ## Testing it
 

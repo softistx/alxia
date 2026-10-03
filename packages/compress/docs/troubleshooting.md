@@ -19,6 +19,7 @@ header you read in the response.
 - [Server-sent events arrive late and in bursts](#server-sent-events-arrive-late-and-in-bursts)
 - [`ETag: W/"…"` where the handler set `"…"`](#etag-w-where-the-handler-set-)
 - [No `Content-Length` on a compressed response](#no-content-length-on-a-compressed-response)
+- [No `Accept-Ranges: bytes` on a compressed file](#no-accept-ranges-bytes-on-a-compressed-file)
 - [`Vary: Accept-Encoding` on a response that is not compressed](#vary-accept-encoding-on-a-response-that-is-not-compressed)
 
 ## Types
@@ -97,7 +98,7 @@ app.use(compress());
 | the request is a `HEAD`, or the status is 204, 206 or 304 | a range request answers 206 |
 | the response already has a `Content-Encoding` | a precompressed file from `static(…, { precompressed })` |
 | its `Cache-Control` holds `no-transform` | |
-| its `Content-Length` is under `threshold` (1024 by default) | a short JSON error, a small string |
+| its `Content-Length` is under `threshold` (1024 by default) | a short JSON error, a small string, a small file from `static` or `file` |
 | `compress()` is not on this app | it was `use`d on another app, or not at all |
 
 **Fix:** ask for an encoding to check the plugin works:
@@ -118,22 +119,18 @@ app.use(compress({ threshold: 256 }));
 
 ### `Content-Encoding: gzip` on a tiny body, larger than the original
 
-**When:** a body of a few bytes comes back compressed — a short stream, or
-a small file served by `static`, `file` or `reply(200, Bun.file(…))` —
-and its compressed size is larger than the original (a 2-byte stream
-becomes 22 bytes of gzip).
+**When:** a `ReadableStream` of a few bytes comes back compressed, and
+its compressed size is larger than the original (a 2-byte stream becomes
+22 bytes of gzip).
 
-**Why:** `threshold` is read from `Content-Length`. A stream and a file
-have none when the hook runs, so their size is unknown and they are
-compressed whatever it is.
+**Why:** `threshold` is read from `Content-Length`. A stream has none when
+the hook runs, so its size is unknown and it is compressed whatever it is.
+A string, JSON or binary body — a file included — has one, and is measured.
 
-**Fix:** for a static directory whose files are small, store compressed
-copies and serve them, which the plugin leaves alone; for a stream that is
-always small, mark it:
+**Fix:** for a stream that is always small, mark it, or send it as a
+string or a `Blob` instead:
 
 ```ts
-app.static('/assets', './public', { precompressed: ['br', 'gzip'] });
-
 app.get('/ping', ({ reply }) => reply(200, smallStream, { headers: { 'content-type': 'text/plain', 'cache-control': 'no-transform' } }));
 ```
 
@@ -209,6 +206,28 @@ response, keep it out of compression:
 
 ```ts
 reply(200, body, { headers: { 'cache-control': 'no-transform' } });
+```
+
+### No `Accept-Ranges: bytes` on a compressed file
+
+**When:** a file served by `static` or `file` carries `Accept-Ranges:
+bytes` when fetched without `Accept-Encoding`, and none when it comes back
+compressed.
+
+**Why:** a byte range of the encoded body is not a range of the file, so
+the plugin removes the header rather than advertise ranges of a body that
+is not the one sent. A request that carries `Range` is answered 206 with
+the slice, uncompressed: the plugin never compresses a 206.
+
+**Fix:** nothing to fix: a client that seeks sends `Range` and gets the
+slice. To keep `Accept-Ranges` on every response for a file type, keep it
+out of compression:
+
+```ts
+// The default test, as the guide's `compressible` section spells it.
+const defaults = /^(text\/(?!event-stream)|application\/(.+\+)?(json|javascript|xml)|image\/svg\+xml)/i;
+
+app.use(compress({ compressible: (type) => defaults.test(type) && !type.startsWith('text/csv') }));
 ```
 
 ### `Vary: Accept-Encoding` on a response that is not compressed

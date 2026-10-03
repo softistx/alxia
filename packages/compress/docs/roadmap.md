@@ -33,11 +33,13 @@ Nothing scheduled yet.
   `Accept-Encoding` and the server's order of preference, with the app's
   routes and the client's types unchanged.
 - **Only what pays.** Text, JSON, JavaScript, XML and SVG of at least 1 KiB
-  by default, with the encodings, the threshold and the types compressed as
-  options. An event stream, a `HEAD`, a 204, 206 or 304, a response already
-  encoded — a precompressed static file — or one marked
-  `Cache-Control: no-transform` is sent as it is.
+  by default — files included — with the encodings, the threshold and the
+  types compressed as options. An event stream, a `HEAD`, a 204, 206 or 304,
+  a response already encoded — a precompressed static file — or one marked
+  `Cache-Control: no-transform` is sent as it is. Brotli runs at quality 4,
+  near gzip's speed, rather than the ahead-of-time default of 11.
 - **Cache-safe headers.** `Vary: Accept-Encoding` on every compressible
-  response, a strong `ETag` made weak, and no stale `Content-Length`.
+  response, a strong `ETag` made weak, and no stale `Content-Length` or
+  `Accept-Ranges`.
 - **`negotiate`.** The same choice of encoding, exported for a handler or a
   plugin that encodes on its own.
