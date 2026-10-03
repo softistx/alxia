@@ -218,11 +218,11 @@ onRefusal<Responses extends RefusalResponses, Result extends DeclaredReply<Respo
 	hook: (refusal: Refusal, ctx: Omit<BaseContext, 'reply'> & Ctx & { reply: TypedReplyFunction<Responses> }) => MaybePromise<Result>,
 ): Alxia<…>
 onRefusal<Kind extends RefusalKind, Result extends Reply<ClientErrorStatus, any> | undefined | void>(
-	kind: Kind,
+	kind: Kind & OneKind<Kind>, // one literal kind
 	hook: (refusal: RefusalOfKind<Kind>, ctx: BaseContext & Ctx) => MaybePromise<Result>,
 ): Alxia<…>
 onRefusal<Kind extends RefusalKind, Responses extends RefusalResponses, Result extends DeclaredReply<Responses> | undefined | void>(
-	kind: Kind,
+	kind: Kind & OneKind<Kind>,
 	schema: { response: Responses; contentType?: string },
 	hook: (refusal: RefusalOfKind<Kind>, ctx: Omit<BaseContext, 'reply'> & Ctx & { reply: TypedReplyFunction<Responses> }) => MaybePromise<Result>,
 ): Alxia<…>

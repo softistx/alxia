@@ -24,6 +24,7 @@ a trap that prints nothing is headed by its symptom.
 - [`'500' does not exist in type 'RefusalResponses'`](#500-does-not-exist-in-type-refusalresponses)
 - [`The inferred type of '…' cannot be named without a reference to '…' from '…/@alxia/core/dist/…'`](#the-inferred-type-of--cannot-be-named-without-a-reference-to--from-alxiacoredist)
 - [`Property 'part' does not exist on type 'Refusal'`](#property-part-does-not-exist-on-type-refusal)
+- [`Argument of type '"validation" | "body_limit"' is not assignable to parameter of type 'never'`](#argument-of-type-validation--body_limit-is-not-assignable-to-parameter-of-type-never)
 
 **Building the app**
 
@@ -454,6 +455,31 @@ succeeded.
 
 ```ts
 app.onRefusal((refusal) => problem({ status: 422, detail: `the request is refused: ${refusal.kind}` }));
+```
+
+### `Argument of type '"validation" | "body_limit"' is not assignable to parameter of type 'never'`
+
+**When:** `onRefusal` is given a kind typed as a union, `RefusalKind`, or
+as a generic parameter, as a plugin's helper may:
+
+```text
+error TS2769: No overload matches this call.
+  …
+    Argument of type '"validation" | "body_limit"' is not assignable to parameter of type 'never'.
+```
+
+For a generic `K extends RefusalKind`, the line reads
+`Argument of type 'K' is not assignable to parameter of type 'K & OneKind<K>'`.
+
+**Why:** the hook is registered for the one string it is given, so the
+types could not say which kind's replies it answers.
+
+**Fix:** write the kind out, or one call per kind:
+
+```ts
+app
+	.onRefusal('validation', (refusal) => problem({ status: 422, detail: refusal.part }))
+	.onRefusal('body_limit', (refusal) => problem({ status: 413, limit: refusal.limit }));
 ```
 
 ### `Property 'part' does not exist on type 'Refusal'`
