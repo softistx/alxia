@@ -36,8 +36,13 @@ app.post(
 
 ## Proposal
 
+Revised with the owner's answer on 2026-10-02: **no step for the response**,
+since validation is only for the request. One validation step can take
+`params`, `query`, `headers`, `cookies` and `body` (a form included) at once,
+each optional, and what it validates is typed in every step after it.
+
 ```ts
-import { alxia, describe, responds, step, validate } from '@alxia/core';
+import { alxia, step, validate } from '@alxia/core';
 
 const auth = step(async ({ request }) => ({ user: await userOf(request) }));
 const admin = step<{ user: User }>()(({ user, reply }) =>
@@ -45,13 +50,11 @@ const admin = step<{ user: User }>()(({ user, reply }) =>
 );
 
 app.post(
-	'/users',
+	'/users/:org',
 	auth,
 	admin,
-	validate.body(NewUser),
-	responds({ 201: User, 403: Forbidden, 409: Taken }),
-	describe({ summary: 'Create a user', tags: ['users'] }),
-	({ body, user, reply }) => reply.created(insert(body, user)),
+	validate({ params: OrgParams, body: NewUser }),
+	({ params, body, user, reply }) => reply.created(insert(params.org, body, user)),
 );
 
 app.get('/health', ({ reply }) => reply.ok('up'));        // no step, no schema
@@ -61,25 +64,50 @@ app.get('/health', ({ reply }) => reply.ok('up'));        // no step, no schema
 
 | Step | Adds to the context | Adds to the contract |
 | --- | --- | --- |
-| `validate.params(s)`, `.query(s)`, `.headers(s)`, `.cookies(s)`, `.body(s)` | `params`, `query`, …, validated | the schema, plus the 400 |
-| `responds({ status: schema })` | nothing | the replies the handler may give; no other status compiles |
-| `describe({ summary, tags, … })` | nothing | the OpenAPI `detail` |
+| `validate({ params?, query?, headers?, cookies?, body? })` | each one given, validated | its schemas, plus the 400 |
 | `step(fn)` | what `fn` returns, or a reply, which stops the chain | the reply's status |
 | `step<Needs>()(fn)` | the same, reading `Needs`, which a step before it must add | the same |
 
-- **Validators come from core and take any Standard Schema:** Zod, Valibot or
-  ArkType. No `@alxia/zod-validator` is needed, and `zq` still works inside
-  `validate.query(z.object({ page: zq.int() }))`.
-- **A validator step carries its schema.** Core reads the chain when the
-  route is declared and rebuilds the same `RouteSchema` that the options
-  object holds today. `RoutesOf`, `@alxia/client` and `@alxia/openapi` stay
-  as they are. This is the difference from Hono, where a validator is an
-  opaque function and `hono-openapi` needs `describeRoute` on top of it.
+- **`validate` comes from core and takes any Standard Schema:** Zod, Valibot
+  or ArkType. No `@alxia/zod-validator` is needed, and `zq` still works in
+  `validate({ query: z.object({ page: zq.int() }) })`. A route may have more
+  than one `validate`, for example `validate({ headers })` before `auth` and
+  `validate({ body })` after it. The same target given twice is a compile
+  error.
+- **`validate` carries its schemas.** Core reads the chain when the route is
+  declared and rebuilds the request part of today's `RouteSchema`, so the
+  request side of `RoutesOf`, `@alxia/client` and `@alxia/openapi` stays as
+  it is. This is the difference from Hono, where a validator is an opaque
+  function.
+- **The replies are typed by the handler.** What the steps and the handler
+  return with `reply(status, body)` is what `RoutesOf` records. The client
+  reads each status with the type of its body, as it already does for a
+  route without `response`.
 - **Steps run in the order they are written.** With `auth` before
-  `validate.body`, a request without a session is refused before its body is
-  read. Today the body is read first.
+  `validate({ body })`, a request without a session is refused before its
+  body is read. Today the body is read first.
 - **`derive` keeps its meaning,** every route after it. A `step` is the same
   function for one route only.
+
+### What goes with the response schemas
+
+Today `response: { 201: User }` does three things, and without it:
+
+1. **A status not declared no longer fails to compile.** The handler may
+   answer any status, and the client is still honest, because it types what
+   the handler actually returns.
+2. **A reply is no longer checked or stripped at run time.** Today an
+   unknown key, a `password` for example, never leaves the server, because
+   the reply goes out as its schema's output. Without a schema, that is the
+   handler's job.
+3. **`@alxia/openapi` no longer has a response schema** to put in the
+   document. TypeScript types do not exist at run time, so a route only
+   documents its request and a `default` response.
+
+A route's response schemas would then live in `@alxia/openapi`, given as
+documentation (`docs({ responses })`, or a `detail` on the route). Core would
+neither check them nor type replies from them. That is a decision to make;
+see below.
 
 ### Typing: probed
 
@@ -90,12 +118,14 @@ they add:
 
 - 11 steps typecheck in 0.25 s, with 35,000 instantiations. Hono stops at
   about ten, through overloads.
-- An undeclared status gives `Type '200' is not assignable to type '201'.`
-- `ctx.body` without `validate.body` gives `Property 'body' does not exist on
+- `ctx.body` without a `validate({ body })` gives `Property 'body' does not exist on
   type '{ request: Request; } & { user: { id: number; }; }'.`
 - A step put before the one it needs gives `Argument of type '(ctx: any) =>
   any' is not assignable to parameter of type '"this step needs user, which
   no step before it adds"'.`
+- `validate({ params, body })` types both. Two `validate` steps add up, and
+  the same target twice gives `"body is validated twice"`, in 0.22 s and
+  35,000 instantiations.
 
 The probe does not yet cover the real `Context`, `RouteEntryOf`, the reply
 shortcuts or `ValidSchema`. The first slice starts with that full probe.
@@ -113,7 +143,7 @@ document becomes a list of steps, and `route` takes steps of its own too:
 export const createUser = {
 	method: 'POST',
 	path: '/users',
-	steps: [validate.body(zNewUser), responds({ 201: zUser, 409: zTaken }), describe({ operationId: 'createUser' })],
+	steps: [validate({ body: zNewUser })],
 } as const;
 
 // the app
@@ -128,10 +158,12 @@ app.route(createUser, auth, ({ body, reply }) => reply.created(insert(body)));
 1. **One form.** I recommend removing the options object and keeping only
    the steps, before 0.1.0, since nothing is published. Keeping both would
    double the signatures and leave two ways to do the same thing.
-2. **Names.** I recommend `validate.body(…)` and the rest grouped under
-   `validate`, with `responds` and `describe` beside them: one import, and no
-   bare `body` or `query` colliding with a user's variables. The alternative
-   is `body(…)`, `query(…)` and so on, imported one by one.
+2. **The response schemas for OpenAPI.** Without them, a document describes
+   only its requests. Three ways:
+   - documentation only, beside the route, which core does not read;
+   - nothing: an app that wants a full contract writes it, in the
+     contract-first direction of the [codegen note](openapi-codegen.md);
+   - a check of replies in development only.
 3. **`route()`.** I recommend `route(operation, ...steps, handler)`, with
    the operation carrying its own steps, as above.
 
@@ -148,8 +180,8 @@ app.route(createUser, auth, ({ body, reply }) => reply.created(insert(body)));
 
 ## Slices
 
-1. **Core:** the full type probe, then the steps and `validate`,
-   `responds`, `describe` and `step`, beside the options object, with specs.
+1. **Core:** the full type probe, then the steps, `validate` and `step`,
+   beside the options object, with specs.
    The options object stays for this slice so that everything else keeps
    building.
 2. **Migration:** the specs and docs of every package, in groups.
