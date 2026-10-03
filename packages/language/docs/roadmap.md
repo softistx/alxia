@@ -40,5 +40,9 @@ Nothing scheduled yet.
 - **The response says it.** `Content-Language` on every response, `Vary` by
   the headers read, and, with `persist`, a language named in the query kept
   in a cookie.
+- **A preference an earlier plugin knows.** Annotate `resolve`'s parameter —
+  `({ user }: BaseContext & { user: User }) => user.language` — and it reads
+  what an earlier plugin added; an app that does not give it cannot use the
+  plugin. Unannotated, it reads the request alone and requires nothing.
 - **A fallback that cannot be wrong.** The types refuse a fallback the app
   does not support, and so does the plugin at start-up.

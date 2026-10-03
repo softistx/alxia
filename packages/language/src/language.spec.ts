@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { alxia } from '@alxia/core';
+import { alxia, type BaseContext, type Empty } from '@alxia/core';
 import { language } from './language';
 import { match, negotiate, parseAcceptLanguage } from './negotiate';
 
@@ -90,6 +90,87 @@ describe('language', () => {
 		});
 		expect(await response.text()).toBe('fr');
 		expect(response.headers.get('vary')).toBe('Accept-Language, Authorization');
+	});
+
+	test('a resolver reads what an earlier plugin adds, typed by its parameter', async () => {
+		interface User {
+			readonly locale: string | null;
+		}
+		const byUser = language({
+			supported: ['en', 'fr'],
+			fallback: 'en',
+			order: ['header'],
+			resolve: ({ user }: BaseContext & { user: User | null }) =>
+				user?.locale ?? undefined,
+			vary: ['Authorization'],
+		});
+		expectTypeOf(byUser['~requires']).toEqualTypeOf<{ user: User | null }>();
+		const app = alxia()
+			.derive(({ request }) => ({
+				user:
+					request.headers.get('authorization') === 'Bearer ada'
+						? ({ locale: 'fr' } as User)
+						: null,
+			}))
+			.use(byUser)
+			.get('/', ({ language: lang, reply }) => {
+				expectTypeOf(lang).toEqualTypeOf<'en' | 'fr'>();
+				return reply(200, lang);
+			});
+		const read = async (headers: Record<string, string>) =>
+			(await app.request('/', { headers })).text();
+		expect(await read({ authorization: 'Bearer ada' })).toBe('fr');
+		expect(await read({})).toBe('en');
+		expect(
+			await read({ authorization: 'Bearer ada', 'accept-language': 'en' }),
+		).toBe('en');
+	});
+
+	test('an unannotated resolver reads nothing more, and a plain one needs nothing', () => {
+		expectTypeOf(
+			language({
+				supported: ['en'],
+				fallback: 'en',
+				resolve: (ctx) => {
+					expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
+					return undefined;
+				},
+			})['~requires'],
+		).toEqualTypeOf<Empty>();
+		expectTypeOf(
+			language({ supported: ['en'], fallback: 'en' })['~requires'],
+		).toEqualTypeOf<Empty>();
+	});
+
+	test('an app that does not give what the resolver reads is refused', () => {
+		const byUser = language({
+			supported: ['en', 'fr'],
+			fallback: 'en',
+			resolve: ({ user }: { user: { locale: string } }) => user.locale,
+		});
+		const _refused = () => {
+			// @ts-expect-error the plugin reads "user", which this app's context does not give
+			alxia().use(byUser);
+			alxia()
+				.derive(() => ({ user: { locale: 1 } }))
+				// @ts-expect-error the plugin reads "user", which this app's context gives with another type
+				.use(byUser);
+		};
+		expect(_refused).toBeFunction();
+	});
+
+	test('a key of BaseContext annotated with a type it does not give is refused', () => {
+		const wrong = language({
+			supported: ['en'],
+			fallback: 'en',
+			resolve: ({ url }: { url: string }) => url.slice(1),
+		});
+		expectTypeOf(wrong['~requires']).toEqualTypeOf<{ url: string }>();
+		const _refused = () => {
+			// @ts-expect-error the plugin reads "url", which this app's context gives with another type
+			alxia().use(wrong);
+		};
+		expect(_refused).toBeFunction();
 	});
 
 	test('a fallback it does not support is refused', () => {
