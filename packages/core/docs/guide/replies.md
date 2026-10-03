@@ -244,8 +244,8 @@ One error skips all three: the client hanging up mid-request, which
 reaches the app as the `AbortError` Bun's body read throws once
 `request.signal` is aborted. Nobody reads the answer, so nothing is logged,
 no `onError` hook runs, and the request gets a bodyless `499` that only
-`onResponse` hooks see. Any other error, thrown after the client left or
-not, goes the three steps above.
+`onResponse` hooks see. Any other error, a bug thrown after the client left
+included, goes the three steps above.
 
 ```ts
 import { alxia, HttpError } from '@alxia/core';

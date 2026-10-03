@@ -996,7 +996,7 @@ first goes through that route's `onError` hooks. An `HttpError` is answered
 with its own status and body.
 
 A request that fails because its client hung up (its `request.signal`
-aborted, and the error the `AbortError` that a body read then throws) is
+aborted, and the error is the `AbortError` a body read then throws) is
 not an error of the app: nothing is printed, no `onError` hook runs, and
 an `onResponse` hook, a logger's, sees a `499` with no body. Any other
 error is printed and answered 500, a bug thrown after the client left
