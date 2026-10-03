@@ -129,6 +129,21 @@ describe('app.static', () => {
 		expect(await plain.text()).toBe('console.log(1)');
 	});
 
+	test('with precompressed copies, the plain file varies by Accept-Encoding too', async () => {
+		const plain = await make().request('/files/app.js');
+		expect(plain.headers.get('content-encoding')).toBeNull();
+		expect(plain.headers.get('vary')).toBe('Accept-Encoding');
+		const revalidated = await make().request('/files/app.js', {
+			headers: { 'if-none-match': plain.headers.get('etag') ?? '' },
+		});
+		expect(revalidated.status).toBe(304);
+		expect(revalidated.headers.get('vary')).toBe('Accept-Encoding');
+		const without = alxia().static('/files', root);
+		expect(
+			(await without.request('/files/app.js')).headers.get('vary'),
+		).toBeNull();
+	});
+
 	test("a Vary of the headers option adds to a precompressed file's", async () => {
 		const app = alxia().static('/files', root, {
 			precompressed: ['gzip'],
