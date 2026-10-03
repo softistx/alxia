@@ -18,11 +18,11 @@ the same cookie, the same rules, the same bodies.
 
 ```ts
 import { alxia } from '@alxia/core';
-import { janusErrors, sendSession, session, signOut } from '@alxia/janus';
+import { janusErrors, session } from '@alxia/janus';
 import { createMemoryStores, janus, scryptHasher } from '@nxgt/janus';
 import { z } from 'zod';
 
-const auth = janus({
+const accounts = janus({
 	user: z.object({ email: z.email(), name: z.string() }),
 	password: { login: 'email' },
 	store: createMemoryStores(),       // your database's adapter in production
@@ -32,24 +32,25 @@ const auth = janus({
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.use(janusErrors())                                  // janus's refusals, typed
-	.post('/signin', { body: SignIn }, async (ctx) => {
-		const signedIn = await auth.signIn(ctx.body);
-		return ctx.reply(200, { id: sendSession(ctx, auth, signedIn).id }); // the token in the cookie
+	.use(janusErrors())                                   // janus's refusals, typed
+	.use(session(accounts))                               // not required: anonymous may sign in
+	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+		const signedIn = await accounts.signIn(body);
+		return reply.ok({ id: auth.send(signedIn).id });  // the token in the cookie
 	})
-	.post('/signout', async (ctx) => ctx.reply(200, await signOut(ctx, auth)))
-	.use(session(auth, { required: true }))              // every route after it
-	.get('/me', ({ user, reply }) => reply(200, user));  // user typed by the schema
+	.post('/signout', async ({ auth, reply }) => reply.ok(await auth.signOut()))
+	.use(session(accounts, { required: true }))           // every route after it
+	.get('/me', ({ user, reply }) => reply.ok(user));     // user typed by the schema
 ```
 
-## `session(auth, options?)`
+## `session(accounts, options?)`
 
-The routes after it read `user` and `session`. With `required: true`, an
-anonymous request is a 401 `{ error: 'unauthenticated' }` and `user` is
-never `null`; without, it is `null` for an anonymous request. A `boolean`
-known only at run time types both: the 401, and a `user` that may be
-`null`. `type` narrows
-to one user type of a multi-type `janus()`.
+The routes after it read `user`, `session` and `auth`. With
+`required: true`, an anonymous request is a 401
+`{ error: 'unauthenticated' }` and `user` is never `null`; without, it is
+`null` for an anonymous request. A `boolean` known only at run time types
+both: the 401, and a `user` that may be `null`. `type` narrows to one user
+type of a multi-type `janus()`; `device` names the device cookie.
 
 The session is read from `Authorization: Bearer`, `X-Session-Token`, or the
 cookie. One renewed in passing is sent again as a cookie after the route —
@@ -57,13 +58,22 @@ only to a request that presented it as one, and never over a session
 cookie the route set itself. **An outage is not anonymous**: a store that
 cannot answer is `STORE_FAILED`, answered 503 by `janusErrors()`.
 
-## `sendSession`, `signOut`, devices
+## `ctx.auth`: signing in and out
 
-`sendSession(ctx, auth, signedIn)` sets the session cookie after `signUp`
-or `signIn` and returns the user: the token is never in a body. With a
-`deviceToken` it sets the device cookie too; `deviceOf(ctx)` reads it back
-for `signIn(…, { device })`. `signOut(ctx, auth)` revokes the session and
-clears the cookie, whatever the answer.
+Sign-in stays on your `janus()` instance — `accounts.signIn`, `accounts.signUp`,
+`accounts.patient.signIn`, a code, a link — and `ctx.auth` does the request's
+part, bound to it:
+
+| `ctx.auth.` | |
+| --- | --- |
+| `send(signedIn)` | sets the session cookie (and the device cookie, with a `deviceToken`) and returns the user: the token is never in a body |
+| `signOut()` | revokes the request's session and clears its cookie, whatever the answer |
+| `device` | the device cookie's value, or `null`, for `signIn(…, { device: ctx.auth.device })` with `janus({ devices })` |
+
+Put the sign-in routes behind a `session(accounts)` that is **not** required:
+behind `required: true`, an anonymous request — anyone signing in — is a
+401. Outside a route (a job, a test), `sendSession(ctx, accounts, signedIn)`,
+`signOut(ctx, accounts)` and `deviceOf(ctx)` are the same functions, unbound.
 
 ## `janusErrors(options?)`
 
@@ -100,7 +110,7 @@ import { createMemoryRelations, defineModel, permissions } from '@nxgt/janus/per
 import { z } from 'zod';
 
 const relations = createMemoryRelations();
-const auth = janus({
+const accounts = janus({
 	user: z.object({ email: z.email() }),
 	password: { login: 'email' },
 	store: createMemoryStores(),
@@ -109,7 +119,7 @@ const auth = janus({
 });
 const access = permissions({
 	model: defineModel({
-		subjects: auth.types,
+		subjects: accounts.types,
 		types: { record: { related: { owners: ['user'] }, permits: { view: ['owners'] } } },
 	}),
 	store: relations,
@@ -120,7 +130,7 @@ const findRecord = (id: string) => records.get(id) ?? null;
 
 const app = alxia()
 	.use(janusErrors())
-	.use(session(auth))
+	.use(session(accounts))
 	.group('/records/:id', (record) =>
 		record
 			.use(permission(access, 'view', 'record', byParam('id', findRecord)))
@@ -136,9 +146,10 @@ types exactly then.
 
 | export | |
 | --- | --- |
-| `session(auth, options?)` | the plugin: `user`, `session` |
-| `SessionOptions` | its options: `type`, `required` |
-| `sendSession`, `signOut`, `deviceOf`, `sendDevice` | cookies |
+| `session(accounts, options?)` | the plugin: `user`, `session`, `auth` |
+| `SessionOptions` | its options: `type`, `required`, `device` |
+| `RequestAuth`, `SessionOpened` | the type of `ctx.auth`: `send`, `signOut`, `device`; and what `send` takes: `token`, `session` and `user` from `@nxgt/janus`'s `SignedIn`, and `deviceToken?` |
+| `sendSession`, `signOut`, `deviceOf`, `sendDevice` | the cookies, outside a route |
 | `DEVICE_COOKIE` | the device cookie's name, `janus-device`: the one `@nxgt/janus-hono` uses, so a device one remembers the other does too |
 | `SendSessionOptions`, `DeviceCookieOptions` | their options: `device`; `name`, `domain`, `path`, `sameSite`, `secure`, `maxAge` |
 | `janusErrors(options?)` | the plugin: janus's refusals answered |
@@ -151,6 +162,6 @@ types exactly then.
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/janus/docs): a page per area — sessions, signing in and out with the session and device cookies, janus's errors and their statuses, and the permission guard.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/janus/docs): a page per area — sessions, signing in and out with `ctx.auth` and the device cookie, janus's errors and their statuses, and the permission guard.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/janus/docs/troubleshooting.md): an error message, or a request anonymous, refused or a 404 when it should not be, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/janus/docs/roadmap.md): what is coming, and what is not planned.

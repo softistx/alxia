@@ -7,9 +7,10 @@ symptom, under [Traps](#traps).
 **Types: sessions and cookies**
 
 - [`Property 'user' does not exist on type 'Context<…>'`](#property-user-does-not-exist-on-type-context)
+- [`Property 'auth' does not exist on type 'Context<…>'`](#property-auth-does-not-exist-on-type-context)
 - [`'user' is possibly 'null'`](#user-is-possibly-null)
 - [`Type '"admin"' is not assignable to type '"user"'`](#type-admin-is-not-assignable-to-type-user)
-- [`Type 'SecondFactorRequired' is missing the following properties from type '{ … }': token, session, user`](#type-secondfactorrequired-is-missing-the-following-properties-from-type----token-session-user)
+- [`Type 'SecondFactorRequired' is missing the following properties from type 'SessionOpened<User<…>>': token, session, user`](#type-secondfactorrequired-is-missing-the-following-properties-from-type-sessionopeneduser-token-session-user)
 - [`Property 'error' is missing in type '{ code: JanusErrorCode; … }'`](#property-error-is-missing-in-type--code-januserrorcode--)
 
 **Types: permissions**
@@ -27,6 +28,7 @@ symptom, under [Traps](#traps).
 - [`Warning: janusErrors(): report failed: …`](#warning-januserrors-report-failed-)
 - [`500 {"error":"internal"}`, with a `JanusError` in the log](#500-errorinternal-with-a-januserror-in-the-log)
 - [`503 {"code":"STORE_FAILED"}`](#503-codestore_failed)
+- [`401 {"error":"unauthenticated"}` from the sign-in route](#401-errorunauthenticated-from-the-sign-in-route)
 - [`401 {"code":"CREDENTIALS_INVALID","retryAfter":900}` with the right password](#401-codecredentials_invalidretryafter900-with-the-right-password)
 
 **Traps**
@@ -42,7 +44,7 @@ symptom, under [Traps](#traps).
 ### `Property 'user' does not exist on type 'Context<…>'`
 
 **When:** a route reads `user` or `session`, and is declared before
-`use(session(auth))`.
+`use(session(accounts))`.
 
 ```text
 error TS2339: Property 'user' does not exist on type 'Context<Empty, "/profile", Empty>'.
@@ -55,13 +57,40 @@ error TS2339: Property 'user' does not exist on type 'Context<Empty, "/profile",
 
 ```ts
 alxia()
-	.use(session(auth, { required: true }))
+	.use(session(accounts, { required: true }))
 	.get('/profile', ({ user, reply }) => reply(200, { name: user.name }));
+```
+
+### `Property 'auth' does not exist on type 'Context<…>'`
+
+**When:** a sign-in or sign-out route calls `ctx.auth.send`,
+`ctx.auth.signOut` or reads `ctx.auth.device`, and is declared before
+`use(session(accounts))`.
+
+```text
+error TS2339: Property 'auth' does not exist on type 'Context<Empty, "/signin", Empty>'.
+```
+
+**Why:** `ctx.auth` is added by `session()`, to the routes declared
+**after** it, like `user`.
+
+**Fix:** use a `session()` that is not required before the route — or keep
+the route where it is and call the unbound `sendSession(ctx, accounts, …)`,
+`signOut(ctx, accounts)` and `deviceOf(ctx)`
+([Signing in and out](guide/sign-in-and-out.md#outside-a-route-sendsession-signout-deviceof)):
+
+```ts
+alxia()
+	.use(session(accounts))
+	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+		const signedIn = await accounts.signIn(body);
+		return reply.ok({ id: auth.send(signedIn).id });
+	});
 ```
 
 ### `'user' is possibly 'null'`
 
-**When:** reading a field of `user` behind `session(auth)` without
+**When:** reading a field of `user` behind `session(accounts)` without
 `required: true`.
 
 ```text
@@ -76,17 +105,17 @@ only at run time, an anonymous request may reach the route with
 `true`, so the plugin answers it with a 401 and `user` is never `null`:
 
 ```ts
-alxia().use(session(auth, { required: true })).get('/me', ({ user, reply }) => reply(200, user.email));
+alxia().use(session(accounts, { required: true })).get('/me', ({ user, reply }) => reply(200, user.email));
 ```
 
 ### `Type '"admin"' is not assignable to type '"user"'`
 
-**When:** `session(auth, { type })` names a type `janus()` does not have.
+**When:** `session(accounts, { type })` names a type `janus()` does not have.
 With a single `user` schema, the only type is `'user'`.
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(auth: Janus<…>, options: SessionOptions<…> & { …; }): Alxia<…>', gave the following error.
+  Overload 1 of 3, '(auth: Janus<…>, options: SessionOptions<…> & { …; }): Al…', gave the following error.
     Type '"admin"' is not assignable to type '"user"'.
 ```
 
@@ -95,14 +124,14 @@ are the keys of `janus({ users })`.
 
 **Fix:** use one of those keys, or declare the type in `janus({ users: { … } })`.
 
-### `Type 'SecondFactorRequired' is missing the following properties from type '{ … }': token, session, user`
+### `Type 'SecondFactorRequired' is missing the following properties from type 'SessionOpened<User<…>>': token, session, user`
 
-**When:** calling `sendSession` with what `signIn` answered, in a `janus()`
-given a `secondFactor`.
+**When:** calling `ctx.auth.send` or `sendSession` with what `signIn`
+answered, in a `janus()` given a `secondFactor`.
 
 ```text
-error TS2345: Argument of type 'SignInResult<User<"user", { email: string; name: string; }>>' is not assignable to parameter of type '{ readonly token: string; readonly session: Session; readonly user: User<"user", { email: string; name: string; }>; readonly deviceToken?: string | null; }'.
-  Type 'SecondFactorRequired' is missing the following properties from type '{ … }': token, session, user
+error TS2345: Argument of type 'SignInResult<User<"user", { email: string; }>>' is not assignable to parameter of type 'SessionOpened<User<"user", { email: string; }>>'.
+  Type 'SecondFactorRequired' is missing the following properties from type 'SessionOpened<User<"user", { email: string; }>>': token, session, user
 ```
 
 **Why:** with a second factor, `signIn` answers either a session or a
@@ -112,15 +141,15 @@ challenge, and a challenge has no session to put in a cookie.
 ([Signing in and out](guide/sign-in-and-out.md#a-second-factor)):
 
 ```ts
-const result = await auth.signIn(ctx.body);
-if (result.status === 'secondFactor') return ctx.reply(200, { challenge: result.challenge });
-return ctx.reply(200, { id: sendSession(ctx, auth, result).id });
+const result = await accounts.signIn(body);
+if (result.status === 'secondFactor') return reply.ok({ challenge: result.challenge });
+return reply.ok({ id: auth.send(result).id });
 ```
 
 ### `Property 'error' is missing in type '{ code: JanusErrorCode; … }'`
 
 **When:** a client reads a 401 from a route behind
-`session(auth, { required: true })` and `janusErrors()` as the session's
+`session(accounts, { required: true })` and `janusErrors()` as the session's
 body only.
 
 ```text
@@ -243,11 +272,11 @@ byParam('id', (id) => db.records.findOne({ id }, { projection: { title: 1, docto
 derived, and no `session()` was used before it. It throws rather than
 treat everyone as anonymous.
 
-**Fix:** use `session(auth)` before the guard, or name the subject:
+**Fix:** use `session(accounts)` before the guard, or name the subject:
 
 ```ts
 app
-	.use(session(auth))
+	.use(session(accounts))
 	.group('/records/:id', (record) =>
 		record.use(permission(access, 'view', 'record', byParam('id', findRecord))).get('/', ({ object, reply }) => reply(200, object)),
 	);
@@ -255,18 +284,18 @@ app
 
 ### `TypeError: signIn: a device was given, but janus() has no devices — pass devices: { keys }`
 
-**When:** every sign-in or sign-up passing `{ device: deviceOf(ctx) }` is
-answered `500 {"error":"internal"}` (the message starts with `signUp:` for
-a sign-up).
+**When:** every sign-in or sign-up passing `{ device: ctx.auth.device }` or
+`{ device: deviceOf(ctx) }` is answered `500 {"error":"internal"}` (the
+message starts with `signUp:` for a sign-up).
 
-**Why:** `deviceOf` answers `null` for a browser with no device cookie, and
-`janus()` reads `device: null` as a device given — "this client holds no
+**Why:** `ctx.auth.device` and `deviceOf` are `null` for a browser with no
+device cookie, and `janus()` reads `device: null` as a device given — "this client holds no
 token yet". Without `janus({ devices })` it has nothing to sign one with.
 
 **Fix:** configure `devices`, or leave `device` out:
 
 ```ts
-const auth = janus({
+const accounts = janus({
 	user: z.object({ email: z.email() }),
 	password: { login: 'email' },
 	store: createMemoryStores(),
@@ -303,9 +332,10 @@ only the routes after it.
 ```ts
 const app = alxia()
 	.use(janusErrors())
-	.post('/signin', { body: SignIn }, async (ctx) => {
-		const signedIn = await auth.signIn(ctx.body); // a refusal is now its 401
-		return ctx.reply(200, { id: sendSession(ctx, auth, signedIn).id });
+	.use(session(accounts))
+	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+		const signedIn = await accounts.signIn(body); // a refusal is now its 401
+		return reply.ok({ id: auth.send(signedIn).id });
 	});
 ```
 
@@ -323,6 +353,31 @@ Routes declared before `session()` still answer.
 
 ```ts
 janusErrors({ report: (error, ctx) => console.error(ctx.route, error.code, error.cause) });
+```
+
+### `401 {"error":"unauthenticated"}` from the sign-in route
+
+**When:** every sign-in, sign-up or sign-out of a request with no session
+is answered `401 {"error":"unauthenticated"}`, and the route never runs.
+
+**Why:** the route is declared after `session(accounts, { required: true })`,
+which answers an anonymous request before any route behind it — and
+whoever signs in is anonymous.
+
+**Fix:** declare it behind a `session()` that is not required, and require
+the session for the routes after it, or in a `group`
+([Sessions](guide/sessions.md#where-the-sign-in-routes-go)):
+
+```ts
+alxia()
+	.use(janusErrors())
+	.use(session(accounts))                     // the sign-in routes
+	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+		const signedIn = await accounts.signIn(body);
+		return reply.ok({ id: auth.send(signedIn).id });
+	})
+	.use(session(accounts, { required: true })) // everything after
+	.get('/me', ({ user, reply }) => reply.ok({ name: user.name }));
 ```
 
 ### `401 {"code":"CREDENTIALS_INVALID","retryAfter":900}` with the right password
@@ -353,7 +408,7 @@ a host other than `localhost`, nor send a cookie to another host.
 there only:
 
 ```ts
-const auth = janus({
+const accounts = janus({
 	user: z.object({ email: z.email() }),
 	password: { login: 'email' },
 	store: createMemoryStores(),
@@ -380,7 +435,7 @@ session cookie get a second one.
 ### A user of another type gets a 401
 
 **When:** a signed-in user is answered `401 {"error":"unauthenticated"}`
-on routes behind `session(auth, { type, required: true })`.
+on routes behind `session(accounts, { type, required: true })`.
 
 **Why:** a user of another type than `type` is anonymous there, by design.
 So is a request whose **first** credential is lapsed: `Authorization:

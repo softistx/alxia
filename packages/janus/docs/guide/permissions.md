@@ -12,7 +12,7 @@ import { createMemoryRelations, defineModel, permissions } from '@nxgt/janus/per
 import { z } from 'zod';
 
 const relations = createMemoryRelations();
-const auth = janus({
+const accounts = janus({
 	user: z.object({ email: z.email() }),
 	password: { login: 'email' },
 	store: createMemoryStores(),
@@ -21,7 +21,7 @@ const auth = janus({
 });
 const access = permissions({
 	model: defineModel({
-		subjects: auth.types,
+		subjects: accounts.types,
 		types: {
 			record: {
 				related: { owners: ['user'] },
@@ -37,7 +37,7 @@ const findRecord = (id: string) => records.get(id) ?? null;
 
 const app = alxia()
 	.use(janusErrors())
-	.use(session(auth))
+	.use(session(accounts))
 	.group('/records/:id', (record) =>
 		record
 			.use(permission(access, 'view', 'record', byParam('id', findRecord)))
@@ -132,7 +132,7 @@ import { createMemoryRelations, defineModel, fromField, permissions } from '@nxg
 
 const access = permissions({
 	model: defineModel({
-		subjects: auth.types,
+		subjects: accounts.types,
 		types: {
 			record: {
 				related: { owners: ['user'], doctors: fromField('doctorId', 'user') },
@@ -161,7 +161,7 @@ require it for that permission, and refuse it for one without a condition:
 import { when } from '@nxgt/janus/permissions';
 
 const model = defineModel({
-	subjects: auth.types,
+	subjects: accounts.types,
 	types: {
 		record: {
 			related: { owners: ['user'] },
@@ -178,7 +178,7 @@ const records = new Map([['r1', { id: 'r1', title: 'Blood test', locked: false }
 
 const app = alxia()
 	.use(janusErrors())
-	.use(session(auth))
+	.use(session(accounts))
 	.group('/records/:id', (record) =>
 		record
 			.use(
@@ -219,7 +219,7 @@ permission(access, 'view', 'record', byParam('id', findRecord), {
 import { expect, test } from 'bun:test';
 
 test('403 to a denial, 404 to nothing loaded, the object once granted', async () => {
-	const { token, user } = await auth.signUp({ email: 'ada@example.com', password: 'correct horse' });
+	const { token, user } = await accounts.signUp({ email: 'ada@example.com', password: 'correct horse' });
 	const headers = { authorization: `Bearer ${token}` };
 
 	expect((await app.request('/records/r1', { headers })).status).toBe(403);

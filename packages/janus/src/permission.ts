@@ -114,7 +114,7 @@ type LooseCan = (
  * it 503. Scope it with `group`, so it guards only its routes:
  *
  * ```ts
- * app.use(session(auth)).group('/records/:id', (records) =>
+ * app.use(session(accounts)).group('/records/:id', (records) =>
  *   records.use(permission(access, 'view', 'record', byParam('id', findRecord)))
  *     .get('/', ({ object, reply }) => reply(200, object)));
  * ```
