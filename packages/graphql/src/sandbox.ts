@@ -2,7 +2,9 @@
  * [Apollo Sandbox](https://www.apollographql.com/docs/graphos/platform/sandbox),
  * embedded: the page a browser gets at the endpoint when the IDE is
  * `apollo-sandbox`. `@nxgt/shared-graphql`'s `renderSandbox`, kept twice: the
- * endpoint is the URL the page was asked at, as there since nxgt-core#171.
+ * Sandbox asks the address the page was opened at, as there since
+ * nxgt-core#171, but here the page resolves the path itself, so a TLS proxy
+ * in front changes nothing.
  */
 
 export interface SandboxOptions {
@@ -28,7 +30,11 @@ export const SANDBOX_POLICY = [
 	"connect-src 'self'",
 ].join('; ');
 
-/** The page, its endpoint `endpoint`. Every value is escaped into its JavaScript and HTML. */
+/**
+ * The page, its endpoint `endpoint`: a URL, or a path the page resolves
+ * against its own address. Every value is escaped into its JavaScript and
+ * HTML.
+ */
 export function renderSandbox(
 	endpoint: string,
 	options: SandboxOptions = {},
@@ -60,7 +66,13 @@ export function renderSandbox(
 <body>
 <div id="sandbox"></div>
 <script src="https://embeddable-sandbox.cdn.apollographql.com/_latest/embeddable-sandbox.umd.production.min.js"></script>
-<script>new window.EmbeddedSandbox(${script(config)});</script>
+<script>
+{
+const config = ${script(config)};
+config.initialEndpoint = new URL(config.initialEndpoint, location.href).href;
+new window.EmbeddedSandbox(config);
+}
+</script>
 </body>
 </html>`;
 }

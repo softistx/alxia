@@ -31,12 +31,14 @@ Nothing scheduled yet.
   everything the app's hooks add — a user, a database handle — plus `set`,
   through which a resolver sets a header or a cookie. A schema whose
   resolvers read what the app does not build is a compile error naming the
-  missing field.
+  missing field, and `GraphQLContext` of anything but an app is a message
+  that fails the first resolver reading a field.
 - **Yoga whole.** Every Yoga option passes through: its plugins and
   Envelop's, the `context` factory, error masking, batching, logging.
   Subscriptions are served over server-sent events.
 - **An IDE, or none.** A browser at the endpoint gets Yoga's GraphiQL by
-  default, or Apollo Sandbox pointed at the URL it was asked at, each with
+  default, or Apollo Sandbox pointed at the address it was opened at —
+  `https` behind a proxy that terminates TLS — each with
   a `Content-Security-Policy` that lets it load; `ide: false` turns it off.
   `renderSandbox` and `SANDBOX_POLICY` serve the Sandbox page anywhere else.
 - **CORS left to the app.** Yoga's own CORS is off, so `@alxia/cors`

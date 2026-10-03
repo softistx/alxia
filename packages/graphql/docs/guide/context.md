@@ -40,13 +40,25 @@ cannot be typed from `app` itself: `app` is built from the schema.
 ```ts
 type GraphQLContext<App, UserContext = Empty> =
 	YogaInitialContext & ServerContext<ContextOf<App>> & UserContext;
-	// `never` when App is not an alxia app
+	// when App is not an alxia app — a function returning one, a schema, a route:
+	// { readonly '~error': 'GraphQLContext needs the type of an app: GraphQLContext<typeof app>' }
 
 type ServerContext<Ctx> = Omit<
 	BaseContext & Ctx,
 	'params' | 'query' | 'headers' | 'cookies' | 'body' | 'reply' | 'redirect'
 >;
 ```
+
+Given anything but an app's type, the context holds only that message, so
+the first resolver that reads a field is a compile error naming it:
+
+```text
+error TS2339: Property 'viewer' does not exist on type '{ readonly '~error': "GraphQLContext needs the type of an app: GraphQLContext<typeof app>"; } & YogaInitialContext'.
+```
+
+Give it the app's type, `typeof base` — not that of a function that builds
+the app, nor of a schema
+([Troubleshooting](../troubleshooting.md#property-viewer-does-not-exist-on-type--readonly-error-graphqlcontext-needs-the-type-of-an-app-graphqlcontexttypeof-app---yogainitialcontext)).
 
 A resolver's context holds:
 
