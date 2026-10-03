@@ -30,21 +30,33 @@ import {
 
 /** The major of a version or a range: `7` for `~7.0.2`, `^7.0.0` or `7`. */
 export function majorOf(version: string): number {
-	return Number(/\d+/.exec(version)?.[0]);
+	return Number(/^\D*(\d+)/.exec(version)?.[1]);
 }
 
-/** Every peer some package accepts in more than one major. */
+/**
+ * Every peer some package accepts in more than one major, with the newest
+ * major any range names, and the packages that widen it.
+ */
 export function widenedPeers(
 	packages: ReadonlyMap<string, Manifest>,
-): Map<string, number> {
-	const peers = new Map<string, number>();
+): Map<string, { major: number; by: string[] }> {
+	const peers = new Map<string, { major: number; by: string[] }>();
 	for (const manifest of packages.values()) {
 		for (const [name, range] of Object.entries(
 			manifest.peerDependencies ?? {},
 		)) {
 			const version = newest(range);
 			if (version === undefined) continue;
-			peers.set(name, Math.max(peers.get(name) ?? 0, majorOf(version)));
+			const major = majorOf(version);
+			if (!Number.isFinite(major)) {
+				throw new Error(
+					`${manifest.name} accepts ${name} ${range}, whose last alternative names no major: write it as ^<major>.`,
+				);
+			}
+			const seen = peers.get(name) ?? { major, by: [] };
+			seen.major = Math.max(seen.major, major);
+			seen.by.push(String(manifest.name));
+			peers.set(name, seen);
 		}
 	}
 	return peers;
@@ -56,14 +68,19 @@ function keepOperator(range: string, version: string): string {
 }
 
 export interface Majors extends Rewrite {
-	/** The peers whose latest no range accepts yet: worth a warning. */
-	readonly ahead: readonly string[];
+	/** What to warn about: a latest beyond every range, or below the newest. */
+	readonly warnings: readonly string[];
 }
 
 /**
  * The manifests with every widened peer moved to `latest`, its npm version.
  * Pure: the caller fetches `latest` and writes the result, or nothing when
  * this throws.
+ *
+ * Unlike newest-peers.ts, every package that installs the peer moves, not
+ * only those that widen it: one copy of each major in the workspace. And
+ * packages naming different newest majors is not an error here: npm's
+ * latest is one version whatever the ranges say.
  */
 export function rewrite(
 	root: Manifest,
@@ -77,54 +94,61 @@ export function rewrite(
 	const nextRoot: Manifest = structuredClone(root);
 	const next = new Map<string, Manifest>();
 	const pinned: string[] = [];
-	const ahead: string[] = [];
-	const installed = new Set<string>();
+	const warnings: string[] = [];
 
 	const pin = (
 		where: string,
 		field: Record<string, string> | undefined,
 		name: string,
-	): boolean => {
+	): void => {
 		const range = field?.[name];
 		const version = latest.get(name);
 		if (field === undefined || range === undefined || version === undefined) {
-			return false;
+			return;
 		}
 		field[name] = keepOperator(range, version);
 		pinned.push(`${where.padEnd(24)} ${name}@${field[name]}`);
-		return true;
 	};
 
-	for (const [path, manifest] of packages) {
-		const copy: Manifest = structuredClone(manifest);
-		for (const name of peers.keys()) {
-			if (pin(String(copy.name), copy.devDependencies, name)) {
-				installed.add(name);
-			}
-		}
-		next.set(path, copy);
-	}
-	for (const [name, accepted] of peers) {
+	for (const [name, { major, by }] of peers) {
 		const version = latest.get(name);
 		if (version === undefined) {
 			throw new Error(`npm gave no latest version of ${name}.`);
 		}
-		if (pin('(root devDependencies)', nextRoot.devDependencies, name)) {
-			installed.add(name);
+		for (const manifest of packages.values()) {
+			if (
+				by.includes(String(manifest.name)) &&
+				manifest.devDependencies?.[name] === undefined &&
+				root.devDependencies?.[name] === undefined
+			) {
+				throw new Error(
+					`${manifest.name} accepts several majors of ${name}, but neither it nor the root installs ${name}: add it to ${manifest.name}'s devDependencies.`,
+				);
+			}
 		}
-		pin('(root overrides)', nextRoot.overrides, name);
-		if (!installed.has(name)) {
-			throw new Error(
-				`A package accepts several majors of ${name}, but neither it nor the root installs ${name}: add it to that package's devDependencies.`,
+		if (majorOf(version) > major) {
+			warnings.push(
+				`${name} ${version} is newer than any peer range accepts (^${major}): it builds and typechecks here; widen the ranges, and Newest peers then runs the specs on it.`,
 			);
-		}
-		if (majorOf(version) > accepted) {
-			ahead.push(
-				`${name} ${version} is newer than any peer range accepts (^${accepted}): widen them once this job is green.`,
+		} else if (majorOf(version) < major) {
+			warnings.push(
+				`npm's latest ${name} is ${version}, below the newest major a range accepts (^${major}): this job tests ${majorOf(version)}, Newest peers tests ${major}.`,
 			);
 		}
 	}
-	return { root: nextRoot, packages: next, pinned, ahead };
+
+	for (const [path, manifest] of packages) {
+		const copy: Manifest = structuredClone(manifest);
+		for (const name of peers.keys()) {
+			pin(String(copy.name), copy.devDependencies, name);
+		}
+		next.set(path, copy);
+	}
+	for (const name of peers.keys()) {
+		pin('(root devDependencies)', nextRoot.devDependencies, name);
+		pin('(root overrides)', nextRoot.overrides, name);
+	}
+	return { root: nextRoot, packages: next, pinned, warnings };
 }
 
 if (import.meta.main) {
@@ -143,7 +167,7 @@ if (import.meta.main) {
 	await write(rootPath, result.root);
 	for (const [path, manifest] of result.packages) await write(path, manifest);
 	for (const line of result.pinned) console.log(`  pinned   ${line}`);
-	for (const line of result.ahead) {
+	for (const line of result.warnings) {
 		console.log(process.env.GITHUB_ACTIONS ? `::warning::${line}` : line);
 	}
 }

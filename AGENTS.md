@@ -128,8 +128,9 @@ each with a matching key in `exports`.
   `verify:artifacts`. Widening a range is all it takes for this to test it.
 - **Newest majors**: `scripts/newest-majors.ts` pins each widened peer to
   npm's `latest`, without `bun.lock`, then build, typecheck and
-  `verify:artifacts`. It tries a new major before any range accepts it, and
-  warns when no range accepts it yet: the signal to widen.
+  `verify:artifacts`, no tests. It tries a new major before any range
+  accepts it, and warns when no range accepts it yet: the signal to widen,
+  after which Newest peers runs the specs on it.
 
 The last two resolve without a lockfile, so an upstream release can turn
 them red with no change here. They are informational: read them, never make

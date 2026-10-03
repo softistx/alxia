@@ -126,10 +126,12 @@ jobs:
     # npm calls `latest` for each widened peer — TypeScript 7 and graphql 17
     # today, the same as above — so the day TypeScript 8 or graphql 18 ships,
     # it is built against before any range accepts it, and the step below
-    # warns that it is ahead. No bun.lock either: nothing else stays pinned.
+    # warns that it is ahead (or behind, when `latest` trails the ranges).
+    # No bun.lock either: nothing else stays pinned, so this one is noisier.
     # Informational like the job above: read it, do not make it required.
-    # No tests, so no Redis: the types and the packed artifacts are what a
-    # new major breaks; the job above runs the specs.
+    # No tests, so no Redis: green here means it builds, typechecks and
+    # loads. A change in behaviour shows only once a range is widened and
+    # the job above runs the specs on it.
     name: Newest majors
     runs-on: ubuntu-latest
     timeout-minutes: 8
