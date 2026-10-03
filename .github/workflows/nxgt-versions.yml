@@ -8,10 +8,12 @@ name: nxgt versions
 # week instead of relying on someone remembering. Copied from nxgt-data,
 # itself from nxgt-janus.
 #
-# Not Dependabot: its Bun updater reads bun.lock up to lockfileVersion 1
-# (MAX_SUPPORTED_LOCKFILE_VERSION in dependabot-core's
-# bun/lib/dependabot/bun/bun_package_manager.rb, Bun 1.3.14 in its image), and
-# this lock, written by Bun 1.4.2, is version 2.
+# Not Dependabot, though its Bun updater reads this lock: it reads bun.lock up
+# to lockfileVersion 1 (MAX_SUPPORTED_LOCKFILE_VERSION in dependabot-core's
+# bun/lib/dependabot/bun/bun_package_manager.rb), and this one is 1 — but it
+# would bump the devDependency alone, where a ^0.x peer must widen with it and
+# a changeset must come along, and it stops reading the lock the day a Bun
+# upgrade writes version 2, as nxgt-data's already is.
 #
 # Something behind opens one issue, or updates the one already open, and fails
 # the run; everything current closes it. The bump itself is a pull request

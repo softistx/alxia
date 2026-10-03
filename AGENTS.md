@@ -155,8 +155,11 @@ they write.
   are `contents: read` and `issues: write`, nothing more. The bump is a pull
   request like any other: the devDependency, the peer range when it must
   widen, `bun.lock`, and a changeset, since it is a change under
-  `packages/`. Not Dependabot: its Bun updater reads `bun.lock` up to
-  `lockfileVersion` 1, and this one, from Bun 1.4.2, is 2.
+  `packages/`. Not Dependabot, though its Bun updater reads this
+  `lockfileVersion` 1 lock: it would bump the devDependency alone, where a
+  `^0.x` peer must widen with it and a changeset must come along, and it
+  stops reading the lock the day a Bun upgrade writes version 2, as
+  nxgt-data's already is.
 
 ## TypeScript
 

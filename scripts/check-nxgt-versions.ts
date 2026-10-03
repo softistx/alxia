@@ -17,8 +17,10 @@
  * peer range and whether it admits `latest`, since a bump outside it is a
  * widening, with its changeset.
  *
- * Dependabot would do it, but not here: its Bun updater reads `bun.lock` up to
- * `lockfileVersion` 1 and this one, written by Bun 1.4.2, is 2.
+ * Not Dependabot, though its Bun updater reads this `lockfileVersion` 1 lock:
+ * it would bump the devDependency alone, where a `^0.x` peer must widen with
+ * it and a changeset must come along, and it stops reading the lock the day a
+ * Bun upgrade writes version 2, as nxgt-data's already is.
  *
  * Exits 0 when everything is current, 1 when something is behind, 2 when it
  * could not tell — a registry that does not answer is a failure, never
@@ -101,7 +103,9 @@ export function tracked(
 /**
  * The tracked packages whose oldest locked version is below `latest`, or that
  * `bun.lock` does not hold at all. Pure. A package missing from `latest`
- * throws: not knowing is not "current".
+ * throws: not knowing is not "current". A prerelease `latest`, which no
+ * `@nxgt/*` package publishes, would read as not admitted: semver keeps
+ * prereleases out of a range that does not name one.
  */
 export function behind(
 	packages: readonly Tracked[],

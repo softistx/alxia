@@ -130,6 +130,37 @@ describe('behind', () => {
 		).toEqual([false]);
 	});
 
+	test('admits latest only when every peer range declaring it does', () => {
+		const two = new Map<string, Manifest>([
+			[
+				'packages/a',
+				{
+					name: '@alxia/a',
+					peerDependencies: { '@nxgt/redis': '^0.3.1 || ^0.4.0' },
+					devDependencies: { '@nxgt/redis': '^0.3.1' },
+				},
+			],
+			[
+				'packages/b',
+				{
+					name: '@alxia/b',
+					peerDependencies: { '@nxgt/redis': '^0.3.1' },
+					devDependencies: { '@nxgt/redis': '^0.3.1' },
+				},
+			],
+		]);
+		const found = behind(
+			tracked(two, lock),
+			new Map([['@nxgt/redis', '0.4.0']]),
+		);
+		expect(found.map((one) => [one.peers, one.admitted])).toEqual([
+			[['^0.3.1', '^0.3.1 || ^0.4.0'], false],
+		]);
+		expect(report(found)).toEqual([
+			'@nxgt/redis: 0.3.1 → 0.4.0 (packages/a, packages/b, peer ^0.3.1 and ^0.3.1 || ^0.4.0 must widen)',
+		]);
+	});
+
 	test('does not report a lock ahead of latest, as after a dist-tag moved back', () => {
 		expect(behind(packages, at('0.3.0'))).toEqual([]);
 	});
@@ -233,6 +264,17 @@ describe('check', () => {
 			lines: ['npm has no latest @nxgt/i18n: 503 Service Unavailable'],
 		});
 	});
+});
+
+test('check exits 2 when the repository cannot be read', async () => {
+	expect(
+		await check(
+			async () => {
+				throw new Error('ENOENT: bun.lock');
+			},
+			async () => '0.0.0',
+		),
+	).toEqual({ code: 2, lines: ['ENOENT: bun.lock'] });
 });
 
 describe('read', () => {
