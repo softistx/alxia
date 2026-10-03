@@ -257,6 +257,26 @@ describe('start', () => {
 		}
 	});
 
+	test('a signal sent from onListen runs the onStop hooks: the handlers are in place first', async () => {
+		const { child, out } = await run(
+			[
+				'const server = createServer({',
+				"\tconfigure: (app) => app.onStop(() => console.log('onStop ran')),",
+				"\tlisten: { port: 0, hostname: '127.0.0.1' },",
+				"\tonListen: () => process.kill(process.pid, 'SIGTERM'),",
+				'});',
+				'server.start(server.create({ build }));',
+			],
+			'onStop ran',
+		);
+		try {
+			expect(out).toContain('onStop ran');
+			expect(await child.exited).toBe(0);
+		} finally {
+			child.kill();
+		}
+	});
+
 	test('an onStop hook that throws on SIGTERM ends the process with 1, printing the error', async () => {
 		const { child } = await run(
 			[

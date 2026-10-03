@@ -320,7 +320,7 @@ Every option is optional:
 | `getLoadContext(ctx, context)` | sets the app's own keys on React Router's provider, `ctx` typed by `configure`'s app |
 | `build`, `mode`, `client` | override what the plugin wires; see [Escape hatches](#escape-hatches) |
 | `listen` | `listen`'s options for `bun build/server/index.js`: `port`, `hostname`, `idleTimeout`, `maxRequestBodySize`, `tls`. A `port` or `hostname` given here wins over `PORT` and `HOST` |
-| `onListen(server)` | called once the built server listens, in place of the `alxia listening on …` line |
+| `onListen(server)` | called once the built server listens and its `SIGINT` and `SIGTERM` handlers are in place, in place of the `alxia listening on …` line; a signal sent from then on runs the `onStop` hooks |
 
 A request goes through four layers, in order:
 
