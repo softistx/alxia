@@ -56,6 +56,16 @@ so `bun add` warns until it is raised; 7 works too.
 +    "start": "bun build/server/index.js",
 ```
 
+```toml
+# bunfig.toml, a new file beside package.json
+[run]
+bun = true
+```
+
+The `react-router` CLI is a Node script (`#!/usr/bin/env node`): where a
+node is installed, `bun run dev` would start it on Node, and alxia's
+server needs Bun. `bun = true` makes `bun run` start it on Bun.
+
 That is all. There is no server file: alxia's default server serves the
 pages in `react-router dev` and from the build, with the client's hashed
 files cached immutable.
