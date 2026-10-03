@@ -331,6 +331,17 @@ alxia().use(auth).use(tenant); // ok: auth adds a user, or answers 401
 alxia().use(tenant);           // compile error: the plugin reads "user", which this app's context does not give
 ```
 
+A tool that reads `app.routes` — a route check, a document — finds a path
+as the core declares and matches it with `joinPath` and `shapeOf`:
+
+```ts
+import { joinPath, shapeOf } from '@alxia/core';
+
+joinPath('/api', '/pets/:petId');                    // '/api/pets/:petId'
+joinPath('/api', '/');                               // '/api'
+shapeOf('/pets/:id') === shapeOf('/pets/:petId');    // true: the router sends them the same requests
+```
+
 [Writing a plugin](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md)
 covers all three kinds.
 
@@ -353,6 +364,8 @@ covers all three kinds.
 | `Requiring<Requires>`, `ProvidedBy<Ctx, Requires>` | the marker on a `definePlugin` plugin, and the check `use` makes of it |
 | `ListenOptions` | the options of `listen`: `port`, `hostname`, `development`, `idleTimeout`, `maxRequestBodySize`, `tls` |
 | `RequestHook`, `ResponseHook`, `AroundHook`, `StartHook`, `StopHook`, `BodyParser` | the hooks of `onRequest`, `onResponse`, `around`, `onStart`, `onStop`, and a body parser |
+| `joinPath(prefix, path)` | a path under a prefix, as the app joins them: `joinPath('/api', '/')` is `'/api'`; typed `JoinPath` |
+| `shapeOf(path)` | the path with its parameter names erased, as the router compares them: `shapeOf('/pets/:id') === shapeOf('/pets/:petId')`; throws a `TypeError` for a path no route may be declared at |
 | `withHeaders`, `vary`, `check` | for plugins: edit a response's headers (copied when immutable; an error of the edit leaves the body unread), add to `Vary`, run a schema |
 | `Checked` | what `check` returns: the value, or its issues |
 | `RoutesOf<App>`, `Jsonify<T>` | the route table the client reads, and what a value is on the wire |

@@ -10,6 +10,7 @@ it to fail prints nothing; those are under [Traps](#traps), by symptom.
 - [`TypeError: implemented(): … operations have no route: …`](#typeerror-implemented--operations-have-no-route-)
 - [`TypeError: exactly(): … routes have no operation: …`](#typeerror-exactly--routes-have-no-operation-)
 - [`TypeError: implemented(): the prefix "…" must start with "/" and not end with one`](#typeerror-implemented-the-prefix--must-start-with--and-not-end-with-one)
+- [`TypeError: implemented(): "…": ":…" is not a parameter name`](#typeerror-implemented---is-not-a-parameter-name)
 
 **Types**
 
@@ -108,6 +109,30 @@ given, it would name `/api//pets/:petId`, and every operation would be
 reported missing.
 
 **Fix:** write it as the app's: `{ prefix: '/api' }`.
+
+### `TypeError: implemented(): "…": ":…" is not a parameter name`
+
+Also as `exactly(): …`, and with any other message the core throws for a
+route path:
+`The route path "…" must start with "/"`, `"…": "*" may only end a path`,
+`"…" declares ":…" twice`.
+
+```text
+TypeError: implemented(): "/pets/:pet-id": ":pet-id" is not a parameter name
+```
+
+**When:** an operation's path is one no route may be declared at: a
+parameter that is not an identifier, a `*` before the last segment, a name
+given twice.
+
+**Why:** an operation is matched by its shape, which the core's `shapeOf`
+reads as the router does, and it refuses such a path as `app.route` would.
+No route could serve it, so the check throws, naming the path and the
+core's reason, rather than list it.
+
+**Fix:** rename the parameter in the operation, as the route that serves it
+must: `/pets/:petId`. A generator writing `operations` from a document turns
+`{pet-id}` into a name the core accepts.
 
 ## Types
 

@@ -138,7 +138,9 @@ if (Bun.env['NODE_ENV'] !== 'production') {
 
 **With a prefix**, or inside a group — one with a parameter too, such as
 `/:tenant` — `path` and `ui` are under it like any route, and the page asks
-for the document under the path it was itself asked at:
+for the document under the path it was itself asked at, joined to `path` as
+the core joins a prefix (`joinPath` from `@alxia/core`: `/openapi.json`
+under `/v1` is `/v1/openapi.json`):
 
 ```ts
 const api = alxia({ prefix: '/api' }).get('/ping', ({ reply }) => reply(200, 'pong'));

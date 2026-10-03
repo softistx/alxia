@@ -67,8 +67,8 @@ implemented(app, operations, { prefix: '/api' });
 
 - by method and path, as `app.routes` holds them: groups, plugins and the
   prefix included
-- by the path's shape: a `GET /pets/:id` serves the `GET /pets/:petId`
-  operation, as the router matches them alike
+- by the path's shape, the core's `shapeOf`: a `GET /pets/:id` serves the
+  `GET /pets/:petId` operation, as the router matches them alike
 - a `HEAD` operation is served by the `GET` route, as the core serves it
 - operations as an object, named by their keys (`operations` of `alxia.ts`),
   or as a list, named by `schema.detail.operationId` when they have one
@@ -81,7 +81,7 @@ schema.
 
 | export | |
 | --- | --- |
-| `implemented(app, operations, options?)`, `ImplementedOptions` | throws a `TypeError` listing each operation with no route. `prefix` |
+| `implemented(app, operations, options?)`, `ImplementedOptions` | throws a `TypeError` listing each operation with no route, or one with the core's reason for an operation path no route may be declared at. `prefix` |
 | `exactly(app, operations, options?)`, `ExactlyOptions` | the same, and each route no operation declares. `prefix`, `exclude` |
 | `Operations` | what both take: an object of core's `RouteOperation`, or a list of them |
 

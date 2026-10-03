@@ -1,4 +1,9 @@
-import { alxia, type BaseContext, type RouteDefinition } from '@alxia/core';
+import {
+	alxia,
+	type BaseContext,
+	joinPath,
+	type RouteDefinition,
+} from '@alxia/core';
 import { openapi } from './document';
 import type { OpenApiDocument, OpenApiOptions } from './types';
 
@@ -43,7 +48,7 @@ export function docs(
 	const show = ({ url, reply }: BaseContext) =>
 		reply(
 			200,
-			page(options.info.title, join(prefixOf(url.pathname, ui), path)),
+			page(options.info.title, joinPath(prefixOf(url.pathname, ui), path)),
 			{
 				headers: {
 					'content-type': 'text/html;charset=utf-8',
@@ -69,11 +74,6 @@ function prefixOf(pathname: string, declared: string): string {
 			: pathname;
 	if (declared === '/') return asked === '/' ? '' : asked;
 	return asked.slice(0, asked.length - declared.length);
-}
-
-function join(prefix: string, path: string): string {
-	if (prefix === '') return path;
-	return path === '/' ? prefix : `${prefix}${path}`;
 }
 
 /** What the reference page loads: Scalar from jsDelivr, and the document from here. */

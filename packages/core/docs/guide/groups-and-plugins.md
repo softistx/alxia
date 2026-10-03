@@ -151,7 +151,7 @@ whose context does not give `Requires`. See
 
 ## For plugin authors
 
-Plugins use the core's public API, and three helpers are exported for
+Plugins use the core's public API, and five helpers are exported for
 them:
 
 | Export | Signature | For |
@@ -159,6 +159,8 @@ them:
 | `withHeaders` | `(response: Response, edit: (headers: Headers) => void) => Response` | editing a response's headers, copying it when they are immutable; an error of `edit` is thrown with the body unread (on a mutable response, headers set before it stay); on immutable headers `edit` runs twice, so keep it free of side effects |
 | `vary` | `(headers: Headers, value: string) => void` | adding to `Vary` once, leaving `*` alone; `*` itself replaces every name, and an empty name adds nothing |
 | `check` | `(schema: StandardSchemaV1, value: unknown, target: ValidationTarget) => Promise<Checked>` | running a schema as a route does: its output, or its issues |
+| `joinPath` | `<Prefix extends string, Path extends string>(prefix: Prefix, path: Path) => JoinPath<Prefix, Path>` | a path under a prefix, as `alxia({ prefix })`, `group` and `use` join them: `/` under `/api` is `/api`, and `''` leaves the path as it is |
+| `shapeOf` | `(path: string) => string` | the path with its parameter names erased, as the router compares two paths: `'/pets/:'` for `/pets/:id` and `/pets/:petId` alike. Only a whole `:name` segment is a parameter, so `/at/10:30` is literal. Throws the `TypeError` of [Paths](routes.md#paths) for a path no route may be declared at |
 
 ```ts
 import { alxia, check, type Plugin, vary, withHeaders } from '@alxia/core';
@@ -176,6 +178,21 @@ const tenant = alxia().derive(async ({ request, reply }) => {
 		? { tenant: (checked.value as z.output<typeof Tenant>)['x-tenant'] }
 		: reply(400, { error: 'validation' as const, issues: checked.issues });
 });
+```
+
+A tool that reads `app.routes` — `@alxia/openapi-routes` is one — looks a
+path up as the core declares and matches it:
+
+```ts
+import { alxia, joinPath, shapeOf } from '@alxia/core';
+
+const app = alxia({ prefix: '/api' }).get('/pets/:id', ({ params, reply }) => reply(200, params.id));
+
+// does the app serve GET /pets/:petId, written without the prefix?
+const wanted = shapeOf(joinPath('/api', '/pets/:petId'));
+app.routes.some((route) => route.method === 'GET' && shapeOf(route.path) === wanted); // true
+
+shapeOf('pets'); // throws: The route path "pets" must start with "/"
 ```
 
 ```ts

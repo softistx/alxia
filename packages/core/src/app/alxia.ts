@@ -1,6 +1,7 @@
 import type { AnyReply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
-import { compilePath, Router } from '../router/router';
+import { joinPath, shapeOf } from '../router/paths';
+import { Router } from '../router/router';
 import { fileHandler, staticHandler } from '../static/serve';
 import type {
 	FileOptions,
@@ -362,7 +363,7 @@ export class Alxia<
 	 * and the app's hooks do not run around it; `app.fetch` answers it 404.
 	 */
 	page<const Path extends RoutePath>(path: Path, bundle: Bun.HTMLBundle): this {
-		this.#page(this.#join(path), bundle);
+		this.#page(joinPath(this.#prefix, path), bundle);
 		return this;
 	}
 
@@ -403,7 +404,7 @@ export class Alxia<
 		Shortcuts
 	> {
 		const definition: SocketDefinition = {
-			path: this.#join(path),
+			path: joinPath(this.#prefix, path),
 			schema,
 			handlers: handlers as SocketDefinition['handlers'],
 			derive: [...this.#derive],
@@ -583,7 +584,7 @@ export class Alxia<
 	): AnyAlxia {
 		const [prefix, build] =
 			typeof prefixOrBuild === 'string'
-				? [this.#join(prefixOrBuild), maybeBuild]
+				? [joinPath(this.#prefix, prefixOrBuild), maybeBuild]
 				: [this.#prefix, prefixOrBuild];
 		if (build === undefined) throw new TypeError('group(): build is missing');
 		const child = new Alxia({
@@ -639,7 +640,7 @@ export class Alxia<
 		for (const route of plugin.routes) {
 			this.#register({
 				...route,
-				path: this.#join(route.path),
+				path: joinPath(this.#prefix, route.path),
 				derive: [...this.#derive, ...route.derive],
 				onError: [...route.onError, ...this.#onError],
 			});
@@ -647,7 +648,7 @@ export class Alxia<
 		for (const socket of plugin.sockets) {
 			this.#mount({
 				...socket,
-				path: this.#join(socket.path),
+				path: joinPath(this.#prefix, socket.path),
 				derive: [...this.#derive, ...socket.derive],
 				onError: [...socket.onError, ...this.#onError],
 			});
@@ -663,7 +664,7 @@ export class Alxia<
 			this.#runtime.globals.onStop.push(...globals.onStop);
 			this.#runtime.globals.parsers.push(...globals.parsers);
 			for (const [path, bundle] of globals.pages) {
-				this.#page(this.#join(path), bundle);
+				this.#page(joinPath(this.#prefix, path), bundle);
 			}
 		}
 		return this;
@@ -741,11 +742,6 @@ export class Alxia<
 		for (const hook of this.#runtime.globals.onStop) await hook();
 	}
 
-	#join(path: string): string {
-		if (this.#prefix === '') return path;
-		return path === '/' ? this.#prefix : `${this.#prefix}${path}`;
-	}
-
 	#method(method: Method) {
 		return (
 			path: string,
@@ -761,7 +757,7 @@ export class Alxia<
 			}
 			this.#register({
 				method,
-				path: this.#join(path),
+				path: joinPath(this.#prefix, path),
 				schema,
 				handler,
 				derive: [...this.#derive],
@@ -789,9 +785,9 @@ export class Alxia<
 
 	/** The page declared at a path of the same shape as `path`. */
 	#pageAt(path: string): string | undefined {
-		const shape = compilePath(path).shape;
+		const shape = shapeOf(path);
 		for (const page of this.#runtime.globals.pages.keys()) {
-			if (compilePath(page).shape === shape) return page;
+			if (shapeOf(page) === shape) return page;
 		}
 		return undefined;
 	}
