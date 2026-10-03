@@ -33,12 +33,12 @@ the same arguments. `ws` declares a socket ([WebSockets](websockets.md)); `stati
 ```ts
 interface RouteMethod<M, Ctx, Routes, Prefix, Shortcuts> {
 	<const Path extends RoutePath, Schema extends RouteSchema, Result extends HandlerResult<Schema>>(
-		path: Path,
+		path: Path, // a literal the app would refuse does not compile: `Invalid path: …`
 		schema: Schema & ValidSchema<JoinPath<Prefix, Path>, Schema>,
 		handler: (ctx: Context<Ctx, JoinPath<Prefix, Path>, Schema>) => MaybePromise<Result>,
 	): Alxia</* … the route added … */>;
 	<const Path extends RoutePath, Result extends AnyReply>(
-		path: Path,
+		path: Path, // checked as above
 		handler: (ctx: Context<Ctx, JoinPath<Prefix, Path>, Empty>) => MaybePromise<Result>,
 	): Alxia</* … */>;
 }
@@ -193,8 +193,8 @@ app.get('/at/10:30', handler);
 // '"Invalid path: \"/at/10:30\": \":\" may only start a segment, as a parameter"'.
 ```
 
-The type reads a path's own syntax — every rule of the table but `/café`
-— under the app's prefix and the group's. Left to the `TypeError` are a
+The type reads a path's own syntax — the rows from `'/a/*/b'` to
+`'/a/./b'`; `'users'` fails on `RoutePath` instead — under the app's prefix and the group's. Left to the `TypeError` are a
 literal the URL percent-encodes (`/café`), a path typed `string`, and what
 takes two routes: a shape or a method and path declared twice
 ([troubleshooting](../troubleshooting.md#argument-of-type--is-not-assignable-to-parameter-of-type-invalid-path-)).

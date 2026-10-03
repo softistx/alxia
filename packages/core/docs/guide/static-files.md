@@ -23,6 +23,17 @@ client types them. `page` is the exception, below.
 static<const Path extends RoutePath>(path: Path, source: FileSource, options?: StaticOptions): Alxia<…>
 ```
 
+`path/*` is checked as a route path: `static('/assets/*', …)` does not
+compile, its route `/assets/*/*` having a `*` before the end. A function
+forwarding a path generic in `P` names it as the type argument, since the
+check waits for `P` to be known:
+
+```ts
+export function servedAt<const P extends RoutePath>(path: P) {
+	return alxia().static<P>(path as never, './public');
+}
+```
+
 A `GET` route at `path/*` (`/*` for `/`). The rest of the URL is looked up
 in `source`, then, for a path with no extension, with each of
 `extensions`, then as a directory with each `index`.
