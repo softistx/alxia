@@ -1361,6 +1361,9 @@ function send(
 			// A reply's Vary adds to the plugins': each said what it read.
 			if (key === 'vary') {
 				for (const name of value.split(',')) vary(headers, name);
+			} else if (key === 'set-cookie') {
+				// Each cookie is its own header: setting would keep the last.
+				headers.append(key, value);
 			} else headers.set(key, value);
 		}
 	}

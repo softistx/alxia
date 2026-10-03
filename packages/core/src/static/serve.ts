@@ -263,7 +263,10 @@ function send(
 			? options.headers(found.path, found.file)
 			: options.headers;
 	if (custom !== undefined) {
-		for (const [name, value] of new Headers(custom)) headers.set(name, value);
+		for (const [name, value] of new Headers(custom)) {
+			if (name === 'set-cookie') headers.append(name, value);
+			else headers.set(name, value);
+		}
 	}
 
 	if (fresh(request.headers, etag, modified))
