@@ -86,7 +86,7 @@ that reads `request.url` sees that host. Testing in process is on
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `headers` | `HeadersInit`, or a function returning one or its promise | none | Sent with every call. A function is called on every call, so a token read there is always the current one. |
+| `headers` | `HeadersInit`, or a function returning one or its promise | none | Sent with every call. A function is called on every call, so a token read there is always the current one. A socket sends an object only, and only under Bun ([sockets](events-and-sockets.md)). |
 | `fetch` | `(request: Request) => Promise<Response>` | the global `fetch` | What a URL target calls. Ignored when the target is an app or a handler: that is already the `fetch`. |
 
 ```ts
@@ -241,8 +241,9 @@ const result = await api.get('/users/:id', {
 An aborted call rejects with the signal's error — `AbortError` for
 `abort()`, `TimeoutError` for `AbortSignal.timeout` — and never resolves to
 a result ([Troubleshooting](../troubleshooting.md#aborterror-the-operation-was-aborted)).
-In process, the app's `fetch` does not read the signal: the call runs to
-the end.
+In process, with `client(app)`, the call rejects the same way, as soon as
+the signal aborts; the handler is not stopped, and runs to its end with
+nothing to answer.
 
 ## A realistic client
 

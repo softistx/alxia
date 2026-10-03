@@ -101,6 +101,9 @@ export function toEventStream(
 	const encoder = new TextEncoder();
 	const iterator = values[Symbol.asyncIterator]();
 	let timer: ReturnType<typeof setInterval> | undefined;
+	// Set once the reader is gone: an event still awaited then has nowhere
+	// to go, and is neither sent nor reported.
+	let cancelled = false;
 	const stop = () => {
 		if (timer !== undefined) clearInterval(timer);
 		timer = undefined;
@@ -115,6 +118,7 @@ export function toEventStream(
 				}
 			}, KEEP_ALIVE_MS);
 			signal?.addEventListener('abort', () => {
+				cancelled = true;
 				stop();
 				void iterator.return?.();
 			});
@@ -122,6 +126,7 @@ export function toEventStream(
 		async pull(controller) {
 			try {
 				const next = await iterator.next();
+				if (cancelled) return;
 				if (next.done) {
 					stop();
 					controller.close();
@@ -138,11 +143,15 @@ export function toEventStream(
 				);
 			} catch (error) {
 				stop();
+				// A real failure of the generator is reported even after the
+				// reader left; only the stream, gone already, is not errored.
 				console.error(error);
+				if (cancelled) return;
 				controller.error(error);
 			}
 		},
 		cancel() {
+			cancelled = true;
 			stop();
 			void iterator.return?.();
 		},

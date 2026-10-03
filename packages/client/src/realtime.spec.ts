@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { alxia, eventStream } from '@alxia/core';
 import { z } from 'zod';
 import { client } from './client';
+import { openSocket } from './ws/socket';
 
 const Tick = z.object({ n: z.number(), at: z.date() });
 
@@ -28,6 +29,27 @@ const app = alxia()
 		({ cookies, reply }) => reply(200, cookies.session),
 	)
 	.ws(
+		'/whoami',
+		{
+			headers: z.object({ 'x-user': z.string() }),
+			cookies: z.object({ session: z.string(), theme: z.string().optional() }),
+			send: z.object({
+				user: z.string(),
+				session: z.string(),
+				theme: z.string().optional(),
+			}),
+		},
+		{
+			open: (socket) =>
+				socket.send({
+					user: socket.data.headers['x-user'],
+					session: socket.data.cookies.session,
+					theme: socket.data.cookies.theme,
+				}),
+			message: () => {},
+		},
+	)
+	.ws(
 		'/echo/:room',
 		{
 			message: z.object({ text: z.string() }),
@@ -49,6 +71,47 @@ describe('server-sent events', () => {
 		const ticks: number[] = [];
 		for await (const tick of result.data) ticks.push(tick.n);
 		expect(ticks).toEqual([1, 2, 3]);
+	});
+});
+
+describe('leaving early', () => {
+	test('a break out of an event stream ends it quietly', async () => {
+		const endless = alxia().get('/forever', ({ reply }) =>
+			reply(
+				200,
+				(async function* () {
+					for (let n = 0; ; n++) {
+						yield n;
+						await Bun.sleep(1);
+					}
+				})(),
+			),
+		);
+		const original = console.error;
+		const logged: unknown[] = [];
+		console.error = (...args: unknown[]) => logged.push(args);
+		try {
+			const result = await client(endless).get('/forever');
+			for await (const n of result.data as AsyncIterable<number>) {
+				if (n === 2) break;
+			}
+			await Bun.sleep(50);
+		} finally {
+			console.error = original;
+		}
+		expect(logged).toEqual([]);
+	});
+
+	test('an aborted call rejects in process, as fetch does', async () => {
+		const slow = alxia().get('/slow', async ({ reply }) => {
+			await Bun.sleep(200);
+			return reply(200, 'late');
+		});
+		const controller = new AbortController();
+		setTimeout(() => controller.abort(), 10);
+		await expect(
+			client(slow).get('/slow', { signal: controller.signal }),
+		).rejects.toThrow(expect.objectContaining({ name: 'AbortError' }));
 	});
 });
 
@@ -78,6 +141,42 @@ describe('websockets', () => {
 		} finally {
 			await app.stop(true);
 		}
+	});
+
+	test('its typed headers and cookies go with the upgrade', async () => {
+		const server = app.listen({ port: 0 });
+		try {
+			const socket = client<typeof app>(server.url, {
+				headers: { cookie: 'theme=dark' },
+			}).ws('/whoami', {
+				headers: { 'x-user': 'ada' },
+				cookies: { session: 'abc' },
+			});
+			const first = await socket[Symbol.asyncIterator]().next();
+			expect(first.value).toEqual({
+				user: 'ada',
+				session: 'abc',
+				theme: 'dark',
+			});
+			socket.close();
+		} finally {
+			await app.stop(true);
+		}
+	});
+
+	test("outside Bun, the call's own headers are refused, the client's left out", () => {
+		const url = new URL('ws://127.0.0.1:9/x');
+		const own = new Headers({ 'x-user': 'ada' });
+		expect(() => openSocket(url, { merged: own, own }, false)).toThrow(
+			"ws(/x): outside Bun, a WebSocket cannot send headers or cookies; a browser sends its own cookies for the socket's host, and anything else goes in the query",
+		);
+		const socket = openSocket(
+			url,
+			{ merged: new Headers({ authorization: 'x' }), own: new Headers() },
+			false,
+		);
+		expect(socket.raw).toBeInstanceOf(WebSocket);
+		socket.close();
 	});
 
 	test('in process, a socket is refused: it needs a server', () => {

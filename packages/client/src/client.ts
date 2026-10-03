@@ -67,7 +67,13 @@ export function client<App extends AppLike>(
 		const url = new URL(send.base + fillPath(path, input.params ?? {}));
 		appendQuery(url, input.query);
 		url.protocol = url.protocol === 'https:' ? 'wss:' : 'ws:';
-		return openSocket(url);
+		const own = new Headers();
+		addInput(own, input);
+		const merged = new Headers(
+			typeof options.headers === 'function' ? undefined : options.headers,
+		);
+		addInput(merged, input);
+		return openSocket(url, { merged, own });
 	};
 	return methods as Client<App>;
 }
@@ -81,9 +87,10 @@ function sender(
 		return { base, fetch: options.fetch ?? ((request) => fetch(request)) };
 	}
 	if ('fetch' in target && typeof target.fetch === 'function') {
+		const local = target.fetch as (request: Request) => Promise<Response>;
 		return {
 			base: IN_PROCESS,
-			fetch: target.fetch as (request: Request) => Promise<Response>,
+			fetch: (request) => abortable(local(request), request.signal),
 		};
 	}
 	throw new TypeError('client(): give it a URL, or an app with a fetch');
@@ -107,19 +114,7 @@ async function call(
 	for (const [key, value] of new Headers(input.init?.headers)) {
 		headers.set(key, value);
 	}
-	for (const [key, value] of Object.entries(input.headers ?? {})) {
-		if (value !== undefined) headers.set(key, stringify(value));
-	}
-	const cookies = Object.entries(input.cookies ?? {})
-		.filter(([, value]) => value !== undefined)
-		.map(
-			([name, value]) =>
-				`${encodeURIComponent(name)}=${encodeURIComponent(stringify(value))}`,
-		);
-	if (cookies.length > 0) {
-		const existing = headers.get('cookie');
-		headers.set('cookie', [existing, ...cookies].filter(Boolean).join('; '));
-	}
+	addInput(headers, input);
 
 	let body: BodyInit | undefined;
 	if (input.body !== undefined) {
@@ -156,6 +151,38 @@ async function call(
 		data,
 		response,
 	};
+}
+
+/** `response`, or the abort's reason once `signal` aborts first, as `fetch` would. */
+function abortable(
+	response: Promise<Response>,
+	signal: AbortSignal,
+): Promise<Response> {
+	if (signal.aborted) return Promise.reject(signal.reason);
+	return new Promise((resolve, reject) => {
+		const abort = () => reject(signal.reason);
+		signal.addEventListener('abort', abort, { once: true });
+		response
+			.then(resolve, reject)
+			.finally(() => signal.removeEventListener('abort', abort));
+	});
+}
+
+/** The call's typed headers, and its typed cookies as the `cookie` header. */
+function addInput(headers: Headers, input: CallInput): void {
+	for (const [key, value] of Object.entries(input.headers ?? {})) {
+		if (value !== undefined) headers.set(key, stringify(value));
+	}
+	const cookies = Object.entries(input.cookies ?? {})
+		.filter(([, value]) => value !== undefined)
+		.map(
+			([name, value]) =>
+				`${encodeURIComponent(name)}=${encodeURIComponent(stringify(value))}`,
+		);
+	if (cookies.length > 0) {
+		const existing = headers.get('cookie');
+		headers.set('cookie', [existing, ...cookies].filter(Boolean).join('; '));
+	}
 }
 
 /** `path` with its parameters filled in, each one encoded. */

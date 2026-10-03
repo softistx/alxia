@@ -72,7 +72,8 @@ ticks.data; // AsyncIterable<{ n: number; at: string }>
 The call resolves as soon as the headers arrive; the events are read as the
 loop asks for them. The stream ends when the server's generator returns.
 Leaving the loop early — `break`, `return`, a throw — cancels the body, and
-the server's generator is closed.
+the server's generator is closed, its `finally` run; the server logs
+nothing.
 
 Each event's `data` is parsed as JSON. Comments, such as the server's
 keep-alives, are skipped; an event with several `data:` lines is read as
@@ -197,12 +198,62 @@ A socket needs a server: `client(app).ws()` throws in process
 
 ### What a socket sends besides its messages
 
-The path, with its params, and the query string. **Not** typed `headers`
-or `cookies`: a `WebSocket` cannot set request headers, so they are
-dropped, and a route that requires them refuses the upgrade
-([Troubleshooting](../troubleshooting.md#a-socket-whose-route-reads-headers-never-opens)).
-Put what the upgrade needs in the query, or, in a browser, in the origin's
-cookies, which the browser sends itself.
+The path, with its params, and the query string, everywhere. Headers and
+cookies depend on where the socket opens, because only Bun's `WebSocket`
+takes headers.
+
+| Sent with the upgrade | Under Bun | Outside Bun (a browser, Node, Deno) |
+| --- | --- | --- |
+| `params`, `query` | yes | yes |
+| the call's typed `headers` and `cookies` | yes; cookies as the `cookie` header | `api.ws()` throws a `TypeError` |
+| `ClientOptions.headers`, an object | yes; the call's own headers win | left out |
+| `ClientOptions.headers`, a function | not called | not called |
+| the site's own cookies | — | sent by the browser itself |
+| `init`, `signal` | not read | not read |
+
+Under Bun — a server calling another, a script, a test over HTTP — a route
+that reads headers or cookies opens like any call:
+
+```ts
+// server.ts
+export const app = alxia().ws(
+	'/whoami',
+	{
+		headers: z.object({ 'x-user': z.string() }),
+		cookies: z.object({ session: z.string() }),
+		send: z.object({ user: z.string(), session: z.string() }),
+	},
+	{
+		open: (socket) =>
+			socket.send({ user: socket.data.headers['x-user'], session: socket.data.cookies.session }),
+		message: () => {},
+	},
+);
+```
+
+```ts
+const api = client<App>('http://localhost:3000', { headers: { 'x-tenant': 'acme' } });
+const socket = api.ws('/whoami', { headers: { 'x-user': 'ada' }, cookies: { session: 'abc' } });
+// the upgrade carries x-tenant: acme, x-user: ada and cookie: session=abc
+const first = await socket[Symbol.asyncIterator]().next();
+first.value; // { user: 'ada', session: 'abc' }
+```
+
+A browser's `WebSocket` cannot send headers, so there a call that passes
+its own `headers` or `cookies` throws at once, from `api.ws()`, rather than
+open a socket the server would refuse:
+
+```text
+TypeError: ws(/whoami): outside Bun, a WebSocket cannot send headers or cookies; a browser sends its own cookies for the socket's host, and anything else goes in the query
+```
+
+In a browser, let the browser send the site's cookies, and put anything
+else the upgrade needs in the query
+([Troubleshooting](../troubleshooting.md#typeerror-ws-outside-bun-a-websocket-cannot-send-headers-or-cookies-a-browser-sends-its-own-cookies-for-the-sockets-host-and-anything-else-goes-in-the-query)):
+
+```ts
+const socket = api.ws('/room', { query: { token } }); // a route whose query schema reads `token`
+```
 
 ## A realistic chat room
 

@@ -55,7 +55,9 @@ made: what a plugin documenting the app — an OpenAPI generator — reads.
 - While nothing is sent, a `: keep-alive` comment goes out every eight
   seconds: Bun closes a connection that stays silent.
 - When the client leaves, the generator is closed: its `finally` runs, so
-  release there what it holds.
+  release there what it holds. An event it was still producing is dropped,
+  and nothing is logged, unless the generator itself throws: that error is
+  still logged.
 - When the generator returns, the stream ends.
 
 ```ts
