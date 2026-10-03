@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/secure-headers",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Secure HTTP headers for alxia: HSTS, CSP, nosniff and the rest, each one adjustable",
 	"license": "MIT",
 	"type": "module",
