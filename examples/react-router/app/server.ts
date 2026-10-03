@@ -17,13 +17,18 @@ const server = createServer({
       .use(compress())
       .use(
         secureHeaders({
+          // A fresh nonce per request, added to script-src: entry.server
+          // reads it with nonceOf(loadContext), and React Router puts it on
+          // every script it renders, so no inline script needs
+          // 'unsafe-inline'.
+          nonce: true,
           // The default, `default-src 'none'; form-action 'none'`, suits an
           // API: on a page it blocks React Router's inline scripts, so the
           // page never hydrates, and every <Form> post. This allows the
           // page's own, and the template's Google Fonts.
           contentSecurityPolicy: [
             "default-src 'self'",
-            "script-src 'self' 'unsafe-inline'",
+            "script-src 'self'",
             "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
             "font-src https://fonts.gstatic.com",
             "img-src 'self' data:",

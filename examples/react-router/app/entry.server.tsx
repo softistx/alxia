@@ -1,5 +1,6 @@
 import { PassThrough } from "node:stream";
 
+import { nonceOf } from "@alxia/react-router";
 import type { EntryContext, RouterContextProvider } from "react-router";
 import { createReadableStreamFromReadable } from "@react-router/node";
 import { ServerRouter } from "react-router";
@@ -43,8 +44,13 @@ export default function handleRequest(
     );
 
     const { pipe, abort } = renderToPipeableStream(
-      <ServerRouter context={routerContext} url={request.url} />,
+      <ServerRouter
+        context={routerContext}
+        url={request.url}
+        nonce={nonceOf(loadContext)}
+      />,
       {
+        nonce: nonceOf(loadContext),
         [readyOption]() {
           shellRendered = true;
           const body = new PassThrough({

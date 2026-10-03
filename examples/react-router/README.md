@@ -80,7 +80,8 @@ the build. Here it adds:
 
 | file | |
 | --- | --- |
-| `app/server.ts` | `logger()`, `compress()`, and `secureHeaders()` with a policy React Router's inline scripts, its `<Form>` posts and the template's Google Fonts pass (the default blocks all three). Also a session deriving `user`, `POST /api/todos` validated by a Zod schema, `getLoadContext` setting React Router's own `userContext`, and the `Register` declaration that types `alxiaOf(context)` |
+| `app/server.ts` | `logger()`, `compress()`, and `secureHeaders()` with `nonce: true` and a policy React Router's scripts, its `<Form>` posts and the template's Google Fonts pass (the default blocks all three); `script-src` has a fresh nonce per request, no `'unsafe-inline'`. Also a session deriving `user`, `POST /api/todos` validated by a Zod schema, `getLoadContext` setting React Router's own `userContext`, and the `Register` declaration that types `alxiaOf(context)` |
+| `app/entry.server.tsx` | React Router's own, from `bunx react-router reveal entry.server`, plus three lines: `nonceOf(loadContext)` from `@alxia/react-router`, given to `<ServerRouter nonce>` and to `renderToPipeableStream` (below) |
 | `app/session.server.ts` | sessions in memory, keyed by the `sid` cookie, which the `derive` reads from the request's `cookies`. Anyone may sign in by name: there is no real authentication |
 | `app/todos.server.ts` | the todos, in memory, and `NewTodo`, the schema both the page's form and the API's body are validated with |
 | `app/context.ts` | `userContext`, a React Router context key, for a route that does not import alxia |
@@ -94,6 +95,31 @@ The added dependencies are `@alxia/logger`, `@alxia/compress`,
 `@alxia/secure-headers` and `zod`. `@types/bun` is a dev dependency, and
 `"bun"` is added to the tsconfig's `types` for the session's
 `Bun.Cookie` and the spec.
+
+The nonce takes three lines in the revealed entry, and every script React
+Router and React render then carries the one the response's policy names:
+
+```diff
+ import { PassThrough } from "node:stream";
+
++import { nonceOf } from "@alxia/react-router";
+ import type { EntryContext, RouterContextProvider } from "react-router";
+ …
+     const { pipe, abort } = renderToPipeableStream(
+-      <ServerRouter context={routerContext} url={request.url} />,
++      <ServerRouter
++        context={routerContext}
++        url={request.url}
++        nonce={nonceOf(loadContext)}
++      />,
+       {
++        nonce: nonceOf(loadContext),
+         [readyOption]() {
+```
+
+The `<ServerRouter>` line is one line made longer; the formatter wraps it.
+`biome.json` turns `useConst` off for that file, so the template's `let`s
+stay as generated.
 
 `app/server.ts` is optional for a new app, but this example's routes read
 what it derives (`user`, `log`), so they need it. Within alxia's
@@ -120,11 +146,13 @@ bun run typecheck  # react-router typegen, then tsc
 bun run test       # the spec
 ```
 
-`bun run test` takes about a second and a half. It builds the app and runs
+`bun run test` takes about four seconds. It builds the app and runs
 `bun build/server/index.js` on a free port. It then sends requests with a
 browser's user agent: Bun's own is a bot to `isbot`, which gets the finished
-page, never a stream. It also builds a copy without `app/server.ts`, which
-checks the default server.
+page, never a stream. It starts `react-router dev` on a free port too, and
+checks there and in the build that every script carries the nonce of its
+response's policy, a new one each time. It also builds a copy without
+`app/server.ts`, which checks the default server.
 
 The template's `Dockerfile` is kept as generated, and it no longer works:
 it is based on a Node image with no Bun, and copies a `package-lock.json`
@@ -135,6 +163,6 @@ says how to deploy with Bun.
 ## Read more
 
 - [The `@alxia/react-router` README](https://github.com/softistx/alxia/blob/develop/packages/react-router/README.md): the quick start, `createServer`'s options and the API.
-- [Its guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): how dev and the build work, customising the server, typing the loaders, the app's own keys, escape hatches, testing and deploying.
+- [Its guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): how dev and the build work, customising the server, typing the loaders, the app's own keys, the CSP nonce, escape hatches, testing and deploying.
 - [Its troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none, the secure-headers policy among them.
 - [`@alxia/logger`](https://github.com/softistx/alxia/tree/develop/packages/logger), [`@alxia/compress`](https://github.com/softistx/alxia/tree/develop/packages/compress) and [`@alxia/secure-headers`](https://github.com/softistx/alxia/tree/develop/packages/secure-headers): the plugins `app/server.ts` uses.
