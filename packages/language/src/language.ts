@@ -1,19 +1,29 @@
-import { type BaseContext, definePlugin, type Empty, vary } from '@alxia/core';
-import { match, negotiate } from './negotiate';
-
-/** Where a language is read from. */
-export type LanguageSource = 'query' | 'cookie' | 'path' | 'header';
+import { type BaseContext, definePlugin, type Empty } from '@alxia/core';
+import { decide, respond, type Settings } from './decide';
+import type { LanguageContext, LanguageSource } from './types';
 
 /**
  * What a callback whose parameter is annotated `Ctx` reads beyond
  * `BaseContext`: `{ user: User }` for `BaseContext & { user: User }`, and
- * `Empty` when it reads nothing more.
+ * `Empty` when it reads nothing more. A key of `BaseContext` annotated with
+ * a type `BaseContext` does not give — `{ url: string }` — is kept, so `use`
+ * refuses it.
  */
-type RequiresOf<Ctx> = [Exclude<keyof Ctx, keyof BaseContext>] extends [never]
+type RequiresOf<Ctx> = [
+	keyof {
+		[Key in keyof Ctx as Key extends keyof BaseContext
+			? BaseContext[Key] extends Ctx[Key]
+				? never
+				: Key
+			: Key]: Ctx[Key];
+	},
+] extends [never]
 	? Empty
 	: {
 			[Key in keyof Ctx as Key extends keyof BaseContext
-				? never
+				? BaseContext[Key] extends Ctx[Key]
+					? never
+					: Key
 				: Key]: Ctx[Key];
 		};
 
@@ -61,13 +71,6 @@ export interface LanguageOptions<
 	readonly vary?: readonly string[];
 }
 
-/** What the routes behind the plugin read. */
-export interface LanguageContext<L extends string> {
-	readonly language: L;
-	/** Where it came from: `fallback` when nothing named one. */
-	readonly languageSource: LanguageSource | 'resolve' | 'fallback';
-}
-
 /**
  * The request's language, as a plugin: the routes declared after it read
  * `language`, typed as one of `supported` — never a string a client made
@@ -84,82 +87,33 @@ export function language<
 	const L extends string,
 	Ctx extends object = BaseContext,
 >(options: LanguageOptions<L, Ctx>) {
-	const order = options.order ?? ['query', 'cookie', 'header'];
-	const queryName = options.query ?? 'lang';
-	const cookieName = options.cookie ?? 'language';
-	const pathIndex = options.pathIndex ?? 0;
-	const persist =
-		options.persist === true
-			? {}
-			: options.persist === false
-				? undefined
-				: options.persist;
-	const supported = options.supported;
-	if (!supported.includes(options.fallback)) {
+	const settings: Settings<L> = {
+		supported: options.supported,
+		fallback: options.fallback,
+		order: options.order ?? ['query', 'cookie', 'header'],
+		query: options.query ?? 'lang',
+		cookie: options.cookie ?? 'language',
+		pathIndex: options.pathIndex ?? 0,
+		persist:
+			options.persist === true
+				? {}
+				: options.persist === false
+					? undefined
+					: options.persist,
+		contentLanguage: options.contentLanguage !== false,
+		// `use` has checked that the app gives what `resolve` reads.
+		resolve: options.resolve as Settings<L>['resolve'],
+		vary: options.vary ?? [],
+	};
+	if (!settings.supported.includes(settings.fallback)) {
 		throw new TypeError(
-			`language(): the fallback "${options.fallback}" is not supported`,
+			`language(): the fallback "${settings.fallback}" is not supported`,
 		);
 	}
-
-	const read = (ctx: BaseContext, source: LanguageSource): L | undefined => {
-		switch (source) {
-			case 'query': {
-				const value = ctx.url.searchParams.get(queryName);
-				return value === null ? undefined : match(value, supported);
-			}
-			case 'cookie': {
-				const value = new Bun.CookieMap(
-					ctx.request.headers.get('cookie') ?? '',
-				).get(cookieName);
-				return value === null ? undefined : match(value, supported);
-			}
-			case 'path': {
-				const segment = ctx.url.pathname.split('/').filter(Boolean)[pathIndex];
-				return segment === undefined ? undefined : match(segment, supported);
-			}
-			case 'header':
-				return negotiate(ctx.request.headers.get('accept-language'), supported);
-		}
-	};
-
-	// `use` has checked that the app gives what `resolve` reads.
-	const resolve = options.resolve as
-		| ((ctx: BaseContext) => string | undefined)
-		| undefined;
 	return definePlugin<RequiresOf<Ctx>>()((app) =>
 		app.derive((ctx): LanguageContext<L> => {
-			let found: LanguageContext<L> | undefined;
-			for (const source of order) {
-				const value = read(ctx, source);
-				if (value !== undefined) {
-					found = { language: value, languageSource: source };
-					break;
-				}
-			}
-			if (found === undefined && resolve !== undefined) {
-				const resolved = resolve(ctx);
-				const value =
-					resolved === undefined ? undefined : match(resolved, supported);
-				if (value !== undefined)
-					found = { language: value, languageSource: 'resolve' };
-			}
-			found ??= { language: options.fallback, languageSource: 'fallback' };
-
-			if (order.includes('header')) vary(ctx.set.headers, 'Accept-Language');
-			if (order.includes('cookie')) vary(ctx.set.headers, 'Cookie');
-			for (const name of options.vary ?? []) vary(ctx.set.headers, name);
-			if (options.contentLanguage !== false) {
-				ctx.set.headers.set('content-language', found.language);
-			}
-			if (persist !== undefined && found.languageSource === 'query') {
-				ctx.set.cookies.set(cookieName, found.language, {
-					path: '/',
-					sameSite: 'lax',
-					httpOnly: false,
-					secure: persist.secure ?? true,
-					maxAge: persist.maxAge ?? 365 * 24 * 60 * 60,
-				});
-			}
+			const found = decide(settings, ctx);
+			respond(settings, ctx, found);
 			return found;
 		}),
 	);

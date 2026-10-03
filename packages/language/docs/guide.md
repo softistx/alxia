@@ -220,9 +220,11 @@ It receives the request's `BaseContext` — `request`, `url`, `ip`,
 plugin added: see [Reading the app's context](#reading-the-apps-context). It
 returns a tag, or `undefined` for none. The tag is matched against
 `supported` like any other: a tag it does not support is ignored, and
-`fallback` decides. It is synchronous; a preference kept in a database is
-better written to the cookie when the user saves it — see
-[the realistic setup](#a-realistic-setup).
+`fallback` decides. It is synchronous: a preference kept in a database is
+either written to the cookie when the user saves it — see
+[the realistic setup](#a-realistic-setup) — or loaded by an async `derive`
+or plugin before `language()`, which `resolve` then reads — see
+[Reading the app's context](#reading-the-apps-context).
 
 ### Reading the app's context
 
@@ -260,9 +262,13 @@ alxia().use(byUser);
 ```
 
 The annotation may be `BaseContext & { user: User }` or `{ user: User }`
-alone; either way the plugin requires `{ user: User }`, and an app whose
-`user` has another type is refused too —
-`the plugin reads "user", which this app's context gives with another type`.
+alone; either way the plugin requires `{ user: User }`. An app whose `user`
+has a type that does not fit it is refused too —
+`the plugin reads "user", which this app's context gives with another type` —
+while a narrower one passes: an app deriving `user: User` may use a plugin
+that reads `User | null`. Annotating a key `BaseContext` already has with
+a type it does not give — `({ url }: { url: string })` — is refused the
+same way.
 A `resolve` left unannotated reads `BaseContext` only, and the plugin
 requires nothing.
 

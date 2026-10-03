@@ -88,6 +88,6 @@ alxia().use(byUser); // a compile error: this app gives no `user`
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/language/docs): every option with its default and an example, how the language is found and `Accept-Language` negotiated, the typed context, and the headers the plugin adds.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/language/docs): every option with its default and an example, how the language is found and `Accept-Language` negotiated, reading what an earlier plugin added, the typed context, and the headers the plugin adds.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md): an error, or a response in the wrong language, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/language/docs/roadmap.md): what is coming, and what is not planned.

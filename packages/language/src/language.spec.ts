@@ -159,6 +159,20 @@ describe('language', () => {
 		expect(_refused).toBeFunction();
 	});
 
+	test('a key of BaseContext annotated with a type it does not give is refused', () => {
+		const wrong = language({
+			supported: ['en'],
+			fallback: 'en',
+			resolve: ({ url }: { url: string }) => url.slice(1),
+		});
+		expectTypeOf(wrong['~requires']).toEqualTypeOf<{ url: string }>();
+		const _refused = () => {
+			// @ts-expect-error the plugin reads "url", which this app's context gives with another type
+			alxia().use(wrong);
+		};
+		expect(_refused).toBeFunction();
+	});
+
 	test('a fallback it does not support is refused', () => {
 		// @ts-expect-error: 'de' is not one of the supported languages
 		expect(() => language({ supported: ['en', 'fr'], fallback: 'de' })).toThrow(
