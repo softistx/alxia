@@ -498,6 +498,42 @@ describe('permission', () => {
 		expect(_refused).toBeFunction();
 	});
 
+	test('load, subject or ctx annotated any is refused on every app, by its name', () => {
+		const { access } = setup();
+		const find = byParam('id', (id) => ({ id, doctorId: null }));
+		const byLoad = permission(access, 'view', 'record', (ctx: any) => ({
+			id: String(ctx.id),
+			doctorId: null,
+		}));
+		const bySubject = permission(access, 'view', 'record', find, {
+			subject: (ctx: any) => ctx.member,
+		});
+		const byCtx = permission(access, 'edit', 'record', find, {
+			ctx: (ctx: any) => ({ locked: Boolean(ctx.locked) }),
+		});
+		type Message<Callback extends string> = {
+			readonly '~any': `the plugin's ${Callback} reads its context as any: annotate what it reads, or leave it unannotated`;
+		};
+		expectTypeOf<(typeof byLoad)['~requires']>().toEqualTypeOf<
+			Message<'load'>
+		>();
+		expectTypeOf<(typeof bySubject)['~requires']>().toEqualTypeOf<
+			Message<'subject'>
+		>();
+		expectTypeOf<(typeof byCtx)['~requires']>().toEqualTypeOf<Message<'ctx'>>();
+		const _refused = () => {
+			// @ts-expect-error the plugin's load reads its context as any
+			alxia().use(byLoad);
+			// @ts-expect-error the plugin's subject reads its context as any
+			alxia().use(bySubject);
+			alxia()
+				.derive(() => ({ locked: false }))
+				// @ts-expect-error the plugin's ctx reads its context as any, whatever the app gives
+				.use(byCtx);
+		};
+		expect(_refused).toBeFunction();
+	});
+
 	test('the permission, the type, the object and the condition stay inferred as before', () => {
 		const { access } = setup();
 		type Rec = { id: string; doctorId: string | null; title: string };

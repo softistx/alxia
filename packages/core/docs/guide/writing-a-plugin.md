@@ -192,7 +192,7 @@ import { type BaseContext, definePlugin, type RequiresOf } from '@alxia/core';
 export const audit = <Ctx extends object = BaseContext>(
 	who: (ctx: BaseContext & Ctx) => string,
 ) =>
-	definePlugin<RequiresOf<Ctx>>()((app) =>
+	definePlugin<RequiresOf<Ctx, 'who'>>()((app) =>
 		app.wrap(async (ctx, next) => {
 			const response = await next();
 			// `use` has checked that the app gives what `who` reads.
@@ -210,6 +210,13 @@ app.use(audit((ctx) => ctx.ip ?? 'unknown')); // unannotated: requires nothing
 | none — `Ctx` defaults to `BaseContext` | `Empty`: any app may use the plugin |
 | `BaseContext & { user: User }`, or `{ user: User }` | `{ user: User }` |
 | `{ url: string }`, a `BaseContext` key with a type it does not give | `{ url: string }`, so `use` refuses it |
+| `unknown` or `object` | `Empty`: the callback reads no key without a check of its own |
+| `Record<string, unknown>` | `{ [x: string]: unknown }`, a key no app's context gives, so `use` refuses it |
+| `any`, or `Record<string, any>` | a requirement `use` refuses on every app, with [`the plugin's who reads its context as any: annotate what it reads, or leave it unannotated`](../troubleshooting.md#the-plugins--reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated) |
+
+The second type argument names the callback in that message; it is
+`'callback'` when omitted. An `any` annotation would otherwise require
+nothing, and the check would be off without a word.
 
 A refusal prints the requirement itself, `{ user: User; }`, never
 `RequiresOf<…>`.

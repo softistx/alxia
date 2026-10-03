@@ -19,6 +19,7 @@ the response does that you did not expect.
 - [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
 - [`the plugin reads "user", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads-user-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
 - [`the plugin reads "user", which this app's context gives with another type`](#the-plugin-reads-user-which-this-apps-context-gives-with-another-type)
+- [`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
 **Responses**
 
@@ -305,6 +306,43 @@ language({
 
 More on this message in
 [`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-gives-with-another-type).
+
+### `the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`
+
+```text
+error TS2769: No overload matches this call.
+  …
+        Types of property ''~requires'' are incompatible.
+          Type '{ readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"; }' is not assignable to type '"the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"'.
+```
+
+**When:** `resolve`'s parameter is annotated `any` —
+`resolve: (ctx: any) => ctx.user.language` — and the plugin is used, on
+any app, whatever its context gives.
+
+**Why:** an `any` parameter reads any key and says nothing of what it
+reads, so the plugin would require nothing, and an app without a `user`
+would be accepted, and throw on every request. The plugin is refused
+instead.
+
+**Fix:** annotate what `resolve` reads, and use the plugin that adds it
+first:
+
+```ts
+const byUser = language({
+	supported: ['en', 'fr'],
+	fallback: 'en',
+	resolve: ({ user }: BaseContext & { user: User }) => user.language ?? undefined,
+});
+
+alxia().use(auth).use(byUser);
+```
+
+Or leave it unannotated when it reads only the request:
+`resolve: (ctx) => ctx.request.headers.get('x-preferred-language') ?? undefined`.
+
+More on this message in
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugins--reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated).
 
 ## Responses
 

@@ -44,5 +44,8 @@ Nothing scheduled yet.
   `({ user }: BaseContext & { user: User }) => user.language` — and it reads
   what an earlier plugin added; an app that does not give it cannot use the
   plugin. Unannotated, it reads the request alone and requires nothing.
+- **No silent `any`.** A `resolve` annotated `any` would require nothing
+  and turn the check off; the plugin is refused on every app instead, with
+  a message naming `resolve`.
 - **A fallback that cannot be wrong.** The types refuse a fallback the app
   does not support, and so does the plugin at start-up.

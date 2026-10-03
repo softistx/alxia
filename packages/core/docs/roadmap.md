@@ -83,3 +83,7 @@ Nothing scheduled yet.
   that takes a callback — `@alxia/language`'s `resolve`, `@alxia/janus`'s
   `load` — requires exactly what its user's annotation names, and nothing
   when the callback is not annotated.
+- **No silent `any`.** A callback annotated `any` would require nothing and
+  turn the check off; `use` refuses it on every app instead, with a message
+  naming the callback — `the plugin's resolve reads its context as any` —
+  that says to annotate what it reads or leave it unannotated.

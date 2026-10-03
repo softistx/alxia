@@ -163,6 +163,9 @@ alxia().use(tenancy).use(session(accounts)).use(byTenant); // tenancy derives te
 alxia().use(session(accounts)).use(byTenant); // a compile error: this app gives no `tenant`
 ```
 
+A callback annotated `any` would require nothing, so the guard is refused
+on every app: annotate what it reads, or leave it unannotated.
+
 ## API
 
 | export | |

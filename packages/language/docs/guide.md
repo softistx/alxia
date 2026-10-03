@@ -272,6 +272,10 @@ a type it does not give — `({ url }: { url: string })` — is refused the
 same way.
 A `resolve` left unannotated reads `BaseContext` only, and the plugin
 requires nothing.
+Annotated `unknown` or `object`, it requires nothing either. Annotated
+`any`, it would read anything and require nothing, so the plugin is
+refused on every app instead:
+[`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](troubleshooting.md#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated).
 
 `resolve` decides only when no source in `order` did. With `header` in
 `order`, a browser that names a supported language decides before the
