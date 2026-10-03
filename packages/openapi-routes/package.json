@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/openapi-routes",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "Checks that an @alxia/core app routes every operation of an OpenAPI document, and only those",
 	"license": "MIT",
 	"type": "module",

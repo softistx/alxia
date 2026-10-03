@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/env",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "Environment variables, validated and typed with any Standard Schema, failing at startup with every issue",
 	"license": "MIT",
 	"type": "module",
