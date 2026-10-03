@@ -364,6 +364,10 @@ client reads each by its own schema, and
 [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
 each kind's statuses on the routes that kind may refuse.
 
+- **One kind, as a literal.** A kind typed as a union, `RefusalKind`, or
+  as a generic parameter is a compile error: the hook is registered for the
+  one string it is given, so the types could not say which kind it answers.
+  Write the kind out, or one call per kind.
 - **Fallback.** A kind with no hook of its own, or whose hook returns
   nothing, falls back to the general hook, `onRefusal(hook)`, then to the
   default of that kind. The types say so: a hook that may return nothing
