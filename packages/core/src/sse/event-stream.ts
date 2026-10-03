@@ -17,8 +17,6 @@ import {
 	namedEventStream,
 } from './named-events';
 
-export { isAsyncIterable } from './async-iterable';
-
 /** A response schema whose body is a stream of events, each one checked by `item`. */
 export interface EventStreamSchema<Item extends StandardSchemaV1>
 	extends StandardSchemaV1<
@@ -55,12 +53,13 @@ export function eventStream<Item extends StandardSchemaV1>(
 	item: Item,
 ): EventStreamSchema<Item>;
 export function eventStream<Events extends EventSchemas>(
-	events: Events,
+	events: Events & Declarable<Events>,
 ): NamedEventStreamSchema<Events>;
 export function eventStream(
 	schema: StandardSchemaV1 | EventSchemas,
 ): EventStreamSchema<StandardSchemaV1> | NamedEventStreamSchema<EventSchemas> {
-	if (!('~standard' in schema)) return namedEventStream(schema);
+	if (!isStandardSchema(schema))
+		return namedEventStream(schema as EventSchemas);
 	const item = schema as StandardSchemaV1;
 	return {
 		'~eventStream': item,
@@ -90,6 +89,25 @@ async function* checkEach(
 		if (!checked.ok) throw mismatch(checked.issues);
 		yield checked.value;
 	}
+}
+
+/**
+ * `unknown` for a map of events the stream can write, `never` for one with
+ * no event or an empty name: a compile error, as it is a `TypeError` at run
+ * time.
+ */
+type Declarable<Events> = [keyof Events] extends [never]
+	? never
+	: '' extends keyof Events
+		? never
+		: unknown;
+
+/** A schema, as opposed to a map of them: an event may be named `~standard`. */
+function isStandardSchema(value: object): value is StandardSchemaV1 {
+	const standard = (
+		value as { '~standard'?: { version?: unknown; vendor?: unknown } }
+	)['~standard'];
+	return standard?.version === 1 && typeof standard.vendor === 'string';
 }
 
 export function isEventStreamSchema(

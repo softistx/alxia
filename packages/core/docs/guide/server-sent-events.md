@@ -44,13 +44,13 @@ The handler replies with an async iterable of what `item` accepts; each
 value is validated and sent as `item`'s **output**, so an unknown key the
 schema strips never leaves the server, as for any reply.
 
-`isEventStreamSchema(schema)` tells whether a schema is one `eventStream`
-made: what a plugin documenting the app — an OpenAPI generator — reads.
+`isEventStreamSchema(schema)` tells whether a schema is one
+`eventStream(schema)` made: what a plugin documenting the app — an OpenAPI generator — reads.
 
 ## Named events
 
 ```ts
-function eventStream<Events extends Record<string, StandardSchemaV1>>(
+function eventStream<Events extends EventSchemas>( // Readonly<Record<string, StandardSchemaV1>>
 	events: Events,
 ): NamedEventStreamSchema<Events>;
 ```
@@ -130,7 +130,7 @@ yielded — `id: 1\ndata: forged` is two lines. So:
 | --- | --- | --- |
 | an event name that is empty, or holds a CR, an LF or a NUL | `eventStream({ … })` | a `TypeError`, when the app is built |
 | no event at all, or a value that is not a Standard Schema | `eventStream({ … })` | a `TypeError`, when the app is built |
-| an `id` that holds a CR, an LF or a NUL | the event is yielded | the stream ends with an error, before the event is written |
+| an `id` that is not a string, or holds a CR, an LF or a NUL | the event is yielded | the stream ends with an error, before the event is written |
 | a `retry` that is not a whole number, 0 or more | the event is yielded | the stream ends with an error, before the event is written |
 | an undeclared `event`, or a value that is not `{ event, data }` | the event is yielded | the stream ends with an error, before the event is written |
 

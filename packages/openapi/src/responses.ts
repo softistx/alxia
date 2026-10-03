@@ -1,7 +1,7 @@
 import {
 	isEventStreamSchema,
-	type RefusalHandler,
 	isNamedEventStreamSchema,
+	type RefusalHandler,
 	type RouteSchema,
 } from '@alxia/core';
 import { type Converter, type JsonSchema, toJsonSchema } from './json-schema';

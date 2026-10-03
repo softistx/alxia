@@ -267,15 +267,19 @@ describe('what would write a frame the handler never yielded is refused', () => 
 		expect(() => eventStream({ 'a\rb': Ping })).toThrow(
 			'An event name must not hold a line break or a NUL',
 		);
+		// @ts-expect-error: an empty name is refused by the types too
 		expect(() => eventStream({ '': Ping })).toThrow(
 			'An event name must not be empty',
 		);
+		// @ts-expect-error: a stream of no event is refused by the types too
 		expect(() => eventStream({})).toThrow(
 			'A named event stream declares at least one event',
 		);
 		expect(() =>
 			eventStream({ ping: { interval: 1 } as unknown as typeof Ping }),
 		).toThrow('The event "ping" is not a Standard Schema');
+		const Odd = eventStream({ '~standard': Ping });
+		expect(isNamedEventStreamSchema(Odd)).toBe(true);
 	});
 });
 

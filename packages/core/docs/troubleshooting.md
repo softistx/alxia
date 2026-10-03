@@ -63,6 +63,11 @@ a trap that prints nothing is headed by its symptom.
 - [`TypeError: … the handler returned no reply. Return ctx.reply(status, body).`](#typeerror--the-handler-returned-no-reply-return-ctxreplystatus-body)
 - [`TypeError: … the onRefusal hook returned neither a reply nor nothing.`](#typeerror--the-onrefusal-hook-returned-neither-a-reply-nor-nothing)
 - [`TypeError: An event does not match its schema`](#typeerror-an-event-does-not-match-its-schema)
+- [`TypeError: An event id must not hold a line break or a NUL`](#typeerror-an-event-id-must-not-hold-a-line-break-or-a-nul), and `An event id must be a string`
+- [`TypeError: An event retry must be a whole number of milliseconds, 0 or more`](#typeerror-an-event-retry-must-be-a-whole-number-of-milliseconds-0-or-more)
+- [`TypeError: The event "…" is not declared: …`](#typeerror-the-event--is-not-declared-), and `An event of a named stream is an object { event, data }`
+- [`TypeError: An event name must not hold a line break or a NUL`](#typeerror-an-event-name-must-not-hold-a-line-break-or-a-nul), and `An event name must not be empty`, `A named event stream declares at least one event`, `The event "…" is not a Standard Schema`
+- [`Type 'string' is not assignable to type '"ping"'` on a named stream](#type-string-is-not-assignable-to-type-ping-on-a-named-stream)
 
 **WebSockets**
 
@@ -1024,7 +1029,8 @@ TypeError: An event id must not hold a line break or a NUL: "1\ndata: forged"
 ```
 
 **When:** an event yielded on a named `eventStream({ … })` has an `id`
-holding a CR, an LF or a NUL. Its type is `string`, so this comes from data
+holding a CR, an LF or a NUL (`An event id must be a string` when it is
+not a string at all). Its type is `string`, so this comes from data
 that reached the id unchecked: a client's input, a database row.
 
 **Why:** a line break would end the `id:` line and start a field the
