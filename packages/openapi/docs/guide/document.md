@@ -109,7 +109,8 @@ interface OpenApiDocument {
 - `components.schemas` holds exactly two schemas, `ValidationError` and
   `InternalError`: the bodies of the 400 and 500 every route may answer.
   Your own schemas are written inline in each operation, not as
-  components.
+  components. So are an `onRefusal` hook's: a route behind one documents
+  the hook's schemas in place of `ValidationError`.
 
 Both indexes of `paths` may be missing, so read them with `?.`:
 

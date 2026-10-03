@@ -264,6 +264,32 @@ for (const [name, transport] of Object.entries(transports)) {
 	});
 }
 
+describe('onRefusal, misused', () => {
+	test('a hook returning neither a reply nor nothing is a 500, logged', async () => {
+		const logged: unknown[] = [];
+		const error = console.error;
+		console.error = (value: unknown) => logged.push(value);
+		try {
+			const app = alxia()
+				.onRefusal((() => new Response('raw')) as never)
+				.post('/a', { body: Name }, ({ reply }) => reply(200, 'ok'));
+			const response = await app.request('/a', json('{}'));
+			expect(response.status).toBe(500);
+			expect(String(logged[0])).toContain(
+				'POST /a: the onRefusal hook returned neither a reply nor nothing.',
+			);
+		} finally {
+			console.error = error;
+		}
+	});
+
+	test('schemas without a hook throw when declared', () => {
+		expect(() =>
+			alxia().onRefusal({ response: {} } as never as () => undefined),
+		).toThrow('onRefusal(): the hook is missing');
+	});
+});
+
 describe('onRefusal on a socket route', () => {
 	test('a refused upgrade is the hook’s reply', async () => {
 		const app = alxia()
@@ -383,6 +409,8 @@ describe('onRefusal, typed', () => {
 		const _mistakes = () => {
 			// @ts-expect-error: a refusal is a client error, never a 500
 			alxia().onRefusal(() => problem({ status: 500 }));
+			// @ts-expect-error: a hook answers with a reply, never a raw Response
+			alxia().onRefusal(() => new Response());
 			// @ts-expect-error: a refusal is a client error, never a 200
 			alxia().onRefusal(({ issues }, { reply }) => reply(200, issues));
 			alxia().onRefusal(

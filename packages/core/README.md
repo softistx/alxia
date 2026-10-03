@@ -96,6 +96,9 @@ returns a reply with a 4xx status — or nothing, for the default.
 
 ```ts
 import { alxia, problem } from '@alxia/core';
+import { z } from 'zod';
+
+const JmapRequest = z.object({ using: z.array(z.string()), methodCalls: z.array(z.unknown()) });
 
 const app = alxia()
 	.onRefusal(({ part, issues }) =>
@@ -107,7 +110,7 @@ const app = alxia()
 			detail: `the ${part} is invalid`,
 		}),
 	)
-	.post('/jmap', { body: JmapRequest }, ({ body, reply }) => reply(200, run(body)));
+	.post('/jmap', { body: JmapRequest }, ({ reply }) => reply(200, { methodResponses: [] }));
 ```
 
 Its reply replaces the 400 in the type of every route after it that

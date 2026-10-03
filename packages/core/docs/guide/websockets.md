@@ -46,7 +46,7 @@ The schema is required; `{}` validates nothing.
 
 | Part | Checks | Refused |
 | --- | --- | --- |
-| `params`, `query`, `headers`, `cookies` | the upgrade request, as a route's | a 400 with every issue, and no socket |
+| `params`, `query`, `headers`, `cookies` | the upgrade request, as a route's | the 400 with every issue, or the reply of the `onRefusal` hook in force ([Hooks](hooks.md#onrefusal)), and no socket |
 | `message` | each message the client sends, parsed as JSON | answered on the socket with a `ValidationErrorBody`; the socket stays open, the handler is not called |
 | `send` | each message the server sends | the message is not sent: `send` rejects with a `ResponseValidationError`, which, in a handler, closes the socket with `1011` |
 | `detail` | nothing at runtime: what OpenAPI says of it | — |

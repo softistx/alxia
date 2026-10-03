@@ -15,7 +15,10 @@ Nothing scheduled yet.
 
 ## Later
 
-Nothing scheduled yet.
+- **The default 400 beside a hook that may fall back to it.** An
+  `onRefusal` hook that returns nothing for some refusals lets the default
+  `ValidationError` 400 answer them, and the document does not show it
+  beside the hook's schemas yet. The client's type already does.
 
 ## Not planned
 

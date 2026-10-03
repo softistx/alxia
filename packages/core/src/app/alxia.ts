@@ -1,9 +1,8 @@
-import type { Refusal, ValidationErrorBody } from '../errors/errors';
+import type { Refusal } from '../errors/errors';
 import type { AnyReply, Reply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
 import { joinPath, shapeOf } from '../router/paths';
 import { Router } from '../router/router';
-import type { InferOutput, StandardSchemaV1 } from '../schema/standard-schema';
 import { fileHandler, staticHandler } from '../static/serve';
 import type {
 	FileOptions,
@@ -44,14 +43,17 @@ import type {
 	BaseContext,
 	BehindShortcuts,
 	Context,
+	DeclaredRefusal,
 	DeclaredReply,
 	Empty,
-	FallsBack,
 	HandlerResult,
 	MaybePromise,
 	Method,
 	Outcome,
 	ProvidedBy,
+	RefusalResponses,
+	RefusalSchema,
+	RefusalsOf,
 	Refusing,
 	RouteEntryOf,
 	RouteRecord,
@@ -143,40 +145,6 @@ type Prefixed<Prefix extends string, Routes, Shortcuts> = {
 			: Routes[Path][M];
 	};
 };
-
-/** The schema of each status an `onRefusal` hook may answer, client errors only. */
-export type RefusalResponses = {
-	readonly [Status in ClientErrorStatus]?: StandardSchemaV1;
-};
-
-/**
- * What an `onRefusal` hook declares: the schema of each status it may
- * answer — its reply is checked by it, typed and documented — and the
- * `content-type` its reply is sent with unless it sets one.
- */
-export interface RefusalSchema<
-	Responses extends RefusalResponses = RefusalResponses,
-> {
-	readonly response: Responses;
-	readonly contentType?: string;
-}
-
-/** The replies an `onRefusal` hook answers with, marked; the default 400 when it may return nothing. */
-type RefusalsOf<Replies, Result> =
-	| (Replies & Refusing)
-	| (undefined extends Result
-			? Reply<400, ValidationErrorBody> & FallsBack
-			: never);
-
-/** Every reply a hook declaring `Responses` may answer, as its schemas give it back. */
-type DeclaredRefusal<Responses> = {
-	[Status in keyof Responses & ClientErrorStatus]: Reply<
-		Status,
-		Responses[Status] extends StandardSchemaV1
-			? InferOutput<Responses[Status]>
-			: never
-	>;
-}[keyof Responses & ClientErrorStatus];
 
 /** Any app, whatever it holds. */
 export type AnyAlxia = Alxia<any, any, any, any>;

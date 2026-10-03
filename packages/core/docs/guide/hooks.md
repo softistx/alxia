@@ -179,6 +179,12 @@ interface ValidationRefusal {
 type Refusal = ValidationRefusal; // told apart by `kind`
 ```
 
+`validation` is the only kind today. A kind added later reaches every
+hook, and only a `validation` refusal has a `part` and `issues`. A hook
+that reads them unchecked, like the one below, will then need
+`if (refusal.kind !== 'validation') return;` first. Returning nothing sends
+that kind's default.
+
 An API whose errors are RFC 9457 problems, as JMAP's are, answers them
 with [`problem`](replies.md#problem-details-problem):
 

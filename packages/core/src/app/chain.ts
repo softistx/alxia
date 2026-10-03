@@ -5,9 +5,7 @@
  */
 import {
 	HttpError,
-	type Refusal,
 	type RequestPart,
-	type ValidationErrorBody,
 	type ValidationIssue,
 } from '../errors/errors';
 import { createReply, Reply } from '../reply/reply';
@@ -21,7 +19,8 @@ import {
 import { check } from '../schema/standard-schema';
 import type { RedirectStatus } from '../types/status';
 import type { RouteDefinition, SocketDefinition } from './definition';
-import { checkReply, internalError, send, sendDeclared } from './send';
+import { refuse } from './refusal';
+import { internalError, send, sendDeclared } from './send';
 import type {
 	BaseContext,
 	RedirectFunction,
@@ -166,57 +165,6 @@ async function validate(
 		ctx,
 		validateResponses,
 	);
-}
-
-/**
- * A refused request, answered by the route's `onRefusal` hook — its reply
- * checked by the schemas the hook declares — or, when it has none or
- * returns nothing, by the default: a 400 with the issues.
- */
-async function refuse(
-	definition: RouteDefinition | SocketDefinition,
-	refusal: Refusal,
-	set: ResponseSettings,
-	ctx: BaseContext,
-	validateResponses: boolean,
-): Promise<Response> {
-	const handler = definition.refusal;
-	if (handler !== undefined) {
-		let reply = handler.hook(refusal, ctx);
-		if (reply instanceof Promise) reply = await reply;
-		const method = 'method' in definition ? definition.method : 'WS';
-		if (reply instanceof Reply) {
-			if (handler.response !== undefined) {
-				reply = await checkReply(
-					method,
-					definition.path,
-					handler.response,
-					reply,
-					validateResponses,
-				);
-			}
-			return send(withContentType(reply, handler.contentType), set);
-		}
-		if (reply !== undefined) {
-			throw new TypeError(
-				`${method} ${definition.path}: the onRefusal hook returned neither a reply nor nothing.`,
-			);
-		}
-	}
-	const body: ValidationErrorBody = {
-		error: 'validation',
-		issues: refusal.issues,
-	};
-	return send(new Reply(400, body), set);
-}
-
-/** `reply` with `content-type` set to `type`, unless it sets one. */
-function withContentType(reply: Reply, type: string | undefined): Reply {
-	if (type === undefined) return reply;
-	const headers = new Headers(reply.headers);
-	if (headers.has('content-type')) return reply;
-	headers.set('content-type', type);
-	return new Reply(reply.status, reply.body, { headers });
 }
 
 /** A route's request, from its hooks to its handler's reply, sent. */

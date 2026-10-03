@@ -1,14 +1,12 @@
 /** The record of an app's routes the client is typed from: what each one takes and answers. */
-import type {
-	InternalErrorBody,
-	ValidationErrorBody,
-} from '../../errors/errors';
+import type { InternalErrorBody } from '../../errors/errors';
 import type { Reply } from '../../reply/reply';
 import type { InferInput, InferOutput } from '../../schema/standard-schema';
 import type { Jsonify, Simplify } from '../../types/json';
 import type { PathParamName } from '../../types/path';
 import type { RedirectStatus } from '../../types/status';
 import type { Empty, Method } from './common';
+import type { RefusalOutcome, Refusing } from './refusal';
 import type {
 	ResponseSchemaAt,
 	ResponsesOf,
@@ -27,62 +25,6 @@ export type OutcomeOf<Replies> =
 	Replies extends Reply<infer Status, infer Body>
 		? Outcome<Status, Jsonify<Body>>
 		: never;
-
-/**
- * The mark, among an app's shortcuts, of each reply its `onRefusal` hook
- * answers a refused request with: they replace the default 400 of a route
- * that validates, and are no part of a route that does not.
- */
-export interface Refusing {
-	readonly '~refusal': true;
-}
-
-/**
- * The default 400 in a route's type, marked: the `onRefusal` hook of an
- * app a plugin is used by replaces it on the plugin's routes, as it does
- * at runtime. The client reads it as `Outcome<400, ValidationErrorBody>`.
- */
-export interface DefaultRefusalOutcome
-	extends Outcome<400, ValidationErrorBody> {
-	readonly '~default': true;
-}
-
-/**
- * The mark of the default 400 among a hook's refusals: the hook may return
- * nothing, and the default answers then.
- */
-export interface FallsBack extends Refusing {
-	readonly '~fallback': true;
-}
-
-/** The outcomes a refused request may get: the hook's in force, or the default. */
-type RefusalOutcome<Shortcuts> = [Extract<Shortcuts, Refusing>] extends [never]
-	? DefaultRefusalOutcome
-	:
-			| OutcomeOf<Exclude<Extract<Shortcuts, Refusing>, FallsBack>>
-			| ([Extract<Shortcuts, FallsBack>] extends [never]
-					? never
-					: Outcome<400, ValidationErrorBody>);
-
-/** `Shortcuts`, then the shortcuts of a later scope: its refusals, if any, replace these. */
-export type ThenShortcuts<Shortcuts, Later> = [
-	Extract<Later, Refusing>,
-] extends [never]
-	? Shortcuts | Later
-	: Exclude<Shortcuts, Refusing> | Later;
-
-/**
- * `Output`, a route of a plugin, behind the hooks of the app using it: its
- * default 400 replaced by the app's refusals, and the app's other replies
- * added.
- */
-export type BehindShortcuts<Output, Shortcuts> =
-	| ([Extract<Shortcuts, Refusing>] extends [never]
-			? Output
-			: [Extract<Output, DefaultRefusalOutcome>] extends [never]
-				? Output
-				: Exclude<Output, DefaultRefusalOutcome> | RefusalOutcome<Shortcuts>)
-	| OutcomeOf<Exclude<Shortcuts, Refusing>>;
 
 type ValidatesRequest<Schema> = [
 	SchemaAt<Schema, 'params' | 'query' | 'headers' | 'cookies' | 'body'>,
