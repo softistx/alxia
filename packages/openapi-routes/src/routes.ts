@@ -126,7 +126,12 @@ function join(prefix: string, path: string): string {
  * declares, as the router matches them alike. Kept twice: see AGENTS.md.
  */
 function keyOf(route: { readonly method: string; readonly path: string }) {
-	return `${route.method} ${route.path.replace(/:[^/]+/g, ':')}`;
+	// Only a whole segment is a parameter: `/at/10:30` is a literal path.
+	const shape = route.path
+		.split('/')
+		.map((segment) => (segment.startsWith(':') ? ':' : segment))
+		.join('/');
+	return `${route.method} ${shape}`;
 }
 
 function noRoute(missing: readonly Wanted[]): string {

@@ -181,6 +181,16 @@ describe('exactly', () => {
 		expect(() => exactly(app, { getPet })).not.toThrow();
 	});
 
+	test('a colon inside a segment is no parameter', () => {
+		const app = alxia().get('/at/10:30', ({ reply }) => reply(200, 'x'));
+		const other = { method: 'GET', path: '/at/10:45' } as const;
+		expect(() => exactly(app, [other])).toThrow(
+			new TypeError(
+				'exactly(): 1 operation has no route: GET /at/10:45; 1 route has no operation: GET /at/10:30',
+			),
+		);
+	});
+
 	test('a HEAD operation: its GET route is served, but not declared', () => {
 		const app = alxia().get('/pets', ({ reply }) => reply(200, 'x'));
 		const head = { method: 'HEAD', path: '/pets' } as const;

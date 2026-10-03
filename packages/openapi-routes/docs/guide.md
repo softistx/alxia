@@ -118,7 +118,9 @@ An operation is served by a route of the same method and path:
 
 - **The path's shape.** A parameter's name does not count:
   `app.get('/pets/:id', …)` serves the operation `GET /pets/:petId`, since
-  the router sends them the same requests. The route's handler still reads
+  the router sends them the same requests. As in the router, a parameter
+  is a whole `:name` segment: `/at/10:30` is a literal path, and does not
+  serve `GET /at/10:45`. The route's handler still reads
   `params.id`, not `params.petId`; declaring it with
   `app.route(api.getPet, …)` keeps the spec's names and schemas.
 - **`HEAD`.** The core answers `HEAD` with the `GET` route, so a `HEAD`
