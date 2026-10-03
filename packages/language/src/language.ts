@@ -7,7 +7,7 @@ import type { LanguageContext, LanguageSource } from './types';
  * `BaseContext`: `{ user: User }` for `BaseContext & { user: User }`, and
  * `Empty` when it reads nothing more. A key of `BaseContext` annotated with
  * a type `BaseContext` does not give — `{ url: string }` — is kept, so `use`
- * refuses it.
+ * refuses it. Kept twice, with `@alxia/janus`'s.
  */
 type RequiresOf<Ctx> = [
 	keyof {
