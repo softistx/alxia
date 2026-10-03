@@ -13,7 +13,7 @@ thrown when the app is built, a response body, or a line in the server log.
 - [`Type 'string' is not assignable to type 'number'` on a `reply`](#type-string-is-not-assignable-to-type-number-on-a-reply)
 - [`Type 'Response' is not assignable to type 'MaybePromise<AnyReply>'`](#type-response-is-not-assignable-to-type-maybepromiseanyreply)
 - [`Property 'user' does not exist on type 'Context<…>'`](#property-user-does-not-exist-on-type-context)
-- [`Type 'string' is not assignable to type 'Method'` on `route`](#type-string-is-not-assignable-to-type-method-on-route)
+- [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
 
 **Building the app**
 
@@ -211,26 +211,26 @@ const app = alxia()
 The same applies to `use(plugin)`. Its route hooks reach the routes
 declared after `use`, not before it.
 
-### `Type 'string' is not assignable to type 'Method'` on `route`
+### `route() needs one method: declare the operation as const`
 
-**When:** an operation declared in a variable of its own, without `as const`,
-is passed to `app.route`.
+**When:** the operation given to `app.route` has a method or a path that is
+not a literal:
+
+- it is declared in a variable of its own, without `as const`;
+- it is typed `RouteOperation`;
+- or its method is a union, `'GET' | 'POST'`.
 
 ```text
-error TS2345: Argument of type '{ method: string; path: string; }' is not assignable to parameter of type 'RouteOperation & { readonly schema?: unknown; }'.
-  Type '{ method: string; path: string; }' is not assignable to type 'RouteOperation'.
-    Types of property 'method' are incompatible.
-      Type 'string' is not assignable to type 'Method'.
+error TS2345: Argument of type '{ method: string; path: string; }' is not assignable to parameter of type 'never'.
+  The intersection 'RouteOperation & { readonly method: "route() needs one method: declare the operation as const"; readonly path: "route() needs the path as a literal: declare the operation as const"; readonly schema?: unknown; }' was reduced to 'never' …
 ```
 
-With the method narrowed alone, the same error names the path instead:
-``Type 'string' is not assignable to type '`/${string}`'``.
-
 **Why:** TypeScript widens the properties of an object in a variable:
-`'GET'` and `'/pets/:petId'` both become `string`, which is neither a
-`Method` nor a path starting with `/`, and the route could not read its
-parameters from it anyway. An operation written inline in the call is not
-widened.
+`'GET'` and `'/pets/:petId'` both become `string`. A route under a method it
+cannot name would be typed under every method while being served under one,
+so the client would offer calls that answer 404. A route with a path it
+cannot name has no parameters to read. An operation written inline in the
+call is not widened.
 
 **Fix:** keep the literals, with `as const` or `satisfies RouteOperation`
 ([Routes as data](guide/routes.md#routes-as-data-route)):

@@ -6,19 +6,21 @@ export {
 	alxia,
 	type ContextOf,
 	type ListenOptions,
-	type OperationMethod,
-	type OperationSchema,
 	type Plugin,
 	type RequestHook,
 	type ResponseHook,
 	type RouteDefinition,
 	type RouteMethod,
-	type RouteOperation,
 	type RoutesOf,
 	type SocketDefinition,
 	type StartHook,
 	type StopHook,
 } from './app/alxia';
+export type {
+	OperationMethod,
+	OperationSchema,
+	RouteOperation,
+} from './app/route-operation';
 export type {
 	BaseContext,
 	Context,

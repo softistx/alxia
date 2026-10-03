@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
 import { alxia, type RoutesOf } from './alxia';
+import type { RouteOperation } from './route-operation';
 
 // As an OpenAPI code generator writes them: data, importing only the schemas.
 const Pet = z.object({ id: z.number(), name: z.string() });
@@ -86,5 +87,29 @@ describe('route(operation, handler)', () => {
 			);
 		};
 		expect(_mistakes).toBeFunction();
+	});
+
+	test('in a group, and for HEAD', async () => {
+		const grouped = alxia().group('/v1', (g) =>
+			g.route({ method: 'HEAD', path: '/ping' }, ({ reply }) => reply(204)),
+		);
+		expectTypeOf<keyof RoutesOf<typeof grouped>>().toEqualTypeOf<'/v1/ping'>();
+		const response = await grouped.request('/v1/ping', { method: 'HEAD' });
+		expect(response.status).toBe(204);
+	});
+
+	test('one method and one path, as literals: a widened one is refused', () => {
+		const typed: RouteOperation = { method: 'GET', path: '/w' };
+		const either = {
+			method: 'GET' as 'GET' | 'POST',
+			path: '/w',
+		} as const;
+		const _refused = () => {
+			// @ts-expect-error the method could be any: the route would be typed under all
+			alxia().route(typed, ({ reply }) => reply(200, 'x'));
+			// @ts-expect-error two methods, one route registered
+			alxia().route(either, ({ reply }) => reply(200, 'x'));
+		};
+		expect(_refused).toBeFunction();
 	});
 });

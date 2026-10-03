@@ -126,9 +126,11 @@ a route without one.
 — or `satisfies RouteOperation` — so that its `method` and `path` stay
 `'GET'` and `'/pets/:petId'` rather than `string`; without it, `route`
 refuses the operation with
-[`Type 'string' is not assignable to type 'Method'`](../troubleshooting.md#type-string-is-not-assignable-to-type-method-on-route).
+[`route() needs one method: declare the operation as const`](../troubleshooting.md#route-needs-one-method-declare-the-operation-as-const).
 An operation written inline, `app.route({ method: 'GET', path: '/x' }, …)`,
-needs neither.
+needs neither. An operation typed `RouteOperation`, or whose method is a union,
+is refused the same way: its route would be typed under every method while
+being served under one.
 
 ```ts
 interface RouteOperation {
