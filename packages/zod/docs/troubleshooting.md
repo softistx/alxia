@@ -15,13 +15,12 @@ you notice. A `400` from validation reads like this, and the heading is its
 **A `400` from validation**
 
 - [`Expected a number`](#expected-a-number)
-- [`Invalid input: expected int, received number`](#invalid-input-expected-int-received-number)
+- [`Expected an integer`](#expected-an-integer)
+- [`Expected true, false, 1 or 0`](#expected-true-false-1-or-0)
+- [`Expected an ISO 8601 date or date-time`](#expected-an-iso-8601-date-or-date-time)
+- [`Expected JSON`](#expected-json)
 - [`Invalid input: expected number, received string`](#invalid-input-expected-number-received-string)
 - [`Invalid input: expected array, received string`](#invalid-input-expected-array-received-string)
-- [`Invalid input` on a boolean](#invalid-input-on-a-boolean)
-- [`Invalid input` on a date](#invalid-input-on-a-date)
-- [`Invalid input` on a JSON value](#invalid-input-on-a-json-value)
-- [`Invalid input` on a list of one](#invalid-input-on-a-list-of-one)
 
 **Wrong values, no error**
 
@@ -31,6 +30,7 @@ you notice. A `400` from validation reads like this, and the heading is its
 **Types**
 
 - [`Type 'string' is not assignable to type 'string[]'`](#type-string-is-not-assignable-to-type-string)
+- [`Type 'number[]' is not assignable to type 'string'`](#type-number-is-not-assignable-to-type-string)
 - [`Type 'number' is not assignable to type 'string | Date | undefined'`](#type-number-is-not-assignable-to-type-string--date--undefined)
 - [`Type '"yes"' is not assignable to type 'boolean | "1" | "true" | "0" | "false" | undefined'`](#type-yes-is-not-assignable-to-type-boolean--1--true--0--false--undefined)
 - [`Expected 1 arguments, but got 0.`](#expected-1-arguments-but-got-0)
@@ -45,7 +45,9 @@ you notice. A `400` from validation reads like this, and the heading is its
 ### `Expected a number`
 
 **When:** a key read by `zq.number()` or `zq.int()` is given text that is
-not a number: `/items/abc`, `?page=`, `?limit=0x10`, `?n=Infinity`.
+not a number: `/items/abc`, `?page=`, `?limit=0x10`, `?n=Infinity`. Or an
+item of a `zq.array(zq.int())` is: `?ids=x` reports it on the key, path
+`["ids"]`; `?ids=1&ids=x` at the item's index, path `["ids", 1]`.
 
 **Why:** the coercion accepts a number, or the text of one — digits, with
 an optional sign, decimal point and exponent — and nothing else. An empty
@@ -61,7 +63,7 @@ await api.get('/items', { query: { page: input.value === '' ? undefined : Number
 If the key is not a number at all — a slug, an id with letters — it is a
 `z.string()`, not a coercion.
 
-### `Invalid input: expected int, received number`
+### `Expected an integer`
 
 **When:** `zq.int()` is given a number with a fraction: `?page=1.5`.
 
@@ -76,15 +78,16 @@ const query = z.object({ page: zq.int(), price: zq.number() });
 ### `Invalid input: expected number, received string`
 
 **When:** a key in `params`, `query`, `headers` or `cookies` is a plain
-`z.number()` — or a `z.array(z.number())`, or `zq.json(z.array(z.number()))`
-that the client sends as an array.
+`z.number()` — or a `z.array(z.number())`. Or a hand-written URL repeats a
+key read by `zq.json(z.array(z.number()))`: `?ids=1&ids=2`, path
+`["ids", 0]`.
 
 **Why:** everything in a URL, a header or a cookie is text, and
 `z.number()` refuses text. The typed client is happy, since its input is a
-`number`, so the error only shows at run time. For `zq.json`, the client
-sends an array the way it sends every array, one value per key
-(`?ids=1&ids=2`), so the schema receives the strings `'1'` and `'2'`, not
-JSON.
+`number`, so the error only shows at run time. A repeated key is a list of
+texts, `'1'` and `'2'`, not JSON, so `zq.json` hands them to the schema
+as they are; the typed client is refused this at compile time, see
+[`Type 'number[]' is not assignable to type 'string'`](#type-number-is-not-assignable-to-type-string).
 
 **Fix:** use the coercion, and `zq.array` for a list:
 
@@ -110,11 +113,13 @@ list of one is refused.
 const query = z.object({ tag: zq.array(z.string()) }); // ?tag=a → ['a'], ?tag=a&tag=b → ['a', 'b']
 ```
 
-### `Invalid input` on a boolean
+### `Expected true, false, 1 or 0`
 
 **When:** `zq.boolean()` is given anything but `true`, `false`, `'true'`,
 `'false'`, `'1'` or `'0'`: `?draft=yes`, `?draft=TRUE`, `?draft=on`, or
-`?draft=` with no value. An HTML checkbox sends `on`.
+`?draft=` with no value. An HTML checkbox sends `on`. In a
+`zq.array(zq.boolean())`, the issue is on the key, without the index of the
+refused item, whether the key was given once or more.
 
 **Why:** the four texts are the only ones read; anything else is refused,
 not guessed.
@@ -126,11 +131,13 @@ not guessed.
 const form = z.object({ draft: z.literal('on').optional().transform((value) => value === 'on') });
 ```
 
-### `Invalid input` on a date
+### `Expected an ISO 8601 date or date-time`
 
 **When:** `zq.date()` is given text that is not ISO 8601 with an offset or
 a date alone: `?since=2026-01-01T10:00` (what an HTML `datetime-local`
-input gives), `?since=1767225600000`, `?since=tomorrow`.
+input gives), `?since=1767225600000`, `?since=tomorrow`. In a
+`zq.array(zq.date())`, the issue is on the key, without the index of the
+refused item, whether the key was given once or more.
 
 **Why:** a date and time without `Z` or an offset names no instant — it
 depends on a time zone the server does not know — so it is refused rather
@@ -145,11 +152,11 @@ await api.get('/orders', { query: { since: new Date(input.value) } });
 
 A date alone, `?since=2026-01-01`, is accepted, and reads midnight UTC.
 
-### `Invalid input` on a JSON value
+### `Expected JSON`
 
 **When:** a key read by `zq.json(schema)` is given text that is not JSON:
-`?filter={`, `?filter=min:3`. Or `schema` is a `z.string()`, and the client
-sends a plain string.
+`?filter={`, `?filter=min:3`, or `?ids=x` for a `zq.json(z.array(...))`.
+Or `schema` is a `z.string()`, and the client sends a plain string.
 
 **Why:** the text is parsed with `JSON.parse` before `schema` sees it, and
 text that does not parse is refused. A client sends an object as its JSON,
@@ -168,24 +175,6 @@ const query = z.object({
 
 When the JSON parses but the schema refuses it, the issue is the schema's
 own, at its path inside the value: `path: ["filter", "min"]`.
-
-### `Invalid input` on a list of one
-
-**When:** `zq.array(item)` is given its key once, and `item` refuses that
-value: `?ids=x` for `zq.array(zq.int())`.
-
-**Why:** the key given once is tried as one item, then as a list, and both
-fail, so the issue is Zod's `Invalid input` on the key. Given more than
-once, `?ids=1&ids=x`, the item's own issue is reported at its index:
-`path: ["ids", 1]`, `Expected a number`.
-
-**Fix:** send values the item accepts. To see the item's message in a test,
-give the key twice:
-
-```ts
-const response = await app.request('/orders?ids=1&ids=x');
-(await response.json()).issues[0].message; // 'Expected a number'
-```
 
 ## Wrong values, no error
 
@@ -257,6 +246,27 @@ error TS2322: Type 'number' is not assignable to type 'string | Date | undefined
 await api.get('/orders', { query: { since: new Date(Date.now() - 86_400_000) } });
 ```
 
+### `Type 'number[]' is not assignable to type 'string'`
+
+```text
+error TS2322: Type 'number[]' is not assignable to type 'string'.
+```
+
+**When:** the client sends an array for a `zq.json(z.array(...))`:
+`query: { ids: [1, 2] }`.
+
+**Why:** a query sends an array as one value per key, `?ids=1&ids=2`,
+which is not JSON, so `zq.json` could never read it; its input for an array
+schema is the JSON text. An object is still given as itself.
+
+**Fix:** send the JSON text, or make the key a `zq.array` the client sends
+as an array:
+
+```ts
+await api.get('/ids', { query: { ids: JSON.stringify([1, 2]) } }); // zq.json(z.array(z.number()))
+await api.get('/ids', { query: { ids: [1, 2] } });                 // zq.array(zq.int())
+```
+
 ### `Type '"yes"' is not assignable to type 'boolean | "1" | "true" | "0" | "false" | undefined'`
 
 ```text
@@ -267,7 +277,7 @@ error TS2322: Type '"yes"' is not assignable to type 'boolean | "1" | "true" | "
 reads.
 
 **Why:** the server would refuse it with
-[`Invalid input`](#invalid-input-on-a-boolean); the type says so first.
+[`Expected true, false, 1 or 0`](#expected-true-false-1-or-0); the type says so first.
 
 **Fix:** send a boolean:
 

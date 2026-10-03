@@ -43,7 +43,7 @@ await api.get('/search/:page', { params: { page: 2 }, query: { exact: true, sinc
 | `zq.boolean()` | `boolean` | `boolean \| 'true' \| 'false' \| '1' \| '0'` |
 | `zq.date()` | `Date` | `Date \| string` |
 | `zq.array(item)` | `Item[]`, from one value or many | `Item \| Item[]` |
-| `zq.json(schema)` | the schema's output | the schema's input, sent as JSON |
+| `zq.json(schema)` | the schema's output | the schema's input, sent as JSON; an array as its JSON text, `JSON.stringify(ids)` |
 
 ## OpenAPI: `zodConverter`
 

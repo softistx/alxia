@@ -39,6 +39,7 @@ import type { z } from 'zod';
 // zq.date()              Date | string                     Date
 // zq.array(item)         z.input<item> | z.input<item>[]   z.output<item>[]
 // zq.json(schema)        string | z.input<schema>          z.output<schema>
+//                        (an array schema: string only)
 
 declare const zq: {
 	number(): z.ZodType<number, number | string>;
@@ -46,7 +47,7 @@ declare const zq: {
 	boolean(): z.ZodType<boolean, boolean | 'true' | 'false' | '1' | '0'>;
 	date(): z.ZodType<Date, Date | string>;
 	array<Item extends z.ZodType>(item: Item): z.ZodType<z.output<Item>[], z.input<Item> | z.input<Item>[]>;
-	json<Schema extends z.ZodType>(schema: Schema): z.ZodType<z.output<Schema>, string | z.input<Schema>>;
+	json<Schema extends z.ZodType>(schema: Schema): z.ZodType<z.output<Schema>, string | Exclude<z.input<Schema>, readonly unknown[]>>;
 };
 
 declare function zodConverter(
@@ -120,8 +121,9 @@ const price = zq.number().pipe(z.number().positive());
 
 ### `zq.int()`
 
-`zq.number()`, then an integer. `'2'` reads `2`; `'1.5'` and `2.5` are
-refused with `Invalid input: expected int, received number`. It is the
+`zq.number()`, then an integer. `'2'` reads `2`; text that is not a number
+is refused with `Expected a number`, and `'1.5'` and `2.5` with
+`Expected an integer`. It is the
 usual choice for an id in the path, a page, a limit:
 
 ```ts
@@ -141,7 +143,7 @@ zq.boolean().parse('0');    // false
 zq.boolean().parse(false);  // false
 ```
 
-Anything else is refused, with Zod's `Invalid input`: `'yes'`, `'TRUE'`,
+Anything else is refused with `Expected true, false, 1 or 0`: `'yes'`, `'TRUE'`,
 `'on'`, and the empty string, so `?draft=` is an error rather than a silent
 `false`. Compare `z.coerce.boolean()`, which reads `'false'` as `true`,
 since any non-empty string is truthy.
@@ -161,11 +163,11 @@ zq.date().parse('2026-01-01');                // 2026-01-01T00:00:00.000Z, midni
 zq.date().parse(new Date(0));                 // the same Date
 ```
 
-Refused, with `Invalid input`:
+Refused, with `Expected an ISO 8601 date or date-time`:
 
 - a date and time with no offset, `'2026-01-01T10:00'` — which is what an
   HTML `datetime-local` input gives; it names no instant, so it is not
-  guessed at (see [Troubleshooting](troubleshooting.md#invalid-input-on-a-date));
+  guessed at (see [Troubleshooting](troubleshooting.md#expected-an-iso-8601-date-or-date-time));
 - a timestamp, `'1767225600000'`;
 - anything `Date` would parse loosely, `'tomorrow'`, `'Jan 1 2026'`;
 - an invalid `Date` object.
@@ -196,10 +198,14 @@ Ids.parse(['1', '2']);   // [1, 2]
 const Statuses = zq.array(z.enum(['open', 'paid', 'shipped']));
 ```
 
-A refused item is reported at its index when the key was given more than
-once (`?ids=1&ids=x` → path `["ids", 1]`, `Expected a number`), and as
-`Invalid input` on the key when it was given once (`?ids=x`), since neither
-"one item" nor "a list" matched.
+A refused list reports the first issue of what was refused: the one value
+given, or the list. Given once (`?ids=x`), the issue is on the key: path
+`["ids"]`, `Expected a number`. Given more than once (`?ids=1&ids=x`), it
+is at the item's index, path `["ids", 1]`, when the item is a plain
+schema such as `zq.int()`, `zq.number()` or `z.string()`. For an item that
+is itself a union or an object — `z.enum(…)`, `zq.date()`, `zq.boolean()`,
+`z.object(…)` — the issue is `invalid_union` on the key, with the item's
+message: its index, or its inner path, is not kept.
 
 An absent key is `undefined`, not `[]`: make the list `.optional()`, or
 `.default([])`.
@@ -218,15 +224,31 @@ Range.parse({ min: 1, max: 5 });   // { min: 1, max: 5 }, already parsed
 
 The client is typed with the schema's input and sends an object as its JSON,
 so it writes `query: { range: { min: 1, max: 5 } }`. Text that is not JSON
-is refused with `Invalid input`; JSON that does not match the schema is
+is refused with `Expected JSON`; JSON that does not match the schema is
 refused with the schema's own issue, at the path inside it:
 
 ```text
 ?range={"min":"x","max":5}   →  path ["range", "min"]: Invalid input: expected number, received string
 ```
 
-Two shapes do not suit it — a string, and an array the client sends; both
-are in [Troubleshooting](troubleshooting.md#invalid-input-on-a-json-value).
+An array is the exception: the client is typed to send it as its JSON
+text, a `string`, not as the array. A query sends a list as one value per
+key, `?ids=1&ids=2`, which is not JSON, so an array given as itself could
+never reach the schema:
+
+```ts
+const app = alxia().get(
+	'/ids',
+	{ query: z.object({ ids: zq.json(z.array(z.number())) }) },
+	({ query, reply }) => reply(200, query.ids), // number[]
+);
+
+await client(app).get('/ids', { query: { ids: JSON.stringify([1, 2]) } }); // ?ids=[1,2]
+```
+
+For a list a key repeats, use [`zq.array(item)`](#zqarrayitem) instead.
+A plain string does not suit `zq.json` either: see
+[Troubleshooting](troubleshooting.md#expected-json).
 
 ## What a refusal looks like
 
@@ -246,13 +268,14 @@ problem. From `GET /items/x`:
 | Coercion | Refused value | `code` | `message` |
 | --- | --- | --- | --- |
 | `number`, `int` | text that is not a number | `invalid_format` | `Expected a number` |
-| `int` | a number that is not an integer | `invalid_type` | `Invalid input: expected int, received number` |
-| `boolean` | text other than the four | `invalid_union` | `Invalid input` |
-| `date` | text that is not ISO 8601 with an offset, or a date | `invalid_union` | `Invalid input` |
-| `json` | text that is not JSON | `invalid_union` | `Invalid input` |
+| `number`, `int` | neither a number nor text, such as an object | `invalid_union` | `Expected a number` |
+| `int` | a number that is not an integer | `invalid_type` | `Expected an integer` |
+| `boolean` | text other than the four | `invalid_union` | `Expected true, false, 1 or 0` |
+| `date` | text that is not ISO 8601 with an offset, or a date | `invalid_union` | `Expected an ISO 8601 date or date-time` |
+| `json` | text that is not JSON | `invalid_union` | `Expected JSON` |
 | `json` | JSON the schema refuses | the schema's | the schema's, at its path |
-| `array` | a key given once, which the item schema refuses | `invalid_union` | `Invalid input` |
-| `array` | a key given more than once, one of them refused | the item's | the item's, at its index: path `["ids", 1]` |
+| `array` | a key given once, which the item schema refuses | `invalid_union` | the item's, on the key: `Expected a number` for `zq.int()` |
+| `array` | a key given more than once, one of them refused | the item's, or `invalid_union` | the item's: at its index (`["ids", 1]`) for `zq.int()` or `z.string()`; on the key, without the index, for an enum, `zq.date()`, `zq.boolean()` or an object |
 
 A typed client already refuses most of these at compile time; the `400` is
 what a hand-written URL, a link, or another client gets.
