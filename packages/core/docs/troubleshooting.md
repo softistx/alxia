@@ -485,12 +485,12 @@ message names the path alone:
 error TS2345: Argument of type '"/:id"' is not assignable to parameter of type '"Invalid path: \"/:id\" is refused under its prefix: the two declare one parameter twice, or the prefix holds a refused segment"'.
 ```
 
+A handler's parameters can then read as `any` on the same call
+(`TS7031`): that goes away with the path's fix.
+
 A plugin given to `use` is not checked under the prefix `use` puts its
 routes at: `alxia({ prefix: '/users/:id' }).use(alxia().get('/:id', …))`
 compiles, then throws `"/users/:id/:id" declares ":id" twice` at startup.
-
-A handler's parameters can then read as `any` on the same call
-(`TS7031`): that goes away with the path's fix.
 
 **Why:** the app throws on these paths at startup; the types refuse them
 first, so the mistake shows in the editor. A literal the URL
@@ -512,7 +512,7 @@ error TS2345: Argument of type 'P' is not assignable to parameter of type 'PathA
   Type '`/${string}`' is not assignable to type 'PathAt<"", P, StaticPath<P>>'.
 ```
 
-(`PathAt<"", P>` for `get`, `ws` and the others.) Type the wrapper's
+(`PathAt<"", P, P>` for `get`, `ws` and the others.) Type the wrapper's
 parameter with the check of the method it forwards to: `PathAt<Prefix, P>`,
 and `PathAt<Prefix, P, StaticPath<P>>` for `static`. The path is then
 checked where the wrapper is called, and the route keeps its literal path:

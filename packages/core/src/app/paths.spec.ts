@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import type { CheckedPath, PathAt, RoutePath } from '../types/path';
+import type { CheckedPath, PathAt, RoutePath, StaticPath } from '../types/path';
 import { alxia } from './alxia';
 
 /**
@@ -296,6 +296,20 @@ describe('the type of a path', () => {
 			.file('/favicon.ico', new Blob(['x']))
 			.route({ method: 'GET', path: '/r/:id' } as const, ok);
 		expect(app.routes.length).toBe(17);
+	});
+
+	test('checks a path forwarded by a wrapper where the wrapper is called', () => {
+		const routedAt = <const P extends RoutePath>(path: PathAt<'', P>) =>
+			alxia().get(path, ok);
+		const servedAt = <const P extends RoutePath>(
+			path: PathAt<'', P, StaticPath<P>>,
+		) => alxia().static(path, '.');
+		expect(routedAt('/pets/:id').routes[0]?.path).toBe('/pets/:id');
+		expect(servedAt('/assets').routes[0]?.path).toBe('/assets/*');
+		// @ts-expect-error: a ":" inside a segment
+		expect(() => routedAt('/at/10:30')).toThrow('may only start a segment');
+		// @ts-expect-error: its route, `/assets/*/*`, has a "*" before the end
+		expect(() => servedAt('/assets/*')).toThrow('may only end a path');
 	});
 
 	test('leaves a path it cannot read to the app', () => {

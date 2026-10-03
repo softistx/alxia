@@ -60,7 +60,9 @@ Nothing scheduled yet.
   `/a/:id/:id`, `/*.js`, a dot segment — no longer compiles, on every
   method that declares a route, with the `TypeError`'s own message after
   `Invalid path:`. Its params are no longer inferred from a path that
-  could never be served.
+  could never be served. The check is exported, `PathAt`, `CheckedPath`
+  and `StaticPath`: a function forwarding a path generic in `P` types its
+  parameter `PathAt<'', P>`, and the path is checked where it is called.
 - **Refusals in your format.** `onRefusal(hook)` answers a request the
   route's schemas refuse with your own reply instead of
   `400 { error: 'validation', issues }`, for the routes declared after it.
