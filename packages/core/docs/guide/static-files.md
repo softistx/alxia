@@ -47,7 +47,7 @@ in `source`, then, for a path with no extension, with each of
 | `dotfiles` | `boolean` | `false` | whether a file or directory starting with `.` is served |
 | `precompressed` | `readonly ('br' \| 'zstd' \| 'gzip')[]` | none | codings stored beside each file (`app.js.br`, `app.js.zst`, `app.js.gz`), tried in this order for a client whose `Accept-Encoding` takes them |
 | `cacheControl` | `string \| false \| ((path) => string \| false)` | `'public, max-age=0'` | `Cache-Control`: a value, none, or one per path |
-| `headers` | `HeadersInit \| ((path, file) => HeadersInit \| undefined)` | none | headers added to every file, or to each |
+| `headers` | `HeadersInit \| ((path, file) => HeadersInit \| undefined)` | none | headers added to every file, or to each; a `Vary` adds its names to the ones the file varies by — a precompressed copy's `Accept-Encoding` — (`*` replaces them), and each `Set-Cookie` is sent |
 | `types` | `Record<string, string>` | Bun's | content types by extension, over the ones Bun knows |
 | `etag` | `boolean` | `true` | a weak `ETag`, answered 304 |
 | `lastModified` | `boolean` | `true` | `Last-Modified`, answered 304 |
