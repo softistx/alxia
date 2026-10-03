@@ -115,7 +115,10 @@ reported missing.
 Also as `exactly(): …`, and with any other message the core throws for a
 route path:
 `The route path "…" must start with "/"`, `"…": "*" may only end a path`,
-`"…" declares ":…" twice`.
+`"…" declares ":…" twice`, `"…": ":" may only start a segment, as a
+parameter`, `"…": "*" may only be a whole segment, as a wildcard`,
+`"…": "…" is a dot segment, which a request's URL never keeps`,
+`"…" is not encoded as a request's URL carries it: declare "…"`.
 
 ```text
 TypeError: implemented(): "/pets/:pet-id": ":pet-id" is not a parameter name
@@ -123,7 +126,8 @@ TypeError: implemented(): "/pets/:pet-id": ":pet-id" is not a parameter name
 
 **When:** an operation's path is one no route may be declared at: a
 parameter that is not an identifier, a `*` before the last segment, a name
-given twice.
+given twice, a `:` or a `*` inside a segment (`/at/10:45`), a dot segment,
+a literal not percent-encoded as a URL carries it (`/café`).
 
 **Why:** an operation is matched by its shape, which the core's `shapeOf`
 reads as the router does, and it refuses such a path as `app.route` would.
@@ -132,7 +136,12 @@ core's reason, rather than list it.
 
 **Fix:** rename the parameter in the operation, as the route that serves it
 must: `/pets/:petId`. A generator writing `operations` from a document turns
-`{pet-id}` into a name the core accepts.
+`{pet-id}` into a name the core accepts. For the other messages, write
+the path as the core's entry for it says: a `:time` parameter for
+`/at/10:45`
+([`":" may only start a segment`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#--may-only-start-a-segment-as-a-parameter)),
+`/caf%C3%A9` for `/café`
+([`is not encoded as a request's URL carries it`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#-is-not-encoded-as-a-requests-url-carries-it-declare-)).
 
 ## Types
 

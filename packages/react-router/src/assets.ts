@@ -27,8 +27,17 @@ export function serveClient(app: Serving, client: string): void {
 		if (name.startsWith('.')) continue;
 		const path = join(client, name);
 		const cacheControl = name === 'assets' ? IMMUTABLE : AN_HOUR;
-		if (isDirectory(path)) app.static(`/${name}`, path, { cacheControl });
-		else app.file(`/${name}`, path, { cacheControl });
+		// Declared as a request's URL carries the name: `my file.pdf` is
+		// `/my%20file.pdf`, `café.png` is `/caf%C3%A9.png`.
+		const route = new URL(`/${name}`, 'http://localhost').pathname;
+		try {
+			if (isDirectory(path)) app.static(route, path, { cacheControl });
+			else app.file(route, path, { cacheControl });
+		} catch (error) {
+			throw new TypeError(
+				`reactRouter(): ${path} cannot be served at a path of its own name; rename it. ${(error as Error).message}`,
+			);
+		}
 	}
 }
 

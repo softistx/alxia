@@ -4,6 +4,13 @@
  * before a wildcard, with a trailing slash a segment of its own. A path
  * matches strictly, as Bun's router matches it, or forgivingly, a trailing
  * slash more or a wildcard's `/` less, as `listen`'s fallback does.
+ *
+ * A path is refused where `Bun.serve` would throw at `listen`, or would
+ * read it otherwise than `fetch` does: a `:` or a `*` inside a segment, a
+ * dot segment, or a literal a request's URL carries otherwise, such as
+ * `/é` for `/%C3%A9`. Bun compares a literal with the request's target as
+ * it came, and `fetch` with its URL's pathname: a literal in the form the
+ * URL gives matches the same requests in both.
  */
 
 /** A segment's rank in Bun's router: lower wins. */
@@ -34,6 +41,9 @@ export function compilePath(path: string): CompiledPath {
 	let source = '';
 	let strict = '';
 	let shape = '';
+	// The path as a request's URL carries it, and whether `path` differs.
+	let carriedPath = '';
+	let uncarried = false;
 	segments.forEach((segment, index) => {
 		if (segment === '*') {
 			if (index !== segments.length - 1) {
@@ -44,6 +54,7 @@ export function compilePath(path: string): CompiledPath {
 			source += '(?:/(.*))?';
 			strict += '/(.*)';
 			shape += '/*';
+			carriedPath += '/*';
 		} else if (segment.startsWith(':')) {
 			const name = segment.slice(1);
 			if (!/^[A-Za-z_$][\w$]*$/.test(name)) {
@@ -57,7 +68,11 @@ export function compilePath(path: string): CompiledPath {
 			source += '/([^/]+)';
 			strict += '/([^/]+)';
 			shape += '/:';
+			carriedPath += `/${segment}`;
 		} else {
+			const carried = carriedOf(path, segment);
+			if (carried !== segment) uncarried = true;
+			carriedPath += `/${carried}`;
 			const literal = `/${segment.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`;
 			ranks.push(LITERAL);
 			source += literal;
@@ -66,6 +81,11 @@ export function compilePath(path: string): CompiledPath {
 		}
 	});
 	const fixed = names.length === 0;
+	if (uncarried) {
+		throw new TypeError(
+			`"${path}" is not encoded as a request's URL carries it: declare "${carriedPath}"`,
+		);
+	}
 	return {
 		path,
 		shape,
@@ -74,6 +94,42 @@ export function compilePath(path: string): CompiledPath {
 		strict: fixed ? undefined : new RegExp(`^${strict}$`),
 		ranks,
 	};
+}
+
+/**
+ * `segment`, a literal of `path`, as a request's URL carries it: what the
+ * URL percent-encodes — non-ASCII, spaces, `"`, `{` and the like — encoded
+ * as it encodes them. Throws for a literal `Bun.serve`'s router reads as
+ * something else, and for a dot segment, which no URL keeps.
+ */
+function carriedOf(path: string, segment: string): string {
+	if (segment.includes(':')) {
+		throw new TypeError(
+			`"${path}": ":" may only start a segment, as a parameter`,
+		);
+	}
+	if (segment.includes('*')) {
+		throw new TypeError(
+			`"${path}": "*" may only be a whole segment, as a wildcard`,
+		);
+	}
+	// What a URL would cut (`?`, `#`), strip (tabs, newlines) or read as a
+	// `/` (`\`) is encoded first, so that only its own encoding is left.
+	let escaped = '';
+	for (const character of segment) {
+		const code = character.charCodeAt(0);
+		escaped +=
+			code <= 0x20 || code === 0x7f || '?#\\'.includes(character)
+				? `%${code.toString(16).toUpperCase().padStart(2, '0')}`
+				: character;
+	}
+	const carried = new URL(`http://x/${escaped}/`).pathname;
+	if (carried === '/') {
+		throw new TypeError(
+			`"${path}": "${segment}" is a dot segment, which a request's URL never keeps`,
+		);
+	}
+	return carried.slice(1, -1);
 }
 
 /**

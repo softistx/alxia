@@ -23,8 +23,8 @@ export function joinPath<Prefix extends string, Path extends string>(
 
 /**
  * The path with every parameter name erased: two paths of one shape match
- * the same requests, and the router refuses the second. Only a whole `:name`
- * segment is a parameter, so `/at/10:30` is a literal path.
+ * the same requests, and the router refuses the second. A parameter is a
+ * whole `:name` segment, and a `:` anywhere else is refused.
  *
  * ```ts
  * shapeOf('/pets/:id'); // '/pets/:'
@@ -33,8 +33,9 @@ export function joinPath<Prefix extends string, Path extends string>(
  * ```
  *
  * Throws a `TypeError`, as declaring a route there would, for a path that
- * does not start with `/`, a `*` that does not end it, a `:name` that is not
- * an identifier, or a name declared twice.
+ * does not start with `/`, a `*` that does not end it, a `:` or a `*` inside
+ * a segment, a `:name` that is not an identifier, a name declared twice, a
+ * dot segment, or a literal not encoded as a request's URL carries it.
  */
 export function shapeOf(path: string): string {
 	return compilePath(path).shape;

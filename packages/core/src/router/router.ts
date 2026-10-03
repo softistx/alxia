@@ -71,6 +71,12 @@ export class Router<Value> {
 		return this.#shapes.has(compilePath(path).shape);
 	}
 
+	/** Whether `path` is declared, and has neither a parameter nor a wildcard. */
+	isFixed(path: string): boolean {
+		const entry = this.#paths.get(path);
+		return entry !== undefined && entry.compiled.pattern === undefined;
+	}
+
 	/** The methods declared at `path`, exactly as it was declared. */
 	methodsAt(path: string): ReadonlyMap<string, Value> | undefined {
 		return this.#paths.get(path)?.methods;

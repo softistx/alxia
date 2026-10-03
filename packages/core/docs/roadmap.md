@@ -92,3 +92,10 @@ Nothing scheduled yet.
   does under `listen` — segment by segment, a literal before a parameter
   before a wildcard, whatever the order of declaration — so `/api/*` beats a
   `/*` catch-all declared before it, in a test as in production.
+- **No path that `listen` throws on.** A path `Bun.serve` would refuse at
+  `listen` or read otherwise than `fetch` — a `:` inside a segment as in
+  `/at/10:30`, a `*` beside other characters, a dot segment, a literal the
+  URL percent-encodes such as `/café` — is refused when the route is
+  declared, naming the form to write (`/caf%C3%A9`). A request sent with
+  an unresolved target, `/files/../admin`, is routed by its URL under
+  `listen` as through `fetch`.

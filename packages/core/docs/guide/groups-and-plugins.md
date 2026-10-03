@@ -160,7 +160,7 @@ them:
 | `vary` | `(headers: Headers, value: string) => void` | adding to `Vary` once, leaving `*` alone; `*` itself replaces every name, and an empty name adds nothing |
 | `check` | `(schema: StandardSchemaV1, value: unknown, target: ValidationTarget) => Promise<Checked>` | running a schema as a route does: its output, or its issues |
 | `joinPath` | `<Prefix extends string, Path extends string>(prefix: Prefix, path: Path) => JoinPath<Prefix, Path>` | a path under a prefix, as `alxia({ prefix })`, `group` and `use` join them: `/` under `/api` is `/api`, and `''` leaves the path as it is |
-| `shapeOf` | `(path: string) => string` | the path with its parameter names erased, as the router compares two paths: `'/pets/:'` for `/pets/:id` and `/pets/:petId` alike. Only a whole `:name` segment is a parameter, so `/at/10:30` is literal. Throws the `TypeError` of [Paths](routes.md#paths) for a path no route may be declared at |
+| `shapeOf` | `(path: string) => string` | the path with its parameter names erased, as the router compares two paths: `'/pets/:'` for `/pets/:id` and `/pets/:petId` alike. Only a whole `:name` segment is a parameter, and a `:` anywhere else throws. Throws the `TypeError` of [Paths](routes.md#paths) for a path no route may be declared at |
 
 ```ts
 import { alxia, check, type Plugin, vary, withHeaders } from '@alxia/core';

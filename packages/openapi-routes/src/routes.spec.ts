@@ -181,12 +181,12 @@ describe('exactly', () => {
 		expect(() => exactly(app, { getPet })).not.toThrow();
 	});
 
-	test('a colon inside a segment is no parameter', () => {
-		const app = alxia().get('/at/10:30', ({ reply }) => reply(200, 'x'));
+	test('a colon inside a segment throws, as the core does', () => {
+		const app = alxia().get('/at/:time', ({ reply }) => reply(200, 'x'));
 		const other = { method: 'GET', path: '/at/10:45' } as const;
 		expect(() => exactly(app, [other])).toThrow(
 			new TypeError(
-				'exactly(): 1 operation has no route: GET /at/10:45; 1 route has no operation: GET /at/10:30',
+				'exactly(): "/at/10:45": ":" may only start a segment, as a parameter',
 			),
 		);
 	});

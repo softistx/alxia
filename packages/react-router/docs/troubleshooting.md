@@ -11,6 +11,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`alxiaOf(): this request has no alxia context. …`](#alxiaof-this-request-has-no-alxia-context-)
 - [``You made a POST request to "/" but did not provide an `action` for route "root", so there is no way to handle the request.``](#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
 - [`TypeError: reactRouter(): client is …, which is not a directory. …`](#typeerror-reactrouter-client-is--which-is-not-a-directory-)
+- [`TypeError: reactRouter(): … cannot be served at a path of its own name; rename it. …`](#typeerror-reactrouter--cannot-be-served-at-a-path-of-its-own-name-rename-it-)
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
 
 **Types**
@@ -145,6 +146,21 @@ working directory, not the server file.
 ```ts
 reactRouter(app, { build, client: new URL('./build/client', import.meta.url) });
 ```
+
+### `TypeError: reactRouter(): … cannot be served at a path of its own name; rename it. …`
+
+**When:** at startup, with `client` given, a top-level file or folder of
+the client build — a copy of `public/` — has a name no route can carry:
+`a:b.txt` (a `:` starts a parameter), `*x` (a `*` is a wildcard). The
+message ends with the core's refusal, which says which.
+
+A name a URL only encodes is fine: `my file.pdf` is served at
+`/my%20file.pdf`, `café.png` at `/caf%C3%A9.png`, as a browser asks for
+them.
+
+**Fix:** rename the file in `public/`, or move it into a folder: a file
+inside a folder is served by that folder's `static` route, whatever its
+name.
 
 ### `Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`
 
