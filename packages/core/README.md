@@ -78,7 +78,7 @@ app.get('/users', { quey: z.object({}) }, ...);                          // a ty
 | `params` | the path, as strings | `{ id: string }`, from the path |
 | `query` | the query string: a key given once is a string, more than once an array | `Record<string, string \| string[]>` |
 | `headers` | the headers, names lowercased | `Record<string, string>` |
-| `cookies` | the `Cookie` header; every hook reads it too, unvalidated | `Record<string, string>` |
+| `cookies` | the `Cookie` header; every route hook reads it too, unvalidated | `Record<string, string>` |
 | `body` | by `content-type`: a parser the app added, JSON, a form, text, or the bytes | `undefined`: read `ctx.request` |
 
 A request any schema refuses is answered with a 400 that names every issue,
@@ -363,11 +363,11 @@ in a hook for a cookie the request sent:
 ```
 
 `onError` turns a thrown error into a reply the same way; an `HttpError`
-is answered as it says, and anything else is a 500 that leaks nothing, but for a client that hung up
-mid-request, a 499 nobody reads. `onRefusal` answers a request
-the route's schemas refuse, or whose body passes its `bodyLimit`
-([Requests](#requests)); the last one declared
-before a route is the one it uses.
+is answered as it says, and anything else is a 500 that leaks nothing, but
+for a client that hung up mid-request, a 499 nobody reads. `onRefusal`
+answers a request the route's schemas refuse, or whose body passes its
+`bodyLimit` ([Requests](#requests)); the last one declared before a route
+is the one it uses.
 
 Global hooks apply to the whole app, wherever they are declared:
 

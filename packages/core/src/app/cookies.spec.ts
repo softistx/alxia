@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
 import type { StandardSchemaV1 } from '../schema/standard-schema';
-import { alxia } from './alxia';
+import { type AnyAlxia, alxia } from './alxia';
 import type { ResponseCookies } from './types';
 
 /** A schema written by hand: a `visits` cookie, as a number. */
@@ -176,5 +176,53 @@ describe('set.cookies', () => {
 			headers: { cookie: 'sid=abc' },
 		});
 		expect(response.headers.getSetCookie()).toEqual([]);
+	});
+});
+
+describe('a socket', () => {
+	/** The `socket.data.cookies` a socket at `path` sends back on open. */
+	async function opened(app: AnyAlxia, path: string): Promise<unknown> {
+		const server = app.listen({ port: 0 });
+		try {
+			const url = new URL(path, server.url);
+			url.protocol = 'ws:';
+			const socket = new WebSocket(url, {
+				headers: { cookie: 'visits=3; a=b' },
+			} as never);
+			const data = await new Promise<unknown>((resolve) => {
+				socket.onmessage = (event) => resolve(JSON.parse(String(event.data)));
+			});
+			socket.close();
+			return data;
+		} finally {
+			await app.stop(true);
+		}
+	}
+
+	test('reads the request map without a schema', async () => {
+		const app = alxia().ws(
+			'/raw',
+			{},
+			{
+				open: (socket) => void socket.send(socket.data.cookies),
+				message: () => {},
+			},
+		);
+		expect(await opened(app, '/raw')).toEqual({ visits: '3', a: 'b' });
+	});
+
+	test('reads the validated values with one', async () => {
+		const app = alxia().ws(
+			'/visits',
+			{ cookies: visits() },
+			{
+				open: (socket) => {
+					expectTypeOf(socket.data.cookies).toEqualTypeOf<{ visits: number }>();
+					void socket.send(socket.data.cookies);
+				},
+				message: () => {},
+			},
+		);
+		expect(await opened(app, '/visits')).toEqual({ visits: 3 });
 	});
 });

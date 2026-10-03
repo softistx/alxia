@@ -211,8 +211,9 @@ error is sent without them.
 
 `set.cookies` holds only the response's: it starts empty, and
 `set.cookies.get` reads back what this response set. To read the request's
-cookies, read `ctx.cookies` — in a handler or any hook — or declare them in
-the route's schema to validate them for its handler
+cookies, read `ctx.cookies` — in a handler or any route hook (`derive`,
+`wrap`, `onError`, `onRefusal`) — or declare them in the route's schema to
+validate them for its handler
 ([Routes](routes.md#the-schema), [Hooks](hooks.md#reading-the-requests-cookies)).
 
 ## Redirects
