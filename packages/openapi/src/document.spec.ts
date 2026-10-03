@@ -339,6 +339,100 @@ describe('openapi', () => {
 		]);
 	});
 
+	test('a hook per kind: each kind’s schemas, under each one’s content type, on the routes it may refuse', () => {
+		const Invalid = z.object({ detail: z.string() });
+		const TooLarge = z.object({ limit: z.number() });
+		const refused = openapi(
+			alxia()
+				.onRefusal(
+					'validation',
+					{
+						response: { 422: Invalid },
+						contentType: 'application/problem+json',
+					},
+					(refusal, { reply }) => reply(422, { detail: refusal.part }),
+				)
+				.onRefusal(
+					'body_limit',
+					{ response: { 413: TooLarge } },
+					(refusal, { reply }) => reply(413, { limit: refusal.limit }),
+				)
+				.post('/both', { body: z.string(), bodyLimit: 64 }, ({ reply }) =>
+					reply(200, 'ok'),
+				)
+				.post('/valid', { body: z.string() }, ({ reply }) => reply(200, 'ok'))
+				.post('/raw', { bodyLimit: 64 }, ({ reply }) => reply(200, 'ok')),
+			{ info: { title: 'Kinds', version: '1' } },
+		);
+		const both = refused.paths['/both']?.post?.responses ?? {};
+		expect(Object.keys(both).sort()).toEqual(['413', '422', '500', 'default']);
+		expect(both['422']).toEqual({
+			description: 'The request was refused',
+			content: {
+				'application/problem+json': {
+					schema: {
+						type: 'object',
+						properties: { detail: { type: 'string' } },
+						required: ['detail'],
+						additionalProperties: false,
+					},
+				},
+			},
+		});
+		expect(both['413']).toEqual({
+			description: 'The body is larger than 64 bytes',
+			content: {
+				'application/json': {
+					schema: {
+						type: 'object',
+						properties: { limit: { type: 'number' } },
+						required: ['limit'],
+						additionalProperties: false,
+					},
+				},
+			},
+		});
+		expect(
+			Object.keys(refused.paths['/valid']?.post?.responses ?? {}).sort(),
+		).toEqual(['422', '500', 'default']);
+		expect(
+			Object.keys(refused.paths['/raw']?.post?.responses ?? {}).sort(),
+		).toEqual(['413', '500', 'default']);
+	});
+
+	test('a kind without a hook: the general hook’s schemas, else the default of the kind', () => {
+		const Problem = z.object({ type: z.string() });
+		const general = openapi(
+			alxia()
+				.onRefusal({ response: { 400: Problem } }, (_refusal, { reply }) =>
+					reply(400, { type: 'urn:example:invalid' }),
+				)
+				.onRefusal('body_limit', () => problem({ status: 413 }))
+				.post('/a', { body: z.string(), bodyLimit: 64 }, ({ reply }) =>
+					reply(200, 'ok'),
+				),
+			{ info: { title: 'Kinds', version: '1' } },
+		);
+		const a = general.paths['/a']?.post?.responses ?? {};
+		expect(Object.keys(a).sort()).toEqual(['400', '4XX', '500', 'default']);
+		expect(Object.keys(a['400']?.content ?? {})).toEqual(['application/json']);
+		const none = openapi(
+			alxia()
+				.onRefusal('validation', () => problem({ status: 422 }))
+				.post('/a', { body: z.string(), bodyLimit: 64 }, ({ reply }) =>
+					reply(200, 'ok'),
+				),
+			{ info: { title: 'Kinds', version: '1' } },
+		);
+		const b = none.paths['/a']?.post?.responses ?? {};
+		expect(Object.keys(b).sort()).toEqual(['413', '4XX', '500', 'default']);
+		expect(b['413']?.content).toEqual({
+			'application/json': {
+				schema: { $ref: '#/components/schemas/ContentTooLargeError' },
+			},
+		});
+	});
+
 	test('operation ids: the route’s own, or one from its method and path', () => {
 		expect(document.paths['/users']?.post?.operationId).toBe('createUser');
 		expect(document.paths['/users/{id}']?.get?.operationId).toBe(

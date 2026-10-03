@@ -2,7 +2,7 @@
  * An app as it runs: its hooks, and the definition of each route and socket
  * route it holds, with the hooks declared before it.
  */
-import type { Refusal } from '../errors/errors';
+import type { Refusal, RefusalKind } from '../errors/errors';
 import type { AnyReply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
 import type { Router } from '../router/router';
@@ -46,6 +46,15 @@ export interface RefusalHandler {
 	readonly contentType?: string;
 }
 
+/**
+ * The `onRefusal(kind, hook)` handlers in force for a route, by kind:
+ * tried in order before its general `refusal`, the first that returns a
+ * reply answering. A plugin's route lists its own before the app's.
+ */
+export type RefusalHandlersByKind = {
+	readonly [Kind in RefusalKind]?: readonly RefusalHandler[];
+};
+
 /** Runs on every request, before routing; a `Response` it returns is sent as it is. */
 export type RequestHook = (
 	ctx: RequestContext,
@@ -84,6 +93,8 @@ export interface RouteDefinition {
 	readonly onError: readonly ErrorHook[];
 	/** The `onRefusal` hook declared last before it; none, and a refused request is the default 400. */
 	readonly refusal?: RefusalHandler | undefined;
+	/** The `onRefusal(kind, hook)` hooks in force for it, tried before `refusal`. */
+	readonly refusalByKind?: RefusalHandlersByKind | undefined;
 }
 
 /** A socket route as the app runs it. */
@@ -95,6 +106,7 @@ export interface SocketDefinition {
 	readonly onError: readonly ErrorHook[];
 	/** Answers a refused upgrade request, as a route's. */
 	readonly refusal?: RefusalHandler | undefined;
+	readonly refusalByKind?: RefusalHandlersByKind | undefined;
 }
 
 export type Definition =

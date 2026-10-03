@@ -58,6 +58,23 @@ export function refusingWithSchemas() {
 	);
 }
 
+// A hook per kind, one with schemas: each kind's marked replies, and the
+// fallback of one that may return nothing, are named in the declaration.
+export function refusingByKind() {
+	return alxia()
+		.onRefusal(
+			'validation',
+			{ response: { 422: Ping }, contentType: 'application/problem+json' },
+			(_refusal, { reply }) => reply(422, { interval: 1 }),
+		)
+		.onRefusal('body_limit', (r) =>
+			r.limit > 0 ? problem({ status: 413, limit: r.limit }) : undefined,
+		)
+		.post('/', { body: Ping, bodyLimit: 1024 }, ({ reply }) =>
+			reply(200, { ok: true }),
+		);
+}
+
 export function streaming() {
 	const Push = eventStream({ ping: Ping });
 	return alxia().get('/push', { response: { 200: Push } }, ({ reply }) =>

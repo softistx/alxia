@@ -111,7 +111,10 @@ interface OpenApiDocument {
   route under a `bodyLimit`) and `InternalError` (a 500).
   Your own schemas are written inline in each operation, not as
   components. So are an `onRefusal` hook's: a route behind one documents
-  the hook's schemas in place of `ValidationError`.
+  the hook's schemas in place of `ValidationError`. A hook of one kind,
+  `onRefusal('validation', …)` or `onRefusal('body_limit', …)`, documents
+  its schemas in place of that kind's error only, on the routes that kind
+  may refuse.
 
 Both indexes of `paths` may be missing, so read them with `?.`:
 

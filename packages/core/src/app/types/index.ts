@@ -20,11 +20,15 @@ export type {
 	DefaultRefusalOutcome,
 	FallsBack,
 	IsLimited,
+	KindFallsBack,
+	KindOutcome,
+	KindRefusalsOf,
 	RefusalOutcome,
 	RefusalResponses,
 	RefusalSchema,
 	RefusalsOf,
 	Refusing,
+	RefusingKind,
 	ThenShortcuts,
 } from './refusal';
 export type { ProvidedBy, RequiresOf, Requiring } from './requires';

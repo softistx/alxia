@@ -1,4 +1,4 @@
-import type { Refusal } from '../errors/errors';
+import type { Refusal, RefusalKind, RefusalOfKind } from '../errors/errors';
 import type { AnyReply, Reply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
 import { joinPath } from '../router/paths';
@@ -36,7 +36,7 @@ import { addPage, refusePage, refuseShadowedPages } from './pages';
 import { serve } from './pipeline';
 import type { OperationMethod, RouteOperation } from './route-operation';
 import { createRuntime, mergeGlobals } from './runtime';
-import { refusalHandler, Scope } from './scope';
+import { refusalHandler, refusalKind, Scope } from './scope';
 import { startServer, stopServer } from './serving';
 import type {
 	AlxiaOptions,
@@ -53,6 +53,7 @@ import type {
 	DeclaredRefusal,
 	DeclaredReply,
 	Empty,
+	KindRefusalsOf,
 	MaybePromise,
 	Method,
 	Outcome,
@@ -61,6 +62,7 @@ import type {
 	RefusalSchema,
 	RefusalsOf,
 	Refusing,
+	RefusingKind,
 	RouteEntryOf,
 	RouteRecord,
 	RouteSchema,
@@ -450,6 +452,19 @@ export class Alxia<
 	 * .onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' },
 	 *   (refusal, { reply }) => reply(400, { type: 'urn:example:invalid', status: 400, detail: refusal.kind }))
 	 * ```
+	 *
+	 * Given a kind first, the hook answers that kind alone and reads it
+	 * narrowed; its schemas, if any, type and document that kind's replies
+	 * apart. A kind with no hook of its own, or whose hook returns nothing,
+	 * falls back to the general hook, then to the default. A general hook
+	 * declared after it replaces it; one of the same kind too:
+	 *
+	 * ```ts
+	 * .onRefusal('validation', { response: { 400: Invalid } }, (refusal, { reply }) =>
+	 *   reply(400, { detail: `the ${refusal.part} is invalid` }))
+	 * .onRefusal('body_limit', { response: { 413: TooLarge } }, (refusal, { reply }) =>
+	 *   reply(413, { limit: refusal.limit }))
+	 * ```
 	 */
 	onRefusal<Result extends Reply<ClientErrorStatus, any> | undefined | void>(
 		hook: (refusal: Refusal, ctx: BaseContext & Ctx) => MaybePromise<Result>,
@@ -476,11 +491,62 @@ export class Alxia<
 		| Exclude<Shortcuts, Refusing>
 		| RefusalsOf<DeclaredRefusal<Responses>, Result>
 	>;
+	onRefusal<
+		Kind extends RefusalKind,
+		Result extends Reply<ClientErrorStatus, any> | undefined | void,
+	>(
+		kind: Kind,
+		hook: (
+			refusal: RefusalOfKind<Kind>,
+			ctx: BaseContext & Ctx,
+		) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes,
+		Prefix,
+		| Exclude<Shortcuts, RefusingKind<Kind>>
+		| KindRefusalsOf<Kind, Extract<Result, AnyReply>, Result>
+	>;
+	onRefusal<
+		Kind extends RefusalKind,
+		Responses extends RefusalResponses,
+		Result extends DeclaredReply<Responses> | undefined | void,
+	>(
+		kind: Kind,
+		schema: RefusalSchema<Responses>,
+		hook: (
+			refusal: RefusalOfKind<Kind>,
+			ctx: Omit<BaseContext, 'reply'> &
+				Ctx & { readonly reply: TypedReplyFunction<Responses> },
+		) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes,
+		Prefix,
+		| Exclude<Shortcuts, RefusingKind<Kind>>
+		| KindRefusalsOf<Kind, DeclaredRefusal<Responses>, Result>
+	>;
 	onRefusal(
-		schemaOrHook: RefusalSchema | ((refusal: Refusal, ctx: never) => unknown),
-		maybeHook?: (refusal: Refusal, ctx: never) => unknown,
+		first:
+			| RefusalKind
+			| RefusalSchema
+			| ((refusal: Refusal, ctx: never) => unknown),
+		second?: RefusalSchema | ((refusal: never, ctx: never) => unknown),
+		third?: (refusal: never, ctx: never) => unknown,
 	): AnyAlxia {
-		this.#scope.refuseWith(refusalHandler(schemaOrHook, maybeHook));
+		if (typeof first === 'string') {
+			this.#scope.refuseKindWith(
+				refusalKind(first),
+				refusalHandler(second as RefusalSchema, third),
+			);
+		} else {
+			this.#scope.refuseWith(
+				refusalHandler(
+					first,
+					second as (refusal: never, ctx: never) => unknown,
+				),
+			);
+		}
 		return this;
 	}
 

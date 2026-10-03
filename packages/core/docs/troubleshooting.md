@@ -41,6 +41,7 @@ a trap that prints nothing is headed by its symptom.
 - [`GET /…: the handler is missing`](#get--the-handler-is-missing)
 - [`group(): build is missing`](#group-build-is-missing)
 - [`onRefusal(): the hook is missing`](#onrefusal-the-hook-is-missing)
+- [`onRefusal(): "…" is no kind of refusal; expected 'validation' or 'body_limit'`](#onrefusal--is-no-kind-of-refusal-expected-validation-or-body_limit)
 - [`page(): /… is already served`](#page--is-already-served)
 - [`GET /… is already served by a page`](#get--is-already-served-by-a-page)
 
@@ -478,6 +479,12 @@ app.onRefusal((refusal) =>
 );
 ```
 
+Or give the kind first: that hook answers it alone and reads it narrowed.
+
+```ts
+app.onRefusal('validation', (refusal) => problem({ status: 400, detail: `the ${refusal.part} is invalid` }));
+```
+
 ### `'500' does not exist in type 'RefusalResponses'`
 
 **When:** the schemas given to `onRefusal` declare a status that is not a
@@ -755,6 +762,18 @@ app.onRefusal({ response: { 400: Problem } }, (_, { reply }) =>
 );
 ```
 
+### `onRefusal(): "…" is no kind of refusal; expected 'validation' or 'body_limit'`
+
+**When:** `onRefusal` is given a string that is not a kind of refusal, a
+typo such as `'body-limit'`. The types refuse that too, so this comes from
+JavaScript or a cast.
+
+**Fix:** give one of the two kinds, with an underscore in `body_limit`:
+
+```ts
+app.onRefusal('body_limit', (refusal) => problem({ status: 413, limit: refusal.limit }));
+```
+
 ### `page(): /… is already served`
 
 **When:** `page(path, bundle)` names a path that another `page` or a
@@ -848,6 +867,11 @@ routes still gets the default 400.
   declare the hook on the app, before the group.
 - The hook returned nothing, `undefined`, for this refusal. Nothing means
   the default: return a reply for every refusal you want answered.
+- The hook is a hook of the other kind, `onRefusal('body_limit', …)`. It
+  answers that kind alone: declare one for `'validation'`, or a general
+  `onRefusal(hook)`.
+- A general `onRefusal(hook)` declared after `onRefusal('validation', …)`
+  replaces it: declare the hook of the kind last.
 
 **Fix:** declare the hook first, and return a reply:
 

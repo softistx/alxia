@@ -318,8 +318,10 @@ interface ProblemDetails<Status extends ClientErrorStatus | ServerErrorStatus> {
 
 On a route with `response` schemas, a problem is a reply like any other:
 its status must be declared and its body accepted by that status's schema.
-[`onRefusal`](hooks.md#onrefusal) answers a refused request with one.
-`@alxia/client` reads `application/problem+json` as JSON.
+[`onRefusal`](hooks.md#onrefusal) answers a refused request with one, and
+a hook per kind declares a schema for each: `onRefusal('validation', { response: { 400: Invalid } }, hook)`
+and `onRefusal('body_limit', { response: { 413: TooLarge } }, hook)`
+([One hook per kind](hooks.md#one-hook-per-kind)). `@alxia/client` reads `application/problem+json` as JSON.
 
 ## Types
 

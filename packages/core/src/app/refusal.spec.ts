@@ -432,8 +432,8 @@ describe('onRefusal, typed', () => {
 				// @ts-expect-error: a status its schemas do not declare
 				(_, { reply }) => reply(422, { detail: 'x' }),
 			);
+			// @ts-expect-error: schemas for client errors only
 			alxia().onRefusal(
-				// @ts-expect-error: schemas for client errors only
 				{ response: { 500: z.object({ detail: z.string() }) } },
 				() => undefined,
 			);

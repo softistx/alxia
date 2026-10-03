@@ -7,16 +7,21 @@ import type {
 	Refusal,
 	ValidationErrorBody,
 } from '../errors/errors';
-import { Reply } from '../reply/reply';
-import type { RouteDefinition, SocketDefinition } from './definition';
+import { type AnyReply, Reply } from '../reply/reply';
+import type {
+	RefusalHandler,
+	RouteDefinition,
+	SocketDefinition,
+} from './definition';
 import { checkReply, send } from './send';
 import type { BaseContext, ResponseSettings } from './types';
 
 /**
- * A refused request, answered by the route's `onRefusal` hook — its reply
- * checked by the schemas the hook declares — or, when it has none or
- * returns nothing, by the default of its kind: a 400 with the issues of a
- * `validation`, the 413 of a `body_limit`.
+ * A refused request, answered by the route's `onRefusal` hooks — its
+ * hooks of the refusal's kind in order, then its general hook, each reply
+ * checked by the schemas its hook declares — or, when none answers, by the
+ * default of its kind: a 400 with the issues of a `validation`, the 413 of
+ * a `body_limit`.
  */
 export async function refuse(
 	definition: RouteDefinition | SocketDefinition,
@@ -25,30 +30,59 @@ export async function refuse(
 	ctx: BaseContext,
 	validateResponses: boolean,
 ): Promise<Response> {
-	const handler = definition.refusal;
-	if (handler !== undefined) {
-		let reply = handler.hook(refusal, ctx);
-		if (reply instanceof Promise) reply = await reply;
-		const method = 'method' in definition ? definition.method : 'WS';
-		if (reply instanceof Reply) {
-			if (handler.response !== undefined) {
-				reply = await checkReply(
-					method,
-					definition.path,
-					handler.response,
-					reply,
-					validateResponses,
-				);
-			}
-			return send(withContentType(reply, handler.contentType), set);
-		}
-		if (reply !== undefined) {
-			throw new TypeError(
-				`${method} ${definition.path}: the onRefusal hook returned neither a reply nor nothing.`,
-			);
-		}
+	const general = definition.refusal;
+	for (const handler of definition.refusalByKind?.[refusal.kind] ?? []) {
+		const reply = await answer(
+			definition,
+			handler,
+			refusal,
+			ctx,
+			validateResponses,
+		);
+		if (reply !== undefined) return send(reply, set);
+	}
+	if (general !== undefined) {
+		const reply = await answer(
+			definition,
+			general,
+			refusal,
+			ctx,
+			validateResponses,
+		);
+		if (reply !== undefined) return send(reply, set);
 	}
 	return send(byDefault(refusal), set);
+}
+
+/** The reply of one handler, checked and with its content type; nothing when its hook returns nothing. */
+async function answer(
+	definition: RouteDefinition | SocketDefinition,
+	handler: RefusalHandler,
+	refusal: Refusal,
+	ctx: BaseContext,
+	validateResponses: boolean,
+): Promise<AnyReply | undefined> {
+	let reply = handler.hook(refusal, ctx);
+	if (reply instanceof Promise) reply = await reply;
+	const method = 'method' in definition ? definition.method : 'WS';
+	if (reply instanceof Reply) {
+		if (handler.response !== undefined) {
+			reply = await checkReply(
+				method,
+				definition.path,
+				handler.response,
+				reply,
+				validateResponses,
+			);
+		}
+		return withContentType(reply, handler.contentType);
+	}
+	if (reply !== undefined) {
+		throw new TypeError(
+			`${method} ${definition.path}: the onRefusal hook returned neither a reply nor nothing.`,
+		);
+	}
+	return undefined;
 }
 
 /** The reply a refusal gets when no hook answers it. */
