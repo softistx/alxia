@@ -1,4 +1,5 @@
-import { checkKey, HASH, params } from './keys';
+import { loadKeys } from './keys';
+import { signToken, verifyToken } from './token';
 
 /**
  * JSON Web Tokens on Web Crypto: nothing to install. HMAC with a secret,
@@ -78,18 +79,6 @@ export interface Jwt {
 	verify(token: string): Promise<VerifyResult>;
 }
 
-const encoder = new TextEncoder();
-const decoder = new TextDecoder();
-
-export function base64url(bytes: Uint8Array): string {
-	return Buffer.from(bytes).toString('base64url');
-}
-
-function fromBase64url(text: string): Uint8Array<ArrayBuffer> {
-	if (!/^[A-Za-z0-9_-]*$/.test(text)) throw new TypeError('not base64url');
-	return new Uint8Array(Buffer.from(text, 'base64url'));
-}
-
 /**
  * A signer and verifier of tokens.
  *
@@ -101,120 +90,17 @@ function fromBase64url(text: string): Uint8Array<ArrayBuffer> {
 export function createJwt(options: JwtOptions): Jwt {
 	const algorithm: Algorithm = options.algorithm ?? 'HS256';
 	const tolerance = options.clockTolerance ?? 5;
-	let keys: Promise<{ sign?: CryptoKey; verify: CryptoKey }>;
-	if ('secret' in options) {
-		const secret =
-			typeof options.secret === 'string'
-				? encoder.encode(options.secret)
-				: new Uint8Array(options.secret);
-		if (secret.byteLength < 32) {
-			throw new TypeError('A JWT secret must hold at least 32 bytes');
-		}
-		keys = crypto.subtle
-			.importKey(
-				'raw',
-				secret,
-				{ name: 'HMAC', hash: HASH[algorithm] },
-				false,
-				['sign', 'verify'],
-			)
-			.then((key) => ({ sign: key, verify: key }));
-	} else {
-		checkKey(options.algorithm, 'publicKey', options.publicKey);
-		if (options.privateKey !== undefined) {
-			checkKey(options.algorithm, 'privateKey', options.privateKey);
-		}
-		keys = Promise.resolve(
-			options.privateKey === undefined
-				? { verify: options.publicKey }
-				: { sign: options.privateKey, verify: options.publicKey },
-		);
-	}
-
+	const keys = loadKeys(options, algorithm);
 	return {
 		algorithm,
-		async sign(claims, signOptions) {
-			const key = (await keys).sign;
-			if (key === undefined) throw new TypeError('Signing needs a private key');
-			const now = Math.floor(Date.now() / 1000);
-			const expiresIn = signOptions?.expiresIn ?? options.expiresIn;
-			const payload: Record<string, unknown> = {
-				iat: now,
-				...(options.issuer === undefined ? {} : { iss: options.issuer }),
-				...(options.audience === undefined ? {} : { aud: options.audience }),
-				...(expiresIn === undefined ? {} : { exp: now + expiresIn }),
-				...claims,
-			};
-			const head = base64url(
-				encoder.encode(JSON.stringify({ alg: algorithm, typ: 'JWT' })),
-			);
-			const body = base64url(encoder.encode(JSON.stringify(payload)));
-			const signature = await crypto.subtle.sign(
-				params(algorithm),
-				key,
-				encoder.encode(`${head}.${body}`),
-			);
-			return `${head}.${body}.${base64url(new Uint8Array(signature))}`;
-		},
-		async verify(token) {
-			const parts = token.split('.');
-			if (parts.length !== 3) return { ok: false, reason: 'malformed' };
-			const [head, body, signature] = parts as [string, string, string];
-			let header: unknown;
-			let claims: JwtClaims;
-			let signed: Uint8Array<ArrayBuffer>;
-			try {
-				header = JSON.parse(decoder.decode(fromBase64url(head)));
-				claims = JSON.parse(decoder.decode(fromBase64url(body)));
-				signed = fromBase64url(signature);
-			} catch {
-				return { ok: false, reason: 'malformed' };
-			}
-			if (
-				claims === null ||
-				typeof claims !== 'object' ||
-				Array.isArray(claims)
-			) {
-				return { ok: false, reason: 'malformed' };
-			}
-			if (
-				header === null ||
-				typeof header !== 'object' ||
-				Array.isArray(header)
-			) {
-				return { ok: false, reason: 'malformed' };
-			}
-			if ((header as { alg?: unknown }).alg !== algorithm) {
-				return { ok: false, reason: 'algorithm' };
-			}
-			// A signature Web Crypto cannot read — the wrong length for the
-			// curve — is a bad signature, not an error to answer with a 500.
-			const valid = await crypto.subtle
-				.verify(
-					params(algorithm),
-					(await keys).verify,
-					signed,
-					encoder.encode(`${head}.${body}`),
-				)
-				.catch(() => false);
-			if (!valid) return { ok: false, reason: 'signature' };
-			const now = Math.floor(Date.now() / 1000);
-			if (typeof claims.exp === 'number' && now - tolerance >= claims.exp) {
-				return { ok: false, reason: 'expired' };
-			}
-			if (typeof claims.nbf === 'number' && now + tolerance < claims.nbf) {
-				return { ok: false, reason: 'not_yet_valid' };
-			}
-			if (options.issuer !== undefined && claims.iss !== options.issuer) {
-				return { ok: false, reason: 'issuer' };
-			}
-			if (options.audience !== undefined) {
-				const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-				if (!audiences.includes(options.audience)) {
-					return { ok: false, reason: 'audience' };
-				}
-			}
-			return { ok: true, claims };
-		},
+		sign: (claims, signOptions) =>
+			signToken(
+				algorithm,
+				keys,
+				options,
+				claims,
+				signOptions?.expiresIn ?? options.expiresIn,
+			),
+		verify: (token) => verifyToken(algorithm, keys, options, tolerance, token),
 	};
 }

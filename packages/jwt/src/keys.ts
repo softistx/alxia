@@ -1,4 +1,4 @@
-import type { Algorithm, KeyAlgorithm } from './jwt';
+import type { Algorithm, JwtOptions, KeyAlgorithm } from './jwt';
 
 /** The hash each algorithm signs with. */
 export const HASH: Record<Algorithm, string> = {
@@ -70,4 +70,50 @@ export function checkKey(
 			`createJwt: the ${role} must be a ${type} key that can ${usage}; it is a ${key.type} key that can ${key.usages.join(', ') || 'do nothing'}`,
 		);
 	}
+}
+
+/** The keys a `Jwt` signs and verifies with: no `sign` without a private key. */
+export interface Keys {
+	readonly sign?: CryptoKey;
+	readonly verify: CryptoKey;
+}
+
+const encoder = new TextEncoder();
+
+/**
+ * The keys of `options`: an HMAC key imported from the secret, or the key
+ * pair as given. Throws at once, not on the first request, on a secret
+ * shorter than 32 bytes or a key `algorithm` cannot use.
+ */
+export function loadKeys(
+	options: JwtOptions,
+	algorithm: Algorithm,
+): Promise<Keys> {
+	if ('secret' in options) {
+		const secret =
+			typeof options.secret === 'string'
+				? encoder.encode(options.secret)
+				: new Uint8Array(options.secret);
+		if (secret.byteLength < 32) {
+			throw new TypeError('A JWT secret must hold at least 32 bytes');
+		}
+		return crypto.subtle
+			.importKey(
+				'raw',
+				secret,
+				{ name: 'HMAC', hash: HASH[algorithm] },
+				false,
+				['sign', 'verify'],
+			)
+			.then((key) => ({ sign: key, verify: key }));
+	}
+	checkKey(options.algorithm, 'publicKey', options.publicKey);
+	if (options.privateKey !== undefined) {
+		checkKey(options.algorithm, 'privateKey', options.privateKey);
+	}
+	return Promise.resolve(
+		options.privateKey === undefined
+			? { verify: options.publicKey }
+			: { sign: options.privateKey, verify: options.publicKey },
+	);
 }
