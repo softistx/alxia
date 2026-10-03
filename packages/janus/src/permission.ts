@@ -1,4 +1,4 @@
-import { type BaseContext, definePlugin } from '@alxia/core';
+import { type BaseContext, definePlugin, type RequiresOf } from '@alxia/core';
 import type {
 	CheckableOf,
 	ModelConfig,
@@ -6,12 +6,7 @@ import type {
 	Permissions,
 	SubjectRef,
 } from '@nxgt/janus/permissions';
-import type {
-	Awaitable,
-	ObjectData,
-	OptionsArgs,
-	RequiresOf,
-} from './permission-options';
+import type { Awaitable, ObjectData, OptionsArgs } from './permission-options';
 
 /** The body of each refusal. */
 export interface PermissionRefusedBody {

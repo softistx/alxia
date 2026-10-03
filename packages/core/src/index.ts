@@ -37,6 +37,7 @@ export type {
 	ProvidedBy,
 	RedirectFunction,
 	RequestContext,
+	RequiresOf,
 	Requiring,
 	ResponseSchemas,
 	ResponseSettings,

@@ -182,6 +182,38 @@ export const audit = <Requires extends object = Empty>(
 app.use(auth).use(audit<{ user: User }>(({ user }) => user.id));
 ```
 
+Or infer it from the callback's annotation, so the app writes no type
+argument: `RequiresOf<Ctx>` is what the annotation adds to `BaseContext`.
+`@alxia/language`'s `resolve` and `@alxia/janus`'s `load` work this way:
+
+```ts
+import { type BaseContext, definePlugin, type RequiresOf } from '@alxia/core';
+
+export const audit = <Ctx extends object = BaseContext>(
+	who: (ctx: BaseContext & Ctx) => string,
+) =>
+	definePlugin<RequiresOf<Ctx>>()((app) =>
+		app.wrap(async (ctx, next) => {
+			const response = await next();
+			// `use` has checked that the app gives what `who` reads.
+			console.log((who as (ctx: BaseContext) => string)(ctx), ctx.route, response.status);
+			return response;
+		}),
+	);
+
+app.use(auth).use(audit(({ user }: BaseContext & { user: User }) => user.id));
+app.use(audit((ctx) => ctx.ip ?? 'unknown')); // unannotated: requires nothing
+```
+
+| `Ctx`, the annotation | `RequiresOf<Ctx>` |
+| --- | --- |
+| none — `Ctx` defaults to `BaseContext` | `Empty`: any app may use the plugin |
+| `BaseContext & { user: User }`, or `{ user: User }` | `{ user: User }` |
+| `{ url: string }`, a `BaseContext` key with a type it does not give | `{ url: string }`, so `use` refuses it |
+
+A refusal prints the requirement itself, `{ user: User; }`, never
+`RequiresOf<…>`.
+
 A key that may be absent is optional: `definePlugin<{ user?: User }>()`
 reads `user` as `User | undefined`, and any app may use it, so long as a
 `user` it gives is a `User`.

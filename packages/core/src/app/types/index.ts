@@ -10,7 +10,7 @@ export type {
 	RequestContext,
 	ResponseSettings,
 } from './context';
-export type { ProvidedBy, Requiring } from './requires';
+export type { ProvidedBy, RequiresOf, Requiring } from './requires';
 export type {
 	Outcome,
 	OutcomeOf,

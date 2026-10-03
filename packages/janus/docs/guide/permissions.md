@@ -339,10 +339,9 @@ interface PermissionRefusedBody {
 type Awaitable<V> = V | Promise<V>;
 ```
 
-`RequiresOf` is internal to this package, and `Requiring` is
-`@alxia/core`'s. `LoadCtx`, `SubjectCtx` and `CheckCtx` are inferred from the types `load`,
-`subject` and `ctx`'s parameters are annotated with, `BaseContext` when they
-are not. `RequiresOf<X>` is what `X` adds to `BaseContext` — `{ tenant: Tenant }`
+`RequiresOf` and `Requiring` are `@alxia/core`'s. `LoadCtx`, `SubjectCtx`
+and `CheckCtx` are inferred from the types `load`, `subject` and `ctx`'s
+parameters are annotated with, `BaseContext` when they are not. `RequiresOf<X>` is what `X` adds to `BaseContext` — `{ tenant: Tenant }`
 for `BaseContext & { tenant: Tenant }` — and `Empty` when it adds nothing;
 see [Reading the app's context](#reading-the-apps-context).
 

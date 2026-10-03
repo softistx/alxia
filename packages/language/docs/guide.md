@@ -48,9 +48,10 @@ type LanguageSource = 'query' | 'cookie' | 'path' | 'header';
 ```
 
 Both type parameters are inferred: `L` from `supported`, and `Ctx` from the
-type `resolve`'s parameter is annotated with. `RequiresOf<Ctx>` is what that
-annotation adds to `BaseContext` — `{ user: User }` — and `Empty` when
-`resolve` is absent or not annotated; see
+type `resolve`'s parameter is annotated with. `RequiresOf<Ctx>`,
+`@alxia/core`'s, is what that annotation adds to `BaseContext` —
+`{ user: User }` — and `Empty` when `resolve` is absent or not annotated;
+see
 [Reading the app's context](#reading-the-apps-context).
 
 `language()` returns an app plugin: pass it to `use`, called. It is a

@@ -1,4 +1,5 @@
 /** What a plugin made by `definePlugin` needs from the app that uses it. */
+import type { Empty } from './common';
 import type { BaseContext } from './context';
 
 /** Carries a plugin's requirement to `use`, which checks it against the app's context. */
@@ -34,3 +35,40 @@ export type ProvidedBy<Ctx, Requires> = BaseContext & Ctx extends {
 					: Message;
 			}
 		: never;
+
+/**
+ * What a callback whose parameter is annotated `Ctx` reads beyond
+ * `BaseContext`: `{ user: User }` for `BaseContext & { user: User }`, and
+ * `Empty` when it reads nothing more. A key of `BaseContext` annotated with
+ * a type `BaseContext` does not give — `{ url: string }` — is kept, so `use`
+ * refuses it. What a plugin factory passes to `definePlugin` when it infers
+ * its requirement from a callback it is given:
+ *
+ * ```ts
+ * function audit<Ctx extends object = BaseContext>(
+ *   who: (ctx: BaseContext & Ctx) => string,
+ * ) {
+ *   return definePlugin<RequiresOf<Ctx>>()((app) => app.onResponse(…));
+ * }
+ * ```
+ *
+ * The mapped type is written twice, not behind an alias, so that an error
+ * prints `{ user: User }` rather than the alias's name.
+ */
+export type RequiresOf<Ctx> = [
+	keyof {
+		[Key in keyof Ctx as Key extends keyof BaseContext
+			? BaseContext[Key] extends Ctx[Key]
+				? never
+				: Key
+			: Key]: Ctx[Key];
+	},
+] extends [never]
+	? Empty
+	: {
+			[Key in keyof Ctx as Key extends keyof BaseContext
+				? BaseContext[Key] extends Ctx[Key]
+					? never
+					: Key
+				: Key]: Ctx[Key];
+		};

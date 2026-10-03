@@ -1,31 +1,6 @@
-import { type BaseContext, definePlugin, type Empty } from '@alxia/core';
+import { type BaseContext, definePlugin, type RequiresOf } from '@alxia/core';
 import { decide, respond, type Settings } from './decide';
 import type { LanguageContext, LanguageSource } from './types';
-
-/**
- * What a callback whose parameter is annotated `Ctx` reads beyond
- * `BaseContext`: `{ user: User }` for `BaseContext & { user: User }`, and
- * `Empty` when it reads nothing more. A key of `BaseContext` annotated with
- * a type `BaseContext` does not give — `{ url: string }` — is kept, so `use`
- * refuses it. Kept twice, with `@alxia/janus`'s.
- */
-type RequiresOf<Ctx> = [
-	keyof {
-		[Key in keyof Ctx as Key extends keyof BaseContext
-			? BaseContext[Key] extends Ctx[Key]
-				? never
-				: Key
-			: Key]: Ctx[Key];
-	},
-] extends [never]
-	? Empty
-	: {
-			[Key in keyof Ctx as Key extends keyof BaseContext
-				? BaseContext[Key] extends Ctx[Key]
-					? never
-					: Key
-				: Key]: Ctx[Key];
-		};
 
 /**
  * `Ctx` is the type `resolve`'s parameter is annotated with —
