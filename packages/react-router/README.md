@@ -54,8 +54,9 @@ bunx --bun react-router build && bun server.ts
 ```
 
 `reactRouter()` is called through `use`, so it reads the app's context
-type. It declares `GET`, `POST`, `PUT`, `PATCH` and `DELETE` at `/*`, after
-every route and hook declared before it; a `HEAD` is handed to React
+type. It declares `GET`, `POST`, `PUT`, `PATCH` and `DELETE` at `/*`, behind
+every hook declared before it, and the app's own routes answer their
+paths wherever they are declared; a `HEAD` is handed to React
 Router as its `GET`, and the core drops the body.
 
 ## Reading the context in a loader
@@ -122,8 +123,9 @@ never shows it. `isReactRouterRoute` names it, and the client files, for
   Router's 405. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
 - **`@alxia/secure-headers`' default policy blocks the page's scripts**
   and forms: give the pages a policy of their own. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
-- **Declare alxia's routes before `reactRouter()`**: `app.request` gives
-  one declared after it to React Router. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#no-route-matches-url-api)
+- **An alxia route whose path covers a page takes it**, wherever it is
+  declared: `GET /:slug` answers `/about`. Keep alxia's routes under
+  `/api`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-page-answers-alxias-json-404-or-405-instead-of-rendering)
 
 ## API
 

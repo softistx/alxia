@@ -263,20 +263,30 @@ around any route:
 
 ## Routes beside the pages
 
-Declare alxia's own routes **before** `reactRouter()`:
+alxia's own routes answer their paths wherever they are declared, before
+`reactRouter()` or after it:
 
 ```ts
 const app = alxia()
 	.get('/api/health', ({ reply }) => reply.ok({ ok: true }))
-	.post('/api/orders', { body: Order }, ({ body, reply }) => reply.ok(save(body)))
-	.use((app) => reactRouter(app, { build, client: 'build/client' }));
+	.use((app) => reactRouter(app, { build, client: 'build/client' }))
+	.post('/api/orders', { body: Order }, ({ body, reply }) => reply.ok(save(body)));
 ```
 
-They answer first, with their own schemas, replies and typed client. A
-route declared after the catch-all is reached through `listen`, whose
-router prefers the longer path, but `app.fetch` and `app.request`, which
-tests and dev servers use, rank by declaration, so React Router answers it
-there. Keep them before it.
+Each answers with its own schemas, replies and typed client. The core ranks
+paths as `Bun.serve` does, through `listen`, `app.fetch` and
+`app.request` alike: segment by segment, a literal beats a parameter,
+which beats the catch-all's wildcard. Two consequences:
+
+- **The path is chosen before the method.** With only `POST /api/orders`,
+  a `GET /api/orders` is alxia's 405, not a page.
+- **A route whose path covers pages takes them.** `GET /:slug` answers
+  every one-segment path, `/about` included, before React Router sees it.
+  Put alxia's routes under a prefix of their own, `/api`.
+
+What the order still decides is the hooks: a route declared after
+`reactRouter()` runs behind the hooks declared before it, as any route
+does.
 
 alxia's WebSocket routes, `page()` and `ctx.server` work under `listen`, as
 in any alxia app.

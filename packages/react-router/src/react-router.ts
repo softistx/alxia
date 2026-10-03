@@ -69,9 +69,9 @@ export function isReactRouterRoute(route: RouteDefinition): boolean {
  * A React Router framework app, server rendered on `app`: `GET`, `POST`,
  * `PUT`, `PATCH` and `DELETE` at `/*`, behind every hook declared on `app`
  * before it. Each loader, action and middleware reads what those hooks
- * built through `alxiaOf<App>(context)`. Routes declared before it — an
- * `/api` — answer first; the client build's files are served when `client`
- * is given. The catch-all adds nothing to the app's route table: pages are
+ * built through `alxiaOf<App>(context)`. The app's own routes — an `/api`
+ * — answer their paths, declared before it or after; the client build's
+ * files are served when `client` is given. The catch-all adds nothing to the app's route table: pages are
  * not something the typed client calls.
  *
  * ```ts

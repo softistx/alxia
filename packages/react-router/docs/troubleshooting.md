@@ -10,7 +10,6 @@ a loader, a message React Router or the browser prints, or an error from
 - [`Error: No value found for context`](#error-no-value-found-for-context)
 - [`alxiaOf(): this request has no alxia context. …`](#alxiaof-this-request-has-no-alxia-context-)
 - [``You made a POST request to "/" but did not provide an `action` for route "root", so there is no way to handle the request.``](#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
-- [`No route matches URL "/api/…"`](#no-route-matches-url-api)
 - [`TypeError: reactRouter(): client is …, which is not a directory. …`](#typeerror-reactrouter-client-is--which-is-not-a-directory-)
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
 
@@ -22,6 +21,7 @@ a loader, a message React Router or the browser prints, or an error from
 **Traps**
 
 - [A loader reads `null` from the app's own key](#a-loader-reads-null-from-the-apps-own-key)
+- [A page answers alxia's JSON 404 or 405 instead of rendering](#a-page-answers-alxias-json-404-or-405-instead-of-rendering)
 - [A streamed page arrives in one piece](#a-streamed-page-arrives-in-one-piece)
 - [The logger times a streamed page at a few milliseconds](#the-logger-times-a-streamed-page-at-a-few-milliseconds)
 
@@ -128,27 +128,6 @@ await app.request('/?index', { method: 'POST', body: new URLSearchParams({ step:
 
 The single-fetch form is `POST /_.data?index`.
 
-### `No route matches URL "/api/…"`
-
-React Router prints it, and answers its 404 page.
-
-**When:** a route of the app — `/api/orders/:id` — is declared **after**
-`reactRouter()`, and the request comes through `app.fetch` or
-`app.request`: a test, or a dev server that hands requests to `fetch`.
-Through `listen`, the same request reaches the alxia route.
-
-**Why:** `Bun.serve`'s router prefers the longer path; `app.fetch` takes
-the route declared first among equal shapes, and the catch-all `/*` was
-first.
-
-**Fix:** declare every alxia route before the catch-all:
-
-```ts
-const app = alxia()
-	.get('/api/orders/:id', ({ params, reply }) => reply.ok(find(params.id)))
-	.use((app) => reactRouter(app, { build }));
-```
-
 ### `TypeError: reactRouter(): client is …, which is not a directory. …`
 
 ```text
@@ -249,6 +228,30 @@ export type Base = typeof base;
 The same cause as [`Error: No value found for context`](#error-no-value-found-for-context),
 with a key that has a default: `createContext<User | null>(null)`. The
 loader silently reads the default. Read the context through `alxiaOf`.
+
+### A page answers alxia's JSON 404 or 405 instead of rendering
+
+`{"error":"not_found"}` or `{"error":"method_not_allowed"}` where a page
+was expected.
+
+**Why:** an alxia route's path covers the page's, and the core ranks it
+first wherever it was declared: segment by segment, a literal beats a
+parameter, which beats the catch-all's `/*`. Then the path is chosen
+before the method. So:
+
+- `GET /:slug` takes `/about`, and every other one-segment page;
+- `POST /account` alone makes `GET /account` a 405, not the page;
+- a folder of `public/`, `public/blog/`, becomes `static('/blog', …)`, and
+  `/blog/first-post` is its 404.
+
+**Fix:** keep alxia's routes under a prefix the pages do not use, and
+`public/`'s folders apart from the page paths:
+
+```ts
+const app = alxia()
+	.get('/api/posts/:slug', ({ params, reply }) => reply.ok(find(params.slug)))
+	.use((app) => reactRouter(app, { build, client: 'build/client' }));
+```
 
 ### A streamed page arrives in one piece
 

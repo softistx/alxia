@@ -149,6 +149,28 @@ describe('beside the app', () => {
 		expect(await response.json()).toEqual({ ok: true });
 	});
 
+	test('a route declared after the catch-all answers too, through fetch and listen alike', async () => {
+		const app = served().get('/api/after/:id', ({ params, reply }) =>
+			reply.ok({ after: params.id }),
+		);
+		const fetched = await app.request('/api/after/7');
+		expect(fetched.status).toBe(200);
+		expect(await fetched.json()).toEqual({ after: '7' });
+		const server = app.listen({ port: 0 });
+		try {
+			const listened = await fetch(new URL('/api/after/7', server.url));
+			expect(listened.status).toBe(200);
+			expect(await listened.json()).toEqual({ after: '7' });
+		} finally {
+			server.stop(true);
+		}
+		// The path is chosen before the method: a POST there is the route's
+		// 405, not a page.
+		expect((await app.request('/api/after/7', { method: 'POST' })).status).toBe(
+			405,
+		);
+	});
+
 	test('the hashed assets are immutable; a missing one is a 404, not a page', async () => {
 		const app = served();
 		const html = await (await app.request('/', { headers: browser })).text();
