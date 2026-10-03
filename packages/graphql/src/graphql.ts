@@ -9,14 +9,13 @@ import type {
 	RoutePath,
 	StatusCode,
 } from '@alxia/core';
-import {
-	createYoga,
-	type GraphQLSchemaWithContext,
-	type YogaInitialContext,
-	type YogaServerInstance,
-	type YogaServerOptions,
+import type {
+	GraphQLSchemaWithContext,
+	YogaInitialContext,
+	YogaServerOptions,
 } from 'graphql-yoga';
-import { renderSandbox, SANDBOX_POLICY, type SandboxOptions } from './sandbox';
+import { graphqlHandler, type YogaContext, yogaServers } from './handler';
+import type { SandboxOptions } from './sandbox';
 
 /** The parts of a route's context Yoga owns, or that mean nothing to a resolver. */
 type RouteOnly =
@@ -53,8 +52,6 @@ export type GraphQLContext<App, UserContext = Empty> = App extends {
 		{
 			readonly '~error': 'GraphQLContext needs the type of an app: GraphQLContext<typeof app>';
 		};
-
-type YogaContext = Record<string, any>;
 
 export interface GraphQLOptions<
 	ServerCtx extends YogaContext,
@@ -117,20 +114,6 @@ export type GraphQLRoutes<
 	RouteEntryOf<'POST', Path, Empty, GraphQLReply, Shortcuts>;
 
 /**
- * What GraphiQL loads: Yoga's page from unpkg, and queries to this server.
- * `@alxia/secure-headers` keeps a policy a response already has.
- */
-const GRAPHIQL_POLICY = [
-	"default-src 'self'",
-	"script-src 'self' 'unsafe-inline' https://unpkg.com",
-	"style-src 'self' 'unsafe-inline' https://unpkg.com",
-	"img-src 'self' data: https:",
-	"font-src 'self' data: https:",
-	"worker-src 'self' blob:",
-	"connect-src 'self'",
-].join('; ');
-
-/**
  * A GraphQL endpoint on `app`, served by [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server):
  * `GET` and `POST` at `path`, behind every hook declared on `app` before it.
  * A guard before it guards it; what the hooks derived is in each
@@ -173,63 +156,17 @@ export function graphql<
 		sandbox,
 		...yogaOptions
 	} = options;
-	// One Yoga per path it is served at: a plugin mounted under a prefix
-	// serves the same routes at a longer path, and GraphiQL must ask that one.
-	const servers = new Map<string, YogaServerInstance<YogaContext, UserCtx>>();
-	const yogaAt = (endpoint: string) => {
-		let yoga = servers.get(endpoint);
-		if (yoga === undefined) {
-			yoga = createYoga<YogaContext, UserCtx>({
-				...(yogaOptions as YogaServerOptions<YogaContext, UserCtx>),
-				graphqlEndpoint: endpoint,
-				cors,
-				graphiql: (ide === 'graphiql'
-					? (graphiql ?? true)
-					: false) as YogaServerOptions<YogaContext, UserCtx>['graphiql'],
-			});
-			servers.set(endpoint, yoga);
-		}
-		return yoga;
-	};
-
-	const handler = async (ctx: Record<string, unknown> & BaseContext) => {
-		const {
-			params: _params,
-			query: _query,
-			headers: _headers,
-			cookies: _cookies,
-			body: _body,
-			reply,
-			redirect: _redirect,
-			...server
-		} = ctx;
-		if (
-			ide === 'apollo-sandbox' &&
-			ctx.request.method === 'GET' &&
-			ctx.request.headers.get('accept')?.includes('text/html') &&
-			!ctx.url.searchParams.has('query')
-		) {
-			// A path: the page resolves it against its own address, so behind
-			// a TLS proxy the Sandbox asks over https, as the browser did.
-			return reply(200, renderSandbox(ctx.route, sandbox), {
-				headers: {
-					'content-type': 'text/html;charset=utf-8',
-					'content-security-policy': SANDBOX_POLICY,
-				},
-			});
-		}
-		const response = await yogaAt(ctx.route).fetch(ctx.request, server);
-		const headers = new Headers(response.headers);
-		if (
-			headers.get('content-type')?.startsWith('text/html') &&
-			!headers.has('content-security-policy')
-		) {
-			headers.set('content-security-policy', GRAPHIQL_POLICY);
-		}
-		return reply(response.status as StatusCode, response.body ?? undefined, {
-			headers,
-		});
-	};
+	const yogaAt = yogaServers<UserCtx>({
+		...(yogaOptions as YogaServerOptions<YogaContext, UserCtx>),
+		cors,
+		graphiql: (ide === 'graphiql'
+			? (graphiql ?? true)
+			: false) as YogaServerOptions<YogaContext, UserCtx>['graphiql'],
+	});
+	const handler = graphqlHandler(
+		yogaAt,
+		ide === 'apollo-sandbox' ? (sandbox ?? {}) : false,
+	);
 
 	const route = app as unknown as {
 		get(path: string, handler: unknown): unknown;
