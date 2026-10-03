@@ -1,0 +1,158 @@
+# Routes as a chain of steps
+
+Status: **proposed**, waiting for the owner's approval. No code is written
+until it is approved.
+
+The owner asked for routes in Hono's shape: `.post(path, mw1, mw2, handler)`.
+A validator would be one of those middlewares, as `@hono/zod-validator` is,
+and the handler would simply be the last step of the chain. The schema
+stays optional. This note proposes that shape and keeps what alxia has
+today: a typed client, the OpenAPI document, and replies refused when their
+status is not declared.
+
+This note reopens a decision taken in
+[API ergonomics](api-ergonomics.md#decided-not-changing), which was to keep
+one form, `get(path, options?, handler)`.
+
+## Today
+
+```ts
+app.post(
+	'/users',
+	{ body: NewUser, response: { 201: User, 409: Taken } },
+	({ body, reply }) => reply.created(insert(body)),
+);
+```
+
+- **The options object is the route's contract.** Core validates with it, and
+  types the context and the replies from it. `RoutesOf` records it, and
+  `@alxia/client` and `@alxia/openapi` read it.
+- **Middleware is not per route.** `derive` and `decorate` apply to every
+  route declared after them, and one route has to be put in a `group` to get
+  its own.
+- **`@alxia/zod` is not a validator middleware.** It adds `zq`, coercions a
+  client can type, and the OpenAPI conversion of what only Zod can say.
+  Validation itself is done by core, from any Standard Schema.
+
+## Proposal
+
+```ts
+import { alxia, describe, responds, step, validate } from '@alxia/core';
+
+const auth = step(async ({ request }) => ({ user: await userOf(request) }));
+const admin = step<{ user: User }>()(({ user, reply }) =>
+	user.admin ? {} : reply(403, { error: 'forbidden' }),
+);
+
+app.post(
+	'/users',
+	auth,
+	admin,
+	validate.body(NewUser),
+	responds({ 201: User, 403: Forbidden, 409: Taken }),
+	describe({ summary: 'Create a user', tags: ['users'] }),
+	({ body, user, reply }) => reply.created(insert(body, user)),
+);
+
+app.get('/health', ({ reply }) => reply.ok('up'));        // no step, no schema
+```
+
+### The steps
+
+| Step | Adds to the context | Adds to the contract |
+| --- | --- | --- |
+| `validate.params(s)`, `.query(s)`, `.headers(s)`, `.cookies(s)`, `.body(s)` | `params`, `query`, …, validated | the schema, plus the 400 |
+| `responds({ status: schema })` | nothing | the replies the handler may give; no other status compiles |
+| `describe({ summary, tags, … })` | nothing | the OpenAPI `detail` |
+| `step(fn)` | what `fn` returns, or a reply, which stops the chain | the reply's status |
+| `step<Needs>()(fn)` | the same, reading `Needs`, which a step before it must add | the same |
+
+- **Validators come from core and take any Standard Schema:** Zod, Valibot or
+  ArkType. No `@alxia/zod-validator` is needed, and `zq` still works inside
+  `validate.query(z.object({ page: zq.int() }))`.
+- **A validator step carries its schema.** Core reads the chain when the
+  route is declared and rebuilds the same `RouteSchema` that the options
+  object holds today. `RoutesOf`, `@alxia/client` and `@alxia/openapi` stay
+  as they are. This is the difference from Hono, where a validator is an
+  opaque function and `hono-openapi` needs `describeRoute` on top of it.
+- **Steps run in the order they are written.** With `auth` before
+  `validate.body`, a request without a session is refused before its body is
+  read. Today the body is read first.
+- **`derive` keeps its meaning,** every route after it. A `step` is the same
+  function for one route only.
+
+### Typing: probed
+
+A probe in a scratch file, with tsc 6 and alxia's strict options, types the
+chain with **one signature, without overloads**. The steps are inferred as a
+tuple (`...args: [...Steps, Handler]`), and the handler is typed by what
+they add:
+
+- 11 steps typecheck in 0.25 s, with 35,000 instantiations. Hono stops at
+  about ten, through overloads.
+- An undeclared status gives `Type '200' is not assignable to type '201'.`
+- `ctx.body` without `validate.body` gives `Property 'body' does not exist on
+  type '{ request: Request; } & { user: { id: number; }; }'.`
+- A step put before the one it needs gives `Argument of type '(ctx: any) =>
+  any' is not assignable to parameter of type '"this step needs user, which
+  no step before it adds"'.`
+
+The probe does not yet cover the real `Context`, `RouteEntryOf`, the reply
+shortcuts or `ValidSchema`. The first slice starts with that full probe.
+That slice stops if the instantiations on core's specs grow by more than a
+small factor, or if the errors stop being readable.
+
+### With the OpenAPI codegen
+
+The [OpenAPI codegen note](openapi-codegen.md) planned
+`app.route(operation, handler)`. With steps, an operation generated from a
+document becomes a list of steps, and `route` takes steps of its own too:
+
+```ts
+// generated
+export const createUser = {
+	method: 'POST',
+	path: '/users',
+	steps: [validate.body(zNewUser), responds({ 201: zUser, 409: zTaken }), describe({ operationId: 'createUser' })],
+} as const;
+
+// the app
+app.route(createUser, auth, ({ body, reply }) => reply.created(insert(body)));
+```
+
+`app.route()` is ready on a local branch with its options form, and it is
+**held** until this note is decided, so that it lands in the chosen shape.
+
+## Decisions to make
+
+1. **One form.** I recommend removing the options object and keeping only
+   the steps, before 0.1.0, since nothing is published. Keeping both would
+   double the signatures and leave two ways to do the same thing.
+2. **Names.** I recommend `validate.body(…)` and the rest grouped under
+   `validate`, with `responds` and `describe` beside them: one import, and no
+   bare `body` or `query` colliding with a user's variables. The alternative
+   is `body(…)`, `query(…)` and so on, imported one by one.
+3. **`route()`.** I recommend `route(operation, ...steps, handler)`, with
+   the operation carrying its own steps, as above.
+
+## Cost
+
+- **Core:** the route method's types and the chain read at declaration time.
+  It is about the same size as today, since the overloads disappear.
+- **Every package's specs, READMEs and guides** use `{ body: X, response: … }`.
+  That is 19 packages to move to the steps. The change is mechanical, but
+  the docs are large, so it is spread over several PRs, one per group of
+  packages, as the docs were.
+- **openapi, client, cache, redis and the other plugins:** no change to
+  their code. They read `RouteSchema`, which core still builds.
+
+## Slices
+
+1. **Core:** the full type probe, then the steps and `validate`,
+   `responds`, `describe` and `step`, beside the options object, with specs.
+   The options object stays for this slice so that everything else keeps
+   building.
+2. **Migration:** the specs and docs of every package, in groups.
+3. **Core:** remove the options object, and add `route(operation, ...steps,
+   handler)`.
+4. **OpenAPI codegen** (in nxgt-http): the emitter generates steps.
