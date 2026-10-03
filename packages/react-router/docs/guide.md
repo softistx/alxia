@@ -260,7 +260,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 }
 ```
 
-The checks it gives:
+Name `typeof server`, the default export's type, not the module's
+(`typeof import('./server')`): a wrong registration makes every read a
+compile error, as [the troubleshooting entry](troubleshooting.md#property--does-not-exist-on-type-basecontext---readonly-registerserver-must-be-typeof-server-the-default-export-of-createserver-never-)
+shows. The checks it gives:
 
 ```ts
 const ctx = alxiaOf(context);

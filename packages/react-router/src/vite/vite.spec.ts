@@ -1,4 +1,12 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	beforeEach,
+	describe,
+	expect,
+	test,
+} from 'bun:test';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
@@ -205,6 +213,7 @@ describe('react-router dev, with app/server.ts', () => {
 			const html = await (await fetch(`${base}/`, { headers: browser })).text();
 			expect(text(html)).toContain('<h1>Howdy anonymous</h1>');
 		} finally {
+			socket.onerror = null;
 			socket.close();
 			await Bun.write(file, original);
 		}
@@ -307,12 +316,13 @@ describe('react-router dev, with app/server.ts', () => {
 });
 
 describe('react-router.config.ts the plugin does not serve', () => {
+	// A copy each: every test writes a config of its own.
 	let fixture: Fixture;
 
-	beforeAll(async () => {
+	beforeEach(async () => {
 		fixture = await copyFixture();
 	});
-	afterAll(async () => {
+	afterEach(async () => {
 		await fixture?.remove();
 	});
 
@@ -321,7 +331,9 @@ describe('react-router.config.ts the plugin does not serve', () => {
 			join(fixture.root, 'react-router.config.ts'),
 			"import type { Config } from '@react-router/dev/config';\n\nexport default { ssr: true, serverBundles: () => 'one' } satisfies Config;\n",
 		);
-		await expect(devServer(fixture.root)).rejects.toThrow(
+		// Through a build: a dev server refused at startup would leave React
+		// Router's typegen watcher writing into the copy as it is removed.
+		await expect(build(fixture.root)).rejects.toThrow(
 			"serverBundles splits React Router's server build in several",
 		);
 	});

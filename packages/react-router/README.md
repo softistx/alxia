@@ -206,7 +206,7 @@ files, so `@alxia/openapi` can leave them out.
 | `Register` | the interface to augment with `server: typeof server` |
 | `RegisteredApp` | the app `alxiaOf` reads with no type argument |
 | `RegisteredOf<R>` | the app a `Register`-shaped interface names: its server's, a fresh app, or `InvalidRegister` |
-| `InvalidRegister` | what a `Register` naming neither a server nor an app reads as: every property a compile error |
+| `InvalidRegister` | what a `Register` naming neither a server nor an app reads as: every key of the app's own a compile error |
 | `AppOf<Server>` | the app a server makes |
 | `alxiaContext` | the React Router context key `alxiaOf` reads, set on every request |
 | `reactRouter(app, options)` | the catch-all and the client's files, for a server of your own. `build`, `mode`, `getLoadContext`, `client` |
