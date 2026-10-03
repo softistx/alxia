@@ -65,8 +65,8 @@ operation is listed, see
 
 ### `TypeError: matchesSpec(): … routes have no operation: …`
 
-Also as `exactly(): …`, from the deprecated `exactly`, as `1 route has no operation: …`, and after a `;` when operations are
-missing too:
+Also as `1 route has no operation: …`, after a `;` when operations are
+missing too, and as `exactly(): …` from the deprecated `exactly`:
 
 ```text
 TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
@@ -114,8 +114,8 @@ reported missing.
 
 ### `TypeError: implemented(): "…": ":…" is not a parameter name`
 
-Also as `matchesSpec(): …` and `exactly(): …`, and with any other message the core throws for a
-route path:
+Also as `matchesSpec(): …` and `exactly(): …`, and with any other
+message the core throws for a route path:
 `The route path "…" must start with "/"`, `"…": "*" may only end a path`,
 `"…" declares ":…" twice`, `"…": ":" may only start a segment, as a
 parameter`, `"…": "*" may only be a whole segment, as a wildcard`,
