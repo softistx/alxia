@@ -265,7 +265,11 @@ function send(
 	if (custom !== undefined) {
 		for (const [name, value] of new Headers(custom)) {
 			if (name === 'set-cookie') headers.append(name, value);
-			else headers.set(name, value);
+			// A precompressed file varies by Accept-Encoding whatever else
+			// the option adds.
+			else if (name === 'vary') {
+				for (const each of value.split(',')) vary(headers, each);
+			} else headers.set(name, value);
 		}
 	}
 

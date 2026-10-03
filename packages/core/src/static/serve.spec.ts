@@ -129,6 +129,18 @@ describe('app.static', () => {
 		expect(await plain.text()).toBe('console.log(1)');
 	});
 
+	test("a Vary of the headers option adds to a precompressed file's", async () => {
+		const app = alxia().static('/files', root, {
+			precompressed: ['gzip'],
+			headers: { vary: 'accept-encoding, Origin' },
+		});
+		const response = await app.request('/files/app.js', {
+			headers: { 'accept-encoding': 'gzip' },
+		});
+		expect(response.headers.get('content-encoding')).toBe('gzip');
+		expect(response.headers.get('vary')).toBe('Accept-Encoding, Origin');
+	});
+
 	test('dotfiles, traversal and missing files are 404s', async () => {
 		const app = make();
 		for (const path of [
