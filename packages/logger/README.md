@@ -36,12 +36,12 @@ A 4xx is a `warn`, a 5xx an `error`. The routes after the plugin read
 
 | option | default | |
 | --- | --- | --- |
-| `write` | a JSON line on stdout | `(entry) => void`: pino, a file, a service |
+| `write` | a JSON line on stdout | `(entry) => void`: pino, a file, a service; a throw or a rejection loses the entry, never the request |
 | `header` | `'x-request-id'` | where the id is read and sent |
-| `generateId` | `crypto.randomUUID` | |
+| `generateId` | `crypto.randomUUID` | an id that is not 1–128 of letters, digits, `_.:@-` becomes a UUID |
 | `trustIncomingId` | `true` | keep an incoming id |
 | `serverTiming` | `true` | `Server-Timing: total;dur=…` |
-| `skip` | none | `(request, url) => boolean`: a health check |
+| `skip` | none | `(request, url) => boolean`: a health check; a throw logs the request |
 
 ## API
 

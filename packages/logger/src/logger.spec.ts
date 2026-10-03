@@ -49,4 +49,70 @@ describe('logger', () => {
 		expect(entries).toHaveLength(1);
 		expect(entries[0]).toMatchObject({ level: 'warn', status: 404 });
 	});
+
+	test('a log that fails never fails the request', async () => {
+		const original = console.error;
+		const reported: unknown[] = [];
+		console.error = (error: unknown) => reported.push(error);
+		try {
+			const broken = alxia()
+				.use(
+					logger({
+						write: () => {
+							throw new Error('disk full');
+						},
+						skip: () => {
+							throw new Error('bad skip');
+						},
+						generateId: () => 'not an id\n',
+					}),
+				)
+				.get('/hello', ({ log, reply }) => {
+					log.info('still answered');
+					return reply(200, 'hi');
+				});
+			const response = await broken.request('/hello');
+			expect(response.status).toBe(200);
+			expect(await response.text()).toBe('hi');
+			expect(response.headers.get('x-request-id')).toMatch(/^[0-9a-f-]{36}$/);
+			expect(response.headers.get('server-timing')).toStartWith('total;dur=');
+			expect(reported.map(String)).toEqual([
+				'Error: disk full',
+				'Error: bad skip',
+				'Error: disk full',
+			]);
+		} finally {
+			console.error = original;
+		}
+	});
+
+	test('an async write that rejects, and a generateId that throws, are reported', async () => {
+		const original = console.error;
+		const reported: unknown[] = [];
+		console.error = (error: unknown) => reported.push(error);
+		try {
+			const app = alxia()
+				.use(
+					logger({
+						write: async () => {
+							throw new Error('remote down');
+						},
+						generateId: () => {
+							throw new Error('no ids');
+						},
+					}),
+				)
+				.get('/', ({ reply }) => reply(200, 'ok'));
+			const response = await app.request('/');
+			await Bun.sleep(0);
+			expect(response.status).toBe(200);
+			expect(response.headers.get('x-request-id')).toMatch(/^[0-9a-f-]{36}$/);
+			expect(reported.map(String)).toEqual([
+				'Error: no ids',
+				'Error: remote down',
+			]);
+		} finally {
+			console.error = original;
+		}
+	});
 });

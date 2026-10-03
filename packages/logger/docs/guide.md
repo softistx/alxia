@@ -44,12 +44,12 @@ interface LoggerOptions {
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `write` | `(entry: LogEntry) => void` | `console.log(JSON.stringify(entry))` | where every entry goes: the request's entry and each `log` call |
+| `write` | `(entry: LogEntry) => void` | `console.log(JSON.stringify(entry))` | where every entry goes: the request's entry and each `log` call; a throw or a rejection loses that entry, never the request |
 | `header` | `string` | `'x-request-id'` | the header the id is read from, and sent back in |
-| `generateId` | `() => string` | `crypto.randomUUID()` | makes the id of a request that brings none, or none that is kept |
+| `generateId` | `() => string` | `crypto.randomUUID()` | makes the id of a request that brings none, or none that is kept; an id that fails the incoming-id rule, or a throw, falls back to `crypto.randomUUID()` |
 | `trustIncomingId` | `boolean` | `true` | whether an id the request brings is kept |
 | `serverTiming` | `boolean` | `true` | whether the response gets `Server-Timing: total;dur=<ms>` |
-| `skip` | `(request: Request, url: URL) => boolean` | none | requests that get no entry of their own |
+| `skip` | `(request: Request, url: URL) => boolean` | none | requests that get no entry of their own; a throw logs the request |
 
 ### `write`
 
@@ -73,8 +73,35 @@ const sink = pino();
 app.use(logger({ write: ({ level, message, ...fields }) => sink[level](fields, message) }));
 ```
 
-`write` is not awaited, and what it throws is not caught by the plugin: see
-[A `write` that throws](troubleshooting.md#no-x-request-id-on-the-response-and-the-error-write-threw-in-the-server-log).
+Logging never breaks a request. A `write` that throws, or returns a
+promise that rejects, loses that entry only: the plugin catches the error
+and prints it with `console.error`. The request is answered as it would have been, with its `X-Request-Id` and
+`Server-Timing`, and a `log.info`, `log.warn` or `log.error` in a route
+does not turn it into a 500:
+
+```ts
+const app = alxia()
+	.use(logger({ write: () => { throw new Error('sink down'); } }))
+	.get('/orders/:id', ({ log, reply }) => {
+		log.info('order read'); // lost, and `Error: sink down` on stderr
+		return reply(200, 'ok'); // still 200, with both headers
+	});
+```
+
+`write` is not awaited: the response does not wait for it. An `async`
+`write` whose promise rejects is caught the same way, its error printed
+with `console.error` once it rejects, so a sink that sends each entry over
+the network needs no `catch` of its own:
+
+```ts
+app.use(
+	logger({
+		write: async (entry) => {
+			await fetch('https://logs.internal/entries', { method: 'POST', body: JSON.stringify(entry) });
+		},
+	}),
+);
+```
 
 ### `header`
 
@@ -87,11 +114,21 @@ app.use(logger({ header: 'x-correlation-id' }));
 
 ### `generateId`
 
-Any string will do; it is not checked. A shorter id, or one from a library
-you already use:
+An id from a library you already use, or one sortable by time:
 
 ```ts
 app.use(logger({ generateId: () => Bun.randomUUIDv7() })); // sortable by time
+```
+
+The id it makes must pass the same rule as an incoming one (see
+[`trustIncomingId`](#trustincomingid)): 1 to 128 letters, digits, `_`,
+`.`, `:`, `@` and `-`. One that does not, an empty string, a space, a
+129th character, is replaced by a `crypto.randomUUID()` without a word. A
+`generateId` that throws is replaced the same way, and its error printed
+with `console.error`:
+
+```ts
+app.use(logger({ generateId: () => 'a b' })); // X-Request-Id: a new UUID, not "a b"
 ```
 
 ### `trustIncomingId`
@@ -134,6 +171,9 @@ written:
 ```ts
 app.use(logger({ skip: (_, url) => url.pathname === '/health' || url.pathname.startsWith('/assets/') }));
 ```
+
+A `skip` that throws logs the request, as if it had returned `false`, and
+its error is printed with `console.error`.
 
 ## The request's entry
 

@@ -31,11 +31,14 @@ Nothing scheduled yet.
 - **A request id.** Every request gets an id, kept from the incoming
   `X-Request-Id` when it is a safe one, or made with `crypto.randomUUID`,
   and sent back on the response. The header, the generator and whether an
-  incoming id is trusted are options.
+  incoming id is trusted are options; a generated id that is not a safe one
+  falls back to a UUID.
 - **One structured entry per request.** Once answered, each request writes
   one entry with its method, path, status, duration and client address, at
   `info`, `warn` for a 4xx or `error` for a 5xx, as a JSON line on stdout or
-  through a `write` of your own. `skip` leaves out a health check.
+  through a `write` of your own. `skip` leaves out a health check. Logging
+  never breaks a request: a `write`, `skip` or `generateId` that throws, or
+  an `async` `write` that rejects, is reported on `console.error`, and the request is answered as it would be.
 - **`Server-Timing`.** The response says how long it took, for the
   browser's developer tools, unless turned off.
 - **A log bound to the request.** The routes after the plugin read a typed

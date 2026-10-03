@@ -1,4 +1,5 @@
 import { alxia, withHeaders } from '@alxia/core';
+import { ID, safeGenerate, safeSkip, safeWrite } from './guards';
 
 /** One line of the log: a request answered, or a message logged during one. */
 export interface LogEntry {
@@ -23,17 +24,28 @@ export interface RequestLog {
 }
 
 export interface LoggerOptions {
-	/** Writes an entry. One JSON line on stdout by default. */
+	/**
+	 * Writes an entry. One JSON line on stdout by default. A `write` that
+	 * throws loses that entry, never the request: its error goes to
+	 * `console.error`.
+	 */
 	readonly write?: (entry: LogEntry) => void;
 	/** The header a request id is read from and sent back in. `x-request-id` by default. */
 	readonly header?: string;
-	/** Makes an id. `crypto.randomUUID` by default. */
+	/**
+	 * Makes an id. `crypto.randomUUID` by default. An id that is not 1 to
+	 * 128 letters, digits or `_.:@-` — what an incoming id must be — is
+	 * replaced by a `crypto.randomUUID()`.
+	 */
 	readonly generateId?: () => string;
 	/** Whether an incoming id is kept: behind a proxy that sets it. On by default. */
 	readonly trustIncomingId?: boolean;
 	/** Whether the response says how long it took, in `Server-Timing`. On by default. */
 	readonly serverTiming?: boolean;
-	/** Requests that are not logged: a health check. Their id is still set. */
+	/**
+	 * Requests that are not logged: a health check. Their id is still set.
+	 * A `skip` that throws logs the request.
+	 */
 	readonly skip?: (request: Request, url: URL) => boolean;
 }
 
@@ -41,8 +53,6 @@ interface State {
 	readonly id: string;
 	readonly start: number;
 }
-
-const ID = /^[\w.:@-]{1,128}$/;
 
 /**
  * Logging, as a plugin: every request gets an id — kept from the incoming
@@ -56,9 +66,11 @@ const ID = /^[\w.:@-]{1,128}$/;
  */
 export function logger(options: LoggerOptions = {}) {
 	const header = options.header ?? 'x-request-id';
-	const write =
-		options.write ?? ((entry: LogEntry) => console.log(JSON.stringify(entry)));
-	const generate = options.generateId ?? (() => crypto.randomUUID());
+	const write = safeWrite(
+		options.write ?? ((entry: LogEntry) => console.log(JSON.stringify(entry))),
+	);
+	const generate = safeGenerate(options.generateId);
+	const skipped = safeSkip(options.skip);
 	const trust = options.trustIncomingId ?? true;
 	const timing = options.serverTiming ?? true;
 	const states = new WeakMap<Request, State>();
@@ -101,7 +113,7 @@ export function logger(options: LoggerOptions = {}) {
 			const state = stateOf(request);
 			const duration =
 				Math.round((performance.now() - state.start) * 100) / 100;
-			if (!options.skip?.(request, url)) {
+			if (!skipped(request, url)) {
 				write({
 					time: new Date().toISOString(),
 					level:
