@@ -99,20 +99,6 @@ export function logger(options: LoggerOptions = {}) {
 		return state;
 	};
 
-	const logOf = (id: string): RequestLog => {
-		const entry =
-			(level: LogEntry['level']) =>
-			(message: string, fields: Record<string, unknown> = {}) =>
-				write({
-					...fields,
-					time: new Date().toISOString(),
-					level,
-					requestId: id,
-					message,
-				});
-		return { info: entry('info'), warn: entry('warn'), error: entry('error') };
-	};
-
 	return alxia()
 		.onRequest(({ request }) => {
 			stateOf(request);
@@ -125,27 +111,15 @@ export function logger(options: LoggerOptions = {}) {
 				if (timing) headers.append('server-timing', `total;dur=${duration}`);
 			});
 			if (skipped(request, url)) return sent;
-			const entry = (
-				duration: number,
-				streamed?: { timeToHeaders: number; outcome: Outcome },
-			): LogEntry => {
-				const outcome =
-					streamed === undefined || streamed.outcome === 'completed'
-						? ''
-						: ` ${streamed.outcome}`;
-				return {
-					time: new Date().toISOString(),
-					level: levelOf(sent.status, streamed?.outcome),
-					requestId: state.id,
-					message: `${request.method} ${url.pathname} ${sent.status}${outcome}`,
-					method: request.method,
-					path: url.pathname,
-					status: sent.status,
-					duration,
-					...streamed,
-					...(ip === undefined ? {} : { ip }),
-				};
+			const answered: Answered = {
+				id: state.id,
+				method: request.method,
+				path: url.pathname,
+				status: sent.status,
+				ip,
 			};
+			const entry = (duration: number, streamed?: Streamed) =>
+				entryOf(answered, duration, streamed);
 			if (settled(sent)) {
 				write(entry(duration));
 				return sent;
@@ -162,8 +136,63 @@ export function logger(options: LoggerOptions = {}) {
 		})
 		.derive(({ request }) => {
 			const { id } = stateOf(request);
-			return { requestId: id, log: logOf(id) };
+			return { requestId: id, log: logOf(write, id) };
 		});
+}
+
+/** The log of the request `id`: each entry written through `write`. */
+function logOf(write: (entry: LogEntry) => void, id: string): RequestLog {
+	const entry =
+		(level: LogEntry['level']) =>
+		(message: string, fields: Record<string, unknown> = {}) =>
+			write({
+				...fields,
+				time: new Date().toISOString(),
+				level,
+				requestId: id,
+				message,
+			});
+	return { info: entry('info'), warn: entry('warn'), error: entry('error') };
+}
+
+/** What the request's entry says of it, whenever it is written. */
+interface Answered {
+	readonly id: string;
+	readonly method: string;
+	readonly path: string;
+	readonly status: number;
+	readonly ip: string | undefined;
+}
+
+/** What a streamed body's entry says beside the rest. */
+interface Streamed {
+	readonly timeToHeaders: number;
+	readonly outcome: Outcome;
+}
+
+/** The request's entry. */
+function entryOf(
+	answered: Answered,
+	duration: number,
+	streamed?: Streamed,
+): LogEntry {
+	const { id, method, path, status, ip } = answered;
+	const outcome =
+		streamed === undefined || streamed.outcome === 'completed'
+			? ''
+			: ` ${streamed.outcome}`;
+	return {
+		time: new Date().toISOString(),
+		level: levelOf(status, streamed?.outcome),
+		requestId: id,
+		message: `${method} ${path} ${status}${outcome}`,
+		method,
+		path,
+		status,
+		duration,
+		...streamed,
+		...(ip === undefined ? {} : { ip }),
+	};
 }
 
 /** Milliseconds since `start`, to two decimals. */

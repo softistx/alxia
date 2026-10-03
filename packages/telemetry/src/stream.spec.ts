@@ -153,3 +153,47 @@ describe('the span of a streamed body', () => {
 		expect(await response.text()).toBe('hello');
 	});
 });
+
+describe('a streamed body without a server', () => {
+	test('ends its span once the test cancels it', async () => {
+		const signals: Signal[] = [];
+		const instance = createTelemetry('alxia-test', {
+			exporters: [
+				{ export: (_resource, batch) => void signals.push(...batch) },
+			],
+		});
+		const app = alxia()
+			.use(telemetry({ instance }))
+			.get('/ticks', { response: { 200: Tick } }, ({ reply }) =>
+				reply(200, ticks()),
+			);
+		const response = await app.request('/ticks');
+		await response.body?.cancel();
+		await instance.close();
+		const spans = signals.filter(
+			(signal): signal is SpanRecord => signal.type === 'span',
+		);
+		expect(spans.map((span) => span.name)).toEqual(['GET /ticks']);
+		expect(spans[0]?.events.map((event) => event.name)).toEqual([
+			'http.response.aborted',
+		]);
+	});
+});
+
+describe('an unsampled span', () => {
+	test('leaves a streamed body as it is', async () => {
+		const instance = createTelemetry('alxia-test', {
+			exporters: [{ export: () => {} }],
+			sampler: { sample: () => false },
+		});
+		const body = new ReadableStream<Uint8Array>({
+			pull: (controller) => controller.close(),
+		});
+		const app = alxia()
+			.use(telemetry({ instance }))
+			.get('/stream', ({ reply }) => reply(200, body));
+		const response = await app.request('/stream');
+		expect(response.body === body).toBe(true);
+		await instance.close();
+	});
+});

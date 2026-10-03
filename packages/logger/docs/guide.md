@@ -215,10 +215,24 @@ it. Its `duration` is the time to the last byte, `timeToHeaders` the time
 to the response, and `outcome` says how it ended:
 
 ```ts
+import { alxia, eventStream } from '@alxia/core';
+import { logger } from '@alxia/logger';
+import { z } from 'zod';
+
+const Tick = eventStream(z.object({ n: z.number() }));
+
 const app = alxia()
 	.use(logger())
-	.get('/ticks', { response: { 200: eventStream(Tick) } }, ({ reply }) =>
-		reply(200, ticks()),
+	.get('/ticks', { response: { 200: Tick } }, ({ reply }) =>
+		reply(
+			200,
+			(async function* () {
+				for (let n = 0; ; n++) {
+					yield { n };
+					await Bun.sleep(1000);
+				}
+			})(),
+		),
 	);
 // the client closes the tab after five seconds:
 // {"level":"warn","message":"GET /ticks 200 aborted","status":200,"duration":5004.1,"timeToHeaders":0.62,"outcome":"aborted",…}
@@ -231,12 +245,30 @@ so an event stream's generator is released) or failed. An endless event
 stream is logged once its client leaves, never before.
 
 A response with no body (a `204`, a `HEAD`, a redirect) or a body whose
-`Content-Length` is set (a string, JSON, a buffer, a file: what
-`@alxia/core` replies with) is logged at once and left as it is, with no
+`Content-Length` header is set (`@alxia/core` sets it on every reply of
+a string, JSON, a buffer or a file) is logged at once and left as it is, with no
 `timeToHeaders` and no `outcome`. Bun sends those bodies without
 JavaScript, a file with `sendfile`, and wrapping them would cost that:
 their `duration` stops when the response is handed over, so a large file
 sent to a slow client takes longer than its `duration`.
+
+A raw `Response` a hook builds (`Response.json(…)`, `new Response(Bun.file(…))`)
+has no `Content-Length` header until Bun sends it, so it is treated as a
+stream: logged once sent, with `timeToHeaders` and an `outcome`. Set the
+header to have it logged at once, and a file sent with `sendfile`:
+
+```ts
+const file = Bun.file('report.pdf');
+return new Response(file, { headers: { 'content-length': String(file.size) } });
+```
+
+What decides is the `Content-Length` of the response when the plugin's
+`onResponse` hook sees it. `@alxia/compress` removes it from the body it
+compresses: with `use(compress())` declared **before** `use(logger())`,
+a compressed JSON reply is a stream by then, and is logged with
+`timeToHeaders` and `outcome: "completed"` once sent. Declared after it,
+as the plugin should be, compress runs later and the reply is logged at
+once.
 
 `Server-Timing` leaves with the headers, before the body: its `total` is
 `timeToHeaders`, not the final `duration`.
@@ -413,6 +445,16 @@ A fixed `generateId` makes the id predictable when the request brings none:
 
 ```ts
 const app = alxia().use(logger({ write: () => {}, generateId: () => 'test-id' }));
+```
+
+A streamed route's entry is written only once its body has been read or
+cancelled, so read it before reading `entries`:
+
+```ts
+const response = await app.request('/ticks');
+await response.body?.cancel(); // or `await response.text()` for a body that ends
+await Bun.sleep(0);
+expect(entries.at(-1)).toMatchObject({ path: '/ticks', outcome: 'aborted' });
 ```
 
 ## See also

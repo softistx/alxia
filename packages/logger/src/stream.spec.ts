@@ -165,3 +165,31 @@ describe('a body that is not streamed', () => {
 		}
 	});
 });
+
+describe('a streamed body without a server', () => {
+	test('is logged once the test reads or cancels it', async () => {
+		const entries: LogEntry[] = [];
+		released.length = 0;
+		const app = alxia()
+			.use(logger({ write: (entry) => entries.push(entry) }))
+			.get('/ticks', { response: { 200: Tick } }, ({ reply }) =>
+				reply(200, ticks()),
+			)
+			.get('/slow', ({ reply }) => reply(200, slow()));
+		const ticking = await app.request('/ticks');
+		expect(entries).toEqual([]);
+		await ticking.body?.cancel();
+		await Bun.sleep(0);
+		expect(entries.at(-1)).toMatchObject({
+			path: '/ticks',
+			outcome: 'aborted',
+		});
+		await until(() => released.length > 0);
+		expect(released).toEqual(['ticks']);
+		await (await app.request('/slow')).text();
+		expect(entries.at(-1)).toMatchObject({
+			path: '/slow',
+			outcome: 'completed',
+		});
+	});
+});

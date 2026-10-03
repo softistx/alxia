@@ -54,8 +54,9 @@ app.listen(3000);
 - It starts as `GET /orders/o-1` and is renamed `GET /orders/:id` once
   routing has matched, with `http.route`: one dashboard row per route, not
   per order. A request no route matched keeps its path.
-- A route's error is its exception. Only a 5xx makes the span an error: a
-  401 a guard answered is the server working.
+- A route's error is its exception. Only a 5xx, or a streamed body that
+  fails midway, makes the span an error: a 401 a guard answered is the
+  server working.
 - `traceResponse: true` says the `traceparent` back on the response.
 
 ## What it records

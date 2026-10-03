@@ -4,9 +4,11 @@ export type Outcome = 'completed' | 'aborted' | 'errored';
 
 /**
  * Whether `response` is sent as it is, with nothing left to time: no body,
- * or a body whose length is known. Bun sends those without JavaScript (a
- * string, a buffer, a file), so they are not wrapped. The header is read
- * first: it does not make Bun build the body's stream.
+ * or a `Content-Length` header, which `@alxia/core` sets on every reply of
+ * a string, JSON, a buffer or a file. Bun sends those without JavaScript,
+ * so they are not wrapped. A raw `Response` has no such header, even of a
+ * string, and is watched. The header is read first: it does not make Bun
+ * build the body's stream.
  */
 export function settled(response: Response): boolean {
 	return response.headers.has('content-length') || response.body === null;
@@ -28,7 +30,14 @@ export function watched(
 	const finish = (outcome: Outcome, error?: unknown) => {
 		if (ended) return;
 		ended = true;
-		end(outcome, error);
+		try {
+			end(outcome, error);
+		} catch (failure) {
+			// What watches the body never stops it: a cancel still reaches it.
+			try {
+				console.error(failure);
+			} catch {}
+		}
 	};
 	return new ReadableStream<Uint8Array>(
 		{
