@@ -220,6 +220,42 @@ describe('cache', () => {
 			console.error = original;
 		}
 	});
+
+	test('a key and tags that read what an earlier plugin added are typed with it', async () => {
+		let runs = 0;
+		const session = alxia().derive(({ request }) => ({
+			user: { tenant: request.headers.get('x-tenant') ?? 'public' },
+		}));
+		const perTenant = cache<{ user: { tenant: string } }>({
+			ttl: 60,
+			key: ({ user, url }) => `${user.tenant}:${url.pathname}`,
+			tags: ({ user }) => [`tenant:${user.tenant}`],
+		});
+		const app = alxia()
+			.use(session)
+			.use(perTenant)
+			.get('/home', ({ user, reply }) =>
+				reply(200, `${user.tenant} ${++runs}`),
+			);
+		const as = (tenant: string) =>
+			app.request('/home', { headers: { 'x-tenant': tenant } });
+		expect(await (await as('a')).text()).toBe('a 1');
+		expect(await (await as('b')).text()).toBe('b 2');
+		expect((await as('a')).headers.get('x-cache')).toBe('HIT');
+		await perTenant.invalidateTag('tenant:a');
+		expect(await (await as('a')).text()).toBe('a 3');
+		expect((await as('b')).headers.get('x-cache')).toBe('HIT');
+
+		const _refused = () => {
+			// @ts-expect-error the plugin reads "user", which this app's context does not give
+			alxia().use(perTenant);
+			alxia()
+				.derive(() => ({ user: { tenant: 1 } }))
+				// @ts-expect-error the plugin reads "user", which this app's context gives with another type
+				.use(perTenant);
+		};
+		expect(_refused).toBeFunction();
+	});
 });
 
 describe('MemoryCacheStore', () => {

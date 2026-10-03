@@ -1,8 +1,8 @@
 # Keys and Vary
 
 This page covers what makes two requests "the same" to the cache: the
-default key, `vary`, a `key` of your own, and keeping personal responses
-out.
+default key, `vary`, a `key` of your own, reading what an earlier plugin
+added, and keeping personal responses out.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -80,12 +80,13 @@ own and the cache keeps one copy per visitor. Keep personal responses
 ## A key of your own
 
 ```ts
-key?: (ctx: BaseContext) => string | undefined;
+key?: (ctx: BaseContext & Requires) => string | undefined;
 ```
 
 `key` replaces the default key whole. It is synchronous and reads the
 `BaseContext` — `request`, `url`, `ip`, `server`, `route`, `pathParams` —
-not what another plugin added to the context.
+and `Requires`, empty by default. To key by what an earlier plugin added,
+see [Reading the app's context](#reading-the-apps-context).
 
 Keyed by the language the route actually answers in, two visitors who both
 prefer French share one copy:
@@ -139,6 +140,39 @@ cache({
 Whatever your key, [`invalidate(path)`](invalidation.md#by-path-invalidate)
 still forgets every response kept for a path: it deletes by the path's tag,
 not by key.
+
+## Reading the app's context
+
+To key or tag by what an earlier plugin added, such as a signed-in `user`
+and its tenant, name it as `cache`'s type argument. `key` and `tags` then
+read it, and the cache is a [`definePlugin`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
+plugin: an app that does not give `user` before it cannot use it.
+
+```ts
+const perTenant = cache<{ user: { tenantId: string } }>({
+	ttl: 60,
+	key: ({ user, url }) => `${user.tenantId}:${url.pathname}${url.search}`,
+	tags: ({ user }) => [`tenant:${user.tenantId}`],
+});
+
+const auth = alxia().derive(({ request }) => ({
+	user: { tenantId: request.headers.get('x-tenant') ?? 'public' }, // your session plugin
+}));
+
+const app = alxia()
+	.use(auth)
+	.use(perTenant)
+	.get('/dashboard', ({ user, reply }) => reply(200, { tenant: user.tenantId }));
+
+await perTenant.invalidateTag('tenant:acme'); // one tenant's pages, every path
+
+alxia().use(perTenant);
+// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+```
+
+The rule of [a key of your own](#a-key-of-your-own) still holds: the route
+must choose by what the key reads, here the tenant, and nothing more
+personal.
 
 ## Personal responses
 

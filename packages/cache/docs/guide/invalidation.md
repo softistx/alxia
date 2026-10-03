@@ -33,7 +33,9 @@ invalidateTag(tag: string): Promise<void>
 Forgets every response that carries `tag`, whatever its key. A response
 carries:
 
-- the tags of the plugin's `tags(ctx)`, computed for each response kept;
+- the tags of the plugin's `tags(ctx)`, computed for each response kept —
+  `cache<{ user: User }>(…)` lets it read what an earlier plugin added
+  ([Reading the app's context](keys-and-vary.md#reading-the-apps-context));
 - the tags its route added with `ctx.cache.tag(…)`.
 
 ```ts

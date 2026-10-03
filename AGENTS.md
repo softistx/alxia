@@ -102,6 +102,7 @@ below records what is kept twice.
 | The HTTP attribute names, in `telemetry/src/attributes.ts` and `@nxgt/telemetry-hono`'s | importing them would depend on Hono; a server span from either must read the same in a dashboard. Change both together |
 | The Apollo Sandbox page, in `graphql/src/sandbox.ts` and `@nxgt/shared-graphql`'s `renderSandbox` | that one is Hono's `html`; both start the Sandbox at the URL the page was asked at (nxgt-core#171). alxia's passes the path, and the page resolves it against its own address, so a TLS proxy in front of the server changes nothing; that one still passes the server's URL. Importing it would depend on Hono. Change both together |
 | `bodyOf`, the permission guard's option types, the device cookie, in `janus/src/` and `@nxgt/janus-hono` | the same refusals and cookies whichever server answers; importing them would depend on Hono. Change both together |
+| `scripts/check-nxgt-versions.ts`, its spec and `.github/workflows/nxgt-versions.yml`, here and in nxgt-data (itself from nxgt-janus) | each repository releases on its own, and this one has no `examples/`. What differs here: the manifests come from `readManifests()` (`packages/*` alone), `latest` from `latestOnRegistry()`, each line names the peer range and whether it admits `latest`, and the issue asks for a changeset; `folderOf` and `manifestOf` are nxgt-data's alone. A fix to the check or the workflow belongs in every copy |
 
 ## The build
 
@@ -137,6 +138,27 @@ The last two resolve without a lockfile, so an upstream release can turn
 them red with no change here. They are informational: read them, never make
 them required. Both scripts rewrite manifests in place; never commit what
 they write.
+
+`.github/workflows/nxgt-versions.yml` runs one more, every Monday and on
+`workflow_dispatch`, not on pull requests:
+
+- **nxgt versions**: `bun run nxgt:outdated`
+  (`scripts/check-nxgt-versions.ts`, spec'd beside it) lists each `@nxgt/*`
+  devDependency of `packages/*` whose locked version is behind npm's
+  `latest`, and whether its peer range admits that release (`^0.3.1` does
+  not admit `0.4.0`: the bump widens it). Exit 0 when all are current, 1
+  when something is behind, 2 when the registry did not answer, which is
+  never read as "current". Something behind opens the issue *@nxgt/\*
+  devDependencies behind npm latest*, or updates the one open, and fails the
+  run; a later run with nothing behind closes it. The job's `permissions`
+  are `contents: read` and `issues: write`, nothing more. The bump is a pull
+  request like any other: the devDependency, the peer range when it must
+  widen, `bun.lock`, and a changeset, since it is a change under
+  `packages/`. Not Dependabot, though its Bun updater reads this
+  `lockfileVersion` 1 lock: it would bump the devDependency alone, where a
+  `^0.x` peer must widen with it and a changeset must come along, and it
+  stops reading the lock the day it is rewritten as version 2, as
+  nxgt-data's already is.
 
 ## TypeScript
 

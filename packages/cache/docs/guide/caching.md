@@ -124,18 +124,22 @@ the store lookup, and the wait on another request's run.
 ## Options
 
 ```ts
-cache(options: CacheOptions): Alxia<…> & Cache
+cache<Requires extends object = Empty>(options: CacheOptions<Requires>): Alxia<…> & Requiring<Requires> & Cache
+// an app, given to `use`, which checks `Requires`; and the hands to empty it
 ```
+
+`Requires` is what `key` and `tags` read beyond `BaseContext`, empty by
+default; see [Reading the app's context](keys-and-vary.md#reading-the-apps-context).
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `ttl` | `number` | required | **seconds** a response is fresh; fractions are allowed (`0.5`) |
 | `staleWhileRevalidate` | `number` | `0` | seconds more it is served stale while one request refreshes it |
 | `store` | `CacheStore` | a new `MemoryCacheStore()` | where responses are kept: [Stores](stores.md) |
-| `key` | `(ctx: BaseContext) => string \| undefined` | the path and query, then each `vary` header | a request's key; `undefined` is not cached: [Keys and Vary](keys-and-vary.md) |
+| `key` | `(ctx: BaseContext & Requires) => string \| undefined` | the path and query, then each `vary` header | a request's key; `undefined` is not cached: [Keys and Vary](keys-and-vary.md) |
 | `vary` | `readonly string[]` | none | request headers the response depends on: part of the default key, and appended to `Vary` |
 | `statuses` | `readonly number[]` | `[200]` | the statuses kept |
-| `tags` | `(ctx: BaseContext) => readonly string[]` | none | tags on every response kept: [Invalidation](invalidation.md) |
+| `tags` | `(ctx: BaseContext & Requires) => readonly string[]` | none | tags on every response kept: [Invalidation](invalidation.md) |
 | `honorClientNoCache` | `boolean` | `false` | a request's `Cache-Control: no-cache` runs the route instead |
 | `debugHeaders` | `boolean` | `true` | send `X-Cache` and `Age` |
 
