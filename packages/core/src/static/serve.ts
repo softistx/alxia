@@ -6,6 +6,9 @@ import { extname, resolve, sep } from 'node:path';
 import type { BaseContext, MaybePromise } from '../app/types';
 import { vary } from '../reply/headers';
 import { type AnyReply, Reply } from '../reply/reply';
+import { fresh, ifRange, parseRange } from './conditional';
+
+export { parseRange } from './conditional';
 
 /**
  * Where files come from: a directory, or a function answering a path —
@@ -268,20 +271,12 @@ function send(
 	const ranges = options.ranges !== false && encoded === undefined;
 	if (ranges) headers.set('accept-ranges', 'bytes');
 
-	const custom =
+	addCustom(
+		headers,
 		typeof options.headers === 'function'
 			? options.headers(found.path, found.file)
-			: options.headers;
-	if (custom !== undefined) {
-		for (const [name, value] of new Headers(custom)) {
-			if (name === 'set-cookie') headers.append(name, value);
-			// What the file varies by — Accept-Encoding with precompressed
-			// copies — stays, whatever else the option adds.
-			else if (name === 'vary') {
-				for (const each of value.split(',')) vary(headers, each);
-			} else headers.set(name, value);
-		}
-	}
+			: options.headers,
+	);
 
 	if (fresh(request.headers, etag, modified))
 		return new Reply(304, undefined, { headers });
@@ -310,72 +305,19 @@ function send(
 	return new Reply(200, served, { headers });
 }
 
+/** The `headers` option over the file's own: a cookie is appended, a `Vary` merged. */
+function addCustom(headers: Headers, custom: HeadersInit | undefined): void {
+	if (custom === undefined) return;
+	for (const [name, value] of new Headers(custom)) {
+		if (name === 'set-cookie') headers.append(name, value);
+		// What the file varies by — Accept-Encoding with precompressed
+		// copies — stays, whatever else the option adds.
+		else if (name === 'vary') {
+			for (const each of value.split(',')) vary(headers, each);
+		} else headers.set(name, value);
+	}
+}
+
 function isBunFile(blob: Blob): blob is Bun.BunFile {
 	return typeof (blob as Bun.BunFile).exists === 'function';
-}
-
-/** Whether the client's copy is current: `If-None-Match` first, `If-Modified-Since` without it. */
-function fresh(
-	headers: Headers,
-	etag: string | undefined,
-	modified: number | undefined,
-): boolean {
-	const match = headers.get('if-none-match');
-	if (match !== null) {
-		if (etag === undefined) return false;
-		const weak = (tag: string) => tag.trim().replace(/^W\//, '');
-		return match
-			.split(',')
-			.some((tag) => tag.trim() === '*' || weak(tag) === weak(etag));
-	}
-	const since = headers.get('if-modified-since');
-	if (since === null || modified === undefined) return false;
-	const time = Date.parse(since);
-	return !Number.isNaN(time) && Math.floor(modified / 1000) * 1000 <= time;
-}
-
-/** Whether a range applies: always without `If-Range`, else only to the copy it names. */
-function ifRange(
-	value: string | null,
-	etag: string | undefined,
-	modified: number | undefined,
-): boolean {
-	if (value === null) return true;
-	if (value.startsWith('"') || value.startsWith('W/')) {
-		// A weak tag never validates a range.
-		return etag !== undefined && !etag.startsWith('W/') && value === etag;
-	}
-	const time = Date.parse(value);
-	return (
-		modified !== undefined &&
-		!Number.isNaN(time) &&
-		Math.floor(modified / 1000) * 1000 <= time
-	);
-}
-
-/**
- * One byte range of `size`: its first and last byte, `unsatisfiable`, or
- * `undefined` — a header this server ignores, several ranges included —
- * which serves the whole file.
- */
-export function parseRange(
-	header: string,
-	size: number,
-):
-	| { readonly start: number; readonly end: number }
-	| 'unsatisfiable'
-	| undefined {
-	const match = /^bytes=(\d*)-(\d*)$/.exec(header.trim());
-	if (match === null) return undefined;
-	const [, from = '', to = ''] = match;
-	if (from === '' && to === '') return undefined;
-	if (from === '') {
-		const suffix = Number(to);
-		if (suffix === 0) return 'unsatisfiable';
-		return { start: Math.max(0, size - suffix), end: size - 1 };
-	}
-	const start = Number(from);
-	const end = to === '' ? size - 1 : Math.min(Number(to), size - 1);
-	if (start >= size || start > end) return 'unsatisfiable';
-	return { start, end };
 }
