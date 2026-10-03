@@ -80,9 +80,9 @@ to the entry live on the next request. `react-router build` makes it the
 server build, `build/server/index.js`, and writes `build/server/serve.js`,
 which listens on `PORT` (3000) and `HOST` (`0.0.0.0`).
 
-## Serving a build without Vite's plugin
+## A server file of your own, without `alxiaServer()`
 
-A server file of your own beside the build, with no Vite plugin:
+A server file of your own beside the build, with no `alxiaServer()`:
 
 ```ts
 // server.ts
@@ -172,12 +172,12 @@ never shows it. `isReactRouterRoute` names it, and the client files, for
 
 ## Traps
 
-- **Without the Vite plugin, a context key made in `app/` is not the one
+- **Without `alxiaServer()`, a context key made in `app/` is not the one
   the loaders read**: React
   Router's build holds its own copy, and the loader gets the default or
   `Error: No value found for context`. Read alxia's context with
   `alxiaOf`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#error-no-value-found-for-context)
-- **Without the Vite plugin, in a monorepo, Vite bundles a linked
+- **Without `alxiaServer()`, in a monorepo, Vite bundles a linked
   `@alxia/react-router`** into the
   build, with a second `alxiaContext`: `alxiaOf` then throws. Add
   `ssr: { external: ['@alxia/react-router'] }` to `vite.config.ts`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#alxiaof-this-request-has-no-alxia-context-)
@@ -187,6 +187,9 @@ never shows it. `isReactRouterRoute` names it, and the client files, for
   Router's 405. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
 - **`@alxia/secure-headers`' default policy blocks the page's scripts**
   and forms: give the pages a policy of their own. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
+- **Under `react-router dev`, alxia's `ws` routes, `page()` and
+  `ctx.server` are absent**: requests arrive through `app.fetch`. Try
+  sockets against the build. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-websocket-route-does-not-connect-under-react-router-dev)
 - **`alxiaServer()` goes before `reactRouter()`** in `vite.config.ts`, or
   React Router renders the pages without alxia. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#alxiaof-this-request-has-no-alxia-context-)
 - **Build with `NODE_ENV=production`**, or unset: `bun test` sets `test`,

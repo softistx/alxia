@@ -8,7 +8,7 @@ testing.
 
 - [Setup](#setup)
 - [The Vite plugin](#the-vite-plugin)
-- [Without the Vite plugin](#without-the-vite-plugin)
+- [A server file of your own](#a-server-file-of-your-own)
 - [The build option](#the-build-option)
 - [Loaders reading the context](#loaders-reading-the-context)
 - [The app's own context keys](#the-apps-own-context-keys)
@@ -164,7 +164,7 @@ alxia's routes. The entry is loaded through Vite's SSR runner, so:
 Requests reach the app through `app.fetch`, as in a test, not through
 `listen`: alxia's `ws` routes, `page()` and `ctx.server` are absent in dev.
 An app that needs them in dev serves the build with a server of its own,
-as below.
+as in [A server file of your own](#a-server-file-of-your-own).
 
 ### In a build
 
@@ -191,7 +191,7 @@ PORT=8080 bun build/server/serve.js
 Since the entry and the routes are bundled together, `app/context.ts` is
 one module there too, and the app's own keys keep working.
 
-## Without the Vite plugin
+## A server file of your own
 
 The server is two files of the app's, outside `app/`: `base.ts` builds the
 alxia app the pages run behind, and `server.ts` hands it React Router's
@@ -320,9 +320,10 @@ There is no global `Register` augmentation to spare the type argument: a
 process may hold more than one app, and a module cannot know which one
 serves it.
 
-Outside the catch-all — under `react-router dev` alone, or a unit test that
-calls a loader with a bare provider — there is no alxia context, and
-`alxiaOf` throws, saying so.
+Outside the catch-all — under `react-router dev` without `alxiaServer()`,
+or with it after `reactRouter()`, or a unit test that calls a loader with a
+bare provider — there is no alxia context, and `alxiaOf` throws, saying so:
+see [the troubleshooting entry](troubleshooting.md#alxiaof-this-request-has-no-alxia-context-).
 
 ## The app's own context keys
 

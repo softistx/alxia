@@ -15,6 +15,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`No route matches URL "/assets/…"`](#no-route-matches-url-assets)
 - [``You made a POST request to "/" but did not provide an `action` for route "root", so there is no way to handle the request.``](#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
 - [`TypeError: reactRouter(): client is …, which is not a directory. …`](#typeerror-reactrouter-client-is--which-is-not-a-directory-)
+- [`TypeError: reactRouter(): … cannot be served at a path of its own name; rename it. …`](#typeerror-reactrouter--cannot-be-served-at-a-path-of-its-own-name-rename-it-)
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
 
 **Types**
@@ -203,124 +204,7 @@ NODE_ENV=production bunx --bun react-router build
 From a test:
 
 ```ts
-await # Troubleshooting
-
-Each entry is headed by the text you see: an error thrown at startup or in
-a loader, a message React Router or the browser prints, or an error from
-`tsc`. Paths, route ids and types in a message are the app's own, written
-`…` below. A trap that prints nothing is under [Traps](#traps), by symptom.
-
-**Thrown or printed**
-
-- [`Error: No value found for context`](#error-no-value-found-for-context)
-- [`alxiaOf(): this request has no alxia context. …`](#alxiaof-this-request-has-no-alxia-context-)
-- [`alxia-react-router: … must export the alxia app as its default export: export default app.`](#alxia-react-router--must-export-the-alxia-app-as-its-default-export-export-default-app)
-- [`alxia-react-router: Vite's ssr environment does not run modules in this process, so … cannot be loaded.`](#alxia-react-router-vites-ssr-environment-does-not-run-modules-in-this-process-so--cannot-be-loaded)
-- [`The React Router Vite plugin requires the use of a Vite config file`](#the-react-router-vite-plugin-requires-the-use-of-a-vite-config-file)
-- [`No route matches URL "/assets/…"`](#no-route-matches-url-assets)
-- [``You made a POST request to "/" but did not provide an `action` for route "root", so there is no way to handle the request.``](#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
-- [`TypeError: reactRouter(): client is …, which is not a directory. …`](#typeerror-reactrouter-client-is--which-is-not-a-directory-)
-- [`TypeError: reactRouter(): … cannot be served at a path of its own name; rename it. …`](#typeerror-reactrouter--cannot-be-served-at-a-path-of-its-own-name-rename-it-)
-- [`Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
-
-**Types**
-
-- [`Type '…' does not satisfy the constraint 'Alxia<any, any, any, any>'`](#type--does-not-satisfy-the-constraint-alxiaany-any-any-any)
-- [`Property '…' does not exist on type 'BaseContext & …'`](#property--does-not-exist-on-type-basecontext--)
-
-**Traps**
-
-- [A loader reads `null` from the app's own key](#a-loader-reads-null-from-the-apps-own-key)
-- [A page answers alxia's JSON 404 or 405 instead of rendering](#a-page-answers-alxias-json-404-or-405-instead-of-rendering)
-- [A streamed page arrives in one piece](#a-streamed-page-arrives-in-one-piece)
-- [The logger times a streamed page at a few milliseconds](#the-logger-times-a-streamed-page-at-a-few-milliseconds)
-
-## Thrown or printed
-
-### `Error: No value found for context`
-
-**When:** a loader, action or middleware calls `context.get(key)` with a
-key made by `createContext()` with no default value, in a file under
-`app/`, and the server set it in `getLoadContext`.
-
-**Why:** `react-router build` bundles `app/context.ts` into
-`build/server/index.js`. The server, which imports `app/context.ts`
-itself, holds another `createContext()` object. React Router matches keys
-by identity, so the server's `context.set(userContext, user)` sets a key
-the loaders never read.
-
-```ts
-// server.ts: the trap
-import { userContext } from './app/context'; // not the build's copy
-reactRouter(app, { build, getLoadContext: ({ user }, context) => context.set(userContext, user) });
-```
-
-**Fix:** read alxia's context with `alxiaOf`. Its key, `alxiaContext`,
-lives in this package under `node_modules`, which Vite leaves external, so
-the build and the server load one module:
-
-```ts
-// app/routes/home.tsx
-import { alxiaOf } from '@alxia/react-router';
-import type { Base } from '../../base';
-
-export function loader({ context }: Route.LoaderArgs) {
-	const { user } = alxiaOf<Base>(context);
-	return { name: user?.name ?? 'anonymous' };
-}
-```
-
-A key of your own works when it is exported by a package installed under
-`node_modules` (`@acme/session`), not by a file of the app.
-
-### `alxiaOf(): this request has no alxia context. …`
-
-```text
-Error: alxiaOf(): this request has no alxia context. Serve the React Router build through reactRouter() from @alxia/react-router.
-```
-
-**When:** a loader calls `alxiaOf` and `alxiaContext` was not set.
-
-**Why:** one of two:
-
-- the request did not go through `reactRouter()`: the app runs under
-  `react-router dev` or `react-router-serve` alone, or a unit test calls the
-  loader with a bare `RouterContextProvider`;
-- the server build holds **its own copy** of `@alxia/react-router`. Vite
-  leaves a package external only when it resolves under `node_modules` to a
-  `.js` file. A package linked from a workspace (`workspace:^`, `bun link`)
-  resolves to its folder, outside `node_modules`, and Vite bundles it into
-  `build/server/index.js` with a second `alxiaContext` the server never
-  sets.
-
-**Fix:** serve the build through `reactRouter()`. In a monorepo, tell Vite
-to leave the package external:
-
-```ts
-// vite.config.ts
-import { reactRouter } from '@react-router/dev/vite';
-import { defineConfig } from 'vite';
-
-export default defineConfig({
-	ssr: { external: ['@alxia/react-router'] },
-	plugins: [reactRouter()],
-});
-```
-
-`grep '@alxia/react-router' build/server/index.js` should show an
-`import … from "@alxia/react-router"` line, not the package's code. In a
-unit test, set the key yourself:
-
-```ts
-import { alxiaContext } from '@alxia/react-router';
-import { RouterContextProvider } from 'react-router';
-
-const context = new RouterContextProvider();
-context.set(alxiaContext, { user: { name: 'Ada' } });
-await loader({ context, request: new Request('http://localhost/'), params: {} } as never);
-```
-
-bunx --bun react-router build`.env({ ...process.env, NODE_ENV: 'production' });
+await Bun.$`bunx --bun react-router build`.env({ ...process.env, NODE_ENV: 'production' });
 ```
 
 ### ``You made a POST request to "/" but did not provide an `action` for route "root", so there is no way to handle the request.``
@@ -518,5 +402,5 @@ to Vite's server, which keeps its own socket for HMR: alxia's `ws`
 routes, `page()` and `ctx.server` are not there in dev.
 
 **Fix:** test sockets against the build, or serve the build with a server
-of your own (see the guide's "Without the Vite plugin") while working on
+of your own (see the guide's "A server file of your own") while working on
 them.
