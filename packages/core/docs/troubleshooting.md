@@ -22,6 +22,8 @@ a trap that prints nothing is headed by its symptom.
 - [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
 - [`Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`](#type-reply500--is-not-assignable-to-type-maybepromisevoid--replyclienterrorstatus-any--undefined)
 - [`'500' does not exist in type 'RefusalResponses'`](#500-does-not-exist-in-type-refusalresponses)
+- [`The inferred type of '…' cannot be named without a reference to '…' from '…/@alxia/core/dist/…'`](#the-inferred-type-of--cannot-be-named-without-a-reference-to--from-alxiacoredist)
+- [`Property 'part' does not exist on type 'Refusal'`](#property-part-does-not-exist-on-type-refusal)
 
 **Building the app**
 
@@ -488,6 +490,22 @@ app.onRefusal({ response: { 400: Problem } }, (_, { reply }) =>
 	reply(400, { type: 'urn:example:invalid', status: 400, detail: 'invalid' }),
 );
 ```
+
+### `The inferred type of '…' cannot be named without a reference to '…' from '…/@alxia/core/dist/…'`
+
+**When:** `tsc` with `declaration: true` (a library, or a project with
+`composite`), on an exported function or constant whose type is an app
+inferred from its builders: TS2883, *"This is likely not portable. A type
+annotation is necessary."*
+
+**Why:** the declaration of that export must name every type the app's
+type is made of, through `@alxia/core` itself. Before 0.2.1,
+`RefusalsOf`, `RefusalOutcome` and `DeclaredRefusal` were not exported, so
+an app with an `onRefusal` hook could not be named.
+
+**Fix:** upgrade to `@alxia/core` 0.2.1 or later. A type core still fails
+to export is a bug: report it with the code. Until then, annotate the
+export or the hook's return type, e.g. `Reply<400 | 413, ProblemDetails>`, with `Reply` and `ProblemDetails` from `@alxia/core`.
 
 ## Building the app
 
