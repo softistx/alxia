@@ -9,11 +9,13 @@ it to fail prints nothing; those are under [Traps](#traps), by symptom.
 
 - [`TypeError: implemented(): … operations have no route: …`](#typeerror-implemented--operations-have-no-route-)
 - [`TypeError: exactly(): … routes have no operation: …`](#typeerror-exactly--routes-have-no-operation-)
+- [`TypeError: implemented(): the prefix "…" must start with "/" and not end with one`](#typeerror-implemented-the-prefix--must-start-with--and-not-end-with-one)
 
 **Types**
 
 - [`Type '"TRACE"' is not assignable to type 'Method'`](#type-trace-is-not-assignable-to-type-method)
 - [``Type '"pets"' is not assignable to type '`/${string}`'``](#type-pets-is-not-assignable-to-type-string)
+- [`Argument of type '{ method: string; path: string; }[]' is not assignable to parameter of type 'Operations'`](#argument-of-type--method-string-path-string--is-not-assignable-to-parameter-of-type-operations)
 - [`Property 'routes' is missing in type '…' but required in type '{ readonly routes: readonly RouteDefinition[]; }'`](#property-routes-is-missing-in-type--but-required-in-type--readonly-routes-readonly-routedefinition-)
 
 **Traps**
@@ -68,7 +70,7 @@ named by method and full path.
 
 **Why:** the route is not in the spec — an admin route, a health check, the
 routes `docs()` from `@alxia/openapi` adds (`GET /openapi.json`,
-`GET /docs`), a `static()` mount (`GET /assets/*`) — or the spec's
+`GET /docs`), an `app.static('/assets', …)` mount (`GET /assets/*`) — or the spec's
 operation was renamed or removed and the route was not.
 
 **Fix:** add the operation to the document and generate again, remove the
@@ -83,6 +85,24 @@ exactly(app, api, {
 
 If only the routes that need no operation are listed, `implemented` may be
 the check you want.
+
+### `TypeError: implemented(): the prefix "…" must start with "/" and not end with one`
+
+Also as `exactly(): the prefix "…" …`.
+
+```text
+TypeError: implemented(): the prefix "/api/" must start with "/" and not end with one
+```
+
+**When:** `prefix` ends with `/`. One without a leading `/` does not
+compile.
+
+**Why:** the prefix is the app's, which the core refuses written that way
+(`The prefix "…" must start with "/" and not end with one`); looked up as
+given, it would name `/api//pets/:petId`, and every operation would be
+reported missing.
+
+**Fix:** write it as the app's: `{ prefix: '/api' }`.
 
 ## Types
 
@@ -110,10 +130,36 @@ error TS2322: Type '"pets"' is not assignable to type '`/${string}`'.
 
 **Fix:** write it as the route would: `{ method: 'GET', path: '/pets' }`.
 
+### `Argument of type '{ method: string; path: string; }[]' is not assignable to parameter of type 'Operations'`
+
+```text
+error TS2345: Argument of type '{ method: string; path: string; }[]' is not assignable to parameter of type 'Operations'.
+  Type '{ method: string; path: string; }[]' is not assignable to type '{ readonly [name: string]: RouteOperation; }'.
+    Index signature for type 'string' is missing in type '{ method: string; path: string; }[]'.
+```
+
+**When:** a list of operations written by hand, in a variable of its own,
+without `as const`.
+
+**Why:** TypeScript widens each `method` to `string` and each `path` to
+`string`, and a `RouteOperation` needs a `Method` and a path starting with
+`/`.
+
+**Fix:** keep the literals:
+
+```ts
+import type { RouteOperation } from '@alxia/core';
+
+const ops = [{ method: 'GET', path: '/pets' }] as const;
+// or: const ops: RouteOperation[] = [{ method: 'GET', path: '/pets' }];
+implemented(app, ops);
+```
+
 ### `Property 'routes' is missing in type '…' but required in type '{ readonly routes: readonly RouteDefinition[]; }'`
 
 ```text
 error TS2345: Argument of type '{ readonly getPet: …; }' is not assignable to parameter of type '{ readonly routes: readonly RouteDefinition[]; }'.
+  Property 'routes' is missing in type '{ readonly getPet: …; }' but required in type '{ readonly routes: readonly RouteDefinition[]; }'.
 ```
 
 **When:** the first argument is not an app: often the operations and the
@@ -130,13 +176,19 @@ app given in the wrong order, `implemented(operations, app)`.
 **Why:** the app has a prefix, `alxia({ prefix: '/api' })`, so it serves
 `GET /api/pets/:petId`, and the operation's `/pets/:petId` is not there.
 
-**Fix:** give the prefix:
+Or the operations were written by hand with OpenAPI's braces,
+`/pets/{petId}`, which no route matches: the router's paths read
+`/pets/:petId`.
+
+**Fix:** give the prefix, written as the app's, a leading `/` and no
+trailing one:
 
 ```ts
 implemented(app, api, { prefix: '/api' });
 ```
 
-The message then names the full paths, `GET /api/pets/:petId`.
+The message then names the full paths, `GET /api/pets/:petId`. For a
+hand-written operation, write its path `/pets/:petId`.
 
 ### An operation of the spec is never listed
 

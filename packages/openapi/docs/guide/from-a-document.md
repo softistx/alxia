@@ -10,12 +10,11 @@ document comes first, and `openapi` and `docs` still serve it back.
 import { alxia } from '@alxia/core';
 import { operations as api } from './generated/alxia';
 
-export const app = alxia()
-	.route(api.getPet, ({ params, reply }) => {
-		const pet = pets.get(params.petId); // a number, read from the path by the spec
-		return pet ? reply.ok(pet) : reply.notFound({ title: 'No such pet' });
-	})
-	.route(api.searchEmployees, ({ body, reply }) => reply.ok(search(body)));
+// pets: your own store
+export const app = alxia().route(api.getPet, ({ params, reply }) => {
+	const pet = pets.get(params.petId); // a number, read from the path by the spec
+	return pet ? reply.ok(pet) : reply.notFound({ title: 'No such pet' });
+});
 ```
 
 Three pieces make it:
@@ -89,7 +88,7 @@ export const searchEmployees = {
 	schema: {
 		body: zSearchEmployeesBody,
 		response: { 200: z.array(zHit) },
-		detail: { operationId: 'searchEmployees', tags: [] },
+		detail: { operationId: 'searchEmployees' },
 	},
 } as const;
 
@@ -120,9 +119,11 @@ of the generator's `validationErrors` option is never written into
 `alxia.ts`. A 400 the spec declares is kept.
 
 **What alxia cannot express is left out**, with an `ignored` warning from
-the generator: a `TRACE`, a path parameter sharing its segment with text
-(`/files/{name}.json`), a binary body, a reply that is binary, JSON Lines,
-a form or named events. Such an operation is not in `operations`; declare
+the generator, for example a `TRACE`, a path parameter sharing its segment
+with text (`/files/{name}.json`), a binary body, or a reply that is binary,
+JSON Lines, a form or named events; the generator's
+[`alxia.ts`](https://github.com/softistx/nxgt-http/blob/develop/packages/openapi-codegen/docs/guide/generated-code.md#alxiats)
+page has the full list. Such an operation is not in `operations`; declare
 its route by hand if you serve it.
 
 The generator's guide has every option, and every file it writes:
@@ -141,6 +142,7 @@ the same compile errors, the same entry in the app's types, which
 import { alxia } from '@alxia/core';
 import { operations as api } from './generated/alxia';
 
+// auth, pets, search: your own hook, store and query
 export const app = alxia({ prefix: '/api' })
 	.use(auth)
 	.route(api.getPet, ({ params, reply }) => {
@@ -186,7 +188,9 @@ test('every operation of the spec is served', () => {
 test('and nothing else is', () => {
 	exactly(app, operations, {
 		prefix: '/api',
-		exclude: (route) => route.path === '/api/health',
+		// served beside the spec: a health check, and the document itself (below)
+		exclude: (route) =>
+			['/api/health', '/api/openapi.json', '/api/docs'].includes(route.path),
 	});
 });
 ```
@@ -224,4 +228,5 @@ app.use(docs(app, { info: { title: 'Pets', version: '1.0.0' } }));
 ```
 
 `docs` adds two routes the spec does not declare, `GET /api/openapi.json`
-and `GET /api/docs`: give them to `exactly`'s `exclude`.
+and `GET /api/docs`: the `exclude` of [step 3](#3-check-every-operation-has-a-route)
+leaves them out.

@@ -5,13 +5,17 @@ app routes every operation of an OpenAPI document, and, if you ask, only
 those. Each operation is the `{ method, path, schema }` that
 `app.route(operation, handler)` takes, as
 [`@nxgt/openapi-codegen`](https://github.com/softistx/nxgt-http/tree/develop/packages/openapi-codegen)'s
-`alxia` option writes them into `alxia.ts`. A route the document declares
-and nobody wrote fails a test, not a client.
+`alxia` option writes them into `alxia.ts` (that option is not in a
+published release yet; a list of operations written by hand works today).
+A route the document declares and nobody wrote fails a test, not a client.
 
 ```sh
-bun add -d @alxia/openapi-routes @alxia/core
+bun add -d @alxia/openapi-routes
 bun add -d typescript
 ```
+
+`@alxia/core` is its peer: the app's own dependency. For a check at
+startup rather than in a test, install it without `-d`.
 
 ## Every operation has a route
 

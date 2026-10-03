@@ -63,7 +63,10 @@ import { alxia } from '@alxia/core';
 import { implemented } from '@alxia/openapi-routes';
 import { operations as api } from './generated/alxia';
 
-const app = alxia().route(api.getPet, ({ params, reply }) => reply.ok(pets.get(params.petId)));
+const app = alxia().route(api.getPet, ({ params, reply }) => {
+	const pet = pets.get(params.petId); // params.petId: a number, as the spec says
+	return pet ? reply.ok(pet) : reply.notFound({ title: 'No such pet' });
+});
 implemented(app, api); // throws, naming each operation with no route
 ```
 

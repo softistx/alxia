@@ -14,7 +14,7 @@ const searchEmployees = {
 	schema: {
 		body: z.object({ name: z.string() }),
 		response: { 200: z.array(zHit) },
-		detail: { operationId: 'searchEmployees', tags: [] },
+		detail: { operationId: 'searchEmployees', tags: ['employees'] },
 	},
 } as const;
 
@@ -125,6 +125,20 @@ describe('implemented', () => {
 		);
 	});
 
+	test('a prefix written as the app would refuse it', () => {
+		const app = alxia({ prefix: '/api' }).route(getPet, ({ reply }) =>
+			reply.notFound({ title: 'x' }),
+		);
+		expect(() => implemented(app, { getPet }, { prefix: '/api/' })).toThrow(
+			new TypeError(
+				'implemented(): the prefix "/api/" must start with "/" and not end with one',
+			),
+		);
+		expect(() => exactly(app, { getPet }, { prefix: '/api/' })).toThrow(
+			'exactly(): the prefix "/api/" must start with "/" and not end with one',
+		);
+	});
+
 	test('nothing to check', () => {
 		expect(() => implemented(alxia(), {})).not.toThrow();
 		expect(() => implemented(alxia(), [])).not.toThrow();
@@ -162,6 +176,21 @@ describe('exactly', () => {
 		);
 	});
 
+	test('a route of the same shape is the operation’s', () => {
+		const app = alxia().get('/pets/:id', ({ reply }) => reply(200, 'x'));
+		expect(() => exactly(app, { getPet })).not.toThrow();
+	});
+
+	test('a HEAD operation: its GET route is served, but not declared', () => {
+		const app = alxia().get('/pets', ({ reply }) => reply(200, 'x'));
+		const head = { method: 'HEAD', path: '/pets' } as const;
+		expect(() => exactly(app, [head])).toThrow(
+			new TypeError('exactly(): 1 route has no operation: GET /pets'),
+		);
+		const get = { method: 'GET', path: '/pets' } as const;
+		expect(() => exactly(app, [head, get])).not.toThrow();
+	});
+
 	test('exclude: a route the document does not have to declare', () => {
 		const app = routed().get('/health', ({ reply }) => reply(200, 'ok'));
 		expect(() =>
@@ -194,6 +223,8 @@ describe('the operations it takes', () => {
 			implemented(alxia(), { x: { method: 'GET', path: 'pets' } });
 			// @ts-expect-error an object that is not an app
 			implemented({}, operations);
+			// @ts-expect-error a prefix starts with "/", as the app's does
+			implemented(alxia(), operations, { prefix: 'api' });
 		};
 		expect(_refused).toBeFunction();
 	});

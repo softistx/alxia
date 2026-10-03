@@ -1,4 +1,4 @@
-import type { RouteDefinition, RouteOperation } from '@alxia/core';
+import type { RouteDefinition, RouteOperation, RoutePath } from '@alxia/core';
 
 /**
  * The operations to check: the `operations` object a code generator writes,
@@ -11,9 +11,10 @@ export type Operations =
 export interface ImplementedOptions {
 	/**
 	 * The prefix the app gave its routes, `'/api'` for `alxia({ prefix: '/api' })`:
-	 * each operation's path is looked up under it.
+	 * each operation's path is looked up under it. Written as the app's: a
+	 * leading `/`, and no trailing one.
 	 */
-	readonly prefix?: string;
+	readonly prefix?: RoutePath;
 }
 
 export interface ExactlyOptions extends ImplementedOptions {
@@ -21,7 +22,10 @@ export interface ExactlyOptions extends ImplementedOptions {
 	readonly exclude?: (route: RouteDefinition) => boolean;
 }
 
-/** Any `alxia()` app: its routes, with their full paths. */
+/**
+ * Any `alxia()` app: its routes, with their full paths. The public
+ * signatures spell it out, so that `tsc` names the shape, not this alias.
+ */
 type Routed = { readonly routes: readonly RouteDefinition[] };
 
 /** An operation as looked up: its method, its full path, and its name. */
@@ -41,7 +45,10 @@ export function implemented(
 	operations: Operations,
 	options: ImplementedOptions = {},
 ): void {
-	const missing = unrouted(app, wanted(operations, options.prefix));
+	const missing = unrouted(
+		app,
+		wanted('implemented', operations, options.prefix),
+	);
 	if (missing.length > 0) {
 		throw new TypeError(`implemented(): ${noRoute(missing)}`);
 	}
@@ -56,7 +63,7 @@ export function exactly(
 	operations: Operations,
 	options: ExactlyOptions = {},
 ): void {
-	const all = wanted(operations, options.prefix);
+	const all = wanted('exactly', operations, options.prefix);
 	const missing = unrouted(app, all);
 	const declared = new Set(all.map(keyOf));
 	const extra = app.routes.filter(
@@ -69,7 +76,17 @@ export function exactly(
 	if (parts.length > 0) throw new TypeError(`exactly(): ${parts.join('; ')}`);
 }
 
-function wanted(operations: Operations, prefix = ''): Wanted[] {
+function wanted(
+	check: 'implemented' | 'exactly',
+	operations: Operations,
+	prefix = '',
+): Wanted[] {
+	// As the core refuses one: a typed prefix can still be '/api/'.
+	if (prefix !== '' && !/^\/.*[^/]$/.test(prefix)) {
+		throw new TypeError(
+			`${check}(): the prefix "${prefix}" must start with "/" and not end with one`,
+		);
+	}
 	const named: [string | undefined, RouteOperation][] = Array.isArray(
 		operations,
 	)
@@ -98,7 +115,7 @@ function unrouted(app: Routed, all: readonly Wanted[]): Wanted[] {
 	);
 }
 
-/** As the core joins a prefix: `/` under `/api` is `/api`. */
+/** As the core joins a prefix: `/` under `/api` is `/api`. Kept twice: see AGENTS.md. */
 function join(prefix: string, path: string): string {
 	if (prefix === '') return path;
 	return path === '/' ? prefix : `${prefix}${path}`;
@@ -106,7 +123,7 @@ function join(prefix: string, path: string): string {
 
 /**
  * A method and a path's shape: `/pets/:id` serves what `/pets/:petId`
- * declares, as the router matches them alike.
+ * declares, as the router matches them alike. Kept twice: see AGENTS.md.
  */
 function keyOf(route: { readonly method: string; readonly path: string }) {
 	return `${route.method} ${route.path.replace(/:[^/]+/g, ':')}`;

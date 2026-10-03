@@ -57,10 +57,17 @@ handler)` reads: `{ method, path, schema? }`. So `operations` is what the
 routes were declared from:
 
 - the `operations` object of a generated `alxia.ts`, keyed by operation id.
-  A message names each operation by its key;
+  A message names each operation by its key. The generator's `alxia` option
+  is not in a published release of `@nxgt/openapi-codegen` yet;
 - a list of operations, written by hand or picked from that object. A
   message names each one by its `schema.detail.operationId`, which the
   generator always writes, or by method and path alone when it has none.
+  Declare a hand-written list `as const`, or type it `RouteOperation[]`, so
+  each `method` stays a `Method`.
+
+A path is written the router's way, `/pets/:petId`, as the generator writes
+it, not OpenAPI's `/pets/{petId}`: an operation written with braces matches
+no route.
 
 Both return nothing when the check passes, and throw a `TypeError` when it
 does not, listing everything that is wrong at once.
@@ -139,9 +146,16 @@ const app = alxia({ prefix: '/api' }).route(api.getPet, getPet);
 implemented(app, api, { prefix: '/api' });
 ```
 
+Write the prefix as the app's: a leading `/` and no trailing one. `'api'`
+does not compile, and `'/api/'` throws
+[`implemented(): the prefix "/api/" must start with "/" and not end with one`](troubleshooting.md#typeerror-implemented-the-prefix--must-start-with--and-not-end-with-one).
+
 The messages then name the full paths, `GET /api/pets/:petId (getPet)`,
 since those are what the app is missing. For operations served under a
-group, `alxia().group('/v1', …)`, give the group's prefix the same way.
+group, `alxia().group('/v1', …)`, give the group's prefix the same way. A
+call takes one prefix: check each group's operations in a call of their
+own, and use `exactly` only when every route of the app is under that
+prefix, or excluded.
 
 ## Where to call it
 
@@ -160,7 +174,8 @@ test('every operation of the spec is served', () => {
 });
 ```
 
-**At startup**, once every route is declared and before `listen`, to refuse
+**At startup**, with the package installed as a dependency rather than a
+dev dependency, once every route is declared and before `listen`, to refuse
 to start a server that does not serve its spec. It runs once, over the
 routes, and costs nothing per request:
 
