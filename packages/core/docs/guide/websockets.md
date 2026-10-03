@@ -36,7 +36,7 @@ Sockets need **a server**: `listen`, or a `Bun.serve` of your own given
 
 ```ts
 ws<const Path extends RoutePath, Schema extends SocketSchema = Empty>(
-	path: Path,
+	path: Path, // a literal the app would refuse does not compile: `Invalid path: …`
 	schema: Schema,
 	handlers: SocketHandlers<SocketContext<Ctx, Path, Schema>, SocketSend<Schema>, SocketMessage<Schema>>,
 ): Alxia<…>

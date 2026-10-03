@@ -33,12 +33,12 @@ the same arguments. `ws` declares a socket ([WebSockets](websockets.md)); `stati
 ```ts
 interface RouteMethod<M, Ctx, Routes, Prefix, Shortcuts> {
 	<const Path extends RoutePath, Schema extends RouteSchema, Result extends HandlerResult<Schema>>(
-		path: Path,
+		path: Path, // a literal the app would refuse does not compile: `Invalid path: …`
 		schema: Schema & ValidSchema<JoinPath<Prefix, Path>, Schema>,
 		handler: (ctx: Context<Ctx, JoinPath<Prefix, Path>, Schema>) => MaybePromise<Result>,
 	): Alxia</* … the route added … */>;
 	<const Path extends RoutePath, Result extends AnyReply>(
-		path: Path,
+		path: Path, // checked as above
 		handler: (ctx: Context<Ctx, JoinPath<Prefix, Path>, Empty>) => MaybePromise<Result>,
 	): Alxia</* … */>;
 }
@@ -182,6 +182,24 @@ Paths are checked when the route is declared, and a mistake throws a
 | `'/users/:userId'` after `'/users/:id'` | `"/users/:userId" has the shape of "/users/:id" with other parameter names. Use the same names: the two would match the same requests.` |
 | the same method and path twice | `GET /a is declared twice` |
 | a method with no handler | `GET /a: the handler is missing` |
+
+A path written as a literal is refused by its type first: the call does
+not compile, and the message is the `TypeError` above after
+`Invalid path:`, so the mistake shows in the editor before the app runs:
+
+```ts
+app.get('/at/10:30', handler);
+// error TS2345: Argument of type '"/at/10:30"' is not assignable to parameter of type
+// '"Invalid path: \"/at/10:30\": \":\" may only start a segment, as a parameter"'.
+```
+
+The type reads a path's own syntax — the rows from `'/a/*/b'` to
+`'/a/./b'`; `'users'` fails on `RoutePath` instead — under the app's
+prefix and the group's. Left to the `TypeError` are a literal the URL
+percent-encodes (`/café`), a path typed `string` or holding a
+`` `${string}` ``, a plugin's routes under the prefix `use` gives them, and
+what takes two routes: a shape or a method and path declared twice
+([troubleshooting](../troubleshooting.md#argument-of-type--is-not-assignable-to-parameter-of-type-invalid-path-)).
 
 The middle four keep a path one that `Bun.serve` accepts at `listen` and
 reads as `fetch` does. Bun's router takes a `:` anywhere in a segment for

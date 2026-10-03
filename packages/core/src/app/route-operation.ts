@@ -1,5 +1,5 @@
 import type { AnyReply } from '../reply/reply';
-import type { JoinPath, RoutePath } from '../types/path';
+import type { JoinPath, PathAt, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
 import type {
 	Context,
@@ -28,10 +28,13 @@ type OneMethod<M> =
 		? 'route() needs one method: declare the operation as const'
 		: M;
 
-/** The path, as a literal: a widened one would name no route. */
-type OnePath<P> = RoutePath extends P
+/**
+ * The path, as a literal: a widened one would name no route. And one a
+ * route may be declared at, under `Prefix`.
+ */
+type OnePath<Prefix extends string, P extends string> = RoutePath extends P
 	? 'route() needs the path as a literal: declare the operation as const'
-	: P;
+	: PathAt<Prefix, P>;
 
 /**
  * A route as data: its method, its path and its options. What
@@ -61,14 +64,15 @@ export type OperationMethod<
 	const Operation extends RouteOperation,
 	Result extends HandlerResult<OperationSchema<Operation>>,
 >(
-	operation: Operation & {
-		readonly method: OneMethod<Operation['method']>;
-		readonly path: OnePath<Operation['path']>;
-		readonly schema?: ValidSchema<
-			JoinPath<Prefix, Operation['path']>,
-			OperationSchema<Operation>
-		>;
-	},
+	operation: OnePath<Prefix, Operation['path']> extends Operation['path']
+		? Operation & {
+				readonly method: OneMethod<Operation['method']>;
+				readonly schema?: ValidSchema<
+					JoinPath<Prefix, Operation['path']>,
+					OperationSchema<Operation>
+				>;
+			}
+		: { readonly path: OnePath<Prefix, Operation['path']> },
 	handler: (
 		ctx: Context<
 			Ctx,

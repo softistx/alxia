@@ -4,7 +4,7 @@
  */
 import type { Refusal, RefusalKind, RefusalOfKind } from '../errors/errors';
 import type { AnyReply, Reply } from '../reply/reply';
-import type { JoinPath, RoutePath } from '../types/path';
+import type { JoinPath, PathAt, RoutePath } from '../types/path';
 import type { ClientErrorStatus } from '../types/status';
 import type { Alxia } from './alxia';
 import type {
@@ -71,7 +71,7 @@ export interface RouteMethod<
 		Schema extends RouteSchema,
 		Result extends HandlerResult<Schema>,
 	>(
-		path: Path,
+		path: PathAt<Prefix, Path>,
 		schema: Schema & ValidSchema<JoinPath<Prefix, Path>, Schema>,
 		handler: (
 			ctx: Context<Ctx, JoinPath<Prefix, Path>, Schema>,
@@ -83,7 +83,7 @@ export interface RouteMethod<
 		Shortcuts
 	>;
 	<const Path extends RoutePath, Result extends AnyReply>(
-		path: Path,
+		path: PathAt<Prefix, Path>,
 		handler: (
 			ctx: Context<Ctx, JoinPath<Prefix, Path>, Empty>,
 		) => MaybePromise<Result>,

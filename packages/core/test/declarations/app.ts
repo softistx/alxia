@@ -6,9 +6,11 @@ import {
 	type ClientErrorStatus,
 	definePlugin,
 	eventStream,
+	type PathAt,
 	problem,
 	type RoutePath,
 	type StandardSchemaV1,
+	type StaticPath,
 } from '@alxia/core';
 
 const Ping = {
@@ -115,9 +117,20 @@ export function plugged() {
 		.get('/', ({ tenant: t, reply }) => reply(200, t));
 }
 
-export function servedAt<const P extends RoutePath>(path: P) {
+// A path generic in `P` is checked where `P` is known: the wrapper's
+// parameter carries the check of the method it forwards to.
+export function servedAt<const P extends RoutePath>(
+	path: PathAt<'', P, StaticPath<P>>,
+) {
 	return alxia().static(path, './public');
 }
+
+export function routedAt<const P extends RoutePath>(path: PathAt<'', P>) {
+	return alxia().get(path, ({ reply }) => reply(200, 'x'));
+}
+
+export const served = servedAt('/assets');
+export const routed = routedAt('/pets/:id');
 
 export function typedBy<R extends StandardSchemaV1>(schema: R) {
 	return alxia().get('/', { response: { 200: schema } }, ({ reply }) =>

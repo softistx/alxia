@@ -8,7 +8,7 @@ import type {
 	StaticOptions,
 	StaticReply,
 } from '../static/types';
-import type { JoinPath, RoutePath } from '../types/path';
+import type { JoinPath, PathAt, RoutePath, StaticPath } from '../types/path';
 import type {
 	SocketContext,
 	SocketEntryOf,
@@ -61,9 +61,6 @@ import type {
 	RouteSchema,
 	ThenShortcuts,
 } from './types';
-
-/** The route a static directory is served at: its path, then a wildcard. */
-type StaticPath<Path extends string> = Path extends '/' ? '/*' : `${Path}/*`;
 
 /** The routes of a plugin, under the prefix of the app it is used by. */
 type Prefixed<Prefix extends string, Routes, Shortcuts> = {
@@ -221,7 +218,7 @@ export class Alxia<
 	 * and `Last-Modified` answer 304s; a `Range` a 206.
 	 */
 	static<const Path extends RoutePath>(
-		path: Path,
+		path: PathAt<Prefix, Path, StaticPath<Path>>,
 		source: FileSource,
 		options: StaticOptions = {},
 	): Alxia<
@@ -251,7 +248,7 @@ export class Alxia<
 	 * `/robots.txt`, a generated sitemap.
 	 */
 	file<const Path extends RoutePath>(
-		path: Path,
+		path: PathAt<Prefix, Path>,
 		file:
 			| string
 			| Blob
@@ -283,7 +280,10 @@ export class Alxia<
 	 * `development` — and served by `Bun.serve` itself. So it needs `listen`,
 	 * and the app's hooks do not run around it; `app.fetch` answers it 404.
 	 */
-	page<const Path extends RoutePath>(path: Path, bundle: Bun.HTMLBundle): this {
+	page<const Path extends RoutePath>(
+		path: PathAt<Prefix, Path>,
+		bundle: Bun.HTMLBundle,
+	): this {
 		addPage(this.#runtime, joinPath(this.#prefix, path), bundle);
 		return this;
 	}
@@ -302,7 +302,7 @@ export class Alxia<
 	 * ```
 	 */
 	ws<const Path extends RoutePath, Schema extends SocketSchema = Empty>(
-		path: Path,
+		path: PathAt<Prefix, Path>,
 		schema: Schema,
 		handlers: SocketHandlers<
 			SocketContext<Ctx, JoinPath<Prefix, Path>, Schema>,
