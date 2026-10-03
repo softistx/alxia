@@ -10,6 +10,8 @@ each through. What prints nothing is under [Traps](#traps), by symptom.
 
 - [`error TS2307: Cannot find module '@alxia/rate-limit' or its corresponding type declarations.`](#error-ts2307-cannot-find-module-alxiarate-limit-or-its-corresponding-type-declarations)
 - [`error TS2307: Cannot find module '@alxia/cache' or its corresponding type declarations.`](#error-ts2307-cannot-find-module-alxiacache-or-its-corresponding-type-declarations)
+- [`Property 'cache' does not exist on type '… & RedisContext<…> …'`](#property-cache-does-not-exist-on-type---rediscontext-)
+- [`Property '…' does not exist on type 'CacheControls'`](#property--does-not-exist-on-type-cachecontrols)
 
 **Startup**
 
@@ -29,8 +31,7 @@ each through. What prints nothing is under [Traps](#traps), by symptom.
 - [`GuardError: run on "…": the key was taken from this run before it finished (forgotten, or its lease of …ms went unrenewed), so a repeat may have run it too; its result was not stored`](#guarderror-run-on--the-key-was-taken-from-this-run-before-it-finished-forgotten-or-its-lease-of-ms-went-unrenewed-so-a-repeat-may-have-run-it-too-its-result-was-not-stored)
 - [``RedisError: The lock "…" is held by somebody else, and this call did not wait for it — pass `wait` to keep trying``](#rediserror-the-lock--is-held-by-somebody-else-and-this-call-did-not-wait-for-it--pass-wait-to-keep-trying)
 - [`RedisError: The lock "…" expired before its work finished: it ran longer than the …ms ttl, so it may have run beside another holder`](#rediserror-the-lock--expired-before-its-work-finished-it-ran-longer-than-the-ms-ttl-so-it-may-have-run-beside-another-holder)
-- [`TypeError: cache.tag is not a function. (In 'cache.tag("…")', 'cache.tag' is undefined)`](#typeerror-cachetag-is-not-a-function-in-cachetag-cachetag-is-undefined)
-- [`TypeError: undefined is not an object (evaluating 'cache.….…')`](#typeerror-undefined-is-not-an-object-evaluating-cache)
+- [`TypeError: undefined is not an object (evaluating 'cache.…')`](#typeerror-undefined-is-not-an-object-evaluating-cache)
 
 **Responses**
 
@@ -76,6 +77,51 @@ bun add @alxia/rate-limit
 ```sh
 bun add @alxia/cache
 ```
+
+### `Property 'cache' does not exist on type '… & RedisContext<…> …'`
+
+**When:** a route behind `redis()` reads its typed caches as `cache` —
+`({ cache }) => cache.users.remember(…)`, the name they had before
+`caches`.
+
+```text
+error TS2339: Property 'cache' does not exist on type 'Omit<BaseContext, "reply"> & Empty & RedisContext<{ readonly users: CacheDefinition<string, ZodObject<…>>; }> & { …; }'.
+```
+
+A `derive(({ cache }) => ({ caches: cache }))` written to keep them apart
+from `@alxia/cache`'s `cache` fails the same way, on the `derive`:
+
+```text
+error TS2339: Property 'cache' does not exist on type 'BaseContext & Empty & RedisContext<{ readonly users: CacheDefinition<string, ZodObject<…>>; }>'.
+```
+
+**Why:** `redis()` puts its caches in the context as `caches`, so that they
+never meet `@alxia/cache`'s `cache`.
+
+**Fix:** read `caches`, and drop the `derive`:
+
+```ts
+alxia()
+	.use(redis(connection.client, { caches: { users } }))
+	.get('/users/:id', async ({ caches, params, reply }) =>
+		reply.ok(await caches.users.remember(params.id, () => loadUser(params.id))),
+	);
+```
+
+### `Property '…' does not exist on type 'CacheControls'`
+
+**When:** the same old name, on a route behind both `redis()` and
+`@alxia/cache`'s `cache()`.
+
+```text
+error TS2339: Property 'users' does not exist on type 'CacheControls'.
+```
+
+**Why:** `ctx.cache` is the response cache's `{ tag, skip }`; the Redis
+caches are `ctx.caches`.
+
+**Fix:** `caches.users`, as above
+([With `@alxia/cache`](guide/caches-and-locks.md#with-alxiacache)).
 
 ## Startup
 
@@ -248,10 +294,11 @@ idempotency(connection.client, { name: 'payments', wait: 2_000 });
 ### `RedisError: Connection has failed`
 
 **When:** any request that reaches Redis while it is unreachable — a
-counted request, a cached route, a guarded route, a `cache.<name>` or a
-`lock`. The first command to fail once Bun's client has given up
-reconnecting logs `Max reconnection attempts reached`; the calls after it
-log `Connection has failed`:
+counted request, a guarded route, a `caches.<name>` or a `lock`, or a call
+to the response cache's `invalidate` or `invalidateTag`. The first command
+to fail once Bun's client has given up reconnecting logs
+`Max reconnection attempts reached`; the calls after it log
+`Connection has failed`:
 
 ```text
 RedisError [ERR_REDIS_CONNECTION_CLOSED]: Max reconnection attempts reached
@@ -259,20 +306,19 @@ RedisError: Connection has failed
  code: "ERR_REDIS_CONNECTION_CLOSED"
 ```
 
-**Why:** `@alxia/redis` does not catch Redis's errors: a store or a guard
-that cannot reach Redis fails the request. A rate limit does not let the
-request through uncounted, an idempotent route does not run unguarded, and
-a cached route does not fall back to the route.
+**Why:** `@alxia/redis` does not catch Redis's errors: a rate limit does
+not let the request through uncounted, and an idempotent route does not
+run unguarded. The response cache is the exception, as `@alxia/cache`
+decides it: a cached route whose store cannot answer runs and answers
+`X-Cache: MISS`, with the outage's first error logged — only its invalidations
+reject.
 
 **Fix:** bring Redis back. Bun's client reconnects on its own while it is
 still retrying — a short outage of a few seconds recovers without a
 restart — but once it has logged `Max reconnection attempts reached`, do
 not count on the same client coming back: `connection.ping()` tells you
 whether it answers, and restarting the process is the way back that is
-sure. Where a
-Redis outage should only cost the response cache, wrap its store so that
-its errors are misses — `@alxia/cache`'s guide has
-[a store that fails open](https://github.com/softistx/alxia/blob/develop/packages/cache/docs/guide/stores.md#a-store-that-fails-open).
+sure.
 
 ### `GuardError: run on "…": the key was taken from this run before it finished (forgotten, or its lease of …ms went unrenewed), so a repeat may have run it too; its result was not stored`
 
@@ -338,45 +384,25 @@ throw.
 await lock('invoices', sendInvoices, { ttl: 120_000 });
 ```
 
-### `TypeError: cache.tag is not a function. (In 'cache.tag("…")', 'cache.tag' is undefined)`
+### `TypeError: undefined is not an object (evaluating 'cache.…')`
 
-**When:** a route behind `@alxia/cache`'s `cache()` calls `cache.tag()` or
-`cache.skip()`, and `redis(…)` is declared **after** `use(cache(…))`.
-
-**Why:** both plugins add `cache` to the context. At runtime the later one
-replaces the earlier; the types merge both, so the call compiles.
-
-**Fix:** rename the Redis caches with a `derive` before the response cache
-is declared:
-
-```ts
-alxia()
-	.use(redis(connection.client, { caches: { users } }))
-	.derive(({ cache }) => ({ caches: cache }))     // the Redis caches, renamed
-	.use(cache({ ttl: 60 }))                        // `cache` is now the response cache
-	.get('/users/:id', async ({ caches, cache, params, reply }) => {
-		cache.tag(`user:${params.id}`);
-		return reply(200, await caches.users.remember(params.id, () => loadUser(params.id)));
-	});
-```
-
-[Caches and locks](guide/caches-and-locks.md#with-alxiacache-two-plugins-named-cache)
-has the full example; `@alxia/cache`'s troubleshooting has
-[the same entry](https://github.com/softistx/alxia/blob/develop/packages/cache/docs/troubleshooting.md#typeerror-cachetag-is-not-a-function-in-cachetag-cachetag-is-undefined).
-
-### `TypeError: undefined is not an object (evaluating 'cache.….…')`
-
-**When:** the same two plugins in the other order: `redis(…)` before
-`use(cache(…))`, and a route after both reads `cache.<name>`.
+**When:** the old name at run time — the app runs without a typecheck, so
+the [type error](#property-cache-does-not-exist-on-type---rediscontext-)
+never showed. The route answers `500 {"error":"internal"}`:
 
 ```text
-TypeError: undefined is not an object (evaluating 'cache.users.get')
+TypeError: undefined is not an object (evaluating 'cache.users')              ← redis() alone
+TypeError: undefined is not an object (evaluating 'cache.users.remember')     ← with @alxia/cache's cache()
+TypeError: undefined is not an object (evaluating 'caches.users')             ← with the old derive
 ```
 
-**Why:** the response cache's `cache` — `{ tag, skip }` — replaced the
-Redis caches.
+**Why:** the Redis caches are `ctx.caches`. Nothing else in the context is
+`cache` but `@alxia/cache`'s controls, and the old
+`derive(({ cache }) => ({ caches: cache }))` now replaces the real `caches`
+with `undefined`.
 
-**Fix:** the `derive` above, between the two.
+**Fix:** read `caches.<name>`, drop the `derive`, and typecheck:
+`tsc --noEmit` finds every place.
 
 ## Responses
 

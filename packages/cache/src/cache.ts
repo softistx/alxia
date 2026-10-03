@@ -1,4 +1,6 @@
-import { alxia, type BaseContext } from '@alxia/core';
+import { vary as addVary, alxia, type BaseContext } from '@alxia/core';
+import { defaultKey, pathTag } from './keys';
+import { respond } from './respond';
 import {
 	type CachedResponse,
 	type CacheStore,
@@ -34,7 +36,7 @@ export interface CacheOptions {
 
 /** What the routes behind the cache read. */
 export interface CacheControls {
-	/** Tags the response being built, beyond the plugin's `tags`. */
+	/** Tags the response being built, beyond the plugin's `tags`. Tags starting `alxia:` are the plugin's own. */
 	tag(...tags: string[]): void;
 	/** Keeps this response out of the cache. */
 	skip(): void;
@@ -42,7 +44,10 @@ export interface CacheControls {
 
 /** A cache of responses, and the hands to empty it. */
 export interface Cache {
-	/** Forgets the response of `path` — `/users/1?x=y` — as the default key reads it. */
+	/**
+	 * Forgets every response kept for `path` — `/users/1?x=y`, as the request
+	 * asked it — whatever its key: each `vary` value, a `key` of your own.
+	 */
 	invalidate(path: string): Promise<void>;
 	/** Forgets every response tagged `tag`. */
 	invalidateTag(tag: string): Promise<void>;
@@ -89,6 +94,26 @@ export function cache(options: CacheOptions) {
 	/** The run of each key being loaded: what it kept, or `undefined` when it kept nothing. */
 	const loading = new Map<string, Promise<CachedResponse | undefined>>();
 	const controls = new WeakMap<Request, { tags: string[]; skipped: boolean }>();
+	/**
+	 * A store that cannot answer is a miss, or keeps nothing: a cache is never
+	 * worth a 500. Said to the log once per outage — again only after the
+	 * store has answered since.
+	 */
+	let failing = false;
+	const attempt = async <T>(
+		work: () => Promise<T> | T,
+		fallback: T,
+	): Promise<T> => {
+		try {
+			const value = await work();
+			failing = false;
+			return value;
+		} catch (error) {
+			if (!failing) console.error(error);
+			failing = true;
+			return fallback;
+		}
+	};
 
 	/**
 	 * Runs the route once for every concurrent miss of a key, and keeps what
@@ -128,7 +153,7 @@ export function cache(options: CacheOptions) {
 			if (!headers.has('etag')) {
 				headers.set('etag', `W/"${Bun.hash(body).toString(36)}"`);
 			}
-			for (const name of vary) appendVary(headers, name);
+			for (const name of vary) addVary(headers, name);
 			const cached: CachedResponse = {
 				status: response.status,
 				headers: [...headers],
@@ -136,9 +161,13 @@ export function cache(options: CacheOptions) {
 				storedAt: Date.now(),
 				ttl,
 				stale,
-				tags: [...(options.tags?.(ctx) ?? []), ...(control?.tags ?? [])],
+				tags: [
+					...(options.tags?.(ctx) ?? []),
+					...(control?.tags ?? []),
+					pathTag(`${ctx.url.pathname}${ctx.url.search}`),
+				],
 			};
-			await store.set(key, cached, ttl + stale);
+			await attempt(() => store.set(key, cached, ttl + stale), undefined);
 			return { kept: cached };
 		})();
 		const shared = run.then((loaded) =>
@@ -175,7 +204,7 @@ export function cache(options: CacheOptions) {
 			const key = keyOf(ctx);
 			if (key === undefined) return next();
 
-			const found = await store.get(key);
+			const found = await attempt(() => store.get(key), undefined);
 			const age =
 				found === undefined
 					? Number.POSITIVE_INFINITY
@@ -203,64 +232,11 @@ export function cache(options: CacheOptions) {
 	const handles: Cache = {
 		store,
 		invalidate: async (path) => {
-			await store.delete(defaultKey(path, [], new Headers()));
+			await store.deleteTag(pathTag(path));
 		},
 		invalidateTag: async (tag) => {
 			await store.deleteTag(tag);
 		},
 	};
 	return Object.assign(plugin, handles);
-}
-
-/** The default key: the path and query, then each varying header's value. */
-export function defaultKey(
-	path: string,
-	vary: readonly string[],
-	headers: Headers,
-): string {
-	if (vary.length === 0) return path;
-	return `${path}|${vary.map((name) => `${name}=${headers.get(name) ?? ''}`).join('|')}`;
-}
-
-function appendVary(headers: Headers, name: string): void {
-	const current = headers.get('vary');
-	const names =
-		current?.split(',').map((value) => value.trim().toLowerCase()) ?? [];
-	if (!names.includes(name))
-		headers.set('vary', current ? `${current}, ${name}` : name);
-}
-
-/** A kept response, or a 304 to a client that has it. */
-function respond(
-	request: Request,
-	cached: CachedResponse,
-	state: string | undefined,
-): Response {
-	const headers = new Headers(cached.headers as [string, string][]);
-	if (state !== undefined) {
-		headers.set('x-cache', state);
-		headers.set(
-			'age',
-			String(Math.max(0, Math.floor((Date.now() - cached.storedAt) / 1000))),
-		);
-	}
-	const etag = headers.get('etag');
-	const match = request.headers.get('if-none-match');
-	if (etag !== null && match !== null) {
-		const weak = (tag: string) => tag.trim().replace(/^W\//, '');
-		if (
-			match
-				.split(',')
-				.some((tag) => tag.trim() === '*' || weak(tag) === weak(etag))
-		) {
-			return new Response(null, { status: 304, headers });
-		}
-	}
-	return new Response(
-		cached.status === 204 ? null : (cached.body as Uint8Array<ArrayBuffer>),
-		{
-			status: cached.status,
-			headers,
-		},
-	);
 }

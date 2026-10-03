@@ -130,9 +130,9 @@ cache({
 });
 ```
 
-A custom key also changes what
-[`invalidate(path)`](invalidation.md#by-path-invalidate) can reach: it
-deletes the default key of a path, which your key may not be.
+Whatever your key, [`invalidate(path)`](invalidation.md#by-path-invalidate)
+still forgets every response kept for a path: it deletes by the path's tag,
+not by key.
 
 ## Personal responses
 

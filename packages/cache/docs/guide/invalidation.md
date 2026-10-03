@@ -57,9 +57,8 @@ await catalogue.invalidateTag('product:1');   // only /products/1, in every lang
 await catalogue.invalidateTag('products');    // every page of the catalogue
 ```
 
-Tags are the way to invalidate whatever the key: a `vary` header, a custom
-`key`, a prefix or a query string are all covered, since the tag is on the
-response, not in its key. Tag what a write changes — the entity, its
+A tag is on the response, not in its key, so it reaches every query
+string and every `vary` value. Tag what a write changes — the entity, its
 collection — and invalidate those tags from the write.
 
 ## By path: `invalidate`
@@ -68,42 +67,63 @@ collection — and invalidate those tags from the write.
 invalidate(path: string): Promise<void>
 ```
 
-Forgets the response kept under the **default key** of `path`, with no
-`vary` header: `path` is the full path and query as the request wrote them,
-prefix included.
+Forgets every response kept for `path`, whatever its key: each `vary`
+value, a `key` of your own. `path` is the path and query as the request
+asked them, prefix included.
 
 ```ts
 import { alxia } from '@alxia/core';
 import { cache } from '@alxia/cache';
 
-const products = cache({ ttl: 300 });
+const products = cache({ ttl: 300, vary: ['accept-language'] });
 const app = alxia({ prefix: '/api' })
 	.use(products)
-	.get('/products', ({ reply }) => reply(200, []));
+	.get('/products', ({ reply }) => reply.ok([]));
 
-await products.invalidate('/api/products');        // forgets GET /api/products
-await products.invalidate('/api/products?page=2'); // forgets GET /api/products?page=2, and only that
+await products.invalidate('/api/products');        // GET /api/products, in every language
+await products.invalidate('/api/products?page=2'); // GET /api/products?page=2, and only that
 ```
 
-It does **not** reach:
+It works by a tag: every response is kept with `alxia:path:<path and
+query>` among its tags — `pathTag(path)` builds it — and `invalidate(path)`
+is `store.deleteTag(pathTag(path))`.
 
-| A response kept… | because its key is | Use instead |
+```ts
+import { pathTag } from '@alxia/cache';
+
+pathTag('/api/products?page=2');   // 'alxia:path:/api/products?page=2'
+```
+
+Tags starting `alxia:` are the plugin's: do not give one of yours that
+prefix. A store of your own must remember each response's `tags`, or
+`invalidate` reaches nothing ([Writing a store](stores.md#writing-a-store)).
+
+The path is matched exactly, so it does **not** reach:
+
+| A response kept… | because its path is | Use instead |
 | --- | --- | --- |
-| behind a `vary` | `/hello\|accept-language=fr` | a tag |
-| under a custom `key` | whatever your key returns | `products.store.delete(yourKey)`, or a tag |
-| at another query, or the same query reordered | `/products?b=2&a=1` | a tag |
-| without the app's prefix | `/products` is not `/api/products` | the full path |
+| at another query | `/products?page=2` is not `/products` | each path, or a tag |
+| at the same query reordered | `/products?b=2&a=1` is not `/products?a=1&b=2` | a tag |
+| with the app's prefix | `/api/products` is not `/products` | the full path |
 
-`invalidate` resolves either way: a path that names nothing kept is not an
-error.
+A `key` of your own that several paths share — `key: (ctx) =>
+ctx.url.pathname`, which `/products` and `/products?page=2` both write — is
+reached by the path that wrote it last: `MemoryCacheStore` replaces the
+entry with its tags, so `invalidate('/products')` misses it once
+`/products?page=2` has written it. `redisCacheStore` keeps every path that
+wrote it, and forgets it from either. Give such a key a tag, and use
+`invalidateTag`.
+
+`invalidate` resolves when nothing was kept for `path`. It rejects when the
+store does — see [When the store cannot answer](stores.md#when-the-store-cannot-answer).
 
 ## From the store
 
-`cache()` exposes its store: `products.store`. Deleting a key you computed
-yourself reaches a custom `key`:
+`cache()` exposes its store: `products.store`. Deleting one key you
+computed yourself forgets that response alone:
 
 ```ts
-await products.store.delete('/hello|fr');
+await products.store.delete('/api/products|accept-language=fr');   // the French one only
 ```
 
 ## Several caches, one store

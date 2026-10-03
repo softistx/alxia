@@ -52,7 +52,8 @@ Everything else — `ttl`, `staleWhileRevalidate`, `key`, `vary`, `statuses`,
   base64, and the plugin's `storedAt`, `ttl` and `stale`. Redis expires it
   when `ttl + staleWhileRevalidate` has passed, rounded up to the second.
 - **A tag** is a Redis set at `<name>:tag:<tag>`, of the response keys it
-  names. It expires with the longest-kept response it names: each `set`
+  names. Besides your tags, every response carries `alxia:path:<path>` —
+  the tag `invalidate(path)` deletes. It expires with the longest-kept response it names: each `set`
   gives a new tag set its expiry, and only ever lengthens it after that.
   On a Redis older than 7, which cannot compare expiries, the last
   response written sets it.
@@ -64,8 +65,9 @@ Measured with `cache({ ttl: 2, tags: () => ['products'] })` after one
 `GET /products`:
 
 ```text
-shop:response:/products   string   TTL 2
-shop:tag:products         set      TTL 2
+shop:response:/products            string   TTL 2
+shop:tag:alxia:path:/products      set      TTL 2
+shop:tag:products                  set      TTL 2
 ```
 
 ## Invalidating across processes
@@ -98,6 +100,14 @@ const app = alxia()
 ```
 
 `invalidateTag` reads the tag's set, deletes every key in it, then the set.
+`invalidate(path)` does the same with the path's tag, so it forgets every
+response kept for that path — each `vary` value, a `key` of your own:
+
+```ts
+await products.invalidate('/products');          // every language, every key, in every process
+await products.invalidate('/products?page=2');   // another path: its query is part of it
+```
+
 Two `cache()` given stores with the same `name` share responses and tags;
 give each app or deployment its own `name`.
 
@@ -105,13 +115,15 @@ give each app or deployment its own `name`.
 
 - **Concurrent misses** run the route once per process, not once overall:
   `@alxia/cache` coalesces them in memory.
-- **A store that fails fails the request.** The plugin awaits the store, so
-  a Redis that is down makes a cached route answer `500 {"error":"internal"}`
-  where it would have answered. `@alxia/cache`'s guide shows a wrapper that
-  turns the store's errors into misses.
+- **A Redis that does not answer costs the cache, not the response.** A
+  read that fails is a miss, so the route runs; a write that fails keeps
+  nothing; the first error of an outage is logged with `console.error`. `invalidate` and
+  `invalidateTag` do reject, so a write that empties the cache learns that
+  it could not — see `@alxia/cache`'s
+  [Stores](https://github.com/softistx/alxia/blob/develop/packages/cache/docs/guide/stores.md#when-the-store-cannot-answer).
 
 ## Next
 
-- [Caches and locks](caches-and-locks.md) — `redis()` adds `cache` to the
-  context too; read the collision there before using both.
+- [Caches and locks](caches-and-locks.md) — `redis()` adds typed caches to
+  the context, as `caches`, beside this one's `cache`.
 - [Testing](testing.md).

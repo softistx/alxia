@@ -83,7 +83,10 @@ A short outage recovers on its own while the client is still retrying;
 after it has given up, do not count on it coming back — restart the process.
 There is no fail-open mode: a rate limit that cannot count does not let the
 request through, and an idempotent route that cannot take its key does not
-run.
+run. The response cache is the exception, as `@alxia/cache` decides it: a
+cached route whose `redisCacheStore` cannot answer runs and answers
+`X-Cache: MISS`, with the outage's first error logged; only its
+invalidations reject.
 
 At startup, Bun's client reconnects by default, so a `connectRedis` to a
 server that is not there keeps trying for about half a minute before it

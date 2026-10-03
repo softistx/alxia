@@ -51,9 +51,14 @@ Nothing scheduled yet.
 - **Keys your way.** The path and query by default; `vary` adds request
   headers to the key and to `Vary`; `key` replaces it, and `undefined`
   leaves a request uncached. `defaultKey` builds the default one.
-- **Invalidation.** `invalidate(path)` forgets one response, and
+- **Invalidation.** `invalidate(path)` forgets every response kept for a
+  path, whatever its key, and
   `invalidateTag(tag)` every response tagged by the plugin's `tags` or by
   its route's `cache.tag()`.
+- **A store that cannot answer costs the cache, not the response.** A
+  lookup that fails is a miss and a keep that fails keeps nothing, logged
+  once per outage; an invalidation rejects, so the code that changed the
+  data knows.
 - **A store contract.** `CacheStore` is four methods; `MemoryCacheStore`
   keeps the least recently read responses of one process, within
   `maxEntries` and `maxBytes`, and `@alxia/redis`'s `redisCacheStore` shares
