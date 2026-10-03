@@ -1,7 +1,10 @@
 # Routes as a chain of steps
 
-Status: **proposed**, waiting for the owner's approval. No code is written
-until it is approved.
+Status: **not adopted** (owner, 2026-10-02). The options form stays. With
+no step for the response, a route would lose the check and stripping of its
+replies and its response schemas in OpenAPI, and the owner did not want a
+response middleware. This note keeps the probe and the reasoning for a later
+look at making the options form friendlier.
 
 The owner asked for routes in Hono's shape: `.post(path, mw1, mw2, handler)`.
 A validator would be one of those middlewares, as `@hono/zod-validator` is,
