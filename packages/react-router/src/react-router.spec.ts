@@ -12,6 +12,7 @@ import {
 	reactRouter,
 } from '@alxia/react-router';
 import { RouterContextProvider, type ServerBuild } from 'react-router';
+import { greetingContext } from '../fixture/app/context';
 import { type Base, makeBase } from '../fixture/base';
 import { BROWSER, CLIENT, fixtureBuild } from '../test/fixture';
 
@@ -302,6 +303,18 @@ describe('the context', () => {
 		);
 		await app.request('/', { headers: { ...browser, 'x-user': 'Di' } });
 		expect(seen).toEqual(['Di', true]);
+	});
+
+	test("a key made in app/ is not the build's own: the loader reads its default", async () => {
+		const app = makeBase().use((app) =>
+			reactRouter(app, {
+				build,
+				getLoadContext: (_ctx, context) =>
+					context.set(greetingContext, 'from the server'),
+			}),
+		);
+		const html = await (await app.request('/', { headers: browser })).text();
+		expect(html).toContain('<p id="greeting">unset</p>');
 	});
 
 	test('alxiaOf outside reactRouter() says so', () => {

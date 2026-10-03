@@ -14,13 +14,75 @@ bun add -d typescript
 ```
 
 `@alxia/core` and `react-router` 8 are peers: the package declares no
-dependency. React, `@react-router/dev`, Vite and `isbot` are the app's, as
-in any React Router app; the package never imports them.
+dependency. `vite` 7 or 8 is a third, optional, for `/vite` alone. React,
+`@react-router/dev`, Vite and `isbot` are the app's, as in any React
+Router app; the runtime never imports them.
 
-## Serving a build
+| import | |
+| --- | --- |
+| `@alxia/react-router` | the runtime: the catch-all, the context, the client's files |
+| `@alxia/react-router/vite` | `alxiaServer()`, the Vite plugin: one server entry for `react-router dev` and `react-router build` |
 
-The example uses `@alxia/logger` (`bun add @alxia/logger`); any plugin
+## One server entry, with Vite
+
+The examples use `@alxia/logger` (`bun add @alxia/logger`); any plugin
 works the same way.
+
+```ts
+// vite.config.ts
+import { alxiaServer } from '@alxia/react-router/vite';
+import { reactRouter } from '@react-router/dev/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+	plugins: [alxiaServer({ entry: 'app/server.ts' }), reactRouter()], // alxiaServer first
+});
+```
+
+```ts
+// app/server.ts: its default export is the alxia app
+import { alxia } from '@alxia/core';
+import { logger } from '@alxia/logger';
+import { reactRouter } from '@alxia/react-router';
+import type { ServerBuild } from 'react-router';
+
+export const base = alxia()
+	.use(logger())
+	.get('/api/health', ({ reply }) => reply.ok({ ok: true }))
+	.derive(({ cookies }) => {
+		const name = cookies.get('user');
+		return { user: name === null ? null : { name } };
+	});
+
+export type Base = typeof base; // what the loaders read
+
+export default base.use((app) =>
+	reactRouter(app, {
+		build: () => import('virtual:react-router/server-build') as Promise<ServerBuild>,
+		mode: import.meta.env.DEV ? 'development' : 'production',
+		client: new URL('../client', import.meta.url),
+	}),
+);
+```
+
+```jsonc
+// package.json
+"scripts": {
+	"dev": "bunx --bun react-router dev",
+	"build": "bunx --bun react-router build",
+	"start": "bun build/server/serve.js"
+}
+```
+
+Under `react-router dev`, the entry is loaded through Vite's SSR runner and
+answers every request Vite does not answer itself, with HMR, and an edit
+to the entry live on the next request. `react-router build` makes it the
+server build, `build/server/index.js`, and writes `build/server/serve.js`,
+which listens on `PORT` (3000) and `HOST` (`0.0.0.0`).
+
+## Serving a build without Vite's plugin
+
+A server file of your own beside the build, with no Vite plugin:
 
 ```ts
 // server.ts
@@ -64,7 +126,7 @@ Router as its `GET`, and the core drops the body.
 ```ts
 // app/routes/dashboard.tsx
 import { alxiaOf } from '@alxia/react-router';
-import type { Base } from '../../server';
+import type { Base } from '../server'; // the app before the catch-all
 import type { Route } from './+types/dashboard';
 
 export function loader({ context }: Route.LoaderArgs) {
@@ -110,11 +172,13 @@ never shows it. `isReactRouterRoute` names it, and the client files, for
 
 ## Traps
 
-- **A context key made in `app/` is not the one the loaders read**: React
+- **Without the Vite plugin, a context key made in `app/` is not the one
+  the loaders read**: React
   Router's build holds its own copy, and the loader gets the default or
   `Error: No value found for context`. Read alxia's context with
   `alxiaOf`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#error-no-value-found-for-context)
-- **In a monorepo, Vite bundles a linked `@alxia/react-router`** into the
+- **Without the Vite plugin, in a monorepo, Vite bundles a linked
+  `@alxia/react-router`** into the
   build, with a second `alxiaContext`: `alxiaOf` then throws. Add
   `ssr: { external: ['@alxia/react-router'] }` to `vite.config.ts`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#alxiaof-this-request-has-no-alxia-context-)
 - **Bun's user agent is a bot to `isbot`**, so a test client gets the
@@ -123,6 +187,10 @@ never shows it. `isReactRouterRoute` names it, and the client files, for
   Router's 405. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
 - **`@alxia/secure-headers`' default policy blocks the page's scripts**
   and forms: give the pages a policy of their own. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
+- **`alxiaServer()` goes before `reactRouter()`** in `vite.config.ts`, or
+  React Router renders the pages without alxia. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#alxiaof-this-request-has-no-alxia-context-)
+- **Build with `NODE_ENV=production`**, or unset: `bun test` sets `test`,
+  `import.meta.env.DEV` is then true, and the assets are not served. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#no-route-matches-url-assets)
 - **An alxia route whose path covers a page takes it**, wherever it is
   declared: `GET /:slug` answers `/about`. Keep alxia's routes under
   `/api`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-page-answers-alxias-json-404-or-405-instead-of-rendering)
@@ -137,8 +205,15 @@ never shows it. `isReactRouterRoute` names it, and the client files, for
 | `alxiaContext` | the React Router context key it reads, set on every request |
 | `isReactRouterRoute(route)` | whether `reactRouter()` declared a route, for OpenAPI's `exclude` |
 
+From `@alxia/react-router/vite`:
+
+| export | |
+| --- | --- |
+| `alxiaServer(options?)` | the Vite plugin. `entry`, `app/server.ts` by default |
+| `AlxiaServerOptions` | its options |
+
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, the server entry, loaders reading the context, the client's files, OpenAPI, and testing.
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, the Vite plugin, the server entry, loaders reading the context, the client's files, OpenAPI, and testing.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.

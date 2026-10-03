@@ -7,12 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Development under Vite, from one server entry.** `@alxia/react-router/vite`,
-  a Vite plugin: `react-router dev` loads the alxia app through Vite's SSR
-  runner and hands it every request Vite does not answer itself, so HMR,
-  the server entry's own reload and the app's context keys all work. On a
-  build, the entry becomes the server build and a generated
-  `build/server/serve.js` listens on `PORT` and `HOST`.
+Nothing scheduled yet.
 
 ## Next
 
@@ -22,6 +17,9 @@ number on it. Every release, with each change it made, is in
 
 ## Later
 
+- **alxia's sockets under `react-router dev`.** Under the Vite plugin the
+  app answers through `app.fetch`, so `ws` routes, `page()` and
+  `ctx.server` wait for the build.
 - **The logger's duration of a streamed page**, to its last byte rather
   than its first.
 - **A React Router `basename`**, the app served under a path.
@@ -60,3 +58,9 @@ number on it. Every release, with each change it made, is in
   body.
 - **OpenAPI.** `isReactRouterRoute` leaves the catch-all and the client's
   files out of `@alxia/openapi`'s document.
+- **One server entry, with Vite.** `@alxia/react-router/vite`'s
+  `alxiaServer()`: under `react-router dev` the entry is loaded through
+  Vite's SSR runner and answers what Vite does not, with HMR, the entry's
+  own edits live and the app's context keys shared; `react-router build`
+  makes it the server build, prerendering included, and writes
+  `build/server/serve.js`, which listens on `PORT` and `HOST`.

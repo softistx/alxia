@@ -37,7 +37,7 @@ export function alxiaOf<App extends AnyAlxia>(
 	const value = context.get(alxiaContext);
 	if (value === MISSING) {
 		throw new Error(
-			'alxiaOf(): this request has no alxia context. Serve the React Router build through reactRouter() from @alxia/react-router.',
+			'alxiaOf(): this request has no alxia context. Serve the React Router build through reactRouter() from @alxia/react-router, and in dev put alxiaServer() from @alxia/react-router/vite before reactRouter() in vite.config.ts.',
 		);
 	}
 	return value as ContextOf<App>;

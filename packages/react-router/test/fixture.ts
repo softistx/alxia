@@ -2,6 +2,7 @@
  * The fixture React Router app, built once per test process with
  * `react-router build`, as an app's own build would be.
  */
+import { cp, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import type { ServerBuild } from 'react-router';
@@ -20,6 +21,8 @@ export function fixtureBuild(): Promise<ServerBuild> {
 	built ??= (async () => {
 		const result = await $`${process.execPath} --bun react-router build`
 			.cwd(FIXTURE)
+			// `bun test` sets NODE_ENV=test, which Vite would build as development.
+			.env({ ...process.env, NODE_ENV: 'production' })
 			.quiet()
 			.nothrow();
 		if (result.exitCode !== 0) {
@@ -32,4 +35,24 @@ export function fixtureBuild(): Promise<ServerBuild> {
 		)) as ServerBuild;
 	})();
 	return built;
+}
+
+/**
+ * A copy of the fixture the `/vite` specs may edit and build, beside it so
+ * that it resolves the same `node_modules`. Removed by `remove`.
+ */
+export async function copyFixture(): Promise<{
+	readonly root: string;
+	readonly remove: () => Promise<void>;
+}> {
+	const root = join(
+		FIXTURE,
+		'..',
+		`.fixture-${process.pid}-${Math.random().toString(36).slice(2, 8)}`,
+	);
+	await cp(FIXTURE, root, {
+		recursive: true,
+		filter: (source) => !/[\\/](build|\.react-router)$/.test(source),
+	});
+	return { root, remove: () => rm(root, { recursive: true, force: true }) };
 }

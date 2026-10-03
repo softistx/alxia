@@ -19,6 +19,11 @@
 			"import": "./dist/index.js",
 			"default": "./dist/index.js"
 		},
+		"./vite": {
+			"types": "./dist/vite/index.d.ts",
+			"import": "./dist/vite/index.js",
+			"default": "./dist/vite/index.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"repository": {
@@ -37,7 +42,8 @@
 	},
 	"alxia": {
 		"entrypoints": [
-			"src/index.ts"
+			"src/index.ts",
+			"src/vite/index.ts"
 		]
 	},
 	"devDependencies": {
@@ -52,11 +58,17 @@
 		"react": "^19.3.0",
 		"react-dom": "^19.3.0",
 		"react-router": "^8.4.0",
-		"vite": "^8.3.2"
+		"vite": "^7.0.0"
 	},
 	"peerDependencies": {
 		"@alxia/core": "workspace:^",
 		"react-router": "^8.0.0",
-		"typescript": "^6.0.3 || ^7.0.0"
+		"typescript": "^6.0.3 || ^7.0.0",
+		"vite": "^7.0.0 || ^8.0.0"
+	},
+	"peerDependenciesMeta": {
+		"vite": {
+			"optional": true
+		}
 	}
 }

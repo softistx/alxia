@@ -2,12 +2,13 @@
 
 `@alxia/react-router` serves a React Router **framework-mode** app with
 server rendering from an alxia app, under Bun. This page walks an app
-author through it: the setup, the server entry, loaders reading alxia's
+author through it: the setup, the Vite plugin, a server of your own, loaders reading alxia's
 context, the hooks around the pages, the client's files, OpenAPI, and
 testing.
 
 - [Setup](#setup)
-- [The server entry](#the-server-entry)
+- [The Vite plugin](#the-vite-plugin)
+- [Without the Vite plugin](#without-the-vite-plugin)
 - [The build option](#the-build-option)
 - [Loaders reading the context](#loaders-reading-the-context)
 - [The app's own context keys](#the-apps-own-context-keys)
@@ -72,7 +73,125 @@ export default async function handleRequest(
 }
 ```
 
-## The server entry
+## The Vite plugin
+
+`@alxia/react-router/vite` makes one server entry serve both
+`react-router dev` and `react-router build`. Vite is an optional peer, 7 or
+8, already in any React Router app.
+
+```ts
+// vite.config.ts
+import { alxiaServer } from '@alxia/react-router/vite';
+import { reactRouter } from '@react-router/dev/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+	plugins: [alxiaServer({ entry: 'app/server.ts' }), reactRouter()],
+});
+```
+
+`alxiaServer()` comes **before** `reactRouter()`: its middleware must run
+before React Router's own SSR middleware, which would otherwise answer the
+pages without alxia. `entry` is relative to Vite's root, `app/server.ts` by
+default.
+
+The entry is a module whose default export is the alxia app. It does not
+listen:
+
+```ts
+// app/server.ts
+import { alxia } from '@alxia/core';
+import { logger } from '@alxia/logger';
+import { reactRouter } from '@alxia/react-router';
+import type { ServerBuild } from 'react-router';
+
+export const base = alxia()
+	.use(logger())
+	.get('/api/health', ({ reply }) => reply.ok({ ok: true }))
+	.derive(({ cookies }) => {
+		const name = cookies.get('user');
+		return { user: name === null ? null : { name } };
+	});
+
+/** What the loaders read: the app before the catch-all. */
+export type Base = typeof base;
+
+export default base.use((app) =>
+	reactRouter(app, {
+		build: () => import('virtual:react-router/server-build') as Promise<ServerBuild>,
+		mode: import.meta.env.DEV ? 'development' : 'production',
+		client: new URL('../client', import.meta.url),
+	}),
+);
+```
+
+- **`build`** is React Router's virtual server build: in dev, Vite's
+  current one on every request; in production, the one bundled beside the
+  entry. `react-router typegen`, which `react-router dev` runs, declares
+  the module; without it, add `declare module
+  'virtual:react-router/server-build'` to a `.d.ts` of the app.
+- **`mode`** follows Vite's: `import.meta.env.DEV` is replaced at build
+  time.
+- **`client`** is resolved against the built file, `build/server/index.js`,
+  so `../client` is `build/client` wherever the process starts. In dev it
+  is ignored, and Vite serves `public/` and the modules itself.
+
+```jsonc
+// package.json
+"scripts": {
+	"dev": "bunx --bun react-router dev",
+	"build": "bunx --bun react-router build",
+	"start": "bun build/server/serve.js"
+}
+```
+
+### In dev
+
+`react-router dev` starts Vite's server. Vite answers its own requests
+first — modules, `/@fs/…`, `public/`, the HMR socket — and the plugin hands
+every other request to the entry's `fetch`: pages, single-fetch data, and
+alxia's routes. The entry is loaded through Vite's SSR runner, so:
+
+- **HMR** works as in any React Router app: a component edit reaches the
+  browser over Vite's socket.
+- **An edit to the entry, or to a module it imports, is live on the next
+  request**, with no restart: the runner reloads what changed.
+- **The app's own context keys work**: the entry and the routes are one
+  module graph, so a key from `app/context.ts` set in `getLoadContext` is
+  the one the loaders read.
+- **Errors** go to Vite's error page, with the stack mapped to the source.
+
+Requests reach the app through `app.fetch`, as in a test, not through
+`listen`: alxia's `ws` routes, `page()` and `ctx.server` are absent in dev.
+An app that needs them in dev serves the build with a server of its own,
+as below.
+
+### In a build
+
+`react-router build` builds the client as usual, and the server with the
+entry as its input:
+
+- **`build/server/index.js`** is the alxia app, React Router's build inside
+  it, in one file. Its default export is the app; the plugin adds React
+  Router's own exports beside it, so the file is a server build too, and
+  React Router's `prerender` reads it. Importing it starts nothing. Do not
+  export a name of a server build from the entry yourself — `entry`,
+  `routes`, `assets`, `basename`, `future`, `publicPath`, `ssr` and the
+  rest — or it hides React Router's.
+- **`build/server/serve.js`**, written by the plugin, imports it and calls
+  `listen` with `PORT` (3000 by default) and `HOST` (`0.0.0.0`). It prints
+  `alxia listening on <url>`, and on `SIGINT` or `SIGTERM` it stops the app,
+  running its `onStop` hooks, and exits.
+
+```sh
+bunx --bun react-router build
+PORT=8080 bun build/server/serve.js
+```
+
+Since the entry and the routes are bundled together, `app/context.ts` is
+one module there too, and the app's own keys keep working.
+
+## Without the Vite plugin
 
 The server is two files of the app's, outside `app/`: `base.ts` builds the
 alxia app the pages run behind, and `server.ts` hands it React Router's
@@ -217,7 +336,9 @@ import { createContext } from 'react-router';
 export const userContext = createContext<{ name: string } | null>(null);
 ```
 
-A `server.ts` that imports `app/context.ts` itself holds a different
+Under [the Vite plugin](#the-vite-plugin) this works: the entry is built
+and loaded with the routes, and `app/context.ts` is one module. Without
+it, a `server.ts` that imports `app/context.ts` itself holds a different
 object, so a `context.set(userContext, user)` there is never seen: the
 loader reads the key's default, or fails with `Error: No value found for
 context` when it has none. Read alxia's context through `alxiaOf` instead,

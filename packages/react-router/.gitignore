@@ -1,2 +1,4 @@
 fixture/build
 fixture/.react-router
+# copies the /vite specs edit and build
+.fixture-*
