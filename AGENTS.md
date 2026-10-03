@@ -30,6 +30,28 @@ Its skeleton is `softistx/nxgt-http`'s: the Bun workspace, the root
 `build.ts`, Biome, changesets, `scripts/publish.ts` and `verify:artifacts`.
 A check added there is a check to port here.
 
+## `examples/`
+
+`examples/` holds applications, not packages. Each is `private` and
+unscoped, and uses the packages by `workspace:^`. They are workspace
+members, so one `bun install` covers them and Biome lints them, each in
+its own style when it has a `biome.json`. The root `typecheck` and `test`
+run theirs after the packages' (`scripts/workspace.ts <script> packages
+examples`), so an example that no longer compiles or answers fails CI like
+a package. The release scripts never see them: `publish.ts`,
+`verify-artifacts.ts` (through `scripts/artifacts/packages.ts`) and
+`check-nxgt-versions.ts` read `packages/*` alone, and a spec of each says
+so. `newest-peers.ts` and `newest-majors.ts` take their ranges from
+`packages/*` alone too, then move an example's own copy of each peer they
+pinned (`followPins`), since two copies of vite do not work together. An
+example's other dependencies still float in those jobs. Every example
+defines `typecheck` and `test`, which the root runs. A change
+confined to `examples/` needs no changeset. The convention is nxgt-data's.
+
+| example | what it shows |
+| --- | --- |
+| `examples/react-router` | React Router's official template (`bunx create-react-router@latest`, committed as generated), then `@alxia/react-router` added in three lines (`bun add`, `alxia()` in `vite.config.ts`, `start: bun build/server/index.js`), then an optional `app/server.ts`. That file holds `createServer()` with logger, compress and secure-headers with a policy the pages pass, a cookie session deriving `user`, `POST /api/todos` validated by Zod, `getLoadContext` and the `Register` declaration. On top of the template: the home loader reading `alxiaOf(context).user`, a sign-in action, a todo form with a 400, and a page streamed behind `<Await>`. `app/server.spec.ts` builds it, runs `bun build/server/index.js` on a free port, and builds a copy without `app/server.ts` to check the default server. |
+
 ## Principles
 
 - **No package has a dependency.** What one needs at runtime is a peer:

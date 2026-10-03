@@ -67,6 +67,14 @@ const result = await client<App>('http://localhost:3000').get('/users/:id', { pa
 if (result.status === 200) result.data.name; // string
 ```
 
+## Examples
+
+- [`examples/react-router`](examples/react-router): React Router's official
+  template served by alxia: three lines to set up, then an optional
+  `app/server.ts` with a session, an `/api`, secure headers and a streamed
+  page. Run `bun run dev` in its folder after `bun install` and
+  `bun run build` at the repository root.
+
 ## Development
 
 Bun 1.4.2 or later.

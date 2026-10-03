@@ -594,7 +594,10 @@ test('the home page renders', async () => {
 ```
 
 Or drive the built app itself, the default export of
-`build/server/index.js`: importing it starts no server.
+`build/server/index.js`: importing it starts no server. Or run it, as
+[the example's spec](https://github.com/softistx/alxia/blob/develop/examples/react-router/app/server.spec.ts)
+does: `bun build/server/index.js` with `PORT=0`, then read the URL from
+its `alxia listening on <url>` line.
 
 Send a browser's user agent. `isbot('Bun/1.4.2')` is true, and React
 Router's entry waits for the whole page before it answers a bot, so a test
@@ -606,9 +609,11 @@ is `POST /?index`, not `POST /`.
 Run `bun run build`, then `bun build/server/index.js` beside the project's
 production `node_modules`: the build imports `react`, `react-router` and
 alxia from them, as any React Router server build does. The template's
-`Dockerfile` runs Node and `react-router-serve`. Base it on an `oven/bun`
-image instead, install with `bun install --production`, and make its
-command `bun build/server/index.js`.
+`Dockerfile` no longer works once `start` runs Bun: it is based on a Node
+image with no Bun, and copies a `package-lock.json` a Bun app does not
+have. Base it on an `oven/bun` image instead, install with
+`bun install --production`, and make its command
+`bun build/server/index.js`.
 
 `PORT` and `HOST` set where the server listens. The platform's `SIGTERM`
 stops it once the requests in flight are answered, and runs the app's
