@@ -225,3 +225,4 @@ From `@alxia/react-router/vite`:
 - [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev and the build work, customising the server, typing the loaders, the app's own keys, escape hatches, the client's files, OpenAPI, testing and deploying.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
+- [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these three lines, then an `app/server.ts` with a session, an `/api`, secure headers and a streamed page.
