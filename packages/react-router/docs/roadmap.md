@@ -11,9 +11,7 @@ Nothing scheduled yet.
 
 ## Next
 
-- **A per-request CSP nonce.** `@alxia/secure-headers` and React Router's
-  `<Scripts nonce>` sharing one nonce, so a page's policy needs no
-  `'unsafe-inline'`.
+Nothing scheduled yet.
 
 ## Later
 
@@ -46,6 +44,15 @@ Nothing scheduled yet.
   Bun, Deno or Cloudflare with a `runtime` option; alxia is Bun's.
 
 ## Shipped
+
+### Next release
+
+- **A per-request CSP nonce.** `nonceOf(loadContext)` reads the nonce that
+  `@alxia/secure-headers`' `nonce: true`, or a `derive` of the app's own,
+  put on the context, so `entry.server.tsx` hands it to `<ServerRouter
+  nonce>` and React in three lines. Every script of the page carries the
+  nonce of its own response's policy, which needs no `'unsafe-inline'`.
+  Neither package depends on the other.
 
 ### 0.1.0
 

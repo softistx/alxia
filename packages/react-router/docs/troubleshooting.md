@@ -41,10 +41,12 @@ a loader, a message React Router or the browser prints, or an error from
 - [`Type '(app: …) => void' is not assignable to type '(app: …) => AnyAlxia'`](#type-app---void-is-not-assignable-to-type-app---anyalxia)
 - [`Property '…' does not exist on type 'BaseContext & { readonly 'Register.server must be typeof server, the default export of createServer()': never; }'`](#property--does-not-exist-on-type-basecontext---readonly-registerserver-must-be-typeof-server-the-default-export-of-createserver-never-)
 - [`Subsequent property declarations must have the same type. Property 'server' must be of type …`](#subsequent-property-declarations-must-have-the-same-type-property-server-must-be-of-type-)
+- [`Type '{ …; nonce: string | undefined; }' is not assignable to type 'ServerRouterProps' with 'exactOptionalPropertyTypes: true'`](#type---nonce-string--undefined--is-not-assignable-to-type-serverrouterprops-with-exactoptionalpropertytypes-true)
 
 **Traps**
 
 - [`bun build/server/index.js` exits at once, printing nothing](#bun-buildserverindexjs-exits-at-once-printing-nothing)
+- [A script of the page has no nonce](#a-script-of-the-page-has-no-nonce)
 - [A loader reads `null` from the app's own key](#a-loader-reads-null-from-the-apps-own-key)
 - [A page answers alxia's JSON 404 or 405 instead of rendering](#a-page-answers-alxias-json-404-or-405-instead-of-rendering)
 - [A streamed page arrives in one piece](#a-streamed-page-arrives-in-one-piece)
@@ -419,9 +421,9 @@ export default createServer({
 });
 ```
 
-or `contentSecurityPolicy: false`. A per-request nonce, shared with
-`<Scripts nonce>`, would drop `'unsafe-inline'`; it is on the
-[roadmap](roadmap.md).
+or `contentSecurityPolicy: false`. Better than `'unsafe-inline'`: a nonce
+per request, with `nonce: true` and `nonceOf(loadContext)` in
+`entry.server.tsx` ([guide](guide.md#a-csp-nonce)).
 
 ### `alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`
 
@@ -714,6 +716,30 @@ whose catch-all every loader of the build runs behind.
 a monorepo its own tsconfig, or drop `Register` and pass the type
 argument, `alxiaOf<Server>(context)`.
 
+### `Type '{ …; nonce: string | undefined; }' is not assignable to type 'ServerRouterProps' with 'exactOptionalPropertyTypes: true'`
+
+**When:** `entry.server.tsx` passes `nonceOf(loadContext)` to
+`<ServerRouter nonce>` under `exactOptionalPropertyTypes`.
+
+```text
+error TS2375: Type '{ context: EntryContext; url: string; nonce: string | undefined; }' is not assignable to type 'ServerRouterProps' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+```
+
+**Why:** `nonceOf` returns `undefined` when no hook set a nonce, and
+`ServerRouterProps.nonce` is optional without `undefined`. React's
+`nonce` option takes `undefined`, so only the prop complains.
+
+**Fix:** spread the prop in only when there is a nonce:
+
+```tsx
+const nonce = nonceOf(loadContext);
+<ServerRouter
+	context={routerContext}
+	url={request.url}
+	{...(nonce === undefined ? {} : { nonce })}
+/>
+```
+
 ## Traps
 
 ### `bun build/server/index.js` exits at once, printing nothing
@@ -726,6 +752,44 @@ is the process's entry point.
 **Fix:** add `alxia()` to `vite.config.ts` and build again; the start line
 `alxia listening on <url>` then comes up. Run the file itself,
 `bun build/server/index.js`, not through another module's `import`.
+
+### A script of the page has no nonce
+
+The policy names `'nonce-…'`, and the browser refuses some or all of the
+page's scripts: `Refused to execute inline script because it violates the
+following Content Security Policy directive: "script-src 'self'
+'nonce-…'"`. The page renders, then never hydrates.
+
+**Why:** one of these:
+
+- the app has no `entry.server.tsx`, so React Router's default renders
+  with no nonce;
+- the entry does not pass it to both `<ServerRouter nonce>` and the
+  renderer's `nonce` option: the first covers React Router's scripts, the
+  second React's own streaming ones;
+- a `<script>` of the app's own, in `root.tsx` say, has no `nonce`
+  attribute.
+
+**Fix:** reveal the entry and pass `nonceOf(loadContext)` to both
+([guide](guide.md#a-csp-nonce)). A script of your own reads the nonce
+through a loader, where `nonceOf(context)` works as well:
+
+```tsx
+// app/root.tsx
+import { nonceOf } from '@alxia/react-router';
+import type { Route } from './+types/root';
+
+export function loader({ context }: Route.LoaderArgs) {
+	return { nonce: nonceOf(context) };
+}
+
+// in Layout: <script nonce={useRouteLoaderData('root')?.nonce}>…</script>
+```
+
+Check what was sent with
+`curl -s -A 'Mozilla/5.0 Chrome/130' http://localhost:5173/ | grep -o '<script[^>]*>'`:
+every tag should hold `nonce="…"`, the value of the response's
+`Content-Security-Policy`.
 
 ### A loader reads `null` from the app's own key
 

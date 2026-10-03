@@ -3,6 +3,7 @@ export {
 	alxiaContext,
 	alxiaOf,
 	type InvalidRegister,
+	nonceOf,
 	type Register,
 	type RegisteredApp,
 	type RegisteredOf,
