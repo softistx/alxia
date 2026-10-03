@@ -23,15 +23,19 @@ each through. What prints nothing is under [Traps](#traps), by symptom.
 
 **Runtime: a 500, with this in the log**
 
-- [`TypeError: defineRateLimit: "…" has a per of …; it is a whole number of milliseconds, and must be at least 1`](#typeerror-defineratelimit--has-a-per-of--it-is-a-whole-number-of-milliseconds-and-must-be-at-least-1)
-- [`TypeError: defineRateLimit: "…" has a limit of …; it is a whole number of requests, and must be at least 1`](#typeerror-defineratelimit--has-a-limit-of--it-is-a-whole-number-of-requests-and-must-be-at-least-1)
 - [`TypeError: defineRateLimit: "…" has a burst of … and a per of …ms; burst × per must be at most 9007199254740 for the script to count exactly`](#typeerror-defineratelimit--has-a-burst-of--and-a-per-of-ms-burst--per-must-be-at-most-9007199254740-for-the-script-to-count-exactly)
+- [`TypeError: defineRateLimit: "…" would take longer than ten years to refill from empty (burst × per ÷ limit); check that per is in milliseconds`](#typeerror-defineratelimit--would-take-longer-than-ten-years-to-refill-from-empty-burst--per--limit-check-that-per-is-in-milliseconds)
 - [`TypeError: run on "…": wait is a whole number of milliseconds, 0 or more`](#typeerror-run-on--wait-is-a-whole-number-of-milliseconds-0-or-more)
 - [`RedisError: Connection has failed`](#rediserror-connection-has-failed)
 - [`GuardError: run on "…": the key was taken from this run before it finished (forgotten, or its lease of …ms went unrenewed), so a repeat may have run it too; its result was not stored`](#guarderror-run-on--the-key-was-taken-from-this-run-before-it-finished-forgotten-or-its-lease-of-ms-went-unrenewed-so-a-repeat-may-have-run-it-too-its-result-was-not-stored)
 - [``RedisError: The lock "…" is held by somebody else, and this call did not wait for it — pass `wait` to keep trying``](#rediserror-the-lock--is-held-by-somebody-else-and-this-call-did-not-wait-for-it--pass-wait-to-keep-trying)
 - [`RedisError: The lock "…" expired before its work finished: it ran longer than the …ms ttl, so it may have run beside another holder`](#rediserror-the-lock--expired-before-its-work-finished-it-ran-longer-than-the-ms-ttl-so-it-may-have-run-beside-another-holder)
 - [`TypeError: undefined is not an object (evaluating 'cache.…')`](#typeerror-undefined-is-not-an-object-evaluating-cache)
+
+**Calling the store yourself**
+
+- [`TypeError: defineRateLimit: "…" has a per of …; it is a whole number of milliseconds, and must be at least 1`](#typeerror-defineratelimit--has-a-per-of--it-is-a-whole-number-of-milliseconds-and-must-be-at-least-1)
+- [`TypeError: defineRateLimit: "…" has a limit of …; it is a whole number of requests, and must be at least 1`](#typeerror-defineratelimit--has-a-limit-of--it-is-a-whole-number-of-requests-and-must-be-at-least-1)
 
 **Responses**
 
@@ -218,61 +222,51 @@ const connection = await connectRedis(Bun.env['REDIS_URL']!);
 Each of these makes the request answer `500 {"error":"internal"}`; the
 message is in the app's log.
 
-### `TypeError: defineRateLimit: "…" has a per of …; it is a whole number of milliseconds, and must be at least 1`
-
-**When:** the first counted request, when `rateLimit` was given a
-`windowMs` that is not a whole number, or below 1, with `redisStore`.
-
-```text
-TypeError: defineRateLimit: "api:5/1.5" has a per of 1.5; it is a whole number of milliseconds, and must be at least 1
-```
-
-**Why:** `redisStore` turns each `limit`/`windowMs` into an
-`@nxgt/redis-guard` rate limit the first time it counts under it, and the
-guard counts in whole milliseconds. The memory store accepted it, so the
-error only appears once the store is Redis.
-
-**Fix:**
-
-```ts
-rateLimit({ limit: 5, windowMs: 1_500, store: redisStore(connection.client, { name: 'api' }) });
-```
-
-### `TypeError: defineRateLimit: "…" has a limit of …; it is a whole number of requests, and must be at least 1`
-
-**When:** the first counted request, with a `limit` of 0, below 0, or with
-a fraction.
-
-```text
-TypeError: defineRateLimit: "api:0/1000" has a limit of 0; it is a whole number of requests, and must be at least 1
-```
-
-**Why:** a limit of 0 would refuse everything; the guard refuses to count
-it. To shut a route, answer it yourself.
-
-**Fix:** a whole number, at least 1:
-
-```ts
-rateLimit({ limit: 1, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) });
-```
-
 ### `TypeError: defineRateLimit: "…" has a burst of … and a per of …ms; burst × per must be at most 9007199254740 for the script to count exactly`
 
-**When:** the first counted request, with a very long window and a large
-limit — a million a year.
+**When:** every counted request, with a large `limit` over a long
+`windowMs`: `limit × windowMs` above 9,007,199,254,740 (about 9e12) — a
+million a year. `rateLimit` starts without complaint.
 
 ```text
 TypeError: defineRateLimit: "api:1000000/31536000000" has a burst of 1000000 and a per of 31536000000ms; burst × per must be at most 9007199254740 for the script to count exactly
 ```
 
 **Why:** the script counts in exact integers; `limit × windowMs` past that
-bound would lose precision.
+bound would lose precision. `redisStore` hands each policy to
+`@nxgt/redis-guard` when it first counts under it, and a refused policy is
+not kept, so it is checked again, and refused again, on each request.
 
 **Fix:** state the same rate over a shorter window:
 
 ```ts
 rateLimit({ limit: 2_740, windowMs: 86_400_000, store: redisStore(connection.client, { name: 'api' }) });  // ~a million a year
 ```
+
+### `TypeError: defineRateLimit: "…" would take longer than ten years to refill from empty (burst × per ÷ limit); check that per is in milliseconds`
+
+**When:** every counted request, with a `windowMs` above 315,360,000,000
+(ten 365-day years) while `limit × windowMs` is still at most
+9,007,199,254,740 — so a `limit` of 28 or less. Past that, the entry
+above is hit first.
+
+```text
+TypeError: defineRateLimit: "api:1/315360000001" would take longer than ten years to refill from empty (burst × per ÷ limit); check that per is in milliseconds
+```
+
+**Why:** `redisStore` sets the guard's burst to `limit`, so the time to
+refill from empty is `windowMs` itself. The guard refuses one over ten
+years: it is far more often a window written in the wrong unit than a
+limit anyone means. As above, nothing is checked at startup, and the
+refused policy is checked again on each request.
+
+**Fix:** `windowMs` in milliseconds, at most ten years:
+
+```ts
+rateLimit({ limit: 1, windowMs: 365 * 86_400_000, store: redisStore(connection.client, { name: 'trial' }) });  // once a year
+```
+
+For "once, ever", a rate limit is the wrong tool: record that it happened.
 
 ### `TypeError: run on "…": wait is a whole number of milliseconds, 0 or more`
 
@@ -403,6 +397,54 @@ with `undefined`.
 
 **Fix:** read `caches.<name>`, drop the `derive`, and typecheck:
 `tsc --noEmit` finds every place.
+
+## Calling the store yourself
+
+A policy `rateLimit` would refuse at startup still reaches the store when
+you call its `consume` directly; the promise rejects with the guard's
+message.
+
+### `TypeError: defineRateLimit: "…" has a per of …; it is a whole number of milliseconds, and must be at least 1`
+
+**When:** `consume` rejects with it, on every call, when you call
+`redisStore`'s `consume` yourself with a `windowMs` that is not a whole
+number, or below 1.
+
+```text
+TypeError: defineRateLimit: "api:5/1.5" has a per of 1.5; it is a whole number of milliseconds, and must be at least 1
+```
+
+**Why:** `redisStore` hands each `limit`/`windowMs` to `@nxgt/redis-guard`
+the first time it counts under it, and the guard counts in whole
+milliseconds. `rateLimit` never passes such a value: it refuses it at
+startup, with [`TypeError: rateLimit: windowMs must be a whole number of 1 or more, not …`](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/troubleshooting.md#typeerror-ratelimit--must-be-a-whole-number-of-1-or-more-not-).
+
+**Fix:** a whole number of milliseconds, at least 1:
+
+```ts
+await store.consume(key, { limit: 5, windowMs: 1_500 });
+```
+
+### `TypeError: defineRateLimit: "…" has a limit of …; it is a whole number of requests, and must be at least 1`
+
+**When:** `consume` rejects with it, on every call, when you call
+`redisStore`'s `consume` yourself with a `limit` of 0, below 0, or with a
+fraction.
+
+```text
+TypeError: defineRateLimit: "api:0/1000" has a limit of 0; it is a whole number of requests, and must be at least 1
+```
+
+**Why:** a limit of 0 would refuse everything; the guard refuses to count
+it. `rateLimit` never passes such a value: it refuses it at startup, with
+[`TypeError: rateLimit: limit must be a whole number of 1 or more, not …`](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/troubleshooting.md#typeerror-ratelimit--must-be-a-whole-number-of-1-or-more-not-).
+To shut a route, answer it yourself.
+
+**Fix:** a whole number, at least 1:
+
+```ts
+await store.consume(key, { limit: 1, windowMs: 60_000 });
+```
 
 ## Responses
 
