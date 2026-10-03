@@ -1,6 +1,6 @@
 import { isEventStreamSchema, type RouteSchema } from '@alxia/core';
 import { type Converter, type JsonSchema, toJsonSchema } from './json-schema';
-import type { Response } from './types';
+import type { ResponseObject } from './types';
 
 /**
  * A route's responses: each reply its schema declares, `default` when it
@@ -10,14 +10,14 @@ import type { Response } from './types';
 export function responses(
 	schema: RouteSchema,
 	convert?: Converter,
-): Record<string, Response> {
-	const responses: Record<string, Response> = {};
+): Record<string, ResponseObject> {
+	const byStatus: Record<string, ResponseObject> = {};
 	for (const [status, responseSchema] of Object.entries(
 		schema.response ?? {},
 	)) {
 		if (responseSchema === undefined) continue;
 		const json = toJsonSchema(responseSchema, 'output', convert);
-		responses[status] =
+		byStatus[status] =
 			status === '204' || status === '304'
 				? { description: describe(status) }
 				: {
@@ -28,7 +28,7 @@ export function responses(
 					};
 	}
 	if (schema.response === undefined) {
-		responses['default'] = { description: 'The reply of the handler' };
+		byStatus['default'] = { description: 'The reply of the handler' };
 	}
 	if (
 		schema.params !== undefined ||
@@ -37,18 +37,18 @@ export function responses(
 		schema.cookies !== undefined ||
 		schema.body !== undefined
 	) {
-		responses['400'] = withError(
-			responses['400'],
+		byStatus['400'] = withError(
+			byStatus['400'],
 			'The request was refused',
 			'ValidationError',
 		);
 	}
-	responses['500'] = withError(
-		responses['500'],
+	byStatus['500'] = withError(
+		byStatus['500'],
 		'The server failed',
 		'InternalError',
 	);
-	return responses;
+	return byStatus;
 }
 
 /**
@@ -57,10 +57,10 @@ export function responses(
  * it — either of the two as JSON, or each under its own content type.
  */
 function withError(
-	own: Response | undefined,
+	own: ResponseObject | undefined,
 	description: string,
 	component: string,
-): Response {
+): ResponseObject {
 	if (own === undefined) return errorResponse(description, component);
 	const error: JsonSchema = { $ref: `#/components/schemas/${component}` };
 	const schema = own.content?.['application/json']?.schema;
@@ -75,7 +75,7 @@ function withError(
 	};
 }
 
-function errorResponse(description: string, component: string): Response {
+function errorResponse(description: string, component: string): ResponseObject {
 	return {
 		description,
 		content: {

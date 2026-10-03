@@ -12,6 +12,8 @@ export function operation(
 ): Operation {
 	const { schema, method, path } = route;
 	const detail = schema.detail ?? {};
+	// The converter runs on the parameters, then the body, then the replies,
+	// as it always has: `responses` is called inside the literal, after both.
 	const params = parameters(path, schema, convert);
 	const body =
 		schema.body === undefined

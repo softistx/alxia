@@ -36,15 +36,15 @@ export interface Operation {
 	description?: string;
 	tags?: string[];
 	deprecated?: boolean;
-	parameters?: Parameter[];
+	parameters?: ParameterObject[];
 	requestBody?: {
 		required: boolean;
 		content: Record<string, { schema: JsonSchema }>;
 	};
-	responses: Record<string, Response>;
+	responses: Record<string, ResponseObject>;
 }
 
-export interface Parameter {
+export interface ParameterObject {
 	name: string;
 	in: 'path' | 'query' | 'header' | 'cookie';
 	required: boolean;
@@ -58,7 +58,7 @@ export interface MediaType {
 	itemSchema?: JsonSchema;
 }
 
-export interface Response {
+export interface ResponseObject {
 	description: string;
 	content?: Record<string, MediaType>;
 }

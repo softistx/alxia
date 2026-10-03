@@ -1,13 +1,13 @@
 import type { RouteSchema, StandardSchemaV1 } from '@alxia/core';
 import { type Converter, type JsonSchema, toJsonSchema } from './json-schema';
-import type { Parameter } from './types';
+import type { ParameterObject } from './types';
 
 /** A route's parameters: its path's, then its query's, headers' and cookies'. */
 export function parameters(
 	path: string,
 	schema: RouteSchema,
 	convert?: Converter,
-): Parameter[] {
+): ParameterObject[] {
 	return [
 		...pathParameters(path, schema.params, convert),
 		...objectParameters('query', schema.query, convert),
@@ -20,7 +20,7 @@ function pathParameters(
 	path: string,
 	schema: StandardSchemaV1 | undefined,
 	convert?: Converter,
-): Parameter[] {
+): ParameterObject[] {
 	const properties = propertiesOf(schema, convert);
 	return path
 		.split('/')
@@ -41,11 +41,11 @@ function objectParameters(
 	location: 'query' | 'header' | 'cookie',
 	schema: StandardSchemaV1 | undefined,
 	convert?: Converter,
-): Parameter[] {
+): ParameterObject[] {
 	const properties = propertiesOf(schema, convert);
 	if (properties === undefined) return [];
 	return Object.entries(properties.schemas).map(([name, property]) => {
-		const parameter: Parameter = {
+		const parameter: ParameterObject = {
 			name,
 			in: location,
 			required: properties.required.has(name),
