@@ -9,6 +9,10 @@ a loader, a message React Router or the browser prints, or an error from
 
 - [`Error: No value found for context`](#error-no-value-found-for-context)
 - [`alxiaOf(): this request has no alxia context. …`](#alxiaof-this-request-has-no-alxia-context-)
+- [`alxia-react-router: … must export the alxia app as its default export: export default app.`](#alxia-react-router--must-export-the-alxia-app-as-its-default-export-export-default-app)
+- [`alxia-react-router: Vite's ssr environment does not run modules in this process, so … cannot be loaded.`](#alxia-react-router-vites-ssr-environment-does-not-run-modules-in-this-process-so--cannot-be-loaded)
+- [`The React Router Vite plugin requires the use of a Vite config file`](#the-react-router-vite-plugin-requires-the-use-of-a-vite-config-file)
+- [`No route matches URL "/assets/…"`](#no-route-matches-url-assets)
 - [``You made a POST request to "/" but did not provide an `action` for route "root", so there is no way to handle the request.``](#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
 - [`TypeError: reactRouter(): client is …, which is not a directory. …`](#typeerror-reactrouter-client-is--which-is-not-a-directory-)
 - [`TypeError: reactRouter(): … cannot be served at a path of its own name; rename it. …`](#typeerror-reactrouter--cannot-be-served-at-a-path-of-its-own-name-rename-it-)
@@ -25,6 +29,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [A page answers alxia's JSON 404 or 405 instead of rendering](#a-page-answers-alxias-json-404-or-405-instead-of-rendering)
 - [A streamed page arrives in one piece](#a-streamed-page-arrives-in-one-piece)
 - [The logger times a streamed page at a few milliseconds](#the-logger-times-a-streamed-page-at-a-few-milliseconds)
+- [A WebSocket route does not connect under `react-router dev`](#a-websocket-route-does-not-connect-under-react-router-dev)
 
 ## Thrown or printed
 
@@ -62,30 +67,35 @@ export function loader({ context }: Route.LoaderArgs) {
 ```
 
 A key of your own works when it is exported by a package installed under
-`node_modules` (`@acme/session`), not by a file of the app.
+`node_modules` (`@acme/session`). A key in `app/` works too under
+`@alxia/react-router/vite`, where the entry is built with the routes and
+loaded in dev by the same runner: `app/context.ts` is then one module.
 
 ### `alxiaOf(): this request has no alxia context. …`
 
 ```text
-Error: alxiaOf(): this request has no alxia context. Serve the React Router build through reactRouter() from @alxia/react-router.
+Error: alxiaOf(): this request has no alxia context. Serve the React Router build through reactRouter() from @alxia/react-router, and in dev put alxiaServer() from @alxia/react-router/vite before reactRouter() in vite.config.ts.
 ```
 
 **When:** a loader calls `alxiaOf` and `alxiaContext` was not set.
 
-**Why:** one of two:
+**Why:** one of three:
 
 - the request did not go through `reactRouter()`: the app runs under
   `react-router dev` or `react-router-serve` alone, or a unit test calls the
   loader with a bare `RouterContextProvider`;
-- the server build holds **its own copy** of `@alxia/react-router`. Vite
+- `alxiaServer()` comes **after** `reactRouter()` in `vite.config.ts`:
+  React Router's own dev middleware then renders the pages, without alxia;
+- without the Vite plugin, the server build holds **its own copy** of `@alxia/react-router`. Vite
   leaves a package external only when it resolves under `node_modules` to a
   `.js` file. A package linked from a workspace (`workspace:^`, `bun link`)
   resolves to its folder, outside `node_modules`, and Vite bundles it into
   `build/server/index.js` with a second `alxiaContext` the server never
   sets.
 
-**Fix:** serve the build through `reactRouter()`. In a monorepo, tell Vite
-to leave the package external:
+**Fix:** serve the build through `reactRouter()`, and put `alxiaServer()`
+first in `plugins`. In a monorepo without the plugin, tell Vite to leave the
+package external:
 
 ```ts
 // vite.config.ts
@@ -109,6 +119,92 @@ import { RouterContextProvider } from 'react-router';
 const context = new RouterContextProvider();
 context.set(alxiaContext, { user: { name: 'Ada' } });
 await loader({ context, request: new Request('http://localhost/'), params: {} } as never);
+```
+
+### `alxia-react-router: … must export the alxia app as its default export: export default app.`
+
+```text
+TypeError: alxia-react-router: app/server.ts must export the alxia app as its default export: export default app.
+```
+
+Vite's error page shows it, and the request is a 500.
+
+**When:** under `react-router dev`, the `entry` given to `alxiaServer()`
+has no default export, or its default is not an app: a named `export const
+app`, the app before `reactRouter()` was called on it, or `{ fetch }`
+wrapped in an object that has none.
+
+**Why:** the plugin hands each request to the default export's `fetch`.
+
+**Fix:** export the app, after the catch-all, as the default:
+
+```ts
+// app/server.ts
+export const base = alxia().use(logger());
+export type Base = typeof base;
+
+export default base.use((app) => reactRouter(app, { build: () => import('virtual:react-router/server-build') }));
+```
+
+### `alxia-react-router: Vite's ssr environment does not run modules in this process, so … cannot be loaded.`
+
+**When:** under `react-router dev`, Vite's `ssr` environment is not a
+runnable one: another plugin replaced it with an environment that runs
+elsewhere, such as a worker runtime.
+
+**Why:** the plugin loads the entry with the `ssr` environment's module
+runner, in Vite's own process, where Bun runs the app.
+
+**Fix:** drop the plugin that replaces the `ssr` environment. alxia runs
+under Bun, not in a worker runtime.
+
+### `The React Router Vite plugin requires the use of a Vite config file`
+
+React Router's Vite plugin throws it.
+
+**When:** a script or a test starts Vite with `createServer({
+configFile: false, plugins: [alxiaServer(), reactRouter()] })`.
+
+**Why:** React Router's plugin reads its options from a config file, and
+refuses inline ones.
+
+**Fix:** write the config to a file, and point `configFile` at it:
+
+```ts
+import { createServer } from 'vite';
+
+const server = await createServer({
+	root,
+	configFile: `${root}/vite.config.ts`,
+	server: { port: 0 },
+});
+await server.listen();
+```
+
+### `No route matches URL "/assets/…"`
+
+React Router's 404 page answers every file under `/assets`, from
+`bun build/server/serve.js`.
+
+**When:** the build ran with `NODE_ENV` set to something other than
+`production`, such as `test` under `bun test`, or a `development` left in
+the shell.
+
+**Why:** Vite replaces `import.meta.env.DEV` by `NODE_ENV`, not by the
+command. With `mode: import.meta.env.DEV ? 'development' : 'production'`,
+such a build is in `development`, where `client` is ignored, so nothing
+serves `build/client` and the catch-all gets the assets.
+
+**Fix:** build with `NODE_ENV=production`, or unset:
+
+```sh
+NODE_ENV=production bunx --bun react-router build
+```
+
+From a test:
+
+```ts
+await Bun.$`bunx --bun react-router build`.env({ ...process.env, NODE_ENV: 'production' });
 ```
 
 ### ``You made a POST request to "/" but did not provide an `action` for route "root", so there is no way to handle the request.``
@@ -295,3 +391,16 @@ deferred value later. If the whole page comes at once:
 `@alxia/logger` writes its entry when the response's headers leave, so a
 page that streams for 800 ms is logged at its first byte. The duration is
 the server's time to first byte, not the page's.
+
+### A WebSocket route does not connect under `react-router dev`
+
+The same route connects from `bun build/server/serve.js`.
+
+**Why:** under `@alxia/react-router/vite`, Vite owns the dev server, and
+the app gets requests through `app.fetch`, as in a test. An upgrade goes
+to Vite's server, which keeps its own socket for HMR: alxia's `ws`
+routes, `page()` and `ctx.server` are not there in dev.
+
+**Fix:** test sockets against the build, or serve the build with a server
+of your own (see the guide's "A server file of your own") while working on
+them.

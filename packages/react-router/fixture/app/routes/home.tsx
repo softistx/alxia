@@ -8,10 +8,15 @@ import {
 	useLoaderData,
 } from 'react-router';
 import type { Base } from '../../base';
+import { greetingContext } from '../context';
 
 export function loader({ context }: LoaderFunctionArgs) {
 	const { user, route } = alxiaOf<Base>(context);
-	return { name: user?.name ?? 'anonymous', route };
+	return {
+		name: user?.name ?? 'anonymous',
+		route,
+		greeting: context.get(greetingContext),
+	};
 }
 
 export async function action({ request, context }: ActionFunctionArgs) {
@@ -23,12 +28,13 @@ export async function action({ request, context }: ActionFunctionArgs) {
 }
 
 export default function Home() {
-	const { name, route } = useLoaderData<typeof loader>();
+	const { name, route, greeting } = useLoaderData<typeof loader>();
 	const acted = useActionData<typeof action>();
 	return (
 		<main>
 			<h1>Hello {name}</h1>
 			<p id="route">{route}</p>
+			<p id="greeting">{greeting}</p>
 			<Form method="post">
 				<input name="step" defaultValue="1" />
 				<button type="submit">add</button>

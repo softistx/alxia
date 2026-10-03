@@ -3,7 +3,7 @@
 	"compilerOptions": {
 		"noEmit": true,
 		"jsx": "react-jsx",
-		"types": ["bun"]
+		"types": ["bun", "vite/client"]
 	},
 	"include": ["**/*"],
 	"exclude": ["build", ".react-router"]
