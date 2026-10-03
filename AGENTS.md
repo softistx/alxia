@@ -130,6 +130,7 @@ below records what is kept twice.
 | The Apollo Sandbox page, in `graphql/src/sandbox.ts` and `@nxgt/shared-graphql`'s `renderSandbox` | that one is Hono's `html`; both start the Sandbox at the URL the page was asked at (nxgt-core#171). alxia's passes the path, and the page resolves it against its own address, so a TLS proxy in front of the server changes nothing; that one still passes the server's URL. Importing it would depend on Hono. Change both together |
 | `bodyOf`, the permission guard's option types, the device cookie, in `janus/src/` and `@nxgt/janus-hono` | the same refusals and cookies whichever server answers; importing them would depend on Hono. Change both together. One divergence, on purpose: alxia's guard infers what `load`, `subject` and `ctx` read beyond `BaseContext` from their annotated parameters (`SubjectCtx` and `CheckCtx` on `PermissionOptions` and `OptionsArgs`, defaulted to `BaseContext`), and `use()` refuses an app that does not give it, and refuses the guard on every app when one is annotated `any`. Hono's callbacks take its `Context`, whose variables a middleware cannot require of the app, and `app.use()` checks nothing, so the Hono types have no such parameters. Every other part of the types stays in step |
 | `scripts/check-nxgt-versions.ts`, its spec and `.github/workflows/nxgt-versions.yml`, here and in nxgt-data (itself from nxgt-janus) | each repository releases on its own, and this one's check reads no `examples/`. What differs here: the manifests come from `readManifests()` (`packages/*` alone), `latest` from `latestOnRegistry()`, each line names the peer range and whether it admits `latest`, and the issue asks for a changeset; `folderOf` and `manifestOf` are nxgt-data's alone. A fix to the check or the workflow belongs in every copy |
+| `scripts/verify-artifacts.ts` and `scripts/artifacts/`, here and in nxgt-http, nxgt-data, nxgt-janus and nxgt-core | the skeleton is nxgt-http's, and each repository releases on its own. `emit.ts`, the declaration-emit stage, started here (#87) and its copies are in step: softistx/nxgt-http#98, softistx/nxgt-data#146, softistx/nxgt-janus#186 and softistx/nxgt-core#173 port it with the same `emit.spec.ts`, the injectable tsc run and Bun's types, which this copy took back from them. The `#!` skip in `imports.ts` (#79) is in nxgt-data's copy (#146) and nxgt-http's (softistx/nxgt-http#97); nxgt-janus and nxgt-core have no `imports.ts`. A check added to one copy belongs in the others |
 
 ## The build
 
@@ -157,10 +158,13 @@ installed tarball with `--help`.
 - **A build that exits 0 is not evidence the artifact loads.**
   `bun run verify:artifacts` packs, installs and imports every package.
   It also emits the declarations of each package's `test/declarations/*.ts`
-  against the install: a type an exported app's `.d.ts` must name and the
-  entry does not export fails there with TS2883, and nowhere else, since
-  inside the workspace tsc names it by a relative path. A builder that adds
-  a type to an app's type gets a case there.
+  against the install, with this repository's `@types/bun`
+  (`scripts/artifacts/emit.ts`): a type an exported app's `.d.ts` must name
+  and the entry does not export fails there with TS2883, and nowhere else,
+  since inside the workspace a package resolves to its own folder and tsc
+  names the type by a relative path. A builder that adds a type to an app's
+  type gets a case there. `emit.spec.ts` covers the stage without a pack,
+  through a fake tsc.
 
 ## CI
 
