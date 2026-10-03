@@ -1,5 +1,13 @@
 # @alxia/core
 
+## 0.2.1
+
+### Patch Changes
+
+- [#89](https://github.com/softistx/alxia/pull/89) [`5520694`](https://github.com/softistx/alxia/commit/55206940f556a1a553acad33fff4af0e0d1fa1da) Thanks [@SteveGT96](https://github.com/SteveGT96)! - A client that hangs up mid-request is no longer logged with `console.error` and answered 500: nothing is printed, no `onError` hook runs, and `onResponse` hooks see a 499. An error the app throws after the client left is still logged and answered 500.
+
+- [#87](https://github.com/softistx/alxia/pull/87) [`d39d9a8`](https://github.com/softistx/alxia/commit/d39d9a88cc23bae09f28acd04a35778a85c8bd76) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Export `RefusalsOf`, `RefusalOutcome` and `DeclaredRefusal`, so an exported app with an `onRefusal` hook can be named in a declaration file (TS2883).
+
 ## 0.2.0
 
 ### Minor Changes
