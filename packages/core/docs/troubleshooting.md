@@ -1,7 +1,8 @@
 # Troubleshooting
 
 Each entry is headed by the text you see: a TypeScript error, an exception
-thrown when the app is built, a response body, or a line in the server log.
+thrown when the app is built, a response body, or a line in the server log;
+a trap that prints nothing is headed by its symptom.
 
 **Types**
 
@@ -42,6 +43,10 @@ thrown when the app is built, a response body, or a line in the server log.
 - [`426 {"error":"upgrade_required"}`](#426-errorupgrade_required)
 - [`416 {"error":"range_not_satisfiable"}`](#416-errorrange_not_satisfiable)
 - [`500 {"error":"internal"}`](#500-errorinternal)
+
+**Routing**
+
+- [A route other than the one declared first answers](#a-route-other-than-the-one-declared-first-answers)
 
 **Server log**
 
@@ -657,27 +662,6 @@ the method, as `Bun.serve` chooses it. With `GET /users/:id` and
 method you call at the path that answers. `HEAD` is answered by the `GET`
 route.
 
-### A route other than the one declared first answers
-
-**When:** two routes match a request, and the one that answers is not the
-one declared first: `/api/*` answers `GET /api/users` although `/*` was
-declared before it, or `/a/*` answers `/a/` rather than `/a`.
-
-**Why:** `app.fetch`, `app.request` and `listen` all rank the matching
-paths as `Bun.serve`'s router does: segment by segment, a literal before a
-parameter before a wildcard, with a trailing slash as a segment of its own.
-The order of declaration plays no part
-([Which route answers](guide/routes.md#which-route-answers)).
-
-**Fix:** make the path you mean to answer the more specific one, rather
-than declaring it first:
-
-```ts
-app
-	.get('/*', ({ reply }) => reply(200, 'page'))
-	.get('/api/*', ({ reply }) => reply(200, 'api')); // answers /api/…, declared last
-```
-
 ### `426 {"error":"upgrade_required"}`
 
 **When:** a request reaches a `ws` route without a WebSocket upgrade, or
@@ -732,6 +716,33 @@ app
 
 Prefer a declared `reply` to `throw new HttpError(…)`: a thrown status is
 not in the route's type, so a typed client does not expect it.
+
+## Routing
+
+A trap that prints nothing: the answer comes from another route than the
+one you expected.
+
+### A route other than the one declared first answers
+
+**When:** two routes match a request, and the one that answers is not the
+one declared first: `/api/*` answers `GET /api/users` although `/*` was
+declared before it, or, with `/a` and `/a/*` declared, `GET /a/` reaches
+`/a/*`.
+
+**Why:** `app.fetch`, `app.request` and `listen` all rank the matching
+paths as `Bun.serve`'s router does: segment by segment, a literal before a
+parameter before a wildcard, with a trailing slash as a segment of its own.
+The order of declaration plays no part
+([Which route answers](guide/routes.md#which-route-answers)).
+
+**Fix:** make the path you mean to answer the more specific one, rather
+than declaring it first:
+
+```ts
+app
+	.get('/*', ({ reply }) => reply(200, 'page'))
+	.get('/api/*', ({ reply }) => reply(200, 'api')); // answers /api/…, declared last
+```
 
 ## Server log
 

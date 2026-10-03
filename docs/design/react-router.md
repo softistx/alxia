@@ -164,11 +164,12 @@ chunk, and the app's own key works too. The probe measured both.
 - through `listen`, `Bun.serve`'s router prefers the longer path, and alxia
   answers `200`.
 
-Core's guide says of `fetch`: "a path without parameters wins, then the one
-declared first". Bun ranks a longer prefix above a wildcard. The gap exists
-today for any two wildcards; the catch-all makes it bite. And Vite's dev
-server reaches the app through `fetch` (section 3), so dev and production
-would route the same app differently.
+Core's guide said of `fetch`: "a path without parameters wins, then the one
+declared first". Bun ranks a longer prefix above a wildcard. The gap existed
+for any two wildcards; the catch-all made it bite. And Vite's dev server
+reaches the app through `fetch` (section 3), so dev and production would
+have routed the same app differently. Resolved by the core's first slice:
+`fetch` now ranks as `Bun.serve` does (see the prerequisites).
 
 **3. `@alxia/compress` holds a streamed page until it ends.** With
 compression on, the first chunk of `/slow` came at **805–811 ms** in gzip,
@@ -347,9 +348,10 @@ export default defineConfig({
 
 ### 3. Prerequisites outside the package
 
-- **Core: `app.fetch` ranks routes as `Bun.serve` does.** Static first,
-  then a parameter, then a wildcard, and a longer prefix before a shorter
-  one, with the order of declaration only between equals. Then dev (Vite,
+- **Core: `app.fetch` ranks routes as `Bun.serve` does** (done). Segment by
+  segment, a literal before a parameter before a wildcard, so a longer
+  prefix wins over a shorter one; the order of declaration plays no part,
+  since the router refuses two paths of one shape. Then dev (Vite,
   through `fetch`), tests (`app.request`) and production (`listen`) route
   alike, and `/api/*` beats the catch-all wherever it is declared. That is
   trap 2.
