@@ -1,5 +1,11 @@
 # @alxia/core
 
+## 0.2.2
+
+### Patch Changes
+
+- [#90](https://github.com/softistx/alxia/pull/90) [`69c815c`](https://github.com/softistx/alxia/commit/69c815c17ed26067b39ca5c731c48396f4da6377) Thanks [@SteveGT96](https://github.com/SteveGT96)! - internal: alxia.ts split, no API change
+
 ## 0.2.1
 
 ### Patch Changes

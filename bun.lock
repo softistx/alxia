@@ -95,7 +95,7 @@
     },
     "packages/core": {
       "name": "@alxia/core",
-      "version": "0.2.1",
+      "version": "0.2.2",
       "devDependencies": {
         "@types/bun": "^1.4.2",
         "zod": "^4.1.0",
@@ -147,7 +147,7 @@
     },
     "packages/i18n": {
       "name": "@alxia/i18n",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@alxia/language": "workspace:^",
@@ -259,7 +259,7 @@
     },
     "packages/react-router": {
       "name": "@alxia/react-router",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "bin": {
         "alxia-react-router": "./dist/cli/index.js",
       },
@@ -289,7 +289,7 @@
     },
     "packages/redis": {
       "name": "@alxia/redis",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@alxia/cache": "workspace:^",
         "@alxia/client": "workspace:^",

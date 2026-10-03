@@ -1,5 +1,13 @@
 # @alxia/i18n
 
+## 0.1.2
+
+### Patch Changes
+
+- [#96](https://github.com/softistx/alxia/pull/96) [`a79f0ec`](https://github.com/softistx/alxia/commit/a79f0ec652fe44170eee52d20022f00c85f1dec9) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `KeyOf` reads a catalogue's keys nine levels deep at most, where `@nxgt/i18n`'s `Path` recursed without a bound: a function generic over its catalogues can hand them to `createI18n` without TS2589 ("Type instantiation is excessively deep and possibly infinite"). A section nested deeper gives `section.${string}`.
+- Updated dependencies [[`69c815c`](https://github.com/softistx/alxia/commit/69c815c17ed26067b39ca5c731c48396f4da6377)]:
+  - @alxia/core@0.2.2
+
 ## 0.1.1
 
 ### Patch Changes
