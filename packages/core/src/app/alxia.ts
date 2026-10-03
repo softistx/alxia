@@ -1,9 +1,7 @@
 import type { Refusal } from '../errors/errors';
 import type { AnyReply, Reply } from '../reply/reply';
-import { checkLimit } from '../request/limit';
 import type { BodyParser } from '../request/read';
-import { joinPath, shapeOf } from '../router/paths';
-import { Router } from '../router/router';
+import { joinPath } from '../router/paths';
 import { fileHandler, staticHandler } from '../static/serve';
 import type {
 	FileOptions,
@@ -23,11 +21,8 @@ import type {
 } from '../ws/types';
 import type {
 	AroundHook,
-	ChainHook,
 	DeriveHook,
 	ErrorHook,
-	RefusalHandler,
-	RefusalHook,
 	RequestHook,
 	ResponseHook,
 	RouteDefinition,
@@ -37,18 +32,27 @@ import type {
 	StopHook,
 	WrapHook,
 } from './definition';
+import { addPage, refusePage, refuseShadowedPages } from './pages';
 import { serve } from './pipeline';
 import type { OperationMethod, RouteOperation } from './route-operation';
+import { createRuntime, mergeGlobals } from './runtime';
+import { refusalHandler, Scope } from './scope';
+import { startServer, stopServer } from './serving';
+import type {
+	AlxiaOptions,
+	AnyAlxia,
+	ListenOptions,
+	Plugin,
+	RouteMethod,
+} from './signatures';
 import { type SocketData, websocketHandler } from './socket';
 import type {
 	BaseContext,
 	BehindShortcuts,
 	BodyLimitShortcut,
-	Context,
 	DeclaredRefusal,
 	DeclaredReply,
 	Empty,
-	HandlerResult,
 	MaybePromise,
 	Method,
 	Outcome,
@@ -62,77 +66,10 @@ import type {
 	RouteSchema,
 	ThenShortcuts,
 	TypedReplyFunction,
-	ValidSchema,
 } from './types';
 
 /** The route a static directory is served at: its path, then a wildcard. */
 type StaticPath<Path extends string> = Path extends '/' ? '/*' : `${Path}/*`;
-
-export interface AlxiaOptions<Prefix extends string> {
-	/** Prepended to the path of every route declared on this app. */
-	readonly prefix?: Prefix;
-	/**
-	 * Whether a reply is checked against the schema its route declares for
-	 * its status, and sent as that schema's output: an unknown key the
-	 * schema strips never leaves the server. On by default; a reply that
-	 * fails is answered with a 500.
-	 */
-	readonly validateResponses?: boolean;
-	/**
-	 * Reads the client's address. By default, the address of the connection;
-	 * behind a proxy you trust, read its header instead.
-	 */
-	readonly ip?: (
-		request: Request,
-		server: Bun.Server<unknown> | undefined,
-	) => string | undefined;
-}
-
-export interface ListenOptions {
-	readonly port?: number | string;
-	readonly hostname?: string;
-	readonly development?: boolean;
-	readonly idleTimeout?: number;
-	readonly maxRequestBodySize?: number;
-	readonly tls?: Bun.TLSOptions;
-}
-
-/** A route method: `app.get(path, schema, handler)` or `app.get(path, handler)`. */
-export interface RouteMethod<
-	M extends Method,
-	Ctx extends object,
-	Routes extends object,
-	Prefix extends string,
-	Shortcuts extends AnyReply,
-> {
-	<
-		const Path extends RoutePath,
-		Schema extends RouteSchema,
-		Result extends HandlerResult<Schema>,
-	>(
-		path: Path,
-		schema: Schema & ValidSchema<JoinPath<Prefix, Path>, Schema>,
-		handler: (
-			ctx: Context<Ctx, JoinPath<Prefix, Path>, Schema>,
-		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes & RouteEntryOf<M, JoinPath<Prefix, Path>, Schema, Result, Shortcuts>,
-		Prefix,
-		Shortcuts
-	>;
-	<const Path extends RoutePath, Result extends AnyReply>(
-		path: Path,
-		handler: (
-			ctx: Context<Ctx, JoinPath<Prefix, Path>, Empty>,
-		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes & RouteEntryOf<M, JoinPath<Prefix, Path>, Empty, Result, Shortcuts>,
-		Prefix,
-		Shortcuts
-	>;
-}
 
 /** The routes of a plugin, under the prefix of the app it is used by. */
 type Prefixed<Prefix extends string, Routes, Shortcuts> = {
@@ -147,16 +84,6 @@ type Prefixed<Prefix extends string, Routes, Shortcuts> = {
 			: Routes[Path][M];
 	};
 };
-
-/** Any app, whatever it holds. */
-export type AnyAlxia = Alxia<any, any, any, any>;
-
-/**
- * A plugin written as a function: it receives the app and returns it, with
- * global hooks added. A plugin that adds to the context or declares routes
- * is an app of its own, given to `use`.
- */
-export type Plugin = <App extends AnyAlxia>(app: App) => App;
 
 /**
  * An app: its routes, and the hooks they run.
@@ -192,32 +119,14 @@ export class Alxia<
 	#runtime: Runtime;
 	readonly #routes: RouteDefinition[] = [];
 	readonly #sockets: SocketDefinition[] = [];
-	#derive: ChainHook[] = [];
-	#onError: ErrorHook[] = [];
-	#refusal: RefusalHandler | undefined;
-	/** The `bodyLimit` of the routes declared next, unless theirs says otherwise. */
-	#bodyLimit: number | undefined;
+	/** The route hooks in force for the routes declared next. */
+	#scope = new Scope();
 	#server: Bun.Server<unknown> | undefined;
 	#websocket: Bun.WebSocketHandler<SocketData> | undefined;
 
 	constructor(options: AlxiaOptions<Prefix> = {}) {
 		this.#prefix = options.prefix ?? '';
-		this.#runtime = {
-			router: new Router(),
-			globals: {
-				around: [],
-				onRequest: [],
-				onResponse: [],
-				onStart: [],
-				onStop: [],
-				parsers: [],
-				pages: new Map(),
-			},
-			validateResponses: options.validateResponses ?? true,
-			ip:
-				options.ip ??
-				((request, server) => server?.requestIP(request)?.address ?? undefined),
-		};
+		this.#runtime = createRuntime(options);
 		if (this.#prefix !== '' && !/^\/.*[^/]$/.test(this.#prefix)) {
 			throw new TypeError(
 				`The prefix "${this.#prefix}" must start with "/" and not end with one`,
@@ -381,18 +290,8 @@ export class Alxia<
 	 * and the app's hooks do not run around it; `app.fetch` answers it 404.
 	 */
 	page<const Path extends RoutePath>(path: Path, bundle: Bun.HTMLBundle): this {
-		this.#page(joinPath(this.#prefix, path), bundle);
+		addPage(this.#runtime, joinPath(this.#prefix, path), bundle);
 		return this;
-	}
-
-	#page(path: string, bundle: Bun.HTMLBundle): void {
-		if (
-			this.#pageAt(path) !== undefined ||
-			this.#runtime.router.hasShape(path)
-		) {
-			throw new TypeError(`page(): ${path} is already served`);
-		}
-		this.#runtime.globals.pages.set(path, bundle);
 	}
 
 	/**
@@ -422,15 +321,12 @@ export class Alxia<
 		Prefix,
 		Shortcuts
 	> {
-		const definition: SocketDefinition = {
+		this.#mount({
 			path: joinPath(this.#prefix, path),
 			schema,
 			handlers: handlers as SocketDefinition['handlers'],
-			derive: [...this.#derive],
-			onError: [...this.#onError],
-			refusal: this.#refusal,
-		};
-		this.#mount(definition);
+			...this.#scope.hooks(),
+		});
 		return this as never;
 	}
 
@@ -438,7 +334,7 @@ export class Alxia<
 	decorate<const Values extends object>(
 		values: Values,
 	): Alxia<Ctx & Values, Routes, Prefix, Shortcuts> {
-		this.#derive.push({ kind: 'derive', run: () => values });
+		this.#scope.chain({ kind: 'derive', run: () => values });
 		return this as never;
 	}
 
@@ -466,7 +362,7 @@ export class Alxia<
 		Prefix,
 		Shortcuts | Extract<Result, AnyReply>
 	> {
-		this.#derive.push({ kind: 'derive', run: hook as DeriveHook });
+		this.#scope.chain({ kind: 'derive', run: hook as DeriveHook });
 		return this as never;
 	}
 
@@ -488,7 +384,7 @@ export class Alxia<
 			next: () => Promise<Response>,
 		) => MaybePromise<Result>,
 	): Alxia<Ctx, Routes, Prefix, Shortcuts | Extract<Result, AnyReply>> {
-		this.#derive.push({ kind: 'wrap', run: hook as unknown as WrapHook });
+		this.#scope.chain({ kind: 'wrap', run: hook as unknown as WrapHook });
 		return this as never;
 	}
 
@@ -509,7 +405,7 @@ export class Alxia<
 	bodyLimit(
 		bytes: number,
 	): Alxia<Ctx, Routes, Prefix, Shortcuts | BodyLimitShortcut> {
-		this.#bodyLimit = checkLimit(bytes, 'bodyLimit()');
+		this.#scope.limit(bytes);
 		return this as never;
 	}
 
@@ -524,7 +420,7 @@ export class Alxia<
 			ctx: BaseContext & Partial<Ctx>,
 		) => MaybePromise<Result>,
 	): Alxia<Ctx, Routes, Prefix, Shortcuts | Extract<Result, AnyReply>> {
-		this.#onError.push(hook as unknown as ErrorHook);
+		this.#scope.onError(hook as unknown as ErrorHook);
 		return this as never;
 	}
 
@@ -584,20 +480,7 @@ export class Alxia<
 		schemaOrHook: RefusalSchema | ((refusal: Refusal, ctx: never) => unknown),
 		maybeHook?: (refusal: Refusal, ctx: never) => unknown,
 	): AnyAlxia {
-		if (typeof schemaOrHook === 'function') {
-			this.#refusal = { hook: schemaOrHook as RefusalHook };
-			return this;
-		}
-		if (typeof maybeHook !== 'function') {
-			throw new TypeError('onRefusal(): the hook is missing');
-		}
-		this.#refusal = {
-			hook: maybeHook as RefusalHook,
-			response: schemaOrHook.response,
-			...(schemaOrHook.contentType === undefined
-				? {}
-				: { contentType: schemaOrHook.contentType }),
-		};
+		this.#scope.refuseWith(refusalHandler(schemaOrHook, maybeHook));
 		return this;
 	}
 
@@ -705,19 +588,11 @@ export class Alxia<
 			prefix,
 			validateResponses: this.#runtime.validateResponses,
 		});
-		child.#derive = [...this.#derive];
-		child.#onError = [...this.#onError];
-		child.#refusal = this.#refusal;
-		child.#bodyLimit = this.#bodyLimit;
+		child.#scope = this.#scope.copy();
 		child.#runtime = { ...child.#runtime, globals: this.#runtime.globals };
 		const before = new Set(this.#runtime.globals.pages.keys());
 		const built = build(child);
-		// The child checks its pages against its own routes only.
-		for (const path of this.#runtime.globals.pages.keys()) {
-			if (!before.has(path) && this.#runtime.router.hasShape(path)) {
-				throw new TypeError(`page(): ${path} is already served`);
-			}
-		}
+		refuseShadowedPages(this.#runtime, before);
 		for (const route of built.routes) this.#register(route);
 		for (const socket of built.sockets) this.#mount(socket);
 		return this;
@@ -754,39 +629,17 @@ export class Alxia<
 	use(plugin: AnyAlxia | ((app: any) => AnyAlxia)): AnyAlxia {
 		if (!(plugin instanceof Alxia)) return plugin(this);
 		for (const route of plugin.routes) {
-			this.#register({
-				...route,
-				path: joinPath(this.#prefix, route.path),
-				derive: [...this.#derive, ...route.derive],
-				onError: [...route.onError, ...this.#onError],
-				refusal: route.refusal ?? this.#refusal,
-			});
+			this.#register(
+				this.#scope.behind(route, joinPath(this.#prefix, route.path)),
+			);
 		}
 		for (const socket of plugin.sockets) {
-			this.#mount({
-				...socket,
-				path: joinPath(this.#prefix, socket.path),
-				derive: [...this.#derive, ...socket.derive],
-				onError: [...socket.onError, ...this.#onError],
-				refusal: socket.refusal ?? this.#refusal,
-			});
+			this.#mount(
+				this.#scope.behind(socket, joinPath(this.#prefix, socket.path)),
+			);
 		}
-		this.#derive = [...this.#derive, ...plugin.#derive];
-		this.#onError = [...plugin.#onError, ...this.#onError];
-		this.#refusal = plugin.#refusal ?? this.#refusal;
-		this.#bodyLimit = plugin.#bodyLimit ?? this.#bodyLimit;
-		if (plugin.#runtime.globals !== this.#runtime.globals) {
-			const globals = plugin.#runtime.globals;
-			this.#runtime.globals.around.push(...globals.around);
-			this.#runtime.globals.onRequest.push(...globals.onRequest);
-			this.#runtime.globals.onResponse.push(...globals.onResponse);
-			this.#runtime.globals.onStart.push(...globals.onStart);
-			this.#runtime.globals.onStop.push(...globals.onStop);
-			this.#runtime.globals.parsers.push(...globals.parsers);
-			for (const [path, bundle] of globals.pages) {
-				this.#page(joinPath(this.#prefix, path), bundle);
-			}
-		}
+		this.#scope.absorb(plugin.#scope);
+		mergeGlobals(this.#runtime, plugin.#runtime.globals, this.#prefix);
 		return this;
 	}
 
@@ -845,42 +698,15 @@ export class Alxia<
 	 * cost of `fetch`'s routing on each such request.
 	 */
 	listen(options: ListenOptions | number = {}): Bun.Server<unknown> {
-		const settings = typeof options === 'number' ? { port: options } : options;
-		const routes: Record<
-			string,
-			| Bun.HTMLBundle
-			| ((request: Request, server: Bun.Server<unknown>) => Promise<Response>)
-		> = {};
-		for (const [path] of this.#runtime.router.paths()) {
-			const routed = this.#runtime.router.isFixed(path) ? path : undefined;
-			routes[path] = (request, server) =>
-				serve(this.#runtime, request, server, routed);
-		}
-		for (const [path, bundle] of this.#runtime.globals.pages) {
-			routes[path] = bundle;
-		}
-		const server = Bun.serve({
-			...settings,
-			routes,
-			fetch: (request: Request, server: Bun.Server<unknown>) =>
-				serve(this.#runtime, request, server, undefined),
-			websocket: this.websocket,
-		} as Bun.Serve.Options<SocketData>) as Bun.Server<unknown>;
-		this.#server = server;
-		for (const hook of this.#runtime.globals.onStart) {
-			Promise.resolve()
-				.then(() => hook(server))
-				.catch((error) => console.error(error));
-		}
-		return server;
+		this.#server = startServer(this.#runtime, options, this.websocket);
+		return this.#server;
 	}
 
 	/** Stops the server `listen` started, then runs every `onStop` hook. */
 	async stop(closeActiveConnections = false): Promise<void> {
 		const server = this.#server;
 		this.#server = undefined;
-		if (server !== undefined) await server.stop(closeActiveConnections);
-		for (const hook of this.#runtime.globals.onStop) await hook();
+		await stopServer(this.#runtime, server, closeActiveConnections);
 	}
 
 	#method(method: Method) {
@@ -897,26 +723,21 @@ export class Alxia<
 				throw new TypeError(`${method} ${path}: the handler is missing`);
 			}
 			const full = joinPath(this.#prefix, path);
-			const bodyLimit =
-				schema.bodyLimit === undefined
-					? this.#bodyLimit
-					: checkLimit(schema.bodyLimit, `${method} ${full}`);
+			const bodyLimit = this.#scope.bodyLimitOf(schema, `${method} ${full}`);
 			this.#register({
 				method,
 				path: full,
 				schema,
 				...(bodyLimit === undefined ? {} : { bodyLimit }),
 				handler,
-				derive: [...this.#derive],
-				onError: [...this.#onError],
-				refusal: this.#refusal,
+				...this.#scope.hooks(),
 			});
 			return this;
 		};
 	}
 
 	#register(route: RouteDefinition): void {
-		this.#refusePage(route.method, route.path);
+		refusePage(this.#runtime, route.method, route.path);
 		this.#runtime.router.add(route.method, route.path, {
 			kind: 'http',
 			...route,
@@ -924,24 +745,8 @@ export class Alxia<
 		this.#routes.push(route);
 	}
 
-	/** `listen` serves a page before any route at its path: refuse the route. */
-	#refusePage(method: string, path: string): void {
-		if (this.#pageAt(path) !== undefined) {
-			throw new TypeError(`${method} ${path} is already served by a page`);
-		}
-	}
-
-	/** The page declared at a path of the same shape as `path`. */
-	#pageAt(path: string): string | undefined {
-		const shape = shapeOf(path);
-		for (const page of this.#runtime.globals.pages.keys()) {
-			if (shapeOf(page) === shape) return page;
-		}
-		return undefined;
-	}
-
 	#mount(socket: SocketDefinition): void {
-		this.#refusePage('WS', socket.path);
+		refusePage(this.#runtime, 'WS', socket.path);
 		this.#runtime.router.add('WS', socket.path, { kind: 'ws', ...socket });
 		this.#sockets.push(socket);
 	}
@@ -968,4 +773,11 @@ export type ContextOf<App> = App extends { readonly '~context': infer Ctx }
 	? BaseContext & Ctx
 	: never;
 
-export type { Outcome };
+export type {
+	AlxiaOptions,
+	AnyAlxia,
+	ListenOptions,
+	Outcome,
+	Plugin,
+	RouteMethod,
+};
