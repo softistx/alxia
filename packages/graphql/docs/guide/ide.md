@@ -78,8 +78,10 @@ default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-s
 ## Apollo Sandbox
 
 `ide: 'apollo-sandbox'` serves a page embedding Apollo Sandbox, pointed at
-the endpoint: the request's origin and the route as served, prefixes
-included. `sandbox` takes `SandboxOptions`:
+the endpoint: the route as served, prefixes included, resolved in the
+browser against the address the page was opened at. Behind a proxy that
+terminates TLS, the Sandbox asks over `https` as the browser did, with no
+option and no `X-Forwarded-Proto`. `sandbox` takes `SandboxOptions`:
 
 ```ts
 interface SandboxOptions {
@@ -152,9 +154,11 @@ const SANDBOX_POLICY: string;
 ```
 
 The page `ide: 'apollo-sandbox'` serves, as an HTML string, for a Sandbox
-you serve yourself: at another path than the endpoint, pointed at another
-server, or at an endpoint URL the request does not give — such as `https`
-behind a proxy that terminates TLS. Send it with `SANDBOX_POLICY`:
+you serve yourself: at another path than the endpoint, or pointed at
+another server. `endpoint` is a URL, or a path the page resolves in the
+browser against its own address — so `'/graphql'` is asked over `https`
+when the page was opened over `https`, proxy or not. Send it with
+`SANDBOX_POLICY`:
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -162,22 +166,21 @@ import { graphql, renderSandbox, SANDBOX_POLICY } from '@alxia/graphql';
 
 const app = alxia()
 	.use((app) => graphql(app, { schema, ide: false }))
-	.get('/explorer', ({ request, url, reply }) => {
-		const proto = request.headers.get('x-forwarded-proto') ?? url.protocol.slice(0, -1);
-		const endpoint = `${proto}://${url.host}/graphql`;
-		return reply(200, renderSandbox(endpoint, { title: 'Users API' }), {
+	.get('/explorer', ({ reply }) =>
+		reply(200, renderSandbox('/graphql', { title: 'Users API' }), {
 			headers: {
 				'content-type': 'text/html;charset=utf-8',
 				'content-security-policy': SANDBOX_POLICY,
 			},
-		});
-	});
+		}),
+	);
 ```
 
-Read `X-Forwarded-Proto` only behind a proxy you trust to set it.
+Pass the path the browser sees when a proxy serves the app under one of its
+own — `renderSandbox('/v1/graphql')` — and a full URL for an endpoint on
+another server: `renderSandbox('https://api.example.com/graphql')`.
 
 ## See also
 
 - [Mounting the endpoint](endpoint.md): which hooks run before the page.
-- [Troubleshooting](../troubleshooting.md#traps): a blank IDE page, and the
-  Sandbox behind an HTTPS proxy.
+- [Troubleshooting](../troubleshooting.md#the-ide-page-is-blank): a blank IDE page.

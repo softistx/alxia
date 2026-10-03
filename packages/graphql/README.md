@@ -95,7 +95,7 @@ graphql(app, {
   | `ide` | |
   | --- | --- |
   | `'graphiql'` (default) | Yoga's GraphiQL; `graphiql` takes its options |
-  | `'apollo-sandbox'` | [Apollo Sandbox](https://www.apollographql.com/docs/graphos/platform/sandbox), embedded, pointed at the URL the page was asked at, prefix included (behind a proxy that terminates TLS it sees `http://`: see the [IDE guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/ide.md#apollo-sandbox)). `sandbox` takes `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
+  | `'apollo-sandbox'` | [Apollo Sandbox](https://www.apollographql.com/docs/graphos/platform/sandbox), embedded, pointed at the address the page was opened at, prefix included — `https` behind a proxy that terminates TLS ([IDE guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/ide.md#apollo-sandbox)). `sandbox` takes `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
   | `false` | none |
 - **CORS** is `@alxia/cors`'s for the whole app: Yoga's own is off unless
   `cors` is given.

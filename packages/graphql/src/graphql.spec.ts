@@ -173,6 +173,14 @@ describe('graphql', () => {
 		>().toExtend<number>();
 	});
 
+	test('GraphQLContext of something that is not an app says so, not never', () => {
+		type Wrong = GraphQLContext<{ readonly users: typeof users }>;
+		expectTypeOf<Wrong>().toEqualTypeOf<{
+			readonly '~error': 'GraphQLContext needs the type of an app: GraphQLContext<typeof app>';
+		}>();
+		expectTypeOf<Wrong>().not.toBeNever();
+	});
+
 	test('a schema whose context the app does not build is a compile error', () => {
 		const _never = () =>
 			alxia().use((app) =>
@@ -193,7 +201,7 @@ describe('graphql', () => {
 });
 
 describe('ide', () => {
-	test('apollo-sandbox: a browser gets the Sandbox, at the URL it asked', async () => {
+	test('apollo-sandbox: a browser gets the Sandbox, at the address the browser used', async () => {
 		const sandboxed = alxia({ prefix: '/api' })
 			.decorate({ users })
 			.derive(() => ({ viewer: null as string | null }))
@@ -215,8 +223,11 @@ describe('ide', () => {
 		expect(page.headers.get('content-security-policy')).toContain(
 			'sandbox.embed.apollographql.com',
 		);
+		// The path, resolved by the page against the address the browser
+		// used: behind a proxy that ends TLS, the server sees http.
+		expect(text).toContain('"initialEndpoint":"/api/graphql"');
 		expect(text).toContain(
-			'"initialEndpoint":"https://api.example.com/api/graphql"',
+			'config.initialEndpoint = new URL(config.initialEndpoint, location.href).href;',
 		);
 		expect(text).toContain('Users &#60;/title&#62;');
 		expect(text).not.toContain('graphiql');

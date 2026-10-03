@@ -48,7 +48,11 @@ export type GraphQLContext<App, UserContext = Empty> = App extends {
 	readonly '~context': infer Ctx;
 }
 	? YogaInitialContext & ServerContext<Ctx> & UserContext
-	: never;
+	: // Not `never`: a schema typed with `never` would let every resolver
+		// read anything until `graphql()` refused it.
+		{
+			readonly '~error': 'GraphQLContext needs the type of an app: GraphQLContext<typeof app>';
+		};
 
 type YogaContext = Record<string, any>;
 
@@ -205,8 +209,9 @@ export function graphql<
 			ctx.request.headers.get('accept')?.includes('text/html') &&
 			!ctx.url.searchParams.has('query')
 		) {
-			const endpoint = new URL(ctx.route, ctx.url.origin).href;
-			return reply(200, renderSandbox(endpoint, sandbox), {
+			// A path: the page resolves it against its own address, so behind
+			// a TLS proxy the Sandbox asks over https, as the browser did.
+			return reply(200, renderSandbox(ctx.route, sandbox), {
 				headers: {
 					'content-type': 'text/html;charset=utf-8',
 					'content-security-policy': SANDBOX_POLICY,

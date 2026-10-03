@@ -12,7 +12,7 @@ symptom.
 **Types**
 
 - [`the schema's resolvers read a context the app does not build: missing …`](#the-schemas-resolvers-read-a-context-the-app-does-not-build-missing-)
-- [`the schema's resolvers read a context the app does not build: missing ${string}`](#the-schemas-resolvers-read-a-context-the-app-does-not-build-missing-string)
+- [`Property 'viewer' does not exist on type '{ readonly '~error': "GraphQLContext needs the type of an app: GraphQLContext<typeof app>"; } & YogaInitialContext'`](#property-viewer-does-not-exist-on-type--readonly-error-graphqlcontext-needs-the-type-of-an-app-graphqlcontexttypeof-app---yogainitialcontext)
 - [`Property 'viewer' does not exist on type 'YogaInitialContext'`](#property-viewer-does-not-exist-on-type-yogainitialcontext)
 - [`Property 'query' does not exist on type 'YogaInitialContext & ServerContext<…>'`](#property-query-does-not-exist-on-type-yogainitialcontext--servercontext)
 - [`Type 'true' is not assignable to type 'GraphiQLOptions | GraphiQLOptionsFactory<…> | undefined'`](#type-true-is-not-assignable-to-type-graphiqloptions--graphiqloptionsfactory--undefined)
@@ -36,7 +36,6 @@ symptom.
 - [The endpoint answers without a guard declared after it](#the-endpoint-answers-without-a-guard-declared-after-it)
 - [A WebSocket client cannot connect: `Expected 101 status code`](#a-websocket-client-cannot-connect-expected-101-status-code)
 - [The IDE page is blank](#the-ide-page-is-blank)
-- [Apollo Sandbox cannot reach the endpoint behind an HTTPS proxy](#apollo-sandbox-cannot-reach-the-endpoint-behind-an-https-proxy)
 - [GraphiQL is served in production](#graphiql-is-served-in-production)
 
 ## Install
@@ -101,18 +100,21 @@ graphql(app, {
 });
 ```
 
-### `the schema's resolvers read a context the app does not build: missing ${string}`
+### `Property 'viewer' does not exist on type '{ readonly '~error': "GraphQLContext needs the type of an app: GraphQLContext<typeof app>"; } & YogaInitialContext'`
 
-**When:** the same call, but the message ends in a literal `${string}`, and
-the schema's type is `GraphQLSchemaWithContext<never>`.
+**When:** a resolver of a schema typed `createSchema<GraphQLContext<X>>`
+reads a field, and `X` is not an alxia app: a function returning one, a
+schema, a route. Passed to `graphql(app, { schema })` anyway, the schema is
+refused with `missing ~error`.
 
-**Why:** `GraphQLContext<X>` is `never` when `X` is not an alxia app: a
-function returning one, a schema, a route. Resolvers typed with `never` read
-anything without an error, so the mistake shows only here.
+**Why:** `GraphQLContext` reads the context from an app's type. Given
+anything else, it is this message, and holds none of the app's fields.
 
 **Fix:** give it the app's type:
 
 ```ts
+const makeApp = () => alxia().decorate({ users });
+const base = makeApp();
 createSchema<GraphQLContext<typeof base>>({ … });   // not GraphQLContext<typeof makeApp>
 ```
 
@@ -379,32 +381,6 @@ app.onResponse((response) =>
 			headers.set('content-security-policy', "default-src 'self'");
 	}),
 );
-```
-
-### Apollo Sandbox cannot reach the endpoint behind an HTTPS proxy
-
-**When:** `ide: 'apollo-sandbox'`, served by Bun over plain HTTP behind a
-proxy that terminates TLS. The page loads at `https://…`, but the Sandbox's
-endpoint reads `http://…/graphql`, and its operations fail.
-
-**Why:** the Sandbox is pointed at the URL the app received: its origin and
-the route. Behind a proxy, that origin is `http`; `X-Forwarded-Proto` is
-not read.
-
-**Fix:** turn the built-in page off, and serve `renderSandbox` with the
-public URL ([`renderSandbox`](guide/ide.md#rendersandbox)):
-
-```ts
-const app = alxia()
-	.use((app) => graphql(app, { schema, ide: false }))
-	.get('/explorer', ({ reply }) =>
-		reply(200, renderSandbox('https://api.example.com/graphql'), {
-			headers: {
-				'content-type': 'text/html;charset=utf-8',
-				'content-security-policy': SANDBOX_POLICY,
-			},
-		}),
-	);
 ```
 
 ### GraphiQL is served in production
