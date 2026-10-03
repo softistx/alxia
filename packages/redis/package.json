@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/redis",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "Redis for alxia on @nxgt/redis and @nxgt/redis-guard: a rate-limit store every process shares, idempotent routes, caches and locks in the context",
 	"license": "MIT",
 	"type": "module",
