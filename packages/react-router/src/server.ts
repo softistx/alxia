@@ -71,7 +71,10 @@ export interface ServerOptions<Before extends AnyAlxia, App extends AnyAlxia> {
 	 * and `HOST` (`0.0.0.0`) from the environment.
 	 */
 	readonly listen?: ListenOptions;
-	/** Called once the built server listens. Prints `alxia listening on <url>` by default. */
+	/**
+	 * Called once the built server listens and its `SIGINT` and `SIGTERM` handlers are in place.
+	 * Prints `alxia listening on <url>` by default.
+	 */
 	readonly onListen?: (server: Bun.Server<unknown>) => void;
 }
 
@@ -150,8 +153,9 @@ export function createServer<
 				hostname: process.env['HOST'] || '0.0.0.0',
 				...options.listen,
 			});
-			(options.onListen ?? announce)(server);
 			// Stop as the platform asks: the app's onStop hooks run, and the process ends.
+			// Installed before onListen: a supervisor may signal as soon as it reads
+			// that the server listens, and a signal with no handler yet kills the process.
 			for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 				process.once(signal, () => {
 					void app.stop().then(
@@ -163,6 +167,7 @@ export function createServer<
 					);
 				});
 			}
+			(options.onListen ?? announce)(server);
 			return server;
 		},
 	};
