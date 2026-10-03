@@ -50,6 +50,23 @@ which Zod 4.2 and later, ArkType and Valibot carry: the package imports no
 validator. `convert` runs first — for a vendor that carries none, or to say
 more than it does; `@alxia/zod` exports one for Zod.
 
+## From an OpenAPI document
+
+The other direction: an OpenAPI document generates each route's method, path
+and schemas, as `@nxgt/openapi-codegen`'s `alxia` option writes them (not in
+a published release yet), and the handler is all you write.
+[`@alxia/openapi-routes`](https://www.npmjs.com/package/@alxia/openapi-routes)
+checks in a test that every operation has its route:
+
+```ts
+import { alxia } from '@alxia/core';
+import { implemented } from '@alxia/openapi-routes';
+import { operations as api } from './generated/alxia';
+
+const app = alxia().route(api.getPet, ({ params, reply }) => reply.ok(pets.get(params.petId)));
+implemented(app, api); // throws, naming each operation with no route
+```
+
 ## API
 
 | export | |
@@ -63,5 +80,6 @@ more than it does; `@alxia/zod` exports one for Zod.
 ## Documentation
 
 - [Guide](https://github.com/softistx/alxia/tree/develop/packages/openapi/docs): a page per area — the document and its options, how a route is documented, schemas and converters, and serving the document and its reference page.
+- [From an OpenAPI document](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/from-a-document.md): the contract first — the generated operations, `app.route()`, and the check that every operation has a route.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/troubleshooting.md): an error message, or a document that says less than your routes, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/roadmap.md): what is coming, and what is not planned.

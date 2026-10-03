@@ -11,6 +11,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/core` | the framework: routes, hooks, groups, plugins, cookies, SSE, WebSockets | — |
 | `@alxia/client` | the client of an app, typed from `typeof app` alone | core |
 | `@alxia/openapi` | the OpenAPI 3.2 document of an app, from its route schemas | core |
+| `@alxia/openapi-routes` | `implemented` and `exactly`: every operation of an OpenAPI document has a route, read from `app.routes` | core |
 | `@alxia/zod` | Zod coercions (`zq`) and the OpenAPI converter | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's hooks and typed context, Yoga's plugins | core, graphql-yoga, graphql |
 | `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | function plugins: global hooks | core |
@@ -67,7 +68,7 @@ A check added there is a check to port here.
 ## Layering
 
 ```
-core ◄── client, openapi, graphql, cors, secure-headers, compress, rate-limit, jwt, logger,
+core ◄── client, openapi, openapi-routes, graphql, cors, secure-headers, compress, rate-limit, jwt, logger,
          telemetry, janus, context-storage, cache, language
          i18n ◄── language
          redis ◄── rate-limit, cache (optional peers: the stores' contracts)
