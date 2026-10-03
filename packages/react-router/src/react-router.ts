@@ -71,8 +71,8 @@ export function isReactRouterRoute(route: RouteDefinition): boolean {
  * before it. Each loader, action and middleware reads what those hooks
  * built through `alxiaOf<App>(context)`. The app's own routes — an `/api`
  * — answer their paths, declared before it or after; the client build's
- * files are served when `client` is given. The catch-all adds nothing to the app's route table: pages are
- * not something the typed client calls.
+ * files are served when `client` is given. The catch-all adds nothing to
+ * the app's route table: pages are not something the typed client calls.
  *
  * ```ts
  * const app = base.use((app) =>
