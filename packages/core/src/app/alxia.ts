@@ -1,14 +1,13 @@
 import type { AnyReply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
 import { compilePath, Router } from '../router/router';
-import {
-	type FileOptions,
-	type FileSource,
-	fileHandler,
-	type StaticOptions,
-	type StaticReply,
-	staticHandler,
-} from '../static/serve';
+import { fileHandler, staticHandler } from '../static/serve';
+import type {
+	FileOptions,
+	FileSource,
+	StaticOptions,
+	StaticReply,
+} from '../static/types';
 import type { JoinPath, RoutePath } from '../types/path';
 import type {
 	SocketContext,
