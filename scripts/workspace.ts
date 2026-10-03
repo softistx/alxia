@@ -4,9 +4,13 @@
  * dependents beside their dependencies on a clean checkout: `@alxia/client`
  * type-checked against an `@alxia/core` with no declarations yet.
  *
- * Packages of one wave run in parallel.
+ * Packages of one wave run in parallel. Folders after the script run in
+ * turn, each once the one before it is done: `packages` by default, and
+ * `examples` after it for `typecheck` and `test`, so an example runs
+ * against every package built and checked.
  *
  *   bun run scripts/workspace.ts build
+ *   bun run scripts/workspace.ts test packages examples
  */
 import { join } from 'node:path';
 import { $ } from 'bun';
@@ -47,10 +51,32 @@ export function waves(nodes: readonly Node[]): Node[][] {
 	return result;
 }
 
-async function readNodes(): Promise<Node[]> {
+/** The workspace folders a script can run in, in the order they may run. */
+export const FOLDERS = ['packages', 'examples'] as const;
+export type Folder = (typeof FOLDERS)[number];
+
+function isFolder(arg: string): arg is Folder {
+	return (FOLDERS as readonly string[]).includes(arg);
+}
+
+/** The folders named after the script, `packages` when none is. */
+export function foldersOf(args: readonly string[]): Folder[] {
+	if (args.length === 0) return ['packages'];
+	return args.map((arg) => {
+		if (!isFolder(arg)) {
+			throw new Error(
+				`Unknown folder ${arg}: expected ${FOLDERS.join(' or ')}.`,
+			);
+		}
+		return arg;
+	});
+}
+
+/** The workspace members directly under `folder`, in a stable order. */
+export async function readNodes(folder: Folder): Promise<Node[]> {
 	const nodes: Node[] = [];
 	for (const rel of [
-		...new Bun.Glob('packages/*/package.json').scanSync(ROOT),
+		...new Bun.Glob(`${folder}/*/package.json`).scanSync(ROOT),
 	].sort()) {
 		const manifest = await Bun.file(join(ROOT, rel)).json();
 		const needs = new Set<string>();
@@ -68,12 +94,23 @@ async function readNodes(): Promise<Node[]> {
 }
 
 if (import.meta.main) {
-	const script = process.argv[2];
+	const [script, ...rest] = process.argv.slice(2);
 	if (script === undefined) {
-		console.error('Usage: bun run scripts/workspace.ts <script>');
+		console.error(
+			'Usage: bun run scripts/workspace.ts <script> [packages] [examples]',
+		);
 		process.exit(1);
 	}
-	for (const wave of waves(await readNodes())) {
+	let folders: Folder[];
+	try {
+		folders = foldersOf(rest);
+	} catch (error) {
+		console.error((error as Error).message);
+		process.exit(1);
+	}
+	const plan: Node[][] = [];
+	for (const folder of folders) plan.push(...waves(await readNodes(folder)));
+	for (const wave of plan) {
 		const results = await Promise.all(
 			wave.map(async (node) => {
 				const run = await $`bun run ${script}`.cwd(node.dir).nothrow().quiet();

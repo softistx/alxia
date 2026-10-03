@@ -293,4 +293,10 @@ describe('read', () => {
 			expect(one.peers.length).toBe(1);
 		}
 	});
+
+	test('reads packages/* alone: an example is no release to keep current', async () => {
+		const { manifests: found } = await read();
+		expect(found.size).toBeGreaterThan(0);
+		for (const dir of found.keys()) expect(dir).toStartWith('packages/');
+	});
 });
