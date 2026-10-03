@@ -1,6 +1,6 @@
 # alxia as the server of a React Router app
 
-Status: **approved** by the owner on 2026-10-03, with the recommended
+Status: **shipped** — slices 1–4 merged as #70, #71, #72 and #74 (and #73, paths Bun.serve refuses). Approved by the owner on 2026-10-03, with the recommended
 option of every decision below: a Vite plugin for dev (1a), the package's
 `alxiaContext` read through `alxiaOf` (2a), both prerequisites in core and
 `@alxia/compress` (3a, 4a), React Router `^8.0.0` only (5a), `HEAD` as `GET`
@@ -396,7 +396,7 @@ core ◄── react-router   (peers: react-router; vite, optional, for /vite on
   - `@react-router/dev`, `@react-router/node`, React and `isbot` are the
     app's, never imported by the package.
 - **Two entry points.** `alxia.entrypoints` gets `src/index.ts` and
-  `src/vite.ts`, the first package with a subpath. `verify:artifacts`
+  `src/vite/index.ts`, the first package with a subpath. `verify:artifacts`
   already imports every declared subpath and installs optional peers.
 - **The specs need a real build.** They build a fixture app with
   `react-router build` (about 1 s) from devDependencies: `react`,
