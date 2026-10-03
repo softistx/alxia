@@ -17,21 +17,21 @@
     "@alxia/secure-headers": "workspace:^",
     "@react-router/node": "^8.4.0",
     "@react-router/serve": "^8.4.0",
-    "isbot": "^5.1.36",
-    "react": "^19.2.8",
-    "react-dom": "^19.2.8",
+    "isbot": "^5.2.2",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "react-router": "^8.4.0",
     "zod": "^4.6.5"
   },
   "devDependencies": {
     "@react-router/dev": "^8.4.0",
-    "@tailwindcss/vite": "^4.2.2",
+    "@tailwindcss/vite": "^4.3.3",
     "@types/bun": "^1.4.2",
-    "@types/node": "^22",
-    "@types/react": "^19.2.18",
-    "@types/react-dom": "^19.2.7",
-    "tailwindcss": "^4.2.2",
-    "typescript": "^5.9.3",
-    "vite": "^8.0.3"
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "tailwindcss": "^4.3.3",
+    "typescript": "^6.0.3",
+    "vite": "^8.3.2"
   }
 }

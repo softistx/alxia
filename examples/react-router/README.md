@@ -28,7 +28,11 @@ can remove.
 
 ```sh
 bun add @alxia/core @alxia/react-router
+bun add -d typescript@^6
 ```
+
+The template comes with TypeScript 5.9. alxia's packages ask for 6 or 7,
+so `bun add` warns until it is raised; 7 works too.
 
 ```diff
  // vite.config.ts
