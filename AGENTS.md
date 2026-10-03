@@ -225,7 +225,8 @@ package is public and MIT, with its own copy of `LICENSE`.
 - Biome, with tabs and single quotes. `./node_modules/.bin/biome check --write`
   before committing; `bunx biome ci` must pass.
 - Commit messages: `<type>: <Capitalized summary>`, with `feat`, `fix`,
-  `update`, `chore`, `docs`, `typo`, `ci`.
+  `update`, `chore`, `docs`, `typo`, `ci`, `test` (specs and fixtures
+  alone, no change a consumer sees).
 - Imports carry no extension. Specs live next to the code they test, files
   are organised in folders by role.
 - A package's `README.md` is its npm page: by section, a copy-paste example
