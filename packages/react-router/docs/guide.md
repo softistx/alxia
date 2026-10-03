@@ -316,7 +316,7 @@ TypeError: reactRouter(): client is build/clinet, which is not a directory. Pass
 In `development` the option is ignored: the dev server serves them.
 
 To serve them with other headers, leave `client` out and declare them
-yourself before the catch-all:
+yourself; they outrank the catch-all wherever they are declared:
 
 ```ts
 alxia()
