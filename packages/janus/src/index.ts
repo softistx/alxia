@@ -12,14 +12,16 @@ export {
 	statusOf,
 } from './errors';
 export {
-	type Awaitable,
 	byParam,
-	type ObjectData,
-	type OptionsArgs,
-	type PermissionOptions,
 	type PermissionRefusedBody,
 	permission,
 } from './permission';
+export type {
+	Awaitable,
+	ObjectData,
+	OptionsArgs,
+	PermissionOptions,
+} from './permission-options';
 export { type SendSessionOptions, sendSession, signOut } from './send';
 export {
 	type SessionOptions,

@@ -57,3 +57,9 @@ Nothing scheduled yet.
   hands it to the routes as `object`; anonymous, not found and denied are
   a typed 401, 404 and 403, and a condition's context is required by the
   types exactly when the permission has one.
+- **A guard that reads what an earlier plugin added.** Annotate `load`,
+  `subject` or `ctx`'s parameter —
+  `({ tenant }: BaseContext & { tenant: Tenant }) => …` — and it reads a
+  tenant, a member or a flag an earlier plugin derived; an app that does
+  not give it cannot use the guard. Unannotated, they read the request
+  alone and the guard requires nothing.

@@ -20,6 +20,9 @@ symptom, under [Traps](#traps).
 - [`Expected 5 arguments, but got 4.`](#expected-5-arguments-but-got-4)
 - [`Type '() => { locked: boolean; }' is not assignable to type 'undefined'`](#type----locked-boolean--is-not-assignable-to-type-undefined)
 - [`Property 'doctorId' is missing in type '{ … }' but required in type '{ readonly doctorId: string | null; }'`](#property-doctorid-is-missing-in-type----but-required-in-type--readonly-doctorid-string--null-)
+- [`Property 'tenant' does not exist on type 'BaseContext'`](#property-tenant-does-not-exist-on-type-basecontext)
+- [`the plugin reads "tenant", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads-tenant-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
+- [`the plugin reads "tenant", which this app's context gives with another type`](#the-plugin-reads-tenant-which-this-apps-context-gives-with-another-type)
 
 **Runtime**
 
@@ -260,6 +263,90 @@ related through it, so the types require it on what `load` answers.
 ```ts
 byParam('id', (id) => db.records.findOne({ id }, { projection: { title: 1, doctorId: 1 } }));
 ```
+
+### `Property 'tenant' does not exist on type 'BaseContext'`
+
+```text
+error TS2339: Property 'tenant' does not exist on type 'BaseContext'.
+```
+
+**When:** `load`, `subject` or `ctx` reads something a `derive` or a plugin
+before the guard added — a tenant, a member — and its parameter is not
+annotated: `load: (ctx) => ctx.tenant.records.get(…)`.
+
+**Why:** an unannotated callback is typed with the request's `BaseContext`
+— the request, the URL, the path parameters — not with what other hooks
+added. `permission()` is built before it is used, so it cannot see the app
+it will be used on.
+
+**Fix:** annotate the parameter with what it reads. The guard infers it,
+and the app that uses it must then give it, before the guard:
+
+```ts
+import type { BaseContext } from '@alxia/core';
+
+const byTenant = permission(access, 'view', 'record', ({ tenant, pathParams }: BaseContext & { tenant: Tenant }) =>
+	tenant.records.get(pathParams['id'] ?? '') ?? null,
+);
+
+app.use(tenancy).use(byTenant); // tenancy derives tenant
+```
+
+See [Reading the app's context](guide/permissions.md#reading-the-apps-context).
+
+### `the plugin reads "tenant", which this app's context does not give: use the plugin that adds it first`
+
+```text
+error TS2769: No overload matches this call.
+  …
+        Types of property ''~requires'' are incompatible.
+          Type '{ tenant: Tenant; }' is not assignable to type '"the plugin reads \"tenant\", which this app's context does not give: use the plugin that adds it first"'.
+```
+
+**When:** a callback of the guard is annotated to read `tenant`, and the
+guard is used on an app — or in a group — whose context has no `tenant` at
+that point: `alxia().use(byTenant)`, or `use(byTenant)` before
+`use(tenancy)`.
+
+**Why:** an annotated `load`, `subject` or `ctx` makes the guard require
+what it reads, and `use` checks the app's context against it, so the
+callback never runs without it.
+
+**Fix:** use the plugin that adds `tenant` first:
+
+```ts
+app.use(tenancy).use(byTenant);
+```
+
+More on this message in
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+
+### `the plugin reads "tenant", which this app's context gives with another type`
+
+```text
+error TS2769: No overload matches this call.
+  …
+          Type '{ tenant: Tenant; }' is not assignable to type '"the plugin reads \"tenant\", which this app's context gives with another type"'.
+```
+
+**When:** the app gives a `tenant`, but of a type that does not fit the one
+the callback's parameter is annotated with: a `Tenant | null` where `load`
+reads `Tenant`, or a tenant of another shape.
+
+**Why:** `use` checks each key the guard reads against the app's context;
+a narrower type passes, a wider or different one does not.
+
+**Fix:** annotate the callback with the type the app gives, and handle it
+inside — a `null` tenant loads nothing, a 404:
+
+```ts
+permission(access, 'view', 'record', ({ tenant, pathParams }: BaseContext & { tenant: Tenant | null }) =>
+	tenant?.records.get(pathParams['id'] ?? '') ?? null,
+);
+```
+
+More on this message in
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-gives-with-another-type).
 
 ## Runtime
 

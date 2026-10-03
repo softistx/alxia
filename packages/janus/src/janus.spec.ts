@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { client } from '@alxia/client';
-import { alxia, type Jsonify } from '@alxia/core';
+import { alxia, type BaseContext, type Empty, type Jsonify } from '@alxia/core';
 import {
 	createMemoryStores,
 	fixedClock,
@@ -409,5 +409,187 @@ describe('permission', () => {
 		const allowed = await app.request('/records/r1', { headers });
 		expect(await allowed.json()).toEqual({ title: 'Blood test' });
 		expect((await app.request('/records/r1')).status).toBe(401);
+	});
+
+	test('subject, load and ctx read what an earlier plugin adds, typed by their parameters', async () => {
+		const { access, auth } = setup();
+		const user = await auth.patient.signUp({ ...ada, password });
+		await access.grant({ type: 'record', id: 'r1' }, 'owners', user.user);
+		interface Tenant {
+			readonly records: ReadonlyMap<
+				string,
+				{ readonly id: string; readonly doctorId: string | null }
+			>;
+		}
+		const tenant: Tenant = {
+			records: new Map([['r1', { id: 'r1', doctorId: null }]]),
+		};
+		const edit = permission(
+			access,
+			'edit',
+			'record',
+			({ tenant: current, pathParams }: BaseContext & { tenant: Tenant }) =>
+				current.records.get(pathParams['id'] ?? '') ?? null,
+			{
+				subject: ({ member }: { member: typeof user.user | null }) => member,
+				ctx: ({ locked }: { locked: boolean }) => ({ locked }),
+			},
+		);
+		expectTypeOf(edit['~requires']).toEqualTypeOf<{
+			tenant: Tenant;
+			member: typeof user.user | null;
+			locked: boolean;
+		}>();
+		const app = alxia()
+			.derive(({ request }) => ({
+				tenant,
+				member: request.headers.get('x-member') === 'ada' ? user.user : null,
+				locked: request.headers.get('x-locked') === 'yes',
+			}))
+			.group('/records/:id', (records) =>
+				records
+					.use(edit)
+					.get('/', ({ object, reply }) => reply(200, { id: object.id })),
+			);
+		const status = async (path: string, headers: Record<string, string>) =>
+			(await app.request(path, { headers })).status;
+		expect(await status('/records/r1', {})).toBe(401);
+		expect(await status('/records/gone', { 'x-member': 'ada' })).toBe(404);
+		expect(
+			await status('/records/r1', { 'x-member': 'ada', 'x-locked': 'yes' }),
+		).toBe(403);
+		expect(await status('/records/r1', { 'x-member': 'ada' })).toBe(200);
+	});
+
+	test('unannotated callbacks read nothing more, and an app without what they read is refused', () => {
+		const { access } = setup();
+		const find = byParam('id', (id) => ({ id, doctorId: null }));
+		expectTypeOf(
+			permission(access, 'view', 'record', find, {
+				subject: (ctx) => {
+					expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
+					return null;
+				},
+			})['~requires'],
+		).toEqualTypeOf<Empty>();
+		const byMember = permission(access, 'view', 'record', find, {
+			subject: ({ member }: { member: { type: 'patient'; id: string } }) =>
+				member,
+		});
+		const _refused = () => {
+			// @ts-expect-error the plugin reads "member", which this app's context does not give
+			alxia().use(byMember);
+			alxia()
+				.derive(() => ({ member: 1 }))
+				// @ts-expect-error the plugin reads "member", which this app's context gives with another type
+				.use(byMember);
+			const wrong = permission(
+				access,
+				'view',
+				'record',
+				({ pathParams }: { pathParams: string }) => ({
+					id: pathParams,
+					doctorId: null,
+				}),
+			);
+			// @ts-expect-error the plugin reads "pathParams", which this app's context gives with another type
+			alxia().use(wrong);
+		};
+		expect(_refused).toBeFunction();
+	});
+
+	test('the permission, the type, the object and the condition stay inferred as before', () => {
+		const { access } = setup();
+		type Rec = { id: string; doctorId: string | null; title: string };
+		const find = byParam('id', (id): Rec | null => ({
+			id,
+			doctorId: null,
+			title: id,
+		}));
+		alxia()
+			.use(
+				permission(access, 'view', 'record', (ctx) => {
+					expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
+					return { id: 'r1', doctorId: null, title: 'x' } as Rec | null;
+				}),
+			)
+			.get('/', ({ object, reply }) => {
+				expectTypeOf(object).toEqualTypeOf<Rec>();
+				return reply(200, object.title);
+			});
+		permission(access, 'edit', 'record', find, {
+			ctx: (ctx, object) => {
+				expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
+				expectTypeOf(object).toEqualTypeOf<Rec>();
+				return { locked: false };
+			},
+		});
+		const _refused = () => {
+			// @ts-expect-error a permission with a condition needs ctx
+			permission(access, 'edit', 'record', find);
+			permission(access, 'edit', 'record', find, {
+				// @ts-expect-error the condition reads { locked: boolean }
+				ctx: () => ({ locked: 'no' }),
+			});
+			permission(access, 'view', 'record', find, {
+				// @ts-expect-error a permission without a condition takes no ctx
+				ctx: () => ({ locked: false }),
+			});
+			// @ts-expect-error not a permission of record
+			permission(access, 'delete', 'record', find);
+			const noDoctor = byParam('id', (id) => ({ id }));
+			// @ts-expect-error the object carries no doctorId, which a fromField reads
+			permission(access, 'view', 'record', noDoctor);
+		};
+		expect(_refused).toBeFunction();
+	});
+
+	test('an annotated subject on the loose path is required too', () => {
+		const { access } = setup();
+		const anyPermission = 'view' as 'view' | 'edit' | 'owners' | 'doctors';
+		const loose = permission(
+			access,
+			anyPermission,
+			'record',
+			byParam('id', (id) => ({ id, doctorId: null })),
+			{
+				subject: ({ member }: { member: { type: 'patient'; id: string } }) =>
+					member,
+				ctx: () => 1, // only the loose path takes any ctx
+			},
+		);
+		expectTypeOf(loose['~requires']).toEqualTypeOf<{
+			member: { type: 'patient'; id: string };
+		}>();
+		const _refused = () => {
+			// @ts-expect-error the plugin reads "member", which this app's context does not give
+			alxia().use(loose);
+		};
+		expect(_refused).toBeFunction();
+	});
+
+	test('the default subject is no requirement: without session() a request throws, a 500', async () => {
+		const { access } = setup();
+		const app = alxia().group('/records/:id', (records) =>
+			records
+				.use(
+					permission(
+						access,
+						'view',
+						'record',
+						byParam('id', (id) => ({ id, doctorId: null })),
+					),
+				)
+				.get('/', ({ object, reply }) => reply(200, object.id)),
+		);
+		const errors: unknown[] = [];
+		const original = console.error;
+		console.error = (...args: unknown[]) => errors.push(args);
+		try {
+			expect((await app.request('/records/r1')).status).toBe(500);
+		} finally {
+			console.error = original;
+		}
+		expect(String(errors.flat())).toContain('no user in the context');
 	});
 });
