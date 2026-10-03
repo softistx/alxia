@@ -26,11 +26,12 @@ client that names no language it supports gets `Hello`. `current` is typed
 ## The signature
 
 ```ts
-function language<const L extends string>(
-	options: LanguageOptions<L>,
-): Alxia<Empty & LanguageContext<L>, Empty, '', never>;
+function language<const L extends string, Ctx extends object = BaseContext>(
+	options: LanguageOptions<L, Ctx>,
+): Alxia<RequiresOf<Ctx> & LanguageContext<L>, Empty, '', never> &
+	Requiring<RequiresOf<Ctx>>;
 
-interface LanguageOptions<L extends string> {
+interface LanguageOptions<L extends string, Ctx extends object = BaseContext> {
 	readonly supported: readonly L[];
 	readonly fallback: NoInfer<L>;
 	readonly order?: readonly LanguageSource[];
@@ -39,12 +40,18 @@ interface LanguageOptions<L extends string> {
 	readonly pathIndex?: number;
 	readonly persist?: boolean | { readonly maxAge?: number; readonly secure?: boolean };
 	readonly contentLanguage?: boolean;
-	readonly resolve?: (ctx: BaseContext) => string | undefined;
+	readonly resolve?: (ctx: BaseContext & Ctx) => string | undefined;
 	readonly vary?: readonly string[];
 }
 
 type LanguageSource = 'query' | 'cookie' | 'path' | 'header';
 ```
+
+Both type parameters are inferred: `L` from `supported`, and `Ctx` from the
+type `resolve`'s parameter is annotated with. `RequiresOf<Ctx>` is what that
+annotation adds to `BaseContext` — `{ user: User }` — and `Empty` when
+`resolve` is absent or not annotated; see
+[Reading the app's context](#reading-the-apps-context).
 
 `language()` returns an app plugin: pass it to `use`, called. It is a
 `derive`, so it applies to the routes declared **after** it — in the same
@@ -75,7 +82,7 @@ for when they cannot.
 | `pathIndex` | `number` | `0` | the path segment read by the `path` source: `/fr/products` is 0 |
 | `persist` | `boolean \| { maxAge?, secure? }` | `false` | a language the query named is written to the cookie |
 | `contentLanguage` | `boolean` | `true` | `Content-Language` on every response the plugin runs for |
-| `resolve` | `(ctx: BaseContext) => string \| undefined` | none | decides after every source, before `fallback` |
+| `resolve` | `(ctx: BaseContext & Ctx) => string \| undefined` | none | decides after every source, before `fallback`; its annotated parameter types what it reads |
 | `vary` | `readonly string[]` | none | the request headers `resolve` reads, added to `Vary` |
 
 ### `supported` and `fallback`
@@ -209,11 +216,66 @@ language({
 one response per value; the plugin cannot see what a function reads.
 
 It receives the request's `BaseContext` — `request`, `url`, `ip`,
-`pathParams`, `set` — and returns a tag, or `undefined` for none. The tag is
-matched against `supported` like any other: a tag it does not support is
-ignored, and `fallback` decides. It is synchronous; a preference kept in a
-database is better written to the cookie when the user saves it — see
-[the realistic setup](#a-realistic-setup).
+`pathParams`, `set` — and, when its parameter is annotated, what an earlier
+plugin added: see [Reading the app's context](#reading-the-apps-context). It
+returns a tag, or `undefined` for none. The tag is matched against
+`supported` like any other: a tag it does not support is ignored, and
+`fallback` decides. It is synchronous: a preference kept in a database is
+either written to the cookie when the user saves it — see
+[the realistic setup](#a-realistic-setup) — or loaded by an async `derive`
+or plugin before `language()`, which `resolve` then reads — see
+[Reading the app's context](#reading-the-apps-context).
+
+### Reading the app's context
+
+To decide by what an earlier plugin added, such as a signed-in `user` and
+the language they saved, annotate `resolve`'s parameter. `language()` infers
+what it reads from that annotation — `supported` still types `language` —
+and the plugin is a
+[`definePlugin`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
+plugin: an app that does not give `user` before it cannot use it.
+
+```ts
+import { alxia, type BaseContext } from '@alxia/core';
+import { language } from '@alxia/language';
+
+interface User {
+	readonly id: string;
+	readonly language: string | null;
+}
+
+const byUser = language({
+	supported: ['en', 'fr'],
+	fallback: 'en',
+	order: ['query', 'cookie'],
+	resolve: ({ user }: BaseContext & { user: User | null }) => user?.language ?? undefined,
+	vary: ['Authorization'], // what auth reads the user from
+});
+
+const app = alxia()
+	.use(auth) // derives user: User | null
+	.use(byUser)
+	.get('/', ({ language: current, reply }) => reply(200, current)); // 'en' | 'fr'
+
+alxia().use(byUser);
+// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+```
+
+The annotation may be `BaseContext & { user: User }` or `{ user: User }`
+alone; either way the plugin requires `{ user: User }`. An app whose `user`
+has a type that does not fit it is refused too —
+`the plugin reads "user", which this app's context gives with another type` —
+while a narrower one passes: an app deriving `user: User` may use a plugin
+that reads `User | null`. Annotating a key `BaseContext` already has with
+a type it does not give — `({ url }: { url: string })` — is refused the
+same way.
+A `resolve` left unannotated reads `BaseContext` only, and the plugin
+requires nothing.
+
+`resolve` decides only when no source in `order` did. With `header` in
+`order`, a browser that names a supported language decides before the
+user's saved one: leave `header` out, as above, when the saved preference
+should win over the browser's.
 
 ## How the language is resolved
 

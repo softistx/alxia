@@ -1,12 +1,8 @@
-export {
-	type LanguageContext,
-	type LanguageOptions,
-	type LanguageSource,
-	language,
-} from './language';
+export { type LanguageOptions, language } from './language';
 export {
 	type Accepted,
 	match,
 	negotiate,
 	parseAcceptLanguage,
 } from './negotiate';
+export type { LanguageContext, LanguageSource } from './types';

@@ -17,6 +17,8 @@ the response does that you did not expect.
 - [`Type 'string | null' is not assignable to type 'string | undefined'`](#type-string--null-is-not-assignable-to-type-string--undefined)
 - [`Type 'Promise<string>' is not assignable to type 'string'`](#type-promisestring-is-not-assignable-to-type-string)
 - [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
+- [`the plugin reads "user", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads-user-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
+- [`the plugin reads "user", which this app's context gives with another type`](#the-plugin-reads-user-which-this-apps-context-gives-with-another-type)
 
 **Responses**
 
@@ -199,29 +201,110 @@ const app = alxia()
 
 Do the same at sign-in, from the stored preference.
 
+Or load it before the plugin, in an async `derive` or the plugin that
+signs the user in, and annotate `resolve` to read it — see
+[Reading the app's context](guide.md#reading-the-apps-context):
+
+```ts
+const app = alxia()
+	.derive(async ({ request }) => ({ saved: await preferences.find(request) }))
+	.use(
+		language({
+			supported,
+			fallback: 'en',
+			resolve: ({ saved }: { saved: string | undefined }) => saved,
+		}),
+	);
+```
+
 ### `Property 'user' does not exist on type 'BaseContext'`
 
 ```text
 error TS2339: Property 'user' does not exist on type 'BaseContext'.
 ```
 
-**When:** `resolve` reads something a `derive` before the plugin added —
-a user, a session: `resolve: (ctx) => ctx.user.language`.
+**When:** `resolve` reads something a `derive` or a plugin before
+`language()` added — a user, a session — and its parameter is not
+annotated: `resolve: (ctx) => ctx.user.language`.
 
-**Why:** `resolve` is typed with the request's `BaseContext` — `request`,
-`url`, `ip`, `pathParams`, `set` — not with what other hooks added.
+**Why:** an unannotated `resolve` is typed with the request's `BaseContext`
+— `request`, `url`, `ip`, `pathParams`, `set` — not with what other hooks
+added. `language()` is built before it is used, so it cannot see the app it
+will be used on.
 
-**Fix:** read the preference from the request itself — a header, a claim
-in a token you decode there — or write it to the language cookie, as in
-[the previous entry](#type-promisestring-is-not-assignable-to-type-string):
+**Fix:** annotate the parameter with what it reads. `language()` infers it
+from the annotation, and the app that uses the plugin must then give it,
+before the plugin:
+
+```ts
+import type { BaseContext } from '@alxia/core';
+
+const byUser = language({
+	supported: ['en', 'fr'],
+	fallback: 'en',
+	resolve: ({ user }: BaseContext & { user: User }) => user.language ?? undefined,
+});
+
+alxia().use(auth).use(byUser); // auth derives user
+```
+
+See [Reading the app's context](guide.md#reading-the-apps-context).
+
+### `the plugin reads "user", which this app's context does not give: use the plugin that adds it first`
+
+```text
+error TS2769: No overload matches this call.
+  …
+        Types of property ''~requires'' are incompatible.
+          Type '{ user: User; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"'.
+```
+
+**When:** the plugin's `resolve` is annotated to read `user`, and it is
+used on an app — or in a group — whose context has no `user` at that point:
+`alxia().use(byUser)`, or `use(byUser)` before `use(auth)`.
+
+**Why:** an annotated `resolve` makes the plugin require what it reads, and
+`use` checks the app's context against it, so `resolve` never runs without
+it.
+
+**Fix:** use the plugin that adds `user` first, with the type `resolve`
+reads:
+
+```ts
+alxia().use(auth).use(byUser);
+```
+
+More on this message in
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+
+### `the plugin reads "user", which this app's context gives with another type`
+
+```text
+error TS2769: No overload matches this call.
+  …
+          Type '{ user: User; }' is not assignable to type '"the plugin reads \"user\", which this app's context gives with another type"'.
+```
+
+**When:** the app gives a `user`, but of a type that does not fit the one
+`resolve`'s parameter is annotated with: a `User | null` where `resolve`
+reads `User`, or a user of another shape.
+
+**Why:** `use` checks each key the plugin reads against the app's context;
+a narrower type passes, a wider or different one does not.
+
+**Fix:** annotate `resolve` with the type the app gives — `User | null`,
+handled inside — or narrow it in the plugin before:
 
 ```ts
 language({
 	supported: ['en', 'fr'],
 	fallback: 'en',
-	resolve: (ctx) => ctx.request.headers.get('x-preferred-language') ?? undefined,
+	resolve: ({ user }: { user: User | null }) => user?.language ?? undefined,
 });
 ```
+
+More on this message in
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-gives-with-another-type).
 
 ## Responses
 
