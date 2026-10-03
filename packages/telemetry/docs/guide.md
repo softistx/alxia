@@ -86,6 +86,26 @@ is traced too; it only cannot read `span` and `telemetry` from its context.
 A WebSocket upgrade is not traced: `@alxia/core` runs no `around` hook for
 it, since there is no response to wrap.
 
+### A streamed body
+
+A response whose body is a stream of unknown length (a React Router page
+rendered as it goes, an `eventStream` reply, a `ReadableStream` of your
+own) keeps the span open until that body has ended, so the span's
+duration is the time to the last byte. The plugin passes the body through
+a stream of its own, one chunk at a time:
+
+| The body | The span |
+| --- | --- |
+| sent whole | ends then, its status from the response |
+| the client left before its end | ends then, `ok`, with an `http.response.aborted` event |
+| the stream failed | ends then, `error`, with the stream's error as its exception |
+
+An endless event stream's span ends when its client leaves. A response
+with no body, or with a `Content-Length` (a string, JSON, a buffer, a
+file: what `@alxia/core` replies with), ends the span when it is handed
+over and is left as it is: Bun sends those bodies without JavaScript, a
+file with `sendfile`.
+
 ### Its name
 
 | The request | The span's name |

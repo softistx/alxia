@@ -28,6 +28,14 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### 0.2.0
+
+- **A streamed body is in its span.** A page rendered as it goes, or an
+  event stream, keeps the server span open until its body has been sent:
+  the span lasts to the last byte, a body that fails midway makes it an
+  error, and a client that leaves midway adds an `http.response.aborted`
+  event.
+
 ### 0.1.0
 
 - **One server span per request.** `alxia().use(telemetry({ service, exporters }))`

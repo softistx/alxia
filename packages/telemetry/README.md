@@ -44,7 +44,10 @@ app.listen(3000);
 ## The span
 
 - It is opened by an `around` hook: it holds the hooks, the handler,
-  everything they await and the `onResponse` hooks.
+  everything they await and the `onResponse` hooks. A streamed body (a
+  page rendered as it goes, an event stream) keeps it open until the body
+  has been sent: one that fails midway makes it an error, a client that
+  leaves adds an `http.response.aborted` event.
 - An inbound `traceparent` continues its trace, as a child of the caller's
   span. An unusable one starts a fresh trace: the header came from a
   stranger.

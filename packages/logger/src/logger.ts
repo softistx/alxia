@@ -1,4 +1,5 @@
 import { alxia, withHeaders } from '@alxia/core';
+import { type Outcome, settled, watched } from './body';
 import { ID, safeGenerate, safeSkip, safeWrite } from './guards';
 
 /** One line of the log: a request answered, or a message logged during one. */
@@ -10,8 +11,15 @@ export interface LogEntry {
 	readonly method?: string;
 	readonly path?: string;
 	readonly status?: number;
-	/** Milliseconds from the request to its response. */
+	/**
+	 * Milliseconds from the request to its response, or, for a streamed
+	 * body, to the end of that body.
+	 */
 	readonly duration?: number;
+	/** A streamed body's: milliseconds from the request to its response's headers. */
+	readonly timeToHeaders?: number;
+	/** A streamed body's: whether it was sent whole, left by its client, or failed. */
+	readonly outcome?: 'completed' | 'aborted' | 'errored';
 	readonly ip?: string;
 	readonly [field: string]: unknown;
 }
@@ -111,33 +119,61 @@ export function logger(options: LoggerOptions = {}) {
 		})
 		.onResponse((response, { request, url, ip }) => {
 			const state = stateOf(request);
-			const duration =
-				Math.round((performance.now() - state.start) * 100) / 100;
-			if (!skipped(request, url)) {
-				write({
-					time: new Date().toISOString(),
-					level:
-						response.status >= 500
-							? 'error'
-							: response.status >= 400
-								? 'warn'
-								: 'info',
-					requestId: state.id,
-					message: `${request.method} ${url.pathname} ${response.status}`,
-					method: request.method,
-					path: url.pathname,
-					status: response.status,
-					duration,
-					...(ip === undefined ? {} : { ip }),
-				});
-			}
-			return withHeaders(response, (headers) => {
+			const duration = since(state.start);
+			const sent = withHeaders(response, (headers) => {
 				headers.set(header, state.id);
 				if (timing) headers.append('server-timing', `total;dur=${duration}`);
+			});
+			if (skipped(request, url)) return sent;
+			const entry = (
+				duration: number,
+				streamed?: { timeToHeaders: number; outcome: Outcome },
+			): LogEntry => {
+				const outcome =
+					streamed === undefined || streamed.outcome === 'completed'
+						? ''
+						: ` ${streamed.outcome}`;
+				return {
+					time: new Date().toISOString(),
+					level: levelOf(sent.status, streamed?.outcome),
+					requestId: state.id,
+					message: `${request.method} ${url.pathname} ${sent.status}${outcome}`,
+					method: request.method,
+					path: url.pathname,
+					status: sent.status,
+					duration,
+					...streamed,
+					...(ip === undefined ? {} : { ip }),
+				};
+			};
+			if (settled(sent)) {
+				write(entry(duration));
+				return sent;
+			}
+			// A stream: logged once it has been sent, or has stopped.
+			const body = watched(sent.body as ReadableStream<Uint8Array>, (outcome) =>
+				write(entry(since(state.start), { timeToHeaders: duration, outcome })),
+			);
+			return new Response(body, {
+				status: sent.status,
+				statusText: sent.statusText,
+				headers: sent.headers,
 			});
 		})
 		.derive(({ request }) => {
 			const { id } = stateOf(request);
 			return { requestId: id, log: logOf(id) };
 		});
+}
+
+/** Milliseconds since `start`, to two decimals. */
+function since(start: number): number {
+	return Math.round((performance.now() - start) * 100) / 100;
+}
+
+/** By the status, then raised by a body that did not end well. */
+function levelOf(status: number, outcome?: Outcome): LogEntry['level'] {
+	if (status >= 500 || outcome === 'errored') return 'error';
+	if (status >= 400 || outcome === 'aborted') return 'warn';
+	return 'info';
 }

@@ -189,6 +189,8 @@ interface LogEntry {
 	readonly path?: string;
 	readonly status?: number;
 	readonly duration?: number;                 // milliseconds, two decimals
+	readonly timeToHeaders?: number;            // a streamed body's: milliseconds to its headers
+	readonly outcome?: 'completed' | 'aborted' | 'errored'; // a streamed body's
 	readonly ip?: string;
 	readonly [field: string]: unknown;          // the fields given to `log`
 }
@@ -196,11 +198,48 @@ interface LogEntry {
 
 | Field | Value |
 | --- | --- |
-| `level` | `info` below 400, `warn` from 400 to 499, `error` from 500 |
-| `message` | `<method> <path> <status>` |
+| `level` | `info` below 400, `warn` from 400 to 499, `error` from 500; a streamed body that was `aborted` is at least `warn`, one that `errored` is `error` |
+| `message` | `<method> <path> <status>`, then the `outcome` when it is not `completed`: `GET /events 200 aborted` |
 | `path` | the URL's path, **without** its query string, so a token in the query never reaches the log |
-| `duration` | from the plugin's `onRequest` hook to its `onResponse` hook, rounded to two decimals |
+| `duration` | from the plugin's `onRequest` hook to its `onResponse` hook, rounded to two decimals; for a streamed body, to the end of that body |
+| `timeToHeaders` | a streamed body's only: from the plugin's `onRequest` hook to its `onResponse` hook, when the headers leave. The key is absent on any other entry |
+| `outcome` | a streamed body's only: `completed` when it was sent whole, `aborted` when the client left before its end, `errored` when the stream failed. The key is absent on any other entry |
 | `ip` | the app's `ctx.ip`; the key is absent when it is `undefined` |
+
+### A streamed body
+
+A response whose body is a stream of unknown length (a React Router page
+rendered as it goes, an `eventStream` reply, a `ReadableStream` of your
+own) is logged once that body has ended, not when the handler returned
+it. Its `duration` is the time to the last byte, `timeToHeaders` the time
+to the response, and `outcome` says how it ended:
+
+```ts
+const app = alxia()
+	.use(logger())
+	.get('/ticks', { response: { 200: eventStream(Tick) } }, ({ reply }) =>
+		reply(200, ticks()),
+	);
+// the client closes the tab after five seconds:
+// {"level":"warn","message":"GET /ticks 200 aborted","status":200,"duration":5004.1,"timeToHeaders":0.62,"outcome":"aborted",…}
+```
+
+The plugin passes such a body through a stream of its own, one chunk at a
+time, and writes the entry when it is read to its end, cancelled (the
+client left: Bun cancels the body, and the cancel goes on to the source,
+so an event stream's generator is released) or failed. An endless event
+stream is logged once its client leaves, never before.
+
+A response with no body (a `204`, a `HEAD`, a redirect) or a body whose
+`Content-Length` is set (a string, JSON, a buffer, a file: what
+`@alxia/core` replies with) is logged at once and left as it is, with no
+`timeToHeaders` and no `outcome`. Bun sends those bodies without
+JavaScript, a file with `sendfile`, and wrapping them would cost that:
+their `duration` stops when the response is handed over, so a large file
+sent to a slow client takes longer than its `duration`.
+
+`Server-Timing` leaves with the headers, before the body: its `total` is
+`timeToHeaders`, not the final `duration`.
 
 A request that fails because its client hung up mid-request is logged
 with `status` 499, at `warn`: `@alxia/core` answers it so, and prints
@@ -337,8 +376,8 @@ const app = alxia()
 	}));
 ```
 
-`duration` stops when the response object is ready, not when its body has
-been sent: a streamed body or a large file is not counted.
+`duration` stops when the response object is ready, or, for a streamed
+body, when that body has been sent ([A streamed body](#a-streamed-body)).
 
 A WebSocket upgrade gets no entry and no header: once upgraded, there is no
 response for the `onResponse` hook to read.

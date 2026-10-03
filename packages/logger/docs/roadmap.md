@@ -26,6 +26,15 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### 0.2.0
+
+- **A streamed body is logged once it has been sent.** A page rendered as
+  it goes, or an event stream, gets its entry when its body ends: its
+  `duration` to the last byte, `timeToHeaders` beside it, and an `outcome`
+  that tells a body sent whole from one its client left (`warn`) or one
+  that failed (`error`). A body of known length is still logged at once,
+  and left as it is.
+
 ### 0.1.0
 
 - **A request id.** Every request gets an id, kept from the incoming
