@@ -1,11 +1,12 @@
-import { vary as addVary, alxia, type BaseContext } from '@alxia/core';
+import { alxia, type BaseContext } from '@alxia/core';
+import { requestControls } from './control';
+import { type Loaded, singleFlight } from './flight';
+import { storeGuard } from './guard';
+import { keepable, toCached } from './keep';
 import { defaultKey, pathTag } from './keys';
+import { bypasses, freshness, refreshBehind } from './lookup';
 import { respond } from './respond';
-import {
-	type CachedResponse,
-	type CacheStore,
-	MemoryCacheStore,
-} from './store';
+import { type CacheStore, MemoryCacheStore } from './store';
 
 export interface CacheOptions {
 	/** Seconds a response is fresh. */
@@ -54,12 +55,6 @@ export interface Cache {
 	readonly store: CacheStore;
 }
 
-/** Response headers that make a response someone's own. */
-const PRIVATE = /\b(no-store|private)\b/i;
-
-/** What a run of the route gives: a response it kept, or its own when it kept nothing. */
-type Loaded = { kept: CachedResponse } | { own: Response };
-
 /**
  * Responses kept and served again, as a plugin: a `GET` to a route declared
  * after it is answered from the store while fresh, and from the route
@@ -91,145 +86,69 @@ export function cache(options: CacheOptions) {
 				vary,
 				ctx.request.headers,
 			));
-	/** The run of each key being loaded: what it kept, or `undefined` when it kept nothing. */
-	const loading = new Map<string, Promise<CachedResponse | undefined>>();
-	const controls = new WeakMap<Request, { tags: string[]; skipped: boolean }>();
-	/**
-	 * A store that cannot answer is a miss, or keeps nothing: a cache is never
-	 * worth a 500. Said to the log once per outage — again only after the
-	 * store has answered since.
-	 */
-	let failing = false;
-	const attempt = async <T>(
-		work: () => Promise<T> | T,
-		fallback: T,
-	): Promise<T> => {
-		try {
-			const value = await work();
-			failing = false;
-			return value;
-		} catch (error) {
-			if (!failing) console.error(error);
-			failing = true;
-			return fallback;
-		}
-	};
+	const controls = requestControls();
+	const attempt = storeGuard();
+	const flight = singleFlight();
 
-	/**
-	 * Runs the route once for every concurrent miss of a key, and keeps what
-	 * it answers. Only a response that is kept is shared: one that is not —
-	 * private, skipped, a cookie, another status — answers the request that
-	 * ran the route, and every other waiting request runs the route itself.
-	 */
-	const load = (
+	/** The miss: the route runs, and what it answers is kept when it may be. */
+	const keepOnMiss = async (
 		key: string,
 		ctx: BaseContext,
 		next: () => Promise<Response>,
-	): Promise<CachedResponse | Response> => {
-		const running = loading.get(key);
-		if (running !== undefined) {
-			return running.then(
-				(cached): Promise<CachedResponse | Response> | CachedResponse =>
-					cached ?? next(),
-				(): Promise<CachedResponse | Response> => next(),
-			);
-		}
-		const run = (async (): Promise<Loaded> => {
-			const response = await next();
-			const control = controls.get(ctx.request);
-			if (
-				control?.skipped ||
-				!statuses.has(response.status) ||
-				PRIVATE.test(response.headers.get('cache-control') ?? '') ||
-				response.headers.has('set-cookie') ||
-				response.headers.get('content-type')?.startsWith('text/event-stream')
-			) {
-				return { own: response };
-			}
-			const body = new Uint8Array(await response.arrayBuffer());
-			const headers = new Headers(response.headers);
-			headers.delete('content-length');
-			headers.delete('date');
-			if (!headers.has('etag')) {
-				headers.set('etag', `W/"${Bun.hash(body).toString(36)}"`);
-			}
-			for (const name of vary) addVary(headers, name);
-			const cached: CachedResponse = {
-				status: response.status,
-				headers: [...headers],
-				body,
-				storedAt: Date.now(),
-				ttl,
-				stale,
-				tags: [
-					...(options.tags?.(ctx) ?? []),
-					...(control?.tags ?? []),
-					pathTag(`${ctx.url.pathname}${ctx.url.search}`),
-				],
-			};
-			await attempt(() => store.set(key, cached, ttl + stale), undefined);
-			return { kept: cached };
-		})();
-		const shared = run.then((loaded) =>
-			'kept' in loaded ? loaded.kept : undefined,
-		);
-		loading.set(key, shared);
-		shared.finally(() => loading.delete(key)).catch(() => {});
-		return run.then((loaded) => ('kept' in loaded ? loaded.kept : loaded.own));
+	): Promise<Loaded> => {
+		const response = await next();
+		const control = controls.get(ctx.request);
+		if (!keepable(response, control, statuses)) return { own: response };
+		const cached = await toCached(response, {
+			ttl,
+			stale,
+			vary,
+			tags: () => [
+				...(options.tags?.(ctx) ?? []),
+				...(control?.tags ?? []),
+				pathTag(`${ctx.url.pathname}${ctx.url.search}`),
+			],
+		});
+		await attempt(() => store.set(key, cached, ttl + stale), undefined);
+		return { kept: cached };
 	};
+	const load = (key: string, ctx: BaseContext, next: () => Promise<Response>) =>
+		flight.load(key, () => keepOnMiss(key, ctx, next), next);
+
+	const label = (says: 'HIT' | 'STALE' | 'MISS') => (debug ? says : undefined);
 
 	const plugin = alxia()
 		.derive(({ request }) => {
-			const control = { tags: [] as string[], skipped: false };
-			controls.set(request, control);
-			const cacheControls: CacheControls = {
-				tag: (...tags) => {
-					control.tags.push(...tags);
-				},
-				skip: () => {
-					control.skipped = true;
-				},
-			};
+			const cacheControls: CacheControls = controls.open(request);
 			return { cache: cacheControls };
 		})
 		.wrap(async (ctx, next) => {
 			const { request } = ctx;
-			if (request.method !== 'GET' && request.method !== 'HEAD') return next();
-			if (
-				options.honorClientNoCache &&
-				/\bno-cache\b/i.test(request.headers.get('cache-control') ?? '')
-			) {
-				return next();
-			}
-			const key = keyOf(ctx);
+			const key = bypasses(request, options.honorClientNoCache ?? false)
+				? undefined
+				: keyOf(ctx);
 			if (key === undefined) return next();
 
 			const found = await attempt(() => store.get(key), undefined);
-			const age =
-				found === undefined
-					? Number.POSITIVE_INFINITY
-					: Date.now() - found.storedAt;
-			if (found !== undefined && age < found.ttl) {
-				return respond(request, found, debug ? 'HIT' : undefined);
+			const worth = found === undefined ? undefined : freshness(found);
+			if (found !== undefined && worth === 'fresh') {
+				return respond(request, found, label('HIT'));
 			}
-			if (found !== undefined && age < found.ttl + found.stale) {
-				if (!loading.has(key)) {
-					// Refreshed behind the response: the route's own error is its to log,
-					// and a response it does not keep is read by no one.
-					load(key, ctx, next)
-						.then((loaded) =>
-							loaded instanceof Response ? loaded.body?.cancel() : undefined,
-						)
-						.catch((error) => console.error(error));
-				}
-				return respond(request, found, debug ? 'STALE' : undefined);
+			if (found !== undefined && worth === 'stale') {
+				if (!flight.has(key)) refreshBehind(load(key, ctx, next));
+				return respond(request, found, label('STALE'));
 			}
 			const loaded = await load(key, ctx, next);
 			if (loaded instanceof Response) return loaded;
-			return respond(request, loaded, debug ? 'MISS' : undefined);
+			return respond(request, loaded, label('MISS'));
 		});
 
-	const handles: Cache = {
+	return Object.assign(plugin, handlesOf(store));
+}
+
+/** The hands to empty a cache: by the path a request asked, or by tag. */
+function handlesOf(store: CacheStore): Cache {
+	return {
 		store,
 		invalidate: async (path) => {
 			await store.deleteTag(pathTag(path));
@@ -238,5 +157,4 @@ export function cache(options: CacheOptions) {
 			await store.deleteTag(tag);
 		},
 	};
-	return Object.assign(plugin, handles);
 }
