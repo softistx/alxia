@@ -256,15 +256,17 @@ const app = alxia()
 	);
 
 alxia().use(edit);
-// error: the plugin reads "member", which this app's context does not give: use the plugin that adds it first
+// error, one message per missing key: the plugin reads "tenant", which this app's context does not give: use the plugin that adds it first
+//   | the plugin reads "member", which this app's context does not give: use the plugin that adds it first
 ```
 
 What the guard requires is the union of what the three annotations read.
 An annotation may be `BaseContext & { member: Member }` or `{ member: Member }`
 alone. An app whose `member` has a type that does not fit is refused too —
 `the plugin reads "member", which this app's context gives with another type`
-— while a narrower one passes, and so is a key `BaseContext` already has
-annotated with a type it does not give, `({ pathParams }: { pathParams: string })`.
+— while a narrower one passes. A key `BaseContext` already has, annotated
+with a type it does not give — `({ pathParams }: { pathParams: string })` —
+is refused the same way.
 A callback left unannotated reads `BaseContext` only, and adds nothing to
 what the guard requires.
 
@@ -337,7 +339,8 @@ interface PermissionRefusedBody {
 type Awaitable<V> = V | Promise<V>;
 ```
 
-`LoadCtx`, `SubjectCtx` and `CheckCtx` are inferred from the types `load`,
+`RequiresOf` is internal to this package, and `Requiring` is
+`@alxia/core`'s. `LoadCtx`, `SubjectCtx` and `CheckCtx` are inferred from the types `load`,
 `subject` and `ctx`'s parameters are annotated with, `BaseContext` when they
 are not. `RequiresOf<X>` is what `X` adds to `BaseContext` — `{ tenant: Tenant }`
 for `BaseContext & { tenant: Tenant }` — and `Empty` when it adds nothing;

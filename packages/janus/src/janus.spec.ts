@@ -497,4 +497,99 @@ describe('permission', () => {
 		};
 		expect(_refused).toBeFunction();
 	});
+
+	test('the permission, the type, the object and the condition stay inferred as before', () => {
+		const { access } = setup();
+		type Rec = { id: string; doctorId: string | null; title: string };
+		const find = byParam('id', (id): Rec | null => ({
+			id,
+			doctorId: null,
+			title: id,
+		}));
+		alxia()
+			.use(
+				permission(access, 'view', 'record', (ctx) => {
+					expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
+					return { id: 'r1', doctorId: null, title: 'x' } as Rec | null;
+				}),
+			)
+			.get('/', ({ object, reply }) => {
+				expectTypeOf(object).toEqualTypeOf<Rec>();
+				return reply(200, object.title);
+			});
+		permission(access, 'edit', 'record', find, {
+			ctx: (ctx, object) => {
+				expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
+				expectTypeOf(object).toEqualTypeOf<Rec>();
+				return { locked: false };
+			},
+		});
+		const _refused = () => {
+			// @ts-expect-error a permission with a condition needs ctx
+			permission(access, 'edit', 'record', find);
+			permission(access, 'edit', 'record', find, {
+				// @ts-expect-error the condition reads { locked: boolean }
+				ctx: () => ({ locked: 'no' }),
+			});
+			permission(access, 'view', 'record', find, {
+				// @ts-expect-error a permission without a condition takes no ctx
+				ctx: () => ({ locked: false }),
+			});
+			// @ts-expect-error not a permission of record
+			permission(access, 'delete', 'record', find);
+			const noDoctor = byParam('id', (id) => ({ id }));
+			// @ts-expect-error the object carries no doctorId, which a fromField reads
+			permission(access, 'view', 'record', noDoctor);
+		};
+		expect(_refused).toBeFunction();
+	});
+
+	test('an annotated subject on the loose path is required too', () => {
+		const { access } = setup();
+		const type = 'record' as 'record' | 'record';
+		const anyPermission = 'view' as 'view' | 'edit';
+		const loose = permission(
+			access,
+			anyPermission,
+			type,
+			byParam('id', (id) => ({ id, doctorId: null })),
+			{
+				subject: ({ member }: { member: { type: 'patient'; id: string } }) =>
+					member,
+				ctx: () => ({ locked: false }),
+			},
+		);
+		expectTypeOf(loose['~requires']).toEqualTypeOf<{
+			member: { type: 'patient'; id: string };
+		}>();
+		const _refused = () => {
+			// @ts-expect-error the plugin reads "member", which this app's context does not give
+			alxia().use(loose);
+		};
+		expect(_refused).toBeFunction();
+	});
+
+	test('the default subject is no requirement: without session() a request throws, a 500', async () => {
+		const { access } = setup();
+		const app = alxia().group('/records/:id', (records) =>
+			records
+				.use(
+					permission(
+						access,
+						'view',
+						'record',
+						byParam('id', (id) => ({ id, doctorId: null })),
+					),
+				)
+				.get('/', ({ object, reply }) => reply(200, object.id)),
+		);
+		const errors: unknown[] = [];
+		const original = console.error;
+		console.error = (...args: unknown[]) => errors.push(args);
+		try {
+			expect((await app.request('/records/r1')).status).toBe(500);
+		} finally {
+			console.error = original;
+		}
+	});
 });
