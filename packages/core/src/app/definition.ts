@@ -1,0 +1,102 @@
+/**
+ * An app as it runs: its hooks, and the definition of each route and socket
+ * route it holds, with the hooks declared before it.
+ */
+import type { AnyReply } from '../reply/reply';
+import type { BodyParser } from '../request/read';
+import type { Router } from '../router/router';
+import type { SocketHandlers, SocketSchema } from '../ws/types';
+import type {
+	BaseContext,
+	MaybePromise,
+	Method,
+	RequestContext,
+	RouteSchema,
+} from './types';
+
+/** A hook that runs before validation, and may add to the context or end the request. */
+export type DeriveHook = (ctx: Record<string, unknown>) => unknown;
+/** A hook around the rest of a route: the hooks after it, validation, the handler. */
+export type WrapHook = (
+	ctx: Record<string, unknown>,
+	next: () => Promise<Response>,
+) => MaybePromise<Response | AnyReply>;
+/** A route hook, in the order declared. */
+export type ChainHook =
+	| { readonly kind: 'derive'; readonly run: DeriveHook }
+	| { readonly kind: 'wrap'; readonly run: WrapHook };
+/** A hook that turns an error into a reply, or lets the next one try. */
+export type ErrorHook = (
+	error: unknown,
+	ctx: BaseContext,
+) => MaybePromise<AnyReply | undefined | void>;
+
+/** Runs on every request, before routing; a `Response` it returns is sent as it is. */
+export type RequestHook = (
+	ctx: RequestContext,
+) => MaybePromise<Response | undefined | void>;
+/** Runs on every response, routed or not; a `Response` it returns replaces it. */
+export type ResponseHook = (
+	response: Response,
+	ctx: RequestContext,
+) => MaybePromise<Response | undefined | void>;
+/**
+ * Runs around every request: `next()` runs the rest — the `onRequest`
+ * hooks, the route, the `onResponse` hooks — and resolves to the response.
+ * What the hook awaits around it runs in its async context: a span, a
+ * transaction, a timer.
+ */
+export type AroundHook = (
+	ctx: RequestContext,
+	next: () => Promise<Response>,
+) => Promise<Response>;
+export type StartHook = (server: Bun.Server<unknown>) => MaybePromise<void>;
+export type StopHook = () => MaybePromise<void>;
+
+/** A route as the app runs it: its schema, its handler, and the hooks declared before it. */
+export interface RouteDefinition {
+	readonly method: Method;
+	readonly path: string;
+	readonly schema: RouteSchema;
+	readonly handler: (ctx: never) => MaybePromise<AnyReply>;
+	readonly derive: readonly ChainHook[];
+	readonly onError: readonly ErrorHook[];
+}
+
+/** A socket route as the app runs it. */
+export interface SocketDefinition {
+	readonly path: string;
+	readonly schema: SocketSchema;
+	readonly handlers: SocketHandlers<never, never, never>;
+	readonly derive: readonly ChainHook[];
+	readonly onError: readonly ErrorHook[];
+}
+
+export type Definition =
+	| ({ readonly kind: 'http' } & RouteDefinition)
+	| ({ readonly kind: 'ws' } & SocketDefinition);
+
+/** What is global to an app, wherever it is declared: a group's or a plugin's included. */
+export interface Globals {
+	readonly around: AroundHook[];
+	readonly onRequest: RequestHook[];
+	readonly onResponse: ResponseHook[];
+	readonly onStart: StartHook[];
+	readonly onStop: StopHook[];
+	readonly parsers: BodyParser[];
+	/** Bun's HTML bundles, by their full path: served by `Bun.serve` itself. */
+	readonly pages: Map<string, Bun.HTMLBundle>;
+}
+
+/** What a request reads of an app: its routes, its global hooks, its options. */
+export interface Runtime {
+	readonly router: Router<Definition>;
+	/** Shared with the app's groups, whose global hooks are the app's. */
+	readonly globals: Globals;
+	readonly validateResponses: boolean;
+	/** The `ip` option, or the address of the connection. */
+	readonly ip: (
+		request: Request,
+		server: Bun.Server<unknown> | undefined,
+	) => string | undefined;
+}
