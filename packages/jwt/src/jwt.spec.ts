@@ -64,6 +64,63 @@ describe('createJwt', () => {
 	});
 });
 
+describe('createJwt keys', () => {
+	const pair = (
+		algorithm: EcKeyGenParams | RsaHashedKeyGenParams | Algorithm,
+	) =>
+		crypto.subtle.generateKey(algorithm, true, [
+			'sign',
+			'verify',
+		]) as Promise<CryptoKeyPair>;
+
+	test('a key the algorithm cannot use is refused at once', async () => {
+		const p384 = await pair({ name: 'ECDSA', namedCurve: 'P-384' });
+		expect(() =>
+			createJwt({ algorithm: 'ES256', publicKey: p384.publicKey }),
+		).toThrow(
+			'createJwt: ES256 needs an ECDSA P-256 key; the publicKey is ECDSA P-384',
+		);
+		const ed = await pair({ name: 'Ed25519' });
+		expect(() =>
+			createJwt({
+				algorithm: 'RS256',
+				publicKey: ed.publicKey,
+				privateKey: ed.privateKey,
+			}),
+		).toThrow(
+			'createJwt: RS256 needs an RSASSA-PKCS1-v1_5 SHA-256 key; the publicKey is Ed25519',
+		);
+		expect(() =>
+			createJwt({ algorithm: 'EdDSA', publicKey: ed.privateKey }),
+		).toThrow(
+			'createJwt: the publicKey must be a public key that can verify; it is a private key that can sign',
+		);
+		const p256 = await pair({ name: 'ECDSA', namedCurve: 'P-256' });
+		const jwt = createJwt({ algorithm: 'ES256', ...p256 });
+		expect((await jwt.verify(await jwt.sign({ sub: 'ada' }))).ok).toBe(true);
+	});
+
+	test('verify answers for any token, never throws', async () => {
+		const p256 = await pair({ name: 'ECDSA', namedCurve: 'P-256' });
+		const jwt = createJwt({ algorithm: 'ES256', ...p256 });
+		const [head, body] = (await jwt.sign({ sub: 'ada' })).split('.');
+		const nullHeader = `${Buffer.from('null').toString('base64url')}.${body}.`;
+		expect(await jwt.verify(nullHeader)).toEqual({
+			ok: false,
+			reason: 'malformed',
+		});
+		const arrayHeader = `${Buffer.from('[]').toString('base64url')}.${body}.`;
+		expect(await jwt.verify(arrayHeader)).toEqual({
+			ok: false,
+			reason: 'malformed',
+		});
+		expect(await jwt.verify(`${head}.${body}.AAAA`)).toEqual({
+			ok: false,
+			reason: 'signature',
+		});
+	});
+});
+
 describe('bearer', () => {
 	const jwt = createJwt({ secret });
 	const app = alxia()
@@ -110,5 +167,24 @@ describe('bearer', () => {
 			headers: { cookie: `token=${token}` },
 		});
 		expect(await response.text()).toBe('ada');
+	});
+
+	test('claims read from a cookie are refused as the cookies', async () => {
+		const fromCookie = alxia()
+			.use(
+				bearer({
+					jwt,
+					cookie: 'token',
+					schema: z.object({ role: z.literal('admin') }),
+				}),
+			)
+			.get('/me', ({ reply }) => reply(200, 'in'));
+		const token = await jwt.sign({ role: 'user' });
+		const response = await fromCookie.request('/me', {
+			headers: { cookie: `token=${token}` },
+		});
+		const refused = await response.json();
+		expect(refused.reason).toBe('claims');
+		expect(refused.issues[0].target).toBe('cookies');
 	});
 });

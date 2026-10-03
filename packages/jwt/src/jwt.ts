@@ -1,3 +1,5 @@
+import { checkKey, HASH, params } from './keys';
+
 /**
  * JSON Web Tokens on Web Crypto: nothing to install. HMAC with a secret,
  * or ECDSA, RSA and EdDSA with a key pair.
@@ -76,26 +78,6 @@ export interface Jwt {
 	verify(token: string): Promise<VerifyResult>;
 }
 
-const HASH: Record<Algorithm, string> = {
-	HS256: 'SHA-256',
-	HS384: 'SHA-384',
-	HS512: 'SHA-512',
-	ES256: 'SHA-256',
-	ES384: 'SHA-384',
-	RS256: 'SHA-256',
-	RS384: 'SHA-384',
-	RS512: 'SHA-512',
-	EdDSA: '',
-};
-
-function params(algorithm: Algorithm): AlgorithmIdentifier | EcdsaParams {
-	if (algorithm.startsWith('HS')) return { name: 'HMAC' };
-	if (algorithm.startsWith('ES'))
-		return { name: 'ECDSA', hash: HASH[algorithm] };
-	if (algorithm.startsWith('RS')) return { name: 'RSASSA-PKCS1-v1_5' };
-	return { name: 'Ed25519' };
-}
-
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -138,6 +120,10 @@ export function createJwt(options: JwtOptions): Jwt {
 			)
 			.then((key) => ({ sign: key, verify: key }));
 	} else {
+		checkKey(options.algorithm, 'publicKey', options.publicKey);
+		if (options.privateKey !== undefined) {
+			checkKey(options.algorithm, 'privateKey', options.privateKey);
+		}
 		keys = Promise.resolve(
 			options.privateKey === undefined
 				? { verify: options.publicKey }
@@ -174,7 +160,7 @@ export function createJwt(options: JwtOptions): Jwt {
 			const parts = token.split('.');
 			if (parts.length !== 3) return { ok: false, reason: 'malformed' };
 			const [head, body, signature] = parts as [string, string, string];
-			let header: { alg?: unknown };
+			let header: unknown;
 			let claims: JwtClaims;
 			let signed: Uint8Array<ArrayBuffer>;
 			try {
@@ -191,13 +177,26 @@ export function createJwt(options: JwtOptions): Jwt {
 			) {
 				return { ok: false, reason: 'malformed' };
 			}
-			if (header.alg !== algorithm) return { ok: false, reason: 'algorithm' };
-			const valid = await crypto.subtle.verify(
-				params(algorithm),
-				(await keys).verify,
-				signed,
-				encoder.encode(`${head}.${body}`),
-			);
+			if (
+				header === null ||
+				typeof header !== 'object' ||
+				Array.isArray(header)
+			) {
+				return { ok: false, reason: 'malformed' };
+			}
+			if ((header as { alg?: unknown }).alg !== algorithm) {
+				return { ok: false, reason: 'algorithm' };
+			}
+			// A signature Web Crypto cannot read — the wrong length for the
+			// curve — is a bad signature, not an error to answer with a 500.
+			const valid = await crypto.subtle
+				.verify(
+					params(algorithm),
+					(await keys).verify,
+					signed,
+					encoder.encode(`${head}.${body}`),
+				)
+				.catch(() => false);
 			if (!valid) return { ok: false, reason: 'signature' };
 			const now = Math.floor(Date.now() / 1000);
 			if (typeof claims.exp === 'number' && now - tolerance >= claims.exp) {

@@ -1,7 +1,7 @@
 # Troubleshooting
 
 Each entry is headed by the text you see: a TypeScript error, an exception
-thrown by `createJwt`, `sign` or `verify`, or the body of the guard's 401.
+thrown by `createJwt` or `sign` (`verify` never throws), or the body of the guard's 401.
 Problems that show no message are under [Traps](#traps), by symptom.
 
 **Types**
@@ -18,12 +18,12 @@ Problems that show no message are under [Traps](#traps), by symptom.
 **Startup**
 
 - [`TypeError: A JWT secret must hold at least 32 bytes`](#typeerror-a-jwt-secret-must-hold-at-least-32-bytes)
+- [`TypeError: createJwt: ES256 needs an ECDSA P-256 key; the publicKey is ECDSA P-384`](#typeerror-createjwt-es256-needs-an-ecdsa-p-256-key-the-publickey-is-ecdsa-p-384)
+- [`TypeError: createJwt: the publicKey must be a public key that can verify; it is a private key that can sign`](#typeerror-createjwt-the-publickey-must-be-a-public-key-that-can-verify-it-is-a-private-key-that-can-sign)
 
 **Runtime**
 
 - [`TypeError: Signing needs a private key`](#typeerror-signing-needs-a-private-key)
-- [`InvalidAccessError: Key algorithm mismatch`](#invalidaccesserror-key-algorithm-mismatch)
-- [`InvalidAccessError: Unable to use this key to sign`](#invalidaccesserror-unable-to-use-this-key-to-sign)
 
 **Responses**
 
@@ -41,7 +41,6 @@ Problems that show no message are under [Traps](#traps), by symptom.
 
 - [A token is still accepted long after it was issued](#a-token-is-still-accepted-long-after-it-was-issued)
 - [A token meant for another service is accepted](#a-token-meant-for-another-service-is-accepted)
-- [Another library refuses the token as an invalid signature](#another-library-refuses-the-token-as-an-invalid-signature)
 - [`user` has no `exp` or `iat`](#user-has-no-exp-or-iat)
 
 ## Types
@@ -239,6 +238,59 @@ literal of 32 characters or more is enough:
 const jwt = createJwt({ secret: 'a-secret-of-at-least-thirty-two-bytes!' });
 ```
 
+### `TypeError: createJwt: ES256 needs an ECDSA P-256 key; the publicKey is ECDSA P-384`
+
+**When:** `createJwt` is given a key the algorithm cannot use: another
+family, another curve, or another hash. The message names the algorithm,
+the key it needs, which option is wrong, and what that key is:
+
+```text
+TypeError: createJwt: ES384 needs an ECDSA P-384 key; the publicKey is ECDSA P-256
+TypeError: createJwt: RS256 needs an RSASSA-PKCS1-v1_5 SHA-256 key; the publicKey is RSASSA-PKCS1-v1_5 SHA-512
+TypeError: createJwt: RS256 needs an RSASSA-PKCS1-v1_5 SHA-256 key; the publicKey is RSA-PSS SHA-256
+TypeError: createJwt: EdDSA needs an Ed25519 key; the publicKey is ECDSA P-256
+```
+
+**Why:** each algorithm signs with one exact key — `ES256` with P-256,
+`RS256` with a SHA-256 RSASSA-PKCS1-v1_5 key. Web Crypto would sign with a
+P-384 key under `ES256`, and every other JWT library would then refuse the
+token, so `createJwt` checks both keys when it is called and the app fails
+at startup. The `publicKey` is checked first, then the `privateKey`.
+
+**Fix:** generate or import the key with the parameters of the algorithm
+you name ([Algorithms and keys](guide/algorithms-and-keys.md#a-key-pair)),
+or name the algorithm the key was made for:
+
+```ts
+const ES256 = { name: 'ECDSA', namedCurve: 'P-256' };
+const publicKey = await crypto.subtle.importKey('spki', der, ES256, false, ['verify']);
+const jwt = createJwt({ algorithm: 'ES256', publicKey });
+```
+
+### `TypeError: createJwt: the publicKey must be a public key that can verify; it is a private key that can sign`
+
+**When:** `createJwt` is given the private key as `publicKey` — the two
+keys swapped, say — or a key imported without its usage. The same check on
+the other key reads:
+
+```text
+TypeError: createJwt: the privateKey must be a private key that can sign; it is a public key that can verify
+TypeError: createJwt: the publicKey must be a public key that can verify; it is a public key that can do nothing
+```
+
+**Why:** a `CryptoKey` carries its type and the operations it was imported
+for, and Web Crypto checks them on every call. `createJwt` checks them once,
+at startup, rather than letting the first request fail.
+
+**Fix:** the private key from PKCS#8 with `['sign']`, the public key from
+SPKI with `['verify']`:
+
+```ts
+const privateKey = await crypto.subtle.importKey('pkcs8', privateDer, ES256, false, ['sign']);
+const publicKey = await crypto.subtle.importKey('spki', publicDer, ES256, false, ['verify']);
+const jwt = createJwt({ algorithm: 'ES256', privateKey, publicKey });
+```
+
 ## Runtime
 
 ### `TypeError: Signing needs a private key`
@@ -254,42 +306,6 @@ point of handing it the public key alone.
 ```ts
 const issuer = createJwt({ algorithm: 'ES256', privateKey, publicKey });
 const token = await issuer.sign({ sub: 'ada' });
-```
-
-### `InvalidAccessError: Key algorithm mismatch`
-
-**When:** on `sign` or `verify`, when the key is of another kind than the
-algorithm — an Ed25519 or RSA-PSS key under `ES256`, an ECDSA key under
-`RS256`. Behind the guard, the request is answered
-`500 {"error":"internal"}` and the server logs the `DOMException`.
-
-**Why:** Web Crypto refuses to use a key with an algorithm it was not made
-for. `createJwt` does not inspect the keys, so the error comes on first
-use.
-
-**Fix:** generate or import the key with the parameters of the algorithm
-you name ([Algorithms and keys](guide/algorithms-and-keys.md#a-key-pair)):
-
-```ts
-const ES256 = { name: 'ECDSA', namedCurve: 'P-256' };
-const publicKey = await crypto.subtle.importKey('spki', der, ES256, false, ['verify']);
-const jwt = createJwt({ algorithm: 'ES256', publicKey });
-```
-
-### `InvalidAccessError: Unable to use this key to sign`
-
-**When:** on `sign`, when `privateKey` is in fact the public key, or a key
-imported without the `sign` usage. The same message ends in `to verify`
-when `publicKey` lacks the `verify` usage, or is the private key.
-
-**Why:** a `CryptoKey` carries the operations it was imported for, and Web
-Crypto checks them on every call.
-
-**Fix:** the private key with `['sign']`, the public key with `['verify']`:
-
-```ts
-const privateKey = await crypto.subtle.importKey('pkcs8', privateDer, ES256, false, ['sign']);
-const publicKey = await crypto.subtle.importKey('spki', publicDer, ES256, false, ['verify']);
 ```
 
 ## Responses
@@ -320,8 +336,9 @@ app.use(bearer({ jwt, cookie: 'token' }));
 
 ### `401 {"error":"unauthorized","reason":"malformed"}`
 
-**When:** the token is not three base64url parts separated by dots, or its
-header or payload is not a JSON object.
+**When:** the token is not three base64url parts separated by dots, its
+header or payload is not JSON, its header is not an object (`null`, an
+array, a number, a string or a boolean), or its payload is not an object.
 
 **Why:** usually not a JWT at all: an opaque session id, a token missing a part,
 a value still wrapped in quotes or URL-encoded. The header wins over the
@@ -355,7 +372,8 @@ const verifier = createJwt(options);
 ### `401 {"error":"unauthorized","reason":"signature"}`
 
 **When:** the token was signed with another secret or private key than the
-one the verifier checks against, or was altered after signing.
+one the verifier checks against, or was altered after signing — its
+signature cut short or replaced included.
 
 **Why:** common causes are a secret that differs between two services or
 two environments, a secret rotated while tokens signed with the old one
@@ -441,8 +459,9 @@ const web = createJwt({ secret, audience: 'web' }); // accepts it
 
 **Why:** the token was signed without a claim the schema requires, or with
 a value it does not accept — a token issued before the schema changed,
-say. Each issue's `path` names the claim; its `target` reads `headers`
-whether the token came from the header or the cookie.
+say. Each issue's `path` names the claim, and its `target` where the token
+was read: `headers` for `Authorization: Bearer`, `cookies` for the guard's
+`cookie`.
 
 **Fix:** sign every claim the schema requires, and make a claim added
 later optional until the old tokens have expired:
@@ -480,29 +499,6 @@ token the shared key signed is accepted.
 
 ```ts
 const billing = createJwt({ algorithm: 'ES256', publicKey, issuer: 'auth', audience: 'billing' });
-```
-
-### Another library refuses the token as an invalid signature
-
-**When:** the key is of the right kind but not the algorithm's exact one: a
-P-384 key under `ES256`, a SHA-512 RSA key under `RS256`. This package
-signs and verifies its own tokens without a complaint.
-
-**Why:** for ECDSA the hash comes from the algorithm and the curve from the
-key; for RSA the hash comes from the key. A mismatched key signs a token
-whose header promises one thing and whose signature is another, which a
-standard verifier refuses.
-
-**Fix:** the curve or hash that the algorithm names
-([Algorithms and keys](guide/algorithms-and-keys.md#a-key-pair)):
-
-```ts
-await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']); // ES256
-await crypto.subtle.generateKey(
-	{ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
-	true,
-	['sign', 'verify'],
-); // RS256
 ```
 
 ### `user` has no `exp` or `iat`
