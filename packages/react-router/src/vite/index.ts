@@ -19,6 +19,7 @@ import {
 import { serveDev } from './dev';
 import { NAME, PASS_THROUGH, serverEntry } from './entry';
 import { servePreview } from './preview';
+import { requireBun } from './runtime';
 
 export interface AlxiaOptions {
 	/**
@@ -111,10 +112,17 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 		},
 		configureServer(server) {
 			if (!enabled) return;
+			requireBun('react-router dev');
 			return serveDev(server, options.entry);
 		},
 		configurePreviewServer(server) {
 			if (!enabled) return;
+			// React Router prerenders through a preview server of its own,
+			// resolved as `serve` too: the message cannot tell the two apart.
+			requireBun(
+				'vite preview, or a react-router build that prerenders,',
+				'bun --bun vite preview or bun --bun react-router build',
+			);
 			// Before Vite's own files: the built server answers every request.
 			servePreview(server);
 		},

@@ -19,6 +19,10 @@ on that template (React Router 8.4.0, Vite 8.3.2, TypeScript 5.9.3, Bun
 `bun add @alxia/core @alxia/react-router`, `alxia()` in `vite.config.ts`'s
 plugins, and `"start": "bun build/server/index.js"`. The template's `dev`,
 `build` and `typecheck` scripts run unchanged through `bun run`.
+(Corrected in #81: the probe had no node. Where one is installed, the
+`react-router` CLI's `#!/usr/bin/env node` starts it on Node, so the
+setup adds a `bunfig.toml` with `[run] bun = true`, and the plugin
+refuses a dev or preview server on Node at startup.)
 
 - **`alxia()`** replaces `alxiaServer({ entry })`. It is `enforce: 'pre'`,
   so it runs before React Router's plugin wherever it is listed: React

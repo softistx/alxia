@@ -11,7 +11,7 @@ hooks built, typed.
 ## Quick start
 
 Start from the official template, `bunx create-react-router@latest`, and
-make three changes.
+make four changes.
 
 **1. Install** alxia and this package:
 
@@ -36,15 +36,29 @@ bun add @alxia/core @alxia/react-router
  });
 ```
 
-**3. Start with Bun**, in `package.json`:
+**3. Run the scripts on Bun**, with a `bunfig.toml`:
+
+```toml
+# bunfig.toml, beside package.json
+[run]
+bun = true
+```
+
+The `react-router` CLI starts with `#!/usr/bin/env node`. Where a node is
+installed, `bun run dev` would run it on Node, and alxia's server needs
+Bun. `bun = true` makes `bun run` start it on Bun. Without it, the dev
+server stops at startup with
+[`alxia-react-router: react-router dev is running on Node, …`](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#alxia-react-router--is-running-on-node-and-alxias-server-runs-on-bun-).
+
+**4. Start with Bun**, in `package.json`:
 
 ```diff
 -    "start": "react-router-serve ./build/server/index.js",
 +    "start": "bun build/server/index.js",
 ```
 
-The template's `dev`, `build` and `typecheck` scripts are unchanged. They
-run through `bun run`, with no Node installed:
+With the `bunfig.toml` in place, the template's `dev`, `build` and
+`typecheck` scripts are unchanged:
 
 - **`bun run dev`**: every request Vite does not answer itself (pages,
   data, `/api`, an upgrade to a `ws` route) reaches alxia, with HMR.

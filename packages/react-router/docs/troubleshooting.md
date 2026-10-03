@@ -7,6 +7,8 @@ a loader, a message React Router or the browser prints, or an error from
 
 **Thrown or printed**
 
+- [`alxia-react-router: … is running on Node, and alxia's server runs on Bun. …`](#alxia-react-router--is-running-on-node-and-alxias-server-runs-on-bun-)
+- [`ReferenceError: Bun is not defined`](#referenceerror-bun-is-not-defined)
 - [`alxiaOf(): this request has no alxia context. …`](#alxiaof-this-request-has-no-alxia-context-)
 - [`Error: No value found for context`](#error-no-value-found-for-context)
 - [`alxia-react-router: … must export createServer() from @alxia/react-router as its default export: …`](#alxia-react-router--must-export-createserver-from-alxiareact-router-as-its-default-export-)
@@ -51,6 +53,45 @@ a loader, a message React Router or the browser prints, or an error from
 - [A `publish` under `react-router dev` misses the sockets opened before an edit](#a-publish-under-react-router-dev-misses-the-sockets-opened-before-an-edit)
 
 ## Thrown or printed
+
+### `alxia-react-router: … is running on Node, and alxia's server runs on Bun. …`
+
+**When:** `bun run dev`, `vite preview`, or a `react-router build` that
+prerenders, on a machine where a node is installed. The full message under
+`react-router dev`:
+
+```
+alxia-react-router: react-router dev is running on Node, and alxia's server runs on Bun. Add a bunfig.toml beside package.json with "[run]" and "bun = true", so bun run starts it on Bun, or run it as bun --bun react-router dev.
+```
+
+**Why:** the `react-router` and `vite` CLIs start with
+`#!/usr/bin/env node`. `bun run` honours that line when a node is on the
+`PATH`, so the dev server, and alxia's server inside it, run on Node,
+where `Bun` does not exist.
+
+**Fix:** a `bunfig.toml` beside `package.json`, so `bun run` starts every
+script on Bun:
+
+```toml
+[run]
+bun = true
+```
+
+Or run the one command on Bun: `bun --bun react-router dev`. Under
+`vite preview` or a prerendering build, the message begins
+`alxia-react-router: vite preview, or a react-router build that prerenders, is running on Node`
+and names `bun --bun vite preview` and `bun --bun react-router build`.
+
+### `ReferenceError: Bun is not defined`
+
+**When:** the first request to a page, with a stack through the app's
+own code or alxia's, from a server running on Node that the plugin did
+not start, so it could not refuse it: `node build/server/index.js`, or a
+`start` script that runs one.
+
+**Fix:** run the server on Bun: `bun build/server/index.js`. Under
+`react-router dev` or `vite preview`, the plugin refuses Node at startup
+with [the entry above](#alxia-react-router--is-running-on-node-and-alxias-server-runs-on-bun-).
 
 ### `alxiaOf(): this request has no alxia context. …`
 

@@ -71,9 +71,22 @@ middleware must come after alxia's.
 }
 ```
 
-Only `start` changes. With no Node installed, `bun run` runs
-`react-router`'s scripts under Bun, so `bun run dev`, `bun run build` and
-`bun run typecheck` work as they are; `bunx --bun` is not needed. The
+Only `start` changes. The `react-router` and `vite` CLIs start with
+`#!/usr/bin/env node`, so where a node is installed `bun run` would run
+them on Node, and alxia's server needs Bun. A `bunfig.toml` beside
+`package.json` makes `bun run` start them on Bun, for every script:
+
+```toml
+# bunfig.toml, beside package.json
+[run]
+bun = true
+```
+
+Then `bun run dev`, `bun run build` and `bun run typecheck` work as they
+are, with or without a node installed. Without that file, run them as
+`bun --bun react-router dev`. The plugin refuses a dev or preview server
+running on Node at startup, rather than failing on the first request:
+see [the troubleshooting entry](troubleshooting.md#alxia-react-router--is-running-on-node-and-alxias-server-runs-on-bun-). The
 template's `@react-router/serve` is no longer used, and you can remove it.
 
 What the template keeps:
@@ -160,8 +173,10 @@ bunx --bun vite preview
 
 `--bun` runs Vite under Bun even where Node is installed, since Vite's bin
 asks for Node: the built server runs inside Vite's process, and it needs
-Bun's APIs. With no Node installed, a `"preview": "vite preview"` script
-run with `bun run preview` works too, as the template's other scripts do.
+Bun's APIs. With the [`bunfig.toml`](#setup) (`[run]`,
+`bun = true`), or with no Node installed, a `"preview": "vite preview"`
+script run with `bun run preview` works too, as the template's other
+scripts do.
 
 The plugin loads `build/server/index.js` on the first request and hands
 every request to its default export, the alxia app, before Vite's own
