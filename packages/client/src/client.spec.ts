@@ -158,6 +158,43 @@ describe('client', () => {
 		} else throw new Error(`expected a 400, got ${result.status}`);
 	});
 
+	test('the replies of a hook per kind are typed, each by its kind’s schemas', async () => {
+		const kinds = client(
+			alxia()
+				.onRefusal(
+					'validation',
+					{ response: { 422: z.object({ detail: z.string() }) } },
+					(refusal, { reply }) =>
+						reply(422, { detail: `the ${refusal.part} is invalid` }),
+				)
+				.onRefusal(
+					'body_limit',
+					{ response: { 413: z.object({ limit: z.number() }) } },
+					(refusal, { reply }) => reply(413, { limit: refusal.limit }),
+				)
+				.post(
+					'/api',
+					{ body: z.object({ text: z.string() }), bodyLimit: 32 },
+					({ reply }) => reply(200, 'ok'),
+				),
+		);
+		expectTypeOf<
+			Awaited<ReturnType<typeof kinds.post<'/api'>>>['status']
+		>().toEqualTypeOf<200 | 413 | 422 | 500>();
+		const invalid = await kinds.post('/api', {
+			body: {} as { text: string },
+		});
+		if (invalid.status === 422) {
+			expectTypeOf(invalid.data).toEqualTypeOf<{ detail: string }>();
+			expect(invalid.data).toEqual({ detail: 'the body is invalid' });
+		} else throw new Error(`expected a 422, got ${invalid.status}`);
+		const large = await kinds.post('/api', { body: { text: 'x'.repeat(64) } });
+		if (large.status === 413) {
+			expectTypeOf(large.data).toEqualTypeOf<{ limit: number }>();
+			expect(large.data).toEqual({ limit: 32 });
+		} else throw new Error(`expected a 413, got ${large.status}`);
+	});
+
 	test('a route without schemas: text, and nothing', async () => {
 		const health = await api.get('/health');
 		expectTypeOf(health.data).toEqualTypeOf<'ok' | InternalErrorBody>();

@@ -46,6 +46,15 @@ export interface BodyLimitRefusal {
  */
 export type Refusal = ValidationRefusal | BodyLimitRefusal;
 
+/** The kinds of refusal, each of which `onRefusal(kind, hook)` may answer apart: `validation`, `body_limit`. */
+export type RefusalKind = Refusal['kind'];
+
+/** The refusal of one `Kind`, as the `onRefusal(kind, hook)` hook of that kind reads it. */
+export type RefusalOfKind<Kind extends RefusalKind> = Extract<
+	Refusal,
+	{ readonly kind: Kind }
+>;
+
 /** The body of the 400 every route that validates its request may answer. */
 export interface ValidationErrorBody {
 	readonly error: 'validation';

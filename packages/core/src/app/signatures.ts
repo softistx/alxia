@@ -2,17 +2,30 @@
  * The options of an app and of its `listen`, and the types its methods are
  * written in.
  */
-import type { AnyReply } from '../reply/reply';
+import type { Refusal, RefusalKind, RefusalOfKind } from '../errors/errors';
+import type { AnyReply, Reply } from '../reply/reply';
 import type { JoinPath, RoutePath } from '../types/path';
+import type { ClientErrorStatus } from '../types/status';
 import type { Alxia } from './alxia';
 import type {
+	BaseContext,
 	Context,
+	DeclaredRefusal,
+	DeclaredReply,
 	Empty,
 	HandlerResult,
+	KindRefusalsOf,
 	MaybePromise,
 	Method,
+	OneKind,
+	RefusalResponses,
+	RefusalSchema,
+	RefusalsOf,
+	Refusing,
+	RefusingKind,
 	RouteEntryOf,
 	RouteSchema,
+	TypedReplyFunction,
 	ValidSchema,
 } from './types';
 
@@ -91,3 +104,76 @@ export type AnyAlxia = Alxia<any, any, any, any>;
  * is an app of its own, given to `use`.
  */
 export type Plugin = <App extends AnyAlxia>(app: App) => App;
+
+/**
+ * `app.onRefusal`: `onRefusal(hook)` or `onRefusal(schema, hook)` for every
+ * kind of refusal, `onRefusal(kind, hook)` or `onRefusal(kind, schema,
+ * hook)` for one.
+ */
+export interface RefusalMethod<
+	Ctx extends object,
+	Routes extends object,
+	Prefix extends string,
+	Shortcuts extends AnyReply,
+> {
+	<Result extends Reply<ClientErrorStatus, any> | undefined | void>(
+		hook: (refusal: Refusal, ctx: BaseContext & Ctx) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes,
+		Prefix,
+		Exclude<Shortcuts, Refusing> | RefusalsOf<Extract<Result, AnyReply>, Result>
+	>;
+	<
+		Responses extends RefusalResponses,
+		Result extends DeclaredReply<Responses> | undefined | void,
+	>(
+		schema: RefusalSchema<Responses>,
+		hook: (
+			refusal: Refusal,
+			ctx: Omit<BaseContext, 'reply'> &
+				Ctx & { readonly reply: TypedReplyFunction<Responses> },
+		) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes,
+		Prefix,
+		| Exclude<Shortcuts, Refusing>
+		| RefusalsOf<DeclaredRefusal<Responses>, Result>
+	>;
+	<
+		Kind extends RefusalKind,
+		Result extends Reply<ClientErrorStatus, any> | undefined | void,
+	>(
+		kind: Kind & OneKind<Kind>,
+		hook: (
+			refusal: RefusalOfKind<Kind>,
+			ctx: BaseContext & Ctx,
+		) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes,
+		Prefix,
+		| Exclude<Shortcuts, RefusingKind<Kind>>
+		| KindRefusalsOf<Kind, Extract<Result, AnyReply>, Result>
+	>;
+	<
+		Kind extends RefusalKind,
+		Responses extends RefusalResponses,
+		Result extends DeclaredReply<Responses> | undefined | void,
+	>(
+		kind: Kind & OneKind<Kind>,
+		schema: RefusalSchema<Responses>,
+		hook: (
+			refusal: RefusalOfKind<Kind>,
+			ctx: Omit<BaseContext, 'reply'> &
+				Ctx & { readonly reply: TypedReplyFunction<Responses> },
+		) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes,
+		Prefix,
+		| Exclude<Shortcuts, RefusingKind<Kind>>
+		| KindRefusalsOf<Kind, DeclaredRefusal<Responses>, Result>
+	>;
+}

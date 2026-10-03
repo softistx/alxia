@@ -94,7 +94,10 @@ use(plugin: Alxia<PluginCtx, PluginRoutes, PluginPrefix, PluginShortcuts>): Alxi
 - Its **`onRefusal` hook** answers its own routes' refused requests. Its
   routes without one take this app's, declared before `use`. The plugin's
   hook then replaces this app's for the routes declared after `use`
-  ([Hooks](hooks.md#onrefusal)).
+  ([Hooks](hooks.md#onrefusal)). A plugin's hook of one kind,
+  `onRefusal('validation', …)`, answers that kind before this app's hooks
+  of that kind, and replaces this app's hook of that kind alone after `use`
+  ([One hook per kind](hooks.md#one-hook-per-kind)).
 - Its **global hooks**, body parsers and [pages](static-files.md#bun-html-bundles)
   become this app's.
 

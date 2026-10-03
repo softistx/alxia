@@ -122,6 +122,26 @@ validates, so the client reads the problem. Given schemas first —
 — its `reply` is typed by them, its body checked and sent as their output,
 and `@alxia/openapi` documents it.
 
+Given a kind first, a hook answers that kind alone, reads its refusal
+narrowed, and types and documents that kind's replies apart. A kind with no
+hook of its own, or whose hook returns nothing, falls back to the general
+hook, then to the default:
+
+```ts
+const Invalid = z.object({ detail: z.string() });
+const TooLarge = z.object({ limit: z.number() });
+
+alxia()
+	.onRefusal('validation', { response: { 422: Invalid } }, (refusal, { reply }) =>
+		reply(422, { detail: `the ${refusal.part} is invalid` }),
+	)
+	.onRefusal('body_limit', { response: { 413: TooLarge } }, (refusal, { reply }) =>
+		reply(413, { limit: refusal.limit }),
+	)
+	.post('/notes', { body: z.object({ text: z.string() }), bodyLimit: 64 * 1024 }, ({ reply }) => reply(201, 'ok'));
+// POST /notes answers 201, 413 { limit: number }, 422 { detail: string } or 500
+```
+
 `ip` is the client's address — the `ip` option reads it behind a proxy —
 and `server` the Bun server, when there is one. `HEAD` runs the `GET` route.
 
@@ -367,7 +387,8 @@ is answered as it says, and anything else is a 500 that leaks nothing, but
 for a client that hung up mid-request, a 499 nobody reads. `onRefusal`
 answers a request the route's schemas refuse, or whose body passes its
 `bodyLimit` ([Requests](#requests)); the last one declared before a route
-is the one it uses.
+is the one it uses, and a hook of one kind, `onRefusal('validation', hook)`,
+falls back to it.
 
 Global hooks apply to the whole app, wherever they are declared:
 
@@ -478,15 +499,17 @@ covers all three kinds.
 | `ContextOf<App>` | what a route declared next on `App` reads: to type a GraphQL schema, a service |
 | `RequestContext`, `BaseContext`, `Context`, `ResponseSettings`, `HandlerResult` | what every hook reads (`BaseContext.cookies`: the request's), what a handler reads, what a route sets on its response, what a handler may return |
 | `ResponseCookies` | `set.cookies`: Bun's `CookieMap` of the cookies the response sets, whose `get` and `has` read those, never the request's |
-| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, what OpenAPI says of it, the checks its schema's type cannot express, a route method, a route and a socket as the app runs them |
+| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod`, `RefusalMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, what OpenAPI says of it, the checks its schema's type cannot express, a route method, the type of `onRefusal` (its four forms), a route and a socket as the app runs them |
 | `RouteOperation`, `OperationSchema`, `OperationMethod` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), and the type of `route` |
 | `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage`, `SocketRecord`, `SocketEntryOf` | sockets: what a socket route validates, what its handlers read, send and receive, the entry one socket adds to `RoutesOf` |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema types |
 | `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426 |
 | `ValidationIssue`, `ValidationTarget` | one issue of a 400, and where the refused value was read from |
 | `Refusal`, `ValidationRefusal`, `BodyLimitRefusal`, `RequestPart` | what an `onRefusal` hook reads: the refusal by `kind` — `validation`, with the `part` that failed first and its `issues`, or `body_limit`, with the route's `limit` |
+| `RefusalKind`, `RefusalOfKind<Kind>` | the kinds `onRefusal(kind, hook)` takes, `'validation' \| 'body_limit'`, and the refusal a hook of one kind reads |
 | `RefusalSchema`, `RefusalResponses` | what an `onRefusal` hook may declare: the schema of each 4xx it answers, and its `contentType` |
-| `RefusalHook`, `RefusalHandler` | an `onRefusal` hook, and the one in force for a route: `RouteDefinition['refusal']`, what `@alxia/openapi` documents |
+| `RefusalHook`, `RefusalHandler`, `RefusalHandlersByKind` | an `onRefusal` hook, the general one in force for a route — `RouteDefinition['refusal']` — and those of each kind, tried before it — `RouteDefinition['refusalByKind']` — what `@alxia/openapi` documents |
+| `RefusingKind`, `KindFallsBack`, `KindRefusalsOf`, `KindOutcome`, `OneKind` | how an app's type carries an `onRefusal(kind, hook)`: the mark of its replies, of the general hook or default it falls back to, the replies it may answer, the outcomes a refusal of one kind may get, and the check that its kind is one literal, not a union. Exported so an app's type can be named in a declaration file |
 | `Refusing`, `FallsBack`, `DefaultRefusalOutcome`, `DefaultLimitOutcome`, `RefusalOutcome`, `RefusalsOf`, `DeclaredRefusal`, `ThenShortcuts`, `BehindShortcuts`, `BodyLimited`, `BodyLimitShortcut`, `IsLimited` | how an app's type carries its `onRefusal` hook and its `bodyLimit()`: the mark of the hook's replies, of the default it falls back to, the default 400 and 413 a plugin's route keeps, how a later scope's and a using app's hooks replace them, the mark of a `bodyLimit()` in force and the shortcut it adds, whether a route is under a limit, the outcomes a refused request may get (`RefusalOutcome`), the replies a hook may answer (`RefusalsOf`) and, for a hook declaring schemas, those replies as its schemas give them back (`DeclaredRefusal`). Exported so an app's type can be named in a declaration file |
 | `problem(details, init?)`, `ProblemDetails` | a reply whose body is an RFC 9457 problem — `type`, `title`, `status`, `detail`, `instance` and typed extension members — sent with its `status` as `application/problem+json` |
 | `RoutePath`, `JoinPath`, `PathParams`, `PathParamName` | paths: an absolute path, a prefix joined to a path, the parameters a path declares |

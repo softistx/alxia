@@ -217,6 +217,15 @@ onRefusal<Responses extends RefusalResponses, Result extends DeclaredReply<Respo
 	schema: { response: Responses; contentType?: string },
 	hook: (refusal: Refusal, ctx: Omit<BaseContext, 'reply'> & Ctx & { reply: TypedReplyFunction<Responses> }) => MaybePromise<Result>,
 ): Alxia<…>
+onRefusal<Kind extends RefusalKind, Result extends Reply<ClientErrorStatus, any> | undefined | void>(
+	kind: Kind & OneKind<Kind>, // one literal kind
+	hook: (refusal: RefusalOfKind<Kind>, ctx: BaseContext & Ctx) => MaybePromise<Result>,
+): Alxia<…>
+onRefusal<Kind extends RefusalKind, Responses extends RefusalResponses, Result extends DeclaredReply<Responses> | undefined | void>(
+	kind: Kind & OneKind<Kind>,
+	schema: { response: Responses; contentType?: string },
+	hook: (refusal: RefusalOfKind<Kind>, ctx: Omit<BaseContext, 'reply'> & Ctx & { reply: TypedReplyFunction<Responses> }) => MaybePromise<Result>,
+): Alxia<…>
 ```
 
 Answers a request that a route declared after it refuses before its
@@ -283,7 +292,7 @@ problem answers 400. Each is sent as
 `application/problem+json`, with its `detail` naming the part.
 
 **Order is meaning.** The last `onRefusal` declared before a route is the
-one in force. A route declared before any keeps the default, and a
+one in force; a [hook of one kind](#one-hook-per-kind) sits in front of it. A route declared before any keeps the default, and a
 [group](groups-and-plugins.md#groups)'s hook stays inside the group. A
 plugin given to `use` keeps its own hook for its routes. Its routes without
 one take the hook of the app using it, and the plugin's hook then applies to
@@ -301,7 +310,8 @@ reply. A status other than 400 replaces it: a hook that answers 422 makes
 the route's outcomes 422 and no 400. The hook's type does not say which
 reply answers which kind, so every reply it may return is in the type of
 every route it may refuse: the JMAP hook above puts its 413 in the type of
-`/download/:blobId` too, though only `/jmap` has a limit.
+`/download/:blobId` too, though only `/jmap` has a limit. A
+[hook per kind](#one-hook-per-kind) says which, and keeps it out.
 
 **With schemas.** Given `{ response, contentType? }` first, the hook's
 `reply` is typed by those schemas, as a route's is. Its reply is checked by
@@ -321,6 +331,55 @@ const documented = alxia()
 	)
 	.post('/jmap', { body: z.object({ using: z.array(z.string()) }) }, ({ reply }) => reply(200, 'ok'));
 ```
+
+### One hook per kind
+
+Given a kind first, `'validation'` or `'body_limit'`, the hook answers that
+kind alone. It reads its refusal narrowed, a `ValidationRefusal` or a
+`BodyLimitRefusal`, with no `kind` to check. Its replies, and its schemas
+when it is given some, replace the default of that kind only:
+
+```ts
+const Invalid = z.object({ type: z.string(), status: z.literal(400), detail: z.string() });
+const TooLarge = z.object({ type: z.string(), status: z.literal(413), limit: z.number() });
+
+const app = alxia()
+	.onRefusal('validation', { response: { 400: Invalid }, contentType: 'application/problem+json' }, (refusal, { reply }) =>
+		reply(400, { type: 'urn:ietf:params:jmap:error:notRequest', status: 400, detail: `the ${refusal.part} is invalid` }),
+	)
+	.onRefusal('body_limit', { response: { 413: TooLarge }, contentType: 'application/problem+json' }, (refusal, { reply }) =>
+		reply(413, { type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: refusal.limit }),
+	)
+	.post('/jmap', { body: z.object({ using: z.array(z.string()) }), bodyLimit: 10_000_000 }, ({ reply }) =>
+		reply(200, { methodResponses: [] }),
+	)
+	.get('/download/:blobId', { params: z.object({ blobId: z.string().min(1) }) }, ({ reply }) =>
+		reply(200, 'blob'),
+	);
+```
+
+Here `/jmap` may answer the `Invalid` 400 and the `TooLarge` 413, and
+`/download/:blobId`, which has no limit, the `Invalid` 400 alone. The
+client reads each by its own schema, and
+[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
+each kind's statuses on the routes that kind may refuse.
+
+- **One kind, as a literal.** A kind typed as a union, `RefusalKind`, or
+  as a generic parameter is a compile error: the hook is registered for the
+  one string it is given, so the types could not say which kind it answers.
+  Write the kind out, or one call per kind.
+- **Fallback.** A kind with no hook of its own, or whose hook returns
+  nothing, falls back to the general hook, `onRefusal(hook)`, then to the
+  default of that kind. The types say so: a hook that may return nothing
+  keeps the general hook's replies, or the default, beside its own.
+- **Order.** A kind's hook replaces the one of that kind declared before
+  it, and keeps the general hook as its fallback. A general hook declared
+  after it replaces it, and every other one: it answers every kind.
+- **Plugins.** A plugin's route tries the plugin's hooks first. Without a
+  general hook of the plugin's own, it then tries the using app's hooks for
+  that kind, then the app's general hook. A plugin's hook of one kind
+  given to `use` applies to the routes declared after it, and keeps the
+  app's general hook.
 
 A hook that throws reaches the route's `onError` hooks, as a handler's
 error does. A socket route's upgrade is refused through the same hook. A

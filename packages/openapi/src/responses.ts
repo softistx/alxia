@@ -2,6 +2,8 @@ import {
 	isEventStreamSchema,
 	isNamedEventStreamSchema,
 	type RefusalHandler,
+	type RefusalKind,
+	type RouteDefinition,
 	type RouteSchema,
 } from '@alxia/core';
 import { type Converter, type JsonSchema, toJsonSchema } from './json-schema';
@@ -10,13 +12,13 @@ import type { ResponseObject } from './types';
 /**
  * A route's responses: each reply its schema declares, `default` when it
  * declares none, its refusals — the 400 when it validates its request, the
- * 413 when it has a `bodyLimit`, or what the `onRefusal` hook in force
- * declares — and the 500 any route may answer.
+ * 413 when it has a `bodyLimit`, or what the `onRefusal` hook in force for
+ * each kind declares — and the 500 any route may answer.
  */
 export function responses(
 	schema: RouteSchema,
 	convert?: Converter,
-	refusal?: RefusalHandler,
+	refusals: Refusals = {},
 	bodyLimit?: number,
 ): Record<string, ResponseObject> {
 	const byStatus: Record<string, ResponseObject> = {};
@@ -47,7 +49,7 @@ export function responses(
 		schema.cookies !== undefined ||
 		schema.body !== undefined;
 	if (validates || bodyLimit !== undefined) {
-		refused(byStatus, refusal, convert, validates, bodyLimit);
+		refused(byStatus, refusals, convert, validates, bodyLimit);
 	}
 	byStatus['500'] = withError(byStatus['500'], 'The server failed', {
 		$ref: '#/components/schemas/InternalError',
@@ -57,45 +59,60 @@ export function responses(
 
 const REFUSED = 'The request was refused';
 
+/** The `onRefusal` hooks in force for a route: the general one, and those of each kind. */
+export type Refusals = Pick<RouteDefinition, 'refusal' | 'refusalByKind'>;
+
 /**
- * The responses of a refused request: the default 400 of a route that
- * validates and 413 of one under a `bodyLimit`; each status the route's
- * `onRefusal` hook declares, under its content type; or, for a hook that
- * declares none, a client error whose body it does not say.
+ * The responses of a refused request, for each kind the route may refuse
+ * with — `validation` when it validates, `body_limit` under a `bodyLimit`
+ * — by the hook in force for that kind: its first `onRefusal(kind, hook)`,
+ * else the general one. Each status that hook declares, under its content
+ * type; for a hook that declares none, a client error whose body it does
+ * not say; with no hook, the default 400 or 413.
  */
 function refused(
 	byStatus: Record<string, ResponseObject>,
-	refusal: RefusalHandler | undefined,
+	refusals: Refusals,
 	convert: Converter | undefined,
 	validates: boolean,
 	bodyLimit: number | undefined,
 ): void {
 	const tooLarge = `The body is larger than ${bodyLimit} bytes`;
-	if (refusal === undefined) {
-		if (validates) {
+	const kinds: RefusalKind[] = [];
+	if (validates) kinds.push('validation');
+	if (bodyLimit !== undefined) kinds.push('body_limit');
+	// One hook may answer both kinds: its statuses are documented once.
+	const inForce = new Map<RefusalHandler, RefusalKind[]>();
+	for (const kind of kinds) {
+		const handler = refusals.refusalByKind?.[kind]?.[0] ?? refusals.refusal;
+		if (handler !== undefined) {
+			inForce.set(handler, [...(inForce.get(handler) ?? []), kind]);
+		} else if (kind === 'validation') {
 			byStatus['400'] = withError(byStatus['400'], REFUSED, {
 				$ref: '#/components/schemas/ValidationError',
 			});
-		}
-		if (bodyLimit !== undefined) {
+		} else {
 			byStatus['413'] = withError(byStatus['413'], tooLarge, {
 				$ref: '#/components/schemas/ContentTooLargeError',
 			});
 		}
-		return;
 	}
-	if (refusal.response === undefined) {
-		byStatus['4XX'] ??= { description: REFUSED };
-		return;
-	}
-	for (const [status, schema] of Object.entries(refusal.response)) {
-		if (schema === undefined) continue;
-		byStatus[status] = withError(
-			byStatus[status],
-			status === '413' && bodyLimit !== undefined ? tooLarge : REFUSED,
-			toJsonSchema(schema, 'output', convert),
-			refusal.contentType,
-		);
+	for (const [handler, answered] of inForce) {
+		if (handler.response === undefined) {
+			byStatus['4XX'] ??= { description: REFUSED };
+			continue;
+		}
+		for (const [status, schema] of Object.entries(handler.response)) {
+			if (schema === undefined) continue;
+			byStatus[status] = withError(
+				byStatus[status],
+				status === '413' && answered.includes('body_limit')
+					? tooLarge
+					: REFUSED,
+				toJsonSchema(schema, 'output', convert),
+				handler.contentType,
+			);
+		}
 	}
 }
 

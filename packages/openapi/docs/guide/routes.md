@@ -322,6 +322,38 @@ hook schemas to document its body. A hook that returns nothing for some
 refusals still answers the default 400 then, which the document does not
 show beside the hook's.
 
+### Behind a hook per kind
+
+A hook of one kind, `onRefusal('validation', …)` or
+`onRefusal('body_limit', …)`, is documented on the routes that kind may
+refuse, and only there: the validation hook's statuses on a route that
+validates its request, the body-limit hook's on a route under a
+`bodyLimit`. A kind with no hook of its own documents the general
+`onRefusal` hook's statuses, or, without one, its default — the
+`ValidationError` 400 or the `ContentTooLargeError` 413:
+
+```ts
+const Invalid = z.object({ detail: z.string() });
+const TooLarge = z.object({ limit: z.number() });
+
+alxia()
+	.onRefusal('validation', { response: { 422: Invalid }, contentType: 'application/problem+json' }, (refusal, { reply }) =>
+		reply(422, { detail: refusal.part }),
+	)
+	.onRefusal('body_limit', { response: { 413: TooLarge } }, (refusal, { reply }) =>
+		reply(413, { limit: refusal.limit }),
+	)
+	.post('/notes', { body: z.string(), bodyLimit: 64 }, ({ reply }) => reply(200, 'ok')) // 422 and 413
+	.post('/search', { body: z.string() }, ({ reply }) => reply(200, 'ok'))              // 422 only
+	.post('/upload', { bodyLimit: 64 }, ({ reply }) => reply(200, 'ok'));               // 413 only
+```
+
+The 413 of `/notes` and `/upload` is described as
+`The body is larger than 64 bytes`, under `application/json`; the 422 of
+`/notes` and `/search` under `application/problem+json`. A hook of one
+kind that returns nothing falls back to the general hook at runtime, which
+the document does not show beside it.
+
 ## The 413
 
 A route under a `bodyLimit` documents a `413`. That covers its own

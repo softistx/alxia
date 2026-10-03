@@ -23,6 +23,7 @@ a trap that prints nothing is headed by its symptom.
 - [`Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`](#type-reply500--is-not-assignable-to-type-maybepromisevoid--replyclienterrorstatus-any--undefined)
 - [`'500' does not exist in type 'RefusalResponses'`](#500-does-not-exist-in-type-refusalresponses)
 - [`The inferred type of '…' cannot be named without a reference to '…' from '…/@alxia/core/dist/…'`](#the-inferred-type-of--cannot-be-named-without-a-reference-to--from-alxiacoredist)
+- [`Argument of type '"validation" | "body_limit"' is not assignable to parameter of type 'never'`](#argument-of-type-validation--body_limit-is-not-assignable-to-parameter-of-type-never)
 - [`Property 'part' does not exist on type 'Refusal'`](#property-part-does-not-exist-on-type-refusal)
 
 **Building the app**
@@ -41,6 +42,7 @@ a trap that prints nothing is headed by its symptom.
 - [`GET /…: the handler is missing`](#get--the-handler-is-missing)
 - [`group(): build is missing`](#group-build-is-missing)
 - [`onRefusal(): the hook is missing`](#onrefusal-the-hook-is-missing)
+- [`onRefusal(): "…" is no kind of refusal; expected 'validation' or 'body_limit'`](#onrefusal--is-no-kind-of-refusal-expected-validation-or-body_limit)
 - [`page(): /… is already served`](#page--is-already-served)
 - [`GET /… is already served by a page`](#get--is-already-served-by-a-page)
 
@@ -455,6 +457,31 @@ succeeded.
 app.onRefusal((refusal) => problem({ status: 422, detail: `the request is refused: ${refusal.kind}` }));
 ```
 
+### `Argument of type '"validation" | "body_limit"' is not assignable to parameter of type 'never'`
+
+**When:** `onRefusal` is given a kind typed as a union, `RefusalKind`, or
+as a generic parameter, as a plugin's helper may:
+
+```text
+error TS2769: No overload matches this call.
+  …
+    Argument of type '"validation" | "body_limit"' is not assignable to parameter of type 'never'.
+```
+
+For a generic `K extends RefusalKind`, the line reads
+`Argument of type 'K' is not assignable to parameter of type 'K & OneKind<K>'`.
+
+**Why:** the hook is registered for the one string it is given, so the
+types could not say which kind's replies it answers.
+
+**Fix:** write the kind out, or one call per kind:
+
+```ts
+app
+	.onRefusal('validation', (refusal) => problem({ status: 422, detail: refusal.part }))
+	.onRefusal('body_limit', (refusal) => problem({ status: 413, limit: refusal.limit }));
+```
+
 ### `Property 'part' does not exist on type 'Refusal'`
 
 **When:** an `onRefusal` hook reads `part` or `issues` without checking
@@ -478,13 +505,22 @@ app.onRefusal((refusal) =>
 );
 ```
 
+Or give the kind first: that hook answers it alone and reads it narrowed.
+
+```ts
+app.onRefusal('validation', (refusal) => problem({ status: 400, detail: `the ${refusal.part} is invalid` }));
+```
+
 ### `'500' does not exist in type 'RefusalResponses'`
 
 **When:** the schemas given to `onRefusal` declare a status that is not a
-client error.
+client error. `onRefusal` has several forms, so TypeScript reports it
+under the call, as no overload matching, with this line among each form's:
 
 ```text
-error TS2353: Object literal may only specify known properties, and '500' does not exist in type 'RefusalResponses'.
+error TS2769: No overload matches this call.
+  Overload 1 of 4, '(schema: RefusalSchema<RefusalResponses>, hook: …)', gave the following error.
+    Object literal may only specify known properties, and '500' does not exist in type 'RefusalResponses'.
 ```
 
 **Fix:** declare the 4xx the hook answers:
@@ -744,15 +780,31 @@ app.group('/admin', (admin) => admin.derive(requireAdmin).get('/stats', stats));
 
 ### `onRefusal(): the hook is missing`
 
-**When:** `onRefusal` is given its schemas but no hook. The types refuse
-that, so this comes from JavaScript or a cast.
+**When:** `onRefusal` is given its schemas but no hook, or a kind with no
+hook — `onRefusal('validation')`, `onRefusal('validation', schema)`. The
+types refuse that, so this comes from JavaScript or a cast.
 
-**Fix:** pass the hook after the schemas:
+**Fix:** pass the hook last:
 
 ```ts
 app.onRefusal({ response: { 400: Problem } }, (_, { reply }) =>
 	reply(400, { type: 'urn:example:invalid', status: 400, detail: 'invalid' }),
 );
+app.onRefusal('validation', { response: { 400: Problem } }, (refusal, { reply }) =>
+	reply(400, { type: 'urn:example:invalid', status: 400, detail: refusal.part }),
+);
+```
+
+### `onRefusal(): "…" is no kind of refusal; expected 'validation' or 'body_limit'`
+
+**When:** `onRefusal` is given a string that is not a kind of refusal, a
+typo such as `'body-limit'`. The types refuse that too, so this comes from
+JavaScript or a cast.
+
+**Fix:** give one of the two kinds, with an underscore in `body_limit`:
+
+```ts
+app.onRefusal('body_limit', (refusal) => problem({ status: 413, limit: refusal.limit }));
 ```
 
 ### `page(): /… is already served`
@@ -848,6 +900,11 @@ routes still gets the default 400.
   declare the hook on the app, before the group.
 - The hook returned nothing, `undefined`, for this refusal. Nothing means
   the default: return a reply for every refusal you want answered.
+- The hook is a hook of the other kind, `onRefusal('body_limit', …)`. It
+  answers that kind alone: declare one for `'validation'`, or a general
+  `onRefusal(hook)`.
+- A general `onRefusal(hook)` declared after `onRefusal('validation', …)`
+  replaces it: declare the hook of the kind last.
 
 **Fix:** declare the hook first, and return a reply:
 

@@ -1,5 +1,4 @@
-import type { Refusal } from '../errors/errors';
-import type { AnyReply, Reply } from '../reply/reply';
+import type { AnyReply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
 import { joinPath } from '../router/paths';
 import { fileHandler, staticHandler } from '../static/serve';
@@ -10,7 +9,6 @@ import type {
 	StaticReply,
 } from '../static/types';
 import type { JoinPath, RoutePath } from '../types/path';
-import type { ClientErrorStatus } from '../types/status';
 import type {
 	SocketContext,
 	SocketEntryOf,
@@ -34,15 +32,17 @@ import type {
 } from './definition';
 import { addPage, refusePage, refuseShadowedPages } from './pages';
 import { serve } from './pipeline';
+import { refusalHandler, refusalKind } from './refusal-handlers';
 import type { OperationMethod, RouteOperation } from './route-operation';
 import { createRuntime, mergeGlobals } from './runtime';
-import { refusalHandler, Scope } from './scope';
+import { Scope } from './scope';
 import { startServer, stopServer } from './serving';
 import type {
 	AlxiaOptions,
 	AnyAlxia,
 	ListenOptions,
 	Plugin,
+	RefusalMethod,
 	RouteMethod,
 } from './signatures';
 import { type SocketData, websocketHandler } from './socket';
@@ -50,22 +50,16 @@ import type {
 	BaseContext,
 	BehindShortcuts,
 	BodyLimitShortcut,
-	DeclaredRefusal,
-	DeclaredReply,
 	Empty,
 	MaybePromise,
 	Method,
 	Outcome,
 	ProvidedBy,
-	RefusalResponses,
 	RefusalSchema,
-	RefusalsOf,
-	Refusing,
 	RouteEntryOf,
 	RouteRecord,
 	RouteSchema,
 	ThenShortcuts,
-	TypedReplyFunction,
 } from './types';
 
 /** The route a static directory is served at: its path, then a wildcard. */
@@ -450,39 +444,40 @@ export class Alxia<
 	 * .onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' },
 	 *   (refusal, { reply }) => reply(400, { type: 'urn:example:invalid', status: 400, detail: refusal.kind }))
 	 * ```
+	 *
+	 * Given a kind first, the hook answers that kind alone and reads it
+	 * narrowed; its schemas, if any, type and document that kind's replies
+	 * apart. A kind with no hook of its own, or whose hook returns nothing,
+	 * falls back to the general hook, then to the default. A general hook
+	 * declared after it replaces it; one of the same kind too:
+	 *
+	 * ```ts
+	 * .onRefusal('validation', { response: { 400: Invalid } }, (refusal, { reply }) =>
+	 *   reply(400, { detail: `the ${refusal.part} is invalid` }))
+	 * .onRefusal('body_limit', { response: { 413: TooLarge } }, (refusal, { reply }) =>
+	 *   reply(413, { limit: refusal.limit }))
+	 * ```
 	 */
-	onRefusal<Result extends Reply<ClientErrorStatus, any> | undefined | void>(
-		hook: (refusal: Refusal, ctx: BaseContext & Ctx) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes,
-		Prefix,
-		Exclude<Shortcuts, Refusing> | RefusalsOf<Extract<Result, AnyReply>, Result>
-	>;
-	onRefusal<
-		Responses extends RefusalResponses,
-		Result extends DeclaredReply<Responses> | undefined | void,
-	>(
-		schema: RefusalSchema<Responses>,
-		hook: (
-			refusal: Refusal,
-			ctx: Omit<BaseContext, 'reply'> &
-				Ctx & { readonly reply: TypedReplyFunction<Responses> },
-		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes,
-		Prefix,
-		| Exclude<Shortcuts, Refusing>
-		| RefusalsOf<DeclaredRefusal<Responses>, Result>
-	>;
-	onRefusal(
-		schemaOrHook: RefusalSchema | ((refusal: Refusal, ctx: never) => unknown),
-		maybeHook?: (refusal: Refusal, ctx: never) => unknown,
-	): AnyAlxia {
-		this.#scope.refuseWith(refusalHandler(schemaOrHook, maybeHook));
+	readonly onRefusal = ((
+		first: unknown,
+		second?: RefusalSchema | ((refusal: never, ctx: never) => unknown),
+		third?: (refusal: never, ctx: never) => unknown,
+	): AnyAlxia => {
+		if (typeof first === 'string') {
+			this.#scope.refuseKindWith(
+				refusalKind(first),
+				refusalHandler(second, third),
+			);
+		} else {
+			this.#scope.refuseWith(
+				refusalHandler(
+					first as RefusalSchema | undefined,
+					second as ((refusal: never, ctx: never) => unknown) | undefined,
+				),
+			);
+		}
 		return this;
-	}
+	}) as RefusalMethod<Ctx, Routes, Prefix, Shortcuts>;
 
 	/**
 	 * A global hook run on every request, before routing: a 404 included. A
@@ -779,5 +774,6 @@ export type {
 	ListenOptions,
 	Outcome,
 	Plugin,
+	RefusalMethod,
 	RouteMethod,
 };

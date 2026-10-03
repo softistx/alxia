@@ -11,10 +11,7 @@ Nothing scheduled yet.
 
 ## Next
 
-- **A body too large through `onRefusal`.** A request whose body is over a
-  limit becomes a refusal of its own kind, `body_limit`, so the hook that
-  shapes the 400 can shape the 413 too, as an RFC 9457 problem with its
-  `limit`.
+Nothing scheduled yet.
 
 ## Later
 
@@ -51,6 +48,13 @@ Nothing scheduled yet.
   itself. A route's `cookies` schema still gives its handler the validated
   values. `set.cookies` is documented, down to its `get`, as the
   response's map, which a hook used to misread as the request's.
+- **A hook per refusal kind.** `onRefusal('validation', hook)` and
+  `onRefusal('body_limit', hook)`, each with schemas of its own if given,
+  answer one kind each and read it narrowed. A route's types, the client
+  and `@alxia/openapi` see each kind's replies apart: the 413 of a
+  `body_limit` hook is no part of a route without a limit. A kind with no
+  hook, or whose hook returns nothing, falls back to `onRefusal(hook)`,
+  then to the default.
 - **Refusals in your format.** `onRefusal(hook)` answers a request the
   route's schemas refuse with your own reply instead of
   `400 { error: 'validation', issues }`, for the routes declared after it.

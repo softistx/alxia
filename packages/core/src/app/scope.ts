@@ -3,24 +3,28 @@
  * `decorate`, `wrap`, `onError`, `onRefusal` and `bodyLimit` add for the
  * routes declared after them, and what each definition carries of them.
  */
+import type { RefusalKind } from '../errors/errors';
 import { checkLimit } from '../request/limit';
 import type {
 	ChainHook,
 	ErrorHook,
 	RefusalHandler,
-	RefusalHook,
 	RouteDefinition,
 	SocketDefinition,
 } from './definition';
-import type { RefusalSchema, RouteSchema } from './types';
+import { behind, byKind, type Refusals, then } from './refusal-handlers';
+import type { RouteSchema } from './types';
 
 /** The hooks a route or socket route declared now runs. */
-type ScopedHooks = Pick<RouteDefinition, 'derive' | 'onError' | 'refusal'>;
+type ScopedHooks = Pick<
+	RouteDefinition,
+	'derive' | 'onError' | 'refusal' | 'refusalByKind'
+>;
 
 export class Scope {
 	#derive: ChainHook[] = [];
 	#onError: ErrorHook[] = [];
-	#refusal: RefusalHandler | undefined;
+	#refusals: Refusals = {};
 	/** The `bodyLimit` of the routes declared next, unless theirs says otherwise. */
 	#bodyLimit: number | undefined;
 
@@ -34,9 +38,16 @@ export class Scope {
 		this.#onError.push(hook);
 	}
 
-	/** Sets the `onRefusal` handler in force for the routes declared next. */
+	/** Sets the `onRefusal` handler in force for the routes declared next: of any kind, every other one replaced. */
 	refuseWith(handler: RefusalHandler): void {
-		this.#refusal = handler;
+		this.#refusals = { refusal: handler };
+	}
+
+	/** Sets the `onRefusal(kind, hook)` handler of `kind` for the routes declared next. */
+	refuseKindWith(kind: RefusalKind, handler: RefusalHandler): void {
+		this.#refusals = then(this.#refusals, {
+			refusalByKind: { [kind]: [handler] },
+		});
 	}
 
 	/** Sets the `bodyLimit` of the routes declared next. */
@@ -49,7 +60,7 @@ export class Scope {
 		const copy = new Scope();
 		copy.#derive = [...this.#derive];
 		copy.#onError = [...this.#onError];
-		copy.#refusal = this.#refusal;
+		copy.#refusals = this.#refusals;
 		copy.#bodyLimit = this.#bodyLimit;
 		return copy;
 	}
@@ -59,7 +70,8 @@ export class Scope {
 		return {
 			derive: [...this.#derive],
 			onError: [...this.#onError],
-			refusal: this.#refusal,
+			refusal: this.#refusals.refusal,
+			...byKind(this.#refusals.refusalByKind),
 		};
 	}
 
@@ -87,7 +99,7 @@ export class Scope {
 			path,
 			derive: [...this.#derive, ...definition.derive],
 			onError: [...definition.onError, ...this.#onError],
-			refusal: definition.refusal ?? this.#refusal,
+			...behind(definition, this.#refusals),
 		};
 	}
 
@@ -95,27 +107,7 @@ export class Scope {
 	absorb(plugin: Scope): void {
 		this.#derive = [...this.#derive, ...plugin.#derive];
 		this.#onError = [...plugin.#onError, ...this.#onError];
-		this.#refusal = plugin.#refusal ?? this.#refusal;
+		this.#refusals = then(this.#refusals, plugin.#refusals);
 		this.#bodyLimit = plugin.#bodyLimit ?? this.#bodyLimit;
 	}
-}
-
-/** The handler of `onRefusal(hook)` or `onRefusal(schema, hook)`. */
-export function refusalHandler(
-	schemaOrHook: RefusalSchema | ((refusal: never, ctx: never) => unknown),
-	maybeHook: ((refusal: never, ctx: never) => unknown) | undefined,
-): RefusalHandler {
-	if (typeof schemaOrHook === 'function') {
-		return { hook: schemaOrHook as RefusalHook };
-	}
-	if (typeof maybeHook !== 'function') {
-		throw new TypeError('onRefusal(): the hook is missing');
-	}
-	return {
-		hook: maybeHook as RefusalHook,
-		response: schemaOrHook.response,
-		...(schemaOrHook.contentType === undefined
-			? {}
-			: { contentType: schemaOrHook.contentType }),
-	};
 }

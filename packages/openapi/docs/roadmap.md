@@ -17,8 +17,9 @@ Nothing scheduled yet.
 
 - **The default 400 beside a hook that may fall back to it.** An
   `onRefusal` hook that returns nothing for some refusals lets the default
-  `ValidationError` 400 answer them, and the document does not show it
-  beside the hook's schemas yet. The client's type already does.
+  `ValidationError` 400 answer them — or, for a hook of one kind, the
+  general hook — and the document does not show it beside the hook's
+  schemas yet. The client's type already does.
 
 ## Not planned
 
@@ -36,6 +37,11 @@ Nothing scheduled yet.
 
 ### Next release
 
+- **Refusals by kind.** Behind `onRefusal('validation', …)` and
+  `onRefusal('body_limit', …)`, a route documents each kind's statuses
+  only where that kind may refuse it: the validation hook's on a route that
+  validates, the body-limit hook's on one under a `bodyLimit`. A kind with
+  no hook of its own documents the general hook's, or its default.
 - **Refusals as the app answers them.** A route behind an `onRefusal`
   hook documents what the hook declares — an RFC 9457 problem under
   `application/problem+json`, for one — in place of the `ValidationError`
