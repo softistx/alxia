@@ -1,8 +1,11 @@
 # alxia as the server of a React Router app
 
-Status: **proposed**. Nothing here is built yet. The package comes after
-the owner approves this note, one PR per slice in the order given at the
-end.
+Status: **approved** by the owner on 2026-10-03, with the recommended
+option of every decision below: a Vite plugin for dev (1a), the package's
+`alxiaContext` read through `alxiaOf` (2a), both prerequisites in core and
+`@alxia/compress` (3a, 4a), React Router `^8.0.0` only (5a), `HEAD` as `GET`
+(6a), the catch-all outside the contract (7a) and a generated `serve.js`
+(8a). One PR per slice, in the order given at the end.
 
 The owner wants `@alxia/react-router`: alxia as the HTTP server of a React
 Router **framework-mode** app with SSR. Under it, the loaders read what
