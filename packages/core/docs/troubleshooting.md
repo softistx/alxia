@@ -492,7 +492,8 @@ app.get('/users/:userId', handler);
 "/at/10:30": ":" may only start a segment, as a parameter
 ```
 
-**When:** a literal segment holds a `:` anywhere but at its start:
+**When:** a route, socket or page path's literal segment holds a `:`
+anywhere but at its start:
 `/at/10:30`, `/ns/a:b`, `/x:`.
 
 **Why:** `Bun.serve`'s router reads a `:` anywhere in a segment as the start
@@ -517,7 +518,8 @@ Or spell the literal without a colon: `/at/10h30`.
 "/*.js": "*" may only be a whole segment, as a wildcard
 ```
 
-**When:** a segment holds a `*` beside something else: `/*.js`, `/v*`,
+**When:** a segment of a route, socket or page path holds a `*` beside
+something else: `/*.js`, `/v*`,
 `/a*b`.
 
 **Why:** `Bun.serve`'s router takes a segment that starts with `*` for a
@@ -538,7 +540,8 @@ app.get('/assets/*', ({ params, reply }) => reply(200, params['*']));
 "/a/./b": "." is a dot segment, which a request's URL never keeps
 ```
 
-**When:** a segment is `.` or `..`, or one of their encodings, `%2e` and
+**When:** a segment of a route, socket or page path is `.` or `..`, or one
+of their encodings, `%2e` and
 `%2E%2E` among them: `/a/./b`, `/a/..`.
 
 **Why:** a URL resolves its dot segments away, so a request's pathname
@@ -556,7 +559,8 @@ not one.
 "/café" is not encoded as a request's URL carries it: declare "/caf%C3%A9"
 ```
 
-**When:** a literal segment holds what a URL percent-encodes: non-ASCII
+**When:** a literal segment of a route, socket or page path holds what a
+URL percent-encodes: non-ASCII
 (`é`), a space, a control character, `"`, `<`, `>`, `` ` ``, `{`, `}`, `^`,
 or a `?`, `#` or `\` that the URL would cut or read as a `/`.
 

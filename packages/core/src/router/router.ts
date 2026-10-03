@@ -71,9 +71,10 @@ export class Router<Value> {
 		return this.#shapes.has(compilePath(path).shape);
 	}
 
-	/** Whether `path`, as it was declared, has neither a parameter nor a wildcard. */
+	/** Whether `path` is declared, and has neither a parameter nor a wildcard. */
 	isFixed(path: string): boolean {
-		return this.#paths.get(path)?.compiled.pattern === undefined;
+		const entry = this.#paths.get(path);
+		return entry !== undefined && entry.compiled.pattern === undefined;
 	}
 
 	/** The methods declared at `path`, exactly as it was declared. */

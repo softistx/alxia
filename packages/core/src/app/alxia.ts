@@ -708,7 +708,8 @@ export class Alxia<
 	 * `fetch` reads its URL's pathname, `/a`. A path without parameters is
 	 * matched by Bun only by a target already in that form, so its route
 	 * answers; a request Bun gives to a path with parameters or a wildcard
-	 * is routed again as `fetch` routes it, so both choose alike.
+	 * is routed again as `fetch` routes it, so both choose alike, at the
+	 * cost of `fetch`'s routing on each such request.
 	 */
 	listen(options: ListenOptions | number = {}): Bun.Server<unknown> {
 		const settings = typeof options === 'number' ? { port: options } : options;

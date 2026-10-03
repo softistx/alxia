@@ -137,10 +137,11 @@ core's reason, rather than list it.
 **Fix:** rename the parameter in the operation, as the route that serves it
 must: `/pets/:petId`. A generator writing `operations` from a document turns
 `{pet-id}` into a name the core accepts. For the other messages, write
-the path as the core's
-[troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md)
-says for that message: a `:time` parameter for `/at/10:45`, `/caf%C3%A9`
-for `/café`.
+the path as the core's entry for it says: a `:time` parameter for
+`/at/10:45`
+([`":" may only start a segment`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#--may-only-start-a-segment-as-a-parameter)),
+`/caf%C3%A9` for `/café`
+([`is not encoded as a request's URL carries it`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#-is-not-encoded-as-a-requests-url-carries-it-declare-)).
 
 ## Types
 

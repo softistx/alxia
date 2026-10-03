@@ -198,6 +198,10 @@ A path served twice — or two paths of the same shape, `/u/:id` and
 - a route or a socket where a page is already declared throws
   `GET /dashboard is already served by a page` (`WS …` for a socket).
 
+A page's path is checked as a route's is, so a page at `/café` or `/*.js`
+throws the same `TypeError` ([Paths](routes.md#paths)). Bun matches a page
+on the request's target as it was sent, unresolved dot segments and all.
+
 A page at `/dashboard` beside a route at `/:id` is no conflict: Bun serves
 the page at `/dashboard`, and the route every other path.
 
