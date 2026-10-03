@@ -14,7 +14,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/openapi-routes` | `implemented` and `exactly`: every operation of an OpenAPI document has a route, read from `app.routes` | core |
 | `@alxia/zod` | Zod coercions (`zq`) and the OpenAPI converter | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's hooks and typed context, Yoga's plugins | core, graphql-yoga, graphql |
-| `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its hooks, loaders reading its typed context, the client build's files; `/vite`, one server entry for `react-router dev` and `build` | core, react-router; vite (optional, `/vite`) |
+| `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its hooks, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js` | core, react-router; vite (optional, `/vite`) |
 | `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | function plugins: global hooks | core |
 | `@alxia/rate-limit`, `@alxia/jwt`, `@alxia/logger` | app plugins: typed context, typed replies, routes | core |
 | `@alxia/env` | environment variables through any Standard Schema | — |
@@ -123,7 +123,8 @@ each with a matching key in `exports`.
   the fixture's build imports it so, and a spec holding the source would
   set an `alxiaContext` its loaders never read. The `/vite` specs start
   Vite in process and build with the plugin on copies of the fixture,
-  `packages/react-router/.fixture-*`, gitignored and removed after; a build
+  `packages/react-router/.fixture-*`, gitignored and removed after, with
+  its `app/server.ts` and, for the default server, without it; a build
   runs with `NODE_ENV=production`, since `bun test` sets `test`.
 - **A build that exits 0 is not evidence the artifact loads.**
   `bun run verify:artifacts` packs, installs and imports every package.

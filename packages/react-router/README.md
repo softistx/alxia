@@ -2,198 +2,193 @@
 
 [alxia](https://www.npmjs.com/package/@alxia/core) as the HTTP server of a
 [React Router](https://reactrouter.com) framework app, server rendered,
-under Bun. The pages are a catch-all route behind the app's hooks — logger,
-compression, sessions, guards — and each loader, action and middleware
-reads what those hooks built, typed by the app. alxia's own routes, an
-`/api`, live beside the pages, and the client build's files are served with
-the cache each one deserves.
+under Bun. One Vite plugin and no server file: the pages are served by
+alxia in `react-router dev` and from the build. When you want more,
+`app/server.ts` adds the app's hooks — logger, compression, sessions,
+guards — and an `/api` beside the pages, and each loader reads what those
+hooks built, typed.
+
+## Quick start
+
+Start from the official template, `bunx create-react-router@latest`, and
+make three changes.
+
+**1. Install** alxia and this package:
 
 ```sh
-bun add @alxia/react-router @alxia/core react-router
-bun add -d typescript
+bun add @alxia/core @alxia/react-router
 ```
 
-`@alxia/core` and `react-router` 8 are peers: the package declares no
-dependency. `vite` 7 or 8 is a third, optional, for `/vite` alone. React,
-`@react-router/dev`, Vite and `isbot` are the app's, as in any React
-Router app; the runtime never imports them.
+**2. Add the plugin** to `vite.config.ts`. It can go anywhere in `plugins`:
 
-| import | |
-| --- | --- |
-| `@alxia/react-router` | the runtime: the catch-all, the context, the client's files |
-| `@alxia/react-router/vite` | `alxiaServer()`, the Vite plugin: one server entry for `react-router dev` and `react-router build` |
+```diff
++import { alxia } from "@alxia/react-router/vite";
+ import { reactRouter } from "@react-router/dev/vite";
+ import tailwindcss from "@tailwindcss/vite";
+ import { defineConfig } from "vite";
 
-## One server entry, with Vite
+ export default defineConfig({
+-  plugins: [tailwindcss(), reactRouter()],
++  plugins: [tailwindcss(), reactRouter(), alxia()],
+   resolve: {
+     tsconfigPaths: true,
+   },
+ });
+```
+
+**3. Start with Bun**, in `package.json`:
+
+```diff
+-    "start": "react-router-serve ./build/server/index.js",
++    "start": "bun build/server/index.js",
+```
+
+The template's `dev`, `build` and `typecheck` scripts are unchanged. They
+run through `bun run`, with no Node installed:
+
+- **`bun run dev`**: every request Vite does not answer itself (pages,
+  data, `/api`) reaches alxia, with HMR.
+- **`bun run build`** writes `build/server/index.js`, a server you can run.
+- **`bun run start`** serves the pages and the client build. It listens on
+  `PORT` (3000) and `HOST` (`0.0.0.0`), and stops on `SIGTERM`.
+
+`@alxia/core` and `react-router` 8 are peers, and `vite` 7 or 8 is an
+optional peer, for `/vite`. The package declares no dependency.
+
+Its `typescript` peer is 6 or 7. The template's TypeScript 5.9 typechecks,
+but `bun add` warns about it; `bun add -d typescript@^6` silences the
+warning.
+
+## Customising: `app/server.ts`
 
 The examples use `@alxia/logger` (`bun add @alxia/logger`); any plugin
-works the same way.
+works the same way. The plugin picks the file up in dev and in the build:
 
 ```ts
-// vite.config.ts
-import { alxiaServer } from '@alxia/react-router/vite';
-import { reactRouter } from '@react-router/dev/vite';
-import { defineConfig } from 'vite';
-
-export default defineConfig({
-	plugins: [alxiaServer({ entry: 'app/server.ts' }), reactRouter()], // alxiaServer first
-});
-```
-
-```ts
-// app/server.ts: its default export is the alxia app
-import { alxia } from '@alxia/core';
+// app/server.ts
 import { logger } from '@alxia/logger';
-import { reactRouter } from '@alxia/react-router';
-import type { ServerBuild } from 'react-router';
+import { createServer } from '@alxia/react-router';
 
-export const base = alxia()
-	.use(logger())
-	.get('/api/health', ({ reply }) => reply.ok({ ok: true }))
-	.derive(({ cookies }) => {
-		const name = cookies.get('user');
-		return { user: name === null ? null : { name } };
-	});
+const server = createServer({
+	configure: (app) =>
+		app
+			.use(logger())
+			.get('/api/health', ({ reply }) => reply.ok({ ok: true }))
+			.derive(({ request }) => {
+				const name = request.headers.get('x-user');
+				return { user: name === null ? null : { name } };
+			}),
+});
 
-export type Base = typeof base; // what the loaders read
+export default server;
 
-export default base.use((app) =>
-	reactRouter(app, {
-		build: () => import('virtual:react-router/server-build') as Promise<ServerBuild>,
-		mode: import.meta.env.DEV ? 'development' : 'production',
-		client: new URL('../client', import.meta.url),
-	}),
-);
-```
-
-```jsonc
-// package.json
-"scripts": {
-	"dev": "bunx --bun react-router dev",
-	"build": "bunx --bun react-router build",
-	"start": "bun build/server/serve.js"
+// What alxiaOf(context) reads in the loaders.
+declare module '@alxia/react-router' {
+	interface Register {
+		server: typeof server;
+	}
 }
 ```
 
-Under `react-router dev`, the entry is loaded through Vite's SSR runner and
-answers every request Vite does not answer itself, with HMR, and an edit
-to the entry live on the next request. `react-router build` makes it the
-server build, `build/server/index.js`, and writes `build/server/serve.js`,
-which listens on `PORT` (3000) and `HOST` (`0.0.0.0`).
+`configure` receives the alxia app and returns it, so what it builds is
+typed. The plugin wires React Router's build, the mode and the client
+folder.
 
-## A server file of your own, without `alxiaServer()`
-
-A server file of your own beside the build, with no `alxiaServer()`:
-
-```ts
-// server.ts
-import { alxia } from '@alxia/core';
-import { logger } from '@alxia/logger';
-import { reactRouter } from '@alxia/react-router';
-import type { ServerBuild } from 'react-router';
-
-export const base = alxia()
-	.use(logger())
-	.get('/api/health', ({ reply }) => reply.ok({ ok: true }))
-	.derive(({ cookies }) => {
-		const name = cookies.get('user');
-		return { user: name === null ? null : { name } };
-	});
-
-export type Base = typeof base;
-
-const app = base.use((app) =>
-	reactRouter(app, {
-		build: () => import('./build/server/index.js') as Promise<ServerBuild>,
-		client: 'build/client',
-	}),
-);
-
-app.listen(Number(process.env.PORT ?? 3000));
-```
-
-```sh
-bunx --bun react-router build && bun server.ts
-```
-
-`reactRouter()` is called through `use`, so it reads the app's context
-type. It declares `GET`, `POST`, `PUT`, `PATCH` and `DELETE` at `/*`, behind
-every hook declared before it, and the app's own routes answer their
-paths wherever they are declared; a `HEAD` is handed to React
-Router as its `GET`, and the core drops the body.
+A request runs through `beforeAll`, then the client's files, then
+`configure`, then the pages. So a guard in `configure` does not block the
+login page's JavaScript.
 
 ## Reading the context in a loader
 
 ```ts
-// app/routes/dashboard.tsx
+// app/routes/home.tsx
 import { alxiaOf } from '@alxia/react-router';
-import type { Base } from '../server'; // the app before the catch-all
-import type { Route } from './+types/dashboard';
+import type { Route } from './+types/home';
 
 export function loader({ context }: Route.LoaderArgs) {
-	const { user, log } = alxiaOf<Base>(context); // typed: what `base` built
-	log.info('dashboard');
+	const { user, log } = alxiaOf(context); // typed: what configure built
+	log.info('home');
 	return { name: user?.name ?? 'anonymous' };
 }
 ```
 
-Pass the type of the app **before** the catch-all, imported with `import
-type`. Reading a key no hook derives, or the type of something that is not
-an app, is a compile error. The key, `alxiaContext`, lives in this
-package, so the server and React Router's build share it; a key made in
-the app's own `app/` folder is copied into the build, and the server's
-`context.set` never reaches it. `getLoadContext(ctx, context)` sets such
-keys on React Router's provider, `ctx` typed by the app.
+How `alxiaOf(context)` is typed:
+
+- with the `Register` declaration above, by that server: reading something
+  no hook derives is a compile error;
+- without it, `alxiaOf<typeof server>(context)` names the server;
+- with neither, `alxiaOf(context)` is `BaseContext`.
+
+[More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#typing-the-loaders)
+
+## Options
+
+```ts
+// app/server.ts
+import { logger } from '@alxia/logger';
+import { createServer } from '@alxia/react-router';
+import { greetingContext } from './context'; // createContext<string>('unset'), in app/context.ts
+
+export default createServer({
+	beforeAll: (app) => app.use(logger()), // runs before the client's files too
+	configure: (app) => app.get('/api/health', ({ reply }) => reply.ok({ ok: true })),
+	getLoadContext: (_ctx, context) => context.set(greetingContext, 'hello'),
+	listen: { idleTimeout: 30 }, // its port and hostname, if given, win over PORT and HOST
+	onListen: (server) => console.log(`up on ${server.url}`),
+});
+```
+
+`build`, `mode` and `client` override what the plugin wires;
+`client: false` serves no client files, so you can serve them yourself.
+A server of your own, with no plugin, calls `reactRouter(app, { build,
+client })` itself. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#escape-hatches)
 
 ## The client's files
 
-With `client`, the folder `react-router build` wrote, `build/client`, is
-served before the catch-all:
+In a build, `build/client` is served before `configure`'s hooks:
 
 | path | `Cache-Control` |
 | --- | --- |
 | `/assets/*`, the hashed bundles | `public, max-age=31536000, immutable` |
 | every other top-level file or folder, the copies of `public/` | `public, max-age=3600` |
 
-A missing asset is alxia's JSON 404, not a page. In `development` the
-option is ignored: Vite serves them.
+A missing asset gets alxia's JSON 404, not a page. In dev, Vite serves
+these files.
 
 ## Leaving the pages out of OpenAPI
 
-```ts
-import { docs } from '@alxia/openapi';
-import { isReactRouterRoute } from '@alxia/react-router';
+The examples use `@alxia/openapi` (`bun add @alxia/openapi`):
 
-app.use(docs(app, { info: { title: 'Shop', version: '1.0.0' }, exclude: isReactRouterRoute }));
+```ts
+// app/server.ts
+import { docs } from '@alxia/openapi';
+import { createServer, isReactRouterRoute } from '@alxia/react-router';
+
+export default createServer({
+	configure: (app) =>
+		app.use(docs(app, { info: { title: 'Shop', version: '1.0.0' }, exclude: isReactRouterRoute })),
+});
 ```
 
 The catch-all adds nothing to the app's route table, so the typed client
-never shows it. `isReactRouterRoute` names it, and the client files, for
-`@alxia/openapi`.
+never shows it. `isReactRouterRoute` names the catch-all and the client
+files, so `@alxia/openapi` can leave them out.
 
 ## Traps
 
-- **Without `alxiaServer()`, a context key made in `app/` is not the one
-  the loaders read**: React
-  Router's build holds its own copy, and the loader gets the default or
-  `Error: No value found for context`. Read alxia's context with
-  `alxiaOf`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#error-no-value-found-for-context)
-- **Without `alxiaServer()`, in a monorepo, Vite bundles a linked
-  `@alxia/react-router`** into the
-  build, with a second `alxiaContext`: `alxiaOf` then throws. Add
-  `ssr: { external: ['@alxia/react-router'] }` to `vite.config.ts`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#alxiaof-this-request-has-no-alxia-context-)
+- **A context key made in `app/` reaches the loaders only through the
+  plugin**, which builds the server with the routes. A server of your own,
+  without the plugin, holds another copy of the key: read alxia's context
+  with `alxiaOf`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#error-no-value-found-for-context)
 - **Bun's user agent is a bot to `isbot`**, so a test client gets the
   finished page, never a stream. Send a browser's `user-agent`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-streamed-page-arrives-in-one-piece)
-- **An index route's action is `POST /?index`**; `POST /` is React
+- **An index route's action is `POST /?index`**; `POST /` gets React
   Router's 405. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
 - **`@alxia/secure-headers`' default policy blocks the page's scripts**
   and forms: give the pages a policy of their own. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
 - **Under `react-router dev`, alxia's `ws` routes, `page()` and
   `ctx.server` are absent**: requests arrive through `app.fetch`. Try
   sockets against the build. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-websocket-route-does-not-connect-under-react-router-dev)
-- **`alxiaServer()` goes before `reactRouter()`** in `vite.config.ts`, or
-  React Router renders the pages without alxia. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#alxiaof-this-request-has-no-alxia-context-)
-- **Build with `NODE_ENV=production`**, or unset: `bun test` sets `test`,
-  `import.meta.env.DEV` is then true, and the assets are not served. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#no-route-matches-url-assets)
 - **An alxia route whose path covers a page takes it**, wherever it is
   declared: `GET /:slug` answers `/about`. Keep alxia's routes under
   `/api`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-page-answers-alxias-json-404-or-405-instead-of-rendering)
@@ -202,21 +197,31 @@ never shows it. `isReactRouterRoute` names it, and the client files, for
 
 | export | |
 | --- | --- |
-| `reactRouter(app, options)` | the catch-all and the client's files. `build`, `mode`, `getLoadContext`, `client` |
+| `createServer(options?)` | the server of `app/server.ts`. `beforeAll`, `configure`, `getLoadContext`, `build`, `mode`, `client`, `listen`, `onListen` |
+| `ServerOptions<Before, App>` | its options |
+| `ReactRouterServer<App>` | what it returns: `create(wiring)` makes the app, `start(app)` listens |
+| `ServerWiring` | what `create` takes: `build`, `mode`, `client` |
+| `FreshApp` | the app `beforeAll`, or `configure` without it, receives |
+| `alxiaOf<App>(context)` | what alxia's hooks built, in a loader, an action or a middleware. Typed by the registered server, by the type argument (a server or an app), or as `BaseContext` |
+| `Register` | the interface to augment with `server: typeof server` |
+| `RegisteredApp` | the app `alxiaOf` reads with no type argument |
+| `RegisteredOf<R>` | the app a `Register`-shaped interface names: its server's, a fresh app, or `InvalidRegister` |
+| `InvalidRegister` | what a `Register` naming neither a server nor an app reads as: every key of the app's own a compile error |
+| `AppOf<Server>` | the app a server makes |
+| `alxiaContext` | the React Router context key `alxiaOf` reads, set on every request |
+| `reactRouter(app, options)` | the catch-all and the client's files, for a server of your own. `build`, `mode`, `getLoadContext`, `client` |
 | `ReactRouterOptions<Ctx>` | its options |
-| `alxiaOf<App>(context)` | what alxia's hooks built, in a loader, an action or a middleware, typed as `ContextOf<App>` |
-| `alxiaContext` | the React Router context key it reads, set on every request |
-| `isReactRouterRoute(route)` | whether `reactRouter()` declared a route, for OpenAPI's `exclude` |
+| `isReactRouterRoute(route)` | whether this package declared a route, for OpenAPI's `exclude` |
 
 From `@alxia/react-router/vite`:
 
 | export | |
 | --- | --- |
-| `alxiaServer(options?)` | the Vite plugin. `entry`, `app/server.ts` by default |
-| `AlxiaServerOptions` | its options |
+| `alxia(options?)` | the Vite plugin. `entry` is the server file: `app/server.ts` by default, or the default server when there is none |
+| `AlxiaOptions` | its options |
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, the Vite plugin, the server entry, loaders reading the context, the client's files, OpenAPI, and testing.
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev and the build work, customising the server, typing the loaders, the app's own keys, escape hatches, the client's files, OpenAPI, testing and deploying.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.

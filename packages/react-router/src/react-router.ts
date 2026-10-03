@@ -1,6 +1,7 @@
 import { fileURLToPath } from 'node:url';
 import type {
 	Alxia,
+	AnyAlxia,
 	AnyReply,
 	BaseContext,
 	MaybePromise,
@@ -110,22 +111,43 @@ export function reactRouter<
 		);
 	};
 
+	const routes = asRoutes(app);
+	declaring(app, () => {
+		if (options.client !== undefined && mode === 'production') {
+			serveClient(routes, pathOf(options.client));
+		}
+		for (const method of METHODS) routes[method]('/*', handler);
+	});
+	return app;
+}
+
+/**
+ * Declares the client build's files on `app`, marked for
+ * `isReactRouterRoute`: what `reactRouter()` does with `client`, apart, so
+ * that `createServer()` serves them before the hooks of `configure`.
+ */
+export function declareClient(app: AnyAlxia, client: string | URL): void {
+	declaring(app, () => serveClient(asRoutes(app), pathOf(client)));
+}
+
+/** Runs `declare`, and marks every route it added to `app` as ours. */
+function declaring(app: AnyAlxia, declare: () => void): void {
 	const before = new Set(app.routes);
-	const routes = app as unknown as {
+	declare();
+	for (const route of app.routes) {
+		if (!before.has(route)) declared.add(route.handler);
+	}
+}
+
+/** The app's route methods, untyped: the catch-all's handler is not one a route type admits. */
+function asRoutes(app: AnyAlxia) {
+	return app as unknown as {
 		static(path: string, source: string, options: object): unknown;
 		file(path: string, file: string, options: object): unknown;
 	} & Record<
 		(typeof METHODS)[number],
 		(path: string, handler: unknown) => unknown
 	>;
-	if (options.client !== undefined && mode === 'production') {
-		serveClient(routes, pathOf(options.client));
-	}
-	for (const method of METHODS) routes[method]('/*', handler);
-	for (const route of app.routes) {
-		if (!before.has(route)) declared.add(route.handler);
-	}
-	return app;
 }
 
 /** A handler that resolves a function build once in production, on every request in development. */

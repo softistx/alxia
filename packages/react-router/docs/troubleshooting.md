@@ -7,24 +7,32 @@ a loader, a message React Router or the browser prints, or an error from
 
 **Thrown or printed**
 
-- [`Error: No value found for context`](#error-no-value-found-for-context)
 - [`alxiaOf(): this request has no alxia context. …`](#alxiaof-this-request-has-no-alxia-context-)
-- [`alxia-react-router: … must export the alxia app as its default export: export default app.`](#alxia-react-router--must-export-the-alxia-app-as-its-default-export-export-default-app)
-- [`alxia-react-router: Vite's ssr environment does not run modules in this process, so … cannot be loaded.`](#alxia-react-router-vites-ssr-environment-does-not-run-modules-in-this-process-so--cannot-be-loaded)
+- [`Error: No value found for context`](#error-no-value-found-for-context)
+- [`alxia-react-router: … must export createServer() from @alxia/react-router as its default export: …`](#alxia-react-router--must-export-createserver-from-alxiareact-router-as-its-default-export-)
+- [`alxia-react-router: the entry … does not exist. …`](#alxia-react-router-the-entry--does-not-exist-)
+- [`alxia-react-router: React Router's Vite plugin is not in this config. …`](#alxia-react-router-react-routers-vite-plugin-is-not-in-this-config-)
+- [`alxia-react-router: serverBundles splits React Router's server build in several, and alxia serves one. …`](#alxia-react-router-serverbundles-splits-react-routers-server-build-in-several-and-alxia-serves-one-)
+- [`alxia-react-router: Vite's ssr environment does not run modules in this process, so the server cannot be loaded.`](#alxia-react-router-vites-ssr-environment-does-not-run-modules-in-this-process-so-the-server-cannot-be-loaded)
 - [`The React Router Vite plugin requires the use of a Vite config file`](#the-react-router-vite-plugin-requires-the-use-of-a-vite-config-file)
 - [`No route matches URL "/assets/…"`](#no-route-matches-url-assets)
 - [``You made a POST request to "/" but did not provide an `action` for route "root", so there is no way to handle the request.``](#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
 - [`TypeError: reactRouter(): client is …, which is not a directory. …`](#typeerror-reactrouter-client-is--which-is-not-a-directory-)
 - [`TypeError: reactRouter(): … cannot be served at a path of its own name; rename it. …`](#typeerror-reactrouter--cannot-be-served-at-a-path-of-its-own-name-rename-it-)
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
+- [`warn: incorrect peer dependency "typescript@5.9.3"`](#warn-incorrect-peer-dependency-typescript593)
 
 **Types**
 
-- [`Type '…' does not satisfy the constraint 'Alxia<any, any, any, any>'`](#type--does-not-satisfy-the-constraint-alxiaany-any-any-any)
 - [`Property '…' does not exist on type 'BaseContext & …'`](#property--does-not-exist-on-type-basecontext--)
+- [`Type '…' does not satisfy the constraint 'AnyAlxia | ReactRouterServer<AnyAlxia>'`](#type--does-not-satisfy-the-constraint-anyalxia--reactrouterserveranyalxia)
+- [`Type '(app: …) => void' is not assignable to type '(app: …) => AnyAlxia'`](#type-app---void-is-not-assignable-to-type-app---anyalxia)
+- [`Property '…' does not exist on type 'BaseContext & { readonly 'Register.server must be typeof server, the default export of createServer()': never; }'`](#property--does-not-exist-on-type-basecontext---readonly-registerserver-must-be-typeof-server-the-default-export-of-createserver-never-)
+- [`Subsequent property declarations must have the same type. Property 'server' must be of type …`](#subsequent-property-declarations-must-have-the-same-type-property-server-must-be-of-type-)
 
 **Traps**
 
+- [`bun build/server/index.js` exits at once, printing nothing](#bun-buildserverindexjs-exits-at-once-printing-nothing)
 - [A loader reads `null` from the app's own key](#a-loader-reads-null-from-the-apps-own-key)
 - [A page answers alxia's JSON 404 or 405 instead of rendering](#a-page-answers-alxias-json-404-or-405-instead-of-rendering)
 - [A streamed page arrives in one piece](#a-streamed-page-arrives-in-one-piece)
@@ -33,69 +41,32 @@ a loader, a message React Router or the browser prints, or an error from
 
 ## Thrown or printed
 
-### `Error: No value found for context`
-
-**When:** a loader, action or middleware calls `context.get(key)` with a
-key made by `createContext()` with no default value, in a file under
-`app/`, and the server set it in `getLoadContext`.
-
-**Why:** `react-router build` bundles `app/context.ts` into
-`build/server/index.js`. The server, which imports `app/context.ts`
-itself, holds another `createContext()` object. React Router matches keys
-by identity, so the server's `context.set(userContext, user)` sets a key
-the loaders never read.
-
-```ts
-// server.ts: the trap
-import { userContext } from './app/context'; // not the build's copy
-reactRouter(app, { build, getLoadContext: ({ user }, context) => context.set(userContext, user) });
-```
-
-**Fix:** read alxia's context with `alxiaOf`. Its key, `alxiaContext`,
-lives in this package under `node_modules`, which Vite leaves external, so
-the build and the server load one module:
-
-```ts
-// app/routes/home.tsx
-import { alxiaOf } from '@alxia/react-router';
-import type { Base } from '../../base';
-
-export function loader({ context }: Route.LoaderArgs) {
-	const { user } = alxiaOf<Base>(context);
-	return { name: user?.name ?? 'anonymous' };
-}
-```
-
-A key of your own works when it is exported by a package installed under
-`node_modules` (`@acme/session`). A key in `app/` works too under
-`@alxia/react-router/vite`, where the entry is built with the routes and
-loaded in dev by the same runner: `app/context.ts` is then one module.
-
 ### `alxiaOf(): this request has no alxia context. …`
 
 ```text
-Error: alxiaOf(): this request has no alxia context. Serve the React Router build through reactRouter() from @alxia/react-router, and in dev put alxiaServer() from @alxia/react-router/vite before reactRouter() in vite.config.ts.
+Error: alxiaOf(): this request has no alxia context. Serve the React Router app through alxia: add alxia() from @alxia/react-router/vite to vite.config.ts's plugins, or, with a server of your own, serve the build through reactRouter() from @alxia/react-router.
 ```
 
 **When:** a loader calls `alxiaOf` and `alxiaContext` was not set.
 
 **Why:** one of three:
 
-- the request did not go through `reactRouter()`: the app runs under
-  `react-router dev` or `react-router-serve` alone, or a unit test calls the
+- the request did not go through alxia: `vite.config.ts` has no `alxia()`,
+  the build runs under `react-router-serve`, or a unit test calls the
   loader with a bare `RouterContextProvider`;
-- `alxiaServer()` comes **after** `reactRouter()` in `vite.config.ts`:
-  React Router's own dev middleware then renders the pages, without alxia;
-- without the Vite plugin, the server build holds **its own copy** of `@alxia/react-router`. Vite
-  leaves a package external only when it resolves under `node_modules` to a
-  `.js` file. A package linked from a workspace (`workspace:^`, `bun link`)
+- a server of your own, without the plugin, serves the build without
+  `reactRouter()`;
+- a server of your own, without the plugin, in a monorepo: the server
+  build holds **its own copy** of `@alxia/react-router`. Vite leaves a
+  package external only when it resolves under `node_modules` to a `.js`
+  file. A package linked from a workspace (`workspace:^`, `bun link`)
   resolves to its folder, outside `node_modules`, and Vite bundles it into
   `build/server/index.js` with a second `alxiaContext` the server never
   sets.
 
-**Fix:** serve the build through `reactRouter()`, and put `alxiaServer()`
-first in `plugins`. In a monorepo without the plugin, tell Vite to leave the
-package external:
+**Fix:** add `alxia()` to `vite.config.ts`, as in the
+[setup](guide.md#setup). With a server of your own in a monorepo, tell
+Vite to leave the package external:
 
 ```ts
 // vite.config.ts
@@ -121,39 +92,128 @@ context.set(alxiaContext, { user: { name: 'Ada' } });
 await loader({ context, request: new Request('http://localhost/'), params: {} } as never);
 ```
 
-### `alxia-react-router: … must export the alxia app as its default export: export default app.`
+### `Error: No value found for context`
 
-```text
-TypeError: alxia-react-router: app/server.ts must export the alxia app as its default export: export default app.
+**When:** a loader, action or middleware calls `context.get(key)` with a
+key made by `createContext()` with no default value, in a file under
+`app/`, and a server of your own, without the plugin, set it in
+`getLoadContext`.
+
+**Why:** `react-router build` bundles `app/context.ts` into
+`build/server/index.js`. A server outside the build, which imports
+`app/context.ts` itself, holds another `createContext()` object. React
+Router matches keys by identity, so that server's
+`context.set(userContext, user)` sets a key the loaders never read.
+
+```ts
+// server.ts, without the plugin: the trap
+import { userContext } from './app/context'; // not the build's copy
+reactRouter(app, { build, getLoadContext: ({ user }, context) => context.set(userContext, user) });
 ```
 
-Vite's error page shows it, and the request is a 500.
+**Fix:** serve the app with the plugin, `alxia()` in `vite.config.ts`: the
+server is then built with the routes, and `app/context.ts` is one module
+for both, in dev and in the build. See
+[the app's own context keys](guide.md#the-apps-own-context-keys).
 
-**When:** under `react-router dev`, the `entry` given to `alxiaServer()`
-has no default export, or its default is not an app: a named `export const
-app`, the app before `reactRouter()` was called on it, or `{ fetch }`
-wrapped in an object that has none.
+Without the plugin, read alxia's context with `alxiaOf`: its key,
+`alxiaContext`, lives in this package under `node_modules`, which Vite
+leaves external, so the build and the server load one module. A key
+exported by a package installed under `node_modules` (`@acme/session`)
+works for the same reason.
 
-**Why:** the plugin hands each request to the default export's `fetch`.
+### `alxia-react-router: … must export createServer() from @alxia/react-router as its default export: …`
 
-**Fix:** export the app, after the catch-all, as the default:
+```text
+TypeError: alxia-react-router: app/server.ts must export createServer() from @alxia/react-router as its default export: export default createServer({ … }).
+```
+
+Under `react-router dev`, Vite's error page shows it, and the request is a
+500. In a build, `bun build/server/index.js` throws it at startup.
+
+**When:** the server file has no default export, or its default is not
+what `createServer()` returns: an alxia app, a named `export const server`,
+or the options object itself.
+
+**Why:** the plugin makes the app with the default export's `create`, and
+listens with its `start`.
+
+**Fix:** export the server as the default:
 
 ```ts
 // app/server.ts
-export const base = alxia().use(logger());
-export type Base = typeof base;
+import { createServer } from '@alxia/react-router';
 
-export default base.use((app) => reactRouter(app, { build: () => import('virtual:react-router/server-build') }));
+const server = createServer({ configure: (app) => app });
+export default server;
 ```
 
-### `alxia-react-router: Vite's ssr environment does not run modules in this process, so … cannot be loaded.`
+An alxia app of your own, with `reactRouter()` on it, is served without the
+plugin: see [a server of your own](guide.md#a-server-of-your-own-without-the-plugin).
+
+### `alxia-react-router: the entry … does not exist. …`
+
+```text
+Error: alxia-react-router: the entry server/main.ts does not exist. Create it, or leave entry out to use app/server.ts, or the default server without it.
+```
+
+**When:** `alxia({ entry })` names a file that is not there, relative to
+Vite's root. Under `react-router dev` each request is a 500 saying so;
+`react-router build` fails.
+
+**Why:** a missing `app/server.ts` falls back to the default server, but an
+`entry` you named is taken as meant.
+
+**Fix:** correct the path, or leave `entry` out.
+
+### `alxia-react-router: React Router's Vite plugin is not in this config. …`
+
+```text
+Error: alxia-react-router: React Router's Vite plugin is not in this config. Add reactRouter() from @react-router/dev/vite beside alxia() in vite.config.ts.
+```
+
+**When:** Vite starts, for `react-router dev`, `react-router build` or
+`vite`, with `alxia()` and no `reactRouter()`.
+
+**Why:** the plugin reads React Router's config (the app directory, the
+build directory, the server build's file name) from React Router's own
+plugin.
+
+**Fix:** list both, in any order:
+
+```ts
+// vite.config.ts
+import { alxia } from '@alxia/react-router/vite';
+import { reactRouter } from '@react-router/dev/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({ plugins: [reactRouter(), alxia()] });
+```
+
+### `alxia-react-router: serverBundles splits React Router's server build in several, and alxia serves one. …`
+
+```text
+Error: alxia-react-router: serverBundles splits React Router's server build in several, and alxia serves one. Remove serverBundles from react-router.config.ts.
+```
+
+**When:** `react-router.config.ts` sets `serverBundles`.
+
+**Why:** the plugin builds one server, `build/server/index.js`, with React
+Router's build inside it. Server bundles make several, each its own
+`index.js`.
+
+**Fix:** remove `serverBundles`. One alxia server serves every route.
+
+### `alxia-react-router: Vite's ssr environment does not run modules in this process, so the server cannot be loaded.`
 
 **When:** under `react-router dev`, Vite's `ssr` environment is not a
 runnable one: another plugin replaced it with an environment that runs
 elsewhere, such as a worker runtime.
 
-**Why:** the plugin loads the entry with the `ssr` environment's module
-runner, in Vite's own process, where Bun runs the app.
+**Why:** the plugin loads the server with the `ssr` environment's module
+runner, in Vite's own process, where Bun runs the app. The check reads the
+environment's `runner` itself, so an app whose Vite is another copy than
+the one this package was tested with passes it.
 
 **Fix:** drop the plugin that replaces the `ssr` environment. alxia runs
 under Bun, not in a worker runtime.
@@ -163,7 +223,7 @@ under Bun, not in a worker runtime.
 React Router's Vite plugin throws it.
 
 **When:** a script or a test starts Vite with `createServer({
-configFile: false, plugins: [alxiaServer(), reactRouter()] })`.
+configFile: false, plugins: [alxia(), reactRouter()] })`.
 
 **Why:** React Router's plugin reads its options from a config file, and
 refuses inline ones.
@@ -183,28 +243,22 @@ await server.listen();
 
 ### `No route matches URL "/assets/…"`
 
-React Router's 404 page answers every file under `/assets`, from
-`bun build/server/serve.js`.
+React Router's 404 page answers every file under `/assets`.
 
-**When:** the build ran with `NODE_ENV` set to something other than
-`production`, such as `test` under `bun test`, or a `development` left in
-the shell.
+**When:** in a build, the server runs in `development`: `createServer({
+mode: 'development' })`, or a server of your own with `reactRouter(app, {
+mode: 'development' })`.
 
-**Why:** Vite replaces `import.meta.env.DEV` by `NODE_ENV`, not by the
-command. With `mode: import.meta.env.DEV ? 'development' : 'production'`,
-such a build is in `development`, where `client` is ignored, so nothing
-serves `build/client` and the catch-all gets the assets.
+**Why:** in `development` the client's files are left to Vite's dev
+server, so nothing serves `build/client`, and the catch-all gets the
+assets. Under the plugin the mode follows the command, `production` in a
+build, whatever `NODE_ENV` says; only an explicit `mode` changes it.
 
-**Fix:** build with `NODE_ENV=production`, or unset:
-
-```sh
-NODE_ENV=production bunx --bun react-router build
-```
-
-From a test:
+**Fix:** leave `mode` out, or set it from where the server runs:
 
 ```ts
-await Bun.$`bunx --bun react-router build`.env({ ...process.env, NODE_ENV: 'production' });
+// server.ts, without the plugin
+reactRouter(app, { build, client: 'build/client', mode: 'production' });
 ```
 
 ### ``You made a POST request to "/" but did not provide an `action` for route "root", so there is no way to handle the request.``
@@ -231,13 +285,17 @@ The single-fetch form is `POST /_.data?index`.
 TypeError: reactRouter(): client is build/clinet, which is not a directory. Pass the client build, build/client by default.
 ```
 
-**When:** at startup, `client` names a path that is missing or a file.
+**When:** at startup, `client` — `createServer`'s, `create`'s or
+`reactRouter`'s — names a path that is missing or a file.
 
-**Why:** the folder is read when `reactRouter()` runs, to declare a route
-per top-level entry. A relative path is resolved against the process's
-working directory, not the server file.
+**Why:** the folder is read when the app is made, to declare a route per
+top-level entry. A relative path is resolved against the process's
+working directory, not the server file. Under the plugin, with no
+`client` option, the folder is `build/client` resolved against the built
+file, and is found wherever the process starts.
 
-**Fix:** build first, and pass the folder relative to the server file:
+**Fix:** build first, leave `client` to the plugin, or pass the folder
+relative to the file that names it:
 
 ```ts
 reactRouter(app, { build, client: new URL('./build/client', import.meta.url) });
@@ -245,10 +303,10 @@ reactRouter(app, { build, client: new URL('./build/client', import.meta.url) });
 
 ### `TypeError: reactRouter(): … cannot be served at a path of its own name; rename it. …`
 
-**When:** at startup, with `client` given, a top-level file or folder of
-the client build — a copy of `public/` — has a name no route can carry:
-`a:b.txt` (a `:` starts a parameter), `*x` (a `*` is a wildcard). The
-message ends with the core's refusal, which says which.
+**When:** at startup, a top-level file or folder of the client build — a
+copy of `public/` — has a name no route can carry: `a:b.txt` (a `:` starts
+a parameter), `*x` (a `*` is a wildcard). The message ends with the core's
+refusal, which says which.
 
 A name a URL only encodes is fine: `my file.pdf` is served at
 `/my%20file.pdf`, `café.png` at `/caf%C3%A9.png`, as a browser asks for
@@ -272,74 +330,187 @@ from `/assets`, runs React Router's inline scripts, and posts forms.
 **Fix:** give the app a policy that allows the page's own scripts:
 
 ```ts
+// app/server.ts
+import { createServer } from '@alxia/react-router';
 import { secureHeaders } from '@alxia/secure-headers';
 
-app.use(
-	secureHeaders({
-		contentSecurityPolicy:
-			"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'self'; frame-ancestors 'none'",
-	}),
-);
+export default createServer({
+	configure: (app) =>
+		app.use(
+			secureHeaders({
+				contentSecurityPolicy:
+					"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'self'; frame-ancestors 'none'",
+			}),
+		),
+});
 ```
 
 or `contentSecurityPolicy: false`. A per-request nonce, shared with
 `<Scripts nonce>`, would drop `'unsafe-inline'`; it is on the
 [roadmap](roadmap.md).
 
+### `warn: incorrect peer dependency "typescript@5.9.3"`
+
+`bun add @alxia/core @alxia/react-router` prints it in the official
+template.
+
+**Why:** the template ships TypeScript 5.9, and alxia's packages declare
+`typescript` 6 or 7 as a peer: their declarations are tested with those.
+The template's own code, with a server file and typed loaders, typechecks
+under 5.9 too.
+
+**Fix:** none is needed to run. To silence it, and typecheck with what
+alxia is tested on:
+
+```sh
+bun add -d typescript@^6
+```
+
 ## Types
-
-### `Type '…' does not satisfy the constraint 'Alxia<any, any, any, any>'`
-
-```text
-error TS2344: Type '{ user: string; }' does not satisfy the constraint 'Alxia<any, any, any, any>'.
-```
-
-**When:** `alxiaOf<T>()` is given a type that is not an alxia app, such as
-the context's own shape.
-
-**Why:** the type argument is the app, and `alxiaOf` reads its context
-type from it, as `ContextOf<App>` does.
-
-**Fix:** pass `typeof` the app before the catch-all:
-
-```ts
-// base.ts
-export const base = alxia().use(session);
-export type Base = typeof base;
-
-// app/routes/home.tsx
-const { user } = alxiaOf<Base>(context);
-```
 
 ### `Property '…' does not exist on type 'BaseContext & …'`
 
 ```text
-error TS2339: Property 'tenant' does not exist on type 'BaseContext & Empty & { user: { name: string; } | null; }'.
+error TS2339: Property 'tenant' does not exist on type 'BaseContext & Empty & { requestId: string; log: RequestLog; } & { user: { name: string; } | null; }'.
 ```
 
-**When:** a loader reads, through `alxiaOf<Base>`, or `getLoadContext`
-destructures, something no hook of the app derives, or one declared after
-`reactRouter()`.
+**When:** a loader reads, through `alxiaOf`, or `getLoadContext`
+destructures, something no hook of the server derives. With the type
+`'BaseContext & Empty'` alone, `alxiaOf(context)` has no server to read:
+`app/server.ts` has no `Register` declaration, or there is no
+`app/server.ts`.
 
 **Why:** the type is the app's context at the point of the catch-all, as
 for any route: "order is meaning".
 
-**Fix:** derive it before the catch-all, and export the app's type after
-that hook:
+**Fix:** derive it in `configure`, and register the server once:
 
 ```ts
-export const base = alxia()
-	.derive(({ request }) => ({ tenant: request.headers.get('x-tenant') ?? 'default' }));
-export type Base = typeof base;
+// app/server.ts
+import { createServer } from '@alxia/react-router';
+
+const server = createServer({
+	configure: (app) =>
+		app.derive(({ request }) => ({ tenant: request.headers.get('x-tenant') ?? 'default' })),
+});
+export default server;
+
+declare module '@alxia/react-router' {
+	interface Register {
+		server: typeof server;
+	}
+}
 ```
 
+### `Type '…' does not satisfy the constraint 'AnyAlxia | ReactRouterServer<AnyAlxia>'`
+
+```text
+error TS2344: Type '{ user: string; }' does not satisfy the constraint 'AnyAlxia | ReactRouterServer<AnyAlxia>'.
+```
+
+**When:** `alxiaOf<T>()` is given a type that is neither a server nor an
+alxia app, such as the context's own shape.
+
+**Why:** the type argument is what the context is read from, as
+`ContextOf<App>` reads an app.
+
+**Fix:** pass the server's type, or register it and pass nothing:
+
+```ts
+// app/server.ts
+export type Server = typeof server;
+
+// app/routes/home.tsx
+import type { Server } from '../server';
+const { user } = alxiaOf<Server>(context);
+```
+
+### `Type '(app: …) => void' is not assignable to type '(app: …) => AnyAlxia'`
+
+```text
+error TS2322: Type '(app: FreshApp) => void' is not assignable to type '(app: FreshApp) => AnyAlxia'.
+  Type 'void' is not assignable to type 'AnyAlxia'.
+```
+
+**When:** `configure` or `beforeAll` has a body that declares on `app` and
+returns nothing.
+
+**Why:** each returns the app it built: that return is how its types reach
+the loaders and `getLoadContext`.
+
+**Fix:** return the chain:
+
+```ts
+createServer({
+	configure: (app) => app.get('/api/health', ({ reply }) => reply.ok({ ok: true })),
+});
+```
+
+### `Property '…' does not exist on type 'BaseContext & { readonly 'Register.server must be typeof server, the default export of createServer()': never; }'`
+
+```text
+error TS2339: Property 'user' does not exist on type 'BaseContext & { readonly 'Register.server must be typeof server, the default export of createServer()': never; }'.
+```
+
+**When:** every `alxiaOf(context)` read fails with it: `Register`'s
+`server` names something that is neither a server nor an alxia app, most
+often the module rather than its default export,
+`server: typeof import('./server')`.
+
+**Why:** a wrong registration types the context as one marker key, so
+that each read is a compile error rather than `never`, which would let
+anything through.
+
+**Fix:** name the default export's type:
+
+```ts
+// app/server.ts
+const server = createServer({ configure: (app) => app });
+export default server;
+
+declare module '@alxia/react-router' {
+	interface Register {
+		server: typeof server;
+	}
+}
+```
+
+### `Subsequent property declarations must have the same type. Property 'server' must be of type …`
+
+```text
+error TS2717: Subsequent property declarations must have the same type.  Property 'server' must be of type 'ReactRouterServer<…>', but here has type 'ReactRouterServer<…>'.
+```
+
+**When:** two files of one TypeScript program declare `Register`'s
+`server`: two React Router apps under one tsconfig, or a copy of the
+declaration left in a second file.
+
+**Why:** a program has one `Register`, and it names one server: the one
+whose catch-all every loader of the build runs behind.
+
+**Fix:** keep one declaration per app, beside its server. Give each app of
+a monorepo its own tsconfig, or drop `Register` and pass the type
+argument, `alxiaOf<Server>(context)`.
+
 ## Traps
+
+### `bun build/server/index.js` exits at once, printing nothing
+
+**Why:** the build was made without the plugin, so `build/server/index.js`
+is React Router's plain server build: a module of exports, which listens
+on nothing. Or it was imported, not run: the server listens only when it
+is the process's entry point.
+
+**Fix:** add `alxia()` to `vite.config.ts` and build again; the start line
+`alxia listening on <url>` then comes up. Run the file itself,
+`bun build/server/index.js`, not through another module's `import`.
 
 ### A loader reads `null` from the app's own key
 
 The same cause as [`Error: No value found for context`](#error-no-value-found-for-context),
 with a key that has a default: `createContext<User | null>(null)`. The
-loader silently reads the default. Read the context through `alxiaOf`.
+loader silently reads the default. Serve the app with the plugin, or read
+the context through `alxiaOf`.
 
 ### A page answers alxia's JSON 404 or 405 instead of rendering
 
@@ -360,9 +531,10 @@ before the method. So:
 `public/`'s folders apart from the page paths:
 
 ```ts
-const app = alxia()
-	.get('/api/posts/:slug', ({ params, reply }) => reply.ok(find(params.slug)))
-	.use((app) => reactRouter(app, { build, client: 'build/client' }));
+createServer({
+	configure: (app) =>
+		app.get('/api/posts/:slug', ({ params, reply }) => reply.ok({ slug: params.slug })),
+});
 ```
 
 ### A streamed page arrives in one piece
@@ -394,13 +566,14 @@ the server's time to first byte, not the page's.
 
 ### A WebSocket route does not connect under `react-router dev`
 
-The same route connects from `bun build/server/serve.js`.
+The same route connects from `bun build/server/index.js`.
 
 **Why:** under `@alxia/react-router/vite`, Vite owns the dev server, and
 the app gets requests through `app.fetch`, as in a test. An upgrade goes
 to Vite's server, which keeps its own socket for HMR: alxia's `ws`
 routes, `page()` and `ctx.server` are not there in dev.
 
-**Fix:** test sockets against the build, or serve the build with a server
-of your own (see the guide's "A server file of your own") while working on
-them.
+**Fix:** test sockets against the build (`bun run build && bun run
+start`), or serve the build with
+[a server of your own](guide.md#a-server-of-your-own-without-the-plugin)
+while working on them.

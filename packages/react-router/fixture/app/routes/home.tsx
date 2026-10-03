@@ -7,11 +7,13 @@ import {
 	useActionData,
 	useLoaderData,
 } from 'react-router';
-import type { Base } from '../../base';
 import { greetingContext } from '../context';
 
 export function loader({ context }: LoaderFunctionArgs) {
-	const { user, route } = alxiaOf<Base>(context);
+	// Typed by the server `app/server.ts` registers.
+	const { user, route } = alxiaOf(context);
+	// @ts-expect-error: no hook of the registered server derives `tenant`
+	alxiaOf(context).tenant;
 	return {
 		name: user?.name ?? 'anonymous',
 		route,
@@ -24,7 +26,7 @@ export async function action({ request, context }: ActionFunctionArgs) {
 	const step = Number(form.get('step'));
 	if (!Number.isInteger(step))
 		return data({ error: 'not a step' }, { status: 400 });
-	return { added: step, by: alxiaOf<Base>(context).user?.name ?? 'anonymous' };
+	return { added: step, by: alxiaOf(context).user?.name ?? 'anonymous' };
 }
 
 export default function Home() {
