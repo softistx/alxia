@@ -75,8 +75,9 @@ const app = alxia()
 	});
 ```
 
-A path declared as a route wins over the wildcard: `/api/health` is not
-looked up in `./dist`.
+A more specific route wins over the wildcard, whichever is declared first
+([Which route answers](routes.md#which-route-answers)): `/api/health` is
+not looked up in `./dist`.
 
 ### Any source
 

@@ -87,3 +87,8 @@ Nothing scheduled yet.
   turn the check off; `use` refuses it on every app instead, with a message
   naming the callback — `the plugin's resolve reads its context as any` —
   that says to annotate what it reads or leave it unannotated.
+- **One routing for dev, tests and production.** `app.fetch` and
+  `app.request` choose among matching routes exactly as `Bun.serve`'s router
+  does under `listen` — segment by segment, a literal before a parameter
+  before a wildcard, whatever the order of declaration — so `/api/*` beats a
+  `/*` catch-all declared before it, in a test as in production.

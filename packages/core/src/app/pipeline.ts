@@ -93,7 +93,10 @@ async function route(
 		| { readonly value: Definition; readonly params: Record<string, string> }
 		| { readonly allowed: readonly string[] }
 		| undefined => {
-		if (path === undefined) return router.match(method, url.pathname);
+		if (path === undefined) {
+			const pages = globals.pages.size === 0 ? undefined : globals.pages.keys();
+			return router.match(method, url.pathname, pages);
+		}
 		const methods = router.methodsAt(path);
 		if (methods === undefined) return undefined;
 		const value = methods.get(method);
