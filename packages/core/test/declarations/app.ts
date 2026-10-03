@@ -115,8 +115,10 @@ export function plugged() {
 		.get('/', ({ tenant: t, reply }) => reply(200, t));
 }
 
+// A path generic in `P` cannot be checked until `P` is known: the wrapper
+// names it as the type argument, and the path's check is left to the app.
 export function servedAt<const P extends RoutePath>(path: P) {
-	return alxia().static(path, './public');
+	return alxia().static<P>(path as never, './public');
 }
 
 export function typedBy<R extends StandardSchemaV1>(schema: R) {

@@ -416,8 +416,14 @@ not a literal:
 - or its method is a union, `'GET' | 'POST'`.
 
 ```text
-error TS2345: Argument of type '{ method: string; path: string; }' is not assignable to parameter of type 'never'.
-  The intersection 'RouteOperation & { readonly method: "route() needs one method: declare the operation as const"; readonly path: "route() needs the path as a literal: declare the operation as const"; readonly schema?: unknown; }' was reduced to 'never' …
+error TS2345: Argument of type '{ method: string; path: string; }' is not assignable to parameter of type '{ readonly path: "route() needs the path as a literal: declare the operation as const"; }'.
+```
+
+With a literal path and a union method, it reads:
+
+```text
+error TS2345: Argument of type '{ readonly method: "GET" | "POST"; readonly path: "/w"; }' is not assignable to parameter of type 'never'.
+  The intersection '… & { readonly method: "route() needs one method: declare the operation as const"; readonly schema?: unknown; }' was reduced to 'never' …
 ```
 
 **Why:** TypeScript widens the properties of an object in a variable:
@@ -436,6 +442,61 @@ export const getPet = {
 	path: '/pets/:petId',
 	schema: { params: z.object({ petId: z.coerce.number().int() }) },
 } as const;
+```
+
+### `Argument of type '"…"' is not assignable to parameter of type '"Invalid path: …"'`
+
+```text
+error TS2345: Argument of type '"/at/10:30"' is not assignable to parameter of type '"Invalid path: \"/at/10:30\": \":\" may only start a segment, as a parameter"'.
+```
+
+**When:** a route, socket, page, file or static path written as a literal
+is one the app would refuse when the route is declared. After
+`Invalid path:` comes the `TypeError` it would throw, so the entries under
+[Building the app](#building-the-app) give the fix:
+
+| Path | After `Invalid path:` |
+| --- | --- |
+| `'/a/*/b'` | `"/a/*/b": "*" may only end a path` |
+| `'/a/:pet-id'` | `"/a/:pet-id": ":pet-id" is not a parameter name` |
+| `'/a/:id/:id'` | `"/a/:id/:id" declares ":id" twice` |
+| `'/at/10:30'` | `"/at/10:30": ":" may only start a segment, as a parameter` |
+| `'/*.js'` | `"/*.js": "*" may only be a whole segment, as a wildcard` |
+| `'/a/./b'` | `"/a/./b": "." is a dot segment, which a request's URL never keeps` |
+| `static('/assets/*', …)` | `"/assets/*/*": "*" may only end a path`: `static` adds the `/*` |
+
+Under a prefix, the joined path is checked. When the path is fine on its
+own but not under the prefix — `/:id` in a group at `/users/:id` — the
+message names the path alone:
+
+```text
+error TS2345: Argument of type '"/:id"' is not assignable to parameter of type '"Invalid path: \"/:id\" is refused under its prefix: the two declare one parameter twice, or the prefix holds a refused segment"'.
+```
+
+A handler's parameters can then read as `any` on the same call
+(`TS7031`): that goes away with the path's fix.
+
+**Why:** the app throws on these paths at startup; the types refuse them
+first, so the mistake shows in the editor. A literal the URL
+percent-encodes, such as `/café`, is still left to the `TypeError`, as is
+a path typed `string` or `` `/${string}` ``.
+
+**Fix:** the fix of the `TypeError` after `Invalid path:`, such as a
+parameter for the varying part:
+
+```ts
+app.get('/at/:time', ({ params, reply }) => reply(200, params.time)); // GET /at/10:30 → "10:30"
+```
+
+A function that takes a path generic in `P` and declares a route at it
+cannot have it checked until `P` is known, so the call refuses it. Name `P`
+as the type argument; the app still checks the path when the route is
+declared:
+
+```ts
+export function servedAt<const P extends RoutePath>(path: P) {
+	return alxia().static<P>(path as never, './public');
+}
 ```
 
 ### `Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`
@@ -550,7 +611,9 @@ export or the hook's return type, e.g. `Reply<400 | 413, ProblemDetails>`, with 
 ## Building the app
 
 These are `TypeError`s thrown when a route is declared, so the app fails at
-startup, not on a request. The eight about a path's syntax are also thrown
+startup, not on a request. A path written as a literal is refused by its
+type first, with the same message after `Invalid path:`
+([the compile error](#argument-of-type--is-not-assignable-to-parameter-of-type-invalid-path-)). The eight about a path's syntax are also thrown
 by `shapeOf(path)`, and so by a tool that calls it: `@alxia/openapi-routes`'
 `implemented` and `matchesSpec` throw them for an operation path no route may
 be declared at, after their own name (`implemented(): …`; `exactly(): …` from the

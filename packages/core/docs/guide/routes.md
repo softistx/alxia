@@ -183,6 +183,22 @@ Paths are checked when the route is declared, and a mistake throws a
 | the same method and path twice | `GET /a is declared twice` |
 | a method with no handler | `GET /a: the handler is missing` |
 
+A path written as a literal is refused by its type first: the call does
+not compile, and the message is the `TypeError` above after
+`Invalid path:`, so the mistake shows in the editor before the app runs:
+
+```ts
+app.get('/at/10:30', handler);
+// error TS2345: Argument of type '"/at/10:30"' is not assignable to parameter of type
+// '"Invalid path: \"/at/10:30\": \":\" may only start a segment, as a parameter"'.
+```
+
+The type reads a path's own syntax — every rule of the table but `/café`
+— under the app's prefix and the group's. Left to the `TypeError` are a
+literal the URL percent-encodes (`/café`), a path typed `string`, and what
+takes two routes: a shape or a method and path declared twice
+([troubleshooting](../troubleshooting.md#argument-of-type--is-not-assignable-to-parameter-of-type-invalid-path-)).
+
 The middle four keep a path one that `Bun.serve` accepts at `listen` and
 reads as `fetch` does. Bun's router takes a `:` anywhere in a segment for
 a parameter and a segment starting with `*` for a wildcard, throws on a

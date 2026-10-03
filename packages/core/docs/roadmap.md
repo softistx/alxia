@@ -55,6 +55,12 @@ Nothing scheduled yet.
   `body_limit` hook is no part of a route without a limit. A kind with no
   hook, or whose hook returns nothing, falls back to `onRefusal(hook)`,
   then to the default.
+- **A refused path is a compile error.** A path written as a literal that
+  the app would refuse when the route is declared — `/at/10:30`,
+  `/a/:id/:id`, `/*.js`, a dot segment — no longer compiles, on every
+  method that declares a route, with the `TypeError`'s own message after
+  `Invalid path:`. Its params are no longer inferred from a path that
+  could never be served.
 - **Refusals in your format.** `onRefusal(hook)` answers a request the
   route's schemas refuse with your own reply instead of
   `400 { error: 'validation', issues }`, for the routes declared after it.
