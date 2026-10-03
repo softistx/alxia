@@ -33,7 +33,10 @@ A check added there is a check to port here.
 ## `examples/`
 
 `examples/` holds applications, not packages. Each is `private` and
-unscoped, and uses the packages by `workspace:^`. They are workspace
+unscoped, and declares the packages by their npm range (`^0.1.0`), as a
+user's app would, not by `workspace:^`: Bun links a range a workspace
+member satisfies to that member, and `changeset version` moves the ranges
+with each release (measured on a simulated minor of core). They are workspace
 members, so one `bun install` covers them and Biome lints them, each in
 its own style when it has a `biome.json`. The root `typecheck` and `test`
 run theirs after the packages' (`scripts/workspace.ts <script> packages

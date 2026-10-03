@@ -7,8 +7,10 @@ Bun through
 The setup is three lines. The rest of the example shows what an optional
 `app/server.ts` adds on top.
 
-It lives in alxia's workspace and uses the packages by `workspace:^`. It is
-never published.
+It declares the packages by their npm versions (`^0.1.0`), as an app of
+your own would. Inside alxia's workspace, Bun links those ranges to the
+local packages, so CI runs it against the code in this repository, and each
+release moves the ranges with it. It is never published.
 
 ## 1. Create the app
 
