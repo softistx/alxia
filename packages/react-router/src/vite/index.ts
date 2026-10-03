@@ -117,9 +117,11 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 		},
 		configurePreviewServer(server) {
 			if (!enabled) return;
-			// React Router prerenders through this server too.
+			// React Router prerenders through a preview server of its own,
+			// resolved as `serve` too: the message cannot tell the two apart.
 			requireBun(
-				config?.command === 'build' ? 'react-router build' : 'vite preview',
+				'vite preview, or a react-router build that prerenders,',
+				'bun --bun vite preview or bun --bun react-router build',
 			);
 			// Before Vite's own files: the built server answers every request.
 			servePreview(server);

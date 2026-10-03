@@ -57,7 +57,8 @@ server stops at startup with
 +    "start": "bun build/server/index.js",
 ```
 
-The template's `dev`, `build` and `typecheck` scripts are unchanged:
+With the `bunfig.toml` in place, the template's `dev`, `build` and
+`typecheck` scripts are unchanged:
 
 - **`bun run dev`**: every request Vite does not answer itself (pages,
   data, `/api`, an upgrade to a `ws` route) reaches alxia, with HMR.

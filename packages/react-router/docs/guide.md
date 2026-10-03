@@ -173,8 +173,10 @@ bunx --bun vite preview
 
 `--bun` runs Vite under Bun even where Node is installed, since Vite's bin
 asks for Node: the built server runs inside Vite's process, and it needs
-Bun's APIs. With no Node installed, a `"preview": "vite preview"` script
-run with `bun run preview` works too, as the template's other scripts do.
+Bun's APIs. With the [`bunfig.toml`](#setup) (`[run]`,
+`bun = true`), or with no Node installed, a `"preview": "vite preview"`
+script run with `bun run preview` works too, as the template's other
+scripts do.
 
 The plugin loads `build/server/index.js` on the first request and hands
 every request to its default export, the alxia app, before Vite's own

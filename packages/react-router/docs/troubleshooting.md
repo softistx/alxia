@@ -57,7 +57,8 @@ a loader, a message React Router or the browser prints, or an error from
 ### `alxia-react-router: … is running on Node, and alxia's server runs on Bun. …`
 
 **When:** `bun run dev`, `vite preview`, or a `react-router build` that
-prerenders, on a machine where a node is installed. The full message:
+prerenders, on a machine where a node is installed. The full message under
+`react-router dev`:
 
 ```
 alxia-react-router: react-router dev is running on Node, and alxia's server runs on Bun. Add a bunfig.toml beside package.json with "[run]" and "bun = true", so bun run starts it on Bun, or run it as bun --bun react-router dev.
@@ -76,7 +77,10 @@ script on Bun:
 bun = true
 ```
 
-Or run the one command on Bun: `bun --bun react-router dev`.
+Or run the one command on Bun: `bun --bun react-router dev`. Under
+`vite preview` or a prerendering build, the message begins
+`alxia-react-router: vite preview, or a react-router build that prerenders, is running on Node`
+and names `bun --bun vite preview` and `bun --bun react-router build`.
 
 ### `ReferenceError: Bun is not defined`
 
