@@ -168,8 +168,8 @@ as in [A server file of your own](#a-server-file-of-your-own).
 
 ### In a build
 
-`react-router build` builds the client as usual, and the server with the
-entry as its input:
+`react-router build` builds the client as usual, and the server from the
+entry, with React Router's server build beside it:
 
 - **`build/server/index.js`** is the alxia app, React Router's build inside
   it, in one file. Its default export is the entry's; beside it are React

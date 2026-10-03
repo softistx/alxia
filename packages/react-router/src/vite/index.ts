@@ -48,7 +48,7 @@ const RESOLVED_SERVER = `\0${SERVER}`;
  *   and every request Vite does not answer itself — pages, data, `/api` —
  *   goes to its `fetch`. HMR, an edit to the entry, and the app's own
  *   context keys work, with no restart.
- * - **`react-router build`**: the entry is the server build's input, so
+ * - **`react-router build`**: the server is built from the entry, so
  *   `build/server/index.js` is the alxia app with React Router's build
  *   inside it, and `build/server/serve.js` imports it and listens on `PORT`
  *   (3000) and `HOST` (`0.0.0.0`).
