@@ -41,6 +41,27 @@ region of it (`pt` for `pt-BR`). `languageSource` says which source decided.
 Every response says `Content-Language`, and `Vary` by the headers it read.
 With `persist`, a language the query named is kept in the cookie.
 
+## Reading the app's context
+
+Annotate `resolve`'s parameter to decide by what an earlier plugin added —
+the language a signed-in user saved. The plugin then requires it: an app
+that does not give `user` before it cannot use it.
+
+```ts
+import { alxia, type BaseContext } from '@alxia/core';
+import { language } from '@alxia/language';
+
+const byUser = language({
+	supported: ['en', 'fr'],
+	fallback: 'en',
+	order: ['query', 'cookie'],
+	resolve: ({ user }: BaseContext & { user: { language: string } | null }) => user?.language,
+});
+
+alxia().use(auth).use(byUser); // auth derives user
+alxia().use(byUser); // a compile error: this app gives no `user`
+```
+
 ## Options
 
 | option | default | |
@@ -52,7 +73,7 @@ With `persist`, a language the query named is kept in the cookie.
 | `pathIndex` | 0 | |
 | `persist` | `false` | `true`, or `{ maxAge, secure }` |
 | `contentLanguage` | `true` | |
-| `resolve` | none | `(ctx) => string \| undefined` |
+| `resolve` | none | `(ctx) => string \| undefined`; annotate `ctx` to read what an earlier plugin adds |
 | `vary` | none | the headers `resolve` reads, added to `Vary` |
 
 ## API

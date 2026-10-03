@@ -1,10 +1,31 @@
-import { alxia, type BaseContext, vary } from '@alxia/core';
+import { type BaseContext, definePlugin, type Empty, vary } from '@alxia/core';
 import { match, negotiate } from './negotiate';
 
 /** Where a language is read from. */
 export type LanguageSource = 'query' | 'cookie' | 'path' | 'header';
 
-export interface LanguageOptions<L extends string> {
+/**
+ * What a callback whose parameter is annotated `Ctx` reads beyond
+ * `BaseContext`: `{ user: User }` for `BaseContext & { user: User }`, and
+ * `Empty` when it reads nothing more.
+ */
+type RequiresOf<Ctx> = [Exclude<keyof Ctx, keyof BaseContext>] extends [never]
+	? Empty
+	: {
+			[Key in keyof Ctx as Key extends keyof BaseContext
+				? never
+				: Key]: Ctx[Key];
+		};
+
+/**
+ * `Ctx` is the type `resolve`'s parameter is annotated with —
+ * `BaseContext & { user: User }`, or `{ user: User }` alone — and
+ * `BaseContext` when it is not.
+ */
+export interface LanguageOptions<
+	L extends string,
+	Ctx extends object = BaseContext,
+> {
 	/** The languages the app speaks: the context's `language` is one of them. */
 	readonly supported: readonly L[];
 	/** The one it speaks when the request names none it does. */
@@ -26,8 +47,13 @@ export interface LanguageOptions<L extends string> {
 		| { readonly maxAge?: number; readonly secure?: boolean };
 	/** Says `Content-Language` on every response. On by default. */
 	readonly contentLanguage?: boolean;
-	/** Decides itself, after every source: a user's saved preference. */
-	readonly resolve?: (ctx: BaseContext) => string | undefined;
+	/**
+	 * Decides itself, after every source: a user's saved preference. Annotate
+	 * its parameter to read what an earlier plugin adds —
+	 * `(ctx: BaseContext & { user: User })` — and the app that uses the
+	 * plugin must then give it.
+	 */
+	readonly resolve?: (ctx: BaseContext & Ctx) => string | undefined;
 	/**
 	 * The request headers `resolve` reads, added to `Vary` so a cache keeps
 	 * one response per value: `['authorization']`. None by default.
@@ -54,7 +80,10 @@ export interface LanguageContext<L extends string> {
  *    .get('/', ({ language, reply }) => reply(200, language)); // 'en' | 'fr'
  * ```
  */
-export function language<const L extends string>(options: LanguageOptions<L>) {
+export function language<
+	const L extends string,
+	Ctx extends object = BaseContext,
+>(options: LanguageOptions<L, Ctx>) {
 	const order = options.order ?? ['query', 'cookie', 'header'];
 	const queryName = options.query ?? 'lang';
 	const cookieName = options.cookie ?? 'language';
@@ -93,39 +122,45 @@ export function language<const L extends string>(options: LanguageOptions<L>) {
 		}
 	};
 
-	return alxia().derive((ctx): LanguageContext<L> => {
-		let found: LanguageContext<L> | undefined;
-		for (const source of order) {
-			const value = read(ctx, source);
-			if (value !== undefined) {
-				found = { language: value, languageSource: source };
-				break;
+	// `use` has checked that the app gives what `resolve` reads.
+	const resolve = options.resolve as
+		| ((ctx: BaseContext) => string | undefined)
+		| undefined;
+	return definePlugin<RequiresOf<Ctx>>()((app) =>
+		app.derive((ctx): LanguageContext<L> => {
+			let found: LanguageContext<L> | undefined;
+			for (const source of order) {
+				const value = read(ctx, source);
+				if (value !== undefined) {
+					found = { language: value, languageSource: source };
+					break;
+				}
 			}
-		}
-		if (found === undefined && options.resolve !== undefined) {
-			const resolved = options.resolve(ctx);
-			const value =
-				resolved === undefined ? undefined : match(resolved, supported);
-			if (value !== undefined)
-				found = { language: value, languageSource: 'resolve' };
-		}
-		found ??= { language: options.fallback, languageSource: 'fallback' };
+			if (found === undefined && resolve !== undefined) {
+				const resolved = resolve(ctx);
+				const value =
+					resolved === undefined ? undefined : match(resolved, supported);
+				if (value !== undefined)
+					found = { language: value, languageSource: 'resolve' };
+			}
+			found ??= { language: options.fallback, languageSource: 'fallback' };
 
-		if (order.includes('header')) vary(ctx.set.headers, 'Accept-Language');
-		if (order.includes('cookie')) vary(ctx.set.headers, 'Cookie');
-		for (const name of options.vary ?? []) vary(ctx.set.headers, name);
-		if (options.contentLanguage !== false) {
-			ctx.set.headers.set('content-language', found.language);
-		}
-		if (persist !== undefined && found.languageSource === 'query') {
-			ctx.set.cookies.set(cookieName, found.language, {
-				path: '/',
-				sameSite: 'lax',
-				httpOnly: false,
-				secure: persist.secure ?? true,
-				maxAge: persist.maxAge ?? 365 * 24 * 60 * 60,
-			});
-		}
-		return found;
-	});
+			if (order.includes('header')) vary(ctx.set.headers, 'Accept-Language');
+			if (order.includes('cookie')) vary(ctx.set.headers, 'Cookie');
+			for (const name of options.vary ?? []) vary(ctx.set.headers, name);
+			if (options.contentLanguage !== false) {
+				ctx.set.headers.set('content-language', found.language);
+			}
+			if (persist !== undefined && found.languageSource === 'query') {
+				ctx.set.cookies.set(cookieName, found.language, {
+					path: '/',
+					sameSite: 'lax',
+					httpOnly: false,
+					secure: persist.secure ?? true,
+					maxAge: persist.maxAge ?? 365 * 24 * 60 * 60,
+				});
+			}
+			return found;
+		}),
+	);
 }
