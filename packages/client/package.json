@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/client",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "The typed fetch client of an @alxia/core app, inferred from its type: no codegen, no spec",
 	"license": "MIT",
 	"type": "module",
