@@ -6,7 +6,7 @@ route, and what to do with each message they throw.
 
 | Page | Read it when |
 | --- | --- |
-| [Guide](guide.md) | calling `implemented` or `exactly` in a test or at startup, checking an app with a prefix, or choosing what `exactly` leaves out |
+| [Guide](guide.md) | calling `implemented` or `matchesSpec` in a test or at startup, checking an app with a prefix, or choosing what `matchesSpec` leaves out |
 | [Troubleshooting](troubleshooting.md) | a check threw and you have its message, or it passes when you expected it to fail |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |
 

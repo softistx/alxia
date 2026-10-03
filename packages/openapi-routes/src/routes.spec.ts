@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { alxia, eventStream } from '@alxia/core';
 import { z } from 'zod';
-import { exactly, implemented, type Operations } from './routes';
+import { exactly, implemented, matchesSpec, type Operations } from './routes';
 
 // alxia.ts as `@nxgt/openapi-codegen` writes it with `alxia: true`.
 const zPet = z.object({ id: z.number(), name: z.string() });
@@ -134,8 +134,8 @@ describe('implemented', () => {
 				'implemented(): the prefix "/api/" must start with "/" and not end with one',
 			),
 		);
-		expect(() => exactly(app, { getPet }, { prefix: '/api/' })).toThrow(
-			'exactly(): the prefix "/api/" must start with "/" and not end with one',
+		expect(() => matchesSpec(app, { getPet }, { prefix: '/api/' })).toThrow(
+			'matchesSpec(): the prefix "/api/" must start with "/" and not end with one',
 		);
 	});
 
@@ -145,23 +145,23 @@ describe('implemented', () => {
 	});
 });
 
-describe('exactly', () => {
+describe('matchesSpec', () => {
 	test('passes when the routes are the operations', () => {
-		expect(() => exactly(routed(), operations)).not.toThrow();
+		expect(() => matchesSpec(routed(), operations)).not.toThrow();
 	});
 
 	test('lists each route no operation declares', () => {
 		const app = routed()
 			.post('/admin/reset', ({ reply }) => reply(204))
 			.get('/health', ({ reply }) => reply(200, 'ok'));
-		expect(() => exactly(app, operations)).toThrow(
+		expect(() => matchesSpec(app, operations)).toThrow(
 			new TypeError(
-				'exactly(): 2 routes have no operation: POST /admin/reset, GET /health',
+				'matchesSpec(): 2 routes have no operation: POST /admin/reset, GET /health',
 			),
 		);
 		const one = routed().get('/health', ({ reply }) => reply(200, 'ok'));
-		expect(() => exactly(one, operations)).toThrow(
-			new TypeError('exactly(): 1 route has no operation: GET /health'),
+		expect(() => matchesSpec(one, operations)).toThrow(
+			new TypeError('matchesSpec(): 1 route has no operation: GET /health'),
 		);
 	});
 
@@ -169,24 +169,24 @@ describe('exactly', () => {
 		const app = alxia()
 			.route(getPet, ({ reply }) => reply.notFound({ title: 'x' }))
 			.get('/health', ({ reply }) => reply(200, 'ok'));
-		expect(() => exactly(app, { getPet, searchEmployees })).toThrow(
+		expect(() => matchesSpec(app, { getPet, searchEmployees })).toThrow(
 			new TypeError(
-				'exactly(): 1 operation has no route: QUERY /employees (searchEmployees); 1 route has no operation: GET /health',
+				'matchesSpec(): 1 operation has no route: QUERY /employees (searchEmployees); 1 route has no operation: GET /health',
 			),
 		);
 	});
 
 	test('a route of the same shape is the operation’s', () => {
 		const app = alxia().get('/pets/:id', ({ reply }) => reply(200, 'x'));
-		expect(() => exactly(app, { getPet })).not.toThrow();
+		expect(() => matchesSpec(app, { getPet })).not.toThrow();
 	});
 
 	test('a colon inside a segment throws, as the core does', () => {
 		const app = alxia().get('/at/:time', ({ reply }) => reply(200, 'x'));
 		const other = { method: 'GET', path: '/at/10:45' } as const;
-		expect(() => exactly(app, [other])).toThrow(
+		expect(() => matchesSpec(app, [other])).toThrow(
 			new TypeError(
-				'exactly(): "/at/10:45": ":" may only start a segment, as a parameter',
+				'matchesSpec(): "/at/10:45": ":" may only start a segment, as a parameter',
 			),
 		);
 	});
@@ -198,9 +198,9 @@ describe('exactly', () => {
 				'implemented(): "/pets/:pet-id": ":pet-id" is not a parameter name',
 			),
 		);
-		expect(() => exactly(alxia(), [bad])).toThrow(
+		expect(() => matchesSpec(alxia(), [bad])).toThrow(
 			new TypeError(
-				'exactly(): "/pets/:pet-id": ":pet-id" is not a parameter name',
+				'matchesSpec(): "/pets/:pet-id": ":pet-id" is not a parameter name',
 			),
 		);
 	});
@@ -208,17 +208,17 @@ describe('exactly', () => {
 	test('a HEAD operation: its GET route is served, but not declared', () => {
 		const app = alxia().get('/pets', ({ reply }) => reply(200, 'x'));
 		const head = { method: 'HEAD', path: '/pets' } as const;
-		expect(() => exactly(app, [head])).toThrow(
-			new TypeError('exactly(): 1 route has no operation: GET /pets'),
+		expect(() => matchesSpec(app, [head])).toThrow(
+			new TypeError('matchesSpec(): 1 route has no operation: GET /pets'),
 		);
 		const get = { method: 'GET', path: '/pets' } as const;
-		expect(() => exactly(app, [head, get])).not.toThrow();
+		expect(() => matchesSpec(app, [head, get])).not.toThrow();
 	});
 
 	test('exclude: a route the document does not have to declare', () => {
 		const app = routed().get('/health', ({ reply }) => reply(200, 'ok'));
 		expect(() =>
-			exactly(app, operations, {
+			matchesSpec(app, operations, {
 				exclude: (route) => route.path === '/health',
 			}),
 		).not.toThrow();
@@ -228,8 +228,8 @@ describe('exactly', () => {
 		const app = alxia({ prefix: '/api' })
 			.route(getPet, ({ reply }) => reply.notFound({ title: 'x' }))
 			.get('/health', ({ reply }) => reply(200, 'ok'));
-		expect(() => exactly(app, { getPet }, { prefix: '/api' })).toThrow(
-			new TypeError('exactly(): 1 route has no operation: GET /api/health'),
+		expect(() => matchesSpec(app, { getPet }, { prefix: '/api' })).toThrow(
+			new TypeError('matchesSpec(): 1 route has no operation: GET /api/health'),
 		);
 	});
 });
@@ -249,7 +249,23 @@ describe('the operations it takes', () => {
 			implemented({}, operations);
 			// @ts-expect-error a prefix starts with "/", as the app's does
 			implemented(alxia(), operations, { prefix: 'api' });
+			// @ts-expect-error matchesSpec takes the same prefix
+			matchesSpec(alxia(), operations, { prefix: 'api' });
+			// @ts-expect-error exclude reads a route and answers a boolean
+			matchesSpec(alxia(), operations, { exclude: (route: string) => route });
 		};
 		expect(_refused).toBeFunction();
+	});
+});
+
+describe('exactly', () => {
+	test('is matchesSpec under its old name, with its own messages', () => {
+		const app = alxia().get('/health', ({ reply }) => reply.ok('ok'));
+		expect(() => exactly(app, [])).toThrow(
+			new TypeError('exactly(): 1 route has no operation: GET /health'),
+		);
+		expect(() => exactly(app, { getPet }, { prefix: '/api/' })).toThrow(
+			'exactly(): the prefix "/api/" must start with "/" and not end with one',
+		);
 	});
 });

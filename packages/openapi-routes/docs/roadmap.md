@@ -30,6 +30,11 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### 0.2.0
+
+- **One name for the check both ways.** `matchesSpec(app, operations)`,
+  the new name of `exactly`, which stays as a deprecated alias.
+
 ### 0.1.0
 
 - **Every operation has a route.** `implemented(app, operations)` throws,

@@ -1,12 +1,12 @@
 # Guide
 
-This page covers `implemented` and `exactly`: what they take, how they
+This page covers `implemented` and `matchesSpec`: what they take, how they
 match an operation to a route, where to call them, and how to check an app
 that has a prefix or routes the document does not declare.
 
 ```ts
 import { alxia } from '@alxia/core';
-import { exactly, implemented } from '@alxia/openapi-routes';
+import { implemented, matchesSpec } from '@alxia/openapi-routes';
 import { operations as api } from './generated/alxia';
 
 // pets, search: your own store and query
@@ -17,8 +17,9 @@ export const app = alxia()
 	})
 	.route(api.searchEmployees, ({ body, reply }) => reply.ok(search(body)));
 
-implemented(app, api); // throws if an operation of the spec has no route
-exactly(app, api); // and also if a route is not in the spec
+matchesSpec(app, api); // throws if an operation of the spec has no route, or a route is not in the spec
+// or, for an app that serves more than its spec:
+implemented(app, api); // throws only if an operation of the spec has no route
 ```
 
 ## The signatures
@@ -30,10 +31,10 @@ function implemented(
 	options?: ImplementedOptions,
 ): void;
 
-function exactly(
+function matchesSpec(
 	app: { readonly routes: readonly RouteDefinition[] },
 	operations: Operations,
-	options?: ExactlyOptions,
+	options?: MatchesSpecOptions,
 ): void;
 
 type Operations =
@@ -44,7 +45,7 @@ interface ImplementedOptions {
 	readonly prefix?: RoutePath; // `/${string}`, from @alxia/core
 }
 
-interface ExactlyOptions extends ImplementedOptions {
+interface MatchesSpecOptions extends ImplementedOptions {
 	readonly exclude?: (route: RouteDefinition) => boolean;
 }
 ```
@@ -86,10 +87,13 @@ It lists each operation the app does not serve, in the order of
 `operations`. Routes the document does not declare are fine: a health
 check, the document's own route, an admin page.
 
-## `exactly`
+## `matchesSpec`
+
+Called `exactly` until 0.2.0: `exactly` and `ExactlyOptions` still
+work, deprecated, and their messages still start with `exactly():`.
 
 ```text
-TypeError: exactly(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
+TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
 ```
 
 It lists the missing operations as `implemented` does, then, after a `;`,
@@ -105,7 +109,7 @@ import { docs } from '@alxia/openapi';
 
 const served = app.use(docs(app, { info: { title: 'Pets', version: '1.0.0' } }));
 
-exactly(served, api, {
+matchesSpec(served, api, {
 	// docs serves the document and its page; /health is for the load balancer
 	exclude: (route) =>
 		['/openapi.json', '/docs', '/health'].includes(route.path),
@@ -129,12 +133,12 @@ An operation is served by a route of the same method and path:
   `params.id`, not `params.petId`; declaring it with
   `app.route(api.getPet, …)` keeps the spec's names and schemas.
 - **`HEAD`.** The core answers `HEAD` with the `GET` route, so a `HEAD`
-  operation is served by a `GET` route at its path. `exactly` still lists
+  operation is served by a `GET` route at its path. `matchesSpec` still lists
   that `GET` route when no operation declares it.
 - **Every other method stands alone.** A `POST /employees` route does not
   serve a `QUERY /employees` operation.
 - **Socket routes are not read.** `app.ws` routes live in `app.sockets`,
-  and an OpenAPI operation is HTTP: `exactly` never lists them.
+  and an OpenAPI operation is HTTP: `matchesSpec` never lists them.
 
 Only the method and the path are compared. A route declared with
 `app.route(operation, handler)` reads its schemas from the operation, so
@@ -163,7 +167,7 @@ The messages then name the full paths, `GET /api/pets/:petId (getPet)`,
 since those are what the app is missing. For operations served under a
 group, `alxia().group('/v1', …)`, give the group's prefix the same way. A
 call takes one prefix: check each group's operations in a call of their
-own, and use `exactly` only when every route of the app is under that
+own, and use `matchesSpec` only when every route of the app is under that
 prefix, or excluded.
 
 ## Where to call it

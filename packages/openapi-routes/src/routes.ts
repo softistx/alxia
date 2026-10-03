@@ -23,10 +23,13 @@ export interface ImplementedOptions {
 	readonly prefix?: RoutePath;
 }
 
-export interface ExactlyOptions extends ImplementedOptions {
+export interface MatchesSpecOptions extends ImplementedOptions {
 	/** A route no operation has to declare: the document's own, a health check. */
 	readonly exclude?: (route: RouteDefinition) => boolean;
 }
+
+/** @deprecated Renamed `MatchesSpecOptions`, as `exactly` is `matchesSpec`. */
+export interface ExactlyOptions extends MatchesSpecOptions {}
 
 /**
  * Any `alxia()` app: its routes, with their full paths. The public
@@ -61,15 +64,38 @@ export function implemented(
 }
 
 /**
- * Throws as `implemented` does, and also lists each route of `app` that no
- * operation declares, `exclude` aside.
+ * Throws a `TypeError` unless `app` and `operations` match both ways: each
+ * operation with no route, as `implemented` lists it, and each route of
+ * `app` that no operation declares, `exclude` aside. One call checks both;
+ * `implemented` alone is for an app that serves more than its document.
+ */
+export function matchesSpec(
+	app: { readonly routes: readonly RouteDefinition[] },
+	operations: Operations,
+	options: MatchesSpecOptions = {},
+): void {
+	match('matchesSpec', app, operations, options);
+}
+
+/**
+ * @deprecated Renamed `matchesSpec`, which checks the same both ways. Its
+ * messages still start with `exactly():`.
  */
 export function exactly(
 	app: { readonly routes: readonly RouteDefinition[] },
 	operations: Operations,
-	options: ExactlyOptions = {},
+	options: MatchesSpecOptions = {},
 ): void {
-	const all = wanted('exactly', operations, options.prefix);
+	match('exactly', app, operations, options);
+}
+
+function match(
+	check: 'matchesSpec' | 'exactly',
+	app: Routed,
+	operations: Operations,
+	options: MatchesSpecOptions,
+): void {
+	const all = wanted(check, operations, options.prefix);
 	const missing = unrouted(app, all);
 	const declared = new Set(all.map(keyOf));
 	const extra = app.routes.filter(
@@ -79,11 +105,11 @@ export function exactly(
 	const parts: string[] = [];
 	if (missing.length > 0) parts.push(noRoute(missing));
 	if (extra.length > 0) parts.push(noOperation(extra));
-	if (parts.length > 0) throw new TypeError(`exactly(): ${parts.join('; ')}`);
+	if (parts.length > 0) throw new TypeError(`${check}(): ${parts.join('; ')}`);
 }
 
 function wanted(
-	check: 'implemented' | 'exactly',
+	check: 'implemented' | 'matchesSpec' | 'exactly',
 	operations: Operations,
 	prefix = '',
 ): Wanted[] {

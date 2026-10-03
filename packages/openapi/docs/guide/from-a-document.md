@@ -23,7 +23,7 @@ Three pieces make it:
 | --- | --- | --- |
 | [1. Generate the operations](#1-generate-the-operations) | `@nxgt/openapi-codegen`, with `alxia: true` | writes `alxia.ts`: each operation as `{ method, path, schema }`, with Zod schemas |
 | [2. Declare the routes](#2-declare-the-routes) | `@alxia/core`'s `app.route()` | one route per operation: the handler is the only argument you write |
-| [3. Check every operation has a route](#3-check-every-operation-has-a-route) | `@alxia/openapi-routes` | `implemented` and `exactly`, in a test |
+| [3. Check every operation has a route](#3-check-every-operation-has-a-route) | `@alxia/openapi-routes` | `implemented` and `matchesSpec`, in a test |
 
 ## 1. Generate the operations
 
@@ -177,7 +177,7 @@ bun add -d @alxia/openapi-routes
 ```ts
 // src/app.spec.ts
 import { test } from 'bun:test';
-import { exactly, implemented } from '@alxia/openapi-routes';
+import { implemented, matchesSpec } from '@alxia/openapi-routes';
 import { app } from './app';
 import { operations } from './generated/alxia';
 
@@ -186,7 +186,7 @@ test('every operation of the spec is served', () => {
 });
 
 test('and nothing else is', () => {
-	exactly(app, operations, {
+	matchesSpec(app, operations, {
 		prefix: '/api',
 		// served beside the spec: a health check, and the document itself (below)
 		exclude: (route) =>
@@ -201,11 +201,11 @@ test('and nothing else is', () => {
 TypeError: implemented(): 2 operations have no route: GET /api/pets/:petId (getPet), QUERY /api/employees (searchEmployees)
 ```
 
-`exactly` also lists each route the spec does not declare, `exclude`
+`matchesSpec` also lists each route the spec does not declare, `exclude`
 aside:
 
 ```text
-TypeError: exactly(): 1 route has no operation: POST /api/admin/reset
+TypeError: matchesSpec(): 1 route has no operation: POST /api/admin/reset
 ```
 
 `prefix` is the app's own: `app.routes` holds full paths, and the

@@ -40,18 +40,18 @@ TypeError: implemented(): 2 operations have no route: GET /pets/:petId (getPet),
 ## Only the operations
 
 ```ts
-import { exactly } from '@alxia/openapi-routes';
+import { matchesSpec } from '@alxia/openapi-routes';
 
-exactly(app, operations, {
+matchesSpec(app, operations, {
 	exclude: (route) => route.path === '/health',
 });
 ```
 
-`exactly` throws as `implemented` does, and also lists each route no
+`matchesSpec` throws as `implemented` does, and also lists each route no
 operation declares, `exclude` aside:
 
 ```text
-TypeError: exactly(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
+TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
 ```
 
 ## Under a prefix
@@ -82,7 +82,8 @@ schema.
 | export | |
 | --- | --- |
 | `implemented(app, operations, options?)`, `ImplementedOptions` | throws a `TypeError` listing each operation with no route, or one with the core's reason for an operation path no route may be declared at. `prefix` |
-| `exactly(app, operations, options?)`, `ExactlyOptions` | the same, and each route no operation declares. `prefix`, `exclude` |
+| `matchesSpec(app, operations, options?)`, `MatchesSpecOptions` | the same, and each route no operation declares. `prefix`, `exclude` |
+| `exactly`, `ExactlyOptions` | deprecated: `matchesSpec` and `MatchesSpecOptions` under their former names, with messages that start `exactly():` |
 | `Operations` | what both take: an object of core's `RouteOperation`, or a list of them |
 
 ## Documentation
