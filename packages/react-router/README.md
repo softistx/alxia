@@ -151,6 +151,53 @@ How `alxiaOf(context)` is typed:
 
 [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#typing-the-loaders)
 
+## A CSP nonce
+
+With `secureHeaders({ nonce: true })` from `@alxia/secure-headers` in
+`configure`, each request's policy names a fresh nonce, and the context
+carries it. `nonceOf(loadContext)` reads it in `entry.server.tsx`, and React
+Router puts it on every script it renders, so `script-src` needs no
+`'unsafe-inline'`:
+
+```ts
+// app/server.ts
+configure: (app) =>
+	app.use(
+		secureHeaders({
+			nonce: true,
+			contentSecurityPolicy:
+				"default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; form-action 'self'; base-uri 'self'; frame-ancestors 'none'",
+		}),
+	),
+```
+
+The template has no `entry.server.tsx`; reveal React Router's, then add
+three lines:
+
+```sh
+bunx react-router reveal entry.server
+```
+
+```diff
+ // app/entry.server.tsx, as reveal writes it
+ import { PassThrough } from "node:stream";
+
++import { nonceOf } from "@alxia/react-router";
+ import type { EntryContext, RouterContextProvider } from "react-router";
+ …
+     const { pipe, abort } = renderToPipeableStream(
+-      <ServerRouter context={routerContext} url={request.url} />,
++      <ServerRouter context={routerContext} url={request.url} nonce={nonceOf(loadContext)} />,
+       {
++        nonce: nonceOf(loadContext),
+         [readyOption]() {
+```
+
+`nonceOf` returns `undefined` when no hook set a nonce, so the entry works
+with or without secure-headers: neither package depends on the other. Any
+`derive` that returns a string `nonce` works the same.
+[More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#a-csp-nonce)
+
 ## WebSockets
 
 A `ws` route in `configure` connects under `react-router dev`, under
@@ -241,7 +288,8 @@ files, so `@alxia/openapi` can leave them out.
 - **An index route's action is `POST /?index`**; `POST /` gets React
   Router's 405. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
 - **`@alxia/secure-headers`' default policy blocks the page's scripts**
-  and forms: give the pages a policy of their own. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
+  and forms: give the pages a policy of their own, with `nonce: true` and
+  `nonceOf` in `entry.server.tsx` rather than `'unsafe-inline'`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
 - **Under `react-router dev`, `page()` and an HTTP request's
   `ctx.server` are absent**: requests arrive through `app.fetch`. A
   socket's upgrade has its server. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#ctxserver-is-undefined-under-react-router-dev)
@@ -265,6 +313,7 @@ files, so `@alxia/openapi` can leave them out.
 | `InvalidRegister` | what a `Register` naming neither a server nor an app reads as: every key of the app's own a compile error |
 | `AppOf<Server>` | the app a server makes |
 | `alxiaContext` | the React Router context key `alxiaOf` reads, set on every request |
+| `nonceOf(context)` | the request's CSP nonce, for `entry.server.tsx`: the context's `nonce` when a hook set one, such as `secureHeaders({ nonce: true })`, else `undefined` |
 | `reactRouter(app, options)` | the catch-all and the client's files, for a server of your own. `build`, `mode`, `getLoadContext`, `client` |
 | `ReactRouterOptions<Ctx>` | its options |
 | `isReactRouterRoute(route)` | whether this package declared a route, for OpenAPI's `exclude` |
@@ -284,7 +333,7 @@ The `alxia-react-router` bin, run with `bunx`:
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev, the build and `vite preview` work, customising the server, typing the loaders, the app's own keys, escape hatches, WebSockets, the client's files, OpenAPI, testing and deploying.
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev, the build and `vite preview` work, customising the server, typing the loaders, the app's own keys, a CSP nonce, escape hatches, WebSockets, the client's files, OpenAPI, testing and deploying.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
-- [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these three lines, then an `app/server.ts` with a session, an `/api`, secure headers and a streamed page.
+- [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these three lines, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.

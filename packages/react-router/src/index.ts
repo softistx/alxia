@@ -7,6 +7,7 @@ export {
 	type RegisteredApp,
 	type RegisteredOf,
 } from './context';
+export { nonceOf } from './nonce';
 export {
 	isReactRouterRoute,
 	type ReactRouterOptions,

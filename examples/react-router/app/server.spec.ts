@@ -75,6 +75,29 @@ async function start(root: string) {
 
 type Server = Awaited<ReturnType<typeof start>>;
 
+/** Every `<script …>` and module preload of a page: what a nonce must cover. */
+const scriptsOf = (html: string) =>
+  html.match(/<script\b[^>]*>|<link rel="modulepreload"[^>]*>/g) ?? [];
+
+/**
+ * The home page and the streamed one, twice each: every script carries the
+ * nonce the response's policy allows, and no two responses share one.
+ */
+async function expectNonces(get: Server["get"]) {
+  const seen = new Set<string>();
+  for (const path of ["/", "/", "/slow", "/slow"]) {
+    const response = await get(path);
+    const policy = response.headers.get("content-security-policy") ?? "";
+    const nonce = policy.match(/'nonce-([^']+)'/)?.[1] as string;
+    expect(nonce).toMatch(/^[\w+/]{22}==$/);
+    const scripts = scriptsOf(await response.text());
+    expect(scripts.length).toBeGreaterThan(2);
+    for (const script of scripts) expect(script).toContain(`nonce="${nonce}"`);
+    seen.add(nonce);
+  }
+  expect(seen.size).toBe(4);
+}
+
 /** The first entry client bundle a page links to. */
 const assetOf = (html: string) =>
   html.match(/\/assets\/entry\.client-[\w-]+\.js/)?.[0] as string;
@@ -202,11 +225,15 @@ describe("customised by app/server.ts", () => {
       headers: { "accept-encoding": "gzip" },
     });
     const policy = response.headers.get("content-security-policy") ?? "";
-    expect(policy).toContain("script-src 'self' 'unsafe-inline'");
+    expect(policy).toMatch(/script-src 'self' 'nonce-[\w+/]+={0,2}';/);
     expect(policy).toContain("form-action 'self'");
     expect(response.headers.get("x-frame-options")).toBe("DENY");
     expect(response.headers.get("x-request-id")).toBeString();
     expect(response.headers.get("content-encoding")).toBe("gzip");
+  });
+
+  test("every script carries the nonce of the page's own policy, a fresh one per request", async () => {
+    await expectNonces(server.get);
   });
 
   test("a hashed asset is served immutable", async () => {
@@ -216,6 +243,62 @@ describe("customised by app/server.ts", () => {
     expect(served.headers.get("cache-control")).toBe(
       "public, max-age=31536000, immutable",
     );
+  });
+});
+
+describe("react-router dev", () => {
+  let get: Server["get"];
+  let child: ReturnType<typeof Bun.spawn> | undefined;
+
+  beforeAll(async () => {
+    // A free port, for Vite's --strictPort.
+    const probe = Bun.serve({ port: 0, fetch: () => new Response() });
+    const port = probe.port;
+    await probe.stop();
+    child = Bun.spawn(
+      [
+        process.execPath,
+        "--bun",
+        "react-router",
+        "dev",
+        "--port",
+        String(port),
+        "--strictPort",
+      ],
+      { cwd: ROOT, stdout: "pipe", stderr: "pipe" },
+    );
+    const reader = (child.stdout as ReadableStream<Uint8Array>).getReader();
+    let out = "";
+    // Vite colours the port where CI asks for colour (GitHub Actions does):
+    // read the output without its escape codes.
+    while (!Bun.stripANSI(out).includes(`:${port}/`)) {
+      const { done, value } = await reader.read();
+      if (done) throw new Error(`react-router dev exited: ${out}`);
+      out += new TextDecoder().decode(value);
+    }
+    reader.releaseLock();
+    void (async () => {
+      for await (const _ of child.stdout as ReadableStream);
+    })();
+    void (async () => {
+      for await (const _ of child.stderr as ReadableStream);
+    })();
+    const base = `http://localhost:${port}`;
+    get = (path, init = {}) =>
+      fetch(new URL(path, base), {
+        redirect: "manual",
+        ...init,
+        headers: { ...browser, ...init.headers },
+      });
+  }, 30_000);
+  afterAll(async () => {
+    // SIGTERM: the CLI forwards it to the process it relaunched.
+    child?.kill("SIGTERM");
+    await child?.exited;
+  });
+
+  test("Vite's scripts and React Router's carry the nonce too", async () => {
+    await expectNonces(get);
   });
 });
 

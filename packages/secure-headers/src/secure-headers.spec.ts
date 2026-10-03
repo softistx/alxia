@@ -29,6 +29,33 @@ describe('secureHeaders', () => {
 		);
 	});
 
+	test('sends every default, exactly, with no nonce anywhere', async () => {
+		const app = alxia()
+			.use(secureHeaders())
+			.get('/', (ctx) => ctx.reply(200, String('nonce' in ctx)));
+		const response = await app.request('/');
+		expect(await response.text()).toBe('false');
+		expect(
+			[...response.headers].filter(
+				([name]) => name !== 'content-type' && name !== 'content-length',
+			),
+		).toEqual([
+			[
+				'content-security-policy',
+				"default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",
+			],
+			['cross-origin-opener-policy', 'same-origin'],
+			['cross-origin-resource-policy', 'same-origin'],
+			['origin-agent-cluster', '?1'],
+			['referrer-policy', 'no-referrer'],
+			['strict-transport-security', 'max-age=31536000; includeSubDomains'],
+			['x-content-type-options', 'nosniff'],
+			['x-dns-prefetch-control', 'off'],
+			['x-frame-options', 'DENY'],
+			['x-permitted-cross-domain-policies', 'none'],
+		]);
+	});
+
 	test('a 404 is covered too', async () => {
 		const app = alxia().use(secureHeaders());
 		const response = await app.request('/nope');

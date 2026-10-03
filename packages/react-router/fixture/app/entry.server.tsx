@@ -1,6 +1,11 @@
+import { nonceOf } from '@alxia/react-router';
 import { isbot } from 'isbot';
 import { renderToReadableStream } from 'react-dom/server';
-import { type EntryContext, ServerRouter } from 'react-router';
+import {
+	type EntryContext,
+	type RouterContextProvider,
+	ServerRouter,
+} from 'react-router';
 
 export const streamTimeout = 5_000;
 
@@ -9,11 +14,20 @@ export default async function handleRequest(
 	responseStatusCode: number,
 	responseHeaders: Headers,
 	routerContext: EntryContext,
+	loadContext: RouterContextProvider,
 ) {
 	let status = responseStatusCode;
+	// The nonce of the request's Content-Security-Policy, when alxia's hooks set one.
+	const nonce = nonceOf(loadContext);
 	const body = await renderToReadableStream(
-		<ServerRouter context={routerContext} url={request.url} />,
+		<ServerRouter
+			context={routerContext}
+			url={request.url}
+			// Under exactOptionalPropertyTypes, ServerRouter's nonce takes no undefined.
+			{...(nonce === undefined ? {} : { nonce })}
+		/>,
 		{
+			nonce,
 			onError(error: unknown) {
 				status = 500;
 				console.error(error);

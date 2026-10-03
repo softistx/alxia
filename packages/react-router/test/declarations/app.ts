@@ -11,6 +11,7 @@ import {
 	alxiaOf,
 	createServer,
 	type FreshApp,
+	nonceOf,
 	type RegisteredOf,
 	reactRouter,
 } from '@alxia/react-router';
@@ -66,4 +67,8 @@ export function serverOf<App extends AnyAlxia>(
 	configure: (app: FreshApp) => App,
 ) {
 	return createServer({ configure });
+}
+
+export function entryNonce() {
+	return nonceOf(context);
 }

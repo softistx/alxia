@@ -25,6 +25,15 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### Next release
+
+- **A nonce per request.** `secureHeaders({ nonce: true })` makes a fresh,
+  random nonce for each request, adds it to the policy's `script-src`, or
+  wherever the policy names `NONCE`, and gives the same one to the routes
+  after it as `ctx.nonce`, typed. A page's inline scripts run without
+  `'unsafe-inline'`; `@alxia/react-router`'s `nonceOf` hands it to React
+  Router. Without the option, nothing changes.
+
 ### 0.1.0
 
 - **Secure headers on every response.** `secureHeaders()` is a plugin for

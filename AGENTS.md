@@ -15,7 +15,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/zod` | Zod coercions (`zq`) and the OpenAPI converter | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's hooks and typed context, Yoga's plugins | core, graphql-yoga, graphql |
 | `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its hooks, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js`; the `alxia-react-router reveal` bin writes the default server out | core, react-router; vite (optional, `/vite`) |
-| `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | function plugins: global hooks | core |
+| `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | function plugins: global hooks; `secureHeaders({ nonce: true })` is an app plugin, adding a typed `nonce` | core |
 | `@alxia/rate-limit`, `@alxia/jwt`, `@alxia/logger` | app plugins: typed context, typed replies, routes | core |
 | `@alxia/env` | environment variables through any Standard Schema | — |
 | `@alxia/cache` | HTTP response caching, a store contract and a memory store | core |
@@ -53,7 +53,7 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
 
 | example | what it shows |
 | --- | --- |
-| `examples/react-router` | React Router's official template (`bunx create-react-router@latest`, committed as generated), then `@alxia/react-router` added in three lines (`bun add`, `alxia()` in `vite.config.ts`, `start: bun build/server/index.js`), then an optional `app/server.ts`. That file holds `createServer()` with logger, compress and secure-headers with a policy the pages pass, a cookie session deriving `user`, `POST /api/todos` validated by Zod, `getLoadContext` and the `Register` declaration. On top of the template: the home loader reading `alxiaOf(context).user`, a sign-in action, a todo form with a 400, and a page streamed behind `<Await>`. `app/server.spec.ts` builds it, runs `bun build/server/index.js` on a free port, and builds a copy without `app/server.ts` to check the default server. |
+| `examples/react-router` | React Router's official template (`bunx create-react-router@latest`, committed as generated), then `@alxia/react-router` added in three lines (`bun add`, `alxia()` in `vite.config.ts`, `start: bun build/server/index.js`), then an optional `app/server.ts`. That file holds `createServer()` with logger, compress and secure-headers with a nonce per request and a policy the pages pass, a cookie session deriving `user`, `POST /api/todos` validated by Zod, `getLoadContext` and the `Register` declaration. On top of the template: `app/entry.server.tsx` as `react-router reveal` writes it, plus `nonceOf(loadContext)` in three lines; the home loader reading `alxiaOf(context).user`, a sign-in action, a todo form with a 400, and a page streamed behind `<Await>`. `app/server.spec.ts` builds it, runs `bun build/server/index.js` on a free port, starts `react-router dev` on a free port to check the nonce on every script there and in the build, and builds a copy without `app/server.ts` to check the default server. |
 
 ## Principles
 

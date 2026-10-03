@@ -1,8 +1,8 @@
 # Guide
 
 This page covers `secureHeaders`: what it sends, how to change or drop each
-header, which responses it reaches, and how a page or another plugin sets
-its own policy.
+header, the per-request nonce, which responses it reaches, and how a page or
+another plugin sets its own policy.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -21,7 +21,8 @@ Every response of that app now carries the headers below, and none carries
 ## The signature
 
 ```ts
-function secureHeaders(options?: SecureHeadersOptions): Plugin;
+function secureHeaders(options: SecureHeadersOptions & { readonly nonce: true }): NoncePlugin;
+function secureHeaders(options?: SecureHeadersOptions & { readonly nonce?: false }): Plugin;
 
 interface SecureHeadersOptions {
 	readonly contentSecurityPolicy?: string | false;
@@ -40,6 +41,9 @@ interface SecureHeadersOptions {
 }
 ```
 
+`nonce` is not in `SecureHeadersOptions`: each overload adds it, so options
+typed by that interface still give the plain `Plugin`.
+
 `secureHeaders` returns a function `Plugin` from `@alxia/core`: give it to
 `use`, called, and the app keeps its type. It adds one global `onResponse`
 hook, so where it sits in the chain does not matter for which routes it
@@ -49,7 +53,13 @@ app's. To vary a header for some routes, set it on their replies
 ([below](#a-header-a-route-sets-is-kept)).
 
 The options are read once, when `secureHeaders(…)` is called; the header
-values are fixed from then on.
+values are fixed from then on, but for the nonce, which is new on every
+request.
+
+With `nonce: true` it returns a `NoncePlugin` instead: an app plugin, still
+given to `use` called, whose hook covers every route as above, and which
+adds `nonce` to the context of the routes declared after it
+([below](#a-nonce-per-request)).
 
 ## The options
 
@@ -74,6 +84,7 @@ leave the header out. An option left out keeps the default.
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `hidePoweredBy` | `boolean` | `true` | removes `X-Powered-By` and `Server` from every response, a route's own included |
+| `nonce` | `boolean` | `false` | a fresh nonce per request, in the policy and on the context: [A nonce per request](#a-nonce-per-request) |
 
 ### A value
 
@@ -165,6 +176,110 @@ up on the response before the plugin reads it.
 That is how `@alxia/openapi`'s reference page and `@alxia/graphql`'s IDE
 load under the strict default: each sets the `Content-Security-Policy` it
 needs, and `secureHeaders` keeps it.
+
+## A nonce per request
+
+A policy that allows a page's inline scripts without `'unsafe-inline'`
+names a nonce: `script-src 'nonce-…'`, and the same value on each
+`<script nonce="…">`. It must be unguessable and new on every response.
+`nonce: true` does both halves.
+
+```ts
+import { alxia } from '@alxia/core';
+import { secureHeaders } from '@alxia/secure-headers';
+
+const app = alxia()
+	.use(
+		secureHeaders({
+			nonce: true,
+			contentSecurityPolicy: "default-src 'self'; script-src 'self'; frame-ancestors 'none'",
+		}),
+	)
+	.get('/', ({ nonce, reply }) =>
+		reply(
+			200,
+			`<!doctype html><script nonce="${nonce}">document.title = 'ready'</script>`,
+			{ headers: { 'content-type': 'text/html; charset=utf-8' } },
+		),
+	);
+
+const response = await app.request('/');
+response.headers.get('content-security-policy');
+// "default-src 'self'; script-src 'self' 'nonce-Gm1y0S3h1JZcVvXQ4l6x0A=='; frame-ancestors 'none'"
+await response.text();
+// "<!doctype html><script nonce=\"Gm1y0S3h1JZcVvXQ4l6x0A==\">…"
+```
+
+### What it is
+
+16 bytes from `crypto.getRandomValues`, base64: 24 characters, `==` at the
+end. Each request makes its own, when the first hook or route asks for it,
+and every reader of that request — the route, its hooks, the header — gets
+the same one. Two requests never share one.
+
+### Where it goes in the policy
+
+| The policy | The nonce goes |
+| --- | --- |
+| names `NONCE` | where `NONCE` stands, each time, and nowhere else |
+| has no `NONCE`, has `script-src` or `script-src-elem` | at the end of each of those directives (their name in any case) |
+| has neither, as the default policy | nowhere: `secureHeaders()` throws at startup; give `contentSecurityPolicy` with `nonce: true` |
+
+`NONCE`, exported, is a placeholder string (`'nonce-{alxia}'`) that no real
+policy contains. Use it to put the nonce in `style-src`, or in a directive
+of your own choosing:
+
+```ts
+import { NONCE, secureHeaders } from '@alxia/secure-headers';
+
+app.use(
+	secureHeaders({
+		nonce: true,
+		contentSecurityPolicy: [
+			"default-src 'self'",
+			`script-src 'self' ${NONCE} 'strict-dynamic'`,
+			`style-src 'self' ${NONCE}`,
+		].join('; '),
+	}),
+);
+```
+
+Leaving `style-src` alone is the default on purpose: once a directive holds
+a nonce, browsers ignore its `'unsafe-inline'`, and `style="…"` attributes,
+which take no nonce, stop applying
+([troubleshooting](troubleshooting.md#inline-style-attributes-stop-applying-once-style-src-has-the-nonce)).
+
+### Who reads it
+
+The header covers every response, as without the nonce: 404s, 500s and the
+routes declared before the plugin get a policy with a nonce of their own.
+`ctx.nonce` is typed and set on the routes declared **after** `use`, in
+their hooks and their handler, as any plugin's context:
+
+```ts
+alxia()
+	.get('/early', ({ reply }) => reply(200, 'policy with a nonce, no ctx.nonce'))
+	.use(secureHeaders({ nonce: true, contentSecurityPolicy: "script-src 'self'" }))
+	.derive(({ nonce }) => ({ scriptTag: (code: string) => `<script nonce="${nonce}">${code}</script>` }))
+	.get('/late', ({ scriptTag, reply }) => reply(200, scriptTag('…')));
+```
+
+A route that sets its own `Content-Security-Policy` keeps it, as
+[above](#a-header-a-route-sets-is-kept); its `ctx.nonce` is then in no
+header, unless it writes it into its own policy.
+
+### With React Router
+
+`@alxia/react-router` reads the nonce from the context, if one is there,
+with `nonceOf(loadContext)` in `entry.server.tsx`. Neither package depends
+on the other. See
+[its guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#a-csp-nonce).
+
+### Without `nonce: true`
+
+Nothing changes: the same headers, the same values, no `nonce` on the
+context. A policy that names `NONCE` without `nonce: true` is refused at
+startup, so the placeholder never reaches a browser.
 
 ## Which responses get the headers
 
@@ -259,6 +374,8 @@ app.use(
 
 Or keep the strict default for the API and give the pages their policy on
 their reply, as in [A header a route sets is kept](#a-header-a-route-sets-is-kept).
+When the pages run inline scripts, add `nonce: true` rather than
+`'unsafe-inline'`: [A nonce per request](#a-nonce-per-request).
 
 ### Framed by your own origin
 
