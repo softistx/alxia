@@ -546,17 +546,16 @@ describe('permission', () => {
 
 	test('an annotated subject on the loose path is required too', () => {
 		const { access } = setup();
-		const type = 'record' as 'record' | 'record';
-		const anyPermission = 'view' as 'view' | 'edit';
+		const anyPermission = 'view' as 'view' | 'edit' | 'owners' | 'doctors';
 		const loose = permission(
 			access,
 			anyPermission,
-			type,
+			'record',
 			byParam('id', (id) => ({ id, doctorId: null })),
 			{
 				subject: ({ member }: { member: { type: 'patient'; id: string } }) =>
 					member,
-				ctx: () => ({ locked: false }),
+				ctx: () => 1, // only the loose path takes any ctx
 			},
 		);
 		expectTypeOf(loose['~requires']).toEqualTypeOf<{
@@ -591,5 +590,6 @@ describe('permission', () => {
 		} finally {
 			console.error = original;
 		}
+		expect(String(errors.flat())).toContain('no user in the context');
 	});
 });
