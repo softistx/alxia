@@ -197,6 +197,61 @@ export interface RouteMethod<
 	>;
 }
 
+/**
+ * A route as data: its method, its path and its options. What
+ * `app.route(operation, handler)` declares — generated from an OpenAPI
+ * document, or written by hand.
+ */
+export interface RouteOperation {
+	readonly method: Method;
+	readonly path: RoutePath;
+	readonly schema?: RouteSchema;
+}
+
+/** The options of an operation: its `schema`, or none. */
+export type OperationSchema<Operation> = Operation extends {
+	readonly schema: infer Schema extends RouteSchema;
+}
+	? Schema
+	: Empty;
+
+/** `app.route(operation, handler)`: `app[method](path, schema, handler)`, with the three read from `operation`. */
+export type OperationMethod<
+	Ctx extends object,
+	Routes extends object,
+	Prefix extends string,
+	Shortcuts extends AnyReply,
+> = <
+	const Operation extends RouteOperation,
+	Result extends HandlerResult<OperationSchema<Operation>>,
+>(
+	operation: Operation & {
+		readonly schema?: ValidSchema<
+			JoinPath<Prefix, Operation['path']>,
+			OperationSchema<Operation>
+		>;
+	},
+	handler: (
+		ctx: Context<
+			Ctx,
+			JoinPath<Prefix, Operation['path']>,
+			OperationSchema<Operation>
+		>,
+	) => MaybePromise<Result>,
+) => Alxia<
+	Ctx,
+	Routes &
+		RouteEntryOf<
+			Operation['method'],
+			JoinPath<Prefix, Operation['path']>,
+			OperationSchema<Operation>,
+			Result,
+			Shortcuts
+		>,
+	Prefix,
+	Shortcuts
+>;
+
 /** The routes of a plugin, under the prefix of the app it is used by. */
 type Prefixed<Prefix extends string, Routes, Shortcuts> = {
 	readonly [Path in keyof Routes as Path extends string
@@ -347,6 +402,21 @@ export class Alxia<
 		Prefix,
 		Shortcuts
 	>;
+	/**
+	 * A route declared as data — `{ method, path, schema? }`, as an OpenAPI
+	 * code generator writes it — and its handler: the same route as
+	 * `app[method](path, schema, handler)`.
+	 */
+	readonly route: OperationMethod<Ctx, Routes, Prefix, Shortcuts> = ((
+		operation: RouteOperation,
+		handler: RouteDefinition['handler'],
+	) =>
+		this.#method(operation.method)(
+			operation.path,
+			operation.schema ?? {},
+			handler,
+		)) as never;
+
 	/**
 	 * A `QUERY` route: a safe, idempotent read whose criteria travel in the
 	 * body, validated like a `POST`'s.

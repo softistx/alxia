@@ -13,6 +13,7 @@ thrown when the app is built, a response body, or a line in the server log.
 - [`Type 'string' is not assignable to type 'number'` on a `reply`](#type-string-is-not-assignable-to-type-number-on-a-reply)
 - [`Type 'Response' is not assignable to type 'MaybePromise<AnyReply>'`](#type-response-is-not-assignable-to-type-maybepromiseanyreply)
 - [`Property 'user' does not exist on type 'Context<…>'`](#property-user-does-not-exist-on-type-context)
+- [`Type 'string' is not assignable to type 'Method'` on `route`](#type-string-is-not-assignable-to-type-method-on-route)
 
 **Building the app**
 
@@ -209,6 +210,38 @@ const app = alxia()
 
 The same applies to `use(plugin)`. Its route hooks reach the routes
 declared after `use`, not before it.
+
+### `Type 'string' is not assignable to type 'Method'` on `route`
+
+**When:** an operation declared in a variable of its own, without `as const`,
+is passed to `app.route`.
+
+```text
+error TS2345: Argument of type '{ method: string; path: string; }' is not assignable to parameter of type 'RouteOperation & { readonly schema?: unknown; }'.
+  Type '{ method: string; path: string; }' is not assignable to type 'RouteOperation'.
+    Types of property 'method' are incompatible.
+      Type 'string' is not assignable to type 'Method'.
+```
+
+With the method narrowed alone, the same error names the path instead:
+``Type 'string' is not assignable to type '`/${string}`'``.
+
+**Why:** TypeScript widens the properties of an object in a variable:
+`'GET'` and `'/pets/:petId'` both become `string`, which is neither a
+`Method` nor a path starting with `/`, and the route could not read its
+parameters from it anyway. An operation written inline in the call is not
+widened.
+
+**Fix:** keep the literals, with `as const` or `satisfies RouteOperation`
+([Routes as data](guide/routes.md#routes-as-data-route)):
+
+```ts
+export const getPet = {
+	method: 'GET',
+	path: '/pets/:petId',
+	schema: { params: z.object({ petId: z.coerce.number().int() }) },
+} as const;
+```
 
 ## Building the app
 

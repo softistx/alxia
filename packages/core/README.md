@@ -103,6 +103,22 @@ app.query(
 );
 ```
 
+`route(operation, handler)` declares the same route from data —
+`{ method, path, schema? }`, written once and shared, or generated from an
+OpenAPI document — with the same types and the same compile errors. A
+variable holding an operation needs `as const`, to keep its method and path
+literal:
+
+```ts
+const getUser = {
+	method: 'GET',
+	path: '/users/:id',
+	schema: { params: z.object({ id: z.coerce.number().int() }), response: { 200: User } },
+} as const;
+
+app.route(getUser, async ({ params, reply }) => reply.ok(await findUser(params.id)));
+```
+
 ## Replies
 
 A handler returns `reply(status, body, init?)`. With `response` schemas,
@@ -300,7 +316,7 @@ global hooks become this app's.
 | export | |
 | --- | --- |
 | `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip` |
-| `Alxia` | `get` `post` `put` `patch` `delete` `options` `head` `query` `ws`, `static` `file` `page`, `decorate` `derive` `wrap` `onError`, `around` `onRequest` `onResponse` `onStart` `onStop` `parser`, `group` `use`, `fetch` `request` `listen` `stop`, `routes` `sockets` `server` |
+| `Alxia` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `decorate` `derive` `wrap` `onError`, `around` `onRequest` `onResponse` `onStart` `onStop` `parser`, `group` `use`, `fetch` `request` `listen` `stop`, `routes` `sockets` `server` |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream` made |
 | `FileSource`, `StaticOptions`, `FileOptions`, `StaticReply`, `parseRange` | static files |
@@ -319,6 +335,7 @@ global hooks become this app's.
 | `ContextOf<App>` | what a route declared next on `App` reads: to type a GraphQL schema, a service |
 | `RequestContext`, `BaseContext`, `Context`, `ResponseSettings`, `HandlerResult` | what every hook reads, what a handler reads, what a route sets on its response, what a handler may return |
 | `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, what OpenAPI says of it, the checks its schema's type cannot express, a route method, a route and a socket as the app runs them |
+| `RouteOperation`, `OperationSchema`, `OperationMethod` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), and the type of `route` |
 | `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage`, `SocketRecord`, `SocketEntryOf` | sockets: what a socket route validates, what its handlers read, send and receive, the entry one socket adds to `RoutesOf` |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema types |
 | `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426 |
