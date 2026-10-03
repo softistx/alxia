@@ -102,20 +102,31 @@ export function rewrite(
 	return { root: nextRoot, packages: next, pinned };
 }
 
-async function write(path: string, manifest: Manifest): Promise<void> {
-	await Bun.write(path, `${JSON.stringify(manifest, null, '\t')}\n`);
-}
-
-if (import.meta.main) {
+/** The root manifest's path, and every package's manifest by its path. */
+export async function readManifests(): Promise<{
+	rootPath: string;
+	root: Manifest;
+	packages: Map<string, Manifest>;
+}> {
 	const rootPath = join(ROOT, 'package.json');
 	const packages = new Map<string, Manifest>();
 	for (const file of new Bun.Glob('packages/*/package.json').scanSync(ROOT)) {
 		const path = join(ROOT, file);
 		packages.set(path, (await Bun.file(path).json()) as Manifest);
 	}
+	const root = (await Bun.file(rootPath).json()) as Manifest;
+	return { rootPath, root, packages };
+}
+
+export async function write(path: string, manifest: Manifest): Promise<void> {
+	await Bun.write(path, `${JSON.stringify(manifest, null, '\t')}\n`);
+}
+
+if (import.meta.main) {
+	const { rootPath, root, packages } = await readManifests();
 	let result: Rewrite;
 	try {
-		result = rewrite((await Bun.file(rootPath).json()) as Manifest, packages);
+		result = rewrite(root, packages);
 	} catch (error) {
 		console.error((error as Error).message);
 		process.exit(1);

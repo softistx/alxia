@@ -120,3 +120,29 @@ jobs:
         run: bun run test
       - name: Verify the built artifacts load
         run: bun run verify:artifacts
+
+  newest-majors:
+    # "Newest peers" proves the peer ranges as written. This one tries what
+    # npm calls `latest` for each widened peer — TypeScript 7 and graphql 17
+    # today, the same as above — so the day TypeScript 8 or graphql 18 ships,
+    # it is built against before any range accepts it, and the step below
+    # warns that it is ahead. No bun.lock either: nothing else stays pinned.
+    # Informational like the job above: read it, do not make it required.
+    # No tests, so no Redis: the types and the packed artifacts are what a
+    # new major breaks; the job above runs the specs.
+    name: Newest majors
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup
+        uses: ./.github/actions/setup
+      - name: Use the newest majors
+        run: rm bun.lock && bun scripts/newest-majors.ts && bun install
+      - name: Build packages
+        run: bun run build
+      - name: Type checking
+        run: bun run typecheck
+      - name: Verify the built artifacts load
+        run: bun run verify:artifacts

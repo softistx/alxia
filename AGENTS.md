@@ -116,6 +116,26 @@ each with a matching key in `exports`.
 - **A build that exits 0 is not evidence the artifact loads.**
   `bun run verify:artifacts` packs, installs and imports every package.
 
+## CI
+
+`.github/workflows/ci.yml` runs three jobs on every pull request:
+
+- **CI**, the required one: lint, build, typecheck, tests, `verify:artifacts`
+  and the changeset check, on the lockfile's toolchain — the first
+  alternative of each peer range (`typescript: ^6.0.3 || ^7.0.0` installs 6).
+- **Newest peers**: `scripts/newest-peers.ts` pins each peer to the last
+  alternative of its range, then the same build, typecheck, tests and
+  `verify:artifacts`. Widening a range is all it takes for this to test it.
+- **Newest majors**: `scripts/newest-majors.ts` pins each widened peer to
+  npm's `latest`, without `bun.lock`, then build, typecheck and
+  `verify:artifacts`. It tries a new major before any range accepts it, and
+  warns when no range accepts it yet: the signal to widen.
+
+The last two resolve without a lockfile, so an upstream release can turn
+them red with no change here. They are informational: read them, never make
+them required. Both scripts rewrite manifests in place; never commit what
+they write.
+
 ## TypeScript
 
 `tsconfig.base.json` is strict past `strict`: `exactOptionalPropertyTypes`,
