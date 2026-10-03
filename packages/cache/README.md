@@ -54,6 +54,8 @@ app.listen({ port: 3000 });
   `Cache-Control: private` or `no-store`, sets a cookie, or streams events —
   and one whose route called `cache.skip()`. Nor is it handed to a
   concurrent request: each runs the route itself.
+- **A store that cannot answer** costs the cache, not the response: the
+  route runs, nothing is kept, and the outage's first error is logged.
 - Only `GET` and `HEAD`; only the routes declared after the plugin.
 
 ## The key
@@ -67,6 +69,13 @@ cache({ ttl: 60, key: (ctx) => (ctx.request.headers.has('authorization') ? undef
 ```
 
 `key` returning `undefined` is not cached: a request with a session, say.
+Whatever the key, `invalidate(path)` forgets every response kept for the
+path and query as the request asked them:
+
+```ts
+await products.invalidate('/products');          // under each `vary` value, or a key of your own
+await products.invalidate('/products?page=2');   // another path: the query is part of it
+```
 
 ## Two stores
 
@@ -81,7 +90,8 @@ cache({ ttl: 60, store: redisCacheStore(connection.client, { name: 'shop' }) });
 The memory store keeps the most recently read responses of one process. The
 Redis store, on `@nxgt/redis`, shares them — and their invalidation —
 across every process. A store of your own implements `CacheStore`: `get`,
-`set`, `delete`, `deleteTag`.
+`set`, `delete`, `deleteTag` — and remembers each response's `tags`, which
+`invalidate` relies on too.
 
 ## Options
 
@@ -104,6 +114,7 @@ across every process. A store of your own implements `CacheStore`: `get`,
 | `cache(options)` | the plugin, with `invalidate(path)`, `invalidateTag(tag)` and `store`; routes after it read `cache.tag()` and `cache.skip()` |
 | `CacheOptions` | its options: `ttl`, `staleWhileRevalidate`, `store`, `key`, `vary`, `statuses`, `tags`, `honorClientNoCache`, `debugHeaders` |
 | `defaultKey(path, vary, headers)` | the default key: the path and query, then each varying header's value |
+| `pathTag(path)` | the tag every kept response carries for its path, `alxia:path:<path>`: what `invalidate(path)` deletes |
 | `MemoryCacheStore` | the in-process store: least recently used |
 | `MemoryCacheOptions` | its options: `maxEntries`, `maxBytes` |
 | `CacheStore`, `CachedResponse` | a store's contract |

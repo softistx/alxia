@@ -161,8 +161,8 @@ describe('redis', () => {
 		let loads = 0;
 		const app = alxia()
 			.use(redis(db.client, { caches: { users } }))
-			.get('/users/:id', async ({ cache, lock, params, reply }) => {
-				const user = await cache.users.remember(params.id, () => {
+			.get('/users/:id', async ({ caches, lock, params, reply }) => {
+				const user = await caches.users.remember(params.id, () => {
 					loads++;
 					return { id: params.id, name: 'Ada' };
 				});
@@ -209,6 +209,44 @@ describe('redisCacheStore', () => {
 		expect(await (await one.app.request('/products')).json()).toEqual({
 			runs: 2,
 		});
+	});
+
+	test('with redis(): ctx.cache and ctx.caches; invalidate(path) forgets every variant', async () => {
+		const { cache } = await import('@alxia/cache');
+		const { redisCacheStore } = await import('./cache-store');
+		const pages = cache({
+			ttl: 60,
+			vary: ['accept-language'],
+			store: redisCacheStore(db.client, { name: 'pages' }),
+		});
+		const app = alxia()
+			.use(
+				redis(db.client, {
+					caches: {
+						greetings: defineCache({
+							name: 'greeting',
+							key: (id: string) => id,
+							ttl: 60,
+							schema: z.string(),
+						}),
+					},
+				}),
+			)
+			.use(pages)
+			.get('/hello', ({ cache: controls, caches, request, reply }) => {
+				expectTypeOf(controls.tag).toBeFunction();
+				expectTypeOf(caches.greetings.remember).toBeFunction();
+				controls.tag('hello');
+				return reply.ok(request.headers.get('accept-language') ?? '-');
+			});
+		const ask = (language: string) =>
+			app.request('/hello', { headers: { 'accept-language': language } });
+		await ask('fr');
+		await ask('en');
+		expect((await ask('fr')).headers.get('x-cache')).toBe('HIT');
+		await pages.invalidate('/hello');
+		expect((await ask('fr')).headers.get('x-cache')).toBe('MISS');
+		expect((await ask('en')).headers.get('x-cache')).toBe('MISS');
 	});
 
 	test('a tag lives as long as its longest-kept response', async () => {

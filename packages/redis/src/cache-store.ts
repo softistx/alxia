@@ -94,10 +94,12 @@ export function redisCacheStore(
 				},
 				{ ttl: seconds },
 			);
-			for (const tag of value.tags) {
-				await client.send('SADD', [tagKey(tag), records.keyFor(key)]);
-				await keepTag(tagKey(tag), seconds);
-			}
+			await Promise.all(
+				value.tags.map(async (tag) => {
+					await client.send('SADD', [tagKey(tag), records.keyFor(key)]);
+					await keepTag(tagKey(tag), seconds);
+				}),
+			);
 		},
 		async delete(key) {
 			await records.delete(key);

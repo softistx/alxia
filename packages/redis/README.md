@@ -62,7 +62,8 @@ const app = alxia()
 
 Responses are `@nxgt/redis` cache records, checked by their schema when
 read: one that no longer reads as a response is a miss. A tag is a Redis
-set of the keys it names.
+set of the keys it names. A Redis that does not answer costs the cache, not
+the response: the route runs, and the error is logged.
 
 ## Idempotent routes
 
@@ -128,19 +129,16 @@ const touch = async (user: z.infer<typeof User>) => user;
 
 const app = alxia()
 	.use(redis(connection.client, { caches: { users } }))
-	.get('/users/:id', async ({ cache, lock, params, reply }) => {
-		const user = await cache.users.remember(params.id, () => loadUser(params.id)); // typed by User
+	.get('/users/:id', async ({ caches, lock, params, reply }) => {
+		const user = await caches.users.remember(params.id, () => loadUser(params.id)); // typed by User
 		await lock(`user:${params.id}`, () => touch(user));
-		return reply(200, user);
+		return reply.ok(user);
 	});
 ```
 
-`cache.<name>` is `@nxgt/redis`'s bound cache; `redis` the client itself,
-for everything else. `@alxia/cache`'s `cache()` also adds `cache` to the
-context: with both on one route, the later one replaces the other at
-runtime — rename one with a `derive`, as
-[the guide](https://github.com/softistx/alxia/blob/develop/packages/redis/docs/guide/caches-and-locks.md#with-alxiacache-two-plugins-named-cache)
-shows.
+`caches.<name>` is `@nxgt/redis`'s bound cache; `redis` the client itself,
+for everything else. It sits beside `@alxia/cache`'s `ctx.cache` — the
+response cache's `{ tag, skip }` — without touching it, in either order.
 
 ## Testing
 
@@ -154,7 +152,7 @@ The package's specs run against `$REDIS_URL`, or a `redis-server` on
 | `redisStore(client, { name })`, `RedisStoreOptions` | an `@alxia/rate-limit` store |
 | `redisCacheStore(client, { name })`, `RedisCacheStoreOptions` | an `@alxia/cache` store |
 | `idempotency(client, options)` | the plugin |
-| `redis(client, { caches? })`, `RedisContextOptions` | the plugin: `redis`, `cache`, `lock` in the context |
+| `redis(client, { caches? })`, `RedisContextOptions` | the plugin: `redis`, `caches`, `lock` in the context |
 | `IdempotencyOptions`, `IdempotencyErrorBody`, `RedisContext`, `BoundCaches` | its types |
 
 ## Documentation

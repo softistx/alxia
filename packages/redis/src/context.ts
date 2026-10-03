@@ -30,8 +30,8 @@ export interface RedisContextOptions<Caches extends Record<string, AnyCache>> {
 export interface RedisContext<Caches extends Record<string, AnyCache>> {
 	/** Bun's own client, untouched. */
 	readonly redis: RedisClient;
-	/** Each cache, bound and typed by its schema. */
-	readonly cache: BoundCaches<Caches>;
+	/** Each cache, bound and typed by its schema: `caches.users.remember(…)`. */
+	readonly caches: BoundCaches<Caches>;
 	/** `work` under a lock every process sharing the Redis respects: `@nxgt/redis`'s `withLock`. */
 	lock<T>(
 		key: string,
@@ -47,13 +47,13 @@ export interface RedisContext<Caches extends Record<string, AnyCache>> {
  * ```ts
  * const users = defineCache({ name: 'user', key: (id: string) => id, ttl: 300, schema: User });
  * app.use(redis(connection.client, { caches: { users } }))
- *    .get('/users/:id', ({ cache, params, reply }) => reply(200, await cache.users.remember(params.id, load)));
+ *    .get('/users/:id', async ({ caches, params, reply }) => reply.ok(await caches.users.remember(params.id, load)));
  * ```
  */
 export function redis<
 	const Caches extends Record<string, AnyCache> = Record<never, never>,
 >(client: RedisClient, options: RedisContextOptions<Caches> = {}) {
-	const cache = Object.fromEntries(
+	const caches = Object.fromEntries(
 		Object.entries(options.caches ?? {}).map(([name, definition]) => [
 			name,
 			bindCache(client, definition),
@@ -61,7 +61,7 @@ export function redis<
 	) as BoundCaches<Caches>;
 	const context: RedisContext<Caches> = {
 		redis: client,
-		cache,
+		caches,
 		lock: (key, work, lockOptions) => withLock(client, key, work, lockOptions),
 	};
 	return alxia().decorate(context);

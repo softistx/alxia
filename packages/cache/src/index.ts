@@ -3,8 +3,8 @@ export {
 	type CacheControls,
 	type CacheOptions,
 	cache,
-	defaultKey,
 } from './cache';
+export { defaultKey, pathTag } from './keys';
 export {
 	type CachedResponse,
 	type CacheStore,

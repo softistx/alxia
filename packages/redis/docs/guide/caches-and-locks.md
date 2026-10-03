@@ -18,9 +18,9 @@ const loadUser = async (id: string) => ({ id, name: 'Ada' });   // your database
 
 const app = alxia()
 	.use(redis(connection.client, { caches: { users } }))
-	.get('/users/:id', async ({ cache, params, reply }) => {
-		const user = await cache.users.remember(params.id, () => loadUser(params.id));   // typed by User
-		return reply(200, user);
+	.get('/users/:id', async ({ caches, params, reply }) => {
+		const user = await caches.users.remember(params.id, () => loadUser(params.id));   // typed by User
+		return reply.ok(user);
 	});
 ```
 
@@ -37,19 +37,19 @@ interface RedisContextOptions<Caches> {
 /** What routes after `redis()` read. */
 interface RedisContext<Caches> {
 	readonly redis: RedisClient;
-	readonly cache: BoundCaches<Caches>;
+	readonly caches: BoundCaches<Caches>;
 	lock<T>(key: string, work: () => Promise<T> | T, options?: LockOptions): Promise<T>;
 }
 ```
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `caches` | `Record<string, CacheDefinition>` | none | each definition, bound to the client once, under `ctx.cache.<name>` |
+| `caches` | `Record<string, CacheDefinition>` | none | each definition, bound to the client once, under `ctx.caches.<name>` |
 
 | In the context | What it is |
 | --- | --- |
 | `redis` | Bun's `RedisClient`, untouched: every command Bun has |
-| `cache.<name>` | the `@nxgt/redis` `BoundCache` of that definition, typed by its schema |
+| `caches.<name>` | the `@nxgt/redis` `BoundCache` of that definition, typed by its schema |
 | `lock(key, work, options?)` | `@nxgt/redis`'s `withLock`: `work` under a lock every process respects |
 
 The caches are bound when `redis(…)` is called, not per request.
@@ -60,7 +60,7 @@ A cache is described with `defineCache` from `@nxgt/redis` — a `name`, a
 `key` function, a `ttl` in **seconds**, and a zod `schema` — and read under
 the name you give it in `caches`:
 
-| `cache.<name>` | |
+| `caches.<name>` | |
 | --- | --- |
 | `get(params)` | the value, or `undefined`: a miss, an expiry, or a stored value the schema no longer accepts |
 | `set(params, value, { ttl }?)` | checks `value` against the schema, then stores it |
@@ -84,13 +84,13 @@ const table = new Map<string, z.input<typeof Profile>>([['1', { id: '1', name: '
 
 const app = alxia()
 	.use(redis(connection.client, { caches: { profiles } }))
-	.get('/profiles/:id', async ({ cache, params, reply }) => {
-		const profile = await cache.profiles.remember(params.id, async () => table.get(params.id) ?? { id: params.id, name: '?' });
-		return reply(200, profile);                       // plan is filled in: 'free'
+	.get('/profiles/:id', async ({ caches, params, reply }) => {
+		const profile = await caches.profiles.remember(params.id, async () => table.get(params.id) ?? { id: params.id, name: '?' });
+		return reply.ok(profile);                         // plan is filled in: 'free'
 	})
-	.put('/profiles/:id', { body: Profile.omit({ id: true }) }, async ({ cache, params, body, reply }) => {
+	.put('/profiles/:id', { body: Profile.omit({ id: true }) }, async ({ caches, params, body, reply }) => {
 		table.set(params.id, { id: params.id, ...body });
-		await cache.profiles.delete(params.id);           // the next read loads it again
+		await caches.profiles.delete(params.id);          // the next read loads it again
 		return reply(204, undefined);
 	});
 ```
@@ -166,20 +166,11 @@ const app = alxia()
 	});
 ```
 
-## With `@alxia/cache`: two plugins named `cache`
+## With `@alxia/cache`
 
-`@alxia/cache`'s `cache()` also adds `cache` to the context — its
-`{ tag, skip }` controls. Used on the same routes, the plugin declared
-later replaces the other's `cache` at runtime, while the types merge both,
-so the route compiles and fails when it runs:
-
-- `redis()` after `cache()`: `cache.tag(…)` throws
-  `TypeError: cache.tag is not a function`;
-- `cache()` after `redis()`: `cache.users.get(…)` throws
-  `TypeError: undefined is not an object (evaluating 'cache.users.get')`.
-
-Either way the route answers `500 {"error":"internal"}`. Rename the Redis
-caches with a `derive` between the two:
+`@alxia/cache`'s `cache()` adds `cache` to the context — the response
+cache's `{ tag, skip }`. `redis()` adds `caches`, so the two sit side by side
+on one route, declared in either order:
 
 ```ts
 import { cache } from '@alxia/cache';
@@ -194,17 +185,16 @@ const loadUser = async (id: string) => ({ id, name: 'Ada' });
 
 const app = alxia()
 	.use(redis(connection.client, { caches: { users } }))
-	.derive(({ cache }) => ({ caches: cache }))     // the Redis caches, renamed
-	.use(cache({ ttl: 60 }))                        // `cache` is now the response cache
+	.use(cache({ ttl: 60 }))
 	.get('/users/:id', async ({ caches, cache, params, reply }) => {
-		cache.tag(`user:${params.id}`);
-		return reply(200, await caches.users.remember(params.id, () => loadUser(params.id)));
+		cache.tag(`user:${params.id}`);                                    // the response cache
+		return reply.ok(await caches.users.remember(params.id, () => loadUser(params.id)));   // the Redis cache
 	});
 ```
 
-`@alxia/cache`'s troubleshooting has the
-[same entry](https://github.com/softistx/alxia/blob/develop/packages/cache/docs/troubleshooting.md#typeerror-cachetag-is-not-a-function-in-cachetag-cachetag-is-undefined)
-from its side.
+Code written for the earlier name — `ctx.cache.users` — no longer compiles;
+[Troubleshooting](../troubleshooting.md#property-cache-does-not-exist-on-type---rediscontext-) has the
+message and the rename.
 
 ## Next
 

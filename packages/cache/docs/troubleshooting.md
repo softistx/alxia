@@ -8,6 +8,7 @@ goes wrong prints nothing at all, and is under [Traps](#traps), by symptom.
 
 - [`Argument of type '{}' is not assignable to parameter of type 'CacheOptions'`](#argument-of-type--is-not-assignable-to-parameter-of-type-cacheoptions)
 - [`Property 'cache' does not exist on type 'Context<…>'`](#property-cache-does-not-exist-on-type-context)
+- [`Property '…' does not exist on type 'CacheControls'`](#property--does-not-exist-on-type-cachecontrols)
 - [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
 - [`Type '(…) => Promise<string>' is not assignable to type '(ctx: BaseContext) => string | undefined'`](#type---promisestring-is-not-assignable-to-type-ctx-basecontext--string--undefined)
 - [`Type '(…) => string | null' is not assignable to type '(ctx: BaseContext) => string | undefined'`](#type---string--null-is-not-assignable-to-type-ctx-basecontext--string--undefined)
@@ -22,9 +23,7 @@ goes wrong prints nothing at all, and is under [Traps](#traps), by symptom.
 
 **Runtime**
 
-- [`TypeError: cache.tag is not a function. (In 'cache.tag("…")', 'cache.tag' is undefined)`](#typeerror-cachetag-is-not-a-function-in-cachetag-cachetag-is-undefined)
-- [`TypeError: undefined is not an object (evaluating 'cache.….…')`](#typeerror-undefined-is-not-an-object-evaluating-cache)
-- [`500 {"error":"internal"}` from a cached route, with the store's error in the log](#500-errorinternal-from-a-cached-route-with-the-stores-error-in-the-log)
+- [`500 {"error":"internal"}` from a route that invalidates, with the store's error in the log](#500-errorinternal-from-a-route-that-invalidates-with-the-stores-error-in-the-log)
 - [The route's error is logged, yet the client got a `200` with `X-Cache: STALE`](#the-routes-error-is-logged-yet-the-client-got-a-200-with-x-cache-stale)
 
 **Traps**
@@ -77,6 +76,34 @@ alxia()
 	.get('/products/:id', ({ params, cache, reply }) => {
 		cache.tag(`product:${params.id}`);
 		return reply(200, { id: params.id });
+	});
+```
+
+### `Property '…' does not exist on type 'CacheControls'`
+
+**When:** a route reads from `ctx.cache` something other than `tag` or
+`skip` — most often `@alxia/redis`'s typed caches, which `redis()` puts in
+the context as `caches`.
+
+```text
+error TS2339: Property 'users' does not exist on type 'CacheControls'.
+```
+
+At run time, without a typecheck, the route answers a 500 with
+`TypeError: undefined is not an object (evaluating 'cache.users.remember')`.
+
+**Why:** `ctx.cache` is this plugin's controls, `{ tag, skip }`, and
+nothing else.
+
+**Fix:** read the other plugin's name for it:
+
+```ts
+alxia()
+	.use(redis(connection.client, { caches: { users } }))
+	.use(cache({ ttl: 60 }))
+	.get('/users/:id', async ({ caches, cache, params, reply }) => {
+		cache.tag(`user:${params.id}`);
+		return reply.ok(await caches.users.remember(params.id, () => loadUser(params.id)));
 	});
 ```
 
@@ -238,57 +265,22 @@ const body = new Uint8Array(Buffer.from(text, 'base64'));         // in get
 
 ## Runtime
 
-### `TypeError: cache.tag is not a function. (In 'cache.tag("…")', 'cache.tag' is undefined)`
+### `500 {"error":"internal"}` from a route that invalidates, with the store's error in the log
 
-**When:** a route behind the response cache calls `cache.tag()` or
-`cache.skip()`, and another plugin that also adds `cache` to the context —
-`@alxia/redis`'s `redis()` does, for its typed caches — is declared
-**after** `use(cache(…))`. The route answers a 500.
+**When:** a write calls `invalidate(path)` or `invalidateTag(tag)` while
+the store cannot answer — a Redis that is down, a store of your own with a
+bug — and does not catch it.
 
-**Why:** two plugins add the same name; at runtime the later one replaces
-the earlier, while the types merge both, so the call compiles.
+**Why:** a lookup or a keep that fails is only logged — the cached route
+still answers, `X-Cache: MISS` — but an invalidation rejects, so the code
+that changed the data learns that the old responses may still be served.
 
-**Fix:** give one of them another name with a `derive` before the second
-is declared:
-
-```ts
-alxia()
-	.use(redis(connection.client, { caches: { users } }))
-	.derive(({ cache }) => ({ caches: cache }))     // the Redis caches, renamed
-	.use(cache({ ttl: 60 }))                        // `cache` is now the response cache
-	.get('/users/:id', async ({ caches, cache, params, reply }) => {
-		cache.tag(`user:${params.id}`);
-		return reply(200, await caches.users.remember(params.id, () => loadUser(params.id)));
-	});
-```
-
-### `TypeError: undefined is not an object (evaluating 'cache.….…')`
-
-**When:** the same two plugins in the other order: the one with typed
-caches before `use(cache(…))`, and a route after both reads
-`cache.<name>`. The route answers a 500.
-
-**Why:** the response cache's `cache` — `{ tag, skip }` — replaced the
-other plugin's.
-
-**Fix:** the `derive` above, between the two.
-
-### `500 {"error":"internal"}` from a cached route, with the store's error in the log
-
-**When:** the store throws — a Redis that is down, a store of your own
-with a bug — on `get` while a request is looked up, or on `set` while a
-response is kept.
-
-**Why:** the plugin awaits the store, and does not catch it: the store's
-error is the request's error, so a route that would have answered is a
-500.
-
-**Fix:** if a store outage should only cost the cache, wrap the store so
-its errors are misses —
-[A store that fails open](guide/stores.md#a-store-that-fails-open):
+**Fix:** bring the store back. Where the write must succeed regardless,
+catch the invalidation, and keep `ttl` short —
+[When the store cannot answer](guide/stores.md#when-the-store-cannot-answer):
 
 ```ts
-cache({ ttl: 60, store: failOpen(redisCacheStore(connection.client, { name: 'shop' })) });
+await products.invalidateTag('products').catch((error) => console.error(error));
 ```
 
 ### The route's error is logged, yet the client got a `200` with `X-Cache: STALE`
@@ -345,6 +337,9 @@ anyway.
   too long; `PX` is right, or `Math.ceil(keepFor / 1000)` for `EX`.
 - **Each process has its own memory store**, and a load balancer spreads
   requests across them: each process misses once.
+- **The store cannot answer**: its first error of the outage is in the log,
+  and every request runs the route
+  ([When the store cannot answer](guide/stores.md#when-the-store-cannot-answer)).
 
 **Fix:** for a large body, raise the limit:
 
@@ -414,15 +409,18 @@ read still answers the old response.
 
 **Why:** the invalidation did not reach the key, or the store:
 
-- `invalidate(path)` deletes the **default key** of `path`, without `vary`:
-  it misses a response kept behind `vary`, under a custom `key`, at another
-  query, or when `path` lacks the app's prefix.
+- `invalidate(path)` forgets the responses of that **exact** path and
+  query, prefix included: `/products` is not `/products?page=2`, nor
+  `/api/products`.
+- A store of your own does not remember each response's `tags` in `set`:
+  neither `invalidate` nor `invalidateTag` reaches anything.
 - Two `cache()` without a `store` have **two memory stores**; invalidating
   through one does not touch the other.
 - Several processes with the **memory store** each keep their own copy;
   the write's process is the only one emptied.
 
-**Fix:** invalidate by tag, on a store every cache and process shares:
+**Fix:** invalidate by tag — it reaches every query — on a store every
+cache and process shares:
 
 ```ts
 const store = redisCacheStore(connection.client, { name: 'shop' });

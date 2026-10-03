@@ -99,9 +99,8 @@ connection and its other options.
 Two things change with Redis:
 
 - **Concurrent misses** run the route once per process, not once overall.
-- **A store that fails fails the request.** The plugin awaits the store; an
-  error from `get` or `set` is the request's 500. Wrap the store if a
-  Redis outage should only cost the cache ([below](#a-store-that-fails-open)).
+- **A Redis that is down** is a store that cannot answer: the routes still
+  answer, uncached ([below](#when-the-store-cannot-answer)).
 
 ## Writing a store
 
@@ -134,7 +133,7 @@ What the plugin relies on:
 | Method | Must |
 | --- | --- |
 | `get` | return what `set` was given, or `undefined` — never `null` — when nothing is kept, or it expired |
-| `set` | keep `value` under `key` for `keepFor` **milliseconds**, replacing what was there, and remember its `tags` |
+| `set` | keep `value` under `key` for `keepFor` **milliseconds**, replacing what was there, and remember its `tags` — `invalidate(path)` relies on them too |
 | `delete` | forget `key`; a key that is not there is not an error |
 | `deleteTag` | forget every key whose response carries `tag` |
 
@@ -185,33 +184,10 @@ A service that stores text keeps `body` as base64 and `headers` as an array
 of pairs, and rebuilds the `Uint8Array` on `get` — as `redisCacheStore`
 does.
 
-### A store that fails open
-
-Wrapping a store so that its errors are a miss, not a 500:
-
-```ts
-import type { CacheStore } from '@alxia/cache';
-
-export function failOpen(store: CacheStore): CacheStore {
-	const quietly = async <T>(work: () => Promise<T> | T, fallback: T): Promise<T> => {
-		try {
-			return await work();
-		} catch (error) {
-			console.error(error);
-			return fallback;
-		}
-	};
-	return {
-		get: (key) => quietly(() => store.get(key), undefined),
-		set: (key, value, keepFor) => quietly(() => store.set(key, value, keepFor), undefined),
-		delete: (key) => quietly(() => store.delete(key), undefined),
-		deleteTag: (tag) => quietly(() => store.deleteTag(tag), undefined),
-	};
-}
-```
-
-An invalidation that fails quietly leaves old responses served until they
-expire: keep `ttl` short if you fail open.
+Every kept response carries, among its `tags`, the tag of its path —
+`alxia:path:/products?page=2`, built by `pathTag` — and `invalidate(path)`
+is `deleteTag` of it. A store that drops `tags` leaves `invalidate` and
+`invalidateTag` reaching nothing.
 
 ### Testing a store
 
@@ -223,20 +199,71 @@ import { alxia } from '@alxia/core';
 import { cache } from '@alxia/cache';
 import { mapCacheStore } from './map-cache-store';
 
-test('the store serves, and forgets by tag', async () => {
+test('the store serves, and forgets by tag and by path', async () => {
 	let runs = 0;
 	const products = cache({ ttl: 60, store: mapCacheStore(), tags: () => ['products'] });
 	const app = alxia()
 		.use(products)
-		.get('/products', ({ reply }) => reply(200, { runs: ++runs }));
+		.get('/products', ({ reply }) => reply.ok({ runs: ++runs }));
 
 	await app.request('/products');
 	expect((await app.request('/products')).headers.get('x-cache')).toBe('HIT');
 
 	await products.invalidateTag('products');
 	expect((await app.request('/products')).headers.get('x-cache')).toBe('MISS');
-	expect(runs).toBe(2);
+
+	await products.invalidate('/products');                 // the path's tag: kept by `set` too
+	expect((await app.request('/products')).headers.get('x-cache')).toBe('MISS');
+	expect(runs).toBe(3);
 });
+```
+
+## When the store cannot answer
+
+A store that throws or rejects costs the cache, not the response:
+
+| Store call | Fails while | Then |
+| --- | --- | --- |
+| `get` | a request is looked up | a miss: the route runs, `X-Cache: MISS` |
+| `set` | a response is kept | nothing is kept; the response is answered |
+| `deleteTag` | `invalidate` or `invalidateTag` | the call rejects with the store's error |
+
+The first two are logged with `console.error` once per outage — the first
+failure, then nothing until the store has answered again — and the request
+goes on. An invalidation rejects instead: the code that changed
+the data should know the old responses may still be served.
+
+```ts
+import { expect, test } from 'bun:test';
+import { alxia } from '@alxia/core';
+import { cache, MemoryCacheStore } from '@alxia/cache';
+
+test('a store that cannot answer: the route answers', async () => {
+	const broken = new MemoryCacheStore();
+	broken.get = () => {
+		throw new Error('store down');
+	};
+	broken.set = () => Promise.reject(new Error('store down'));
+	broken.deleteTag = () => Promise.reject(new Error('store down'));
+
+	const products = cache({ ttl: 60, store: broken });
+	const app = alxia()
+		.use(products)
+		.get('/products', ({ reply }) => reply.ok([]));
+
+	const response = await app.request('/products');   // logs "store down" once
+	expect(response.status).toBe(200);
+	expect(response.headers.get('x-cache')).toBe('MISS');
+	await expect(products.invalidate('/products')).rejects.toThrow('store down');
+});
+```
+
+A write that must answer even when the store is down catches the
+invalidation, and keeps `ttl` short, since the old responses stay until
+they expire:
+
+```ts
+await products.invalidateTag('products').catch((error) => console.error(error));
 ```
 
 ## See also

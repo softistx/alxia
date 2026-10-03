@@ -174,6 +174,52 @@ describe('cache', () => {
 		await app.request('/products');
 		expect(runs()).toBe(3);
 	});
+
+	test('invalidate(path) forgets every variant: each vary value, a key of your own', async () => {
+		const varying = setup({ vary: ['accept-language'] });
+		const ask = (language: string) =>
+			varying.app.request('/hello', {
+				headers: { 'accept-language': language },
+			});
+		await ask('fr');
+		await ask('en');
+		await varying.products.invalidate('/hello');
+		expect((await ask('fr')).headers.get('x-cache')).toBe('MISS');
+		expect((await ask('en')).headers.get('x-cache')).toBe('MISS');
+
+		const keyed = setup({ key: (ctx) => `custom:${ctx.url.pathname}` });
+		await keyed.app.request('/products?page=2');
+		await keyed.products.invalidate('/products');
+		expect(
+			(await keyed.app.request('/products?page=2')).headers.get('x-cache'),
+		).toBe('HIT'); // another path: `/products?page=2` is not `/products`
+		await keyed.products.invalidate('/products?page=2');
+		expect(
+			(await keyed.app.request('/products?page=2')).headers.get('x-cache'),
+		).toBe('MISS');
+	});
+
+	test('a store that cannot answer: the route answers, and it is logged', async () => {
+		const broken = new MemoryCacheStore();
+		broken.get = () => {
+			throw new Error('store down');
+		};
+		broken.set = () => Promise.reject(new Error('store down'));
+		const logged: unknown[] = [];
+		const original = console.error;
+		console.error = (error: unknown) => logged.push(error);
+		try {
+			const { app, runs } = setup({ store: broken });
+			const first = await app.request('/products');
+			expect(first.status).toBe(200);
+			expect(await first.json()).toEqual({ runs: 1 });
+			expect((await app.request('/products')).status).toBe(200);
+			expect(runs()).toBe(2);
+			expect(logged).toHaveLength(1); // once per outage, not per request
+		} finally {
+			console.error = original;
+		}
+	});
 });
 
 describe('MemoryCacheStore', () => {
