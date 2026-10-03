@@ -259,6 +259,25 @@ describe('responses', () => {
 		}
 	});
 
+	test('a reply with a status the route does not declare names the route', async () => {
+		const original = console.error;
+		const logged: unknown[] = [];
+		console.error = (error: unknown) => logged.push(error);
+		try {
+			const app = alxia().get(
+				'/u',
+				{ response: { 200: z.string() } },
+				({ reply }) => reply(201 as 200, 'made'),
+			);
+			expect((await app.request('/u')).status).toBe(500);
+			expect(String(logged[0])).toBe(
+				'ResponseValidationError: GET /u declares no 201 reply',
+			);
+		} finally {
+			console.error = original;
+		}
+	});
+
 	test('a redirect needs no schema', async () => {
 		const moved = alxia().get(
 			'/old',

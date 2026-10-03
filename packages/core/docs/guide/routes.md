@@ -329,7 +329,7 @@ app.get('/users', { response: { 999: z.string() } }, ({ reply }) => reply(200, '
 
 A params schema with an optional key the path does not declare —
 `/users/:id` with `{ id, extra? }` — is refused with
-`the params schema reads keys "/users/:id" does not declare`. What
+`the params schema reads "extra", which "/users/:id" does not declare`. What
 `reply` refuses is on [Replies](replies.md#with-response-schemas).
 
 ## Answered outside every route
