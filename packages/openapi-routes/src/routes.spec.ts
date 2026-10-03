@@ -249,6 +249,10 @@ describe('the operations it takes', () => {
 			implemented({}, operations);
 			// @ts-expect-error a prefix starts with "/", as the app's does
 			implemented(alxia(), operations, { prefix: 'api' });
+			// @ts-expect-error matchesSpec takes the same prefix
+			matchesSpec(alxia(), operations, { prefix: 'api' });
+			// @ts-expect-error exclude reads a route and answers a boolean
+			matchesSpec(alxia(), operations, { exclude: (route: string) => route });
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -259,6 +263,9 @@ describe('exactly', () => {
 		const app = alxia().get('/health', ({ reply }) => reply.ok('ok'));
 		expect(() => exactly(app, [])).toThrow(
 			new TypeError('exactly(): 1 route has no operation: GET /health'),
+		);
+		expect(() => exactly(app, { getPet }, { prefix: '/api/' })).toThrow(
+			'exactly(): the prefix "/api/" must start with "/" and not end with one',
 		);
 	});
 });

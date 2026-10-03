@@ -6,7 +6,7 @@ that has a prefix or routes the document does not declare.
 
 ```ts
 import { alxia } from '@alxia/core';
-import { exactly, implemented } from '@alxia/openapi-routes';
+import { implemented, matchesSpec } from '@alxia/openapi-routes';
 import { operations as api } from './generated/alxia';
 
 // pets, search: your own store and query
@@ -89,7 +89,7 @@ check, the document's own route, an admin page.
 
 ## `matchesSpec`
 
-Called `exactly` until this release: `exactly` and `ExactlyOptions` still
+Called `exactly` until 0.2.0: `exactly` and `ExactlyOptions` still
 work, deprecated, and their messages still start with `exactly():`.
 
 ```text

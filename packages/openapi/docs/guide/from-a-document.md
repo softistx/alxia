@@ -177,7 +177,7 @@ bun add -d @alxia/openapi-routes
 ```ts
 // src/app.spec.ts
 import { test } from 'bun:test';
-import { exactly, implemented } from '@alxia/openapi-routes';
+import { implemented, matchesSpec } from '@alxia/openapi-routes';
 import { app } from './app';
 import { operations } from './generated/alxia';
 

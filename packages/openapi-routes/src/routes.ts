@@ -29,7 +29,7 @@ export interface MatchesSpecOptions extends ImplementedOptions {
 }
 
 /** @deprecated Renamed `MatchesSpecOptions`, as `exactly` is `matchesSpec`. */
-export type ExactlyOptions = MatchesSpecOptions;
+export interface ExactlyOptions extends MatchesSpecOptions {}
 
 /**
  * Any `alxia()` app: its routes, with their full paths. The public

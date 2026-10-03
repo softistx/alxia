@@ -30,12 +30,17 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### 0.2.0
+
+- **One name for the check both ways.** `matchesSpec(app, operations)`,
+  the new name of `exactly`, which stays as a deprecated alias.
+
 ### 0.1.0
 
 - **Every operation has a route.** `implemented(app, operations)` throws,
   listing each operation of the document that the app does not serve, by
   method, path and operation id.
-- **Only the operations.** `matchesSpec(app, operations)` also lists each route
+- **Only the operations.** `exactly(app, operations)` also lists each route
   the document does not declare; `exclude` leaves out the ones it should
   not, such as a health check or the document's own route.
 - **The generated shape.** Both take the `operations` object

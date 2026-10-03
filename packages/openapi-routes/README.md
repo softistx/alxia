@@ -40,7 +40,7 @@ TypeError: implemented(): 2 operations have no route: GET /pets/:petId (getPet),
 ## Only the operations
 
 ```ts
-import { exactly } from '@alxia/openapi-routes';
+import { matchesSpec } from '@alxia/openapi-routes';
 
 matchesSpec(app, operations, {
 	exclude: (route) => route.path === '/health',

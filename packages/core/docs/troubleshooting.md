@@ -513,7 +513,8 @@ These are `TypeError`s thrown when a route is declared, so the app fails at
 startup, not on a request. The eight about a path's syntax are also thrown
 by `shapeOf(path)`, and so by a tool that calls it: `@alxia/openapi-routes`'
 `implemented` and `matchesSpec` throw them for an operation path no route may
-be declared at, after their own name (`implemented(): …`).
+be declared at, after their own name (`implemented(): …`; `exactly(): …` from the
+deprecated `exactly`).
 
 ### `The route path "…" must start with "/"`
 
