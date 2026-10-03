@@ -156,6 +156,11 @@ installed tarball with `--help`.
   runs with `NODE_ENV=production`, since `bun test` sets `test`.
 - **A build that exits 0 is not evidence the artifact loads.**
   `bun run verify:artifacts` packs, installs and imports every package.
+  It also emits the declarations of each package's `test/declarations/*.ts`
+  against the install: a type an exported app's `.d.ts` must name and the
+  entry does not export fails there with TS2883, and nowhere else, since
+  inside the workspace tsc names it by a relative path. A builder that adds
+  a type to an app's type gets a case there.
 
 ## CI
 
