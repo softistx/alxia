@@ -181,8 +181,8 @@ makes of it ([The app's type](types.md#jsonifyt)).
 
 ## Headers and cookies: `set`
 
-`set.headers` (a `Headers`) and `set.cookies` (a `Bun.CookieMap`) apply to
-the reply the request ends with, whatever its status: the handler's, a
+`set.headers` (a `Headers`) and `set.cookies` (a `Bun.CookieMap`, the
+response's) apply to the reply the request ends with, whatever its status: the handler's, a
 hook's, an `onError`'s, or the 400 of a refused request.
 
 ```ts
@@ -209,8 +209,12 @@ every one given — in `set.headers`, in `init.headers` (a `Headers` with
 `append`), or through `set.cookies` — is sent. The 500 of an unhandled
 error is sent without them.
 
-To read cookies, declare them in the route's schema, or read
-`ctx.cookies` without one ([Routes](routes.md#the-schema)).
+`set.cookies` holds only the response's: it starts empty, and
+`set.cookies.get` reads back what this response set. To read the request's
+cookies, read `ctx.cookies` — in a handler or any route hook (`derive`,
+`wrap`, `onError`, `onRefusal`) — or declare them in the route's schema to
+validate them for its handler
+([Routes](routes.md#the-schema), [Hooks](hooks.md#reading-the-requests-cookies)).
 
 ## Redirects
 

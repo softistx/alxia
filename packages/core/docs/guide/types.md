@@ -172,7 +172,7 @@ test('GET /users/:id answers 200, 400 or 500', () => {
 | Types | Name |
 | --- | --- |
 | `RouteInput`, `RouteOutput`, `OutcomeOf`, `RouteEntryOf` | the pieces of one route's record |
-| `Context`, `BaseContext`, `RequestContext`, `ResponseSettings` | what handlers and hooks read ([Hooks](hooks.md#what-each-hook-reads)) |
+| `Context`, `BaseContext`, `RequestContext`, `ResponseSettings`, `ResponseCookies` | what handlers and hooks read ([Hooks](hooks.md#what-each-hook-reads)) |
 | `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema` | what a route declares, and the checks on it ([Routes](routes.md#what-the-types-refuse)) |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema interface |
 | `ValidationErrorBody`, `ValidationIssue`, `ValidationTarget`, `InternalErrorBody`, `RoutingErrorBody` | the bodies the framework answers |

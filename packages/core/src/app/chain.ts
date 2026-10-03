@@ -13,7 +13,6 @@ import { Reply } from '../reply/reply';
 import {
 	type BodyParser,
 	readBody,
-	readCookies,
 	readHeaders,
 	readQuery,
 } from '../request/read';
@@ -27,8 +26,8 @@ import type { BaseContext, RequestContext, ResponseSettings } from './types';
 /**
  * Runs the hooks of a route in order — a `derive` adds to the context or
  * ends the request, a `wrap` runs the rest inside it — then validates the
- * request, then `last`. A socket's upgrade skips the `wrap` hooks: it has
- * no response to wrap.
+ * request, then `last`, given the context its handler reads. A socket's
+ * upgrade skips the `wrap` hooks: it has no response to wrap.
  */
 export async function chain<Last>(
 	definition: RouteDefinition | SocketDefinition,
@@ -38,7 +37,9 @@ export async function chain<Last>(
 	ctx: Record<string, unknown> & BaseContext,
 	parsers: readonly BodyParser[],
 	validateResponses: boolean,
-	last: () => Promise<Response | Last>,
+	last: (
+		ctx: Record<string, unknown> & BaseContext,
+	) => Promise<Response | Last>,
 ): Promise<Response | Last> {
 	const hooks = definition.derive;
 	const socket = !('method' in definition);
@@ -46,7 +47,7 @@ export async function chain<Last>(
 	const step = async (index: number): Promise<Response | Last> => {
 		const hook = hooks[index];
 		if (hook === undefined) {
-			const refused = await validate(
+			const validated = await validate(
 				definition,
 				request,
 				rawParams,
@@ -55,7 +56,7 @@ export async function chain<Last>(
 				parsers,
 				validateResponses,
 			);
-			return refused ?? last();
+			return 'refused' in validated ? validated.refused : last(validated.ctx);
 		}
 		if (hook.kind === 'wrap') {
 			if (socket) return step(index + 1);
@@ -83,7 +84,10 @@ async function validate(
 	ctx: Record<string, unknown> & BaseContext,
 	parsers: readonly BodyParser[],
 	validateResponses: boolean,
-): Promise<Response | undefined> {
+): Promise<
+	| { readonly refused: Response }
+	| { readonly ctx: Record<string, unknown> & BaseContext }
+> {
 	const { schema } = definition;
 	const issues: ValidationIssue[] = [];
 	let part: RequestPart | undefined;
@@ -91,7 +95,6 @@ async function validate(
 		['params', schema.params, () => rawParams],
 		['query', schema.query, () => readQuery(request.url)],
 		['headers', schema.headers, () => readHeaders(request.request.headers)],
-		['cookies', schema.cookies, () => readCookies(request.request.headers)],
 	] as const;
 	for (const [target, partSchema, read] of parts) {
 		const raw = read();
@@ -103,6 +106,18 @@ async function validate(
 		if (checked.ok) ctx[target] = checked.value;
 		else {
 			part ??= target;
+			issues.push(...checked.issues);
+		}
+	}
+	// The request's cookies stay on `ctx`, where every hook reads them as
+	// they arrived — an `onError` or an `onRefusal` included; the handler
+	// alone reads the validated ones, on a copy of the context.
+	let cookies: { value: unknown } | undefined;
+	if (schema.cookies !== undefined) {
+		const checked = await check(schema.cookies, ctx.cookies, 'cookies');
+		if (checked.ok) cookies = { value: checked.value };
+		else {
+			part ??= 'cookies';
 			issues.push(...checked.issues);
 		}
 	}
@@ -122,14 +137,28 @@ async function validate(
 			}
 		}
 	}
-	if (part === undefined) return undefined;
-	return refuse(
-		definition,
-		{ kind: 'validation', part, issues },
-		set,
-		ctx,
-		validateResponses,
-	);
+	if (part === undefined) {
+		return { ctx: cookies === undefined ? ctx : handlerContext(ctx, cookies) };
+	}
+	return {
+		refused: await refuse(
+			definition,
+			{ kind: 'validation', part, issues },
+			set,
+			ctx,
+			validateResponses,
+		),
+	};
+}
+
+/** The context a handler reads: `ctx`, its cookies the validated ones. */
+function handlerContext(
+	ctx: Record<string, unknown> & BaseContext,
+	cookies: { value: unknown },
+): Record<string, unknown> & BaseContext {
+	const copy: Record<string, unknown> = { ...ctx };
+	copy['cookies'] = cookies.value;
+	return copy as Record<string, unknown> & BaseContext;
 }
 
 /** A route's request, from its hooks to its handler's reply, sent. */
@@ -150,8 +179,8 @@ export async function handle(
 			ctx,
 			parsers,
 			validateResponses,
-			async () => {
-				let reply = route.handler(ctx as never);
+			async (validated) => {
+				let reply = route.handler(validated as never);
 				if (reply instanceof Promise) reply = await reply;
 				if (!(reply instanceof Reply)) {
 					throw new TypeError(

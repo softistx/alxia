@@ -34,8 +34,9 @@ const server = createServer({
           ].join("; "),
         }),
       )
-      // A tiny session: the user, from the cookie the sign-in sets.
-      .derive(({ request }) => ({ user: userOf(request) }))
+      // A tiny session: the user, from the cookie the sign-in sets. Every
+      // hook reads the request's cookies as `cookies`.
+      .derive(({ cookies }) => ({ user: userOf(cookies) }))
       // alxia's own JSON route, validated by its schema. Under /api, a
       // prefix no page uses.
       .post(

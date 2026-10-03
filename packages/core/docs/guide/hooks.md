@@ -99,6 +99,54 @@ Write the error literal `as const`: the client then reads
 `{ error: 'unauthenticated' }`, not `{ error: string }`. A hook's reply is
 sent as it is: the route's `response` schemas do not check it.
 
+### Reading the request's cookies
+
+Every route hook — `derive`, `wrap`, `onError`, `onRefusal`, a guard —
+reads the request's cookies as `ctx.cookies`, a
+`Readonly<Record<string, string>>` parsed from the `Cookie` header on first
+read. A route with no hook or handler that reads it never parses the header.
+
+```ts
+const sessions = new Map<string, User>();
+
+const app = alxia()
+	.derive(({ cookies }) => ({ user: sessions.get(cookies['sid'] ?? '') ?? null }))
+	.get('/me', ({ user, reply }) => reply(200, { user }));
+// GET /me with "Cookie: sid=…" → the session's user; without it → {"user":null}
+```
+
+A route with a `cookies` schema gives its **handler** the validated values
+instead, typed by the schema's output. Its hooks still read the cookies as
+they arrived — strings — even an `onError` or `onRefusal` that runs after
+validation, so the type each one reads is the one it gets:
+
+```ts
+app
+	.onError((error, { cookies }) => console.error(error, cookies['sid'])) // a string
+	.get('/visits', { cookies: z.object({ visits: z.coerce.number() }) },
+		({ cookies, reply }) => reply(200, cookies.visits));                 // a number
+```
+
+Two consequences of that split:
+
+- On a route with a `cookies` schema, the handler's context is a copy of
+  the hooks' whose `cookies` is the schema's output. `getContext()` from
+  `@alxia/context-storage` holds the hooks' one, with the cookies as
+  strings.
+- A handler's context on a route whose `cookies` schema outputs anything
+  but strings — `{ visits: number }` — is no longer a `BaseContext`, whose
+  `cookies` are strings. Pass a helper typed `(ctx: BaseContext) => …` the
+  fields it reads, or type it `Omit<BaseContext, 'cookies'>`.
+
+A `derive` that returns `cookies` replaces the map for the hooks and the
+handler after it; a route's `cookies` schema then validates the map it
+returned, not the `Cookie` header.
+
+`set.cookies` is the other side: the cookies the **response** sets, empty
+when the request starts. `set.cookies.get('sid')` reads back what this
+response set, never what the request sent, so in a hook it is `null`
+([Troubleshooting](../troubleshooting.md#setcookiesget-returns-null-in-a-hook)).
+
 ## `wrap`
 
 ```ts
@@ -394,14 +442,19 @@ interface RequestContext {               // around, onRequest, onResponse
 interface BaseContext extends RequestContext {   // derive, wrap, onError, onRefusal, handlers
 	readonly route: string;                          // as declared: /users/:id
 	readonly pathParams: Readonly<Record<string, string>>;
-	readonly set: ResponseSettings;                  // { headers: Headers; cookies: Bun.CookieMap }
+	readonly cookies: Readonly<Record<string, string>>; // the request's, parsed on first read
+	readonly set: ResponseSettings;                  // { headers: Headers; cookies: ResponseCookies }
 	readonly reply: FreeReplyFunction;
 	readonly redirect: RedirectFunction;
 }
 ```
 
+`ResponseCookies` is Bun's `CookieMap`, documented as the response's: its
+`get` and `has` read what this response set.
+
 A handler reads `BaseContext`, what every hook before it added, and the
-validated `params`, `query`, `headers`, `cookies` and `body`. `ContextOf<App>`
+validated `params`, `query`, `headers`, `cookies` and `body`: a `cookies`
+schema's output replaces the request's map for the handler alone. `ContextOf<App>`
 names that context outside the chain ([The app's type](types.md#contextofapp)).
 
 ## See also

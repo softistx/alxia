@@ -81,7 +81,7 @@ the build. Here it adds:
 | file | |
 | --- | --- |
 | `app/server.ts` | `logger()`, `compress()`, and `secureHeaders()` with a policy React Router's inline scripts, its `<Form>` posts and the template's Google Fonts pass (the default blocks all three). Also a session deriving `user`, `POST /api/todos` validated by a Zod schema, `getLoadContext` setting React Router's own `userContext`, and the `Register` declaration that types `alxiaOf(context)` |
-| `app/session.server.ts` | sessions in memory, keyed by the `sid` cookie. A hook reads the `Cookie` header itself; only a route handler gets `ctx.cookies`. Anyone may sign in by name: there is no real authentication |
+| `app/session.server.ts` | sessions in memory, keyed by the `sid` cookie, which the `derive` reads from the request's `cookies`. Anyone may sign in by name: there is no real authentication |
 | `app/todos.server.ts` | the todos, in memory, and `NewTodo`, the schema both the page's form and the API's body are validated with |
 | `app/context.ts` | `userContext`, a React Router context key, for a route that does not import alxia |
 | `app/routes/home.tsx` | the template's home page. Its loader reads `user` and `log` with `alxiaOf(context)`, typed by `Register` |
@@ -93,7 +93,7 @@ the build. Here it adds:
 The added dependencies are `@alxia/logger`, `@alxia/compress`,
 `@alxia/secure-headers` and `zod`. `@types/bun` is a dev dependency, and
 `"bun"` is added to the tsconfig's `types` for the session's
-`Bun.CookieMap` and the spec.
+`Bun.Cookie` and the spec.
 
 `app/server.ts` is optional for a new app, but this example's routes read
 what it derives (`user`, `log`), so they need it. Within alxia's

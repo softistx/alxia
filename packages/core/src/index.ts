@@ -54,6 +54,7 @@ export type {
 	RequestContext,
 	RequiresOf,
 	Requiring,
+	ResponseCookies,
 	ResponseSchemas,
 	ResponseSettings,
 	RouteDetail,

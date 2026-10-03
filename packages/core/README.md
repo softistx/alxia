@@ -78,7 +78,7 @@ app.get('/users', { quey: z.object({}) }, ...);                          // a ty
 | `params` | the path, as strings | `{ id: string }`, from the path |
 | `query` | the query string: a key given once is a string, more than once an array | `Record<string, string \| string[]>` |
 | `headers` | the headers, names lowercased | `Record<string, string>` |
-| `cookies` | the `Cookie` header | `Record<string, string>` |
+| `cookies` | the `Cookie` header; every route hook reads it too, unvalidated | `Record<string, string>` |
 | `body` | by `content-type`: a parser the app added, JSON, a form, text, or the bytes | `undefined`: read `ctx.request` |
 
 A request any schema refuses is answered with a 400 that names every issue,
@@ -202,7 +202,7 @@ password hash — never leaves the server. A reply its schema refuses is a
 A string is `text/plain`, a `Blob` — a `Bun.file` — a stream or a buffer
 goes as it is, an async iterable is a stream of server-sent events, anything
 else is JSON. `redirect(location, status?)` needs no schema.
-`set.headers` and `set.cookies` (a `Bun.CookieMap`) apply to every reply.
+`set.headers` and `set.cookies` (a `Bun.CookieMap` of the response's cookies, empty at first) apply to every reply.
 
 ## Static files
 
@@ -353,13 +353,21 @@ response, which the hook returns — or a reply of its own, typed like a
 ```
 
 Hooks run before validation: `pathParams` holds the path's parameters as
-they arrived. `onError` turns a thrown
-error into a reply the same way; an `HttpError` is answered as it says, and
-anything else is a 500 that leaks nothing, but for a client that hung up
-mid-request, a 499 nobody reads. `onRefusal` answers a request
-the route's schemas refuse, or whose body passes its `bodyLimit`
-([Requests](#requests)); the last one declared
-before a route is the one it uses.
+they arrived, and `cookies` the request's cookies, parsed on first read. A
+route's `cookies` schema validates them for its handler alone. `set.cookies`
+is the response's — its `get` reads what the response set, so it is `null`
+in a hook for a cookie the request sent:
+
+```ts
+.derive(({ cookies }) => ({ user: sessions.get(cookies['sid'] ?? '') ?? null }))
+```
+
+`onError` turns a thrown error into a reply the same way; an `HttpError`
+is answered as it says, and anything else is a 500 that leaks nothing, but
+for a client that hung up mid-request, a 499 nobody reads. `onRefusal`
+answers a request the route's schemas refuse, or whose body passes its
+`bodyLimit` ([Requests](#requests)); the last one declared before a route
+is the one it uses.
 
 Global hooks apply to the whole app, wherever they are declared:
 
@@ -468,7 +476,8 @@ covers all three kinds.
 | `RoutesOf<App>`, `Jsonify<T>` | the route table the client reads, and what a value is on the wire |
 | `RouteTable`, `RouteRecord`, `RouteEntryOf`, `RouteInput`, `RouteOutput`, `Outcome`, `OutcomeOf` | a route as the client knows it: the entry one route adds to `RoutesOf`, what it sends, every outcome it may read |
 | `ContextOf<App>` | what a route declared next on `App` reads: to type a GraphQL schema, a service |
-| `RequestContext`, `BaseContext`, `Context`, `ResponseSettings`, `HandlerResult` | what every hook reads, what a handler reads, what a route sets on its response, what a handler may return |
+| `RequestContext`, `BaseContext`, `Context`, `ResponseSettings`, `HandlerResult` | what every hook reads (`BaseContext.cookies`: the request's), what a handler reads, what a route sets on its response, what a handler may return |
+| `ResponseCookies` | `set.cookies`: Bun's `CookieMap` of the cookies the response sets, whose `get` and `has` read those, never the request's |
 | `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, what OpenAPI says of it, the checks its schema's type cannot express, a route method, a route and a socket as the app runs them |
 | `RouteOperation`, `OperationSchema`, `OperationMethod` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), and the type of `route` |
 | `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage`, `SocketRecord`, `SocketEntryOf` | sockets: what a socket route validates, what its handlers read, send and receive, the entry one socket adds to `RoutesOf` |

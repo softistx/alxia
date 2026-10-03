@@ -7,13 +7,10 @@ export interface User {
 const COOKIE = "sid";
 const sessions = new Map<string, User>();
 
-/** The user of the request's session, or null. */
-export function userOf(request: Request): User | null {
-  // A hook reads the Cookie header itself: only a route handler gets the
-  // cookies parsed, as ctx.cookies.
-  const cookies = new Bun.CookieMap(request.headers.get("cookie") ?? "");
-  const id = cookies.get(COOKIE);
-  return id === null ? null : (sessions.get(id) ?? null);
+/** The user of the session the request's cookies name, or null. */
+export function userOf(cookies: Readonly<Record<string, string>>): User | null {
+  const id = cookies[COOKIE];
+  return id === undefined ? null : (sessions.get(id) ?? null);
 }
 
 /** Opens a session for `user`, and returns the Set-Cookie that carries it. */

@@ -111,3 +111,11 @@ export function typedBy<R extends StandardSchemaV1>(schema: R) {
 export function refusedWith<S extends ClientErrorStatus>(status: S) {
 	return alxia().onRefusal(() => problem({ status }));
 }
+
+// The response's cookie map, carried in the context: `ResponseCookies`
+// is named in the app's type.
+export function withResponseCookies() {
+	return alxia()
+		.derive(({ cookies, set }) => ({ sid: cookies['sid'], jar: set.cookies }))
+		.get('/', ({ sid, reply }) => reply(200, sid ?? ''));
+}
