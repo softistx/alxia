@@ -38,8 +38,8 @@ Nothing scheduled yet.
   types compressed as options. An event stream (unless `compressible` lets
   it in), a `HEAD`, a 204, 206 or 304, a response already encoded — a
   precompressed static file — or one marked `Cache-Control: no-transform`
-  is sent as it is. Brotli runs at quality 4,
-  near gzip's speed, rather than the ahead-of-time default of 11.
+  is sent as it is. Brotli runs at quality 4, near gzip's speed, rather
+  than the ahead-of-time default of 11.
 - **Streamed bodies flushed as they come.** A body with no
   `Content-Length` — a server-rendered page, a `ReadableStream`, an event
   stream that `compressible` lets in — is flushed after the chunks of each

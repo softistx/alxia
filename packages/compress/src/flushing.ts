@@ -40,6 +40,7 @@ function codec(encoding: Encoding): { codec: Codec; kind: number } {
 
 /** Until the codec can take more, or is gone. */
 function drained(zlib: Codec): Promise<void> {
+	if (zlib.destroyed) return Promise.resolve();
 	return new Promise((resolve) => {
 		const done = () => {
 			zlib.off('drain', done);
