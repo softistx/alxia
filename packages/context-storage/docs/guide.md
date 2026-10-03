@@ -16,7 +16,7 @@ const requestContext = contextStorage<typeof base>();
 
 // three calls down, no context passed
 function greet(): string {
-	const { greeting, user } = requestContext.get(); // typed: greeting, user
+	const { greeting, user } = requestContext.context(); // typed: greeting, user
 	return `${greeting}, ${user}`;
 }
 
@@ -32,16 +32,18 @@ context of the request that called it, and never another's.
 ## The signature
 
 ```ts
-function contextStorage<App = undefined>(): ContextStoragePlugin<App>;
+// `uncalled` takes nothing: it makes `use(contextStorage)` a compile error
+function contextStorage<App = undefined>(...uncalled: readonly never[]): ContextStoragePlugin<App>;
 
 type ContextStoragePlugin<App> = Alxia<Empty, Empty, '', never> & {
-	get(): ContextOf<App> extends never ? BaseContext : ContextOf<App>;
-	tryGet(): (ContextOf<App> extends never ? BaseContext : ContextOf<App>) | undefined;
+	context(): ContextOf<App> extends never ? BaseContext : ContextOf<App>;
+	tryContext(): (ContextOf<App> extends never ? BaseContext : ContextOf<App>) | undefined;
 };
 
 function getContext<Ctx extends object = Empty>(): BaseContext & Ctx;
 function tryGetContext<Ctx extends object = Empty>(): (BaseContext & Ctx) | undefined;
 function getRequestContext(): RequestContext;
+function tryGetRequestContext(): RequestContext | undefined;
 function runWithContext<T>(ctx: BaseContext, work: () => T): T;
 
 class ContextStorageError extends Error {
@@ -52,17 +54,18 @@ class ContextStorageError extends Error {
 type ContextStorageErrorCode = 'OUTSIDE_REQUEST' | 'NOT_ROUTED';
 ```
 
-`contextStorage()` returns an app plugin: pass it to `use`, called. It adds
+`contextStorage()` returns an app plugin: pass it to `use`, called — `use(contextStorage)` fails `tsc` with `TS2769` and throws a `TypeError` at startup ([troubleshooting](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)). It adds
 nothing to the app's type. `BaseContext`, `RequestContext` and `ContextOf`
 come from `@alxia/core`.
 
 | Export | Returns | Where it would have nothing |
 | --- | --- | --- |
-| `requestContext.get()` | the route's context, typed by `App` | throws a `ContextStorageError` |
-| `requestContext.tryGet()` | the same | `undefined` |
+| `requestContext.context()` | the route's context, typed by `App` | throws a `ContextStorageError` |
+| `requestContext.tryContext()` | the same | `undefined` |
 | `getContext<Ctx>()` | the route's context, as `BaseContext & Ctx`: `Ctx` is yours to state | throws a `ContextStorageError` |
 | `tryGetContext<Ctx>()` | the same | `undefined` |
 | `getRequestContext()` | the request as global hooks see it: `request`, `url`, `ip`, `server`, and once routing has run, `route` and `error` | throws a `ContextStorageError` coded `OUTSIDE_REQUEST` |
+| `tryGetRequestContext()` | the same | `undefined` |
 | `runWithContext(ctx, work)` | what `work` returns, with `ctx` as the current context while it runs | — |
 
 There is one store per copy of the package: every `contextStorage()` writes
@@ -77,16 +80,16 @@ request's `RequestContext`. A route hook records the route's context in
 that store, for the routes declared after the plugin only. So what each
 function reads depends on where the code runs:
 
-| Code running in | `getRequestContext()` | `getContext()` | `tryGetContext()` |
-| --- | --- | --- | --- |
-| an `onRequest` hook | the request, `route` still `undefined` | throws `NOT_ROUTED` | `undefined` |
-| a route declared **before** the plugin, and its `onResponse` | the request | throws `NOT_ROUTED` | `undefined` |
-| a `derive` or `wrap` declared after the plugin | the request | the route's context, **before validation**: no `params`, `query` or `body` yet | the same |
-| the handler of a route declared after the plugin, and everything it calls | the request | the context the handler receives — the same object | the same |
-| that route's `onError` and `onResponse` hooks | the request, with `route` and `error` | the same context | the same |
-| an `onResponse` for a 404 | the request, `route` `undefined` | throws `NOT_ROUTED` | `undefined` |
-| a socket's handlers (`open`, `message`, `close`) | throws `OUTSIDE_REQUEST` | throws `OUTSIDE_REQUEST` | `undefined` |
-| startup, a job, a timer started at startup | throws `OUTSIDE_REQUEST` | throws `OUTSIDE_REQUEST` | `undefined` |
+| Code running in | `getRequestContext()` | `tryGetRequestContext()` | `getContext()` | `tryGetContext()` |
+| --- | --- | --- | --- | --- |
+| an `onRequest` hook | the request, `route` still `undefined` | the same | throws `NOT_ROUTED` | `undefined` |
+| a route declared **before** the plugin, and its `onResponse` | the request | the same | throws `NOT_ROUTED` | `undefined` |
+| a `derive` or `wrap` declared after the plugin | the request | the same | the route's context, **before validation**: no `params`, `query` or `body` yet | the same |
+| the handler of a route declared after the plugin, and everything it calls | the request | the same | the context the handler receives — the same object | the same |
+| that route's `onError` and `onResponse` hooks | the request, with `route` and `error` | the same | the same context | the same |
+| an `onResponse` for a 404 | the request, `route` `undefined` | the same | throws `NOT_ROUTED` | `undefined` |
+| a socket's handlers (`open`, `message`, `close`) | throws `OUTSIDE_REQUEST` | `undefined` | throws `OUTSIDE_REQUEST` | `undefined` |
+| startup, a job, a timer started at startup | throws `OUTSIDE_REQUEST` | `undefined` | throws `OUTSIDE_REQUEST` | `undefined` |
 
 The two errors carry these messages:
 
@@ -108,8 +111,8 @@ try {
 }
 ```
 
-Code that runs both in and out of requests uses `tryGet()` or
-`tryGetContext()` instead of catching.
+Code that runs both in and out of requests uses `tryContext()`,
+`tryGetContext()` or `tryGetRequestContext()` instead of catching.
 
 The context is the whole of what the handler reads: the request, `set` to
 add a header or a cookie to the response, `reply` and `redirect`, and what
@@ -151,7 +154,7 @@ export const requestContext = contextStorage<typeof base>();
 import { requestContext } from './context';
 
 export async function listOrders() {
-	const { db, user, set } = requestContext.get();
+	const { db, user, set } = requestContext.context();
 	set.headers.set('cache-control', 'private');
 	return db.orders.filter((order) => order.userId === user.id);
 }
@@ -168,31 +171,22 @@ export const app = base
 ```
 
 A logger is the code that runs in and out of requests: at startup, in a 404,
-in a route. `getRequestContext()` gives it the request wherever there is
-one, and `tryGet()` the user where a route was reached:
+in a route. `tryGetRequestContext()` gives it the request wherever there is
+one, and `tryContext()` the user where a route was reached:
 
 ```ts
 // log.ts
-import { ContextStorageError, getRequestContext } from '@alxia/context-storage';
+import { tryGetRequestContext } from '@alxia/context-storage';
 import { requestContext } from './context';
 
-function currentRequest() {
-	try {
-		return getRequestContext();
-	} catch (error) {
-		if (error instanceof ContextStorageError) return undefined;
-		throw error;
-	}
-}
-
 export function log(message: string): void {
-	const request = currentRequest();
+	const request = tryGetRequestContext(); // undefined outside a request
 	console.log(
 		JSON.stringify({
 			message,
 			method: request?.request.method,
 			route: request?.route,
-			user: requestContext.tryGet()?.user.id,
+			user: requestContext.tryContext()?.user.id,
 		}),
 	);
 }
@@ -203,10 +197,10 @@ the user's id; from startup, the message alone.
 
 ## Typing it
 
-`contextStorage<App>()` takes the type of an app, and `get()` and `tryGet()`
+`contextStorage<App>()` takes the type of an app, and `context()` and `tryContext()`
 return what a route declared next on that app would read: `ContextOf<App>`.
 
-| `App` | `get()` returns |
+| `App` | `context()` returns |
 | --- | --- |
 | none: `contextStorage()` | `BaseContext`: the request, `set`, `reply`, `redirect`, `route`, `pathParams` |
 | `typeof base` | `ContextOf<typeof base>`: `BaseContext` plus everything `base`'s `decorate`, `derive` and plugins added |
@@ -223,9 +217,9 @@ const typed = contextStorage<typeof base>();
 const untyped = contextStorage();
 
 export function whoIsAsking(): string {
-	untyped.get().route;     // string: BaseContext only
-	// untyped.get().user — error TS2339: Property 'user' does not exist on type 'BaseContext'.
-	return typed.get().user; // string
+	untyped.context().route;     // string: BaseContext only
+	// untyped.context().user — error TS2339: Property 'user' does not exist on type 'BaseContext'.
+	return typed.context().user; // string
 }
 ```
 
@@ -236,7 +230,7 @@ Three rules follow from typing by an app:
   `requestContext = contextStorage<typeof app>()` is a circular type, which
   `tsc` refuses with `TS7022`. Declare `base` first, as above.
 - **What a hook after the plugin adds is there at runtime, not in the
-  type.** `get()` knows `base`, so a `derive` added after
+  type.** `context()` knows `base`, so a `derive` added after
   `base.use(requestContext)` is missing from its type. Put the hooks whose
   values services read in `base`, or state the type with `getContext<Ctx>()`.
 - **A route's own `params`, `query`, `body` and `headers` are not in it**:
@@ -280,15 +274,16 @@ request's `onResponse`, `getContext()` throws `NOT_ROUTED`, and
 
 | Placement | Effect |
 | --- | --- |
-| at the top of the chain | every route can read it; `get()` is typed `BaseContext` unless typed by an app declared before it |
+| at the top of the chain | every route can read it; `context()` is typed `BaseContext` unless typed by an app declared before it |
 | after `decorate` and `derive` | the usual place: typed by them, and every route after reads it |
 | inside a `group` | the group's routes read it; a route outside the group throws `NOT_ROUTED` |
 | twice | harmless: one store, one context per request |
 
-`requestContext.get` is the context, not a route method: declare routes on
-the app, never on the plugin, and pass `contextStorage()` to `use` called —
-see [the troubleshooting entry](troubleshooting.md#contextstorageerror-getcontext-called-outside-a-request--use-trygetcontext-or-runwithcontext-in-a-job-or-a-test)
-for what the uncalled form does.
+The plugin is an app like any other: `requestContext.get('/x', handler)` is the
+route method, and the context is read with `context()` and `tryContext()`.
+Declare routes on the app rather than on the plugin, and pass
+`contextStorage()` to `use` called — the uncalled form is
+[refused](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage).
 
 ## What `AsyncLocalStorage` carries
 
@@ -300,7 +295,7 @@ context of that request, and concurrent requests never see each other's.
 async function greet(): Promise<string> {
 	await Bun.sleep(10);
 	await new Promise((resolve) => setTimeout(resolve, 1));
-	const { greeting, user } = requestContext.get(); // still this request's
+	const { greeting, user } = requestContext.context(); // still this request's
 	return `${greeting} ${user}`;
 }
 ```
@@ -313,8 +308,8 @@ runs:
 
 | The callback | Sees |
 | --- | --- |
-| a `setTimeout` or promise started in the request, firing after the response is sent | that request's context, stale: `get()` does not throw, but `set` no longer reaches any response |
-| a `setInterval`, queue consumer or pool started at startup | nothing: `get()` throws `OUTSIDE_REQUEST`, `tryGet()` is `undefined` |
+| a `setTimeout` or promise started in the request, firing after the response is sent | that request's context, stale: `context()` does not throw, but `set` no longer reaches any response |
+| a `setInterval`, queue consumer or pool started at startup | nothing: `context()` throws `OUTSIDE_REQUEST`, `tryContext()` is `undefined` |
 | a function pushed into a queue in the request, and run by something started at startup | nothing, as above |
 | an `EventEmitter` listener | the context of the code that called `emit`, since listeners run synchronously |
 | a WebSocket's `open`, `message` and `close` | nothing: a socket's upgrade runs outside `around` |
@@ -329,7 +324,7 @@ import { requestContext } from './context';
 const pending: (() => Promise<void>)[] = [];
 
 export function auditLater(action: string): void {
-	const { user, route } = requestContext.get(); // read now, in the request
+	const { user, route } = requestContext.context(); // read now, in the request
 	pending.push(async () => {
 		console.log(JSON.stringify({ action, user: user.id, route }));
 	});

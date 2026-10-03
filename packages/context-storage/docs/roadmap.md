@@ -31,17 +31,20 @@ Nothing scheduled yet.
   lets a service, a repository or a logger read the context of the route
   that called it with `getContext()`, without it being passed down, through
   every `await`, timer and promise, and never another request's.
-- **Typed by the app.** `contextStorage<typeof base>()` gives `get()` and
-  `tryGet()` what a route declared next on `base` reads: the values its
+- **Typed by the app.** `contextStorage<typeof base>()` gives `context()` and
+  `tryContext()` what a route declared next on `base` reads: the values its
   `decorate` and `derive` hooks added.
 - **The request in global hooks.** `getRequestContext()` reads the request
   before routing, in a 404 and in an `onResponse`, with the route it
-  reached and the error it failed with.
+  reached and the error it failed with; `tryGetRequestContext()` returns
+  `undefined` outside a request instead of throwing.
 - **Jobs and tests.** `runWithContext(ctx, work)` runs code that reads the
   context outside a request.
 - **A refusal that says why.** Where there is no context, `getContext()`
   throws a `ContextStorageError` coded `OUTSIDE_REQUEST` or `NOT_ROUTED`,
   and `tryGetContext()` returns `undefined`.
+  `use(contextStorage)`, the factory uncalled, fails `tsc` and throws a
+  `TypeError` at startup, rather than leaving the routes after it unserved.
 - **Ported from `hono/context-storage`.** One store, and `getContext()`
   read wherever it is called, as Hono's is: code written against one ports
   to the other.
