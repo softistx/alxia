@@ -512,7 +512,7 @@ export or the hook's return type, e.g. `Reply<400 | 413, ProblemDetails>`, with 
 These are `TypeError`s thrown when a route is declared, so the app fails at
 startup, not on a request. The eight about a path's syntax are also thrown
 by `shapeOf(path)`, and so by a tool that calls it: `@alxia/openapi-routes`'
-`implemented` and `exactly` throw them for an operation path no route may
+`implemented` and `matchesSpec` throw them for an operation path no route may
 be declared at, after their own name (`implemented(): …`).
 
 ### `The route path "…" must start with "/"`

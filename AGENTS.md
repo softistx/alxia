@@ -11,7 +11,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/core` | the framework: routes, hooks, groups, plugins, cookies, SSE, WebSockets | — |
 | `@alxia/client` | the client of an app, typed from `typeof app` alone | core |
 | `@alxia/openapi` | the OpenAPI 3.2 document of an app, from its route schemas | core |
-| `@alxia/openapi-routes` | `implemented` and `exactly`: every operation of an OpenAPI document has a route, read from `app.routes` | core |
+| `@alxia/openapi-routes` | `implemented` and `matchesSpec`: every operation of an OpenAPI document has a route, read from `app.routes` | core |
 | `@alxia/zod` | Zod coercions (`zq`) and the OpenAPI converter | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's hooks and typed context, Yoga's plugins | core, graphql-yoga, graphql |
 | `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its hooks, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js`; the `alxia-react-router reveal` bin writes the default server out | core, react-router; vite (optional, `/vite`) |

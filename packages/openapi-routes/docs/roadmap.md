@@ -35,7 +35,7 @@ Nothing scheduled yet.
 - **Every operation has a route.** `implemented(app, operations)` throws,
   listing each operation of the document that the app does not serve, by
   method, path and operation id.
-- **Only the operations.** `exactly(app, operations)` also lists each route
+- **Only the operations.** `matchesSpec(app, operations)` also lists each route
   the document does not declare; `exclude` leaves out the ones it should
   not, such as a health check or the document's own route.
 - **The generated shape.** Both take the `operations` object
