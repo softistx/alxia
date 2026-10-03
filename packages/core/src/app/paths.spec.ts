@@ -1,4 +1,5 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
+import { problem } from '../reply/problem';
 import type { CheckedPath, PathAt, RoutePath, StaticPath } from '../types/path';
 import { alxia } from './alxia';
 
@@ -245,6 +246,13 @@ describe('the type of a path', () => {
 				),
 		];
 		for (const declare of refused) expect(declare).toThrow(TypeError);
+	});
+
+	test('refuses them behind a hook per refusal kind', () => {
+		const app = alxia().onRefusal('validation', () => problem({ status: 422 }));
+		// @ts-expect-error: a ":" inside a segment
+		expect(() => app.get('/at/10:30', ok)).toThrow('may only start a segment');
+		expect(app.get('/at/:time', ok).routes[0]?.path).toBe('/at/:time');
 	});
 
 	test('reads the path under the prefix it is declared at', () => {
