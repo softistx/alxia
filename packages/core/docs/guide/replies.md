@@ -270,6 +270,40 @@ declared.
 Every route's type includes `500 { error: 'internal' }`
 (`InternalErrorBody`), so a client always handles it.
 
+## Problem details: `problem`
+
+`problem(details, init?)` is a reply whose body is a problem as RFC 9457
+(which obsoletes RFC 7807) defines it. Its status is the problem's
+`status`, and its `content-type` is `application/problem+json` unless
+`init` sets one. Every other member is an extension, kept as given and in
+the body's type:
+
+```ts
+import { alxia, problem } from '@alxia/core';
+
+const app = alxia().post('/upload', ({ request }) =>
+	Number(request.headers.get('content-length')) > 50_000_000
+		? problem({ type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: 'maxSizeRequest' })
+		: problem({ type: 'about:blank', status: 501, title: 'Not Implemented' }),
+);
+// the client reads 413 { type: 'urn:ietf:params:jmap:error:limit'; status: 413; limit: 'maxSizeRequest' }
+```
+
+```ts
+interface ProblemDetails<Status extends ClientErrorStatus | ServerErrorStatus> {
+	readonly type?: string;     // a URI; absent, it is about:blank
+	readonly title?: string;
+	readonly status: Status;    // the response's status
+	readonly detail?: string;
+	readonly instance?: string;
+}
+```
+
+On a route with `response` schemas, a problem is a reply like any other:
+its status must be declared and its body accepted by that status's schema.
+[`onRefusal`](hooks.md#onrefusal) answers a refused request with one.
+`@alxia/client` reads `application/problem+json` as JSON.
+
 ## Types
 
 ```ts

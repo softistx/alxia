@@ -15,7 +15,10 @@ Nothing scheduled yet.
 
 ## Later
 
-Nothing scheduled yet.
+- **The default 400 beside a hook that may fall back to it.** An
+  `onRefusal` hook that returns nothing for some refusals lets the default
+  `ValidationError` 400 answer them, and the document does not show it
+  beside the hook's schemas yet. The client's type already does.
 
 ## Not planned
 
@@ -30,6 +33,13 @@ Nothing scheduled yet.
   viewer from a CDN in the browser.
 
 ## Shipped
+
+### Next release
+
+- **Refusals as the app answers them.** A route behind an `onRefusal`
+  hook documents what the hook declares — an RFC 9457 problem under
+  `application/problem+json`, for one — in place of the `ValidationError`
+  400; a hook without schemas, a `4XX`.
 
 ### 0.1.0
 

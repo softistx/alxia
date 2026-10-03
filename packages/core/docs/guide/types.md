@@ -83,7 +83,8 @@ interface Outcome<Status extends number = number, Data = unknown> {
 | each reply the handler can return | it has none |
 | a redirect the handler returns | always |
 | each reply a `derive`, `wrap` or `onError` before the route can return | always |
-| `400`, `ValidationErrorBody` | the route validates a part of its request |
+| `400`, `ValidationErrorBody` | the route validates a part of its request, and no `onRefusal` hook is declared before it |
+| each reply the `onRefusal` hook before the route can return, in place of the 400 | the route validates a part of its request; the 400 too when the hook may return nothing |
 | `500`, `InternalErrorBody` | always |
 
 ```ts

@@ -1,15 +1,21 @@
-import { isEventStreamSchema, type RouteSchema } from '@alxia/core';
+import {
+	isEventStreamSchema,
+	type RefusalHandler,
+	type RouteSchema,
+} from '@alxia/core';
 import { type Converter, type JsonSchema, toJsonSchema } from './json-schema';
 import type { ResponseObject } from './types';
 
 /**
  * A route's responses: each reply its schema declares, `default` when it
- * declares none, its 400 when it validates its request, and the 500 any
- * route may answer.
+ * declares none, its refusal when it validates its request — the 400, or
+ * what the `onRefusal` hook in force declares — and the 500 any route may
+ * answer.
  */
 export function responses(
 	schema: RouteSchema,
 	convert?: Converter,
+	refusal?: RefusalHandler,
 ): Record<string, ResponseObject> {
 	const byStatus: Record<string, ResponseObject> = {};
 	for (const [status, responseSchema] of Object.entries(
@@ -37,50 +43,68 @@ export function responses(
 		schema.cookies !== undefined ||
 		schema.body !== undefined
 	) {
-		byStatus['400'] = withError(
-			byStatus['400'],
-			'The request was refused',
-			'ValidationError',
+		refused(byStatus, refusal, convert);
+	}
+	byStatus['500'] = withError(byStatus['500'], 'The server failed', {
+		$ref: '#/components/schemas/InternalError',
+	});
+	return byStatus;
+}
+
+const REFUSED = 'The request was refused';
+
+/**
+ * The responses of a refused request: the default 400; each status the
+ * route's `onRefusal` hook declares, under its content type; or, for a hook
+ * that declares none, a client error whose body it does not say.
+ */
+function refused(
+	byStatus: Record<string, ResponseObject>,
+	refusal: RefusalHandler | undefined,
+	convert: Converter | undefined,
+): void {
+	if (refusal === undefined) {
+		byStatus['400'] = withError(byStatus['400'], REFUSED, {
+			$ref: '#/components/schemas/ValidationError',
+		});
+		return;
+	}
+	if (refusal.response === undefined) {
+		byStatus['4XX'] ??= { description: REFUSED };
+		return;
+	}
+	for (const [status, schema] of Object.entries(refusal.response)) {
+		if (schema === undefined) continue;
+		byStatus[status] = withError(
+			byStatus[status],
+			REFUSED,
+			toJsonSchema(schema, 'output', convert),
+			refusal.contentType,
 		);
 	}
-	byStatus['500'] = withError(
-		byStatus['500'],
-		'The server failed',
-		'InternalError',
-	);
-	return byStatus;
 }
 
 /**
  * The response for a status the framework itself may answer: its error
  * alone, or, when the route declares that status too, the route's beside
- * it — either of the two as JSON, or each under its own content type.
+ * it — either of the two under one content type, or each under its own.
  */
 function withError(
 	own: ResponseObject | undefined,
 	description: string,
-	component: string,
+	error: JsonSchema,
+	type = 'application/json',
 ): ResponseObject {
-	if (own === undefined) return errorResponse(description, component);
-	const error: JsonSchema = { $ref: `#/components/schemas/${component}` };
-	const schema = own.content?.['application/json']?.schema;
+	if (own === undefined) {
+		return { description, content: { [type]: { schema: error } } };
+	}
+	const schema = own.content?.[type]?.schema;
 	return {
 		description: own.description,
 		content: {
 			...own.content,
-			'application/json': {
+			[type]: {
 				schema: schema === undefined ? error : { anyOf: [schema, error] },
-			},
-		},
-	};
-}
-
-function errorResponse(description: string, component: string): ResponseObject {
-	return {
-		description,
-		content: {
-			'application/json': {
-				schema: { $ref: `#/components/schemas/${component}` },
 			},
 		},
 	};

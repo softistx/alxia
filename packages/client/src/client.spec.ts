@@ -1,5 +1,10 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { alxia, type InternalErrorBody } from '@alxia/core';
+import {
+	alxia,
+	type InternalErrorBody,
+	problem,
+	type RequestPart,
+} from '@alxia/core';
 import { z } from 'zod';
 import { client, fillPath } from './client';
 
@@ -108,6 +113,46 @@ describe('client', () => {
 		});
 		if (result.status === 400) {
 			expect(result.data.issues[0]?.target).toBe('body');
+		} else throw new Error(`expected a 400, got ${result.status}`);
+	});
+
+	test('the problem an onRefusal hook answers is typed, in place of the 400', async () => {
+		const problems = client(
+			alxia()
+				.onRefusal(({ part }) =>
+					problem({
+						type: 'urn:ietf:params:jmap:error:notRequest',
+						status: 400,
+						detail: `the ${part} is invalid`,
+					}),
+				)
+				.post(
+					'/api',
+					{ body: z.object({ using: z.array(z.string()) }) },
+					({ reply }) => reply(200, 'ok'),
+				),
+		);
+		// A body the schema refuses, past the types that would refuse it too.
+		const result = await problems.post('/api', {
+			body: {} as { using: string[] },
+		});
+		if (result.status === 400) {
+			expectTypeOf(
+				result.data.type,
+			).toEqualTypeOf<'urn:ietf:params:jmap:error:notRequest'>();
+			expectTypeOf(
+				result.data.detail,
+			).toEqualTypeOf<`the ${RequestPart} is invalid`>();
+			// @ts-expect-error: the default 400's `issues` is no part of it
+			void result.data.issues;
+			expect(result.response.headers.get('content-type')).toBe(
+				'application/problem+json',
+			);
+			expect(result.data).toEqual({
+				type: 'urn:ietf:params:jmap:error:notRequest',
+				status: 400,
+				detail: 'the body is invalid',
+			});
 		} else throw new Error(`expected a 400, got ${result.status}`);
 	});
 

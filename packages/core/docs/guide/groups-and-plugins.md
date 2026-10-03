@@ -88,6 +88,10 @@ use(plugin: Alxia<PluginCtx, PluginRoutes, PluginPrefix, PluginShortcuts>): Alxi
 - Its **route hooks** then apply to the routes declared on this app after
   `use`: an `auth` plugin can be a `derive` and nothing else.
 - Its **`onError` hooks** are tried before this app's, for its own routes.
+- Its **`onRefusal` hook** answers its own routes' refused requests. Its
+  routes without one take this app's, declared before `use`. The plugin's
+  hook then replaces this app's for the routes declared after `use`
+  ([Hooks](hooks.md#onrefusal)).
 - Its **global hooks**, body parsers and [pages](static-files.md#bun-html-bundles)
   become this app's.
 

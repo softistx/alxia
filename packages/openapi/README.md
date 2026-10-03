@@ -41,7 +41,10 @@ await Bun.write('openapi.json', JSON.stringify(openapi(app, { info }), null, 2))
 - an event stream as `text/event-stream`, by the schema of one event, as its `itemSchema`
 - `cookies` as cookie parameters
 - the 400 of a route that validates its request, and the 500 of every route —
-  beside the route's own 400 or 500, when it declares one
+  beside the route's own 400 or 500, when it declares one. Behind an
+  `onRefusal` hook given schemas, the refusal is each status those schemas
+  declare, under the hook's `contentType`, such as `application/problem+json`.
+  Behind a hook without schemas, it is a `4XX` whose body is not documented
 - `detail`: `summary`, `description`, `tags`, `operationId`, `deprecated`. An
   operation id is otherwise made from the method and path: `getUsersById`
 

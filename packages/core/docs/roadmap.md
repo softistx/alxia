@@ -11,7 +11,10 @@ Nothing scheduled yet.
 
 ## Next
 
-Nothing scheduled yet.
+- **A body too large through `onRefusal`.** A request whose body is over a
+  limit becomes a refusal of its own kind, `body_limit`, so the hook that
+  shapes the 400 can shape the 413 too, as an RFC 9457 problem with its
+  `limit`.
 
 ## Later
 
@@ -38,6 +41,20 @@ Nothing scheduled yet.
   return one, for what a typed client never asks.
 
 ## Shipped
+
+### Next release
+
+- **Refusals in your format.** `onRefusal(hook)` answers a request the
+  route's schemas refuse with your own reply instead of
+  `400 { error: 'validation', issues }`, for the routes declared after it.
+  The hook reads the part that failed and every issue, and may answer 400
+  or another 4xx. Its reply takes the 400's place in each route's type, so
+  the client reads it. Given schemas, `@alxia/openapi` documents it under
+  its content type. A group's hook stays in the group, and the default is
+  unchanged.
+- **RFC 9457 problems.** `problem({ type, status, detail, … })` is a reply
+  sent as `application/problem+json`, with its extension members typed:
+  the error format of JMAP and other APIs built on problem details.
 
 ### 0.1.0
 

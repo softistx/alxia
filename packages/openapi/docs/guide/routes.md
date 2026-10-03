@@ -47,7 +47,7 @@ const get = openapi(app, { info: { title: 'Users', version: '1.0.0' } }).paths['
 | `body` | a required `application/json` request body: what the schema **accepts** |
 | `response` | one reply per status: what the schema **gives back** |
 | no `response` | a single `default` reply, `The reply of the handler` |
-| any of `params`, `query`, `headers`, `cookies`, `body` | a `400`, `ValidationError` — beside the route's own `400`, when it declares one |
+| any of `params`, `query`, `headers`, `cookies`, `body` | a `400`, `ValidationError` — beside the route's own `400`, when it declares one. Behind an `onRefusal` hook, what the hook declares ([below](#behind-an-onrefusal-hook)) |
 | every route | a `500`, `InternalError` — beside the route's own `500`, when it declares one |
 | `detail` | `summary`, `description`, `tags`, `deprecated`, `operationId` |
 
@@ -242,6 +242,52 @@ documented beside it under `application/json`:
   }
 }
 ```
+
+### Behind an `onRefusal` hook
+
+A route declared after `@alxia/core`'s
+[`onRefusal`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/hooks.md#onrefusal)
+is refused in the hook's format, so its 400 is documented as the hook
+says. A hook given schemas documents each status they declare, by what the
+schema gives back, under the hook's `contentType` (`application/json` when
+it sets none). It is beside the route's own reply for that status, when the
+route declares one:
+
+```ts
+const Problem = z.object({ type: z.string(), status: z.literal(400), detail: z.string() });
+
+alxia()
+	.onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' }, ({ part }, { reply }) =>
+		reply(400, { type: 'urn:ietf:params:jmap:error:notRequest', status: 400, detail: `the ${part} is invalid` }),
+	)
+	.post('/jmap', { body: z.object({ using: z.array(z.string()) }) }, ({ reply }) => reply(200, 'ok'));
+```
+
+```json
+"400": {
+  "description": "The request was refused",
+  "content": {
+    "application/problem+json": {
+      "schema": {
+        "type": "object",
+        "properties": {
+          "type": { "type": "string" },
+          "status": { "type": "number", "const": 400 },
+          "detail": { "type": "string" }
+        },
+        "required": ["type", "status", "detail"],
+        "additionalProperties": false
+      }
+    }
+  }
+}
+```
+
+A hook without schemas has a reply the document cannot read. Its routes
+document a `4XX`, `The request was refused`, with no content. Give the
+hook schemas to document its body. A hook that returns nothing for some
+refusals still answers the default 400 then, which the document does not
+show beside the hook's.
 
 ## `detail`
 

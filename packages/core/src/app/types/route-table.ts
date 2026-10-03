@@ -1,14 +1,12 @@
 /** The record of an app's routes the client is typed from: what each one takes and answers. */
-import type {
-	InternalErrorBody,
-	ValidationErrorBody,
-} from '../../errors/errors';
+import type { InternalErrorBody } from '../../errors/errors';
 import type { Reply } from '../../reply/reply';
 import type { InferInput, InferOutput } from '../../schema/standard-schema';
 import type { Jsonify, Simplify } from '../../types/json';
 import type { PathParamName } from '../../types/path';
 import type { RedirectStatus } from '../../types/status';
 import type { Empty, Method } from './common';
+import type { RefusalOutcome, Refusing } from './refusal';
 import type {
 	ResponseSchemaAt,
 	ResponsesOf,
@@ -48,10 +46,8 @@ export type RouteOutput<Schema, Result, Shortcuts> =
 							>;
 					  }[StatusOf<ResponsesOf<Schema>>]
 					| OutcomeOf<Extract<Result, Reply<RedirectStatus, undefined>>>)
-	| OutcomeOf<Shortcuts>
-	| (ValidatesRequest<Schema> extends true
-			? Outcome<400, ValidationErrorBody>
-			: never)
+	| OutcomeOf<Exclude<Shortcuts, Refusing>>
+	| (ValidatesRequest<Schema> extends true ? RefusalOutcome<Shortcuts> : never)
 	| Outcome<500, InternalErrorBody>;
 
 type PartInput<Schema, Key extends 'query' | 'headers' | 'cookies' | 'body'> = [

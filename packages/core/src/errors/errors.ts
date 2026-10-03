@@ -14,6 +14,27 @@ export interface ValidationIssue {
 	readonly message: string;
 }
 
+/** A part of the request a route validates: where a refused value was read from. */
+export type RequestPart = Exclude<ValidationTarget, 'message'>;
+
+/**
+ * A request the route's schemas refused, as an `onRefusal` hook reads it:
+ * the first part that failed, in the order params, query, headers,
+ * cookies, body, and every issue, each naming its own part.
+ */
+export interface ValidationRefusal {
+	readonly kind: 'validation';
+	readonly part: RequestPart;
+	readonly issues: readonly ValidationIssue[];
+}
+
+/**
+ * Why the app refused a request before its handler ran, as an `onRefusal`
+ * hook reads it, told apart by `kind`. Only `validation` today; a kind
+ * added later reaches a hook that returns nothing for it as its default.
+ */
+export type Refusal = ValidationRefusal;
+
 /** The body of the 400 every route that validates its request may answer. */
 export interface ValidationErrorBody {
 	readonly error: 'validation';

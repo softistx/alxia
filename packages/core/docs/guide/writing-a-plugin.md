@@ -17,7 +17,7 @@ hooks — are in [Groups and plugins](groups-and-plugins.md#plugins).
 An app is a plugin. What it declares is mounted on the app that uses it,
 and its types come with it:
 
-- its route hooks (`derive`, `decorate`, `wrap`, `onError`) apply to the
+- its route hooks (`derive`, `decorate`, `wrap`, `onError`, `onRefusal`) apply to the
   routes declared after `use`, and what they add is typed on them;
 - its routes are mounted under the app's prefix, behind the hooks declared
   before `use`;

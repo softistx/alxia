@@ -10,6 +10,18 @@ export type {
 	RequestContext,
 	ResponseSettings,
 } from './context';
+export type {
+	BehindShortcuts,
+	DeclaredRefusal,
+	DefaultRefusalOutcome,
+	FallsBack,
+	RefusalOutcome,
+	RefusalResponses,
+	RefusalSchema,
+	RefusalsOf,
+	Refusing,
+	ThenShortcuts,
+} from './refusal';
 export type { ProvidedBy, RequiresOf, Requiring } from './requires';
 export type {
 	Outcome,

@@ -356,6 +356,11 @@ Two codes are the framework's: `invalid_json` (the body is not JSON) and
 `unreadable_body` (a parser threw). The 400 is in the type of every route
 that validates part of its request, so a client reads it.
 
+The 400 is the default. [`onRefusal`](hooks.md#onrefusal) answers a refused
+request in your own format for the routes declared after it, such as an RFC
+9457 problem sent as `application/problem+json`. Its reply then takes the
+400's place in those routes' types.
+
 ## What the types refuse
 
 The schema argument is checked against the path and against
