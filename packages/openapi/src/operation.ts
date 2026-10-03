@@ -21,7 +21,7 @@ export function operation(
 			: toJsonSchema(schema.body, 'input', convert);
 	return {
 		operationId: detail.operationId ?? operationId(method, path),
-		responses: responses(schema, convert, route.refusal),
+		responses: responses(schema, convert, route.refusal, route.bodyLimit),
 		...(detail.summary === undefined ? {} : { summary: detail.summary }),
 		...(detail.description === undefined
 			? {}

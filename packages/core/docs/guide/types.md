@@ -84,7 +84,8 @@ interface Outcome<Status extends number = number, Data = unknown> {
 | a redirect the handler returns | always |
 | each reply a `derive`, `wrap` or `onError` before the route can return | always |
 | `400`, `ValidationErrorBody` | the route validates a part of its request, and no `onRefusal` hook is declared before it |
-| each reply the `onRefusal` hook before the route can return, in place of the 400 | the route validates a part of its request; the 400 too when the hook may return nothing |
+| each reply the `onRefusal` hook before the route can return, in place of the 400 and the 413 | the route validates a part of its request, or has a `bodyLimit`; the default of each kind too when the hook may return nothing |
+| `413`, `ContentTooLargeBody` | the route has a `bodyLimit` of its own, or a `bodyLimit()` was called before it ([Routes](routes.md#body-size-bodylimit)), and no `onRefusal` hook is declared before it, or one that may return nothing |
 | `500`, `InternalErrorBody` | always |
 
 ```ts

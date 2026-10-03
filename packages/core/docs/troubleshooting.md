@@ -133,7 +133,7 @@ error TS2561: Object literal may only specify known properties, but 'quey' does 
 ```
 
 When the schema object is a variable, the message names the key instead:
-`"quey" is not a part of a route: params, query, headers, cookies, body, response or detail`.
+`"quey" is not a part of a route: params, query, headers, cookies, body, response, bodyLimit or detail`.
 A variable with no known key at all gives
 `TS2559: Type '{ quey: … }' has no properties in common with type 'RouteSchema'`.
 
@@ -141,7 +141,7 @@ A variable with no known key at all gives
 read the raw value.
 
 **Fix:** use one of `params`, `query`, `headers`, `cookies`, `body`,
-`response` or `detail`:
+`response`, `bodyLimit` or `detail`:
 
 ```ts
 app.get('/users', { query: z.object({ page: zq.int().optional() }) }, handler);
@@ -446,7 +446,30 @@ succeeded.
 **Fix:** answer with a 4xx, such as 400 or 422:
 
 ```ts
-app.onRefusal(({ part }) => problem({ status: 422, detail: `the ${part} is invalid` }));
+app.onRefusal((refusal) => problem({ status: 422, detail: `the request is refused: ${refusal.kind}` }));
+```
+
+### `Property 'part' does not exist on type 'Refusal'`
+
+**When:** an `onRefusal` hook reads `part` or `issues` without checking
+the refusal's `kind`, often by destructuring it:
+
+```text
+error TS2339: Property 'part' does not exist on type 'Refusal'.
+  Property 'part' does not exist on type 'BodyLimitRefusal'.
+```
+
+**Why:** a hook answers every kind of refusal. A `body_limit` refusal, a
+body past the route's `bodyLimit`, has a `limit` and no `part` or
+`issues`.
+
+**Fix:** check `kind` first. Return nothing for a kind you leave to its
+default:
+
+```ts
+app.onRefusal((refusal) =>
+	refusal.kind === 'validation' ? problem({ status: 400, detail: `the ${refusal.part} is invalid` }) : undefined,
+);
 ```
 
 ### `'500' does not exist in type 'RefusalResponses'`
@@ -673,6 +696,19 @@ third argument that is `undefined`.
 app.get('/a', { query: Query }, ({ query, reply }) => reply(200, query));
 ```
 
+### `POST /…: bodyLimit must be a whole number of bytes, 0 or more; got …`
+
+**When:** a route's `bodyLimit` is negative, fractional, `NaN` or
+`Infinity`. `bodyLimit()` throws the same message, prefixed
+`bodyLimit():`.
+
+**Fix:** give a byte count, or leave `bodyLimit` out for no limit beyond
+the server's:
+
+```ts
+app.post('/upload', { bodyLimit: 25 * 1024 * 1024 }, handler);
+```
+
 ### `group(): build is missing`
 
 **When:** `group('/admin')` is called without its function.
@@ -724,8 +760,8 @@ app.page('/dashboard', dashboard).get('/api/dashboard', ({ reply }) => reply(200
 ## Responses
 
 The app answers these itself. Their bodies are the exported
-`ValidationErrorBody`, `RoutingErrorBody`, `FileNotFoundBody`,
-`RangeNotSatisfiableBody` and `InternalErrorBody`.
+`ValidationErrorBody`, `ContentTooLargeBody`, `RoutingErrorBody`,
+`FileNotFoundBody`, `RangeNotSatisfiableBody` and `InternalErrorBody`.
 
 ### `400 {"error":"validation","issues":[…]}`
 
@@ -794,9 +830,64 @@ routes still gets the default 400.
 
 ```ts
 const app = alxia()
-	.onRefusal(({ part }) => problem({ status: 400, detail: `the ${part} is invalid` }))
+	.onRefusal((refusal) =>
+		refusal.kind === 'validation' ? problem({ status: 400, detail: `the ${refusal.part} is invalid` }) : undefined,
+	)
 	.post('/users', { body: NewUser }, handler);
 ```
+
+A body past the route's `bodyLimit` still gets the default
+`413 {"error":"content_too_large","limit":…}` from that hook, which returns nothing
+for a `body_limit`. Return a reply for it too to answer it in your format
+([`413`](#413-errorcontent_too_largelimit)).
+
+### `413 {"error":"content_too_large","limit":…}`
+
+**When:** a request's body is larger than its route's `bodyLimit`: the
+route's own, or the one a `bodyLimit(bytes)` before it set. Either its
+`Content-Length` says so, and the body is not read, or the bytes counted as
+it was read passed the limit:
+
+```json
+{ "error": "content_too_large", "limit": 65536 }
+```
+
+**Why:** `limit` is the route's limit, in bytes. The count covers every
+reader of the body: the JSON, form and text parsers, a `parser` of the
+app's, and a handler reading `ctx.request.body`. A body of exactly `limit`
+bytes is accepted.
+
+**Fix:** send a smaller body, or raise the limit for that route alone. A
+route's own `bodyLimit` wins over the default:
+
+```ts
+app
+	.bodyLimit(64 * 1024)
+	.post('/attachments', { bodyLimit: 25 * 1024 * 1024 }, async ({ request, reply }) => {
+		await Bun.write('attachment.bin', new Response(request.body));
+		return reply(204);
+	});
+```
+
+To answer in another format, such as an RFC 9457 problem, return it from
+an [`onRefusal`](guide/hooks.md#onrefusal) hook declared before the route,
+for the refusal of kind `body_limit`. The `onError` hooks never see it:
+
+```ts
+import { problem } from '@alxia/core';
+
+app
+	.onRefusal((refusal) =>
+		refusal.kind === 'body_limit'
+			? problem({ type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: 'maxSizeRequest' })
+			: undefined,
+	)
+	.post('/api', { body: z.unknown(), bodyLimit: 10_000_000 }, handler);
+```
+
+A 413 with no JSON body comes from Bun itself. The body passed `listen`'s
+`maxRequestBodySize`, which applies to every route, before any route's
+`bodyLimit`.
 
 ### `404 {"error":"not_found"}`
 
@@ -901,6 +992,28 @@ app
 Prefer a declared `reply` to `throw new HttpError(…)`: a thrown status is
 not in the route's type, so a typed client does not expect it.
 
+### A plugin's route reads a body past the app's `bodyLimit()`
+
+**When:** an app calls `bodyLimit(bytes)` and then `use(plugin)` with an
+app plugin, and a route of that plugin accepts a larger body.
+
+**Why:** an app's `bodyLimit()` reaches the routes declared on it and in
+its groups, never a plugin's. A plugin's route keeps the limit it was
+declared with, and its type with it. A plugin route with no `onRefusal` of
+its own is still answered by the app's hook. A function plugin that declares its routes on the app is
+bounded like any of them.
+
+**Fix:** give the plugin's route a `bodyLimit` of its own:
+
+```ts
+const uploads = alxia().post('/upload', { bodyLimit: 25 * 1024 * 1024 }, handler);
+const app = alxia().bodyLimit(64 * 1024).use(uploads);
+```
+
+A `bodyLimit()` the plugin calls instead also applies to the app's routes
+declared after `use`, as its hooks do. Call the app's own after `use` to
+keep it.
+
 ## Routing
 
 A trap that prints nothing: the answer comes from another route than the
@@ -999,7 +1112,9 @@ refuses it, so this comes from JavaScript or a cast.
 **Fix:** return `reply(…)` or `problem(…)`, or nothing for the default:
 
 ```ts
-app.onRefusal(({ part }) => (part === 'body' ? problem({ status: 400, detail: 'bad body' }) : undefined));
+app.onRefusal((refusal) =>
+	refusal.kind === 'validation' && refusal.part === 'body' ? problem({ status: 400, detail: 'bad body' }) : undefined,
+);
 ```
 
 ### `TypeError: An event does not match its schema`

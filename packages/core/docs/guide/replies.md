@@ -258,10 +258,16 @@ const app = alxia()
 ```ts
 class HttpError<Status extends number = number, Body = unknown> extends Error {
 	constructor(status: Status, body: Body, message?: string);
+	readonly name: string; // 'HttpError', or a subclass's own
 	readonly status: Status;
 	readonly body: Body;
 }
 ```
+
+Core throws one subclass of its own, `ContentTooLargeError`, for a body past
+its route's `bodyLimit` ([Routes](routes.md#body-size-bodylimit)). The route
+answers it as a refusal, through [`onRefusal`](hooks.md#onrefusal), before
+any `onError` hook. Test for it with `instanceof`, not by `name`.
 
 An `onError` reply is added to the type of the routes after it. A thrown
 `HttpError` is not: the client reads it as a status the route never

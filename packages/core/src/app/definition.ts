@@ -73,6 +73,12 @@ export interface RouteDefinition {
 	readonly method: Method;
 	readonly path: string;
 	readonly schema: RouteSchema;
+	/**
+	 * The most bytes its request body may hold: its schema's `bodyLimit`,
+	 * else the `bodyLimit` in effect where it was declared. None, no limit
+	 * beyond the server's `maxRequestBodySize`.
+	 */
+	readonly bodyLimit?: number;
 	readonly handler: (ctx: never) => MaybePromise<AnyReply>;
 	readonly derive: readonly ChainHook[];
 	readonly onError: readonly ErrorHook[];

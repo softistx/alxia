@@ -119,12 +119,14 @@ describe('client', () => {
 	test('the problem an onRefusal hook answers is typed, in place of the 400', async () => {
 		const problems = client(
 			alxia()
-				.onRefusal(({ part }) =>
-					problem({
-						type: 'urn:ietf:params:jmap:error:notRequest',
-						status: 400,
-						detail: `the ${part} is invalid`,
-					}),
+				.onRefusal((refusal) =>
+					refusal.kind === 'validation'
+						? problem({
+								type: 'urn:ietf:params:jmap:error:notRequest',
+								status: 400,
+								detail: `the ${refusal.part} is invalid`,
+							})
+						: problem({ status: 413, detail: 'too large' }),
 				)
 				.post(
 					'/api',

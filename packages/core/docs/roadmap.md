@@ -62,6 +62,15 @@ Nothing scheduled yet.
   `id:` and `retry:`; the client reads a union discriminated by `event`. A
   line break in an id, or a retry that is not a whole number, is refused
   before it can write a frame the handler never yielded.
+- **A body size per route.** `bodyLimit` on a route, or `bodyLimit(bytes)`
+  for the app or a group, caps its request body below the server's
+  `maxRequestBodySize`. A body over the limit is refused with a typed 413,
+  which `@alxia/openapi` documents. A `Content-Length` over the limit is
+  refused unread, and a chunked upload is cut off as soon as it passes the
+  limit, never buffered whole. This holds for JSON, forms, text, custom
+  parsers and a handler reading the raw stream. The refusal reaches
+  `onRefusal` as `{ kind: 'body_limit', limit }`, so a JMAP server answers
+  it with its own problem.
 
 ### 0.1.0
 

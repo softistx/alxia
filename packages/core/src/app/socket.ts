@@ -10,7 +10,8 @@ import {
 import type { BodyParser } from '../request/read';
 import { check, type StandardSchemaV1 } from '../schema/standard-schema';
 import type { Socket } from '../ws/types';
-import { chain, fail, routeContext } from './chain';
+import { chain, fail } from './chain';
+import { routeContext } from './context';
 import type { SocketDefinition } from './definition';
 import { routingError } from './send';
 import type { MaybePromise, RequestContext } from './types';

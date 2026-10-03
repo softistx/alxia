@@ -106,8 +106,9 @@ interface OpenApiDocument {
 - `paths` is keyed by the path as OpenAPI writes it (`/users/{id}`), then
   by the lowercase method (`get`, `post`…, `query` for a `QUERY` route). Each value is an `Operation`;
   what goes into one is on [How a route is documented](routes.md).
-- `components.schemas` holds exactly two schemas, `ValidationError` and
-  `InternalError`: the bodies of the 400 and 500 every route may answer.
+- `components.schemas` holds the bodies of the errors the app answers
+  itself: `ValidationError` (a 400), `ContentTooLargeError` (the 413 of a
+  route under a `bodyLimit`) and `InternalError` (a 500).
   Your own schemas are written inline in each operation, not as
   components. So are an `onRefusal` hook's: a route behind one documents
   the hook's schemas in place of `ValidationError`.
