@@ -23,17 +23,3 @@ export function freshness(
 	if (age < found.ttl + found.stale) return 'stale';
 	return undefined;
 }
-
-/**
- * A stale response's refresh, run behind it: the route's own error is its to
- * log, and a response it does not keep is read by no one.
- */
-export function refreshBehind(
-	loading: Promise<CachedResponse | Response>,
-): void {
-	loading
-		.then((loaded) =>
-			loaded instanceof Response ? loaded.body?.cancel() : undefined,
-		)
-		.catch((error) => console.error(error));
-}

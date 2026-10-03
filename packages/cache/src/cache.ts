@@ -1,10 +1,10 @@
 import { alxia, type BaseContext } from '@alxia/core';
 import { requestControls } from './control';
-import { type Loaded, singleFlight } from './flight';
+import { type Loaded, refreshBehind, singleFlight } from './flight';
 import { storeGuard } from './guard';
 import { keepable, toCached } from './keep';
 import { defaultKey, pathTag } from './keys';
-import { bypasses, freshness, refreshBehind } from './lookup';
+import { bypasses, freshness } from './lookup';
 import { respond } from './respond';
 import { type CacheStore, MemoryCacheStore } from './store';
 
@@ -78,6 +78,7 @@ export function cache(options: CacheOptions) {
 	const vary = (options.vary ?? []).map((name) => name.toLowerCase());
 	const statuses = new Set(options.statuses ?? [200]);
 	const debug = options.debugHeaders ?? true;
+	const honorNoCache = options.honorClientNoCache ?? false;
 	const keyOf =
 		options.key ??
 		((ctx: BaseContext) =>
@@ -124,9 +125,7 @@ export function cache(options: CacheOptions) {
 		})
 		.wrap(async (ctx, next) => {
 			const { request } = ctx;
-			const key = bypasses(request, options.honorClientNoCache ?? false)
-				? undefined
-				: keyOf(ctx);
+			const key = bypasses(request, honorNoCache) ? undefined : keyOf(ctx);
 			if (key === undefined) return next();
 
 			const found = await attempt(() => store.get(key), undefined);
