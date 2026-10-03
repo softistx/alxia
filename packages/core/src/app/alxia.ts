@@ -1,22 +1,6 @@
-import {
-	HttpError,
-	type InternalErrorBody,
-	ResponseValidationError,
-	type RoutingErrorBody,
-	type ValidationErrorBody,
-	type ValidationIssue,
-} from '../errors/errors';
-import { vary } from '../reply/headers';
-import { type AnyReply, createReply, Reply, toResponse } from '../reply/reply';
-import {
-	type BodyParser,
-	readBody,
-	readCookies,
-	readHeaders,
-	readQuery,
-} from '../request/read';
+import type { AnyReply } from '../reply/reply';
+import type { BodyParser } from '../request/read';
 import { Router } from '../router/router';
-import { check, type StandardSchemaV1 } from '../schema/standard-schema';
 import {
 	type FileOptions,
 	type FileSource,
@@ -26,9 +10,7 @@ import {
 	staticHandler,
 } from '../static/serve';
 import type { JoinPath, RoutePath } from '../types/path';
-import type { RedirectStatus } from '../types/status';
 import type {
-	Socket,
 	SocketContext,
 	SocketEntryOf,
 	SocketHandlers,
@@ -36,7 +18,23 @@ import type {
 	SocketSchema,
 	SocketSend,
 } from '../ws/types';
+import type {
+	AroundHook,
+	ChainHook,
+	DeriveHook,
+	ErrorHook,
+	RequestHook,
+	ResponseHook,
+	RouteDefinition,
+	Runtime,
+	SocketDefinition,
+	StartHook,
+	StopHook,
+	WrapHook,
+} from './definition';
+import { serve } from './pipeline';
 import type { OperationMethod, RouteOperation } from './route-operation';
+import { type SocketData, websocketHandler } from './socket';
 import type {
 	BaseContext,
 	Context,
@@ -46,88 +44,11 @@ import type {
 	Method,
 	Outcome,
 	OutcomeOf,
-	RedirectFunction,
-	RequestContext,
-	ResponseSettings,
 	RouteEntryOf,
 	RouteRecord,
 	RouteSchema,
 	ValidSchema,
 } from './types';
-
-/** A hook that runs before validation, and may add to the context or end the request. */
-type DeriveHook = (ctx: Record<string, unknown>) => unknown;
-/** A hook around the rest of a route: the hooks after it, validation, the handler. */
-type WrapHook = (
-	ctx: Record<string, unknown>,
-	next: () => Promise<Response>,
-) => MaybePromise<Response | AnyReply>;
-/** A route hook, in the order declared. */
-type ChainHook =
-	| { readonly kind: 'derive'; readonly run: DeriveHook }
-	| { readonly kind: 'wrap'; readonly run: WrapHook };
-/** A hook that turns an error into a reply, or lets the next one try. */
-type ErrorHook = (
-	error: unknown,
-	ctx: BaseContext,
-) => MaybePromise<AnyReply | undefined | void>;
-
-/** Runs on every request, before routing; a `Response` it returns is sent as it is. */
-export type RequestHook = (
-	ctx: RequestContext,
-) => MaybePromise<Response | undefined | void>;
-/** Runs on every response, routed or not; a `Response` it returns replaces it. */
-export type ResponseHook = (
-	response: Response,
-	ctx: RequestContext,
-) => MaybePromise<Response | undefined | void>;
-/**
- * Runs around every request: `next()` runs the rest — the `onRequest`
- * hooks, the route, the `onResponse` hooks — and resolves to the response.
- * What the hook awaits around it runs in its async context: a span, a
- * transaction, a timer.
- */
-export type AroundHook = (
-	ctx: RequestContext,
-	next: () => Promise<Response>,
-) => Promise<Response>;
-export type StartHook = (server: Bun.Server<unknown>) => MaybePromise<void>;
-export type StopHook = () => MaybePromise<void>;
-
-/** A route as the app runs it: its schema, its handler, and the hooks declared before it. */
-export interface RouteDefinition {
-	readonly method: Method;
-	readonly path: string;
-	readonly schema: RouteSchema;
-	readonly handler: (ctx: never) => MaybePromise<AnyReply>;
-	readonly derive: readonly ChainHook[];
-	readonly onError: readonly ErrorHook[];
-}
-
-/** A socket route as the app runs it. */
-export interface SocketDefinition {
-	readonly path: string;
-	readonly schema: SocketSchema;
-	readonly handlers: SocketHandlers<never, never, never>;
-	readonly derive: readonly ChainHook[];
-	readonly onError: readonly ErrorHook[];
-}
-
-type Definition =
-	| ({ readonly kind: 'http' } & RouteDefinition)
-	| ({ readonly kind: 'ws' } & SocketDefinition);
-
-/** What is global to an app, wherever it is declared: a group's or a plugin's included. */
-interface Globals {
-	readonly around: AroundHook[];
-	readonly onRequest: RequestHook[];
-	readonly onResponse: ResponseHook[];
-	readonly onStart: StartHook[];
-	readonly onStop: StopHook[];
-	readonly parsers: BodyParser[];
-	/** Bun's HTML bundles, by their full path: served by `Bun.serve` itself. */
-	readonly pages: Map<string, Bun.HTMLBundle>;
-}
 
 /** The route a static directory is served at: its path, then a wildcard. */
 type StaticPath<Path extends string> = Path extends '/' ? '/*' : `${Path}/*`;
@@ -222,22 +143,6 @@ export type AnyAlxia = Alxia<any, any, any, any>;
  */
 export type Plugin = <App extends AnyAlxia>(app: App) => App;
 
-const redirect: RedirectFunction = (location, status) =>
-	new Reply(status ?? (302 as RedirectStatus), undefined, {
-		headers: { location: String(location) },
-	}) as never;
-
-const internal: InternalErrorBody = { error: 'internal' };
-
-/** What the pipeline returns once a socket is open: Bun wants no response then. */
-const UPGRADED = Symbol('upgraded');
-
-interface SocketData {
-	readonly definition: SocketDefinition;
-	readonly ctx: Record<string, unknown>;
-	socket?: Socket<unknown, unknown>;
-}
-
 /**
  * An app: its routes, and the hooks they run.
  *
@@ -268,30 +173,32 @@ export class Alxia<
 	declare readonly '~context': Ctx;
 
 	readonly #prefix: string;
-	readonly #validateResponses: boolean;
-	readonly #ip: NonNullable<AlxiaOptions<string>['ip']>;
-	readonly #router = new Router<Definition>();
+	/** The routes, the global hooks and the options a request is served with. */
+	#runtime: Runtime;
 	readonly #routes: RouteDefinition[] = [];
 	readonly #sockets: SocketDefinition[] = [];
 	#derive: ChainHook[] = [];
 	#onError: ErrorHook[] = [];
-	#globals: Globals = {
-		around: [],
-		onRequest: [],
-		onResponse: [],
-		onStart: [],
-		onStop: [],
-		parsers: [],
-		pages: new Map(),
-	};
 	#server: Bun.Server<unknown> | undefined;
 
 	constructor(options: AlxiaOptions<Prefix> = {}) {
 		this.#prefix = options.prefix ?? '';
-		this.#validateResponses = options.validateResponses ?? true;
-		this.#ip =
-			options.ip ??
-			((request, server) => server?.requestIP(request)?.address ?? undefined);
+		this.#runtime = {
+			router: new Router(),
+			globals: {
+				around: [],
+				onRequest: [],
+				onResponse: [],
+				onStart: [],
+				onStop: [],
+				parsers: [],
+				pages: new Map(),
+			},
+			validateResponses: options.validateResponses ?? true,
+			ip:
+				options.ip ??
+				((request, server) => server?.requestIP(request)?.address ?? undefined),
+		};
 		if (this.#prefix !== '' && !/^\/.*[^/]$/.test(this.#prefix)) {
 			throw new TypeError(
 				`The prefix "${this.#prefix}" must start with "/" and not end with one`,
@@ -375,18 +282,6 @@ export class Alxia<
 		Shortcuts
 	>;
 
-	/**
-	 * A WebSocket route. The upgrade request runs the hooks before it and is
-	 * validated as a route's; each message is then checked by `message`, and
-	 * each one sent by `send`. Open through `listen`: a socket needs a server.
-	 *
-	 * ```ts
-	 * app.ws('/rooms/:room', { message: Chat, send: Chat }, {
-	 *   open: (socket) => socket.subscribe(socket.data.params.room),
-	 *   message: (socket, chat) => socket.publish(socket.data.params.room, chat),
-	 * });
-	 * ```
-	 */
 	/**
 	 * A directory of files — or any `FileSource` — served under `path`: a
 	 * `GET` route at `path/*`, typed and documented like any other, every
@@ -473,14 +368,26 @@ export class Alxia<
 
 	#page(path: string, bundle: Bun.HTMLBundle): void {
 		if (
-			this.#globals.pages.has(path) ||
-			this.#router.methodsAt(path) !== undefined
+			this.#runtime.globals.pages.has(path) ||
+			this.#runtime.router.methodsAt(path) !== undefined
 		) {
 			throw new TypeError(`page(): ${path} is already served`);
 		}
-		this.#globals.pages.set(path, bundle);
+		this.#runtime.globals.pages.set(path, bundle);
 	}
 
+	/**
+	 * A WebSocket route. The upgrade request runs the hooks before it and is
+	 * validated as a route's; each message is then checked by `message`, and
+	 * each one sent by `send`. Open through `listen`: a socket needs a server.
+	 *
+	 * ```ts
+	 * app.ws('/rooms/:room', { message: Chat, send: Chat }, {
+	 *   open: (socket) => socket.subscribe(socket.data.params.room),
+	 *   message: (socket, chat) => socket.publish(socket.data.params.room, chat),
+	 * });
+	 * ```
+	 */
 	ws<const Path extends RoutePath, Schema extends SocketSchema = Empty>(
 		path: Path,
 		schema: Schema,
@@ -502,8 +409,7 @@ export class Alxia<
 			derive: [...this.#derive],
 			onError: [...this.#onError],
 		};
-		this.#router.add('WS', definition.path, { kind: 'ws', ...definition });
-		this.#sockets.push(definition);
+		this.#mount(definition);
 		return this as never;
 	}
 
@@ -587,7 +493,7 @@ export class Alxia<
 	 * redirect to HTTPS. What a client must read belongs in `derive`.
 	 */
 	onRequest(hook: RequestHook): this {
-		this.#globals.onRequest.push(hook);
+		this.#runtime.globals.onRequest.push(hook);
 		return this;
 	}
 
@@ -597,7 +503,7 @@ export class Alxia<
 	 * keep its status, which the client's types promise.
 	 */
 	onResponse(hook: ResponseHook): this {
-		this.#globals.onResponse.push(hook);
+		this.#runtime.globals.onResponse.push(hook);
 		return this;
 	}
 
@@ -617,19 +523,19 @@ export class Alxia<
 	 * ```
 	 */
 	around(hook: AroundHook): this {
-		this.#globals.around.push(hook);
+		this.#runtime.globals.around.push(hook);
 		return this;
 	}
 
 	/** Runs once `listen` has started the server. */
 	onStart(hook: StartHook): this {
-		this.#globals.onStart.push(hook);
+		this.#runtime.globals.onStart.push(hook);
 		return this;
 	}
 
 	/** Runs when `stop` stops the server: close a pool, flush a log. */
 	onStop(hook: StopHook): this {
-		this.#globals.onStop.push(hook);
+		this.#runtime.globals.onStop.push(hook);
 		return this;
 	}
 
@@ -639,7 +545,7 @@ export class Alxia<
 	 * text parsers.
 	 */
 	parser(type: string | RegExp, parse: BodyParser['parse']): this {
-		this.#globals.parsers.push({ type, parse });
+		this.#runtime.globals.parsers.push({ type, parse });
 		return this;
 	}
 
@@ -682,17 +588,14 @@ export class Alxia<
 		if (build === undefined) throw new TypeError('group(): build is missing');
 		const child = new Alxia({
 			prefix,
-			validateResponses: this.#validateResponses,
+			validateResponses: this.#runtime.validateResponses,
 		});
 		child.#derive = [...this.#derive];
 		child.#onError = [...this.#onError];
-		child.#globals = this.#globals;
+		child.#runtime = { ...child.#runtime, globals: this.#runtime.globals };
 		const built = build(child);
 		for (const route of built.routes) this.#register(route);
-		for (const socket of built.sockets) {
-			this.#router.add('WS', socket.path, { kind: 'ws', ...socket });
-			this.#sockets.push(socket);
-		}
+		for (const socket of built.sockets) this.#mount(socket);
 		return this;
 	}
 
@@ -730,25 +633,23 @@ export class Alxia<
 			});
 		}
 		for (const socket of plugin.sockets) {
-			const mounted: SocketDefinition = {
+			this.#mount({
 				...socket,
 				path: this.#join(socket.path),
 				derive: [...this.#derive, ...socket.derive],
 				onError: [...socket.onError, ...this.#onError],
-			};
-			this.#router.add('WS', mounted.path, { kind: 'ws', ...mounted });
-			this.#sockets.push(mounted);
+			});
 		}
 		this.#derive = [...this.#derive, ...plugin.#derive];
 		this.#onError = [...plugin.#onError, ...this.#onError];
-		if (plugin.#globals !== this.#globals) {
-			const globals = plugin.#globals;
-			this.#globals.around.push(...globals.around);
-			this.#globals.onRequest.push(...globals.onRequest);
-			this.#globals.onResponse.push(...globals.onResponse);
-			this.#globals.onStart.push(...globals.onStart);
-			this.#globals.onStop.push(...globals.onStop);
-			this.#globals.parsers.push(...globals.parsers);
+		if (plugin.#runtime.globals !== this.#runtime.globals) {
+			const globals = plugin.#runtime.globals;
+			this.#runtime.globals.around.push(...globals.around);
+			this.#runtime.globals.onRequest.push(...globals.onRequest);
+			this.#runtime.globals.onResponse.push(...globals.onResponse);
+			this.#runtime.globals.onStart.push(...globals.onStart);
+			this.#runtime.globals.onStop.push(...globals.onStop);
+			this.#runtime.globals.parsers.push(...globals.parsers);
 			for (const [path, bundle] of globals.pages) {
 				this.#page(this.#join(path), bundle);
 			}
@@ -779,7 +680,7 @@ export class Alxia<
 	readonly fetch = (
 		request: Request,
 		server?: Bun.Server<unknown>,
-	): Promise<Response> => this.#serve(request, server, undefined);
+	): Promise<Response> => serve(this.#runtime, request, server, undefined);
 
 	/** A request to the app, in process: `app.request('/users/1')`. */
 	request(path: string, init?: RequestInit): Promise<Response> {
@@ -797,19 +698,22 @@ export class Alxia<
 			| Bun.HTMLBundle
 			| ((request: Request, server: Bun.Server<unknown>) => Promise<Response>)
 		> = {};
-		for (const [path] of this.#router.paths()) {
-			routes[path] = (request, server) => this.#serve(request, server, path);
+		for (const [path] of this.#runtime.router.paths()) {
+			routes[path] = (request, server) =>
+				serve(this.#runtime, request, server, path);
 		}
-		for (const [path, bundle] of this.#globals.pages) routes[path] = bundle;
+		for (const [path, bundle] of this.#runtime.globals.pages) {
+			routes[path] = bundle;
+		}
 		const server = Bun.serve({
 			...settings,
 			routes,
 			fetch: (request: Request, server: Bun.Server<unknown>) =>
-				this.#serve(request, server, undefined),
-			websocket: this.#websocket(),
+				serve(this.#runtime, request, server, undefined),
+			websocket: websocketHandler(this.#runtime.validateResponses),
 		} as Bun.Serve.Options<SocketData>) as Bun.Server<unknown>;
 		this.#server = server;
-		for (const hook of this.#globals.onStart) {
+		for (const hook of this.#runtime.globals.onStart) {
 			Promise.resolve()
 				.then(() => hook(server))
 				.catch((error) => console.error(error));
@@ -822,7 +726,7 @@ export class Alxia<
 		const server = this.#server;
 		this.#server = undefined;
 		if (server !== undefined) await server.stop(closeActiveConnections);
-		for (const hook of this.#globals.onStop) await hook();
+		for (const hook of this.#runtime.globals.onStop) await hook();
 	}
 
 	#join(path: string): string {
@@ -856,534 +760,17 @@ export class Alxia<
 	}
 
 	#register(route: RouteDefinition): void {
-		this.#router.add(route.method, route.path, { kind: 'http', ...route });
+		this.#runtime.router.add(route.method, route.path, {
+			kind: 'http',
+			...route,
+		});
 		this.#routes.push(route);
 	}
 
-	/** The whole of a request: global hooks around the route's own pipeline. */
-	async #serve(
-		request: Request,
-		server: Bun.Server<unknown> | undefined,
-		path: string | undefined,
-	): Promise<Response> {
-		const url = new URL(request.url);
-		const ctx: RequestContext = {
-			request,
-			url,
-			server,
-			ip: this.#ip(request, server),
-			route: undefined,
-			error: undefined,
-		};
-		const around = this.#globals.around;
-		const upgrade =
-			request.headers.get('upgrade')?.toLowerCase() === 'websocket';
-		if (around.length === 0 || upgrade) return this.#pipeline(ctx, path);
-		const run = (index: number): Promise<Response> => {
-			const hook = around[index];
-			if (hook === undefined) return this.#pipeline(ctx, path);
-			return hook(ctx, () => run(index + 1));
-		};
-		try {
-			return await run(0);
-		} catch (error) {
-			console.error(error);
-			return toResponse(500, internal, new Headers());
-		}
+	#mount(socket: SocketDefinition): void {
+		this.#runtime.router.add('WS', socket.path, { kind: 'ws', ...socket });
+		this.#sockets.push(socket);
 	}
-
-	/** The `onRequest` hooks, the route, then the `onResponse` hooks. */
-	async #pipeline(
-		ctx: RequestContext,
-		path: string | undefined,
-	): Promise<Response> {
-		let response: Response | typeof UPGRADED | undefined;
-		try {
-			for (const hook of this.#globals.onRequest) {
-				let early = hook(ctx);
-				if (early instanceof Promise) early = await early;
-				if (early instanceof Response) {
-					response = early;
-					break;
-				}
-			}
-			response ??= await this.#route(ctx, path);
-		} catch (error) {
-			console.error(error);
-			response = toResponse(500, internal, new Headers());
-		}
-		if (response === UPGRADED) return undefined as never;
-		for (const hook of this.#globals.onResponse) {
-			try {
-				let replaced = hook(response, ctx);
-				if (replaced instanceof Promise) replaced = await replaced;
-				if (replaced instanceof Response) response = replaced;
-			} catch (error) {
-				console.error(error);
-			}
-		}
-		return response;
-	}
-
-	async #route(
-		ctx: RequestContext,
-		path: string | undefined,
-	): Promise<Response | typeof UPGRADED> {
-		const { request, url } = ctx;
-		const upgrade =
-			request.headers.get('upgrade')?.toLowerCase() === 'websocket';
-		const find = (
-			method: string,
-		):
-			| { readonly value: Definition; readonly params: Record<string, string> }
-			| { readonly allowed: readonly string[] }
-			| undefined => {
-			if (path === undefined) return this.#router.match(method, url.pathname);
-			const methods = this.#router.methodsAt(path);
-			if (methods === undefined) return undefined;
-			const value = methods.get(method);
-			if (value !== undefined) {
-				return { value, params: this.#router.paramsAt(path, url.pathname) };
-			}
-			return { allowed: [...methods.keys()] };
-		};
-
-		if (upgrade) {
-			const socket = find('WS');
-			if (
-				socket !== undefined &&
-				'value' in socket &&
-				socket.value.kind === 'ws'
-			) {
-				(ctx as { route: string | undefined }).route = socket.value.path;
-				return this.#upgrade(socket.value, ctx, socket.params);
-			}
-		}
-		let match = find(request.method);
-		let head = false;
-		if (
-			request.method === 'HEAD' &&
-			match !== undefined &&
-			'allowed' in match
-		) {
-			const get = find('GET');
-			if (get !== undefined && 'value' in get) {
-				match = get;
-				head = true;
-			}
-		}
-		if (match === undefined) return routingError(404, 'not_found');
-		if ('allowed' in match) {
-			const allowed = match.allowed.filter((method) => method !== 'WS');
-			if (allowed.length === 0) return routingError(426, 'upgrade_required');
-			return routingError(405, 'method_not_allowed', allowed);
-		}
-		const definition = match.value;
-		(ctx as { route: string | undefined }).route = definition.path;
-		if (definition.kind === 'ws') return routingError(426, 'upgrade_required');
-		const response = await this.#handle(definition, ctx, match.params);
-		return head
-			? new Response(null, {
-					status: response.status,
-					headers: response.headers,
-				})
-			: response;
-	}
-
-	/**
-	 * Runs the hooks of a route in order — a `derive` adds to the context or
-	 * ends the request, a `wrap` runs the rest inside it — then validates the
-	 * request, then `last`. A socket's upgrade skips the `wrap` hooks: it has
-	 * no response to wrap.
-	 */
-	async #chain<Last>(
-		definition: RouteDefinition | SocketDefinition,
-		request: RequestContext,
-		rawParams: Record<string, string>,
-		set: ResponseSettings,
-		ctx: Record<string, unknown> & BaseContext,
-		last: () => Promise<Response | Last>,
-	): Promise<Response | Last> {
-		const hooks = definition.derive;
-		const socket = !('method' in definition);
-		const signal = request.request.signal;
-		const step = async (index: number): Promise<Response | Last> => {
-			const hook = hooks[index];
-			if (hook === undefined) {
-				const refused = await this.#validate(
-					definition,
-					request,
-					rawParams,
-					set,
-					ctx,
-				);
-				return refused ?? last();
-			}
-			if (hook.kind === 'wrap') {
-				if (socket) return step(index + 1);
-				let wrapped = hook.run(ctx, () => step(index + 1) as Promise<Response>);
-				if (wrapped instanceof Promise) wrapped = await wrapped;
-				return wrapped instanceof Reply ? send(wrapped, set, signal) : wrapped;
-			}
-			let added = hook.run(ctx);
-			if (added instanceof Promise) added = await added;
-			if (added instanceof Reply) return send(added, set, signal);
-			if (added !== null && typeof added === 'object') {
-				Object.assign(ctx, added);
-			}
-			return step(index + 1);
-		};
-		return step(0);
-	}
-
-	/** The request checked by the route's schemas: the 400 that refuses it, or nothing. */
-	async #validate(
-		definition: RouteDefinition | SocketDefinition,
-		request: RequestContext,
-		rawParams: Record<string, string>,
-		set: ResponseSettings,
-		ctx: Record<string, unknown> & BaseContext,
-	): Promise<Response | undefined> {
-		const { schema } = definition;
-		const issues: ValidationIssue[] = [];
-		const parts = [
-			['params', schema.params, () => rawParams],
-			['query', schema.query, () => readQuery(request.url)],
-			['headers', schema.headers, () => readHeaders(request.request.headers)],
-			['cookies', schema.cookies, () => readCookies(request.request.headers)],
-		] as const;
-		for (const [target, partSchema, read] of parts) {
-			const raw = read();
-			if (partSchema === undefined) {
-				ctx[target] = raw;
-				continue;
-			}
-			const checked = await check(partSchema, raw, target);
-			if (checked.ok) ctx[target] = checked.value;
-			else issues.push(...checked.issues);
-		}
-		ctx['body'] = undefined;
-		const bodySchema = 'body' in schema ? schema.body : undefined;
-		if (bodySchema !== undefined) {
-			const body = await readBody(request.request, this.#globals.parsers);
-			if (!body.ok) issues.push(body.issue);
-			else {
-				const checked = await check(bodySchema, body.value, 'body');
-				if (checked.ok) ctx['body'] = checked.value;
-				else issues.push(...checked.issues);
-			}
-		}
-		if (issues.length > 0) {
-			const body: ValidationErrorBody = { error: 'validation', issues };
-			return send(new Reply(400, body), set);
-		}
-		return undefined;
-	}
-
-	#context(
-		definition: RouteDefinition | SocketDefinition,
-		request: RequestContext,
-		pathParams: Record<string, string>,
-	): { ctx: Record<string, unknown> & BaseContext; set: ResponseSettings } {
-		let cookies: Bun.CookieMap | undefined;
-		const set: ResponseSettings & { readonly touched: () => boolean } = {
-			headers: new Headers(),
-			get cookies() {
-				cookies ??= new Bun.CookieMap();
-				return cookies;
-			},
-			touched: () => cookies !== undefined,
-		};
-		const ctx: Record<string, unknown> & BaseContext = {
-			...request,
-			route: definition.path,
-			pathParams,
-			set,
-			reply: createReply,
-			redirect,
-		};
-		return { ctx, set };
-	}
-
-	async #handle(
-		route: RouteDefinition,
-		request: RequestContext,
-		rawParams: Record<string, string>,
-	): Promise<Response> {
-		const { ctx, set } = this.#context(route, request, rawParams);
-		try {
-			return await this.#chain(
-				route,
-				request,
-				rawParams,
-				set,
-				ctx,
-				async () => {
-					let reply = route.handler(ctx as never);
-					if (reply instanceof Promise) reply = await reply;
-					if (!(reply instanceof Reply)) {
-						throw new TypeError(
-							`${route.method} ${route.path}: the handler returned no reply. ` +
-								'Return ctx.reply(status, body).',
-						);
-					}
-					return this.#send(route, reply, set, request.request.signal);
-				},
-			);
-		} catch (error) {
-			(request as { error: unknown }).error = error;
-			return this.#fail(route, error, ctx);
-		}
-	}
-
-	async #fail(
-		definition: RouteDefinition | SocketDefinition,
-		error: unknown,
-		ctx: BaseContext,
-	): Promise<Response> {
-		for (const hook of definition.onError) {
-			let handled = hook(error, ctx);
-			if (handled instanceof Promise) handled = await handled;
-			if (handled instanceof Reply) return send(handled, ctx.set);
-		}
-		if (error instanceof HttpError) {
-			return send(new Reply(error.status, error.body), ctx.set);
-		}
-		console.error(error);
-		return toResponse(500, internal, new Headers());
-	}
-
-	async #send(
-		route: RouteDefinition,
-		reply: AnyReply,
-		set: ResponseSettings,
-		signal: AbortSignal,
-	): Promise<Response> {
-		const responses = route.schema.response;
-		if (responses === undefined || isRedirect(reply)) {
-			return send(reply, set, signal);
-		}
-		const schema = responses[reply.status as keyof typeof responses];
-		if (schema === undefined) {
-			throw ResponseValidationError.undeclared(
-				route.method,
-				route.path,
-				reply.status,
-			);
-		}
-		if (!this.#validateResponses) return send(reply, set, signal);
-		const checked = await check(schema, reply.body, 'body');
-		if (!checked.ok) {
-			throw new ResponseValidationError(
-				route.method,
-				route.path,
-				reply.status,
-				checked.issues,
-			);
-		}
-		return send(
-			new Reply(reply.status, checked.value, { headers: reply.headers ?? {} }),
-			set,
-			signal,
-		);
-	}
-
-	async #upgrade(
-		definition: SocketDefinition,
-		request: RequestContext,
-		rawParams: Record<string, string>,
-	): Promise<Response | typeof UPGRADED> {
-		const { ctx, set } = this.#context(definition, request, rawParams);
-		const server = request.server;
-		try {
-			return await this.#chain<typeof UPGRADED>(
-				definition,
-				request,
-				rawParams,
-				set,
-				ctx,
-				async () => {
-					if (server === undefined) {
-						return routingError(426, 'upgrade_required');
-					}
-					const headers = new Headers(set.headers);
-					if ((set as { touched?: () => boolean }).touched?.()) {
-						for (const cookie of set.cookies.toSetCookieHeaders()) {
-							headers.append('set-cookie', cookie);
-						}
-					}
-					const data: SocketData = { definition, ctx };
-					const upgraded = server.upgrade(request.request, { headers, data });
-					return upgraded ? UPGRADED : routingError(426, 'upgrade_required');
-				},
-			);
-		} catch (error) {
-			return this.#fail(definition, error, ctx);
-		}
-	}
-
-	#websocket(): Bun.WebSocketHandler<SocketData> {
-		const validate = this.#validateResponses;
-		const socketOf = (ws: Bun.ServerWebSocket<SocketData>) => {
-			ws.data.socket ??= createSocket(ws, validate);
-			return ws.data.socket;
-		};
-		const guard = async (
-			ws: Bun.ServerWebSocket<SocketData>,
-			run: () => MaybePromise<void>,
-		) => {
-			try {
-				await run();
-			} catch (error) {
-				console.error(error);
-				ws.close(1011, 'internal error');
-			}
-		};
-		return {
-			open: (ws) =>
-				guard(ws, () =>
-					ws.data.definition.handlers.open?.(socketOf(ws) as never),
-				),
-			message: (ws, raw) =>
-				guard(ws, async () => {
-					const { definition } = ws.data;
-					const socket = socketOf(ws);
-					const schema = definition.schema.message;
-					let message: unknown =
-						typeof raw === 'string' ? raw : new Uint8Array(raw);
-					if (schema !== undefined) {
-						const parsed = parseMessage(message);
-						if (!parsed.ok) {
-							ws.send(JSON.stringify(parsed.error));
-							return;
-						}
-						const checked = await check(schema, parsed.value, 'message');
-						if (!checked.ok) {
-							const error: ValidationErrorBody = {
-								error: 'validation',
-								issues: checked.issues,
-							};
-							ws.send(JSON.stringify(error));
-							return;
-						}
-						message = checked.value;
-					}
-					await definition.handlers.message(socket as never, message as never);
-				}),
-			close: (ws, code, reason) =>
-				guard(ws, () =>
-					ws.data.definition.handlers.close?.(
-						socketOf(ws) as never,
-						code,
-						reason,
-					),
-				),
-			drain: (ws) =>
-				guard(ws, () =>
-					ws.data.definition.handlers.drain?.(socketOf(ws) as never),
-				),
-		};
-	}
-}
-
-function parseMessage(
-	message: unknown,
-):
-	| { readonly ok: true; readonly value: unknown }
-	| { readonly ok: false; readonly error: ValidationErrorBody } {
-	if (typeof message !== 'string') return { ok: true, value: message };
-	try {
-		return { ok: true, value: JSON.parse(message) };
-	} catch {
-		return {
-			ok: false,
-			error: {
-				error: 'validation',
-				issues: [
-					{
-						target: 'message',
-						path: [],
-						code: 'invalid_json',
-						message: 'The message is not valid JSON',
-					},
-				],
-			},
-		};
-	}
-}
-
-function createSocket(
-	ws: Bun.ServerWebSocket<SocketData>,
-	validate: boolean,
-): Socket<unknown, unknown> {
-	const schema: StandardSchemaV1 | undefined = ws.data.definition.schema.send;
-	const encode = async (message: unknown): Promise<string> => {
-		if (schema === undefined || !validate) return JSON.stringify(message);
-		const checked = await check(schema, message, 'body');
-		if (!checked.ok) {
-			throw new ResponseValidationError(
-				'WS',
-				ws.data.definition.path,
-				101,
-				checked.issues,
-			);
-		}
-		return JSON.stringify(checked.value);
-	};
-	return {
-		data: ws.data.ctx,
-		async send(message) {
-			ws.send(await encode(message));
-		},
-		async publish(topic, message) {
-			ws.publish(topic, await encode(message));
-		},
-		subscribe: (topic) => ws.subscribe(topic),
-		unsubscribe: (topic) => ws.unsubscribe(topic),
-		isSubscribed: (topic) => ws.isSubscribed(topic),
-		close: (code, reason) => ws.close(code, reason),
-		raw: ws as Bun.ServerWebSocket<unknown>,
-	};
-}
-
-function isRedirect(reply: AnyReply): boolean {
-	return reply.status >= 300 && reply.status < 400 && reply.body === undefined;
-}
-
-function send(
-	reply: AnyReply,
-	set: ResponseSettings,
-	signal?: AbortSignal,
-): Response {
-	const headers = new Headers(set.headers);
-	if (reply.headers !== undefined) {
-		for (const [key, value] of new Headers(reply.headers)) {
-			// A reply's Vary adds to the plugins': each said what it read.
-			if (key === 'vary') {
-				for (const name of value.split(',')) vary(headers, name);
-			} else if (key === 'set-cookie') {
-				// Each cookie is its own header: setting would keep the last.
-				headers.append(key, value);
-			} else headers.set(key, value);
-		}
-	}
-	if ((set as { touched?: () => boolean }).touched?.()) {
-		for (const cookie of set.cookies.toSetCookieHeaders()) {
-			headers.append('set-cookie', cookie);
-		}
-	}
-	return toResponse(reply.status, reply.body, headers, signal);
-}
-
-function routingError(
-	status: 404 | 405 | 426,
-	error: RoutingErrorBody['error'],
-	allowed?: readonly string[],
-): Response {
-	const headers = new Headers();
-	if (allowed !== undefined) headers.set('allow', allowed.join(', '));
-	const body: RoutingErrorBody = { error };
-	return toResponse(status, body, headers);
 }
 
 /** A new app. */
