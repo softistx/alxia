@@ -1,7 +1,7 @@
 /**
- * The few lines between Vite's dev server, which speaks `node:http`, and an
- * alxia app, which speaks `Request` and `Response`: no dependency, Bun's
- * own `node:http` and `node:stream` underneath.
+ * The few lines between Vite's dev and preview servers, which speak
+ * `node:http`, and an alxia app, which speaks `Request` and `Response`: no
+ * dependency, Bun's own `node:http` and `node:stream` underneath.
  */
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { Readable } from 'node:stream';

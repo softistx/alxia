@@ -2,7 +2,8 @@
 
 `@alxia/react-router` serves a React Router **framework-mode** app with
 server rendering from an alxia app, under Bun. This page walks an app
-author through it: the setup, what happens in dev and in a build,
+author through it: the setup, what happens in dev, in a build and under
+`vite preview`,
 customising the server, typing the loaders, the app's own context keys,
 the escape hatches, the client's files, OpenAPI, testing and deploying.
 
@@ -144,10 +145,120 @@ React Router's `serverBundles` split the server build in several, and
 alxia serves one: the plugin refuses them. With `ssr: false`, a
 single-page app, the plugin does nothing.
 
+### Under `vite preview`
+
+After a build, Vite's preview server serves the built server:
+
+```sh
+bun run build
+bunx --bun vite preview
+```
+
+`--bun` runs Vite under Bun even where Node is installed, since Vite's bin
+asks for Node: the built server runs inside Vite's process, and it needs
+Bun's APIs. With no Node installed, a `"preview": "vite preview"` script
+run with `bun run preview` works too, as the template's other scripts do.
+
+The plugin loads `build/server/index.js` on the first request and hands
+every request to its default export, the alxia app, before Vite's own
+files. So the preview answers as `bun run start` does: the pages and their
+data, `/api`, `build/client` with the cache headers of
+[the client's files](#the-clients-files), and every hook of `beforeAll`
+and `configure`. Requests, their bodies and every `Set-Cookie` pass
+through whole, and pages stream.
+
+What differs from `bun run start`:
+
+- **Vite listens**, on `preview.port` (4173), `preview.host` and
+  `preview.https`. `listen`, `onListen`, `PORT` and `HOST` are not read.
+- **Requests arrive through `app.fetch`**, as under `react-router dev`:
+  alxia's `ws` routes, `page()` and `ctx.server` are absent.
+- **Vite's preview options that come after the plugin never run**:
+  `preview.proxy`, `preview.headers` and Vite's file serving.
+  `preview.cors` and `preview.allowedHosts` still apply.
+- **The build is loaded once**: after `bun run build` again, restart the
+  preview.
+
+React Router prerenders the `prerender` paths of `react-router.config.ts`
+through the same preview server, during `react-router build`. A
+prerendered page is therefore rendered by the built server too: its loader
+reads `alxiaOf(context)` and `getLoadContext`'s keys, and `beforeAll`'s
+and `configure`'s hooks run around it.
+
 ## Customising the server
 
-Write `app/server.ts`, with `createServer()` as its default export. The
-example uses `@alxia/logger` and `@alxia/compress`
+Write `app/server.ts`, with `createServer()` as its default export, or let
+the package's bin write it for you.
+
+### Revealing the default server
+
+From the app's root, once `@alxia/react-router` is installed:
+
+```sh
+bunx alxia-react-router reveal
+```
+
+```text
+alxia-react-router: wrote app/server.ts, the server alxia() runs by default.
+Next: uncomment configure in app/server.ts to add the app's hooks and /api; bun run dev picks it up.
+```
+
+The file is the server the plugin runs without one, `createServer()`, so
+the app answers as before. It holds `beforeAll`, `configure` and
+`getLoadContext`, commented, each of which compiles once uncommented
+(`getLoadContext`'s key is yours to make, below), and the `Register`
+declaration that types the loaders:
+
+```ts
+// app/server.ts, as reveal writes it, less its comments
+import { createServer } from '@alxia/react-router';
+// import { userAgentContext } from './context';
+
+const server = createServer({
+	// beforeAll: (app) => app,
+	// configure: (app) => app.get('/api/health', ({ reply }) => reply.ok({ ok: true })),
+	// getLoadContext: (ctx, context) => {
+	// 	context.set(userAgentContext, ctx.request.headers.get('user-agent'));
+	// },
+});
+
+export default server;
+
+declare module '@alxia/react-router' {
+	interface Register {
+		server: typeof server;
+	}
+}
+```
+
+`getLoadContext`'s example sets a key of the app's own, imported from
+`app/context.ts`. Make it there before uncommenting both lines:
+
+```ts
+// app/context.ts
+import { createContext } from 'react-router';
+
+export const userAgentContext = createContext<string | null>(null);
+```
+
+- **Where it writes**: the `entry` that `alxia({ entry: '…' })` names in
+  `vite.config.ts`, or `server.ts` in React Router's `appDirectory`
+  (`app/` unless `react-router.config.ts` names another). It reads both as
+  string literals, past comments. A computed one is refused, since
+  reveal would write a file the plugin does not load: give it as a
+  literal.
+- **It never overwrites**: a file already there is left as it is, and the
+  command exits 1. `bunx alxia-react-router reveal --force` overwrites it.
+- **Bun only**: the bin starts with `#!/usr/bin/env bun`, so no Node is
+  needed.
+
+React Router's own rendering entries, `app/entry.server.tsx` and
+`app/entry.client.tsx`, are revealed by React Router:
+`bunx react-router reveal`.
+
+### By hand
+
+The example uses `@alxia/logger` and `@alxia/compress`
 (`bun add @alxia/logger @alxia/compress`); any plugin works the same way.
 
 ```ts

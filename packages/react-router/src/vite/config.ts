@@ -68,16 +68,24 @@ export function serverFile(
 	return existsSync(file) ? file : undefined;
 }
 
-/** `build/client`, relative to the built `build/server/index.js`. */
-export function clientPath(config: ResolvedConfig): string {
+/** The built server, absolute: `build/server/index.js`. */
+export function serverBuildPath(config: ResolvedConfig): string {
 	const rr = contextOf(config);
 	const outDir = resolve(
 		config.root,
 		config.environments['ssr']?.build.outDir ??
 			join(rr.buildDirectory, 'server'),
 	);
-	const built = dirname(join(outDir, rr.serverBuildFile));
-	const path = relative(built, join(rr.buildDirectory, 'client'));
+	return join(outDir, rr.serverBuildFile);
+}
+
+/** `build/client`, relative to the built `build/server/index.js`. */
+export function clientPath(config: ResolvedConfig): string {
+	const built = dirname(serverBuildPath(config));
+	const path = relative(
+		built,
+		join(contextOf(config).buildDirectory, 'client'),
+	);
 	return path.startsWith('.') ? path : `./${path}`;
 }
 

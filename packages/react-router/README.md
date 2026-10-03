@@ -52,6 +52,10 @@ run through `bun run`, with no Node installed:
 - **`bun run start`** serves the pages and the client build. It listens on
   `PORT` (3000) and `HOST` (`0.0.0.0`), and stops on `SIGTERM`.
 
+After a build, `bunx --bun vite preview` serves that built server through
+Vite's preview server, as `bun run start` would: the pages, `/api`, the
+client's files and the app's hooks. So does React Router's prerendering.
+
 `@alxia/core` and `react-router` 8 are peers, and `vite` 7 or 8 is an
 optional peer, for `/vite`. The package declares no dependency.
 
@@ -60,6 +64,18 @@ but `bun add` warns about it; `bun add -d typescript@^6` silences the
 warning.
 
 ## Customising: `app/server.ts`
+
+Start from the default server, written out:
+
+```sh
+bunx alxia-react-router reveal
+```
+
+It writes `app/server.ts` (or the file `alxia({ entry })` names):
+`createServer()` with `beforeAll`, `configure` and `getLoadContext`
+commented, and the `Register` declaration. It refuses to overwrite a file
+already there; `--force` overwrites it. Run it from the app's root, once
+`@alxia/react-router` is installed.
 
 The examples use `@alxia/logger` (`bun add @alxia/logger`); any plugin
 works the same way. The plugin picks the file up in dev and in the build:
@@ -217,12 +233,18 @@ From `@alxia/react-router/vite`:
 
 | export | |
 | --- | --- |
-| `alxia(options?)` | the Vite plugin. `entry` is the server file: `app/server.ts` by default, or the default server when there is none |
+| `alxia(options?)` | the Vite plugin, for `react-router dev`, `react-router build` and `vite preview`. `entry` is the server file: `app/server.ts` by default, or the default server when there is none |
 | `AlxiaOptions` | its options |
+
+The `alxia-react-router` bin, run with `bunx`:
+
+| command | |
+| --- | --- |
+| `reveal [--force]` | writes the default server to `app/server.ts`, or to `alxia({ entry })`'s file; refuses an existing file without `--force` |
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev and the build work, customising the server, typing the loaders, the app's own keys, escape hatches, the client's files, OpenAPI, testing and deploying.
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev, the build and `vite preview` work, customising the server, typing the loaders, the app's own keys, escape hatches, the client's files, OpenAPI, testing and deploying.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these three lines, then an `app/server.ts` with a session, an `/api`, secure headers and a streamed page.

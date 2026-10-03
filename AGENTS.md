@@ -14,7 +14,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/openapi-routes` | `implemented` and `exactly`: every operation of an OpenAPI document has a route, read from `app.routes` | core |
 | `@alxia/zod` | Zod coercions (`zq`) and the OpenAPI converter | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's hooks and typed context, Yoga's plugins | core, graphql-yoga, graphql |
-| `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its hooks, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js` | core, react-router; vite (optional, `/vite`) |
+| `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its hooks, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js`; the `alxia-react-router reveal` bin writes the default server out | core, react-router; vite (optional, `/vite`) |
 | `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | function plugins: global hooks | core |
 | `@alxia/rate-limit`, `@alxia/jwt`, `@alxia/logger` | app plugins: typed context, typed replies, routes | core |
 | `@alxia/env` | environment variables through any Standard Schema | — |
@@ -133,7 +133,10 @@ below records what is kept twice.
 Every package is built by the root `build.ts`: JavaScript from `Bun.build`
 with `packages: 'external'`, declarations from `tsc` against
 `tsconfig.build.json`. Entry points are declared under `alxia.entrypoints`,
-each with a matching key in `exports`.
+each with a matching key in `exports`, or, for a bin, in `bin`: its entry
+starts with `#!/usr/bin/env bun`, `build.ts` refuses a bin with no `#!`
+line and makes it executable, and `verify:artifacts` runs it from the
+installed tarball with `--help`.
 
 - **Build before typecheck and tests**: `exports` points at `dist/`.
   `bun run build`, `typecheck` and `test` go through `scripts/workspace.ts`,

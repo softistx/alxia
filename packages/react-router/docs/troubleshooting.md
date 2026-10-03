@@ -20,6 +20,15 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: reactRouter(): client is …, which is not a directory. …`](#typeerror-reactrouter-client-is--which-is-not-a-directory-)
 - [`TypeError: reactRouter(): … cannot be served at a path of its own name; rename it. …`](#typeerror-reactrouter--cannot-be-served-at-a-path-of-its-own-name-rename-it-)
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
+- [`alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`](#alxia-react-router--already-exists-and-reveal-leaves-it-as-it-is-run-alxia-react-router-reveal---force-to-overwrite-it)
+- [`alxia-react-router: no vite.config.ts in …. Run reveal from the app's root, beside vite.config.ts.`](#alxia-react-router-no-viteconfigts-in--run-reveal-from-the-apps-root-beside-viteconfigts)
+- [`alxia-react-router: … gives alxia() an entry reveal cannot read. …`](#alxia-react-router--gives-alxia-an-entry-reveal-cannot-read-)
+- [`alxia-react-router: … computes appDirectory, which reveal cannot read. …`](#alxia-react-router--computes-appdirectory-which-reveal-cannot-read-)
+- [`alxia-react-router: unknown command ….`](#alxia-react-router-unknown-command-)
+- [`alxia-react-router: unknown option … for reveal.`](#alxia-react-router-unknown-option--for-reveal)
+- [`error: GET https://registry.npmjs.org/alxia-react-router - 404`](#error-get-httpsregistrynpmjsorgalxia-react-router---404)
+- [`alxia-react-router: build/server/index.js does not exist. Run react-router build before vite preview.`](#alxia-react-router-buildserverindexjs-does-not-exist-run-react-router-build-before-vite-preview)
+- [`alxia-react-router: build/server/index.js is not alxia's server: its default export has no fetch. …`](#alxia-react-router-buildserverindexjs-is-not-alxias-server-its-default-export-has-no-fetch-)
 - [`warn: incorrect peer dependency "typescript@5.9.3"`](#warn-incorrect-peer-dependency-typescript593)
 
 **Types**
@@ -348,6 +357,154 @@ export default createServer({
 or `contentSecurityPolicy: false`. A per-request nonce, shared with
 `<Scripts nonce>`, would drop `'unsafe-inline'`; it is on the
 [roadmap](roadmap.md).
+
+### `alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`
+
+```text
+alxia-react-router: app/server.ts already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.
+```
+
+**When:** `bunx alxia-react-router reveal` finds a server file where it
+would write one: `app/server.ts`, or the file `alxia({ entry })` names. It
+exits 1 and writes nothing.
+
+**Why:** that file is the app's server, customised or not; reveal never
+replaces it unasked.
+
+**Fix:** keep it, or overwrite it with the default server, its options
+commented:
+
+```sh
+bunx alxia-react-router reveal --force
+```
+
+### `alxia-react-router: no vite.config.ts in …. Run reveal from the app's root, beside vite.config.ts.`
+
+**When:** `bunx alxia-react-router reveal` runs in a folder with no
+`vite.config.ts` (nor `.mts`, `.cts`, `.js`, `.mjs` or `.cjs`): a
+subfolder of the app, or another project.
+
+**Why:** reveal reads where to write from the app's `vite.config.ts`,
+`alxia({ entry })`, and writes relative to it.
+
+**Fix:** `cd` to the folder that holds `vite.config.ts`, and run it there.
+
+### `alxia-react-router: … gives alxia() an entry reveal cannot read. …`
+
+```text
+alxia-react-router: vite.config.ts gives alxia() an entry reveal cannot read. Write it as a string literal, alxia({ entry: 'app/server.ts' }), and run reveal again.
+```
+
+**When:** `vite.config.ts` passes `alxia()` an `entry` that is not a string
+literal: a constant, a template with `${…}`, a call. Reveal exits 1 and
+writes nothing.
+
+**Why:** reveal reads the config as text, cheaply, and does not run it.
+Guessing `app/server.ts` would write a file the plugin does not load.
+
+**Fix:** write the path as a literal, run reveal, then compute it again if
+you need to:
+
+```ts
+// vite.config.ts
+import { alxia } from '@alxia/react-router/vite';
+import { reactRouter } from '@react-router/dev/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({ plugins: [reactRouter(), alxia({ entry: 'server/main.ts' })] });
+```
+
+### `alxia-react-router: … computes appDirectory, which reveal cannot read. …`
+
+```text
+alxia-react-router: react-router.config.ts computes appDirectory, which reveal cannot read. Write it as a string literal, appDirectory: 'app', and run reveal again.
+```
+
+**When:** `react-router.config.ts` sets `appDirectory` to something other
+than a string literal, and `vite.config.ts` names no `entry`. Reveal exits
+1 and writes nothing.
+
+**Why:** the same as above: reveal does not run the config, and `app/`
+might not be the folder the plugin reads.
+
+**Fix:** write `appDirectory` as a literal for the time of the reveal, or
+name the file in `vite.config.ts`, `alxia({ entry: 'src/server.ts' })`.
+
+### `alxia-react-router: unknown command ….`
+
+**When:** the bin is given a command other than `reveal`, such as
+`bunx alxia-react-router reveal-server`. It prints its usage and exits 1.
+
+**Fix:** `bunx alxia-react-router reveal`, or `--help` for the usage.
+
+### `alxia-react-router: unknown option … for reveal.`
+
+**When:** `reveal` is given an option other than `--force` or `--help`,
+such as react-router-hono-server's `reveal file` or `reveal folder`. It
+prints its usage and exits 1.
+
+**Fix:** `bunx alxia-react-router reveal` writes the one server file the
+plugin reads. For a server in a folder of its own, name it first,
+`alxia({ entry: 'app/server/index.ts' })`, then run `reveal`: it writes
+there.
+
+### `error: GET https://registry.npmjs.org/alxia-react-router - 404`
+
+**When:** `bunx alxia-react-router reveal` runs in a project where
+`@alxia/react-router` is not installed.
+
+**Why:** `bunx` looks for the bin in `node_modules/.bin`, then for an npm
+package of the bin's name. The bin is `@alxia/react-router`'s, and no
+package is named `alxia-react-router`.
+
+**Fix:** install the package, then run the bin:
+
+```sh
+bun add @alxia/core @alxia/react-router
+bunx alxia-react-router reveal
+```
+
+### `alxia-react-router: build/server/index.js does not exist. Run react-router build before vite preview.`
+
+With another `buildDirectory` or `serverBuildFile`, the message names
+that file.
+
+Under `vite preview`, every request is a 500 with this text, and Vite's
+terminal prints it.
+
+**When:** the preview server starts before a build, or after
+`build/server/index.js` was removed.
+
+**Why:** under the plugin, the preview serves the built server, and there
+is none yet.
+
+**Fix:** build, then preview:
+
+```sh
+bun run build
+bunx --bun vite preview
+```
+
+The next request after the build loads it, with no restart.
+
+### `alxia-react-router: build/server/index.js is not alxia's server: its default export has no fetch. …`
+
+With another `buildDirectory` or `serverBuildFile`, the message names
+that file.
+
+```text
+alxia-react-router: build/server/index.js is not alxia's server: its default export has no fetch. Build it with alxia() in vite.config.ts's plugins, then run vite preview again.
+```
+
+**When:** under `vite preview`, the build in `build/` was made without
+`alxia()`: before the plugin was added, or with another Vite config.
+
+**Why:** React Router's own server build exports the routes and no app.
+The plugin hands each request to the default export's `fetch`, which only
+a build made with the plugin has.
+
+**Fix:** add `alxia()` to `vite.config.ts`'s plugins, run `bun run build`,
+then restart `vite preview`: a build already loaded is not read again.
 
 ### `warn: incorrect peer dependency "typescript@5.9.3"`
 
