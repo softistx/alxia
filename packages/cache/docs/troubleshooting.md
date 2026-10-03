@@ -31,8 +31,8 @@ goes wrong prints nothing at all, and is under [Traps](#traps), by symptom.
 - [No `X-Cache` header, and the route runs every time](#no-x-cache-header-and-the-route-runs-every-time)
 - [`X-Cache: MISS` on every request](#x-cache-miss-on-every-request)
 - [Hits with curl, misses in a browser](#hits-with-curl-misses-in-a-browser)
-- [One visitor sees another visitor's page](#one-visitor-sees-another-visitors-page)
 - [A client that sent no `Accept-Encoding` gets gzip bytes](#a-client-that-sent-no-accept-encoding-gets-gzip-bytes)
+- [One visitor sees another visitor's page](#one-visitor-sees-another-visitors-page)
 - [Old data after a write](#old-data-after-a-write)
 - [A hard reload shows new data, a plain reload the old](#a-hard-reload-shows-new-data-a-plain-reload-the-old)
 - [Responses are kept for hours](#responses-are-kept-for-hours)
@@ -385,10 +385,11 @@ any route whose answer depends on a request header, and that header is not
 in `vary`. The first client asked with `Accept-Encoding: gzip`; the next
 one, without it, gets `Content-Encoding: gzip` with `X-Cache: HIT`.
 
-**Why:** the key is built from the path, the query and `vary` alone. The
-response's own `Vary` is passed on to the client but not read by the cache.
+**Why:** the default key is built from the path, the query and `vary`
+alone, and a `key` of your own from what it reads. The response's own
+`Vary` is passed on to the client but not read by the cache.
 
-**Fix:** name the header in `vary`:
+**Fix:** name the header in `vary`, or read it in your `key`:
 
 ```ts
 app.use(cache({ ttl: 60, vary: ['accept-encoding'] }))

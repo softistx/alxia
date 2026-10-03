@@ -59,7 +59,7 @@ Each header named is:
 Names are matched case-insensitively and written lowercased.
 
 **The response's own `Vary` is not read.** Only the names in `vary` are in
-the key. A response that varies by a header of its own — `app.static` with
+the default key. A response that varies by a header of its own — `app.static` with
 `precompressed` varies by `Accept-Encoding` — is kept once and served to
 every client, whatever that header says. Name it here:
 `vary: ['accept-encoding']` ([troubleshooting](../troubleshooting.md#a-client-that-sent-no-accept-encoding-gets-gzip-bytes)).
