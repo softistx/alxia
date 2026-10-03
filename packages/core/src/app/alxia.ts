@@ -44,6 +44,7 @@ import type {
 	Method,
 	Outcome,
 	OutcomeOf,
+	ProvidedBy,
 	RouteEntryOf,
 	RouteRecord,
 	RouteSchema,
@@ -611,7 +612,9 @@ export class Alxia<
 	 * app's hooks, and its hooks, which then apply to the routes declared on
 	 * this app after it — a plugin can be an `auth` that only derives a
 	 * `user`. Its global hooks become this app's. It is read once, here:
-	 * declare it completely before using it.
+	 * declare it completely before using it. A plugin made by `definePlugin`
+	 * names what it reads from this app's context: using it on an app that
+	 * does not give it is a compile error.
 	 *
 	 * Or a function, given this app, that returns it: a `Plugin`.
 	 */
@@ -621,8 +624,11 @@ export class Alxia<
 		PluginRoutes extends object,
 		PluginPrefix extends string,
 		PluginShortcuts extends AnyReply,
+		PluginRequires = Empty,
 	>(
-		plugin: Alxia<PluginCtx, PluginRoutes, PluginPrefix, PluginShortcuts>,
+		plugin: Alxia<PluginCtx, PluginRoutes, PluginPrefix, PluginShortcuts> & {
+			readonly '~requires'?: PluginRequires;
+		} & ProvidedBy<Ctx, PluginRequires>,
 	): Alxia<
 		Ctx & PluginCtx,
 		Routes & Prefixed<Prefix, PluginRoutes, Shortcuts>,

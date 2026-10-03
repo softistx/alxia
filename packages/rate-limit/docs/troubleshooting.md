@@ -6,8 +6,8 @@ nothing of its own; past the limit it answers a 429.
 
 **Types**
 
-- [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
-- [`Type '() => Promise<boolean>' is not assignable to type '(ctx: BaseContext) => boolean'`](#type---promiseboolean-is-not-assignable-to-type-ctx-basecontext--boolean)
+- [`Property 'user' does not exist on type 'BaseContext & Empty'`](#property-user-does-not-exist-on-type-basecontext--empty)
+- [`Type '() => Promise<boolean>' is not assignable to type '(ctx: BaseContext & Empty) => boolean'`](#type---promiseboolean-is-not-assignable-to-type-ctx-basecontext--empty--boolean)
 - [`'rateLimit' is possibly 'undefined'`](#ratelimit-is-possibly-undefined)
 - [`This comparison appears to be unintentional because the types '200 | 500' and '429' have no overlap`](#this-comparison-appears-to-be-unintentional-because-the-types-200--500-and-429-have-no-overlap)
 
@@ -28,37 +28,42 @@ nothing of its own; past the limit it answers a 429.
 
 ## Types
 
-### `Property 'user' does not exist on type 'BaseContext'`
+### `Property 'user' does not exist on type 'BaseContext & Empty'`
 
-**When:** a `key` (or `skip`) reads something an earlier `derive` added to
-the context.
+**When:** a `key` (or `skip`) reads something an earlier `derive` or plugin
+added to the context, and `rateLimit` is not told about it.
 
 ```text
-error TS2339: Property 'user' does not exist on type 'BaseContext'.
+error TS2339: Property 'user' does not exist on type 'BaseContext & Empty'.
 ```
 
 **Why:** `key` and `skip` are typed with `BaseContext`, what every route hook
-reads — `request`, `url`, `ip`, `server`, `route`, `pathParams` — and not
-with the context of the app they are mounted on.
+reads — `request`, `url`, `ip`, `server`, `route`, `pathParams` — plus what
+you name as `rateLimit`'s type argument, and nothing else. `rateLimit` is
+built before it is used, so it cannot see the app it will be used on.
 
-**Fix:** derive the key from the request itself:
+**Fix:** name what `key` reads. The app that uses the limit must then give
+it, before the limit:
 
 ```ts
-app.use(
-	rateLimit({
-		limit: 100,
-		windowMs: 60_000,
-		key: ({ request }) => request.headers.get('authorization') ?? undefined,
-	}),
-);
+const perUser = rateLimit<{ user: { id: string } }>({
+	limit: 100,
+	windowMs: 60_000,
+	key: ({ user }) => user.id,
+});
+
+alxia().use(auth).use(perUser); // auth derives user
 ```
 
-### `Type '() => Promise<boolean>' is not assignable to type '(ctx: BaseContext) => boolean'`
+On an app that does not give `user`, `use(perUser)` is a compile error:
+[`the plugin reads "user", which this app's context does not give`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+
+### `Type '() => Promise<boolean>' is not assignable to type '(ctx: BaseContext & Empty) => boolean'`
 
 **When:** `skip` is an `async` function.
 
 ```text
-error TS2322: Type '() => Promise<boolean>' is not assignable to type '(ctx: BaseContext) => boolean'.
+error TS2322: Type '() => Promise<boolean>' is not assignable to type '(ctx: BaseContext & Empty) => boolean'.
   Type 'Promise<boolean>' is not assignable to type 'boolean'.
 ```
 

@@ -74,3 +74,7 @@ Nothing scheduled yet.
 - **Groups and plugins.** `group` scopes a prefix and its hooks; `use` mounts
   another app — its routes, context and replies, all typed — or a function
   plugin that adds global hooks.
+- **Plugins that need an earlier one.** `definePlugin<Requires>()` builds a
+  plugin on an app whose context already has `Requires` — a `user`, a
+  `session` — and `use` on an app that does not give them is a compile
+  error naming the missing key.

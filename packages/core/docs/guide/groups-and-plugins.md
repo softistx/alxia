@@ -142,6 +142,13 @@ A function plugin must only add **global** hooks: a route hook it added
 would not be in the app's type. What adds context or replies is an app
 plugin.
 
+### A plugin that needs an earlier one
+
+`definePlugin<Requires>()` builds an app plugin that reads what an earlier
+plugin added, such as a `user`. `use` refuses it at compile time on an app
+whose context does not give `Requires`. See
+[Writing a plugin](writing-a-plugin.md#a-plugin-that-needs-an-earlier-one).
+
 ## For plugin authors
 
 Plugins use the core's public API, and three helpers are exported for
@@ -182,5 +189,7 @@ of any shape.
 
 ## See also
 
+- [Writing a plugin](writing-a-plugin.md): choosing between an app, a
+  `Plugin` function and `definePlugin`, with an example of each.
 - [Hooks](hooks.md): what each hook does.
 - [The app's type](types.md): what `use` and `group` add to `RoutesOf`.

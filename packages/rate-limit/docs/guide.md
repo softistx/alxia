@@ -23,21 +23,24 @@ app.listen({ port: 3000 });
 ## The signature
 
 ```ts
-function rateLimit(options: RateLimitOptions): Alxia<…>; // an app, given to `use`
+function rateLimit<Requires extends object = Empty>(
+	options: RateLimitOptions<Requires>,
+): Alxia<…>; // an app, given to `use`
 
-interface RateLimitOptions {
+interface RateLimitOptions<Requires extends object = Empty> {
 	readonly limit: number;
 	readonly windowMs: number;
-	readonly key?: (ctx: BaseContext) => string | undefined | Promise<string | undefined>;
+	readonly key?: (ctx: BaseContext & Requires) => string | undefined | Promise<string | undefined>;
 	readonly store?: RateLimitStore;
-	readonly skip?: (ctx: BaseContext) => boolean;
+	readonly skip?: (ctx: BaseContext & Requires) => boolean;
 	readonly headers?: 'draft' | 'legacy' | false;
 }
 ```
 
 `rateLimit` returns an app whose single route hook counts the request. Given
 to `use`, it adds `rateLimit` to the context of every route declared after
-it, and its 429 to each of those routes' types.
+it, and its 429 to each of those routes' types. `Requires` is what `key`
+and `skip` read beyond `BaseContext`; see [Reading the app's context](#reading-the-apps-context).
 
 ## Options
 
@@ -45,9 +48,9 @@ it, and its 429 to each of those routes' types.
 | --- | --- | --- | --- |
 | `limit` | `number` | required | requests one key may make in a window: a whole number, 1 or more |
 | `windowMs` | `number` | required | the window, in milliseconds: a whole number, 1 or more |
-| `key` | `(ctx: BaseContext) => string \| undefined \| Promise<…>` | `ctx.ip` | what is counted; `undefined` is not counted |
+| `key` | `(ctx: BaseContext & Requires) => string \| undefined \| Promise<…>` | `ctx.ip` | what is counted; `undefined` is not counted |
 | `store` | `RateLimitStore` | a new `MemoryStore` | where the counts are kept |
-| `skip` | `(ctx: BaseContext) => boolean` | none | requests not counted at all |
+| `skip` | `(ctx: BaseContext & Requires) => boolean` | none | requests not counted at all |
 | `headers` | `'draft' \| 'legacy' \| false` | `'draft'` | which rate-limit headers each counted response carries |
 
 A `limit` or a `windowMs` that is not a whole number of 1 or more makes
@@ -87,9 +90,8 @@ app.use(
 ```
 
 `key` is typed with `BaseContext`, what every route hook reads: the request,
-`url`, `ip`, `server`, `route` and `pathParams`. What an earlier `derive`
-added is not in that type; see
-[Troubleshooting](troubleshooting.md#property-user-does-not-exist-on-type-basecontext).
+`url`, `ip`, `server`, `route` and `pathParams`. To read what an earlier
+plugin added, see [Reading the app's context](#reading-the-apps-context).
 
 ### `skip`
 
@@ -104,6 +106,30 @@ app.use(
 		skip: ({ ip }) => ip === '127.0.0.1', // the local health checker
 	}),
 );
+```
+
+### Reading the app's context
+
+To count by what an earlier plugin added, such as a signed-in `user`, name
+it as `rateLimit`'s type argument. `key` and `skip` then read it, and the
+limit is a [`definePlugin`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
+plugin: an app that does not give `user` before it cannot use it.
+
+```ts
+const perUser = rateLimit<{ user: { id: string; role: string } }>({
+	limit: 100,
+	windowMs: 60_000,
+	key: ({ user }) => user.id,
+	skip: ({ user }) => user.role === 'admin',
+});
+
+const app = alxia()
+	.use(auth) // derives user, or answers 401
+	.use(perUser)
+	.get('/search', handler);
+
+alxia().use(perUser);
+// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
 ```
 
 ### `headers`

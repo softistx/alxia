@@ -73,4 +73,32 @@ describe('rateLimit', () => {
 		);
 		expect(() => rateLimit({ limit: 1, windowMs: 1 })).not.toThrow();
 	});
+
+	test('a key that reads what an earlier plugin added is typed with it', async () => {
+		const session = alxia().derive(({ request }) => ({
+			user: { id: request.headers.get('x-user') ?? 'anonymous' },
+		}));
+		const perUser = rateLimit<{ user: { id: string } }>({
+			limit: 1,
+			windowMs: 60_000,
+			key: ({ user }) => user.id,
+			skip: ({ user }) => user.id === 'admin',
+		});
+		const limited = alxia()
+			.use(session)
+			.use(perUser)
+			.get('/', ({ reply }) => reply(200, 'ok'));
+		const as = (user: string) =>
+			limited.request('/', { headers: { 'x-user': user } });
+		expect((await as('ada')).status).toBe(200);
+		expect((await as('ada')).status).toBe(429);
+		expect((await as('bob')).status).toBe(200);
+		expect((await as('admin')).status).toBe(200);
+		expect((await as('admin')).status).toBe(200);
+		const _refused = () => {
+			// @ts-expect-error the plugin reads "user", which this app's context does not give
+			alxia().use(perUser);
+		};
+		expect(_refused).toBeFunction();
+	});
 });

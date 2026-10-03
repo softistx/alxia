@@ -13,6 +13,8 @@ thrown when the app is built, a response body, or a line in the server log.
 - [`Type 'string' is not assignable to type 'number'` on a `reply`](#type-string-is-not-assignable-to-type-number-on-a-reply)
 - [`Type 'Response' is not assignable to type 'MaybePromise<AnyReply>'`](#type-response-is-not-assignable-to-type-maybepromiseanyreply)
 - [`Property 'user' does not exist on type 'Context<…>'`](#property-user-does-not-exist-on-type-context)
+- [`the plugin reads "…", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
+- [`the plugin reads "…", which this app's context gives with another type`](#the-plugin-reads--which-this-apps-context-gives-with-another-type)
 - [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
 
 **Building the app**
@@ -213,6 +215,78 @@ const app = alxia()
 
 The same applies to `use(plugin)`. Its route hooks reach the routes
 declared after `use`, not before it.
+
+### `the plugin reads "…", which this app's context does not give: use the plugin that adds it first`
+
+**When:** an app uses a plugin made by `definePlugin<Requires>()`, and
+nothing declared before that `use` adds a key the plugin requires.
+
+```ts
+const tenant = definePlugin<{ user: { tenantId: string } }>()((app) =>
+	app.derive(({ user }) => ({ tenant: tenants.get(user.tenantId) ?? null })),
+);
+
+alxia().use(tenant);
+```
+
+```text
+error TS2769: No overload matches this call.
+  …
+  Overload 2 of 2, '(plugin: Alxia<…> & { readonly '~requires'?: { user: { tenantId: string; }; }; } & { ...; }): Alxia<…>', gave the following error.
+    …
+        Types of property ''~requires'' are incompatible.
+          Type '{ user: { tenantId: string; }; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"'.
+```
+
+The first overload's error, about a function plugin, is noise: the
+message on the last line is the one that matters.
+
+**Why:** the plugin's hooks read `user`, and on this app no plugin or
+`derive` before it adds one, so at runtime `user` would be `undefined`. The
+message names each missing key; with several, TypeScript lists one message
+per key.
+
+**Fix:** use the plugin that adds the key first:
+
+```ts
+alxia().use(auth).use(tenant); // auth derives user
+```
+
+The order is what counts: `alxia().use(tenant).use(auth)` is refused too.
+
+### `the plugin reads "…", which this app's context gives with another type`
+
+**When:** the app's context has the key the plugin requires, but its type
+does not fit, such as a `user` that may be `null` for a plugin that
+requires one.
+
+```ts
+alxia()
+	.derive(async ({ request }) => ({ user: await authenticate(request) })) // user: User | null
+	.use(tenant);
+```
+
+```text
+          Type '{ user: { tenantId: string; }; }' is not assignable to type '"the plugin reads \"user\", which this app's context gives with another type"'.
+```
+
+**Why:** with `user: User | null`, the plugin's `user.tenantId` would throw
+on an anonymous request.
+
+**Fix:** give the type the plugin requires, here by answering 401 when
+there is no user:
+
+```ts
+alxia()
+	.derive(async ({ request, reply }) => {
+		const user = await authenticate(request);
+		return user ? { user } : reply(401, { error: 'unauthenticated' as const });
+	})
+	.use(tenant);
+```
+
+If you wrote the plugin, you can instead widen its requirement
+(`{ user: { tenantId: string } | null }`) and handle the `null` in it.
 
 ### `route() needs one method: declare the operation as const`
 

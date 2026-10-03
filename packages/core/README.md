@@ -311,6 +311,21 @@ const poweredBy = (name: string): Plugin => (app) =>
 hooks; its route hooks then apply to the routes declared after it, and its
 global hooks become this app's.
 
+A plugin that reads what an earlier one added names it with `definePlugin`,
+and an app that does not give it cannot use it:
+
+```ts
+const tenant = definePlugin<{ user: { tenantId: string } }>()((app) =>
+	app.derive(({ user }) => ({ tenant: tenants.get(user.tenantId) ?? null })),
+);
+
+alxia().use(auth).use(tenant); // ok: auth adds user
+alxia().use(tenant);           // compile error: the plugin reads "user", which this app's context does not give
+```
+
+[Writing a plugin](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md)
+covers all three kinds.
+
 ## API
 
 | export | |
@@ -326,6 +341,8 @@ global hooks become this app's.
 | `AnyReply`, `FreeReplyFunction`, `TypedReplyFunction`, `DeclaredReply`, `RedirectFunction` | any reply, `reply` without and with schemas, every reply a route with schemas may return, `redirect` |
 | `FreeShortcuts`, `TypedShortcuts`, `SHORTCUTS`, `Shortcuts` | `reply`'s shortcuts without and with schemas, and the status of each |
 | `Plugin`, `AnyAlxia` | a function plugin, any app |
+| `definePlugin<Requires>()(build)` | an app plugin built on an app whose context has `Requires`; `use` refuses it on an app that does not give them |
+| `Requiring<Requires>`, `ProvidedBy<Ctx, Requires>` | what `definePlugin` returns carries, and the check `use` makes of it |
 | `ListenOptions` | the options of `listen`: `port`, `hostname`, `development`, `idleTimeout`, `maxRequestBodySize`, `tls` |
 | `RequestHook`, `ResponseHook`, `AroundHook`, `StartHook`, `StopHook`, `BodyParser` | the hooks of `onRequest`, `onResponse`, `around`, `onStart`, `onStop`, and a body parser |
 | `withHeaders`, `vary`, `check` | for plugins: edit a response's headers (copied when immutable; an error of the edit leaves the body unread), add to `Vary`, run a schema |
@@ -346,6 +363,6 @@ global hooks become this app's.
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/core/docs): a page per area — routes and schemas, replies, hooks, groups and plugins, static files, server-sent events, WebSockets, serving, and the app's type.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/core/docs): a page per area — routes and schemas, replies, hooks, groups and plugins, writing a plugin, static files, server-sent events, WebSockets, serving, and the app's type.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/core/docs/roadmap.md): what is coming, and what is not planned.
