@@ -14,16 +14,19 @@
  * typescript, which breaks in minors; `^` for graphql) with npm's latest
  * after it: the root's `devDependencies` and `overrides`, and each package's
  * `devDependencies`, edited in place. The job deletes `bun.lock` first, so
- * nothing else stays pinned either. Run it on a throwaway checkout, never
+ * nothing else stays pinned either. An example's own copy of a widened peer
+ * moves too, as in newest-peers.ts. Run it on a throwaway checkout, never
  * commit what it writes.
  *
  *   bun scripts/newest-majors.ts
  */
 import { latestOnRegistry } from './artifacts/registry';
 import {
+	followPins,
 	type Manifest,
 	newest,
 	type Rewrite,
+	readExamples,
 	readManifests,
 	write,
 } from './newest-peers';
@@ -31,6 +34,20 @@ import {
 /** The major of a version or a range: `7` for `~7.0.2`, `^7.0.0` or `7`. */
 export function majorOf(version: string): number {
 	return Number(/^\D*(\d+)/.exec(version)?.[1]);
+}
+
+/**
+ * What an example's own range of a widened peer becomes, for `followPins`:
+ * npm's latest behind the operator the example wrote; `undefined` for a
+ * dependency no package widened.
+ */
+export function followLatest(
+	versions: ReadonlyMap<string, string>,
+): (name: string, range: string) => string | undefined {
+	return (name, range) => {
+		const version = versions.get(name);
+		return version === undefined ? undefined : keepOperator(range, version);
+	};
 }
 
 /**
@@ -95,6 +112,7 @@ export function rewrite(
 	const next = new Map<string, Manifest>();
 	const pinned: string[] = [];
 	const warnings: string[] = [];
+	const versions = new Map<string, string>();
 
 	const pin = (
 		where: string,
@@ -115,6 +133,7 @@ export function rewrite(
 		if (version === undefined) {
 			throw new Error(`npm gave no latest version of ${name}.`);
 		}
+		versions.set(name, version);
 		for (const manifest of packages.values()) {
 			if (
 				by.includes(String(manifest.name)) &&
@@ -148,7 +167,7 @@ export function rewrite(
 		pin('(root devDependencies)', nextRoot.devDependencies, name);
 		pin('(root overrides)', nextRoot.overrides, name);
 	}
-	return { root: nextRoot, packages: next, pinned, warnings };
+	return { root: nextRoot, packages: next, versions, pinned, warnings };
 }
 
 if (import.meta.main) {
@@ -164,9 +183,16 @@ if (import.meta.main) {
 		console.error((error as Error).message);
 		process.exit(1);
 	}
+	const followed = followPins(
+		await readExamples(),
+		followLatest(result.versions),
+	);
 	await write(rootPath, result.root);
 	for (const [path, manifest] of result.packages) await write(path, manifest);
-	for (const line of result.pinned) console.log(`  pinned   ${line}`);
+	for (const [path, manifest] of followed.examples) await write(path, manifest);
+	for (const line of [...result.pinned, ...followed.pinned]) {
+		console.log(`  pinned   ${line}`);
+	}
 	for (const line of result.warnings) {
 		console.log(process.env.GITHUB_ACTIONS ? `::warning::${line}` : line);
 	}

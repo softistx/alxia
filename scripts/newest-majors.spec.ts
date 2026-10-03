@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { majorOf, rewrite, widenedPeers } from './newest-majors';
+import { followLatest, majorOf, rewrite, widenedPeers } from './newest-majors';
 import type { Manifest } from './newest-peers';
 
 test('the major of a version or a range', () => {
@@ -47,6 +47,14 @@ describe('rewrite', () => {
 		});
 		expect(result.warnings).toEqual([]);
 		expect(graphql.devDependencies?.graphql).toBe('^16.11.0');
+	});
+
+	test("the versions an example's own copies follow are npm's latest of each widened peer", () => {
+		const result = rewrite(root, new Map([['g', graphql]]), latest);
+		expect(Object.fromEntries(result.versions)).toEqual({
+			graphql: '17.0.2',
+			typescript: '7.0.2',
+		});
 	});
 
 	test('a major no range accepts yet is pinned, and said', () => {
@@ -139,4 +147,16 @@ describe('rewrite', () => {
 			'nothing newer to test',
 		);
 	});
+});
+
+test("followLatest gives an example's range npm's latest behind its own operator", () => {
+	const follow = followLatest(
+		new Map([
+			['vite', '8.1.0'],
+			['typescript', '7.0.2'],
+		]),
+	);
+	expect(follow('vite', '^8.0.3')).toBe('^8.1.0');
+	expect(follow('typescript', '~6.0.3')).toBe('~7.0.2');
+	expect(follow('react', '^19.2.8')).toBeUndefined();
 });
