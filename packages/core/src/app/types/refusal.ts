@@ -53,6 +53,19 @@ export type DeclaredRefusal<Responses> = {
 }[keyof Responses & ClientErrorStatus];
 
 /**
+ * `Kind`, when it is one kind: a union of kinds is `never`, since the
+ * hook is registered for the one string it is given at runtime.
+ */
+export type OneKind<Kind extends RefusalKind> =
+	true extends IsUnion<Kind> ? never : Kind;
+
+type IsUnion<T, All = T> = T extends unknown
+	? [All] extends [T]
+		? false
+		: true
+	: never;
+
+/**
  * The replies an `onRefusal(kind, hook)` hook answers with, marked by its
  * kind; when it may return nothing, the mark that the general hook, then
  * the default, answers that kind then.

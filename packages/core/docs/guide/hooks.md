@@ -292,7 +292,7 @@ problem answers 400. Each is sent as
 `application/problem+json`, with its `detail` naming the part.
 
 **Order is meaning.** The last `onRefusal` declared before a route is the
-one in force. A route declared before any keeps the default, and a
+one in force; a [hook of one kind](#one-hook-per-kind) sits in front of it. A route declared before any keeps the default, and a
 [group](groups-and-plugins.md#groups)'s hook stays inside the group. A
 plugin given to `use` keeps its own hook for its routes. Its routes without
 one take the hook of the app using it, and the plugin's hook then applies to

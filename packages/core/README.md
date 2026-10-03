@@ -138,7 +138,7 @@ alxia()
 	.onRefusal('body_limit', { response: { 413: TooLarge } }, (refusal, { reply }) =>
 		reply(413, { limit: refusal.limit }),
 	)
-	.post('/notes', { body: JmapRequest, bodyLimit: 64 * 1024 }, ({ reply }) => reply(201, 'ok'));
+	.post('/notes', { body: z.object({ text: z.string() }), bodyLimit: 64 * 1024 }, ({ reply }) => reply(201, 'ok'));
 // POST /notes answers 201, 413 { limit: number }, 422 { detail: string } or 500
 ```
 
@@ -387,7 +387,8 @@ is answered as it says, and anything else is a 500 that leaks nothing, but
 for a client that hung up mid-request, a 499 nobody reads. `onRefusal`
 answers a request the route's schemas refuse, or whose body passes its
 `bodyLimit` ([Requests](#requests)); the last one declared before a route
-is the one it uses.
+is the one it uses, and a hook of one kind, `onRefusal('validation', hook)`,
+falls back to it.
 
 Global hooks apply to the whole app, wherever they are declared:
 

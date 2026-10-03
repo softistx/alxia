@@ -488,10 +488,13 @@ app.onRefusal('validation', (refusal) => problem({ status: 400, detail: `the ${r
 ### `'500' does not exist in type 'RefusalResponses'`
 
 **When:** the schemas given to `onRefusal` declare a status that is not a
-client error.
+client error. `onRefusal` has several forms, so TypeScript reports it
+under the call, as no overload matching, with this line among each form's:
 
 ```text
-error TS2353: Object literal may only specify known properties, and '500' does not exist in type 'RefusalResponses'.
+error TS2769: No overload matches this call.
+  Overload 1 of 4, '(schema: RefusalSchema<RefusalResponses>, hook: …)', gave the following error.
+    Object literal may only specify known properties, and '500' does not exist in type 'RefusalResponses'.
 ```
 
 **Fix:** declare the 4xx the hook answers:
@@ -751,14 +754,18 @@ app.group('/admin', (admin) => admin.derive(requireAdmin).get('/stats', stats));
 
 ### `onRefusal(): the hook is missing`
 
-**When:** `onRefusal` is given its schemas but no hook. The types refuse
-that, so this comes from JavaScript or a cast.
+**When:** `onRefusal` is given its schemas but no hook, or a kind with no
+hook — `onRefusal('validation')`, `onRefusal('validation', schema)`. The
+types refuse that, so this comes from JavaScript or a cast.
 
-**Fix:** pass the hook after the schemas:
+**Fix:** pass the hook last:
 
 ```ts
 app.onRefusal({ response: { 400: Problem } }, (_, { reply }) =>
 	reply(400, { type: 'urn:example:invalid', status: 400, detail: 'invalid' }),
+);
+app.onRefusal('validation', { response: { 400: Problem } }, (refusal, { reply }) =>
+	reply(400, { type: 'urn:example:invalid', status: 400, detail: refusal.part }),
 );
 ```
 

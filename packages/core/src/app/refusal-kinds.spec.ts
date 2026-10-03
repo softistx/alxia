@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
 import type {
 	BodyLimitRefusal,
+	RefusalKind,
 	ContentTooLargeBody,
 	RequestPart,
 	ValidationErrorBody,
@@ -350,6 +351,63 @@ describe('onRefusal(kind, hook): in the types', () => {
 		expectTypeOf<A['status']>().toEqualTypeOf<200 | 409 | 413 | 500>();
 	});
 
+	test("a plugin's kind hook that may return nothing: the app's hook of that kind, then the app's general hook", async () => {
+		const plugin = alxia()
+			.onRefusal('validation', (refusal) =>
+				refusal.part === 'query' ? problem({ status: 418 }) : undefined,
+			)
+			.post('/p', both, ({ reply }) => reply(200, 'ok'));
+		const app = alxia()
+			.onRefusal(() => problem({ status: 409 }))
+			.onRefusal('validation', (refusal) =>
+				refusal.part === 'query' ? problem({ status: 422 }) : undefined,
+			)
+			.use(plugin);
+		type P = RoutesOf<typeof app>['/p']['POST']['output'];
+		expectTypeOf<P['status']>().toEqualTypeOf<200 | 409 | 418 | 422 | 500>();
+		expect((await app.request('/p', INVALID)).status).toBe(409);
+	});
+
+	test("a plugin's general hook: its routes keep it, and after use() it replaces the app's kind hooks", async () => {
+		const plugin = alxia()
+			.onRefusal(() => problem({ status: 409 }))
+			.post('/p', both, ({ reply }) => reply(200, 'ok'));
+		const app = alxia()
+			.onRefusal('validation', () => problem({ status: 422 }))
+			.use(plugin)
+			.post('/a', both, ({ reply }) => reply(200, 'ok'));
+		type Routes = RoutesOf<typeof app>;
+		expectTypeOf<Routes['/p']['POST']['output']['status']>().toEqualTypeOf<
+			200 | 409 | 500
+		>();
+		expectTypeOf<Routes['/a']['POST']['output']['status']>().toEqualTypeOf<
+			200 | 409 | 500
+		>();
+		expect((await app.request('/p', INVALID)).status).toBe(409);
+		expect((await app.request('/a', INVALID)).status).toBe(409);
+	});
+
+	test('nested plugins: each kind answered by the innermost hook of that kind, then outward', async () => {
+		const inner = alxia()
+			.onRefusal('validation', (refusal) =>
+				refusal.part === 'query' ? problem({ status: 418 }) : undefined,
+			)
+			.post('/q', both, ({ reply }) => reply(200, 'ok'));
+		const middle = alxia()
+			.onRefusal('body_limit', () => problem({ status: 413 }))
+			.use(inner);
+		const app = alxia()
+			.onRefusal(() => problem({ status: 409 }))
+			.use(middle);
+		type Q = RoutesOf<typeof app>['/q']['POST']['output'];
+		expectTypeOf<Q['status']>().toEqualTypeOf<200 | 409 | 413 | 418 | 500>();
+		expectTypeOf<Extract<Q, { status: 413 }>['data']>().toEqualTypeOf<{
+			status: 413;
+		}>();
+		expect((await app.request('/q', INVALID)).status).toBe(409);
+		expect((await app.request('/q', LARGE)).status).toBe(413);
+	});
+
 	test('mistakes are compile errors', () => {
 		const _mistakes = () => {
 			alxia().onRefusal(
@@ -362,6 +420,9 @@ describe('onRefusal(kind, hook): in the types', () => {
 			alxia().onRefusal('body_limit', () => problem({ status: 500 }));
 			// @ts-expect-error: no such kind
 			alxia().onRefusal('timeout', () => undefined);
+			const either = 'validation' as RefusalKind;
+			// @ts-expect-error: one kind, not a union: the hook answers the one it is given
+			alxia().onRefusal(either, () => problem({ status: 422 }));
 		};
 		expect(_mistakes).toBeFunction();
 	});

@@ -9,21 +9,17 @@ import type {
 	ChainHook,
 	ErrorHook,
 	RefusalHandler,
-	RefusalHandlersByKind,
-	RefusalHook,
 	RouteDefinition,
 	SocketDefinition,
 } from './definition';
-import type { RefusalSchema, RouteSchema } from './types';
+import { behind, byKind, type Refusals, then } from './refusal-handlers';
+import type { RouteSchema } from './types';
 
 /** The hooks a route or socket route declared now runs. */
 type ScopedHooks = Pick<
 	RouteDefinition,
 	'derive' | 'onError' | 'refusal' | 'refusalByKind'
 >;
-
-/** The `onRefusal` handlers in force: the general one, and those of each kind. */
-type Refusals = Pick<RouteDefinition, 'refusal' | 'refusalByKind'>;
 
 export class Scope {
 	#derive: ChainHook[] = [];
@@ -114,81 +110,4 @@ export class Scope {
 		this.#refusals = then(this.#refusals, plugin.#refusals);
 		this.#bodyLimit = plugin.#bodyLimit ?? this.#bodyLimit;
 	}
-}
-
-/** `refusalByKind`, as a definition carries it: only when it holds a handler. */
-function byKind(
-	handlers: RefusalHandlersByKind | undefined,
-): Pick<Refusals, 'refusalByKind'> {
-	return handlers === undefined || Object.keys(handlers).length === 0
-		? {}
-		: { refusalByKind: handlers };
-}
-
-/**
- * `earlier`'s handlers, then `later`'s in the same scope: a general one
- * replaces every one of `earlier`, one of a kind that kind's alone.
- */
-function then(earlier: Refusals, later: Refusals): Refusals {
-	if (later.refusal !== undefined) return later;
-	return {
-		refusal: earlier.refusal,
-		...byKind({ ...earlier.refusalByKind, ...later.refusalByKind }),
-	};
-}
-
-/**
- * A plugin's route's handlers, `own`, in front of the using app's: with a
- * general one, the route's own answer every refusal; without, the app's
- * answer each kind after the route's own of that kind, as its type says.
- */
-function behind(own: Refusals, app: Refusals): Refusals {
-	if (own.refusal !== undefined) {
-		return { refusal: own.refusal, ...byKind(own.refusalByKind) };
-	}
-	const handlers: { [Kind in RefusalKind]?: readonly RefusalHandler[] } = {};
-	for (const kind of REFUSAL_KINDS) {
-		const listed = [
-			...(own.refusalByKind?.[kind] ?? []),
-			...(app.refusalByKind?.[kind] ?? []),
-		];
-		if (listed.length > 0) handlers[kind] = listed;
-	}
-	return { refusal: app.refusal, ...byKind(handlers) };
-}
-
-/** Every kind of refusal, which `onRefusal(kind, hook)` accepts. */
-export const REFUSAL_KINDS: readonly RefusalKind[] = [
-	'validation',
-	'body_limit',
-];
-
-/** `kind`, checked: a kind of refusal. */
-export function refusalKind(kind: unknown): RefusalKind {
-	if (!REFUSAL_KINDS.includes(kind as RefusalKind)) {
-		throw new TypeError(
-			`onRefusal(): ${JSON.stringify(kind)} is no kind of refusal; expected ${REFUSAL_KINDS.map((k) => `'${k}'`).join(' or ')}`,
-		);
-	}
-	return kind as RefusalKind;
-}
-
-/** The handler of `onRefusal(hook)` or `onRefusal(schema, hook)`. */
-export function refusalHandler(
-	schemaOrHook: RefusalSchema | ((refusal: never, ctx: never) => unknown),
-	maybeHook: ((refusal: never, ctx: never) => unknown) | undefined,
-): RefusalHandler {
-	if (typeof schemaOrHook === 'function') {
-		return { hook: schemaOrHook as RefusalHook };
-	}
-	if (typeof maybeHook !== 'function') {
-		throw new TypeError('onRefusal(): the hook is missing');
-	}
-	return {
-		hook: maybeHook as RefusalHook,
-		response: schemaOrHook.response,
-		...(schemaOrHook.contentType === undefined
-			? {}
-			: { contentType: schemaOrHook.contentType }),
-	};
 }

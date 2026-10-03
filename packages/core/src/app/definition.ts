@@ -106,6 +106,7 @@ export interface SocketDefinition {
 	readonly onError: readonly ErrorHook[];
 	/** Answers a refused upgrade request, as a route's. */
 	readonly refusal?: RefusalHandler | undefined;
+	/** Answers a refused upgrade request of one kind, as a route's. */
 	readonly refusalByKind?: RefusalHandlersByKind | undefined;
 }
 

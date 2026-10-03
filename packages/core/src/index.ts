@@ -6,6 +6,7 @@ export {
 	type ContextOf,
 	type ListenOptions,
 	type Plugin,
+	type RefusalMethod,
 	type RouteMethod,
 	type RoutesOf,
 } from './app/alxia';
@@ -46,6 +47,7 @@ export type {
 	KindRefusalsOf,
 	MaybePromise,
 	Method,
+	OneKind,
 	Outcome,
 	OutcomeOf,
 	ProvidedBy,

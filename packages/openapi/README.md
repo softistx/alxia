@@ -47,11 +47,11 @@ await Bun.write('openapi.json', JSON.stringify(openapi(app, { info }), null, 2))
   or 500, when it declares one. Behind an
   `onRefusal` hook given schemas, the refusal is each status those schemas
   declare, under the hook's `contentType`, such as `application/problem+json`.
+  Behind a hook without schemas, it is a `4XX` whose body is not documented.
   Behind a hook per kind, `onRefusal('validation', …)` or
   `onRefusal('body_limit', …)`, each kind's statuses are documented on the
   routes that kind may refuse: the validation hook's where the route
-  validates, the body-limit hook's where it has a `bodyLimit`.
-  Behind a hook without schemas, it is a `4XX` whose body is not documented
+  validates, the body-limit hook's where it has a `bodyLimit`
 - `detail`: `summary`, `description`, `tags`, `operationId`, `deprecated`. An
   operation id is otherwise made from the method and path: `getUsersById`
 

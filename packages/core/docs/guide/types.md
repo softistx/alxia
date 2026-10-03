@@ -83,8 +83,8 @@ interface Outcome<Status extends number = number, Data = unknown> {
 | each reply the handler can return | it has none |
 | a redirect the handler returns | always |
 | each reply a `derive`, `wrap` or `onError` before the route can return | always |
-| `400`, `ValidationErrorBody` | the route validates a part of its request, and no `onRefusal` hook answering `validation` is declared before it |
-| each reply the `onRefusal` hook before the route can return, in place of the 400 and the 413 | the route validates a part of its request, or has a `bodyLimit`; the default of each kind too when the hook may return nothing |
+| `400`, `ValidationErrorBody` | the route validates a part of its request, and no `onRefusal` hook answering `validation` is declared before it, or one that may return nothing |
+| each reply the general `onRefusal(hook)` before the route can return, in place of the 400 and the 413 | the route validates a part of its request, or has a `bodyLimit`, for each kind with no hook of its own or whose hook may return nothing; the default of each kind too when the general hook may return nothing |
 | each reply an `onRefusal('validation', …)` hook can return, in place of the 400 and the general hook's | the route validates a part of its request; the general hook's replies, or the 400, too when it may return nothing |
 | each reply an `onRefusal('body_limit', …)` hook can return, in place of the 413 and the general hook's | the route has a `bodyLimit`; the general hook's replies, or the 413, too when it may return nothing |
 | `413`, `ContentTooLargeBody` | the route has a `bodyLimit` of its own, or a `bodyLimit()` was called before it ([Routes](routes.md#body-size-bodylimit)), and no `onRefusal` hook answering `body_limit` is declared before it, or one that may return nothing |

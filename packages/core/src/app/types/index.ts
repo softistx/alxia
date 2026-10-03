@@ -23,6 +23,7 @@ export type {
 	KindFallsBack,
 	KindOutcome,
 	KindRefusalsOf,
+	OneKind,
 	RefusalOutcome,
 	RefusalResponses,
 	RefusalSchema,

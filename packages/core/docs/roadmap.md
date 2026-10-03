@@ -11,10 +11,7 @@ Nothing scheduled yet.
 
 ## Next
 
-- **A body too large through `onRefusal`.** A request whose body is over a
-  limit becomes a refusal of its own kind, `body_limit`, so the hook that
-  shapes the 400 can shape the 413 too, as an RFC 9457 problem with its
-  `limit`.
+Nothing scheduled yet.
 
 ## Later
 

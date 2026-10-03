@@ -1,5 +1,4 @@
-import type { Refusal, RefusalKind, RefusalOfKind } from '../errors/errors';
-import type { AnyReply, Reply } from '../reply/reply';
+import type { AnyReply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
 import { joinPath } from '../router/paths';
 import { fileHandler, staticHandler } from '../static/serve';
@@ -10,7 +9,6 @@ import type {
 	StaticReply,
 } from '../static/types';
 import type { JoinPath, RoutePath } from '../types/path';
-import type { ClientErrorStatus } from '../types/status';
 import type {
 	SocketContext,
 	SocketEntryOf,
@@ -34,15 +32,17 @@ import type {
 } from './definition';
 import { addPage, refusePage, refuseShadowedPages } from './pages';
 import { serve } from './pipeline';
+import { refusalHandler, refusalKind } from './refusal-handlers';
 import type { OperationMethod, RouteOperation } from './route-operation';
 import { createRuntime, mergeGlobals } from './runtime';
-import { refusalHandler, refusalKind, Scope } from './scope';
+import { Scope } from './scope';
 import { startServer, stopServer } from './serving';
 import type {
 	AlxiaOptions,
 	AnyAlxia,
 	ListenOptions,
 	Plugin,
+	RefusalMethod,
 	RouteMethod,
 } from './signatures';
 import { type SocketData, websocketHandler } from './socket';
@@ -50,24 +50,16 @@ import type {
 	BaseContext,
 	BehindShortcuts,
 	BodyLimitShortcut,
-	DeclaredRefusal,
-	DeclaredReply,
 	Empty,
-	KindRefusalsOf,
 	MaybePromise,
 	Method,
 	Outcome,
 	ProvidedBy,
-	RefusalResponses,
 	RefusalSchema,
-	RefusalsOf,
-	Refusing,
-	RefusingKind,
 	RouteEntryOf,
 	RouteRecord,
 	RouteSchema,
 	ThenShortcuts,
-	TypedReplyFunction,
 } from './types';
 
 /** The route a static directory is served at: its path, then a wildcard. */
@@ -466,89 +458,26 @@ export class Alxia<
 	 *   reply(413, { limit: refusal.limit }))
 	 * ```
 	 */
-	onRefusal<Result extends Reply<ClientErrorStatus, any> | undefined | void>(
-		hook: (refusal: Refusal, ctx: BaseContext & Ctx) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes,
-		Prefix,
-		Exclude<Shortcuts, Refusing> | RefusalsOf<Extract<Result, AnyReply>, Result>
-	>;
-	onRefusal<
-		Responses extends RefusalResponses,
-		Result extends DeclaredReply<Responses> | undefined | void,
-	>(
-		schema: RefusalSchema<Responses>,
-		hook: (
-			refusal: Refusal,
-			ctx: Omit<BaseContext, 'reply'> &
-				Ctx & { readonly reply: TypedReplyFunction<Responses> },
-		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes,
-		Prefix,
-		| Exclude<Shortcuts, Refusing>
-		| RefusalsOf<DeclaredRefusal<Responses>, Result>
-	>;
-	onRefusal<
-		Kind extends RefusalKind,
-		Result extends Reply<ClientErrorStatus, any> | undefined | void,
-	>(
-		kind: Kind,
-		hook: (
-			refusal: RefusalOfKind<Kind>,
-			ctx: BaseContext & Ctx,
-		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes,
-		Prefix,
-		| Exclude<Shortcuts, RefusingKind<Kind>>
-		| KindRefusalsOf<Kind, Extract<Result, AnyReply>, Result>
-	>;
-	onRefusal<
-		Kind extends RefusalKind,
-		Responses extends RefusalResponses,
-		Result extends DeclaredReply<Responses> | undefined | void,
-	>(
-		kind: Kind,
-		schema: RefusalSchema<Responses>,
-		hook: (
-			refusal: RefusalOfKind<Kind>,
-			ctx: Omit<BaseContext, 'reply'> &
-				Ctx & { readonly reply: TypedReplyFunction<Responses> },
-		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes,
-		Prefix,
-		| Exclude<Shortcuts, RefusingKind<Kind>>
-		| KindRefusalsOf<Kind, DeclaredRefusal<Responses>, Result>
-	>;
-	onRefusal(
-		first:
-			| RefusalKind
-			| RefusalSchema
-			| ((refusal: Refusal, ctx: never) => unknown),
+	readonly onRefusal = ((
+		first: unknown,
 		second?: RefusalSchema | ((refusal: never, ctx: never) => unknown),
 		third?: (refusal: never, ctx: never) => unknown,
-	): AnyAlxia {
+	): AnyAlxia => {
 		if (typeof first === 'string') {
 			this.#scope.refuseKindWith(
 				refusalKind(first),
-				refusalHandler(second as RefusalSchema, third),
+				refusalHandler(second, third),
 			);
 		} else {
 			this.#scope.refuseWith(
 				refusalHandler(
-					first,
-					second as (refusal: never, ctx: never) => unknown,
+					first as RefusalSchema | undefined,
+					second as ((refusal: never, ctx: never) => unknown) | undefined,
 				),
 			);
 		}
 		return this;
-	}
+	}) as RefusalMethod<Ctx, Routes, Prefix, Shortcuts>;
 
 	/**
 	 * A global hook run on every request, before routing: a 404 included. A
@@ -845,5 +774,6 @@ export type {
 	ListenOptions,
 	Outcome,
 	Plugin,
+	RefusalMethod,
 	RouteMethod,
 };
