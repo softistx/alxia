@@ -17,6 +17,11 @@ export {
 	type StopHook,
 } from './app/alxia';
 export type {
+	OperationMethod,
+	OperationSchema,
+	RouteOperation,
+} from './app/route-operation';
+export type {
 	BaseContext,
 	Context,
 	DeclaredReply,

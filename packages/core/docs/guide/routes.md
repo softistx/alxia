@@ -76,6 +76,84 @@ called as `api.query(path, { body })` by
 `@alxia/cache` keys `GET` and `HEAD` only, as a `QUERY`'s key would have to
 include its body.
 
+### Routes as data: `route`
+
+`route(operation, handler)` declares a route whose method, path and schema
+are plain data — `{ method, path, schema? }` — instead of arguments: an
+operation written once and shared between modules, or one a code generator
+writes from an OpenAPI document.
+
+```ts
+// operations.ts: data, importing only the schemas
+import { z } from 'zod';
+
+const Pet = z.object({ id: z.number(), name: z.string() });
+
+export const getPet = {
+	method: 'GET',
+	path: '/pets/:petId',
+	schema: {
+		params: z.object({ petId: z.coerce.number().int() }),
+		response: { 200: Pet, 404: z.object({ error: z.literal('not_found') }) },
+	},
+} as const;
+
+export const health = { method: 'GET', path: '/health' } as const;
+```
+
+```ts
+// app.ts
+import { alxia } from '@alxia/core';
+import { getPet, health } from './operations';
+
+const app = alxia({ prefix: '/api' })
+	.route(getPet, ({ params, reply }) => {
+		const pet = findPet(params.petId); // params.petId: number
+		return pet ? reply.ok(pet) : reply.notFound({ error: 'not_found' });
+	})
+	.route(health, ({ reply }) => reply(200, 'ok'));
+// GET /api/pets/1 → 200, GET /api/pets/x → 400, GET /api/health → "ok"
+```
+
+It is exactly the route `app[method](path, schema, handler)` declares: the
+same context, the same entry in `RoutesOf` (`'/api/pets/:petId'` above, the
+prefix applied), and the same compile errors — a params schema that does not
+read the path, an unknown schema key, a status the operation does not declare.
+`method` is any `Method`, `QUERY` included; an operation without `schema` is
+a route without one.
+
+**Keep the literals.** An operation in a variable of its own needs `as const`
+— or `satisfies RouteOperation` — so that its `method` and `path` stay
+`'GET'` and `'/pets/:petId'` rather than `string`; without it, `route`
+refuses the operation with
+[`route() needs one method: declare the operation as const`](../troubleshooting.md#route-needs-one-method-declare-the-operation-as-const).
+An operation written inline, `app.route({ method: 'GET', path: '/x' }, …)`,
+needs neither. An operation typed `RouteOperation`, or whose method is a union,
+is refused the same way: its route would be typed under every method while
+being served under one.
+
+```ts
+interface RouteOperation {
+	readonly method: Method;
+	readonly path: RoutePath;
+	readonly schema?: RouteSchema;
+}
+/** The operation's `schema`, or `Empty`. */
+type OperationSchema<Operation> = Operation extends { readonly schema: infer Schema extends RouteSchema }
+	? Schema
+	: Empty;
+
+// app.route: OperationMethod<Ctx, Routes, Prefix, Shortcuts>
+<const Operation extends RouteOperation, Result extends HandlerResult<OperationSchema<Operation>>>(
+	operation: Operation & {
+		readonly schema?: ValidSchema<JoinPath<Prefix, Operation['path']>, OperationSchema<Operation>>;
+	},
+	handler: (
+		ctx: Context<Ctx, JoinPath<Prefix, Operation['path']>, OperationSchema<Operation>>,
+	) => MaybePromise<Result>,
+) => Alxia</* … the route added … */>;
+```
+
 ## Paths
 
 | Segment | Matches | Read as |

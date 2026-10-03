@@ -36,6 +36,7 @@ import type {
 	SocketSchema,
 	SocketSend,
 } from '../ws/types';
+import type { OperationMethod, RouteOperation } from './route-operation';
 import type {
 	BaseContext,
 	Context,
@@ -347,6 +348,21 @@ export class Alxia<
 		Prefix,
 		Shortcuts
 	>;
+	/**
+	 * A route declared as data — `{ method, path, schema? }`, as an OpenAPI
+	 * code generator writes it — and its handler: the same route as
+	 * `app[method](path, schema, handler)`.
+	 */
+	readonly route: OperationMethod<Ctx, Routes, Prefix, Shortcuts> = ((
+		operation: RouteOperation,
+		handler: RouteDefinition['handler'],
+	) =>
+		this.#method(operation.method)(
+			operation.path,
+			operation.schema ?? {},
+			handler,
+		)) as never;
+
 	/**
 	 * A `QUERY` route: a safe, idempotent read whose criteria travel in the
 	 * body, validated like a `POST`'s.

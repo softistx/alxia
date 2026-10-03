@@ -46,7 +46,9 @@ Nothing scheduled yet.
   `cookies` and `body` are validated by any Standard Schema — Zod, Valibot,
   ArkType or one written by hand — and read as typed values; a refused
   request is a 400 naming every issue. A `QUERY` route is a safe read whose
-  criteria travel in a validated body. `listen` hands the routes to
+  criteria travel in a validated body. `route(operation, handler)` declares
+  the same route from data — `{ method, path, schema? }`, shared or
+  generated from an OpenAPI document. `listen` hands the routes to
   `Bun.serve`'s router, and `fetch` and `request` run the app in process.
 - **Replies the types hold to.** `reply(status, body)` accepts only a
   declared status with a body its schema accepts, and sends the schema's
