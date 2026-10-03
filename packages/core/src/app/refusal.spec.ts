@@ -432,11 +432,10 @@ describe('onRefusal, typed', () => {
 				// @ts-expect-error: a status its schemas do not declare
 				(_, { reply }) => reply(422, { detail: 'x' }),
 			);
+			const serverError = { response: { 500: z.string() } };
+			// One line: TypeScript reports it at the call or at the schema, by version.
 			// @ts-expect-error: schemas for client errors only
-			alxia().onRefusal(
-				{ response: { 500: z.object({ detail: z.string() }) } },
-				() => undefined,
-			);
+			alxia().onRefusal(serverError, () => undefined);
 		};
 		expect(_mistakes).toBeFunction();
 	});
