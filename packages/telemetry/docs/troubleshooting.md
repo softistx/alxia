@@ -372,9 +372,9 @@ app.use(telemetry({ service: 'checkout', exporters, traced: (ctx) => ctx.url.pat
 
 **When:** a route throws, and an `onError` hook answers with a `4xx`.
 
-**Why:** the error is recorded as the span's exception, but only a `5xx`, or a
-streamed body that fails midway, makes a span an error: a `400` the app chose to answer is the server
-working.
+**Why:** the error is recorded as the span's exception, but only a
+`5xx`, or a streamed body that fails midway, makes a span an error: a
+`400` the app chose to answer is the server working.
 
 **Fix:** none needed. For an error that should mark the span, answer it
 with a `5xx`, or let it throw to the `500`.

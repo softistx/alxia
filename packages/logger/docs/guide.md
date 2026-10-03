@@ -212,7 +212,8 @@ A response whose body is a stream of unknown length (a React Router page
 rendered as it goes, an `eventStream` reply, a `ReadableStream` of your
 own) is logged once that body has ended, not when the handler returned
 it. Its `duration` is the time to the last byte, `timeToHeaders` the time
-to the response, and `outcome` says how it ended:
+to the response, and `outcome` says how it ended (the schema here is Zod's,
+`bun add zod`; any Standard Schema works):
 
 ```ts
 import { alxia, eventStream } from '@alxia/core';
@@ -255,7 +256,7 @@ sent to a slow client takes longer than its `duration`.
 A raw `Response` a hook builds (`Response.json(…)`, `new Response(Bun.file(…))`)
 has no `Content-Length` header until Bun sends it, so it is treated as a
 stream: logged once sent, with `timeToHeaders` and an `outcome`. Set the
-header to have it logged at once, and a file sent with `sendfile`:
+header, and it is logged at once and a file is sent with `sendfile`:
 
 ```ts
 const file = Bun.file('report.pdf');
