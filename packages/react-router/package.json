@@ -6,6 +6,9 @@
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
+	"bin": {
+		"alxia-react-router": "./dist/cli/index.js"
+	},
 	"files": [
 		"dist",
 		"docs",
@@ -43,7 +46,8 @@
 	"alxia": {
 		"entrypoints": [
 			"src/index.ts",
-			"src/vite/index.ts"
+			"src/vite/index.ts",
+			"src/cli/index.ts"
 		]
 	},
 	"devDependencies": {

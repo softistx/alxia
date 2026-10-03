@@ -38,6 +38,10 @@ Nothing scheduled yet.
   `react-router` are peers.
 - **A `react-router-serve` of its own.** `bun build/server/index.js` is the
   server; there is no separate command to serve a build.
+- **A `reveal folder` target.** react-router-hono-server's `reveal folder`
+  writes `app/server/index.ts`. Here the plugin reads `app/server.ts` or
+  the file `alxia({ entry })` names, and `reveal` writes that file:
+  `alxia({ entry: 'app/server/index.ts' })` gives the folder form.
 - **Several runtimes from one plugin.** react-router-hono-server picks Node,
   Bun, Deno or Cloudflare with a `runtime` option; alxia is Bun's.
 
@@ -70,6 +74,12 @@ Nothing scheduled yet.
   shared. `react-router build` makes `build/server/index.js` the server,
   prerendering included: run, it listens on `PORT` and `HOST` and stops on
   `SIGTERM`; imported, it starts nothing.
+- **`bunx alxia-react-router reveal`.** The package's bin writes the
+  default server into the app, `app/server.ts` or `alxia({ entry })`'s
+  file: `createServer()` with `beforeAll`, `configure` and
+  `getLoadContext` commented, and the `Register` declaration. It refuses
+  to overwrite a file already there unless given `--force`, and runs under
+  Bun with no Node.
 - **Loaders typed with no type argument.** A `Register` declaration beside
   the server types `alxiaOf(context)`; `alxiaOf<typeof server>` and an app
   still work, and with neither it is `BaseContext`.

@@ -146,8 +146,78 @@ single-page app, the plugin does nothing.
 
 ## Customising the server
 
-Write `app/server.ts`, with `createServer()` as its default export. The
-example uses `@alxia/logger` and `@alxia/compress`
+Write `app/server.ts`, with `createServer()` as its default export, or let
+the package's bin write it for you.
+
+### Revealing the default server
+
+From the app's root, once `@alxia/react-router` is installed:
+
+```sh
+bunx alxia-react-router reveal
+```
+
+```text
+alxia-react-router: wrote app/server.ts, the server alxia() runs by default.
+Next: uncomment configure in app/server.ts to add the app's hooks and /api; bun run dev picks it up.
+```
+
+The file is the server the plugin runs without one, `createServer()`, so
+the app answers as before. It holds `beforeAll`, `configure` and
+`getLoadContext`, commented, each of which compiles once uncommented
+(`getLoadContext`'s key is yours to make, below), and the `Register`
+declaration that types the loaders:
+
+```ts
+// app/server.ts, as reveal writes it, less its comments
+import { createServer } from '@alxia/react-router';
+// import { userAgentContext } from './context';
+
+const server = createServer({
+	// beforeAll: (app) => app,
+	// configure: (app) => app.get('/api/health', ({ reply }) => reply.ok({ ok: true })),
+	// getLoadContext: (ctx, context) => {
+	// 	context.set(userAgentContext, ctx.request.headers.get('user-agent'));
+	// },
+});
+
+export default server;
+
+declare module '@alxia/react-router' {
+	interface Register {
+		server: typeof server;
+	}
+}
+```
+
+`getLoadContext`'s example sets a key of the app's own, imported from
+`app/context.ts`. Make it there before uncommenting both lines:
+
+```ts
+// app/context.ts
+import { createContext } from 'react-router';
+
+export const userAgentContext = createContext<string | null>(null);
+```
+
+- **Where it writes**: the `entry` that `alxia({ entry: '…' })` names in
+  `vite.config.ts`, or `server.ts` in React Router's `appDirectory`
+  (`app/` unless `react-router.config.ts` names another). It reads both as
+  string literals, past comments. A computed one is refused, since
+  reveal would write a file the plugin does not load: give it as a
+  literal.
+- **It never overwrites**: a file already there is left as it is, and the
+  command exits 1. `bunx alxia-react-router reveal --force` overwrites it.
+- **Bun only**: the bin starts with `#!/usr/bin/env bun`, so no Node is
+  needed.
+
+React Router's own rendering entries, `app/entry.server.tsx` and
+`app/entry.client.tsx`, are revealed by React Router:
+`bunx react-router reveal`.
+
+### By hand
+
+The example uses `@alxia/logger` and `@alxia/compress`
 (`bun add @alxia/logger @alxia/compress`); any plugin works the same way.
 
 ```ts

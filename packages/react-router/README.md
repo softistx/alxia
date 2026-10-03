@@ -61,6 +61,18 @@ warning.
 
 ## Customising: `app/server.ts`
 
+Start from the default server, written out:
+
+```sh
+bunx alxia-react-router reveal
+```
+
+It writes `app/server.ts` (or the file `alxia({ entry })` names):
+`createServer()` with `beforeAll`, `configure` and `getLoadContext`
+commented, and the `Register` declaration. It refuses to overwrite a file
+already there; `--force` overwrites it. Run it from the app's root, once
+`@alxia/react-router` is installed.
+
 The examples use `@alxia/logger` (`bun add @alxia/logger`); any plugin
 works the same way. The plugin picks the file up in dev and in the build:
 
@@ -219,6 +231,12 @@ From `@alxia/react-router/vite`:
 | --- | --- |
 | `alxia(options?)` | the Vite plugin. `entry` is the server file: `app/server.ts` by default, or the default server when there is none |
 | `AlxiaOptions` | its options |
+
+The `alxia-react-router` bin, run with `bunx`:
+
+| command | |
+| --- | --- |
+| `reveal [--force]` | writes the default server to `app/server.ts`, or to `alxia({ entry })`'s file; refuses an existing file without `--force` |
 
 ## Documentation
 
