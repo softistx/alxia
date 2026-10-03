@@ -26,6 +26,7 @@ each through. What prints nothing is under [Traps](#traps), by symptom.
 - [`TypeError: defineRateLimit: "…" has a per of …; it is a whole number of milliseconds, and must be at least 1`](#typeerror-defineratelimit--has-a-per-of--it-is-a-whole-number-of-milliseconds-and-must-be-at-least-1)
 - [`TypeError: defineRateLimit: "…" has a limit of …; it is a whole number of requests, and must be at least 1`](#typeerror-defineratelimit--has-a-limit-of--it-is-a-whole-number-of-requests-and-must-be-at-least-1)
 - [`TypeError: defineRateLimit: "…" has a burst of … and a per of …ms; burst × per must be at most 9007199254740 for the script to count exactly`](#typeerror-defineratelimit--has-a-burst-of--and-a-per-of-ms-burst--per-must-be-at-most-9007199254740-for-the-script-to-count-exactly)
+- [`TypeError: defineRateLimit: "…" would take longer than ten years to refill from empty (burst × per ÷ limit); check that per is in milliseconds`](#typeerror-defineratelimit--would-take-longer-than-ten-years-to-refill-from-empty-burst--per--limit-check-that-per-is-in-milliseconds)
 - [`TypeError: run on "…": wait is a whole number of milliseconds, 0 or more`](#typeerror-run-on--wait-is-a-whole-number-of-milliseconds-0-or-more)
 - [`RedisError: Connection has failed`](#rediserror-connection-has-failed)
 - [`GuardError: run on "…": the key was taken from this run before it finished (forgotten, or its lease of …ms went unrenewed), so a repeat may have run it too; its result was not stored`](#guarderror-run-on--the-key-was-taken-from-this-run-before-it-finished-forgotten-or-its-lease-of-ms-went-unrenewed-so-a-repeat-may-have-run-it-too-its-result-was-not-stored)
@@ -220,8 +221,10 @@ message is in the app's log.
 
 ### `TypeError: defineRateLimit: "…" has a per of …; it is a whole number of milliseconds, and must be at least 1`
 
-**When:** the first counted request, when `rateLimit` was given a
-`windowMs` that is not a whole number, or below 1, with `redisStore`.
+**When:** every counted request, when `redisStore`'s `consume` is called
+directly with a `windowMs` that is not a whole number, or below 1.
+`rateLimit` itself refuses such a `windowMs` at startup, with
+`TypeError: rateLimit: windowMs must be a whole number of 1 or more, not …`.
 
 ```text
 TypeError: defineRateLimit: "api:5/1.5" has a per of 1.5; it is a whole number of milliseconds, and must be at least 1
@@ -240,8 +243,10 @@ rateLimit({ limit: 5, windowMs: 1_500, store: redisStore(connection.client, { na
 
 ### `TypeError: defineRateLimit: "…" has a limit of …; it is a whole number of requests, and must be at least 1`
 
-**When:** the first counted request, with a `limit` of 0, below 0, or with
-a fraction.
+**When:** every counted request, when `redisStore`'s `consume` is called
+directly with a `limit` of 0, below 0, or with a fraction. `rateLimit`
+itself refuses such a `limit` at startup, with
+`TypeError: rateLimit: limit must be a whole number of 1 or more, not …`.
 
 ```text
 TypeError: defineRateLimit: "api:0/1000" has a limit of 0; it is a whole number of requests, and must be at least 1
@@ -258,21 +263,49 @@ rateLimit({ limit: 1, windowMs: 60_000, store: redisStore(connection.client, { n
 
 ### `TypeError: defineRateLimit: "…" has a burst of … and a per of …ms; burst × per must be at most 9007199254740 for the script to count exactly`
 
-**When:** the first counted request, with a very long window and a large
-limit — a million a year.
+**When:** every counted request, with a large `limit` over a long
+`windowMs`: `limit × windowMs` above 9,007,199,254,740 (about 9e12) — a
+million a year. `rateLimit` starts; the first request it counts answers a
+`500`, and so does every one after it.
 
 ```text
 TypeError: defineRateLimit: "api:1000000/31536000000" has a burst of 1000000 and a per of 31536000000ms; burst × per must be at most 9007199254740 for the script to count exactly
 ```
 
 **Why:** the script counts in exact integers; `limit × windowMs` past that
-bound would lose precision.
+bound would lose precision. `redisStore` hands each policy to
+`@nxgt/redis-guard` when it first counts under it, and a refused policy is
+not kept, so it is checked again, and refused again, on each request.
 
 **Fix:** state the same rate over a shorter window:
 
 ```ts
 rateLimit({ limit: 2_740, windowMs: 86_400_000, store: redisStore(connection.client, { name: 'api' }) });  // ~a million a year
 ```
+
+### `TypeError: defineRateLimit: "…" would take longer than ten years to refill from empty (burst × per ÷ limit); check that per is in milliseconds`
+
+**When:** every counted request, with a `windowMs` longer than ten
+365-day years — above 315,360,000,000 — and a `limit` of 28 or less. A
+larger `limit` over such a window hits the bound above first.
+
+```text
+TypeError: defineRateLimit: "api:1/315360000001" would take longer than ten years to refill from empty (burst × per ÷ limit); check that per is in milliseconds
+```
+
+**Why:** `redisStore` sets the guard's burst to `limit`, so the time to
+refill from empty is `windowMs` itself. The guard refuses one over ten
+years: it is far more often a window written in the wrong unit than a
+limit anyone means. As above, nothing is checked at startup, and the
+refused policy is checked again on each request.
+
+**Fix:** `windowMs` in milliseconds, at most ten years:
+
+```ts
+rateLimit({ limit: 1, windowMs: 365 * 86_400_000, store: redisStore(connection.client, { name: 'trial' }) });  // once a year
+```
+
+For "once, ever", a rate limit is the wrong tool: record that it happened.
 
 ### `TypeError: run on "…": wait is a whole number of milliseconds, 0 or more`
 
