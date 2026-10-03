@@ -155,6 +155,15 @@ describe('app.static', () => {
 		expect(response.headers.get('vary')).toBe('Accept-Encoding, Origin');
 	});
 
+	test('each Set-Cookie of the headers option is kept', async () => {
+		const headers = new Headers();
+		headers.append('set-cookie', 'a=1');
+		headers.append('set-cookie', 'b=2');
+		const app = alxia().static('/files', root, { headers });
+		const response = await app.request('/files/hello.txt');
+		expect(response.headers.getSetCookie()).toEqual(['a=1', 'b=2']);
+	});
+
 	test('dotfiles, traversal and missing files are 404s', async () => {
 		const app = make();
 		for (const path of [
