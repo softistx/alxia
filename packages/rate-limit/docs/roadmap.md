@@ -46,7 +46,8 @@ Nothing scheduled yet.
   `headers: 'legacy'`, or none.
 - **What is counted, your way.** `key` counts by an address, a token or an
   API key, sync or async; `skip` and an `undefined` key leave a request
-  uncounted.
+  uncounted. `rateLimit<{ user: User }>(…)` types them with what an earlier
+  plugin adds, and an app that does not give it cannot use the limit.
 - **A store contract.** `RateLimitStore` decides each request; `MemoryStore`
   counts a fixed window in one process, and `@alxia/redis`'s `redisStore`
   counts across processes. `reset(key)` forgets a key.

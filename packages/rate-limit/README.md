@@ -34,7 +34,7 @@ IETF draft's `RateLimit-Limit`, `-Remaining`, `-Reset` and `-Policy`.
 | --- | --- | --- |
 | `limit` | required | requests per window: a whole number, 1 or more |
 | `windowMs` | required | the window, in milliseconds: a whole number, 1 or more |
-| `key` | the client's address | what is counted: `(ctx) => string \| undefined`; `undefined` is not counted |
+| `key` | the client's address | what is counted: `(ctx) => string \| undefined`; `undefined` is not counted. `rateLimit<{ user: User }>(…)` lets it read a `user` an earlier plugin adds |
 | `store` | `MemoryStore` | where: `redisStore` from `@alxia/redis`, or your own `RateLimitStore` |
 | `skip` | none | requests not counted |
 | `headers` | `'draft'` | `'legacy'` for `X-RateLimit-*`, or `false` |

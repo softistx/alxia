@@ -9,6 +9,7 @@ export {
 	type RouteMethod,
 	type RoutesOf,
 } from './app/alxia';
+export { definePlugin } from './app/define-plugin';
 export type {
 	AroundHook,
 	RequestHook,
@@ -33,8 +34,10 @@ export type {
 	Method,
 	Outcome,
 	OutcomeOf,
+	ProvidedBy,
 	RedirectFunction,
 	RequestContext,
+	Requiring,
 	ResponseSchemas,
 	ResponseSettings,
 	RouteDetail,
