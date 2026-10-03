@@ -138,10 +138,12 @@ TypeError: rateLimit: windowMs must be a whole number of 1 or more, not NaN
 **Why:** a `limit` of 0 would refuse every request, and a window of 0 or
 less would never end one.
 
-**Fix:** pass whole numbers, and parse the environment before passing it:
+**Fix:** pass whole numbers. A value read from the environment is a
+string, or `undefined` when the variable is unset: give it a default, and
+let an empty or non-numeric value still fail at startup, as it should:
 
 ```ts
-app.use(rateLimit({ limit: Number(env.RATE_LIMIT ?? 100), windowMs: 60_000 }));
+app.use(rateLimit({ limit: Number(Bun.env.RATE_LIMIT ?? 100), windowMs: 60_000 }));
 ```
 
 ## Responses

@@ -48,14 +48,11 @@ it, and its 429 to each of those routes' types.
 | `key` | `(ctx: BaseContext) => string \| undefined \| Promise<…>` | `ctx.ip` | what is counted; `undefined` is not counted |
 | `store` | `RateLimitStore` | a new `MemoryStore` | where the counts are kept |
 | `skip` | `(ctx: BaseContext) => boolean` | none | requests not counted at all |
+| `headers` | `'draft' \| 'legacy' \| false` | `'draft'` | which rate-limit headers each counted response carries |
 
 A `limit` or a `windowMs` that is not a whole number of 1 or more makes
 `rateLimit()` throw a `TypeError` when it is called, so the app fails at
 startup ([troubleshooting](troubleshooting.md#typeerror-ratelimit--must-be-a-whole-number-of-1-or-more-not-)).
-| `headers` | `'draft' \| 'legacy' \| false` | `'draft'` | which rate-limit headers each counted response carries |
-
-Neither `limit` nor `windowMs` is checked: `limit: 0` refuses every counted
-request.
 
 ### `key`
 
