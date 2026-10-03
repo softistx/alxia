@@ -70,7 +70,12 @@ export function permission<
 		const body: PermissionRefusedBody = { error };
 		return body;
 	};
-	return definePlugin<RequiresOf<LoadCtx & SubjectCtx & CheckCtx>>()((app) =>
+	return definePlugin<
+		RequiresOf<
+			LoadCtx & SubjectCtx & CheckCtx,
+			AnnotatedAny<LoadCtx, SubjectCtx>
+		>
+	>()((app) =>
 		app.derive(async (ctx) => {
 			const who = subject === undefined ? userOf(ctx) : await subject(ctx);
 			if (who === null) return ctx.reply(401, refuse('unauthenticated'));
@@ -87,6 +92,20 @@ export function permission<
 		}),
 	);
 }
+
+/**
+ * The callback to name when `RequiresOf` refuses one annotated `any`: `load`
+ * or `subject` when it is that one, `ctx` otherwise. An `any` in any of the
+ * three makes their intersection `any`, so `RequiresOf` cannot tell which;
+ * a `Record<string, any>` passes the same test.
+ */
+type AnnotatedAny<LoadCtx, SubjectCtx> = [LoadCtx] extends [
+	{ readonly '~any': 1 },
+]
+	? 'load'
+	: [SubjectCtx] extends [{ readonly '~any': 1 }]
+		? 'subject'
+		: 'ctx';
 
 /**
  * A `load` reading one path parameter, as it arrived: `find(id)`, or `null`

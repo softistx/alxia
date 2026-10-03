@@ -62,6 +62,9 @@ alxia().use(auth).use(byUser); // auth derives user
 alxia().use(byUser); // a compile error: this app gives no `user`
 ```
 
+A `resolve` annotated `any` would require nothing, so the plugin is refused
+on every app: annotate what it reads, or leave it unannotated.
+
 ## Options
 
 | option | default | |

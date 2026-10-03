@@ -269,6 +269,10 @@ with a type it does not give — `({ pathParams }: { pathParams: string })` —
 is refused the same way.
 A callback left unannotated reads `BaseContext` only, and adds nothing to
 what the guard requires.
+Annotated `unknown` or `object`, it adds nothing either. Annotated `any`,
+it would read anything and require nothing, so the guard is refused on
+every app instead, with a message naming `load`, `subject` or `ctx`:
+[`the plugin's load reads its context as any: annotate what it reads, or leave it unannotated`](../troubleshooting.md#the-plugins-load-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated).
 
 The default subject — no `subject` option — reads the `user`
 [`session()`](sessions.md) derived at runtime, and is not part of what the

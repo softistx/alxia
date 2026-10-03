@@ -63,3 +63,6 @@ Nothing scheduled yet.
   tenant, a member or a flag an earlier plugin derived; an app that does
   not give it cannot use the guard. Unannotated, they read the request
   alone and the guard requires nothing.
+- **No silent `any`.** A `load`, `subject` or `ctx` annotated `any` would
+  require nothing and turn the check off; the guard is refused on every
+  app instead, with a message naming the callback.

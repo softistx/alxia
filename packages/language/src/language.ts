@@ -85,7 +85,7 @@ export function language<
 			`language(): the fallback "${settings.fallback}" is not supported`,
 		);
 	}
-	return definePlugin<RequiresOf<Ctx>>()((app) =>
+	return definePlugin<RequiresOf<Ctx, 'resolve'>>()((app) =>
 		app.derive((ctx): LanguageContext<L> => {
 			const found = decide(settings, ctx);
 			respond(settings, ctx, found);

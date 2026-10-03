@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { type Alxia, alxia, type ContextOf, type RoutesOf } from './alxia';
 import { definePlugin } from './define-plugin';
-import type { BaseContext, Empty, RequiresOf } from './types';
+import type { BaseContext, Empty, ProvidedBy, RequiresOf } from './types';
 
 interface User {
 	readonly id: string;
@@ -142,6 +142,16 @@ describe('definePlugin', () => {
 		};
 		expect(_limits).toBeFunction();
 	});
+	test('a union requirement, or never, is refused with one message', () => {
+		expectTypeOf<
+			ProvidedBy<Empty, { a: string } | { b: string }>
+		>().toEqualTypeOf<{
+			readonly '~requires': "this app's context does not give what the plugin reads";
+		}>();
+		expectTypeOf<ProvidedBy<Empty, never>>().toEqualTypeOf<{
+			readonly '~requires': "this app's context does not give what the plugin reads";
+		}>();
+	});
 });
 
 /**
@@ -193,6 +203,60 @@ describe('RequiresOf', () => {
 			const byUrl = audit(({ url }: { url: string }) => url);
 			// @ts-expect-error the plugin reads "url", which this app's context gives with another type
 			alxia().use(byUrl);
+		};
+		expect(_refused).toBeFunction();
+	});
+
+	test('a callback annotated any is refused on every app, by its name', () => {
+		expectTypeOf<RequiresOf<any>>().toEqualTypeOf<{
+			readonly '~any': "the plugin's callback reads its context as any: annotate what it reads, or leave it unannotated";
+		}>();
+		expectTypeOf<RequiresOf<any, 'who'>>().toEqualTypeOf<{
+			readonly '~any': "the plugin's who reads its context as any: annotate what it reads, or leave it unannotated";
+		}>();
+		// A key annotated any is a key read: only an app that gives it passes.
+		expectTypeOf<RequiresOf<{ user: any }>>().toEqualTypeOf<{ user: any }>();
+		// Any string key as any reads anything too.
+		expectTypeOf<RequiresOf<Record<string, any>>>().toEqualTypeOf<
+			RequiresOf<any>
+		>();
+		expectTypeOf<
+			RequiresOf<BaseContext & { [key: string]: any }>
+		>().toEqualTypeOf<RequiresOf<any>>();
+		// never is no any: refused as before, by ProvidedBy's own message.
+		expectTypeOf<RequiresOf<never>>().not.toEqualTypeOf<RequiresOf<any>>();
+		const byRecord = audit((ctx: Record<string, any>) => String(ctx['user']));
+		const loose = audit((ctx: any) => String(ctx.user));
+		const _refused = () => {
+			// @ts-expect-error the plugin's callback reads its context as any
+			alxia().use(loose);
+			// @ts-expect-error the plugin's callback reads its context as any, whatever the app gives
+			alxia().use(session).use(loose);
+			// @ts-expect-error the plugin's callback reads its context as any, through an index signature
+			alxia().use(byRecord);
+		};
+		expect(_refused).toBeFunction();
+	});
+
+	test('a callback annotated unknown or object requires nothing', async () => {
+		const byUnknown = audit((ctx: unknown) => typeof ctx);
+		const byObject = audit((ctx: object) => String('url' in ctx));
+		expectTypeOf(byUnknown['~requires']).toEqualTypeOf<Empty>();
+		expectTypeOf(byObject['~requires']).toEqualTypeOf<Empty>();
+		const app = alxia()
+			.use(byUnknown)
+			.get('/unknown', ({ actor, reply }) => reply(200, actor))
+			.use(byObject)
+			.get('/object', ({ actor, reply }) => reply(200, actor));
+		expect(await (await app.request('/unknown')).text()).toBe('object');
+		expect(await (await app.request('/object')).text()).toBe('true');
+	});
+
+	test('a callback annotated Record<string, unknown> is refused, as before', () => {
+		const byRecord = audit((ctx: Record<string, unknown>) => typeof ctx['url']);
+		const _refused = () => {
+			// @ts-expect-error a string index of unknown is a key no app's context gives
+			alxia().use(byRecord);
 		};
 		expect(_refused).toBeFunction();
 	});

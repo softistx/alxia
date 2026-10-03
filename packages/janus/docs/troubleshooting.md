@@ -23,6 +23,7 @@ symptom, under [Traps](#traps).
 - [`Property 'tenant' does not exist on type 'BaseContext'`](#property-tenant-does-not-exist-on-type-basecontext)
 - [`the plugin reads "tenant", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads-tenant-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
 - [`the plugin reads "tenant", which this app's context gives with another type`](#the-plugin-reads-tenant-which-this-apps-context-gives-with-another-type)
+- [`the plugin's load reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-load-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
 **Runtime**
 
@@ -347,6 +348,44 @@ permission(access, 'view', 'record', ({ tenant, pathParams }: BaseContext & { te
 
 More on this message in
 [`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-gives-with-another-type).
+
+### `the plugin's load reads its context as any: annotate what it reads, or leave it unannotated`
+
+```text
+error TS2769: No overload matches this call.
+  …
+        Types of property ''~requires'' are incompatible.
+          Type '{ readonly '~any': "the plugin's load reads its context as any: annotate what it reads, or leave it unannotated"; }' is not assignable to type '"the plugin's load reads its context as any: annotate what it reads, or leave it unannotated"'.
+```
+
+The same message names `subject` or `ctx` when that callback is the one at
+fault.
+
+**When:** `load`, `subject` or `ctx` has its parameter annotated `any` —
+`(ctx: any) => records.get(ctx.tenant.id)` — and the guard is used, on any
+app, whatever its context gives.
+
+**Why:** an `any` parameter reads any key and says nothing of what it
+reads, so the guard would require nothing, and an app without a `tenant`
+would be accepted, and throw on every guarded request. The guard is
+refused instead.
+
+**Fix:** annotate what the callback reads, and use the plugin that adds it
+first:
+
+```ts
+const byTenant = permission(access, 'view', 'record', ({ tenant, pathParams }: BaseContext & { tenant: Tenant }) =>
+	tenant.records.get(pathParams['id'] ?? '') ?? null,
+);
+
+app.use(tenancy).use(byTenant);
+```
+
+Or leave it unannotated when it reads only the request, as `byParam`'s
+`load` does.
+
+More on this message in
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugins--reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated).
 
 ## Runtime
 

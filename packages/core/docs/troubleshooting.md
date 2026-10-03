@@ -16,6 +16,7 @@ thrown when the app is built, a response body, or a line in the server log.
 - [`the plugin reads "…", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
 - [`the plugin reads "…", which this app's context gives with another type`](#the-plugin-reads--which-this-apps-context-gives-with-another-type)
 - [`this app's context does not give what the plugin reads`](#this-apps-context-does-not-give-what-the-plugin-reads)
+- [`the plugin's … reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins--reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 - [`… is not assignable to type 'ProvidedBy<C, …>'`](#-is-not-assignable-to-type-providedbyc-)
 - [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
 
@@ -306,6 +307,55 @@ symbol key, and a message can only name a string or number key.
 
 **Fix:** give what the plugin requires before using it, or, if you wrote
 the plugin, name its requirement with string keys.
+
+### `the plugin's … reads its context as any: annotate what it reads, or leave it unannotated`
+
+**When:** an app uses a plugin whose requirement is inferred from a
+callback (with `RequiresOf`), and that callback's parameter is annotated
+`any`, or `Record<string, any>`. `@alxia/language`'s `resolve` and
+`@alxia/janus`'s `load`, `subject` and `ctx` are such callbacks; the
+message names the one at fault.
+
+```ts
+const audit = <Ctx extends object = BaseContext>(who: (ctx: BaseContext & Ctx) => string) =>
+	definePlugin<RequiresOf<Ctx, 'who'>>()((app) => app /* … */);
+
+alxia().use(audit((ctx: any) => ctx.user.id));
+```
+
+```text
+error TS2769: No overload matches this call.
+  …
+        Types of property ''~requires'' are incompatible.
+          Type '{ readonly '~any': "the plugin's who reads its context as any: annotate what it reads, or leave it unannotated"; }' is not assignable to type '"the plugin's who reads its context as any: annotate what it reads, or leave it unannotated"'.
+```
+
+Every app is refused, whatever its context gives.
+
+**Why:** a parameter annotated `any` reads any key, of any type, and says
+nothing of what it reads. The plugin would require nothing, so `use` would
+accept it on an app without the `user` the callback reads, and the request
+would throw at runtime. A requirement that turns the check off without a
+word is refused instead.
+
+**Fix:** annotate what the callback reads. The app must then give it before
+the plugin:
+
+```ts
+alxia().use(auth).use(audit(({ user }: BaseContext & { user: User }) => user.id));
+```
+
+Or leave the parameter unannotated, if it reads only the request. It is
+then typed `BaseContext` and requires nothing:
+
+```ts
+alxia().use(audit((ctx) => ctx.ip ?? 'unknown'));
+```
+
+A parameter annotated `unknown` or `object` requires nothing, and is not
+refused: it reads no key without a check or a cast of its own. A key
+annotated `any`, as in `{ user: any }`, is still a key the plugin reads:
+an app must give some `user`.
 
 ### `… is not assignable to type 'ProvidedBy<C, …>'`
 

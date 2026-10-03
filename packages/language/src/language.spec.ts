@@ -173,6 +173,48 @@ describe('language', () => {
 		expect(_refused).toBeFunction();
 	});
 
+	test('a resolver annotated any is refused on every app', () => {
+		const loose = language({
+			supported: ['en'],
+			fallback: 'en',
+			resolve: (ctx: any) => ctx.user.locale,
+		});
+		expectTypeOf(loose['~requires']).toEqualTypeOf<{
+			readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated";
+		}>();
+		const _refused = () => {
+			// @ts-expect-error the plugin's resolve reads its context as any
+			alxia().use(loose);
+			alxia()
+				.derive(() => ({ user: { locale: 'fr' } }))
+				// @ts-expect-error the plugin's resolve reads its context as any, whatever the app gives
+				.use(loose);
+		};
+		expect(_refused).toBeFunction();
+	});
+
+	test('a resolver annotated unknown or object needs nothing', async () => {
+		const byUnknown = language({
+			supported: ['en', 'fr'],
+			fallback: 'en',
+			resolve: (ctx: unknown) =>
+				ctx instanceof Object && 'url' in ctx ? 'fr' : undefined,
+		});
+		const byObject = language({
+			supported: ['en', 'fr'],
+			fallback: 'en',
+			resolve: (ctx: object) => ('url' in ctx ? 'fr' : undefined),
+		});
+		expectTypeOf(byUnknown['~requires']).toEqualTypeOf<Empty>();
+		expectTypeOf(byObject['~requires']).toEqualTypeOf<Empty>();
+		for (const plugin of [byUnknown, byObject]) {
+			const served = alxia()
+				.use(plugin)
+				.get('/', ({ language: current, reply }) => reply(200, current));
+			expect(await (await served.request('/')).text()).toBe('fr');
+		}
+	});
+
 	test('a fallback it does not support is refused', () => {
 		// @ts-expect-error: 'de' is not one of the supported languages
 		expect(() => language({ supported: ['en', 'fr'], fallback: 'de' })).toThrow(
