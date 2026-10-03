@@ -4,7 +4,7 @@
  */
 import { handle } from './chain';
 import type { Definition, Runtime } from './definition';
-import { internalError, routingError } from './send';
+import { failed, routingError } from './send';
 import { UPGRADED, upgradeSocket } from './socket';
 import type { RequestContext } from './types';
 
@@ -35,8 +35,7 @@ export async function serve(
 	try {
 		return await run(0);
 	} catch (error) {
-		console.error(error);
-		return internalError();
+		return failed(error, ctx.request);
 	}
 }
 
@@ -58,8 +57,7 @@ async function pipeline(
 		}
 		response ??= await route(runtime, ctx, path);
 	} catch (error) {
-		console.error(error);
-		response = internalError();
+		response = failed(error, ctx.request);
 	}
 	if (response === UPGRADED) return undefined as never;
 	for (const hook of runtime.globals.onResponse) {

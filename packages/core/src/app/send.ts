@@ -23,6 +23,23 @@ export function internalError(): Response {
 	return toResponse(500, internal, new Headers());
 }
 
+/**
+ * What a request that failed with `error` gets. A client that hung up
+ * mid-request (its `request.signal` aborted, the body read failing with an
+ * `AbortError`) is no app error: nothing is logged, and the 499 nobody
+ * reads is only what an `onResponse` hook, a logger's, sees. Any other
+ * error is logged and answered 500.
+ */
+export function failed(error: unknown, request: Request): Response {
+	if (request.signal.aborted)
+		return new Response(null, { status: CLIENT_GONE });
+	console.error(error);
+	return internalError();
+}
+
+/** nginx's "client closed request": the status of a request its client left. */
+export const CLIENT_GONE = 499;
+
 /** A reply as it is, with what the route set on its response. */
 export function send(
 	reply: AnyReply,
