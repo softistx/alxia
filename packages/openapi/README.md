@@ -79,7 +79,7 @@ implemented(app, api); // throws, naming each operation with no route
 | `docs(app, options)`, `DocsOptions` | a plugin serving it, and a reference page. `path`, `ui` too |
 | `toJsonSchema(schema, side, convert?)` | one schema as JSON Schema 2020-12 |
 | `openApiPath(path)`, `operationId(method, path)` | the naming the document uses |
-| `OpenApiDocument`, `OpenApiInfo`, `Operation`, `JsonSchema`, `Side`, `Converter` | its types: `convert` is a `Converter` |
+| `OpenApiDocument`, `OpenApiInfo`, `Operation`, `MediaType`, `JsonSchema`, `Side`, `Converter` | its types: `convert` is a `Converter`, and a `MediaType` is one entry of a body's `content` |
 
 ## Documentation
 
