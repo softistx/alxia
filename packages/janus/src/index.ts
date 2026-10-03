@@ -20,13 +20,10 @@ export {
 	type PermissionRefusedBody,
 	permission,
 } from './permission';
+export { type SendSessionOptions, sendSession, signOut } from './send';
 export {
-	type Auth,
-	type SendSessionOptions,
 	type SessionOptions,
-	sendSession,
 	session,
-	signOut,
 	type UnauthenticatedBody,
-	type UserOfAuth,
 } from './session';
+export type { Auth, RequestAuth, SessionOpened, UserOfAuth } from './types';

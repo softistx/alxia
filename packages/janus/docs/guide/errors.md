@@ -7,11 +7,11 @@ it; and `bodyOf` and `statusOf`, the two functions it is made of.
 
 ```ts
 import { alxia } from '@alxia/core';
-import { janusErrors, sendSession } from '@alxia/janus';
+import { janusErrors, session } from '@alxia/janus';
 import { createMemoryStores, janus, scryptHasher } from '@nxgt/janus';
 import { z } from 'zod';
 
-const auth = janus({
+const accounts = janus({
 	user: z.object({ email: z.email(), name: z.string() }),
 	password: { login: 'email', minLength: 12 },
 	store: createMemoryStores(),
@@ -22,9 +22,10 @@ const SignUp = z.object({ email: z.string(), name: z.string(), password: z.strin
 
 const app = alxia()
 	.use(janusErrors())
-	.post('/signup', { body: SignUp }, async (ctx) => {
-		const signedUp = await auth.signUp(ctx.body); // throws a JanusError when it refuses
-		return ctx.reply(201, { id: sendSession(ctx, auth, signedUp).id });
+	.use(session(accounts))
+	.post('/signup', { body: SignUp }, async ({ body, auth, reply }) => {
+		const signedUp = await accounts.signUp(body); // throws a JanusError when it refuses
+		return reply.created({ id: auth.send(signedUp).id });
 	});
 ```
 
@@ -125,7 +126,7 @@ The 4xx are not reported: they are the client's.
 
 The refusals are in the type of every route after the plugin, so
 `@alxia/client` reads them. A 401 from a route behind
-`session(auth, { required: true })` is either the session's
+`session(accounts, { required: true })` is either the session's
 `{ error: 'unauthenticated' }` or janus's `{ code }`; narrow on the key:
 
 ```ts
@@ -135,7 +136,7 @@ import { janusErrors, session } from '@alxia/janus';
 
 const app = alxia()
 	.use(janusErrors())
-	.use(session(auth, { required: true }))
+	.use(session(accounts, { required: true }))
 	.get('/me', ({ user, reply }) => reply(200, { name: user.name }));
 
 const me = await client(app).get('/me');

@@ -18,7 +18,8 @@ import {
 import { z } from 'zod';
 import { type JanusErrorBody, janusErrors } from './errors';
 import { byParam, permission } from './permission';
-import { type SessionOptions, sendSession, session, signOut } from './session';
+import { sendSession, signOut } from './send';
+import { type SessionOptions, session } from './session';
 
 const ada = { email: 'ada@example.test', name: 'Ada Lovelace' };
 const password = 'correct horse';
@@ -167,6 +168,56 @@ describe('session', () => {
 		expect((await app.request('/whoami')).status).toBe(200);
 	});
 
+	test('ctx.auth: send, signOut and device, bound to the request', async () => {
+		const { auth } = setup();
+		await auth.patient.signUp({ ...ada, password });
+		const app = alxia()
+			.use(janusErrors())
+			.use(session(auth, { type: 'patient', device: { name: 'my-device' } }))
+			.post(
+				'/signin',
+				{ body: z.object({ email: z.string(), password: z.string() }) },
+				async ({ body, auth: current, reply }) => {
+					expectTypeOf(current.device).toEqualTypeOf<string | null>();
+					const signedIn = await auth.patient.signIn(body);
+					return reply.ok({
+						id: current.send(signedIn).id,
+						device: current.device,
+					});
+				},
+			)
+			.post('/signout', async ({ auth: current, reply }) =>
+				reply.ok(await current.signOut()),
+			)
+			.get('/me', ({ user, reply }) => reply.ok({ name: user?.name ?? null }));
+
+		const signedIn = await app.request('/signin', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				cookie: 'my-device=d-1',
+			},
+			body: JSON.stringify({ email: ada.email, password }),
+		});
+		expect((await signedIn.json()).device).toBe('d-1');
+		const token = tokenOf(signedIn);
+		expect(token).not.toBe('');
+		const cookie = `janus-session=${token}`;
+		expect(
+			await (await app.request('/me', { headers: { cookie } })).json(),
+		).toEqual({ name: 'Ada Lovelace' });
+
+		const out = await app.request('/signout', {
+			method: 'POST',
+			headers: { cookie },
+		});
+		expect(await out.json()).toBe(true);
+		expect(cookieOf(out)).toContain('janus-session=;');
+		expect(
+			await (await app.request('/me', { headers: { cookie } })).json(),
+		).toEqual({ name: null });
+	});
+
 	test('required as a boolean: user may be null, and the 401 is in the type', async () => {
 		const { auth } = setup();
 		for (const required of [true, false]) {
@@ -189,6 +240,99 @@ describe('session', () => {
 		const forwarded = (options: SessionOptions<'patient'>) =>
 			session(auth, options);
 		expect(forwarded({}).routes).toEqual([]);
+	});
+
+	test('session() twice, one instance: a request is looked up once', async () => {
+		const { auth, outage } = setup();
+		await auth.patient.signUp({ ...ada, password });
+		const { token } = await auth.patient.signIn({ email: ada.email, password });
+		const lookedUp = { count: 0 };
+		const counted = {
+			...auth,
+			authenticate: ((...args: Parameters<typeof auth.authenticate>) => {
+				lookedUp.count++;
+				return auth.authenticate(...args);
+			}) as typeof auth.authenticate,
+		};
+		const app = alxia()
+			.use(janusErrors())
+			.use(session(counted))
+			.use(session(counted, { required: true }))
+			.get('/me', ({ user, reply }) => reply.ok({ type: user.type }))
+			.use(session(counted, { type: 'patient' }))
+			.get('/patient', ({ reply }) => reply.ok('patient'));
+		const cookie = `janus-session=${token}`;
+		expect((await app.request('/me', { headers: { cookie } })).status).toBe(
+			200,
+		);
+		expect(lookedUp.count).toBe(1);
+		lookedUp.count = 0;
+		await app.request('/patient', { headers: { cookie } });
+		expect(lookedUp.count).toBe(2); // another `type` is its own lookup
+
+		// A failed lookup is not kept: the same Request object asks again.
+		const request = new Request('http://localhost/me', { headers: { cookie } });
+		outage.on = true;
+		expect((await app.fetch(request)).status).toBe(503);
+		outage.on = false;
+		expect((await app.fetch(request)).status).toBe(200);
+	});
+
+	test('a renewal behind two session() is sent once', async () => {
+		const { auth, clock } = setup();
+		await auth.patient.signUp({ ...ada, password });
+		const { token } = await auth.patient.signIn({ email: ada.email, password });
+		const app = alxia()
+			.use(session(auth))
+			.use(session(auth, { required: true }))
+			.get('/me', ({ reply }) => reply.ok('me'));
+		clock.advance(2 * DAY);
+		const renewed = await app.request('/me', {
+			headers: { cookie: `janus-session=${token}` },
+		});
+		expect(
+			renewed.headers
+				.getSetCookie()
+				.filter((value) => value.startsWith('janus-session=')),
+		).toHaveLength(1);
+	});
+
+	test('auth.send sets the device cookie under the name session() gives', async () => {
+		const key = Buffer.from(
+			crypto.getRandomValues(new Uint8Array(32)),
+		).toString('base64');
+		const accounts = janus({
+			user: z.object({ email: z.email(), name: z.string() }),
+			password: { login: 'email' },
+			store: createMemoryStores(),
+			hasher: scryptHasher({ cost: 10 }),
+			devices: { keys: [{ id: 'k1', key }] },
+		});
+		await accounts.signUp({ ...ada, password });
+		const app = alxia()
+			.use(session(accounts, { device: { name: 'my-device' } }))
+			.post(
+				'/signin',
+				{ body: z.object({ email: z.string(), password: z.string() }) },
+				async ({ body, auth, reply }) => {
+					const signedIn = await accounts.signIn(body, { device: auth.device });
+					return reply.ok({ id: auth.send(signedIn).id });
+				},
+			);
+		const first = await app.request('/signin', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: JSON.stringify({ email: ada.email, password }),
+		});
+		const device = first.headers
+			.getSetCookie()
+			.find((value) => value.startsWith('my-device='));
+		expect(device).toContain('HttpOnly');
+		expect(
+			first.headers
+				.getSetCookie()
+				.some((value) => value.startsWith('janus-device=')),
+		).toBe(false);
 	});
 
 	test('a renewed session is sent again, only to a cookie client', async () => {

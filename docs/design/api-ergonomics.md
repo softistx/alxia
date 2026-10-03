@@ -84,32 +84,37 @@ return reply(200, { id: sendSession(ctx, auth, signedIn).id });
 await signOut(ctx, auth);
 ```
 
-Proposed: `session(auth, …)` also derives `auth`, bound to the request:
+**Revised in the slice** (owner, 2026-10-02). The first proposal had
+`ctx.auth.signIn(body)` sign in by itself. That cannot work: in
+`@nxgt/janus`, sign-in lives on each user type and each flow
+(`accounts.patient.signIn`, `signUp`, `signInCode`, magic links, step-up…), and
+each answers either a session or a challenge. So the context binds what
+every flow ends with, and the sign-in call stays on the instance:
 
 ```ts
-app.use(session(auth)).post('/sign-in', { body: Credentials }, async ({ body, auth, reply }) => {
-	const user = await auth.signIn(body); // signs in, sets the cookie, keeps the device
-	return reply.ok({ id: user.id });
-});
+const accounts = janus({ … }); // the instance: named `accounts` in the docs, so `auth` is free
 
-app.post('/sign-out', async ({ auth, reply }) => {
-	await auth.signOut(); // revokes, clears the cookie whatever the answer
-	return reply.noContent();
-});
+app
+	.use(session(accounts))
+	.post('/sign-in', { body: Credentials }, async ({ body, auth, reply }) => {
+		const signedIn = await accounts.patient.signIn(body, { device: auth.device });
+		return reply.ok({ id: auth.send(signedIn).id }); // session cookie, device cookie
+	})
+	.post('/sign-out', async ({ auth, reply }) => reply.ok(await auth.signOut()));
 ```
 
+- `ctx.auth` is `RequestAuth`. `device` is `deviceOf(ctx)`, `send(signedIn)`
+  is `sendSession(ctx, accounts, signedIn)`, and `signOut()` is
+  `signOut(ctx, accounts)`, all bound to the request.
+  `SessionOptions.device` names the device cookie for both.
+- The name is `auth`, as the owner chose. The docs now name the instance
+  `accounts` (`janus` is the factory's name), so the context's `auth`
+  shadows nothing.
 - `user` and `session` stay flat, as today.
-- `sendSession`, `signOut` and `deviceOf` stay exported for code outside a
-  route (a job, a test) until we know nobody needs them.
-- **Open: the name.** Code that uses janus already names its `Auth` instance
-  `auth` (every example does). So `({ auth })` would shadow it inside the
-  handler, the same trap `@alxia/language`'s docs record for `language`. The
-  alternatives are `ctx.janus` or `ctx.account`. Recommended: `auth`
-  anyway, as asked. The handler then no longer needs the imported one, and
-  the guide says so.
-- A sign-in route usually runs without a session. It reads `ctx.auth`
-  after `session(auth)` (not required), or after a smaller `janus(auth)`
-  plugin that only adds `auth`. That choice is made in the slice.
+- `sendSession`, `signOut` and `deviceOf` stay exported, for code outside a
+  route (a job, a test).
+- A sign-in route sits behind a session that is not required. Otherwise an
+  anonymous request would get its 401 before the route runs.
 
 ### The other packages
 
@@ -146,7 +151,7 @@ const tenant = definePlugin<{ user: { tenantId: string } }>()((app) =>
 	app.derive(({ user }) => ({ tenant: tenants.get(user.tenantId) })),
 );
 
-base.use(session(auth, { required: true })).use(tenant); // ok
+base.use(session(accounts, { required: true })).use(tenant); // ok
 alxia().use(tenant); // compile error: the app gives no `user`
 ```
 

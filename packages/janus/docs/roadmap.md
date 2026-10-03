@@ -31,18 +31,23 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **The user in the context.** `use(session(auth))` hands the routes after
-  it `user` and `session`, typed by the user schema and narrowed by `type`;
-  with `required: true`, an anonymous request is a typed 401 and `user` is
-  never `null`.
-- **The session cookie kept and renewed.** `sendSession` sets it after a
-  sign-up or a sign-in and keeps the token out of the body; `signOut`
-  revokes the session and clears it; a session renewed in passing is sent
-  again, only to a client that presented it as a cookie, and never over one
-  the route set itself.
-- **Devices remembered.** `deviceOf` and `sendSession` read and write the
-  device cookie under the name `@nxgt/janus-hono` uses, so a device one
-  remembers the other does too.
+- **The user in the context.** `use(session(accounts))` hands the routes
+  after it `user`, `session` and `auth`, typed by the user schema and
+  narrowed by `type`; with `required: true`, an anonymous request is a typed
+  401 and `user` is never `null`. A required `session()` behind an open one
+  shares its lookup.
+- **Signing in and out on the context.** `ctx.auth.send(signedIn)` sets the
+  session cookie — and the device cookie, with a `deviceToken` — and answers
+  the user; `ctx.auth.signOut()` revokes the session and clears it;
+  `ctx.auth.device` reads the device cookie, named by
+  `session(accounts, { device })`. `sendSession`, `signOut` and `deviceOf`
+  stay, unbound, for code outside a route.
+- **The session cookie kept and renewed.** The token stays out of the body;
+  a session renewed in passing is sent again, only to a client that
+  presented it as a cookie, and never over one the route set itself.
+- **Devices remembered.** `ctx.auth.device` and `ctx.auth.send` read and
+  write the device cookie under the name `@nxgt/janus-hono` uses, so a
+  device one remembers the other does too.
 - **Janus's refusals answered.** `janusErrors()` answers every `JanusError`
   with its status and a body holding only what a client can act on, typed
   on the routes after it, with `Retry-After` for a throttled sign-in; an

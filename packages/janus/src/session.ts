@@ -3,20 +3,13 @@ import {
 	alxia,
 	type Empty,
 	type Reply,
-	type ResponseSettings,
 	withHeaders,
 } from '@alxia/core';
-import type { Authenticated, Session, SharedApi } from '@nxgt/janus';
-import { type DeviceCookieOptions, sendDevice } from './device';
-
-/** Anything `janus()` answered: the part of it this package calls. */
-export type Auth<U extends { readonly type: string }> = Pick<
-	SharedApi<U>,
-	'authenticate' | 'signOut' | 'cookie'
->;
-
-/** The users an `auth` instance knows, as a union narrowed by `user.type`. */
-export type UserOfAuth<A> = A extends Auth<infer U> ? U : never;
+import type { Session } from '@nxgt/janus';
+import { type DeviceCookieOptions, deviceOf } from './device';
+import { authenticateOnce, type Found } from './lookup';
+import { sendSession, signOut } from './send';
+import type { Auth, RequestAuth, UserOfAuth } from './types';
 
 export interface SessionOptions<T extends string> {
 	/** Only a user of this type is authenticated here; any other is anonymous. */
@@ -28,6 +21,8 @@ export interface SessionOptions<T extends string> {
 	 * may be `null`.
 	 */
 	readonly required?: boolean;
+	/** The device cookie `auth.device` reads and `auth.send` sets. */
+	readonly device?: DeviceCookieOptions;
 }
 
 /** The body of the 401 a required session answers. */
@@ -50,7 +45,7 @@ type UserOf<A, T> = Extract<UserOfAuth<A>, { readonly type: T }>;
  * handed a cookie), and never over a session cookie the route set itself.
  *
  * ```ts
- * app.use(session(auth, { required: true })).get('/me', ({ user, reply }) => reply(200, user));
+ * app.use(session(accounts, { required: true })).get('/me', ({ user, reply }) => reply.ok(user));
  * ```
  */
 export function session<
@@ -60,7 +55,11 @@ export function session<
 	auth: A,
 	options: SessionOptions<T> & { readonly required: true },
 ): Alxia<
-	{ readonly user: UserOf<A, T>; readonly session: Session },
+	{
+		readonly user: UserOf<A, T>;
+		readonly session: Session;
+		readonly auth: RequestAuth;
+	},
 	Empty,
 	'',
 	Reply<401, UnauthenticatedBody>
@@ -72,7 +71,11 @@ export function session<
 	auth: A,
 	options?: SessionOptions<T> & { readonly required?: false },
 ): Alxia<
-	{ readonly user: UserOf<A, T> | null; readonly session: Session | null },
+	{
+		readonly user: UserOf<A, T> | null;
+		readonly session: Session | null;
+		readonly auth: RequestAuth;
+	},
 	Empty,
 	'',
 	never
@@ -84,7 +87,11 @@ export function session<
 	auth: A,
 	options?: SessionOptions<T>,
 ): Alxia<
-	{ readonly user: UserOf<A, T> | null; readonly session: Session | null },
+	{
+		readonly user: UserOf<A, T> | null;
+		readonly session: Session | null;
+		readonly auth: RequestAuth;
+	},
 	Empty,
 	'',
 	Reply<401, UnauthenticatedBody>
@@ -93,22 +100,26 @@ export function session(
 	auth: Auth<{ readonly type: string }>,
 	options: SessionOptions<string> = {},
 ): unknown {
-	const current = new WeakMap<
-		Request,
-		Authenticated<{ readonly type: string }> | null
-	>();
+	const current = new WeakMap<Request, Found>();
 	const unauthenticated: UnauthenticatedBody = { error: 'unauthenticated' };
 	return alxia()
-		.derive(async ({ request, reply }) => {
-			const found = await auth.authenticate(
-				request,
-				options.type === undefined ? undefined : { type: options.type },
-			);
+		.derive(async (ctx) => {
+			const { request, reply } = ctx;
+			const found = await authenticateOnce(auth, request, options.type);
 			current.set(request, found);
 			if (found === null && options.required === true) {
 				return reply(401, unauthenticated);
 			}
-			return { user: found?.user ?? null, session: found?.session ?? null };
+			const bound: RequestAuth = {
+				device: deviceOf(ctx, options.device),
+				send: (signedIn) => sendSession(ctx, auth, signedIn, options),
+				signOut: () => signOut(ctx, auth),
+			};
+			return {
+				user: found?.user ?? null,
+				session: found?.session ?? null,
+				auth: bound,
+			};
 		})
 		.wrap(async ({ request }, next) => {
 			const response = await next();
@@ -133,54 +144,4 @@ export function session(
 				),
 			);
 		});
-}
-
-/** What `sendSession` takes besides: the device cookie's options. */
-export interface SendSessionOptions {
-	readonly device?: DeviceCookieOptions;
-}
-
-/**
- * Sends the session cookie — after `signUp`, `signIn`, anything that
- * answered a token and its session — and answers the user. The token is in
- * the cookie, never in the body. With a `deviceToken`, the device cookie
- * too.
- *
- * ```ts
- * const signedIn = await auth.signIn(body, { device: deviceOf(ctx) });
- * return reply(200, { id: sendSession(ctx, auth, signedIn).id });
- * ```
- */
-export function sendSession<U>(
-	ctx: { readonly set: ResponseSettings },
-	auth: Pick<Auth<{ readonly type: string }>, 'cookie'>,
-	signedIn: {
-		readonly token: string;
-		readonly session: Session;
-		readonly user: U;
-		readonly deviceToken?: string | null;
-	},
-	options: SendSessionOptions = {},
-): U {
-	ctx.set.headers.append(
-		'set-cookie',
-		auth.cookie.serialize(signedIn.token, signedIn.session),
-	);
-	if (typeof signedIn.deviceToken === 'string') {
-		sendDevice(ctx, signedIn.deviceToken, options.device);
-	}
-	return signedIn.user;
-}
-
-/**
- * Revokes the session the request presents and clears the cookie — cleared
- * whatever the answer, so a browser holding a stale cookie drops it too.
- */
-export async function signOut(
-	ctx: { readonly request: Request; readonly set: ResponseSettings },
-	auth: Pick<Auth<{ readonly type: string }>, 'signOut' | 'cookie'>,
-): Promise<boolean> {
-	const revoked = await auth.signOut(ctx.request);
-	ctx.set.headers.append('set-cookie', auth.cookie.clear());
-	return revoked;
 }
