@@ -1,7 +1,8 @@
 # Guide
 
-This page covers what `compress()` compresses, what it leaves alone, the
-headers it writes, its options, and `negotiate` on its own.
+This page covers what `compress()` compresses, what it leaves alone, how a
+streamed body is flushed, the headers it writes, its options, and
+`negotiate` on its own.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -65,9 +66,11 @@ app.use(compress({ encodings: ['br', 'gzip'] }));
 | `zstd` | `['br', 'gzip']` | nothing: not offered |
 | `identity`, or no header | any | nothing |
 
-`zstd` and `gzip` and `deflate` go through the runtime's
-`CompressionStream`; `br` through `node:zlib`'s `createBrotliCompress`
-at quality 4, not zlib's default of 11. Quality 11 is meant for
+A body with a `Content-Length` goes through the runtime's
+`CompressionStream` for `zstd`, `gzip` and `deflate`, and through
+`node:zlib`'s `createBrotliCompress` for `br`, at quality 4, not zlib's
+default of 11. A body with none goes through `node:zlib` in all four, which
+can flush: see [Streamed bodies](#streamed-bodies). Quality 11 is meant for
 compressing once, ahead of time: paid on every request, it costs many
 times gzip's CPU for a few percent, while 4 is still smaller than gzip at
 about its speed. None of the codecs' levels is an option. For the smallest
@@ -120,9 +123,10 @@ app.use(
 );
 ```
 
-A function that answers `true` for `text/event-stream` compresses event
-streams, and the codec then holds each event until a block fills: see
-[Troubleshooting](troubleshooting.md#server-sent-events-arrive-late-and-in-bursts).
+The default leaves `text/event-stream` out: events are small, and a
+compressed one saves little. A function that answers `true` for it
+compresses event streams too, and each event still leaves as it is sent:
+see [Streamed bodies](#streamed-bodies).
 
 ## What is never compressed
 
@@ -137,6 +141,83 @@ Whatever `compressible` says, a response is sent as it is when:
 | its `Cache-Control` holds `no-transform` | the sender asked for its bytes to be kept |
 | its `Content-Length` is under `threshold` | the gain would be smaller than the headers |
 | the client accepts none of `encodings` | |
+
+## Streamed bodies
+
+A body with no `Content-Length` when the hook runs — a `ReadableStream`, a
+page rendered by `renderToReadableStream`, an event stream that
+`compressible` lets in — is flushed as it comes. After the chunks the
+source yields in one turn of the event loop, the codec is flushed
+(`Z_SYNC_FLUSH` for gzip and deflate, `BROTLI_OPERATION_FLUSH` for br,
+`ZSTD_e_flush` for zstd), and the bytes so far leave, decodable on their
+own. Without it, a codec holds its input until a block fills or the stream
+ends, and a page's shell would reach the browser only with its last
+deferred part.
+
+```ts
+import { alxia } from '@alxia/core';
+import { compress } from '@alxia/compress';
+
+const encoder = new TextEncoder();
+const app = alxia()
+	.use(compress())
+	.get('/page', ({ reply }) =>
+		reply(
+			200,
+			new ReadableStream<Uint8Array>({
+				start(controller) {
+					controller.enqueue(encoder.encode('<!DOCTYPE html><html><body><main>…the shell…'));
+					setTimeout(() => {
+						controller.enqueue(encoder.encode('…the deferred part…</main></body></html>'));
+						controller.close();
+					}, 300);
+				},
+			}),
+			{ headers: { 'content-type': 'text/html;charset=utf-8' } },
+		),
+	);
+// gzip, br, zstd and deflate alike: the shell arrives in about 1 ms,
+// the rest at 300 ms.
+```
+
+**What it costs.** The chunks of one turn share one flush, so a renderer
+that writes its shell as many small chunks at once pays for one flush, not
+for each. On a 41 KB streamed page of 308 chunks written in three turns,
+the flushed output was within 2% of the same page compressed whole, in all
+four encodings. A source that yields each small chunk in a turn of its own
+pays a flush per chunk: the same page, one chunk per turn, came out 56%
+larger in gzip and deflate and 89–94% larger in br and zstd. A source
+yielding a row at a time can batch its rows before it yields them.
+
+**What keeps today's path.** A body with a `Content-Length` — a string, a
+JSON reply, a `Blob`, a file — is compressed whole, unflushed, through the
+codecs listed under [`encodings`](#encodings): its bytes are the same as
+before streams were flushed.
+
+**Errors and cancellation.** A source that fails errors the compressed
+body after what it had already sent: through `listen`, the connection is
+closed with the response cut short. A client that goes away cancels the
+source, as it would without compression, and the codec is released.
+
+To assert in a spec that a stream is flushed, read the body as it comes
+and decode what arrived before the source's pause, with the flush mode as
+`finishFlush`:
+
+```ts
+import { expect, test } from 'bun:test';
+import { constants, gunzipSync } from 'node:zlib';
+
+test('the shell leaves before the stream ends', async () => {
+	const since = performance.now();
+	const response = await app.request('/page', { headers: { 'accept-encoding': 'gzip' } });
+	const early: Uint8Array[] = [];
+	for await (const chunk of response.body ?? []) {
+		if (performance.now() - since < 150) early.push(chunk);
+	}
+	const shell = gunzipSync(Buffer.concat(early), { finishFlush: constants.Z_SYNC_FLUSH });
+	expect(shell.toString()).toBe('<!DOCTYPE html><html><body><main>…the shell…');
+});
+```
 
 ## The headers it writes
 
@@ -214,7 +295,7 @@ const app = alxia()
 		reply(
 			200,
 			(async function* () {
-				yield { at: Date.now() };                         // text/event-stream: never compressed
+				yield { at: Date.now() };                         // text/event-stream: left alone by default
 			})(),
 		),
 	)

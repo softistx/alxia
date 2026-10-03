@@ -20,13 +20,28 @@ app.use(compress({ encodings: ['br', 'gzip'], threshold: 2048 }));
 
 Compressed: text, JSON, JavaScript, XML and SVG of at least `threshold`
 bytes (1 KiB), files included; a `ReadableStream` has no length, and is
-compressed whatever its size. Never: an event stream (it would wait for a
-block to fill), a `HEAD`, a 204, 206 or 304, a response already encoded, or
-one marked `Cache-Control: no-transform`. `Vary: Accept-Encoding` is set, a
+compressed whatever its size. Never: a `HEAD`, a 204, 206 or 304, a
+response already encoded, or one marked `Cache-Control: no-transform`. An
+event stream is left alone unless `compressible` lets it in. `Vary: Accept-Encoding` is set, a
 strong ETag becomes weak, and `Accept-Ranges` is dropped from a compressed
 response. Brotli runs at quality 4, near gzip's speed; for the smallest
 static assets, serve copies compressed at build time with `static`'s
 `precompressed` option.
+
+## Streams
+
+A body with no `Content-Length` — a `ReadableStream`, a server-rendered
+page, an event stream let in — is flushed as it comes: what the source
+yields in one turn of the event loop leaves at once, decodable, so a
+page's shell reaches the browser before its deferred parts. A body with a
+length is compressed whole, which compresses better.
+
+```ts
+app.use(compress()).get('/page', ({ reply }) =>
+	reply(200, renderedStream, { headers: { 'content-type': 'text/html;charset=utf-8' } }),
+);
+// the shell arrives as soon as it is rendered, compressed
+```
 
 ## Options
 
@@ -46,6 +61,6 @@ static assets, serve copies compressed at build time with `static`'s
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/compress/docs): what is compressed and what is not, every option, the headers written, the order among other hooks, testing, and `negotiate`.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/compress/docs): what is compressed and what is not, streamed bodies, every option, the headers written, the order among other hooks, testing, and `negotiate`.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/compress/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/compress/docs/roadmap.md): what is coming, and what is not planned.

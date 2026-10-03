@@ -16,7 +16,8 @@ header you read in the response.
 - [No `Content-Encoding` on a response](#no-content-encoding-on-a-response)
 - [`Content-Encoding: gzip` on a tiny body, larger than the original](#content-encoding-gzip-on-a-tiny-body-larger-than-the-original)
 - [`Cache-Control: no-transform` and `Content-Encoding` on the same response](#cache-control-no-transform-and-content-encoding-on-the-same-response)
-- [Server-sent events arrive late and in bursts](#server-sent-events-arrive-late-and-in-bursts)
+- [A streamed page or server-sent events arrive late and in bursts](#a-streamed-page-or-server-sent-events-arrive-late-and-in-bursts)
+- [A streamed body is larger compressed than the same body sent whole](#a-streamed-body-is-larger-compressed-than-the-same-body-sent-whole)
 - [`ETag: W/"…"` where the handler set `"…"`](#etag-w-where-the-handler-set-)
 - [No `Content-Length` on a compressed response](#no-content-length-on-a-compressed-response)
 - [No `Accept-Ranges: bytes` on a compressed file](#no-accept-ranges-bytes-on-a-compressed-file)
@@ -156,23 +157,68 @@ const app = alxia()
 A `Cache-Control` set by the handler itself (`reply(200, body, { headers })`
 or `set.headers`) is always seen.
 
-### Server-sent events arrive late and in bursts
+### A streamed page or server-sent events arrive late and in bursts
 
-**When:** a `compressible` of your own answers `true` for
-`text/event-stream`, and a client receives each event only when the next
-ones push it out, or when the stream ends.
+**When:** a server-rendered page's shell, or the events of an event stream
+that `compressible` lets in, reach the client only when later chunks push
+them out, or when the stream ends.
 
-**Why:** a compressor holds its input until a block fills. An event
-stream sends a few bytes at a time, so an event can sit in the codec until
-the stream closes. The default `compressible` refuses `text/event-stream`
-for that reason.
+**Why:** not the plugin. A body with no `Content-Length` is flushed after
+the chunks of each turn of the event loop, in every encoding: see
+[Streamed bodies](guide.md#streamed-bodies). An earlier `@alxia/compress`
+held a stream in the codec until a block filled, and the default
+`compressible` left event streams out for that reason; it still leaves
+them out, now because events are small. What holds a stream back now is
+outside the plugin:
 
-**Fix:** keep event streams out of your test:
+| Cause | How to see it |
+| --- | --- |
+| a proxy in front of the server buffers the response | the delay is gone with `curl -N` against the server itself; nginx honours the `X-Accel-Buffering: no` that alxia sets on an event stream, not on a page |
+| an `onResponse` hook after `compress()` reads the body, as `await response.text()` does, and answers a new one | the hook's response has a `Content-Length` |
+| the response has a `Content-Length` | a body with one is compressed whole; a stream handed to `reply` has none |
+| the renderer waits for everything before it writes | React Router's default entry waits for `allReady` when the user agent looks like a bot, as `Bun/1.4.2` does: send a browser's |
+
+**Fix:** check the server alone first, and decode as it comes:
+
+```sh
+curl -N -s -H 'accept-encoding: gzip' localhost:3000/page | gunzip
+# the shell prints at once, the deferred part after it
+```
+
+### A streamed body is larger compressed than the same body sent whole
+
+**When:** a `ReadableStream` that yields many small chunks, each in a turn
+of its own — a row at a time from a cursor, a token at a time — comes out
+much larger than the same text compressed in one piece: up to 56% larger
+in gzip, and up to 94% in br and zstd, on a page of 300 small chunks.
+
+**Why:** a streamed body is flushed after each turn of the event loop, so
+what the source yields leaves at once. Each flush ends a block, and a
+block costs bytes. Chunks yielded in the same turn share one flush, which
+costs almost nothing: the same page written in three turns came out within
+2% of the whole.
+
+**Fix:** batch in the source what has no reason to leave alone, or, for a
+body that need not stream, send it with a length:
 
 ```ts
-app.use(
-	compress({
-		compressible: (type) => !type.startsWith('text/event-stream') && /^(text\/|application\/json)/.test(type),
+// a row at a time, batched by 100 before it is yielded
+async function* batched(rows: AsyncIterable<string>) {
+	let batch = '';
+	let count = 0;
+	for await (const row of rows) {
+		batch += row;
+		if (++count % 100 === 0) {
+			yield batch;
+			batch = '';
+		}
+	}
+	if (batch !== '') yield batch;
+}
+
+app.get('/report', async ({ reply }) =>
+	reply(200, ReadableStream.from(batched(rows())).pipeThrough(new TextEncoderStream()), {
+		headers: { 'content-type': 'text/csv' },
 	}),
 );
 ```
