@@ -74,16 +74,18 @@ export default async function handleRequest(
 
 ## The server entry
 
-The server is a file of the app's, outside `app/`, that builds the alxia
-app and hands it React Router's server build:
+The server is two files of the app's, outside `app/`: `base.ts` builds the
+alxia app the pages run behind, and `server.ts` hands it React Router's
+server build and listens. Keeping them apart lets the loaders import the
+type of `base`, and a test import `base` without starting a server. The
+example uses `@alxia/logger` and `@alxia/compress`
+(`bun add @alxia/logger @alxia/compress`); any plugin works the same way.
 
 ```ts
-// server.ts
+// base.ts
 import { alxia } from '@alxia/core';
 import { compress } from '@alxia/compress';
 import { logger } from '@alxia/logger';
-import { reactRouter } from '@alxia/react-router';
-import type { ServerBuild } from 'react-router';
 
 export const base = alxia()
 	.use(logger())
@@ -96,6 +98,13 @@ export const base = alxia()
 
 /** What the loaders read: the app before the catch-all. */
 export type Base = typeof base;
+```
+
+```ts
+// server.ts
+import { reactRouter } from '@alxia/react-router';
+import type { ServerBuild } from 'react-router';
+import { base } from './base';
 
 const app = base.use((app) =>
 	reactRouter(app, {
@@ -159,7 +168,7 @@ that request. `alxiaOf<App>(context)` reads it, typed:
 // app/routes/account.tsx
 import { alxiaOf } from '@alxia/react-router';
 import { data, redirect } from 'react-router';
-import type { Base } from '../../server';
+import type { Base } from '../../base';
 import type { Route } from './+types/account';
 
 export function loader({ context }: Route.LoaderArgs) {
@@ -178,7 +187,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 ```
 
 The type argument is the app **before** the catch-all, `Base`, exported
-beside the server. Import it with `import type`: nothing is bundled, and
+from `base.ts`. Import it with `import type`: nothing is bundled, and
 the route never imports the server at runtime. The checks it gives:
 
 ```ts
@@ -327,8 +336,7 @@ route.path === '/api/health'`.
 ## Testing
 
 `app.request` drives the pages in process, after a `react-router build`.
-Keep the app before the catch-all in a module of its own, `base.ts`, so a
-test imports it without starting the server:
+Import `base`, not `server.ts`, so the test starts no server:
 
 ```ts
 import { expect, test } from 'bun:test';

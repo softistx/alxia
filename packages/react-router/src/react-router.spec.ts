@@ -1,5 +1,5 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
-import { alxia, type RoutesOf } from '@alxia/core';
+import { alxia, type BaseContext, type RoutesOf } from '@alxia/core';
 import { openapi } from '@alxia/openapi';
 // The package by its published name, `dist/`, not `./index`: the fixture's
 // build imports it so, and the catch-all must set the very `alxiaContext`
@@ -325,6 +325,23 @@ describe('the context', () => {
 					}),
 				)
 				.derive(() => ({ user: 1 }));
+			// An annotated parameter is read as what the app must build:
+			// narrower than the app's context is fine, wider is refused.
+			base.use((app) =>
+				reactRouter(app, {
+					build,
+					getLoadContext: (ctx: BaseContext & { user: { id: string } }) =>
+						void ctx.user.id,
+				}),
+			);
+			base.use((app) =>
+				// @ts-expect-error: no hook before it derives `tenant`
+				reactRouter(app, {
+					build,
+					getLoadContext: (ctx: BaseContext & { tenant: string }) =>
+						void ctx.tenant,
+				}),
+			);
 		};
 		expect(typed).toBeFunction();
 	});

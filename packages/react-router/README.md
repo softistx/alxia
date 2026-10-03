@@ -19,6 +19,9 @@ in any React Router app; the package never imports them.
 
 ## Serving a build
 
+The example uses `@alxia/logger` (`bun add @alxia/logger`); any plugin
+works the same way.
+
 ```ts
 // server.ts
 import { alxia } from '@alxia/core';
@@ -103,6 +106,24 @@ app.use(docs(app, { info: { title: 'Shop', version: '1.0.0' }, exclude: isReactR
 The catch-all adds nothing to the app's route table, so the typed client
 never shows it. `isReactRouterRoute` names it, and the client files, for
 `@alxia/openapi`.
+
+## Traps
+
+- **A context key made in `app/` is not the one the loaders read**: React
+  Router's build holds its own copy, and the loader gets the default or
+  `Error: No value found for context`. Read alxia's context with
+  `alxiaOf`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#error-no-value-found-for-context)
+- **In a monorepo, Vite bundles a linked `@alxia/react-router`** into the
+  build, with a second `alxiaContext`: `alxiaOf` then throws. Add
+  `ssr: { external: ['@alxia/react-router'] }` to `vite.config.ts`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#alxiaof-this-request-has-no-alxia-context-)
+- **Bun's user agent is a bot to `isbot`**, so a test client gets the
+  finished page, never a stream. Send a browser's `user-agent`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-streamed-page-arrives-in-one-piece)
+- **An index route's action is `POST /?index`**; `POST /` is React
+  Router's 405. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
+- **`@alxia/secure-headers`' default policy blocks the page's scripts**
+  and forms: give the pages a policy of their own. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
+- **Declare alxia's routes before `reactRouter()`**: `app.request` gives
+  one declared after it to React Router. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#no-route-matches-url-api)
 
 ## API
 

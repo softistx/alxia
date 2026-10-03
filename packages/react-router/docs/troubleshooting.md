@@ -71,7 +71,7 @@ Error: alxiaOf(): this request has no alxia context. Serve the React Router buil
 
 **When:** a loader calls `alxiaOf` and `alxiaContext` was not set.
 
-**Why:** one of three:
+**Why:** one of two:
 
 - the request did not go through `reactRouter()`: the app runs under
   `react-router dev` or `react-router-serve` alone, or a unit test calls the
@@ -81,8 +81,7 @@ Error: alxiaOf(): this request has no alxia context. Serve the React Router buil
   `.js` file. A package linked from a workspace (`workspace:^`, `bun link`)
   resolves to its folder, outside `node_modules`, and Vite bundles it into
   `build/server/index.js` with a second `alxiaContext` the server never
-  sets;
-- a loader is tested directly, without a request.
+  sets.
 
 **Fix:** serve the build through `reactRouter()`. In a monorepo, tell Vite
 to leave the package external:
@@ -266,10 +265,12 @@ deferred value later. If the whole page comes at once:
   await fetch(url, { headers: { 'user-agent': BROWSER } });
   ```
 
-- **A compressor holds the stream.** One that does not flush after each
-  chunk sends the page when it ends. Compare with `accept-encoding:
-  identity`; if only the compressed response arrives in one piece, the
-  compressor is the cause.
+- **`@alxia/compress` holds the stream.** A compressor that does not flush
+  after each chunk sends the page when it ends: `@alxia/compress` did so
+  for every streamed body before it flushed chunk by chunk. Compare with
+  `accept-encoding: identity`; if only the compressed response arrives in
+  one piece, the compressor is the cause. Until yours flushes, leave pages
+  that stream behind `<Await>` uncompressed, or upgrade `@alxia/compress`.
 
 ### The logger times a streamed page at a few milliseconds
 
