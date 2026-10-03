@@ -1,7 +1,7 @@
 # Typed routes from an OpenAPI document
 
-Status: **proposed**, waiting for the owner's approval. No code is written
-until it is approved.
+Status: **approved** by the owner on 2026-10-02. Each slice below is one
+PR, built in the order given at the end.
 
 Today alxia goes from code to contract: a route declares its schemas, and
 `@alxia/openapi` writes the document. This note proposes the opposite
