@@ -327,7 +327,7 @@ const query = z.object({
 });
 ```
 
-`zodConverter` targets JSON Schema 2020-12, the dialect of OpenAPI 3.1, and
+`zodConverter` targets JSON Schema 2020-12, the dialect of OpenAPI 3.1 and 3.2, and
 fits the `convert` option as it is: its type matches `@alxia/openapi`'s
 `Converter` without importing it, so this package has no dependency on
 `@alxia/openapi`.

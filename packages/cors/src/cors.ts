@@ -29,7 +29,16 @@ export interface CorsOptions {
 	readonly privateNetwork?: boolean;
 }
 
-const METHODS = ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'];
+const METHODS = [
+	'GET',
+	'HEAD',
+	'PUT',
+	'PATCH',
+	'POST',
+	'DELETE',
+	'OPTIONS',
+	'QUERY',
+];
 
 /**
  * CORS, as a plugin: a preflight is answered before routing, with a 204,

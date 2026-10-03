@@ -39,7 +39,7 @@ const get = openapi(app, { info: { title: 'Users', version: '1.0.0' } }).paths['
 | Route | In the document |
 | --- | --- |
 | the path | the key in `paths`: `:id` is `{id}`, a trailing `*` is `{path}` |
-| the method | the key under the path, lowercase |
+| the method | the key under the path, lowercase: a `QUERY` route is the `query` operation OpenAPI 3.2 added |
 | `params` | one `path` parameter per segment, always required |
 | `query` | one `query` parameter per property |
 | `headers` | one `header` parameter per property |
@@ -140,7 +140,7 @@ what goes over the wire.
 | The schema | The reply |
 | --- | --- |
 | a `204` or `304` | a description, no content |
-| an `eventStream(...)` | `text/event-stream`, by the schema of one event |
+| an `eventStream(...)` | `text/event-stream`, by the schema of one event, as its `itemSchema` |
 | one that converts to `{ type: 'string' }` | `text/plain` |
 | any other | `application/json` |
 
@@ -157,7 +157,7 @@ const app = alxia()
 	);
 // /health 200  → content['text/plain'].schema         { type: 'string' }
 // /users/{id} 204 → { description: 'No content' }
-// /ticks 200   → content['text/event-stream'].schema  { type: 'object', properties: { n: ... } }
+// /ticks 200   → content['text/event-stream'].itemSchema  { type: 'object', properties: { n: ... } }
 ```
 
 A reply's `description` is the status's name for `200`, `201`, `202`,
@@ -284,6 +284,7 @@ import { operationId } from '@alxia/openapi';
 operationId('GET', '/users/:id');           // 'getUsersById'
 operationId('DELETE', '/files/*');          // 'deleteFilesPath'
 operationId('POST', '/api/password-reset'); // 'postApiPasswordReset'
+operationId('QUERY', '/users/search');      // 'queryUsersSearch'
 ```
 
 Client generators name their functions after it, so set `operationId` on

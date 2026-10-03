@@ -26,8 +26,8 @@ app.get(path, schema, handler);
 app.get(path, handler); // no schema: nothing validated, any reply
 ```
 
-`get`, `post`, `put`, `patch`, `delete`, `options` and `head` take the same
-arguments. `ws` declares a socket ([WebSockets](websockets.md)); `static`,
+`get`, `post`, `put`, `patch`, `delete`, `options`, `head` and `query` take
+the same arguments. `ws` declares a socket ([WebSockets](websockets.md)); `static`,
 `file` and `page` serve files ([Static files](static-files.md)).
 
 ```ts
@@ -47,6 +47,34 @@ interface RouteMethod<M, Ctx, Routes, Prefix, Shortcuts> {
 A handler must return a reply. One that returns anything else is answered
 with a 500, and the server logs
 `GET /path: the handler returned no reply. Return ctx.reply(status, body).`
+
+### `QUERY`
+
+`query` declares a route for the HTTP `QUERY` method: a read, safe and
+idempotent like a `GET`, whose criteria travel in the body — a search too
+long or too structured for a query string. Its body is read and validated
+like a `POST`'s, and a refused one is the same [400](#the-400).
+
+```ts
+const app = alxia().query(
+	'/users/search',
+	{
+		body: z.object({ name: z.string().min(1), roles: z.array(z.string()).default([]) }),
+		response: { 200: z.array(z.object({ id: z.number(), name: z.string() })) },
+	},
+	({ body, reply }) => reply.ok(searchUsers(body.name, body.roles)),
+);
+// QUERY /users/search, content-type: application/json, {"name":"A"} → 200
+// QUERY /users/search, {"name":""}                                    → 400
+```
+
+It is in the app's type like any route — `RoutesOf<App>['/users/search']['QUERY']`,
+called as `api.query(path, { body })` by
+[`@alxia/client`](https://www.npmjs.com/package/@alxia/client) — and in the
+`Allow` of a 405 on its path. `@alxia/openapi` documents it as the path's
+`query` operation, and `@alxia/cors` allows it by default. A cache does not:
+`@alxia/cache` keys `GET` and `HEAD` only, as a `QUERY`'s key would have to
+include its body.
 
 ## Paths
 

@@ -38,6 +38,17 @@ const app = alxia()
 			return reply(201, { id: 2, name: body.name });
 		},
 	)
+	.query(
+		'/users',
+		{
+			body: z.object({ name: z.string().min(1) }),
+			response: { 200: z.array(User) },
+		},
+		({ body, users, reply }) =>
+			reply.ok(
+				[...users.values()].filter((user) => user.name.startsWith(body.name)),
+			),
+	)
 	.get('/health', ({ reply }) => reply(200, { ok: true }))
 	.get('/files/*', ({ params, reply }) => reply(200, params['*']))
 	.get('/boom', () => {
@@ -69,6 +80,32 @@ describe('routing', () => {
 		const response = await call('/health', { method: 'DELETE' });
 		expect(response.status).toBe(405);
 		expect(response.headers.get('allow')).toBe('GET');
+	});
+});
+
+describe('QUERY', () => {
+	const search = (body: string) =>
+		call('/users', {
+			method: 'QUERY',
+			headers: { 'content-type': 'application/json' },
+			body,
+		});
+
+	test('its body is read and validated, like a POST', async () => {
+		const found = await search(JSON.stringify({ name: 'A' }));
+		expect(found.status).toBe(200);
+		expect(await found.json()).toEqual([{ id: 1, name: 'Ada' }]);
+		const refused = await search(JSON.stringify({ name: '' }));
+		expect(refused.status).toBe(400);
+	});
+
+	test('it is in the route table, and in the Allow of a 405', async () => {
+		expectTypeOf<
+			RoutesOf<typeof app>['/users']['QUERY']['input']['body']
+		>().toEqualTypeOf<{ name: string }>();
+		const response = await call('/users', { method: 'PUT' });
+		expect(response.status).toBe(405);
+		expect(response.headers.get('allow')).toContain('QUERY');
 	});
 });
 

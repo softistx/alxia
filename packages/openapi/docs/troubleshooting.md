@@ -148,7 +148,7 @@ expect(document.paths['/users']?.get?.operationId).toBe('getUsers');
 **When:** reading an operation by its uppercase method.
 
 ```text
-error TS2551: Property 'GET' does not exist on type 'Partial<Record<"get" | "post" | "put" | "patch" | "delete" | "options" | "head", Operation>>'. Did you mean 'get'?
+error TS2551: Property 'GET' does not exist on type 'Partial<Record<"get" | "post" | "put" | "patch" | "delete" | "options" | "head" | "query", Operation>>'. Did you mean 'get'?
 ```
 
 **Why:** OpenAPI writes methods lowercase; routes declare them uppercase.
@@ -309,6 +309,6 @@ detail: { description: 'Accepts application/x-www-form-urlencoded.' },
 **When:** an app declares `app.ws(...)` routes.
 
 **Why:** the document is made from `app.routes`, the HTTP routes;
-OpenAPI 3.1 has no way to describe a WebSocket.
+OpenAPI 3.2 has no way to describe a WebSocket.
 
 **Fix:** none: document them elsewhere.

@@ -75,7 +75,7 @@ when no `options` route matches.
 | --- | --- | --- | --- |
 | `origin` | `CorsOrigin` | `true` | which origins may call |
 | `credentials` | `boolean` | `false` | sends `Access-Control-Allow-Credentials: true`, so cookies and `Authorization` go with the call |
-| `methods` | `readonly string[]` | `GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS` | `Access-Control-Allow-Methods`, on preflights |
+| `methods` | `readonly string[]` | `GET, HEAD, PUT, PATCH, POST, DELETE, OPTIONS, QUERY` | `Access-Control-Allow-Methods`, on preflights |
 | `allowedHeaders` | `readonly string[]` | the headers the preflight asks for | `Access-Control-Allow-Headers`, on preflights |
 | `exposedHeaders` | `readonly string[]` | none | `Access-Control-Expose-Headers`, on other responses: what a script may read |
 | `maxAge` | `number` (seconds) | none: the browser's own default | `Access-Control-Max-Age`, on preflights |
@@ -161,14 +161,15 @@ app with its user's cookies: with `credentials`, name the origins.
 
 The methods a preflight allows, sent as `Access-Control-Allow-Methods`. The
 default is every method a route can have: `GET, HEAD, PUT, PATCH, POST,
-DELETE, OPTIONS`. Narrow it to refuse the others at the browser:
+DELETE, OPTIONS, QUERY`. Narrow it to refuse the others at the browser:
 
 ```ts
 cors({ origin: 'https://app.example.com', methods: ['GET', 'POST'] });
 ```
 
 `GET`, `HEAD` and `POST` with safelisted headers need no preflight, so a
-browser sends them whatever this list says. `methods` decides what a
+browser sends them whatever this list says. A `QUERY` always has a
+preflight, and is refused by a list without it. `methods` decides what a
 browser may send, not what a route answers.
 
 ### `allowedHeaders`

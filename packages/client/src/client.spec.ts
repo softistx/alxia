@@ -36,6 +36,14 @@ const app = alxia()
 		({ body, headers, reply }) =>
 			reply(201, { name: body.name, tenant: headers['x-tenant'] }),
 	)
+	.query(
+		'/users',
+		{
+			body: z.object({ name: z.string() }),
+			response: { 200: z.array(z.string()) },
+		},
+		({ body, reply }) => reply.ok([body.name]),
+	)
 	.get('/health', ({ reply }) => reply(200, 'ok'))
 	.delete('/users/:id', ({ reply }) => reply(204));
 
@@ -82,6 +90,15 @@ describe('client', () => {
 		});
 		expect(result.status).toBe(201);
 		expect(result.data).toEqual({ name: 'Grace', tenant: 'acme' });
+	});
+
+	test('a QUERY sends its body, and reads a typed reply', async () => {
+		const result = await api.query('/users', { body: { name: 'Ada' } });
+		expect(result.status).toBe(200);
+		if (result.status === 200) {
+			expectTypeOf(result.data).toEqualTypeOf<string[]>();
+			expect(result.data).toEqual(['Ada']);
+		}
 	});
 
 	test('the 400 of a refused request is typed', async () => {

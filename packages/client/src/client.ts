@@ -32,6 +32,7 @@ const METHODS: readonly Method[] = [
 	'DELETE',
 	'OPTIONS',
 	'HEAD',
+	'QUERY',
 ];
 
 /**

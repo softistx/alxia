@@ -26,7 +26,8 @@ export type Method =
 	| 'PATCH'
 	| 'DELETE'
 	| 'OPTIONS'
-	| 'HEAD';
+	| 'HEAD'
+	| 'QUERY';
 
 /** No properties: the identity of `&`. */
 export type Empty = Record<never, never>;

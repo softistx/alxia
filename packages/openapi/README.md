@@ -1,6 +1,6 @@
 # @alxia/openapi
 
-The OpenAPI 3.1 document of an [`@alxia/core`](https://www.npmjs.com/package/@alxia/core)
+The OpenAPI 3.2 document of an [`@alxia/core`](https://www.npmjs.com/package/@alxia/core)
 app, made from the schemas its routes already declare. Nothing is written
 twice: the document cannot drift from the code.
 
@@ -35,9 +35,10 @@ await Bun.write('openapi.json', JSON.stringify(openapi(app, { info }), null, 2))
 - the path as OpenAPI writes it: `/users/:id` is `/users/{id}`, a `*` is `{path}`
 - `params`, `query` and `headers` as parameters, required as their schemas say
 - `body` as a JSON request body, what its schema **accepts**
+- a `QUERY` route (`app.query`) as its path's `query` operation, body included
 - each `response` as what its schema **gives back**, as it goes over the wire:
   (with Zod, give it `zodConverter` from `@alxia/zod`: a `Date` is then a `date-time` string)
-- an event stream as `text/event-stream`, by the schema of one event
+- an event stream as `text/event-stream`, by the schema of one event, as its `itemSchema`
 - `cookies` as cookie parameters
 - the 400 of a route that validates its request, and the 500 of every route —
   beside the route's own 400 or 500, when it declares one

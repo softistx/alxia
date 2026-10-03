@@ -27,7 +27,9 @@ The plugin is a route hook: it applies to the routes declared **after**
 `use(cache(…))`, in the same app or group, and to no other. Within those:
 
 - only `GET` and `HEAD` are looked up; every other method runs the route as
-  if there were no cache, and still reads [`ctx.cache`](#what-a-route-reads);
+  if there were no cache, and still reads [`ctx.cache`](#what-a-route-reads).
+  A `QUERY` is a read too, but not cached: its key would have to include
+  its body;
 - a `HEAD` and a `GET` to the same URL share one key; a `HEAD` that misses
   runs the `GET` route and keeps its whole body, so the next `GET` is a hit;
 - a request whose [`key`](keys-and-vary.md#a-key-of-your-own) is

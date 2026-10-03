@@ -1,4 +1,5 @@
 export {
+	type MediaType,
 	type OpenApiDocument,
 	type OpenApiInfo,
 	type OpenApiOptions,
