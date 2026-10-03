@@ -22,11 +22,31 @@ export interface RequestContext {
 	readonly error: unknown;
 }
 
+/**
+ * The cookies a route sets on its response: Bun's `CookieMap`, empty when
+ * the request starts. It holds what this response sets, not what the
+ * request sent: read those from `ctx.cookies`.
+ */
+export interface ResponseCookies extends Bun.CookieMap {
+	/**
+	 * The value of a cookie **this response** set, or `null`. Not the
+	 * request's: the map starts empty, so a hook reading a session cookie
+	 * here always gets `null`. Read the request's from `ctx.cookies`.
+	 */
+	get(name: string): string | null;
+	/** Whether **this response** set (or deleted) `name`. Not the request's: see `ctx.cookies`. */
+	has(name: string): boolean;
+}
+
 /** What a route sets on its response, whatever the status. */
 export interface ResponseSettings {
 	readonly headers: Headers;
-	/** Cookies set or deleted: each change is a `Set-Cookie` header. */
-	readonly cookies: Bun.CookieMap;
+	/**
+	 * Cookies set or deleted on the response: each change is a `Set-Cookie`
+	 * header. The response's side only: it starts empty, and `get` reads back what
+	 * this response set. The request's cookies are `ctx.cookies`.
+	 */
+	readonly cookies: ResponseCookies;
 }
 
 /** What every route hook and handler reads, before the request is validated. */
@@ -38,6 +58,13 @@ export interface BaseContext extends RequestContext {
 	 * schema: what a hook reads, since it runs before validation.
 	 */
 	readonly pathParams: Readonly<Record<string, string>>;
+	/**
+	 * The request's cookies, by name, as the `Cookie` header sent them —
+	 * what a hook reads, since it runs before validation. Parsed on first
+	 * read. A route's `cookies` schema gives its handler the validated
+	 * values instead; a hook always reads these.
+	 */
+	readonly cookies: Readonly<Record<string, string>>;
 	readonly set: ResponseSettings;
 	/** A reply that ends the request here. A hook's is added to every route after it. */
 	readonly reply: FreeReplyFunction;
@@ -47,7 +74,7 @@ export interface BaseContext extends RequestContext {
 /** What a handler reads: the request validated, and what each hook added. */
 export type Context<Ctx, Path extends string, Schema> = Omit<
 	BaseContext,
-	'reply'
+	'reply' | 'cookies'
 > &
 	Ctx & {
 		readonly params: OutputAt<Schema, 'params', PathParams<Path>>;

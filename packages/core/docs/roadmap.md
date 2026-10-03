@@ -45,6 +45,12 @@ Nothing scheduled yet.
 
 ### Next release
 
+- **Request cookies in every hook.** `ctx.cookies` is on the base context:
+  a `derive`, `wrap`, `onError`, `onRefusal` or guard reads the request's
+  cookies, parsed on first read, without parsing the `Cookie` header
+  itself. A route's `cookies` schema still gives its handler the validated
+  values. `set.cookies` is documented, down to its `get`, as the
+  response's map, which a hook used to misread as the request's.
 - **Refusals in your format.** `onRefusal(hook)` answers a request the
   route's schemas refuse with your own reply instead of
   `400 { error: 'validation', issues }`, for the routes declared after it.

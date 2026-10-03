@@ -5,6 +5,7 @@
  */
 import { createReply, Reply } from '../reply/reply';
 import { limitBody } from '../request/limit';
+import { readCookies } from '../request/read';
 import type { RedirectStatus } from '../types/status';
 import type { RouteDefinition, SocketDefinition } from './definition';
 import type {
@@ -29,15 +30,18 @@ export function routeContext(
 	request: RequestContext,
 	pathParams: Record<string, string>,
 ): { ctx: Record<string, unknown> & BaseContext; set: ResponseSettings } {
-	let cookies: Bun.CookieMap | undefined;
+	let sent: Bun.CookieMap | undefined;
 	const set: ResponseSettings & { readonly touched: () => boolean } = {
 		headers: new Headers(),
 		get cookies() {
-			cookies ??= new Bun.CookieMap();
-			return cookies;
+			sent ??= new Bun.CookieMap();
+			return sent;
 		},
-		touched: () => cookies !== undefined,
+		touched: () => sent !== undefined,
 	};
+	// The request's cookies, parsed on first read: a route no one reads
+	// them on never parses its `Cookie` header.
+	let received: Readonly<Record<string, string>> | undefined;
 	const limit = 'bodyLimit' in definition ? definition.bodyLimit : undefined;
 	const ctx: Record<string, unknown> & BaseContext = {
 		...request,
@@ -46,6 +50,15 @@ export function routeContext(
 			: { request: limitBody(request.request, limit) }),
 		route: definition.path,
 		pathParams,
+		get cookies() {
+			received ??= readCookies(request.request.headers);
+			return received;
+		},
+		// A setter, so that a `derive` returning `cookies` replaces them
+		// rather than throwing on an accessor without one.
+		set cookies(value: Readonly<Record<string, string>>) {
+			received = value;
+		},
 		set,
 		reply: createReply,
 		redirect,

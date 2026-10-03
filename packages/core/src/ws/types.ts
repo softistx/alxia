@@ -52,7 +52,7 @@ type InputAt<Schema, Key extends keyof SocketSchema, Fallback> = [
 /** What a socket's handlers read as `socket.data`: the upgrade request, validated, and what each hook added. */
 export type SocketContext<Ctx, Path extends string, Schema> = Omit<
 	BaseContext,
-	'reply' | 'redirect' | 'set'
+	'reply' | 'redirect' | 'set' | 'cookies'
 > &
 	Ctx & {
 		readonly params: OutputAt<Schema, 'params', PathParams<Path>>;

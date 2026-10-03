@@ -8,6 +8,7 @@ export type {
 	BaseContext,
 	Context,
 	RequestContext,
+	ResponseCookies,
 	ResponseSettings,
 } from './context';
 export type {

@@ -54,6 +54,10 @@ a trap that prints nothing is headed by its symptom.
 - [`416 {"error":"range_not_satisfiable"}`](#416-errorrange_not_satisfiable)
 - [`500 {"error":"internal"}`](#500-errorinternal)
 
+**Hooks**
+
+- [`set.cookies.get()` returns null in a hook](#setcookiesget-returns-null-in-a-hook)
+
 **Routing**
 
 - [A route other than the one declared first answers](#a-route-other-than-the-one-declared-first-answers)
@@ -1039,6 +1043,34 @@ const app = alxia().bodyLimit(64 * 1024).use(uploads);
 A `bodyLimit()` the plugin calls instead also applies to the app's routes
 declared after `use`, as its hooks do. Call the app's own after `use` to
 keep it.
+
+## Hooks
+
+A trap that prints nothing: a hook reads a value that is never there.
+
+### `set.cookies.get()` returns null in a hook
+
+**When:** a `derive`, `wrap`, `onError`, `onRefusal` or guard reads a
+cookie the request sent through `set.cookies` — a session id — and always
+gets `null`, so every request looks signed out:
+
+```ts
+.derive(({ set }) => ({ user: sessions.get(set.cookies.get('sid') ?? '') })) // always null
+```
+
+**Why:** `set.cookies` is the **response's** cookie map. It starts empty,
+and `get` reads back only what this response set with `set.cookies.set`;
+it never holds the `Cookie` header the request sent.
+
+**Fix:** read the request's cookies from `ctx.cookies`, which every hook
+has:
+
+```ts
+.derive(({ cookies }) => ({ user: sessions.get(cookies['sid'] ?? '') }))
+```
+
+A route's `cookies` schema validates them for its handler; a hook reads
+them as they arrived ([Hooks](guide/hooks.md#reading-the-requests-cookies)).
 
 ## Routing
 

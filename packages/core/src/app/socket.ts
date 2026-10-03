@@ -45,7 +45,7 @@ export async function upgradeSocket(
 			ctx,
 			parsers,
 			validateResponses,
-			async () => {
+			async (validated) => {
 				if (server === undefined) {
 					return routingError(426, 'upgrade_required');
 				}
@@ -55,7 +55,7 @@ export async function upgradeSocket(
 						headers.append('set-cookie', cookie);
 					}
 				}
-				const data: SocketData = { definition, ctx };
+				const data: SocketData = { definition, ctx: validated };
 				const upgraded = server.upgrade(request.request, { headers, data });
 				return upgraded ? UPGRADED : routingError(426, 'upgrade_required');
 			},
