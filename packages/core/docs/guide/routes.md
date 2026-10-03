@@ -175,9 +175,33 @@ Paths are checked when the route is declared, and a mistake throws a
 | `'users'` | `The route path "users" must start with "/"` |
 | `'/a/*/b'` | `"/a/*/b": "*" may only end a path` |
 | `'/a/:id/:id'` | `"/a/:id/:id" declares ":id" twice` |
+| `'/at/10:30'` | `"/at/10:30": ":" may only start a segment, as a parameter` |
+| `'/*.js'` | `"/*.js": "*" may only be a whole segment, as a wildcard` |
+| `'/a/./b'` | `"/a/./b": "." is a dot segment, which a request's URL never keeps` |
+| `'/café'` | `"/café" is not encoded as a request's URL carries it: declare "/caf%C3%A9"` |
 | `'/users/:userId'` after `'/users/:id'` | `"/users/:userId" has the shape of "/users/:id" with other parameter names. Use the same names: the two would match the same requests.` |
 | the same method and path twice | `GET /a is declared twice` |
 | a method with no handler | `GET /a: the handler is missing` |
+
+The middle four keep a path one that `Bun.serve` accepts at `listen` and
+reads as `fetch` does. Bun's router takes a `:` anywhere in a segment for
+a parameter and a segment starting with `*` for a wildcard, throws on a
+non-ASCII path, and compares a literal with the request's target as it was
+sent, where `fetch` reads the URL's pathname. So a path is declared as a
+request's URL carries it: percent-encoded where the URL encodes,
+`/caf%C3%A9` for `/café`, and with no `.` or `..` segment, which the URL
+resolves away. A client encodes what it asks for, so a request for `/café`
+reaches `/caf%C3%A9`, through `fetch` and `listen` alike. What a URL leaves
+as it is stays allowed: `%` and escapes, compared as written (`/caf%c3%a9`
+is another path), `|`, `~`, `'`, `/.well-known`, an empty segment as in
+`/a//b`.
+
+A request whose target is not as its URL carries it, such as
+`GET /files/../admin` sent unresolved by a raw client, is routed by its
+URL, `/admin`, under `listen` as through `fetch`: a route with parameters
+or a wildcard that Bun's router hands such a request to routes it again,
+as `fetch` does. A [page](static-files.md) is the exception: `Bun.serve`
+serves it itself, so it is matched on the target as sent.
 
 ### Which route answers
 

@@ -27,6 +27,10 @@ a trap that prints nothing is headed by its symptom.
 - [`The prefix "…" must start with "/" and not end with one`](#the-prefix--must-start-with--and-not-end-with-one)
 - [`"…": "*" may only end a path`](#--may-only-end-a-path)
 - [`"…": ":…" is not a parameter name`](#--is-not-a-parameter-name)
+- [`"…": ":" may only start a segment, as a parameter`](#--may-only-start-a-segment-as-a-parameter)
+- [`"…": "*" may only be a whole segment, as a wildcard`](#--may-only-be-a-whole-segment-as-a-wildcard)
+- [`"…": "…" is a dot segment, which a request's URL never keeps`](#--is-a-dot-segment-which-a-requests-url-never-keeps)
+- [`"…" is not encoded as a request's URL carries it: declare "…"`](#-is-not-encoded-as-a-requests-url-carries-it-declare-)
 - [`"…" declares ":…" twice`](#-declares--twice)
 - [`"…" has the shape of "…" with other parameter names`](#-has-the-shape-of--with-other-parameter-names)
 - [`GET /… is declared twice`](#get--is-declared-twice)
@@ -419,7 +423,7 @@ export const getPet = {
 ## Building the app
 
 These are `TypeError`s thrown when a route is declared, so the app fails at
-startup, not on a request. The four about a path's syntax are also thrown
+startup, not on a request. The eight about a path's syntax are also thrown
 by `shapeOf(path)`, and so by a tool that calls it: `@alxia/openapi-routes`'
 `implemented` and `exactly` throw them for an operation path no route may
 be declared at, after their own name (`implemented(): …`).
@@ -481,6 +485,97 @@ write as `params.name`.
 ```ts
 app.get('/users/:userId', handler);
 ```
+
+### `"…": ":" may only start a segment, as a parameter`
+
+```text
+"/at/10:30": ":" may only start a segment, as a parameter
+```
+
+**When:** a literal segment holds a `:` anywhere but at its start:
+`/at/10:30`, `/ns/a:b`, `/x:`.
+
+**Why:** `Bun.serve`'s router reads a `:` anywhere in a segment as the start
+of a parameter. Given `/at/10:30` it throws at `listen`
+(`Route parameter names cannot start with a number`); given `/at/x:y` it
+takes `y` for a parameter, where `fetch` would take the segment as a
+literal. Refusing the path when it is declared keeps the two from routing
+apart.
+
+**Fix:** make the varying part a parameter, a whole `:name` segment, and
+read it from `params`; a request for `/at/10:30` reaches it:
+
+```ts
+app.get('/at/:time', ({ params, reply }) => reply(200, params.time)); // "10:30"
+```
+
+Or spell the literal without a colon: `/at/10h30`.
+
+### `"…": "*" may only be a whole segment, as a wildcard`
+
+```text
+"/*.js": "*" may only be a whole segment, as a wildcard
+```
+
+**When:** a segment holds a `*` beside something else: `/*.js`, `/v*`,
+`/a*b`.
+
+**Why:** `Bun.serve`'s router takes a segment that starts with `*` for a
+wildcard — `/*.js` matches every path, `.js` or not — while `fetch` would
+take it as a literal. A `*` is only ever a whole last segment.
+
+**Fix:** take the rest of the path with a wildcard, and test what it holds
+in the handler:
+
+```ts
+// GET /assets/app.js → "app.js"; check the extension here.
+app.get('/assets/*', ({ params, reply }) => reply(200, params['*']));
+```
+
+### `"…": "…" is a dot segment, which a request's URL never keeps`
+
+```text
+"/a/./b": "." is a dot segment, which a request's URL never keeps
+```
+
+**When:** a segment is `.` or `..`, or one of their encodings, `%2e` and
+`%2E%2E` among them: `/a/./b`, `/a/..`.
+
+**Why:** a URL resolves its dot segments away, so a request's pathname
+never holds one: `fetch` would never reach the route, and `Bun.serve`,
+which compares the request's target as it was sent, only for a client that
+sends `/a/./b` unresolved.
+
+**Fix:** declare the path the URL resolves it to: `/a/b` for `/a/./b`. A
+segment that merely contains dots, such as `/.well-known` or `/a..b`, is
+not one.
+
+### `"…" is not encoded as a request's URL carries it: declare "…"`
+
+```text
+"/café" is not encoded as a request's URL carries it: declare "/caf%C3%A9"
+```
+
+**When:** a literal segment holds what a URL percent-encodes: non-ASCII
+(`é`), a space, a control character, `"`, `<`, `>`, `` ` ``, `{`, `}`, `^`,
+or a `?`, `#` or `\` that the URL would cut or read as a `/`.
+
+**Why:** `Bun.serve` throws at `listen` for a non-ASCII path
+(`Please encode all non-ASCII characters in the path`), and matches every
+other one against the request's target as sent, where `fetch` reads the
+URL's pathname, which carries `/café` as `/caf%C3%A9`. Declared in that
+form, the path matches the same requests in both.
+
+**Fix:** declare the path the message gives. A client encodes the request
+as its URL does, so a request for `/café` still reaches it:
+
+```ts
+app.get('/caf%C3%A9', ({ reply }) => reply(200, 'café'));
+await app.request('/café'); // 200
+```
+
+An escape is compared as written, case and all: `/caf%c3%a9` is another
+path, which a request for `/café` does not reach.
 
 ### `"…" declares ":…" twice`
 

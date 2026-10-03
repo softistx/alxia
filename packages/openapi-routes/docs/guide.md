@@ -123,8 +123,9 @@ An operation is served by a route of the same method and path:
   `app.get('/pets/:id', …)` serves the operation `GET /pets/:petId`, since
   the router sends them the same requests. Both are compared by
   `shapeOf` from `@alxia/core`, the function the router uses itself. As in the router, a parameter
-  is a whole `:name` segment: `/at/10:30` is a literal path, and does not
-  serve `GET /at/10:45`. The route's handler still reads
+  is a whole `:name` segment, and an operation path with a `:` anywhere
+  else, such as `/at/10:45`, throws the core's `TypeError`, as declaring a
+  route there would. The route's handler still reads
   `params.id`, not `params.petId`; declaring it with
   `app.route(api.getPet, …)` keeps the spec's names and schemas.
 - **`HEAD`.** The core answers `HEAD` with the `GET` route, so a `HEAD`

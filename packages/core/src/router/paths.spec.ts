@@ -48,10 +48,10 @@ describe('shapeOf', () => {
 		expect(shapeOf('/users/:id/posts/*')).toBe('/users/:/posts/*');
 	});
 
-	test('keeps literal segments, and a `:` inside one', () => {
+	test('keeps literal segments', () => {
 		expect(shapeOf('/pets')).toBe('/pets');
-		expect(shapeOf('/at/10:30')).toBe('/at/10:30');
-		expect(shapeOf('/at/10:30')).not.toBe(shapeOf('/at/10:45'));
+		expect(shapeOf('/at/10h30')).toBe('/at/10h30');
+		expect(shapeOf('/at/10h30')).not.toBe(shapeOf('/at/10h45'));
 	});
 
 	test('gives one shape to the paths the router refuses as the same', () => {
@@ -67,5 +67,7 @@ describe('shapeOf', () => {
 		expect(() => shapeOf('/a/*/b')).toThrow('may only end a path');
 		expect(() => shapeOf('/a/:pet-id')).toThrow('is not a parameter name');
 		expect(() => shapeOf('/a/:id/:id')).toThrow('twice');
+		expect(() => shapeOf('/at/10:30')).toThrow('may only start a segment');
+		expect(() => shapeOf('/caf\u00e9')).toThrow('declare "/caf%C3%A9"');
 	});
 });

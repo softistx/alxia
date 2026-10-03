@@ -12,6 +12,82 @@ describe('compilePath', () => {
 		expect(() => compilePath('/a/*/b')).toThrow('may only end a path');
 		expect(() => compilePath('/a/:id/:id')).toThrow('twice');
 	});
+
+	test('refuses a `:` or a `*` inside a segment', () => {
+		for (const path of ['/at/10:30', '/at/x:y', '/at/a:']) {
+			expect(() => compilePath(path)).toThrow(
+				new TypeError(
+					`"${path}": ":" may only start a segment, as a parameter`,
+				),
+			);
+		}
+		for (const path of ['/*a', '/a*', '/a*b', '/a/x*/b']) {
+			expect(() => compilePath(path)).toThrow(
+				new TypeError(
+					`"${path}": "*" may only be a whole segment, as a wildcard`,
+				),
+			);
+		}
+	});
+
+	test('refuses a dot segment, which a URL resolves away', () => {
+		for (const [path, segment] of [
+			['/.', '.'],
+			['/a/..', '..'],
+			['/a/./b', '.'],
+			['/a/%2e/b', '%2e'],
+			['/a/%2E%2E', '%2E%2E'],
+		]) {
+			expect(() => compilePath(path as string)).toThrow(
+				new TypeError(
+					`"${path}": "${segment}" is a dot segment, which a request's URL never keeps`,
+				),
+			);
+		}
+	});
+
+	test('refuses a literal not encoded as a request carries it, and names the form', () => {
+		for (const [path, carried] of [
+			['/caf\u00e9', '/caf%C3%A9'],
+			['/u/:id/\u00e9', '/u/:id/%C3%A9'],
+			['/a b', '/a%20b'],
+			['/a"b', '/a%22b'],
+			['/a{b}', '/a%7Bb%7D'],
+			['/a^b', '/a%5Eb'],
+			['/a?b', '/a%3Fb'],
+			['/a#b', '/a%23b'],
+			['/a\\b', '/a%5Cb'],
+			['/a\tb', '/a%09b'],
+		]) {
+			expect(() => compilePath(path as string)).toThrow(
+				new TypeError(
+					`"${path}" is not encoded as a request's URL carries it: declare "${carried}"`,
+				),
+			);
+		}
+	});
+
+	test('takes what a URL keeps as it is', () => {
+		for (const path of [
+			'/caf%C3%A9',
+			'/caf%c3%a9',
+			'/a%20b',
+			'/%',
+			'/100%',
+			'/%zz',
+			'/a|b',
+			"/a'b",
+			'/a~b',
+			'/.well-known/x',
+			'/a..b',
+			'//',
+			'/a//b',
+			'/a/',
+			'/',
+		]) {
+			expect(compilePath(path).path).toBe(path);
+		}
+	});
 });
 
 describe('Router', () => {
