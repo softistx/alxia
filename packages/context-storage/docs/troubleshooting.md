@@ -7,10 +7,10 @@ behaviour that prints nothing, or an error from `tsc`. A
 
 **Runtime**
 
+- [`TypeError: contextStorage is a factory: use(contextStorage()), not use(contextStorage)`](#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)
 - [`ContextStorageError: getContext(): called outside a request — use tryGetContext(), or runWithContext() in a job or a test`](#contextstorageerror-getcontext-called-outside-a-request--use-trygetcontext-or-runwithcontext-in-a-job-or-a-test)
 - [`ContextStorageError: getContext(): this request reached no route declared after contextStorage() — use it earlier, or getRequestContext()`](#contextstorageerror-getcontext-this-request-reached-no-route-declared-after-contextstorage--use-it-earlier-or-getrequestcontext)
 - [A header set from a timer never reaches the response](#a-header-set-from-a-timer-never-reaches-the-response)
-- [Routes declared before `.use(contextStorage)` answer `404`](#routes-declared-before-usecontextstorage-answer-404)
 
 **Types**
 
@@ -21,9 +21,35 @@ behaviour that prints nothing, or an error from `tsc`. A
 
 ## Runtime
 
+### `TypeError: contextStorage is a factory: use(contextStorage()), not use(contextStorage)`
+
+`tsc` reports the same mistake first:
+
+```text
+error TS2769: No overload matches this call.
+  …
+    Argument of type '<App = undefined>(...uncalled: readonly never[]) => ContextStoragePlugin<App>' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => ContextStoragePlugin<undefined>'.
+```
+
+**When:** at startup, on `.use(contextStorage)`: the factory given to `use`
+without being called.
+
+**Why:** `use` takes a function as a plugin and calls it with the app.
+Called that way, `contextStorage` would return a new, empty plugin app,
+and every route declared after it would land on an app nobody serves; it
+refuses the argument instead.
+
+**Fix:** call it, once, and keep the result:
+
+```ts
+export const requestContext = contextStorage<typeof base>();
+
+const app = base.use(requestContext);
+```
+
 ### `ContextStorageError: getContext(): called outside a request — use tryGetContext(), or runWithContext() in a job or a test`
 
-`error.code` is `'OUTSIDE_REQUEST'`. `getContext()`, `requestContext.get()`
+`error.code` is `'OUTSIDE_REQUEST'`. `getContext()`, `requestContext.context()`
 and `getRequestContext()` all throw it.
 
 **When:** the code that reads the context runs where no request is:
@@ -34,8 +60,6 @@ and `getRequestContext()` all throw it.
   and run later by such a timer;
 - in a WebSocket's `open`, `message` or `close`, since a socket's upgrade
   runs outside the plugin's hook;
-- at startup, on the first route declared after `.use(contextStorage)`
-  without the call — see [below](#routes-declared-before-usecontextstorage-answer-404);
 - with two copies of `@alxia/context-storage` installed: each has its own
   store, so a plugin from one is invisible to `getContext()` from the other.
 
@@ -43,10 +67,12 @@ and `getRequestContext()` all throw it.
 for each request. A callback reads the store that was current where it was
 **scheduled**; anything started outside a request has none.
 
-**Fix:** in code that runs in and out of requests, use `tryGet()`:
+**Fix:** in code that runs in and out of requests, use `tryContext()` —
+or `tryGetRequestContext()` for the request alone:
 
 ```ts
-const user = requestContext.tryGet()?.user; // undefined outside a request
+const user = requestContext.tryContext()?.user; // undefined outside a request
+const method = tryGetRequestContext()?.request.method; // the same
 ```
 
 In a job, a consumer or a test, give the code a context to read:
@@ -71,7 +97,7 @@ hand the values over:
 
 ```ts
 export function auditLater(action: string): void {
-	const { user } = requestContext.get(); // in the request
+	const { user } = requestContext.context(); // in the request
 	pending.push(() => audit(action, user.id)); // runs later, needs nothing
 }
 ```
@@ -120,10 +146,10 @@ app.onResponse((response) => {
 ### A header set from a timer never reaches the response
 
 **When:** a `setTimeout`, a promise that is not awaited, or a callback
-started in a request calls `requestContext.get().set.headers.set(…)` — or
+started in a request calls `requestContext.context().set.headers.set(…)` — or
 sets a cookie — after the handler has returned.
 
-**Why:** the callback still reads the request's context — `get()` does not
+**Why:** the callback still reads the request's context — `context()` does not
 throw — but the response was already sent. The context is stale, not gone.
 
 **Fix:** await the work that shapes the response before replying, and
@@ -137,28 +163,6 @@ const app = base.use(requestContext).get('/orders', async ({ reply }) => {
 });
 ```
 
-### Routes declared before `.use(contextStorage)` answer `404`
-
-**When:** `contextStorage` is given to `use` without being called. The
-routes declared before it answer `404`, and the first route declared after
-it throws at startup, with
-[`called outside a request`](#contextstorageerror-getcontext-called-outside-a-request--use-trygetcontext-or-runwithcontext-in-a-job-or-a-test).
-
-**Why:** `use` takes a function as a plugin and continues with what it
-returns: here, a new, empty plugin app, whose `get` is the context reader
-rather than the route method. `tsc` accepts it, because `contextStorage`
-takes no argument.
-
-**Fix:** call it, once, and keep the result:
-
-```ts
-export const requestContext = contextStorage<typeof base>();
-
-const app = base.use(requestContext);
-```
-
-For the same reason, declare routes on the app, never on the plugin:
-`requestContext.get('/x', handler)` compiles, and throws the same error.
 
 ## Types
 
@@ -196,13 +200,13 @@ error TS2339: Property 'user' does not exist on type 'BaseContext'.
 
 Also as `Property 'user' does not exist on type 'BaseContext & Empty & { readonly db: … }'.`
 
-**When:** reading from `get()` a value a hook adds, and either
+**When:** reading from `context()` a value a hook adds, and either
 
 - the plugin was made without an app type, `contextStorage()`; or
 - it is typed by `base`, and the hook adding `user` comes after it:
   `base.use(requestContext).derive(() => ({ user }))`.
 
-**Why:** `get()` returns `ContextOf<App>`: what a route declared next on
+**Why:** `context()` returns `ContextOf<App>`: what a route declared next on
 `App` reads. With no `App`, that is `BaseContext`; a hook after `App` is
 not in it. At runtime the value is there.
 
@@ -215,7 +219,7 @@ const base = alxia()
 	.derive(({ request }) => ({ user: request.headers.get('x-user') ?? 'anonymous' }));
 
 export const requestContext = contextStorage<typeof base>();
-// requestContext.get().user: string
+// requestContext.context().user: string
 ```
 
 ### `Property 'params' does not exist on type 'BaseContext & …'.`
@@ -226,7 +230,7 @@ error TS2339: Property 'params' does not exist on type 'BaseContext & Empty & { 
 
 The same for `query`, `body` and `headers`.
 
-**When:** reading a route's validated input from `requestContext.get()`.
+**When:** reading a route's validated input from `requestContext.context()`.
 
 **Why:** those belong to one route's schema, not to the app, so the app's
 context does not have them. Hooks run before validation: a `derive` reads

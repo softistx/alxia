@@ -8,6 +8,7 @@ import {
 	getRequestContext,
 	runWithContext,
 	tryGetContext,
+	tryGetRequestContext,
 } from './storage';
 
 const base = alxia()
@@ -22,7 +23,7 @@ const requestContext = contextStorage<typeof base>();
 async function greet(): Promise<string> {
 	await Bun.sleep(Math.random() * 10);
 	await new Promise((resolve) => setTimeout(resolve, 1));
-	const { greeting, user, set } = requestContext.get();
+	const { greeting, user, set } = requestContext.context();
 	expectTypeOf(user).toBeString();
 	set.headers.set('x-greeted', user);
 	return `${greeting} ${user}`;
@@ -88,6 +89,25 @@ describe('contextStorage', () => {
 			expect((error as ContextStorageError).code).toBe('OUTSIDE_REQUEST');
 		}
 		expect(await (await app.request('/before')).text()).toBe('none');
+	});
+
+	test('the request context without throwing; the factory must be called', async () => {
+		expect(tryGetRequestContext()).toBeUndefined();
+		const seen: (string | undefined)[] = [];
+		const traced = alxia()
+			.use(contextStorage())
+			.onResponse(() => {
+				seen.push(tryGetRequestContext()?.url.pathname);
+			})
+			.get('/here', ({ reply }) => reply.ok('here'));
+		await traced.request('/here');
+		await traced.request('/nowhere');
+		expect(seen).toEqual(['/here', '/nowhere']);
+
+		// @ts-expect-error the factory, uncalled
+		expect(() => alxia().use(contextStorage)).toThrow(
+			'contextStorage is a factory: use(contextStorage()), not use(contextStorage)',
+		);
 	});
 
 	test('runWithContext, for a job or a test', async () => {

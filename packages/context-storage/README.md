@@ -31,7 +31,7 @@ const app = base
 import { requestContext } from './app';
 
 export async function listOrders() {
-	const { db, user, set } = requestContext.get();   // typed: user, db
+	const { db, user, set } = requestContext.context();   // typed: user, db
 	set.headers.set('cache-control', 'private');
 	return db.orders.forUser(user.id);
 }
@@ -45,27 +45,31 @@ twenty contexts.
 
 | | |
 | --- | --- |
-| `requestContext.get()` | the route's context, typed by the app the plugin was given: the request, `set`, `reply`, and what every hook before it added. Throws outside |
-| `requestContext.tryGet()` | the same, or `undefined`: code that runs in and out of requests |
+| `requestContext.context()` | the route's context, typed by the app the plugin was given: the request, `set`, `reply`, and what every hook before it added. Throws outside |
+| `requestContext.tryContext()` | the same, or `undefined`: code that runs in and out of requests |
 | `getContext<Ctx>()`, `tryGetContext<Ctx>()` | untyped, as `hono/context-storage`'s: `Ctx` is yours to state |
-| `getRequestContext()` | the request as global hooks see it — in a 404, an `onResponse` — with the `route` it reached and its `error` |
+| `getRequestContext()`, `tryGetRequestContext()` | the request as global hooks see it — in a 404, an `onResponse` — with the `route` it reached and its `error`; the `try` form returns `undefined` outside a request |
 | `runWithContext(ctx, work)` | runs `work` with a context: a job, a queue consumer, a test of a service |
 
 Outside a request, `getContext()` throws a `ContextStorageError` coded
 `OUTSIDE_REQUEST`; in a request that reached no route declared after the
 plugin, `NOT_ROUTED`. Declare it before the routes whose code reads it.
 
+Pass the plugin to `use` called: `use(contextStorage)`, uncalled, is refused by
+`tsc` (`TS2769`) and throws a `TypeError` at startup
+([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)).
+
 ## API
 
 | export | |
 | --- | --- |
-| `contextStorage<App>()` | the plugin, with `get()` and `tryGet()` typed by `App` |
+| `contextStorage<App>()` | the plugin, with `context()` and `tryContext()` typed by `App` |
 | `ContextStoragePlugin<App>` | its type |
-| `getContext`, `tryGetContext`, `getRequestContext`, `runWithContext` | the store, untyped |
+| `getContext`, `tryGetContext`, `getRequestContext`, `tryGetRequestContext`, `runWithContext` | the store, untyped |
 | `ContextStorageError`, `ContextStorageErrorCode` | why there is no context |
 
 ## Documentation
 
 - [Guide](https://github.com/softistx/alxia/tree/develop/packages/context-storage/docs): what the plugin stores and when, reading it from a service or a logger, its typing, where it sits among hooks, what a timer or a detached callback sees, and jobs and tests with `runWithContext`.
-- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/troubleshooting.md): a `ContextStorageError` or a `tsc` error, and what to do about it.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/troubleshooting.md): a `ContextStorageError`, the `TypeError` of `use(contextStorage)`, or a `tsc` error, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/roadmap.md): what is coming, and what is not planned.

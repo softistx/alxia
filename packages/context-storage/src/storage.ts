@@ -47,7 +47,7 @@ const storage = new AsyncLocalStorage<Holder>();
  * Throws a `ContextStorageError` outside a route declared after
  * `contextStorage()`.
  *
- * `Ctx` types what the hooks added; prefer the typed `get()` of the plugin
+ * `Ctx` types what the hooks added; prefer the typed `context()` of the plugin
  * itself, typed by the app.
  */
 export function getContext<Ctx extends object = Empty>(): BaseContext & Ctx {
@@ -74,6 +74,11 @@ export function getRequestContext(): RequestContext {
 	return holder.request;
 }
 
+/** `getRequestContext()`, or `undefined` outside a request. */
+export function tryGetRequestContext(): RequestContext | undefined {
+	return storage.getStore()?.request;
+}
+
 /**
  * Runs `work` with `ctx` as the current context: a job, a queue consumer,
  * a test calling a service that reads `getContext()`.
@@ -85,9 +90,9 @@ export function runWithContext<T>(ctx: BaseContext, work: () => T): T {
 /** The plugin, and its context typed by the app it follows. */
 export type ContextStoragePlugin<App> = Alxia<Empty, Empty, '', never> & {
 	/** `getContext()`, typed by `App`. */
-	get(): ContextOf<App> extends never ? BaseContext : ContextOf<App>;
+	context(): ContextOf<App> extends never ? BaseContext : ContextOf<App>;
 	/** `tryGetContext()`, typed by `App`. */
-	tryGet():
+	tryContext():
 		| (ContextOf<App> extends never ? BaseContext : ContextOf<App>)
 		| undefined;
 };
@@ -99,7 +104,7 @@ export type ContextStoragePlugin<App> = Alxia<Empty, Empty, '', never> & {
  * it being passed down.
  *
  * Typed by the app it is used on: give the plugin that app's type, and its
- * `get()` returns what its routes read — the `user` a session derived, the
+ * `context()` returns what its routes read — the `user` a session derived, the
  * `db` decorated.
  *
  * ```ts
@@ -109,12 +114,21 @@ export type ContextStoragePlugin<App> = Alxia<Empty, Empty, '', never> & {
  *
  * // orders.ts — no context passed
  * export const listOrders = () => {
- *   const { db, user } = requestContext.get();
+ *   const { db, user } = requestContext.context();
  *   return db.orders.forUser(user.id);
  * };
  * ```
  */
-export function contextStorage<App = undefined>(): ContextStoragePlugin<App> {
+export function contextStorage<App = undefined>(
+	...uncalled: readonly never[]
+): ContextStoragePlugin<App> {
+	if (uncalled.length > 0) {
+		// `use(contextStorage)`: the app is handed to the factory, and what
+		// follows would be declared on a plugin nobody serves.
+		throw new TypeError(
+			'contextStorage is a factory: use(contextStorage()), not use(contextStorage)',
+		);
+	}
 	const plugin = alxia()
 		.around((request, next) => {
 			const current = storage.getStore();
@@ -127,7 +141,7 @@ export function contextStorage<App = undefined>(): ContextStoragePlugin<App> {
 			return next();
 		});
 	return Object.assign(plugin, {
-		get: () => getContext(),
-		tryGet: () => tryGetContext(),
+		context: () => getContext(),
+		tryContext: () => tryGetContext(),
 	}) as unknown as ContextStoragePlugin<App>;
 }

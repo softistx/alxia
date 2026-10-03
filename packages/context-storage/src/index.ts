@@ -7,4 +7,5 @@ export {
 	getRequestContext,
 	runWithContext,
 	tryGetContext,
+	tryGetRequestContext,
 } from './storage';
