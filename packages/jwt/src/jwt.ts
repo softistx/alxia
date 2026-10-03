@@ -1,5 +1,5 @@
 import { loadKeys } from './keys';
-import { signToken, verifyToken } from './token';
+import { signToken, type TokenContext, verifyToken } from './token';
 
 /**
  * JSON Web Tokens on Web Crypto: nothing to install. HMAC with a secret,
@@ -89,18 +89,16 @@ export interface Jwt {
  */
 export function createJwt(options: JwtOptions): Jwt {
 	const algorithm: Algorithm = options.algorithm ?? 'HS256';
-	const tolerance = options.clockTolerance ?? 5;
-	const keys = loadKeys(options, algorithm);
+	const context: TokenContext = {
+		algorithm,
+		keys: loadKeys(options, algorithm),
+		options,
+		tolerance: options.clockTolerance ?? 5,
+	};
 	return {
 		algorithm,
 		sign: (claims, signOptions) =>
-			signToken(
-				algorithm,
-				keys,
-				options,
-				claims,
-				signOptions?.expiresIn ?? options.expiresIn,
-			),
-		verify: (token) => verifyToken(algorithm, keys, options, tolerance, token),
+			signToken(context, claims, signOptions?.expiresIn ?? options.expiresIn),
+		verify: (token) => verifyToken(context, token),
 	};
 }

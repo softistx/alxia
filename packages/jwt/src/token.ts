@@ -5,6 +5,15 @@ import { type Keys, params } from './keys';
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+/** What a `Jwt` signs and verifies with, fixed when it is created. */
+export interface TokenContext {
+	readonly algorithm: Algorithm;
+	readonly keys: Promise<Keys>;
+	readonly options: JwtOptions;
+	/** Seconds of clock skew allowed on `exp` and `nbf`. */
+	readonly tolerance: number;
+}
+
 type Failure = Extract<VerifyResult, { ok: false }>;
 type Reason = Failure['reason'];
 
@@ -15,9 +24,7 @@ const isObject = (value: unknown): value is Record<string, unknown> =>
 
 /** A token of `claims`, with `iat`, and `exp`, `iss`, `aud` from the options unless given. */
 export async function signToken(
-	algorithm: Algorithm,
-	keys: Promise<Keys>,
-	options: JwtOptions,
+	{ algorithm, keys, options }: TokenContext,
 	claims: JwtClaims,
 	expiresIn: number | undefined,
 ): Promise<string> {
@@ -46,8 +53,8 @@ export async function signToken(
 interface Decoded {
 	readonly header: Record<string, unknown>;
 	readonly claims: JwtClaims;
-	/** The bytes the signature covers: `head.body`. */
-	readonly content: string;
+	/** The signing input, `head.body`: the text the signature covers. */
+	readonly signingInput: string;
 	readonly signature: Uint8Array<ArrayBuffer>;
 }
 
@@ -70,7 +77,7 @@ function decodeToken(token: string): Decoded | undefined {
 	return {
 		header,
 		claims: claims as JwtClaims,
-		content: `${head}.${body}`,
+		signingInput: `${head}.${body}`,
 		signature: signed,
 	};
 }
@@ -100,10 +107,7 @@ function checkClaims(
 
 /** Checks the signature, the algorithm, the times, the issuer and the audience. */
 export async function verifyToken(
-	algorithm: Algorithm,
-	keys: Promise<Keys>,
-	options: JwtOptions,
-	tolerance: number,
+	{ algorithm, keys, options, tolerance }: TokenContext,
 	token: string,
 ): Promise<VerifyResult> {
 	const decoded = decodeToken(token);
@@ -116,7 +120,7 @@ export async function verifyToken(
 			params(algorithm),
 			(await keys).verify,
 			decoded.signature,
-			encoder.encode(decoded.content),
+			encoder.encode(decoded.signingInput),
 		)
 		.catch(() => false);
 	if (!valid) return fail('signature');
