@@ -66,6 +66,47 @@ describe('zq', () => {
 		expect((await app.request('/search/1?filter={')).status).toBe(400);
 	});
 
+	test('a refusal says what was expected, not Invalid input', async () => {
+		const messages = async (path: string) =>
+			(
+				(await (await app.request(path)).json()) as {
+					issues: { message: string }[];
+				}
+			).issues.map((issue) => issue.message);
+		expect(await messages('/search/x')).toEqual(['Expected a number']);
+		expect(await messages('/search/1.5')).toEqual(['Expected an integer']);
+		expect(await messages('/search/1?exact=maybe')).toEqual([
+			'Expected true, false, 1 or 0',
+		]);
+		expect(await messages('/search/1?since=soon')).toEqual([
+			'Expected an ISO 8601 date or date-time',
+		]);
+		expect(await messages('/search/1?filter={')).toEqual(['Expected JSON']);
+		const ids = zq.array(zq.int());
+		expect(ids.safeParse('x').error?.issues[0]?.message).toBe(
+			'Expected a number',
+		);
+		const points = zq.array(z.object({ x: z.number() }));
+		expect(
+			points.safeParse([{ x: 'a' }]).error?.issues[0]?.message,
+		).not.toContain('received array');
+	});
+
+	test('zq.json of an array is given as JSON text, since a query repeats a list', async () => {
+		const list = alxia().get(
+			'/ids',
+			{ query: z.object({ ids: zq.json(z.array(z.number())) }) },
+			({ query, reply }) => reply(200, query.ids),
+		);
+		expectTypeOf<
+			z.input<ReturnType<typeof zq.json<z.ZodArray<z.ZodNumber>>>>
+		>().toEqualTypeOf<string>();
+		const result = await client(list).get('/ids', {
+			query: { ids: JSON.stringify([1, 2]) },
+		});
+		expect(result.data).toEqual([1, 2]);
+	});
+
 	test("the client's input is what it means to send", () => {
 		expectTypeOf<z.input<ReturnType<typeof zq.int>>>().toEqualTypeOf<
 			string | number

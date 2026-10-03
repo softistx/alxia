@@ -37,10 +37,17 @@ Nothing scheduled yet.
   `{ page: '2' }`, and never `unknown`.
 - **Strict reading.** An empty value is not `0`, `'false'` is `false`,
   and a date and time without an offset is refused rather than guessed.
+- **Refusals that say what was expected.** A refused value reports
+  `Expected a number`, `Expected an integer`, `Expected true, false, 1 or 0`,
+  `Expected an ISO 8601 date or date-time` or `Expected JSON`, and a
+  refused list reports what was refused — the value given, or each refused
+  item at its index — never Zod's bare `Invalid input`.
 - **Lists of one.** `zq.array(item)` reads `?tag=a` as `['a']` and
   `?tag=a&tag=b` as `['a', 'b']`, where `z.array` refuses the first.
 - **JSON in the query string.** `zq.json(schema)` reads a filter sent as
   JSON, validates it with the schema, and lets the client send the object.
+  An array is sent as its JSON text, since a query sends a list as repeated
+  keys.
 - **OpenAPI that matches the wire.** `zodConverter`, given to
   `@alxia/openapi`'s `openapi` or `docs`, documents a `Date` as a
   `date-time` string and a `bigint` as an integer, and documents the rest
