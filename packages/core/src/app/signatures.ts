@@ -1,0 +1,93 @@
+/**
+ * The options of an app and of its `listen`, and the types its methods are
+ * written in.
+ */
+import type { AnyReply } from '../reply/reply';
+import type { JoinPath, RoutePath } from '../types/path';
+import type { Alxia } from './alxia';
+import type {
+	Context,
+	Empty,
+	HandlerResult,
+	MaybePromise,
+	Method,
+	RouteEntryOf,
+	RouteSchema,
+	ValidSchema,
+} from './types';
+
+export interface AlxiaOptions<Prefix extends string> {
+	/** Prepended to the path of every route declared on this app. */
+	readonly prefix?: Prefix;
+	/**
+	 * Whether a reply is checked against the schema its route declares for
+	 * its status, and sent as that schema's output: an unknown key the
+	 * schema strips never leaves the server. On by default; a reply that
+	 * fails is answered with a 500.
+	 */
+	readonly validateResponses?: boolean;
+	/**
+	 * Reads the client's address. By default, the address of the connection;
+	 * behind a proxy you trust, read its header instead.
+	 */
+	readonly ip?: (
+		request: Request,
+		server: Bun.Server<unknown> | undefined,
+	) => string | undefined;
+}
+
+export interface ListenOptions {
+	readonly port?: number | string;
+	readonly hostname?: string;
+	readonly development?: boolean;
+	readonly idleTimeout?: number;
+	readonly maxRequestBodySize?: number;
+	readonly tls?: Bun.TLSOptions;
+}
+
+/** A route method: `app.get(path, schema, handler)` or `app.get(path, handler)`. */
+export interface RouteMethod<
+	M extends Method,
+	Ctx extends object,
+	Routes extends object,
+	Prefix extends string,
+	Shortcuts extends AnyReply,
+> {
+	<
+		const Path extends RoutePath,
+		Schema extends RouteSchema,
+		Result extends HandlerResult<Schema>,
+	>(
+		path: Path,
+		schema: Schema & ValidSchema<JoinPath<Prefix, Path>, Schema>,
+		handler: (
+			ctx: Context<Ctx, JoinPath<Prefix, Path>, Schema>,
+		) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes & RouteEntryOf<M, JoinPath<Prefix, Path>, Schema, Result, Shortcuts>,
+		Prefix,
+		Shortcuts
+	>;
+	<const Path extends RoutePath, Result extends AnyReply>(
+		path: Path,
+		handler: (
+			ctx: Context<Ctx, JoinPath<Prefix, Path>, Empty>,
+		) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes & RouteEntryOf<M, JoinPath<Prefix, Path>, Empty, Result, Shortcuts>,
+		Prefix,
+		Shortcuts
+	>;
+}
+
+/** Any app, whatever it holds. */
+export type AnyAlxia = Alxia<any, any, any, any>;
+
+/**
+ * A plugin written as a function: it receives the app and returns it, with
+ * global hooks added. A plugin that adds to the context or declares routes
+ * is an app of its own, given to `use`.
+ */
+export type Plugin = <App extends AnyAlxia>(app: App) => App;
