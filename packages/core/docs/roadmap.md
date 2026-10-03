@@ -78,3 +78,8 @@ Nothing scheduled yet.
   plugin on an app whose context already has `Requires` — a `user`, a
   `session` — and `use` on an app that does not give them is a compile
   error naming the missing key.
+- **A requirement inferred from a callback.** `RequiresOf<Ctx>` is what a
+  callback's annotated parameter reads beyond `BaseContext`, so a plugin
+  that takes a callback — `@alxia/language`'s `resolve`, `@alxia/janus`'s
+  `load` — requires exactly what its user's annotation names, and nothing
+  when the callback is not annotated.

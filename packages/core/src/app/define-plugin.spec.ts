@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { type Alxia, alxia, type ContextOf, type RoutesOf } from './alxia';
 import { definePlugin } from './define-plugin';
+import type { BaseContext, Empty, RequiresOf } from './types';
 
 interface User {
 	readonly id: string;
@@ -140,5 +141,67 @@ describe('definePlugin', () => {
 			return generic;
 		};
 		expect(_limits).toBeFunction();
+	});
+});
+
+/**
+ * A factory that infers its requirement from the callback it is given, as
+ * `@alxia/language`'s `resolve` and `@alxia/janus`'s `load` do.
+ */
+function audit<Ctx extends object = BaseContext>(
+	who: (ctx: BaseContext & Ctx) => string,
+) {
+	return definePlugin<RequiresOf<Ctx>>()((app) =>
+		app.derive((ctx) => ({
+			// `use` has checked that the app gives what `who` reads.
+			actor: (who as (ctx: BaseContext) => string)(ctx),
+		})),
+	);
+}
+
+describe('RequiresOf', () => {
+	test('is what the annotation adds to BaseContext, Empty when nothing', () => {
+		expectTypeOf<RequiresOf<BaseContext & { user: User }>>().toEqualTypeOf<{
+			user: User;
+		}>();
+		expectTypeOf<RequiresOf<{ user: User }>>().toEqualTypeOf<{
+			user: User;
+		}>();
+		expectTypeOf<RequiresOf<{ user?: User }>>().toEqualTypeOf<{
+			user?: User;
+		}>();
+		expectTypeOf<RequiresOf<BaseContext>>().toEqualTypeOf<Empty>();
+		expectTypeOf<RequiresOf<{ request: Request }>>().toEqualTypeOf<Empty>();
+		// A BaseContext key the annotation types otherwise is kept.
+		expectTypeOf<RequiresOf<{ url: string }>>().toEqualTypeOf<{
+			url: string;
+		}>();
+	});
+
+	test('an annotated callback makes the plugin require what it reads', async () => {
+		const byUser = audit(({ user }: BaseContext & { user: User }) => user.id);
+		const app = alxia()
+			.use(session)
+			.use(byUser)
+			.get('/', ({ actor, reply }) => reply(200, actor));
+		expect(
+			await (await app.request('/', { headers: { 'x-user': 'ada' } })).text(),
+		).toBe('ada');
+		const _refused = () => {
+			// @ts-expect-error the plugin reads "user", which this app's context does not give
+			alxia().use(byUser);
+			const byUrl = audit(({ url }: { url: string }) => url);
+			// @ts-expect-error the plugin reads "url", which this app's context gives with another type
+			alxia().use(byUrl);
+		};
+		expect(_refused).toBeFunction();
+	});
+
+	test('an unannotated callback requires nothing', async () => {
+		const byPath = audit((ctx) => ctx.url.pathname);
+		const app = alxia()
+			.use(byPath)
+			.get('/here', ({ actor, reply }) => reply(200, actor));
+		expect(await (await app.request('/here')).text()).toBe('/here');
 	});
 });

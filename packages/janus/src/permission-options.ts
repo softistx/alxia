@@ -1,4 +1,4 @@
-import type { BaseContext, Empty } from '@alxia/core';
+import type { BaseContext } from '@alxia/core';
 import type {
 	CheckableOf,
 	CtxOf,
@@ -17,31 +17,6 @@ export type ObjectData<C extends ModelConfig, T extends ObjectTypeOf<C>> = {
 } & { readonly [F in FieldsOf<C, T>]: string | null };
 
 export type Awaitable<V> = V | Promise<V>;
-
-/**
- * What a callback whose parameter is annotated `Ctx` reads beyond
- * `BaseContext`: `{ user: User }` for `BaseContext & { user: User }`, and
- * `Empty` when it reads nothing more. A key of `BaseContext` annotated with
- * a type `BaseContext` does not give — `{ url: string }` — is kept, so `use`
- * refuses it. Kept twice, with `@alxia/language`'s.
- */
-export type RequiresOf<Ctx> = [
-	keyof {
-		[Key in keyof Ctx as Key extends keyof BaseContext
-			? BaseContext[Key] extends Ctx[Key]
-				? never
-				: Key
-			: Key]: Ctx[Key];
-	},
-] extends [never]
-	? Empty
-	: {
-			[Key in keyof Ctx as Key extends keyof BaseContext
-				? BaseContext[Key] extends Ctx[Key]
-					? never
-					: Key
-				: Key]: Ctx[Key];
-		};
 
 /**
  * The options of `permission()`: `ctx` required exactly when a condition of
