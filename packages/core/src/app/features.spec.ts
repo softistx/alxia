@@ -183,6 +183,24 @@ describe('group', () => {
 });
 
 describe('cookies', () => {
+	test('every set-cookie a reply gives in its headers is sent', async () => {
+		const headers = new Headers();
+		headers.append('set-cookie', 'a=1; Path=/');
+		headers.append('set-cookie', 'b=2; Path=/');
+		const app = alxia().get('/two', ({ reply, set }) => {
+			set.headers.append('set-cookie', 'z=0; Path=/');
+			set.cookies.set('c', '3');
+			return reply(200, 'ok', { headers });
+		});
+		const response = await app.request('/two');
+		expect(response.headers.getSetCookie()).toEqual([
+			'z=0; Path=/',
+			'a=1; Path=/',
+			'b=2; Path=/',
+			'c=3; Path=/; SameSite=Lax',
+		]);
+	});
+
 	const app = alxia()
 		.get(
 			'/session',

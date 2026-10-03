@@ -33,7 +33,7 @@ reply(200, csv, { headers: { 'content-type': 'text/csv' } });
 | --- | --- | --- |
 | `status` | a `StatusCode` | the response status |
 | `body` | depends on the route, below | encoded as in [Bodies](#how-a-body-is-sent) |
-| `init.headers` | `HeadersInit` | headers of this reply, over those on `set.headers` — except `Vary`, whose names are added to theirs |
+| `init.headers` | `HeadersInit` | headers of this reply, over those on `set.headers` — except `Vary`, whose names are added to theirs, and `Set-Cookie`, each of which is sent |
 
 It returns a `Reply<Status, Body>`: a value, not a `Response`. A handler
 cannot return a raw `Response`; that keeps every outcome in the route's
@@ -204,8 +204,10 @@ app.post('/logout', ({ set, reply }) => {
 ```
 
 Each cookie set or deleted is one `Set-Cookie` header. `init.headers` on
-the reply wins over `set.headers` for the same name. The 500 of an
-unhandled error is sent without them.
+the reply wins over `set.headers` for the same name, except `Set-Cookie`:
+every one given — in `set.headers`, in `init.headers` (a `Headers` with
+`append`), or through `set.cookies` — is sent. The 500 of an unhandled
+error is sent without them.
 
 To read cookies, declare them in the route's schema, or read
 `ctx.cookies` without one ([Routes](routes.md#the-schema)).
