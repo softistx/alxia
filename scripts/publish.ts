@@ -50,7 +50,8 @@ const REGISTRY = 'https://registry.npmjs.org';
 
 type Pkg = { name: string; version: string; dir: string; deps: Set<string> };
 
-async function readPackages(): Promise<Pkg[]> {
+/** The packages to publish: `packages/*` alone, and none marked `private`. */
+export async function readPackages(): Promise<Pkg[]> {
 	const pkgs: Pkg[] = [];
 	for (const rel of [
 		...new Bun.Glob('packages/*/package.json').scanSync(ROOT),

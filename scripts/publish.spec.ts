@@ -2,7 +2,11 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { appendChangesetsOutput, changesetsGitTagEvent } from './publish';
+import {
+	appendChangesetsOutput,
+	changesetsGitTagEvent,
+	readPackages,
+} from './publish';
 
 describe('changesets/action@v2 output', () => {
 	const dirs: string[] = [];
@@ -43,5 +47,16 @@ describe('changesets/action@v2 output', () => {
 				packageName: '@alxia/shared',
 			},
 		]);
+	});
+});
+
+describe('readPackages', () => {
+	test('publishes packages/* alone, never an example', async () => {
+		const pkgs = await readPackages();
+		expect(pkgs.length).toBeGreaterThan(0);
+		for (const pkg of pkgs) {
+			expect(pkg.name).toStartWith('@alxia/');
+			expect(pkg.dir).toContain('/packages/');
+		}
 	});
 });

@@ -5,3 +5,6 @@
 # React Router
 /.react-router/
 /build/
+
+# The default-server copies app/server.spec.ts builds
+/.default-*/
