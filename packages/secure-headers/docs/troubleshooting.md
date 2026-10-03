@@ -116,7 +116,7 @@ error TS2769: No overload matches this call.
 ```
 
 **Why:** the options are the twelve headers in the
-[guide](guide.md#the-options), plus `hidePoweredBy`. `X-Powered-By` and
+[guide](guide.md#the-options), plus `hidePoweredBy` and `nonce`. `X-Powered-By` and
 `Server` are governed by `hidePoweredBy`; anything else —
 `Content-Security-Policy-Report-Only`, `X-XSS-Protection` — is not sent by
 the plugin.
