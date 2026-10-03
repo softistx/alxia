@@ -269,7 +269,9 @@ describe("react-router dev", () => {
     );
     const reader = (child.stdout as ReadableStream<Uint8Array>).getReader();
     let out = "";
-    while (!out.includes(`:${port}/`)) {
+    // Vite colours the port where CI asks for colour (GitHub Actions does):
+    // read the output without its escape codes.
+    while (!Bun.stripANSI(out).includes(`:${port}/`)) {
       const { done, value } = await reader.read();
       if (done) throw new Error(`react-router dev exited: ${out}`);
       out += new TextDecoder().decode(value);
