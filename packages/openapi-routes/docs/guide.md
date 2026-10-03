@@ -9,6 +9,7 @@ import { alxia } from '@alxia/core';
 import { exactly, implemented } from '@alxia/openapi-routes';
 import { operations as api } from './generated/alxia';
 
+// pets, search: your own store and query
 export const app = alxia()
 	.route(api.getPet, ({ params, reply }) => {
 		const pet = pets.get(params.petId);
@@ -40,7 +41,7 @@ type Operations =
 	| readonly RouteOperation[];
 
 interface ImplementedOptions {
-	readonly prefix?: string;
+	readonly prefix?: RoutePath; // `/${string}`, from @alxia/core
 }
 
 interface ExactlyOptions extends ImplementedOptions {
@@ -147,7 +148,7 @@ implemented(app, api, { prefix: '/api' });
 ```
 
 Write the prefix as the app's: a leading `/` and no trailing one. `'api'`
-does not compile, and `'/api/'` throws
+[does not compile](troubleshooting.md#type-pets-is-not-assignable-to-type-string), and `'/api/'` throws
 [`implemented(): the prefix "/api/" must start with "/" and not end with one`](troubleshooting.md#typeerror-implemented-the-prefix--must-start-with--and-not-end-with-one).
 
 The messages then name the full paths, `GET /api/pets/:petId (getPet)`,

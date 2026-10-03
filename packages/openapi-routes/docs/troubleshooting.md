@@ -45,8 +45,12 @@ is declared after the check ran.
 **Fix:** declare each one from its operation:
 
 ```ts
+// pets, search: your own store and query
 const app = alxia()
-	.route(api.getPet, ({ params, reply }) => reply.ok(pets.get(params.petId)))
+	.route(api.getPet, ({ params, reply }) => {
+		const pet = pets.get(params.petId);
+		return pet ? reply.ok(pet) : reply.notFound({ title: 'No such pet' });
+	})
 	.route(api.searchEmployees, ({ body, reply }) => reply.ok(search(body)));
 
 implemented(app, api);
@@ -94,8 +98,9 @@ Also as `exactly(): the prefix "…" …`.
 TypeError: implemented(): the prefix "/api/" must start with "/" and not end with one
 ```
 
-**When:** `prefix` ends with `/`. One without a leading `/` does not
-compile.
+**When:** `prefix` ends with `/`, or is `/` alone; leave it out for an app
+with no prefix. One without a leading `/` does not
+[compile](#type-pets-is-not-assignable-to-type-string).
 
 **Why:** the prefix is the app's, which the core refuses written that way
 (`The prefix "…" must start with "/" and not end with one`); looked up as
@@ -126,9 +131,13 @@ core serves: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `HEAD` or
 error TS2322: Type '"pets"' is not assignable to type '`/${string}`'.
 ```
 
-**When:** an operation's `path` does not start with `/`.
+Also as ``Type '"api"' is not assignable to type '`/${string}`'`` for a
+`prefix`.
 
-**Fix:** write it as the route would: `{ method: 'GET', path: '/pets' }`.
+**When:** an operation's `path`, or `prefix`, does not start with `/`.
+
+**Fix:** write it as the route would: `{ method: 'GET', path: '/pets' }`,
+and the prefix as the app's: `{ prefix: '/api' }`.
 
 ### `Argument of type '{ method: string; path: string; }[]' is not assignable to parameter of type 'Operations'`
 

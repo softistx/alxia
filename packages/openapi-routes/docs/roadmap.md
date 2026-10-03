@@ -26,7 +26,7 @@ Nothing scheduled yet.
 - **Registering the routes.** `app.route(operation, handler)` is in
   `@alxia/core`, where it keeps the chain that types the app.
 - **A runtime dependency.** `@alxia/openapi-routes` declares no dependency,
-  only `@alxia/core` as a peer, whose types it reads.
+  only `@alxia/core`, whose types it reads, and `typescript` as peers.
 
 ## Shipped
 

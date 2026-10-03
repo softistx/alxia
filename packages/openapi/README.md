@@ -56,13 +56,14 @@ The other direction: an OpenAPI document generates each route's method, path
 and schemas, as `@nxgt/openapi-codegen`'s `alxia` option writes them (not in
 a published release yet), and the handler is all you write.
 [`@alxia/openapi-routes`](https://www.npmjs.com/package/@alxia/openapi-routes)
-checks in a test that every operation has its route:
+checks, in a test or at startup, that every operation has its route:
 
 ```ts
 import { alxia } from '@alxia/core';
 import { implemented } from '@alxia/openapi-routes';
 import { operations as api } from './generated/alxia';
 
+// pets: your own store
 const app = alxia().route(api.getPet, ({ params, reply }) => {
 	const pet = pets.get(params.petId); // params.petId: a number, as the spec says
 	return pet ? reply.ok(pet) : reply.notFound({ title: 'No such pet' });
