@@ -198,6 +198,11 @@ describe('exactly', () => {
 				'implemented(): "/pets/:pet-id": ":pet-id" is not a parameter name',
 			),
 		);
+		expect(() => exactly(alxia(), [bad])).toThrow(
+			new TypeError(
+				'exactly(): "/pets/:pet-id": ":pet-id" is not a parameter name',
+			),
+		);
 	});
 
 	test('a HEAD operation: its GET route is served, but not declared', () => {
