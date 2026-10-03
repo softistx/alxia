@@ -121,19 +121,24 @@ are the same count.
 
 ## Policies Redis refuses
 
-`limit` and `windowMs` are checked the first time a request is counted, not
-when the app starts. A policy that cannot be counted exactly makes that
-request, and every one after it, a `500 {"error":"internal"}`, with the
-reason in the log:
+`rateLimit` refuses a `limit` or a `windowMs` that is not a whole number of
+1 or more when it is created, with
+[`TypeError: rateLimit: … must be a whole number of 1 or more, not …`](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/troubleshooting.md#typeerror-ratelimit--must-be-a-whole-number-of-1-or-more-not-).
+`redisStore` checks two more bounds, `@nxgt/redis-guard`'s, only when it
+first counts under a policy, not when the app starts. A policy past either
+makes the first request it counts, and every one after it, a
+`500 {"error":"internal"}`, with the reason in the log — a refused policy
+is not kept, so each request checks it again:
 
 | Policy | Logged |
 | --- | --- |
-| `windowMs` not a whole number (`1.5`) | `TypeError: defineRateLimit: "api:5/1.5" has a per of 1.5; it is a whole number of milliseconds, and must be at least 1` |
-| `limit` below 1, or not whole | `TypeError: defineRateLimit: "api:0/1000" has a limit of 0; it is a whole number of requests, and must be at least 1` |
-| `limit × windowMs` above 9,007,199,254,740 | `TypeError: defineRateLimit: "api:1000000/31536000000" has a burst of 1000000 and a per of 31536000000ms; burst × per must be at most 9007199254740 for the script to count exactly` |
+| `limit × windowMs` above 9,007,199,254,740 (about 9e12) | `TypeError: defineRateLimit: "api:1000000/31536000000" has a burst of 1000000 and a per of 31536000000ms; burst × per must be at most 9007199254740 for the script to count exactly` |
+| `windowMs` above ten 365-day years, 315,360,000,000, with `limit × windowMs` inside the bound above | `TypeError: defineRateLimit: "api:1/315360000001" would take longer than ten years to refill from empty (burst × per ÷ limit); check that per is in milliseconds` |
 
 `limit: 1_000, windowMs: 86_400_000` — a thousand a day — is well inside
-the last bound; a million a year is not.
+both; a million a year is not. Troubleshooting has the fix for each:
+[burst × per](../troubleshooting.md#typeerror-defineratelimit--has-a-burst-of--and-a-per-of-ms-burst--per-must-be-at-most-9007199254740-for-the-script-to-count-exactly)
+and [ten years](../troubleshooting.md#typeerror-defineratelimit--would-take-longer-than-ten-years-to-refill-from-empty-burst--per--limit-check-that-per-is-in-milliseconds).
 
 ## Resetting a key
 
