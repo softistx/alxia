@@ -2,8 +2,11 @@
 
 Each entry is headed by what you see: a TypeScript error, a response, or
 what is missing from the log or from a response. `@alxia/logger` throws no
-error of its own; what goes wrong is where it sits in the app, and what
-`write` does.
+error of its own, and logging never breaks a request: a `write`, a `skip`
+or a `generateId` that throws, or an `async` `write` that rejects, has its
+error printed with `console.error` while the request is answered as it
+would have been. What goes wrong is
+where the plugin sits in the app, and what those options return.
 
 **Types**
 
@@ -12,9 +15,8 @@ error of its own; what goes wrong is where it sits in the app, and what
 
 **Responses**
 
-- [No `X-Request-Id` on the response, and the error `write` threw in the server log](#no-x-request-id-on-the-response-and-the-error-write-threw-in-the-server-log)
-- [`500 {"error":"internal"}` from a route that calls `log`](#500-errorinternal-from-a-route-that-calls-log)
 - [The `X-Request-Id` sent back is not the one the request brought](#the-x-request-id-sent-back-is-not-the-one-the-request-brought)
+- [The `X-Request-Id` is a UUID, not the id `generateId` made](#the-x-request-id-is-a-uuid-not-the-id-generateid-made)
 
 **The log**
 
@@ -76,43 +78,6 @@ app.use(logger()).onError((error, { log }) => {
 
 ## Responses
 
-### No `X-Request-Id` on the response, and the error `write` threw in the server log
-
-**When:** `write` throws while writing the request's entry: a closed file,
-a sink that is down, a `JSON.stringify` of a value it cannot serialise.
-
-**Why:** the entry is written before the headers are set, in the same
-`onResponse` hook. The app catches what the hook throws, prints it with
-`console.error`, and sends the response without the hook's work: no
-`X-Request-Id`, no `Server-Timing`. The status is unchanged.
-
-**Fix:** make `write` safe; a log line is not worth a request:
-
-```ts
-app.use(
-	logger({
-		write: (entry) => {
-			try {
-				sink.write(entry);
-			} catch (error) {
-				console.error('log sink failed', error);
-			}
-		},
-	}),
-);
-```
-
-### `500 {"error":"internal"}` from a route that calls `log`
-
-**When:** the route calls `log.info`, `log.warn` or `log.error`, and
-`write` throws.
-
-**Why:** `log` calls `write` synchronously in the handler, so what it
-throws is the handler's error: the app answers 500. The request's own entry
-then throws too, so the response also has no `X-Request-Id`.
-
-**Fix:** the same `write` with a `try`, above.
-
 ### The `X-Request-Id` sent back is not the one the request brought
 
 **When:** the request sent an id in the header, and the response carries a
@@ -131,6 +96,24 @@ the one named by `header`, `x-request-id` by default.
 /^[\w.:@-]{1,128}$/.test('a b');     // false: replaced
 
 app.use(logger({ header: 'x-correlation-id' })); // if your proxy uses another header
+```
+
+### The `X-Request-Id` is a UUID, not the id `generateId` made
+
+**When:** a request that brings no id is answered with a new UUID, though
+`generateId` is set.
+
+**Why:** the id `generateId` makes must pass the rule an incoming id does,
+1 to 128 letters, digits, `_`, `.`, `:`, `@` and `-`, or it is
+replaced by a `crypto.randomUUID()` without a word. A `generateId` that
+throws is replaced too; its error is in the server log, from
+`console.error`.
+
+**Fix:** make an id that matches:
+
+```ts
+app.use(logger({ generateId: () => `job:${crypto.randomUUID()}` })); // kept
+app.use(logger({ generateId: () => 'job 7' }));                      // a space: replaced
 ```
 
 ## The log
