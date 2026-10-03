@@ -3,7 +3,6 @@ import { type BaseContext, definePlugin, type RequiresOf } from '@alxia/core';
 import { type LanguageOptions, language } from '@alxia/language';
 import {
 	createTranslator,
-	type Path,
 	registerLanguageSource,
 	type TranslationContext,
 } from '@nxgt/i18n';
@@ -13,8 +12,37 @@ export type Catalogues = Readonly<
 	Record<string, Readonly<Record<string, unknown>>>
 >;
 
-/** Every key of a catalogue, dotted: `users.greeting`. */
-export type KeyOf<Catalogue> = Path<Catalogue> & string;
+/**
+ * Every key of a catalogue, dotted: `users.greeting`. The keys of
+ * `@nxgt/i18n`'s `Path`, nine levels deep: a section nested deeper gives
+ * `${section}.${string}`, any key under it.
+ *
+ * `Path` recurses without a bound. A catalogue that is a type parameter —
+ * a function generic over the catalogues it hands to `createI18n` — leaves
+ * it deferred, and some checks then unfold it forever (TS2589, "Type
+ * instantiation is excessively deep and possibly infinite"). The depth
+ * stops them.
+ */
+export type KeyOf<Catalogue> = KeysOf<Catalogue, 8> & string;
+
+/** One level shallower: `Shallower[8]` is `7`, and `Shallower[0]` is `never`. */
+type Shallower = [never, 0, 1, 2, 3, 4, 5, 6, 7];
+
+/**
+ * The dotted keys of `T`, `Depth` more levels down at most. `Path`'s own
+ * test, `Record<string, any>`, kept so that the keys stay `Path`'s.
+ */
+type KeysOf<
+	T,
+	Depth extends number,
+	K extends keyof T = keyof T,
+> = K extends string
+	? T[K] extends Record<string, any>
+		? [Shallower[Depth]] extends [never]
+			? `${K}.${string}`
+			: `${K}.${KeysOf<T[K], Shallower[Depth]>}`
+		: K
+	: never;
 
 /** A translation of a key, in a language, formatted with ICU's `context`. */
 export type Translate<Key extends string> = (

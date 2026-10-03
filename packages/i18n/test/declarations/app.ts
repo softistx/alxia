@@ -3,7 +3,7 @@
 // `@alxia/i18n`, `@alxia/language`, `@alxia/core` and `@nxgt/i18n` alone
 // (TS2883 otherwise).
 import { alxia, type BaseContext } from '@alxia/core';
-import { createI18n } from '@alxia/i18n';
+import { type Catalogues, createI18n } from '@alxia/i18n';
 
 const en = { home: { title: 'Home', greeting: 'Hello {name}' } } as const;
 const fr = { home: { title: 'Accueil', greeting: 'Bonjour {name}' } } as const;
@@ -32,6 +32,17 @@ export function translatedFor() {
 		.get('/', ({ t, reply }) =>
 			reply(200, t('home.greeting', { name: 'Ada' })),
 		);
+}
+
+// Generic over the catalogues: `t`'s keys stay a type over `C`, which the
+// declaration names through `KeyOf`.
+export function translatedWith<
+	const C extends Catalogues,
+	const Fallback extends keyof C & string,
+>(resources: C, fallback: Fallback) {
+	return alxia()
+		.use(createI18n({ resources, fallback }))
+		.get('/', ({ language, reply }) => reply(200, language));
 }
 
 export function translator() {

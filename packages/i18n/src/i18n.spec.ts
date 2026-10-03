@@ -1,7 +1,12 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { alxia, type BaseContext, type Empty } from '@alxia/core';
-import { getLanguage, resources as shared } from '@nxgt/i18n';
-import { createI18n } from './i18n';
+import { getLanguage, type Path, resources as shared } from '@nxgt/i18n';
+import {
+	type Catalogues,
+	createI18n,
+	type I18nContext,
+	type KeyOf,
+} from './i18n';
 
 const en = {
 	...shared.en,
@@ -70,6 +75,58 @@ describe('i18n', () => {
 		expect(i18n.language()).toBe('en');
 		// @ts-expect-error: not a key of the catalogue
 		expect(i18n.t('home.nope')).toBe('home.nope');
+	});
+});
+
+describe('KeyOf', () => {
+	test("gives Path's keys, the shared catalogue's included", () => {
+		expectTypeOf<KeyOf<typeof en>>().toEqualTypeOf<Path<typeof en> & string>();
+		expectTypeOf<
+			KeyOf<{ a: { b: 'x'; c: { d: 'y' } }; e: 'z' }>
+		>().toEqualTypeOf<'a.b' | 'a.c.d' | 'e'>();
+		// An empty section has no key, as in Path.
+		expectTypeOf<
+			KeyOf<{ a: Record<never, never>; b: 'x' }>
+		>().toEqualTypeOf<'b'>();
+	});
+
+	test('reads nine levels exactly, and any key below', () => {
+		type Deep = {
+			l1: {
+				l2: {
+					l3: {
+						l4: { l5: { l6: { l7: { l8: { l9: 'x'; m9: { l10: 'y' } } } } } };
+					};
+				};
+			};
+		};
+		expectTypeOf<KeyOf<Deep>>().toEqualTypeOf<
+			'l1.l2.l3.l4.l5.l6.l7.l8.l9' | `l1.l2.l3.l4.l5.l6.l7.l8.m9.${string}`
+		>();
+	});
+
+	test('a function generic over its catalogues hands them to createI18n', () => {
+		// Each was TS2589 with Path, whose recursion has no bound: the second
+		// is what a route's context does to t when the app's context has an
+		// index signature, as `RequiresOf<BaseContext>` has without Bun's types.
+		const translatedWith = <
+			const C extends Catalogues,
+			const Fallback extends keyof C & string,
+		>(
+			resources: C,
+			fallback: Fallback,
+		) =>
+			alxia()
+				.use(createI18n({ resources, fallback }))
+				.get('/', ({ language, reply }) => reply(200, language));
+		const routed = <
+			const C extends Catalogues,
+			const Fallback extends keyof C & string,
+		>(
+			ctx: Readonly<Record<string, any>> & I18nContext<KeyOf<C[Fallback]>>,
+		): Omit<typeof ctx, 'reply'> => ctx;
+		expect(translatedWith({ en, fr }, 'fr')).toBeDefined();
+		expect(routed).toBeFunction();
 	});
 });
 

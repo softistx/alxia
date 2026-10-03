@@ -50,7 +50,7 @@ interface I18nOptions<C extends Catalogues, Fallback extends keyof C & string, C
 }
 
 type Catalogues = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
-type KeyOf<Catalogue> = Path<Catalogue> & string; // every key, dotted: 'home.title'
+type KeyOf<Catalogue> = …; // every key, dotted: 'home.title', nine levels deep
 type Translate<Key extends string> = (key: Key, context?: TranslationContext) => string;
 interface I18nContext<Key extends string> {
 	readonly t: Translate<Key>;
@@ -362,6 +362,24 @@ export const i18n = createI18n({ resources: { en }, fallback: 'en' });
 type Key = KeyOf<typeof en>; // 'cart.items'
 
 export const describeCart = (t: Translate<Key>, count: number) => t('cart.items', { count });
+```
+
+`KeyOf` gives the keys of `@nxgt/i18n`'s `Path`, nine levels deep; a section
+nested deeper gives `section.${string}`, any key under it. The bound is what
+lets a function generic over its catalogues hand them to `createI18n`:
+
+```ts
+import { alxia } from '@alxia/core';
+import { type Catalogues, createI18n } from '@alxia/i18n';
+
+export function translatedWith<const C extends Catalogues, const Fallback extends keyof C & string>(
+	resources: C,
+	fallback: Fallback,
+) {
+	return alxia()
+		.use(createI18n({ resources, fallback }))
+		.get('/', ({ language, reply }) => reply(200, language));
+}
 ```
 
 ## Outside a route

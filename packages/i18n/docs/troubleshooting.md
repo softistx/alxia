@@ -79,6 +79,31 @@ compile-time form of [the start-up error](#typeerror-language-the-fallback-de-is
 createI18n({ resources: { en, fr }, fallback: 'en' });
 ```
 
+### `Type instantiation is excessively deep and possibly infinite`
+
+```text
+error TS2589: Type instantiation is excessively deep and possibly infinite.
+```
+
+**When:** a function generic over its catalogues hands them to
+`createI18n`, then uses the plugin, with `@alxia/i18n` 0.1.1 or earlier:
+
+```ts
+function translatedWith<const C extends Catalogues, const Fallback extends keyof C & string>(
+	resources: C,
+	fallback: Fallback,
+) {
+	return alxia().use(createI18n({ resources, fallback }));
+}
+```
+
+**Why:** `KeyOf` was `@nxgt/i18n`'s `Path`, which recurses without a bound.
+With `C` a type parameter, the keys stay deferred, and some checks then
+unfold them forever. A tsconfig whose `types` leaves out `bun` is one
+setting that triggers them.
+
+**Fix:** upgrade `@alxia/i18n`: `KeyOf` now reads nine levels deep at most.
+
 ### `Argument of type '"cart.itmes"' is not assignable to parameter of type '"cart.items"'`
 
 ```text

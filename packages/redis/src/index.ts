@@ -1,5 +1,6 @@
 export { type RedisCacheStoreOptions, redisCacheStore } from './cache-store';
 export {
+	type AnyCache,
 	type BoundCaches,
 	type RedisContext,
 	type RedisContextOptions,

@@ -42,3 +42,16 @@ export function speakingAny<const L extends string>(
 		.use(language({ supported, fallback }))
 		.get('/', ({ language: lang, reply }) => reply(200, lang));
 }
+
+// With Bun's types, the plugin requires nothing of the app: a route reads
+// only what the context gives. Without them, `Bun.Server` is an error type
+// and the requirement widens to `{ [x: string]: any }`, which any key reads.
+export function speakingOnly() {
+	return alxia()
+		.use(language({ supported: ['en'], fallback: 'en' }))
+		.get('/', (ctx) => {
+			// @ts-expect-error not in the context
+			ctx.nothing;
+			return ctx.reply(200, ctx.language);
+		});
+}

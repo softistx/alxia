@@ -5,8 +5,14 @@
 import { cache } from '@alxia/cache';
 import { alxia } from '@alxia/core';
 import { rateLimit } from '@alxia/rate-limit';
-import { idempotency, redis, redisCacheStore, redisStore } from '@alxia/redis';
-import { type CacheDefinition, defineCache } from '@nxgt/redis';
+import {
+	type AnyCache,
+	idempotency,
+	redis,
+	redisCacheStore,
+	redisStore,
+} from '@alxia/redis';
+import { defineCache } from '@nxgt/redis';
 import { z } from 'zod';
 
 // Bun's `RedisClient`, named through the plugin: the fixtures compile
@@ -59,9 +65,7 @@ export function stores() {
 		.get('/', ({ reply }) => reply(200, 'ok'));
 }
 
-// What `redis()` itself takes: a definition's key parameters are its own.
-type AnyCache = CacheDefinition<any, z.ZodType>;
-
+// Generic over the caches, under the constraint `redis()` itself takes.
 export function withCaches<const Caches extends Record<string, AnyCache>>(
 	caches: Caches,
 ) {
