@@ -34,6 +34,9 @@ Nothing scheduled yet.
   the requests of every route declared after it, per client address by
   default, and answers a 429 with `Retry-After` and
   `{ error: 'rate_limited', retryAfter }` past the limit.
+- **Options that can work, or a startup error.** A `limit` or `windowMs`
+  that is not a whole number of 1 or more throws when `rateLimit()` is
+  called.
 - **A typed 429.** The 429 is part of each limited route's type, so
   `@alxia/client` reads it, and a route declared before the limit has none.
 - **What the route reads.** `ctx.rateLimit` gives the limit, what is left,

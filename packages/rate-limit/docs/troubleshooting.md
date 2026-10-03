@@ -11,6 +11,10 @@ nothing of its own; past the limit it answers a 429.
 - [`'rateLimit' is possibly 'undefined'`](#ratelimit-is-possibly-undefined)
 - [`This comparison appears to be unintentional because the types '200 | 500' and '429' have no overlap`](#this-comparison-appears-to-be-unintentional-because-the-types-200--500-and-429-have-no-overlap)
 
+**Startup**
+
+- [`TypeError: rateLimit: … must be a whole number of 1 or more, not …`](#typeerror-ratelimit--must-be-a-whole-number-of-1-or-more-not-)
+
 **Responses**
 
 - [`429 {"error":"rate_limited","retryAfter":…}`](#429-errorrate_limitedretryafter)
@@ -116,6 +120,30 @@ drop the check, if it should not:
 const app = alxia()
 	.use(rateLimit({ limit: 100, windowMs: 60_000 }))
 	.get('/search', ({ reply }) => reply(200, [])); // now 200 | 429 | 500
+```
+
+## Startup
+
+### `TypeError: rateLimit: … must be a whole number of 1 or more, not …`
+
+**When:** `rateLimit()` is called with a `limit` or a `windowMs` of 0, a
+negative or fractional number, or `NaN`, often from an environment variable
+that is unset. It throws at once, so the app fails at startup:
+
+```text
+TypeError: rateLimit: limit must be a whole number of 1 or more, not 0
+TypeError: rateLimit: windowMs must be a whole number of 1 or more, not NaN
+```
+
+**Why:** a `limit` of 0 would refuse every request, and a window of 0 or
+less would never end one.
+
+**Fix:** pass whole numbers. A value read from the environment is a
+string, or `undefined` when the variable is unset: give it a default, and
+let an empty or non-numeric value still fail at startup, as it should:
+
+```ts
+app.use(rateLimit({ limit: Number(Bun.env.RATE_LIMIT ?? 100), windowMs: 60_000 }));
 ```
 
 ## Responses

@@ -2,9 +2,9 @@ import { alxia, type BaseContext } from '@alxia/core';
 import { MemoryStore, type RateLimitStore } from './store';
 
 export interface RateLimitOptions {
-	/** How many requests a key may make in a window. */
+	/** How many requests a key may make in a window: a whole number, 1 or more. */
 	readonly limit: number;
-	/** The window, in milliseconds. */
+	/** The window, in milliseconds: a whole number, 1 or more. */
 	readonly windowMs: number;
 	/** What is counted: the client's address by default. `undefined` is not counted. */
 	readonly key?: (
@@ -46,6 +46,15 @@ export interface RateLimitInfo {
  * ```
  */
 export function rateLimit(options: RateLimitOptions) {
+	for (const name of ['limit', 'windowMs'] as const) {
+		const value = options[name];
+		if (!Number.isSafeInteger(value) || value < 1) {
+			// 0 refuses every request; a window of 0 or less never ends one.
+			throw new TypeError(
+				`rateLimit: ${name} must be a whole number of 1 or more, not ${String(value)}`,
+			);
+		}
+	}
 	const store = options.store ?? new MemoryStore();
 	const key = options.key ?? ((ctx: BaseContext) => ctx.ip);
 	const style = options.headers ?? 'draft';
