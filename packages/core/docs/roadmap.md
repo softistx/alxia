@@ -66,7 +66,8 @@ Nothing scheduled yet.
   are each validated, sent as JSON and read by the client as an
   `AsyncIterable`.
 - **WebSockets.** `ws` validates the upgrade like a route and each message
-  received and sent by its schema, with publish and subscribe.
+  received and sent by its schema, with publish and subscribe; `listen`
+  serves them, or `Bun.serve` given `app.fetch` and `app.websocket`.
 - **Hooks in order.** `decorate`, `derive`, `wrap` and `onError` apply to the
   routes declared after them and add their context and replies to those
   routes' types; `around`, `onRequest`, `onResponse`, `onStart`, `onStop` and

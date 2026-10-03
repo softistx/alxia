@@ -768,7 +768,8 @@ through `app.fetch` / `app.request`, which have no server to upgrade with.
 
 **Why:** a socket needs `Bun.serve`'s upgrade.
 
-**Fix:** serve the app with `listen` and connect with a WebSocket
+**Fix:** serve the app with `listen`, or with `Bun.serve` given `fetch`
+and `websocket`, and connect with a WebSocket
 ([WebSockets](../README.md#websockets)):
 
 ```ts

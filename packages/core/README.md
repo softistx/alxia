@@ -232,8 +232,8 @@ The upgrade request runs the hooks before the route and is validated as a
 route's — a 401 or a 400 never becomes a socket. Each message is parsed as
 JSON and checked by `message` (a refused one is answered with its issues,
 the socket kept open); each one sent is checked by `send`. `socket.data`
-holds the validated request and what each hook added. Sockets need
-`listen`.
+holds the validated request and what each hook added. Sockets need a
+server: `listen`, or `Bun.serve({ fetch: app.fetch, websocket: app.websocket })`.
 
 ## Hooks
 
@@ -350,7 +350,7 @@ covers all three kinds.
 | export | |
 | --- | --- |
 | `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip` |
-| `Alxia` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `decorate` `derive` `wrap` `onError`, `around` `onRequest` `onResponse` `onStart` `onStop` `parser`, `group` `use`, `fetch` `request` `listen` `stop`, `routes` `sockets` `server` |
+| `Alxia` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `decorate` `derive` `wrap` `onError`, `around` `onRequest` `onResponse` `onStart` `onStop` `parser`, `group` `use`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server` |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream` made |
 | `FileSource`, `StaticOptions`, `FileOptions`, `StaticReply`, `parseRange` | static files |

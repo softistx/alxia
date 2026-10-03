@@ -17,9 +17,9 @@ Nothing scheduled yet.
 
 ## Later
 
-- **alxia's sockets under `react-router dev`.** Under the Vite plugin the
-  app answers through `app.fetch`, so `ws` routes, `page()` and
-  `ctx.server` wait for the build.
+- **`ctx.server` under `react-router dev`.** An HTTP request reaches the
+  app through `app.fetch`, so `ctx.server` and `page()` wait for the build;
+  a socket's upgrade already has its server.
 - **The logger's duration of a streamed page**, to its last byte rather
   than its first.
 - **A React Router `basename`**, the app served under a path.
@@ -85,6 +85,12 @@ Nothing scheduled yet.
   `getLoadContext` commented, and the `Register` declaration. It refuses
   to overwrite a file already there unless given `--force`, and runs under
   Bun with no Node.
+- **WebSockets in dev and preview.** An alxia `ws` route connects under
+  `react-router dev` and `vite preview` as from the build, with nothing to
+  configure: the plugin relays each upgrade Vite does not claim (HMR, its
+  proxy) to a `Bun.serve` of the app, so its hooks, refusals,
+  `socket.data` and handlers run as `listen` runs them, and in dev an edit
+  to the server is used from the next connection.
 - **Loaders typed with no type argument.** A `Register` declaration beside
   the server types `alxiaOf(context)`; `alxiaOf<typeof server>` and an app
   still work, and with neither it is `BaseContext`.

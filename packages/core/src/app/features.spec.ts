@@ -376,6 +376,30 @@ describe('websockets', () => {
 		}
 	});
 
+	test('Bun.serve opens them with fetch and websocket, as listen does', async () => {
+		const server = Bun.serve({
+			port: 0,
+			fetch: app.fetch,
+			websocket: app.websocket,
+		});
+		try {
+			const url = new URL('/rooms/lobby?user=grace', server.url);
+			url.protocol = 'ws:';
+			const socket = new WebSocket(url);
+			const received = new Promise<unknown>((resolve) => {
+				socket.onmessage = (event) => resolve(JSON.parse(String(event.data)));
+			});
+			await new Promise((resolve) => {
+				socket.onopen = resolve;
+			});
+			socket.send(JSON.stringify({ text: 'hi' }));
+			expect(await received).toEqual({ from: 'grace', text: 'hi' });
+			socket.close();
+		} finally {
+			await server.stop(true);
+		}
+	});
+
 	test('without a server, or without an upgrade, a socket route is a 426', async () => {
 		const response = await app.request('/rooms/lobby');
 		expect(response.status).toBe(426);

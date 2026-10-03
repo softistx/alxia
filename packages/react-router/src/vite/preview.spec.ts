@@ -9,26 +9,11 @@ import {
 } from 'bun:test';
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
-import { type PreviewServer, preview } from 'vite';
+import type { PreviewServer } from 'vite';
 import { BROWSER, copyFixture } from '../../test/fixture';
-import { build, type Fixture } from '../../test/vite';
+import { build, type Fixture, previewServer } from '../../test/vite';
 
 const browser = { 'user-agent': BROWSER };
-
-/** Vite's preview server on a copy of the fixture, in this process, on a free port. */
-async function previewServer(root: string) {
-	const server = await preview({
-		root,
-		configFile: join(root, 'vite.alxia.config.ts'),
-		logLevel: 'silent',
-		preview: { port: 0, host: '127.0.0.1' },
-	});
-	const address = server.httpServer.address();
-	if (address === null || typeof address !== 'object') {
-		throw new Error('Vite did not listen');
-	}
-	return { server, base: `http://127.0.0.1:${address.port}` };
-}
 
 describe('vite preview, after react-router build', () => {
 	let fixture: Fixture;

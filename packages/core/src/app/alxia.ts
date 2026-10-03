@@ -181,6 +181,7 @@ export class Alxia<
 	#derive: ChainHook[] = [];
 	#onError: ErrorHook[] = [];
 	#server: Bun.Server<unknown> | undefined;
+	#websocket: Bun.WebSocketHandler<SocketData> | undefined;
 
 	constructor(options: AlxiaOptions<Prefix> = {}) {
 		this.#prefix = options.prefix ?? '';
@@ -380,7 +381,8 @@ export class Alxia<
 	/**
 	 * A WebSocket route. The upgrade request runs the hooks before it and is
 	 * validated as a route's; each message is then checked by `message`, and
-	 * each one sent by `send`. Open through `listen`: a socket needs a server.
+	 * each one sent by `send`. Open through `listen`, or a `Bun.serve` given
+	 * `fetch` and `websocket`: a socket needs a server.
 	 *
 	 * ```ts
 	 * app.ws('/rooms/:room', { message: Chat, send: Chat }, {
@@ -695,6 +697,19 @@ export class Alxia<
 		server?: Bun.Server<unknown>,
 	): Promise<Response> => serve(this.#runtime, request, server, undefined);
 
+	/**
+	 * The `websocket` handler `Bun.serve` opens this app's sockets with, beside
+	 * `fetch`: what `listen` passes, for a server started otherwise.
+	 *
+	 * ```ts
+	 * Bun.serve({ fetch: app.fetch, websocket: app.websocket });
+	 * ```
+	 */
+	get websocket(): Bun.WebSocketHandler<SocketData> {
+		this.#websocket ??= websocketHandler(this.#runtime.validateResponses);
+		return this.#websocket;
+	}
+
 	/** A request to the app, in process: `app.request('/users/1')`. */
 	request(path: string, init?: RequestInit): Promise<Response> {
 		return this.fetch(new Request(new URL(path, 'http://localhost'), init));
@@ -731,7 +746,7 @@ export class Alxia<
 			routes,
 			fetch: (request: Request, server: Bun.Server<unknown>) =>
 				serve(this.#runtime, request, server, undefined),
-			websocket: websocketHandler(this.#runtime.validateResponses),
+			websocket: this.websocket,
 		} as Bun.Serve.Options<SocketData>) as Bun.Server<unknown>;
 		this.#server = server;
 		for (const hook of this.#runtime.globals.onStart) {

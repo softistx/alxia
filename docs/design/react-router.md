@@ -65,8 +65,9 @@ plugins, and `"start": "bun build/server/index.js"`. The template's `dev`,
 - a default logger in the default server: alxia's default server is bare,
   and the logger is one `configure` away;
 - `reveal`, a CLI that writes `app/server.ts`: the file is three lines;
-- WebSockets in dev through `@hono/node-server` and `ws`: still on the
-  roadmap, as a dependency the package will not take;
+- WebSockets in dev through `@hono/node-server` and `ws`: a dependency
+  the package will not take. Since shipped without one: the plugin relays
+  each upgrade Vite's HMR leaves to a loopback `Bun.serve` of the app;
 - `vite preview` support, Chrome DevTools' workspace file, socket info
   headers in dev, a `react-dom/server.browser` alias for Bun (React
   Router's default entry already streams under Bun), and the build path
@@ -410,9 +411,9 @@ export default defineConfig({
 - **Without the Vite plugin**, the runtime alone still serves a build: a
   server file imports `build/server/index.js` and passes it as `build`. It
   must then read the context through `alxiaOf`, never through a key of its
-  own in `app/`, because of trap 1. That is the setup for an app that
-  needs alxia's sockets in dev (D3). The package documents it and does not
-  ship it.
+  own in `app/`, because of trap 1. It was the setup for an app that
+  needed alxia's sockets in dev (D3), before the plugin relayed them. The
+  package documents it and does not ship it.
 
 ### 3. Prerequisites outside the package
 
@@ -478,7 +479,8 @@ core ◄── react-router   (peers: react-router; vite, optional, for /vite on
      one server entry serves dev and production. It measured best on HMR,
      server reload and first SSR, and the app's own context keys work. The
      cost: in dev, alxia's `ws` routes, `page` and `ctx.server` are absent,
-     as under `app.request` today.
+     as under `app.request` today. (Since shipped: the `ws` routes, through
+     a relay to a `Bun.serve` of the app.)
    - (b) alxia owns `Bun.serve` (D3). Sockets work in dev, but it adds two
      extra ports and a rule for what goes to Vite. Server edits need a
      restart, and only the package's key reaches the loaders.

@@ -1,8 +1,8 @@
 # Serving
 
 This page covers running an app: `listen` and its options, `fetch` and
-`request` for tests and other servers, reading the client's address, and
-stopping cleanly.
+`request` for tests and other servers, `websocket` for a `Bun.serve` of
+your own, reading the client's address, and stopping cleanly.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -24,7 +24,8 @@ listen(options?: ListenOptions | number): Bun.Server<unknown>
 `Bun.serve` with the app. A number is the port. Each declared path goes to
 Bun's own router; a request none of them matches goes to `fetch`, which
 answers 404 or 405. Sockets and [HTML pages](static-files.md#bun-html-bundles)
-are wired in too: they only work through `listen`.
+are wired in too: pages only work through `listen`, sockets through it or
+a `Bun.serve` given [`websocket`](#websocket).
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
@@ -79,6 +80,24 @@ test('POST /users', async () => {
 Through `fetch` alone there is no server: `ctx.server` is `undefined`, the
 default `ip` is `undefined`, a socket route answers 426, and a `page`
 answers 404. Use `listen({ port: 0 })` to test those.
+
+## `websocket`
+
+```ts
+get websocket(): Bun.WebSocketHandler<…>
+```
+
+The handler `Bun.serve` opens the app's sockets with: what `listen`
+passes beside `fetch`. Give both to a server you start yourself, and its
+`ws` routes connect as through `listen`:
+
+```ts
+const server = Bun.serve({ port: 3000, fetch: app.fetch, websocket: app.websocket });
+```
+
+Such a server is not the app's: `app.server` stays `undefined`, and
+`onStart` and `onStop` do not run. One handler serves every socket the app
+opens, its groups' and plugins' included.
 
 ## The client's address: `ip`
 
