@@ -19,8 +19,8 @@
  *
  * Not Dependabot, though its Bun updater reads this `lockfileVersion` 1 lock:
  * it would bump the devDependency alone, where a `^0.x` peer must widen with
- * it and a changeset must come along, and it stops reading the lock the day a
- * Bun upgrade writes version 2, as nxgt-data's already is.
+ * it and a changeset must come along, and it stops reading the lock the day the lock
+ * is rewritten as version 2, as nxgt-data's already is.
  *
  * Exits 0 when everything is current, 1 when something is behind, 2 when it
  * could not tell — a registry that does not answer is a failure, never

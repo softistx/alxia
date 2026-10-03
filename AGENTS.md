@@ -158,7 +158,7 @@ they write.
   `packages/`. Not Dependabot, though its Bun updater reads this
   `lockfileVersion` 1 lock: it would bump the devDependency alone, where a
   `^0.x` peer must widen with it and a changeset must come along, and it
-  stops reading the lock the day a Bun upgrade writes version 2, as
+  stops reading the lock the day it is rewritten as version 2, as
   nxgt-data's already is.
 
 ## TypeScript

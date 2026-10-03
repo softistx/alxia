@@ -264,17 +264,17 @@ describe('check', () => {
 			lines: ['npm has no latest @nxgt/i18n: 503 Service Unavailable'],
 		});
 	});
-});
 
-test('check exits 2 when the repository cannot be read', async () => {
-	expect(
-		await check(
-			async () => {
-				throw new Error('ENOENT: bun.lock');
-			},
-			async () => '0.0.0',
-		),
-	).toEqual({ code: 2, lines: ['ENOENT: bun.lock'] });
+	test('exits 2 when the repository cannot be read', async () => {
+		expect(
+			await check(
+				async () => {
+					throw new Error('ENOENT: bun.lock');
+				},
+				async () => '0.0.0',
+			),
+		).toEqual({ code: 2, lines: ['ENOENT: bun.lock'] });
+	});
 });
 
 describe('read', () => {
