@@ -76,9 +76,33 @@ the server's generator is closed, its `finally` run; the server logs
 nothing.
 
 Each event's `data` is parsed as JSON. Comments, such as the server's
-keep-alives, are skipped; an event with several `data:` lines is read as
-their lines joined by `\n`. Other fields — `event:`, `id:`, `retry:` — are
-ignored.
+keep-alives, are skipped, and so is an event with no `data:` line, as an
+`EventSource` skips it; an event with several `data:` lines is read as
+their lines joined by `\n`. Lines may end with LF, CRLF or CR. `retry:` is
+ignored: it tells an `EventSource` when to reconnect, and this reader does
+not reconnect.
+
+### Named events
+
+An event sent with a name — as every event of a named
+`eventStream({ state: StateChange, ping: Ping })` is — reads as
+`{ event, data, id? }`. Its type is a union discriminated by `event`, each
+`data` typed by that name's schema; `id` is there when the server sent one:
+
+```ts
+const push = await api.get('/push');
+if (push.status === 200) {
+	for await (const item of push.data) {
+		// item: { event: 'state'; data: { '@type': 'StateChange'; changed: … }; id?: string }
+		//     | { event: 'ping'; data: { interval: number }; id?: string }
+		if (item.event === 'state') console.log(item.data.changed, item.id);
+		else console.log('ping every', item.data.interval, 'seconds');
+	}
+}
+```
+
+Reading `item.data.interval` before `event` says which is a compile error.
+An unnamed stream reads as its data alone, as before.
 
 ```ts
 const controller = new AbortController();
@@ -107,6 +131,9 @@ for await (const event of readEvents(response.body!)) {
 	console.log(event); // { n: 1, at: '…' }, then 2, then 3
 }
 ```
+
+An event with an `event:` line comes as `{ event, data, id? }`, one
+without it as its data alone.
 
 It yields `unknown`: check the values yourself. An event whose `data` is
 not JSON makes the loop throw a `SyntaxError`

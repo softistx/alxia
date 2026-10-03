@@ -250,6 +250,27 @@ Each value is checked by the event's schema and sent as one `data:` line of
 JSON; a comment keeps an idle stream open, and the generator is closed when
 the client leaves. The client reads `data` as an `AsyncIterable` of events.
 
+Name the events, each with its schema, and each is sent with its `event:`
+line, plus `id:` and `retry:` when given:
+
+```ts
+const Push = eventStream({ state: StateChange, ping: Ping });
+
+app.get('/push', { response: { 200: Push } }, ({ reply }) =>
+	reply(200, (async function* () {
+		yield Push.event('ping', { interval: 30 });
+		yield Push.event('state', change, { id: 's42' });
+	})()),
+);
+// event: ping
+// data: {"interval":30}
+```
+
+`Push.event(name, data, fields?)` types each by its name's schema. The
+client reads `{ event, data, id? }`, a union discriminated by `event`. A
+line break in an `id`, or a `retry` that is not a whole number, ends the
+stream before it is written.
+
 ## WebSockets
 
 ```ts
@@ -385,7 +406,10 @@ covers all three kinds.
 | `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip` |
 | `Alxia` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `decorate` `derive` `wrap` `onError` `onRefusal`, `around` `onRequest` `onResponse` `onStart` `onStop` `parser`, `group` `use`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server` |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
-| `isEventStreamSchema(schema)` | whether a schema is one `eventStream` made |
+| `isEventStreamSchema(schema)` | whether a schema is one `eventStream(schema)` made |
+| `eventStream({ name: schema })`, `NamedEventStreamSchema`, `EventSchemas` | the response schema of a stream of named events, its `event(name, data, fields?)` builder, its schemas by name under `~events` |
+| `EventInput<Of>`, `EventOutput<Of>`, `EventFields` | what a handler yields on a named stream, what the client reads of it, and an event's `id` and `retry` |
+| `isNamedEventStreamSchema(schema)` | whether a schema is one `eventStream({ … })` made |
 | `FileSource`, `StaticOptions`, `FileOptions`, `StaticReply`, `parseRange` | static files |
 | `Precompressed`, `FileNotFoundBody`, `RangeNotSatisfiableBody` | a coding stored beside a file, the bodies of the 404 and 416 |
 | `Reply`, `HttpError`, `ResponseValidationError` | what a handler returns or throws |

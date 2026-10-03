@@ -74,6 +74,71 @@ describe('server-sent events', () => {
 	});
 });
 
+describe('named server-sent events', () => {
+	const Push = eventStream({
+		state: z.object({
+			changed: z.record(z.string(), z.string()),
+			at: z.date(),
+		}),
+		ping: z.object({ interval: z.number() }),
+	});
+	const push = alxia().get('/push', { response: { 200: Push } }, ({ reply }) =>
+		reply(
+			200,
+			(async function* () {
+				yield Push.event('ping', { interval: 30 });
+				yield Push.event(
+					'state',
+					{ changed: { Email: 's1' }, at: new Date(0) },
+					{ id: 's1', retry: 1000 },
+				);
+			})(),
+		),
+	);
+
+	test('the data is a union of the events, discriminated by event', async () => {
+		const result = await client(push).get('/push');
+		if (result.status !== 200) throw new Error(`got ${result.status}`);
+		const read: unknown[] = [];
+		for await (const item of result.data) {
+			// @ts-expect-error: `interval` is a ping's alone, until `event` says which
+			item.data.interval;
+			if (item.event === 'ping') {
+				expectTypeOf(item.data).toEqualTypeOf<{ interval: number }>();
+			} else {
+				expectTypeOf(item.event).toEqualTypeOf<'state'>();
+				expectTypeOf(item.data).toEqualTypeOf<{
+					changed: Record<string, string>;
+					at: string;
+				}>();
+				expectTypeOf(item.id).toEqualTypeOf<string | undefined>();
+			}
+			read.push(item);
+		}
+		expect(read).toEqual([
+			{ event: 'ping', data: { interval: 30 } },
+			{
+				event: 'state',
+				data: { changed: { Email: 's1' }, at: '1970-01-01T00:00:00.000Z' },
+				id: 's1',
+			},
+		]);
+	});
+
+	test('through listen, the events arrive the same', async () => {
+		const server = push.listen({ port: 0 });
+		try {
+			const result = await client<typeof push>(server.url).get('/push');
+			if (result.status !== 200) throw new Error(`got ${result.status}`);
+			const events: string[] = [];
+			for await (const item of result.data) events.push(item.event);
+			expect(events).toEqual(['ping', 'state']);
+		} finally {
+			await push.stop(true);
+		}
+	});
+});
+
 describe('leaving early', () => {
 	test('a break out of an event stream ends it quietly', async () => {
 		const endless = alxia().get('/forever', ({ reply }) =>

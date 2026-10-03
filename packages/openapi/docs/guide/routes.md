@@ -141,6 +141,7 @@ what goes over the wire.
 | --- | --- |
 | a `204` or `304` | a description, no content |
 | an `eventStream(...)` | `text/event-stream`, by the schema of one event, as its `itemSchema` |
+| an `eventStream({ name: schema })` | `text/event-stream`, its `itemSchema` a `oneOf` of one object per event name |
 | one that converts to `{ type: 'string' }` | `text/plain` |
 | any other | `application/json` |
 
@@ -158,6 +159,34 @@ const app = alxia()
 // /health 200  → content['text/plain'].schema         { type: 'string' }
 // /users/{id} 204 → { description: 'No content' }
 // /ticks 200   → content['text/event-stream'].itemSchema  { type: 'object', properties: { n: ... } }
+```
+
+A stream of named events documents each name as an object of its own: the
+event's name as a `const`, its data by its schema:
+
+```ts
+const push = alxia().get(
+	'/push',
+	{
+		response: {
+			200: eventStream({
+				state: z.object({ changed: z.record(z.string(), z.string()) }),
+				ping: z.object({ interval: z.number() }),
+			}),
+		},
+	},
+	({ reply }) => reply(200, (async function* () {})()),
+);
+// /push 200 → content['text/event-stream'].itemSchema
+// {
+//   oneOf: [
+//     { type: 'object', required: ['event', 'data'], properties: {
+//         event: { const: 'state' }, data: { type: 'object', … },
+//         id: { type: 'string' }, retry: { type: 'integer', minimum: 0 } } },
+//     { type: 'object', required: ['event', 'data'], properties: {
+//         event: { const: 'ping' }, data: { type: 'object', … }, … } },
+//   ],
+// }
 ```
 
 A reply's `description` is the status's name for `200`, `201`, `202`,

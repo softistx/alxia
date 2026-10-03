@@ -23,7 +23,10 @@ For each schema, `toJsonSchema` — and so `openapi` and `docs` — tries, in
 order:
 
 1. an **event stream** (`eventStream(schema)` from `@alxia/core`) is
-   replaced by the schema of one event, and converted as below;
+   replaced by the schema of one event, and converted as below; a **named**
+   one (`eventStream({ state, ping })`) becomes a `oneOf` of one object per
+   name, `{ event: { const: name }, data, id, retry }`, its `data` converted
+   as below;
 2. **`convert`**, when given: what it returns is used, unless it returns
    `undefined`;
 3. **Standard JSON Schema**, the `~standard.jsonSchema` that Zod 4.2 and

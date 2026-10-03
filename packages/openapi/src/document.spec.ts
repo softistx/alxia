@@ -106,6 +106,46 @@ describe('openapi', () => {
 		});
 	});
 
+	test('named events: one object per name in the itemSchema', () => {
+		const push = alxia().get(
+			'/push',
+			{
+				response: {
+					200: eventStream({
+						state: z.object({ changed: z.record(z.string(), z.string()) }),
+						ping: z.object({ interval: z.number() }),
+					}),
+				},
+			},
+			({ reply }) => reply(200, (async function* () {})()),
+		);
+		const doc = openapi(push, { info: { title: 't', version: '1' } });
+		const content = doc.paths['/push']?.get?.responses['200']?.content;
+		expect(Object.keys(content ?? {})).toEqual(['text/event-stream']);
+		const event = (name: string, data: unknown) => ({
+			type: 'object',
+			properties: {
+				event: { const: name },
+				data,
+				id: { type: 'string' },
+				retry: { type: 'integer', minimum: 0 },
+			},
+			required: ['event', 'data'],
+		});
+		expect(content?.['text/event-stream']?.itemSchema).toMatchObject({
+			oneOf: [
+				event('state', {
+					type: 'object',
+					properties: { changed: { type: 'object' } },
+				}),
+				event('ping', {
+					type: 'object',
+					properties: { interval: { type: 'number' } },
+				}),
+			],
+		});
+	});
+
 	test('every validating route documents its 400, every route its 500', () => {
 		const post = document.paths['/users']?.post;
 		expect(Object.keys(post?.responses ?? {}).sort()).toEqual([

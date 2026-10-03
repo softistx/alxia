@@ -10,7 +10,9 @@ import {
 } from '../errors/errors';
 import { vary } from '../reply/headers';
 import { type AnyReply, Reply, toResponse } from '../reply/reply';
-import { check } from '../schema/standard-schema';
+import { check, type StandardSchemaV1 } from '../schema/standard-schema';
+import { isAsyncIterable } from '../sse/async-iterable';
+import { isNamedEventStreamSchema, toFrames } from '../sse/named-events';
 import type { RouteDefinition } from './definition';
 import type { ResponseSchemas, ResponseSettings } from './types';
 
@@ -90,7 +92,7 @@ export async function checkReply(
 	if (schema === undefined) {
 		throw ResponseValidationError.undeclared(method, path, reply.status);
 	}
-	if (!validateResponses) return reply;
+	if (!validateResponses) return framed(schema, reply);
 	const checked = await check(schema, reply.body, 'body');
 	if (!checked.ok) {
 		throw new ResponseValidationError(
@@ -115,6 +117,22 @@ export function routingError(
 	if (allowed !== undefined) headers.set('allow', allowed.join(', '));
 	const body: RoutingErrorBody = { error };
 	return toResponse(status, body, headers);
+}
+
+/**
+ * An unchecked reply as it is, but for a named event stream: its events
+ * still need their `event:` lines, and their fields still refuse a line
+ * break.
+ */
+function framed(schema: StandardSchemaV1, reply: AnyReply): AnyReply {
+	if (!isNamedEventStreamSchema(schema) || !isAsyncIterable(reply.body)) {
+		return reply;
+	}
+	return new Reply(
+		reply.status,
+		toFrames(schema['~events'], reply.body, false),
+		{ headers: reply.headers ?? {} },
+	);
 }
 
 function isRedirect(reply: AnyReply): boolean {

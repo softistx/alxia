@@ -1,4 +1,8 @@
-import { isEventStreamSchema, type StandardSchemaV1 } from '@alxia/core';
+import {
+	isEventStreamSchema,
+	isNamedEventStreamSchema,
+	type StandardSchemaV1,
+} from '@alxia/core';
 
 export type JsonSchema = Record<string, unknown>;
 
@@ -27,7 +31,8 @@ interface StandardJsonSchema {
  * `convert`, else through [Standard JSON Schema](https://standardschema.dev),
  * which Zod 4.2 and later, ArkType and Valibot carry. A schema neither
  * converts is documented as `{}`, anything. An event stream is documented
- * by the schema of one event, its `itemSchema`.
+ * by the schema of one event, its `itemSchema`: its data's, or, for named
+ * events, one object per name — its `event`, its `data`, its `id`, its `retry`.
  */
 export function toJsonSchema(
 	schema: StandardSchemaV1,
@@ -36,6 +41,20 @@ export function toJsonSchema(
 ): JsonSchema {
 	if (isEventStreamSchema(schema)) {
 		return toJsonSchema(schema['~eventStream'], side, convert);
+	}
+	if (isNamedEventStreamSchema(schema)) {
+		return {
+			oneOf: Object.entries(schema['~events']).map(([name, data]) => ({
+				type: 'object',
+				properties: {
+					event: { const: name },
+					data: toJsonSchema(data, side, convert),
+					id: { type: 'string' },
+					retry: { type: 'integer', minimum: 0 },
+				},
+				required: ['event', 'data'],
+			})),
+		};
 	}
 	const converted = convert?.(schema, side);
 	if (converted !== undefined) return clean(converted);

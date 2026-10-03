@@ -2,7 +2,8 @@
 
 This page covers streaming events to a client: a handler replies with an
 async iterable, each value is one event, and the client reads the same
-values back as an async iterable.
+values back as an async iterable. A stream may also name its events —
+`event: state`, `event: ping` — each with a schema of its own.
 
 ```ts
 import { alxia, eventStream } from '@alxia/core';
@@ -46,9 +47,161 @@ schema strips never leaves the server, as for any reply.
 `isEventStreamSchema(schema)` tells whether a schema is one `eventStream`
 made: what a plugin documenting the app — an OpenAPI generator — reads.
 
+## Named events
+
+```ts
+function eventStream<Events extends Record<string, StandardSchemaV1>>(
+	events: Events,
+): NamedEventStreamSchema<Events>;
+```
+
+Given a schema per event name, the stream sends each event with its
+`event:` line, as a protocol that tells its events apart by name expects —
+JMAP's push, for one, sends `state` and `ping`:
+
+```ts
+import { alxia, eventStream } from '@alxia/core';
+import { z } from 'zod';
+
+const StateChange = z.object({
+	'@type': z.literal('StateChange'),
+	changed: z.record(z.string(), z.record(z.string(), z.string())),
+});
+const Ping = z.object({ interval: z.number().int() });
+
+const Push = eventStream({ state: StateChange, ping: Ping });
+
+const app = alxia().get('/push', { response: { 200: Push } }, ({ reply }) =>
+	reply(
+		200,
+		(async function* () {
+			yield Push.event('ping', { interval: 30 });
+			yield Push.event(
+				'state',
+				{ '@type': 'StateChange', changed: { a1: { Email: 's42' } } },
+				{ id: 's42' },
+			);
+		})(),
+	),
+);
+```
+
+```text
+event: ping
+data: {"interval":30}
+
+event: state
+id: s42
+data: {"@type":"StateChange","changed":{"a1":{"Email":"s42"}}}
+
+```
+
+- **What the handler yields** is `{ event, data, id?, retry? }`: `event`
+  one of the declared names, `data` what that name's schema accepts. Any
+  other name, or data of another event, is a compile error. The data is
+  validated and sent as its schema's output, as for an unnamed stream.
+- **`Push.event(name, data, fields?)`** builds one, typed by the schema of
+  its name. A plain `{ event: 'ping', data }` object yielded from an
+  `async function*` passed to `reply(200, …)` widens `event` to `string`,
+  which the stream's type refuses; `Push.event` keeps the literal. A
+  generator annotated with the union takes plain objects too:
+
+  ```ts
+  import type { EventInput } from '@alxia/core';
+
+  async function* pings(): AsyncGenerator<EventInput<typeof Push>> {
+  	yield { event: 'ping', data: { interval: 30 } };
+  }
+  ```
+
+- **`id`** is the event's id, which an `EventSource` sends back as
+  `Last-Event-ID` when it reconnects. **`retry`**, a whole number of
+  milliseconds, tells an `EventSource` how long to wait before reconnecting.
+  Both are left out unless given.
+- **The client** reads `{ event, data, id? }`, a union discriminated by
+  `event`: see [Reading it](#reading-it).
+
+### What is refused
+
+A field holding a line break would write a frame the handler never
+yielded — `id: 1\ndata: forged` is two lines. So:
+
+| What | When | Result |
+| --- | --- | --- |
+| an event name that is empty, or holds a CR, an LF or a NUL | `eventStream({ … })` | a `TypeError`, when the app is built |
+| no event at all, or a value that is not a Standard Schema | `eventStream({ … })` | a `TypeError`, when the app is built |
+| an `id` that holds a CR, an LF or a NUL | the event is yielded | the stream ends with an error, before the event is written |
+| a `retry` that is not a whole number, 0 or more | the event is yielded | the stream ends with an error, before the event is written |
+| an undeclared `event`, or a value that is not `{ event, data }` | the event is yielded | the stream ends with an error, before the event is written |
+
+The types refuse each of the last three; they come from a cast or from
+JavaScript. These checks run even with `validateResponses: false`, which
+skips only the data's schema. Data is never a risk: it is JSON, whose line
+breaks are escaped, so a string holding one stays on a single `data:` line.
+
+### Pings, the end of the stream, and a client that leaves
+
+A push stream usually waits on two things at once: what it pushes, and a
+timer that pings. The handler reads `request.signal`, aborted when the
+client leaves, to stop waiting at once; its `finally` releases the timer
+and the subscription. Returning ends the stream — what a client's
+`closeafter=state` asks for:
+
+```ts
+app.get(
+	'/events',
+	{
+		query: z.object({ closeafter: z.enum(['state', 'no']).default('no') }),
+		response: { 200: Push },
+	},
+	({ query, request, reply }) =>
+		reply(
+			200,
+			(async function* () {
+				const queue: EventInput<typeof Push>[] = [];
+				let wake = () => {};
+				const timer = setInterval(() => {
+					queue.push(Push.event('ping', { interval: 30 }));
+					wake();
+				}, 30_000);
+				const subscription = changes.subscribe((change) => {
+					queue.push(Push.event('state', change));
+					wake();
+				});
+				request.signal.addEventListener('abort', () => wake());
+				try {
+					while (!request.signal.aborted) {
+						const next = queue.shift();
+						if (next === undefined) {
+							await new Promise<void>((resolve) => {
+								wake = resolve;
+							});
+							continue;
+						}
+						yield next;
+						if (next.event === 'state' && query.closeafter === 'state') return;
+					}
+				} finally {
+					clearInterval(timer); // runs when the client leaves, or the stream ends
+					subscription.close();
+				}
+			})(),
+		),
+);
+```
+
+Without the signal, a generator waiting on a promise is closed only when it
+next yields: its `finally` would wait for the next ping.
+
+`isNamedEventStreamSchema(schema)` tells whether a schema is a named
+stream, and `schema['~events']` holds its schemas by name: what an OpenAPI
+generator reads. `isEventStreamSchema` stays true of the unnamed form only.
+
 ## What is sent
 
-- Each value is one event: a `data:` line of JSON, then a blank line.
+- Each value is one event: a `data:` line of JSON, then a blank line. On
+  a named stream, its `event:` line comes first, then its `id:` and
+  `retry:` lines when it has them.
 - The response has `content-type: text/event-stream`,
   `cache-control: no-cache` and `x-accel-buffering: no`, so a proxy such as
   nginx does not buffer it.
@@ -82,6 +235,7 @@ app.get('/orders/:id/status', { response: { 200: eventStream(Status) } }, ({ par
 | --- | --- |
 | the reply is not an async iterable (the types refuse it; a cast gets past them) | `500`, before the stream starts; a `ResponseValidationError` naming `An event stream replies with an async iterable` is logged |
 | an event its schema refuses | the stream is ended with an error: `An event does not match its schema: …` is logged; the events already sent stay sent |
+| a named event whose fields would write another frame | the stream is ended with an error, which is logged: see [What is refused](#what-is-refused) |
 | the generator throws | the stream is ended with an error, which is logged |
 
 The status and headers are gone once the first event is sent, so an
@@ -127,7 +281,22 @@ if (ticks.status === 200) {
 }
 ```
 
-Any `EventSource` reads it too: each `data` is the JSON of one event.
+On a named stream, each one is `{ event, data, id? }`, a union
+discriminated by `event`, its `data` typed by that name's schema:
+
+```ts
+const push = await api.get('/push');
+if (push.status === 200) {
+	for await (const item of push.data) {
+		if (item.event === 'state') console.log(item.data.changed, item.id);
+		else console.log('ping every', item.data.interval);
+	}
+}
+```
+
+Any `EventSource` reads it too: each `data` is the JSON of one event, and a
+named event is dispatched under its name
+(`source.addEventListener('state', …)`).
 
 In a test, the body is the text of the events:
 
@@ -151,3 +320,6 @@ expect(await response.text()).toBe('data: {"n":1}\n\ndata: {"n":2}\n\n');
 
 - [Replies](replies.md#how-a-body-is-sent): how every other body is sent.
 - [WebSockets](websockets.md): when the client sends too.
+- [`@alxia/compress`](https://www.npmjs.com/package/@alxia/compress) leaves
+  an event stream alone by default; opted in with `compressible`, it
+  flushes each event as it is sent.
