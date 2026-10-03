@@ -63,6 +63,11 @@ a trap that prints nothing is headed by its symptom.
 - [`TypeError: … the handler returned no reply. Return ctx.reply(status, body).`](#typeerror--the-handler-returned-no-reply-return-ctxreplystatus-body)
 - [`TypeError: … the onRefusal hook returned neither a reply nor nothing.`](#typeerror--the-onrefusal-hook-returned-neither-a-reply-nor-nothing)
 - [`TypeError: An event does not match its schema`](#typeerror-an-event-does-not-match-its-schema)
+- [`TypeError: An event id must not hold a line break or a NUL`](#typeerror-an-event-id-must-not-hold-a-line-break-or-a-nul), and `An event id must be a string`
+- [`TypeError: An event retry must be a whole number of milliseconds, 0 or more`](#typeerror-an-event-retry-must-be-a-whole-number-of-milliseconds-0-or-more)
+- [`TypeError: The event "…" is not declared: …`](#typeerror-the-event--is-not-declared-), and `An event of a named stream is an object { event, data }`
+- [`TypeError: An event name must not hold a line break or a NUL`](#typeerror-an-event-name-must-not-hold-a-line-break-or-a-nul), and `An event name must not be empty`, `A named event stream declares at least one event`, `The event "…" is not a Standard Schema`
+- [`Type 'string' is not assignable to type '"ping"'` on a named stream](#type-string-is-not-assignable-to-type-ping-on-a-named-stream)
 
 **WebSockets**
 
@@ -1004,7 +1009,8 @@ TypeError: An event does not match its schema: n: Invalid input: expected number
 ```
 
 **When:** a value yielded by an `eventStream` reply is refused by the
-event's schema. The response has already started with a 200, so the stream
+event's schema. On a named stream, the path starts with the event's name:
+`ping.interval: …`. The response has already started with a 200, so the stream
 is cut, and the client reads an error mid-stream instead of a 500.
 
 **Fix:** yield values the event's schema accepts, mapping them inside the
@@ -1014,6 +1020,86 @@ generator ([Server-sent events](../README.md#server-sent-events)):
 reply(200, (async function* () {
 	for await (const row of rows) yield { n: Number(row.n) };
 })());
+```
+
+### `TypeError: An event id must not hold a line break or a NUL`
+
+```text
+TypeError: An event id must not hold a line break or a NUL: "1\ndata: forged"
+```
+
+**When:** an event yielded on a named `eventStream({ … })` has an `id`
+holding a CR, an LF or a NUL (`An event id must be a string` when it is
+not a string at all). Its type is `string`, so this comes from data
+that reached the id unchecked: a client's input, a database row.
+
+**Why:** a line break would end the `id:` line and start a field the
+handler never yielded, and an `EventSource` ignores an id holding a NUL. The
+stream ends before the event is written; the events already sent stay sent.
+
+**Fix:** make the id from something without line breaks — a counter, a
+state string you issue — or encode it:
+
+```ts
+yield Push.event('state', change, { id: encodeURIComponent(state) });
+```
+
+### `TypeError: An event retry must be a whole number of milliseconds, 0 or more`
+
+**When:** an event's `retry` is a fraction, negative, `NaN` or not a number.
+
+**Why:** an `EventSource` reads `retry:` as ASCII digits only, and ignores
+anything else; the stream ends rather than send a field no client reads.
+
+**Fix:** round it:
+
+```ts
+yield Push.event('ping', { interval: 30 }, { retry: Math.round(seconds * 1000) });
+```
+
+### `TypeError: The event "…" is not declared: …`
+
+**When:** a value yielded on a named stream has an `event` that is not one
+of the names its `eventStream({ … })` declares. The types refuse it, so this
+comes from a cast or from JavaScript. `TypeError: An event of a named stream
+is an object { event, data }` is its sibling, for a value that has no
+`event` at all.
+
+**Fix:** declare the event, or yield one that is:
+
+```ts
+const Push = eventStream({ state: StateChange, ping: Ping });
+yield Push.event('ping', { interval: 30 });
+```
+
+### `TypeError: An event name must not hold a line break or a NUL`
+
+**When:** `eventStream({ … })` is given a name holding a CR, an LF or a
+NUL, or an empty one (`An event name must not be empty`). It throws when the
+app is built, as do `A named event stream declares at least one event` and
+`The event "…" is not a Standard Schema`.
+
+**Fix:** name each event with a single line, and give each a schema:
+
+```ts
+const Push = eventStream({ state: StateChange, ping: Ping });
+```
+
+### `Type 'string' is not assignable to type '"ping"'` on a named stream
+
+**When:** a generator handed to `reply(200, …)` yields a plain
+`{ event: 'ping', data }` object: TypeScript widens its `event` to `string`,
+which no declared name is.
+
+**Fix:** build the event with the stream's `event`, which keeps the name,
+or annotate the generator:
+
+```ts
+yield Push.event('ping', { interval: 30 });
+// or
+async function* pings(): AsyncGenerator<EventInput<typeof Push>> {
+	yield { event: 'ping', data: { interval: 30 } };
+}
 ```
 
 ## WebSockets

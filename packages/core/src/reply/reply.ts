@@ -1,4 +1,5 @@
-import { isAsyncIterable, toEventStream } from '../sse/event-stream';
+import { isAsyncIterable } from '../sse/async-iterable';
+import { toEventStream } from '../sse/event-stream';
 import { BODILESS, type StatusCode } from '../types/status';
 
 export interface ReplyInit {

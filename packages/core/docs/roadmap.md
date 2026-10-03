@@ -18,7 +18,8 @@ Nothing scheduled yet.
 
 ## Later
 
-Nothing scheduled yet.
+- **Comments on a stream.** A handler yielding a comment line of its own
+  (`: …`), beside the keep-alive the stream already sends while idle.
 
 ## Not planned
 
@@ -55,6 +56,12 @@ Nothing scheduled yet.
 - **RFC 9457 problems.** `problem({ type, status, detail, … })` is a reply
   sent as `application/problem+json`, with its extension members typed:
   the error format of JMAP and other APIs built on problem details.
+- **Named server-sent events.** `eventStream({ state: State, ping: Ping })`
+  maps each event name to the schema of its data: the handler yields only
+  declared events, each sent with its `event:` line and, when given, its
+  `id:` and `retry:`; the client reads a union discriminated by `event`. A
+  line break in an id, or a retry that is not a whole number, is refused
+  before it can write a frame the handler never yielded.
 
 ### 0.1.0
 

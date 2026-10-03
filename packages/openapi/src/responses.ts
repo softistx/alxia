@@ -1,5 +1,6 @@
 import {
 	isEventStreamSchema,
+	isNamedEventStreamSchema,
 	type RefusalHandler,
 	type RouteSchema,
 } from '@alxia/core';
@@ -28,9 +29,11 @@ export function responses(
 				? { description: describe(status) }
 				: {
 						description: describe(status),
-						content: isEventStreamSchema(responseSchema)
-							? { 'text/event-stream': { itemSchema: json } }
-							: { [contentType(json)]: { schema: json } },
+						content:
+							isEventStreamSchema(responseSchema) ||
+							isNamedEventStreamSchema(responseSchema)
+								? { 'text/event-stream': { itemSchema: json } }
+								: { [contentType(json)]: { schema: json } },
 					};
 	}
 	if (schema.response === undefined) {

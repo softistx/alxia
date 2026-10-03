@@ -99,6 +99,14 @@ export {
 	eventStream,
 	isEventStreamSchema,
 } from './sse/event-stream';
+export {
+	type EventFields,
+	type EventInput,
+	type EventOutput,
+	type EventSchemas,
+	isNamedEventStreamSchema,
+	type NamedEventStreamSchema,
+} from './sse/named-events';
 export { parseRange } from './static/conditional';
 export type {
 	FileNotFoundBody,

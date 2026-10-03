@@ -57,6 +57,19 @@ if (ticks.status === 200) {
 }
 ```
 
+A stream of named events — `eventStream({ state, ping })` — reads as
+`{ event, data, id? }`, a union discriminated by `event`:
+
+```ts
+const push = await api.get('/push');
+if (push.status === 200) {
+	for await (const item of push.data) {
+		if (item.event === 'state') console.log(item.data.changed, item.id);
+		else console.log('ping', item.data.interval);
+	}
+}
+```
+
 ## WebSockets
 
 ```ts
@@ -98,7 +111,7 @@ JSON.
 | `ClientOptions` | its options: `headers`, sent with every call (a socket: an object, under Bun only), and `fetch` |
 | `Target` | where a client sends its calls: a base URL, or a fetch handler such as an app |
 | `fillPath(path, params)` | a path with its parameters encoded in |
-| `readEvents(body)` | a `text/event-stream` body as the values of its events |
+| `readEvents(body)` | a `text/event-stream` body as the values of its events, `{ event, data, id? }` for a named one |
 | `TypedSocket<Send, Receive>` | what `api.ws()` returns |
 | `Client<App>` | the client's type: one method per HTTP method the app answers |
 | `CallResult<Output>` | what a call resolves to: `status`, `ok`, `data`, `response` |

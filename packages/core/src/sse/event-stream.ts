@@ -9,6 +9,13 @@ import {
 	type InferOutput,
 	type StandardSchemaV1,
 } from '../schema/standard-schema';
+import { isAsyncIterable } from './async-iterable';
+import { frameText, mismatch } from './frame';
+import {
+	type EventSchemas,
+	type NamedEventStreamSchema,
+	namedEventStream,
+} from './named-events';
 
 /** A response schema whose body is a stream of events, each one checked by `item`. */
 export interface EventStreamSchema<Item extends StandardSchemaV1>
@@ -20,17 +27,40 @@ export interface EventStreamSchema<Item extends StandardSchemaV1>
 }
 
 /**
- * The schema of a reply that streams events: each value the handler yields
- * is checked by `item`, and sent as its output.
+ * The schema of a reply that streams events.
+ *
+ * Given one schema, each value the handler yields is checked by it and sent
+ * as its output, on `data:` lines alone:
  *
  * ```ts
  * app.get('/ticks', { response: { 200: eventStream(Tick) } }, ({ reply }) =>
  *   reply(200, (async function* () { yield { n: 1 }; })()));
  * ```
+ *
+ * Given a schema per event name, the handler yields `{ event, data, id?,
+ * retry? }`: only a declared name, with data its schema accepts. Each is
+ * sent with its `event:` line, and the client reads `{ event, data, id? }`:
+ *
+ * ```ts
+ * const Push = eventStream({ state: StateChange, ping: Ping });
+ * app.get('/push', { response: { 200: Push } }, ({ reply }) =>
+ *   reply(200, (async function* () { yield { event: 'ping', data: { interval: 30 } }; })()));
+ * ```
+ *
+ * An event name that is empty or holds a line break throws a `TypeError`.
  */
 export function eventStream<Item extends StandardSchemaV1>(
 	item: Item,
-): EventStreamSchema<Item> {
+): EventStreamSchema<Item>;
+export function eventStream<Events extends EventSchemas>(
+	events: Events & Declarable<Events>,
+): NamedEventStreamSchema<Events>;
+export function eventStream(
+	schema: StandardSchemaV1 | EventSchemas,
+): EventStreamSchema<StandardSchemaV1> | NamedEventStreamSchema<EventSchemas> {
+	if (!isStandardSchema(schema))
+		return namedEventStream(schema as EventSchemas);
+	const item = schema as StandardSchemaV1;
 	return {
 		'~eventStream': item,
 		'~standard': {
@@ -47,7 +77,7 @@ export function eventStream<Item extends StandardSchemaV1>(
 				return { value: checkEach(item, value) };
 			},
 		},
-	} as EventStreamSchema<Item>;
+	} as EventStreamSchema<StandardSchemaV1>;
 }
 
 async function* checkEach(
@@ -56,28 +86,28 @@ async function* checkEach(
 ): AsyncGenerator<unknown> {
 	for await (const value of values) {
 		const checked = await check(item, value, 'body');
-		if (!checked.ok) {
-			throw new TypeError(
-				`An event does not match its schema: ${checked.issues
-					.map(
-						(issue) => `${issue.path.join('.') || '(root)'}: ${issue.message}`,
-					)
-					.join('; ')}`,
-			);
-		}
+		if (!checked.ok) throw mismatch(checked.issues);
 		yield checked.value;
 	}
 }
 
-export function isAsyncIterable(
-	value: unknown,
-): value is AsyncIterable<unknown> {
-	return (
-		value !== null &&
-		typeof value === 'object' &&
-		Symbol.asyncIterator in value &&
-		!(value instanceof ReadableStream)
-	);
+/**
+ * `unknown` for a map of events the stream can write, `never` for one with
+ * no event or an empty name: a compile error, as it is a `TypeError` at run
+ * time.
+ */
+type Declarable<Events> = [keyof Events] extends [never]
+	? never
+	: '' extends keyof Events
+		? never
+		: unknown;
+
+/** A schema, as opposed to a map of them: an event may be named `~standard`. */
+function isStandardSchema(value: object): value is StandardSchemaV1 {
+	const standard = (
+		value as { '~standard'?: { version?: unknown; vendor?: unknown } }
+	)['~standard'];
+	return standard?.version === 1 && typeof standard.vendor === 'string';
 }
 
 export function isEventStreamSchema(
@@ -90,9 +120,10 @@ export function isEventStreamSchema(
 export const KEEP_ALIVE_MS = 8_000;
 
 /**
- * The events of `values` as a `text/event-stream` body: each value as one
- * `data:` line of JSON, a comment while nothing is sent, and the iterator
- * closed when the client goes away.
+ * The events of `values` as a `text/event-stream` body: each value as
+ * `data:` lines of JSON, after its `event:`, `id:` and `retry:` lines on a
+ * named stream, a comment while nothing is sent, and the iterator closed
+ * when the client goes away.
  */
 export function toEventStream(
 	values: AsyncIterable<unknown>,
@@ -132,15 +163,7 @@ export function toEventStream(
 					controller.close();
 					return;
 				}
-				const data = JSON.stringify(next.value) ?? 'null';
-				controller.enqueue(
-					encoder.encode(
-						`${data
-							.split('\n')
-							.map((line) => `data: ${line}`)
-							.join('\n')}\n\n`,
-					),
-				);
+				controller.enqueue(encoder.encode(frameText(next.value)));
 			} catch (error) {
 				stop();
 				// A real failure of the generator is reported even after the

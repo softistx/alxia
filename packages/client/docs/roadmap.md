@@ -32,6 +32,11 @@ Nothing scheduled yet.
   `@alxia/core`'s `onRefusal` hook reads that hook's reply in place of
   `ValidationErrorBody`, such as an `application/problem+json` problem with
   its members typed.
+- **Named server-sent events.** An event sent with a name — every event of
+  a named `eventStream({ state, ping })` — reads as `{ event, data, id? }`,
+  a union discriminated by `event` with each `data` typed by its name's
+  schema. An unnamed stream reads as before; a stream from another server
+  that sends `event:` lines now reads as `{ event, data }` too.
 
 ### 0.1.0
 

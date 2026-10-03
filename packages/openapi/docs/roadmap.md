@@ -40,6 +40,10 @@ Nothing scheduled yet.
   hook documents what the hook declares — an RFC 9457 problem under
   `application/problem+json`, for one — in place of the `ValidationError`
   400; a hook without schemas, a `4XX`.
+- **Named server-sent events.** A stream of named events,
+  `eventStream({ state, ping })`, is documented as `text/event-stream`
+  with one object per event name in its `itemSchema`: the name as a
+  `const`, the data by its schema, the `id` and `retry` fields.
 
 ### 0.1.0
 
