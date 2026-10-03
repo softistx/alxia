@@ -202,9 +202,10 @@ interface LogEntry {
 | `duration` | from the plugin's `onRequest` hook to its `onResponse` hook, rounded to two decimals |
 | `ip` | the app's `ctx.ip`; the key is absent when it is `undefined` |
 
-A request whose client hung up before it was answered is logged with
-`status` 499, at `warn`: `@alxia/core` answers it so, and prints nothing
-else.
+A request that fails because its client hung up mid-request is logged
+with `status` 499, at `warn`: `@alxia/core` answers it so, and prints
+nothing else. A handler that replies despite the abort is logged with its
+own status.
 
 Every request is answered, so every request gets an entry: a 404 or a 405
 that matched no route, a 500 from a handler that threw, a response an

@@ -995,12 +995,13 @@ The next section lists the messages it prints. An error thrown in a route
 first goes through that route's `onError` hooks. An `HttpError` is answered
 with its own status and body.
 
-A request whose client hung up before it was answered (its
-`request.signal` aborted, typically while its body was read) is not an
-error of the app: nothing is printed, no `onError` hook runs, and an
-`onResponse` hook, a logger's, sees a `499` with no body. An `AbortError`
-the app raises itself, from a fetch of its own, is still printed and
-answered 500.
+A request that fails because its client hung up (its `request.signal`
+aborted, and the error the `AbortError` that a body read then throws) is
+not an error of the app: nothing is printed, no `onError` hook runs, and
+an `onResponse` hook, a logger's, sees a `499` with no body. Any other
+error is printed and answered 500, a bug thrown after the client left
+included. A handler that ignores the abort and replies gets its own
+status.
 
 **Fix:** read the server log for the real error. To answer a known failure
 with a status of your own, return a declared reply, or turn the error into

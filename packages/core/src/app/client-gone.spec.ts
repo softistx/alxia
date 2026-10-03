@@ -76,6 +76,46 @@ describe('a client that hangs up mid-body', () => {
 		}
 	});
 
+	test('a bug thrown after the client left is still logged and answered 500', async () => {
+		const logged = spyOn(console, 'error').mockImplementation(() => {});
+		const seen: number[] = [];
+		const app = alxia()
+			.onResponse((response) => {
+				seen.push(response.status);
+			})
+			.get('/slow', async () => {
+				await Bun.sleep(100);
+				throw new TypeError('a real bug');
+			});
+		const server = app.listen({ port: 0 });
+		try {
+			const leaving = new AbortController();
+			const sent = fetch(`http://127.0.0.1:${server.port}/slow`, {
+				signal: leaving.signal,
+			}).catch(() => undefined);
+			await Bun.sleep(30);
+			leaving.abort();
+			await sent;
+			await until(() => seen.length > 0);
+			expect(seen).toEqual([500]);
+			expect(logged).toHaveBeenCalledTimes(1);
+		} finally {
+			server.stop(true);
+		}
+	});
+
+	test('a bug under a caller signal it aborted is still logged and answered 500', async () => {
+		const logged = spyOn(console, 'error').mockImplementation(() => {});
+		const caller = new AbortController();
+		const app = alxia().get('/x', () => {
+			caller.abort();
+			throw new TypeError('a real bug');
+		});
+		const response = await app.request('/x', { signal: caller.signal });
+		expect(response.status).toBe(500);
+		expect(logged).toHaveBeenCalledTimes(1);
+	});
+
 	test('an error of the app is still logged and answered 500', async () => {
 		const logged = spyOn(console, 'error').mockImplementation(() => {});
 		const app = alxia().post('/up', () => {

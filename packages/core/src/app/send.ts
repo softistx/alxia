@@ -24,15 +24,29 @@ export function internalError(): Response {
 }
 
 /**
- * What a request that failed with `error` gets. A client that hung up
- * mid-request (its `request.signal` aborted, the body read failing with an
- * `AbortError`) is no app error: nothing is logged, and the 499 nobody
- * reads is only what an `onResponse` hook, a logger's, sees. Any other
- * error is logged and answered 500.
+ * Whether `error` is the client hanging up: the request's signal is
+ * aborted and the error is that abort, as Bun's body read throws it (an
+ * `AbortError`, not the signal's own reason). Any other error raised after
+ * the client left, a bug included, is the app's.
+ */
+export function clientGone(error: unknown, request: Request): boolean {
+	if (!request.signal.aborted) return false;
+	return (
+		error === request.signal.reason ||
+		(error instanceof DOMException && error.name === 'AbortError')
+	);
+}
+
+/**
+ * What a request that failed with `error` gets. The client hanging up
+ * mid-request (`clientGone`) is no app error: nothing is logged, and the
+ * 499 nobody reads is only what an `onResponse` hook, a logger's, sees. Any
+ * other error is logged and answered 500.
  */
 export function failed(error: unknown, request: Request): Response {
-	if (request.signal.aborted)
+	if (clientGone(error, request)) {
 		return new Response(null, { status: CLIENT_GONE });
+	}
 	console.error(error);
 	return internalError();
 }
