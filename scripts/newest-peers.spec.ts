@@ -1,5 +1,12 @@
 import { describe, expect, test } from 'bun:test';
-import { type Manifest, newest, rewrite } from './newest-peers';
+import {
+	followPins,
+	type Manifest,
+	newest,
+	readExamples,
+	readManifests,
+	rewrite,
+} from './newest-peers';
 
 test('the newest alternative of a range, none for a single one', () => {
 	expect(newest('^6.0.3 || ^7.0.0')).toBe('^7.0.0');
@@ -18,6 +25,29 @@ const pkg = (name: string, manifest: Manifest = {}): Manifest => ({
 });
 
 describe('rewrite', () => {
+	test("the versions are the packages' pins, from rewrite", () => {
+		const { versions } = rewrite(
+			{ devDependencies: { typescript: '~6.0.3' } },
+			new Map([
+				[
+					'packages/react-router/package.json',
+					{
+						name: '@alxia/react-router',
+						peerDependencies: {
+							vite: '^7.0.0 || ^8.0.0',
+							typescript: '^6.0.3 || ^7.0.0',
+						},
+						devDependencies: { vite: '^7.0.0' },
+					},
+				],
+			]),
+		);
+		expect(Object.fromEntries(versions)).toEqual({
+			vite: '^8.0.0',
+			typescript: '^7.0.0',
+		});
+	});
+
 	test('a package’s own devDependency, the root’s, and every override', () => {
 		const graphql = pkg('@alxia/graphql', {
 			peerDependencies: {
@@ -68,4 +98,48 @@ describe('rewrite', () => {
 			'nothing newer to test',
 		);
 	});
+});
+
+test('reads packages/* alone: an example widens no range and pins nothing', async () => {
+	const { packages } = await readManifests();
+	expect(packages.size).toBeGreaterThan(0);
+	for (const path of packages.keys()) expect(path).toContain('/packages/');
+	for (const manifest of packages.values()) {
+		expect(manifest.name).toStartWith('@alxia/');
+	}
+});
+
+describe('followPins', () => {
+	const example: Manifest = {
+		name: 'react-router-example',
+		private: true,
+		dependencies: { '@alxia/react-router': 'workspace:^', react: '^19.3.0' },
+		devDependencies: { vite: '^7.0.0', typescript: '~6.0.3' },
+	};
+
+	test("moves an example's own copy of each pinned peer, and nothing else", () => {
+		const versions = new Map([
+			['vite', '^8.0.0'],
+			['typescript', '^7.0.0'],
+		]);
+		const { examples, pinned } = followPins(
+			new Map([['examples/react-router/package.json', example]]),
+			(name) => versions.get(name),
+		);
+		expect(examples.get('examples/react-router/package.json')).toEqual({
+			...example,
+			devDependencies: { vite: '^8.0.0', typescript: '^7.0.0' },
+		});
+		expect(pinned).toHaveLength(2);
+		// Pure: the manifest read stays as it was.
+		expect(example.devDependencies?.['vite']).toBe('^7.0.0');
+	});
+});
+
+test('readExamples reads examples/* alone', async () => {
+	const examples = await readExamples();
+	expect([...examples.values()].map((manifest) => manifest.name)).toContain(
+		'react-router-example',
+	);
+	for (const path of examples.keys()) expect(path).toContain('/examples/');
 });

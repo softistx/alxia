@@ -14,7 +14,10 @@
  *
  * It edits the root `package.json` (`devDependencies` and `overrides`) and
  * each package's `devDependencies` in place: run it on a throwaway checkout,
- * never commit what it writes.
+ * never commit what it writes. An example under `examples/` moves with them
+ * (`followPins`): its own copy of a pinned peer — vite beside
+ * `@alxia/react-router` — would otherwise stay behind, and two copies of
+ * one library do not typecheck together. Its ranges are never read.
  *
  *   bun scripts/newest-peers.ts
  */
@@ -24,6 +27,7 @@ import { ROOT } from './artifacts/packages';
 export type Manifest = Record<string, unknown> & {
 	name?: string;
 	peerDependencies?: Record<string, string>;
+	dependencies?: Record<string, string>;
 	devDependencies?: Record<string, string>;
 	overrides?: Record<string, string>;
 };
@@ -37,6 +41,12 @@ export function newest(range: string): string | undefined {
 export interface Rewrite {
 	readonly root: Manifest;
 	readonly packages: ReadonlyMap<string, Manifest>;
+	/**
+	 * Each peer pinned, by name: what an example's own copy follows. Here a
+	 * range, `^8.0.0`, copied as it is; in newest-majors.ts npm's bare
+	 * version, `8.1.0`, which `followLatest` gives the example's operator.
+	 */
+	readonly versions: ReadonlyMap<string, string>;
 	/** One line per version pinned: `<where> <name>@<version>`. */
 	readonly pinned: readonly string[];
 }
@@ -99,7 +109,44 @@ export function rewrite(
 	if (pinned.length === 0) {
 		throw new Error('No peer range has an alternative: nothing newer to test.');
 	}
-	return { root: nextRoot, packages: next, pinned };
+	return { root: nextRoot, packages: next, versions: atRoot, pinned };
+}
+
+/**
+ * The examples with every dependency the packages pinned moved to the same
+ * version: `version(name, range)` is what the example's `range` becomes,
+ * `undefined` for a dependency left alone. Pure, like `rewrite`.
+ */
+export function followPins(
+	examples: ReadonlyMap<string, Manifest>,
+	version: (name: string, range: string) => string | undefined,
+): { examples: Map<string, Manifest>; pinned: string[] } {
+	const next = new Map<string, Manifest>();
+	const pinned: string[] = [];
+	for (const [path, manifest] of examples) {
+		const copy: Manifest = structuredClone(manifest);
+		for (const field of [copy.dependencies, copy.devDependencies]) {
+			if (field === undefined) continue;
+			for (const [name, range] of Object.entries(field)) {
+				const to = version(name, range);
+				if (to === undefined) continue;
+				field[name] = to;
+				pinned.push(`${String(copy.name).padEnd(24)} ${name}@${to}`);
+			}
+		}
+		next.set(path, copy);
+	}
+	return { examples: next, pinned };
+}
+
+/** Every example's manifest by its path: what `followPins` moves, never a package. */
+export async function readExamples(): Promise<Map<string, Manifest>> {
+	const examples = new Map<string, Manifest>();
+	for (const file of new Bun.Glob('examples/*/package.json').scanSync(ROOT)) {
+		const path = join(ROOT, file);
+		examples.set(path, (await Bun.file(path).json()) as Manifest);
+	}
+	return examples;
 }
 
 /** The root manifest's path, and every package's manifest by its path. */
@@ -131,7 +178,14 @@ if (import.meta.main) {
 		console.error((error as Error).message);
 		process.exit(1);
 	}
+	const { versions } = result;
+	const followed = followPins(await readExamples(), (name) =>
+		versions.get(name),
+	);
 	await write(rootPath, result.root);
 	for (const [path, manifest] of result.packages) await write(path, manifest);
-	for (const line of result.pinned) console.log(`  pinned   ${line}`);
+	for (const [path, manifest] of followed.examples) await write(path, manifest);
+	for (const line of [...result.pinned, ...followed.pinned]) {
+		console.log(`  pinned   ${line}`);
+	}
 }
