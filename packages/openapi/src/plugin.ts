@@ -1,5 +1,6 @@
 import { alxia, type BaseContext, type RouteDefinition } from '@alxia/core';
-import { type OpenApiDocument, type OpenApiOptions, openapi } from './document';
+import { openapi } from './document';
+import type { OpenApiDocument, OpenApiOptions } from './types';
 
 export interface DocsOptions extends OpenApiOptions {
 	/** Where the document is served. `/openapi.json` by default. */
