@@ -13,10 +13,14 @@ nothing — what the response does that you did not expect.
 - [`Type '"de"' is not assignable to type '"en" | "fr"'`](#type-de-is-not-assignable-to-type-en--fr)
 - [`Argument of type '"cart.itmes"' is not assignable to parameter of type '"cart.items"'`](#argument-of-type-cartitmes-is-not-assignable-to-parameter-of-type-cartitems)
 - [`Property 't' does not exist on type 'Context<Empty, "/", Empty>'`](#property-t-does-not-exist-on-type-contextempty--empty)
-- [`Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string>': resources, fallback`](#type-alxiaempty-empty--never-is-missing-the-following-properties-from-type-i18noptionsreadonlyrecordstring-readonlyrecordstring-unknown-string-resources-fallback)
+- [`Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`](#type-alxiaempty-empty--never-is-missing-the-following-properties-from-type-i18noptionsreadonlyrecordstring-readonlyrecordstring-unknown-string-basecontext-resources-fallback)
 - [`Object literal may only specify known properties, and 'supported' does not exist in type 'I18nOptions<…>'`](#object-literal-may-only-specify-known-properties-and-supported-does-not-exist-in-type-i18noptions)
 - [`Cannot invoke an object which is possibly 'undefined'`](#cannot-invoke-an-object-which-is-possibly-undefined)
 - [`t()` accepts any key, typos included](#t-accepts-any-key-typos-included)
+- [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
+- [`the plugin reads "user", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads-user-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
+- [`the plugin reads "user", which this app's context gives with another type`](#the-plugin-reads-user-which-this-apps-context-gives-with-another-type)
+- [`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
 **Messages**
 
@@ -118,15 +122,14 @@ const app = alxia()
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 ```
 
-### `Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string>': resources, fallback`
+### `Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`
 
 ```text
-error TS2589: Type instantiation is excessively deep and possibly infinite.
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(plugin: (app: Alxia<Empty, Empty, "", never>) => Alxia<Empty & LanguageContext<string> & I18nContext<string>, Empty, "", never> & { ...; }): Alxia<...> & { ...; }', gave the following error.
-    Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string>(options: I18nOptions<C, Fallback>) => …' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => …'.
+  Overload 1 of 2, '(plugin: (app: Alxia<Empty, Empty, "", never>) => Alxia<Empty & LanguageContext<string> & I18nContext<string>, Empty & Prefixed<...>, "", never> & Requiring<...> & { ...; }): Alxia<...> & ... 1 more ... & { ...; }', gave the following error.
+    Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => …' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => …'.
       Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string>': resources, fallback
+        Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback
 ```
 
 **When:** `app.use(createI18n)`, without calling it.
@@ -145,7 +148,7 @@ const app = alxia().use(i18n);
 ### `Object literal may only specify known properties, and 'supported' does not exist in type 'I18nOptions<…>'`
 
 ```text
-error TS2353: Object literal may only specify known properties, and 'supported' does not exist in type 'I18nOptions<{ readonly en: { cart: { items: string; }; }; readonly fr: { cart: { items: string; extra: string; }; }; }, "en">'.
+error TS2353: Object literal may only specify known properties, and 'supported' does not exist in type 'I18nOptions<{ readonly en: { cart: { items: string; }; }; readonly fr: { cart: { items: string; extra: string; }; }; }, "en", BaseContext>'.
 ```
 
 **When:** `createI18n({ resources, fallback: 'en', supported: ['en'] })`,
@@ -208,6 +211,116 @@ import fr from './locales/fr.json';
 
 export const i18n = createI18n({ resources: { en, fr }, fallback: 'en' });
 ```
+
+### `Property 'user' does not exist on type 'BaseContext'`
+
+```text
+error TS2339: Property 'user' does not exist on type 'BaseContext'.
+```
+
+**When:** `resolve` reads something a `derive` or a plugin before the
+i18n plugin added — a user, a session — and its parameter is not
+annotated: `resolve: (ctx) => ctx.user.language`.
+
+**Why:** an unannotated `resolve` is typed with the request's `BaseContext`
+— `request`, `url`, `ip`, `pathParams`, `set` — not with what other hooks
+added. The plugin is built before it is used, so it cannot see the app it
+will be used on.
+
+**Fix:** annotate the parameter with what it reads; the plugin then
+requires it of the app, before the plugin:
+
+```ts
+const i18n = createI18n({
+	resources: { en, fr },
+	fallback: 'en',
+	resolve: ({ user }: BaseContext & { user: User | null }) => user?.language ?? undefined,
+});
+
+alxia().use(auth).use(i18n); // auth derives user
+```
+
+See [Reading the app's context](guide.md#reading-the-apps-context).
+
+### `the plugin reads "user", which this app's context does not give: use the plugin that adds it first`
+
+```text
+error TS2769: No overload matches this call.
+  …
+        Types of property ''~requires'' are incompatible.
+          Type '{ user: User | null; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"'.
+```
+
+**When:** `resolve` is annotated to read `user` —
+`({ user }: BaseContext & { user: User | null }) => …` — and the plugin is
+used on an app, or in a group, whose context has no `user` at that point:
+`alxia().use(i18n)`, or `use(i18n)` before `use(auth)`.
+
+**Why:** an annotated `resolve` makes the plugin require what it reads, and
+`use` checks the app's context against it, so `resolve` never runs without
+it. An app whose `user` has another type is refused too, with
+`the plugin reads "user", which this app's context gives with another type`.
+
+**Fix:** use the plugin that adds `user` first, with the type `resolve`
+reads:
+
+```ts
+alxia().use(auth).use(i18n);
+```
+
+More on this message in
+[`@alxia/language`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#the-plugin-reads-user-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+
+### `the plugin reads "user", which this app's context gives with another type`
+
+```text
+error TS2769: No overload matches this call.
+  …
+          Type '{ user: User; }' is not assignable to type '"the plugin reads \"user\", which this app's context gives with another type"'.
+```
+
+**When:** the app gives a `user`, but of a type that does not fit the one
+`resolve`'s parameter is annotated with: a `User | null` where `resolve`
+reads `User`, or a user of another shape.
+
+**Why:** `use` checks each key the plugin reads against the app's context;
+a narrower type passes, a wider or different one does not.
+
+**Fix:** annotate `resolve` with the type the app gives, and handle it
+inside:
+
+```ts
+resolve: ({ user }: { user: User | null }) => user?.language ?? undefined,
+```
+
+More on this message in
+[`@alxia/language`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#the-plugin-reads-user-which-this-apps-context-gives-with-another-type).
+
+### `the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`
+
+```text
+error TS2769: No overload matches this call.
+  …
+        Types of property ''~requires'' are incompatible.
+          Type '{ readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"; }' is not assignable to type '"the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"'.
+```
+
+**When:** `resolve`'s parameter is annotated `any` —
+`resolve: (ctx: any) => ctx.user.language` — or `Record<string, any>`, and
+the plugin is used, on any app, whatever its context gives.
+
+**Why:** an `any` parameter reads any key and says nothing of what it
+reads, so the plugin would require nothing, and an app without a `user`
+would be accepted, and throw on every request. The plugin is refused
+instead.
+
+**Fix:** annotate what `resolve` reads —
+`({ user }: BaseContext & { user: User | null }) => user?.language ?? undefined` —
+and use the plugin that adds it first; or leave it unannotated when it
+reads only the request.
+
+More on this message in
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugins--reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated).
 
 ## Messages
 

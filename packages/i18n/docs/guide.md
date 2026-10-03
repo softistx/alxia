@@ -30,16 +30,21 @@ no language the catalogues have gets the fallback's, English.
 ## The signature
 
 ```ts
-function createI18n<const C extends Catalogues, const Fallback extends keyof C & string>(
-	options: I18nOptions<C, Fallback>,
-): Alxia<Empty & LanguageContext<keyof C & string> & I18nContext<KeyOf<C[Fallback]>>, Empty, '', never> & {
-	t: Translate<KeyOf<C[Fallback]>>;
-	language: () => keyof C & string;
-	supported: (keyof C & string)[];
-};
+function createI18n<
+	const C extends Catalogues,
+	const Fallback extends keyof C & string,
+	Ctx extends object = BaseContext,
+>(
+	options: I18nOptions<C, Fallback, Ctx>,
+): Alxia<RequiresOf<Ctx, 'resolve'> & Empty & LanguageContext<keyof C & string> & I18nContext<KeyOf<C[Fallback]>>, Empty, '', never> &
+	Requiring<RequiresOf<Ctx, 'resolve'>> & {
+		t: Translate<KeyOf<C[Fallback]>>;
+		language: () => keyof C & string;
+		supported: (keyof C & string)[];
+	};
 
-interface I18nOptions<C extends Catalogues, Fallback extends keyof C & string>
-	extends Omit<LanguageOptions<keyof C & string>, 'supported' | 'fallback'> {
+interface I18nOptions<C extends Catalogues, Fallback extends keyof C & string, Ctx extends object = BaseContext>
+	extends Omit<LanguageOptions<keyof C & string, Ctx>, 'supported' | 'fallback'> {
 	readonly resources: C;
 	readonly fallback: Fallback;
 }
@@ -51,6 +56,12 @@ interface I18nContext<Key extends string> {
 	readonly t: Translate<Key>;
 }
 ```
+
+`C` and `Fallback` are inferred from `resources` and `fallback`, and `Ctx`
+from the type `resolve`'s parameter is annotated with: `RequiresOf<Ctx, 'resolve'>`,
+`@alxia/core`'s, is what that annotation adds to `BaseContext`, and `Empty`
+when `resolve` is absent or not annotated. See
+[Reading the app's context](#reading-the-apps-context).
 
 `createI18n()` returns two things in one value:
 
@@ -76,7 +87,7 @@ does not grow `@nxgt/i18n`'s list; see [`@nxgt/i18n`'s own `translate`](#nxgti18
 | `pathIndex` | `number` | `0` | the path segment the `path` source reads |
 | `persist` | `boolean \| { maxAge?, secure? }` | `false` | a language the query named is kept in the cookie |
 | `contentLanguage` | `boolean` | `true` | `Content-Language` on every response the plugin runs for |
-| `resolve` | `(ctx: BaseContext) => string \| undefined` | none | decides after every source, before `fallback` |
+| `resolve` | `(ctx: BaseContext & Ctx) => string \| undefined` | none | decides after every source, before `fallback`; annotate `ctx` to read what an earlier plugin adds |
 
 Every option but `resources` and `fallback` is `@alxia/language`'s, passed
 through as it is; its [guide](https://github.com/softistx/alxia/blob/develop/packages/language/docs/guide.md)
@@ -173,6 +184,45 @@ export const app = alxia()
 
 The plugin reads the segment; it does not route on it, so the routes
 declare it.
+
+### Reading the app's context
+
+To speak the language a signed-in user saved, annotate `resolve`'s
+parameter with what an earlier plugin added. `createI18n()` infers it from
+the annotation — the languages and the keys are still inferred from
+`resources` and `fallback` — and the plugin then requires it: an app that
+does not give `user` before it cannot use it.
+
+```ts
+import { alxia, type BaseContext } from '@alxia/core';
+import { createI18n } from '@alxia/i18n';
+
+interface User {
+	readonly language: string | null;
+}
+
+const i18n = createI18n({
+	resources: { en, fr },
+	fallback: 'en',
+	order: ['query'], // the query decides first, then the user's saved language
+	resolve: ({ user }: BaseContext & { user: User | null }) => user?.language ?? undefined,
+});
+
+export const app = alxia()
+	.use(auth) // derives user: User | null
+	.use(i18n)
+	.get('/', ({ t, reply }) => reply(200, t('home.title')));
+
+alxia().use(i18n);
+// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+```
+
+This is `@alxia/language`'s check, carried through; its
+[guide](https://github.com/softistx/alxia/blob/develop/packages/language/docs/guide.md#reading-the-apps-context)
+details it. A `resolve` left unannotated reads `BaseContext` only, and the
+plugin requires nothing. Annotated `any`, the plugin is refused on every
+app:
+[`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](troubleshooting.md#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated).
 
 ## What the routes read
 

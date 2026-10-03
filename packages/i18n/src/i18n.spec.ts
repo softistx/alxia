@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { alxia } from '@alxia/core';
+import { alxia, type BaseContext, type Empty } from '@alxia/core';
 import { getLanguage, resources as shared } from '@nxgt/i18n';
 import { createI18n } from './i18n';
 
@@ -70,6 +70,77 @@ describe('i18n', () => {
 		expect(i18n.language()).toBe('en');
 		// @ts-expect-error: not a key of the catalogue
 		expect(i18n.t('home.nope')).toBe('home.nope');
+	});
+});
+
+describe("resolve reads the app's context", () => {
+	interface User {
+		readonly language: string | null;
+	}
+	const byUser = createI18n({
+		resources: { en, fr },
+		fallback: 'en',
+		order: ['query'],
+		resolve: ({ user }: BaseContext & { user: User | null }) =>
+			user?.language ?? undefined,
+	});
+	/** Derives a user from `x-user-language`, or `null`. */
+	const auth = alxia().derive(({ request }) => {
+		const language = request.headers.get('x-user-language');
+		const user: User | null = language === null ? null : { language };
+		return { user };
+	});
+
+	test("an annotated resolve speaks the user's language, the languages and keys still inferred", async () => {
+		expectTypeOf(byUser['~requires']).toEqualTypeOf<{ user: User | null }>();
+		expectTypeOf(byUser.supported).toEqualTypeOf<('en' | 'fr')[]>();
+		const served = alxia()
+			.use(auth)
+			.use(byUser)
+			.get('/', ({ language, t, reply }) => {
+				expectTypeOf(language).toEqualTypeOf<'en' | 'fr'>();
+				return reply(200, t('home.title'));
+			});
+		const title = async (headers: Record<string, string>, path = '/') =>
+			(await served.request(path, { headers })).text();
+		expect(await title({ 'x-user-language': 'fr' })).toBe('Bienvenue');
+		expect(await title({})).toBe('Welcome');
+		expect(await title({ 'x-user-language': 'fr' }, '/?lang=en')).toBe(
+			'Welcome',
+		);
+	});
+
+	test('an unannotated resolve, or none, requires nothing', () => {
+		const plain = createI18n({
+			resources: { en, fr },
+			fallback: 'en',
+			resolve: (ctx) => {
+				expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
+				return undefined;
+			},
+		});
+		expectTypeOf(plain['~requires']).toEqualTypeOf<Empty>();
+		expectTypeOf(i18n['~requires']).toEqualTypeOf<Empty>();
+		alxia().use(plain).use(i18n);
+	});
+
+	test('an app that does not give what resolve reads is refused, and so is any', () => {
+		const loose = createI18n({
+			resources: { en, fr },
+			fallback: 'en',
+			resolve: (ctx: any) => ctx.user.language,
+		});
+		const _refused = () => {
+			// @ts-expect-error the plugin reads "user", which this app's context does not give
+			alxia().use(byUser);
+			alxia()
+				.derive(() => ({ user: { language: 1 } }))
+				// @ts-expect-error the plugin reads "user", which this app's context gives with another type
+				.use(byUser);
+			// @ts-expect-error the plugin's resolve reads its context as any
+			alxia().use(auth).use(loose);
+		};
+		expect(_refused).toBeFunction();
 	});
 });
 

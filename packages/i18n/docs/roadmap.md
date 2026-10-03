@@ -32,6 +32,11 @@ Nothing scheduled yet.
   `language`, typed as one of the catalogues' languages.
 - **The request's language, found by `@alxia/language`.** The query, a
   cookie, `Accept-Language`, then `fallback`; its options pass through.
+- **A preference an earlier plugin knows.** Annotate `resolve`'s parameter —
+  `({ user }: BaseContext & { user: User }) => user.language` — and it reads
+  what an earlier plugin added; an app that does not give it cannot use the
+  plugin, and one annotated `any` is refused. The languages and keys stay
+  inferred from `resources` and `fallback`.
 - **Keys typed by your catalogue.** `t` takes the dotted keys of the
   fallback's catalogue, from a literal or a JSON file, and refuses a typo.
 - **ICU messages.** Plurals, selects and numbers, formatted by `@nxgt/i18n`

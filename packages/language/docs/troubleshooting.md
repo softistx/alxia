@@ -12,7 +12,7 @@ the response does that you did not expect.
 
 - [`Type '"de"' is not assignable to type '"en" | "fr"'`](#type-de-is-not-assignable-to-type-en--fr)
 - [`Property 'language' does not exist on type 'Context<Empty, "/", Empty>'`](#property-language-does-not-exist-on-type-contextempty--empty)
-- [`Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'LanguageOptions<string>': supported, fallback`](#type-alxiaempty-empty--never-is-missing-the-following-properties-from-type-languageoptionsstring-supported-fallback)
+- [`Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback`](#type-alxiaempty-empty--never-is-missing-the-following-properties-from-type-languageoptionsstring-basecontext-supported-fallback)
 - [`Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ en: string; fr: string; }'`](#element-implicitly-has-an-any-type-because-expression-of-type-string-cant-be-used-to-index-type--en-string-fr-string-)
 - [`Type 'string | null' is not assignable to type 'string | undefined'`](#type-string--null-is-not-assignable-to-type-string--undefined)
 - [`Type 'Promise<string>' is not assignable to type 'string'`](#type-promisestring-is-not-assignable-to-type-string)
@@ -93,14 +93,14 @@ const app = alxia()
 	.get('/', ({ language: current, reply }) => reply(200, current));
 ```
 
-### `Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'LanguageOptions<string>': supported, fallback`
+### `Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback`
 
 ```text
 error TS2769: No overload matches this call.
   Overload 1 of 2, '(plugin: (app: Alxia<Empty, Empty, "", never>) => …): Alxia<…>', gave the following error.
-    Argument of type '<const L extends string>(options: LanguageOptions<L>) => Alxia<Empty & LanguageContext<L>, Empty, "", never>' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => …'.
+    Argument of type '<const L extends string, Ctx extends object = BaseContext>(options: LanguageOptions<L, Ctx>) => Alxia<RequiresOf<Ctx, "resolve"> & LanguageContext<L>, Empty, "", never> & Requiring<...>' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => …'.
       Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'LanguageOptions<string>': supported, fallback
+        Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback
 ```
 
 **When:** `app.use(language)`, without calling it.
