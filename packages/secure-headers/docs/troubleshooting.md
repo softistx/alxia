@@ -48,8 +48,9 @@ error TS2322: Type '{ defaultSrc: string[]; }' is not assignable to type 'Settin
 `'boolean | undefined'`.
 
 **Why:** a header option is the header's value as a string, or `false` to
-leave it out (`Setting`, exported, is `string | false`). There is no `true` — leaving
-the key out is the default — and no object form for a policy.
+leave it out (`Setting`, exported, is `string | false`). There is no
+`true` — leaving the key out is the default — and no object form for a
+policy.
 
 **Fix:** write the header as it goes out, or leave the key out:
 
