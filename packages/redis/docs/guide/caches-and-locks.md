@@ -27,17 +27,17 @@ const app = alxia()
 ## The signature
 
 ```ts
-function redis<Caches extends Record<string, AnyCache>>(client: RedisClient, options?: RedisContextOptions<Caches>);  // a plugin
+function redis<const Caches extends Record<string, AnyCache> = Record<never, never>>(client: RedisClient, options?: RedisContextOptions<Caches>);  // a plugin
 
 type AnyCache = CacheDefinition<any, z.ZodType>; // any cache definition
 
-interface RedisContextOptions<Caches> {
+interface RedisContextOptions<Caches extends Record<string, AnyCache>> {
 	/** `@nxgt/redis` cache definitions, by the name routes read them under. */
 	readonly caches?: Caches;
 }
 
 /** What routes after `redis()` read. */
-interface RedisContext<Caches> {
+interface RedisContext<Caches extends Record<string, AnyCache>> {
 	readonly redis: RedisClient;
 	readonly caches: BoundCaches<Caches>;
 	lock<T>(key: string, work: () => Promise<T> | T, options?: LockOptions): Promise<T>;

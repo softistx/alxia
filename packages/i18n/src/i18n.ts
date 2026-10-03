@@ -28,7 +28,10 @@ export type KeyOf<Catalogue> = KeysOf<Catalogue, 8> & string;
 /** One level shallower: `Shallower[8]` is `7`, and `Shallower[0]` is `never`. */
 type Shallower = [never, 0, 1, 2, 3, 4, 5, 6, 7];
 
-/** The dotted keys of `T`, `Depth` more levels down at most. */
+/**
+ * The dotted keys of `T`, `Depth` more levels down at most. `Path`'s own
+ * test, `Record<string, any>`, kept so that the keys stay `Path`'s.
+ */
 type KeysOf<
 	T,
 	Depth extends number,

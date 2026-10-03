@@ -99,7 +99,8 @@ function translatedWith<const C extends Catalogues, const Fallback extends keyof
 
 **Why:** `KeyOf` was `@nxgt/i18n`'s `Path`, which recurses without a bound.
 With `C` a type parameter, the keys stay deferred, and some checks then
-unfold them forever: a tsconfig whose `types` leaves out `bun` is one.
+unfold them forever. A tsconfig whose `types` leaves out `bun` is one
+setting that triggers them.
 
 **Fix:** upgrade `@alxia/i18n`: `KeyOf` now reads nine levels deep at most.
 
