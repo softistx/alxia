@@ -127,13 +127,13 @@ How `alxiaOf(context)` is typed:
 // app/server.ts
 import { logger } from '@alxia/logger';
 import { createServer } from '@alxia/react-router';
-import { greetingContext } from './context';
+import { greetingContext } from './context'; // createContext<string>('unset'), in app/context.ts
 
 export default createServer({
 	beforeAll: (app) => app.use(logger()), // runs before the client's files too
 	configure: (app) => app.get('/api/health', ({ reply }) => reply.ok({ ok: true })),
 	getLoadContext: (_ctx, context) => context.set(greetingContext, 'hello'),
-	listen: { idleTimeout: 30 }, // on top of PORT and HOST
+	listen: { idleTimeout: 30 }, // its port and hostname, if given, win over PORT and HOST
 	onListen: (server) => console.log(`up on ${server.url}`),
 });
 ```
@@ -205,6 +205,8 @@ files, so `@alxia/openapi` can leave them out.
 | `alxiaOf<App>(context)` | what alxia's hooks built, in a loader, an action or a middleware. Typed by the registered server, by the type argument (a server or an app), or as `BaseContext` |
 | `Register` | the interface to augment with `server: typeof server` |
 | `RegisteredApp` | the app `alxiaOf` reads with no type argument |
+| `RegisteredOf<R>` | the app a `Register`-shaped interface names: its server's, a fresh app, or `InvalidRegister` |
+| `InvalidRegister` | what a `Register` naming neither a server nor an app reads as: every property a compile error |
 | `AppOf<Server>` | the app a server makes |
 | `alxiaContext` | the React Router context key `alxiaOf` reads, set on every request |
 | `reactRouter(app, options)` | the catch-all and the client's files, for a server of your own. `build`, `mode`, `getLoadContext`, `client` |

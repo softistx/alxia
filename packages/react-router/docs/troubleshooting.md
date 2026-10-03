@@ -27,6 +27,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`Property '…' does not exist on type 'BaseContext & …'`](#property--does-not-exist-on-type-basecontext--)
 - [`Type '…' does not satisfy the constraint 'AnyAlxia | ReactRouterServer<AnyAlxia>'`](#type--does-not-satisfy-the-constraint-anyalxia--reactrouterserveranyalxia)
 - [`Type '(app: …) => void' is not assignable to type '(app: …) => AnyAlxia'`](#type-app---void-is-not-assignable-to-type-app---anyalxia)
+- [`Property '…' does not exist on type 'BaseContext & { readonly 'Register.server must be typeof server, the default export of createServer()': never; }'`](#property--does-not-exist-on-type-basecontext---readonly-registerserver-must-be-typeof-server-the-default-export-of-createserver-never-)
 - [`Subsequent property declarations must have the same type. Property 'server' must be of type …`](#subsequent-property-declarations-must-have-the-same-type-property-server-must-be-of-type-)
 
 **Traps**
@@ -190,6 +191,10 @@ export default defineConfig({ plugins: [reactRouter(), alxia()] });
 ```
 
 ### `alxia-react-router: serverBundles splits React Router's server build in several, and alxia serves one. …`
+
+```text
+Error: alxia-react-router: serverBundles splits React Router's server build in several, and alxia serves one. Remove serverBundles from react-router.config.ts.
+```
 
 **When:** `react-router.config.ts` sets `serverBundles`.
 
@@ -439,6 +444,35 @@ the loaders and `getLoadContext`.
 createServer({
 	configure: (app) => app.get('/api/health', ({ reply }) => reply.ok({ ok: true })),
 });
+```
+
+### `Property '…' does not exist on type 'BaseContext & { readonly 'Register.server must be typeof server, the default export of createServer()': never; }'`
+
+```text
+error TS2339: Property 'user' does not exist on type 'BaseContext & { readonly 'Register.server must be typeof server, the default export of createServer()': never; }'.
+```
+
+**When:** every `alxiaOf(context)` read fails with it: `Register`'s
+`server` names something that is neither a server nor an alxia app, most
+often the module rather than its default export,
+`server: typeof import('./server')`.
+
+**Why:** a wrong registration types the context as one marker key, so
+that each read is a compile error rather than `never`, which would let
+anything through.
+
+**Fix:** name the default export's type:
+
+```ts
+// app/server.ts
+const server = createServer({ configure: (app) => app });
+export default server;
+
+declare module '@alxia/react-router' {
+	interface Register {
+		server: typeof server;
+	}
+}
 ```
 
 ### `Subsequent property declarations must have the same type. Property 'server' must be of type …`

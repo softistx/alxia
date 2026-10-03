@@ -236,7 +236,11 @@ describe('react-router dev, with app/server.ts', () => {
 			"import { alxia } from '@alxia/core';\nexport default alxia();\n",
 		);
 		const config = await configFile(fixture.root, 'not-a-server', (source) =>
-			source.replace('alxia()]', "alxia({ entry: 'app/not-a-server.ts' })]"),
+			// An absolute entry, as a relative one is resolved to.
+			source.replace(
+				'alxia()]',
+				`alxia({ entry: ${JSON.stringify(join(fixture.root, 'app', 'not-a-server.ts'))} })]`,
+			),
 		);
 		const other = await devServer(fixture.root, { configFile: config });
 		try {
@@ -300,6 +304,49 @@ describe('react-router dev, with app/server.ts', () => {
 			devServer(fixture.root, { configFile: config }),
 		).rejects.toThrow("React Router's Vite plugin is not in this config");
 	});
+});
+
+describe('react-router.config.ts the plugin does not serve', () => {
+	let fixture: Fixture;
+
+	beforeAll(async () => {
+		fixture = await copyFixture();
+	});
+	afterAll(async () => {
+		await fixture?.remove();
+	});
+
+	test('serverBundles is refused, saying so', async () => {
+		await Bun.write(
+			join(fixture.root, 'react-router.config.ts'),
+			"import type { Config } from '@react-router/dev/config';\n\nexport default { ssr: true, serverBundles: () => 'one' } satisfies Config;\n",
+		);
+		await expect(devServer(fixture.root)).rejects.toThrow(
+			"serverBundles splits React Router's server build in several",
+		);
+	});
+
+	test('a single-page app builds as it would without the plugin', async () => {
+		await Bun.write(
+			join(fixture.root, 'react-router.config.ts'),
+			"import type { Config } from '@react-router/dev/config';\n\nexport default { ssr: false } satisfies Config;\n",
+		);
+		// Server loaders have no place in a single-page app: one plain route.
+		await Bun.write(
+			join(fixture.root, 'app', 'routes.ts'),
+			"import { index, type RouteConfig } from '@react-router/dev/routes';\n\nexport default [index('routes/plain.tsx')] satisfies RouteConfig;\n",
+		);
+		await Bun.write(
+			join(fixture.root, 'app', 'routes', 'plain.tsx'),
+			'export default function Plain() {\n\treturn <p>plain</p>;\n}\n',
+		);
+		await build(fixture.root);
+		expect(
+			await Bun.file(
+				join(fixture.root, 'build', 'client', 'index.html'),
+			).text(),
+		).toContain('"isSpaMode":true');
+	}, 60_000);
 });
 
 describe('react-router dev, with no server file', () => {

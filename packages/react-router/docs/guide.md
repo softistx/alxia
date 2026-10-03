@@ -185,7 +185,7 @@ Every option is optional:
 | `beforeAll(app)` | runs first, on a new app. What it declares applies to the client's files too: a rate limit, a guard on everything, a logger that should see every asset. It returns the app, which `configure` then receives |
 | `getLoadContext(ctx, context)` | sets the app's own keys on React Router's provider, `ctx` typed by `configure`'s app |
 | `build`, `mode`, `client` | override what the plugin wires; see [Escape hatches](#escape-hatches) |
-| `listen` | `listen`'s options for `bun build/server/index.js`, on top of `PORT` and `HOST`: `port`, `hostname`, `idleTimeout`, `maxRequestBodySize`, `tls` |
+| `listen` | `listen`'s options for `bun build/server/index.js`: `port`, `hostname`, `idleTimeout`, `maxRequestBodySize`, `tls`. A `port` or `hostname` given here wins over `PORT` and `HOST` |
 | `onListen(server)` | called once the built server listens, in place of the `alxia listening on …` line |
 
 A request goes through four layers, in order:

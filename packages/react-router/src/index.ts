@@ -2,8 +2,10 @@ export {
 	type AppOf,
 	alxiaContext,
 	alxiaOf,
+	type InvalidRegister,
 	type Register,
 	type RegisteredApp,
+	type RegisteredOf,
 } from './context';
 export {
 	isReactRouterRoute,

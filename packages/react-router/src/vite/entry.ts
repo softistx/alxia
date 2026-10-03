@@ -9,6 +9,9 @@ export const NAME = 'alxia-react-router';
 /** React Router's server build, as its Vite plugin serves it. */
 const SERVER_BUILD = 'virtual:react-router/server-build';
 
+/** The input when the plugin is disabled: React Router's build alone. */
+export const PASS_THROUGH = `export * from '${SERVER_BUILD}';\n`;
+
 export interface EntryOptions {
 	/** The server file, absolute, or `undefined` for `createServer()` as it is. */
 	readonly file: string | undefined;

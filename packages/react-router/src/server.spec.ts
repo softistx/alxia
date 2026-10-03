@@ -1,15 +1,19 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
-import type { BaseContext } from '@alxia/core';
+import { join } from 'node:path';
+import type { BaseContext, ContextOf } from '@alxia/core';
 // By its published name, as the fixture's build imports it: see react-router.spec.ts.
 import {
 	alxiaContext,
 	alxiaOf,
 	createServer,
 	isReactRouterRoute,
+	type RegisteredOf,
 } from '@alxia/react-router';
 import { RouterContextProvider, type ServerBuild } from 'react-router';
 import { configure } from '../fixture/base';
-import { BROWSER, CLIENT, fixtureBuild } from '../test/fixture';
+import { BROWSER, CLIENT, FIXTURE, fixtureBuild } from '../test/fixture';
+
+const SERVER_BUILD = join(FIXTURE, 'build', 'server', 'index.js');
 
 let build: ServerBuild;
 beforeAll(async () => {
@@ -164,6 +168,10 @@ describe('the types', () => {
 				configure: (app) => void app,
 			});
 			createServer({
+				// @ts-expect-error: beforeAll returns the app
+				beforeAll: (app) => void app,
+			});
+			createServer({
 				beforeAll: (app) => app.decorate({ region: 'eu' }),
 				configure: (app) => app.derive(({ region }) => ({ upper: region })),
 				getLoadContext: ({ region, upper }) => void `${region}${upper}`,
@@ -196,9 +204,113 @@ describe('the types', () => {
 		expect(typed).toBeFunction();
 	});
 
+	test('Register names a server or an app; anything else makes every read an error', () => {
+		const server = createServer({ configure });
+		const typed = () => {
+			const registered = {} as ContextOf<
+				RegisteredOf<{ server: typeof server }>
+			>;
+			const name: string | undefined = registered.user?.name;
+			const unregistered: BaseContext = {} as ContextOf<RegisteredOf<object>>;
+			// The module rather than its default export: refused, not `never`.
+			const wrong = {} as ContextOf<
+				RegisteredOf<{ server: { default: typeof server } }>
+			>;
+			// @ts-expect-error: a wrong registration types no `user`
+			wrong.user;
+			// @ts-expect-error: nor anything assignable to what reads it
+			const tenant: { a: number } = wrong.tenant;
+			return { name, unregistered, tenant };
+		};
+		expect(typed).toBeFunction();
+	});
+
 	test('alxiaOf outside the catch-all says how to serve the app', () => {
 		expect(() => alxiaOf(new RouterContextProvider())).toThrow(
 			'add alxia() from @alxia/react-router/vite',
 		);
 	});
 });
+
+describe('start', () => {
+	test("listen's port and hostname win over PORT and HOST, and onListen is told", async () => {
+		const { child, out } = await run(
+			[
+				'const server = createServer({',
+				"\tlisten: { port: 0, hostname: '127.0.0.1' },",
+				'\tonListen: (listening) => console.log(`told ${listening.url}`),',
+				'});',
+				'server.start(server.create({ build }));',
+			],
+			'told ',
+			{ PORT: '1', HOST: '0.0.0.0' },
+		);
+		try {
+			const url = out.match(/told (\S+)/)?.[1] as string;
+			expect(url).toStartWith('http://127.0.0.1:');
+			expect(url).not.toBe('http://127.0.0.1:1/');
+			expect((await fetch(new URL('/nowhere', url))).status).toBe(404);
+			child.kill('SIGTERM');
+			expect(await child.exited).toBe(0);
+		} finally {
+			child.kill();
+		}
+	});
+
+	test('an onStop hook that throws on SIGTERM ends the process with 1, printing the error', async () => {
+		const { child } = await run(
+			[
+				'const server = createServer({',
+				"\tconfigure: (app) => app.onStop(() => { throw new Error('pool would not close'); }),",
+				"\tlisten: { port: 0, hostname: '127.0.0.1' },",
+				'});',
+				'server.start(server.create({ build }));',
+			],
+			'alxia listening on',
+		);
+		try {
+			child.kill('SIGTERM');
+			expect(await child.exited).toBe(1);
+			expect(await new Response(child.stderr).text()).toContain(
+				'pool would not close',
+			);
+		} finally {
+			child.kill();
+		}
+	});
+});
+
+/**
+ * A process that imports the package and the fixture's build, then runs
+ * `lines`: `start` installs signal handlers, kept out of the test's own
+ * process. Resolves once its output holds `ready`.
+ */
+async function run(
+	lines: readonly string[],
+	ready: string,
+	env: Record<string, string> = {},
+) {
+	const script = [
+		"import { createServer } from '@alxia/react-router';",
+		`const build = await import(${JSON.stringify(SERVER_BUILD)});`,
+		...lines,
+	].join('\n');
+	const child = Bun.spawn([process.execPath, '-e', script], {
+		cwd: join(import.meta.dir, '..'),
+		env: { ...process.env, ...env },
+		stdout: 'pipe',
+		stderr: 'pipe',
+	});
+	const reader = child.stdout.getReader();
+	let out = '';
+	while (!out.includes(ready)) {
+		const { done, value } = await reader.read();
+		if (done) {
+			child.kill();
+			throw new Error(`exited: ${out}`);
+		}
+		out += new TextDecoder().decode(value);
+	}
+	reader.releaseLock();
+	return { child, out };
+}

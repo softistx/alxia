@@ -376,6 +376,8 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 ### 2. `@alxia/react-router/vite`: one server entry, for dev and production
 
+*Superseded by [the zero-config revision](#revised-2026-10-03-zero-config): `alxia()` replaced `alxiaServer()`, and `serve.js` is gone.*
+
 ```ts
 // vite.config.ts
 import { reactRouter } from '@react-router/dev/vite';
@@ -514,6 +516,7 @@ core ◄── react-router   (peers: react-router; vite, optional, for /vite on
    - (b) Typed like `@alxia/graphql`'s routes: the client would show a
      `/*` nobody calls.
 8. **Production start.**
+   *Superseded by the zero-config revision: `build/server/index.js` listens when run (`import.meta.main`).*
    - **(a, recommended) The plugin writes `build/server/serve.js`**, which
      listens. The entry stays a module that only exports the app.
    - (b) The entry calls `listen()` under `import.meta.env.PROD`. That is

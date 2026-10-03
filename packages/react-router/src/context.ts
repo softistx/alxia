@@ -2,7 +2,7 @@
  * The key under which `reactRouter()` hands every loader, action and
  * middleware the request's alxia context, and the typed way to read it.
  */
-import type { AnyAlxia, ContextOf } from '@alxia/core';
+import type { Alxia, AnyAlxia, ContextOf, Empty } from '@alxia/core';
 import { createContext, type RouterContextProvider } from 'react-router';
 import type { FreshApp, ReactRouterServer } from './server';
 
@@ -44,10 +44,29 @@ export interface Register {}
 export type AppOf<Server> =
 	Server extends ReactRouterServer<infer App> ? App : Server;
 
-/** What `alxiaOf` reads with no type argument: the registered server's app, or a fresh one. */
-export type RegisteredApp = Register extends { readonly server: infer Server }
-	? AppOf<Server>
+/**
+ * What `Register` names when it is neither a server nor an app — the
+ * module, say, rather than its default export: an app whose context has
+ * nothing but this key, so that reading anything of it is a compile error.
+ */
+export type InvalidRegister = Alxia<
+	{
+		readonly 'Register.server must be typeof server, the default export of createServer()': never;
+	},
+	Empty,
+	'',
+	never
+>;
+
+/** The app `alxiaOf` reads for a `Register` interface: its server's, a fresh one, or `InvalidRegister`. */
+export type RegisteredOf<R> = R extends { readonly server: infer Server }
+	? Server extends AnyAlxia | ReactRouterServer<AnyAlxia>
+		? AppOf<Server>
+		: InvalidRegister
 	: FreshApp;
+
+/** What `alxiaOf` reads with no type argument: the registered server's app, or a fresh one. */
+export type RegisteredApp = RegisteredOf<Register>;
 
 /**
  * What alxia's hooks built for this request, read in a loader, an action or

@@ -67,7 +67,7 @@ export interface ServerOptions<Before extends AnyAlxia, App extends AnyAlxia> {
 	 */
 	readonly client?: string | URL | false;
 	/**
-	 * `listen`'s options for `bun build/server/index.js`, over `PORT` (3000)
+	 * `listen`'s options for `bun build/server/index.js`; a `port` or `hostname` here wins over `PORT` (3000)
 	 * and `HOST` (`0.0.0.0`) from the environment.
 	 */
 	readonly listen?: ListenOptions;
@@ -123,7 +123,9 @@ export function createServer<
 				options.client === false
 					? undefined
 					: (options.client ?? wiring.client);
-			const fresh = alxia() as FreshApp;
+			const fresh = alxia();
+			// Without beforeAll or configure, Before and App are their defaults,
+			// the app passed through: a type argument given by hand is believed.
 			const before = (options.beforeAll?.(fresh) ?? fresh) as Before;
 			if (client !== undefined && mode === 'production') {
 				declareClient(before, client);
