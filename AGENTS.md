@@ -15,7 +15,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/zod` | Zod coercions (`zq`) and the OpenAPI converter | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's hooks and typed context, Yoga's plugins | core, graphql-yoga, graphql |
 | `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its hooks, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js`; the `alxia-react-router reveal` bin writes the default server out | core, react-router; vite (optional, `/vite`) |
-| `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | function plugins: global hooks | core |
+| `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | function plugins: global hooks; `secureHeaders({ nonce: true })` is an app plugin, adding a typed `nonce` | core |
 | `@alxia/rate-limit`, `@alxia/jwt`, `@alxia/logger` | app plugins: typed context, typed replies, routes | core |
 | `@alxia/env` | environment variables through any Standard Schema | — |
 | `@alxia/cache` | HTTP response caching, a store contract and a memory store | core |

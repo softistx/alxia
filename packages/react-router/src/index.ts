@@ -3,11 +3,11 @@ export {
 	alxiaContext,
 	alxiaOf,
 	type InvalidRegister,
-	nonceOf,
 	type Register,
 	type RegisteredApp,
 	type RegisteredOf,
 } from './context';
+export { nonceOf } from './nonce';
 export {
 	isReactRouterRoute,
 	type ReactRouterOptions,

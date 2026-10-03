@@ -9,8 +9,8 @@ or a header in the wrong place.
 **Types**
 
 - [`Type 'true' is not assignable to type 'Setting | undefined'`](#type-true-is-not-assignable-to-type-setting--undefined)
-- [`… is not assignable to parameter of type 'SecureHeadersOptions' with 'exactOptionalPropertyTypes: true'`](#-is-not-assignable-to-parameter-of-type-secureheadersoptions-with-exactoptionalpropertytypes-true)
-- [`Object literal may only specify known properties, and '…' does not exist in type 'SecureHeadersOptions'`](#object-literal-may-only-specify-known-properties-and--does-not-exist-in-type-secureheadersoptions)
+- [`No overload matches this call` … `is not assignable to type 'SecureHeadersOptions' with 'exactOptionalPropertyTypes: true'`](#no-overload-matches-this-call--is-not-assignable-to-type-secureheadersoptions-with-exactoptionalpropertytypes-true)
+- [`No overload matches this call` … `Object literal may only specify known properties, and '…' does not exist in type 'SecureHeadersOptions & …'`](#no-overload-matches-this-call--object-literal-may-only-specify-known-properties-and--does-not-exist-in-type-secureheadersoptions--)
 - [`No overload matches this call` … `Property 'nonce' is missing in type 'Alxia<Empty, Empty, "", never>'`](#no-overload-matches-this-call--property-nonce-is-missing-in-type-alxiaempty-empty--never)
 - [`Property 'nonce' does not exist on type 'Context<…>'`](#property-nonce-does-not-exist-on-type-context)
 - [`No overload matches this call` … `Type 'boolean' is not assignable to type 'true'`](#no-overload-matches-this-call--type-boolean-is-not-assignable-to-type-true)
@@ -77,13 +77,18 @@ app.use(
 );
 ```
 
-### `… is not assignable to parameter of type 'SecureHeadersOptions' with 'exactOptionalPropertyTypes: true'`
+### `No overload matches this call` … `is not assignable to type 'SecureHeadersOptions' with 'exactOptionalPropertyTypes: true'`
 
 **When:** an option is set to `undefined`, often from a condition, with
 `exactOptionalPropertyTypes` on.
 
 ```text
-error TS2379: Argument of type '{ xFrameOptions: undefined; }' is not assignable to parameter of type 'SecureHeadersOptions' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+error TS2769: No overload matches this call.
+  Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin', gave the following error.
+    Argument of type '{ xFrameOptions: undefined; }' is not assignable to parameter of type 'SecureHeadersOptions & { readonly nonce: true; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+      Type '{ xFrameOptions: undefined; }' is not assignable to type 'SecureHeadersOptions' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
+  Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): Plugin', gave the following error.
+    Argument of type '{ xFrameOptions: undefined; }' is not assignable to parameter of type 'SecureHeadersOptions & { readonly nonce?: false; }' with 'exactOptionalPropertyTypes: true'. …
 ```
 
 **Why:** the options are optional, not `undefined`-able. Under that flag a
@@ -97,13 +102,17 @@ const production = Bun.env.NODE_ENV === 'production';
 app.use(secureHeaders({ ...(production ? {} : { strictTransportSecurity: false }) }));
 ```
 
-### `Object literal may only specify known properties, and '…' does not exist in type 'SecureHeadersOptions'`
+### `No overload matches this call` … `Object literal may only specify known properties, and '…' does not exist in type 'SecureHeadersOptions & …'`
 
 **When:** an option names a header the plugin does not send, or uses
 another library's name for one.
 
 ```text
-error TS2353: Object literal may only specify known properties, and 'xPoweredBy' does not exist in type 'SecureHeadersOptions'.
+error TS2769: No overload matches this call.
+  Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin', gave the following error.
+    Object literal may only specify known properties, and 'xPoweredBy' does not exist in type 'SecureHeadersOptions & { readonly nonce: true; }'.
+  Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): Plugin', gave the following error.
+    Object literal may only specify known properties, and 'xPoweredBy' does not exist in type 'SecureHeadersOptions & { readonly nonce?: false; }'.
 ```
 
 **Why:** the options are the twelve headers in the
@@ -278,6 +287,11 @@ route's replace it ([guide](guide.md#who-reads-it)).
 ### `TypeError: secureHeaders: contentSecurityPolicy names NONCE, but nonce is off: give nonce: true`
 
 **When:** the policy holds `NONCE`, and `nonce` is left out or `false`.
+It throws at startup:
+
+```text
+TypeError: secureHeaders: contentSecurityPolicy names NONCE, but nonce is off: give nonce: true
+```
 
 **Why:** without `nonce: true` the placeholder would go out as it is,
 `'nonce-{alxia}'`, which allows nothing and reads as a mistake in a
@@ -286,6 +300,8 @@ browser's console.
 **Fix:**
 
 ```ts
+import { NONCE, secureHeaders } from '@alxia/secure-headers';
+
 app.use(secureHeaders({ nonce: true, contentSecurityPolicy: `script-src 'self' ${NONCE}` }));
 ```
 

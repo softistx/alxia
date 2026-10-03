@@ -38,9 +38,11 @@ interface SecureHeadersOptions {
 	readonly xPermittedCrossDomainPolicies?: string | false;
 	readonly permissionsPolicy?: string | false;
 	readonly hidePoweredBy?: boolean;
-	readonly nonce?: boolean;
 }
 ```
+
+`nonce` is not in `SecureHeadersOptions`: each overload adds it, so options
+typed by that interface still give the plain `Plugin`.
 
 `secureHeaders` returns a function `Plugin` from `@alxia/core`: give it to
 `use`, called, and the app keeps its type. It adds one global `onResponse`
@@ -221,7 +223,7 @@ the same one. Two requests never share one.
 | --- | --- |
 | names `NONCE` | where `NONCE` stands, each time, and nowhere else |
 | has no `NONCE`, has `script-src` or `script-src-elem` | at the end of each of those directives (their name in any case) |
-| has neither | nowhere: `secureHeaders()` throws at startup |
+| has neither, as the default policy | nowhere: `secureHeaders()` throws at startup; give `contentSecurityPolicy` with `nonce: true` |
 
 `NONCE`, exported, is a placeholder string (`'nonce-{alxia}'`) that no real
 policy contains. Use it to put the nonce in `style-src`, or in a directive

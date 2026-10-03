@@ -28,6 +28,13 @@ export interface SecureHeadersOptions {
 	readonly permissionsPolicy?: Setting;
 	/** Whether `X-Powered-By` and `Server` are removed. On by default. */
 	readonly hidePoweredBy?: boolean;
+}
+
+/**
+ * The nonce switch, beside `SecureHeadersOptions` rather than in it, so that
+ * options typed by that interface still pick the plugin without a nonce.
+ */
+interface NonceOption {
 	/**
 	 * A fresh nonce for each request, in `contentSecurityPolicy` and on the
 	 * context as `nonce`. Placed where the policy names `NONCE`, or added to
@@ -99,7 +106,7 @@ export function secureHeaders(
 	options?: SecureHeadersOptions & { readonly nonce?: false },
 ): Plugin;
 export function secureHeaders(
-	options: SecureHeadersOptions = {},
+	options: SecureHeadersOptions & NonceOption = {},
 ): Plugin | NoncePlugin {
 	const headers = fixedHeaders(options);
 	const hide = options.hidePoweredBy ?? true;
@@ -122,11 +129,12 @@ export function secureHeaders(
 	const withNonce = policyWithNonce(policy);
 	const nonceOf = nonceStore();
 	const set = setter(headers, hide);
-	return definePlugin()((app) =>
+	const plugin: NoncePlugin = definePlugin()((app) =>
 		app
 			.onResponse((response, ctx) => set(response, withNonce(nonceOf(ctx.url))))
 			.derive(({ url }): NonceContext => ({ nonce: nonceOf(url) })),
-	) as unknown as NoncePlugin;
+	);
+	return plugin;
 }
 
 /** Each header the options leave in, by name, with its value. Throws on an empty one. */

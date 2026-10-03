@@ -64,7 +64,8 @@ app.use(
 ```
 
 A policy with nowhere to put the nonce (no `script-src`, no `NONCE`) is
-refused at startup. Without `nonce: true`, the headers are what they always
+refused at startup, the default policy included: give `contentSecurityPolicy`
+with `nonce: true`. Without `nonce: true`, the headers are what they always
 were. With `@alxia/react-router`, `nonceOf(loadContext)` hands it to
 `entry.server.tsx` ([its README](https://github.com/softistx/alxia/tree/develop/packages/react-router#a-csp-nonce)).
 
