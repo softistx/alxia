@@ -1,1 +1,5 @@
-export { type SecureHeadersOptions, secureHeaders } from './secure-headers';
+export {
+	type SecureHeadersOptions,
+	type Setting,
+	secureHeaders,
+} from './secure-headers';

@@ -38,7 +38,8 @@ it on its reply.
 | `X-Permitted-Cross-Domain-Policies` | `none` | `xPermittedCrossDomainPolicies` |
 | `Permissions-Policy` | not sent | `permissionsPolicy` |
 
-Each option takes a value, or `false` to leave the header out.
+Each option takes a value, or `false` to leave the header out; an empty
+value is refused at startup.
 `X-Powered-By` and `Server` are removed unless `hidePoweredBy: false`.
 
 ## API
@@ -47,6 +48,7 @@ Each option takes a value, or `false` to leave the header out.
 | --- | --- |
 | `secureHeaders(options?)` | the plugin |
 | `SecureHeadersOptions` | its options |
+| `Setting` | a header option's type: its value, or `false` to leave it out |
 
 ## Documentation
 

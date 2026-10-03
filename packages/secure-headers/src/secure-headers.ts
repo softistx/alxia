@@ -1,7 +1,7 @@
 import { type Plugin, withHeaders } from '@alxia/core';
 
-/** A header's value, or `false` to leave it out. */
-type Setting = string | false;
+/** A header's value, or `false` to leave it out. An empty value is refused. */
+export type Setting = string | false;
 
 export interface SecureHeadersOptions {
 	/** Defaults to a policy for an API: nothing loads, nothing frames it. */
@@ -69,6 +69,12 @@ export function secureHeaders(options: SecureHeadersOptions = {}): Plugin {
 		Setting,
 	][]) {
 		const setting = options[OPTION[name]];
+		if (typeof setting === 'string' && setting.trim() === '') {
+			// An empty header says nothing a browser can act on: leave it out.
+			throw new TypeError(
+				`secureHeaders: ${OPTION[name]} is empty; give false to leave the ${name} header out`,
+			);
+		}
 		const value = setting === undefined ? fallback : setting;
 		if (typeof value === 'string') headers.push([name, value]);
 	}

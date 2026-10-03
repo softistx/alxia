@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
-import { secureHeaders } from './secure-headers';
+import { type Setting, secureHeaders } from './secure-headers';
 
 describe('secureHeaders', () => {
 	test('sets the defaults, keeps what a route set, takes options', async () => {
@@ -34,5 +34,14 @@ describe('secureHeaders', () => {
 		const response = await app.request('/nope');
 		expect(response.status).toBe(404);
 		expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+	});
+
+	test('an empty value is refused, at once: false leaves a header out', () => {
+		expect(() => secureHeaders({ contentSecurityPolicy: '' })).toThrow(
+			'secureHeaders: contentSecurityPolicy is empty; give false to leave the content-security-policy header out',
+		);
+		expect(() => secureHeaders({ referrerPolicy: '  ' })).toThrow(TypeError);
+		const setting: Setting = false;
+		expect(() => secureHeaders({ xFrameOptions: setting })).not.toThrow();
 	});
 });
