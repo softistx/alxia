@@ -78,6 +78,22 @@ await products.invalidate('/products');          // under each `vary` value, or 
 await products.invalidate('/products?page=2');   // another path: the query is part of it
 ```
 
+A `key` or `tags` that reads what an earlier plugin added names it as the
+type argument; an app that does not give it before the cache cannot use it:
+
+```ts
+const perTenant = cache<{ user: { tenantId: string } }>({
+	ttl: 60,
+	key: ({ user, url }) => `${user.tenantId}:${url.pathname}${url.search}`,
+	tags: ({ user }) => [`tenant:${user.tenantId}`],
+});
+
+const auth = alxia().derive(() => ({ user: { tenantId: 'acme' } })); // your session plugin
+
+alxia().use(auth).use(perTenant);   // compiles: auth derives user
+alxia().use(perTenant);             // a compile error: no `user` in this app's context
+```
+
 ## Two stores
 
 ```ts
@@ -101,10 +117,10 @@ across every process. A store of your own implements `CacheStore`: `get`,
 | `ttl` | required | seconds fresh |
 | `staleWhileRevalidate` | 0 | seconds served stale while refreshed |
 | `store` | `MemoryCacheStore` | |
-| `key` | path and query | `(ctx) => string \| undefined` |
+| `key` | path and query | `(ctx) => string \| undefined`; `cache<{ user: User }>(…)` lets it read a `user` an earlier plugin adds |
 | `vary` | none | request headers the response depends on |
 | `statuses` | `[200]` | |
-| `tags` | none | `(ctx) => string[]` |
+| `tags` | none | `(ctx) => string[]`, typed like `key` |
 | `honorClientNoCache` | `false` | a client's `no-cache` skips the cache |
 | `debugHeaders` | `true` | `X-Cache` and `Age` |
 
@@ -112,8 +128,8 @@ across every process. A store of your own implements `CacheStore`: `get`,
 
 | export | |
 | --- | --- |
-| `cache(options)` | the plugin, with `invalidate(path)`, `invalidateTag(tag)` and `store`; routes after it read `cache.tag()` and `cache.skip()` |
-| `CacheOptions` | its options: `ttl`, `staleWhileRevalidate`, `store`, `key`, `vary`, `statuses`, `tags`, `honorClientNoCache`, `debugHeaders` |
+| `cache<Requires>(options)` | the plugin, with `invalidate(path)`, `invalidateTag(tag)` and `store`; routes after it read `cache.tag()` and `cache.skip()` |
+| `CacheOptions<Requires>` | its options: `ttl`, `staleWhileRevalidate`, `store`, `key`, `vary`, `statuses`, `tags`, `honorClientNoCache`, `debugHeaders` |
 | `defaultKey(path, vary, headers)` | the default key: the path and query, then each varying header's value |
 | `pathTag(path)` | the tag every kept response carries for its path, `alxia:path:<path>`: what `invalidate(path)` deletes |
 | `MemoryCacheStore` | the in-process store: least recently used |
