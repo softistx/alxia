@@ -200,9 +200,9 @@ const Statuses = zq.array(z.enum(['open', 'paid', 'shipped']));
 
 A refused list reports the first issue of what was refused: the one value
 given, or the list. Given once (`?ids=x`), the issue is on the key: path
-`["ids"]`, `Expected a number`. Given more than once (`?ids=1&ids=x`), it
-is at the item's index, path `["ids", 1]`, when the item is a plain
-schema such as `zq.int()`, `zq.number()` or `z.string()`. For an item that
+`["ids"]`, `Expected a number`. Given more than once (`?ids=1&ids=x`), each
+refused item is its own issue at its index, path `["ids", 1]`, when the
+item is a plain schema such as `zq.int()`, `zq.number()` or `z.string()`. For an item that
 is itself a union or an object — `z.enum(…)`, `zq.date()`, `zq.boolean()`,
 `z.object(…)` — the issue is `invalid_union` on the key, with the item's
 message: its index, or its inner path, is not kept.

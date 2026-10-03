@@ -40,8 +40,8 @@ Nothing scheduled yet.
 - **Refusals that say what was expected.** A refused value reports
   `Expected a number`, `Expected an integer`, `Expected true, false, 1 or 0`,
   `Expected an ISO 8601 date or date-time` or `Expected JSON`, and a
-  refused list reports the first issue of what was refused — the value
-  given, or the list — never Zod's bare `Invalid input`.
+  refused list reports what was refused — the value given, or each refused
+  item at its index — never Zod's bare `Invalid input`.
 - **Lists of one.** `zq.array(item)` reads `?tag=a` as `['a']` and
   `?tag=a&tag=b` as `['a', 'b']`, where `z.array` refuses the first.
 - **JSON in the query string.** `zq.json(schema)` reads a filter sent as
