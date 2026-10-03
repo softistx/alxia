@@ -101,11 +101,16 @@ function wanted(
 				operation,
 			])
 		: Object.entries(operations);
-	return named.map(([name, operation]) => ({
-		method: operation.method,
-		path: joinPath(prefix, operation.path),
-		name,
-	}));
+	return named.map(([name, operation]) => {
+		const path = joinPath(prefix, operation.path);
+		try {
+			shapeOf(path);
+		} catch (error) {
+			// No route may be declared there: say so, named by the check.
+			throw new TypeError(`${check}(): ${(error as Error).message}`);
+		}
+		return { method: operation.method, path, name };
+	});
 }
 
 /** The operations no route serves. `HEAD` is served by the `GET` route. */

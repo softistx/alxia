@@ -81,7 +81,7 @@ schema.
 
 | export | |
 | --- | --- |
-| `implemented(app, operations, options?)`, `ImplementedOptions` | throws a `TypeError` listing each operation with no route. `prefix` |
+| `implemented(app, operations, options?)`, `ImplementedOptions` | throws a `TypeError` listing each operation with no route, or one with the core's reason for an operation path no route may be declared at. `prefix` |
 | `exactly(app, operations, options?)`, `ExactlyOptions` | the same, and each route no operation declares. `prefix`, `exclude` |
 | `Operations` | what both take: an object of core's `RouteOperation`, or a list of them |
 

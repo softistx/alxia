@@ -364,7 +364,10 @@ export const getPet = {
 ## Building the app
 
 These are `TypeError`s thrown when a route is declared, so the app fails at
-startup, not on a request.
+startup, not on a request. The four about a path's syntax are also thrown
+by `shapeOf(path)`, and so by a tool that calls it: `@alxia/openapi-routes`'
+`implemented` and `exactly` throw them for an operation path no route may
+be declared at, after their own name (`implemented(): …`).
 
 ### `The route path "…" must start with "/"`
 

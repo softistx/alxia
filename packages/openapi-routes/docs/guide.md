@@ -71,7 +71,10 @@ it, not OpenAPI's `/pets/{petId}`: an operation written with braces matches
 no route.
 
 Both return nothing when the check passes, and throw a `TypeError` when it
-does not, listing everything that is wrong at once.
+does not, listing everything that is wrong at once. An operation path no
+route may be declared at — `/pets/:pet-id`, `/a/*/b` — is the exception: it
+throws at once, with the core's reason for that path, since no route
+could serve it ([troubleshooting](troubleshooting.md#typeerror-implemented---is-not-a-parameter-name)).
 
 ## `implemented`
 

@@ -194,7 +194,9 @@ describe('exactly', () => {
 	test('an operation path no route may be declared at throws, as the core does', () => {
 		const bad = { method: 'GET', path: '/pets/:pet-id' } as const;
 		expect(() => implemented(alxia(), [bad])).toThrow(
-			new TypeError('"/pets/:pet-id": ":pet-id" is not a parameter name'),
+			new TypeError(
+				'implemented(): "/pets/:pet-id": ":pet-id" is not a parameter name',
+			),
 		);
 	});
 
