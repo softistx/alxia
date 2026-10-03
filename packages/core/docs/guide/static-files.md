@@ -189,8 +189,16 @@ under `development`. Because Bun serves it itself:
 - it is not in the app's type, so a client does not call it.
 
 A page of a plugin app is mounted under the prefix of the app that uses it.
-A path served twice — two pages, or a page where a route is already
-declared — throws `page(): /dashboard is already served`.
+A path served twice — or two paths of the same shape, `/u/:id` and
+`/u/:name` — throws, in either order, and through a group or a plugin too:
+
+- two pages, or a page where a route is already declared, throw
+  `page(): /dashboard is already served`;
+- a route or a socket where a page is already declared throws
+  `GET /dashboard is already served by a page` (`WS …` for a socket).
+
+A page at `/dashboard` beside a route at `/:id` is no conflict: Bun serves
+the page at `/dashboard`, and the route every other path.
 
 ## See also
 

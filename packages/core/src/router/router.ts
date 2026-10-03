@@ -115,6 +115,11 @@ export class Router<Value> {
 		})();
 	}
 
+	/** Whether a path of the same shape as `path` is declared: one matching the same requests. */
+	hasShape(path: string): boolean {
+		return this.#shapes.has(compilePath(path).shape);
+	}
+
 	/** The methods declared at `path`, exactly as it was declared. */
 	methodsAt(path: string): ReadonlyMap<string, Value> | undefined {
 		return this.#paths.get(path)?.methods;
