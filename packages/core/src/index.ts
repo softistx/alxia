@@ -139,10 +139,13 @@ export type {
 } from './static/types';
 export type { Jsonify, Simplify } from './types/json';
 export type {
+	CheckedPath,
 	JoinPath,
+	PathAt,
 	PathParamName,
 	PathParams,
 	RoutePath,
+	StaticPath,
 } from './types/path';
 export type {
 	ClientErrorStatus,

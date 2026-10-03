@@ -8,7 +8,7 @@ import type {
 	StaticOptions,
 	StaticReply,
 } from '../static/types';
-import type { JoinPath, PathAt, RoutePath } from '../types/path';
+import type { JoinPath, PathAt, RoutePath, StaticPath } from '../types/path';
 import type {
 	SocketContext,
 	SocketEntryOf,
@@ -61,9 +61,6 @@ import type {
 	RouteSchema,
 	ThenShortcuts,
 } from './types';
-
-/** The route a static directory is served at: its path, then a wildcard. */
-type StaticPath<Path extends string> = Path extends '/' ? '/*' : `${Path}/*`;
 
 /** The routes of a plugin, under the prefix of the app it is used by. */
 type Prefixed<Prefix extends string, Routes, Shortcuts> = {

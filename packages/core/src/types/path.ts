@@ -27,6 +27,11 @@ export type PathParams<Path extends string> = {
 /** A path a route may be declared at: absolute. */
 export type RoutePath = `/${string}`;
 
+/** The route `static(path, …)` declares: `path`, then a wildcard. */
+export type StaticPath<Path extends string> = Path extends '/'
+	? '/*'
+	: `${Path}/*`;
+
 /**
  * `Path` when a route may be declared there, else the message the app
  * would throw when it is declared, as `Invalid path: …`. A `string`, or a
@@ -82,34 +87,46 @@ type SegmentsError<
 		: never
 	: SegmentError<Path, Rest, Seen, true>;
 
-type ParamOf<Segment extends string> = Segment extends `:${infer Name}`
-	? Name
-	: never;
+/** The parameter `Segment` declares, if it is readable. */
+type ParamOf<Segment extends string> =
+	IsPattern<Segment> extends true
+		? never
+		: Segment extends `:${infer Name}`
+			? Name
+			: never;
+
+/**
+ * Whether `Segment` holds a `${string}` hole, so stands for many segments:
+ * a record keyed by a pattern has no required key.
+ */
+type IsPattern<Segment extends string> =
+	Record<never, never> extends Record<Segment, 1> ? true : false;
 
 type SegmentError<
 	Path extends string,
 	Segment extends string,
 	Seen extends string,
 	Last extends boolean,
-> = string extends Segment
-	? never
-	: Segment extends '*'
-		? Last extends true
-			? never
-			: `Invalid path: "${Path}": "*" may only end a path`
-		: Segment extends `:${infer Name}`
-			? IsIdentifier<Name> extends false
-				? `Invalid path: "${Path}": ":${Name}" is not a parameter name`
-				: Name extends Seen
-					? `Invalid path: "${Path}" declares ":${Name}" twice`
-					: never
-			: Segment extends `${string}:${string}`
-				? `Invalid path: "${Path}": ":" may only start a segment, as a parameter`
-				: Segment extends `${string}*${string}`
-					? `Invalid path: "${Path}": "*" may only be a whole segment, as a wildcard`
-					: Lowercase<Segment> extends DotSegment
-						? `Invalid path: "${Path}": "${Segment}" is a dot segment, which a request's URL never keeps`
-						: never;
+> =
+	IsPattern<Segment> extends true
+		? never
+		: Segment extends '*'
+			? Last extends true
+				? never
+				: `Invalid path: "${Path}": "*" may only end a path`
+			: Segment extends `:${infer Name}`
+				? IsIdentifier<Name> extends false
+					? `Invalid path: "${Path}": ":${Name}" is not a parameter name`
+					: Name extends Seen
+						? `Invalid path: "${Path}" declares ":${Name}" twice`
+						: never
+				: Segment extends `${string}:${string}`
+					? `Invalid path: "${Path}": ":" may only start a segment, as a parameter`
+					: Segment extends `${string}*${string}`
+						? `Invalid path: "${Path}": "*" may only be a whole segment, as a wildcard`
+						: Lowercase<Segment> extends DotSegment
+							? `Invalid path: "${Path}": "${Segment}" is a dot segment, which a request's URL never keeps`
+							: never;
 
 /** What a URL reads as `.` or `..`, and drops. */
 type DotSegment = '.' | '..' | '%2e' | '.%2e' | '%2e.' | '%2e%2e';

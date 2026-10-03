@@ -194,9 +194,11 @@ app.get('/at/10:30', handler);
 ```
 
 The type reads a path's own syntax — the rows from `'/a/*/b'` to
-`'/a/./b'`; `'users'` fails on `RoutePath` instead — under the app's prefix and the group's. Left to the `TypeError` are a
-literal the URL percent-encodes (`/café`), a path typed `string`, and what
-takes two routes: a shape or a method and path declared twice
+`'/a/./b'`; `'users'` fails on `RoutePath` instead — under the app's
+prefix and the group's. Left to the `TypeError` are a literal the URL
+percent-encodes (`/café`), a path typed `string` or holding a
+`` `${string}` ``, a plugin's routes under the prefix `use` gives them, and
+what takes two routes: a shape or a method and path declared twice
 ([troubleshooting](../troubleshooting.md#argument-of-type--is-not-assignable-to-parameter-of-type-invalid-path-)).
 
 The middle four keep a path one that `Bun.serve` accepts at `listen` and

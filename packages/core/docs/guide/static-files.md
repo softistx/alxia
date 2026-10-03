@@ -25,12 +25,14 @@ static<const Path extends RoutePath>(path: Path, source: FileSource, options?: S
 
 `path/*` is checked as a route path: `static('/assets/*', …)` does not
 compile, its route `/assets/*/*` having a `*` before the end. A function
-forwarding a path generic in `P` names it as the type argument, since the
-check waits for `P` to be known:
+forwarding a path generic in `P` types its parameter with the same check,
+so the path is checked where the function is called:
 
 ```ts
-export function servedAt<const P extends RoutePath>(path: P) {
-	return alxia().static<P>(path as never, './public');
+import { alxia, type PathAt, type RoutePath, type StaticPath } from '@alxia/core';
+
+export function servedAt<const P extends RoutePath>(path: PathAt<'', P, StaticPath<P>>) {
+	return alxia().static(path, './public');
 }
 ```
 

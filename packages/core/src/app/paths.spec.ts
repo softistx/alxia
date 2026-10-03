@@ -305,6 +305,15 @@ describe('the type of a path', () => {
 		expectTypeOf<
 			CheckedPath<`/u/:${string}`>
 		>().toEqualTypeOf<`/u/:${string}`>();
+		expectTypeOf<
+			CheckedPath<`/u/:${string}/b/:id`>
+		>().toEqualTypeOf<`/u/:${string}/b/:id`>();
+		expectTypeOf<
+			CheckedPath<`/a/${string}:x`>
+		>().toEqualTypeOf<`/a/${string}:x`>();
+		expectTypeOf<
+			CheckedPath<`/a/${string}*`>
+		>().toEqualTypeOf<`/a/${string}*`>();
 		const path: RoutePath = '/at/10:30';
 		expect(() => alxia().get(path, ok)).toThrow('may only start a segment');
 	});

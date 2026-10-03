@@ -485,6 +485,10 @@ message names the path alone:
 error TS2345: Argument of type '"/:id"' is not assignable to parameter of type '"Invalid path: \"/:id\" is refused under its prefix: the two declare one parameter twice, or the prefix holds a refused segment"'.
 ```
 
+A plugin given to `use` is not checked under the prefix `use` puts its
+routes at: `alxia({ prefix: '/users/:id' }).use(alxia().get('/:id', …))`
+compiles, then throws `"/users/:id/:id" declares ":id" twice` at startup.
+
 A handler's parameters can then read as `any` on the same call
 (`TS7031`): that goes away with the path's fix.
 
@@ -508,13 +512,23 @@ error TS2345: Argument of type 'P' is not assignable to parameter of type 'PathA
   Type '`/${string}`' is not assignable to type 'PathAt<"", P, StaticPath<P>>'.
 ```
 
-(`PathAt<"", P>` for `get`, `ws` and the others.) Name `P` as the type
-argument; the app still checks the path when the route is declared:
+(`PathAt<"", P>` for `get`, `ws` and the others.) Type the wrapper's
+parameter with the check of the method it forwards to: `PathAt<Prefix, P>`,
+and `PathAt<Prefix, P, StaticPath<P>>` for `static`. The path is then
+checked where the wrapper is called, and the route keeps its literal path:
 
 ```ts
-export function servedAt<const P extends RoutePath>(path: P) {
-	return alxia().static<P>(path as never, './public');
+import { alxia, type PathAt, type RoutePath, type StaticPath } from '@alxia/core';
+
+export function routedAt<const P extends RoutePath>(path: PathAt<'', P>) {
+	return alxia().get(path, ({ reply }) => reply(200, 'x'));
 }
+export function servedAt<const P extends RoutePath>(path: PathAt<'', P, StaticPath<P>>) {
+	return alxia().static(path, './public');
+}
+
+routedAt('/pets/:id'); // routes '/pets/:id'
+routedAt('/at/10:30'); // does not compile: Invalid path: …
 ```
 
 ### `Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`
