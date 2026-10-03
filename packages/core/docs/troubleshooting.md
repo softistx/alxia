@@ -27,6 +27,7 @@ thrown when the app is built, a response body, or a line in the server log.
 - [`GET /…: the handler is missing`](#get--the-handler-is-missing)
 - [`group(): build is missing`](#group-build-is-missing)
 - [`page(): /… is already served`](#page--is-already-served)
+- [`GET /… is already served by a page`](#get--is-already-served-by-a-page)
 
 **Responses**
 
@@ -367,10 +368,27 @@ app.group('/admin', (admin) => admin.derive(requireAdmin).get('/stats', stats));
 ### `page(): /… is already served`
 
 **When:** `page(path, bundle)` names a path that another `page` or a
-route already serves.
+route already serves, or one of the same shape (`/u/:id` where `/u/:name`
+is served), on the app, in a group or in a plugin it uses.
 
 **Fix:** serve the page at its own path, or remove the route. Note that
 `static('/', …)` declares `/*`, not `/`, so it leaves `/` free for a page.
+
+### `GET /… is already served by a page`
+
+**When:** a route — `get`, `post`, any method, or `ws` — is declared at a
+path a `page` already serves, on the app, in a group or in a plugin it
+uses. The message names the method. A path of the same shape counts:
+`/users/:name` where a page serves `/users/:id`.
+
+**Why:** `listen` gives the page that path in Bun's routes, and the page
+then answers every method there, so the route would never be reached.
+
+**Fix:** move the route, or the page:
+
+```ts
+app.page('/dashboard', dashboard).get('/api/dashboard', ({ reply }) => reply(200, stats()));
+```
 
 ## Responses
 

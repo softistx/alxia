@@ -240,6 +240,57 @@ describe('app.file', () => {
 });
 
 describe('app.page', () => {
+	test('a route at a page, or a page at a route through a group, is refused', async () => {
+		const bundle = (await import('../../test/fixtures/page.html')).default;
+		expect(() =>
+			alxia()
+				.page('/x', bundle)
+				.get('/x', ({ reply }) => reply(200, 'x')),
+		).toThrow('GET /x is already served by a page');
+		expect(() =>
+			alxia()
+				.page('/x', bundle)
+				.ws('/x', {}, { message() {} }),
+		).toThrow('WS /x is already served by a page');
+		expect(() =>
+			alxia()
+				.get('/g/x', ({ reply }) => reply(200, 'x'))
+				.group('/g', (g) => g.page('/x', bundle)),
+		).toThrow('page(): /g/x is already served');
+		expect(() =>
+			alxia()
+				.group('/g', (g) => g.page('/x', bundle))
+				.get('/g/x', ({ reply }) => reply(200, 'x')),
+		).toThrow('GET /g/x is already served by a page');
+		expect(() =>
+			alxia()
+				.page('/y/:id', bundle)
+				.get('/y/:name', ({ reply }) => reply(200, 'y')),
+		).toThrow('GET /y/:name is already served by a page');
+		expect(() =>
+			alxia()
+				.get('/a/b/x', ({ reply }) => reply(200, 'x'))
+				.group('/a', (a) => a.group('/b', (b) => b.page('/x', bundle))),
+		).toThrow('page(): /a/b/x is already served');
+		expect(() =>
+			alxia()
+				.page('/x', bundle)
+				.use(alxia().get('/x', ({ reply }) => reply(200, 'x'))),
+		).toThrow('GET /x is already served by a page');
+		// A static path beside a parameter is no conflict: Bun serves the page at /x.
+		expect(() =>
+			alxia()
+				.page('/x', bundle)
+				.get('/:id', ({ reply }) => reply(200, 'id')),
+		).not.toThrow();
+		const plugin = alxia().page('/x', bundle);
+		expect(() =>
+			alxia()
+				.get('/x', ({ reply }) => reply(200, 'x'))
+				.use(plugin),
+		).toThrow('page(): /x is already served');
+	});
+
 	test("Bun's HTML bundle, served by Bun.serve; a path served twice is refused", async () => {
 		const bundle = (await import('../../test/fixtures/page.html')).default;
 		const app = alxia()

@@ -1,6 +1,6 @@
 import type { AnyReply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
-import { Router } from '../router/router';
+import { compilePath, Router } from '../router/router';
 import {
 	type FileOptions,
 	type FileSource,
@@ -368,8 +368,8 @@ export class Alxia<
 
 	#page(path: string, bundle: Bun.HTMLBundle): void {
 		if (
-			this.#runtime.globals.pages.has(path) ||
-			this.#runtime.router.methodsAt(path) !== undefined
+			this.#pageAt(path) !== undefined ||
+			this.#runtime.router.hasShape(path)
 		) {
 			throw new TypeError(`page(): ${path} is already served`);
 		}
@@ -593,7 +593,14 @@ export class Alxia<
 		child.#derive = [...this.#derive];
 		child.#onError = [...this.#onError];
 		child.#runtime = { ...child.#runtime, globals: this.#runtime.globals };
+		const before = new Set(this.#runtime.globals.pages.keys());
 		const built = build(child);
+		// The child checks its pages against its own routes only.
+		for (const path of this.#runtime.globals.pages.keys()) {
+			if (!before.has(path) && this.#runtime.router.hasShape(path)) {
+				throw new TypeError(`page(): ${path} is already served`);
+			}
+		}
 		for (const route of built.routes) this.#register(route);
 		for (const socket of built.sockets) this.#mount(socket);
 		return this;
@@ -760,6 +767,7 @@ export class Alxia<
 	}
 
 	#register(route: RouteDefinition): void {
+		this.#refusePage(route.method, route.path);
 		this.#runtime.router.add(route.method, route.path, {
 			kind: 'http',
 			...route,
@@ -767,7 +775,24 @@ export class Alxia<
 		this.#routes.push(route);
 	}
 
+	/** `listen` serves a page before any route at its path: refuse the route. */
+	#refusePage(method: string, path: string): void {
+		if (this.#pageAt(path) !== undefined) {
+			throw new TypeError(`${method} ${path} is already served by a page`);
+		}
+	}
+
+	/** The page declared at a path of the same shape as `path`. */
+	#pageAt(path: string): string | undefined {
+		const shape = compilePath(path).shape;
+		for (const page of this.#runtime.globals.pages.keys()) {
+			if (compilePath(page).shape === shape) return page;
+		}
+		return undefined;
+	}
+
 	#mount(socket: SocketDefinition): void {
+		this.#refusePage('WS', socket.path);
 		this.#runtime.router.add('WS', socket.path, { kind: 'ws', ...socket });
 		this.#sockets.push(socket);
 	}
