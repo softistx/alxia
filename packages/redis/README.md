@@ -154,6 +154,7 @@ The package's specs run against `$REDIS_URL`, or a `redis-server` on
 | `idempotency(client, options)` | the plugin |
 | `redis(client, { caches? })`, `RedisContextOptions` | the plugin: `redis`, `caches`, `lock` in the context |
 | `IdempotencyOptions`, `IdempotencyErrorBody`, `RedisContext`, `BoundCaches` | its types |
+| `AnyCache` | any cache definition: the constraint of a function generic over the caches it hands to `redis()` |
 
 ## Documentation
 

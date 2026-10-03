@@ -27,7 +27,9 @@ const app = alxia()
 ## The signature
 
 ```ts
-function redis<Caches>(client: RedisClient, options?: RedisContextOptions<Caches>);  // a plugin
+function redis<Caches extends Record<string, AnyCache>>(client: RedisClient, options?: RedisContextOptions<Caches>);  // a plugin
+
+type AnyCache = CacheDefinition<any, z.ZodType>; // any cache definition
 
 interface RedisContextOptions<Caches> {
 	/** `@nxgt/redis` cache definitions, by the name routes read them under. */
@@ -44,7 +46,7 @@ interface RedisContext<Caches> {
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `caches` | `Record<string, CacheDefinition>` | none | each definition, bound to the client once, under `ctx.caches.<name>` |
+| `caches` | `Record<string, AnyCache>` | none | each definition, bound to the client once, under `ctx.caches.<name>` |
 
 | In the context | What it is |
 | --- | --- |
@@ -53,6 +55,21 @@ interface RedisContext<Caches> {
 | `lock(key, work, options?)` | `@nxgt/redis`'s `withLock`: `work` under a lock every process respects |
 
 The caches are bound when `redis(…)` is called, not per request.
+
+A function generic over the caches it hands to `redis()` takes the same
+constraint, `AnyCache`:
+
+```ts
+import { alxia } from '@alxia/core';
+import { type AnyCache, redis } from '@alxia/redis';
+import type { RedisClient } from 'bun';
+
+export function withCaches<const Caches extends Record<string, AnyCache>>(client: RedisClient, caches: Caches) {
+	return alxia()
+		.use(redis(client, { caches }))
+		.get('/caches', ({ caches: bound, reply }) => reply(200, Object.keys(bound)));
+}
+```
 
 ## Caches
 

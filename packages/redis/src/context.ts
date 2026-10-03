@@ -9,7 +9,18 @@ import {
 import type { RedisClient } from 'bun';
 import type { z } from 'zod';
 
-type AnyCache = CacheDefinition<any, z.ZodType>;
+/**
+ * Any `@nxgt/redis` cache definition, whatever its key parameters and
+ * schema: what `redis()`'s `caches` hold. The constraint a function generic
+ * over the caches it hands to `redis()` takes:
+ *
+ * ```ts
+ * function withCaches<const Caches extends Record<string, AnyCache>>(caches: Caches) {
+ *   return alxia().use(redis(client, { caches }));
+ * }
+ * ```
+ */
+export type AnyCache = CacheDefinition<any, z.ZodType>;
 
 /** The caches of `Caches`, each bound to the client. */
 export type BoundCaches<Caches extends Record<string, AnyCache>> = {
