@@ -23,6 +23,7 @@ message are under [Traps](#traps), by symptom.
 - [`TypeError: client(): give it a URL, or an app with a fetch`](#typeerror-client-give-it-a-url-or-an-app-with-a-fetch)
 - [`TypeError: /…: the parameter :… is missing`](#typeerror--the-parameter--is-missing)
 - [`TypeError: client(app).ws(): a socket needs a server. Give the client its URL.`](#typeerror-clientappws-a-socket-needs-a-server-give-the-client-its-url)
+- [`TypeError: ws(…): outside Bun, a WebSocket cannot send headers or cookies; …`](#typeerror-ws-outside-bun-a-websocket-cannot-send-headers-or-cookies-a-browser-sends-its-own-cookies-for-the-sockets-host-and-anything-else-goes-in-the-query)
 - [`TypeError: Invalid URL`](#typeerror-invalid-url)
 - [`TypeError: Unable to connect. Is the computer able to access the url?`](#typeerror-unable-to-connect-is-the-computer-able-to-access-the-url)
 - [`AbortError: The operation was aborted.`](#aborterror-the-operation-was-aborted)
@@ -31,14 +32,11 @@ message are under [Traps](#traps), by symptom.
 - [`SyntaxError: JSON Parse error: Unexpected identifier "…"` in an event stream](#syntaxerror-json-parse-error-unexpected-identifier--in-an-event-stream)
 - [`Error: The socket to ws://…/… failed`](#error-the-socket-to-ws-failed)
 - [`TypeError: Body already used`](#typeerror-body-already-used)
-- [`TypeError: Invalid state: Controller is already closed`](#typeerror-invalid-state-controller-is-already-closed)
 
 **Traps**
 
 - [A status the type does not list](#a-status-the-type-does-not-list)
-- [A socket whose route reads headers never opens](#a-socket-whose-route-reads-headers-never-opens)
 - [A socket message never arrives](#a-socket-message-never-arrives)
-- [A timeout never fires in a test](#a-timeout-never-fires-in-a-test)
 - [Cookies are not sent from a browser](#cookies-are-not-sent-from-a-browser)
 - [The browser bundle holds the server's code](#the-browser-bundle-holds-the-servers-code)
 - [A query or param field accepts anything](#a-query-or-param-field-accepts-anything)
@@ -296,6 +294,29 @@ const server = app.listen({ port: 0 });
 const socket = client<typeof app>(server.url).ws('/echo/:room', { params: { room: 'lobby' } });
 ```
 
+### `TypeError: ws(…): outside Bun, a WebSocket cannot send headers or cookies; a browser sends its own cookies for the socket's host, and anything else goes in the query`
+
+For example `TypeError: ws(/whoami): outside Bun, a WebSocket cannot send headers or cookies; …`,
+with the socket's path, params filled in.
+
+**When:** calling `api.ws()` outside Bun — in a browser — with typed
+`headers` or `cookies`. The same call works under Bun. Node and Deno are
+treated the same way: the client sends headers only where it has been
+tested to.
+
+**Why:** a browser's `WebSocket` cannot send request headers, and the route
+reads them, so the server would refuse the upgrade. The client throws
+rather than open a socket that fails. Under Bun, whose `WebSocket` takes
+headers, they go with the upgrade.
+
+**Fix:** let the browser send its own cookies for the socket's host, which
+it does on the upgrade without being asked, and put anything else — a token, a tenant —
+in the route's query:
+
+```ts
+const socket = api.ws('/room', { query: { token } }); // the route's query schema reads `token`
+```
+
 ### `TypeError: Invalid URL`
 
 **When:** every call, from a client whose base URL is relative — `'/api'`,
@@ -333,7 +354,7 @@ try {
 
 ### `AbortError: The operation was aborted.`
 
-**When:** a call whose `signal` was aborted before the response arrived.
+**When:** a call whose `signal` was aborted before the response arrived — over HTTP, or in process with `client(app)`.
 
 **Why:** an aborted call rejects with the signal's reason; it does not
 resolve to a result.
@@ -414,18 +435,6 @@ resolved.
 
 **Fix:** use `result.data`; keep `response` for its headers.
 
-### `TypeError: Invalid state: Controller is already closed`
-
-**When:** printed by the server — or by the test, in process — after a
-`for await` over an event stream was left early with `break` or `return`.
-
-**Why:** the client cancels the stream, and the server's stream still
-tries to send the event it was producing. The server's generator is closed
-all the same, and its `finally` runs; nothing else is affected.
-
-**Fix:** none is needed on the client. Ending the stream from the server,
-when the generator returns, prints nothing.
-
 ## Traps
 
 ### A status the type does not list
@@ -449,22 +458,6 @@ const api = client<App>('https://example.com/api'); // a proxy serves the app un
 const moved = await api.get('/old', { init: { redirect: 'manual' } });
 ```
 
-### A socket whose route reads headers never opens
-
-**Symptom:** `api.ws()` with typed `headers` or `cookies` compiles, but the
-socket fails: `opened` rejects with
-[`The socket to … failed`](#error-the-socket-to-ws-failed).
-
-**Why:** a `WebSocket` cannot send request headers, so the client drops
-them, and the server refuses the upgrade for want of them.
-
-**Fix:** carry what the upgrade needs in the query, or, in a browser, in
-the origin's cookies, which the browser sends itself:
-
-```ts
-const socket = api.ws('/room', { query: { token } });
-```
-
 ### A socket message never arrives
 
 **Symptom:** the server sent a message — a welcome on open, an answer —
@@ -481,16 +474,6 @@ const socket = api.ws('/echo/:room', { params: { room: 'lobby' } });
 socket.on(handle);
 socket.send({ text: 'hi' });
 ```
-
-### A timeout never fires in a test
-
-**Symptom:** a call with `signal: AbortSignal.timeout(…)` resolves after
-the timeout, in a test using `client(app)`.
-
-**Why:** in process, the client calls `app.fetch`, which does not read the
-request's signal: the handler runs to the end.
-
-**Fix:** test cancellation over HTTP ([Testing](guide/testing.md#over-http)).
 
 ### Cookies are not sent from a browser
 

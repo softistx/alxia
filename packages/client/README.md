@@ -69,7 +69,10 @@ socket.close();
 ```
 
 Messages are JSON both ways; a send before the socket opens is queued. A
-socket needs a server: give the client its URL.
+socket needs a server: give the client its URL. Under Bun, the call's typed
+`headers` and `cookies` go with the upgrade; outside Bun (a browser, Node,
+Deno) a socket cannot send them, so there `api.ws()` throws on them, and what the upgrade needs goes in
+the query, beside the site's own cookies.
 
 ## Options
 
@@ -91,7 +94,7 @@ JSON.
 | export | |
 | --- | --- |
 | `client<App>(target, options?)` | the client of an app: a base URL, or anything with a `fetch(request)` |
-| `ClientOptions` | its options: `headers`, sent with every call, and `fetch` |
+| `ClientOptions` | its options: `headers`, sent with every call (a socket: an object, under Bun only), and `fetch` |
 | `Target` | where a client sends its calls: a base URL, or a fetch handler such as an app |
 | `fillPath(path, params)` | a path with its parameters encoded in |
 | `readEvents(body)` | a `text/event-stream` body as the values of its events |

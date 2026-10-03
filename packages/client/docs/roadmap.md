@@ -44,10 +44,13 @@ Nothing scheduled yet.
   response and typed as it crossed the wire.
 - **Server-sent events as an async iterable.** A route that streams
   `eventStream` events resolves to an `AsyncIterable` of them, typed by
-  their schema; `readEvents` reads any `text/event-stream` body.
+  their schema; `readEvents` reads any `text/event-stream` body. Leaving
+  the loop early closes the server's generator, quietly.
 - **Typed WebSockets.** `api.ws()` opens a socket whose `send`, `on` and
   `for await` are typed by the route, JSON both ways, with sends queued
-  until it opens.
+  until it opens. Under Bun, its typed headers and cookies go with the
+  upgrade; in a browser, which cannot send them, passing them is an error
+  rather than a refused upgrade.
 - **Testing without a server.** `client(app)` calls the app's `fetch` in
   process; headers for every call, a custom `fetch`, and an abort signal
-  per call are options.
+  per call are options. An aborted call rejects, in process as over HTTP.

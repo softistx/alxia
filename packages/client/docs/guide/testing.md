@@ -34,7 +34,7 @@ What differs from a server:
 | | In process | Over HTTP |
 | --- | --- | --- |
 | request URL | `http://alxia.local/<path>` | the base URL |
-| `signal`, `AbortSignal.timeout` | not read: the call runs to the end | aborts the call |
+| `signal`, `AbortSignal.timeout` | rejects the call, as `fetch` does; the handler runs on to its end | aborts the call |
 | a redirect | the `302` itself | followed by `fetch`, unless `init: { redirect: 'manual' }` |
 | `api.ws()` | throws: a socket needs a server | opens the socket |
 | `ClientOptions.fetch` | ignored | the `fetch` called |
