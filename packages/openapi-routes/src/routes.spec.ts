@@ -1,12 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { alxia, eventStream } from '@alxia/core';
 import { z } from 'zod';
-import {
-	exactly,
-	implemented,
-	matchesSpec,
-	type Operations,
-} from './routes';
+import { exactly, implemented, matchesSpec, type Operations } from './routes';
 
 // alxia.ts as `@nxgt/openapi-codegen` writes it with `alxia: true`.
 const zPet = z.object({ id: z.number(), name: z.string() });
