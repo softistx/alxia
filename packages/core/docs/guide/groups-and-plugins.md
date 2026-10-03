@@ -216,6 +216,8 @@ of any shape.
 
 ## See also
 
+- [Middleware: which way to use](middleware.md): every way to run code
+  around routes, side by side, and the order a request runs them in.
 - [Writing a plugin](writing-a-plugin.md): choosing between an app, a
   `Plugin` function and `definePlugin`, with an example of each.
 - [Hooks](hooks.md): what each hook does.
