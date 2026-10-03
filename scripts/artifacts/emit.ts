@@ -75,7 +75,8 @@ const TSCONFIG = {
 		outDir: 'out',
 		skipLibCheck: true,
 	},
-	include: ['*.ts'],
+	include: ['**/*.ts'],
+	exclude: ['out'],
 };
 
 function indent(text: string): string {

@@ -1,7 +1,15 @@
 // Every builder an app can be made of, behind exported functions whose
 // return types are inferred: a declaration build must be able to name each
 // one through `@alxia/core` alone (TS2883 otherwise).
-import { alxia, eventStream, problem } from '@alxia/core';
+import {
+	alxia,
+	type ClientErrorStatus,
+	definePlugin,
+	eventStream,
+	problem,
+	type RoutePath,
+	type StandardSchemaV1,
+} from '@alxia/core';
 
 const Ping = {
 	'~standard': {
@@ -60,4 +68,46 @@ export function streaming() {
 			})(),
 		),
 	);
+}
+
+// The rest of the builders, and the generic forms most likely to keep an
+// alias the declaration then has to name.
+export function serving() {
+	return alxia()
+		.static('/assets', './public')
+		.file('/favicon.ico', './favicon.ico')
+		.decorate({ db: 'db' })
+		.onError((_error, { reply }) => reply(500, { error: 'internal' as const }))
+		.ws(
+			'/rooms/:room',
+			{ message: Ping, send: Ping },
+			{
+				message: (socket, ping) => socket.send(ping),
+			},
+		);
+}
+
+const tenant = definePlugin<{ user: string }>()((app) =>
+	app.derive(({ user }) => ({ tenant: user.length })),
+);
+
+export function plugged() {
+	return alxia()
+		.derive(() => ({ user: 'u' }))
+		.use(tenant)
+		.get('/', ({ tenant: t, reply }) => reply(200, t));
+}
+
+export function servedAt<const P extends RoutePath>(path: P) {
+	return alxia().static(path, './public');
+}
+
+export function typedBy<R extends StandardSchemaV1>(schema: R) {
+	return alxia().get('/', { response: { 200: schema } }, ({ reply }) =>
+		reply(200, {} as never),
+	);
+}
+
+export function refusedWith<S extends ClientErrorStatus>(status: S) {
+	return alxia().onRefusal(() => problem({ status }));
 }
