@@ -172,12 +172,10 @@ as in [A server file of your own](#a-server-file-of-your-own).
 entry as its input:
 
 - **`build/server/index.js`** is the alxia app, React Router's build inside
-  it, in one file. Its default export is the app; the plugin adds React
-  Router's own exports beside it, so the file is a server build too, and
-  React Router's `prerender` reads it. Importing it starts nothing. Do not
-  export a name of a server build from the entry yourself — `entry`,
-  `routes`, `assets`, `basename`, `future`, `publicPath`, `ssr` and the
-  rest — or it hides React Router's.
+  it, in one file. Its default export is the entry's; beside it are React
+  Router's own exports, so the file is a server build too, and React
+  Router's `prerender` reads it. The entry's other exports, `base` and the
+  rest, stay out of it. Importing it starts nothing.
 - **`build/server/serve.js`**, written by the plugin, imports it and calls
   `listen` with `PORT` (3000 by default) and `HOST` (`0.0.0.0`). It prints
   `alxia listening on <url>`, and on `SIGINT` or `SIGTERM` it stops the app,

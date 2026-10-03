@@ -10,8 +10,8 @@ export function serveScript(entry: string): string {
 import app from './${entry}';
 
 const server = app.listen({
-	port: Number(process.env.PORT ?? 3000),
-	hostname: process.env.HOST ?? '0.0.0.0',
+	port: Number(process.env.PORT || 3000),
+	hostname: process.env.HOST || '0.0.0.0',
 });
 console.log(\`alxia listening on \${server.url}\`);
 

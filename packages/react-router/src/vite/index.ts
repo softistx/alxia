@@ -30,6 +30,10 @@ const NAME = 'alxia-react-router';
 /** React Router's server build, as its Vite plugin serves it. */
 const SERVER_BUILD = 'virtual:react-router/server-build';
 
+/** The server build's input: the entry's app, and React Router's build. */
+const SERVER = 'virtual:alxia-react-router/server';
+const RESOLVED_SERVER = `\0${SERVER}`;
+
 /**
  * The Vite plugin that makes an alxia app the server of a React Router app.
  * Put it **before** React Router's own:
@@ -52,40 +56,49 @@ const SERVER_BUILD = 'virtual:react-router/server-build';
 export function alxiaServer(options: AlxiaServerOptions = {}): Plugin {
 	const entry = options.entry ?? 'app/server.ts';
 	let root = process.cwd();
-	let building = false;
 	return {
 		name: NAME,
 		config(config, env) {
-			building = env.command === 'build';
-			if (!building) return;
-			return {
-				environments: {
-					ssr: {
-						build: {
+			root = resolve(config.root ?? root);
+			if (env.command !== 'build') return;
+			// One file, `build/server/index.js`: the entry and React Router's
+			// build together, so the entry's `import.meta.url` is beside
+			// `build/client`, whatever the two share. Rolldown, under Vite 8,
+			// names the option otherwise.
+			// Vite 7's types know neither `rolldownVersion` nor `rolldownOptions`.
+			const meta = this.meta as { readonly rolldownVersion?: string };
+			const bundler =
+				meta.rolldownVersion === undefined
+					? {
 							rollupOptions: {
-								input: entryPath(resolve(config.root ?? root), entry),
-								// One file, `build/server/index.js`: the entry and React
-								// Router's build together, so the entry's `import.meta.url`
-								// is beside `build/client`, whatever the two share.
+								input: SERVER,
 								output: { inlineDynamicImports: true },
 							},
-						},
-					},
-				},
-			};
+						}
+					: {
+							rolldownOptions: {
+								input: SERVER,
+								output: { codeSplitting: false },
+							},
+						};
+			return { environments: { ssr: { build: bundler as never } } };
 		},
 		configResolved(config) {
 			root = config.root;
 		},
-		transform(code, id) {
-			// The server build is the entry, and React Router reads it back to
-			// prerender: it must also export what a server build exports.
-			if (!building || this.environment.name !== 'ssr') return;
-			if (id !== entryPath(root, entry)) return;
-			return {
-				code: `${code}\nexport * from '${SERVER_BUILD}';\n`,
-				map: null,
-			};
+		resolveId(id) {
+			return id === SERVER ? RESOLVED_SERVER : undefined;
+		},
+		load(id) {
+			// The server build's input: the app as its default export, and what a
+			// server build exports beside it, which React Router reads back to
+			// prerender. The entry's other exports stay out of it.
+			if (id !== RESOLVED_SERVER) return;
+			return [
+				`export { default } from ${JSON.stringify(entryPath(root, entry))};`,
+				`export * from '${SERVER_BUILD}';`,
+				'',
+			].join('\n');
 		},
 		generateBundle(_options, bundle) {
 			if (this.environment.name !== 'ssr') return;

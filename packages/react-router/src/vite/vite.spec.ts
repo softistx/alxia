@@ -192,6 +192,34 @@ describe('react-router dev', () => {
 			await other.server.close();
 		}
 	});
+
+	test('an ssr environment that runs elsewhere is a 500 saying so', async () => {
+		const config = join(fixture.root, 'vite.elsewhere.config.ts');
+		await Bun.write(
+			config,
+			(await Bun.file(join(fixture.root, 'vite.alxia.config.ts')).text())
+				.replace(
+					"import { defineConfig } from 'vite';",
+					"import { DevEnvironment, defineConfig } from 'vite';",
+				)
+				.replace(
+					'plugins: [',
+					// An environment with no module runner in this process, as a
+					// worker runtime's would be.
+					'environments: { ssr: { dev: { createEnvironment: (name, config) => new DevEnvironment(name, config, { hot: false }) } } },\n\tplugins: [',
+				),
+		);
+		const other = await devServer(fixture.root, { configFile: config });
+		try {
+			const response = await fetch(`${other.base}/`, { headers: browser });
+			expect(response.status).toBe(500);
+			expect(await response.text()).toContain(
+				"Vite's ssr environment does not run modules in this process",
+			);
+		} finally {
+			await other.server.close();
+		}
+	});
 });
 
 describe('react-router build', () => {
@@ -203,6 +231,13 @@ describe('react-router build', () => {
 		await Bun.write(
 			join(fixture.root, 'react-router.config.ts'),
 			"import type { Config } from '@react-router/dev/config';\n\nexport default { ssr: true, prerender: ['/login'] } satisfies Config;\n",
+		);
+		// A name a server build exports, exported by the entry: it stays the
+		// entry's, out of the build.
+		const entry = join(fixture.root, 'app', 'server.ts');
+		await Bun.write(
+			entry,
+			`${await Bun.file(entry).text()}\nexport const routes = 'not a server build';\n`,
 		);
 		const result =
 			await $`${process.execPath} --bun react-router build --config vite.alxia.config.ts`
