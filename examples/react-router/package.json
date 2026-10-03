@@ -5,10 +5,12 @@
   "scripts": {
     "build": "react-router build",
     "dev": "react-router dev",
-    "start": "react-router-serve ./build/server/index.js",
+    "start": "bun build/server/index.js",
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
+    "@alxia/core": "workspace:^",
+    "@alxia/react-router": "workspace:^",
     "@react-router/node": "^8.4.0",
     "@react-router/serve": "^8.4.0",
     "isbot": "^5.1.36",
