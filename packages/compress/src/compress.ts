@@ -1,6 +1,7 @@
 import { Duplex } from 'node:stream';
 import { constants, createBrotliCompress } from 'node:zlib';
 import { type Plugin, vary, withHeaders } from '@alxia/core';
+import { BROTLI_QUALITY, flushing } from './flushing';
 
 export type Encoding = 'zstd' | 'br' | 'gzip' | 'deflate';
 
@@ -13,21 +14,16 @@ export interface CompressOptions {
 	readonly compressible?: (type: string) => boolean;
 }
 
-/**
- * zlib's default, 11, is meant for compressing once ahead of time: on a
- * response compressed per request it costs many times gzip's CPU for a few
- * percent. 4 is still smaller than gzip's default, at about its speed.
- */
-const BROTLI_QUALITY = 4;
-
 const COMPRESSIBLE =
 	/^(text\/(?!event-stream)|application\/(.+\+)?(json|javascript|xml)|image\/svg\+xml)/i;
 
 /**
  * Compression, as a plugin: each response worth it is streamed through the
  * best encoding both sides accept — zstd, Brotli, gzip or deflate — with
- * Bun's and Node's own codecs. An event stream is never compressed: it
- * would wait for a block to fill.
+ * Bun's and Node's own codecs. A body with no `Content-Length` is flushed
+ * as it comes, so a streamed page's shell leaves before its stream ends. An
+ * event stream is left alone by default: `compressible` can opt it in, and
+ * each event is then flushed in the same way.
  */
 export function compress(options: CompressOptions = {}): Plugin {
 	const encodings = options.encodings ?? ['zstd', 'br', 'gzip', 'deflate'];
@@ -69,7 +65,14 @@ export function compress(options: CompressOptions = {}): Plugin {
 			const etag = headers.get('etag');
 			if (etag !== null && !etag.startsWith('W/'))
 				headers.set('etag', `W/${etag}`);
-			return new Response(response.body.pipeThrough(compressor(encoding)), {
+			// A body with no length is a stream: flushed as it comes, so a
+			// streamed page or an event leaves at once. One with a length is
+			// compressed whole, which compresses better.
+			const body =
+				length === null
+					? flushing(response.body, encoding)
+					: response.body.pipeThrough(compressor(encoding));
+			return new Response(body, {
 				status: response.status,
 				statusText: response.statusText,
 				headers,

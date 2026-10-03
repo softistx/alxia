@@ -82,7 +82,7 @@ graphql(app, {
 
 - **Subscriptions** are served over server-sent events, Yoga's default:
   `async *subscribe` in a resolver, `Accept: text/event-stream` on the
-  request. `@alxia/compress` never compresses an event stream.
+  request. `@alxia/compress` leaves an event stream alone by default.
 - **An IDE** answers a `GET` from a browser at the endpoint, with a
   `Content-Security-Policy` that lets it load — `@alxia/secure-headers`
   keeps it. `ide` chooses which:

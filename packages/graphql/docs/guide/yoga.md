@@ -194,8 +194,9 @@ process; across several, give it an event target backed by a broker, as
 [Yoga's subscriptions guide](https://the-guild.dev/graphql/yoga-server/docs/features/subscriptions)
 describes.
 
-`@alxia/compress` never compresses a `text/event-stream`, so results are
-sent as they are produced.
+`@alxia/compress` leaves a `text/event-stream` alone by default, so results
+are sent as they are produced. A `compressible` that lets event streams in
+still sends each result at once: a streamed body is flushed as it comes.
 
 ## CORS
 
