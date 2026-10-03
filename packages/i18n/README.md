@@ -37,6 +37,37 @@ app.listen(3000);
 - **`@nxgt/i18n`'s shared keys** — `errors.not-found`, `zod.*` — are yours by
   spreading its `resources` into your catalogues.
 
+## Reading the app's context
+
+Annotate `resolve`'s parameter to speak the language a signed-in user saved.
+The plugin then requires what it reads: an app that does not give `user`
+before it cannot use it.
+
+```ts
+import { alxia, type BaseContext } from '@alxia/core';
+import { createI18n } from '@alxia/i18n';
+
+const en = { home: { title: 'Welcome' } };
+const fr = { home: { title: 'Bienvenue' } };
+
+const auth = alxia().derive(({ request }) => ({
+	user: request.headers.has('authorization') ? { language: 'fr' } : null, // your sign-in
+}));
+
+const byUser = createI18n({
+	resources: { en, fr },
+	fallback: 'en',
+	order: ['query'],
+	resolve: ({ user }: BaseContext & { user: { language: string } | null }) => user?.language,
+});
+
+alxia().use(auth).use(byUser); // auth derives user
+alxia().use(byUser); // a compile error: this app gives no `user`
+```
+
+Unannotated, `resolve` reads the request alone and the plugin requires
+nothing; annotated `any`, the plugin is refused on every app.
+
 ## Anywhere
 
 ```ts
@@ -68,11 +99,11 @@ A response in the request's language varies by what decided it: give
 | export | |
 | --- | --- |
 | `createI18n({ resources, fallback, …languageOptions })` | the plugin — routes after it read `t` and `language` — with `t()`, `language()` and `supported` |
-| `I18nOptions` | its options: `resources`, `fallback`, and every `@alxia/language` option but `supported` |
+| `I18nOptions` | its options: `resources`, `fallback`, and every `@alxia/language` option but `supported`; `resolve` may be annotated to read the app's context |
 | `KeyOf<Catalogue>`, `Translate<Key>`, `Catalogues`, `I18nContext<Key>` | its types |
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/i18n/docs): the catalogues and every option, what the routes read, ICU messages and typed keys, `t()` outside a route, and `@nxgt/i18n`'s own `translate`.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/i18n/docs): the catalogues and every option, reading what an earlier plugin added, what the routes read, ICU messages and typed keys, `t()` outside a route, and `@nxgt/i18n`'s own `translate`.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/troubleshooting.md): an error, a key shown instead of a message, or a response in the wrong language, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/roadmap.md): what is coming, and what is not planned.

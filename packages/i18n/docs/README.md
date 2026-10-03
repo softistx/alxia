@@ -8,6 +8,6 @@ response shows a key or the wrong language.
 
 | Page | Read it when |
 | --- | --- |
-| [Guide](guide.md) | writing the catalogues, choosing where the language is read from, typing a function that translates, translating in a service or an error handler, caching the responses, or testing them |
-| [Troubleshooting](troubleshooting.md) | `createI18n()` threw at start-up, `tsc` refused a key or an option, the log shows an ICU error, or a response shows a key or the wrong language |
+| [Guide](guide.md) | writing the catalogues, choosing where the language is read from, reading a user's saved language from an earlier plugin, typing a function that translates, translating in a service or an error handler, caching the responses, or testing them |
+| [Troubleshooting](troubleshooting.md) | `createI18n()` threw at start-up, `tsc` refused a key, an option or `use(i18n)`, the log shows an ICU error, or a response shows a key or the wrong language |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |
