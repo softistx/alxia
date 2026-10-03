@@ -118,7 +118,8 @@ An operation is served by a route of the same method and path:
 
 - **The path's shape.** A parameter's name does not count:
   `app.get('/pets/:id', …)` serves the operation `GET /pets/:petId`, since
-  the router sends them the same requests. As in the router, a parameter
+  the router sends them the same requests. Both are compared by
+  `shapeOf` from `@alxia/core`, the function the router uses itself. As in the router, a parameter
   is a whole `:name` segment: `/at/10:30` is a literal path, and does not
   serve `GET /at/10:45`. The route's handler still reads
   `params.id`, not `params.petId`; declaring it with
@@ -141,7 +142,8 @@ keep in step.
 `app.routes` holds full paths, so an app made with `alxia({ prefix: '/api' })`
 serves `api.getPet` at `GET /api/pets/:petId`. The operations are written
 without it, as the document's paths are. Give the prefix, and each operation
-is looked up under it, as the core joins them (`/` under `/api` is `/api`):
+is looked up under it, joined by the core's own `joinPath` (`/` under `/api`
+is `/api`):
 
 ```ts
 const app = alxia({ prefix: '/api' }).route(api.getPet, getPet);

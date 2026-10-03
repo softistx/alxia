@@ -71,6 +71,7 @@ export {
 	type Shortcuts,
 } from './reply/reply';
 export type { BodyParser } from './request/read';
+export { joinPath, shapeOf } from './router/paths';
 export type {
 	InferInput,
 	InferOutput,

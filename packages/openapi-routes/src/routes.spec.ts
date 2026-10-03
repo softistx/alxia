@@ -191,6 +191,13 @@ describe('exactly', () => {
 		);
 	});
 
+	test('an operation path no route may be declared at throws, as the core does', () => {
+		const bad = { method: 'GET', path: '/pets/:pet-id' } as const;
+		expect(() => implemented(alxia(), [bad])).toThrow(
+			new TypeError('"/pets/:pet-id": ":pet-id" is not a parameter name'),
+		);
+	});
+
 	test('a HEAD operation: its GET route is served, but not declared', () => {
 		const app = alxia().get('/pets', ({ reply }) => reply(200, 'x'));
 		const head = { method: 'HEAD', path: '/pets' } as const;

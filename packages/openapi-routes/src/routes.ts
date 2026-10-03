@@ -1,4 +1,10 @@
-import type { RouteDefinition, RouteOperation, RoutePath } from '@alxia/core';
+import {
+	joinPath,
+	type RouteDefinition,
+	type RouteOperation,
+	type RoutePath,
+	shapeOf,
+} from '@alxia/core';
 
 /**
  * The operations to check: the `operations` object a code generator writes,
@@ -97,7 +103,7 @@ function wanted(
 		: Object.entries(operations);
 	return named.map(([name, operation]) => ({
 		method: operation.method,
-		path: join(prefix, operation.path),
+		path: joinPath(prefix, operation.path),
 		name,
 	}));
 }
@@ -115,23 +121,12 @@ function unrouted(app: Routed, all: readonly Wanted[]): Wanted[] {
 	);
 }
 
-/** As the core joins a prefix: `/` under `/api` is `/api`. Kept twice: see AGENTS.md. */
-function join(prefix: string, path: string): string {
-	if (prefix === '') return path;
-	return path === '/' ? prefix : `${prefix}${path}`;
-}
-
 /**
  * A method and a path's shape: `/pets/:id` serves what `/pets/:petId`
- * declares, as the router matches them alike. Kept twice: see AGENTS.md.
+ * declares, as the router matches them alike.
  */
 function keyOf(route: { readonly method: string; readonly path: string }) {
-	// Only a whole segment is a parameter: `/at/10:30` is a literal path.
-	const shape = route.path
-		.split('/')
-		.map((segment) => (segment.startsWith(':') ? ':' : segment))
-		.join('/');
-	return `${route.method} ${shape}`;
+	return `${route.method} ${shapeOf(route.path)}`;
 }
 
 function noRoute(missing: readonly Wanted[]): string {

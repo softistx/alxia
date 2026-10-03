@@ -67,8 +67,8 @@ implemented(app, operations, { prefix: '/api' });
 
 - by method and path, as `app.routes` holds them: groups, plugins and the
   prefix included
-- by the path's shape: a `GET /pets/:id` serves the `GET /pets/:petId`
-  operation, as the router matches them alike
+- by the path's shape, the core's `shapeOf`: a `GET /pets/:id` serves the
+  `GET /pets/:petId` operation, as the router matches them alike
 - a `HEAD` operation is served by the `GET` route, as the core serves it
 - operations as an object, named by their keys (`operations` of `alxia.ts`),
   or as a list, named by `schema.detail.operationId` when they have one
