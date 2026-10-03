@@ -14,6 +14,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/openapi-routes` | `implemented` and `exactly`: every operation of an OpenAPI document has a route, read from `app.routes` | core |
 | `@alxia/zod` | Zod coercions (`zq`) and the OpenAPI converter | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's hooks and typed context, Yoga's plugins | core, graphql-yoga, graphql |
+| `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its hooks, loaders reading its typed context, the client build's files | core, react-router |
 | `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | function plugins: global hooks | core |
 | `@alxia/rate-limit`, `@alxia/jwt`, `@alxia/logger` | app plugins: typed context, typed replies, routes | core |
 | `@alxia/env` | environment variables through any Standard Schema | — |
@@ -72,6 +73,7 @@ core ◄── client, openapi, openapi-routes, graphql, cors, secure-headers, c
          telemetry, janus, context-storage, cache, language
          i18n ◄── language
          redis ◄── rate-limit, cache (optional peers: the stores' contracts)
+         react-router   (peer: react-router; dev: openapi for its specs)
 zod             (peer: zod; dev: core, client, openapi for its specs)
 env             (standalone)
 ```
@@ -115,6 +117,11 @@ each with a matching key in `exports`.
   `bun run build`, `typecheck` and `test` go through `scripts/workspace.ts`,
   which runs a package only after every sibling it names in any dependency
   field: `bun run --filter` started dependents beside their dependencies.
+- **`@alxia/react-router`'s specs build a React Router app.** They run
+  `react-router build` on `packages/react-router/fixture` (about a second)
+  and import the package by its published name, its `dist/`, not `./index`:
+  the fixture's build imports it so, and a spec holding the source would
+  set an `alxiaContext` its loaders never read.
 - **A build that exits 0 is not evidence the artifact loads.**
   `bun run verify:artifacts` packs, installs and imports every package.
 

@@ -19,6 +19,7 @@
 "@alxia/language": minor
 "@alxia/i18n": minor
 "@alxia/openapi-routes": minor
+"@alxia/react-router": minor
 ---
 
 The first release of alxia: a zero-dependency, type-safe HTTP framework for Bun, its typed client, its OpenAPI document, its Zod and GraphQL Yoga integrations, its plugins, and its adapters to the nxgt suite: telemetry, Redis and janus.
