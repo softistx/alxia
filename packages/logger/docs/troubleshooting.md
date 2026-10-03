@@ -23,6 +23,7 @@ where the plugin sits in the app, and what those options return.
 - [A client chooses the id its requests are logged under](#a-client-chooses-the-id-its-requests-are-logged-under)
 - [The entries have no `ip`, or the proxy's](#the-entries-have-no-ip-or-the-proxys)
 - [`duration` is `0`, or shorter than the request took](#duration-is-0-or-shorter-than-the-request-took)
+- [A streamed request's entry comes long after the request](#a-streamed-requests-entry-comes-long-after-the-request)
 - [A WebSocket connection has no entry](#a-websocket-connection-has-no-entry)
 - [Requests outside the group are logged](#requests-outside-the-group-are-logged)
 - [A skipped path still shows up in the log](#a-skipped-path-still-shows-up-in-the-log)
@@ -163,8 +164,10 @@ than its `duration`.
 `onResponse` hook. An `onRequest` hook declared before the plugin that
 answers on its own (a CORS preflight, a redirect) skips the plugin's, so
 the clock starts at the response: `0`. `onRequest` hooks before the plugin
-are not counted either. And the clock stops when the response is ready, not
-when its body has been sent.
+are not counted either. And for a body of known length, a file included,
+the clock stops when the response is handed to Bun, not when its last byte
+has been sent: only a streamed body, one with no `Content-Length`, is
+timed to its end.
 
 **Fix:** use the plugin first, so it times every other hook:
 
@@ -176,8 +179,29 @@ import { logger } from '@alxia/logger';
 const app = alxia().use(logger()).use(cors());
 ```
 
-A streamed body's own time is not in `duration`; time it in the stream if
-you need it.
+A large file sent to a slow client is the case that stays short: Bun sends
+it with `sendfile`, which the plugin does not wrap. Its `Content-Length`
+tells the client how long it is; the time to send it is the proxy's or the
+client's to measure.
+
+### A streamed request's entry comes long after the request
+
+**When:** the entry of a page streamed as it renders, or of an event
+stream, is written seconds or minutes after the request, or only when the
+client closes the tab.
+
+**Why:** a streamed body is logged once it has ended, so `duration` and
+`outcome` say what the client actually received. An event stream that
+never ends on its own is logged when its client leaves, with `outcome:
+'aborted'`, at `warn`.
+
+**Fix:** none is needed. The time to the response is in `timeToHeaders`.
+To keep an event stream's `warn` out of an alert, filter on its path or on
+`outcome`, or `skip` it:
+
+```ts
+app.use(logger({ skip: (_, url) => url.pathname === '/events' }));
+```
 
 ### A WebSocket connection has no entry
 

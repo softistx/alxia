@@ -86,6 +86,43 @@ is traced too; it only cannot read `span` and `telemetry` from its context.
 A WebSocket upgrade is not traced: `@alxia/core` runs no `around` hook for
 it, since there is no response to wrap.
 
+### A streamed body
+
+A response whose body is a stream of unknown length (a React Router page
+rendered as it goes, an `eventStream` reply, a `ReadableStream` of your
+own) keeps the span open until that body has ended, so the span's
+duration is the time to the last byte. The plugin passes the body through
+a stream of its own, one chunk at a time:
+
+| The body | The span |
+| --- | --- |
+| sent whole | ends then, its status from the response |
+| the client left before its end | ends then, `ok`, with an `http.response.aborted` event |
+| the stream failed | ends then, `error`, with the stream's error as its exception |
+
+An endless event stream's span ends when its client leaves. A response
+with no body, or with a `Content-Length` header (`@alxia/core` sets it on
+every reply of a string, JSON, a buffer or a file), ends the span when it
+is handed over and is left as it is: Bun sends those bodies without
+JavaScript, a file with `sendfile`. A raw `Response` a hook builds, even
+of a string or a `Bun.file`, has no such header until Bun sends it: it is
+treated as a stream, and timed to its end. An unsampled span is never
+exported, so its body is never wrapped.
+
+What decides is the `Content-Length` of the response the app finally
+sends, after every `onResponse` hook. `@alxia/compress` removes it from
+the body it compresses, so under compress a compressed JSON reply is a
+stream too, and its span lasts until it has been sent.
+
+In a test, a streamed route's span ends only once its body has been read
+or cancelled: read it before `close()`, or the span is never exported.
+
+```ts
+const response = await app.request('/events');
+await response.body?.cancel(); // or `await response.text()` for a body that ends
+await instance.close();
+```
+
 ### Its name
 
 | The request | The span's name |
@@ -107,6 +144,7 @@ one per order. So `spanName` only names what routing did not match. A
 | `499`, the client hung up mid-request | `ok` | the `AbortError` |
 | a `5xx` from a throw | `error` | the error |
 | a `5xx` the route replied | `error` | none |
+| a streamed body that failed midway ([A streamed body](#a-streamed-body)) | `error` | the stream's error |
 
 A `401` a guard answered is the server working, so a 4xx never marks a
 span. The error the route failed with is still recorded, as `ctx.error`

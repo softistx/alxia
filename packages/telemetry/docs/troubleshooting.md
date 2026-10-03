@@ -30,6 +30,7 @@ the server log, or, for what prints nothing, what you see in your traces.
 
 - [The span starts a new trace although the caller sent `traceparent`](#the-span-starts-a-new-trace-although-the-caller-sent-traceparent)
 - [`spanName` only shows on requests no route matched](#spanname-only-shows-on-requests-no-route-matched)
+- [A streamed request's span lasts as long as its stream](#a-streamed-requests-span-lasts-as-long-as-its-stream)
 - [A span has an exception, and its status is `ok`](#a-span-has-an-exception-and-its-status-is-ok)
 
 ## Types
@@ -349,13 +350,31 @@ app.get('/orders/:id', ({ params, span, reply }) => {
 });
 ```
 
+### A streamed request's span lasts as long as its stream
+
+**When:** the span of a page streamed as it renders, or of an event
+stream, lasts seconds or minutes, or ends only when the client closes the
+tab, with an `http.response.aborted` event.
+
+**Why:** a streamed body keeps the server span open until it has been
+sent, so the span measures what the client received. An event stream
+that never ends on its own ends its span when its client leaves; the
+event says so, and the status stays `ok`: the server did nothing wrong.
+
+**Fix:** none is needed. To keep an event stream out of a latency
+dashboard, filter on its route, or leave it untraced:
+
+```ts
+app.use(telemetry({ service: 'checkout', exporters, traced: (ctx) => ctx.url.pathname !== '/events' }));
+```
+
 ### A span has an exception, and its status is `ok`
 
 **When:** a route throws, and an `onError` hook answers with a `4xx`.
 
-**Why:** the error is recorded as the span's exception, but only a `5xx`
-makes a span an error: a `400` the app chose to answer is the server
-working.
+**Why:** the error is recorded as the span's exception, but only a
+`5xx`, or a streamed body that fails midway, makes a span an error: a
+`400` the app chose to answer is the server working.
 
 **Fix:** none needed. For an error that should mark the span, answer it
 with a `5xx`, or let it throw to the `500`.

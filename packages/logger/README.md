@@ -29,8 +29,17 @@ new UUID — sent back on its response. Once answered, one entry:
 {"time":"…","level":"info","requestId":"…","message":"GET /orders/7 200","method":"GET","path":"/orders/7","status":200,"duration":1.42,"ip":"127.0.0.1"}
 ```
 
-A 4xx is a `warn`, a 5xx an `error`. The routes after the plugin read
-`requestId`, and `log`, whose entries carry it.
+A 4xx is a `warn`, a 5xx an `error`. A streamed body (a page rendered as
+it goes, an event stream) is logged once it has been sent, its `duration`
+to the last byte, with `timeToHeaders` and an `outcome`: `completed`,
+`aborted` (a `warn`: the client left) or `errored` (an `error`):
+
+```json
+{"time":"…","level":"warn","requestId":"…","message":"GET /events 200 aborted","method":"GET","path":"/events","status":200,"duration":5012.3,"timeToHeaders":0.84,"outcome":"aborted","ip":"127.0.0.1"}
+```
+
+The routes after the plugin read `requestId`, and `log`, whose entries
+carry it.
 
 ## Options
 
