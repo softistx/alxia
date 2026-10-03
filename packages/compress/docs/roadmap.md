@@ -22,8 +22,8 @@ Nothing scheduled yet.
 - **A runtime dependency.** `@alxia/compress` installs nothing beside its
   `@alxia/core` peer: zstd, gzip and deflate come from the runtime's
   `CompressionStream`, and Brotli and every streamed body from `node:zlib`,
-  so adding it to an app
-  adds no native binding or transitive package to audit or update.
+  so adding it to an app adds no native binding or transitive package to
+  audit or update.
 
 ## Shipped
 
@@ -36,9 +36,9 @@ Nothing scheduled yet.
 - **Only what pays.** Text, JSON, JavaScript, XML and SVG of at least 1 KiB
   by default — files included — with the encodings, the threshold and the
   types compressed as options. An event stream (unless `compressible` lets
-  it in), a `HEAD`, a 204, 206 or 304,
-  a response already encoded — a precompressed static file — or one marked
-  `Cache-Control: no-transform` is sent as it is. Brotli runs at quality 4,
+  it in), a `HEAD`, a 204, 206 or 304, a response already encoded — a
+  precompressed static file — or one marked `Cache-Control: no-transform`
+  is sent as it is. Brotli runs at quality 4,
   near gzip's speed, rather than the ahead-of-time default of 11.
 - **Streamed bodies flushed as they come.** A body with no
   `Content-Length` — a server-rendered page, a `ReadableStream`, an event

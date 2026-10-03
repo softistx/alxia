@@ -22,11 +22,11 @@ Compressed: text, JSON, JavaScript, XML and SVG of at least `threshold`
 bytes (1 KiB), files included; a `ReadableStream` has no length, and is
 compressed whatever its size. Never: a `HEAD`, a 204, 206 or 304, a
 response already encoded, or one marked `Cache-Control: no-transform`. An
-event stream is left alone unless `compressible` lets it in. `Vary: Accept-Encoding` is set, a
-strong ETag becomes weak, and `Accept-Ranges` is dropped from a compressed
-response. Brotli runs at quality 4, near gzip's speed; for the smallest
-static assets, serve copies compressed at build time with `static`'s
-`precompressed` option.
+event stream is left alone unless `compressible` lets it in.
+`Vary: Accept-Encoding` is set, a strong ETag becomes weak, and
+`Accept-Ranges` is dropped from a compressed response. Brotli runs at
+quality 4, near gzip's speed; for the smallest static assets, serve copies
+compressed at build time with `static`'s `precompressed` option.
 
 ## Streams
 
@@ -36,9 +36,13 @@ yields in one turn of the event loop leaves at once, decodable, so a
 page's shell reaches the browser before its deferred parts. A body with a
 length is compressed whole, which compresses better.
 
-```ts
-app.use(compress()).get('/page', ({ reply }) =>
-	reply(200, renderedStream, { headers: { 'content-type': 'text/html;charset=utf-8' } }),
+```tsx
+import { renderToReadableStream } from 'react-dom/server';
+
+app.use(compress()).get('/page', async ({ reply }) =>
+	reply(200, await renderToReadableStream(<App />), {
+		headers: { 'content-type': 'text/html;charset=utf-8' },
+	}),
 );
 // the shell arrives as soon as it is rendered, compressed
 ```

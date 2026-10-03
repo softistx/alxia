@@ -65,7 +65,15 @@ const app = alxia()
 	.use(compress({ threshold: 0 }))
 	.get('/page', ({ reply }) => reply(200, page(), { headers: html }))
 	.get('/broken', ({ reply }) => reply(200, page(true), { headers: html }))
-	.get('/whole', ({ reply }) => reply(200, SHELL + LATE, { headers: html }));
+	.get('/whole', ({ reply }) => reply(200, SHELL + LATE, { headers: html }))
+	.get('/measured', ({ reply }) =>
+		reply(200, page(), {
+			headers: {
+				...html,
+				'content-length': String(encoder.encode(SHELL + LATE).byteLength),
+			},
+		}),
+	);
 
 /** The bytes of `body` with the time each arrived, from `since`. */
 async function timed(body: ReadableStream<Uint8Array>, since: number) {
@@ -193,6 +201,24 @@ describe('a streamed body is flushed as it comes', () => {
 });
 
 describe('a body with a length is compressed whole, as before', () => {
+	for (const encoding of ['gzip', 'br'] as const) {
+		test(`${encoding}: a stream with a Content-Length is not flushed`, async () => {
+			const since = performance.now();
+			const response = await app.request('/measured', {
+				headers: { 'accept-encoding': encoding },
+			});
+			expect(response.headers.get('content-encoding')).toBe(encoding);
+			if (response.body === null) throw new Error('no body');
+			const chunks = await timed(response.body, since);
+			const early = Buffer.concat(
+				chunks.filter(({ at }) => at < PROMPT).map(({ bytes }) => bytes),
+			);
+			expect(decode(encoding, early)).toBe('');
+			const all = Buffer.concat(chunks.map(({ bytes }) => bytes));
+			expect(decode(encoding, all)).toBe(SHELL + LATE);
+		});
+	}
+
 	test('gzip: the same bytes as CompressionStream over the body', async () => {
 		const response = await app.request('/whole', {
 			headers: { 'accept-encoding': 'gzip' },

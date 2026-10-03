@@ -38,6 +38,19 @@ function codec(encoding: Encoding): { codec: Codec; kind: number } {
 	}
 }
 
+/** Until the codec can take more, or is gone. */
+function drained(zlib: Codec): Promise<void> {
+	return new Promise((resolve) => {
+		const done = () => {
+			zlib.off('drain', done);
+			zlib.off('close', done);
+			resolve();
+		};
+		zlib.once('drain', done);
+		zlib.once('close', done);
+	});
+}
+
 /**
  * `source` compressed as `encoding`, flushed after the chunks of each turn
  * of the event loop: what the source has yielded leaves at once, decodable,
@@ -110,12 +123,7 @@ export function flushing(
 						scheduled = true;
 						setImmediate(flush);
 					}
-					if (!zlib.write(next.value)) {
-						await Promise.race([
-							new Promise((resolve) => zlib.once('drain', resolve)),
-							gone,
-						]);
-					}
+					if (!zlib.write(next.value)) await drained(zlib);
 				}
 			},
 			cancel(reason) {
@@ -124,8 +132,9 @@ export function flushing(
 				return reader.cancel(reason).catch(() => {});
 			},
 		},
-		// Up to 64 KiB of compressed bytes wait for the reader before the
-		// source is read no further.
+		// Once about 64 KiB of compressed bytes wait for the reader, the
+		// source is read no further; what the codec still holds may add as
+		// much again.
 		new ByteLengthQueuingStrategy({ highWaterMark: 64 * 1024 }),
 	);
 }

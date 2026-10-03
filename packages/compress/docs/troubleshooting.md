@@ -176,7 +176,7 @@ outside the plugin:
 | a proxy in front of the server buffers the response | the delay is gone with `curl -N` against the server itself; nginx honours the `X-Accel-Buffering: no` that alxia sets on an event stream, not on a page |
 | an `onResponse` hook after `compress()` reads the body, as `await response.text()` does, and answers a new one | the hook's response has a `Content-Length` |
 | the response has a `Content-Length` | a body with one is compressed whole; a stream handed to `reply` has none |
-| the renderer waits for everything before it writes | React Router's default entry waits for `allReady` when the user agent looks like a bot, as `Bun/1.4.2` does: send a browser's |
+| the renderer waits for everything before it writes | React Router's default entry waits for `allReady` when the user agent looks like a bot, as Bun's default user agent does: send a browser's |
 
 **Fix:** check the server alone first, and decode as it comes:
 
@@ -189,8 +189,9 @@ curl -N -s -H 'accept-encoding: gzip' localhost:3000/page | gunzip
 
 **When:** a `ReadableStream` that yields many small chunks, each in a turn
 of its own — a row at a time from a cursor, a token at a time — comes out
-much larger than the same text compressed in one piece: up to 56% larger
-in gzip, and up to 94% in br and zstd, on a page of 300 small chunks.
+much larger than the same text compressed in one piece: on a 41 KB page
+of 308 small chunks, 56% larger in gzip and deflate, and 89–94% in br and
+zstd.
 
 **Why:** a streamed body is flushed after each turn of the event loop, so
 what the source yields leaves at once. Each flush ends a block, and a
