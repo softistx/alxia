@@ -2,6 +2,7 @@ import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { alxia, type RoutesOf } from '@alxia/core';
 import { createSchema, type Plugin } from 'graphql-yoga';
 import { type GraphQLContext, graphql } from './graphql';
+import { SANDBOX_POLICY } from './sandbox';
 
 const users = new Map([['1', { id: '1', name: 'Ada' }]]);
 
@@ -233,6 +234,20 @@ describe('ide', () => {
 		expect(text).not.toContain('graphiql');
 		const query = await post(sandboxed, '/api/graphql', '{ me }');
 		expect(await query.json()).toEqual({ data: { me: null } });
+	});
+
+	test('apollo-sandbox without options: the page with its defaults', async () => {
+		const sandboxed = alxia()
+			.decorate({ users })
+			.derive(() => ({ viewer: null as string | null }))
+			.use((app) =>
+				graphql(app, { schema, ide: 'apollo-sandbox', logging: false }),
+			);
+		const page = await sandboxed.request('/graphql', {
+			headers: { accept: 'text/html' },
+		});
+		expect(page.headers.get('content-security-policy')).toBe(SANDBOX_POLICY);
+		expect(await page.text()).toContain('<title>Sandbox Explorer</title>');
 	});
 
 	test('false: no IDE at all', async () => {
