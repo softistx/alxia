@@ -52,7 +52,7 @@ the build and the server load one module:
 ```ts
 // app/routes/home.tsx
 import { alxiaOf } from '@alxia/react-router';
-import type { Base } from '../../server';
+import type { Base } from '../../base';
 
 export function loader({ context }: Route.LoaderArgs) {
 	const { user } = alxiaOf<Base>(context);
@@ -212,7 +212,7 @@ type from it, as `ContextOf<App>` does.
 **Fix:** pass `typeof` the app before the catch-all:
 
 ```ts
-// server.ts
+// base.ts
 export const base = alxia().use(session);
 export type Base = typeof base;
 
@@ -265,12 +265,12 @@ deferred value later. If the whole page comes at once:
   await fetch(url, { headers: { 'user-agent': BROWSER } });
   ```
 
-- **`@alxia/compress` holds the stream.** A compressor that does not flush
-  after each chunk sends the page when it ends: `@alxia/compress` did so
-  for every streamed body before it flushed chunk by chunk. Compare with
-  `accept-encoding: identity`; if only the compressed response arrives in
-  one piece, the compressor is the cause. Until yours flushes, leave pages
-  that stream behind `<Await>` uncompressed, or upgrade `@alxia/compress`.
+- **`@alxia/compress` holds the stream.** It does not flush after each
+  chunk yet, so a compressed page is sent when it ends; flushing each chunk
+  of a streamed body is planned. Compare with `accept-encoding:
+  identity`: if only the compressed response arrives in one piece, the
+  compressor is the cause. Meanwhile, leave the pages that stream behind
+  `<Await>` uncompressed.
 
 ### The logger times a streamed page at a few milliseconds
 
