@@ -14,8 +14,8 @@ bun add -d typescript
 ```ts
 import { secureHeaders } from '@alxia/secure-headers';
 
-app.use(secureHeaders());
-app.use(secureHeaders({ contentSecurityPolicy: "default-src 'self'", xFrameOptions: false }));
+app.plugin(secureHeaders());
+app.plugin(secureHeaders({ contentSecurityPolicy: "default-src 'self'", xFrameOptions: false }));
 ```
 
 A header a route sets itself is kept: a page that needs its own policy sets
@@ -33,7 +33,7 @@ import { alxia } from '@alxia/core';
 import { secureHeaders } from '@alxia/secure-headers';
 
 const app = alxia()
-	.use(
+	.plugin(
 		secureHeaders({
 			nonce: true,
 			// The nonce is added to script-src (and script-src-elem).
@@ -55,7 +55,7 @@ left as written:
 ```ts
 import { NONCE, secureHeaders } from '@alxia/secure-headers';
 
-app.use(
+app.plugin(
 	secureHeaders({
 		nonce: true,
 		contentSecurityPolicy: `default-src 'self'; script-src 'self' ${NONCE}; style-src 'self' ${NONCE}`,

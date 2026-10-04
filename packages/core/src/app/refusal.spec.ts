@@ -231,8 +231,8 @@ for (const [name, transport] of Object.entries(transports)) {
 			);
 			const app = alxia()
 				.onRefusal(() => problem({ status: 400, detail: 'app' }))
-				.use(plain)
-				.use(own)
+				.plugin(plain)
+				.plugin(own)
 				// The plugin's hook now applies to the routes after it, as its derives do.
 				.post('/after', { body: Name }, ({ reply }) => reply(200, 'ok'));
 			const call = transport(app);

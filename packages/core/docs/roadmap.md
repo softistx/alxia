@@ -16,8 +16,10 @@ number on it. Every release, with each change it made, is in
   before it answers 401 before the body is read, and `responds` checks the
   replies made after it. `ws` takes the same, and so does
   `route(operation, ...middlewares, handler)`: the operation's schema is a
-  `responds` first and a `validate` just before the handler, or where
-  `validate(operation)` is placed. The 0.3 forms — a list of hooks, a
+  `validate` and a `responds` just before the handler, or where
+  `validate(operation)` and `responds(operation)` are placed: an auth's
+  401 is its own. A middleware that calls `next()` and returns nothing
+  answers with the rest's response. The 0.3 forms — a list of hooks, a
   schema before the handler, `defineHook`, `defineWrap` — keep working,
   deprecated.
 - **Middlewares for every route after a point.** `app.use(auth)` runs a
@@ -27,6 +29,11 @@ number on it. Every release, with each change it made, is in
   nothing; a group's `use` adds to its subtree's context. `derive` stays,
   the shorthand for a middleware that only adds
   ([Upgrading](upgrading.md#middlewares-for-the-routes-after-them-use)).
+- **Plugins on a method of their own.** `app.plugin(plugin)` mounts an app
+  — a sub-app, `defineRoutes`, `definePlugin` — or calls a function given
+  the app, and checks what the plugin reads of the context; a function that
+  returns anything but an app throws. `use(plugin)` still runs, deprecated
+  ([Upgrading](upgrading.md#plugins-move-to-appplugin)).
 - **Spec first, no client typed from the app.** The OpenAPI document is the
   contract, and a client is generated from it with the generator you
   choose — the examples use `@nxgt/openapi-codegen`. `Alxia` takes
@@ -47,13 +54,17 @@ number on it. Every release, with each change it made, is in
   Register { context: typeof base } }`, beside the chain that builds the
   context, and a file of routes reads it with no import of the app:
   `defineRoutes('/todos').get('/', ({ user, reply }) => …)`, mounted with
-  `base.use(todos)`, which `use` refuses on an app that does not give that
+  `base.plugin(todos)`, which `plugin` refuses on an app that does not give that
   context. `AppContext` types a service with it, `contextStorage()` reads
   it, and so does `@alxia/react-router`'s `alxiaOf` when no server is
   registered ([The app's type](guide/types.md#register-and-appcontext)).
 
 ## Next
 
+- **`use` takes any `(ctx, next)` function.** In the next minor, the
+  `use(plugin)` forms are removed, and `use` reads every function it is
+  given as a middleware, with no `defineMiddleware` mark needed: a plugin
+  is given to `app.plugin(…)` alone.
 - **The retired client deprecated on npm.** Its last published version
   marked deprecated, pointing at the upgrading guide, once the owner runs
   the command the [upgrading guide](upgrading.md#no-more-client-spec-first)
@@ -74,7 +85,7 @@ number on it. Every release, with each change it made, is in
   the middleware that does the same, leaving one way to add to the
   context.
 - **The plugin guards as middlewares too.** `bearer`, `permission`,
-  `rateLimit`, `cache` and `idempotency` are app plugins: given to `use`,
+  `rateLimit`, `cache` and `idempotency` are app plugins: given to `plugin`,
   they guard every route declared after them, in a group for some. A
   middleware form of each, named on the one route that needs it, would sit
   beside the plugin.

@@ -53,7 +53,7 @@ const find = (id: string) => (id === 'r1' ? { id, title: 'Blood test' } : null);
 
 export function signingIn() {
 	return alxia()
-		.use(janusErrors())
+		.plugin(janusErrors())
 		.post(
 			'/signin',
 			validate({ body: z.object({ email: z.string(), password: z.string() }) }),
@@ -67,7 +67,7 @@ export function signingIn() {
 
 export function required() {
 	return alxia()
-		.use(session(auth, { type: 'patient', required: true }))
+		.plugin(session(auth, { type: 'patient', required: true }))
 		.get('/me', ({ user, auth: bound, reply }) =>
 			reply(200, { name: user.name, device: bound.device }),
 		);
@@ -75,7 +75,7 @@ export function required() {
 
 export function optional() {
 	return alxia()
-		.use(session(auth))
+		.plugin(session(auth))
 		.get('/me', ({ user, session: current, reply }) =>
 			reply(200, { type: user?.type ?? null, expires: current?.expiresAt }),
 		);
@@ -83,20 +83,20 @@ export function optional() {
 
 export function guarded() {
 	return alxia()
-		.use(session(auth, { required: true }))
+		.plugin(session(auth, { required: true }))
 		.group('/records/:id', (records) =>
 			records
-				.use(permission(access, 'view', 'record', byParam('id', find)))
+				.plugin(permission(access, 'view', 'record', byParam('id', find)))
 				.get('/', ({ object, reply }) => reply(200, { title: object.title })),
 		);
 }
 
 export function guardedWithCtx() {
 	return alxia()
-		.use(session(auth, { required: true }))
+		.plugin(session(auth, { required: true }))
 		.group('/records/:id', (records) =>
 			records
-				.use(
+				.plugin(
 					permission(access, 'edit', 'record', byParam('id', find), {
 						ctx: () => ({ locked: false }),
 					}),
@@ -109,6 +109,6 @@ export function sessionOf<A extends Auth<{ readonly type: string }>>(
 	accounts: A,
 ) {
 	return alxia()
-		.use(session(accounts, { required: true }))
+		.plugin(session(accounts, { required: true }))
 		.get('/me', ({ user, reply }) => reply(200, user.type));
 }

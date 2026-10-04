@@ -29,7 +29,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **Compression as a plugin.** `app.use(compress())` streams every response
+- **Compression as a plugin.** `app.plugin(compress())` streams every response
   worth it through zstd, Brotli, gzip or deflate, chosen from the client's
   `Accept-Encoding` and the server's order of preference, with the app's
   routes and type unchanged.

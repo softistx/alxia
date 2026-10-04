@@ -22,12 +22,12 @@ const schema = createSchema<GraphQLContext<typeof base>>({
 });
 
 export function served() {
-	return base.use((app) => graphql(app, { schema }));
+	return base.plugin((app) => graphql(app, { schema }));
 }
 
 export function servedAt() {
 	return base
-		.use((app) =>
+		.plugin((app) =>
 			graphql(app, { schema, path: '/api/graphql', ide: 'apollo-sandbox' }),
 		)
 		.get('/health', ({ reply }) => reply(200, 'ok'));
@@ -53,5 +53,5 @@ export function guarded() {
 				return reply(401, { error: 'unauthorized' as const });
 			return { viewer };
 		})
-		.use((app) => graphql(app, { schema }));
+		.plugin((app) => graphql(app, { schema }));
 }

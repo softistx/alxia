@@ -11,7 +11,7 @@ import { cache, MemoryCacheStore } from '@alxia/cache';
 const store = new MemoryCacheStore({ maxEntries: 5_000, maxBytes: 128 * 1024 * 1024 });
 
 const app = alxia()
-	.use(cache({ ttl: 60, store }))
+	.plugin(cache({ ttl: 60, store }))
 	.get('/products', ({ reply }) => reply(200, []));
 ```
 
@@ -203,7 +203,7 @@ test('the store serves, and forgets by tag and by path', async () => {
 	let runs = 0;
 	const products = cache({ ttl: 60, store: mapCacheStore(), tags: () => ['products'] });
 	const app = alxia()
-		.use(products)
+		.plugin(products)
 		.get('/products', ({ reply }) => reply.ok({ runs: ++runs }));
 
 	await app.request('/products');
@@ -248,7 +248,7 @@ test('a store that cannot answer: the route answers', async () => {
 
 	const products = cache({ ttl: 60, store: broken });
 	const app = alxia()
-		.use(products)
+		.plugin(products)
 		.get('/products', ({ reply }) => reply.ok([]));
 
 	const response = await app.request('/products');   // logs "store down" once

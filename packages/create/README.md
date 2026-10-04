@@ -29,7 +29,7 @@ bun create @alxia my-site --template react-router
 
 | template | what it writes |
 | --- | --- |
-| `api` | an `@alxia/core` app with Zod, OpenAPI spec first: `openapi.yaml` declares `GET /todos`, `POST /todos` and `GET /todos/{id}`; `bun run generate` writes `src/generated/` from it with [`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen) (`openapi-codegen.config.ts`), committed, so nothing is generated at install or build; `src/context.ts` holds the base the routes read and registers it with `@alxia/core`'s `Register`; `src/routes/todos.ts`, made with `defineRoutes()`, reads that context with no import of the app and binds each operation with `route(operation, …middlewares, handler)`, as `route(operations.createTodo, requireKey, handler)`, where `requireKey`, made with `defineMiddleware`, answers 401 without an API key, and the operation's schemas validate the request and check every reply; `src/app.ts` mounts the routes on the base, `base.use(todoRoutes)`; a `bun test` spec calling the app with `app.request()` and asserting `matchesSpec` from [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi): every operation has its route, and no route is outside the spec; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, Biome (`biome.json`, `lint`, `format`, `check`, `check:ci`), `verify`, starting with `generate --check`, a `Dockerfile` running on `oven/bun:1-alpine`, `.dockerignore`, `.gitignore`, `.env.example`, `.vscode/` and a README. `@alxia/openapi` and `@nxgt/openapi-codegen` are devDependencies |
+| `api` | an `@alxia/core` app with Zod, OpenAPI spec first: `openapi.yaml` declares `GET /todos`, `POST /todos` and `GET /todos/{id}`; `bun run generate` writes `src/generated/` from it with [`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen) (`openapi-codegen.config.ts`), committed, so nothing is generated at install or build; `src/context.ts` holds the base the routes read and registers it with `@alxia/core`'s `Register`; `src/routes/todos.ts`, made with `defineRoutes()`, reads that context with no import of the app and binds each operation with `route(operation, …middlewares, handler)`, as `route(operations.createTodo, requireKey, handler)`, where `requireKey`, made with `defineMiddleware`, answers 401 without an API key, and the operation's schemas validate the request and check the handler's reply; `src/app.ts` mounts the routes on the base, `base.plugin(todoRoutes)`; a `bun test` spec calling the app with `app.request()` and asserting `matchesSpec` from [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi): every operation has its route, and no route is outside the spec; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, Biome (`biome.json`, `lint`, `format`, `check`, `check:ci`), `verify`, starting with `generate --check`, a `Dockerfile` running on `oven/bun:1-alpine`, `.dockerignore`, `.gitignore`, `.env.example`, `.vscode/` and a README. `@alxia/openapi` and `@nxgt/openapi-codegen` are devDependencies |
 | `react-router` | React Router's official template, as `create-react-router` writes it, shipped in this package and copied, with [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun, a `Dockerfile` running on `oven/bun:1-alpine` in place of React Router's Node one, and Biome as the `api` project has it, the scaffold formatted by it once. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
 
 The heart of the `api` project, its middleware and a route bound to an
@@ -61,13 +61,13 @@ export const todoRoutes = defineRoutes()
   });
 
 // src/app.ts
-export const app = base.use(todoRoutes);
+export const app = base.plugin(todoRoutes);
 ```
 
 `operations.createTodo` is `POST /todos` as `openapi.yaml` declares it:
 the body is validated just before the handler, which reads it typed, and
-every reply, `requireKey`'s 401 included, is checked against the spec's
-responses. To change the API, edit `openapi.yaml` and run
+the handler's reply is checked against the spec's responses; `requireKey`'s
+401 is its own, sent as it is. To change the API, edit `openapi.yaml` and run
 `bun run generate`; never edit `src/generated/`.
 
 ## Lint and format

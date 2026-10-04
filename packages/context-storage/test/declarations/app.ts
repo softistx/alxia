@@ -11,7 +11,7 @@ const base = alxia()
 const requestContext = contextStorage<typeof base>();
 
 export function stored() {
-	return base.use(requestContext).get('/orders', ({ reply }) => {
+	return base.plugin(requestContext).get('/orders', ({ reply }) => {
 		const { db, user } = requestContext.context();
 		return reply(200, { orders: db.orders, user: user.id });
 	});
@@ -23,7 +23,7 @@ export function storage() {
 
 export function untyped() {
 	return alxia()
-		.use(contextStorage())
+		.plugin(contextStorage())
 		.get('/', ({ reply }) => reply(200, getContext<{ user: string }>().user));
 }
 

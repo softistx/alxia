@@ -16,7 +16,7 @@ import { alxia } from '@alxia/core';
 import { cors } from '@alxia/cors';
 
 const app = alxia()
-	.use(cors({ origin: ['https://app.example.com', /\.example\.com$/], credentials: true }))
+	.plugin(cors({ origin: ['https://app.example.com', /\.example\.com$/], credentials: true }))
 	.get(...);
 ```
 

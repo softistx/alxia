@@ -9,7 +9,7 @@ import { alxia } from '@alxia/core';
 import { cache } from '@alxia/cache';
 
 const app = alxia()
-	.use(cache({ ttl: 60, vary: ['accept-language'] }))
+	.plugin(cache({ ttl: 60, vary: ['accept-language'] }))
 	.get('/hello', ({ request, reply }) =>
 		reply(200, request.headers.get('accept-language')?.startsWith('fr') ? 'Bonjour' : 'Hello'),
 	);
@@ -103,7 +103,7 @@ function language(header: string | null): string {
 }
 
 const app = alxia()
-	.use(
+	.plugin(
 		cache({
 			ttl: 60,
 			vary: ['accept-language'],                   // still says `Vary: accept-language`
@@ -160,14 +160,14 @@ const auth = alxia().derive(({ request }) => ({
 }));
 
 const app = alxia()
-	.use(auth)
-	.use(perTenant)
+	.plugin(auth)
+	.plugin(perTenant)
 	.get('/dashboard', ({ user, reply }) => reply(200, { tenant: user.tenantId }));
 
 await perTenant.invalidateTag('tenant:acme'); // one tenant's pages, every path
 
-alxia().use(perTenant);
-// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+alxia().plugin(perTenant);
+// error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
 The rule of [a key of your own](#a-key-of-your-own) still holds: the route
@@ -189,7 +189,7 @@ or sets a cookie. Three ways, from the cheapest:
 // 1. Declare them before the cache: it never sees them, and no lookup is made.
 alxia()
 	.get('/me', ({ reply }) => reply(200, { name: 'Grace' }))
-	.use(cache({ ttl: 60 }))
+	.plugin(cache({ ttl: 60 }))
 	.get('/products', ({ reply }) => reply(200, []));
 
 // 2. No key for a request that carries a session: it is neither looked up nor kept.

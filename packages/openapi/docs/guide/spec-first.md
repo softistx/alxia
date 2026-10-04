@@ -53,8 +53,8 @@ paths:
 
 A request the schemas refuse is answered by alxia, not by your handler, with
 `400 { error: 'validation', issues }`. Declare that body once and refer to
-it from each operation that takes a parameter or a body, so a client knows
-it and the route's `responds` checks it:
+it from each operation that takes a parameter or a body, so a client
+generated from the document knows it:
 
 ```yaml
 components:
@@ -189,21 +189,33 @@ export const app = alxia()
 	});
 ```
 
-The operation's schema runs as two middlewares the route adds itself:
+The operation's schema runs as two middlewares the route adds itself, just
+before the handler:
 
-- **a `responds` of its responses, first.** Every reply with a status the
-  operation declares is checked against that status's schema, a
-  middleware's included: `requireKey`'s 401 above is checked against the
-  spec's `Unauthorized`. A body the schema refuses is a 500. A status the
-  operation does not declare is sent as it is.
-- **a `validate` of its request, just before the handler.** So `requireKey`
-  answers a stranger 401 before his body is read. Place
-  `validate(operation)` among the middlewares to validate earlier; the route
-  then runs no other:
+- **a `validate` of its request.** So `requireKey` answers a stranger 401
+  before his body is read. Place `validate(operation)` among the
+  middlewares to validate earlier; the route then runs no other.
+- **a `responds` of its responses, after it.** The handler's reply is
+  checked against the schema of its status, which must be one the
+  operation declares; a body the schema refuses is a 500. A middleware's
+  own reply, `requireKey`'s 401 above, is sent as it is. Place
+  `responds(operation)` among the middlewares to check the replies of
+  those after it too, `requireKey`'s against the spec's `Unauthorized`;
+  the route then runs no other.
 
 ```ts
-import { alxia, validate } from '@alxia/core';
+import { alxia, responds, validate } from '@alxia/core';
 
+// requireKey's 401 is checked against the spec's Unauthorized
+const checked = alxia().route(
+	operations.createTodo,
+	responds(operations.createTodo),
+	requireKey,
+	({ body, reply }) => reply.created({ id: todos.length + 1, title: body.title, done: false }),
+);
+```
+
+```ts
 // a bad body gets its 400 before anyone is asked for a key
 const strict = alxia().route(
 	operations.createTodo,

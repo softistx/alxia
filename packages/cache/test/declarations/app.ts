@@ -13,7 +13,7 @@ const responses = cache({
 
 export function cached() {
 	return alxia()
-		.use(responses)
+		.plugin(responses)
 		.get('/products', ({ cache: controls, reply }) => {
 			controls.tag('products');
 			return reply(200, ['a']);
@@ -23,7 +23,7 @@ export function cached() {
 export function cachedByUser() {
 	return alxia()
 		.derive(() => ({ user: { id: 'u' } }))
-		.use(
+		.plugin(
 			cache<{ user: { id: string } }>({
 				ttl: 10,
 				key: ({ user, url }) => `${user.id}:${url.pathname}`,

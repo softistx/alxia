@@ -467,9 +467,9 @@ problem answers 400. Each is sent as
 **Order is meaning.** The last `onRefusal` declared before a route is the
 one in force; a [hook of one kind](#one-hook-per-kind) sits in front of it. A route declared before any keeps the default, and a
 [group](groups-and-plugins.md#groups)'s hook stays inside the group. A
-plugin given to `use` keeps its own hook for its routes. Its routes without
-one take the hook of the app using it, and the plugin's hook then applies to
-the routes declared after `use`, as its `derive`s do.
+plugin given to `plugin` keeps its own hook for its routes. Its routes without
+one take the hook of the app mounting it, and the plugin's hook then applies to
+the routes declared after `plugin`, as its `derive`s do.
 
 **What it replaces.** The hook's reply replaces the default 400 of every
 route after it that validates part of its request with a `validate`. A
@@ -542,9 +542,9 @@ OpenAPI document declares on each of them.
   it, and keeps the general hook as its fallback. A general hook declared
   after it replaces it, and every other one: it answers every kind.
 - **Plugins.** A plugin's route tries the plugin's hooks first. Without a
-  general hook of the plugin's own, it then tries the using app's hooks for
+  general hook of the plugin's own, it then tries the mounting app's hooks for
   that kind, then the app's general hook. A plugin's hook of one kind
-  given to `use` applies to the routes declared after it, and keeps the
+  given to `plugin` applies to the routes declared after it, and keeps the
   app's general hook.
 
 A hook that throws reaches the route's `onError` hooks, as a handler's

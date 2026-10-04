@@ -37,7 +37,7 @@ const app = base
 	.get('/before', ({ reply }) =>
 		reply(200, tryGetContext() === undefined ? 'none' : 'some'),
 	)
-	.use(requestContext)
+	.plugin(requestContext)
 	.onResponse(() => {
 		seenOnResponse.push(getRequestContext().route);
 	})
@@ -97,7 +97,7 @@ describe('contextStorage', () => {
 		expect(tryGetRequestContext()).toBeUndefined();
 		const seen: (string | undefined)[] = [];
 		const traced = alxia()
-			.use(contextStorage())
+			.plugin(contextStorage())
 			.onResponse(() => {
 				seen.push(tryGetRequestContext()?.url.pathname);
 			})
@@ -107,8 +107,8 @@ describe('contextStorage', () => {
 		expect(seen).toEqual(['/here', '/nowhere']);
 
 		// @ts-expect-error the factory, uncalled
-		expect(() => alxia().use(contextStorage)).toThrow(
-			'contextStorage is a factory: use(contextStorage()), not use(contextStorage)',
+		expect(() => alxia().plugin(contextStorage)).toThrow(
+			'contextStorage is a factory: plugin(contextStorage()), not plugin(contextStorage)',
 		);
 	});
 
@@ -121,13 +121,13 @@ describe('contextStorage', () => {
 		expect(await runWithContext(fake, greet)).toBe('hi job');
 	});
 
-	test('typed by the app it names, which the app that uses it must give', () => {
+	test('typed by the app it names, which the app that mounts it must give', () => {
 		expectTypeOf(contextStorage().context).returns.toEqualTypeOf<
 			BaseContext & Empty
 		>();
 		// @ts-expect-error: an app that gives no `user` cannot use it
-		alxia().use(contextStorage<typeof base>());
-		expect(() => base.use(contextStorage<typeof base>())).not.toThrow();
+		alxia().plugin(contextStorage<typeof base>());
+		expect(() => base.plugin(contextStorage<typeof base>())).not.toThrow();
 	});
 
 	test('with no type argument, typed by the app Register names', async () => {

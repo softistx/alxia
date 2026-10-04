@@ -296,7 +296,7 @@ const requireKey = defineMiddleware(({ request, reply }, next) =>
 // Each route is an operation of openapi.yaml, generated into
 // src/generated/alxia.ts: its method, path and schemas come from the spec,
 // so the handler is all that is written here. The request is validated
-// just before the handler, and every reply against the spec's responses.
+// just before the handler, and its reply against the spec's responses.
 // `todos` is the registered context's: defineRoutes() reads it, and the
 // app that mounts these routes must give it.
 export const todoRoutes = defineRoutes()
@@ -316,7 +316,7 @@ export const todoRoutes = defineRoutes()
 
 `defineRoutes()` is a plugin, `alxia()` at runtime, typed with the
 registered context: the handlers read `todos`. It requires that context
-of the app that mounts it, so `alxia().use(todoRoutes)` is a compile
+of the app that mounts it, so `alxia().plugin(todoRoutes)` is a compile
 error. It takes no prefix here: an operation's path is already whole.
 
 ### `src/app.ts`
@@ -327,7 +327,7 @@ import { todoRoutes } from "./routes/todos";
 
 // The base, then the route files: each requires the base's context, so
 // mounting one before it is a compile error.
-export const app = base.use(todoRoutes);
+export const app = base.plugin(todoRoutes);
 
 export type App = typeof app;
 ```
@@ -348,10 +348,12 @@ route(operation, ...middlewares, handler)
   `title` is a 400 naming `title`, `/todos/first` a 400 naming `id`, and
   the handler never runs. To validate before a middleware instead, place
   `validate(operations.createTodo)` among the middlewares.
-- **Every reply is checked against the spec's responses**, a middleware's
-  too: `requireKey`'s 401 is checked against `Unauthorized`. A reply the
-  spec refuses is not sent; the client gets a 500
-  ([troubleshooting](troubleshooting.md#responsevalidationerror-post-todos-the-401-reply-does-not-match-its-schema)).
+- **The handler's reply is checked against the spec's responses**: a
+  reply the spec refuses is not sent; the client gets a 500
+  ([troubleshooting](troubleshooting.md#responsevalidationerror-post-todos-the-201-reply-does-not-match-its-schema)).
+  A middleware's own reply, `requireKey`'s 401, is sent as it is; to check
+  it against `Unauthorized` too, place `responds(operations.createTodo)`
+  before `requireKey`.
 - **`todos` lives in memory**: replace the array with your database,
   given to the routes the same way, by `decorate`.
 

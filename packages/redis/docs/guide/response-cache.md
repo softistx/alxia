@@ -15,7 +15,7 @@ const connection = await connectRedis(Bun.env['REDIS_URL']!);
 const products = cache({ ttl: 60, store: redisCacheStore(connection.client, { name: 'shop' }), tags: () => ['products'] });
 
 const app = alxia()
-	.use(products)
+	.plugin(products)
 	.get('/products', ({ reply }) => reply(200, [{ id: '1', name: 'Kettle' }]));
 ```
 
@@ -95,7 +95,7 @@ const app = alxia()
 		await products.invalidateTag('products');      // forgotten in every process
 		return reply(201, body);
 	})
-	.use(products)
+	.plugin(products)
 	.get('/products', ({ reply }) => reply(200, [...catalogue.values()]));
 ```
 

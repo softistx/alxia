@@ -64,7 +64,7 @@ export type TelemetryPluginOptions =
  *
  * ```ts
  * const tracing = telemetry({ service: 'checkout', exporters: [otlpExporter({ endpoint })] });
- * const app = alxia().use(tracing).get(...);
+ * const app = alxia().plugin(tracing).get(...);
  * app.onStop(() => tracing.telemetry.close());
  * ```
  */

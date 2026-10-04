@@ -66,8 +66,8 @@ import { zq } from '@alxia/zod';
 import { z } from 'zod';
 
 const app = alxia()
-	.use(logger())
-	.use(cors())
+	.plugin(logger())
+	.plugin(cors())
 	.get(
 		'/users/:id',
 		validate({ params: z.object({ id: zq.int() }) }),

@@ -13,7 +13,7 @@ const requireKey = defineMiddleware(({ request, reply }, next) =>
 // Each route is an operation of openapi.yaml, generated into
 // src/generated/alxia.ts: its method, path and schemas come from the spec,
 // so the handler is all that is written here. The request is validated
-// just before the handler, and every reply against the spec's responses.
+// just before the handler, and its reply against the spec's responses.
 // `todos` is the registered context's: defineRoutes() reads it, and the
 // app that mounts these routes must give it.
 export const todoRoutes = defineRoutes()

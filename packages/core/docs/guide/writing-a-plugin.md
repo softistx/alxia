@@ -8,19 +8,22 @@ This page covers the three ways to write a plugin, and when to use each:
 | [a `Plugin` function](#a-plugin-function) | adds global hooks only, the app's type unchanged | a header on every response |
 | [`definePlugin<Requires>()`](#a-plugin-that-needs-an-earlier-one) | reads what an earlier plugin added | a tenant scope that reads `user` |
 
-Whichever you write, a plugin uses the core's public API only. The
-mechanics of `use` itself — prefixes, the order of `onError`, global
-hooks — are in [Groups and plugins](groups-and-plugins.md#plugins).
+Whichever you write, a plugin uses the core's public API only, and the app
+mounts it with `app.plugin(…)`. The mechanics of `plugin` itself —
+prefixes, the order of `onError`, global hooks — are in
+[Groups and plugins](groups-and-plugins.md#plugins). A middleware, which
+runs on requests, is no plugin: it is made by `defineMiddleware` and given
+to `use` ([Middleware](middleware.md#use-for-every-route-after-it)).
 
 ## An app plugin
 
-An app is a plugin. What it declares is mounted on the app that uses it,
+An app is a plugin. What it declares is mounted on the app that mounts it,
 and its types come with it:
 
 - its route hooks (`derive`, `decorate`, `wrap`, `onError`, `onRefusal`) apply to the
-  routes declared after `use`, and what they add is typed on them;
+  routes declared after `plugin`, and what they add is typed on them;
 - its routes are mounted under the app's prefix, behind the hooks declared
-  before `use`;
+  before `plugin`;
 - its hooks' replies — a 401, a 429 — may answer every route after it.
 
 ```ts
@@ -40,7 +43,7 @@ export const auth = alxia().derive(async ({ request, reply }) => {
 // app.ts
 const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok')) // no user, no 401
-	.use(auth)
+	.plugin(auth)
 	.get('/me', ({ user, reply }) => reply(200, user)); // user: User; may answer 401
 ```
 
@@ -54,10 +57,10 @@ export const requireRole = (role: string) =>
 			: reply(403, { error: 'forbidden' as const }),
 	);
 
-app.use(requireRole('admin')).get('/stats', handler);
+app.plugin(requireRole('admin')).get('/stats', handler);
 ```
 
-`use` reads the app once, when it is called: declare it completely first.
+`plugin` reads the app once, when it is called: declare it completely first.
 
 ## A `Plugin` function
 
@@ -81,10 +84,11 @@ export const poweredBy =
 
 const app = alxia()
 	.get('/', ({ reply }) => reply(200, 'hi'))
-	.use(poweredBy('alxia')); // global: it applies to `/` too
+	.plugin(poweredBy('alxia')); // global: it applies to `/` too
 ```
 
-Add only global hooks here. A `derive` added by a `Plugin` would run, but
+A `Plugin` returns the app it is given: `plugin` throws on `undefined`, a
+promise or anything else that is not an app. Add only global hooks here. A `derive` added by a `Plugin` would run, but
 `Plugin` returns the app's type unchanged, so no route could read what it
 added. To add context or replies, write an app plugin.
 
@@ -125,22 +129,22 @@ definePlugin<Requires extends object = Empty>(): <Plugin extends AnyAlxia>(
   `build` runs once, when the function `definePlugin<…>()` returns is
   called: for a factory such as `tenantOf` below, once per call of the
   factory.
-- The result is an app, given to `use` like any other. `use` checks the
+- The result is an app, given to `plugin` like any other. `plugin` checks the
   app's context against `Requires` at compile time, so the plugin's hooks
   never run without what they read.
 
 ```ts
 const app = alxia()
-	.use(auth)   // adds user: User
-	.use(tenant) // compiles: User has a tenantId
+	.plugin(auth)   // adds user: User
+	.plugin(tenant) // compiles: User has a tenantId
 	.get('/tenant', ({ tenant, reply }) => reply(200, tenant)); // tenant: Tenant | null
 
-alxia().use(tenant);
-// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+alxia().plugin(tenant);
+// error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
-The order matters, as everywhere in alxia. `alxia().use(tenant).use(auth)`
-is refused too: when `tenant` is used, no `user` has been added yet.
+The order matters, as everywhere in alxia. `alxia().plugin(tenant).plugin(auth)`
+is refused too: when `tenant` is mounted, no `user` has been added yet.
 
 An app whose `user` has another type, such as `User | null` from an
 optional session, gets the second message:
@@ -149,7 +153,7 @@ optional session, gets the second message:
 the plugin reads "user", which this app's context gives with another type
 ```
 
-[Troubleshooting](../troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
+[Troubleshooting](../troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
 shows both errors in full.
 
 A plugin that takes options is a function around `definePlugin`:
@@ -178,7 +182,7 @@ export const audit = <Requires extends object = Empty>(
 		}),
 	);
 
-app.use(auth).use(audit<{ user: User }>(({ user }) => user.id));
+app.plugin(auth).plugin(audit<{ user: User }>(({ user }) => user.id));
 ```
 
 Or infer it from the callback's annotation, so the app writes no type
@@ -194,24 +198,24 @@ export const audit = <Ctx extends object = BaseContext>(
 	definePlugin<RequiresOf<Ctx, 'who'>>()((app) =>
 		app.wrap(async (ctx, next) => {
 			const response = await next();
-			// `use` has checked that the app gives what `who` reads.
+			// `plugin` has checked that the app gives what `who` reads.
 			console.log((who as (ctx: BaseContext) => string)(ctx), ctx.route, response.status);
 			return response;
 		}),
 	);
 
-app.use(auth).use(audit(({ user }: BaseContext & { user: User }) => user.id));
-app.use(audit((ctx) => ctx.ip ?? 'unknown')); // unannotated: requires nothing
+app.plugin(auth).plugin(audit(({ user }: BaseContext & { user: User }) => user.id));
+app.plugin(audit((ctx) => ctx.ip ?? 'unknown')); // unannotated: requires nothing
 ```
 
 | `Ctx`, the annotation | `RequiresOf<Ctx>` |
 | --- | --- |
 | none — `Ctx` defaults to `BaseContext` | `Empty`: any app may use the plugin |
 | `BaseContext & { user: User }`, or `{ user: User }` | `{ user: User }` |
-| `{ url: string }`, a `BaseContext` key with a type it does not give | `{ url: string }`, so `use` refuses it |
+| `{ url: string }`, a `BaseContext` key with a type it does not give | `{ url: string }`, so `plugin` refuses it |
 | `unknown` or `object` | `Empty`: the callback reads no key without a check of its own |
-| `Record<string, unknown>` | `{ [x: string]: unknown }`, a key no app's context gives, so `use` refuses it |
-| `any`, or `Record<string, any>` | a requirement `use` refuses on every app, with [`the plugin's who reads its context as any: annotate what it reads, or leave it unannotated`](../troubleshooting.md#the-plugins--reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated) |
+| `Record<string, unknown>` | `{ [x: string]: unknown }`, a key no app's context gives, so `plugin` refuses it |
+| `any`, or `Record<string, any>` | a requirement `plugin` refuses on every app, with [`the plugin's who reads its context as any: annotate what it reads, or leave it unannotated`](../troubleshooting.md#the-plugins--reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated) |
 
 The second type argument names the callback in that message; it is
 `'callback'` when omitted. An `any` annotation would otherwise require
@@ -228,10 +232,10 @@ reads `user` as `User | undefined`, and any app may use it, so long as a
 
 - **What is chained on after `definePlugin` returns.** The requirement is
   carried by the value `definePlugin` returns. `tenant.get('/x', …)` is a
-  plain app again, and `use` no longer checks it. Declare everything inside
+  plain app again, and `plugin` no longer checks it. Declare everything inside
   `build`.
 - **A context that is a type parameter.** In
-  `<C extends { user: User }>(app: Alxia<C>) => app.use(tenant)`, TypeScript
+  `<C extends { user: User }>(app: Alxia<C>) => app.plugin(tenant)`, TypeScript
   defers the check and refuses the call, even though the bound gives a
   `user`. Type the host with a concrete context, or as `AnyAlxia`, which is
   not checked at all.
@@ -266,11 +270,11 @@ That is sound where the key was not, because nothing reads it unchecked:
   still start from `BaseContext`, and a route reads only what was added
   before it.
 - **What reads it requires it.** `defineRoutes()` carries the registered
-  context as a requirement, like `definePlugin`'s, so `use` refuses it on
-  an app that does not give it yet; so do `defineMiddleware<AppContext>()`
-  and `contextStorage()`.
+  context as a requirement, like `definePlugin`'s, so `plugin` refuses it
+  on an app that does not give it yet; so does `plugin` for
+  `contextStorage()`, and `use` for `defineMiddleware<AppContext>()`.
 - **It names a real chain.** The type is `typeof base`, what `decorate`,
-  `derive` and `use` built, not a key written by hand that no hook has to
+  `derive`, `use` and `plugin` built, not a key written by hand that no hook has to
   match.
 
 A plugin published for several apps should not read `Register`: each app
@@ -279,7 +283,7 @@ with `definePlugin<Requires>()`, as above.
 
 ## See also
 
-- [Groups and plugins](groups-and-plugins.md): what `use` mounts, and the
+- [Groups and plugins](groups-and-plugins.md): what `plugin` mounts, and the
   helpers `withHeaders`, `vary` and `check`.
 - [Hooks](hooks.md): what each hook does, and its order.
 - [The app's type](types.md): `ContextOf`.

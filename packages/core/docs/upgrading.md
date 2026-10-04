@@ -9,7 +9,9 @@ break yours.
 | Change | Package | Can it break your code |
 | --- | --- | --- |
 | [One middleware model](#one-middleware-model) | core | no: the forms of 0.3 still work, deprecated |
-| [Middlewares for the routes after them: `use`](#middlewares-for-the-routes-after-them-use) | core | no: `use` still takes a plugin as before |
+| [Middlewares for the routes after them: `use`](#middlewares-for-the-routes-after-them-use) | core | no: new; a plugin goes to `plugin` |
+| [Plugins move to `app.plugin`](#plugins-move-to-appplugin) | core | no: `use(plugin)` still works, deprecated; a function given to it that returns no app now throws |
+| [How a middleware settles, and the details](#how-a-middleware-settles-and-the-details) | core | no: new behaviour of the new forms; a route mixing a list of hooks with middlewares now throws |
 | [alxia is OpenAPI spec first](#alxia-is-openapi-spec-first) | core, openapi | no: the document is the source, the routes run as before |
 | [No more client: spec first](#no-more-client-spec-first) | core, client, graphql, janus, secure-headers, context-storage, react-router | yes: `@alxia/client`, `RoutesOf` and the route table are gone, and `Alxia` takes three type parameters |
 | [`@alxia/openapi-routes` is now `@alxia/openapi`](#alxiaopenapi-routes-is-now-alxiaopenapi) | openapi, openapi-routes | no: change the import; `@alxia/openapi-routes` 0.3.0 re-exports it, deprecated |
@@ -50,9 +52,9 @@ const app = alxia().post(
 `ws(path, options?, ...middlewares, handlers)` takes the same; its options
 are `message`, `send` and `detail`. A route takes at most 8 middlewares.
 `app.route(operation, ...middlewares, handler)` takes the same middlewares,
-the operation's `schema` read as a `responds` first and a `validate` just
-before the handler — or where `validate(operation)` stands. `group`, `use`,
-and the hooks on the app — `derive`, `decorate`, `wrap`, `onError`,
+the operation's `schema` read as a `validate` and a `responds` just before
+the handler — or where `validate(operation)` and `responds(operation)`
+stand. `group`, `use`, and the hooks on the app — `derive`, `decorate`, `wrap`, `onError`,
 `onRefusal`, `bodyLimit`, `onRequest`, `onResponse`, `around` — are
 unchanged, and not deprecated.
 
@@ -70,8 +72,8 @@ New exports: `defineMiddleware`, `validate`, `responds`, and the types
 `ValidateRequires`, `RouteOptions`, `SocketOptions`, the types a route
 threads its middlewares with, and `OperationForms` with the types `route`
 threads an operation's schemas with (`OperationParts`, `OperationOptions`,
-`OperationResponds`, `OperationValidate`, `OperationApp`). `validate` also
-takes an operation.
+`OperationResponds`, `OperationValidate`, `OperationApp`). `validate` and
+`responds` also take an operation.
 
 A request's body is read once: a second `validate` of the body on one
 route checks what the first read, where it used to fail with
@@ -118,8 +120,9 @@ const canView = defineMiddleware<{ user: User; pathParams: { id: string } }>()(
 Read the raw path parameters as `pathParams`. A middleware placed before
 any `validate` reads `params` as they arrived too, but after a
 `validate({ params })`, `params` is that schema's output; `pathParams` is
-always the path's strings. A middleware that returns nothing is a 500,
-with this error logged:
+always the path's strings. A middleware that calls `next()` and returns
+nothing answers with the rest's response; one that returns nothing without
+calling `next()` is a 500, with this error logged:
 
 ```text
 TypeError: GET /posts/:id: a middleware returned nothing: return next(), a reply or a Response
@@ -292,8 +295,9 @@ before the route's own. What they pass `next` is typed in those routes.
 declared; those may add nothing to the context, a compile error
 (`Invalid middleware: …`) otherwise. To add to a subtree's context, `use`
 them in a group. `defineMiddleware` marks what it makes, and `use` reads
-the mark: any other function is a plugin, as before. `derive` stays, the
-shorthand for a middleware that only adds.
+the mark: any other function is a plugin, in the deprecated form of
+[`use(plugin)`](#plugins-move-to-appplugin). `derive` stays, the shorthand
+for a middleware that only adds.
 
 ```ts
 // before: a derive for every route after a point, a guard repeated on each route
@@ -317,17 +321,109 @@ alxia()
 	.get('/admin/users', handler);
 ```
 
-**Can it break your code?** No. `use(app)`, `use(plugin)` and
-`definePlugin` work as they did. Three calls that never worked now throw
-where they are made, saying why: `use` given a plugin and more arguments,
-`use` given what is neither an app nor a function (a hook of
-`defineHook`), and `use()` given nothing. A plain `(ctx, next) => …` given to `use` is still called
-as a plugin: wrap it in `defineMiddleware`
-([Troubleshooting](troubleshooting.md#my-middleware-was-treated-as-a-plugin)).
+**Can it break your code?** No. A plugin goes to `plugin` now;
+`use(app)` and `use(plugin)` still work, deprecated
+([Plugins move to `app.plugin`](#plugins-move-to-appplugin)). Calls that
+never worked now throw where they are made, saying why: `use` given a
+plugin and more arguments, `use` given what is neither an app nor a
+function (a hook of `defineHook`), `use()` given nothing, and a plain
+`(ctx, next) => …` given to `use`, called once as a plugin, which returns
+no app: wrap it in `defineMiddleware`
+([Troubleshooting](troubleshooting.md#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-made-with-definemiddleware-and-given-to-use)).
 
-New exports: the types `MiddlewareMark`, `UseForms`, `PluginForms`,
-`ScopeMiddleware`, `PathMiddleware`, `AddingNothing`, `ScopePathAt` and
-`AppAfterUse`.
+New exports: the types `MiddlewareMark`, `UseForms`, `PluginForms`
+(deprecated), `ScopeMiddleware`, `PathMiddleware`, `AddingNothing`,
+`ScopePathAt` and `AppAfterUse`.
+
+### Plugins move to `app.plugin`
+
+**What changed.** A plugin is mounted by `app.plugin(…)`: an app — a
+sub-app, the routes of `defineRoutes`, a `definePlugin` — or a function
+`(app) => app` that adds global hooks. The requirement checks of
+`definePlugin` and `defineRoutes` are on `plugin`, as is the prefix and
+the place behind the hooks declared before it. `use` is for middlewares.
+
+```ts
+// before
+alxia().use(cors()).use(auth).use(todos);
+
+// now
+alxia().plugin(cors()).plugin(auth).plugin(todos);
+```
+
+`plugin` throws where it is called when a function given to it returns
+anything but an app, and leaves a promise it returned handled; it throws
+too for a middleware, for more than one argument, and for a value that is
+neither an app nor a function
+([Troubleshooting](troubleshooting.md#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-made-with-definemiddleware-and-given-to-use)).
+
+**Can it break your code?** No, unless a plugin function returned no app.
+`use(plugin)` still mounts a plugin, deprecated, with the same checks. A
+function given to it that returns anything but an app now throws, where in
+0.3 `use` returned what it returned: a middleware written without
+`defineMiddleware`, `(ctx, next) => …`, given to `use` was called once as
+a plugin and never guarded a request. Now it throws
+`use(): the plugin function returned a promise, not an app: …`; wrap it in
+`defineMiddleware`. Replace each `.use(plugin)` by `.plugin(plugin)`; each
+`.use(middleware)` stays. In the next minor, the plugin forms of `use` are
+removed, and `use` takes any `(ctx, next)` function as a middleware
+([Roadmap](roadmap.md)).
+
+New export: the type `PluginMethod`. `Mounted` and `RequiredIn` now come
+from `plugin-method.ts`, under the same names; `PluginForms`, the plugin
+forms of `use`, is deprecated.
+
+### How a middleware settles, and the details
+
+**What changed.** The middleware model above, in its details:
+
+- **A middleware that called `next()` and returns nothing answers with the
+  rest's response**, awaited or not, as Koa and Hono do. The 500
+  `a middleware returned nothing` is now only for a middleware that never
+  called `next()`.
+- **`next(); return reply(403)`**, a reply returned before the `next()` it
+  called settled: the rest runs anyway, so the reply is sent once it has,
+  `console.warn` logs
+  [`GET /…: a middleware returned before the next() it called settled: …`](troubleshooting.md#get--a-middleware-returned-before-the-next-it-called-settled-the-rest-of-the-route-ran-anyway-await-next-or-return-it),
+  and an error of the rest is logged with `console.error`, never an
+  unhandled rejection.
+- **On a socket route, once the upgrade happened**, what a middleware
+  returns after `next()` is ignored and what it throws is logged; the
+  socket stays open.
+- **`route(operation, …)`**: the implicit `validate` and `responds` both
+  stand just before the handler, after a `validate(operation)` placed
+  among the middlewares. The implicit `responds` checks the handler's
+  reply alone: an auth's 401 is its own. `responds(operation)`, new,
+  reads `schema.response` and, placed among the middlewares, checks the
+  replies made after it as before; the implicit one is then left out
+  ([Routes](guide/routes.md#middlewares-on-a-route-declared-as-data)).
+- **Each `validate` of the cookies reads the request's cookies**, not what
+  an earlier one gave back. A route with no middleware and no schema runs
+  no validation step. A schema in the route's arguments, the form of 0.3,
+  leaves the parts it has no schema for as they are: a body a `use`
+  middleware passed `next` reaches the handler.
+- **A list of hooks and middlewares, mixed, throws** where the route is
+  declared:
+  [`GET /: a list of hooks and middlewares are two forms, never mixed: …`](troubleshooting.md#get--a-list-of-hooks-and-middlewares-are-two-forms-never-mixed-give-the-hooks-as-middlewares-made-by-definemiddleware),
+  `route(operation, [hooks], auth, handler)` included, which in 0.3 took
+  `auth` for the handler and dropped the real one without a word.
+- **`validate` and `responds` are marked** with `Symbol.for('alxia.builtin')`
+  and carry `BuiltinMark<'validate' | 'responds'>` in their type, so two
+  copies of `@alxia/core` read each other's.
+- **The `Middleware` type no longer leaks `any`**: `MiddlewareResult`'s
+  brand is `Next`.
+- **A missing requirement is reported on the middleware forms**: the
+  overloads of the routes, `ws`, `route(operation)` and `use` are
+  ordered so that TypeScript names the key, `Property 'user' is missing in
+  type … but required in type '{ user: User; }'`, rather than the
+  deprecated list's `'~hooks'` message
+  ([Troubleshooting](troubleshooting.md#property-user-is-missing-in-type-routebase-but-required-in-type--user-user-)).
+
+**Can it break your code?** Only a route that mixed a list of hooks with
+middlewares, which never ran as written: give the hooks as middlewares.
+The rest is how the new forms behave.
+
+New export: the type `BuiltinMark`.
 
 ### alxia is OpenAPI spec first
 
@@ -588,7 +684,7 @@ imports the app, nor takes it as a parameter.
 **Can it break your code.** No for core: nothing reads `Register` until
 an app augments it. `@alxia/context-storage`'s `contextStorage<typeof
 base>()` now requires `base`'s context of the app that uses it, and so
-does `contextStorage()`, typed by `Register`: using it on an app that does
+does `contextStorage()`, typed by `Register`: mounting it on an app that does
 not give that context, which read `undefined` at runtime, is now a compile
 error. `@alxia/react-router`'s `alxiaOf(context)` reads core's `Register`
 when its own names no server; its own still wins.
@@ -616,7 +712,7 @@ export const todos = defineRoutes('/todos')
 	.get('/', ({ user, reply }) => reply(200, user.todos));
 
 // src/app.ts
-export const app = base.use(todos);
+export const app = base.plugin(todos);
 ```
 
 Register `base`, never the app that mounts the routes: `TS7022`

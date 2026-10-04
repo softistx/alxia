@@ -69,7 +69,7 @@ interface State {
  * entries carry the id.
  *
  * ```ts
- * app.use(logger()).get('/', ({ log, reply }) => { log.info('home'); return reply(200); });
+ * app.plugin(logger()).get('/', ({ log, reply }) => { log.info('home'); return reply(200); });
  * ```
  */
 export function logger(options: LoggerOptions = {}) {

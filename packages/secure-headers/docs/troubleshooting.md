@@ -18,7 +18,7 @@ or a header in the wrong place.
 **Runtime**
 
 - [`TypeError: secureHeaders: … is empty; give false to leave the … header out`](#typeerror-secureheaders--is-empty-give-false-to-leave-the--header-out)
-- [`TypeError: alxia().use(secureHeaders).get is not a function`](#typeerror-alxiausesecureheadersget-is-not-a-function)
+- [`TypeError: plugin(): the plugin function returned function, not an app: …`](#typeerror-plugin-the-plugin-function-returned-function-not-an-app-)
 - [`TypeError: secureHeaders: nonce is on, but the content-security-policy has no script-src to add it to: …`](#typeerror-secureheaders-nonce-is-on-but-the-content-security-policy-has-no-script-src-to-add-it-to-)
 - [`TypeError: secureHeaders: nonce is on, but contentSecurityPolicy is false: …`](#typeerror-secureheaders-nonce-is-on-but-contentsecuritypolicy-is-false-)
 - [`TypeError: secureHeaders: contentSecurityPolicy names NONCE, but nonce is off: give nonce: true`](#typeerror-secureheaders-contentsecuritypolicy-names-nonce-but-nonce-is-off-give-nonce-true)
@@ -69,7 +69,7 @@ policy.
 **Fix:** write the header as it goes out, or leave the key out:
 
 ```ts
-app.use(
+app.plugin(
 	secureHeaders({
 		contentSecurityPolicy: "default-src 'self'; img-src 'self' data:",
 		// xFrameOptions: true  →  leave it out for 'DENY'
@@ -99,7 +99,7 @@ key present with `undefined` is not a key left out.
 ```ts
 const production = Bun.env.NODE_ENV === 'production';
 
-app.use(secureHeaders({ ...(production ? {} : { strictTransportSecurity: false }) }));
+app.plugin(secureHeaders({ ...(production ? {} : { strictTransportSecurity: false }) }));
 ```
 
 ### `No overload matches this call` … `Object literal may only specify known properties, and '…' does not exist in type 'SecureHeadersOptions & …'`
@@ -129,7 +129,7 @@ import { alxia, withHeaders } from '@alxia/core';
 import { secureHeaders } from '@alxia/secure-headers';
 
 const app = alxia()
-	.use(secureHeaders({ hidePoweredBy: true }))
+	.plugin(secureHeaders({ hidePoweredBy: true }))
 	.onResponse((response) =>
 		withHeaders(response, (headers) =>
 			headers.set('content-security-policy-report-only', "default-src 'self'"),
@@ -139,7 +139,7 @@ const app = alxia()
 
 ### `No overload matches this call` … `Property 'nonce' is missing in type 'Alxia<Empty, "", never>'`
 
-**When:** `secureHeaders` is given to `use` without being called.
+**When:** `secureHeaders` is given to `app.plugin` without being called.
 
 ```text
 error TS2769: No overload matches this call.
@@ -157,7 +157,7 @@ overload, the nonce one, and says what that lacks.
 **Fix:** call it, with or without options:
 
 ```ts
-app.use(secureHeaders());
+app.plugin(secureHeaders());
 ```
 
 ### `Property 'nonce' does not exist on type 'Context<…>'`
@@ -169,14 +169,14 @@ error TS2339: Property 'nonce' does not exist on type 'Context<Empty, "/", Empty
 ```
 
 **Why:** only `secureHeaders({ nonce: true })` adds it, and only to the
-routes declared after its `use`. Without `nonce: true`, or on a route
+routes declared after its `app.plugin`. Without `nonce: true`, or on a route
 declared before it, there is none.
 
 **Fix:** turn it on, and declare the routes that read it after it:
 
 ```ts
 alxia()
-	.use(secureHeaders({ nonce: true, contentSecurityPolicy: "script-src 'self'" }))
+	.plugin(secureHeaders({ nonce: true, contentSecurityPolicy: "script-src 'self'" }))
 	.get('/', ({ nonce, reply }) => reply(200, nonce));
 ```
 
@@ -202,8 +202,8 @@ routes read one.
 ```ts
 const policy = "default-src 'self'; script-src 'self'";
 const app = useNonce
-	? alxia().use(secureHeaders({ nonce: true, contentSecurityPolicy: policy }))
-	: alxia().use(secureHeaders({ contentSecurityPolicy: policy }));
+	? alxia().plugin(secureHeaders({ nonce: true, contentSecurityPolicy: policy }))
+	: alxia().plugin(secureHeaders({ contentSecurityPolicy: policy }));
 ```
 
 Or keep it on everywhere: the nonce costs one random draw per request.
@@ -226,23 +226,24 @@ Only `false` leaves a header out.
 **Fix:**
 
 ```ts
-app.use(secureHeaders({ xFrameOptions: false }));
+app.plugin(secureHeaders({ xFrameOptions: false }));
 ```
 
-### `TypeError: alxia().use(secureHeaders).get is not a function`
+### `TypeError: plugin(): the plugin function returned function, not an app: …`
 
-**When:** the same mistake as above in JavaScript, or past a cast: the
-chain breaks on the next method after `use(secureHeaders)`.
+**When:** the same mistake as above in JavaScript, or past a cast:
+`alxia().plugin(secureHeaders)`, the factory given uncalled. It throws at
+startup.
 
-**Why:** `use` calls the function with the app. Uncalled, `secureHeaders`
-reads the app as its options and returns a plugin, not the app, so the
-next `.get` is called on a function.
+**Why:** `app.plugin` calls a function with the app, and expects the app
+back. Uncalled, `secureHeaders` reads the app as its options and returns
+a plugin, a function, not the app.
 
 **Fix:**
 
 ```ts
 const app = alxia()
-	.use(secureHeaders())
+	.plugin(secureHeaders())
 	.get('/', ({ reply }) => reply(200, 'ok'));
 ```
 
@@ -265,8 +266,8 @@ change what else they may load.
 ```ts
 import { NONCE, secureHeaders } from '@alxia/secure-headers';
 
-app.use(secureHeaders({ nonce: true, contentSecurityPolicy: "default-src 'self'; script-src 'self'" }));
-app.use(secureHeaders({ nonce: true, contentSecurityPolicy: `default-src 'self' ${NONCE}` }));
+app.plugin(secureHeaders({ nonce: true, contentSecurityPolicy: "default-src 'self'; script-src 'self'" }));
+app.plugin(secureHeaders({ nonce: true, contentSecurityPolicy: `default-src 'self' ${NONCE}` }));
 ```
 
 ### `TypeError: secureHeaders: nonce is on, but contentSecurityPolicy is false: …`
@@ -302,7 +303,7 @@ browser's console.
 ```ts
 import { NONCE, secureHeaders } from '@alxia/secure-headers';
 
-app.use(secureHeaders({ nonce: true, contentSecurityPolicy: `script-src 'self' ${NONCE}` }));
+app.plugin(secureHeaders({ nonce: true, contentSecurityPolicy: `script-src 'self' ${NONCE}` }));
 ```
 
 ## In the browser
@@ -410,7 +411,7 @@ other.
 **Fix:** change both:
 
 ```ts
-app.use(
+app.plugin(
 	secureHeaders({
 		contentSecurityPolicy: "default-src 'none'; frame-ancestors 'self'",
 		xFrameOptions: 'SAMEORIGIN',
@@ -431,7 +432,7 @@ origin embed its responses. A CORS `fetch` is not concerned.
 routes that need it, on their reply:
 
 ```ts
-app.use(secureHeaders({ crossOriginResourcePolicy: 'cross-origin' }));
+app.plugin(secureHeaders({ crossOriginResourcePolicy: 'cross-origin' }));
 ```
 
 ### `window.opener` is `null` in a sign-in popup
@@ -446,7 +447,7 @@ browsing context group of its own, cut from any window of another origin.
 **Fix:**
 
 ```ts
-app.use(secureHeaders({ crossOriginOpenerPolicy: 'same-origin-allow-popups' }));
+app.plugin(secureHeaders({ crossOriginOpenerPolicy: 'same-origin-allow-popups' }));
 ```
 
 ### A subdomain on plain HTTP no longer opens
@@ -464,7 +465,7 @@ over HTTPS.
 header altogether where the app is not served over HTTPS:
 
 ```ts
-app.use(secureHeaders({ strictTransportSecurity: 'max-age=31536000' }));
+app.plugin(secureHeaders({ strictTransportSecurity: 'max-age=31536000' }));
 ```
 
 A browser that already stored the policy keeps it until it expires, or
@@ -508,7 +509,7 @@ const app = alxia()
 	.onResponse((response) =>
 		withHeaders(response, (headers) => headers.set('x-powered-by', 'my-app')),
 	)
-	.use(secureHeaders()); // its hook runs after, and deletes it
+	.plugin(secureHeaders()); // its hook runs after, and deletes it
 ```
 
 ### A response arrives without the headers
@@ -552,7 +553,7 @@ values on their replies:
 
 ```ts
 const app = alxia()
-	.use(secureHeaders())
+	.plugin(secureHeaders())
 	.get('/embed', ({ reply }) =>
 		reply(200, 'ok', {
 			headers: {

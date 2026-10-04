@@ -42,7 +42,7 @@ export type ProvidedBy<Ctx, Requires> = [AnyMessage<Requires>] extends [never]
 						? (BaseContext & Ctx)[Key] extends Requires[Key]
 							? never
 							: `the plugin reads "${Key & (string | number)}", which this app's context gives with another type`
-						: `the plugin reads "${Key & (string | number)}", which this app's context does not give: use the plugin that adds it first`;
+						: `the plugin reads "${Key & (string | number)}", which this app's context does not give: add the plugin or middleware that gives it first`;
 				}[keyof Requires] extends infer Message
 			? {
 					readonly '~requires': [Message] extends [never]
@@ -77,7 +77,7 @@ type AnyMessage<Requires> = [Requires] extends [never]
  *
  * A parameter annotated `any` — or `Record<string, any>`, any key as `any` —
  * would read anything and require nothing, so the check would be off
- * without a word: it gives a requirement `use` refuses on every app,
+ * without a word: it gives a requirement `plugin` refuses on every app,
  * naming `Callback` — `resolve`, `load` — in its message. `unknown` and
  * `object` read nothing without a cast, and give `Empty`, as an unannotated
  * parameter does.

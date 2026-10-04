@@ -71,7 +71,7 @@ describe('the span of a streamed body', () => {
 		batch: 1,
 	});
 	const app = alxia()
-		.use(telemetry({ instance }))
+		.plugin(telemetry({ instance }))
 		.get('/slow', ({ reply }) => reply(200, slow()))
 		.get('/failing', ({ reply }) => reply(200, failing()))
 		.get('/ticks', responds({ 200: Tick }), ({ reply }) => reply(200, ticks()))
@@ -161,7 +161,7 @@ describe('a streamed body without a server', () => {
 			],
 		});
 		const app = alxia()
-			.use(telemetry({ instance }))
+			.plugin(telemetry({ instance }))
 			.get('/ticks', responds({ 200: Tick }), ({ reply }) =>
 				reply(200, ticks()),
 			);
@@ -188,7 +188,7 @@ describe('an unsampled span', () => {
 			pull: (controller) => controller.close(),
 		});
 		const app = alxia()
-			.use(telemetry({ instance }))
+			.plugin(telemetry({ instance }))
 			.get('/stream', ({ reply }) => reply(200, body));
 		const response = await app.request('/stream');
 		expect(response.body === body).toBe(true);

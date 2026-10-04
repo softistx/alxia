@@ -12,7 +12,7 @@ import { language } from '@alxia/language';
 const greetings = { en: 'Hello', fr: 'Bonjour', 'pt-BR': 'Olá' };
 
 const app = alxia()
-	.use(language({ supported: ['en', 'fr', 'pt-BR'], fallback: 'en' }))
+	.plugin(language({ supported: ['en', 'fr', 'pt-BR'], fallback: 'en' }))
 	.get('/', ({ language: current, reply }) => reply(200, greetings[current]));
 
 app.listen(3000);
@@ -54,7 +54,7 @@ type `resolve`'s parameter is annotated with. `RequiresOf<Ctx>`,
 see
 [Reading the app's context](#reading-the-apps-context).
 
-`language()` returns an app plugin: pass it to `use`, called. It is a
+`language()` returns an app plugin: pass it to `app.plugin`, called. It is a
 `derive`, so it applies to the routes declared **after** it — in the same
 app, or inside the [group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md)
 it is used in — and adds `language` and `languageSource` to their context.
@@ -146,7 +146,7 @@ routes still declare it, as a parameter:
 
 ```ts
 const app = alxia()
-	.use(language({ supported: ['en', 'fr'], fallback: 'en', order: ['path', 'header'] }))
+	.plugin(language({ supported: ['en', 'fr'], fallback: 'en', order: ['path', 'header'] }))
 	.get('/:lang/products', ({ language: current, reply }) => reply(200, current));
 
 await app.request('/fr/products'); // 'fr'
@@ -254,12 +254,12 @@ const byUser = language({
 });
 
 const app = alxia()
-	.use(auth) // derives user: User | null
-	.use(byUser)
+	.plugin(auth) // derives user: User | null
+	.plugin(byUser)
 	.get('/', ({ language: current, reply }) => reply(200, current)); // 'en' | 'fr'
 
-alxia().use(byUser);
-// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+alxia().plugin(byUser);
+// error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
 The annotation may be `BaseContext & { user: User }` or `{ user: User }`
@@ -414,7 +414,7 @@ type Language = (typeof supported)[number];
 const titles: Record<Language, string> = { en: 'Products', fr: 'Produits' };
 
 const app = alxia()
-	.use(language({ supported, fallback: 'en' }))
+	.plugin(language({ supported, fallback: 'en' }))
 	.get('/products', ({ language: current, languageSource, reply }) =>
 		reply(200, { title: titles[current], decidedBy: languageSource }),
 	);
@@ -485,7 +485,7 @@ const messages: Record<Language, { welcome: string }> = {
 };
 
 export const app = alxia()
-	.use(
+	.plugin(
 		language({
 			supported,
 			fallback: 'en',

@@ -13,7 +13,7 @@ a realistic example for each.
 | [Replies](guide/replies.md) | answering with a status, a file, a header, a cookie, a redirect or an RFC 9457 problem, or turning an error into a response |
 | [Middleware: which way to use](guide/middleware.md) | writing a middleware with `defineMiddleware`, choosing between a route's middlewares, `use(...middlewares)` and `use(path, …)` for the routes after it, `derive`, `wrap`, `onError`, `onRefusal`, a global hook, a group or a plugin, or reading the order a request runs them in, `validate` and `responds` included |
 | [Hooks](guide/hooks.md) | authenticating, adding to the context, answering a refused request in your own format, timing or tracing a request, or editing every response |
-| [Groups and plugins](guide/groups-and-plugins.md) | splitting the app across files with `defineRoutes`, scoping hooks and middlewares to some routes, or reading what `use` mounts |
+| [Groups and plugins](guide/groups-and-plugins.md) | splitting the app across files with `defineRoutes`, scoping hooks and middlewares to some routes, or reading what `plugin` mounts |
 | [Writing a plugin](guide/writing-a-plugin.md) | writing a plugin: an app, a `Plugin` function, or a `definePlugin` that reads what an earlier plugin added |
 | [Static files](guide/static-files.md) | serving a directory, one file, a single-page app, or a Bun HTML bundle |
 | [Server-sent events](guide/server-sent-events.md) | streaming typed events to a client |

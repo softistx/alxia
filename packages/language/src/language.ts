@@ -54,7 +54,7 @@ export interface LanguageOptions<
  * order given, then `fallback`.
  *
  * ```ts
- * app.use(language({ supported: ['en', 'fr'], fallback: 'en' }))
+ * app.plugin(language({ supported: ['en', 'fr'], fallback: 'en' }))
  *    .get('/', ({ language, reply }) => reply(200, language)); // 'en' | 'fr'
  * ```
  */
@@ -76,7 +76,7 @@ export function language<
 					? undefined
 					: options.persist,
 		contentLanguage: options.contentLanguage !== false,
-		// `use` has checked that the app gives what `resolve` reads.
+		// `app.plugin` has checked that the app gives what `resolve` reads.
 		resolve: options.resolve as Settings<L>['resolve'],
 		vary: options.vary ?? [],
 	};

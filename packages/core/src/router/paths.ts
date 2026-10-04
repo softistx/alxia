@@ -3,7 +3,7 @@ import { compilePath } from './compile';
 
 /**
  * `prefix` then `path`, as the app joins them: a prefix, a group, a plugin
- * given to `use`. `/` under `/api` is `/api`, and an empty prefix leaves the
+ * given to `plugin`. `/` under `/api` is `/api`, and an empty prefix leaves the
  * path as it is. `JoinPath` is its type. It checks neither argument: the
  * app refuses a prefix or a path that is not absolute when it is given.
  *

@@ -86,7 +86,7 @@ const OPTION: Record<keyof typeof DEFAULTS, keyof SecureHeadersOptions> = {
  * `@alxia/graphql`'s IDE — sets it.
  *
  * ```ts
- * app.use(secureHeaders({ contentSecurityPolicy: "default-src 'self'" }));
+ * app.plugin(secureHeaders({ contentSecurityPolicy: "default-src 'self'" }));
  * ```
  *
  * With `nonce: true`, each request gets a nonce of its own, in the policy
@@ -94,7 +94,7 @@ const OPTION: Record<keyof typeof DEFAULTS, keyof SecureHeadersOptions> = {
  *
  * ```ts
  * app
- *   .use(secureHeaders({ nonce: true, contentSecurityPolicy: "script-src 'self'" }))
+ *   .plugin(secureHeaders({ nonce: true, contentSecurityPolicy: "script-src 'self'" }))
  *   .get('/', ({ nonce, reply }) => reply(200, `<script nonce="${nonce}">…</script>`));
  * ```
  */

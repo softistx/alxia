@@ -22,8 +22,8 @@ const SignUp = z.object({ email: z.string(), name: z.string(), password: z.strin
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.use(janusErrors()) // a refused sign-in answered 401, a login taken 409
-	.use(session(accounts)) // not required: the people signing in are anonymous
+	.plugin(janusErrors()) // a refused sign-in answered 401, a login taken 409
+	.plugin(session(accounts)) // not required: the people signing in are anonymous
 	.post('/signup', validate({ body: SignUp }), async ({ body, auth, reply }) => {
 		const signedUp = await accounts.signUp(body);
 		return reply.created({ id: auth.send(signedUp).id });
@@ -91,8 +91,8 @@ const accounts = janus({
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.use(janusErrors())
-	.use(session(accounts))
+	.plugin(janusErrors())
+	.plugin(session(accounts))
 	.post('/patients/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.patient.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
@@ -167,8 +167,8 @@ const accounts = janus({
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.use(janusErrors())
-	.use(session(accounts))
+	.plugin(janusErrors())
+	.plugin(session(accounts))
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body, { device: auth.device });
 		return reply.ok({
@@ -202,7 +202,7 @@ and `ctx.auth.send` sets, so they always agree:
 const device = { name: 'shop-device', domain: 'example.com' };
 
 alxia()
-	.use(session(accounts, { device }))
+	.plugin(session(accounts, { device }))
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body, { device: auth.device });
 		return reply.ok({ id: auth.send(signedIn).id });
@@ -257,13 +257,13 @@ const accounts = janus({
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.use(janusErrors())
+	.plugin(janusErrors())
 	.post('/signin', validate({ body: SignIn }), async (ctx) => {
 		const signedIn = await accounts.signIn(ctx.body, { device: deviceOf(ctx) });
 		return ctx.reply.ok({ id: sendSession(ctx, accounts, signedIn).id });
 	})
 	.post('/signout', async (ctx) => ctx.reply.ok(await signOut(ctx, accounts)))
-	.use(session(accounts, { required: true }))
+	.plugin(session(accounts, { required: true }))
 	.get('/me', ({ user, reply }) => reply.ok({ name: user.name }));
 ```
 

@@ -9,9 +9,7 @@ export type {
 } from './app/app-hooks';
 export type {
 	GroupMethod,
-	Mounted,
 	PluginForms,
-	RequiredIn,
 	UseMethod,
 } from './app/compose-methods';
 export { defineHook, defineWrap } from './app/define-hook';
@@ -37,6 +35,11 @@ export type {
 	OperationResponds,
 	OperationValidate,
 } from './app/operation-types';
+export type {
+	Mounted,
+	PluginMethod,
+	RequiredIn,
+} from './app/plugin-method';
 export type * from './app/register';
 export type {
 	AppWithRoute,
@@ -91,6 +94,7 @@ export type {
 	BaseContext,
 	BodyLimited,
 	BodyLimitShortcut,
+	BuiltinMark,
 	Context,
 	DeclaredRefusal,
 	DeclaredReply,

@@ -5,7 +5,7 @@ import { type LogEntry, logger } from './logger';
 describe('logger', () => {
 	const entries: LogEntry[] = [];
 	const app = alxia()
-		.use(
+		.plugin(
 			logger({
 				write: (entry) => entries.push(entry),
 				skip: (_, url) => url.pathname === '/health',
@@ -56,7 +56,7 @@ describe('logger', () => {
 		console.error = (error: unknown) => reported.push(error);
 		try {
 			const broken = alxia()
-				.use(
+				.plugin(
 					logger({
 						write: () => {
 							throw new Error('disk full');
@@ -92,7 +92,7 @@ describe('logger', () => {
 		console.error = (error: unknown) => reported.push(error);
 		try {
 			const app = alxia()
-				.use(
+				.plugin(
 					logger({
 						write: async () => {
 							throw new Error('remote down');

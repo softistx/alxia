@@ -72,7 +72,7 @@ export interface Cache {
  *
  * ```ts
  * const products = cache({ ttl: 60, staleWhileRevalidate: 300, tags: () => ['products'] });
- * app.use(products).get('/products', ...);
+ * app.plugin(products).get('/products', ...);
  * await products.invalidateTag('products');
  * ```
  *

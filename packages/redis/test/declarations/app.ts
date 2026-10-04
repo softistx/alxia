@@ -28,7 +28,7 @@ const users = defineCache({
 
 export function withRedis() {
 	return alxia()
-		.use(redis(client, { caches: { users } }))
+		.plugin(redis(client, { caches: { users } }))
 		.get('/users/:id', async ({ caches, lock, pathParams, reply }) => {
 			const id = pathParams['id'] ?? '';
 			const user = await lock(id, () =>
@@ -40,7 +40,7 @@ export function withRedis() {
 
 export function bare() {
 	return alxia()
-		.use(redis(client))
+		.plugin(redis(client))
 		.get('/', async ({ redis: connection, reply }) =>
 			reply(200, await connection.get('k')),
 		);
@@ -48,20 +48,22 @@ export function bare() {
 
 export function idempotent() {
 	return alxia()
-		.use(idempotency(client, { name: 'orders', required: true }))
+		.plugin(idempotency(client, { name: 'orders', required: true }))
 		.post('/orders', ({ reply }) => reply(201, { id: 'o1' }));
 }
 
 export function stores() {
 	return alxia()
-		.use(
+		.plugin(
 			rateLimit({
 				limit: 100,
 				windowMs: 60_000,
 				store: redisStore(client, { name: 'api' }),
 			}),
 		)
-		.use(cache({ ttl: 60, store: redisCacheStore(client, { name: 'shop' }) }))
+		.plugin(
+			cache({ ttl: 60, store: redisCacheStore(client, { name: 'shop' }) }),
+		)
 		.get('/', ({ reply }) => reply(200, 'ok'));
 }
 
@@ -70,6 +72,6 @@ export function withCaches<const Caches extends Record<string, AnyCache>>(
 	caches: Caches,
 ) {
 	return alxia()
-		.use(redis(client, { caches }))
+		.plugin(redis(client, { caches }))
 		.get('/', ({ caches: bound, reply }) => reply(200, Object.keys(bound)));
 }

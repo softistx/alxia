@@ -13,6 +13,7 @@ export type {
 } from './context';
 export type {
 	AddedOf,
+	BuiltinMark,
 	HandlerContext,
 	Merge,
 	Middleware,

@@ -4,9 +4,11 @@
  */
 import { joinPath } from '../router/paths';
 import { type AppState, mount, register } from './app-state';
+import { isMiddleware } from './define-middleware';
 import { refuseShadowedPages } from './pages';
 import { mergeGlobals } from './runtime';
 import type { AnyAlxia } from './signatures';
+import { builtinOf } from './validate';
 
 /** A group's build: given the group, it returns it with its routes declared. */
 type Build = (group: AnyAlxia) => AnyAlxia;
@@ -43,31 +45,58 @@ export function group(
 }
 
 /**
- * The plugin `use` is given, alone: an app, or a function given the app.
- * A function `defineMiddleware` made was read before, as a middleware.
- * `isApp` tells an app.
+ * The plugin `plugin` is given, or `use` in its deprecated plugin form —
+ * a function `defineMiddleware` made was read before, as a middleware —
+ * alone.
  */
-export function pluginOf(
-	args: readonly unknown[],
-	isApp: (value: unknown) => value is AnyAlxia,
-): AnyAlxia | ((app: AnyAlxia) => AnyAlxia) {
-	const [plugin] = args;
+export function pluginOf(label: string, args: readonly unknown[]): unknown {
 	if (args.length === 0) {
-		throw new TypeError('use(): nothing is given: a plugin, or middlewares');
+		throw new TypeError(
+			`${label}: nothing is given: ${label === 'use()' ? 'middlewares' : 'a plugin, an app or a function'}`,
+		);
 	}
 	if (args.length !== 1) {
 		throw new TypeError(
-			'use(): a plugin is given alone; middlewares are made with defineMiddleware()',
+			`${label}: a plugin is given alone, to app.plugin(); middlewares are made with defineMiddleware() and given to use()`,
 		);
 	}
-	if (isApp(plugin) || typeof plugin === 'function') return plugin as never;
+	return args[0];
+}
+
+/**
+ * What `app.plugin(plugin)` mounts: an app, or what a function given the
+ * app returns, which must be an app. `isApp` tells one. A function that
+ * returns anything else — a middleware not made by `defineMiddleware`,
+ * called once with the app — throws, and its promise, if it returned one,
+ * is left handled: its guard would otherwise never run on any request.
+ */
+export function pluginApp(
+	label: string,
+	plugin: unknown,
+	app: AnyAlxia,
+	isApp: (value: unknown) => value is AnyAlxia,
+): AnyAlxia {
+	if (isApp(plugin)) return plugin;
+	if (typeof plugin !== 'function') {
+		throw new TypeError(
+			`${label}: the plugin is neither an app nor a function; a middleware is made with defineMiddleware() and given to use()`,
+		);
+	}
+	if (isMiddleware(plugin) || builtinOf(plugin) !== undefined) {
+		throw new TypeError(
+			`${label}: a middleware is given to use(), not taken for a plugin`,
+		);
+	}
+	const result: unknown = plugin(app);
+	if (isApp(result)) return result;
+	if (result instanceof Promise) result.catch(() => {});
 	throw new TypeError(
-		"use(): the plugin is neither an app nor a function; a middleware is made with defineMiddleware(), and a hook of defineHook() or defineWrap() goes in a route's list",
+		`${label}: the plugin function returned ${result instanceof Promise ? 'a promise' : typeof result}, not an app: a plugin returns the app it is given; a middleware is made with defineMiddleware() and given to use()`,
 	);
 }
 
 /**
- * `app.use(plugin)`, an app: its routes under this app's prefix and behind
+ * `app.plugin(plugin)`, an app: its routes under this app's prefix and behind
  * its hooks, its hooks for the routes declared after it, its global hooks.
  */
 export function usePlugin(state: AppState, plugin: AppState): void {

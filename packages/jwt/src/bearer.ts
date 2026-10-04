@@ -36,7 +36,7 @@ type User<Schema> = Schema extends StandardSchemaV1
  * each such route's type.
  *
  * ```ts
- * app.use(bearer({ jwt, schema: z.object({ sub: z.string(), role: z.enum(['admin', 'user']) }) }))
+ * app.plugin(bearer({ jwt, schema: z.object({ sub: z.string(), role: z.enum(['admin', 'user']) }) }))
  *    .get('/me', ({ user, reply }) => reply(200, user));
  * ```
  */

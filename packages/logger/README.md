@@ -15,7 +15,7 @@ bun add -d typescript
 import { logger } from '@alxia/logger';
 
 const app = alxia()
-	.use(logger())
+	.plugin(logger())
 	.get('/orders/:id', ({ log, requestId, reply }) => {
 		log.info('order read', { id: requestId });
 		return reply(200, ...);

@@ -45,7 +45,7 @@ const METHODS = [
  * and every response to an allowed origin carries its headers.
  *
  * ```ts
- * const app = alxia().use(cors({ origin: ['https://app.example.com'], credentials: true }));
+ * const app = alxia().plugin(cors({ origin: ['https://app.example.com'], credentials: true }));
  * ```
  */
 export function cors(options: CorsOptions = {}): Plugin {

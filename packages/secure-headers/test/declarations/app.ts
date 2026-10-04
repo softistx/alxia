@@ -6,13 +6,13 @@ import { NONCE, secureHeaders } from '@alxia/secure-headers';
 
 export function secured() {
 	return alxia()
-		.use(secureHeaders({ referrerPolicy: 'same-origin' }))
+		.plugin(secureHeaders({ referrerPolicy: 'same-origin' }))
 		.get('/', ({ reply }) => reply(200, 'ok'));
 }
 
 export function withNonce() {
 	return alxia()
-		.use(
+		.plugin(
 			secureHeaders({
 				nonce: true,
 				contentSecurityPolicy: `script-src 'self'; style-src 'self' ${NONCE}`,

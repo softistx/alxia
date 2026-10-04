@@ -37,7 +37,7 @@ Nothing scheduled yet.
 ### 0.1.0
 
 - **Secure headers on every response.** `secureHeaders()` is a plugin for
-  `use` that sends `Content-Security-Policy`, `Strict-Transport-Security`,
+  `app.plugin` that sends `Content-Security-Policy`, `Strict-Transport-Security`,
   `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
   `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`,
   `Origin-Agent-Cluster`, `X-DNS-Prefetch-Control` and

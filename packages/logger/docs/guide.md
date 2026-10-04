@@ -9,7 +9,7 @@ import { alxia } from '@alxia/core';
 import { logger } from '@alxia/logger';
 
 const app = alxia()
-	.use(logger())
+	.plugin(logger())
 	.get('/orders/:id', ({ params, log, requestId, reply }) => {
 		log.info('order read', { order: params.id });
 		return reply(200, { id: params.id, requestId });
@@ -30,7 +30,7 @@ took in `Server-Timing`:
 ## Options
 
 ```ts
-function logger(options?: LoggerOptions): Alxia<…> // an app plugin: give it to `use`
+function logger(options?: LoggerOptions): Alxia<…> // an app plugin: give it to `app.plugin`
 
 interface LoggerOptions {
 	readonly write?: (entry: LogEntry) => void;
@@ -59,7 +59,7 @@ can go to any sink. To a file, one JSON line each:
 ```ts
 const file = Bun.file('requests.log').writer();
 
-app.use(logger({ write: (entry) => file.write(`${JSON.stringify(entry)}\n`) }));
+app.plugin(logger({ write: (entry) => file.write(`${JSON.stringify(entry)}\n`) }));
 ```
 
 To a logger that already has levels, such as pino, whose `info`, `warn`
@@ -70,7 +70,7 @@ import pino from 'pino';
 
 const sink = pino();
 
-app.use(logger({ write: ({ level, message, ...fields }) => sink[level](fields, message) }));
+app.plugin(logger({ write: ({ level, message, ...fields }) => sink[level](fields, message) }));
 ```
 
 Logging never breaks a request. A `write` that throws, or returns a
@@ -81,7 +81,7 @@ does not turn it into a 500:
 
 ```ts
 const app = alxia()
-	.use(logger({ write: () => { throw new Error('sink down'); } }))
+	.plugin(logger({ write: () => { throw new Error('sink down'); } }))
 	.get('/orders/:id', ({ log, reply }) => {
 		log.info('order read'); // lost, and `Error: sink down` on stderr
 		return reply(200, 'ok'); // still 200, with both headers
@@ -94,7 +94,7 @@ with `console.error` once it rejects, so a sink that sends each entry over
 the network needs no `catch` of its own:
 
 ```ts
-app.use(
+app.plugin(
 	logger({
 		write: async (entry) => {
 			await fetch('https://logs.internal/entries', { method: 'POST', body: JSON.stringify(entry) });
@@ -109,7 +109,7 @@ The header is matched without regard to case, as every header is. Name the
 one your proxy or your other services already use:
 
 ```ts
-app.use(logger({ header: 'x-correlation-id' }));
+app.plugin(logger({ header: 'x-correlation-id' }));
 ```
 
 ### `generateId`
@@ -117,7 +117,7 @@ app.use(logger({ header: 'x-correlation-id' }));
 An id from a library you already use, or one sortable by time:
 
 ```ts
-app.use(logger({ generateId: () => Bun.randomUUIDv7() })); // sortable by time
+app.plugin(logger({ generateId: () => Bun.randomUUIDv7() })); // sortable by time
 ```
 
 The id it makes must pass the same rule as an incoming one (see
@@ -128,7 +128,7 @@ The id it makes must pass the same rule as an incoming one (see
 with `console.error`:
 
 ```ts
-app.use(logger({ generateId: () => 'a b' })); // X-Request-Id: a new UUID, not "a b"
+app.plugin(logger({ generateId: () => 'a b' })); // X-Request-Id: a new UUID, not "a b"
 ```
 
 ### `trustIncomingId`
@@ -148,7 +148,7 @@ no proxy setting the header, should turn it off, so a client cannot choose
 the id its requests are logged under:
 
 ```ts
-app.use(logger({ trustIncomingId: false }));
+app.plugin(logger({ trustIncomingId: false }));
 ```
 
 ### `serverTiming`
@@ -159,7 +159,7 @@ a `Server-Timing` the route already set is kept beside it. Turn it off when
 the timing should not leave the server:
 
 ```ts
-app.use(logger({ serverTiming: false }));
+app.plugin(logger({ serverTiming: false }));
 ```
 
 ### `skip`
@@ -169,7 +169,7 @@ only its own entry is not written. What a route logs through `log` is still
 written:
 
 ```ts
-app.use(logger({ skip: (_, url) => url.pathname === '/health' || url.pathname.startsWith('/assets/') }));
+app.plugin(logger({ skip: (_, url) => url.pathname === '/health' || url.pathname.startsWith('/assets/') }));
 ```
 
 A `skip` that throws logs the request, as if it had returned `false`, and
@@ -223,7 +223,7 @@ import { z } from 'zod';
 const Tick = eventStream(z.object({ n: z.number() }));
 
 const app = alxia()
-	.use(logger())
+	.plugin(logger())
 	.get('/ticks', responds({ 200: Tick }), ({ reply }) =>
 		reply(
 			200,
@@ -265,7 +265,7 @@ return new Response(file, { headers: { 'content-length': String(file.size) } });
 
 What decides is the `Content-Length` of the response when the plugin's
 `onResponse` hook sees it. `@alxia/compress` removes it from the body it
-compresses: with `use(compress())` declared **before** `use(logger())`,
+compresses: with `plugin(compress())` declared **before** `plugin(logger())`,
 a compressed JSON reply is a stream by then, and is logged with
 `timeToHeaders` and `outcome: "completed"` once sent. Declared after it,
 as the plugin should be, compress runs later and the reply is logged at
@@ -294,7 +294,7 @@ const app = alxia({
 	ip: (request, server) =>
 		request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
 		server?.requestIP(request)?.address,
-}).use(logger());
+}).plugin(logger());
 ```
 
 `app.request` and `app.fetch` run without a server, so their entries have
@@ -302,7 +302,7 @@ no `ip`.
 
 ## `log` and `requestId`
 
-The routes declared after `use(logger())` read two more keys from their
+The routes declared after `plugin(logger())` read two more keys from their
 context:
 
 ```ts
@@ -312,7 +312,7 @@ interface RequestLog {
 	error(message: string, fields?: Record<string, unknown>): void;
 }
 
-// in the context of every route after `use(logger())`:
+// in the context of every route after `plugin(logger())`:
 // requestId: string
 // log: RequestLog
 ```
@@ -333,7 +333,7 @@ log.info('paid', { requestId: 'mine', level: 'error' });
 services you call, so their logs carry it too:
 
 ```ts
-app.use(logger()).post('/checkout', async ({ requestId, log, reply }) => {
+app.plugin(logger()).post('/checkout', async ({ requestId, log, reply }) => {
 	const response = await fetch('https://payments.internal/charges', {
 		method: 'POST',
 		headers: { 'x-request-id': requestId },
@@ -346,14 +346,14 @@ app.use(logger()).post('/checkout', async ({ requestId, log, reply }) => {
 ### Declared before, or after
 
 `log` and `requestId` come from a `derive`, so they reach only the routes
-and route hooks declared after `use(logger())`. A route declared before it
+and route hooks declared after `plugin(logger())`. A route declared before it
 is a compile error, `Property 'log' does not exist`
 ([Troubleshooting](troubleshooting.md#property-log-does-not-exist-on-type-context)).
 In a `derive` of your own, after the plugin, they are there:
 
 ```ts
 app
-	.use(logger())
+	.plugin(logger())
 	.derive(({ request, log }) => {
 		const user = request.headers.get('x-user');
 		if (user === null) log.warn('anonymous request');
@@ -369,7 +369,7 @@ ran. Log the error with the request's id:
 
 ```ts
 app
-	.use(logger())
+	.plugin(logger())
 	.onError((error, { log }) => {
 		log?.error('request failed', { error: String(error) });
 		return undefined; // the app still answers 500
@@ -390,8 +390,8 @@ an `onResponse` that writes the entry and sets the headers. Global hooks
 apply to the whole app, wherever they are declared, so:
 
 - every request is logged and gets the header, including the routes
-  declared before `use(logger())` and those outside a `group` that uses it;
-- the order of global hooks is the order declared. Use the plugin first, so
+  declared before `plugin(logger())` and those outside a `group` that mounts it;
+- the order of global hooks is the order declared. Mount the plugin first, so
   its `duration` covers the `onRequest` hooks after it. Its `onResponse`
   then runs before those declared after it (CORS, security headers); they
   add headers but do not change the status it logs:
@@ -401,7 +401,7 @@ import { alxia } from '@alxia/core';
 import { logger } from '@alxia/logger';
 
 const app = alxia()
-	.use(logger({ skip: (_, url) => url.pathname === '/health' }))
+	.plugin(logger({ skip: (_, url) => url.pathname === '/health' }))
 	.get('/health', ({ reply }) => reply(200, 'ok'))
 	.group('/api', (api) => api.get('/me', ({ log, reply }) => {
 		log.info('me');
@@ -427,7 +427,7 @@ import { type LogEntry, logger } from '@alxia/logger';
 
 const entries: LogEntry[] = [];
 const app = alxia()
-	.use(logger({ write: (entry) => entries.push(entry) }))
+	.plugin(logger({ write: (entry) => entries.push(entry) }))
 	.get('/hello', ({ requestId, log, reply }) => {
 		log.info('greeting', { who: 'ada' });
 		return reply(200, requestId);
@@ -445,7 +445,7 @@ test('every entry carries the id sent back', async () => {
 A fixed `generateId` makes the id predictable when the request brings none:
 
 ```ts
-const app = alxia().use(logger({ write: () => {}, generateId: () => 'test-id' }));
+const app = alxia().plugin(logger({ write: () => {}, generateId: () => 'test-id' }));
 ```
 
 A streamed route's entry is written only once its body has been read or

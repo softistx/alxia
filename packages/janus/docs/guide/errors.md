@@ -21,8 +21,8 @@ const accounts = janus({
 const SignUp = z.object({ email: z.string(), name: z.string(), password: z.string() });
 
 const app = alxia()
-	.use(janusErrors())
-	.use(session(accounts))
+	.plugin(janusErrors())
+	.plugin(session(accounts))
 	.post('/signup', validate({ body: SignUp }), async ({ body, auth, reply }) => {
 		const signedUp = await accounts.signUp(body); // throws a JanusError when it refuses
 		return reply.created({ id: auth.send(signedUp).id });
@@ -101,7 +101,7 @@ passwords in fifteen minutes by default — and the plugin then adds the
 ## Reporting the 5xx
 
 ```ts
-const app = alxia().use(
+const app = alxia().plugin(
 	janusErrors({
 		report: (error, ctx) => console.error(`${ctx.route}: ${error.code}`, error.cause),
 	}),
@@ -136,8 +136,8 @@ import { alxia } from '@alxia/core';
 import { janusErrors, session } from '@alxia/janus';
 
 const app = alxia()
-	.use(janusErrors())
-	.use(session(accounts, { required: true }))
+	.plugin(janusErrors())
+	.plugin(session(accounts, { required: true }))
 	.get('/me', ({ user, reply }) => reply(200, { name: user.name }));
 
 const me = await app.request('/me');

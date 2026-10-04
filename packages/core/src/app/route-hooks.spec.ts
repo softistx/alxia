@@ -43,7 +43,7 @@ const canEdit = defineHook<{ bookmark: { locked: boolean } }>()(
 const Update = z.object({ title: z.string().min(1) });
 
 const bookmarks = alxia()
-	.use(session)
+	.plugin(session)
 	.patch(
 		'/bookmarks/:id',
 		[canView, loadBookmark, canEdit],
@@ -268,7 +268,7 @@ describe('the types of a route with hooks', () => {
 			>
 		>();
 		alxia()
-			.use(session)
+			.plugin(session)
 			.get('/', [owned], ({ reply }) => reply(200, 'x'));
 		// @ts-expect-error a wrap's requirement is checked as a hook's
 		alxia().get('/', [owned], ({ reply }) => reply(200, 'x'));
@@ -277,7 +277,7 @@ describe('the types of a route with hooks', () => {
 	});
 
 	test('a hook whose requirement the route does not give is a compile error', () => {
-		const withUser = () => alxia().use(session);
+		const withUser = () => alxia().plugin(session);
 		// The probe: the same calls compile where the context gives it.
 		withUser().get('/:id', [canView], ({ reply }) => reply(200, 'x'));
 		withUser().get('/:id', [loadBookmark, canEdit], ({ reply }) =>
@@ -334,9 +334,9 @@ describe('the types of a route with hooks', () => {
 		const handlers = { message: () => {} };
 		// The probes.
 		alxia()
-			.use(session)
+			.plugin(session)
 			.route(op, [canView], ({ reply }) => reply(200, 'x'));
-		alxia().use(session).ws('/b/:id', [canView], {}, handlers);
+		alxia().plugin(session).ws('/b/:id', [canView], {}, handlers);
 		// @ts-expect-error no hook before gives `user`
 		alxia().route(op, [canView], ({ reply }) => reply(200, 'x'));
 		// @ts-expect-error no hook before gives `user`
@@ -345,7 +345,7 @@ describe('the types of a route with hooks', () => {
 
 	test('a list is written in the call, so each of its hooks is checked', () => {
 		const list: AnyRouteHook[] = [canView];
-		const app = alxia().use(session);
+		const app = alxia().plugin(session);
 		// The probe: a tuple kept `as const` is checked like one written inline.
 		const tuple = [canView, loadBookmark] as const;
 		app.get('/t/:id', tuple, ({ bookmark, reply }) => reply(200, bookmark.id));
@@ -382,7 +382,7 @@ describe('hooks given to a route, with the rest of the app', () => {
 	test('in a group, under its prefix and behind its hooks', async () => {
 		const app = alxia().group('/api', (api) =>
 			api
-				.use(session)
+				.plugin(session)
 				.get('/bookmarks/:id', [canView], ({ params, reply }) =>
 					reply(200, params.id),
 				),
@@ -408,7 +408,7 @@ describe('hooks given to a route, with the rest of the app', () => {
 		const plugin = definePlugin<{ user: User }>()((app) =>
 			app.get('/bookmarks/:id', [canView], ({ reply }) => reply(200, 'mine')),
 		);
-		const app = alxia({ prefix: '/v1' }).use(session).use(plugin);
+		const app = alxia({ prefix: '/v1' }).plugin(session).plugin(plugin);
 		expect(
 			(
 				await app.request('/v1/bookmarks/ada-1', {
@@ -427,7 +427,7 @@ describe('hooks given to a route, with the rest of the app', () => {
 
 	test('a refusal after the hooks is answered by the onRefusal hook of its kind, under the bodyLimit', async () => {
 		const app = alxia()
-			.use(session)
+			.plugin(session)
 			.bodyLimit(16)
 			.onRefusal('body_limit', (refusal) =>
 				problem({ status: 413, limit: refusal.limit }),
@@ -456,7 +456,7 @@ describe('hooks given to a route, with the rest of the app', () => {
 
 	test('route() takes the list before the handler', async () => {
 		const app = alxia()
-			.use(session)
+			.plugin(session)
 			.route(
 				{
 					method: 'GET',
@@ -479,7 +479,7 @@ describe('hooks given to a route, with the rest of the app', () => {
 	test('a socket route runs its hooks on the upgrade, skipping a wrap, and its handlers read what they add', async () => {
 		let wrapped = false;
 		const app = alxia()
-			.use(session)
+			.plugin(session)
 			.ws(
 				'/rooms/:id',
 				[

@@ -21,15 +21,17 @@ import type { AnyRouteHook, Empty, RouteHookBase, ThreadHooks } from './types';
 /**
  * `app.ws(path, options?, ...middlewares, handlers)`, see `SocketForms`;
  * and the forms of 0.3, deprecated: `app.ws(path, schema, handlers)`, or
- * `app.ws(path, hooks, schema, handlers)`.
+ * `app.ws(path, hooks, schema, handlers)`. In the order of `RouteMethod`'s
+ * forms: the middleware forms last, where a missing requirement is
+ * reported.
  */
 export interface SocketMethod<
 	Ctx extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
-> extends SocketForms<RouteApp<'GET', Ctx, Prefix, Shortcuts>>,
-		SocketOptionsForms<RouteApp<'GET', Ctx, Prefix, Shortcuts>>,
-		DeprecatedSocketForms<Ctx, Prefix, Shortcuts> {}
+> extends SocketOptionsForms<RouteApp<'GET', Ctx, Prefix, Shortcuts>>,
+		DeprecatedSocketForms<Ctx, Prefix, Shortcuts>,
+		SocketForms<RouteApp<'GET', Ctx, Prefix, Shortcuts>> {}
 
 /** The forms of `ws` 0.3 had, which the middleware forms replace. */
 export interface DeprecatedSocketForms<

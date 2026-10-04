@@ -26,16 +26,19 @@ import type {
  * A route method: `app.get(path, options?, ...middlewares, handler)`, see
  * `MiddlewareForms` and `OptionsForms`; `app.get(path, handler)`; and the
  * forms of 0.3, deprecated: a schema before the handler, a list of hooks
- * after the path.
+ * after the path. The options forms come first, so that an options object
+ * is never read as a schema of 0.3, and the middleware forms last, so that
+ * a middleware the route's context does not give is reported on them,
+ * naming the key it reads.
  */
 export interface RouteMethod<
 	M extends Method,
 	Ctx extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
-> extends MiddlewareForms<RouteApp<M, Ctx, Prefix, Shortcuts>>,
-		OptionsForms<RouteApp<M, Ctx, Prefix, Shortcuts>>,
-		DeprecatedForms<Ctx, Prefix, Shortcuts> {}
+> extends OptionsForms<RouteApp<M, Ctx, Prefix, Shortcuts>>,
+		DeprecatedForms<Ctx, Prefix, Shortcuts>,
+		MiddlewareForms<RouteApp<M, Ctx, Prefix, Shortcuts>> {}
 
 /** The forms of a route method that 0.3 had, which the middleware forms replace. */
 export interface DeprecatedForms<

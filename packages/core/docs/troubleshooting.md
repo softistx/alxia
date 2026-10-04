@@ -14,7 +14,7 @@ a trap that prints nothing is headed by its symptom.
 - [`Type 'string' is not assignable to type 'number'` on a `reply`](#type-string-is-not-assignable-to-type-number-on-a-reply)
 - [`Type 'Response' is not assignable to type 'MaybePromise<AnyReply>'`](#type-response-is-not-assignable-to-type-maybepromiseanyreply)
 - [`Property 'user' does not exist on type 'Context<…>'`](#property-user-does-not-exist-on-type-context)
-- [`the plugin reads "…", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
+- [`the plugin reads "…", which this app's context does not give: add the plugin or middleware that gives it first`](#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
 - [`the plugin reads "…", which this app's context gives with another type`](#the-plugin-reads--which-this-apps-context-gives-with-another-type)
 - [`this app's context does not give what the plugin reads`](#this-apps-context-does-not-give-what-the-plugin-reads)
 - [`the plugin's … reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins--reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
@@ -42,7 +42,6 @@ a trap that prints nothing is headed by its symptom.
 - [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
 - [`Argument of type '"…"' is not assignable to parameter of type '"Invalid path: …"'`](#argument-of-type--is-not-assignable-to-parameter-of-type-invalid-path-)
 - [`… is not assignable to type '"Invalid middleware: a middleware given a path may add nothing to the context, …"'`](#-is-not-assignable-to-type-invalid-middleware-a-middleware-given-a-path-may-add-nothing-to-the-context-)
-- [`… is not assignable to parameter of type 'Alxia<object, string, AnyReply> & …'`, on `use(middleware)`](#-is-not-assignable-to-parameter-of-type-alxiaobject-string-anyreply---on-usemiddleware)
 - [`Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`](#type-reply500--is-not-assignable-to-type-maybepromisevoid--replyclienterrorstatus-any--undefined)
 - [`'500' does not exist in type 'RefusalResponses'`](#500-does-not-exist-in-type-refusalresponses)
 - [`The inferred type of '…' cannot be named without a reference to '…' from '…/@alxia/core/dist/…'`](#the-inferred-type-of--cannot-be-named-without-a-reference-to--from-alxiacoredist)
@@ -52,7 +51,7 @@ a trap that prints nothing is headed by its symptom.
 - [`Generic type 'Alxia<Ctx, Prefix, Shortcuts>' requires between 0 and 3 type arguments`](#generic-type-alxiactx-prefix-shortcuts-requires-between-0-and-3-type-arguments)
 - [`'app' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer`](#app-implicitly-has-type-any-because-it-does-not-have-a-type-annotation-and-is-referenced-directly-or-indirectly-in-its-own-initializer), with `Register`
 - [`Property '…' does not exist on type 'BaseContext & { readonly 'Register.context must be typeof base, …': never; }'`](#property--does-not-exist-on-type-basecontext---readonly-registercontext-must-be-typeof-base--never-)
-- [`Subsequent property declarations must have the same type.  Property 'context' must be of type '…'`](#subsequent-property-declarations-must-have-the-same-type-property-context-must-be-of-type-)
+- [`Subsequent property declarations must have the same type.  Property 'context' must be of type '…'`](#subsequent-property-declarations-must-have-the-same-type--property-context-must-be-of-type-)
 - [`Property 'user' does not exist on type 'MiddlewareContext<Empty>'`](#property-user-does-not-exist-on-type-middlewarecontextempty), with `Register`
 
 **Building the app**
@@ -81,7 +80,12 @@ a trap that prints nothing is headed by its symptom.
 - [`use(): middleware 2 was not made by defineMiddleware()`](#use-middleware-2-was-not-made-by-definemiddleware), and `use(): middleware 1 is a validate() or responds(), which belongs to a route`
 - [`use("…"): no middleware is given`](#use-no-middleware-is-given), and `use("/a/*/b"): "/a/*/b": "*" may only end a path`
 - [`use("/admin/"): a path given to use() does not end with "/"`](#useadmin-a-path-given-to-use-does-not-end-with-)
-- [`use(): a plugin is given alone; middlewares are made with defineMiddleware()`](#use-a-plugin-is-given-alone-middlewares-are-made-with-definemiddleware), `use(): the plugin is neither an app nor a function; …` and `use(): nothing is given: a plugin, or middlewares`
+- [`plugin(): a plugin is given alone, to app.plugin(); middlewares are made with defineMiddleware() and given to use()`](#plugin-a-plugin-is-given-alone-to-appplugin-middlewares-are-made-with-definemiddleware-and-given-to-use), `plugin(): nothing is given: …`, and the same of `use()`
+- [`plugin(): the plugin is neither an app nor a function; a middleware is made with defineMiddleware() and given to use()`](#plugin-the-plugin-is-neither-an-app-nor-a-function-a-middleware-is-made-with-definemiddleware-and-given-to-use), and the same of `use()`
+- [`plugin(): a middleware is given to use(), not taken for a plugin`](#plugin-a-middleware-is-given-to-use-not-taken-for-a-plugin)
+- [`plugin(): the plugin function returned undefined, not an app: a plugin returns the app it is given; a middleware is made with defineMiddleware() and given to use()`](#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-made-with-definemiddleware-and-given-to-use), and `use(): the plugin function returned a promise, …` for a middleware written without `defineMiddleware`
+- [`GET /…: a list of hooks and middlewares are two forms, never mixed: give the hooks as middlewares, made by defineMiddleware()`](#get--a-list-of-hooks-and-middlewares-are-two-forms-never-mixed-give-the-hooks-as-middlewares-made-by-definemiddleware)
+- [`responds(): the operation GET /… declares no response`](#responds-the-operation-get--declares-no-response)
 - [`onRefusal(): the hook is missing`](#onrefusal-the-hook-is-missing)
 - [`onRefusal(): "…" is no kind of refusal; expected 'validation' or 'body_limit'`](#onrefusal--is-no-kind-of-refusal-expected-validation-or-body_limit)
 - [`page(): /… is already served`](#page--is-already-served)
@@ -102,7 +106,6 @@ a trap that prints nothing is headed by its symptom.
 **Hooks**
 
 - [`set.cookies.get()` returns null in a hook](#setcookiesget-returns-null-in-a-hook)
-- [My middleware was treated as a plugin](#my-middleware-was-treated-as-a-plugin)
 - [A `use(path)` guard did not run on a request under its path](#a-usepath-guard-did-not-run-on-a-request-under-its-path)
 
 **Routing**
@@ -116,7 +119,7 @@ a trap that prints nothing is headed by its symptom.
 - [`TypeError: … a middleware (…) returned nothing: return next(), a reply or a Response`](#typeerror--a-middleware--returned-nothing-return-next-a-reply-or-a-response)
 - [`TypeError: … a middleware called next() twice`](#typeerror--a-middleware-called-next-twice)
 - [`TypeError: … a middleware called next() after it returned`](#typeerror--a-middleware-called-next-after-it-returned)
-- [`TypeError: WS /…: a middleware returned another response than next() resolved to, once the socket was open`](#typeerror-ws--a-middleware-returned-another-response-than-next-resolved-to-once-the-socket-was-open)
+- [`GET /…: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`](#get--a-middleware-returned-before-the-next-it-called-settled-the-rest-of-the-route-ran-anyway-await-next-or-return-it), a warning
 - [`TypeError: validate() runs among a route's middlewares, not called on its own`](#typeerror-validate-runs-among-a-routes-middlewares-not-called-on-its-own), and `responds() …`
 - [`TypeError: … the handler returned no reply. Return ctx.reply(status, body).`](#typeerror--the-handler-returned-no-reply-return-ctxreplystatus-body)
 - [`TypeError: … the onRefusal hook returned neither a reply nor nothing.`](#typeerror--the-onrefusal-hook-returned-neither-a-reply-nor-nothing)
@@ -329,21 +332,22 @@ const app = alxia()
 	.get('/me', ({ user, reply }) => reply(200, user));
 ```
 
-The same applies to `use(plugin)`. Its route hooks reach the routes
-declared after `use`, not before it.
+The same applies to `plugin(app)`. Its route hooks reach the routes
+declared after `plugin`, not before it.
 
-### `the plugin reads "…", which this app's context does not give: use the plugin that adds it first`
+### `the plugin reads "…", which this app's context does not give: add the plugin or middleware that gives it first`
 
-**When:** an app uses a plugin made by `definePlugin<Requires>()`, or
+**When:** an app mounts a plugin made by `definePlugin<Requires>()`, or
 routes made by `defineRoutes()` (which require the registered context),
-and nothing declared before that `use` adds a key the plugin requires.
+with `plugin(…)`, and nothing declared before it adds a key the plugin
+requires.
 
 ```ts
 const tenant = definePlugin<{ user: { tenantId: string } }>()((app) =>
 	app.derive(({ user }) => ({ tenant: tenants.get(user.tenantId) ?? null })),
 );
 
-alxia().use(tenant);
+alxia().plugin(tenant);
 ```
 
 ```text
@@ -352,19 +356,19 @@ error TS2769: No overload matches this call.
   Overload 2 of 2, '(plugin: Alxia<…> & { readonly '~requires'?: { user: { tenantId: string; }; }; } & { ...; }): Alxia<…>', gave the following error.
     …
         Types of property ''~requires'' are incompatible.
-          Type '{ user: { tenantId: string; }; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"'.
+          Type '{ user: { tenantId: string; }; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: add the plugin or middleware that gives it first"'.
 ```
 
 The first overload's error, about a function plugin, is noise: the
 message on the last line is the one that matters.
 
 Returned from a `group` or a plugin function, `group(() => todos)` or
-`use(() => todos)`, the error is a `TS2322: Type 'AppWithRoute<…>' is not
+`plugin(() => todos)`, the error is a `TS2322: Type 'AppWithRoute<…>' is not
 assignable to type '… & { readonly '~requires': "the plugin reads …" }'`
 on the returned app, with the same message.
 
 For routes made by `defineRoutes()`, the last line reads
-`Property ''~requires'' is missing in type 'Alxia<…>' but required in type '{ readonly '~requires': "the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"; }'`.
+`Property ''~requires'' is missing in type 'Alxia<…>' but required in type '{ readonly '~requires': "the plugin reads \"user\", which this app's context does not give: add the plugin or middleware that gives it first"; }'`.
 
 **Why:** the plugin's hooks read `user`, and on this app no plugin or
 `derive` before it adds one, so at runtime `user` would be `undefined`. The
@@ -372,13 +376,13 @@ message names each key at fault; with several, the error lists one message
 per key, joined by `|`, and a key of another type gets the message of the
 entry below.
 
-**Fix:** use the plugin that adds the key first:
+**Fix:** mount the plugin, or give the middleware, that adds the key first:
 
 ```ts
-alxia().use(auth).use(tenant); // auth derives user
+alxia().plugin(auth).plugin(tenant); // auth derives user
 ```
 
-The order is what counts: `alxia().use(tenant).use(auth)` is refused too.
+The order is what counts: `alxia().plugin(tenant).plugin(auth)` is refused too.
 
 ### `the plugin reads "…", which this app's context gives with another type`
 
@@ -389,7 +393,7 @@ requires one.
 ```ts
 alxia()
 	.derive(async ({ request }) => ({ user: await authenticate(request) })) // user: User | null
-	.use(tenant);
+	.plugin(tenant);
 ```
 
 ```text
@@ -408,7 +412,7 @@ alxia()
 		const user = await authenticate(request);
 		return user ? { user } : reply(401, { error: 'unauthenticated' as const });
 	})
-	.use(tenant);
+	.plugin(tenant);
 ```
 
 If you wrote the plugin, you can instead widen its requirement
@@ -432,7 +436,7 @@ the plugin, name its requirement with string keys.
 
 ### `the plugin's … reads its context as any: annotate what it reads, or leave it unannotated`
 
-**When:** an app uses a plugin whose requirement is inferred from a
+**When:** an app mounts a plugin whose requirement is inferred from a
 callback (with `RequiresOf`), and that callback's parameter is annotated
 `any`, or `Record<string, any>`. `@alxia/language`'s `resolve` and
 `@alxia/janus`'s `load`, `subject` and `ctx` are such callbacks; the
@@ -442,7 +446,7 @@ message names the one at fault.
 const audit = <Ctx extends object = BaseContext>(who: (ctx: BaseContext & Ctx) => string) =>
 	definePlugin<RequiresOf<Ctx, 'who'>>()((app) => app /* … */);
 
-alxia().use(audit((ctx: any) => ctx.user.id));
+alxia().plugin(audit((ctx: any) => ctx.user.id));
 ```
 
 ```text
@@ -455,7 +459,7 @@ error TS2769: No overload matches this call.
 Every app is refused, whatever its context gives.
 
 **Why:** a parameter annotated `any` reads any key, of any type, and says
-nothing of what it reads. The plugin would require nothing, so `use` would
+nothing of what it reads. The plugin would require nothing, so `plugin` would
 accept it on an app without the `user` the callback reads, and the request
 would throw at runtime. A requirement that turns the check off without a
 word is refused instead.
@@ -464,14 +468,14 @@ word is refused instead.
 the plugin:
 
 ```ts
-alxia().use(auth).use(audit(({ user }: BaseContext & { user: User }) => user.id));
+alxia().plugin(auth).plugin(audit(({ user }: BaseContext & { user: User }) => user.id));
 ```
 
 Or leave the parameter unannotated, if it reads only the request. It is
 then typed `BaseContext` and requires nothing:
 
 ```ts
-alxia().use(audit((ctx) => ctx.ip ?? 'unknown'));
+alxia().plugin(audit((ctx) => ctx.ip ?? 'unknown'));
 ```
 
 A parameter annotated `unknown` or `object` requires nothing, and is not
@@ -481,12 +485,12 @@ an app must give some `user`.
 
 ### `… is not assignable to type 'ProvidedBy<C, …>'`
 
-**When:** `use(plugin)` with a `definePlugin` plugin, on an app whose
+**When:** `plugin(tenant)` with a `definePlugin` plugin, on an app whose
 context is a type parameter:
 
 ```ts
 const withTenant = <C extends { user: { tenantId: string } }>(app: Alxia<C>) =>
-	app.use(tenant);
+	app.plugin(tenant);
 ```
 
 ```text
@@ -519,16 +523,14 @@ alxia().patch('/bookmarks/:id', [canView], { body: Update }, handler);
 ```text
 error TS2769: No overload matches this call.
   …
-  Overload 3 of 21, '(path: "/bookmarks/:id", hooks: [RouteHook<…>] & NoInfer<readonly [{ readonly '~requires': "the hook reads \"user\", …"; }]>, …)', gave the following error.
+  Overload 2 of 21, '(path: "/bookmarks/:id", hooks: [RouteHook<…>] & NoInfer<readonly [{ readonly '~requires': "the hook reads \"user\", …"; }]>, …)', gave the following error.
     …
         Types of property ''~requires'' are incompatible.
           Type '{ user: User; params: { id: string; }; }' is not assignable to type '"the hook reads \"user\", which this route's context does not give: derive it before this route, or earlier in its list"'.
 ```
 
-Overloads 1 and 2, about `RouteMiddleware<…>` and `OptionsOnly<RouteOptions>`,
-are the middleware forms TypeScript tried first: noise here. Without a
-schema, `get(path, [hook], handler)`, only the last overload is printed,
-and it carries the message.
+Overload 1, about `OptionsOnly<RouteOptions>`, and overload 3, about
+`RouteMiddleware<…>`, are the other forms TypeScript tried: noise here.
 
 **Why:** the hook reads `user`, which nothing before it on this route adds,
 so at runtime it would be `undefined`. Each hook is checked against the
@@ -770,8 +772,7 @@ defineMiddleware<{ user: User }>()(({ user }, next) => next({ id: user.id }));
 or the validated `params`, of the operation. The operation's `validate`
 stands just before the handler, so a middleware before it reads the
 request as it arrived: `body` is `undefined`, `params` strings. TypeScript
-reports it under `Overload 1 of 10`, then a `'~hooks'` message from the
-deprecated list form, which is not the cause.
+reports it on the middleware forms, which come last.
 
 ```ts
 app.route(op, ({ body }, next) => next({ title: body.title }), handler); // body: undefined here
@@ -818,8 +819,9 @@ alxia()
 ### `Property 'user' is missing in type 'RouteBase<…>' but required in type '{ user: User; }'`
 
 **When:** a middleware made by `defineMiddleware<Requires>()` is placed
-where nothing before it gives what it requires. TypeScript prints it under
-`No overload matches this call`, in the first overload:
+where nothing before it gives what it requires — on a route, a socket,
+`route(operation, …)` or `use(…)`. TypeScript prints it under `No overload
+matches this call`, on the middleware forms, which it tries last:
 
 ```ts
 const canPost = defineMiddleware<{ user: User }>()(({ user, reply }, next) =>
@@ -830,16 +832,24 @@ app.post('/posts', canPost, auth, handler);
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 21, '(path: "/posts", m1: RouteMiddleware<…>, m2: RouteMiddleware<…>, handler: RouteHandler<…>): AppWithRoute<…>', gave the following error.
+  …
+  Overload 3 of 21, '(path: "/posts", m1: RouteMiddleware<…>, m2: RouteMiddleware<…>, handler: RouteHandler<…>): AppWithRoute<…>', gave the following error.
     Argument of type 'Middleware<{ user: User; }, …>' is not assignable to parameter of type 'RouteMiddleware<…>'.
       Types of parameters 'ctx' and 'ctx' are incompatible.
         …
           Property 'user' is missing in type 'RouteBase<…>' but required in type '{ user: User; }'.
 ```
 
-The overloads after it — one about `OptionsOnly<RouteOptions>`, one about a
-list of hooks — are the other forms of a route TypeScript tried; they are
-noise here.
+The overloads before it — one about `OptionsOnly<RouteOptions>`, one about
+a list of hooks — are the other forms of a route TypeScript tried; they
+are noise here. With more forms in reach, TypeScript prints the last
+alone, `The last overload gave the following error.`, and that one is the
+middleware form, naming the key.
+
+On `use(canPost)`, the type named is the app's context, `'BaseContext &
+Empty'`, rather than `RouteBase<…>`; before 0.4 TypeScript reported there
+the plugin form of `use`, `not assignable to parameter of type
+'Alxia<object, string, AnyReply> & …'`, which named no key.
 
 **Why:** the error is reported where the middleware stands: at that place
 the route's context has no `user`, so it would read `undefined`.
@@ -874,20 +884,9 @@ On the socket, the key is named the same way: `Property 'extra' is missing
 in type 'Readonly<Record<string, string>> & PathParams<"/rooms/:room">' but
 required in type '{ readonly room: string; readonly extra: string | undefined; }'`.
 
-On a route whose only middleware is the `validate` and that has no options,
-TypeScript prints only the last overload it tried, the deprecated list of
-hooks, and not the key:
-
-```text
-error TS2769: No overload matches this call.
-  The last overload gave the following error.
-    Argument of type 'Middleware<{ readonly pathParams: { readonly id: string; readonly extra: string | undefined; }; }, Next<Validated<…>, { …; }>>' is not assignable to parameter of type '(readonly [] | readonly AnyRouteHook[]) & NoInfer<{ readonly '~hooks': "a route's hooks are a list written in the call, [first, second]: a list of unknown length cannot be checked"; }>'.
-```
-
-The list is not the problem. What the `validate` reads is in its type,
-`pathParams: { readonly id: string; readonly extra: string | undefined; }`:
-compare it with the path's parameters. Giving the route its options, `{}`,
-or a second middleware, makes TypeScript name the key instead.
+The middleware forms are the last overloads TypeScript tries, so it names
+the key on a route with no options and one middleware too; before 0.4 it
+printed the deprecated list of hooks' `'~hooks'` message there instead.
 
 **Why:** `validate`'s `params` schema reads the path's parameters, which
 are strings. A key the path does not declare is never there; a schema that
@@ -1097,8 +1096,8 @@ error TS2345: Argument of type '"/:id"' is not assignable to parameter of type '
 A handler's parameters can then read as `any` on the same call
 (`TS7031`): that goes away with the path's fix.
 
-A plugin given to `use` is not checked under the prefix `use` puts its
-routes at: `alxia({ prefix: '/users/:id' }).use(alxia().get('/:id', …))`
+A plugin given to `plugin` is not checked under the prefix `plugin` puts its
+routes at: `alxia({ prefix: '/users/:id' }).plugin(alxia().get('/:id', …))`
 compiles, then throws `"/users/:id/:id" declares ":id" twice` at startup.
 
 **Why:** the app throws on these paths at startup; the types refuse them
@@ -1169,34 +1168,6 @@ app.group('/admin', (admin) => admin.use(auth).get('/me', ({ user, reply }) => r
 
 A guard that only answers or passes, `next()`, can stay on the path:
 `app.use('/admin', requireAdmin)`.
-
-### `… is not assignable to parameter of type 'Alxia<object, string, AnyReply> & …'`, on `use(middleware)`
-
-```text
-error TS2769: No overload matches this call.
-  The last overload gave the following error.
-    Argument of type 'Middleware<{ user: User; }, …> & MiddlewareMark' is not assignable to parameter of type 'Alxia<object, string, AnyReply> & { readonly '~requires'?: Empty; }'.
-```
-
-**When:** `use` is given a middleware made by `defineMiddleware<Requires>()`
-— one that reads a `user` — where no middleware, hook or plugin before it
-adds what it reads:
-
-```ts
-const canPost = defineMiddleware<{ user: User }>()(({ user, reply }, next) => …);
-alxia().use(canPost); // nothing before it adds `user`
-```
-
-**Why:** no middleware form of `use` takes it, so TypeScript reports the
-last form it tried, the plugin's, which names an app rather than the
-missing `user`.
-
-**Fix:** give it after what adds what it reads, in the same call or an
-earlier one:
-
-```ts
-alxia().use(auth, canPost); // auth passes next({ user })
-```
 
 ### `Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`
 
@@ -1359,7 +1330,7 @@ See [No more client: spec first](upgrading.md#no-more-client-spec-first).
 than the base that builds the context:
 
 ```ts
-export const app = alxia().derive(auth).use(todos); // todos = defineRoutes(…)
+export const app = alxia().derive(auth).plugin(todos); // todos = defineRoutes(…)
 
 declare module '@alxia/core' {
 	interface Register {
@@ -1380,7 +1351,7 @@ The same happens when the registered chain itself reads `Register`: a
 `BaseContext`: give it to the app after `base`.)
 
 **Why:** `todos`' type reads `Register`, which is `typeof app`, whose type
-is what `use(todos)` returns: each needs the other first, so TypeScript
+is what `plugin(todos)` returns: each needs the other first, so TypeScript
 gives both `any`.
 
 **Fix:** register the chain that builds the context, and mount the routes
@@ -1397,7 +1368,7 @@ declare module '@alxia/core' {
 }
 
 // src/app.ts
-export const app = base.use(todos);
+export const app = base.plugin(todos);
 ```
 
 Give `base` nothing that reads `Register`; give those to `app`.
@@ -1660,7 +1631,7 @@ app.get('/users/:id', getUser).patch('/users/:id', updateUser);
 ### `GET /… is declared twice`
 
 **When:** the same method and path are declared twice, often once directly
-and once through `use(plugin)` or a `group`, or as `static` beside a
+and once through `plugin(app)` or a `group`, or as `static` beside a
 `GET /…/*`.
 
 **Fix:** keep one. `HEAD` runs the `GET` route, so you do not need to
@@ -1767,6 +1738,44 @@ for `validate`, the status for `responds`.
 app.post('/posts', validate({ body: Post }), responds({ 201: Post }), handler);
 ```
 
+### `GET /…: a list of hooks and middlewares are two forms, never mixed: give the hooks as middlewares, made by defineMiddleware()`
+
+**When:** a route is given a list of hooks, the form of 0.3, and
+middlewares after it: `app.get('/', [hook], auth, handler)`, or `[hook],
+schema, auth, handler`. `route(operation, [hook], auth, handler)` throws
+the same, named by the operation: `GET /pets/:petId: a list of hooks and
+middlewares are two forms, …`. The types refuse both, so this comes from
+JavaScript or a cast. It throws where the route is declared.
+
+**Why:** the two forms read the arguments differently. Before 0.4 the
+route kept one of them: `route(operation, [hook], auth, handler)` took
+`auth` for the handler and dropped the real one without a word.
+
+**Fix:** give the hooks as middlewares, after the path:
+
+```ts
+const loadPost = defineMiddleware(async ({ pathParams }, next) =>
+	next({ post: await posts.find(pathParams.id) }),
+);
+app.get('/posts/:id', loadPost, auth, handler);
+```
+
+See [Upgrading](upgrading.md#3-the-list-of-hooks-becomes-middlewares-after-the-path).
+
+### `responds(): the operation GET /… declares no response`
+
+**When:** `responds(operation)` is given an operation whose `schema` has no
+`response`: `responds({ method: 'GET', path: '/health' })`. It throws
+where it is called.
+
+**Why:** `responds(operation)` checks the replies the operation declares;
+with none, it would type `reply` by no status and refuse every reply.
+
+**Fix:** declare the responses in the document, regenerate the
+operations, or leave `responds` out: `route(operation, …)` checks the
+handler's reply by the operation's responses on its own, and an operation
+without them adds no check.
+
 ### `GET /…: the handler is missing`
 
 **When:** a route method's last argument is not a function:
@@ -1854,18 +1863,79 @@ nothing.
 **Fix:** drop the slash: `use('/admin', guard)` for `/admin` and under,
 `use('/admin/*', guard)` for under it alone.
 
-### `use(): a plugin is given alone; middlewares are made with defineMiddleware()`
+### `plugin(): a plugin is given alone, to app.plugin(); middlewares are made with defineMiddleware() and given to use()`
 
-**When:** `use` is given an app or a plugin function followed by more
-arguments — `use(auth, logger)` where `auth` is a plain function or an
-app — or, as `use(): the plugin is neither an app nor a function; …`
-says, something that is neither: a hook made by `defineHook` or
-`defineWrap`, an object. `use()` given nothing says `use(): nothing is
-given`.
+**When:** `plugin` is given more than one argument, or `use` an app or a
+plugin function followed by more — `use(auth, logger)` where `auth` is a
+plain function or an app, which `use` reads in its deprecated plugin form
+and says `use(): a plugin is given alone, …`. Given nothing, `plugin()`
+says `plugin(): nothing is given: a plugin, an app or a function`, and
+`use()` says `use(): nothing is given: middlewares`.
 
-**Fix:** one plugin per `use`, `use(a).use(b)`; middlewares, several to a
-call, made by `defineMiddleware`; a hook of `defineHook` in a route's list,
-or better rewritten as a middleware ([Upgrading](upgrading.md#migrating-to-middlewares)).
+**Fix:** one plugin per call, `plugin(a).plugin(b)`; middlewares, several
+to a `use`, made by `defineMiddleware`.
+
+### `plugin(): the plugin is neither an app nor a function; a middleware is made with defineMiddleware() and given to use()`
+
+**When:** `plugin` — or `use`, in its deprecated plugin form, `use(): the
+plugin is neither …` — is given what is neither an app nor a function: a
+hook made by `defineHook` or `defineWrap`, an object, `null`. The types
+refuse it, so this comes from JavaScript or a cast.
+
+**Fix:** give `plugin` an app or a function `(app) => app`; a hook of
+`defineHook` goes in a route's list, or better rewritten as a middleware
+([Upgrading](upgrading.md#migrating-to-middlewares)).
+
+### `plugin(): a middleware is given to use(), not taken for a plugin`
+
+**When:** `plugin` is given a middleware made by `defineMiddleware`, or a
+`validate(…)` or `responds(…)`. The types refuse it first.
+
+**Why:** a middleware runs on requests, a plugin once, on the app: called
+as a plugin, a guard would guard nothing.
+
+**Fix:** give it to `use`, or to the route:
+
+```ts
+app.use(auth).get('/me', ({ user, reply }) => reply(200, user));
+```
+
+### `plugin(): the plugin function returned undefined, not an app: a plugin returns the app it is given; a middleware is made with defineMiddleware() and given to use()`
+
+**When:** a function given to `plugin` returns anything but an app —
+`undefined`, a promise, a reply — and, the most common case, a middleware
+written without `defineMiddleware`, `(ctx, next) => …`, given to `use`,
+which reads it in its deprecated plugin form and says `use(): the plugin
+function returned a promise, not an app: …`:
+
+```ts
+const auth = async ({ request, reply }, next) => { … }; // a plain function
+app.use(auth); // called once as a plugin, auth(app): it returns a promise, and use throws
+```
+
+A middleware that calls `ctx.reply` or `next` before its first `await`
+throws first, `TypeError: next is not a function` or the like, from the
+function run with the app as `ctx`.
+
+**Why:** a plugin is a function too, `(app) => app`. `use` tells the two
+apart by the mark `defineMiddleware` puts on a middleware; any other
+function is a plugin, called with the app. Before 0.4 `use` returned what
+it returned, so a guard ran on no request without a word; now a result
+that is not an app throws, and a promise it returned is left handled. A
+route's own middlewares take a plain function: only `use` needs the mark.
+
+**Fix:** make a middleware with `defineMiddleware`, and return the app
+from a plugin function:
+
+```ts
+const auth = defineMiddleware(async ({ request, reply }, next) => { … });
+app.use(auth);
+app.plugin((app) => app.onResponse(addHeader)); // onResponse returns the app
+```
+
+The types say so first: a plain `(ctx, next) => …` given to `use` does not
+compile, since a plugin takes the app alone and returns an app. In the
+next minor, `use` takes any `(ctx, next)` function as a middleware.
 
 ### `onRefusal(): the hook is missing`
 
@@ -2178,7 +2248,7 @@ expect it.
 
 ### A plugin's route reads a body past the app's `bodyLimit()`
 
-**When:** an app calls `bodyLimit(bytes)` and then `use(plugin)` with an
+**When:** an app calls `bodyLimit(bytes)` and then `plugin(app)` with an
 app plugin, and a route of that plugin accepts a larger body.
 
 **Why:** an app's `bodyLimit()` reaches the routes declared on it and in
@@ -2191,12 +2261,12 @@ bounded like any of them.
 
 ```ts
 const uploads = alxia().post('/upload', { bodyLimit: 25 * 1024 * 1024 }, handler);
-const app = alxia().bodyLimit(64 * 1024).use(uploads);
+const app = alxia().bodyLimit(64 * 1024).plugin(uploads);
 ```
 
 A `bodyLimit()` the plugin calls instead also applies to the app's routes
-declared after `use`, as its hooks do. Call the app's own after `use` to
-keep it.
+declared after `plugin`, as its hooks do. Call the app's own after `plugin`
+to keep it.
 
 ## Hooks
 
@@ -2226,34 +2296,6 @@ has:
 A `validate({ cookies })` validates them for the middlewares after it and
 the handler; a hook reads them as they arrived
 ([Hooks](guide/hooks.md#reading-the-requests-cookies)).
-
-### My middleware was treated as a plugin
-
-**When:** a function written as a middleware, `(ctx, next) => …`, is given
-to `use` without `defineMiddleware`. `use` throws where it is called —
-`TypeError: next is not a function`, or another error of the function run
-with the app as `ctx` — or, if the function never calls `next`, returns
-whatever it returned and runs on no route:
-
-```ts
-const auth = async ({ request, reply }, next) => { … }; // a plain function
-app.use(auth); // called as a plugin: auth(app)
-```
-
-**Why:** a plugin is a function too, `(app) => app`. `use` tells the two
-apart by the mark `defineMiddleware` puts on a middleware, and calls any
-other function as a plugin, with the app, as it always has. A route's own
-middlewares take a plain function: only `use` needs the mark.
-
-**Fix:** make it with `defineMiddleware`:
-
-```ts
-const auth = defineMiddleware(async ({ request, reply }, next) => { … });
-app.use(auth);
-```
-
-The types say so first: a plain `(ctx, next) => …` given to `use` does not
-compile, since a plugin takes the app alone and returns an app.
 
 ### A `use(path)` guard did not run on a request under its path
 
@@ -2359,14 +2401,15 @@ app.post('/users', responds({ 201: User, 409: Conflict }), handler);
 TypeError: GET /posts: a middleware returned nothing: return next(), a reply or a Response
 ```
 
-**When:** a middleware returns something other than what `next()`
-resolves to, a reply or a `Response`. The message names what it returned,
+**When:** a middleware that never called `next()` returns something other
+than a reply or a `Response`. The message names what it returned,
 `nothing` for a missing `return`, or its type, `returned string`,
 `returned object`; it names the middleware when its function has a name,
 and leaves the parentheses out when not. TypeScript
 [refuses it](#type-string-is-not-assignable-to-type-middlewarereturn), so
-this comes from JavaScript, a cast, or a middleware that calls `next()`
-without returning it.
+this comes from JavaScript or a cast. A middleware that called `next()`
+and returns nothing is not refused: it answers with the rest's response,
+as Koa and Hono do.
 
 **Fix:** return what `next()` resolves to:
 
@@ -2424,24 +2467,47 @@ const audit = defineMiddleware(async (ctx, next) => {
 });
 ```
 
-### `TypeError: WS /…: a middleware returned another response than next() resolved to, once the socket was open`
+### `GET /…: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`
 
-**When:** a middleware of a socket route awaits `next()`, then returns
-another `Response` or a reply.
+```text
+GET /posts: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it
+```
 
-**Why:** on a socket route, `next()` resolves once the socket is open, to
-an empty stand-in response. The upgrade has happened: nothing else can be
-sent, and headers set on the stand-in are lost.
+A warning, by `console.warn`; the request is answered with the
+middleware's own reply.
 
-**Fix:** return what `next()` resolved to; set headers before calling it,
-on `ctx.set.headers`:
+**When:** a middleware calls `next()` without awaiting or returning it,
+then returns a reply of its own:
 
 ```ts
-const tagged = defineMiddleware(async (ctx, next) => {
-	ctx.set.headers.set('x-room', 'lobby');
-	return next();
+const guard = defineMiddleware((ctx, next) => {
+	next(); // the handler starts here
+	return ctx.reply(403, { error: 'forbidden' as const });
 });
 ```
+
+**Why:** `next()` runs the rest of the route — the middlewares after it
+and the handler — the moment it is called, and nothing can stop it once
+started. The handler runs, with whatever it writes, though the client gets
+a 403. alxia sends the middleware's reply once the rest has run, so that
+nothing the handler sets on the response leaks into it, and logs an error
+the rest throws with `console.error` rather than leave it an unhandled
+rejection. Not every such middleware is caught: one whose rest settles
+before it returns is taken for one that awaited it, and an error of that
+rest for one it read, as `try { return await next() } catch { … }` does —
+not logged, and never an unhandled rejection either.
+
+**Fix:** decide before calling `next()`, and return or await it:
+
+```ts
+const guard = defineMiddleware((ctx, next) =>
+	allowed(ctx) ? next() : ctx.reply(403, { error: 'forbidden' as const }),
+);
+```
+
+A middleware that calls `next()` and returns nothing — `next()` not
+awaited, or `await next()` with no `return` — is no mistake: it answers
+with the rest's response.
 
 ### `TypeError: validate() runs among a route's middlewares, not called on its own`
 

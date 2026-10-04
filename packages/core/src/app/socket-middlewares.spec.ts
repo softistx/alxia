@@ -24,35 +24,6 @@ describe('a socket route, its middlewares and validate', () => {
 		);
 	});
 
-	test('a middleware must return the stand-in response next() resolved to', async () => {
-		const error = spyOn(console, 'error').mockImplementation(() => {});
-		const app = alxia().ws(
-			'/',
-			async (_ctx, next) => {
-				await next();
-				return new Response('mine');
-			},
-			{ message: () => {} },
-		);
-		const server = app.listen({ port: 0 });
-		try {
-			const url = new URL('/', server.url);
-			url.protocol = 'ws:';
-			const socket = new WebSocket(url);
-			await new Promise((resolve) => {
-				socket.onopen = resolve;
-				socket.onerror = resolve;
-			});
-			socket.close();
-			expect(String(error.mock.calls[0]?.[0])).toContain(
-				'WS /: a middleware returned another response than next() resolved to',
-			);
-		} finally {
-			error.mockRestore();
-			await server.stop(true);
-		}
-	});
-
 	test('runs its middlewares and validate on the upgrade, then opens', async () => {
 		const around: number[] = [];
 		const app = alxia().ws(
@@ -100,6 +71,68 @@ describe('a socket route, its middlewares and validate', () => {
 			expect(around).toEqual([400, 200]);
 		} finally {
 			await server.stop(true);
+		}
+	});
+});
+
+describe('a middleware around a socket route', () => {
+	const open = async (app: ReturnType<typeof alxia>) => {
+		const server = app.listen({ port: 0 });
+		const url = new URL('/', server.url);
+		url.protocol = 'ws:';
+		const socket = new WebSocket(url);
+		const echoed = await new Promise<string>((resolve, reject) => {
+			socket.onopen = () => socket.send('ping');
+			socket.onmessage = (event) => resolve(String(event.data));
+			socket.onerror = () => reject(new Error('no socket'));
+		});
+		socket.close();
+		await server.stop(true);
+		return echoed;
+	};
+
+	test('that wraps every response of use() is ignored once the socket is open', async () => {
+		const error = spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const opened: string[] = [];
+			const wrapping = defineMiddleware(async (_ctx, next) => {
+				const response = await next();
+				return new Response(response.body, {
+					status: response.status,
+					headers: { 'x-wrapped': '1' },
+				});
+			});
+			const app = alxia()
+				.use(wrapping)
+				.ws('/', {
+					open: () => {
+						opened.push('open');
+					},
+					message: (socket, message) => socket.send(`echo ${message}`),
+				});
+			expect(await open(app as never)).toBe('"echo ping"');
+			expect(opened).toEqual(['open']);
+			expect(error).not.toHaveBeenCalled();
+		} finally {
+			error.mockRestore();
+		}
+	});
+
+	test('that throws after the upgrade is logged, and the socket stays open', async () => {
+		const error = spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const app = alxia().ws(
+				'/',
+				async (_ctx, next) => {
+					await next();
+					throw new Error('after the upgrade');
+				},
+				{ message: (socket, message) => socket.send(`echo ${message}`) },
+			);
+			expect(await open(app as never)).toBe('"echo ping"');
+			expect(String(error.mock.calls[0]?.[0])).toContain('after the upgrade');
+		} finally {
+			error.mockRestore();
 		}
 	});
 });

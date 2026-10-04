@@ -28,7 +28,7 @@ const schema = createSchema<GraphQLContext<typeof base>>({
 	},
 });
 
-const app = base.use((app) => graphql(app, { schema }));
+const app = base.plugin((app) => graphql(app, { schema }));
 ```
 
 Declare the hooks on a `base` app, type the schema with
@@ -117,7 +117,7 @@ typed with a context the app does not build is refused, and the error names
 the missing field:
 
 ```ts
-const app = alxia().use((app) => graphql(app, { schema })); // no hook derives `viewer` or `users`
+const app = alxia().plugin((app) => graphql(app, { schema })); // no hook derives `viewer` or `users`
 ```
 
 ```text
@@ -152,7 +152,7 @@ import { z } from 'zod';
 const jwt = createJwt({ secret: Bun.env['JWT_SECRET']! });
 const Claims = z.object({ sub: z.string(), role: z.enum(['admin', 'user']) });
 
-const base = alxia().use(bearer({ jwt, schema: Claims })); // 401 without a valid token
+const base = alxia().plugin(bearer({ jwt, schema: Claims })); // 401 without a valid token
 
 const schema = createSchema<GraphQLContext<typeof base>>({
 	typeDefs: /* GraphQL */ `type Query { me: String!, isAdmin: Boolean! }`,
@@ -164,7 +164,7 @@ const schema = createSchema<GraphQLContext<typeof base>>({
 	},
 });
 
-const app = base.use((app) => graphql(app, { schema }));
+const app = base.plugin((app) => graphql(app, { schema }));
 ```
 
 The guard's `401` and its body are `@alxia/jwt`'s, described in its
@@ -186,7 +186,7 @@ const schema = createSchema<GraphQLContext<typeof base, Loaders>>({
 	},
 });
 
-const app = base.use((app) =>
+const app = base.plugin((app) =>
 	graphql(app, {
 		schema,
 		// annotate the argument: see below

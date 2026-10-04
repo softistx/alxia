@@ -47,7 +47,7 @@ print, or — for a trap that prints nothing — the symptom.
 - [`openapi.yaml → src/generated: out of date, run nxgt-openapi generate`](#openapiyaml--srcgenerated-out-of-date-run-nxgt-openapi-generate)
 - [`src/generated/` changes after moving `@nxgt/openapi-codegen`](#srcgenerated-changes-after-moving-nxgtopenapi-codegen)
 - [`TypeError: matchesSpec(): 1 operation has no route: DELETE /todos/:id (deleteTodo)`](#typeerror-matchesspec-1-operation-has-no-route-delete-todosid-deletetodo)
-- [`ResponseValidationError: POST /todos: the 401 reply does not match its schema`](#responsevalidationerror-post-todos-the-401-reply-does-not-match-its-schema)
+- [`ResponseValidationError: POST /todos: the 201 reply does not match its schema`](#responsevalidationerror-post-todos-the-201-reply-does-not-match-its-schema)
 - [``cookie parameter `session` is not supported [unsupported_parameter]``](#cookie-parameter-session-is-not-supported-unsupported_parameter)
 
 **Biome**
@@ -496,26 +496,26 @@ route has an operation.
 For a route deliberately outside the spec, a health check say, see
 [`@alxia/openapi`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/troubleshooting.md#typeerror-matchesspec--routes-have-no-operation-).
 
-### `ResponseValidationError: POST /todos: the 401 reply does not match its schema`
+### `ResponseValidationError: POST /todos: the 201 reply does not match its schema`
 
 The client gets `500 {"error":"internal"}`, and the server prints the
 error, with the field that broke the schema after the colon:
 
 ```text
-ResponseValidationError: POST /todos: the 401 reply does not match its schema: error: Invalid input: expected "unauthorized"
+ResponseValidationError: POST /todos: the 201 reply does not match its schema: title: Invalid input: expected string, received undefined
 ```
 
 The method, path and status are the route's and the reply's.
 
-**When:** a reply's body does not match what `openapi.yaml` declares for
-its status: a handler's, or a middleware's such as `requireKey`'s, since
-every reply with a declared status is checked. The types refuse most of
+**When:** the handler's reply does not match what `openapi.yaml` declares
+for its status. A middleware's own reply, such as `requireKey`'s 401, is
+not checked, unless `responds(operation)` stands before it. The types refuse most of
 these, so it comes from data the types do not see (a database row,
 `JSON.parse`, `any`, a cast), or from `openapi.yaml` changed and
 generated while the code still sends the old shape.
 
-**Why:** a route bound with `route(operation, …)` checks every reply
-against the operation's responses, so a client generated from the same
+**Why:** a route bound with `route(operation, …)` checks the handler's
+reply against the operation's responses, so a client generated from the same
 spec never reads a body it was not told about. A body the spec refuses is
 not sent.
 
@@ -523,7 +523,7 @@ not sent.
 send that:
 
 ```ts
-reply(401, { error: "unauthorized" as const }) // Unauthorized: { error: "unauthorized" }
+reply.created({ id: todo.id, title: todo.title, done: todo.done }) // Todo: { id, title, done }
 ```
 
 The other forms of the error, and how to turn the check off, are in

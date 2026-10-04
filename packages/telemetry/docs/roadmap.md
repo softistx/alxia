@@ -38,7 +38,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **One server span per request.** `alxia().use(telemetry({ service, exporters }))`
+- **One server span per request.** `alxia().plugin(telemetry({ service, exporters }))`
   opens a span around everything a request runs — hooks, handler, what
   they await — and every log written with `@nxgt/telemetry`'s
   `createLogger` inside it carries its trace id.

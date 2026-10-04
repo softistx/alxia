@@ -288,7 +288,7 @@ describe('app.page', () => {
 		expect(() =>
 			alxia()
 				.page('/x', bundle)
-				.use(alxia().get('/x', ({ reply }) => reply(200, 'x'))),
+				.plugin(alxia().get('/x', ({ reply }) => reply(200, 'x'))),
 		).toThrow('GET /x is already served by a page');
 		// A static path beside a parameter is no conflict: Bun serves the page at /x.
 		expect(() =>
@@ -300,7 +300,7 @@ describe('app.page', () => {
 		expect(() =>
 			alxia()
 				.get('/x', ({ reply }) => reply(200, 'x'))
-				.use(plugin),
+				.plugin(plugin),
 		).toThrow('page(): /x is already served');
 	});
 
@@ -326,7 +326,7 @@ describe('app.page', () => {
 
 	test('a page of a plugin is mounted under its prefix', async () => {
 		const bundle = (await import('../../test/fixtures/page.html')).default;
-		const app = alxia({ prefix: '/app' }).use(alxia().page('/', bundle));
+		const app = alxia({ prefix: '/app' }).plugin(alxia().page('/', bundle));
 		const server = app.listen({ port: 0 });
 		try {
 			expect((await fetch(new URL('/app', server.url))).status).toBe(200);

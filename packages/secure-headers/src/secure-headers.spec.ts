@@ -5,7 +5,7 @@ import { type Setting, secureHeaders } from './secure-headers';
 describe('secureHeaders', () => {
 	test('sets the defaults, keeps what a route set, takes options', async () => {
 		const app = alxia()
-			.use(
+			.plugin(
 				secureHeaders({ referrerPolicy: 'same-origin', xFrameOptions: false }),
 			)
 			.get('/page', ({ reply }) =>
@@ -31,7 +31,7 @@ describe('secureHeaders', () => {
 
 	test('sends every default, exactly, with no nonce anywhere', async () => {
 		const app = alxia()
-			.use(secureHeaders())
+			.plugin(secureHeaders())
 			.get('/', (ctx) => ctx.reply(200, String('nonce' in ctx)));
 		const response = await app.request('/');
 		expect(await response.text()).toBe('false');
@@ -57,7 +57,7 @@ describe('secureHeaders', () => {
 	});
 
 	test('a 404 is covered too', async () => {
-		const app = alxia().use(secureHeaders());
+		const app = alxia().plugin(secureHeaders());
 		const response = await app.request('/nope');
 		expect(response.status).toBe(404);
 		expect(response.headers.get('x-content-type-options')).toBe('nosniff');

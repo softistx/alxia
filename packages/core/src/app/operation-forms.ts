@@ -1,7 +1,7 @@
 /**
  * The middleware form of `app.route`: `route(operation, ...middlewares,
- * handler)`, the operation's schemas as an implicit `responds` first and an
- * implicit `validate` just before the handler.
+ * handler)`, the operation's schemas as an implicit `validate` and an
+ * implicit `responds`, just before the handler.
  */
 import type {
 	OperationApp,
@@ -19,24 +19,21 @@ import type {
 import type { CheckedOperation, RouteOperation } from './route-operation';
 import type { MiddlewareReturn, ThreadContext } from './types';
 
-/** The context the implicit `validate` reads: the implicit `responds`'s, then the middlewares'. */
+/** The context the implicit `validate` reads: the middlewares'. */
 type BeforeValidate<
 	App extends AppTypes,
 	Op extends RouteOperation,
 	Results extends readonly unknown[],
-> = ThreadContext<
-	RouteBase<OperationApp<App, Op>, Op['path']>,
-	[OperationResponds<Op>, ...Results]
->;
-/** The results the route threads: the implicit `responds`, the middlewares', the implicit `validate`. */
+> = ThreadContext<RouteBase<OperationApp<App, Op>, Op['path']>, Results>;
+/** The results the route threads: the middlewares', the implicit `validate`, the implicit `responds`. */
 type Steps<
 	App extends AppTypes,
 	Op extends RouteOperation,
 	Results extends readonly unknown[],
 > = [
-	OperationResponds<Op>,
 	...Results,
 	OperationValidate<Op, BeforeValidate<App, Op, Results>>,
+	OperationResponds<Op>,
 ];
 /** Middleware `n`, after the ones that returned `Before`. */
 type Mw<
@@ -61,10 +58,12 @@ type R = MiddlewareReturn;
 
 /**
  * `app.route(operation, ...middlewares, handler)`: the route
- * `app[method](path, options, responds(response), ...middlewares,
- * validate(parts), handler)` declares, read from `operation`. A
- * `validate(operation)` among the middlewares stands where it is given, and
- * the implicit one is left out. Up to 8 middlewares.
+ * `app[method](path, options, ...middlewares, validate(parts),
+ * responds(response), handler)` declares, read from `operation`: the
+ * operation's responses check the handler's reply, not a middleware's. A
+ * `validate(operation)` or a `responds(operation)` among the middlewares
+ * stands where it is given, and the implicit one is left out. Up to 8
+ * middlewares.
  *
  * ```ts
  * app.route(operations.updatePet, auth, ({ user, params, body, reply }) =>

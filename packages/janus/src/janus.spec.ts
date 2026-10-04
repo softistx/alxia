@@ -75,7 +75,7 @@ function setup() {
 	]);
 
 	const app = alxia()
-		.use(janusErrors())
+		.plugin(janusErrors())
 		.post(
 			'/signup',
 			validate({
@@ -100,7 +100,7 @@ function setup() {
 		)
 		.post('/signout', async (ctx) => ctx.reply(200, await signOut(ctx, auth)))
 		.get('/whoami', async ({ reply }) => reply(200, 'anyone'))
-		.use(session(auth, { type: 'patient', required: true }))
+		.plugin(session(auth, { type: 'patient', required: true }))
 		.get('/me', ({ user, session: current, reply }) => {
 			expectTypeOf(user.email).toBeString();
 			expectTypeOf(current).toEqualTypeOf<Session>();
@@ -108,7 +108,7 @@ function setup() {
 		})
 		.group('/records/:id', (records_) =>
 			records_
-				.use(
+				.plugin(
 					permission(
 						access,
 						'view',
@@ -166,8 +166,8 @@ describe('session', () => {
 		const { auth } = setup();
 		await auth.patient.signUp({ ...ada, password });
 		const app = alxia()
-			.use(janusErrors())
-			.use(session(auth, { type: 'patient', device: { name: 'my-device' } }))
+			.plugin(janusErrors())
+			.plugin(session(auth, { type: 'patient', device: { name: 'my-device' } }))
 			.post(
 				'/signin',
 				validate({
@@ -218,7 +218,7 @@ describe('session', () => {
 		const { auth } = setup();
 		for (const required of [true, false]) {
 			const app = alxia()
-				.use(session(auth, { required }))
+				.plugin(session(auth, { required }))
 				.get('/me', ({ user, reply }) => {
 					const anonymous: typeof user = null; // compiles only if user may be null
 					void anonymous;
@@ -246,11 +246,11 @@ describe('session', () => {
 			}) as typeof auth.authenticate,
 		};
 		const app = alxia()
-			.use(janusErrors())
-			.use(session(counted))
-			.use(session(counted, { required: true }))
+			.plugin(janusErrors())
+			.plugin(session(counted))
+			.plugin(session(counted, { required: true }))
 			.get('/me', ({ user, reply }) => reply.ok({ type: user.type }))
-			.use(session(counted, { type: 'patient' }))
+			.plugin(session(counted, { type: 'patient' }))
 			.get('/patient', ({ reply }) => reply.ok('patient'));
 		const cookie = `janus-session=${token}`;
 		expect((await app.request('/me', { headers: { cookie } })).status).toBe(
@@ -274,8 +274,8 @@ describe('session', () => {
 		await auth.patient.signUp({ ...ada, password });
 		const { token } = await auth.patient.signIn({ email: ada.email, password });
 		const app = alxia()
-			.use(session(auth))
-			.use(session(auth, { required: true }))
+			.plugin(session(auth))
+			.plugin(session(auth, { required: true }))
 			.get('/me', ({ reply }) => reply.ok('me'));
 		clock.advance(2 * DAY);
 		const renewed = await app.request('/me', {
@@ -301,7 +301,7 @@ describe('session', () => {
 		});
 		await accounts.signUp({ ...ada, password });
 		const app = alxia()
-			.use(session(accounts, { device: { name: 'my-device' } }))
+			.plugin(session(accounts, { device: { name: 'my-device' } }))
 			.post(
 				'/signin',
 				validate({
@@ -441,7 +441,7 @@ describe('permission', () => {
 			}))
 			.group('/records/:id', (records) =>
 				records
-					.use(edit)
+					.plugin(edit)
 					.get('/', ({ object, reply }) => reply(200, { id: object.id })),
 			);
 		const status = async (path: string, headers: Record<string, string>) =>
@@ -471,11 +471,11 @@ describe('permission', () => {
 		});
 		const _refused = () => {
 			// @ts-expect-error the plugin reads "member", which this app's context does not give
-			alxia().use(byMember);
+			alxia().plugin(byMember);
 			alxia()
 				.derive(() => ({ member: 1 }))
 				// @ts-expect-error the plugin reads "member", which this app's context gives with another type
-				.use(byMember);
+				.plugin(byMember);
 			const wrong = permission(
 				access,
 				'view',
@@ -486,7 +486,7 @@ describe('permission', () => {
 				}),
 			);
 			// @ts-expect-error the plugin reads "pathParams", which this app's context gives with another type
-			alxia().use(wrong);
+			alxia().plugin(wrong);
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -516,13 +516,13 @@ describe('permission', () => {
 		expectTypeOf<(typeof byCtx)['~requires']>().toEqualTypeOf<Message<'ctx'>>();
 		const _refused = () => {
 			// @ts-expect-error the plugin's load reads its context as any
-			alxia().use(byLoad);
+			alxia().plugin(byLoad);
 			// @ts-expect-error the plugin's subject reads its context as any
-			alxia().use(bySubject);
+			alxia().plugin(bySubject);
 			alxia()
 				.derive(() => ({ locked: false }))
 				// @ts-expect-error the plugin's ctx reads its context as any, whatever the app gives
-				.use(byCtx);
+				.plugin(byCtx);
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -536,7 +536,7 @@ describe('permission', () => {
 			title: id,
 		}));
 		alxia()
-			.use(
+			.plugin(
 				permission(access, 'view', 'record', (ctx) => {
 					expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
 					return { id: 'r1', doctorId: null, title: 'x' } as Rec | null;
@@ -592,7 +592,7 @@ describe('permission', () => {
 		}>();
 		const _refused = () => {
 			// @ts-expect-error the plugin reads "member", which this app's context does not give
-			alxia().use(loose);
+			alxia().plugin(loose);
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -601,7 +601,7 @@ describe('permission', () => {
 		const { access } = setup();
 		const app = alxia().group('/records/:id', (records) =>
 			records
-				.use(
+				.plugin(
 					permission(
 						access,
 						'view',

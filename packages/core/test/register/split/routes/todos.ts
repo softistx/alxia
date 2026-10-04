@@ -21,10 +21,10 @@ export const todos = defineRoutes('/todos')
 	.get('/', (ctx) => ctx.reply(200, { text: greet(ctx), owner: ctx.owner }));
 
 // @ts-expect-error: an app with no `user` cannot mount the routes
-alxia().use(todos);
+alxia().plugin(todos);
 
 // @ts-expect-error: nor return them from a plugin function
-alxia().use(() => todos);
+alxia().plugin(() => todos);
 
 // @ts-expect-error: nor from a group
 alxia().group(() => todos);

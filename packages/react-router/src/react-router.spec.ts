@@ -25,7 +25,9 @@ const browser = { 'user-agent': BROWSER };
 
 /** The fixture served as an app would serve it: `/api/health`, then the catch-all. */
 function served() {
-	return makeBase().use((app) => reactRouter(app, { build, client: CLIENT }));
+	return makeBase().plugin((app) =>
+		reactRouter(app, { build, client: CLIENT }),
+	);
 }
 
 /** React's server renderer puts a comment between adjacent text nodes. */
@@ -196,7 +198,7 @@ describe('beside the app', () => {
 	});
 
 	test('in development the client build is left to Vite', () => {
-		const app = makeBase().use((app) =>
+		const app = makeBase().plugin((app) =>
 			reactRouter(app, { build, client: CLIENT, mode: 'development' }),
 		);
 		expect(app.routes.map((route) => route.path)).not.toContain('/assets/*');
@@ -204,14 +206,14 @@ describe('beside the app', () => {
 
 	test('a client folder that is not one is refused at startup', () => {
 		expect(() =>
-			alxia().use((app) =>
+			alxia().plugin((app) =>
 				reactRouter(app, { build, client: `${CLIENT}/nowhere` }),
 			),
 		).toThrow('is not a directory');
 	});
 
 	test('client may be a file: URL', () => {
-		const app = alxia().use((app) =>
+		const app = alxia().plugin((app) =>
 			reactRouter(app, { build, client: new URL(`file://${CLIENT}`) }),
 		);
 		expect(app.routes.map((route) => route.path)).toContain('/assets/*');
@@ -244,7 +246,7 @@ describe('beside the app', () => {
 describe('the build', () => {
 	test('a function is called on every request in development', async () => {
 		let calls = 0;
-		const app = alxia().use((app) =>
+		const app = alxia().plugin((app) =>
 			reactRouter(app, {
 				mode: 'development',
 				build: () => {
@@ -260,7 +262,7 @@ describe('the build', () => {
 
 	test('and once in production', async () => {
 		let calls = 0;
-		const app = alxia().use((app) =>
+		const app = alxia().plugin((app) =>
 			reactRouter(app, {
 				build: async () => {
 					calls += 1;
@@ -278,7 +280,7 @@ describe('the build', () => {
 
 	test('a function that failed is tried again on the next request', async () => {
 		let calls = 0;
-		const app = alxia().use((app) =>
+		const app = alxia().plugin((app) =>
 			reactRouter(app, {
 				build: async () => {
 					calls += 1;
@@ -295,7 +297,7 @@ describe('the build', () => {
 describe('the context', () => {
 	test('getLoadContext gets the typed context and the provider, alxiaContext already set', async () => {
 		const seen: unknown[] = [];
-		const app = makeBase().use((app) =>
+		const app = makeBase().plugin((app) =>
 			reactRouter(app, {
 				build,
 				getLoadContext: (ctx, context) => {
@@ -308,7 +310,7 @@ describe('the context', () => {
 	});
 
 	test("a key made in app/ is not the build's own: the loader reads its default", async () => {
-		const app = makeBase().use((app) =>
+		const app = makeBase().plugin((app) =>
 			reactRouter(app, {
 				build,
 				getLoadContext: (_ctx, context) =>
@@ -344,10 +346,10 @@ describe('the context', () => {
 	test('getLoadContext reads only what the hooks before it built', () => {
 		const typed = () => {
 			const base = alxia().derive(() => ({ user: { id: '1' } }));
-			base.use((app) =>
+			base.plugin((app) =>
 				reactRouter(app, { build, getLoadContext: ({ user }) => void user.id }),
 			);
-			base.use((app) =>
+			base.plugin((app) =>
 				reactRouter(app, {
 					build,
 					// @ts-expect-error: no hook before it derives `tenant`
@@ -355,7 +357,7 @@ describe('the context', () => {
 				}),
 			);
 			alxia()
-				.use((app) =>
+				.plugin((app) =>
 					reactRouter(app, {
 						build,
 						// @ts-expect-error: `user` is derived after the catch-all
@@ -365,14 +367,14 @@ describe('the context', () => {
 				.derive(() => ({ user: 1 }));
 			// An annotated parameter is read as what the app must build:
 			// narrower than the app's context is fine, wider is refused.
-			base.use((app) =>
+			base.plugin((app) =>
 				reactRouter(app, {
 					build,
 					getLoadContext: (ctx: BaseContext & { user: { id: string } }) =>
 						void ctx.user.id,
 				}),
 			);
-			base.use((app) =>
+			base.plugin((app) =>
 				// @ts-expect-error: no hook before it derives `tenant`
 				reactRouter(app, {
 					build,
@@ -440,8 +442,8 @@ describe('streaming', () => {
 		'and still does behind @alxia/compress, in %s',
 		async (encoding) => {
 			const app = makeBase()
-				.use(compress())
-				.use((app) => reactRouter(app, { build }));
+				.plugin(compress())
+				.plugin((app) => reactRouter(app, { build }));
 			const result = await slow(app, encoding);
 			expect(result.encoding).toBe(encoding);
 			expectStreamed(result);

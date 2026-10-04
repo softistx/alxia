@@ -46,7 +46,7 @@ export interface RateLimitInfo {
  * requests, and answers a 429 past the limit.
  *
  * ```ts
- * app.use(rateLimit({ limit: 100, windowMs: 60_000 })).get(...);
+ * app.plugin(rateLimit({ limit: 100, windowMs: 60_000 })).get(...);
  * ```
  *
  * A `key` that reads what an earlier plugin added names it, and the app

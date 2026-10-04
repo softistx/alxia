@@ -224,7 +224,7 @@ const jwt: Jwt = {
 	},
 };
 
-app.use(bearer({ jwt }));
+app.plugin(bearer({ jwt }));
 ```
 
 Drop `previous` once the longest `expiresIn` has passed since the switch.

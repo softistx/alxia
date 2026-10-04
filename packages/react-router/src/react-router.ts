@@ -31,7 +31,7 @@ export interface ReactRouterOptions<Ctx> {
 	/**
 	 * Sets the app's own keys on React Router's context provider, from the
 	 * context alxia's hooks built. `ctx` is typed by the app at the point of
-	 * `use`: reading what no hook before it derives is a compile error.
+	 * `app.plugin`: reading what no hook before it derives is a compile error.
 	 * `alxiaContext` is always set, whether or not this is given.
 	 */
 	readonly getLoadContext?: (
@@ -76,7 +76,7 @@ export function isReactRouterRoute(route: RouteDefinition): boolean {
  * files are served when `client` is given.
  *
  * ```ts
- * const app = base.use((app) =>
+ * const app = base.plugin((app) =>
  *   reactRouter(app, { build: () => import('./build/server/index.js'), client: 'build/client' }),
  * );
  * ```

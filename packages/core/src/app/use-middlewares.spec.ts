@@ -67,7 +67,7 @@ describe('app.use(...middlewares)', () => {
 	test('a plugin app’s middlewares apply to the routes declared after it', async () => {
 		const plugin = alxia().use(auth);
 		const app = alxia()
-			.use(plugin)
+			.plugin(plugin)
 			.get('/', ({ user, reply }) => reply(200, user.id));
 		expect((await app.request('/')).status).toBe(401);
 		expect(await (await app.request('/', user)).text()).toBe('ada');
@@ -89,7 +89,7 @@ describe('app.use(...middlewares)', () => {
 			seen.push(app);
 			return app;
 		};
-		const app = alxia().use(plugin);
+		const app = alxia().plugin(plugin);
 		expect(seen).toEqual([app]);
 		// A plain `(ctx, next)` arrow is called as a plugin, given the app.
 		const plain = (_ctx: unknown, next: () => unknown) => next();

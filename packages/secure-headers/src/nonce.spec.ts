@@ -11,7 +11,7 @@ const nonceIn = (policy: string | null) =>
 
 const page = () =>
 	alxia()
-		.use(secureHeaders({ nonce: true, contentSecurityPolicy: PAGE_POLICY }))
+		.plugin(secureHeaders({ nonce: true, contentSecurityPolicy: PAGE_POLICY }))
 		.get('/', ({ nonce, reply }) => reply(200, nonce));
 
 describe('secureHeaders({ nonce: true })', () => {
@@ -40,7 +40,7 @@ describe('secureHeaders({ nonce: true })', () => {
 
 	test('NONCE places it, every time it is named, and nowhere else', async () => {
 		const app = alxia()
-			.use(
+			.plugin(
 				secureHeaders({
 					nonce: true,
 					contentSecurityPolicy: `script-src 'self'; style-src 'self' ${NONCE}; style-src-elem ${NONCE}`,
@@ -56,7 +56,7 @@ describe('secureHeaders({ nonce: true })', () => {
 
 	test('without NONCE, it goes to script-src and script-src-elem, whatever their case', async () => {
 		const app = alxia()
-			.use(
+			.plugin(
 				secureHeaders({
 					nonce: true,
 					contentSecurityPolicy:
@@ -73,7 +73,9 @@ describe('secureHeaders({ nonce: true })', () => {
 
 	test('the same nonce under a bodyLimit, which hands the route a Request of its own', async () => {
 		const app = alxia()
-			.use(secureHeaders({ nonce: true, contentSecurityPolicy: PAGE_POLICY }))
+			.plugin(
+				secureHeaders({ nonce: true, contentSecurityPolicy: PAGE_POLICY }),
+			)
 			.post('/', { bodyLimit: 64 }, ({ nonce, reply }) => reply(200, nonce));
 		const response = await app.request('/', { method: 'POST', body: 'hi' });
 		expect(nonceIn(response.headers.get('content-security-policy'))).toBe(
@@ -83,7 +85,9 @@ describe('secureHeaders({ nonce: true })', () => {
 
 	test('a response no route made gets a nonce too; a policy a route set is kept', async () => {
 		const app = alxia()
-			.use(secureHeaders({ nonce: true, contentSecurityPolicy: PAGE_POLICY }))
+			.plugin(
+				secureHeaders({ nonce: true, contentSecurityPolicy: PAGE_POLICY }),
+			)
 			.get('/own', ({ reply }) =>
 				reply(200, 'own', {
 					headers: { 'content-security-policy': "default-src 'none'" },
@@ -112,7 +116,7 @@ describe('secureHeaders({ nonce: true })', () => {
 					].includes(name),
 			);
 		const plain = alxia()
-			.use(secureHeaders({ contentSecurityPolicy: PAGE_POLICY }))
+			.plugin(secureHeaders({ contentSecurityPolicy: PAGE_POLICY }))
 			.get('/', ({ reply }) => reply(200, 'x'));
 		expect(await headersOf(await page().request('/'))).toEqual(
 			await headersOf(await plain.request('/')),
@@ -141,10 +145,12 @@ describe('secureHeaders({ nonce: true })', () => {
 		alxia()
 			// @ts-expect-error a route before the plugin has no nonce
 			.get('/before', ({ nonce, reply }) => reply(200, String(nonce)))
-			.use(secureHeaders({ nonce: true, contentSecurityPolicy: PAGE_POLICY }))
+			.plugin(
+				secureHeaders({ nonce: true, contentSecurityPolicy: PAGE_POLICY }),
+			)
 			.get('/after', ({ nonce, reply }) => reply(200, nonce satisfies string));
 		alxia()
-			.use(secureHeaders({ contentSecurityPolicy: PAGE_POLICY }))
+			.plugin(secureHeaders({ contentSecurityPolicy: PAGE_POLICY }))
 			// @ts-expect-error no nonce without nonce: true
 			.get('/', ({ nonce, reply }) => reply(200, String(nonce)));
 		// Options typed by the exported interface pick the plugin without a nonce.

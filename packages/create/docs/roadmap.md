@@ -11,7 +11,7 @@ number on it. Every release, with each change it made, is in
   base the routes read and registers it with `@alxia/core`'s `Register`;
   `src/routes/todos.ts` binds the operations with `defineRoutes()`,
   reading that context with no import of the app; `src/app.ts` mounts
-  them, `base.use(todoRoutes)`.
+  them, `base.plugin(todoRoutes)`.
 
 ## Next
 
@@ -47,7 +47,7 @@ Nothing scheduled yet.
   `@nxgt/openapi-codegen`, committed, so the project and its image build
   with no generation step and offline; `src/app.ts` binds each operation
   with `route(operations.createTodo, requireKey, handler)`, which
-  validates the request and checks every reply against the spec; the
+  validates the request and checks the handler's reply against the spec; the
   spec asserts `matchesSpec` from `@alxia/openapi`, so no operation lacks
   a route; and `bun run verify` starts with `generate --check`, which
   fails when `src/generated/` drifts from `openapi.yaml`. New projects

@@ -9,7 +9,7 @@ import { alxia } from '@alxia/core';
 import { secureHeaders } from '@alxia/secure-headers';
 
 const app = alxia()
-	.use(secureHeaders())
+	.plugin(secureHeaders())
 	.get('/health', ({ reply }) => reply(200, 'ok'));
 
 app.listen(3000);
@@ -45,7 +45,7 @@ interface SecureHeadersOptions {
 typed by that interface still give the plain `Plugin`.
 
 `secureHeaders` returns a function `Plugin` from `@alxia/core`: give it to
-`use`, called, and the app keeps its type. It adds one global `onResponse`
+`app.plugin`, called, and the app keeps its type. It adds one global `onResponse`
 hook, so where it sits in the chain does not matter for which routes it
 reaches: every route, declared before or after it, is covered. Used inside
 a `group`, it still covers the whole app — a group's global hooks are the
@@ -57,7 +57,7 @@ values are fixed from then on, but for the nonce, which is new on every
 request.
 
 With `nonce: true` it returns a `NoncePlugin` instead: an app plugin, still
-given to `use` called, whose hook covers every route as above, and which
+given to `app.plugin` called, whose hook covers every route as above, and which
 adds `nonce` to the context of the routes declared after it
 ([below](#a-nonce-per-request)).
 
@@ -92,7 +92,7 @@ A string replaces the default as it is, with no parsing: write the header
 exactly as it should go out.
 
 ```ts
-app.use(
+app.plugin(
 	secureHeaders({
 		contentSecurityPolicy: "default-src 'self'; img-src 'self' data:",
 		referrerPolicy: 'strict-origin-when-cross-origin',
@@ -106,7 +106,7 @@ app.use(
 `false` leaves the header out of every response the plugin touches.
 
 ```ts
-app.use(secureHeaders({ xFrameOptions: false, strictTransportSecurity: false }));
+app.plugin(secureHeaders({ xFrameOptions: false, strictTransportSecurity: false }));
 ```
 
 An empty string is refused: `secureHeaders({ xFrameOptions: '' })` throws a
@@ -123,7 +123,7 @@ default under a condition, leave the key out:
 ```ts
 const production = Bun.env.NODE_ENV === 'production';
 
-app.use(
+app.plugin(
 	secureHeaders({
 		...(production ? {} : { strictTransportSecurity: false }),
 	}),
@@ -137,7 +137,7 @@ even when a route set them.
 
 ```ts
 const app = alxia()
-	.use(secureHeaders())
+	.plugin(secureHeaders())
 	.get('/', ({ reply }) => reply(200, 'hi', { headers: { 'x-powered-by': 'php' } }));
 
 (await app.request('/')).headers.get('x-powered-by'); // null
@@ -156,7 +156,7 @@ import { alxia } from '@alxia/core';
 import { secureHeaders } from '@alxia/secure-headers';
 
 const app = alxia()
-	.use(secureHeaders({ referrerPolicy: 'same-origin', xFrameOptions: false }))
+	.plugin(secureHeaders({ referrerPolicy: 'same-origin', xFrameOptions: false }))
 	.get('/page', ({ reply }) =>
 		reply(200, '<p>hi</p>', {
 			headers: { 'content-security-policy': "default-src 'self'" },
@@ -188,7 +188,7 @@ import { alxia } from '@alxia/core';
 import { secureHeaders } from '@alxia/secure-headers';
 
 const app = alxia()
-	.use(
+	.plugin(
 		secureHeaders({
 			nonce: true,
 			contentSecurityPolicy: "default-src 'self'; script-src 'self'; frame-ancestors 'none'",
@@ -231,7 +231,7 @@ of your own choosing:
 ```ts
 import { NONCE, secureHeaders } from '@alxia/secure-headers';
 
-app.use(
+app.plugin(
 	secureHeaders({
 		nonce: true,
 		contentSecurityPolicy: [
@@ -252,13 +252,13 @@ which take no nonce, stop applying
 
 The header covers every response, as without the nonce: 404s, 500s and the
 routes declared before the plugin get a policy with a nonce of their own.
-`ctx.nonce` is typed and set on the routes declared **after** `use`, in
+`ctx.nonce` is typed and set on the routes declared **after** `app.plugin`, in
 their hooks and their handler, as any plugin's context:
 
 ```ts
 alxia()
 	.get('/early', ({ reply }) => reply(200, 'policy with a nonce, no ctx.nonce'))
-	.use(secureHeaders({ nonce: true, contentSecurityPolicy: "script-src 'self'" }))
+	.plugin(secureHeaders({ nonce: true, contentSecurityPolicy: "script-src 'self'" }))
 	.derive(({ nonce }) => ({ scriptTag: (code: string) => `<script nonce="${nonce}">${code}</script>` }))
 	.get('/late', ({ scriptTag, reply }) => reply(200, scriptTag('…')));
 ```
@@ -295,7 +295,7 @@ The plugin runs as an `onResponse` hook, so it reaches what the app's
 | the 500 sent when an `around` hook itself throws | no |
 
 ```ts
-const app = alxia().use(secureHeaders());
+const app = alxia().plugin(secureHeaders());
 
 const response = await app.request('/nope');
 response.status;                                // 404
@@ -322,7 +322,7 @@ const app = alxia()
 	.onResponse((response) =>
 		withHeaders(response, (headers) => headers.set('referrer-policy', 'origin')),
 	)
-	.use(secureHeaders())
+	.plugin(secureHeaders())
 	.get('/', ({ reply }) => reply(200, 'ok'));
 
 (await app.request('/')).headers.get('referrer-policy'); // 'origin'
@@ -339,7 +339,7 @@ import { alxia, withHeaders } from '@alxia/core';
 import { secureHeaders } from '@alxia/secure-headers';
 
 const app = alxia()
-	.use(secureHeaders())
+	.plugin(secureHeaders())
 	.onResponse((response) =>
 		withHeaders(response, (headers) => {
 			if (!headers.has('content-security-policy-report-only')) {
@@ -363,7 +363,7 @@ The default policy blocks everything a page loads. Loosen it for the whole
 app when it serves its own pages, and keep framing refused:
 
 ```ts
-app.use(
+app.plugin(
 	secureHeaders({
 		contentSecurityPolicy:
 			"default-src 'self'; img-src 'self' data:; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
@@ -382,7 +382,7 @@ Both `frame-ancestors` in the policy and `X-Frame-Options` refuse framing;
 change both:
 
 ```ts
-app.use(
+app.plugin(
 	secureHeaders({
 		contentSecurityPolicy: "default-src 'none'; frame-ancestors 'self'",
 		xFrameOptions: 'SAMEORIGIN',
@@ -397,7 +397,7 @@ app.use(
 CORS `fetch` is not affected. For a public asset host:
 
 ```ts
-app.use(secureHeaders({ crossOriginResourcePolicy: 'cross-origin' }));
+app.plugin(secureHeaders({ crossOriginResourcePolicy: 'cross-origin' }));
 ```
 
 ### Sign-in in a popup
@@ -407,7 +407,7 @@ a popup of another origin, which a sign-in popup that reports back through
 `window.opener` needs:
 
 ```ts
-app.use(secureHeaders({ crossOriginOpenerPolicy: 'same-origin-allow-popups' }));
+app.plugin(secureHeaders({ crossOriginOpenerPolicy: 'same-origin-allow-popups' }));
 ```
 
 ### Cross-origin isolation
@@ -417,7 +417,7 @@ isolated, which takes `Cross-Origin-Embedder-Policy` beside the default
 `Cross-Origin-Opener-Policy: same-origin`:
 
 ```ts
-app.use(secureHeaders({ crossOriginEmbedderPolicy: 'require-corp' }));
+app.plugin(secureHeaders({ crossOriginEmbedderPolicy: 'require-corp' }));
 ```
 
 ## In a real app
@@ -435,7 +435,7 @@ const PAGE_POLICY =
 	"default-src 'self'; img-src 'self' data:; base-uri 'self'; form-action 'self'; frame-ancestors 'none'";
 
 export const app = alxia()
-	.use(
+	.plugin(
 		secureHeaders({
 			permissionsPolicy: 'camera=(), microphone=(), geolocation=()',
 			...(production ? {} : { strictTransportSecurity: false }),

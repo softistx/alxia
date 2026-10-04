@@ -30,7 +30,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **A rate limit as a plugin.** `use(rateLimit({ limit, windowMs }))` counts
+- **A rate limit as a plugin.** `plugin(rateLimit({ limit, windowMs }))` counts
   the requests of every route declared after it, per client address by
   default, and answers a 429 with `Retry-After` and
   `{ error: 'rate_limited', retryAfter }` past the limit.

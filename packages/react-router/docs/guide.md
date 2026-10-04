@@ -438,8 +438,8 @@ import { createServer } from '@alxia/react-router';
 const server = createServer({
 	configure: (app) =>
 		app
-			.use(logger())
-			.use(compress())
+			.plugin(logger())
+			.plugin(compress())
 			.get('/api/health', ({ reply }) => reply.ok({ ok: true }))
 			.derive(({ request }) => {
 				const name = request.headers.get('x-user');
@@ -557,7 +557,7 @@ bundled and the route never imports the server at runtime:
 
 ```ts
 // app/server.ts
-const server = createServer({ configure: (app) => app.use(logger()) });
+const server = createServer({ configure: (app) => app.plugin(logger()) });
 export default server;
 export type Server = typeof server;
 ```
@@ -599,7 +599,7 @@ declare module '@alxia/core' {
 }
 
 // app/server.ts
-const server = createServer({ configure: (app) => app.use(base) });
+const server = createServer({ configure: (app) => app.plugin(base) });
 export default server;
 ```
 
@@ -709,7 +709,7 @@ import { secureHeaders } from '@alxia/secure-headers';
 
 export default createServer({
 	configure: (app) =>
-		app.use(
+		app.plugin(
 			secureHeaders({
 				nonce: true,
 				contentSecurityPolicy: [
@@ -848,13 +848,13 @@ import { reactRouter } from '@alxia/react-router';
 import type { ServerBuild } from 'react-router';
 
 export const base = alxia()
-	.use(logger())
+	.plugin(logger())
 	.get('/api/health', ({ reply }) => reply.ok({ ok: true }));
 
 /** What the loaders read: alxiaOf<Base>(context). */
 export type Base = typeof base;
 
-const app = base.use((app) =>
+const app = base.plugin((app) =>
 	reactRouter(app, {
 		build: () =>
 			import(new URL('./build/server/index.js', import.meta.url).href) as Promise<ServerBuild>,
@@ -876,7 +876,7 @@ bun run build && bun server.ts
 | `getLoadContext(ctx, context)` | as `createServer`'s |
 | `client` | the client build's folder, a path or a `file:` URL, served before the catch-all in `production` |
 
-`reactRouter()` goes through `use`, as `@alxia/graphql`'s `graphql(app, …)`
+`reactRouter()` goes through `app.plugin`, as `@alxia/graphql`'s `graphql(app, …)`
 does: that is how it knows the app's context type. A `HEAD` is handed to
 React Router as a `GET`, since React Router answers a `HEAD` of its own
 with no headers at all; the core then drops the body. In a monorepo where

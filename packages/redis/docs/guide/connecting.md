@@ -12,7 +12,7 @@ import { connectRedis } from '@nxgt/redis';
 const connection = await connectRedis(Bun.env['REDIS_URL'] ?? 'redis://127.0.0.1:6379');
 
 const app = alxia()
-	.use(redis(connection.client))
+	.plugin(redis(connection.client))
 	.get('/ping', async ({ redis, reply }) => reply(200, await redis.ping()));
 
 app.listen({ port: 3000 });
@@ -62,8 +62,8 @@ import { connectRedis } from '@nxgt/redis';
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia()
-	.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
-	.use(idempotency(connection.client, { name: 'orders' }))
+	.plugin(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
+	.plugin(idempotency(connection.client, { name: 'orders' }))
 	.post('/orders', ({ reply }) => reply(201, { id: crypto.randomUUID() }));
 ```
 

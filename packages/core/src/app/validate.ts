@@ -10,6 +10,7 @@ import type {
 import type { StatusCode } from '../types/status';
 import type { RouteOperation } from './route-operation';
 import type {
+	BuiltinMark,
 	Empty,
 	Middleware,
 	Next,
@@ -84,8 +85,13 @@ export type BuiltinStep =
 	| { readonly kind: 'validate'; readonly schemas: RequestSchemas }
 	| { readonly kind: 'responds'; readonly responses: ResponseSchemas };
 
-/** Where a middleware made by `validate` or `responds` carries its step. */
-export const BUILTIN: unique symbol = Symbol('alxia.builtin');
+/**
+ * Where a middleware made by `validate` or `responds` carries its step: a
+ * symbol of the global registry, as `defineMiddleware`'s mark, so that a
+ * `validate` of another copy of `@alxia/core` — a duplicate install, a
+ * plugin that bundles it — is still recognised.
+ */
+const BUILTIN: unique symbol = Symbol.for('alxia.builtin');
 
 /** The step a middleware made by `validate` or `responds` stands for, or nothing. */
 export function builtinOf(middleware: unknown): BuiltinStep | undefined {
@@ -128,7 +134,8 @@ export function validate<const Schemas extends RequestSchemas | RouteOperation>(
 	Middleware<
 		ValidateRequires<PartsOf<Schemas>>,
 		Next<Validated<PartsOf<Schemas>>, PartsOf<Schemas>>
-	>
+	> &
+		BuiltinMark<'validate'>
 > {
 	if (isOperation(schemas)) {
 		const parts = Object.fromEntries(
@@ -156,6 +163,13 @@ function isOperation(given: unknown): given is RouteOperation {
 	);
 }
 
+/** What `responds` was given: response schemas, or an operation, whose `schema.response` it reads. */
+type ResponsesIn<Given> = Given extends RouteOperation
+	? Given extends { readonly schema: { readonly response: infer Responses } }
+		? Responses
+		: Empty
+	: Given;
+
 /**
  * A middleware that checks the handler's reply against the schema it
  * declares for its status, and sends it as that schema's output: an
@@ -176,11 +190,32 @@ function isOperation(given: unknown): given is RouteOperation {
  * not the schema's: a declared status with a body the schema refuses
  * compiles, and is answered 500 like the handler's. A redirect passes. A
  * socket route refuses it: it sends no reply.
+ *
+ * Given an operation, it checks the responses of its `schema`: on
+ * `app.route(operation, …)`, where it stands replaces the check the route
+ * runs just before its handler, so that the replies of the middlewares
+ * after it are checked too.
  */
-export function responds<const Responses extends ResponseSchemas>(
-	responses: Responses & KnownStatuses<Responses>,
-): NoInfer<Middleware<Empty, Next<Empty, { readonly response: Responses }>>> {
-	return builtin({ kind: 'responds', responses }, 'responds');
+export function responds<const Given extends ResponseSchemas | RouteOperation>(
+	responses: Given &
+		(Given extends RouteOperation ? unknown : KnownStatuses<Given>),
+): NoInfer<
+	Middleware<Empty, Next<Empty, { readonly response: ResponsesIn<Given> }>> &
+		BuiltinMark<'responds'>
+> {
+	if (isOperation(responses)) {
+		const declared = responses.schema?.response;
+		if (declared === undefined) {
+			throw new TypeError(
+				`responds(): the operation ${responses.method} ${responses.path} declares no response`,
+			);
+		}
+		return builtin({ kind: 'responds', responses: declared }, 'responds');
+	}
+	return builtin(
+		{ kind: 'responds', responses: responses as ResponseSchemas },
+		'responds',
+	);
 }
 
 function builtin(step: BuiltinStep, name: string): never {

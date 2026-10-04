@@ -15,7 +15,7 @@ const schema = createSchema({
 	resolvers: { Query: { hello: () => 'world' } },
 });
 
-const app = alxia().use((app) =>
+const app = alxia().plugin((app) =>
 	graphql(app, {
 		schema,
 		ide: Bun.env['NODE_ENV'] === 'production' ? false : 'apollo-sandbox',
@@ -143,7 +143,7 @@ const app = alxia()
 				headers.set('content-security-policy', "default-src 'self'");
 		}),
 	)
-	.use((app) => graphql(app, { schema }));
+	.plugin((app) => graphql(app, { schema }));
 ```
 
 ## `renderSandbox`
@@ -165,7 +165,7 @@ import { alxia } from '@alxia/core';
 import { graphql, renderSandbox, SANDBOX_POLICY } from '@alxia/graphql';
 
 const app = alxia()
-	.use((app) => graphql(app, { schema, ide: false }))
+	.plugin((app) => graphql(app, { schema, ide: false }))
 	.get('/explorer', ({ reply }) =>
 		reply(200, renderSandbox('/graphql', { title: 'Users API' }), {
 			headers: {

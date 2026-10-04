@@ -16,7 +16,7 @@ let app: ReturnType<typeof makeApp>;
 
 const makeApp = (client: RedisConnection['client']) =>
 	alxia({ ip: () => '1.2.3.4' })
-		.use(idempotency(client, { name: 'payments' }))
+		.plugin(idempotency(client, { name: 'payments' }))
 		.post('/payments', ({ reply }) => reply(201, { id: crypto.randomUUID() }));
 
 beforeAll(async () => {
@@ -78,7 +78,7 @@ test('two processes share one count', async () => {
 	await connection.client.send('FLUSHDB', []);
 	const make = () =>
 		alxia({ ip: () => '1.2.3.4' })
-			.use(rateLimit({ limit: 2, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
+			.plugin(rateLimit({ limit: 2, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
 			.get('/', ({ reply }) => reply(200, 'ok'));
 	const [one, two] = [make(), make()];             // two apps stand for two processes
 	expect((await one.request('/')).status).toBe(200);
@@ -102,7 +102,7 @@ const connection = await connectRedis(Bun.env['REDIS_URL'] ?? 'redis://127.0.0.1
 
 const app = alxia()
 	.post('/open', ({ reply }) => reply(201, 'ok'))
-	.use(idempotency(connection.client, { name: 'payments' }))
+	.plugin(idempotency(connection.client, { name: 'payments' }))
 	.post('/payments', ({ reply }) => reply(201, 'ok'));
 
 test('only the routes after the plugin refuse a bad key', async () => {

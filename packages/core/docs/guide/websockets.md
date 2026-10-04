@@ -76,7 +76,7 @@ The options hold no schema of the request — `params`, `query`, `headers`,
 | `validate({ params, query, headers, cookies })` | checks the upgrade request as a route's: a refused one is answered with the 400 with every issue, or the reply of the `onRefusal` hook in force ([Hooks](hooks.md#onrefusal)), and no socket. A `params` key the path lacks, optional or not, does not compile, as on a route |
 | a middleware returning `next(added)` | `added` is in `socket.data`, typed |
 | a middleware returning a reply or a `Response` | the upgrade is refused with it: an unauthenticated client never gets a socket |
-| a middleware that awaits `next()` | receives a stand-in response once the socket is open ([below](#the-upgrade)) |
+| a middleware that awaits `next()` | receives a stand-in response once the socket is open; what it returns after is ignored ([below](#the-upgrade)) |
 | `responds(…)` | refused: a socket sends no reply. `send` checks its messages |
 
 `responds` on a socket does not compile, and throws where the socket is
@@ -110,16 +110,19 @@ const app = alxia().ws('/live', auth, validate({ query: z.object({ channel: z.st
 A middleware that awaits `next()` runs around the rest of the upgrade. When
 the request is refused after it — a `validate`'s 400 — `next()` resolves to
 that response. When the socket opens, there is no response: `next()`
-resolves to a **stand-in**, an empty `200`, which the middleware must
-return as it is. A header set on it is lost — set it with `set.headers`,
-sent with the `101` — and returning another response throws
-`WS /x: a middleware returned another response than next() resolved to, once the socket was open: return it as it is`.
+resolves to a **stand-in**, an empty `200`. The socket is open by then:
+what the middleware returns after it is ignored, as a `wrap` is skipped,
+and what it throws is logged with `console.error`, the socket kept open.
+So a middleware of `use` that wraps every response —
+`new Response(response.body, { headers })` — leaves the socket routes after
+it as they are. A header set on the stand-in is lost: set it with
+`set.headers`, sent with the `101`.
 
 ```ts
 const watched = defineMiddleware(async ({ route }, next) => {
 	const response = await next();
 	console.log(route, response.status); // 400 for a refused upgrade, 200 once the socket is open
-	return response;                     // as it is
+	return response;                     // ignored once the socket is open
 });
 ```
 

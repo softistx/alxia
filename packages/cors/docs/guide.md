@@ -9,7 +9,7 @@ import { alxia } from '@alxia/core';
 import { cors } from '@alxia/cors';
 
 const app = alxia()
-	.use(cors({ origin: 'https://app.example.com' }))
+	.plugin(cors({ origin: 'https://app.example.com' }))
 	.get('/data', ({ reply }) => reply(200, { ok: true }));
 
 app.listen(3000);
@@ -41,7 +41,7 @@ interface CorsOptions {
 }
 ```
 
-`cors()` returns a function plugin: pass it to `use`, called. It adds two
+`cors()` returns a function plugin: pass it to `app.plugin`, called. It adds two
 global hooks, an `onRequest` and an `onResponse`, and nothing to the app's
 type.
 
@@ -118,7 +118,7 @@ route already sets, never replacing it:
 
 ```ts
 const app = alxia()
-	.use(cors({ origin: 'https://app.example.com' }))
+	.plugin(cors({ origin: 'https://app.example.com' }))
 	.get('/v', ({ reply }) => reply(200, 1, { headers: { vary: 'Accept-Encoding' } }));
 
 const response = await app.request('/v', { headers: { origin: 'https://app.example.com' } });
@@ -143,7 +143,7 @@ sends them when the call asks for it too:
 
 ```ts
 // the server
-alxia().use(cors({ origin: 'https://app.example.com', credentials: true }));
+alxia().plugin(cors({ origin: 'https://app.example.com', credentials: true }));
 
 // the browser, with fetch
 await fetch('https://api.example.com/me', { credentials: 'include' });
@@ -196,7 +196,7 @@ browser unless it is listed here:
 
 ```ts
 const app = alxia()
-	.use(cors({ origin: 'https://app.example.com', exposedHeaders: ['x-total', 'etag'] }))
+	.plugin(cors({ origin: 'https://app.example.com', exposedHeaders: ['x-total', 'etag'] }))
 	.get('/items', ({ reply }) => reply(200, [], { headers: { 'x-total': '0' } }));
 ```
 
@@ -260,7 +260,7 @@ without CORS headers, and the browser reports a failed preflight. Use
 
 ```ts
 const app = alxia()
-	.use(cors({ origin: 'https://app.example.com' }))   // first: preflights stop here
+	.plugin(cors({ origin: 'https://app.example.com' }))   // first: preflights stop here
 	.onRequest(({ request }) =>
 		request.headers.has('authorization') ? undefined : new Response(null, { status: 401 }),
 	)
@@ -272,7 +272,7 @@ Route hooks (`derive`, `wrap`) run after routing, so they never see a
 preflight.
 
 Its hooks are global: used inside a `group`, or in an app that is then
-mounted with `use`, `cors()` still applies to every route of the app it
+mounted with `app.plugin`, `cors()` still applies to every route of the app it
 ends up in. An app has one CORS policy.
 
 `@alxia/graphql` leaves GraphQL Yoga's own CORS off by default, so the
@@ -291,7 +291,7 @@ import { cors } from '@alxia/cors';
 const origins = (process.env['CORS_ORIGINS'] ?? 'https://app.example.com').split(',');
 
 export const app = alxia()
-	.use(
+	.plugin(
 		cors({
 			origin: [...origins, /^http:\/\/localhost:\d+$/],
 			credentials: true,

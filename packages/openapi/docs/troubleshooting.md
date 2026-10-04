@@ -66,7 +66,7 @@ const app = alxia()
 implemented(app, api);
 ```
 
-Call the check after the last `route`, `use` and `group`. If every
+Call the check after the last `route`, `use`, `plugin` and `group`. If every
 operation is listed, see
 [Every operation is listed](#every-operation-is-listed-though-the-app-serves-them).
 

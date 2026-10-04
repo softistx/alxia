@@ -9,7 +9,7 @@ import { alxia } from '@alxia/core';
 import { compress } from '@alxia/compress';
 
 const app = alxia()
-	.use(compress())
+	.plugin(compress())
 	.get('/report', ({ reply }) => reply(200, { rows: Array.from({ length: 500 }, (_, i) => ({ i })) }));
 
 app.listen(3000);
@@ -54,7 +54,7 @@ equally, the first in `encodings` wins. Leave out what you do not want to
 spend CPU on:
 
 ```ts
-app.use(compress({ encodings: ['br', 'gzip'] }));
+app.plugin(compress({ encodings: ['br', 'gzip'] }));
 ```
 
 | `Accept-Encoding` | `encodings` | Sent |
@@ -88,7 +88,7 @@ what `static` and `file` serve, an `ArrayBuffer` or a typed array. A
 with no `Content-Length` is compressed whatever its size**:
 
 ```ts
-app.use(compress({ threshold: 2048 }));
+app.plugin(compress({ threshold: 2048 }));
 // reply(200, 'x'.repeat(1500))          → sent as it is: 1500 < 2048
 // reply(200, { text: 'alxia '.repeat(1000) }) → compressed: 6011 bytes
 // static('/s', '.') for a 117-byte file → sent as it is: 117 < 2048
@@ -116,7 +116,7 @@ test and extend it:
 ```ts
 const defaults = /^(text\/(?!event-stream)|application\/(.+\+)?(json|javascript|xml)|image\/svg\+xml)/i;
 
-app.use(
+app.plugin(
 	compress({
 		compressible: (type) => defaults.test(type) || type.startsWith('application/wasm'),
 	}),
@@ -160,7 +160,7 @@ import { compress } from '@alxia/compress';
 
 const encoder = new TextEncoder();
 const app = alxia()
-	.use(compress())
+	.plugin(compress())
 	.get('/page', ({ reply }) =>
 		reply(
 			200,
@@ -265,7 +265,7 @@ const app = alxia()
 			? withHeaders(response, (headers) => headers.set('cache-control', 'no-transform'))
 			: undefined,
 	)
-	.use(compress())
+	.plugin(compress())
 	// after: sees Content-Encoding, and no Content-Length on a compressed body
 	.onResponse((response, { request }) => {
 		console.log(request.method, request.url, response.status, response.headers.get('content-encoding') ?? 'identity');
@@ -289,7 +289,7 @@ import { z } from 'zod';
 const Tick = z.object({ at: z.number() });
 
 const app = alxia()
-	.use(compress({ encodings: ['zstd', 'br', 'gzip'] }))
+	.plugin(compress({ encodings: ['zstd', 'br', 'gzip'] }))
 	.get('/api/products', ({ reply }) => reply(200, products))  // JSON: compressed over 1 KiB
 	.get('/api/ticks', responds({ 200: eventStream(Tick) }), ({ reply }) =>
 		reply(
@@ -326,7 +326,7 @@ import { compress } from '@alxia/compress';
 
 const big = 'alxia '.repeat(1000);
 const app = alxia()
-	.use(compress())
+	.plugin(compress())
 	.get('/big', ({ reply }) => reply(200, { text: big }));
 
 const get = (encoding: string) => app.request('/big', { headers: { 'accept-encoding': encoding } });

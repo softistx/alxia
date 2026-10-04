@@ -178,3 +178,14 @@ describe('a socket route', () => {
 		expectTypeOf<Reply<200, string>>().not.toBeNever();
 	});
 });
+
+describe('validate and responds', () => {
+	test('carry their mark in their type, as defineMiddleware does', () => {
+		expectTypeOf(
+			validate({ body: Post })['~builtin'],
+		).toEqualTypeOf<'validate'>();
+		expectTypeOf(
+			responds({ 200: Post })['~builtin'],
+		).toEqualTypeOf<'responds'>();
+	});
+});

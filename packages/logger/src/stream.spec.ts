@@ -54,7 +54,7 @@ async function until(done: () => boolean): Promise<void> {
 describe('a streamed body', () => {
 	const entries: LogEntry[] = [];
 	const app = alxia()
-		.use(logger({ write: (entry) => entries.push(entry) }))
+		.plugin(logger({ write: (entry) => entries.push(entry) }))
 		.get('/slow', ({ reply }) => reply(200, slow()))
 		.get('/failing', ({ reply }) => reply(200, failing()))
 		.get('/ticks', responds({ 200: Tick }), ({ reply }) => reply(200, ticks()))
@@ -141,7 +141,7 @@ describe('a body that is not streamed', () => {
 		headers: { 'content-length': '5' },
 	});
 	const app = alxia()
-		.use(logger({ write: (entry) => entries.push(entry) }))
+		.plugin(logger({ write: (entry) => entries.push(entry) }))
 		.get('/text', ({ reply }) => reply(200, 'hello'))
 		.get('/empty', ({ reply }) => reply(204))
 		.onRequest(({ url }) => (url.pathname === '/raw' ? text : undefined));
@@ -169,7 +169,7 @@ describe('a streamed body without a server', () => {
 		const entries: LogEntry[] = [];
 		released.length = 0;
 		const app = alxia()
-			.use(logger({ write: (entry) => entries.push(entry) }))
+			.plugin(logger({ write: (entry) => entries.push(entry) }))
 			.get('/ticks', responds({ 200: Tick }), ({ reply }) =>
 				reply(200, ticks()),
 			)

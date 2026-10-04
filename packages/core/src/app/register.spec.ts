@@ -32,13 +32,13 @@ describe('Register, unregistered', () => {
 		const routes = defineRoutes('/todos').get('/', ({ route, reply }) =>
 			reply(200, route),
 		);
-		const app = alxia({ prefix: '/api' }).use(routes);
+		const app = alxia({ prefix: '/api' }).plugin(routes);
 		expect(await (await app.request('/api/todos')).text()).toBe('/api/todos');
 		expect(app.routes.map(({ path }) => path)).toEqual(['/api/todos']);
 	});
 
 	test('defineRoutes() takes no prefix', async () => {
-		const app = alxia().use(
+		const app = alxia().plugin(
 			defineRoutes().get('/', ({ reply }) => reply(200, 'root')),
 		);
 		expect(await (await app.request('/')).text()).toBe('root');

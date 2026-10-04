@@ -17,7 +17,7 @@ import { rateLimit } from '@alxia/rate-limit';
 
 const app = alxia()
 	.get('/health', ...)                                  // not limited
-	.use(rateLimit({ limit: 100, windowMs: 60_000 }))
+	.plugin(rateLimit({ limit: 100, windowMs: 60_000 }))
 	.get('/search', ({ rateLimit, reply }) => ...);      // limited; rateLimit.remaining
 
 const response = await app.request('/search');
@@ -51,7 +51,7 @@ process the same store: [`@alxia/redis`](https://www.npmjs.com/package/@alxia/re
 ```ts
 import { redisStore } from '@alxia/redis';
 
-app.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis, { name: 'api' }) }));
+app.plugin(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis, { name: 'api' }) }));
 ```
 
 A store of your own implements `RateLimitStore`: `consume(key, { limit,

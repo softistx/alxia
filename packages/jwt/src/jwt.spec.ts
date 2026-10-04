@@ -123,7 +123,7 @@ describe('createJwt keys', () => {
 describe('bearer', () => {
 	const jwt = createJwt({ secret });
 	const app = alxia()
-		.use(
+		.plugin(
 			bearer({
 				jwt,
 				schema: z.object({ sub: z.string(), role: z.enum(['admin', 'user']) }),
@@ -160,7 +160,7 @@ describe('bearer', () => {
 
 	test('a token read from a cookie', async () => {
 		const fromCookie = alxia()
-			.use(bearer({ jwt, cookie: 'token' }))
+			.plugin(bearer({ jwt, cookie: 'token' }))
 			.get('/me', ({ user, reply }) => reply(200, user.sub ?? ''));
 		const token = await jwt.sign({ sub: 'ada' });
 		const response = await fromCookie.request('/me', {
@@ -171,7 +171,7 @@ describe('bearer', () => {
 
 	test('claims read from a cookie are refused as the cookies', async () => {
 		const fromCookie = alxia()
-			.use(
+			.plugin(
 				bearer({
 					jwt,
 					cookie: 'token',

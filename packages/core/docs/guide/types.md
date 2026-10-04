@@ -87,11 +87,11 @@ export function greet({ greeting, user }: AppContext): string {
 What it types, and what it does not:
 
 - **`AppContext`**, for a service, a resolver, a job's context.
-- **`defineRoutes`**: its routes read the context, and `use` checks that
+- **`defineRoutes`**: its routes read the context, and `plugin` checks that
   the app mounting them gives it.
 - **`contextStorage()`** from `@alxia/context-storage`, with no type
   argument: its `context()` reads `AppContext`, and an app that does not
-  give it cannot use it.
+  give it cannot mount it.
 - **`alxiaOf(context)`** from `@alxia/react-router`, when that package's
   own `Register` names no server.
 - **Not `defineMiddleware(fn)`**: a middleware may run before `base` gives

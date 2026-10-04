@@ -1,6 +1,6 @@
 /**
  * What a route declared from an operation threads: the operation's
- * `responds`, first, and its `validate`, just before the handler.
+ * `validate` and its `responds`, just before the handler.
  */
 import type { InferOutput, StandardSchemaV1 } from '../schema/standard-schema';
 import type { AppTypes } from './route-forms';
@@ -20,7 +20,7 @@ export type OperationOptions<Operation> = Omit<
 	keyof RequestSchemas | 'response'
 >;
 
-/** The implicit `responds` of an operation, first on its route. */
+/** The implicit `responds` of an operation, just before its handler. */
 export type OperationResponds<Operation> =
 	OperationSchema<Operation> extends {
 		readonly response: infer Responses extends object;

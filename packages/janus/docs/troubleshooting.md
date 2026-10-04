@@ -20,7 +20,7 @@ symptom, under [Traps](#traps).
 - [`Type '() => { locked: boolean; }' is not assignable to type 'undefined'`](#type----locked-boolean--is-not-assignable-to-type-undefined)
 - [`Property 'doctorId' is missing in type '{ … }' but required in type '{ readonly doctorId: string | null; }'`](#property-doctorid-is-missing-in-type----but-required-in-type--readonly-doctorid-string--null-)
 - [`Property 'tenant' does not exist on type 'BaseContext'`](#property-tenant-does-not-exist-on-type-basecontext)
-- [`the plugin reads "tenant", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads-tenant-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
+- [`the plugin reads "tenant", which this app's context does not give: add the plugin or middleware that gives it first`](#the-plugin-reads-tenant-which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
 - [`the plugin reads "tenant", which this app's context gives with another type`](#the-plugin-reads-tenant-which-this-apps-context-gives-with-another-type)
 - [`the plugin's load reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-load-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
@@ -47,7 +47,7 @@ symptom, under [Traps](#traps).
 ### `Property 'user' does not exist on type 'Context<…>'`
 
 **When:** a route reads `user` or `session`, and is declared before
-`use(session(accounts))`.
+`plugin(session(accounts))`.
 
 ```text
 error TS2339: Property 'user' does not exist on type 'Context<Empty, "/profile", Empty>'.
@@ -60,7 +60,7 @@ error TS2339: Property 'user' does not exist on type 'Context<Empty, "/profile",
 
 ```ts
 alxia()
-	.use(session(accounts, { required: true }))
+	.plugin(session(accounts, { required: true }))
 	.get('/profile', ({ user, reply }) => reply(200, { name: user.name }));
 ```
 
@@ -68,7 +68,7 @@ alxia()
 
 **When:** a sign-in or sign-out route calls `ctx.auth.send`,
 `ctx.auth.signOut` or reads `ctx.auth.device`, and is declared before
-`use(session(accounts))`.
+`plugin(session(accounts))`.
 
 ```text
 error TS2339: Property 'auth' does not exist on type 'Context<Empty, "/signin", Empty>'.
@@ -84,7 +84,7 @@ the route where it is and call the unbound `sendSession(ctx, accounts, …)`,
 
 ```ts
 alxia()
-	.use(session(accounts))
+	.plugin(session(accounts))
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
@@ -108,7 +108,7 @@ only at run time, an anonymous request may reach the route with
 `true`, so the plugin answers it with a 401 and `user` is never `null`:
 
 ```ts
-alxia().use(session(accounts, { required: true })).get('/me', ({ user, reply }) => reply(200, user.email));
+alxia().plugin(session(accounts, { required: true })).get('/me', ({ user, reply }) => reply(200, user.email));
 ```
 
 ### `Type '"admin"' is not assignable to type '"user"'`
@@ -167,7 +167,7 @@ app or group it is used in.
 ```ts
 app.group('/records/:id', (record) =>
 	record
-		.use(permission(access, 'view', 'record', byParam('id', findRecord)))
+		.plugin(permission(access, 'view', 'record', byParam('id', findRecord)))
 		.get('/', ({ object, reply }) => reply(200, object)),
 );
 ```
@@ -256,7 +256,7 @@ added. `permission()` is built before it is used, so it cannot see the app
 it will be used on.
 
 **Fix:** annotate the parameter with what it reads. The guard infers it,
-and the app that uses it must then give it, before the guard:
+and the app that mounts it must then give it, before the guard:
 
 ```ts
 import type { BaseContext } from '@alxia/core';
@@ -265,37 +265,37 @@ const byTenant = permission(access, 'view', 'record', ({ tenant, pathParams }: B
 	tenant.records.get(pathParams['id'] ?? '') ?? null,
 );
 
-app.use(tenancy).use(byTenant); // tenancy derives tenant
+app.plugin(tenancy).plugin(byTenant); // tenancy derives tenant
 ```
 
 See [Reading the app's context](guide/permissions.md#reading-the-apps-context).
 
-### `the plugin reads "tenant", which this app's context does not give: use the plugin that adds it first`
+### `the plugin reads "tenant", which this app's context does not give: add the plugin or middleware that gives it first`
 
 ```text
 error TS2769: No overload matches this call.
   …
         Types of property ''~requires'' are incompatible.
-          Type '{ tenant: Tenant; }' is not assignable to type '"the plugin reads \"tenant\", which this app's context does not give: use the plugin that adds it first"'.
+          Type '{ tenant: Tenant; }' is not assignable to type '"the plugin reads \"tenant\", which this app's context does not give: add the plugin or middleware that gives it first"'.
 ```
 
 **When:** a callback of the guard is annotated to read `tenant`, and the
 guard is used on an app — or in a group — whose context has no `tenant` at
-that point: `alxia().use(byTenant)`, or `use(byTenant)` before
-`use(tenancy)`.
+that point: `alxia().plugin(byTenant)`, or `plugin(byTenant)` before
+`plugin(tenancy)`.
 
 **Why:** an annotated `load`, `subject` or `ctx` makes the guard require
-what it reads, and `use` checks the app's context against it, so the
+what it reads, and `app.plugin` checks the app's context against it, so the
 callback never runs without it.
 
-**Fix:** use the plugin that adds `tenant` first:
+**Fix:** mount the plugin that adds `tenant` first:
 
 ```ts
-app.use(tenancy).use(byTenant);
+app.plugin(tenancy).plugin(byTenant);
 ```
 
 More on this message in
-[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first).
 
 ### `the plugin reads "tenant", which this app's context gives with another type`
 
@@ -309,7 +309,7 @@ error TS2769: No overload matches this call.
 the callback's parameter is annotated with: a `Tenant | null` where `load`
 reads `Tenant`, or a tenant of another shape.
 
-**Why:** `use` checks each key the guard reads against the app's context;
+**Why:** `app.plugin` checks each key the guard reads against the app's context;
 a narrower type passes, a wider or different one does not.
 
 **Fix:** annotate the callback with the type the app gives, and handle it
@@ -345,7 +345,7 @@ reads, so the guard would require nothing, and an app without a `tenant`
 would be accepted, and throw on every guarded request. The guard is
 refused instead.
 
-**Fix:** annotate what the callback reads, and use the plugin that adds it
+**Fix:** annotate what the callback reads, and mount the plugin that adds it
 first:
 
 ```ts
@@ -353,7 +353,7 @@ const byTenant = permission(access, 'view', 'record', ({ tenant, pathParams }: B
 	tenant.records.get(pathParams['id'] ?? '') ?? null,
 );
 
-app.use(tenancy).use(byTenant);
+app.plugin(tenancy).plugin(byTenant);
 ```
 
 Or leave it unannotated when it reads only the request, as `byParam`'s
@@ -377,9 +377,9 @@ treat everyone as anonymous.
 
 ```ts
 app
-	.use(session(accounts))
+	.plugin(session(accounts))
 	.group('/records/:id', (record) =>
-		record.use(permission(access, 'view', 'record', byParam('id', findRecord))).get('/', ({ object, reply }) => reply(200, object)),
+		record.plugin(permission(access, 'view', 'record', byParam('id', findRecord))).get('/', ({ object, reply }) => reply(200, object)),
 	);
 ```
 
@@ -425,15 +425,15 @@ one failing.
 **When:** a `janus()` refusal — `NotFoundError`, a refused password —
 thrown by a route is answered 500 instead of its own status.
 
-**Why:** the route is declared before `use(janusErrors())`, which answers
+**Why:** the route is declared before `plugin(janusErrors())`, which answers
 only the routes after it.
 
 **Fix:** use `janusErrors()` first:
 
 ```ts
 const app = alxia()
-	.use(janusErrors())
-	.use(session(accounts))
+	.plugin(janusErrors())
+	.plugin(session(accounts))
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body); // a refusal is now its 401
 		return reply.ok({ id: auth.send(signedIn).id });
@@ -471,13 +471,13 @@ the session for the routes after it, or in a `group`
 
 ```ts
 alxia()
-	.use(janusErrors())
-	.use(session(accounts))                     // the sign-in routes
+	.plugin(janusErrors())
+	.plugin(session(accounts))                     // the sign-in routes
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
 	})
-	.use(session(accounts, { required: true })) // everything after
+	.plugin(session(accounts, { required: true })) // everything after
 	.get('/me', ({ user, reply }) => reply.ok({ name: user.name }));
 ```
 
@@ -559,7 +559,7 @@ compiles.
 
 ```ts
 app.group('/records/:recordId', (record) =>
-	record.use(permission(access, 'view', 'record', byParam('recordId', findRecord))).get('/', ({ object, reply }) => reply(200, object)),
+	record.plugin(permission(access, 'view', 'record', byParam('recordId', findRecord))).get('/', ({ object, reply }) => reply(200, object)),
 );
 ```
 

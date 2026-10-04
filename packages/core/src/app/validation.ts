@@ -31,14 +31,17 @@ export interface ChainRun {
 
 /**
  * The request checked by `schemas`: the context what follows reads, or the
- * response that refuses it. `raw`, the validation of the form of 0.3, sets
- * every part it has no schema for to the request's, as 0.3 did.
+ * response that refuses it. Each part is read as it arrived, `cookies`
+ * included — those of the route's own context, never the output of an
+ * earlier `validate`. A part it has no schema for is left as it is: what
+ * a middleware of `use` passed `next` stays, the form of 0.3's validation
+ * included.
  */
 export async function validateStep(
 	run: ChainRun,
 	schemas: RequestSchemas,
-	raw: boolean,
 	ctx: Ctx,
+	cookies: unknown,
 ): Promise<{ readonly refused: Response } | { readonly ctx: Ctx }> {
 	const { request } = run;
 	const issues: ValidationIssue[] = [];
@@ -49,10 +52,7 @@ export async function validateStep(
 		['headers', schemas.headers, () => readHeaders(request.request.headers)],
 	] as const;
 	for (const [target, schema, read] of parts) {
-		if (schema === undefined) {
-			if (raw) ctx[target] = read();
-			continue;
-		}
+		if (schema === undefined) continue;
 		const checked = await check(schema, read(), target);
 		if (checked.ok) ctx[target] = checked.value;
 		else {
@@ -63,16 +63,15 @@ export async function validateStep(
 	// The request's cookies stay on `ctx`, where every hook reads them as
 	// they arrived — an `onError` or an `onRefusal` included; what follows
 	// the validation alone reads the validated ones, on a copy of it.
-	let cookies: { value: unknown } | undefined;
+	let validCookies: { value: unknown } | undefined;
 	if (schemas.cookies !== undefined) {
-		const checked = await check(schemas.cookies, ctx.cookies, 'cookies');
-		if (checked.ok) cookies = { value: checked.value };
+		const checked = await check(schemas.cookies, cookies, 'cookies');
+		if (checked.ok) validCookies = { value: checked.value };
 		else {
 			part ??= 'cookies';
 			issues.push(...checked.issues);
 		}
 	}
-	if (raw) ctx['body'] = undefined;
 	if (schemas.body !== undefined) {
 		const failed = await validateBody(run, schemas.body, ctx);
 		if (failed !== undefined) {
@@ -81,7 +80,9 @@ export async function validateStep(
 		}
 	}
 	if (part === undefined) {
-		return { ctx: cookies === undefined ? ctx : withCookies(ctx, cookies) };
+		return {
+			ctx: validCookies === undefined ? ctx : withCookies(ctx, validCookies),
+		};
 	}
 	return {
 		refused: await refuse(
@@ -114,8 +115,9 @@ async function validateBody(
 /**
  * `ctx`, its cookies the validated ones: what follows the validation reads.
  * A copy, so that the route's own context keeps the request's cookies.
- * When two `validate`s check the cookies, a middleware between them keeps
- * the first copy it was given: what it reads is the first validation's.
+ * When two `validate`s check the cookies, each checks the request's, and a
+ * middleware between them keeps the first copy it was given: what it
+ * reads is the first validation's.
  */
 function withCookies(ctx: Ctx, cookies: { value: unknown }): Ctx {
 	const copy: Record<string, unknown> = { ...ctx };

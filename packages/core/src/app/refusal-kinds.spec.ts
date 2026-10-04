@@ -136,7 +136,7 @@ describe('onRefusal(kind, hook): at runtime', () => {
 				seen.push('app validation');
 				return undefined;
 			})
-			.use(plugin);
+			.plugin(plugin);
 		const invalid = await app.request('/p', INVALID);
 		expect(await invalid.json()).toEqual({ status: 400, detail: 'app' });
 		expect(seen).toEqual(['plugin validation', 'app validation']);
@@ -152,7 +152,7 @@ describe('onRefusal(kind, hook): at runtime', () => {
 			.post('/p', both, ({ reply }) => reply(200, 'ok'));
 		const app = alxia()
 			.onRefusal('validation', () => problem({ status: 422 }))
-			.use(plugin);
+			.plugin(plugin);
 		expect((await app.request('/p', INVALID)).status).toBe(400);
 	});
 
@@ -162,7 +162,7 @@ describe('onRefusal(kind, hook): at runtime', () => {
 		);
 		const app = alxia()
 			.onRefusal(() => problem({ status: 400, detail: 'app' }))
-			.use(plugin)
+			.plugin(plugin)
 			.post('/a', both, ({ reply }) => reply(200, 'ok'));
 		expect(await (await app.request('/a', LARGE)).json()).toEqual({
 			status: 413,
@@ -261,7 +261,7 @@ describe('onRefusal(kind, hook): its types, and plugins', () => {
 			.onRefusal('validation', (refusal) =>
 				refusal.part === 'query' ? problem({ status: 422 }) : undefined,
 			)
-			.use(plugin);
+			.plugin(plugin);
 		expect((await app.request('/p', INVALID)).status).toBe(409);
 	});
 
@@ -271,7 +271,7 @@ describe('onRefusal(kind, hook): its types, and plugins', () => {
 			.post('/p', both, ({ reply }) => reply(200, 'ok'));
 		const app = alxia()
 			.onRefusal('validation', () => problem({ status: 422 }))
-			.use(plugin)
+			.plugin(plugin)
 			.post('/a', both, ({ reply }) => reply(200, 'ok'));
 		expect((await app.request('/p', INVALID)).status).toBe(409);
 		expect((await app.request('/a', INVALID)).status).toBe(409);
@@ -285,10 +285,10 @@ describe('onRefusal(kind, hook): its types, and plugins', () => {
 			.post('/q', both, ({ reply }) => reply(200, 'ok'));
 		const middle = alxia()
 			.onRefusal('body_limit', () => problem({ status: 413 }))
-			.use(inner);
+			.plugin(inner);
 		const app = alxia()
 			.onRefusal(() => problem({ status: 409 }))
-			.use(middle);
+			.plugin(middle);
 		expect((await app.request('/q', INVALID)).status).toBe(409);
 		expect((await app.request('/q', LARGE)).status).toBe(413);
 	});

@@ -73,7 +73,7 @@ error status.
 
 ```ts
 const app = alxia()
-	.use(cors({ origin: 'https://app.example.com' }))   // first
+	.plugin(cors({ origin: 'https://app.example.com' }))   // first
 	.onRequest(({ request }) =>
 		request.headers.has('authorization') ? undefined : new Response(null, { status: 401 }),
 	)
@@ -255,12 +255,12 @@ error TS2322: Type 'false' is not assignable to type 'CorsOrigin | undefined'.
 **Why:** `origin` is `true`, a string, a `RegExp`, a list or a function;
 there is no off switch inside the plugin.
 
-**Fix:** do not use the plugin where CORS should be off:
+**Fix:** do not mount the plugin where CORS should be off:
 
 ```ts
 const origins = process.env['CORS_ORIGINS']?.split(',');
 
-const app = alxia().use((app) => (origins ? cors({ origin: origins })(app) : app));
+const app = alxia().plugin((app) => (origins ? cors({ origin: origins })(app) : app));
 ```
 
 ### `Type 'Alxia<…>' has no properties in common with type 'CorsOptions'`
@@ -273,14 +273,14 @@ error TS2769: No overload matches this call.
         Type 'Alxia<Empty, "", never>' has no properties in common with type 'CorsOptions'.
 ```
 
-**When:** `app.use(cors)`, without calling it.
+**When:** `app.plugin(cors)`, without calling it.
 
 **Why:** `cors` makes the plugin; it is not the plugin.
 
 **Fix:** call it, with no options for the defaults:
 
 ```ts
-alxia().use(cors());
+alxia().plugin(cors());
 ```
 
 ### `Type 'string' is not assignable to type 'readonly string[]'`

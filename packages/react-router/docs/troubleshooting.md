@@ -417,7 +417,7 @@ import { secureHeaders } from '@alxia/secure-headers';
 
 export default createServer({
 	configure: (app) =>
-		app.use(
+		app.plugin(
 			secureHeaders({
 				contentSecurityPolicy:
 					"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'self'; frame-ancestors 'none'",

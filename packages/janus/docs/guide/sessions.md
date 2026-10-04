@@ -19,9 +19,9 @@ const accounts = janus({
 });
 
 const app = alxia()
-	.use(janusErrors())
+	.plugin(janusErrors())
 	.get('/health', ({ reply }) => reply(200, 'ok'))       // before it: open
-	.use(session(accounts, { required: true }))
+	.plugin(session(accounts, { required: true }))
 	.get('/me', ({ user, reply }) => reply(200, { name: user.name })); // user: never null
 ```
 
@@ -62,7 +62,7 @@ the route decides:
 
 ```ts
 const app = alxia()
-	.use(session(accounts))
+	.plugin(session(accounts))
 	.get('/greeting', ({ user, reply }) =>
 		reply(200, user === null ? 'Hello, stranger' : `Hello, ${user.name}`),
 	);
@@ -86,7 +86,7 @@ request 401 and `false` lets it through with `user: null`:
 const strict = Bun.env['STRICT'] === '1';
 
 const app = alxia()
-	.use(session(accounts, { required: strict }))
+	.plugin(session(accounts, { required: strict }))
 	.get('/me', ({ user, reply }) => reply(200, user === null ? 'anonymous' : user.name));
 
 // STRICT=1: 401 {"error":"unauthenticated"}; otherwise: 200 "anonymous"
@@ -122,13 +122,13 @@ const accounts = janus({
 });
 
 const app = alxia()
-	.use(janusErrors())
+	.plugin(janusErrors())
 	.group('/staff', (staff) =>
 		staff
-			.use(session(accounts, { type: 'staff', required: true }))
+			.plugin(session(accounts, { type: 'staff', required: true }))
 			.get('/me', ({ user, reply }) => reply(200, { username: user.username })), // a staff user
 	)
-	.use(session(accounts))
+	.plugin(session(accounts))
 	.get('/whoami', ({ user, reply }) =>
 		reply(200, user === null ? 'anonymous' : user.type), // 'patient' | 'staff'
 	);
@@ -184,8 +184,8 @@ const accounts = janus({
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.use(janusErrors())
-	.use(session(accounts))                       // open: user may be null
+	.plugin(janusErrors())
+	.plugin(session(accounts))                       // open: user may be null
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
@@ -193,7 +193,7 @@ const app = alxia()
 	.post('/signout', async ({ auth, reply }) => reply.ok(await auth.signOut()))
 	.group('/account', (account) =>
 		account
-			.use(session(accounts, { required: true })) // required: user never null
+			.plugin(session(accounts, { required: true })) // required: user never null
 			.get('/me', ({ user, reply }) => reply.ok({ name: user.name })),
 	)
 	.get('/greeting', ({ user, reply }) => reply.ok(user === null ? 'Hello, stranger' : `Hello, ${user.name}`));
@@ -202,7 +202,7 @@ const app = alxia()
 The second `session()` replaces the first's `user`, `session` and `auth`
 for the routes after it, with its own types: `user` is never `null` under
 `/account`, and still may be on `/greeting`, outside the group. Without the
-`group`, `.use(session(accounts, { required: true }))` on the app itself works
+`group`, `.plugin(session(accounts, { required: true }))` on the app itself works
 the same for every route declared after it.
 
 A route behind both plugins still looks the session up once: the plugins
@@ -239,7 +239,7 @@ const accounts = janus({
 	clock,
 });
 const app = alxia()
-	.use(session(accounts, { required: true }))
+	.plugin(session(accounts, { required: true }))
 	.get('/me', ({ user, reply }) => reply(200, user.email));
 
 const { token } = await accounts.signUp({ email: 'ada@example.com', password: 'correct horse' });
@@ -285,7 +285,7 @@ const accounts = janus({
 	hasher: scryptHasher({ cost: 10 }), // fast in tests
 });
 const app = alxia()
-	.use(session(accounts, { required: true }))
+	.plugin(session(accounts, { required: true }))
 	.get('/me', ({ user, reply }) => reply(200, { email: user.email }));
 
 test('the session reads the user, and anonymous is a 401', async () => {

@@ -20,7 +20,7 @@ function greet(): string {
 	return `${greeting}, ${user}`;
 }
 
-const app = base.use(requestContext).get('/hello', ({ reply }) => reply(200, greet()));
+const app = base.plugin(requestContext).get('/hello', ({ reply }) => reply(200, greet()));
 
 app.listen(3000);
 ```
@@ -32,11 +32,11 @@ context of the request that called it, and never another's.
 ## The signature
 
 ```ts
-// `uncalled` takes nothing: it makes `use(contextStorage)` a compile error.
+// `uncalled` takes nothing: it makes `plugin(contextStorage)` a compile error.
 // `App` defaults to the app `Register` names in `@alxia/core` (`RegisteredBase`)
 function contextStorage<App = RegisteredBase>(...uncalled: readonly never[]): ContextStoragePlugin<App>;
 
-// It requires `App`'s context of the app that uses it (`Requiring`)
+// It requires `App`'s context of the app that mounts it (`Requiring`)
 type ContextStoragePlugin<App> = Alxia<Empty, '', never> &
 	Requiring<RequiresOf<StoredContext<App>, 'context'>> & {
 		context(): StoredContext<App>;
@@ -60,9 +60,9 @@ class ContextStorageError extends Error {
 type ContextStorageErrorCode = 'OUTSIDE_REQUEST' | 'NOT_ROUTED';
 ```
 
-`contextStorage()` returns an app plugin: pass it to `use`, called — `use(contextStorage)` fails `tsc` with `TS2769` and throws a `TypeError` at startup ([troubleshooting](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)). It adds
+`contextStorage()` returns an app plugin: pass it to `app.plugin`, called — `plugin(contextStorage)` fails `tsc` with `TS2769` and throws a `TypeError` at startup ([troubleshooting](troubleshooting.md#typeerror-contextstorage-is-a-factory-plugincontextstorage-not-plugincontextstorage)). It adds
 nothing to the app's type, but it requires `StoredContext<App>` of the app
-that uses it: `use` on an app that does not give that context is a compile
+that mounts it: `app.plugin` on an app that does not give that context is a compile
 error. `BaseContext`, `RequestContext`, `ContextOf`, `RegisteredBase`,
 `Requiring` and `Mounted` come from `@alxia/core`.
 
@@ -174,7 +174,7 @@ import { base, requestContext } from './context';
 import { listOrders } from './orders';
 
 export const app = base
-	.use(requestContext)
+	.plugin(requestContext)
 	.get('/orders', async ({ reply }) => reply(200, await listOrders()));
 ```
 
@@ -248,20 +248,20 @@ export const requestContext = contextStorage(); // context().user: string
 
 Four rules follow from typing by an app:
 
-- **The app that uses it must give that context.** The plugin requires
+- **The app that mounts it must give that context.** The plugin requires
   what `context()` reads beyond `BaseContext`, as a `definePlugin` does:
-  `alxia().use(contextStorage<typeof base>())` is a compile error, since
+  `alxia().plugin(contextStorage<typeof base>())` is a compile error, since
   `context()` would claim a `user` that no hook of that app adds.
 
-- **Type it by the app before the plugin, never by the app that uses it.**
-  `const app = alxia().use(requestContext)…` with
+- **Type it by the app before the plugin, never by the app that mounts it.**
+  `const app = alxia().plugin(requestContext)…` with
   `requestContext = contextStorage<typeof app>()` is a circular type, which
   `tsc` refuses with `TS7022`. Declare `base` first, as above. Registered,
   the same holds: give `contextStorage()` to the app after `base`, never
   to the registered `base` itself.
 - **What a hook after the plugin adds is there at runtime, not in the
   type.** `context()` knows `base`, so a `derive` added after
-  `base.use(requestContext)` is missing from its type. Put the hooks whose
+  `base.plugin(requestContext)` is missing from its type. Put the hooks whose
   values services read in `base`, or state the type with `getContext<Ctx>()`.
 - **A route's own `params`, `query`, `body` and `headers` are not in it**:
   they belong to one route's `validate(…)`, not to the app. Read them in
@@ -280,7 +280,7 @@ as `hono/context-storage`'s do: nothing checks it against the route.
 ## Where it sits
 
 The plugin's `around` hook is global: it applies to every request, wherever
-`use` is called. Its route hook applies to the routes declared after it, in
+`app.plugin` is called. Its route hook applies to the routes declared after it, in
 the same app or group. So **use it before the routes whose code reads the
 context**, and after the hooks whose values services read:
 
@@ -292,7 +292,7 @@ const requestContext = contextStorage();
 
 const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok'))      // getContext() throws NOT_ROUTED here
-	.use(requestContext)
+	.plugin(requestContext)
 	.derive(() => ({ startedAt: Date.now() }))            // after the plugin: may call code that reads it
 	.get('/me', ({ reply }) => reply(200, getContext().route)); // '/me'
 ```
@@ -312,8 +312,8 @@ request's `onResponse`, `getContext()` throws `NOT_ROUTED`, and
 The plugin is an app like any other: `requestContext.get('/x', handler)` is the
 route method, and the context is read with `context()` and `tryContext()`.
 Declare routes on the app rather than on the plugin, and pass
-`contextStorage()` to `use` called — the uncalled form is
-[refused](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage).
+`contextStorage()` to `app.plugin` called — the uncalled form is
+[refused](troubleshooting.md#typeerror-contextstorage-is-a-factory-plugincontextstorage-not-plugincontextstorage).
 
 ## What `AsyncLocalStorage` carries
 

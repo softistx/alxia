@@ -51,11 +51,11 @@ const perUser = rateLimit<{ user: { id: string } }>({
 	key: ({ user }) => user.id,
 });
 
-alxia().use(auth).use(perUser); // auth derives user
+alxia().plugin(auth).plugin(perUser); // auth derives user
 ```
 
-On an app that does not give `user`, `use(perUser)` is a compile error:
-[`the plugin reads "user", which this app's context does not give`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+On an app that does not give `user`, `plugin(perUser)` is a compile error:
+[`the plugin reads "user", which this app's context does not give`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first).
 
 ### `Type '() => Promise<boolean>' is not assignable to type '(ctx: BaseContext & Empty) => boolean'`
 
@@ -73,7 +73,7 @@ error TS2322: Type '() => Promise<boolean>' is not assignable to type '(ctx: Bas
 `undefined` for a request that should not be counted:
 
 ```ts
-app.use(
+app.plugin(
 	rateLimit({
 		limit: 100,
 		windowMs: 60_000,
@@ -99,7 +99,7 @@ returned `undefined` — which the default key does when `ctx.ip` is
 
 ```ts
 app
-	.use(rateLimit({ limit: 100, windowMs: 60_000 }))
+	.plugin(rateLimit({ limit: 100, windowMs: 60_000 }))
 	.get('/quota', ({ rateLimit, reply }) => reply(200, { remaining: rateLimit?.remaining ?? null }));
 ```
 
@@ -124,7 +124,7 @@ string, or `undefined` when the variable is unset: give it a default, and
 let an empty or non-numeric value still fail at startup, as it should:
 
 ```ts
-app.use(rateLimit({ limit: Number(Bun.env.RATE_LIMIT ?? 100), windowMs: 60_000 }));
+app.plugin(rateLimit({ limit: Number(Bun.env.RATE_LIMIT ?? 100), windowMs: 60_000 }));
 ```
 
 ## Responses
@@ -165,7 +165,7 @@ and only from a proxy you trust:
 const app = alxia({
 	ip: (request, server) =>
 		request.headers.get('x-real-ip') ?? server?.requestIP(request)?.address,
-}).use(rateLimit({ limit: 100, windowMs: 60_000 }));
+}).plugin(rateLimit({ limit: 100, windowMs: 60_000 }));
 ```
 
 ### Nothing is limited, and no `RateLimit-*` header is sent
@@ -184,7 +184,7 @@ either, and never answers a 429.)
 
 ```ts
 const app = alxia({ ip: (request) => request.headers.get('x-ip') ?? undefined })
-	.use(rateLimit({ limit: 2, windowMs: 60_000 }))
+	.plugin(rateLimit({ limit: 2, windowMs: 60_000 }))
 	.get('/limited', ({ reply }) => reply(200, 'ok'));
 
 await app.request('/limited', { headers: { 'x-ip': '1.1.1.1' } });
@@ -203,7 +203,7 @@ every count.
 ```ts
 import { redisStore } from '@alxia/redis';
 
-app.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis, { name: 'api' }) }));
+app.plugin(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis, { name: 'api' }) }));
 ```
 
 ### A client is refused before `limit` requests
@@ -226,6 +226,6 @@ creates one — and give all but one limit `headers: false`:
 
 ```ts
 app
-	.use(rateLimit({ limit: 10, windowMs: 1_000 }))
-	.use(rateLimit({ limit: 1_000, windowMs: 60 * 60_000, headers: false }));
+	.plugin(rateLimit({ limit: 10, windowMs: 1_000 }))
+	.plugin(rateLimit({ limit: 1_000, windowMs: 60 * 60_000, headers: false }));
 ```

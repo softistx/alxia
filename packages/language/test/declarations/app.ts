@@ -6,7 +6,7 @@ import { language } from '@alxia/language';
 
 export function speaking() {
 	return alxia()
-		.use(
+		.plugin(
 			language({
 				supported: ['en', 'fr'],
 				fallback: 'en',
@@ -22,7 +22,7 @@ export function speaking() {
 export function speakingTo() {
 	return alxia()
 		.derive(() => ({ user: { language: 'fr' } }))
-		.use(
+		.plugin(
 			language({
 				supported: ['en', 'fr', 'de'],
 				fallback: 'en',
@@ -39,7 +39,7 @@ export function speakingAny<const L extends string>(
 	fallback: L,
 ) {
 	return alxia()
-		.use(language({ supported, fallback }))
+		.plugin(language({ supported, fallback }))
 		.get('/', ({ language: lang, reply }) => reply(200, lang));
 }
 
@@ -48,7 +48,7 @@ export function speakingAny<const L extends string>(
 // and the requirement widens to `{ [x: string]: any }`, which any key reads.
 export function speakingOnly() {
 	return alxia()
-		.use(language({ supported: ['en'], fallback: 'en' }))
+		.plugin(language({ supported: ['en'], fallback: 'en' }))
 		.get('/', (ctx) => {
 			// @ts-expect-error not in the context
 			ctx.nothing;

@@ -5,7 +5,7 @@ import { compress, negotiate } from './compress';
 
 const big = 'alxia '.repeat(1000);
 const app = alxia()
-	.use(compress())
+	.plugin(compress())
 	.get('/big', ({ reply }) => reply(200, { text: big }))
 	.get('/small', ({ reply }) => reply(200, 'tiny'))
 	.get('/ticks', ({ reply }) =>
@@ -48,7 +48,7 @@ describe('compress', () => {
 
 	test('a file is measured too: a small one is left alone, a compressed one offers no ranges', async () => {
 		const files = alxia()
-			.use(compress())
+			.plugin(compress())
 			.file('/small.txt', new Blob(['tiny'], { type: 'text/plain' }))
 			.file('/big.txt', new Blob([big], { type: 'text/plain' }));
 		const small = await files.request('/small.txt', {

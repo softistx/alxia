@@ -1,18 +1,14 @@
 /**
  * The types of how an app is put together from parts: `group`, routes in a
- * scope of their own; `use`, middlewares for the routes after it, or a
- * plugin.
+ * scope of their own; `use`, middlewares for the routes after it, and its
+ * plugin forms, deprecated for `plugin` (`plugin-method.ts`).
  */
 import type { AnyReply } from '../reply/reply';
 import type { JoinPath, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
+import type { Mounted, RequiredIn } from './plugin-method';
 import type { AnyAlxia } from './signatures';
-import type {
-	Empty,
-	ProvidedBy,
-	RequiringContext,
-	ThenShortcuts,
-} from './types';
+import type { Empty, ProvidedBy, ThenShortcuts } from './types';
 import type { UseForms } from './use-forms';
 
 /** `app.group(prefix, build)` or `app.group(build)`. */
@@ -45,18 +41,21 @@ export interface GroupMethod<
 
 /**
  * `app.use(...middlewares)`, `app.use(path, ...middlewares)`, see
- * `UseForms`; or `app.use(plugin)`, see `PluginForms`. A function made by
- * `defineMiddleware` is a middleware; any other function is a plugin.
+ * `UseForms`; and the plugin forms of 0.3, deprecated for `app.plugin`,
+ * see `PluginForms`. A function made by `defineMiddleware` is a
+ * middleware; any other function is a plugin. The plugin forms come first,
+ * so that a middleware a route's context does not give is reported on the
+ * middleware forms, naming the key.
  */
 export interface UseMethod<
 	App,
 	Ctx extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
-> extends UseForms<Ctx, Prefix, Shortcuts>,
-		PluginForms<App, Ctx, Prefix, Shortcuts> {}
+> extends PluginForms<App, Ctx, Prefix, Shortcuts>,
+		UseForms<Ctx, Prefix, Shortcuts> {}
 
-/** `app.use(plugin)`: an app, or a function given this app. */
+/** `app.use(plugin)`, deprecated: `app.plugin(plugin)`, see `PluginMethod`. */
 export interface PluginForms<
 	App,
 	Ctx extends object,
@@ -64,8 +63,9 @@ export interface PluginForms<
 	Shortcuts extends AnyReply,
 > {
 	/**
-	 * A plugin written as a function, given this app, that returns it: a
-	 * `Plugin`.
+	 * @deprecated A plugin is given to `app.plugin(plugin)`: `use` takes
+	 * middlewares alone, and will take any `(ctx, next)` function in the
+	 * next minor. See the upgrading guide.
 	 */
 	<Result extends AnyAlxia>(
 		plugin: (
@@ -73,13 +73,9 @@ export interface PluginForms<
 		) => Result & ProvidedBy<Ctx, RequiredIn<Result['~context']>>,
 	): Result;
 	/**
-	 * A plugin. An app: its routes, under this app's prefix and behind this
-	 * app's hooks, and its hooks, which then apply to the routes declared on
-	 * this app after it — a plugin can be an `auth` that only derives a
-	 * `user`. Its global hooks become this app's. It is read once, here:
-	 * declare it completely before using it. A plugin made by `definePlugin`
-	 * names what it reads from this app's context: using it on an app that
-	 * does not give it is a compile error.
+	 * @deprecated A plugin is given to `app.plugin(plugin)`: `use` takes
+	 * middlewares alone, and will take any `(ctx, next)` function in the
+	 * next minor. See the upgrading guide.
 	 */
 	<
 		PluginCtx extends object,
@@ -97,20 +93,3 @@ export interface PluginForms<
 		ThenShortcuts<Shortcuts, PluginShortcuts>
 	>;
 }
-
-/**
- * What a plugin's context requires of the app that mounts it: what
- * `defineRoutes` started from, kept in its context through every route.
- */
-export type RequiredIn<PluginCtx> = 0 extends 1 & PluginCtx
-	? Empty
-	: PluginCtx extends RequiringContext<infer Requires>
-		? Requires
-		: Empty;
-
-/** What a plugin's context adds to the app that mounts it: all of it but the requirement. */
-export type Mounted<PluginCtx> = 0 extends 1 & PluginCtx
-	? PluginCtx
-	: PluginCtx extends { readonly '~requires': unknown }
-		? Omit<PluginCtx, '~requires'>
-		: PluginCtx;

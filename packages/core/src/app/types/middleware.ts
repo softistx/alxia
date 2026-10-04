@@ -39,7 +39,7 @@ export interface NextFunction {
 }
 
 /** What a middleware may return: `next(…)`'s response, a reply, or a `Response` of its own. */
-export type MiddlewareResult = Next<any, any> | AnyReply | Response;
+export type MiddlewareResult = Next | AnyReply | Response;
 
 /** What a middleware's function returns: its result, or a promise of it. */
 export type MiddlewareReturn = MaybePromise<MiddlewareResult>;
@@ -63,6 +63,16 @@ export type Middleware<Requires = Empty, Result = MiddlewareReturn> = (
  */
 export interface MiddlewareMark {
 	readonly '~middleware': true;
+}
+
+/**
+ * What `validate` and `responds` mark their middleware with: a step the
+ * chain runs itself, which `use` refuses. Never set as such: at runtime
+ * the mark is `Symbol.for('alxia.builtin')` on the function, shared by
+ * every copy of `@alxia/core`, as `defineMiddleware`'s is.
+ */
+export interface BuiltinMark<Kind extends 'validate' | 'responds'> {
+	readonly '~builtin': Kind;
 }
 
 /**
