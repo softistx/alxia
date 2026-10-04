@@ -218,12 +218,13 @@ and `configure`'s hooks run around it.
 
 `build/server/index.js` runs on Bun, and the plugin builds it for Bun,
 with nothing to configure. It adds to Vite's `ssr` environment, under
-`react-router dev` and `react-router build` alike:
+`react-router dev` and `react-router build` alike but for the last row,
+the build's alone:
 
 | option | what the plugin adds | why |
 | --- | --- | --- |
 | `resolve.conditions` | `bun` | a package bundled into the server whose `exports` has a `bun` condition is bundled as its Bun variant |
-| `resolve.externalConditions` | `bun` | a dependency left external is loaded as its Bun variant in dev too, as Bun loads it from the build |
+| `resolve.externalConditions` | `bun` | a dependency left external, as every one is in dev and one the app names in `ssr.external` is in the build, is loaded as its Bun variant, as Bun loads it |
 | `resolve.builtins` | `bun`, and `bun:*` (`bun:sqlite`, `bun:ffi`, …) | Bun's own modules stay imports of the build, whichever runtime runs Vite. Vite knows `bun:*`, and bare `bun` only when it runs on Bun |
 | `build.target` | `esnext` | the newest syntax is left as written: Bun runs it, and Vite's default targets browsers |
 | `resolve.noExternal` | `true`, under `react-router build` only | every package is bundled into `build/server/index.js`, so `build/` runs with no `node_modules` ([Self-contained](#self-contained)) |

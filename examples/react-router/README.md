@@ -182,9 +182,11 @@ docker run -p 3000:3000 react-router-example
 
 Inside alxia's repository the example has no `bun.lock` of its own, the
 workspace's is at the root, so the image resolves the published
-`@alxia/*` versions its `package.json` names. Its image holds `build/`
-alone from `@alxia/react-router` 0.4.0, the first whose plugin bundles
-the build. An app of your own commits
+`@alxia/*` versions its `package.json` names. Until
+`@alxia/react-router` 0.4.0, the first whose plugin bundles the build, is
+published, that image's container stops at startup with
+[`Cannot find package '…'`](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#error-cannot-find-package--from-appbuildserverindexjs):
+its `build/` still imports the packages the image does not hold. An app of your own commits
 its `bun.lock`, which the image installs from with `--frozen-lockfile`.
 The package's
 [guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#docker)

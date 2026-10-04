@@ -36,6 +36,7 @@ nothing — the symptom.
 **After**
 
 - [`error: lockfile had changes, but lockfile is frozen`](#error-lockfile-had-changes-but-lockfile-is-frozen)
+- [`error: Module not found "dist/server.js"`](#error-module-not-found-distserverjs)
 - [`error: Cannot find package '…' from '/app/dist/server.js'`](#error-cannot-find-package--from-appdistserverjs)
 - [The project's `@alxia/*` are older than npm's latest](#the-projects-alxia-are-older-than-npms-latest)
 
@@ -253,6 +254,20 @@ behind in a clone where `package.json` moved on without it.
 **Fix:** run `bun install`, commit `bun.lock`, and build again. The other
 traps of the `react-router` image, a write refused to the `bun` user among them, are in
 [`@alxia/react-router`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#eacces-permission-denied-open-app).
+
+### `error: Module not found "dist/server.js"`
+
+**When:** `bun start` in an `api` project that was never built, or whose
+`dist/` was deleted.
+
+**Why:** `start` runs the build, `bun dist/server.js`, as the image does;
+it no longer runs `src/server.ts`. `bun dev` runs the sources.
+
+**Fix:** build first:
+
+```sh
+bun run build && bun start
+```
 
 ### `error: Cannot find package '…' from '/app/dist/server.js'`
 

@@ -48,7 +48,9 @@ bun run build    # dist/server.js and dist/server.js.map
 bun start        # bun dist/server.js
 ```
 
-`dist/` needs Bun and nothing else, no `node_modules`. Bun reads the
+`bun start` before any build fails with `Module not found
+"dist/server.js"`: build first. `dist/` needs Bun and nothing else, no
+`node_modules`. Bun reads the
 source map, so a stack trace names the lines of `src/`. `bun dev` and
 `bun test` run the TypeScript as it is, with no build.
 
