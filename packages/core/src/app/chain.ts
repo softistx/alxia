@@ -2,7 +2,9 @@
  * A route's own run, once the router has found it: one loop over its
  * chain — the hooks and middlewares in force where it was declared, then
  * its own, its validation among them, in the order declared — then its
- * handler. What any of it throws is answered by `boundary.ts`.
+ * handler. A request no route matches runs the app's chain the same way,
+ * before its 404. A middleware given a path runs when the request's path
+ * matches it. What any of it throws is answered by `boundary.ts`.
  */
 import { ValidationError } from '../errors/errors';
 import { type AnyReply, Reply } from '../reply/reply';

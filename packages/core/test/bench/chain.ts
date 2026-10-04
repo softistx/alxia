@@ -14,6 +14,9 @@
  * without another `then`, and the steps that never wait run in one loop:
  * measured on the same machine, the list 1090 → 944 ns, the middleware
  * form 1325 → 1030 ns (a ratio of 1.09) and `use()` 1341 → 1007 ns.
+ * `next.behind` is one function shared by every call: an `Object.assign`
+ * of it onto each `next` cost the middleware form 15% again (a ratio of
+ * 1.24). A 404 costs some 470 ns bare, 1250 ns through three `use()`.
  */
 import { alxia, defineHook, defineMiddleware } from '@alxia/core';
 

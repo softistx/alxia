@@ -167,7 +167,7 @@ export interface Globals {
 /** What a request reads of an app: its routes, its global hooks, its options. */
 export interface Runtime {
 	readonly router: Router<Definition>;
-	/** The chain a request no route matches runs: the app's, as declared so far. */
+	/** The chain a request no route matches runs: the app's own, every `use()` of it wherever declared. */
 	readonly unmatched: () => ScopedHooks;
 	/** Shared with the app's groups, whose global hooks are the app's. */
 	readonly globals: Globals;

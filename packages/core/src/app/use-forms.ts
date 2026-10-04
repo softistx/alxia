@@ -87,9 +87,10 @@ export interface UseForms<
 	/**
 	 * Middlewares made by `defineMiddleware`, run on every route declared
 	 * after this — not before — in this app or group, before the route's
-	 * own middlewares, in the order given. What each passes `next` is added
-	 * to the context of the routes after it, typed; a reply it returns ends
-	 * the request:
+	 * own middlewares, in the order given; on the app, on every request no
+	 * route matches too — a 404, a 405, a preflight — wherever declared.
+	 * What each passes `next` is added to the context of the routes after
+	 * it, typed; a reply it returns ends the request:
 	 *
 	 * ```ts
 	 * app.use(auth).get('/me', ({ user, reply }) => reply(200, user));
@@ -187,10 +188,12 @@ export interface UseForms<
 		m8: ScopeMiddleware<Ctx, [R1, R2, R3, R4, R5, R6, R7], R8>,
 	): AppAfterUse<Ctx, Prefix, Shortcuts, [R1, R2, R3, R4, R5, R6, R7, R8]>;
 	/**
-	 * Middlewares made by `defineMiddleware`, run on the routes declared
-	 * after this whose path is under `path`, matched once, when each route
-	 * is declared: `/admin` is `/admin` and every route under it,
-	 * `/admin/*` the routes under it alone, and `:name` any one segment.
+	 * Middlewares made by `defineMiddleware`, run on the requests under
+	 * `path` that reach a route declared after this — and, on the app, on
+	 * those no route matches. The request's path is matched, compiled once
+	 * here: `/admin` is `/admin` and every path under it, `/admin/*` the
+	 * paths under it alone, and `:name` any one segment; a route
+	 * `/users/:id` requested as `/users/admin` runs `use('/users/admin', …)`.
 	 * They may add nothing to the context — `next()`, a reply or a
 	 * `Response` — since the routes they run on are not typed apart: to
 	 * add to a subtree's, `use` them in a group.

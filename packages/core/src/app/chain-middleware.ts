@@ -80,21 +80,29 @@ class Call {
 		this.#merge = merge;
 		this.#rest = rest;
 		this.#definition = definition;
+		const next = ((added?: object) => this.#call(added)) as Next;
+		next.behind = behind;
+		next[CALL] = this;
+		this.next = next;
+	}
+
+	/** `next.behind(added)`: the rest run as `next(added)` runs it, the middleware's reply sent without waiting. */
+	behind(added: object | undefined): Promise<Response> {
+		const pending = this.#call(added);
+		this.#behind = true;
+		pending.catch(ignore);
+		return pending;
 	}
 
 	/** Whether `next.behind()` ran the rest: the middleware's own reply does not wait for it. */
 	#behind = false;
 
-	readonly next: ((added?: object) => Promise<Response>) & {
-		behind: (added?: object) => Promise<Response>;
-	} = Object.assign((added?: object) => this.#call(added), {
-		behind: (added?: object) => {
-			const pending = this.#call(added);
-			this.#behind = true;
-			pending.catch(ignore);
-			return pending;
-		},
-	});
+	/**
+	 * `next`, and its `behind`: one function shared by every call, which
+	 * finds its call on `next` — an `Object.assign` per call cost a route
+	 * behind three middlewares some 15%.
+	 */
+	readonly next: Next;
 
 	#call(added: object | undefined): Promise<Response> {
 		if (this.#state !== 'idle') {
@@ -206,6 +214,20 @@ class Call {
 }
 
 function ignore(): void {}
+
+/** Where `next` keeps its call, for the shared `behind`. */
+const CALL = Symbol('call');
+
+/** `next` as a middleware is given it. */
+interface Next {
+	(added?: object): Promise<Response>;
+	behind: (this: Next, added?: object) => Promise<Response>;
+	[CALL]: Call;
+}
+
+function behind(this: Next, added?: object): Promise<Response> {
+	return this[CALL].behind(added);
+}
 
 /** A socket's upgrade, parked behind the stand-in response `next()` resolved to. */
 interface Parked {
