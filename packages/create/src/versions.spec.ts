@@ -37,6 +37,7 @@ describe('alxiaRanges', () => {
 	test("in the workspace, workspace:^ reads as ^ and the sibling's version, as bun publish writes it", async () => {
 		expect(await alxiaRanges()).toEqual({
 			'@alxia/core': `^${await versionOf('core')}`,
+			'@alxia/openapi': `^${await versionOf('openapi')}`,
 			'@alxia/react-router': `^${await versionOf('react-router')}`,
 		});
 	});
@@ -50,12 +51,14 @@ describe('alxiaRanges', () => {
 			JSON.stringify({
 				devDependencies: {
 					'@alxia/core': '^0.3.0',
+					'@alxia/openapi': '^0.4.0',
 					'@alxia/react-router': '^0.2.0',
 				},
 			}),
 		);
 		expect(await alxiaRanges(new URL(`file://${file}`))).toEqual({
 			'@alxia/core': '^0.3.0',
+			'@alxia/openapi': '^0.4.0',
 			'@alxia/react-router': '^0.2.0',
 		});
 	});

@@ -25,6 +25,7 @@ const VERSIONS = {
 	typescript: ['6.0.3', '7.0.2'],
 	'@types/bun': ['1.4.2'],
 	'@biomejs/biome': ['2.5.15', '2.5.16', '2.6.0', '3.0.0'],
+	'@nxgt/openapi-codegen': ['0.6.0', '0.6.1', '0.7.0'],
 	'react-router': ['8.4.0'],
 	'@react-router/node': ['8.4.0'],
 	'@react-router/serve': ['8.4.0'],
@@ -138,6 +139,8 @@ describe('create-alxia', () => {
 			'Dockerfile',
 			'README.md',
 			'biome.json',
+			'openapi-codegen.config.ts',
+			'openapi.yaml',
 			'package.json',
 			'src',
 			'tsconfig.json',
@@ -178,6 +181,9 @@ describe('create-alxia', () => {
 			name: 'my-api',
 			dependencies: { '@alxia/core': ALXIA['@alxia/core'], zod: '^4.6.5' },
 			devDependencies: {
+				'@alxia/openapi': ALXIA['@alxia/openapi'],
+				// Pinned exactly, as its output is committed: its newest patch.
+				'@nxgt/openapi-codegen': '0.6.1',
 				'@types/bun': '^1.4.2',
 				typescript: '^7.0.2',
 			},
@@ -266,6 +272,7 @@ describe('create-alxia', () => {
 		// Fixed ranges, not this checkout's: at x.y.0 nothing older shares the minor.
 		const published = {
 			'@alxia/core': '^0.3.1',
+			'@alxia/openapi': ALXIA['@alxia/openapi'],
 			'@alxia/react-router': '^0.2.0',
 		};
 		registry.stop();
@@ -291,7 +298,7 @@ describe('create-alxia', () => {
 			await main(['my-api', '--template', 'api', '--no-install'], root, io),
 		).toBe(0);
 		expect(err[0]).toBe(
-			'create-alxia: warning: the registry did not answer for @alxia/core, zod, @biomejs/biome, @types/bun, typescript; kept the versions the template ships.',
+			'create-alxia: warning: the registry did not answer for @alxia/core, zod, @alxia/openapi, @biomejs/biome, @nxgt/openapi-codegen, @types/bun, typescript; kept the versions the template ships.',
 		);
 		expect(
 			(await json(join(root, 'my-api', 'package.json'))).devDependencies

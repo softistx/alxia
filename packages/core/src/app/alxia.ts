@@ -143,7 +143,7 @@ export class Alxia<
 		return this;
 	}) as never;
 
-	/** Every route, in the order declared: what `@alxia/openapi` documents. */
+	/** Every route, in the order declared: what `@alxia/openapi`'s `matchesSpec` checks against the document. */
 	get routes(): readonly RouteDefinition[] {
 		return this.#state.routes;
 	}

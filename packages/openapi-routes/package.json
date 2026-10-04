@@ -1,28 +1,29 @@
 {
-	"name": "@alxia/create",
-	"version": "0.1.5",
-	"description": "Start an alxia app: `bun create @alxia` writes an API with Zod, or React Router's official template served by alxia",
+	"name": "@alxia/openapi-routes",
+	"version": "0.2.0",
+	"description": "Deprecated: moved to @alxia/openapi, which this release re-exports",
 	"license": "MIT",
 	"type": "module",
-	"bin": {
-		"create-alxia": "./dist/index.js"
-	},
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
 	"files": [
 		"dist",
-		"docs",
-		"templates/api",
-		"templates/react-router",
 		"README.md",
 		"package.json",
 		"LICENSE"
 	],
 	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/softistx/alxia.git",
-		"directory": "packages/create"
+		"directory": "packages/openapi-routes"
 	},
 	"publishConfig": {
 		"registry": "https://registry.npmjs.org",
@@ -30,7 +31,7 @@
 	},
 	"scripts": {
 		"build": "bun run ../../build.ts",
-		"test": "bun test ./src",
+		"test": "bun test src",
 		"typecheck": "tsc --noEmit"
 	},
 	"alxia": {
@@ -41,9 +42,11 @@
 	"devDependencies": {
 		"@alxia/core": "workspace:^",
 		"@alxia/openapi": "workspace:^",
-		"@alxia/react-router": "workspace:^",
-		"@nxgt/openapi-codegen": "0.6.0",
-		"@types/bun": "^1.4.2",
-		"zod": "^4.6.5"
+		"@types/bun": "^1.4.2"
+	},
+	"peerDependencies": {
+		"@alxia/core": "workspace:^",
+		"@alxia/openapi": "workspace:^",
+		"typescript": "^6.0.3 || ^7.0.0"
 	}
 }

@@ -1,7 +1,9 @@
 /**
  * Runs `bun create @alxia` as a user would, from the packed tarballs, for
  * each template, then proves the project it wrote works: it installs, its
- * `typecheck`, `test` and `build` pass, then `check:ci` (Biome) with no
+ * `typecheck`, `test` and `build` pass (the `api` template's `verify` runs
+ * the first two, after `generate --check`: its committed `src/generated/` is
+ * what the `@nxgt/openapi-codegen` it installed writes), then `check:ci` (Biome) with no
  * error, warning or info, over what they generated, its production server answers, and
  * so does the image its `Dockerfile` builds (`templates/docker.ts`): skipped
  * locally with no Docker daemon, a failure on CI.
@@ -52,9 +54,13 @@ const CHECKS: readonly Check[] = [
 			'.vscode/settings.json',
 			'biome.json',
 			'Dockerfile',
+			'openapi.yaml',
+			'openapi-codegen.config.ts',
 			'src/app.ts',
+			'src/generated/alxia.ts',
 		],
-		scripts: ['typecheck', 'test', 'build'],
+		// verify: generate --check, check:ci, typecheck, then test.
+		scripts: ['verify', 'build'],
 		request: (base) =>
 			fetch(`${base}/todos`, {
 				method: 'POST',

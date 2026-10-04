@@ -1,15 +1,49 @@
 # An alxia API
 
 An [alxia](https://github.com/softistx/alxia) app with
-[Zod](https://zod.dev), made with `bun create @alxia`.
+[Zod](https://zod.dev), made with `bun create @alxia`. It is OpenAPI spec
+first: `openapi.yaml` is the contract, the routes are bound to the
+operations generated from it, and a client is generated from the same file.
 
-- `src/app.ts`: the app. `POST /todos` runs its middlewares in order:
-  `requireKey`, made with `defineMiddleware`, answers 401 without the
-  `x-api-key` header; `validate({ body })` checks the body with Zod;
-  `responds({ 201 })` checks the reply.
+- `openapi.yaml`: the API's operations, `GET /todos`, `POST /todos` and
+  `GET /todos/{id}`, their bodies, parameters and replies.
+- `src/generated/`: what `bun run generate` writes from it, with
+  [`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen)
+  (`openapi-codegen.config.ts`). `alxia.ts` holds each operation as the
+  data `app.route()` takes. Never edit it: change `openapi.yaml`, then
+  generate.
+- `src/app.ts`: the app. `route(operations.createTodo, requireKey, handler)`
+  runs its middlewares in order: `requireKey`, made with
+  `defineMiddleware`, answers 401 without the `x-api-key` header; the
+  operation's body is validated just before the handler, and every reply
+  checked against the operation's responses.
 - `src/server.ts`: listens on `PORT`, 3000 by default.
-- `src/app.spec.ts`: `app.request()`, no port.
+- `src/app.spec.ts`: `app.request()`, no port, and `matchesSpec` from
+  [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi): every
+  operation of `openapi.yaml` has its route, and no route is outside it.
 - `biome.json`: Biome's lint and format settings ([Lint and format](#lint-and-format)).
+
+## The contract first
+
+A new route starts in `openapi.yaml`:
+
+1. Add the operation, with an `operationId`: `deleteTodo`, say.
+2. `bun run generate`: `src/generated/alxia.ts` now exports
+   `operations.deleteTodo`.
+3. Bind it in `src/app.ts`, with the middlewares it needs:
+   `.route(operations.deleteTodo, requireKey, ({ params, reply }) => …)`.
+   The handler's `params`, `body` and `reply` are typed by the spec.
+4. `bun test`: `matchesSpec` fails while an operation has no route.
+
+`src/generated/` is committed, so the project builds with no generation
+step, in Docker too. `bun run verify` runs `bun run generate --check`
+first: it fails when `src/generated/` is not what `openapi.yaml` gives.
+`@nxgt/openapi-codegen` is pinned exactly, since another release may
+write the files differently: after moving it, run `bun run generate`.
+
+A client in another project is generated from the same `openapi.yaml`,
+with the generator of its choice: `@nxgt/openapi-codegen` writes types,
+Zod validators and the operations a typed client reads.
 
 ## Environment
 
@@ -38,20 +72,22 @@ curl -X POST localhost:3000/todos \
 ```sh
 bun test         # src/app.spec.ts: in process, no port
 bun run typecheck
+bun run generate # src/generated/, from openapi.yaml
 ```
 
 ## Lint and format
 
 [Biome](https://biomejs.dev) lints and formats the project, as `biome.json`
 sets it: Biome's recommended rules, spaces, double quotes, imports
-sorted. What the build writes, `dist/`, is skipped.
+sorted. What the build writes, `dist/`, is skipped, and so is what
+`bun run generate` writes, `src/generated/`.
 
 ```sh
 bun run check      # lint, format and sort imports, fixing what it can
 bun run lint       # lint only
 bun run format     # format only, in place
 bun run check:ci   # what CI runs: changes nothing, fails on an error
-bun run verify     # check:ci, then typecheck, then test
+bun run verify     # generate --check, check:ci, typecheck, then test
 ```
 
 `bun run check:ci`, not `bun ci`: `bun ci` is Bun's frozen-lockfile

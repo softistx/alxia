@@ -51,7 +51,7 @@ describe('addLintSection', () => {
 describe('the committed template', () => {
 	const TEMPLATE = join(ROOT, 'packages/create/templates/react-router');
 
-	test("its README has LINT_SECTION, and the api template's README the same but for verify", async () => {
+	test("its README has LINT_SECTION, and the api template's README the same but for verify and src/generated/", async () => {
 		expect(await Bun.file(join(TEMPLATE, 'README.md')).text()).toContain(
 			LINT_SECTION,
 		);
@@ -61,12 +61,12 @@ describe('the committed template', () => {
 		expect(api).toContain(
 			LINT_SECTION.replace(
 				/What the build and[\s\S]*?is skipped\./,
-				'What the build writes, `dist/`, is skipped.',
+				'What the build writes, `dist/`, is skipped, and so is what\n`bun run generate` writes, `src/generated/`.',
 			)
 				.replaceAll('```bash', '```sh')
 				.replace(
 					'check:ci, then typecheck, then build',
-					'check:ci, then typecheck, then test',
+					'generate --check, check:ci, typecheck, then test',
 				),
 		);
 	});

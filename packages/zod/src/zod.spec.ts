@@ -1,6 +1,5 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { alxia, responds, validate } from '@alxia/core';
-import { openapi } from '@alxia/openapi';
 import { z } from 'zod';
 import { zq } from './coerce';
 import { zodConverter } from './convert';
@@ -117,13 +116,9 @@ describe('zq', () => {
 });
 
 describe('zodConverter', () => {
-	test('a Date is documented as a date-time string', () => {
-		const document = openapi(app, {
-			info: { title: 'Search', version: '1' },
-			convert: zodConverter,
-		});
-		const ok = document.paths['/search/{page}']?.get?.responses['200'];
-		expect(ok?.content?.['application/json']?.schema).toMatchObject({
+	test('a Date is a date-time string, as it crosses the wire', () => {
+		const Message = z.object({ since: z.date().nullable() });
+		expect(zodConverter(Message, 'output')).toMatchObject({
 			properties: {
 				since: {
 					anyOf: [{ type: 'string', format: 'date-time' }, { type: 'null' }],
