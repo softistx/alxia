@@ -96,3 +96,19 @@ describe('the forms of 0.3 and the middleware forms', () => {
 		);
 	});
 });
+
+describe('app.routes, of route(operation)', () => {
+	test('holds the route options alone: the schemas stay in its chain', async () => {
+		const operation = {
+			...getPet,
+			schema: { ...getPet.schema, detail: { operationId: 'getPet' } },
+		} as const;
+		const app = alxia().route(operation, ({ params, reply }) =>
+			reply(200, { id: params.petId, name: 'Rex' }),
+		);
+		expect(app.routes[0]?.schema).toEqual({
+			detail: { operationId: 'getPet' },
+		});
+		expect((await app.request('/pets/x')).status).toBe(400);
+	});
+});

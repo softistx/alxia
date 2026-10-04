@@ -419,7 +419,8 @@ At run time `validate`'s schemas check what a client sends, and
 `responds`' what it may read — what the OpenAPI document a client is
 generated from declares, its 400 included. The document declares them, not
 the app: `app.routes[i].schema` holds the route's options alone. A route bound to a generated operation, `route(operation, …)`,
-takes both from the document. Where
+takes both from the document, into its chain (`app.routes[i].schema`
+keeps its `detail`). Where
 each stands changes which answer comes first, a 401 or a 400
 ([Middleware](middleware.md#where-validate-stands)).
 

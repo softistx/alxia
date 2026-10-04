@@ -167,6 +167,7 @@ core ◄── openapi, graphql, cors, secure-headers, compress, rate-limit, jwt
          telemetry, janus, context-storage, cache, language
          openapi ◄── openapi-routes   (deprecated: a re-export)
          i18n ◄── language
+         janus   (dev: i18n, language, @nxgt/i18n for its specs)
          redis ◄── rate-limit, cache (optional peers: the stores' contracts)
          react-router   (peers: react-router; vite, optional, for /vite; dev: openapi, compress for its specs)
 zod             (peer: zod; dev: core for its specs)

@@ -233,7 +233,10 @@ answers it in its own format instead
 ([`ValidationError`](#validate-throws-a-validationerror)).
 `app.routes[i].schema` holds the route's options alone (`detail`,
 `bodyLimit`): the schemas of `validate` and `responds` stay in its chain,
-since the OpenAPI document, not the app, declares them.
+since the OpenAPI document, not the app, declares them. The same holds
+for `route(operation, …)`: its `schema` keeps the operation's `detail`
+(`operationId`, which `@alxia/openapi` reads), not its `params`, `body`
+or `response`. A tool that read those reads the operation itself.
 
 #### 5. A socket's schema becomes options and `validate`
 

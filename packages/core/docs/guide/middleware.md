@@ -758,6 +758,12 @@ what the observers made of it, the outermost last — is the one sent. So
 an [error handler](#ordering) works wherever it is given; given after the
 observers, they see its reply too.
 
+The error goes on when the observer gives `settle` its `next()` itself and
+returns the `Response` `settle` resolved to, or one made from it. A
+middleware that settles `next().then(…)`, or returns a reply of its own
+after `settle`, answers the error there, as a `try`/`catch` that does not
+rethrow does: a middleware around it sees that answer, not the error.
+
 ### Answering a refusal or an error
 
 An error is a rejection of `next()`: a middleware that wraps it in

@@ -2484,6 +2484,8 @@ does not run.
 on: an `onError` hook, deprecated, that returned a reply; a middleware of
 your own that caught it and returned a response; or a middleware that
 read `next()` with `.catch()` or `.then(…, …)` rather than through
+`settle`; or one that settled a promise other than `next()` itself,
+`settle(ctx, next().then(…))`, or returned a reply of its own after
 `settle`. An observer — `logger()`, `telemetry()`, `secureHeaders()`,
 `cors()`, `compress()`, `createI18n()`, `contextStorage()` — does not: it
 settles `next()`, reads the response the error would be answered with, and

@@ -199,7 +199,10 @@ class Call {
 	 * rejected, never left unhandled — and the middleware's goes on.
 	 */
 	#thrown(error: unknown): never {
-		this.#pending?.catch(console.error);
+		// The rest's own error, rethrown, goes on: logged once, where answered.
+		this.#pending?.catch((rest: unknown) => {
+			if (rest !== error) console.error(rest);
+		});
 		throw error;
 	}
 

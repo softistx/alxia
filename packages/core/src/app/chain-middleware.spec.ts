@@ -173,6 +173,30 @@ describe("the rest's error, when the middleware does not read it", () => {
 		}
 	});
 
+	test('a middleware that rethrows it adds no log: the 500 is logged once', async () => {
+		const error = spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const seen: unknown[] = [];
+			const rethrow = (async (_ctx: unknown, next: () => Promise<Response>) => {
+				try {
+					return await next();
+				} catch (thrown) {
+					seen.push(thrown);
+					throw thrown;
+				}
+			}) as never;
+			const app = alxia().get('/', rethrow, rethrow, () => {
+				throw new Error('boom');
+			});
+			expect((await app.request('/')).status).toBe(500);
+			await settled();
+			expect(error).toHaveBeenCalledTimes(1);
+			expect(seen).toHaveLength(2);
+		} finally {
+			error.mockRestore();
+		}
+	});
+
 	test('a middleware that catches it is not logged', async () => {
 		const error = spyOn(console, 'error').mockImplementation(() => {});
 		try {
