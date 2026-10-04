@@ -54,7 +54,7 @@ declare module '@alxia/core' {
 
 export const requestContext = contextStorage(); // context(): AppContext
 base.use(requestContext);                       // ok
-alxia().use(requestContext);                    // compile error: the middleware reads "db" | "user", which this app's context does not give
+alxia().use(requestContext);                    // compile error: Property 'db' is missing in type 'BaseContext & Empty'
 ```
 
 Requiring that context of the app is new in 0.4.0: a middleware used on an app
@@ -89,7 +89,8 @@ Pass it to `app.use` called: `use(contextStorage)`, uncalled, is refused by
 | --- | --- |
 | `contextStorage<App>()` | the middleware, given to `app.use`, with `context()` and `tryContext()` typed by `App` — by default the app `@alxia/core`'s `Register` names, `BaseContext` when none — and required of the app that mounts it |
 | `StoredContext<App>` | what `context()` returns: `ContextOf<App>`, or `BaseContext` when `App` is no app |
-| `ContextStoragePlugin<App>` | its type: a middleware with `context()` and `tryContext()` |
+| `ContextStorageMiddleware<App>` | its type: a middleware with `context()` and `tryContext()` |
+| `ContextStoragePlugin<App>` | deprecated: the former name of `ContextStorageMiddleware` |
 | `getContext`, `tryGetContext`, `getRequestContext`, `tryGetRequestContext`, `runWithContext` | the store, untyped |
 | `ContextStorageError`, `ContextStorageErrorCode` | why there is no context |
 

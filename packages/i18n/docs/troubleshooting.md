@@ -13,13 +13,13 @@ nothing — what the response does that you did not expect.
 - [`Type '"de"' is not assignable to type '"en" | "fr"'`](#type-de-is-not-assignable-to-type-en--fr)
 - [`Argument of type '"cart.itmes"' is not assignable to parameter of type '"cart.items"'`](#argument-of-type-cartitmes-is-not-assignable-to-parameter-of-type-cartitems)
 - [`Property 't' does not exist on type 'Context<Empty, "/", Empty>'`](#property-t-does-not-exist-on-type-contextempty--empty)
-- [`Type 'Alxia<Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`](#type-alxiaempty--never-is-missing-the-following-properties-from-type-i18noptionsreadonlyrecordstring-readonlyrecordstring-unknown-string-basecontext-resources-fallback)
+- [`Type 'BaseContext & Empty' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`](#type-basecontext--empty-is-missing-the-following-properties-from-type-i18noptionsreadonlyrecordstring-readonlyrecordstring-unknown-string-basecontext-resources-fallback)
 - [`Object literal may only specify known properties, and 'supported' does not exist in type 'I18nOptions<…>'`](#object-literal-may-only-specify-known-properties-and-supported-does-not-exist-in-type-i18noptions)
 - [`Cannot invoke an object which is possibly 'undefined'`](#cannot-invoke-an-object-which-is-possibly-undefined)
 - [`t()` accepts any key, typos included](#t-accepts-any-key-typos-included)
 - [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
-- [`the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first`](#the-plugin-reads-user-which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
-- [`the plugin reads "user", which this app's context gives with another type`](#the-plugin-reads-user-which-this-apps-context-gives-with-another-type)
+- [`Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'`](#property-user-is-missing-in-type-basecontext--empty-but-required-in-type--user-user--null-)
+- [`Types of property 'user' are incompatible`](#types-of-property-user-are-incompatible)
 - [`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
 **Messages**
@@ -147,14 +147,15 @@ const app = alxia()
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 ```
 
-### `Type 'Alxia<Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`
+### `Type 'BaseContext & Empty' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => Middleware<…>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
-      Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback
+  Overload 1 of 11, '(m1: ScopeMiddleware<Empty, [], MiddlewareReturn>): AppAfterUse<Empty, "", never, [MiddlewareReturn]>', gave the following error.
+    Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => I18nMiddleware<keyof C & string, KeyOf<C[Fallback]>, RequiresOf<...>>' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
+      …
+        Types of parameters 'options' and 'ctx' are incompatible.
+          Type 'BaseContext & Empty' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback
 ```
 
 **When:** `app.use(createI18n)`, without calling it.
@@ -195,28 +196,35 @@ createI18n({ resources: { en }, fallback: 'en' });
 error TS2722: Cannot invoke an object which is possibly 'undefined'.
 ```
 
-**When:** a deprecated `onError` hook calls `t('…')` from its context.
+**When:** a deprecated `onError` hook calls `t('…')` from its context. (A
+middleware declared after `.use(i18n)` has no such doubt: `t` is typed there.)
 
 **Why:** `onError` also handles what was thrown before the middleware ran —
 by a middleware declared before it — so what it adds is optional there.
 
 **Fix:** in an error-handling middleware declared after `.use(i18n)`, catch
-around `next()` and call `i18n.t()`, which always answers. Where an `onError`
-hook stays, call `t` optionally, with an answer for when it is missing:
+around `next()` and call `t`, or the middleware's own `i18n.t()`, which always
+answers, in the request's language and in the fallback when the error was
+thrown before the language was read:
 
 ```ts
+import { alxia, defineMiddleware, HttpError } from '@alxia/core';
+
 alxia()
 	.use(i18n)
-	.onError((error, { t, reply }) =>
-		error instanceof HttpError && error.status === 404
-			? reply(404, { error: t?.('errors.not-found') ?? 'Not found' })
-			: undefined,
+	.use(
+		defineMiddleware(async ({ t, reply }, next) => {
+			try {
+				return await next();
+			} catch (error) {
+				if (error instanceof HttpError && error.status === 404) {
+					return reply(404, { error: t('errors.not-found') });
+				}
+				throw error;
+			}
+		}),
 	);
 ```
-
-Or call the middleware's own `i18n.t()`, which answers in the request's
-language there too, and in the fallback when the error was thrown before
-the language was read.
 
 ### `t()` accepts any key, typos included
 
@@ -269,13 +277,13 @@ alxia().plugin(auth).use(i18n); // auth derives user
 
 See [Reading the app's context](guide.md#reading-the-apps-context).
 
-### `the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first`
+### `Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'`
 
 ```text
 error TS2769: No overload matches this call.
   …
-        Types of property ''~requires'' are incompatible.
-          Type '{ user: User | null; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: add the plugin or middleware that gives it first"'.
+          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ user: User | null; }>'.
+            Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'.
 ```
 
 **When:** `resolve` is annotated to read `user` —
@@ -286,7 +294,7 @@ used on an app, or in a group, whose context has no `user` at that point:
 **Why:** an annotated `resolve` makes the middleware require what it reads, and
 `app.use` checks the app's context against it, so `resolve` never runs without
 it. An app whose `user` has another type is refused too, with
-`the plugin reads "user", which this app's context gives with another type`.
+`Types of property 'user' are incompatible`.
 
 **Fix:** mount what adds `user` first, with the type `resolve`
 reads:
@@ -296,14 +304,18 @@ alxia().plugin(auth).use(i18n);
 ```
 
 More on this message in
-[`@alxia/language`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#the-plugin-reads-user-which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first).
+[`@alxia/language`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#property-user-is-missing-in-type-basecontext--empty-but-required-in-type--user-user--null-).
 
-### `the plugin reads "user", which this app's context gives with another type`
+### `Types of property 'user' are incompatible`
 
 ```text
 error TS2769: No overload matches this call.
   …
-          Type '{ user: User; }' is not assignable to type '"the plugin reads \"user\", which this app's context gives with another type"'.
+          Type 'BaseContext & Empty & { user: User | null; }' is not assignable to type 'MiddlewareContext<{ user: User; }>'.
+            Type 'BaseContext & Empty & { user: User | null; }' is not assignable to type '{ user: User; }'.
+              Types of property 'user' are incompatible.
+                Type 'User | null' is not assignable to type 'User'.
+                  Type 'null' is not assignable to type 'User'.
 ```
 
 **When:** the app gives a `user`, but of a type that does not fit the one
@@ -321,15 +333,15 @@ resolve: ({ user }: { user: User | null }) => user?.language ?? undefined,
 ```
 
 More on this message in
-[`@alxia/language`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#the-plugin-reads-user-which-this-apps-context-gives-with-another-type).
+[`@alxia/language`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#types-of-property-user-are-incompatible).
 
 ### `the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`
 
 ```text
 error TS2769: No overload matches this call.
   …
-        Types of property ''~requires'' are incompatible.
-          Type '{ readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"; }' is not assignable to type '"the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"'.
+          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"; }>'.
+            Property ''~any'' is missing in type 'BaseContext & Empty' but required in type '{ readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"; }'.
 ```
 
 **When:** `resolve`'s parameter is annotated `any` —
@@ -422,7 +434,7 @@ chain, run with no language to answer in.
 
 **Fix:** translate after the middleware: declare the middlewares and the
 routes that translate after `.use(i18n)`, and move what an `onRequest` hook
-renders into a middleware declared after it:
+renders (a deprecated hook) into a middleware declared after it:
 
 ```ts
 import { alxia, defineMiddleware } from '@alxia/core';

@@ -1003,11 +1003,21 @@ A guard given to `use` in `configure` or `beforeAll` runs on every request
 it is in front of, a request no route matches included, and answers before
 the 404. An anonymous request to `/nope` gets the 401, not the 404, and so
 does the login page the guard sits in front of. Scope the guard to what it
-guards, with a path or a `group`:
+guards, with a path. A path-scoped `use` takes a middleware that adds nothing
+to the context, so `bearer`, which adds `user`, does not compile there: write
+the guard as a middleware that only refuses. The pages are a catch-all outside
+any `group`, so a `group` would not reach them.
 
 ```ts
+import { defineMiddleware } from '@alxia/core';
+
+const account = defineMiddleware(async ({ request, reply }, next) => {
+	const token = request.headers.get('authorization')?.slice('Bearer '.length) ?? '';
+	return (await jwt.verify(token)).ok ? next() : reply(401, { error: 'unauthorized' as const });
+});
+
 createServer({
-	configure: (app) => app.use('/account', bearer({ jwt })), // the pages under /account only
+	configure: (app) => app.use('/account', account), // the pages under /account only
 });
 ```
 

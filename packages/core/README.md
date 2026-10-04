@@ -227,6 +227,11 @@ alxia()
 | `'/admin/*'` | the requests under `/admin`, not `/admin` itself |
 | `'/users/:any/posts'` | `:any` is any one segment: `/users/:id/posts`, `/users/me/posts/:postId`; a literal matches that literal alone |
 
+The request's path is read as the router and the static files read it,
+fail closed: decoded segment by segment (`%2F` splits one), empty segments
+collapsed, **without case** — `/%61dmin`, `//admin` and `/ADMIN` run
+`use('/admin', guard)` too.
+
 `use` takes middlewares made by `defineMiddleware`, whose mark it reads; a
 plugin goes to [`app.plugin(…)`](#plugins). `use(plugin)` still mounts one,
 deprecated, and throws when a function given to it returns no app — a
@@ -243,17 +248,22 @@ Four rules follow from running on every request:
   session and `rateLimit` give an anonymous request to `/nowhere` its 401,
   not a 404. A group guards some routes only; `use('/api', guard)` does for a
   guard that adds nothing to the context.
-- **A group's middlewares stay with its routes**: they do not run on an
-  unmatched request, even one under the group's prefix. The middlewares of a
-  plugin app are the app's, and do.
+- **A group's middlewares stay under its prefix**: its routes, and an
+  unmatched request under the prefix, before its 404 or 405 — never a
+  route after the group. So does a plugin app with a prefix of its own,
+  `defineRoutes('/todos')`; the middlewares of a plugin app without one
+  are the app's.
 - **A `use` after a route does not run for it**, and does for a request no
-  route matches.
+  route matches; in development it warns once, naming the routes.
+  `plugin(middleware)`, deprecated, runs app-wide, as 0.3's global hooks
+  did.
 
 The order matters. Give the observers first — `logger()`, `telemetry()`,
 `secureHeaders()`, `cors()`, `compress()` — so that they wrap everything, a
 404 included. A middleware that answers errors itself (a try/catch around
-`next()`, `janusErrors()`) goes after them: an observer settles `next()`,
-which answers an error before an outer try/catch could see it.
+`next()`, `janusErrors()`) goes after them, so that they see its reply. An
+observer settles `next()` without swallowing the error: the try/catch
+catches it wherever it stands.
 
 An error is a rejection through `next()`: a middleware's
 `try { return await next() } catch (error) { … }` sees what the rest threw,
@@ -272,6 +282,9 @@ const poweredBy = defineMiddleware(async (ctx, next) => {
 	return response;                               // the error stays on ctx.error
 });
 ```
+
+Once it returns, the error goes on to the middlewares around it, and the
+response it made is the one sent when none catches it.
 
 `next.behind(added?)` runs the rest behind a reply the middleware returns at
 once — a stale cache entry served while the route refreshes it.
@@ -790,7 +803,7 @@ covers all three kinds.
 | `AnyReply`, `FreeReplyFunction`, `TypedReplyFunction`, `DeclaredReply`, `RedirectFunction` | any reply, `reply` without and behind a `responds`, every reply a route with schemas may return, `redirect` |
 | `FreeShortcuts`, `TypedShortcuts`, `SHORTCUTS`, `Shortcuts` | `reply`'s shortcuts without and with schemas, and the status of each |
 | `Plugin`, `AnyAlxia` | a function plugin, any app |
-| `defineMiddleware(fn)`, `defineMiddleware<Requires>()(fn)`, `MiddlewareMark` | a middleware, `(ctx, next) => …`, typed, marked as one for `use`, and returned: `next(added)` adds `added` to the context after it, `next.behind(added?)` runs the rest behind a reply it returns at once, a reply ends the request, a `Response` is sent as it is, nothing once `next()` was called is the rest's response; `Requires` is what it reads beyond `BaseContext`, which the route must give where it is placed |
+| `defineMiddleware(fn)`, `defineMiddleware<Requires>()(fn)`, `MiddlewareMark`, `MadeByDefineMiddleware` | a middleware, `(ctx, next) => …`, typed, marked as one for `use`, and returned: `next(added)` adds `added` to the context after it, `next.behind(added?)` runs the rest behind a reply it returns at once, a reply ends the request, a `Response` is sent as it is, nothing once `next()` was called is the rest's response; `Requires` is what it reads beyond `BaseContext`, which the route must give where it is placed |
 | `validate(schemas)`, `validate(operation)`, `RequestSchemas`, `Validated<Schemas>`, `ValidateRequires<Schemas>` | the middleware that validates `params`, `query`, `headers`, `cookies` and `body`, each with any Standard Schema — or the request parts of an operation's `schema`, which its `route` then validates nowhere else; what it takes, what it passes on, the path parameters its `params` schema must read |
 | `responds(responses)`, `responds(operation)` | the middleware that types the handler's `reply` by the statuses it declares, and checks the replies after it of those statuses against their schemas; given an operation, its `schema.response`, which its `route` then checks nowhere else — it throws for an operation that declares none |
 | `BuiltinMark<Kind>` | the mark `validate` and `responds` carry in their type, `'~builtin': 'validate' \| 'responds'`; at runtime `Symbol.for('alxia.builtin')`, so one made by another copy of `@alxia/core` is still recognised, and `use` refuses it |
@@ -805,7 +818,7 @@ covers all three kinds.
 | `Register`, `AppContext` | the interface an app augments with `context: typeof base`, and that base's context: `BaseContext` when nothing is registered |
 | `defineRoutes(prefix?)` | an app plugin built on the registered context, requiring it of the app that mounts it with `plugin`: a file of routes with no import of the app |
 | `RegisteredOf<R>`, `RegisteredBase`, `InvalidRegister`, `RoutesContext` | the app a `Register`-shaped interface names (a fresh app when it names none), the one `Register` names, what a `context` that is not an app reads as (every key of the app's own a compile error), and the context `defineRoutes` starts from, its requirement in it |
-| `RequiringContext<Requires>`, `RequiredIn<PluginCtx>`, `Mounted<PluginCtx>` | the requirement a `defineRoutes` plugin carries in its context (a function type, never set, so a route reading it gets nothing usable), what it requires of the app that mounts it — checked by `plugin(app)`, `plugin((app) => plugin)` and a `group` returning it (`plugin-method.ts`) — and what it adds to it. Exported so an app's type can be named in a declaration file |
+| `RequiringContext<Requires>`, `RequiredIn<PluginCtx>`, `Mounted<PluginCtx>`, `MountedIn<Ctx, PluginCtx, PluginPrefix>` | the requirement a `defineRoutes` plugin carries in its context (a function type, never set, so a route reading it gets nothing usable), what it requires of the app that mounts it — checked by `plugin(app)`, `plugin((app) => plugin)` and a `group` returning it (`plugin-method.ts`) — and what it adds to it: nothing when the plugin has a prefix of its own (`MountedIn`). Exported so an app's type can be named in a declaration file |
 | `definePlugin<Requires>()(build)` | an app plugin built on an app whose context has `Requires`; `plugin` refuses it on an app that does not give them |
 | `Requiring<Requires>`, `ProvidedBy<Ctx, Requires>` | the marker on a `definePlugin` plugin, and the check `plugin` makes of it |
 | `RequiresOf<Ctx, Callback?>` | what a callback annotated `Ctx` reads beyond `BaseContext` — `{ user: User }` for `BaseContext & { user: User }`, `Empty` for nothing more: the `Requires` of a plugin that infers it from a callback it is given. A callback annotated `any` is refused on every app, with a message naming `Callback` |

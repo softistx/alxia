@@ -58,7 +58,7 @@ interface IdempotencyOptions {
 | `methods` | `readonly string[]` | `['POST', 'PATCH']` | the methods it guards; the others pass through |
 | `header` | `string` | `'idempotency-key'` | the request header the key is read from (any case) |
 | `required` | `boolean` | `false` | refuse a guarded request with no key, with a `400` |
-| `scope` | `(ctx: BaseContext) => string \| undefined` | `ctx.ip` | whose key it is; `undefined` scopes it to everyone |
+| `scope` | `(ctx: BaseContext) => string \| undefined` | `ctx.ip` | whose key it is; `undefined` leaves the request unguarded, with a warning |
 
 `name`, `ttl` and `lease` are checked when `idempotency(…)` is called, so a
 wrong one throws at startup:
@@ -168,8 +168,15 @@ const app = alxia()
 Clients choose their keys, so two clients can choose the same one. The
 stored key is `<name>:<route>:<scope>:<key>`, where `scope(ctx)` is the
 client's address by default. When it is `undefined` — no address, as with
-`app.request()` in a test or a server that cannot see one — the scope is
-`anyone`, and every client shares the key space.
+`app.request()` in a test or a server that cannot see one, and no `scope`
+option, or one that returns `undefined` — the request runs unguarded:
+nothing is stored, nothing replayed, and each repeat runs the route again.
+Sharing one key space between every client would replay one client's
+response to another. The middleware warns once:
+
+```
+idempotency "payments": no client scope could be derived (ctx.ip is undefined and no scope option returned one), so these requests run unguarded, nothing stored or replayed. Pass a scope option, (ctx) => a user id, or an ip option to alxia().
+```
 
 Behind a proxy, the address is the proxy's unless the app's `ip` option
 reads the forwarded header. Where requests carry a user, scope by the user:

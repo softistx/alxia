@@ -26,7 +26,12 @@ and its types come with it:
   after `plugin`, and what they add is typed on them. They become the
   app's, so they run on a request no route matches too;
 - its routes are mounted under the app's prefix, behind the middlewares
-  declared before `plugin`;
+  declared before `plugin`, and a path it gave `use` moves with them;
+- given a prefix of its own, `alxia({ prefix: '/todos' })`, it is a group
+  once mounted instead: its `derive`s, `decorate`s and middlewares run on
+  its routes and on the requests no route matches under that prefix, and
+  add nothing to the routes after `plugin`. A plugin that adds context to
+  the app — an `auth` — has no prefix;
 - its replies — a 401, a 429 — may answer every route after it, and a
   missing path too.
 

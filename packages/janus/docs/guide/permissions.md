@@ -255,20 +255,20 @@ const edit = permission(
 
 const app = alxia()
 	.use(janusErrors())
-	.use(tenancy) // derives tenant and member
+	.plugin(tenancy) // derives tenant and member
 	.group('/records/:id', (record) =>
 		record.use(edit).put('/', ({ object, reply }) => reply(200, { title: object.title })),
 	);
 
 alxia().use(edit);
-// error, one message per missing key: the plugin reads "tenant", which this app's context does not give: add the plugin or middleware that gives it first
-//   | the plugin reads "member", which this app's context does not give: add the plugin or middleware that gives it first
+// error, one message per missing key: Property 'tenant' is missing in type 'BaseContext & Empty' but required in type '{ tenant: Tenant; }'
+//   | Property 'member' is missing in type 'BaseContext & Empty' but required in type '{ member: { type: 'user'; id: string } | null; }'
 ```
 
 What the guard requires is the union of what the three annotations read.
 An annotation may be `BaseContext & { member: Member }` or `{ member: Member }`
 alone. An app whose `member` has a type that does not fit is refused too —
-`the plugin reads "member", which this app's context gives with another type`
+`Types of property 'member' are incompatible`
 — while a narrower one passes. A key `BaseContext` already has, annotated
 with a type it does not give — `({ pathParams }: { pathParams: string })` —
 is refused the same way.

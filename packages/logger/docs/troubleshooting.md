@@ -63,21 +63,29 @@ const app = alxia()
 error TS18048: 'log' is possibly 'undefined'.
 ```
 
-**When:** an `onError` hook (deprecated) declared after the middleware calls
-`log.error(…)`.
+**When:** a deprecated `onError` hook, or a callback that runs outside the
+chain, calls `log.error(…)`.
 
 **Why:** an `onError` hook also runs for an error thrown before
 `logger()` had run, when there is no `log` yet. A middleware after
-`logger()` has no such doubt: read `log` there, and catch with a
-`try`/`catch` around `next()`.
+`logger()` has no such doubt: `log` is typed there.
 
-**Fix:** call it optionally:
+**Fix:** catch in a middleware declared after `logger()`, with a `try`/`catch`
+around `next()`, and read `log` there:
 
 ```ts
-app.use(logger()).onError((error, { log }) => {
-	log?.error('request failed', { error: String(error) });
-	return undefined;
-});
+import { alxia, defineMiddleware } from '@alxia/core';
+
+app.use(logger()).use(
+	defineMiddleware(async ({ log }, next) => {
+		try {
+			return await next();
+		} catch (error) {
+			log.error('request failed', { error: String(error) });
+			throw error; // rethrow what is not yours
+		}
+	}),
+);
 ```
 
 ## Responses

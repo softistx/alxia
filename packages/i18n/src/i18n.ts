@@ -2,6 +2,9 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import {
 	type BaseContext,
 	defineMiddleware,
+	type Empty,
+	type Middleware,
+	type MiddlewareMark,
 	type Next,
 	type NextFunction,
 	type RequiresOf,
@@ -108,6 +111,28 @@ export interface I18nContext<Key extends string> {
 }
 
 /**
+ * What `createI18n()` makes: a middleware that gives `language`, one of
+ * `Language`, and `t`, typed by `Key`, and requires `Requires` of the app —
+ * what `resolve` reads — with a `t` and a `language` of its own for the
+ * request running.
+ */
+export type I18nMiddleware<
+	Language extends string,
+	Key extends string,
+	Requires extends object = Empty,
+> = Middleware<
+	Requires,
+	Promise<Next<LanguageContext<Language> & I18nContext<Key>>>
+> &
+	MiddlewareMark & {
+		/** Translates into the current request's language, or the fallback outside one. */
+		t: Translate<Key>;
+		/** The current request's language, or the fallback outside one. */
+		language: () => Language;
+		supported: Language[];
+	};
+
+/**
  * Translations, as a middleware, on [`@nxgt/i18n`](https://www.npmjs.com/package/@nxgt/i18n):
  * `@alxia/language` reads the request's language among the catalogues', and
  * the routes declared after it read `language` and `t`, bound to it. Keys
@@ -131,7 +156,13 @@ export function createI18n<
 	const C extends Catalogues,
 	const Fallback extends keyof C & string,
 	Ctx extends object = BaseContext,
->(options: I18nOptions<C, Fallback, Ctx>) {
+>(
+	options: I18nOptions<C, Fallback, Ctx>,
+): I18nMiddleware<
+	keyof C & string,
+	KeyOf<C[Fallback]>,
+	RequiresOf<Ctx, 'resolve'>
+> {
 	type Language = keyof C & string;
 	type Key = KeyOf<C[Fallback]>;
 	const { resources, fallback, resolve, ...detect } = options;
@@ -188,9 +219,7 @@ export function createI18n<
 	);
 
 	return Object.assign(middleware, {
-		/** Translates into the current request's language, or the fallback outside one. */
 		t: ((key, context) => translate(spoken())(key, context)) as Translate<Key>,
-		/** The current request's language, or the fallback outside one. */
 		language: spoken,
 		supported,
 	});

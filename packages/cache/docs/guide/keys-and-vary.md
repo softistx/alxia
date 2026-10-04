@@ -160,14 +160,14 @@ const auth = alxia().derive(({ request }) => ({
 }));
 
 const app = alxia()
-	.use(auth)
+	.plugin(auth)
 	.use(perTenant)
 	.get('/dashboard', ({ user, reply }) => reply(200, { tenant: user.tenantId }));
 
 await perTenant.invalidateTag('tenant:acme'); // one tenant's pages, every path
 
 alxia().use(perTenant);
-// error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
+// error: Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: { tenantId: string; }; }'
 ```
 
 The rule of [a key of your own](#a-key-of-your-own) still holds: the route
@@ -176,10 +176,25 @@ personal.
 
 ## Personal responses
 
-The default key does not read who is asking. A route that answers by the
-`Cookie` or `Authorization` header, behind a cache with the default key,
-and says nothing about it, serves the first visitor's answer to every later
-one. curl, sending no cookie, never shows it; a signed-in browser does.
+The default key does not read who is asking, so the cache reads the
+request instead (RFC 9111 §3.5): the answer to a request carrying
+`Authorization` or `Cookie` is never kept, unless
+
+- the response says it may be shared: `Cache-Control: public`, `s-maxage`
+  or `must-revalidate`;
+- `vary` names that header, so each value is a key of its own;
+- for `Cookie` only, the cache has a `key` of yours: your word that the key
+  tells users apart, as `perTenant` above does.
+
+```ts
+cache({ ttl: 60 });                                          // /me with a bearer token: runs for every caller, no X-Cache
+cache({ ttl: 60, vary: ['authorization'] });                 // kept per token
+cache<{ user: { id: string } }>({ ttl: 60, key: ({ user, url }) => `${user.id}:${url.pathname}` }); // a cookie session, kept per user
+```
+
+A `key` of yours that does not read the user, behind a cookie session,
+serves the first visitor's answer to every later one; so does a credential
+the cache does not know — an `X-Api-Key` header, a token in the query.
 
 A personal response that says so is never kept, nor shared with a
 concurrent request: it answers `Cache-Control: private` (or `no-store`),

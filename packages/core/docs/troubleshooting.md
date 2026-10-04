@@ -14,6 +14,7 @@ a trap that prints nothing is headed by its symptom.
 - [`Type 'string' is not assignable to type 'number'` on a `reply`](#type-string-is-not-assignable-to-type-number-on-a-reply)
 - [`Type 'Response' is not assignable to type 'MaybePromise<AnyReply>'`](#type-response-is-not-assignable-to-type-maybepromiseanyreply)
 - [`Property 'user' does not exist on type 'Context<…>'`](#property-user-does-not-exist-on-type-context)
+- [`… is not assignable to type 'MadeByDefineMiddleware'`](#-is-not-assignable-to-type-madebydefinemiddleware)
 - [`the plugin reads "…", which this app's context does not give: add the plugin or middleware that gives it first`](#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
 - [`the plugin reads "…", which this app's context gives with another type`](#the-plugin-reads--which-this-apps-context-gives-with-another-type)
 - [`this app's context does not give what the plugin reads`](#this-apps-context-does-not-give-what-the-plugin-reads)
@@ -107,6 +108,9 @@ a trap that prints nothing is headed by its symptom.
 
 - [`set.cookies.get()` returns null in a hook](#setcookiesget-returns-null-in-a-hook)
 - [A `use(path)` guard did not run on a request under its path](#a-usepath-guard-did-not-run-on-a-request-under-its-path)
+- [A `use(path)` guard runs on a path spelled otherwise, or in another case](#a-usepath-guard-runs-on-a-path-spelled-otherwise-or-in-another-case)
+- [`use(): the middleware runs on the routes declared after it …`](#use-the-middleware-runs-on-the-routes-declared-after-it-and-on-requests-no-route-matches-not-on-the--declared-before-it), a warning
+- [`plugin(): plugin(middleware) is deprecated: …`](#plugin-pluginmiddleware-is-deprecated-the-middleware-runs-on-every-route-the--declared-before-it-included-but-what-it-adds-to-the-context-is-typed-only-for-the-routes-after-it), a warning
 - [A path that does not exist answers `401`, not `404`](#a-path-that-does-not-exist-answers-401-not-404)
 - [A middleware's `try`/`catch` never sees the error](#a-middlewares-trycatch-never-sees-the-error)
 - [`Type 'string | undefined' is not assignable to type 'string'` on `ctx.route`](#type-string--undefined-is-not-assignable-to-type-string-on-ctxroute)
@@ -337,7 +341,37 @@ const app = alxia()
 ```
 
 The same applies to `plugin(app)`. Its `derive`s and middlewares reach the routes
-declared after `plugin`, not before it.
+declared after `plugin`, not before it — and none at all when the plugin
+has a prefix of its own, `alxia({ prefix: '/todos' })` or
+`defineRoutes('/todos')`: such a plugin keeps them under its prefix, as a
+group does, so a route after it reads none of what they add:
+
+```ts
+const todos = alxia({ prefix: '/todos' }).use(auth).get('/', listTodos);
+alxia().plugin(todos).get('/me', ({ user, reply }) => reply(200, user));
+// Property 'user' does not exist on type …: auth runs under /todos alone
+```
+
+Give `auth` to the app before both, or mount a plugin without a prefix
+(`alxia().use(auth)`), whose middlewares are the app's.
+
+### `… is not assignable to type 'MadeByDefineMiddleware'`
+
+```text
+error TS2769: No overload matches this call.
+  Overload 1 of 11, '(m1: ScopeMiddleware<Empty, [], Promise<Response>>): …', gave the following error.
+    Argument of type '(ctx: …, next: …) => Promise<Response>' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], Promise<Response>>'.
+      Type '(ctx: …, next: …) => Promise<Response>' is not assignable to type 'MadeByDefineMiddleware'.
+```
+
+**When:** `app.use` is given a plain `(ctx, next) => …` function.
+
+**Why:** `use` tells a middleware by the mark `defineMiddleware` sets on
+it; a plain function has none, and at runtime would be taken for a
+plugin, deprecated, and throw.
+
+**Fix:** wrap it: `app.use(defineMiddleware((ctx, next) => …))`. A
+route's own middlewares take a plain function.
 
 ### `the plugin reads "…", which this app's context does not give: add the plugin or middleware that gives it first`
 
@@ -357,14 +391,21 @@ alxia().plugin(tenant);
 ```text
 error TS2769: No overload matches this call.
   …
-  Overload 2 of 2, '(plugin: Alxia<…> & { readonly '~requires'?: { user: { tenantId: string; }; }; } & { ...; }): Alxia<…>', gave the following error.
+  Overload 2 of 3, '(plugin: Alxia<…> & { readonly '~requires'?: { user: { tenantId: string; }; }; } & { ...; }): Alxia<…>', gave the following error.
     …
         Types of property ''~requires'' are incompatible.
           Type '{ user: { tenantId: string; }; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: add the plugin or middleware that gives it first"'.
+  Overload 3 of 3, '(middleware: ScopeMiddleware<Empty, [], MiddlewareReturn>): …', gave the following error.
+    …
 ```
 
-The first overload's error, about a function plugin, is noise: the
-message on the last line is the one that matters.
+The first overload's error, about a function plugin, and the third, about
+the deprecated middleware form, are noise: the message of the second is
+the one that matters.
+
+A middleware given to `use` whose context the app does not give reads
+otherwise: `use`'s middleware form is reported first, ending
+`Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: … }'`.
 
 Returned from a `group` or a plugin function, `group(() => todos)` or
 `plugin(() => todos)`, the error is a `TS2322: Type 'AppWithRoute<…>' is not
@@ -2343,6 +2384,60 @@ that names them:
 app.use('/admin', guard).get('/admin/stats', handler); // guarded
 ```
 
+A plugin's own `use(path, …)` moves under the prefix the plugin is mounted
+at, as its routes do: `alxia({ prefix: '/api' }).plugin(alxia().use('/admin', guard).get(…))`
+guards `/api/admin`.
+
+### A `use(path)` guard runs on a path spelled otherwise, or in another case
+
+**When:** `use('/admin', guard)` answers `/ADMIN/x`, `/Admin`, `/%61dmin/x`,
+`//admin/x` or `/public%2F..%2Fadmin` too, or guards a route declared as
+`/Admin/stats`.
+
+**Why:** on purpose. The path is read as what serves it reads it: the
+router decodes a parameter and a wildcard, the static files decode the
+path and, on macOS, find `PRIVATE` as `private`, and React Router's
+matching ignores case. A guard compared with the raw path would let each
+of these spellings through to what it guards. So each segment is decoded,
+an encoded `/` splits it, empty segments are collapsed, the comparison
+ignores case, and a segment that does not decode, or a `.` or `..` once
+decoded, runs the guard.
+
+**Fix:** none needed for a guard. A middleware that must tell `/Admin` from
+`/admin` reads `ctx.url.pathname` itself, given to `use` without a path or
+to the route.
+
+### `use(): the middleware runs on the routes declared after it and on requests no route matches, not on the … declared before it`
+
+```text
+use(): the middleware runs on the routes declared after it and on requests no route matches, not on the route (GET /health) declared before it. Give it to use() before them if they need it.
+```
+
+**When:** in development (`NODE_ENV` neither `production` nor `test`),
+once per app, when `use` is given a middleware after routes it would have
+run on — those under its path, given one.
+
+**Why:** a route runs the middlewares declared before it: this one does
+not run on those routes. That is often meant — a `/health` before an
+`auth` — and often not: an observer given last logs nothing but 404s.
+
+**Fix:** give it before the routes that need it. When the order is meant,
+the warning is the only effect; it never prints in production or under
+`bun test`.
+
+### `plugin(): plugin(middleware) is deprecated: the middleware runs on every route, the … declared before it included, but what it adds to the context is typed only for the routes after it`
+
+**When:** in development, once per app, `app.plugin(middleware)` is given
+after routes.
+
+**Why:** `plugin(middleware)` keeps its meaning of 0.3, where
+`secureHeaders()`, `cors()`, `logger()`, `compress()` and `telemetry()`
+were global hooks: it runs app-wide, before the app's chain, on the routes
+declared before it too. A guard given that way guards those routes too;
+what a middleware adds is typed only after it.
+
+**Fix:** give it to `use`, before the routes: `app.use(secureHeaders()).get(…)`.
+
 ### A path that does not exist answers `401`, not `404`
 
 **When:** `GET /nowhere` with no credentials answers
@@ -2360,8 +2455,8 @@ route matches included, before the router's 404 or 405. A guard on the
 app — `bearer`, a required `session`, `rateLimit` — answers an anonymous
 request to a missing path before the router does.
 
-**Fix:** if only some routes should be guarded, guard them in a group, which
-runs on its own routes alone:
+**Fix:** if only some routes should be guarded, guard them in a group,
+which runs on its own routes and on the requests under its prefix alone:
 
 ```ts
 const app = alxia()
@@ -2369,8 +2464,11 @@ const app = alxia()
 	.group('/api', (api) =>
 		api.use(bearer({ jwt })).get('/users', ({ reply }) => reply(200, [])),
 	);
-// GET /nowhere → 404; GET /api/users without a token → 401
+// GET /nowhere → 404; GET /api/users and GET /api/nowhere without a token → 401
 ```
+
+A plugin with a prefix of its own, `defineRoutes('/todos').use(guard)`,
+is such a group once mounted: its guard answers under `/todos` alone.
 
 `use('/api', guard)` also scopes a guard to a path, but only a middleware
 that adds nothing to the context: `bearer` and `session` add, so they take a
@@ -2380,32 +2478,31 @@ group ([`Invalid middleware: …`](#-is-not-assignable-to-type-invalid-middlewar
 
 **When:** a middleware catches what `next()` throws, and the error never
 reaches it: the response is the 500 or the `onError` reply, and the `catch`
-does not run:
+does not run.
 
-```ts
-const app = alxia()
-	.use(errors)    // try { return await next() } catch { … }
-	.use(logger())  // an observer, after it
-	.get('/boom', () => { throw new Error('boom'); });
-```
+**Why:** something between them answered the error without throwing it
+on: an `onError` hook, deprecated, that returned a reply; a middleware of
+your own that caught it and returned a response; or a middleware that
+read `next()` with `.catch()` or `.then(…, …)` rather than through
+`settle`. An observer — `logger()`, `telemetry()`, `secureHeaders()`,
+`cors()`, `compress()`, `createI18n()`, `contextStorage()` — does not: it
+settles `next()`, reads the response the error would be answered with, and
+the error goes on to the middlewares around it.
 
-**Why:** `logger()`, `telemetry()`, `secureHeaders()` and `cors()` settle
-`next()`: they answer an error with the route's `onError` hooks, its
-`HttpError` or a 500 so that they can see and decorate the response. The
-error is already an answer when it reaches a middleware outside them.
-
-**Fix:** give the observers first and the middleware that answers errors
-after them, so it is inside:
+**Fix:** let the error through what stands between them — `settle(ctx,
+next())` in a middleware that only watches — or give the catching
+middleware after it. Wherever it stands, give it after the observers, so
+that they see its reply:
 
 ```ts
 const app = alxia()
 	.use(logger())  // observers, first
-	.use(errors)    // sees the error before the observer settles it
+	.use(errors)    // catches the error; logger sees its reply
 	.get('/boom', () => { throw new Error('boom'); });
 ```
 
-The same holds for `janusErrors()`: it answers what is thrown **behind**
-it, so `app.use(janusErrors(), session(accounts))`.
+`janusErrors()` answers what is thrown **behind** it:
+`app.use(janusErrors(), session(accounts))`.
 
 ### `Type 'string | undefined' is not assignable to type 'string'` on `ctx.route`
 
@@ -2446,7 +2543,8 @@ const app = alxia()
 **Why:** a route runs the middlewares declared **before** it. A `use` after
 a route is not part of that route's chain; it runs for a request no route
 matches, where every top-level `use` runs, wherever declared. A group's
-`use` stays with the group's routes.
+`use` stays with the group's routes and the requests under its prefix. In
+development, the `use` warns once, naming the routes before it.
 
 **Fix:** declare the middleware before the routes it should cover, first
 when it is an observer:

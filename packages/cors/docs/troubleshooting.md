@@ -31,7 +31,7 @@ Firefox and Safari say the same thing in other words.
 **Types**
 
 - [`Type 'false' is not assignable to type 'CorsOrigin | undefined'`](#type-false-is-not-assignable-to-type-corsorigin--undefined)
-- [`Type 'Alxia<…>' has no properties in common with type 'CorsOptions'`](#type-alxia-has-no-properties-in-common-with-type-corsoptions)
+- [`Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'`](#type-corsmiddleware-is-not-assignable-to-type-middlewarereturn)
 - [`Type 'string' is not assignable to type 'readonly string[]'`](#type-string-is-not-assignable-to-type-readonly-string)
 
 ## In the browser
@@ -272,11 +272,11 @@ app.derive(({ request, reply }) =>
 **When:** an `origin` function throws — typically `new URL(origin)` on the
 `Origin: null` that a sandboxed iframe or a page opened from a file sends.
 
-**Why:** the function runs in the middleware. On a preflight, the throw
-becomes a `500 {"error":"internal"}` without CORS headers. On any other
-request, the route has already answered: the error is logged and the
-response is sent as the route made it, without CORS headers, so the browser
-refuses it as it would a refused origin.
+**Why:** the function runs in the middleware, which logs the throw and
+treats the origin as refused: a throw costs the CORS headers, never the
+response. A preflight is answered with its `204`, without them; any other
+request gets the route's answer, without them. The browser refuses both as
+it would a refused origin.
 
 **Fix:** make the function total — it returns `false` for what it cannot
 read:
@@ -310,13 +310,16 @@ const base = alxia();
 const app = origins ? base.use(cors({ origin: origins })) : base;
 ```
 
-### `Type 'Alxia<…>' has no properties in common with type 'CorsOptions'`
+### `Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'`
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '(options?: CorsOptions | undefined) => NoInfer<Middleware<Empty, Promise<Response>> & MiddlewareMark>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
-      Types of parameters 'options' and 'app' are incompatible.
+  Overload 1 of 11, '(m1: ScopeMiddleware<Empty, [], MiddlewareReturn>): AppAfterUse<Empty, "", never, [MiddlewareReturn]>', gave the following error.
+    Argument of type '(options?: CorsOptions) => CorsMiddleware' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
+      Type '(options?: CorsOptions) => CorsMiddleware' is not assignable to type '(ctx: BaseContext & Empty, next: NextFunction) => MiddlewareReturn'.
+        Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'.
+  Overload 2 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
+    …
         Type 'Alxia<Empty, "", never>' has no properties in common with type 'CorsOptions'.
 ```
 

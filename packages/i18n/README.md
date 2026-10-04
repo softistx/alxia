@@ -102,6 +102,7 @@ A response in the request's language varies by what decided it: give
 | `I18nOptions` | its options: `resources`, `fallback`, and every `@alxia/language` option but `supported`; `resolve` may be annotated to read the app's context |
 | `KeyOf<Catalogue>` | a catalogue's dotted keys, nine levels deep; a deeper section gives `section.${string}` |
 | `Translate<Key>`, `Catalogues`, `I18nContext<Key>` | its types |
+| `I18nMiddleware<Language, Key, Requires>` | what `createI18n()` returns: a middleware adding `language` and `t`, with `t()`, `language()` and `supported` |
 
 ## Documentation
 

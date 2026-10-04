@@ -56,8 +56,11 @@ export type SecureHeaders = Middleware<Empty, Promise<Response>> &
  * `app.use`, whose routes after it read `nonce`, and which sets the header
  * with the same one.
  */
-export type NoncePlugin = Middleware<Empty, Promise<Next<NonceContext>>> &
+export type NonceMiddleware = Middleware<Empty, Promise<Next<NonceContext>>> &
 	MiddlewareMark;
+
+/** @deprecated Renamed `NonceMiddleware`: it is a middleware. */
+export type NoncePlugin = NonceMiddleware;
 
 const DEFAULTS = {
 	'content-security-policy':
@@ -111,13 +114,13 @@ const OPTION: Record<keyof typeof DEFAULTS, keyof SecureHeadersOptions> = {
  */
 export function secureHeaders(
 	options: SecureHeadersOptions & { readonly nonce: true },
-): NoncePlugin;
+): NonceMiddleware;
 export function secureHeaders(
 	options?: SecureHeadersOptions & { readonly nonce?: false },
 ): SecureHeaders;
 export function secureHeaders(
 	options: SecureHeadersOptions & NonceOption = {},
-): SecureHeaders | NoncePlugin {
+): SecureHeaders | NonceMiddleware {
 	const headers = fixedHeaders(options);
 	const hide = options.hidePoweredBy ?? true;
 	const policy = headers.get('content-security-policy');

@@ -21,7 +21,7 @@ Every response of that app now carries the headers below, and none carries
 ## The signature
 
 ```ts
-function secureHeaders(options: SecureHeadersOptions & { readonly nonce: true }): NoncePlugin;
+function secureHeaders(options: SecureHeadersOptions & { readonly nonce: true }): NonceMiddleware;
 function secureHeaders(options?: SecureHeadersOptions & { readonly nonce?: false }): SecureHeaders;
 
 interface SecureHeadersOptions {
@@ -59,7 +59,7 @@ The options are read once, when `secureHeaders(…)` is called; the header
 values are fixed from then on, but for the nonce, which is new on every
 request.
 
-With `nonce: true` it returns a `NoncePlugin` instead: a middleware, still
+With `nonce: true` it returns a `NonceMiddleware` instead: a middleware, still
 given to `app.use` called, that covers the same responses as above, and which
 adds `nonce` to the context of the routes declared after it
 ([below](#a-nonce-per-request)).

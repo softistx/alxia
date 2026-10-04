@@ -216,7 +216,7 @@ export const app = alxia()
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 
 alxia().use(i18n);
-// error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
+// error: Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'
 ```
 
 This is `@alxia/language`'s check, carried through; its

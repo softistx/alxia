@@ -99,6 +99,8 @@ A response is kept only when all of these hold:
 | its status is in `statuses` (`[200]` by default) | a 500 or a 404 is not served again unless you say so |
 | its `Cache-Control` has neither `private` nor `no-store` | the route said it belongs to one client |
 | it sets no cookie | a `Set-Cookie` belongs to one client |
+| the request carries no `Authorization`, or the response says `public`, `s-maxage` or `must-revalidate`, or `vary` names `authorization` | an authorized request's answer belongs to its sender (RFC 9111 §3.5) |
+| the request carries no `Cookie`, or the response says `public`, `s-maxage` or `must-revalidate`, or `vary` names `cookie`, or the cache has a `key` of yours | the same, for a cookie session; a `key` of your own is your word that it tells users apart |
 | it is not `text/event-stream` | a stream has no end to keep |
 | the route did not call `cache.skip()` | the route said so |
 

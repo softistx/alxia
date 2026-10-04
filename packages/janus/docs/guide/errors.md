@@ -59,8 +59,11 @@ It answers only a `JanusError`. Anything else goes on, thrown, to the
 middlewares before it, then the app's `onError`, or its 500.
 
 An observer that settles `next()` (`logger()`, `secureHeaders()`,
-`telemetry()`) answers an error itself, so it must be outside: give the
-observers to `use` first, then `janusErrors()`.
+`telemetry()`, `createI18n()`) reads the response the error would be
+answered with, and lets the error go on: `janusErrors()` answers it
+wherever it stands, `use(janusErrors()).use(i18n).use(session())`
+included. Give the observers to `use` first, then `janusErrors()`, so
+that they see its reply rather than the 500.
 
 ```ts
 import { logger } from '@alxia/logger';

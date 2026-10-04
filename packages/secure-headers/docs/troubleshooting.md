@@ -51,7 +51,7 @@ or a header in the wrong place.
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin', gave the following error.
+  Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NonceMiddleware', gave the following error.
     Type 'true' is not assignable to type 'Setting'.
   Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): SecureHeaders', gave the following error.
     Type 'true' is not assignable to type 'Setting | undefined'.
@@ -86,7 +86,7 @@ app.use(
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin', gave the following error.
+  Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NonceMiddleware', gave the following error.
     Argument of type '{ xFrameOptions: undefined; }' is not assignable to parameter of type 'SecureHeadersOptions & { readonly nonce: true; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
       Type '{ xFrameOptions: undefined; }' is not assignable to type 'SecureHeadersOptions' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
   Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): SecureHeaders', gave the following error.
@@ -111,7 +111,7 @@ another library's name for one.
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin', gave the following error.
+  Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NonceMiddleware', gave the following error.
     Object literal may only specify known properties, and 'xPoweredBy' does not exist in type 'SecureHeadersOptions & { readonly nonce: true; }'.
   Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): SecureHeaders', gave the following error.
     Object literal may only specify known properties, and 'xPoweredBy' does not exist in type 'SecureHeadersOptions & { readonly nonce?: false; }'.
@@ -148,7 +148,7 @@ const app = alxia()
 ```text
 error TS2769: No overload matches this call.
   Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '{ (options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin; (options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): Plugin; }' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
+    Argument of type '{ (options: SecureHeadersOptions & { readonly nonce: true; }): NonceMiddleware; (options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): Plugin; }' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
       Types of parameters 'options' and 'app' are incompatible.
         Type 'Alxia<Empty, "", never>' is not assignable to type 'SecureHeadersOptions & { readonly nonce: true; }'.
           Property 'nonce' is missing in type 'Alxia<Empty, "", never>' but required in type '{ readonly nonce: true; }'.
@@ -194,7 +194,7 @@ the environment, say.
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin', gave the following error.
+  Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NonceMiddleware', gave the following error.
     Type 'boolean' is not assignable to type 'true'.
   Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): SecureHeaders', gave the following error.
     Type 'boolean' is not assignable to type 'false'.

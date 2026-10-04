@@ -207,8 +207,8 @@ for the routes after it, with its own types: `user` is never `null` under
 `group`, `.use(session(accounts, { required: true }))` on the app itself works
 the same for every route declared after it, and for a request no route
 matches: an anonymous request to a missing path is then a 401, not a 404.
-Scope a required session with a `group`, or a path (`use('/api', …)`), to
-guard only some routes.
+Scope a required session with a `group` to guard only some routes: a path-scoped
+`use('/api', session(…))` does not compile, since `session` adds `user`.
 
 A route behind both middlewares still looks the session up once: the
 middlewares of one instance share a request's lookup, for the same `type`. A different

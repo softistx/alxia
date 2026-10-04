@@ -18,7 +18,7 @@ behaviour that prints nothing, or an error from `tsc`. A
 - [`Property 'user' does not exist on type 'BaseContext'.`](#property-user-does-not-exist-on-type-basecontext)
 - [`Property 'params' does not exist on type 'BaseContext & …'.`](#property-params-does-not-exist-on-type-basecontext--)
 - [`Object literal may only specify known properties, and 'db' does not exist in type 'BaseContext'.`](#object-literal-may-only-specify-known-properties-and-db-does-not-exist-in-type-basecontext)
-- [`the plugin reads "…", which this app's context does not give: add the plugin or middleware that gives it first`](#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
+- [`Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: string; }'`](#property-user-is-missing-in-type-basecontext--empty-but-required-in-type--user-string-)
 
 ## Runtime
 
@@ -29,7 +29,9 @@ behaviour that prints nothing, or an error from `tsc`. A
 ```text
 error TS2769: No overload matches this call.
   …
-    Argument of type '<App = Alxia<Empty, "", never>>(...uncalled: readonly never[]) => ContextStoragePlugin<App>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
+    Argument of type '<App = Alxia<Empty, "", never>>(...uncalled: readonly never[]) => ContextStorageMiddleware<App>' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
+      …
+          Type 'BaseContext & Empty' is not assignable to type 'never'.
 ```
 
 **When:** at startup, on `.use(contextStorage)`: the factory given to
@@ -281,13 +283,13 @@ const ctx = {
 runWithContext(ctx as unknown as Ctx, () => listOrders());
 ```
 
-### `the plugin reads "…", which this app's context does not give: add the plugin or middleware that gives it first`
+### `Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: string; }'`
 
 ```text
 error TS2769: No overload matches this call.
   …
-        Types of property ''~requires'' are incompatible.
-          Type '{ user: string; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: add the plugin or middleware that gives it first"'.
+          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ user: string; }>'.
+            Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: string; }'.
 ```
 
 **When:** an app uses the middleware typed by another app, `contextStorage<typeof

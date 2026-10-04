@@ -1,6 +1,14 @@
 import { Duplex } from 'node:stream';
 import { constants, createBrotliCompress } from 'node:zlib';
-import { defineMiddleware, settle, vary, withHeaders } from '@alxia/core';
+import {
+	defineMiddleware,
+	type Empty,
+	type Middleware,
+	type MiddlewareMark,
+	settle,
+	vary,
+	withHeaders,
+} from '@alxia/core';
 import { BROTLI_QUALITY, flushing } from './flushing';
 
 export type Encoding = 'zstd' | 'br' | 'gzip' | 'deflate';
@@ -13,6 +21,10 @@ export interface CompressOptions {
 	/** Whether a `content-type` is worth compressing. Text, JSON, JavaScript, XML and SVG by default. */
 	readonly compressible?: (type: string) => boolean;
 }
+
+/** What `compress()` makes: a middleware that adds nothing to the context. */
+export type CompressMiddleware = Middleware<Empty, Promise<Response>> &
+	MiddlewareMark;
 
 const COMPRESSIBLE =
 	/^(text\/(?!event-stream)|application\/(.+\+)?(json|javascript|xml)|image\/svg\+xml)/i;
@@ -31,7 +43,7 @@ const COMPRESSIBLE =
  * app.use(compress());
  * ```
  */
-export function compress(options: CompressOptions = {}) {
+export function compress(options: CompressOptions = {}): CompressMiddleware {
 	const settings: Settings = {
 		encodings: options.encodings ?? ['zstd', 'br', 'gzip', 'deflate'],
 		threshold: options.threshold ?? 1024,

@@ -55,3 +55,7 @@ export function speakingOnly() {
 			return ctx.reply(200, ctx.language);
 		});
 }
+
+export function detector() {
+	return language({ supported: ['en', 'fr'], fallback: 'en' });
+}

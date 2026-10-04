@@ -70,7 +70,10 @@ export const app = base.plugin(todos); // GET /todos, POST /todos
 - **`defineRoutes(prefix?)`** is `alxia({ prefix })` at runtime: a plugin,
   mounted by `plugin` as any app is. Its type starts from the registered
   context, and it carries that context as its requirement through every
-  route, `derive`, `use` and `plugin` declared on it.
+  route, `derive`, `use` and `plugin` declared on it. Given a prefix, it
+  is a group once mounted: its `use()` middlewares run on its routes and on
+  the requests no route matches under its prefix, never on `/public` after
+  it — `defineRoutes('/todos').use(requireAdmin)` guards `/todos` alone.
 - **`plugin` checks the requirement.** Mounting the routes on an app that
   does not give the context — `alxia().plugin(todos)`, `alxia().plugin(() =>
   todos)`, `alxia().group(() => todos)`, or `base` before the `derive`
@@ -133,9 +136,12 @@ The types follow: `/admin/stats` may answer the 403, `/public` may not.
 
 `use(...middlewares)` in a group runs them on the group's routes declared
 after it, and types what they add there alone: it is how a subtree's
-context is added to. They stay with the group's routes: a request no route
-matches, even one under the group's prefix, does not run them, where a
-`use` on the app does. `use(path, ...middlewares)` guards a subtree without
+context is added to. They stay under the group's prefix: they run on its
+routes and on a request no route matches under it, before its 404 or 405 —
+a guarded group answers `DELETE /admin/secret` with its 401, not a 405
+whose `Allow` tells what is there — and never on a route declared after
+the group, nor on a request outside it. A group without a prefix of its
+own adds none to unmatched requests. `use(path, ...middlewares)` guards a subtree without
 a group, on the app it also answers a missing path under it, and its
 middlewares may add nothing
 ([Middleware: `use(path, …)`](middleware.md#use-with-a-path)).
@@ -177,7 +183,7 @@ packages' included: `app.use(logger())`.
 | | Adds | Type of the app after it |
 | --- | --- | --- |
 | middlewares, `use(auth)`, `use(path, guard)` | middlewares for every request: the routes declared after it, and a request no route matches | grows by what they add; `use(path, …)` adds nothing |
-| an app, `plugin(otherApp)` | routes, middlewares, context, typed replies, its [`bodyLimit()`](routes.md#body-size-bodylimit) | grows: its routes and context are added |
+| an app, `plugin(otherApp)` | routes, middlewares, context, typed replies, its [`bodyLimit()`](routes.md#body-size-bodylimit) | grows by its context; unchanged for an app with a prefix of its own, whose middlewares stay under it |
 | a function, `plugin(fn)` | lifecycle hooks, parsers | unchanged |
 
 `plugin` throws where it is called when a function given to it returns
@@ -199,11 +205,20 @@ plugin(plugin: Alxia<PluginCtx, PluginPrefix, PluginShortcuts>): Alxia<…>
 - Its **routes** are mounted under this app's prefix and behind this app's
   middlewares declared so far: `alxia({ prefix: '/api' }).plugin(posts)`
   serves `posts`' `/posts/:id` at `/api/posts/:id`.
-- Its **`derive`s and middlewares** then apply to the routes declared on
-  this app after `plugin`: an `auth` plugin can be a `plugin(auth)` and nothing
-  else. They become this app's, so they also run on a request no route
-  matches — an `auth` that answers 401 answers it to a missing path too. A
-  path it gave `use` is joined to this app's prefix, as its routes are.
+- Its **`derive`s and middlewares**, when it has no prefix of its own,
+  then apply to the routes declared on this app after `plugin`: an `auth`
+  plugin can be a `plugin(auth)` and nothing else. They become this app's,
+  so they also run on a request no route matches — an `auth` that answers
+  401 answers it to a missing path too.
+- **With a prefix of its own**, `alxia({ prefix: '/todos' })` or
+  `defineRoutes('/todos')`, it is a group once mounted: its `derive`s and
+  middlewares run on its routes and on the requests no route matches under
+  its prefix, never on the routes declared after `plugin`, and add nothing
+  to their context.
+- A path it gave `use` moves under this app's prefix, as its routes do:
+  `alxia({ prefix: '/api' }).plugin(alxia().use('/admin', guard).get('/:section/panel', …))`
+  guards `/api/admin/panel`, and so does the same plugin in
+  `group('/api', (api) => api.plugin(…))`.
 - Its deprecated **`onError` hooks** are tried before this app's, for its
   own routes.
 - Its deprecated **`onRefusal` hook** answers its own routes' refused

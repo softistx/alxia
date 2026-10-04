@@ -1,6 +1,10 @@
 import {
 	type BaseContext,
 	defineMiddleware,
+	type Empty,
+	type Middleware,
+	type MiddlewareMark,
+	type Next,
 	type RequiresOf,
 } from '@alxia/core';
 import { decide, respond, type Settings } from './decide';
@@ -51,6 +55,15 @@ export interface LanguageOptions<
 }
 
 /**
+ * What `language()` makes: a middleware that gives `language`, one of `L`,
+ * and requires `Requires` of the app — what `resolve` reads.
+ */
+export type LanguageMiddleware<
+	L extends string,
+	Requires extends object = Empty,
+> = Middleware<Requires, Promise<Next<LanguageContext<L>>>> & MiddlewareMark;
+
+/**
  * The request's language, as a middleware: the routes declared after it read
  * `language`, typed as one of `supported` — never a string a client made
  * up. It is read from the query, a cookie, a path segment and
@@ -65,7 +78,9 @@ export interface LanguageOptions<
 export function language<
 	const L extends string,
 	Ctx extends object = BaseContext,
->(options: LanguageOptions<L, Ctx>) {
+>(
+	options: LanguageOptions<L, Ctx>,
+): LanguageMiddleware<L, RequiresOf<Ctx, 'resolve'>> {
 	const settings: Settings<L> = {
 		supported: options.supported,
 		fallback: options.fallback,

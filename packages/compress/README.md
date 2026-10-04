@@ -65,6 +65,7 @@ app.use(compress()).get('/page', async ({ reply }) =>
 | `compress(options?)` | the middleware, for `app.use` |
 | `negotiate(accept, offered)` | the encoding an `Accept-Encoding` gets |
 | `CompressOptions`, `Encoding` | its types |
+| `CompressMiddleware` | what `compress()` returns: a middleware that adds nothing to the context |
 
 ## Traps
 

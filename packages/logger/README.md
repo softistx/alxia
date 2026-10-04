@@ -59,6 +59,7 @@ every request is logged, a 404 or a 405 that matched no route included.
 | --- | --- |
 | `logger(options?)` | the middleware: give it to `app.use`; it adds `requestId` and `log` to the context |
 | `LogEntry`, `RequestLog`, `LoggerOptions`, `LoggerContext` | its types; `LoggerContext` is what it adds (`requestId`, `log`) |
+| `LoggerMiddleware` | what `logger()` returns: a middleware adding `LoggerContext` |
 
 ## Documentation
 

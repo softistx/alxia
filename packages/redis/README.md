@@ -100,7 +100,8 @@ is not guarded: there is no route to scope its key by. What is kept is what the
 route answers, an error's answer included. Keys are scoped by the
 route and by `scope(ctx)` — the client's address by default, a user id
 when there is one — so two clients choosing the same key never see each
-other's response. A replay never repeats `Set-Cookie`. Every response
+other's response. A request with no scope — no address, no `scope` — runs
+unguarded, nothing stored or replayed, and the middleware warns once. A replay never repeats `Set-Cookie`. Every response
 below 500 is kept, a 4xx included: declare a rate limit or an auth check
 **before** `idempotency`, or its refusal is replayed (`app.use` in
 declaration order: the guard first, then `idempotency`).
@@ -114,7 +115,7 @@ declaration order: the guard first, then `idempotency`).
 | `methods` | `POST`, `PATCH` | |
 | `header` | `Idempotency-Key` | |
 | `required` | `false` | |
-| `scope` | the client's address | `(ctx) => string` |
+| `scope` | the client's address | `(ctx) => string \| undefined`; `undefined` runs the request unguarded |
 
 ## Caches and locks in the context
 
@@ -157,6 +158,7 @@ The package's specs run against `$REDIS_URL`, or a `redis-server` on
 | `idempotency(client, options)` | the middleware, given to `app.use` |
 | `redis(client, { caches? })`, `RedisContextOptions` | a plugin, given to `app.plugin`: `redis`, `caches`, `lock` in the context |
 | `IdempotencyOptions`, `IdempotencyErrorBody`, `RedisContext`, `BoundCaches` | its types |
+| `IdempotencyMiddleware` | what `idempotency()` returns: a middleware that adds nothing, and may answer a 400, a 409 or a 422 |
 | `AnyCache` | any cache definition: the constraint of a function generic over the caches it hands to `redis()` |
 
 ## Documentation

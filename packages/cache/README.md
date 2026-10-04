@@ -54,6 +54,18 @@ app.listen({ port: 3000 });
   `Cache-Control: private` or `no-store`, sets a cookie, or streams events —
   and one whose route called `cache.skip()`. Nor is it handed to a
   concurrent request: each runs the route itself.
+- **Someone's own, unless it says otherwise** (RFC 9111 §3.5): the answer
+  to a request carrying `Authorization` is kept only when it says
+  `Cache-Control: public`, `s-maxage` or `must-revalidate`, or `vary` names
+  `authorization`; one carrying `Cookie` also when the cache has a `key` of
+  your own, which is your word that it tells users apart. A bearer API's
+  `/me` behind `cache()` runs for every caller:
+
+  ```ts
+  cache({ ttl: 60 });                                  // Authorization or Cookie: not kept
+  cache({ ttl: 60, vary: ['authorization'] });         // kept per token
+  cache({ ttl: 60, key: ({ url, user }) => `${user.id}:${url.pathname}` }); // kept per user, for a cookie session
+  ```
 - **A store that cannot answer** costs the cache, not the response: the
   route runs, nothing is kept, and the outage's first error is logged.
 - Only `GET` and `HEAD` — not `QUERY`, whose key would have to include its
@@ -92,7 +104,7 @@ const perTenant = cache<{ user: { tenantId: string } }>({
 
 const auth = alxia().derive(() => ({ user: { tenantId: 'acme' } })); // your session middleware
 
-alxia().use(auth).use(perTenant);   // compiles: auth derives user
+alxia().plugin(auth).use(perTenant);   // compiles: auth derives user
 alxia().use(perTenant);             // a compile error: no `user` in this app's context
 ```
 

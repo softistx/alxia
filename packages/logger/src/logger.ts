@@ -1,4 +1,12 @@
-import { defineMiddleware, settle, withHeaders } from '@alxia/core';
+import {
+	defineMiddleware,
+	type Empty,
+	type Middleware,
+	type MiddlewareMark,
+	type Next,
+	settle,
+	withHeaders,
+} from '@alxia/core';
 import { type Outcome, settled, watched } from './body';
 import { ID, safeGenerate, safeSkip, safeWrite } from './guards';
 
@@ -57,6 +65,10 @@ export interface LoggerOptions {
 	readonly skip?: (request: Request, url: URL) => boolean;
 }
 
+/** What `logger()` makes: a middleware that gives `requestId` and `log`. */
+export type LoggerMiddleware = Middleware<Empty, Promise<Next<LoggerContext>>> &
+	MiddlewareMark;
+
 /**
  * Logging, as a middleware: every request gets an id — kept from the
  * incoming header, or made — sent back on its response, and one entry once
@@ -69,7 +81,7 @@ export interface LoggerOptions {
  * app.use(logger()).get('/', ({ log, reply }) => { log.info('home'); return reply(200); });
  * ```
  */
-export function logger(options: LoggerOptions = {}) {
+export function logger(options: LoggerOptions = {}): LoggerMiddleware {
 	const header = options.header ?? 'x-request-id';
 	const write = safeWrite(
 		options.write ?? ((entry: LogEntry) => console.log(JSON.stringify(entry))),

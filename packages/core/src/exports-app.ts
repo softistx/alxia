@@ -42,6 +42,7 @@ export type {
 } from './app/operation-types';
 export type {
 	Mounted,
+	MountedIn,
 	PluginMethod,
 	RequiredIn,
 } from './app/plugin-method';

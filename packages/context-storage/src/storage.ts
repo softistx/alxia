@@ -97,7 +97,7 @@ export function runWithContext<T>(ctx: BaseContext, work: () => T): T {
  * requires that context of the app that uses it, beyond the base context:
  * `app.use` on an app that does not give it is a compile error.
  */
-export type ContextStoragePlugin<App> = Middleware<
+export type ContextStorageMiddleware<App> = Middleware<
 	RequiresOf<StoredContext<App>, 'context'>,
 	Promise<Response>
 > &
@@ -107,6 +107,9 @@ export type ContextStoragePlugin<App> = Middleware<
 		/** `tryGetContext()`, typed by `App`. */
 		tryContext(): StoredContext<App> | undefined;
 	};
+
+/** @deprecated Renamed `ContextStorageMiddleware`: it is a middleware. */
+export type ContextStoragePlugin<App> = ContextStorageMiddleware<App>;
 
 /** What `context()` reads: the context of `App`, or the base context when `App` is no app. */
 export type StoredContext<App> = [ContextOf<App>] extends [never]
@@ -142,7 +145,7 @@ export type StoredContext<App> = [ContextOf<App>] extends [never]
  */
 export function contextStorage<App = RegisteredBase>(
 	...uncalled: readonly never[]
-): ContextStoragePlugin<App> {
+): ContextStorageMiddleware<App> {
 	if (uncalled.length > 0) {
 		// `use(contextStorage)`: the app is handed to the factory, and what
 		// follows would be declared on a plugin nobody serves.
@@ -166,5 +169,5 @@ export function contextStorage<App = RegisteredBase>(
 	return Object.assign(middleware, {
 		context: () => getContext(),
 		tryContext: () => tryGetContext(),
-	}) as unknown as ContextStoragePlugin<App>;
+	}) as unknown as ContextStorageMiddleware<App>;
 }

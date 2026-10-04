@@ -34,12 +34,12 @@ const app = alxia()
 | `wrap(hook)` | **deprecated** | the routes declared after it | a `use` middleware that awaits `next()` |
 | `onError(hook)` | **deprecated** | the routes declared after it | a `use` middleware with `try`/`catch` around `next()` |
 | `onRefusal(…)` | **deprecated** | the routes declared after it | the same `try`/`catch`, reading `refusalOf(error)` |
-| `app.plugin(middleware)` | **deprecated** | as `use` | `app.use(middleware)` |
+| `app.plugin(middleware)` | **deprecated** | every route, declared before it or after it, and unmatched requests, as 0.3's global hooks | `app.use(middleware)`, given before the routes |
 | a route's list of hooks, `defineHook`, `defineWrap` | **deprecated** | one route | the route's own middlewares ([below](#hooks-on-one-route)) |
 | `derive(fn)` | stays | the routes declared after it, and unmatched requests | — |
-| `decorate(values)` | stays | the routes declared after it | — |
+| `decorate(values)` | stays | the routes declared after it, and unmatched requests | — |
 | `onStart`, `onStop`, `parser`, `bodyLimit` | stay | the whole app | — |
-| `app.plugin(otherApp)`, `definePlugin` | stay: plugins are apps | its routes, then the routes declared after it | — |
+| `app.plugin(otherApp)`, `definePlugin` | stay: plugins are apps | its routes, then the routes declared after it and unmatched requests; one with a prefix of its own, its routes and the unmatched requests under that prefix | — |
 
 `derive` stays as a shorthand, not a hook to migrate: it adds to the
 context and cannot wrap what follows, so it needs no `next`. It is
@@ -48,7 +48,16 @@ context and cannot wrap what follows, so it needs no `next`. It is
 ## From a hook to a middleware
 
 Each deprecated hook, and the middleware that does the same. A middleware
-given to `use` runs in the order declared, so give these first.
+given to `use` runs in the order declared, on the routes declared after
+it: give the replacements of the global hooks first, before any route.
+The replacement of `onError` goes after the observers, so that they see
+its reply too; it catches the error wherever it stands, since `settle`
+does not swallow it ([Middleware: ordering](middleware.md#ordering)).
+
+A hook of 0.3 that throws — `onRequest`, `around` — is answered by a bare
+500 outside the chain: no middleware, observers included, adds its
+headers to it. Its replacement, a middleware, throws inside the chain,
+where the observers settle it.
 
 ### Instead of `onRequest`
 

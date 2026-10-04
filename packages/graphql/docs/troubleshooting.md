@@ -373,12 +373,19 @@ const app = alxia()
 **Why:** a guard given to the app's `use` runs on every request, a request
 no route matches included, and answers before the 404.
 
-**Fix:** scope the guard to what it guards, with a path or a `group`:
+**Fix:** scope the guard to what it guards, with a `group`. A path-scoped
+`use('/graphql', bearer(…))` does not compile: a middleware given a path may
+add nothing to the context, and `bearer` adds `user`.
 
 ```ts
 const app = alxia()
-	.use('/graphql', bearer({ jwt }))
-	.plugin((app) => graphql(app, { schema }));
+	.get('/health', ({ reply }) => reply(200, 'ok'))
+	.group('/api', (api) =>
+		api
+			.use(bearer({ jwt }))
+			.plugin((app) => graphql(app, { schema })), // /api/graphql: a 401 without a token
+	);
+// GET /nope → 404, GET /api/nope → 404
 ```
 
 ### A WebSocket client cannot connect: `Expected 101 status code`

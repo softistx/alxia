@@ -20,8 +20,8 @@ symptom, under [Traps](#traps).
 - [`Type '() => { locked: boolean; }' is not assignable to type 'undefined'`](#type----locked-boolean--is-not-assignable-to-type-undefined)
 - [`Property 'doctorId' is missing in type '{ … }' but required in type '{ readonly doctorId: string | null; }'`](#property-doctorid-is-missing-in-type----but-required-in-type--readonly-doctorid-string--null-)
 - [`Property 'tenant' does not exist on type 'BaseContext'`](#property-tenant-does-not-exist-on-type-basecontext)
-- [`the plugin reads "tenant", which this app's context does not give: add the plugin or middleware that gives it first`](#the-plugin-reads-tenant-which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
-- [`the plugin reads "tenant", which this app's context gives with another type`](#the-plugin-reads-tenant-which-this-apps-context-gives-with-another-type)
+- [`Property 'tenant' is missing in type 'BaseContext & Empty' but required in type '{ tenant: Tenant; }'`](#property-tenant-is-missing-in-type-basecontext--empty-but-required-in-type--tenant-tenant-)
+- [`Types of property 'tenant' are incompatible`](#types-of-property-tenant-are-incompatible)
 - [`the plugin's load reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-load-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
 **Runtime**
@@ -268,44 +268,48 @@ const byTenant = permission(access, 'view', 'record', ({ tenant, pathParams }: B
 	tenant.records.get(pathParams['id'] ?? '') ?? null,
 );
 
-app.use(tenancy).use(byTenant); // tenancy derives tenant
+app.plugin(tenancy).use(byTenant); // tenancy derives tenant
 ```
 
 See [Reading the app's context](guide/permissions.md#reading-the-apps-context).
 
-### `the plugin reads "tenant", which this app's context does not give: add the plugin or middleware that gives it first`
+### `Property 'tenant' is missing in type 'BaseContext & Empty' but required in type '{ tenant: Tenant; }'`
 
 ```text
 error TS2769: No overload matches this call.
   …
-        Types of property ''~requires'' are incompatible.
-          Type '{ tenant: Tenant; }' is not assignable to type '"the plugin reads \"tenant\", which this app's context does not give: add the plugin or middleware that gives it first"'.
+          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ tenant: Tenant; }>'.
+            Property 'tenant' is missing in type 'BaseContext & Empty' but required in type '{ tenant: Tenant; }'.
 ```
 
 **When:** a callback of the guard is annotated to read `tenant`, and the
 guard is used on an app — or in a group — whose context has no `tenant` at
 that point: `alxia().use(byTenant)`, or `use(byTenant)` before
-`use(tenancy)`.
+`plugin(tenancy)`.
 
 **Why:** an annotated `load`, `subject` or `ctx` makes the guard require
 what it reads, and `app.use` checks the app's context against it, so the
 callback never runs without it.
 
-**Fix:** add the middleware that adds `tenant` first:
+**Fix:** mount what adds `tenant` first:
 
 ```ts
-app.use(tenancy).use(byTenant);
+app.plugin(tenancy).use(byTenant);
 ```
 
 More on this message in
 [`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first).
 
-### `the plugin reads "tenant", which this app's context gives with another type`
+### `Types of property 'tenant' are incompatible`
 
 ```text
 error TS2769: No overload matches this call.
   …
-          Type '{ tenant: Tenant; }' is not assignable to type '"the plugin reads \"tenant\", which this app's context gives with another type"'.
+          Type 'BaseContext & Empty & { tenant: Tenant | null; }' is not assignable to type 'MiddlewareContext<{ tenant: Tenant; }>'.
+            Type 'BaseContext & Empty & { tenant: Tenant | null; }' is not assignable to type '{ tenant: Tenant; }'.
+              Types of property 'tenant' are incompatible.
+                Type 'Tenant | null' is not assignable to type 'Tenant'.
+                  Type 'null' is not assignable to type 'Tenant'.
 ```
 
 **When:** the app gives a `tenant`, but of a type that does not fit the one
@@ -332,8 +336,8 @@ More on this message in
 ```text
 error TS2769: No overload matches this call.
   …
-        Types of property ''~requires'' are incompatible.
-          Type '{ readonly '~any': "the plugin's load reads its context as any: annotate what it reads, or leave it unannotated"; }' is not assignable to type '"the plugin's load reads its context as any: annotate what it reads, or leave it unannotated"'.
+          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ readonly '~any': "the plugin's load reads its context as any: annotate what it reads, or leave it unannotated"; }>'.
+            Property ''~any'' is missing in type 'BaseContext & Empty' but required in type '{ readonly '~any': "the plugin's load reads its context as any: annotate what it reads, or leave it unannotated"; }'.
 ```
 
 The same message names `subject` or `ctx` when that callback is the one at
@@ -348,7 +352,7 @@ reads, so the guard would require nothing, and an app without a `tenant`
 would be accepted, and throw on every guarded request. The guard is
 refused instead.
 
-**Fix:** annotate what the callback reads, and give `use` the middleware that adds it
+**Fix:** annotate what the callback reads, and mount what adds it
 first:
 
 ```ts
@@ -356,7 +360,7 @@ const byTenant = permission(access, 'view', 'record', ({ tenant, pathParams }: B
 	tenant.records.get(pathParams['id'] ?? '') ?? null,
 );
 
-app.use(tenancy).use(byTenant);
+app.plugin(tenancy).use(byTenant);
 ```
 
 Or leave it unannotated when it reads only the request, as `byParam`'s
@@ -519,16 +523,19 @@ alxia()
 	);
 ```
 
-### The error is never seen by a `try`/`catch` around `logger()` or `secureHeaders()`
+### `logger()` or `secureHeaders()` never shows the reply of `janusErrors()`
 
-**When:** a middleware that catches errors is declared before `logger()`,
-`secureHeaders()` or another observer, and never runs its `catch`.
+**When:** `janusErrors()` is declared before `logger()`, `secureHeaders()`
+or another observer: the janus error is answered as janus says, but the
+log line shows a 500, or the response lacks the security headers.
 
-**Why:** an observer settles `next()`: it answers the error with the route's
-`onError`, `HttpError` or 500 before an outer `try` could see it. `janusErrors()`
-declared before the observers is such a middleware.
+**Why:** an observer settles `next()`: it reads the response the error
+would be answered with — a 500 — and the error goes on to `janusErrors()`
+outside it, which answers it. The observer inside saw the 500, not the
+reply.
 
-**Fix:** observers first, then the error-handling middleware:
+**Fix:** observers first, then the error-handling middleware, so that
+they see its reply:
 
 ```ts
 alxia().use(logger()).use(janusErrors(), session(accounts));

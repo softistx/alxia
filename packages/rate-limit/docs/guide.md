@@ -134,12 +134,12 @@ const perUser = rateLimit<{ user: { id: string; role: string } }>({
 });
 
 const app = alxia()
-	.use(auth) // derives user, or answers 401
+	.plugin(auth) // derives user, or answers 401
 	.use(perUser)
 	.get('/search', handler);
 
 alxia().use(perUser);
-// error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
+// error: Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: { id: string; role: string; }; }'
 ```
 
 ### `headers`

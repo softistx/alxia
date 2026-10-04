@@ -96,13 +96,14 @@ value is refused at startup. `nonce` is off by default.
 
 | export | |
 | --- | --- |
-| `secureHeaders(options?)` | the middleware, for `app.use`: a `SecureHeaders`, or with `nonce: true` a `NoncePlugin` |
+| `secureHeaders(options?)` | the middleware, for `app.use`: a `SecureHeaders`, or with `nonce: true` a `NonceMiddleware` |
 | `SecureHeadersOptions` | its options: the headers and `hidePoweredBy`; `nonce` is added by each overload |
 | `Setting` | a header option's type: its value, or `false` to leave it out |
 | `NONCE` | where the nonce goes in `contentSecurityPolicy`, each time it is named |
 | `NonceContext` | what `nonce: true` adds to the context: `nonce`, a string |
 | `SecureHeaders` | what `secureHeaders()` returns: a middleware that adds nothing to the context |
-| `NoncePlugin` | what `secureHeaders({ nonce: true })` returns: a middleware adding `NonceContext` |
+| `NonceMiddleware` | what `secureHeaders({ nonce: true })` returns: a middleware adding `NonceContext` |
+| `NoncePlugin` | deprecated: the former name of `NonceMiddleware` |
 
 ## Traps
 

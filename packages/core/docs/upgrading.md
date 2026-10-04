@@ -345,9 +345,13 @@ function (a hook of `defineHook`), `use()` given nothing, and a plain
 no app: wrap it in `defineMiddleware`
 ([Troubleshooting](troubleshooting.md#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-made-with-definemiddleware-and-given-to-use)).
 
-New exports: the types `MiddlewareMark`, `UseForms`, `PluginForms`
-(deprecated), `ScopeMiddleware`, `PathMiddleware`, `AddingNothing`,
-`ScopePathAt` and `AppAfterUse`.
+New exports: the types `MiddlewareMark`, `MadeByDefineMiddleware` (the
+mark as `use` requires it, named so that a plain `(ctx, next)` function
+reads `is not assignable to type 'MadeByDefineMiddleware'`), `UseForms`,
+`PluginForms` (deprecated), `ScopeMiddleware`, `PathMiddleware`,
+`AddingNothing`, `ScopePathAt` and `AppAfterUse`. A middleware the
+route's context does not give is reported on `use`'s middleware form
+first, before its deprecated plugin forms.
 
 ### Middlewares replace the request hooks
 
@@ -568,8 +572,12 @@ same.
 
 #### The package plugins are middlewares
 
-The factories keep their names. Give them to `use`: `app.use(logger())`.
-`app.plugin(logger())` still works, deprecated.
+The factories keep their names. Give them to `use`, before the routes:
+`app.use(logger())`. `app.plugin(logger())` still works, deprecated, as
+it did in 0.3: app-wide, on the routes declared before it too, before the
+app's chain — so an app that kept `.get(…).plugin(secureHeaders())` keeps
+its headers on every route. `use(logger())` given after routes does not
+run on them, and warns once in development, naming them.
 
 ```ts
 // before
@@ -600,10 +608,13 @@ alxia().use(logger()).use(secureHeaders()).use(cors()).use(bearer({ jwt }));
 - **Observers first**: `logger`, `telemetry`, `secureHeaders`, `cors` and
   `compress` go first, so they wrap everything, a 404 included.
 - **An error-handling middleware after the observers**: a try/catch
-  middleware, or `janusErrors()`. An observer settles `next()`, which
-  answers an error with the route's `onError`, `HttpError` or 500 before an
-  outer try/catch could see it.
-- **`janusErrors()` before `session()`.**
+  middleware, or `janusErrors()`. An observer — these, `createI18n()`,
+  `contextStorage()` — settles `next()`: it reads the response the error
+  would be answered with, and the error goes on, so a try/catch catches it
+  wherever it stands. Given after the observers, they see its reply too.
+- **`janusErrors()` before `session()`**: it answers what is thrown behind
+  it. `use(janusErrors()).use(i18n).use(session())` answers a janus error
+  as janus says.
 - **A guard on the app answers a missing path too**: `bearer`, a required
   `session` and `rateLimit` run on unmatched requests, so an anonymous request
   to a path that does not exist gets the 401, not the 404. Scope the guard
@@ -633,7 +644,23 @@ run as in 0.3. What a changed behaviour can break:
 - a `wrap` moved to a middleware: its `next()` no longer resolves a refusal
   to the 400, it rejects with the `ValidationError`;
 - an `onError` or `onRefusal` hook that you moved to a middleware: it
-  must be declared **after** the observers to see the error.
+  sees the error wherever it stands, but the observers before it see its
+  reply only when it is declared after them;
+- a group's middlewares now run on an unmatched request under the group's
+  prefix: a guarded group answers `/admin/missing` with its 401, and
+  `DELETE /admin/secret` too, rather than a 405 whose `Allow` lists its
+  methods;
+- a plugin with a prefix of its own — `alxia({ prefix: '/todos' })`,
+  `defineRoutes('/todos')` — keeps its middlewares, `derive` and
+  `decorate` under that prefix once mounted, as a group does: they no
+  longer run on the routes declared after `plugin`, nor on the requests
+  outside it, and add nothing to their context, in the types too. A plugin
+  without a prefix keeps giving them to the app;
+- a `use(path, …)` matches the request's path decoded, with empty segments
+  collapsed and without case: `use('/admin', guard)` now guards
+  `/%61dmin`, `//admin` and `/ADMIN` too, as the router, the static files
+  and React Router serve them. A route whose path differs from a guarded
+  one by its case alone is guarded too.
 
 ### Plugins are apps: `app.plugin`
 
@@ -672,7 +699,8 @@ guarded a request. Now it throws
 forms of `use` and the middleware form of `plugin` are removed
 ([Roadmap](roadmap.md)).
 
-New export: the type `PluginMethod`. `Mounted` and `RequiredIn` now come
+New exports: the types `PluginMethod` and `MountedIn`, the context of the
+routes after a plugin. `Mounted` and `RequiredIn` now come
 from `plugin-method.ts`, under the same names; `PluginForms`, the plugin
 forms of `use`, is deprecated.
 

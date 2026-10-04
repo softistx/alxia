@@ -4,7 +4,8 @@ Each entry is headed by the text you see: a TypeScript error, an exception
 at startup, an exception in the log beside a `500 {"error":"internal"}`, or
 the response a client got. `@alxia/redis` throws nothing of its own: the
 messages are `@nxgt/redis`'s, `@nxgt/redis-guard`'s and Bun's, and it lets
-each through. What prints nothing is under [Traps](#traps), by symptom.
+each through. It prints one warning of its own, under
+[Runtime: a warning in the log](#runtime-a-warning-in-the-log). What prints nothing is under [Traps](#traps), by symptom.
 
 **Install and types**
 
@@ -31,6 +32,10 @@ each through. What prints nothing is under [Traps](#traps), by symptom.
 - [``RedisError: The lock "…" is held by somebody else, and this call did not wait for it — pass `wait` to keep trying``](#rediserror-the-lock--is-held-by-somebody-else-and-this-call-did-not-wait-for-it--pass-wait-to-keep-trying)
 - [`RedisError: The lock "…" expired before its work finished: it ran longer than the …ms ttl, so it may have run beside another holder`](#rediserror-the-lock--expired-before-its-work-finished-it-ran-longer-than-the-ms-ttl-so-it-may-have-run-beside-another-holder)
 - [`TypeError: undefined is not an object (evaluating 'cache.…')`](#typeerror-undefined-is-not-an-object-evaluating-cache)
+
+**Runtime: a warning in the log**
+
+- [`idempotency "…": no client scope could be derived (ctx.ip is undefined and no scope option returned one), so these requests run unguarded, nothing stored or replayed. Pass a scope option, (ctx) => a user id, or an ip option to alxia().`](#idempotency--no-client-scope-could-be-derived-ctxip-is-undefined-and-no-scope-option-returned-one-so-these-requests-run-unguarded-nothing-stored-or-replayed-pass-a-scope-option-ctx--a-user-id-or-an-ip-option-to-alxia)
 
 **Calling the store yourself**
 
@@ -398,6 +403,38 @@ with `undefined`.
 **Fix:** read `caches.<name>`, drop the `derive`, and typecheck:
 `tsc --noEmit` finds every place.
 
+## Runtime: a warning in the log
+
+### `idempotency "…": no client scope could be derived (ctx.ip is undefined and no scope option returned one), so these requests run unguarded, nothing stored or replayed. Pass a scope option, (ctx) => a user id, or an ip option to alxia().`
+
+**When:** a guarded request carries an `Idempotency-Key`, and the
+middleware has no client to scope it by: `ctx.ip` is `undefined` — under
+`app.request()` in a test, or a server that cannot see the address — and
+there is no `scope` option, or it returned `undefined`. Printed once per
+`idempotency(…)`, with its `name`.
+
+**Why:** keys are scoped by the client, so two clients choosing the same key
+never see each other's response. With no client, the request runs
+unguarded: the route runs, nothing is stored, a repeat runs it again.
+Sharing one key space between every client would replay one client's
+response to another.
+
+**Fix:** scope by the user where there is one, or give `alxia()` an `ip`
+option that reads the address:
+
+```ts
+idempotency(connection.client, {
+	name: 'payments',
+	scope: ({ request }) => request.headers.get('x-user-id') ?? undefined,
+});
+```
+
+or, behind a proxy you trust:
+
+```ts
+alxia({ ip: (request) => request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() });
+```
+
 ## Calling the store yourself
 
 A policy `rateLimit` would refuse at startup still reaches the store when
@@ -597,8 +634,9 @@ behind a proxy, or with keys that are not random — `1`, `order-1`.
 
 **Why:** keys are scoped by `scope(ctx)`, the client's address by default.
 Behind a proxy that the app's `ip` option does not see through, every
-client has the proxy's address; with no address at all, the scope is
-`anyone`. Clients then share one key space.
+client has the proxy's address, and they then share one key space. (With
+no address at all and no `scope`, the request runs unguarded instead, with
+a [warning](#runtime-a-warning-in-the-log).)
 
 **Fix:** scope by the user where there is one, and have clients send
 random keys:

@@ -390,8 +390,9 @@ app.use(telemetry({ service: 'checkout', exporters, traced: (ctx) => ctx.url.pat
 
 ### A span has an exception, and its status is `ok`
 
-**When:** a route throws, and an error-handling middleware or an `onError`
-hook answers with a `4xx`.
+**When:** a route throws, and the route boundary (an `HttpError`, a
+deprecated `onError` hook) answers with a `4xx`. An error-handling middleware
+that catches it leaves the span `ok` with no exception at all.
 
 **Why:** the error is recorded as the span's exception, but only a
 `5xx`, or a streamed body that fails midway, makes a span an error: a
