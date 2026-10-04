@@ -33,6 +33,9 @@ a loader, a message React Router or the browser prints, or an error from
 - [`alxia-react-router: build/server/index.js does not exist. Run react-router build before vite preview.`](#alxia-react-router-buildserverindexjs-does-not-exist-run-react-router-build-before-vite-preview)
 - [`alxia-react-router: build/server/index.js is not alxia's server: its default export has no fetch. …`](#alxia-react-router-buildserverindexjs-is-not-alxias-server-its-default-export-has-no-fetch-)
 - [`warn: incorrect peer dependency "typescript@5.9.3"`](#warn-incorrect-peer-dependency-typescript593)
+- [`Module "…" has been externalized for browser compatibility, imported by "…"`](#module--has-been-externalized-for-browser-compatibility-imported-by-)
+- [`error: lockfile had changes, but lockfile is frozen`](#error-lockfile-had-changes-but-lockfile-is-frozen)
+- [`EACCES: permission denied, open '/app/…'`](#eacces-permission-denied-open-app)
 
 **Types**
 
@@ -53,6 +56,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [The logger times a streamed page at a few milliseconds](#the-logger-times-a-streamed-page-at-a-few-milliseconds)
 - [`ctx.server` is `undefined` under `react-router dev`](#ctxserver-is-undefined-under-react-router-dev)
 - [A `publish` under `react-router dev` misses the sockets opened before an edit](#a-publish-under-react-router-dev-misses-the-sockets-opened-before-an-edit)
+- [The build has a package's Node variant, not its `bun` one](#the-build-has-a-packages-node-variant-not-its-bun-one)
 
 ## Thrown or printed
 
@@ -590,6 +594,87 @@ alxia is tested on:
 bun add -d typescript@^6
 ```
 
+### `Module "…" has been externalized for browser compatibility, imported by "…"`
+
+`react-router build` warns it while building the client, for
+`Module "bun:sqlite"` or `Module "bun"`. What follows depends on Vite:
+
+- **Vite 7** then fails the build:
+
+  ```
+  RollupError: app/routes/todos.tsx (1:9): "Database" is not exported by "__vite-browser-external", imported by "app/routes/todos.tsx".
+  ```
+
+- **Vite 8** builds, and the page fails in the browser instead, with
+  `TypeError: … is not a constructor` or `… is not a function` once it
+  hydrates.
+
+**Why:** a route module imports one of Bun's modules, `bun` or `bun:*`,
+and uses it outside its `loader` and `action`, in the component or at the
+module's top level. React Router keeps that code in the client build, for
+the browser, which has no such module. The server build leaves Bun's
+modules external ([Built for Bun](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#built-for-bun));
+the client build cannot.
+
+**Fix:** use them only in the server's code: in `loader` and `action`, or
+in a `.server.ts` module, which React Router keeps out of the client.
+
+```ts
+// app/db.server.ts
+import { Database } from 'bun:sqlite';
+
+export const db = new Database(':memory:');
+```
+
+```tsx
+// app/routes/todos.tsx
+import { db } from '../db.server';
+
+export function loader() {
+	return { version: db.query('select sqlite_version() as v').get() };
+}
+```
+
+### `error: lockfile had changes, but lockfile is frozen`
+
+`docker build` stops at `RUN bun install --frozen-lockfile`, followed by
+`note: try re-running without --frozen-lockfile and commit the updated lockfile`.
+
+**Why:** the `Dockerfile` installs exactly what `bun.lock` records, and
+`package.json` asks for something it does not: a dependency added or
+changed by hand, without `bun install`.
+
+**Fix:** update the lockfile, commit it, and build again:
+
+```sh
+bun install
+git add bun.lock
+docker build -t my-app .
+```
+
+### `EACCES: permission denied, open '/app/…'`
+
+The container starts, then a write fails: `Bun.write` gives this, and
+`new Database('/app/data.sqlite')` gives
+`SQLiteError: unable to open database file`.
+
+**Why:** the `Dockerfile` runs the server as the image's `bun` user, not
+root, and `/app` is root's: the user reads the build and cannot write
+beside it.
+
+**Fix:** write to a directory the user owns, a volume for what must
+outlive the container:
+
+```dockerfile
+# Dockerfile, before USER bun
+RUN mkdir /data && chown bun:bun /data
+VOLUME /data
+```
+
+```ts
+const db = new Database('/data/app.sqlite');
+```
+
 ## Types
 
 ### `Property '…' does not exist on type 'BaseContext & …'`
@@ -894,3 +979,19 @@ server, with the handlers it opened with, and a topic is one server's.
 
 **Fix:** reconnect the clients after an edit: reload their pages. From
 the build there is one server, and every socket shares its topics.
+
+### The build has a package's Node variant, not its `bun` one
+
+A dependency ships a `bun` variant, and the server runs its other one.
+
+**Why:** the plugin adds the `bun` condition, and the package's `exports`
+decides which of its conditions comes first: read top to bottom, the
+first one the build has wins. A package listing `node` or `import` before
+`bun` gives that variant, under the plugin as under Bun itself.
+
+**Fix:** none in the config can reorder a package's `exports`; that is
+the package's to change. To check which file a condition picks, ask Bun:
+
+```sh
+bun -e "console.log(import.meta.resolve('some-package'))"
+```

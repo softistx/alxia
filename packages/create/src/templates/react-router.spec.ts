@@ -21,6 +21,7 @@ describe('the stored template', () => {
 	for (const [file, storedAs] of [
 		['vite.config.ts', 'vite.config.ts'],
 		['bunfig.toml', '_bunfig.toml'],
+		['Dockerfile', 'Dockerfile'],
 	] as const) {
 		test(`its ${file} is examples/react-router's`, async () => {
 			expect(await stored(storedAs).text()).toBe(
@@ -39,6 +40,24 @@ describe('the stored template', () => {
 				/(^|\/)(\.gitignore|bunfig\.toml|\.npmrc|bun\.lockb?|package-lock\.json)$|(^|\/)(\.react-router|node_modules|build)\//,
 			);
 		}
+	});
+
+	test('names no other package manager: its README, Dockerfile and scripts run Bun', async () => {
+		const other = /(^|[\s`(])(npm|npx|pnpm|yarn) /m;
+		const { scripts } = await stored('package.json').json();
+		for (const [where, text] of [
+			['README.md', await stored('README.md').text()],
+			['Dockerfile', await stored('Dockerfile').text()],
+			['package.json scripts', Object.values(scripts).join('\n')],
+		] as const) {
+			expect({ where, match: text.match(other)?.[0] ?? null }).toEqual({
+				where,
+				match: null,
+			});
+		}
+		expect(await stored('Dockerfile').text()).toContain(
+			'RUN bun install --frozen-lockfile',
+		);
 	});
 
 	test('its React Router is the major @alxia/react-router accepts', async () => {

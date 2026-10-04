@@ -21,7 +21,7 @@ A modern, production-ready template for building full-stack React applications u
 Install the dependencies:
 
 ```bash
-npm install
+bun install
 ```
 
 ### Development
@@ -29,7 +29,7 @@ npm install
 Start the development server with HMR:
 
 ```bash
-npm run dev
+bun dev
 ```
 
 Your application will be available at `http://localhost:5173`.
@@ -39,7 +39,7 @@ Your application will be available at `http://localhost:5173`.
 Create a production build:
 
 ```bash
-npm run build
+bun run build
 ```
 
 ## Deployment
@@ -66,13 +66,13 @@ The containerized application can be deployed to any platform that supports Dock
 
 ### DIY Deployment
 
-If you're familiar with deploying Node applications, the built-in app server is production-ready.
+The build is production-ready: `bun run start` runs `build/server/index.js` on Bun.
 
-Make sure to deploy the output of `npm run build`
+Make sure to deploy the output of `bun run build`
 
 ```
 ├── package.json
-├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
+├── bun.lock
 ├── build/
 │   ├── client/    # Static assets
 │   └── server/    # Server-side code

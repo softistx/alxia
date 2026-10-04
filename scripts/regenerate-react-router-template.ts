@@ -6,7 +6,10 @@
  * the dependencies (as `workspace:^`, which `@alxia/create` replaces with
  * the versions it was published beside), `start` running the build on Bun,
  * `alxia()` after `reactRouter()` in `vite.config.ts`; plus
- * `examples/react-router`'s `bunfig.toml`. Two files are stored under
+ * `examples/react-router`'s `bunfig.toml`, and its `Dockerfile` in place of
+ * the scaffold's, which builds and runs the app on Node; and its
+ * `README.md`'s commands on Bun, the package manager alxia uses (`toBun`).
+ * Two files are stored under
  * another name, since `bun publish` leaves them out of a tarball:
  * `.gitignore` as `gitignore`, `bunfig.toml` as `_bunfig.toml`.
  * `@alxia/create` renames them back when it copies the template.
@@ -35,6 +38,35 @@ export function addPlugin(config: string): string {
 		throw new Error('vite.config.ts: expected reactRouter() exactly once');
 	}
 	return IMPORT + config.replace(/\breactRouter\(\)/, 'reactRouter(), alxia()');
+}
+
+/** The commands of another package manager, which `toBun` leaves none of. */
+export const OTHER_MANAGER = /(^|[\s`(])(npm|npx|pnpm|yarn) /m;
+
+/**
+ * The scaffold's `README.md` with Bun's commands for npm's: `bun install`,
+ * `bun dev`, `bun run <script>`, `bunx`, `bun.lock`, and `start` running
+ * the build on Bun. Refuses a README that still names another package
+ * manager's command after that, so a new one is read before it ships.
+ */
+export function toBun(readme: string): string {
+	const bun = readme
+		.replace(/^.*package-lock\.json.*$/m, '├── bun.lock')
+		.replace(
+			"If you're familiar with deploying Node applications, the built-in app server is production-ready.",
+			'The build is production-ready: `bun run start` runs `build/server/index.js` on Bun.',
+		)
+		.replaceAll('npm install', 'bun install')
+		.replaceAll('npm run dev', 'bun dev')
+		.replace(/\bnpm run /g, 'bun run ')
+		.replace(/\bnpx /g, 'bunx ');
+	const left = bun.match(OTHER_MANAGER);
+	if (left !== null) {
+		throw new Error(
+			`README.md: a ${left[2]} command toBun does not know is left: ${bun.split('\n').find((line) => OTHER_MANAGER.test(line))}`,
+		);
+	}
+	return bun;
 }
 
 type Manifest = {
@@ -88,8 +120,16 @@ async function main(): Promise<void> {
 		);
 		await Bun.write(join(out, 'vite.config.ts'), config);
 		await Bun.write(
+			join(out, 'README.md'),
+			toBun(await Bun.file(join(out, 'README.md')).text()),
+		);
+		await Bun.write(
 			join(out, '_bunfig.toml'),
 			Bun.file(join(ROOT, 'examples/react-router/bunfig.toml')),
+		);
+		await Bun.write(
+			join(out, 'Dockerfile'),
+			Bun.file(join(ROOT, 'examples/react-router/Dockerfile')),
 		);
 		await rename(join(out, '.gitignore'), join(out, 'gitignore'));
 		await rm(TEMPLATE, { recursive: true, force: true });

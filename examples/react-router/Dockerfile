@@ -1,22 +1,29 @@
-FROM node:24-alpine AS development-dependencies-env
-COPY . /app
-WORKDIR /app
-RUN npm ci
+# Bun builds the app and runs it: build/server/index.js is alxia's server,
+# which runs on Bun. Pinned to Bun 1, the major alxia supports.
 
-FROM node:24-alpine AS production-dependencies-env
-COPY ./package.json package-lock.json /app/
+# The production dependencies alone, for the final image.
+FROM oven/bun:1 AS production-dependencies
 WORKDIR /app
-RUN npm ci --omit=dev
+COPY package.json bun.lock* bunfig.toml* ./
+RUN bun install --frozen-lockfile --production
 
-FROM node:24-alpine AS build-env
-COPY . /app/
-COPY --from=development-dependencies-env /app/node_modules /app/node_modules
+# Every dependency, then react-router build: build/client and
+# build/server/index.js.
+FROM oven/bun:1 AS build
 WORKDIR /app
-RUN npm run build
+COPY package.json bun.lock* bunfig.toml* ./
+RUN bun install --frozen-lockfile
+COPY . .
+RUN bun run build
 
-FROM node:24-alpine
-COPY ./package.json package-lock.json /app/
-COPY --from=production-dependencies-env /app/node_modules /app/node_modules
-COPY --from=build-env /app/build /app/build
+# The build and the production dependencies, run as Bun's own non-root
+# user. The server listens on PORT (3000) and HOST (0.0.0.0).
+FROM oven/bun:1
 WORKDIR /app
-CMD ["npm", "run", "start"]
+ENV NODE_ENV=production
+COPY package.json ./
+COPY --from=production-dependencies /app/node_modules ./node_modules
+COPY --from=build /app/build ./build
+USER bun
+EXPOSE 3000
+CMD ["bun", "build/server/index.js"]

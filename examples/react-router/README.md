@@ -4,7 +4,7 @@ React Router's official template, served by
 [alxia](https://github.com/softistx/alxia/tree/develop/packages/core) under
 Bun through
 [`@alxia/react-router`](https://github.com/softistx/alxia/tree/develop/packages/react-router).
-The setup is three lines. The rest of the example shows what an optional
+The setup is four small changes. The rest of the example shows what an optional
 `app/server.ts` adds on top.
 
 It declares the packages by their npm versions (`^0.1.0`), as an app of
@@ -21,8 +21,9 @@ cd my-app
 
 This example was made that way: the default template, with Tailwind, its
 welcome page and its `ErrorBoundary`. Its files are kept as generated,
-except where the steps below change them, its package name, and a
-`.gitignore` line for the spec's copies. That includes
+except where the steps below change them, its package name, a
+`.gitignore` line for the spec's copies, and its `Dockerfile`, which runs
+on Bun ([5. Docker](#5-docker)). That includes
 `@react-router/serve`, which `start` no longer uses and an app of your own
 can remove.
 
@@ -68,7 +69,11 @@ The `react-router` CLI is a Node script (`#!/usr/bin/env node`): where a
 node is installed, `bun run dev` would start it on Node, and alxia's
 server needs Bun. `bun = true` makes `bun run` start it on Bun.
 
-That is all. There is no server file: alxia's default server serves the
+That is all. The plugin also builds the server for Bun: packages resolve
+their `bun` export condition, and `bun` and `bun:*` stay imports of the
+build
+([Built for Bun](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#built-for-bun)).
+There is no server file: alxia's default server serves the
 pages in `react-router dev` and from the build, with the client's hashed
 files cached immutable.
 
@@ -152,13 +157,33 @@ browser's user agent: Bun's own is a bot to `isbot`, which gets the finished
 page, never a stream. It starts `react-router dev` on a free port too, and
 checks there and in the build that every script carries the nonce of its
 response's policy, a new one each time. It also builds a copy without
-`app/server.ts`, which checks the default server.
+`app/server.ts`, which checks the default server, and resolves Vite's
+config to check that the server build resolves the `bun` condition and
+targets `esnext`.
 
-The template's `Dockerfile` is kept as generated, and it no longer works:
-it is based on a Node image with no Bun, and copies a `package-lock.json`
-the example does not have. The package's
-[guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#deploying)
-says how to deploy with Bun.
+## 5. Docker
+
+The template's `Dockerfile` builds and runs on Node, which no longer runs
+the app once `start` runs Bun. This one replaces it, the same one
+[`@alxia/create`](https://github.com/softistx/alxia/tree/develop/packages/create)'s
+`react-router` template ships: multi-stage on `oven/bun:1`, the
+production dependencies in a stage of their own, `bun run build` in
+another, and a final image holding `build/` and the production
+`node_modules`, running `bun build/server/index.js` as the image's
+non-root `bun` user. The template's `.dockerignore` is kept.
+
+```sh
+docker build -t react-router-example .
+docker run -p 3000:3000 react-router-example
+```
+
+Inside alxia's repository the example has no `bun.lock` of its own, the
+workspace's is at the root, so the image resolves the published
+`@alxia/*` versions its `package.json` names. An app of your own commits
+its `bun.lock`, which the image installs from with `--frozen-lockfile`.
+The package's
+[guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#docker)
+has the commented file.
 
 ## Read more
 
