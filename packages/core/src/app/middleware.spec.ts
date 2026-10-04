@@ -169,13 +169,53 @@ describe('a middleware', () => {
 		}
 	});
 
+	test('next() called after the middleware returned throws, and the rest never runs', async () => {
+		const error = spyOn(console, 'error').mockImplementation(() => {});
+		let late: Promise<unknown> | undefined;
+		let ran = false;
+		try {
+			const app = alxia().get(
+				'/',
+				({ reply }, next) => {
+					late = Promise.resolve().then(() => next());
+					return reply(202, 'early');
+				},
+				({ reply }) => {
+					ran = true;
+					return reply(200, 'late');
+				},
+			);
+			expect((await app.request('/')).status).toBe(202);
+			expect(late).rejects.toThrow(
+				'GET /: a middleware called next() after it returned',
+			);
+			await late?.catch(() => {});
+			expect(ran).toBe(false);
+		} finally {
+			error.mockRestore();
+		}
+	});
+
+	test('a schema in the options, beside middlewares, is refused where the route is declared', () => {
+		expect(() =>
+			alxia().get(
+				'/',
+				{ query: z.object({}) } as never,
+				validate({}),
+				({ reply }) => reply(200, 'x'),
+			),
+		).toThrow(
+			'GET /: the options hold no schema: give validate(…) and responds(…) among the middlewares',
+		);
+	});
+
 	test('anything else after the options is refused where the route is declared', () => {
 		expect(() =>
 			alxia().get('/', { bodyLimit: 10 }, 'auth' as never, ({ reply }) =>
 				reply(200, 'x'),
 			),
 		).toThrow(
-			'GET /: argument 1 after the options is not a middleware: make it with defineMiddleware(), validate() or responds()',
+			'GET /: middleware 1 is not a function: make it with defineMiddleware(), validate() or responds()',
 		);
 		expect(() => defineMiddleware('auth' as never)).toThrow(
 			'defineMiddleware(): the middleware is not a function',

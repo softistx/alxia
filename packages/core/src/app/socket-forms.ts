@@ -15,7 +15,7 @@ import type {
 	AppTypes,
 	NotAFunction,
 	RouteBase,
-	RouteStep,
+	RouteMiddleware,
 } from './route-forms';
 import type {
 	Empty,
@@ -40,7 +40,13 @@ export interface SocketOptions {
 /** `Options`, with no schema of the request in it: that is a `validate` middleware. */
 export type SocketOptionsOnly<Options> = Options &
 	NotAFunction & {
-		readonly [Key in 'params' | 'query' | 'headers' | 'cookies']?: never;
+		readonly [Key in
+			| 'params'
+			| 'query'
+			| 'headers'
+			| 'cookies'
+			| 'body'
+			| 'response']?: never;
 	};
 
 /** What a socket's handlers read as `socket.data`, after the middlewares that returned `Results`. */
@@ -59,11 +65,14 @@ export type SocketHandlersAfter<
 	Path extends string,
 	Results extends readonly unknown[],
 	Options,
-> = SocketHandlers<
-	SocketDataAfter<App, Path, Results>,
-	SocketSend<Options>,
-	SocketMessage<Options>
->;
+> =
+	ThreadSchema<Results> extends { readonly response: unknown }
+		? 'responds() checks replies, and a socket route sends none: check its messages with the `send` option'
+		: SocketHandlers<
+				SocketDataAfter<App, Path, Results>,
+				SocketSend<Options>,
+				SocketMessage<Options>
+			>;
 
 /** `App` with the socket route at `Path` added to its table. */
 export type AppWithSocket<
@@ -87,7 +96,8 @@ export type AppWithSocket<
  * whose upgrade request runs the hooks before it, then its middlewares —
  * a `validate` among them checks it — and opens; what they added,
  * `socket.data` reads. A middleware that awaits `next()` receives a
- * stand-in response once the socket is open: return it as it is.
+ * stand-in response once the socket is open: return it as it is (headers
+ * set on it are lost; set them on `ctx.set.headers` before).
  *
  * ```ts
  * app.ws('/rooms/:room', { message: Chat, send: Chat }, auth, {
@@ -103,7 +113,7 @@ export interface SocketForms<App extends AppTypes> {
 	): AppWithSocket<App, Path, Empty, []>;
 	<const Path extends RoutePath, R1 extends MiddlewareReturn>(
 		path: PathAt<App['prefix'], Path>,
-		m1: RouteStep<App, Path, [], R1>,
+		m1: RouteMiddleware<App, Path, [], R1>,
 		handlers: SocketHandlersAfter<App, Path, [R1], Empty>,
 	): AppWithSocket<App, Path, Empty, [R1]>;
 	<
@@ -112,8 +122,8 @@ export interface SocketForms<App extends AppTypes> {
 		R2 extends MiddlewareReturn,
 	>(
 		path: PathAt<App['prefix'], Path>,
-		m1: RouteStep<App, Path, [], R1>,
-		m2: RouteStep<App, Path, [R1], R2>,
+		m1: RouteMiddleware<App, Path, [], R1>,
+		m2: RouteMiddleware<App, Path, [R1], R2>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2], Empty>,
 	): AppWithSocket<App, Path, Empty, [R1, R2]>;
 	<
@@ -123,9 +133,9 @@ export interface SocketForms<App extends AppTypes> {
 		R3 extends MiddlewareReturn,
 	>(
 		path: PathAt<App['prefix'], Path>,
-		m1: RouteStep<App, Path, [], R1>,
-		m2: RouteStep<App, Path, [R1], R2>,
-		m3: RouteStep<App, Path, [R1, R2], R3>,
+		m1: RouteMiddleware<App, Path, [], R1>,
+		m2: RouteMiddleware<App, Path, [R1], R2>,
+		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3], Empty>,
 	): AppWithSocket<App, Path, Empty, [R1, R2, R3]>;
 	<
@@ -136,10 +146,10 @@ export interface SocketForms<App extends AppTypes> {
 		R4 extends MiddlewareReturn,
 	>(
 		path: PathAt<App['prefix'], Path>,
-		m1: RouteStep<App, Path, [], R1>,
-		m2: RouteStep<App, Path, [R1], R2>,
-		m3: RouteStep<App, Path, [R1, R2], R3>,
-		m4: RouteStep<App, Path, [R1, R2, R3], R4>,
+		m1: RouteMiddleware<App, Path, [], R1>,
+		m2: RouteMiddleware<App, Path, [R1], R2>,
+		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
+		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3, R4], Empty>,
 	): AppWithSocket<App, Path, Empty, [R1, R2, R3, R4]>;
 	<
@@ -151,11 +161,11 @@ export interface SocketForms<App extends AppTypes> {
 		R5 extends MiddlewareReturn,
 	>(
 		path: PathAt<App['prefix'], Path>,
-		m1: RouteStep<App, Path, [], R1>,
-		m2: RouteStep<App, Path, [R1], R2>,
-		m3: RouteStep<App, Path, [R1, R2], R3>,
-		m4: RouteStep<App, Path, [R1, R2, R3], R4>,
-		m5: RouteStep<App, Path, [R1, R2, R3, R4], R5>,
+		m1: RouteMiddleware<App, Path, [], R1>,
+		m2: RouteMiddleware<App, Path, [R1], R2>,
+		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
+		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
+		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3, R4, R5], Empty>,
 	): AppWithSocket<App, Path, Empty, [R1, R2, R3, R4, R5]>;
 	<
@@ -168,12 +178,12 @@ export interface SocketForms<App extends AppTypes> {
 		R6 extends MiddlewareReturn,
 	>(
 		path: PathAt<App['prefix'], Path>,
-		m1: RouteStep<App, Path, [], R1>,
-		m2: RouteStep<App, Path, [R1], R2>,
-		m3: RouteStep<App, Path, [R1, R2], R3>,
-		m4: RouteStep<App, Path, [R1, R2, R3], R4>,
-		m5: RouteStep<App, Path, [R1, R2, R3, R4], R5>,
-		m6: RouteStep<App, Path, [R1, R2, R3, R4, R5], R6>,
+		m1: RouteMiddleware<App, Path, [], R1>,
+		m2: RouteMiddleware<App, Path, [R1], R2>,
+		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
+		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
+		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
+		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3, R4, R5, R6], Empty>,
 	): AppWithSocket<App, Path, Empty, [R1, R2, R3, R4, R5, R6]>;
 	<
@@ -187,13 +197,13 @@ export interface SocketForms<App extends AppTypes> {
 		R7 extends MiddlewareReturn,
 	>(
 		path: PathAt<App['prefix'], Path>,
-		m1: RouteStep<App, Path, [], R1>,
-		m2: RouteStep<App, Path, [R1], R2>,
-		m3: RouteStep<App, Path, [R1, R2], R3>,
-		m4: RouteStep<App, Path, [R1, R2, R3], R4>,
-		m5: RouteStep<App, Path, [R1, R2, R3, R4], R5>,
-		m6: RouteStep<App, Path, [R1, R2, R3, R4, R5], R6>,
-		m7: RouteStep<App, Path, [R1, R2, R3, R4, R5, R6], R7>,
+		m1: RouteMiddleware<App, Path, [], R1>,
+		m2: RouteMiddleware<App, Path, [R1], R2>,
+		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
+		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
+		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
+		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
+		m7: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5, R6], R7>,
 		handlers: SocketHandlersAfter<
 			App,
 			Path,
@@ -213,14 +223,14 @@ export interface SocketForms<App extends AppTypes> {
 		R8 extends MiddlewareReturn,
 	>(
 		path: PathAt<App['prefix'], Path>,
-		m1: RouteStep<App, Path, [], R1>,
-		m2: RouteStep<App, Path, [R1], R2>,
-		m3: RouteStep<App, Path, [R1, R2], R3>,
-		m4: RouteStep<App, Path, [R1, R2, R3], R4>,
-		m5: RouteStep<App, Path, [R1, R2, R3, R4], R5>,
-		m6: RouteStep<App, Path, [R1, R2, R3, R4, R5], R6>,
-		m7: RouteStep<App, Path, [R1, R2, R3, R4, R5, R6], R7>,
-		m8: RouteStep<App, Path, [R1, R2, R3, R4, R5, R6, R7], R8>,
+		m1: RouteMiddleware<App, Path, [], R1>,
+		m2: RouteMiddleware<App, Path, [R1], R2>,
+		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
+		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
+		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
+		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
+		m7: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5, R6], R7>,
+		m8: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5, R6, R7], R8>,
 		handlers: SocketHandlersAfter<
 			App,
 			Path,

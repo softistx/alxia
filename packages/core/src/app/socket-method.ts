@@ -14,7 +14,7 @@ import type {
 } from '../ws/types';
 import type { Alxia } from './alxia';
 import type { NotAFunction } from './route-forms';
-import type { AppOf } from './route-method';
+import type { RouteApp } from './route-method';
 import type { SocketForms } from './socket-forms';
 import type { SocketOptionsForms } from './socket-options';
 import type { AnyRouteHook, Empty, RouteHookBase, ThreadHooks } from './types';
@@ -29,8 +29,8 @@ export interface SocketMethod<
 	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
-> extends SocketForms<AppOf<'GET', Ctx, Routes, Prefix, Shortcuts>>,
-		SocketOptionsForms<AppOf<'GET', Ctx, Routes, Prefix, Shortcuts>>,
+> extends SocketForms<RouteApp<'GET', Ctx, Routes, Prefix, Shortcuts>>,
+		SocketOptionsForms<RouteApp<'GET', Ctx, Routes, Prefix, Shortcuts>>,
 		DeprecatedSocketForms<Ctx, Routes, Prefix, Shortcuts> {}
 
 /** The forms of `ws` 0.3 had, which the middleware forms replace. */

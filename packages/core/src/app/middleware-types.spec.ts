@@ -162,8 +162,46 @@ describe('validate and responds', () => {
 	});
 
 	test('the options hold no schema', () => {
-		// @ts-expect-error a schema is validate(…) among the middlewares
-		alxia().post('/', { body: Post }, auth, ({ reply }) => reply(200, 'x'));
+		const declare = () =>
+			// @ts-expect-error a schema is validate(…) among the middlewares
+			alxia().post('/', { body: Post }, auth, ({ reply }) => reply(200, 'x'));
+		void declare;
+	});
+
+	test('a ninth middleware is refused after options, and on a socket', () => {
+		const add = defineMiddleware((_ctx, next) => next({ x: 1 }));
+		const declare = () => {
+			alxia().get(
+				'/',
+				{},
+				add,
+				add,
+				add,
+				add,
+				add,
+				add,
+				add,
+				add,
+				add,
+				// @ts-expect-error a route takes at most 8 middlewares
+				({ reply }) => reply(200, 'x'),
+			);
+			// @ts-expect-error a socket route takes at most 8 middlewares
+			alxia().ws('/', add, add, add, add, add, add, add, add, add, {
+				message: () => {},
+			});
+		};
+		void declare;
+	});
+
+	test('responds on a socket route is refused: it sends no reply', () => {
+		const declare = () => {
+			// @ts-expect-error responds() has nothing to check on a socket
+			alxia().ws('/', responds({ 200: Post }), {
+				message: () => {},
+			});
+		};
+		void declare;
 	});
 
 	test('the route table reads the middlewares: their replies, the 400, the 413', () => {

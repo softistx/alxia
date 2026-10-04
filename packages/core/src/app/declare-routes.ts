@@ -103,7 +103,7 @@ export function addSocket(
 			last !== null && typeof last === 'object' && !Array.isArray(last),
 		'handlers object',
 	);
-	const { derive, schema } = routeChain(label, args);
+	const { derive, schema } = routeChain(label, args, true);
 	mount(state, {
 		path: full,
 		schema: schema as SocketSchema,

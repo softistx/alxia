@@ -35,8 +35,8 @@ export interface RouteMethod<
 	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
-> extends MiddlewareForms<AppOf<M, Ctx, Routes, Prefix, Shortcuts>>,
-		OptionsForms<AppOf<M, Ctx, Routes, Prefix, Shortcuts>>,
+> extends MiddlewareForms<RouteApp<M, Ctx, Routes, Prefix, Shortcuts>>,
+		OptionsForms<RouteApp<M, Ctx, Routes, Prefix, Shortcuts>>,
 		DeprecatedForms<M, Ctx, Routes, Prefix, Shortcuts> {}
 
 /** The forms of a route method that 0.3 had, which the middleware forms replace. */
@@ -157,7 +157,7 @@ export interface DeprecatedForms<
 }
 
 /** The types of an app and a method, as the middleware forms read them. */
-export interface AppOf<
+export interface RouteApp<
 	M extends Method,
 	Ctx extends object,
 	Routes extends object,

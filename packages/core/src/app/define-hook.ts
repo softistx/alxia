@@ -45,6 +45,10 @@ type WrapFn<Requires, Result> = (
  *
  * One signature, not two overloads: an overloaded call written inside a
  * route's list would leave the list untyped.
+ *
+ * @deprecated A route's list of hooks is the form of 0.3: write a
+ * middleware with `defineMiddleware`, which returns `next(added)`, `next()`
+ * or a reply — see the upgrading guide.
  */
 export function defineHook<Requires extends object = Empty, Result = NoHookYet>(
 	hook?: DeriveFn<Requires, Result>,
@@ -76,6 +80,10 @@ export function defineHook<Requires extends object = Empty, Result = NoHookYet>(
  *     (await locks.tryRun(params.id, next)) ?? reply(409, { error: 'busy' as const }),
  * );
  * ```
+ *
+ * @deprecated A route's list of hooks is the form of 0.3: write a
+ * middleware with `defineMiddleware` that awaits `next()` — see the
+ * upgrading guide.
  */
 export function defineWrap<
 	Requires extends object = Empty,

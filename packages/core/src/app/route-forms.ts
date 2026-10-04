@@ -77,7 +77,7 @@ export type RouteBase<
  * A middleware of a route at `Path` on `App`, after the middlewares that
  * returned `Before`: it reads their context, and returns `Result`.
  */
-export type RouteStep<
+export type RouteMiddleware<
 	App extends AppTypes,
 	Path extends string,
 	Before extends readonly unknown[],

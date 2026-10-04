@@ -7,6 +7,7 @@
 import { ContentTooLargeError, HttpError } from '../errors/errors';
 import { type AnyReply, Reply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
+import type { StatusCode } from '../types/status';
 import { routeContext } from './context';
 import type {
 	MiddlewareHook,
@@ -47,13 +48,28 @@ export async function chain<Last>(
 	const socket = !('method' in definition);
 	const method = socket ? 'WS' : definition.method;
 	const signal = run.request.request.signal;
-	// Synchronous but for a reply a `responds` checks: most steps await nothing more.
+	// What a step adds goes on the context it runs with and on the route's
+	// own, which `onError` reads: after a `validate` of the cookies, the
+	// steps run with a copy holding the validated ones.
+	const merge = (current: Ctx, added: object) => {
+		Object.assign(current, added);
+		if (current !== ctx) Object.assign(ctx, added);
+	};
+	// Synchronous but for a reply a `responds` checks: most steps await
+	// nothing more. The handler's reply must have a status `responds`
+	// declares; a middleware's is checked when its status is declared, and
+	// sent as it is otherwise, as its type says.
 	const answer = (
 		result: unknown,
 		responses: ResponseSchemas | undefined,
+		handler = false,
 	): Response | Last | Promise<Response> => {
 		if (!(result instanceof Reply)) return result as Response | Last;
-		if (responses === undefined || isRedirect(result)) {
+		if (
+			responses === undefined ||
+			isRedirect(result) ||
+			(!handler && responses[result.status as StatusCode] === undefined)
+		) {
 			return send(result, set, signal);
 		}
 		return checkReply(
@@ -70,7 +86,7 @@ export async function chain<Last>(
 		responses: ResponseSchemas | undefined,
 	): Promise<Response | Last> => {
 		const hook = steps[index];
-		if (hook === undefined) return answer(await last(ctx), responses);
+		if (hook === undefined) return answer(await last(ctx), responses, true);
 		const next = index + 1;
 		const rest = () => step(next, ctx, responses);
 		switch (hook.kind) {
@@ -79,15 +95,15 @@ export async function chain<Last>(
 				if (added instanceof Promise) added = await added;
 				if (added instanceof Reply) return answer(added, responses);
 				if (added !== null && typeof added === 'object') {
-					Object.assign(ctx, added);
+					merge(ctx, added);
 				}
-				return step(index + 1, ctx, responses);
+				return step(next, ctx, responses);
 			}
 			case 'wrap':
 				if (socket) return rest();
 				return answer(await wrapped(hook.run, ctx, rest), responses);
 			case 'middleware': {
-				let result = middleware(hook.run, ctx, rest, definition, socket);
+				let result = middleware(hook.run, ctx, merge, rest, run.definition);
 				if (result instanceof Promise) result = await result;
 				return answer(result, responses);
 			}
@@ -95,10 +111,10 @@ export async function chain<Last>(
 				const raw = hook.raw === true;
 				const validated = await validateStep(run, hook.schemas, raw, ctx);
 				if ('refused' in validated) return validated.refused;
-				return step(index + 1, validated.ctx, responses);
+				return step(next, validated.ctx, responses);
 			}
 			case 'responds':
-				return step(index + 1, ctx, socket ? undefined : hook.responses);
+				return step(next, ctx, socket ? undefined : hook.responses);
 		}
 	};
 	return step(0, ctx, undefined);
@@ -116,31 +132,32 @@ async function wrapped(
 
 /**
  * A middleware run with `next`, which merges what it is given into the
- * context and runs `rest`, once: its result, or a promise of it. What
- * `rest` resolves to that is not a response — a socket's upgrade —
- * reaches the middleware as a stand-in response, and comes back as itself
- * when the middleware returns it.
+ * context and runs `rest`, once, before the middleware settles: its
+ * result, or a promise of it. What `rest` resolves to that is not a
+ * response — a socket's upgrade — reaches the middleware as a stand-in
+ * response, which it must return as it is: the socket is open by then.
  */
 function middleware(
 	hook: MiddlewareHook,
 	ctx: Ctx,
+	merge: (ctx: Ctx, added: object) => void,
 	rest: () => Promise<unknown>,
 	definition: RouteDefinition | SocketDefinition,
-	socket: boolean,
 ): unknown {
-	const label = () =>
-		`${'method' in definition ? definition.method : 'WS'} ${definition.path}`;
-	let called = false;
+	const fail = (why: string) =>
+		new TypeError(
+			`${'method' in definition ? definition.method : 'WS'} ${definition.path}: ${why}`,
+		);
+	let state: 'idle' | 'called' | 'settled' = 'idle';
 	let parked: { stand: Response; value: unknown } | undefined;
 	const next = (added?: object): Promise<Response> => {
-		if (called) {
-			throw new TypeError(`${label()}: a middleware called next() twice`);
+		if (state === 'called') throw fail('a middleware called next() twice');
+		if (state === 'settled') {
+			throw fail('a middleware called next() after it returned');
 		}
-		called = true;
-		if (added !== null && typeof added === 'object') {
-			Object.assign(ctx, added);
-		}
-		if (!socket) return rest() as Promise<Response>;
+		state = 'called';
+		if (added !== null && typeof added === 'object') merge(ctx, added);
+		if ('method' in definition) return rest() as Promise<Response>;
 		return rest().then((downstream) => {
 			if (downstream instanceof Response) return downstream;
 			parked = { stand: new Response(null), value: downstream };
@@ -148,11 +165,17 @@ function middleware(
 		});
 	};
 	const settle = (result: unknown): unknown => {
-		if (parked !== undefined && result === parked.stand) return parked.value;
+		state = 'settled';
+		if (parked !== undefined) {
+			if (result === parked.stand) return parked.value;
+			throw fail(
+				'a middleware returned another response than next() resolved to, once the socket was open: return it as it is',
+			);
+		}
 		if (result instanceof Reply || result instanceof Response) return result;
 		const name = hook.name ? ` (${hook.name})` : '';
-		throw new TypeError(
-			`${label()}: a middleware${name} returned ${result === undefined ? 'nothing' : typeof result}: return next(), a reply or a Response`,
+		throw fail(
+			`a middleware${name} returned ${result === undefined ? 'nothing' : typeof result}: return next(), a reply or a Response`,
 		);
 	};
 	const result = hook(ctx, next);

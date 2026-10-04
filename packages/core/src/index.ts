@@ -24,18 +24,12 @@ export type {
 	StopHook,
 } from './app/definition';
 export type {
-	AppTypes,
 	AppWithRoute,
-	OptionsOnly,
-	RouteBase,
-	RouteHandler,
 	RouteOptions,
-	RouteResult,
-	RouteStep,
 } from './app/route-forms';
 export type {
-	AppOf,
 	DeprecatedForms,
+	RouteApp,
 	RouteMethod,
 } from './app/route-method';
 export type { MiddlewareForms } from './app/route-middlewares';
@@ -65,11 +59,8 @@ export type {
 } from './app/signatures';
 export type {
 	AppWithSocket,
-	SocketDataAfter,
 	SocketForms,
-	SocketHandlersAfter,
 	SocketOptions,
-	SocketOptionsOnly,
 } from './app/socket-forms';
 export type {
 	DeprecatedSocketForms,
@@ -83,7 +74,6 @@ export type {
 } from './app/static-methods';
 export type {
 	AddedBy,
-	AddedOf,
 	AnyRouteHook,
 	BaseContext,
 	BehindShortcuts,
@@ -96,7 +86,6 @@ export type {
 	DefaultRefusalOutcome,
 	Empty,
 	FallsBack,
-	HandlerContext,
 	HandlerResult,
 	HookContext,
 	HookProvided,
@@ -106,10 +95,8 @@ export type {
 	KindRefusalsOf,
 	MaxRouteHooks,
 	MaybePromise,
-	Merge,
 	Method,
 	Middleware,
-	MiddlewareBase,
 	MiddlewareContext,
 	MiddlewareResult,
 	MiddlewareReturn,
@@ -145,12 +132,8 @@ export type {
 	RouteSchema,
 	RouteTable,
 	RouteWrap,
-	SchemaOf,
 	ThenShortcuts,
-	ThreadContext,
 	ThreadHooks,
-	ThreadReplies,
-	ThreadSchema,
 	TypedReplyFunction,
 	TypedShortcuts,
 	ValidSchema,

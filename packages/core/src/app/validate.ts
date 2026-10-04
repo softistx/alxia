@@ -108,7 +108,7 @@ export function validate<const Schemas extends RequestSchemas>(
 }
 
 /**
- * A middleware that checks every reply after it against the schema it
+ * A middleware that checks the handler's reply against the schema it
  * declares for its status, and sends it as that schema's output: an
  * unknown key the schema strips never leaves the server. A status it does
  * not declare, or a body its schema refuses, is a 500, unless the app was
@@ -121,8 +121,10 @@ export function validate<const Schemas extends RequestSchemas>(
  *   reply.notFound({ error: 'no such post' }));
  * ```
  *
- * A reply a middleware before it returns is not checked; one a middleware
- * after it returns is, so declare its status too. A redirect passes.
+ * A reply of a middleware after it is checked when its status is declared,
+ * and sent as it is otherwise, as the route's type says; one of a
+ * middleware before it is not checked. A redirect passes. A socket route
+ * refuses it: it sends no reply.
  */
 export function responds<const Responses extends ResponseSchemas>(
 	responses: Responses & KnownStatuses<Responses>,
@@ -131,11 +133,8 @@ export function responds<const Responses extends ResponseSchemas>(
 }
 
 function builtin(step: BuiltinStep, name: string): never {
-	if (
-		(step.kind === 'validate' ? step.schemas : step.responses) === null ||
-		typeof (step.kind === 'validate' ? step.schemas : step.responses) !==
-			'object'
-	) {
+	const schemas = step.kind === 'validate' ? step.schemas : step.responses;
+	if (schemas === null || typeof schemas !== 'object') {
 		throw new TypeError(`${name}(): the schemas are not an object`);
 	}
 	const middleware = () => {

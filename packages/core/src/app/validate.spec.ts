@@ -16,6 +16,7 @@ const auth = defineMiddleware(({ request, reply }, next) => {
 });
 
 const Post = z.object({ title: z.string().min(1) });
+const Strict = z.object({ id: z.string() });
 
 describe('validate', () => {
 	test('leaves the raw cookies to the hooks, and gives the validated ones to what follows', async () => {
@@ -38,6 +39,25 @@ describe('validate', () => {
 		expect(seen).toEqual([{ n: '2' }]);
 	});
 
+	test('what a middleware adds after a cookie validate reaches onError too', async () => {
+		const seen: unknown[] = [];
+		const app = alxia()
+			.onError((_error, ctx) => {
+				seen.push((ctx as { user?: unknown }).user);
+				return ctx.reply(500, { error: 'caught' as const });
+			})
+			.get(
+				'/',
+				validate({ cookies: z.object({ n: z.string() }) }),
+				auth,
+				() => {
+					throw new Error('boom');
+				},
+			);
+		await app.request('/', { headers: { cookie: 'n=1', 'x-user': 'ada' } });
+		expect(seen).toEqual([{ id: 'ada' }]);
+	});
+
 	test('declares its schemas on the route, for what documents it', () => {
 		const app = alxia().post(
 			'/posts',
@@ -56,8 +76,6 @@ describe('validate', () => {
 });
 
 describe('responds', () => {
-	const Strict = z.object({ id: z.string() });
-
 	test('sends a reply as its schema gives it back, and answers one it refuses with a 500', async () => {
 		const error = spyOn(console, 'error').mockImplementation(() => {});
 		try {
@@ -77,7 +95,7 @@ describe('responds', () => {
 		}
 	});
 
-	test('checks the replies of the middlewares after it, not before', async () => {
+	test('checks the replies after it it declares a status for; the handler may answer no other', async () => {
 		const error = spyOn(console, 'error').mockImplementation(() => {});
 		try {
 			const before = alxia().get(
@@ -88,12 +106,26 @@ describe('responds', () => {
 			);
 			const after = alxia().get(
 				'/',
-				responds({ 200: Strict }),
+				responds({ 200: Strict, 403: Strict }),
 				auth,
+				({ reply }) => reply(403, { id: 'x', extra: 1 }),
 				({ reply }) => reply(200, { id: 'a' }),
 			);
+			const undeclared = alxia().get(
+				'/',
+				responds({ 200: Strict }),
+				({ reply }) => reply(201 as never, { id: 'a' } as never),
+			);
 			expect((await before.request('/')).status).toBe(401);
-			expect((await after.request('/')).status).toBe(500);
+			// The 401 is auth's, as the route's type says: sent as it is.
+			expect((await after.request('/')).status).toBe(401);
+			// A declared status is checked, a middleware's reply too.
+			const checked = await after.request('/', {
+				headers: { 'x-user': 'ada' },
+			});
+			expect(checked.status).toBe(403);
+			expect(await checked.json()).toEqual({ id: 'x' });
+			expect((await undeclared.request('/')).status).toBe(500);
 		} finally {
 			error.mockRestore();
 		}
@@ -128,6 +160,45 @@ describe('responds', () => {
 });
 
 describe('a socket route', () => {
+	test('refuses responds, which has no reply to check there', () => {
+		expect(() =>
+			alxia().ws('/', responds({ 200: Strict }) as never, {
+				message: () => {},
+			}),
+		).toThrow(
+			'WS /: responds() checks replies, and a socket route sends none: check its messages with the `send` option',
+		);
+	});
+
+	test('a middleware must return the stand-in response next() resolved to', async () => {
+		const error = spyOn(console, 'error').mockImplementation(() => {});
+		const app = alxia().ws(
+			'/',
+			async (_ctx, next) => {
+				await next();
+				return new Response('mine');
+			},
+			{ message: () => {} },
+		);
+		const server = app.listen({ port: 0 });
+		try {
+			const url = new URL('/', server.url);
+			url.protocol = 'ws:';
+			const socket = new WebSocket(url);
+			await new Promise((resolve) => {
+				socket.onopen = resolve;
+				socket.onerror = resolve;
+			});
+			socket.close();
+			expect(String(error.mock.calls[0]?.[0])).toContain(
+				'WS /: a middleware returned another response than next() resolved to',
+			);
+		} finally {
+			error.mockRestore();
+			await server.stop(true);
+		}
+	});
+
 	test('runs its middlewares and validate on the upgrade, then opens', async () => {
 		const around: number[] = [];
 		const app = alxia().ws(
