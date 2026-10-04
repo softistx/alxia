@@ -6,6 +6,7 @@ chooses the versions it writes.
 - [Running it](#running-it)
 - [The `api` template](#the-api-template)
 - [The `react-router` template](#the-react-router-template)
+- [Docker](#docker)
 - [Versions](#versions)
 - [In a script or CI](#in-a-script-or-ci)
 
@@ -50,6 +51,15 @@ directory's name, lowercased, with `-` for anything npm refuses.
 to the package `@scope/create`, and npm maps `npm create @scope` the same
 way. Any of the three runs the same bin, on Bun.
 
+Both templates are files shipped in this package, under
+`templates/api/` and `templates/react-router/`, and copied as they are:
+nothing is downloaded but the dependencies, and only `package.json` is
+written again, with the directory's name, alxia's versions and the newest
+of the others ([Versions](#versions)). Two files are stored under another
+name, since `bun publish` leaves them out of a tarball, and take theirs
+back on the copy: `gitignore` is written as `.gitignore`, `_bunfig.toml`
+as `bunfig.toml`.
+
 ## The `api` template
 
 ```
@@ -60,6 +70,9 @@ my-api/
 │   └── server.ts     app.listen(PORT)
 ├── package.json
 ├── tsconfig.json
+├── Dockerfile        the production dependencies and src/, on oven/bun:1
+├── .dockerignore
+├── .env.example      PORT and API_KEY, for a .env Bun loads
 ├── .gitignore
 └── README.md
 ```
@@ -127,7 +140,16 @@ The scripts:
 | `bun test` | the spec |
 | `bun run typecheck` | `tsc --noEmit` |
 | `bun run build` | `bun build src/server.ts --target=bun --outdir=dist`: one file, its dependencies bundled |
-| `bun start` | `bun dist/server.js` |
+| `bun start` | `bun src/server.ts`: Bun runs the TypeScript as it is, no build first |
+
+`build` is for a host that has Bun and no `node_modules`: `dist/server.js`
+holds the dependencies, and runs as `bun dist/server.js`. `start`, `bun dev`
+and the image need no build.
+
+Bun loads `.env` on every command. `.env.example` names the two variables
+the app reads, `PORT` (3000 by default) and `API_KEY` (`dev-key` by
+default, for development only): copy it to `.env`, which `.gitignore`
+keeps out of git and `.dockerignore` out of the image.
 
 `tsconfig.json` holds the settings alxia's own packages are checked under:
 `strict`, and past it `exactOptionalPropertyTypes`,
@@ -198,14 +220,39 @@ bunx alxia-react-router reveal
 The [`@alxia/react-router` guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md)
 goes from there.
 
-### Docker
+## Docker
 
-The project's `Dockerfile` builds the app and runs it on Bun, on the
-official `oven/bun:1` image, in three stages: the production dependencies,
-then every dependency and `bun run build`, then an image with `build/`
-and the production `node_modules` alone, running
-`bun build/server/index.js`, `start`'s command, as the image's non-root
-`bun` user. `.dockerignore` keeps `node_modules`, `build` and
+Each project's `Dockerfile` runs it on Bun, on the official `oven/bun:1`
+image, as the image's non-root `bun` user. The installs are
+`--frozen-lockfile`, from the `bun.lock` the command's `bun install`
+wrote: commit it.
+
+### `api`
+
+Two stages: the production dependencies, installed with
+`bun install --frozen-lockfile --production`, then an image with them,
+`package.json` and `src/`, running `bun src/server.ts`, `start`'s command,
+written out so that Bun is the container's process. There is no build
+stage: Bun runs the TypeScript as it is, so a build would only add a
+second, full install and a bundle the image does not need.
+`.dockerignore` keeps `node_modules`, `dist`, `.env`, the README and the
+specs out of the context.
+
+```sh
+cd my-api
+docker build -t my-api .
+docker run -p 3000:3000 -e API_KEY=change-me my-api
+```
+
+The server listens on `PORT`, 3000 in the image; set `API_KEY`, whose
+default is for development.
+
+### `react-router`
+
+Three stages: the production dependencies, then every dependency and
+`bun run build`, then an image with `build/` and the production
+`node_modules` alone, running `bun build/server/index.js`, `start`'s
+command. `.dockerignore` keeps `node_modules`, `build` and
 `.react-router` out of the context.
 
 ```sh
@@ -214,9 +261,8 @@ docker build -t my-site .
 docker run -p 3000:3000 my-site
 ```
 
-The installs are `--frozen-lockfile`, from the `bun.lock` the command's
-`bun install` wrote: commit it. The commented file, and what to change to
-write files from the container, are in
+The commented file, and what to change to write files from the container,
+are in
 [`@alxia/react-router`'s guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#docker).
 
 ## Versions

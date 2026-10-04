@@ -13,6 +13,12 @@
   },
   "overrides": [
     {
+      "includes": ["api/**"],
+      "formatter": { "indentStyle": "tab" },
+      "javascript": { "formatter": { "quoteStyle": "single" } },
+      "assist": { "actions": { "source": { "organizeImports": "on" } } }
+    },
+    {
       "includes": ["react-router/app/welcome/**"],
       "linter": { "rules": { "a11y": { "noSvgWithoutTitle": "off" } } }
     }

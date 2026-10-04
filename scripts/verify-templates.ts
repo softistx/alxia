@@ -1,7 +1,9 @@
 /**
  * Runs `bun create @alxia` as a user would, from the packed tarballs, for
  * each template, then proves the project it wrote works: it installs, its
- * `typecheck`, `test` and `build` pass, and its production server answers.
+ * `typecheck`, `test` and `build` pass, its production server answers, and
+ * so does the image its `Dockerfile` builds (`templates/docker.ts`): skipped
+ * locally with no Docker daemon, a failure on CI.
  *
  * Every package is packed, and served by a registry on localhost that passes
  * every other request to npm's (`templates/registry.ts`). Bun is pointed at
@@ -9,9 +11,9 @@
  * directory of its own, so neither `@alxia/create` nor a package it installs
  * comes from the published versions. What is not alxia's — React Router,
  * Zod, Vite, TypeScript — comes from npm at the newest versions
- * `@alxia/create` resolves today, so this needs the network,
- * and an upstream release can turn it red with no change here. It runs in CI
- * as the `Templates` job, informational like `Newest peers`.
+ * `@alxia/create` resolves today, so this needs the network, and an upstream
+ * release can turn it red with no change here. It runs in CI as the
+ * `Templates` job, informational like `Newest peers`.
  *
  * `bun run build` first: it packs `dist/`.
  */
@@ -23,46 +25,9 @@ import { pack } from './artifacts/install';
 import { readPackages } from './artifacts/packages';
 import { staleBuilds } from './artifacts/stale';
 import type { Tarball } from './artifacts/tarball';
+import { dockerRuns, dockerServed } from './templates/docker';
 import { startRegistry } from './templates/registry';
-
-/** A port nothing listens on, for a server this script starts. */
-function freePort(): number {
-	const probe = Bun.serve({ port: 0, fetch: () => new Response() });
-	const { port } = probe;
-	probe.stop(true);
-	if (port === undefined) throw new Error('no free port');
-	return port;
-}
-
-/** Starts `bun run start` in `dir` and resolves to what `request` answers. */
-async function served(
-	dir: string,
-	env: Record<string, string>,
-	request: (base: string) => Promise<Response>,
-): Promise<number> {
-	const port = freePort();
-	const server = Bun.spawn(['bun', 'run', 'start'], {
-		cwd: dir,
-		env: { ...env, PORT: String(port), NODE_ENV: 'production' },
-		stdout: 'inherit',
-		stderr: 'inherit',
-	});
-	try {
-		const deadline = Date.now() + 20_000;
-		while (Date.now() < deadline) {
-			const status = await request(`http://localhost:${port}`).then(
-				(response) => response.status,
-				() => undefined,
-			);
-			if (status !== undefined) return status;
-			await Bun.sleep(250);
-		}
-		return 0;
-	} finally {
-		server.kill();
-		await server.exited;
-	}
-}
+import { served } from './templates/serve';
 
 interface Check {
 	readonly template: 'api' | 'react-router';
@@ -76,7 +41,13 @@ interface Check {
 const CHECKS: readonly Check[] = [
 	{
 		template: 'api',
-		files: ['.gitignore', 'src/app.ts'],
+		files: [
+			'.gitignore',
+			'.dockerignore',
+			'.env.example',
+			'Dockerfile',
+			'src/app.ts',
+		],
 		scripts: ['typecheck', 'test', 'build'],
 		request: (base) =>
 			fetch(`${base}/todos`, {
@@ -88,7 +59,13 @@ const CHECKS: readonly Check[] = [
 	},
 	{
 		template: 'react-router',
-		files: ['.gitignore', 'bunfig.toml', 'vite.config.ts', 'app/root.tsx'],
+		files: [
+			'.gitignore',
+			'bunfig.toml',
+			'Dockerfile',
+			'vite.config.ts',
+			'app/root.tsx',
+		],
 		scripts: ['typecheck', 'build'],
 		request: (base) => fetch(`${base}/`),
 		expected: 200,
@@ -103,19 +80,40 @@ function report(passed: boolean, what: string): boolean {
 
 /**
  * `bun publish` leaves every `.gitignore` and `bunfig.toml` out of a
- * tarball, so the `react-router` template ships them as `gitignore` and
- * `_bunfig.toml`, renamed when it is copied.
+ * tarball, so the templates ship them as `gitignore` and `_bunfig.toml`,
+ * renamed when they are copied.
  */
+const SHIPPED: Readonly<Record<Check['template'], readonly string[]>> = {
+	api: [
+		'gitignore',
+		'.dockerignore',
+		'.env.example',
+		'Dockerfile',
+		'package.json',
+		'src/app.ts',
+	],
+	'react-router': [
+		'gitignore',
+		'_bunfig.toml',
+		'.dockerignore',
+		'Dockerfile',
+		'package.json',
+		'vite.config.ts',
+	],
+};
+
 function templateShipped(tarballs: readonly Tarball[]): boolean {
 	const create = tarballs.find(
 		({ manifest }) => manifest['name'] === '@alxia/create',
 	);
 	const entries = create?.entries ?? [];
-	return report(
-		['gitignore', '_bunfig.toml', 'package.json', 'vite.config.ts'].every(
-			(file) => entries.includes(`package/templates/react-router/${file}`),
+	return Object.entries(SHIPPED).every(([template, files]) =>
+		report(
+			files.every((file) =>
+				entries.includes(`package/templates/${template}/${file}`),
+			),
+			`@alxia/create's tarball holds templates/${template}: ${files.join(', ')}`,
 		),
-		"@alxia/create's tarball holds templates/react-router, gitignore and _bunfig.toml included",
 	);
 }
 
@@ -139,6 +137,7 @@ async function templateWorks(
 	workdir: string,
 	env: Record<string, string>,
 	registryUrl: string,
+	docker: boolean,
 ): Promise<boolean> {
 	const name = `my-${check.template}`;
 	const dir = join(workdir, name);
@@ -178,10 +177,23 @@ async function templateWorks(
 		);
 	}
 	const status = await served(dir, env, check.request);
-	return (
+	ok =
 		report(
 			status === check.expected,
 			`${check.template}: bun run start answered ${status}, expected ${check.expected}`,
+		) && ok;
+	if (!docker) return ok;
+	console.log(`\n=== ${check.template}: docker build, docker run\n`);
+	const contained = await dockerServed(
+		dir,
+		`alxia-template-${check.template}`,
+		registryUrl,
+		check.request,
+	);
+	return (
+		report(
+			contained === check.expected,
+			`${check.template}: its Docker image answered ${contained}, expected ${check.expected}`,
 		) && ok
 	);
 }
@@ -216,8 +228,13 @@ async function main(): Promise<boolean> {
 	try {
 		let ok = templateShipped(packed.tarballs);
 		ok = (await helpRuns(workdir, env)) && ok;
+		const docker = await dockerRuns();
+		// CI's runners have a daemon: one missing there is a failure.
+		if (!docker)
+			ok = report(!process.env['CI'], 'docker: no daemon, skipped') && ok;
 		for (const check of CHECKS) {
-			ok = (await templateWorks(check, workdir, env, registry.url)) && ok;
+			ok =
+				(await templateWorks(check, workdir, env, registry.url, docker)) && ok;
 		}
 		return ok;
 	} finally {

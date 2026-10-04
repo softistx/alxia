@@ -1,23 +1,12 @@
 /** Writes a template's project, its dependencies moved to the registry's newest. */
 
 import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { NAME, type Template } from './args';
+import { copyTemplate } from './copy';
 import type { Io } from './io';
-import { bumpDependencies, type Manifest, registryUrl } from './registry';
+import { bumpDependencies, registryUrl } from './registry';
 import { packageName } from './target';
-import { apiFiles, apiManifest } from './templates/api';
-import { reactRouterTemplate } from './templates/react-router';
 import type { AlxiaPackage } from './versions';
-
-/**
- * The `react-router` template's files, beside `src/` here and beside
- * `dist/` published: this module is bundled into `dist/index.js`, as
- * `versions.ts` reads `../package.json`.
- */
-const REACT_ROUTER = fileURLToPath(
-	new URL('../templates/react-router', import.meta.url),
-);
 
 /** Writes the project into `target`. */
 export async function write(
@@ -26,19 +15,11 @@ export async function write(
 	alxia: Record<AlxiaPackage, string>,
 	io: Io,
 ): Promise<true> {
-	const name = packageName(target);
-	let manifest: Manifest;
-	let files: Record<string, string | Blob>;
-	if (template === 'api') {
-		manifest = apiManifest(name, alxia);
-		files = apiFiles(name);
-	} else {
-		({ manifest, files } = await reactRouterTemplate(
-			REACT_ROUTER,
-			name,
-			alxia,
-		));
-	}
+	const { manifest, files } = await copyTemplate(
+		template,
+		packageName(target),
+		alxia,
+	);
 
 	io.out('Resolving the newest versions alxia accepts...');
 	const bumped = await bumpDependencies(
@@ -56,9 +37,12 @@ export async function write(
 		);
 	}
 
-	files['package.json'] = `${JSON.stringify(manifest, null, 2)}\n`;
 	for (const [file, content] of Object.entries(files)) {
 		await Bun.write(join(target, file), content);
 	}
+	await Bun.write(
+		join(target, 'package.json'),
+		`${JSON.stringify(manifest, null, 2)}\n`,
+	);
 	return true;
 }

@@ -28,7 +28,7 @@ bun create @alxia my-site --template react-router
 
 | template | what it writes |
 | --- | --- |
-| `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a hook made with `defineHook` that answers 401 without an API key; a `bun test` spec calling it with `app.request()` and through `@alxia/client`, typed; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, `.gitignore` and a README |
+| `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a hook made with `defineHook` that answers 401 without an API key; a `bun test` spec calling it with `app.request()` and through `@alxia/client`, typed; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, a `Dockerfile` on `oven/bun:1`, `.dockerignore`, `.gitignore`, `.env.example` and a README |
 | `react-router` | React Router's official template, as `create-react-router` writes it, shipped in this package and copied, with [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun, and a `Dockerfile` on `oven/bun:1` in place of React Router's Node one. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
 
 The heart of the `api` project, its route and hook (the whole file, with
@@ -53,9 +53,19 @@ export const app = alxia()
 
 ## Docker
 
-The `react-router` project builds into an image as it is written: its
-`Dockerfile` installs, builds and runs on `oven/bun:1`, and the image runs
-`bun build/server/index.js` as the non-root `bun` user.
+Both projects build into an image as they are written, on `oven/bun:1`,
+the image running the app as the non-root `bun` user:
+
+- `api`: the production dependencies, then `src/server.ts` run as it is.
+  Bun runs TypeScript, so there is no build stage.
+- `react-router`: the production dependencies, then `bun run build`, then
+  `bun build/server/index.js`.
+
+```sh
+cd my-api
+docker build -t my-api .
+docker run -p 3000:3000 -e API_KEY=change-me my-api
+```
 
 ```sh
 cd my-site
@@ -117,6 +127,6 @@ the project it writes installs with `bun install`.
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md): each template file by file, what the `react-router` template adds to React Router's, how versions are chosen, and running it in CI.
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md): each template file by file, what the `react-router` template adds to React Router's, each `Dockerfile`, how versions are chosen, and running it in CI.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md): each message the command prints, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/create/docs/roadmap.md): what is coming, and what is not planned.

@@ -10,6 +10,7 @@
 	"files": [
 		"dist",
 		"docs",
+		"templates/api",
 		"templates/react-router",
 		"README.md",
 		"package.json",
@@ -29,7 +30,7 @@
 	},
 	"scripts": {
 		"build": "bun run ../../build.ts",
-		"test": "bun test src",
+		"test": "bun test ./src",
 		"typecheck": "tsc --noEmit"
 	},
 	"alxia": {
