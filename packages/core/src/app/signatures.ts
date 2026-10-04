@@ -4,29 +4,21 @@
  */
 import type { Refusal, RefusalKind, RefusalOfKind } from '../errors/errors';
 import type { AnyReply, Reply } from '../reply/reply';
-import type { JoinPath, PathAt, RoutePath } from '../types/path';
 import type { ClientErrorStatus } from '../types/status';
 import type { Alxia } from './alxia';
 import type {
 	BaseContext,
-	Context,
 	DeclaredRefusal,
 	DeclaredReply,
-	Empty,
-	HandlerResult,
 	KindRefusalsOf,
 	MaybePromise,
-	Method,
 	OneKind,
 	RefusalResponses,
 	RefusalSchema,
 	RefusalsOf,
 	Refusing,
 	RefusingKind,
-	RouteEntryOf,
-	RouteSchema,
 	TypedReplyFunction,
-	ValidSchema,
 } from './types';
 
 export interface AlxiaOptions<Prefix extends string> {
@@ -56,43 +48,6 @@ export interface ListenOptions {
 	readonly idleTimeout?: number;
 	readonly maxRequestBodySize?: number;
 	readonly tls?: Bun.TLSOptions;
-}
-
-/** A route method: `app.get(path, schema, handler)` or `app.get(path, handler)`. */
-export interface RouteMethod<
-	M extends Method,
-	Ctx extends object,
-	Routes extends object,
-	Prefix extends string,
-	Shortcuts extends AnyReply,
-> {
-	<
-		const Path extends RoutePath,
-		Schema extends RouteSchema,
-		Result extends HandlerResult<Schema>,
-	>(
-		path: PathAt<Prefix, Path>,
-		schema: Schema & ValidSchema<JoinPath<Prefix, Path>, Schema>,
-		handler: (
-			ctx: Context<Ctx, JoinPath<Prefix, Path>, Schema>,
-		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes & RouteEntryOf<M, JoinPath<Prefix, Path>, Schema, Result, Shortcuts>,
-		Prefix,
-		Shortcuts
-	>;
-	<const Path extends RoutePath, Result extends AnyReply>(
-		path: PathAt<Prefix, Path>,
-		handler: (
-			ctx: Context<Ctx, JoinPath<Prefix, Path>, Empty>,
-		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes & RouteEntryOf<M, JoinPath<Prefix, Path>, Empty, Result, Shortcuts>,
-		Prefix,
-		Shortcuts
-	>;
 }
 
 /** Any app, whatever it holds. */
@@ -177,3 +132,5 @@ export interface RefusalMethod<
 		| KindRefusalsOf<Kind, DeclaredRefusal<Responses>, Result>
 	>;
 }
+
+export type { RouteMethod } from './route-method';

@@ -4,7 +4,9 @@
 import {
 	alxia,
 	type ClientErrorStatus,
+	defineHook,
 	definePlugin,
+	defineWrap,
 	eventStream,
 	type PathAt,
 	problem,
@@ -148,4 +150,44 @@ export function withResponseCookies() {
 	return alxia()
 		.derive(({ cookies, set }) => ({ sid: cookies['sid'], jar: set.cookies }))
 		.get('/', ({ sid, reply }) => reply(200, sid ?? ''));
+}
+
+// Hooks given to a route, in a list: a hook made once and exported names
+// `RouteHook` and `RouteWrap`; a route threading them names what they add
+// and reply in its record.
+export const canSee = defineHook<{ user: string; params: { id: string } }>()(
+	({ user, params, reply }) =>
+		user === params.id
+			? undefined
+			: reply(403, { error: 'forbidden' as const }),
+);
+export const loaded = defineHook(({ params }) => ({ loadedAt: params['id'] }));
+export const exclusive = defineWrap<{ user: string }>()(async (_ctx, next) =>
+	next(),
+);
+export const busy = defineWrap(({ reply }) =>
+	reply(409, { error: 'busy' as const }),
+);
+
+export function hooked() {
+	return alxia()
+		.derive(() => ({ user: 'u' }))
+		.get('/:id', [canSee, loaded, exclusive], ({ loadedAt, reply }) =>
+			reply(200, loadedAt ?? ''),
+		)
+		.post('/:id', [busy], { body: Ping }, ({ body, reply }) => reply(200, body))
+		.route(
+			{ method: 'PUT', path: '/:id', schema: { body: Ping } } as const,
+			[canSee],
+			({ reply }) => reply(204),
+		)
+		.ws(
+			'/live/:id',
+			[canSee, loaded],
+			{},
+			{
+				open: (socket) => void socket.send(socket.data.loadedAt ?? ''),
+				message: () => {},
+			},
+		);
 }

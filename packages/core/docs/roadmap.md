@@ -42,6 +42,14 @@ Nothing scheduled yet.
 
 ### Next release
 
+- **Hooks on one route.** A route takes a list of hooks after its path —
+  `app.patch('/bookmarks/:id', [canView, loadBookmark, canEdit], schema, handler)` — run
+  after the hooks in force, in order, before validation. Each is written
+  once with `defineHook` or `defineWrap` and names what it reads, a `user`
+  or a path parameter: a route that does not give it does not compile.
+  What a hook adds, the hooks after it and the handler read; its replies
+  join that route's type, so the client reads them. `route()` and `ws`
+  take the list too. A route without one costs the compiler nothing more.
 - **Request cookies in every hook.** `ctx.cookies` is on the base context:
   a `derive`, `wrap`, `onError`, `onRefusal` or guard reads the request's
   cookies, parsed on first read, without parsing the `Cookie` header

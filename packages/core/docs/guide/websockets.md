@@ -32,7 +32,7 @@ Sockets need **a server**: `listen`, or a `Bun.serve` of your own given
 — `app.request`, a test without a server — a socket route answers
 `426 upgrade_required`.
 
-## `ws(path, schema, handlers)`
+## `ws(path, schema, handlers)`, `ws(path, hooks, schema, handlers)`
 
 ```ts
 ws<const Path extends RoutePath, Schema extends SocketSchema = Empty>(
@@ -40,9 +40,17 @@ ws<const Path extends RoutePath, Schema extends SocketSchema = Empty>(
 	schema: Schema,
 	handlers: SocketHandlers<SocketContext<Ctx, Path, Schema>, SocketSend<Schema>, SocketMessage<Schema>>,
 ): Alxia<…>
+ws<const Path extends RoutePath, const Hooks extends readonly AnyRouteHook[], Schema extends SocketSchema = Empty>(
+	path: Path,
+	hooks: Hooks, // each checked as a route's list is: at most 8
+	schema: Schema,
+	handlers: SocketHandlers<SocketContext<Ctx & /* what the hooks add */, Path, Schema>, SocketSend<Schema>, SocketMessage<Schema>>,
+): Alxia<…>
 ```
 
-The schema is required; `{}` validates nothing.
+The schema is required; `{}` validates nothing. With a list of hooks
+after the path — `ws(path, [canJoin, loadRoom], schema, handlers)` — the
+socket runs hooks of its own on the upgrade ([below](#the-upgrade)).
 
 | Part | Checks | Refused |
 | --- | --- | --- |
@@ -54,7 +62,11 @@ The schema is required; `{}` validates nothing.
 ## The upgrade
 
 The upgrade request runs the route hooks declared before the socket —
-`decorate`, `derive` — then validation, like a route. A `derive` that
+`decorate`, `derive` — then the hooks of its own list, in order, then
+validation, like a route. A `defineHook` in the list runs, and what it
+adds is in `socket.data`; a `defineWrap` in it is skipped, as every `wrap`
+is on an upgrade: there is no response to wrap
+([Hooks on one route](hooks.md#hooks-on-one-route)). A `derive` that
 replies 401 refuses the socket with that 401: an unauthenticated client
 never gets one.
 
