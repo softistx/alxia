@@ -15,7 +15,7 @@ const connection = await connectRedis(Bun.env['REDIS_URL']!);
 const Payment = z.object({ amount: z.number().int().positive() });
 
 const app = alxia()
-	.use(idempotency(connection.client, { name: 'payments' }))
+	.plugin(idempotency(connection.client, { name: 'payments' }))
 	.post('/payments', validate({ body: Payment }), ({ body, reply }) =>
 		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
 	);
@@ -28,7 +28,7 @@ curl -X POST localhost:3000/payments -H 'idempotency-key: 4f1c' -H 'content-type
 # 201 {"id":"9a…","amount":10}     Idempotent-Replayed: true — the route did not run
 ```
 
-Only the routes declared **after** `use(idempotency(…))` are guarded.
+Only the routes declared **after** `plugin(idempotency(…))` are guarded.
 
 ## The signature
 
@@ -109,7 +109,7 @@ import { z } from 'zod';
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia()
-	.use(idempotency(connection.client, { name: 'payments', required: true }))
+	.plugin(idempotency(connection.client, { name: 'payments', required: true }))
 	.post('/payments', validate({ body: z.object({ amount: z.number() }) }), ({ body, reply }) =>
 		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
 	);
@@ -157,7 +157,7 @@ import { connectRedis } from '@nxgt/redis';
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia()
-	.use(idempotency(connection.client, { name: 'orders', wait: 2_000 }))   // keep it under your HTTP timeout
+	.plugin(idempotency(connection.client, { name: 'orders', wait: 2_000 }))   // keep it under your HTTP timeout
 	.post('/orders', async ({ reply }) => reply(201, { id: crypto.randomUUID() }));
 ```
 
@@ -180,7 +180,7 @@ import { connectRedis } from '@nxgt/redis';
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia({ ip: (request) => request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() })
-	.use(
+	.plugin(
 		idempotency(connection.client, {
 			name: 'payments',
 			scope: ({ request }) => request.headers.get('x-user-id') ?? undefined,
@@ -213,8 +213,8 @@ import { connectRedis } from '@nxgt/redis';
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia()
-	.use(rateLimit({ limit: 10, windowMs: 60_000, store: redisStore(connection.client, { name: 'pay' }) }))  // its 429 is never kept
-	.use(idempotency(connection.client, { name: 'payments' }))
+	.plugin(rateLimit({ limit: 10, windowMs: 60_000, store: redisStore(connection.client, { name: 'pay' }) }))  // its 429 is never kept
+	.plugin(idempotency(connection.client, { name: 'payments' }))
 	.post('/payments', ({ reply }) => reply(201, { ok: true }));
 ```
 

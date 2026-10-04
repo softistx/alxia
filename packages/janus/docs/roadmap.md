@@ -31,7 +31,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **The user in the context.** `use(session(accounts))` hands the routes
+- **The user in the context.** `plugin(session(accounts))` hands the routes
   after it `user`, `session` and `auth`, typed by the user schema and
   narrowed by `type`; with `required: true`, an anonymous request is a typed
   401 and `user` is never `null`. A required `session()` behind an open one

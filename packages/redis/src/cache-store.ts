@@ -28,7 +28,7 @@ const REFUSED_ARGUMENTS = /wrong number of arguments|syntax error/i;
  * of the keys they name.
  *
  * ```ts
- * app.use(cache({ ttl: 60, store: redisCacheStore(connection.client, { name: 'shop' }) }));
+ * app.plugin(cache({ ttl: 60, store: redisCacheStore(connection.client, { name: 'shop' }) }));
  * ```
  */
 export function redisCacheStore(

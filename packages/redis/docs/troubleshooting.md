@@ -106,7 +106,7 @@ never meet `@alxia/cache`'s `cache`.
 
 ```ts
 alxia()
-	.use(redis(connection.client, { caches: { users } }))
+	.plugin(redis(connection.client, { caches: { users } }))
 	.get('/users/:id', async ({ caches, params, reply }) =>
 		reply.ok(await caches.users.remember(params.id, () => loadUser(params.id))),
 	);
@@ -580,8 +580,8 @@ the request was sent with a valid token.
 
 ```ts
 alxia()
-	.use(rateLimit({ limit: 10, windowMs: 60_000, store: redisStore(connection.client, { name: 'pay' }) }))
-	.use(idempotency(connection.client, { name: 'payments' }))
+	.plugin(rateLimit({ limit: 10, windowMs: 60_000, store: redisStore(connection.client, { name: 'pay' }) }))
+	.plugin(idempotency(connection.client, { name: 'payments' }))
 	.post('/payments', ({ reply }) => reply(201, { ok: true }));
 ```
 

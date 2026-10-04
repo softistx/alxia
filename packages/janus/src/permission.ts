@@ -37,8 +37,8 @@ type LooseCan = (
  * it 503. Scope it with `group`, so it guards only its routes:
  *
  * ```ts
- * app.use(session(accounts)).group('/records/:id', (records) =>
- *   records.use(permission(access, 'view', 'record', byParam('id', findRecord)))
+ * app.plugin(session(accounts)).group('/records/:id', (records) =>
+ *   records.plugin(permission(access, 'view', 'record', byParam('id', findRecord)))
  *     .get('/', ({ object, reply }) => reply(200, object)));
  * ```
  */
@@ -57,7 +57,7 @@ export function permission<
 	load: (ctx: BaseContext & LoadCtx) => Awaitable<O | null>,
 	...options: OptionsArgs<C, T, P, O, SubjectCtx, CheckCtx>
 ) {
-	// `use` has checked that the app gives what `load`, `subject` and `ctx` read.
+	// `app.plugin` has checked that the app gives what `load`, `subject` and `ctx` read.
 	const loadOf = load as (ctx: BaseContext) => Awaitable<O | null>;
 	const { subject, ctx: ctxOf } = (options[0] ?? {}) as {
 		readonly subject?: (

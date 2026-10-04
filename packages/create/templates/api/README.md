@@ -20,9 +20,9 @@ operations generated from it, and a client is generated from the same file.
   operation. `route(operations.createTodo, requireKey, handler)` runs its
   middlewares in order: `requireKey`, made with `defineMiddleware`,
   answers 401 without the `x-api-key` header; the operation's body is
-  validated just before the handler, and every reply checked against the
-  operation's responses.
-- `src/app.ts`: the app, `base.use(todoRoutes)`. Mounting the routes on
+  validated just before the handler, and the handler's reply checked
+  against the operation's responses.
+- `src/app.ts`: the app, `base.plugin(todoRoutes)`. Mounting the routes on
   an app that does not give the base's context is a compile error.
 - `src/server.ts`: listens on `PORT`, 3000 by default.
 - `src/app.spec.ts`: `app.request()`, no port, and `matchesSpec` from

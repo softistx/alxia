@@ -16,7 +16,7 @@ const fr = { home: { title: 'Bienvenue', greeting: 'Bonjour {name}' } };
 const i18n = createI18n({ resources: { en, fr }, fallback: 'en' });
 
 const app = alxia()
-	.use(i18n)
+	.plugin(i18n)
 	.get('/', ({ t, reply }) => reply(200, { title: t('home.title'), greeting: t('home.greeting', { name: 'Ada' }) }));
 
 app.listen(3000);
@@ -65,7 +65,7 @@ when `resolve` is absent or not annotated. See
 
 `createI18n()` returns two things in one value:
 
-- **an app plugin**: pass it to `use`. It applies to the routes declared
+- **an app plugin**: pass it to `app.plugin`. It applies to the routes declared
   **after** it, in the same app or [group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md),
   and adds `t`, `language` and `languageSource` to their context;
 - **`t()`, `language()` and `supported`**, to call where no context is at
@@ -178,7 +178,7 @@ const i18n = createI18n({
 });
 
 export const app = alxia()
-	.use(i18n)
+	.plugin(i18n)
 	.get('/:lang/home', ({ t, reply }) => reply(200, t('home.title'))); // /fr/home → 'Bienvenue'
 ```
 
@@ -209,11 +209,11 @@ const i18n = createI18n({
 });
 
 export const app = alxia()
-	.use(auth) // derives user: User | null
-	.use(i18n)
+	.plugin(auth) // derives user: User | null
+	.plugin(i18n)
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 
-alxia().use(i18n);
+alxia().plugin(i18n);
 // error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
@@ -242,14 +242,14 @@ const i18n = createI18n({
 });
 
 export const app = alxia()
-	.use(i18n)
+	.plugin(i18n)
 	.get('/', ({ t, language, languageSource, reply }) =>
 		reply(200, { title: t('home.title'), language, languageSource }),
 	);
 // GET /?lang=fr → {"title":"Bienvenue","language":"fr","languageSource":"query"}
 ```
 
-A route declared before `.use(i18n)` reads none of them:
+A route declared before `.plugin(i18n)` reads none of them:
 
 ```text
 error TS2339: Property 't' does not exist on type 'Context<Empty, "/", Empty>'.
@@ -377,7 +377,7 @@ export function translatedWith<const C extends Catalogues, const Fallback extend
 	fallback: Fallback,
 ) {
 	return alxia()
-		.use(createI18n({ resources, fallback }))
+		.plugin(createI18n({ resources, fallback }))
 		.get('/', ({ language, reply }) => reply(200, language));
 }
 ```
@@ -408,7 +408,7 @@ async function describeCart(count: number) {
 }
 
 export const app = alxia()
-	.use(i18n)
+	.plugin(i18n)
 	.get('/cart', async ({ reply }) => reply(200, await describeCart(3))); // ?lang=fr → '3 articles'
 
 i18n.language(); // 'en': no request here
@@ -420,12 +420,12 @@ everything the request runs knows it. Before that, `i18n.t()` and
 
 | Where | `i18n.t()` answers in |
 | --- | --- |
-| a route, `derive` or `wrap` declared after `.use(i18n)`, and what they call | the request's language |
+| a route, `derive` or `wrap` declared after `.plugin(i18n)`, and what they call | the request's language |
 | an `onError` hook, for what a route after the plugin threw | the request's language |
 | an `onResponse` hook, for a request the plugin ran for | the request's language |
-| an `around` hook declared after `.use(i18n)`, once `next()` has resolved | the request's language |
-| an `onRequest` hook; an `around` hook declared before `.use(i18n)`; one declared after it, before `next()` | the fallback: the language is not read yet |
-| a route or route hook declared before `.use(i18n)`, or a `404` no route matched | the fallback: the plugin does not run for it |
+| an `around` hook declared after `.plugin(i18n)`, once `next()` has resolved | the request's language |
+| an `onRequest` hook; an `around` hook declared before `.plugin(i18n)`; one declared after it, before `next()` | the fallback: the language is not read yet |
+| a route or route hook declared before `.plugin(i18n)`, or a `404` no route matched | the fallback: the plugin does not run for it |
 | code outside any request: start-up, a timer, a queue consumer | the fallback: pass the language, see below |
 
 An `onError` hook translates an error's message with `i18n.t()`, or with
@@ -439,7 +439,7 @@ import { resources as shared } from '@nxgt/i18n';
 const i18n = createI18n({ resources: { en: shared.en, fr: shared.fr }, fallback: 'en' });
 
 export const app = alxia()
-	.use(i18n)
+	.plugin(i18n)
 	.onError((error, { reply }) =>
 		error instanceof HttpError && error.status === 404
 			? reply(404, { error: i18n.t('errors.not-found') })
@@ -487,7 +487,7 @@ import { getLanguage, translate, resources as shared } from '@nxgt/i18n';
 const i18n = createI18n({ resources: { en: shared.en, fr: shared.fr }, fallback: 'en' });
 
 export const app = alxia()
-	.use(i18n)
+	.plugin(i18n)
 	.get('/', ({ reply }) => reply(200, { language: getLanguage(), message: translate('errors.not-found') }));
 // GET /?lang=fr → {"language":"fr","message":"Impossible de trouver la ressource demandée."}
 ```
@@ -521,8 +521,8 @@ const i18n = createI18n({
 });
 
 export const app = alxia()
-	.use(i18n)
-	.use(cache({ ttl: 60, vary: ['accept-language', 'cookie'] }))
+	.plugin(i18n)
+	.plugin(cache({ ttl: 60, vary: ['accept-language', 'cookie'] }))
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 ```
 
@@ -540,7 +540,7 @@ const i18n = createI18n({
 	fallback: 'en',
 });
 const app = alxia()
-	.use(i18n)
+	.plugin(i18n)
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 
 test("answers in the browser's language", async () => {
@@ -585,7 +585,7 @@ const carts = new Map<string, string[]>([['c1', ['book', 'pen']]]);
 const describeCart = (items: readonly string[]) => i18n.t('cart.items', { count: items.length });
 
 export const app = alxia()
-	.use(i18n)
+	.plugin(i18n)
 	.onError((error, { t, reply }) =>
 		error instanceof HttpError && error.status === 404
 			? reply(404, { error: t?.('errors.not-found') ?? 'Not found' })

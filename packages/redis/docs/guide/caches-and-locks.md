@@ -17,7 +17,7 @@ const users = defineCache({ name: 'user', key: (id: string) => id, ttl: 300, sch
 const loadUser = async (id: string) => ({ id, name: 'Ada' });   // your database
 
 const app = alxia()
-	.use(redis(connection.client, { caches: { users } }))
+	.plugin(redis(connection.client, { caches: { users } }))
 	.get('/users/:id', async ({ caches, params, reply }) => {
 		const user = await caches.users.remember(params.id, () => loadUser(params.id));   // typed by User
 		return reply.ok(user);
@@ -66,7 +66,7 @@ import type { RedisClient } from 'bun';
 
 export function withCaches<const Caches extends Record<string, AnyCache>>(client: RedisClient, caches: Caches) {
 	return alxia()
-		.use(redis(client, { caches }))
+		.plugin(redis(client, { caches }))
 		.get('/caches', ({ caches: bound, reply }) => reply(200, Object.keys(bound)));
 }
 ```
@@ -100,7 +100,7 @@ const profiles = defineCache({ name: 'profile', key: (id: string) => id, ttl: 60
 const table = new Map<string, z.input<typeof Profile>>([['1', { id: '1', name: 'Ada' }]]);
 
 const app = alxia()
-	.use(redis(connection.client, { caches: { profiles } }))
+	.plugin(redis(connection.client, { caches: { profiles } }))
 	.get('/profiles/:id', async ({ caches, params, reply }) => {
 		const profile = await caches.profiles.remember(params.id, async () => table.get(params.id) ?? { id: params.id, name: '?' });
 		return reply.ok(profile);                         // plan is filled in: 'free'
@@ -142,7 +142,7 @@ const connection = await connectRedis(Bun.env['REDIS_URL']!);
 const sendInvoices = async () => 12;   // the work that must not run twice at once
 
 const app = alxia()
-	.use(redis(connection.client))
+	.plugin(redis(connection.client))
 	.post('/invoices/run', async ({ lock, reply }) => {
 		try {
 			const sent = await lock('invoices', sendInvoices, { ttl: 60_000 });
@@ -176,7 +176,7 @@ import { connectRedis } from '@nxgt/redis';
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia()
-	.use(redis(connection.client))
+	.plugin(redis(connection.client))
 	.post('/articles/:id/views', async ({ redis, params, reply }) => {
 		const views = await redis.incr(`views:${params.id}`);
 		return reply(200, { views });
@@ -201,8 +201,8 @@ const users = defineCache({ name: 'user', key: (id: string) => id, ttl: 300, sch
 const loadUser = async (id: string) => ({ id, name: 'Ada' });
 
 const app = alxia()
-	.use(redis(connection.client, { caches: { users } }))
-	.use(cache({ ttl: 60 }))
+	.plugin(redis(connection.client, { caches: { users } }))
+	.plugin(cache({ ttl: 60 }))
 	.get('/users/:id', async ({ caches, cache, params, reply }) => {
 		cache.tag(`user:${params.id}`);                                    // the response cache
 		return reply.ok(await caches.users.remember(params.id, () => loadUser(params.id)));   // the Redis cache

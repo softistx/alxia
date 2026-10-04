@@ -83,9 +83,9 @@ does not run those hooks: another app, or the endpoint declared before the
 hooks ([The typed context](guide/context.md)):
 
 ```ts
-const base = alxia().use(bearer({ jwt }));                       // adds user
+const base = alxia().plugin(bearer({ jwt }));                       // adds user
 const schema = createSchema<GraphQLContext<typeof base>>({ … });
-const app = base.use((app) => graphql(app, { schema }));         // not alxia().use(…)
+const app = base.plugin((app) => graphql(app, { schema }));         // not alxia().plugin(…)
 ```
 
 **When the missing field comes from the `context` option** — `missing
@@ -205,7 +205,7 @@ graphql(app, { schema, path: '/gql' });
 `get('/graphql', …)` beside the endpoint.
 
 **Why:** each `graphql` call declares `GET` and `POST` at its `path`, and
-two endpoints with the default path collide. `use((app) => graphql(app, …))`
+two endpoints with the default path collide. `plugin((app) => graphql(app, …))`
 declares the routes on the app it is called on, so calling it twice on the
 same `base` — for two variants of an app — declares them twice there.
 
@@ -213,8 +213,8 @@ same `base` — for two variants of an app — declares them twice there.
 
 ```ts
 const app = alxia()
-	.use((app) => graphql(app, { schema }))
-	.use((app) => graphql(app, { schema: admin, path: '/admin/graphql' }));
+	.plugin((app) => graphql(app, { schema }))
+	.plugin((app) => graphql(app, { schema: admin, path: '/admin/graphql' }));
 ```
 
 ## Responses
@@ -255,8 +255,8 @@ CORS plugin.
 import { cors } from '@alxia/cors';
 
 const app = alxia()
-	.use(cors({ origin: 'https://app.example.com', credentials: true }))
-	.use((app) => graphql(app, { schema }));
+	.plugin(cors({ origin: 'https://app.example.com', credentials: true }))
+	.plugin((app) => graphql(app, { schema }));
 ```
 
 ### `405 {"errors":[{"message":"Can only perform a mutation operation from a POST request."}]}`
@@ -328,8 +328,8 @@ await app.request(`/graphql?query=${encodeURIComponent('{ me }')}`, {
 
 ### The endpoint answers without a guard declared after it
 
-**When:** `.use((app) => graphql(app, { schema }))` comes before
-`.use(bearer(…))` or a guarding `derive`: the endpoint answers anonymous
+**When:** `.plugin((app) => graphql(app, { schema }))` comes before
+`.plugin(bearer(…))` or a guarding `derive`: the endpoint answers anonymous
 requests, and its resolvers read no `user`.
 
 **Why:** a route hook applies to the routes declared after it. The endpoint
@@ -339,8 +339,8 @@ guarded app is refused (`missing user`); an untyped one is not.
 **Fix:** declare the guard first:
 
 ```ts
-const base = alxia().use(bearer({ jwt }));
-const app = base.use((app) => graphql(app, { schema }));
+const base = alxia().plugin(bearer({ jwt }));
+const app = base.plugin((app) => graphql(app, { schema }));
 ```
 
 ### A WebSocket client cannot connect: `Expected 101 status code`

@@ -60,7 +60,7 @@ cache({ ttl: 60 });
 ### `Property 'cache' does not exist on type 'Context<…>'`
 
 **When:** a route reads `ctx.cache` — to call `tag` or `skip` — and is
-declared before `use(cache(…))`.
+declared before `plugin(cache(…))`.
 
 ```text
 error TS2339: Property 'cache' does not exist on type 'Context<Empty, "/x", Empty>'.
@@ -73,7 +73,7 @@ routes declared after it. The route before it is not cached either.
 
 ```ts
 alxia()
-	.use(cache({ ttl: 60 }))
+	.plugin(cache({ ttl: 60 }))
 	.get('/products/:id', ({ params, cache, reply }) => {
 		cache.tag(`product:${params.id}`);
 		return reply(200, { id: params.id });
@@ -100,8 +100,8 @@ nothing else.
 
 ```ts
 alxia()
-	.use(redis(connection.client, { caches: { users } }))
-	.use(cache({ ttl: 60 }))
+	.plugin(redis(connection.client, { caches: { users } }))
+	.plugin(cache({ ttl: 60 }))
 	.get('/users/:id', async ({ caches, cache, params, reply }) => {
 		cache.tag(`user:${params.id}`);
 		return reply.ok(await caches.users.remember(params.id, () => loadUser(params.id)));
@@ -136,10 +136,10 @@ const auth = alxia().derive(({ request }) => ({
 	user: { tenantId: request.headers.get('x-tenant') ?? 'public' },
 }));
 
-alxia().use(auth).use(perTenant); // auth derives user
+alxia().plugin(auth).plugin(perTenant); // auth derives user
 ```
 
-On an app that does not give `user`, `use(perTenant)` is a compile error:
+On an app that does not give `user`, `plugin(perTenant)` is a compile error:
 [`the plugin reads "user", which this app's context does not give`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first),
 or [`… gives with another type`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-gives-with-another-type)
 when its `user` is not `{ tenantId: string }`.
@@ -324,7 +324,7 @@ fails is what stale-while-revalidate is for. Fix the route; keep
 
 | Cause | Fix |
 | --- | --- |
-| the route is declared before `use(cache(…))` | declare it after |
+| the route is declared before `plugin(cache(…))` | declare it after |
 | the response sets a cookie — a session plugin that touches every response, say | move the routes that set it before the cache, or stop it setting a cookie on public pages |
 | the response says `Cache-Control: private` or `no-store` | intended: it is personal |
 | its status is not in `statuses` (`[200]`) | `statuses: [200, 404]` |
@@ -407,7 +407,7 @@ alone, and a `key` of your own from what it reads. The response's own
 **Fix:** name the header in `vary`, or read it in your `key`:
 
 ```ts
-app.use(cache({ ttl: 60, vary: ['accept-encoding'] }))
+app.plugin(cache({ ttl: 60, vary: ['accept-encoding'] }))
 	.static('/assets', './public', { precompressed: ['br', 'gzip'] });
 ```
 

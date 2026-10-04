@@ -32,14 +32,14 @@ const accounts = janus({
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.use(janusErrors())                                   // janus's refusals, typed
-	.use(session(accounts))                               // not required: anonymous may sign in
+	.plugin(janusErrors())                                   // janus's refusals, typed
+	.plugin(session(accounts))                               // not required: anonymous may sign in
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });  // the token in the cookie
 	})
 	.post('/signout', async ({ auth, reply }) => reply.ok(await auth.signOut()))
-	.use(session(accounts, { required: true }))           // every route after it
+	.plugin(session(accounts, { required: true }))           // every route after it
 	.get('/me', ({ user, reply }) => reply.ok(user));     // user typed by the schema
 ```
 
@@ -129,11 +129,11 @@ const records = new Map([['r1', { id: 'r1', title: 'Blood test' }]]);
 const findRecord = (id: string) => records.get(id) ?? null;
 
 const app = alxia()
-	.use(janusErrors())
-	.use(session(accounts))
+	.plugin(janusErrors())
+	.plugin(session(accounts))
 	.group('/records/:id', (record) =>
 		record
-			.use(permission(access, 'view', 'record', byParam('id', findRecord)))
+			.plugin(permission(access, 'view', 'record', byParam('id', findRecord)))
 			.get('/', ({ object, reply }) => reply(200, object)), // object: what findRecord found
 	);
 ```
@@ -159,8 +159,8 @@ const byTenant = permission(
 		tenant.records.get(pathParams['id'] ?? '') ?? null,
 );
 
-alxia().use(tenancy).use(session(accounts)).use(byTenant); // tenancy derives tenant
-alxia().use(session(accounts)).use(byTenant); // a compile error: this app gives no `tenant`
+alxia().plugin(tenancy).plugin(session(accounts)).plugin(byTenant); // tenancy derives tenant
+alxia().plugin(session(accounts)).plugin(byTenant); // a compile error: this app gives no `tenant`
 ```
 
 A callback annotated `any` would require nothing, so the guard is refused

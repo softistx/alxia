@@ -128,10 +128,11 @@ implemented(app, operations, { prefix: '/api' });
 
 ## Routes with middlewares
 
-`app.route(operation, ...middlewares, handler)` checks every reply with a
-status the operation declares, a middleware's too, and validates the request
-just before the handler, or where `validate(operation)` stands. The checks
-match such a route as any other, by method and path:
+`app.route(operation, ...middlewares, handler)` validates the request and
+checks the handler's reply just before the handler, or where
+`validate(operation)` and `responds(operation)` stand. A middleware's own
+reply, such as an auth's 401, is sent as it is. The checks match such a
+route as any other, by method and path:
 
 ```ts
 import { alxia, validate } from '@alxia/core';

@@ -27,7 +27,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **CORS as one plugin.** `alxia().use(cors(options))` sets the policy for
+- **CORS as one plugin.** `alxia().plugin(cors(options))` sets the policy for
   the whole app, every route and every error response included, and adds
   nothing to the app's type.
 - **Preflights answered before routing.** An `OPTIONS` with

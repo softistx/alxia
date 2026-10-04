@@ -14,7 +14,7 @@ const tracing = telemetry({ service: 'checkout', exporters: [consoleExporter()] 
 const log = createLogger('Orders');
 
 const app = alxia()
-	.use(tracing)
+	.plugin(tracing)
 	.get('/orders/:id', ({ params, span, reply }) => {
 		span?.attribute('order.id', params.id);
 		log.info('order read');
@@ -52,7 +52,7 @@ interface Hooks {
 
 `SpanScope`, `Telemetry` and `TelemetryOptions` are `@nxgt/telemetry`'s;
 `RequestContext` is `@alxia/core`'s. `telemetry()` returns an app plugin:
-pass it to `use`, called. It adds a global `around` hook, which traces every
+pass it to `app.plugin`, called. It adds a global `around` hook, which traces every
 request of the app, and a `derive`, which gives the routes declared
 **after** it `span` and `telemetry`. The telemetry it writes to is also on
 the plugin itself, as `.telemetry`, for the code that is not a route.
@@ -73,7 +73,7 @@ import { consoleExporter, createLogger, span } from '@nxgt/telemetry';
 const log = createLogger('Orders');
 
 const app = alxia()
-	.use(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
+	.plugin(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
 	.get('/orders/:id', async ({ params, reply }) => {
 		const order = await span('orders.find', () => ({ id: params.id })); // a child of the server span
 		log.info('order read');                                            // carries the server span's ids
@@ -81,7 +81,7 @@ const app = alxia()
 	});
 ```
 
-Because the hook is global, a route declared before `use(telemetry(...))`
+Because the hook is global, a route declared before `plugin(telemetry(...))`
 is traced too; it only cannot read `span` and `telemetry` from its context.
 A WebSocket upgrade is not traced: `@alxia/core` runs no `around` hook for
 it, since there is no response to wrap.
@@ -156,7 +156,7 @@ import { telemetry } from '@alxia/telemetry';
 import { consoleExporter } from '@nxgt/telemetry';
 
 const app = alxia()
-	.use(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
+	.plugin(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
 	.onError((error, { reply }) =>
 		error instanceof RangeError ? reply(400, { error: 'out_of_range' as const }) : undefined,
 	)
@@ -206,7 +206,7 @@ import { telemetry } from '@alxia/telemetry';
 import { withAttributes } from '@nxgt/telemetry';
 
 const app = alxia()
-	.use(telemetry({ service: 'shop' }))
+	.plugin(telemetry({ service: 'shop' }))
 	.around((ctx, next) =>
 		withAttributes({ 'tenant.id': ctx.request.headers.get('x-tenant') ?? 'none' }, next),
 	);
@@ -227,7 +227,7 @@ import { telemetry } from '@alxia/telemetry';
 import { consoleExporter, span } from '@nxgt/telemetry';
 
 const app = alxia()
-	.use(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
+	.plugin(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
 	.post('/orders/:id/reserve', async ({ params, reply }) => {
 		const stock = await span('stock.reserve', { kind: 'client' }, (scope) =>
 			fetch(`https://stock.example.com/reserve/${params.id}`, {
@@ -252,7 +252,7 @@ import { telemetry } from '@alxia/telemetry';
 import { consoleExporter } from '@nxgt/telemetry';
 
 const app = alxia()
-	.use(telemetry({ service: 'checkout', exporters: [consoleExporter()], traceResponse: true }))
+	.plugin(telemetry({ service: 'checkout', exporters: [consoleExporter()], traceResponse: true }))
 	.get('/', ({ reply }) => reply(200, 'ok'));
 
 const response = await app.request('/');
@@ -315,7 +315,7 @@ import { consoleExporter, createTelemetry } from '@nxgt/telemetry';
 
 const shared = createTelemetry('checkout', { exporters: [consoleExporter()] }).install();
 
-const app = alxia().use(telemetry({ instance: shared }));
+const app = alxia().plugin(telemetry({ instance: shared }));
 ```
 
 The plugin runs each traced request inside the instance, so the logs in it
@@ -360,7 +360,7 @@ import { telemetry } from '@alxia/telemetry';
 import { consoleExporter } from '@nxgt/telemetry';
 
 const app = alxia()
-	.use(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
+	.plugin(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
 	.get('/orders/:id', ({ params, span, telemetry: current, reply }) => {
 		span?.attribute('order.id', params.id);          // SpanScope | undefined
 		span?.event('cache.miss');
@@ -373,7 +373,7 @@ const app = alxia()
 | `span` | `SpanScope \| undefined` | the server span: `attribute`, `attributes`, `event`, `fail`, `traceparent()`, a writable `name` and `status`; `undefined` when `traced` said no |
 | `telemetry` | `Telemetry` | the telemetry the plugin writes to, traced or not |
 
-Only the routes declared after `use(telemetry(...))`, in the same app or
+Only the routes declared after `plugin(telemetry(...))`, in the same app or
 group, read them.
 
 ## Shutting down
@@ -391,7 +391,7 @@ import { consoleExporter } from '@nxgt/telemetry';
 const tracing = telemetry({ service: 'checkout', exporters: [consoleExporter()] });
 
 const app = alxia()
-	.use(tracing)
+	.plugin(tracing)
 	.get('/', ({ reply }) => reply(200, 'ok'))
 	.onStop(() => tracing.telemetry.close());
 
@@ -431,7 +431,7 @@ const tracing = telemetry({
 });
 
 const app = alxia()
-	.use(tracing)
+	.plugin(tracing)
 	.get('/', ({ reply }) => reply(200, 'ok'))
 	.onStop(() => tracing.telemetry.close());
 
@@ -471,7 +471,7 @@ test('a route gets one server span, named after it', async () => {
 	};
 	const instance = createTelemetry('test', { exporters: [exporter] });
 	const app = alxia()
-		.use(telemetry({ instance }))
+		.plugin(telemetry({ instance }))
 		.get('/users/:id', ({ params, reply }) => reply(200, { id: params.id }));
 
 	await app.request('/users/7');

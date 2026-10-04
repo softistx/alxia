@@ -167,7 +167,7 @@ payload is whatever its signer chose: a custom claim is `unknown`.
 typed:
 
 ```ts
-app.use(bearer({ jwt, schema: Claims })).get('/me', ({ user, reply }) => reply(200, user.role));
+app.plugin(bearer({ jwt, schema: Claims })).get('/me', ({ user, reply }) => reply(200, user.role));
 ```
 
 ### `Type 'string | undefined' is not assignable to type 'string'` on `sub`
@@ -186,13 +186,13 @@ without `sub` verifies.
 acceptable:
 
 ```ts
-app.use(bearer({ jwt, schema: z.object({ sub: z.string() }) }));      // user.sub: string
-app.use(bearer({ jwt })).get('/me', ({ user, reply }) => reply(200, user.sub ?? ''));
+app.plugin(bearer({ jwt, schema: z.object({ sub: z.string() }) }));      // user.sub: string
+app.plugin(bearer({ jwt })).get('/me', ({ user, reply }) => reply(200, user.sub ?? ''));
 ```
 
 ### `Property 'user' does not exist on type 'Context<…>'`
 
-**When:** a route reads `user` but is declared before `use(bearer(…))`.
+**When:** a route reads `user` but is declared before `plugin(bearer(…))`.
 
 ```text
 error TS2339: Property 'user' does not exist on type 'Context<Empty, "/me", Empty>'.
@@ -207,7 +207,7 @@ it, at runtime and in the types. A route before it is open, and has no
 ```ts
 const app = alxia()
 	.post('/login', /* … */)       // open
-	.use(bearer({ jwt }))
+	.plugin(bearer({ jwt }))
 	.get('/me', ({ user, reply }) => reply(200, user));
 ```
 
@@ -331,7 +331,7 @@ in:
 ```ts
 await fetch('/me', { headers: { authorization: `Bearer ${token}` } });
 
-app.use(bearer({ jwt, cookie: 'token' }));
+app.plugin(bearer({ jwt, cookie: 'token' }));
 ```
 
 ### `401 {"error":"unauthorized","reason":"malformed"}`

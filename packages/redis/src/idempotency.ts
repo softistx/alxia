@@ -74,7 +74,7 @@ class Unstored extends Error {
  * key is free again.
  *
  * ```ts
- * app.use(idempotency(redis.client, { name: 'payments' })).post('/payments', ...);
+ * app.plugin(idempotency(redis.client, { name: 'payments' })).post('/payments', ...);
  * ```
  */
 export function idempotency(client: RedisClient, options: IdempotencyOptions) {

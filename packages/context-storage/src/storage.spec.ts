@@ -121,7 +121,7 @@ describe('contextStorage', () => {
 		expect(await runWithContext(fake, greet)).toBe('hi job');
 	});
 
-	test('typed by the app it names, which the app that uses it must give', () => {
+	test('typed by the app it names, which the app that mounts it must give', () => {
 		expectTypeOf(contextStorage().context).returns.toEqualTypeOf<
 			BaseContext & Empty
 		>();

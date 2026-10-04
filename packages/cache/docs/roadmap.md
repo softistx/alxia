@@ -33,7 +33,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **Response caching as a plugin.** `use(cache({ ttl }))` answers the `GET`
+- **Response caching as a plugin.** `plugin(cache({ ttl }))` answers the `GET`
   and `HEAD` requests of every route declared after it from a store while
   they are fresh, and from the route otherwise, saying `X-Cache: HIT` or
   `MISS` and `Age`.

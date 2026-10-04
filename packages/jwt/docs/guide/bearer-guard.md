@@ -12,7 +12,7 @@ const jwt = createJwt({ secret: Bun.env['JWT_SECRET']!, expiresIn: 3600 });
 
 const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok'))        // open: declared before the guard
-	.use(bearer({ jwt }))
+	.plugin(bearer({ jwt }))
 	.get('/me', ({ user, reply }) => reply(200, { sub: user.sub ?? null })); // user: JwtClaims
 
 app.listen(3000);
@@ -37,8 +37,8 @@ interface BearerOptions<Schema extends StandardSchemaV1 | undefined> {
 }
 ```
 
-`bearer` returns an app, given to `use`. Like any route hook, it applies to
-the routes declared **after** `use`, in the same app or
+`bearer` returns an app, given to `app.plugin`. Like any route hook, it applies to
+the routes declared **after** `app.plugin`, in the same app or
 [group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md);
 a route declared before it is open, and cannot read `user`.
 
@@ -63,7 +63,7 @@ on the header alone, even if the header's token is bad and the cookie's
 good.
 
 ```ts
-app.use(bearer({ jwt, cookie: 'token' }));
+app.plugin(bearer({ jwt, cookie: 'token' }));
 // Authorization: Bearer <token>      → the header's token
 // Cookie: token=<token>              → the cookie's token
 // Authorization: Basic …, + cookie   → the cookie's token
@@ -83,7 +83,7 @@ import { z } from 'zod';
 const Claims = z.object({ sub: z.string(), role: z.enum(['admin', 'user']) });
 
 const app = alxia()
-	.use(bearer({ jwt, schema: Claims }))
+	.plugin(bearer({ jwt, schema: Claims }))
 	.get('/me', ({ user, reply }) => reply(200, user)); // user: { sub: string; role: 'admin' | 'user' }
 ```
 
@@ -122,7 +122,7 @@ OpenAPI document, and the client you generate from it (with
 the schema's output:
 
 ```ts
-app.use(bearer({ jwt, schema: Claims })).get('/me', ({ user, reply }) =>
+app.plugin(bearer({ jwt, schema: Claims })).get('/me', ({ user, reply }) =>
 	reply(200, { role: user.role }), // 'admin' | 'user'
 );
 ```
@@ -143,7 +143,7 @@ the typed `user`, and its reply ends the request for the routes after it:
 
 ```ts
 const app = alxia()
-	.use(bearer({ jwt, schema: Claims }))
+	.plugin(bearer({ jwt, schema: Claims }))
 	.get('/me', ({ user, reply }) => reply(200, user))
 	.derive(({ user, reply }) => (user.role === 'admin' ? undefined : reply(403, { error: 'forbidden' as const })))
 	.get('/admin/stats', ({ reply }) => reply(200, { users: 42 })); // 200, 401 or 403
@@ -183,7 +183,7 @@ export const app = alxia()
 		set.cookies.delete('token');
 		return reply(204);
 	})
-	.use(bearer({ jwt, schema: Claims, cookie: 'token' }))
+	.plugin(bearer({ jwt, schema: Claims, cookie: 'token' }))
 	.get('/me', ({ user, reply }) => reply(200, user));
 ```
 

@@ -93,7 +93,7 @@ export function runWithContext<T>(ctx: BaseContext, work: () => T): T {
 
 /**
  * The plugin, and its context typed by the app it follows. It requires
- * that context of the app that uses it, beyond the base context: `use` on
+ * that context of the app that mounts it, beyond the base context: `app.plugin` on
  * an app that does not give it is a compile error.
  */
 export type ContextStoragePlugin<App> = Alxia<Empty, '', never> &
@@ -122,9 +122,9 @@ export type StoredContext<App> = [ContextOf<App>] extends [never]
  * it must give that context: using it before is a compile error.
  *
  * ```ts
- * const base = alxia().decorate({ db }).use(session(auth, { required: true }));
+ * const base = alxia().decorate({ db }).plugin(session(auth, { required: true }));
  * export const requestContext = contextStorage<typeof base>();
- * const app = base.use(requestContext).get('/orders', ({ reply }) => reply(200, listOrders()));
+ * const app = base.plugin(requestContext).get('/orders', ({ reply }) => reply(200, listOrders()));
  *
  * // orders.ts — no context passed
  * export const listOrders = () => {

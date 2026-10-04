@@ -14,8 +14,8 @@ bun add -d typescript
 ```ts
 import { compress } from '@alxia/compress';
 
-app.use(compress());
-app.use(compress({ encodings: ['br', 'gzip'], threshold: 2048 }));
+app.plugin(compress());
+app.plugin(compress({ encodings: ['br', 'gzip'], threshold: 2048 }));
 ```
 
 Compressed: text, JSON, JavaScript, XML and SVG of at least `threshold`
@@ -39,7 +39,7 @@ length is compressed whole, which compresses better.
 ```tsx
 import { renderToReadableStream } from 'react-dom/server';
 
-app.use(compress()).get('/page', async ({ reply }) =>
+app.plugin(compress()).get('/page', async ({ reply }) =>
 	reply(200, await renderToReadableStream(<App />), {
 		headers: { 'content-type': 'text/html;charset=utf-8' },
 	}),

@@ -30,7 +30,7 @@ import { connectRedis } from '@nxgt/redis';
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia()
-	.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
+	.plugin(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
 	.get('/search', ({ reply }) => reply(200, []));
 ```
 
@@ -56,7 +56,7 @@ const app = alxia()
 		await products.invalidateTag('products');   // forgotten in every process
 		return reply(201, { ok: true });
 	})
-	.use(products)
+	.plugin(products)
 	.get('/products', ({ reply }) => reply(200, [{ id: '1', name: 'Kettle' }]));
 ```
 
@@ -77,7 +77,7 @@ const connection = await connectRedis(Bun.env['REDIS_URL']!);
 const Payment = z.object({ amount: z.number().int().positive() });
 
 const app = alxia()
-	.use(idempotency(connection.client, { name: 'payments', required: true }))
+	.plugin(idempotency(connection.client, { name: 'payments', required: true }))
 	.post('/payments', validate({ body: Payment }), ({ body, reply }) =>
 		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
 	);
@@ -128,7 +128,7 @@ const loadUser = async (id: string) => ({ id, name: 'Ada' });   // your database
 const touch = async (user: z.infer<typeof User>) => user;
 
 const app = alxia()
-	.use(redis(connection.client, { caches: { users } }))
+	.plugin(redis(connection.client, { caches: { users } }))
 	.get('/users/:id', async ({ caches, lock, params, reply }) => {
 		const user = await caches.users.remember(params.id, () => loadUser(params.id)); // typed by User
 		await lock(`user:${params.id}`, () => touch(user));

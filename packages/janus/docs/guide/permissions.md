@@ -36,11 +36,11 @@ const records = new Map([['r1', { id: 'r1', title: 'Blood test' }]]);
 const findRecord = (id: string) => records.get(id) ?? null;
 
 const app = alxia()
-	.use(janusErrors())
-	.use(session(accounts))
+	.plugin(janusErrors())
+	.plugin(session(accounts))
 	.group('/records/:id', (record) =>
 		record
-			.use(permission(access, 'view', 'record', byParam('id', findRecord)))
+			.plugin(permission(access, 'view', 'record', byParam('id', findRecord)))
 			.get('/', ({ object, reply }) => reply(200, { title: object.title })),
 	);
 ```
@@ -181,11 +181,11 @@ const access = permissions({ model, store: relations });
 const records = new Map([['r1', { id: 'r1', title: 'Blood test', locked: false }]]);
 
 const app = alxia()
-	.use(janusErrors())
-	.use(session(accounts))
+	.plugin(janusErrors())
+	.plugin(session(accounts))
 	.group('/records/:id', (record) =>
 		record
-			.use(
+			.plugin(
 				permission(access, 'edit', 'record', byParam('id', (id) => records.get(id) ?? null), {
 					ctx: (_ctx, object) => ({ locked: object.locked }), // object: the loaded record
 				}),
@@ -249,13 +249,13 @@ const edit = permission(
 // requires { tenant: Tenant; member: { type: 'user'; id: string } | null }
 
 const app = alxia()
-	.use(janusErrors())
-	.use(tenancy) // derives tenant and member
+	.plugin(janusErrors())
+	.plugin(tenancy) // derives tenant and member
 	.group('/records/:id', (record) =>
-		record.use(edit).put('/', ({ object, reply }) => reply(200, { title: object.title })),
+		record.plugin(edit).put('/', ({ object, reply }) => reply(200, { title: object.title })),
 	);
 
-alxia().use(edit);
+alxia().plugin(edit);
 // error, one message per missing key: the plugin reads "tenant", which this app's context does not give: add the plugin or middleware that gives it first
 //   | the plugin reads "member", which this app's context does not give: add the plugin or middleware that gives it first
 ```

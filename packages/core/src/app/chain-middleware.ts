@@ -47,61 +47,87 @@ export function middleware(
 	rest: () => Promise<unknown>,
 	definition: RouteDefinition | SocketDefinition,
 ): unknown {
-	const label = `${'method' in definition ? definition.method : 'WS'} ${definition.path}`;
-	const fail = (why: string) => new TypeError(`${label}: ${why}`);
+	const route = 'method' in definition;
 	let state: 'idle' | 'called' | 'settled' = 'idle';
 	let pending: Promise<unknown> | undefined;
-	let parked: { stand: Response; value: unknown } | undefined;
+	let parked: Parked | undefined;
 	const next = (added?: object): Promise<Response> => {
-		if (state === 'called') throw fail('a middleware called next() twice');
-		if (state === 'settled') {
-			throw fail('a middleware called next() after it returned');
+		if (state !== 'idle') {
+			throw failure(
+				definition,
+				state === 'called'
+					? 'a middleware called next() twice'
+					: 'a middleware called next() after it returned',
+			);
 		}
 		state = 'called';
 		if (added !== null && typeof added === 'object') merge(ctx, added);
-		pending =
-			'method' in definition
-				? rest()
-				: rest().then((downstream) => {
-						if (downstream instanceof Response) return downstream;
-						parked = { stand: new Response(null), value: downstream };
-						return parked.stand;
-					});
+		pending = route
+			? rest()
+			: rest().then((downstream) => {
+					if (downstream instanceof Response) return downstream;
+					parked = { stand: new Response(null), value: downstream };
+					return parked.stand;
+				});
 		return pending as Promise<Response>;
-	};
-	const own = (result: unknown): unknown => {
-		if (parked !== undefined) return parked.value;
-		if (result instanceof Reply || result instanceof Response) return result;
-		const name = hook.name ? ` (${hook.name})` : '';
-		throw fail(
-			`a middleware${name} returned ${result === undefined ? 'nothing' : typeof result}: return next(), a reply or a Response`,
-		);
 	};
 	const settle = (result: unknown): unknown => {
 		state = 'settled';
-		if (pending === undefined) return own(result);
+		if (pending === undefined) return own(hook, definition, result, parked);
 		if (result === undefined) {
 			return pending.then((downstream) => parked?.value ?? downstream);
 		}
-		if (Bun.peek.status(pending) !== 'pending') return own(result);
+		if (Bun.peek.status(pending) !== 'pending') {
+			return own(hook, definition, result, parked);
+		}
 		console.warn(
-			`${label}: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`,
+			`${labelOf(definition)}: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`,
 		);
-		return pending.then(
-			() => own(result),
-			(error: unknown) => {
-				console.error(error);
-				return own(result);
-			},
-		);
+		const after = () => own(hook, definition, result, parked);
+		return pending.then(after, (error: unknown) => {
+			console.error(error);
+			return after();
+		});
 	};
-	const upgraded = (error: unknown): unknown => {
+	const result = hook(ctx, next);
+	if (!(result instanceof Promise)) return settle(result);
+	if (route) return result.then(settle);
+	return result.then(settle, (error: unknown) => {
 		if (parked === undefined) throw error;
 		console.error(error);
 		return parked.value;
-	};
-	const result = hook(ctx, next);
-	return result instanceof Promise
-		? result.then(settle, upgraded)
-		: settle(result);
+	});
+}
+
+/** A socket's upgrade, parked behind the stand-in response `next()` resolved to. */
+interface Parked {
+	readonly stand: Response;
+	readonly value: unknown;
+}
+
+/** What a middleware's own result answers: the upgrade once parked, else its reply or `Response`. */
+function own(
+	hook: MiddlewareHook,
+	definition: RouteDefinition | SocketDefinition,
+	result: unknown,
+	parked: Parked | undefined,
+): unknown {
+	if (parked !== undefined) return parked.value;
+	if (result instanceof Reply || result instanceof Response) return result;
+	const name = hook.name ? ` (${hook.name})` : '';
+	throw failure(
+		definition,
+		`a middleware${name} returned ${result === undefined ? 'nothing' : typeof result}: return next(), a reply or a Response`,
+	);
+}
+
+function labelOf(definition: RouteDefinition | SocketDefinition): string {
+	return `${'method' in definition ? definition.method : 'WS'} ${definition.path}`;
+}
+
+function failure(
+	definition: RouteDefinition | SocketDefinition,
+	why: string,
+): TypeError {
+	return new TypeError(`${labelOf(definition)}: ${why}`);
 }

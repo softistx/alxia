@@ -30,7 +30,7 @@ const tracing = telemetry({
 const log = createLogger('Orders');
 
 const app = alxia()
-	.use(tracing)
+	.plugin(tracing)
 	.get('/orders/:id', ({ params, span, reply }) => {
 		span?.attribute('order.id', params.id);
 		log.info('order read');                 // carries this request's traceId

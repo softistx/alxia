@@ -14,7 +14,7 @@ const schema = createSchema({
 	resolvers: { Query: { hello: () => 'world' } },
 });
 
-const app = alxia().use((app) =>
+const app = alxia().plugin((app) =>
 	graphql(app, {
 		schema,
 		plugins: [useExecutionCancellation()], // stop resolvers when the client goes away
@@ -209,8 +209,8 @@ import { cors } from '@alxia/cors';
 import { graphql } from '@alxia/graphql';
 
 const app = alxia()
-	.use(cors({ origin: 'https://app.example.com', credentials: true }))
-	.use((app) => graphql(app, { schema }));
+	.plugin(cors({ origin: 'https://app.example.com', credentials: true }))
+	.plugin((app) => graphql(app, { schema }));
 // OPTIONS /graphql → 204, Access-Control-Allow-Origin: https://app.example.com
 ```
 

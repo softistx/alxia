@@ -10,7 +10,7 @@ import { cache } from '@alxia/cache';
 
 const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok'))      // declared before: never cached
-	.use(cache({ ttl: 60, staleWhileRevalidate: 300 }))
+	.plugin(cache({ ttl: 60, staleWhileRevalidate: 300 }))
 	.get('/products', ({ reply }) => reply(200, [{ id: 1, name: 'Lamp' }]));
 
 app.listen({ port: 3000 });
@@ -24,7 +24,7 @@ curl -i localhost:3000/products   # x-cache: HIT, age: 0 — the route did not
 ## Which requests
 
 The plugin is a route hook: it applies to the routes declared **after**
-`use(cache(…))`, in the same app or group, and to no other. Within those:
+`plugin(cache(…))`, in the same app or group, and to no other. Within those:
 
 - only `GET` and `HEAD` are looked up; every other method runs the route as
   if there were no cache, and still reads [`ctx.cache`](#what-a-route-reads).
@@ -58,7 +58,7 @@ import { cache } from '@alxia/cache';
 test('ten concurrent misses run the route once', async () => {
 	let runs = 0;
 	const app = alxia()
-		.use(cache({ ttl: 60 }))
+		.plugin(cache({ ttl: 60 }))
 		.get('/products', async ({ reply }) => {
 			await Bun.sleep(20);
 			return reply(200, { runs: ++runs });
@@ -112,7 +112,7 @@ import { alxia } from '@alxia/core';
 import { cache } from '@alxia/cache';
 
 const app = alxia()
-	.use(cache({ ttl: 60 }))
+	.plugin(cache({ ttl: 60 }))
 	.get('/me', ({ request, reply }) =>
 		reply(200, { cookie: request.headers.get('cookie') }, { headers: { 'cache-control': 'private' } }),
 	); // concurrent requests: one run each, each with its own answer
@@ -125,7 +125,7 @@ the store lookup, and the wait on another request's run.
 
 ```ts
 cache<Requires extends object = Empty>(options: CacheOptions<Requires>): Alxia<…> & Requiring<Requires> & Cache
-// an app, given to `use`, which checks `Requires`; and the hands to empty it
+// an app, given to `app.plugin`, which checks `Requires`; and the hands to empty it
 ```
 
 `Requires` is what `key` and `tags` read beyond `BaseContext`, empty by
@@ -201,7 +201,7 @@ import { cache } from '@alxia/cache';
 
 test('a client whose copy is current gets a 304', async () => {
 	const app = alxia()
-		.use(cache({ ttl: 60 }))
+		.plugin(cache({ ttl: 60 }))
 		.get('/products', ({ reply }) => reply(200, []));
 
 	const first = await app.request('/products');
@@ -252,7 +252,7 @@ import { alxia } from '@alxia/core';
 import { cache } from '@alxia/cache';
 
 const app = alxia()
-	.use(cache({ ttl: 60 }))
+	.plugin(cache({ ttl: 60 }))
 	.get('/products/:id', ({ params, cache, reply }) => {
 		cache.tag(`product:${params.id}`);               // invalidateTag('product:1') forgets it
 		return reply(200, { id: params.id });
@@ -269,7 +269,7 @@ compile error ([Troubleshooting](../troubleshooting.md#property-cache-does-not-e
 
 ## The value `cache()` returns
 
-`cache()` returns the plugin — an app to give to `use` — with the handles
+`cache()` returns the plugin — an app to give to `app.plugin` — with the handles
 of its store on it:
 
 ```ts
@@ -310,7 +310,7 @@ export const app = alxia({ prefix: '/api' })
 		return reply(201, product);
 	})
 	.get('/me', ({ reply }) => reply(200, { name: 'Grace' }))  // before the cache: personal
-	.use(catalogue)
+	.plugin(catalogue)
 	.get('/products', ({ reply }) => reply(200, [...products.values()]))
 	.get('/products/:id', ({ params, cache, reply }) => {
 		cache.tag(`product:${params.id}`);

@@ -107,7 +107,7 @@ export interface ReactRouterServer<App extends AnyAlxia> {
  *
  * ```ts
  * const server = createServer({
- *   configure: (app) => app.use(logger()).get('/api/health', ({ reply }) => reply.ok({ ok: true })),
+ *   configure: (app) => app.plugin(logger()).get('/api/health', ({ reply }) => reply.ok({ ok: true })),
  * });
  * export default server;
  * ```

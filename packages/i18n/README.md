@@ -23,7 +23,7 @@ const fr = { ...shared.fr, cart: { items: '{count, plural, =0 {Aucun article} on
 export const i18n = createI18n({ resources: { en, fr }, fallback: 'en' });
 
 const app = alxia()
-	.use(i18n)
+	.plugin(i18n)
 	.get('/cart', ({ t, reply }) => reply(200, t('cart.items', { count: 3 }))); // '3 articles' in French
 
 app.listen(3000);
@@ -61,8 +61,8 @@ const byUser = createI18n({
 	resolve: ({ user }: BaseContext & { user: { language: string } | null }) => user?.language,
 });
 
-alxia().use(auth).use(byUser); // auth derives user
-alxia().use(byUser); // a compile error: this app gives no `user`
+alxia().plugin(auth).plugin(byUser); // auth derives user
+alxia().plugin(byUser); // a compile error: this app gives no `user`
 ```
 
 Unannotated, `resolve` reads the request alone and the plugin requires

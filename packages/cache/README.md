@@ -30,7 +30,7 @@ const app = alxia()
 		await products.invalidateTag('products');           // the next GET runs the route
 		return reply(201, body);
 	})
-	.use(products)                                         // the GETs after it are cached
+	.plugin(products)                                         // the GETs after it are cached
 	.get('/products', ({ reply }) => reply(200, [...catalogue.values()]))
 	.get('/products/:id', ({ params, cache, reply }) => {
 		cache.tag(`product:${params.id}`);                // a tag of its own
@@ -90,8 +90,8 @@ const perTenant = cache<{ user: { tenantId: string } }>({
 
 const auth = alxia().derive(() => ({ user: { tenantId: 'acme' } })); // your session plugin
 
-alxia().use(auth).use(perTenant);   // compiles: auth derives user
-alxia().use(perTenant);             // a compile error: no `user` in this app's context
+alxia().plugin(auth).plugin(perTenant);   // compiles: auth derives user
+alxia().plugin(perTenant);             // a compile error: no `user` in this app's context
 ```
 
 ## Two stores

@@ -10,7 +10,7 @@ import { rateLimit } from '@alxia/rate-limit';
 
 const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok'))      // not limited
-	.use(rateLimit({ limit: 100, windowMs: 60_000 }))
+	.plugin(rateLimit({ limit: 100, windowMs: 60_000 }))
 	.get('/search', ({ rateLimit, reply }) =>             // limited
 		reply(200, { remaining: rateLimit?.remaining }),
 	);
@@ -25,7 +25,7 @@ app.listen({ port: 3000 });
 ```ts
 function rateLimit<Requires extends object = Empty>(
 	options: RateLimitOptions<Requires>,
-): Alxia<…> & Requiring<Requires>; // an app, given to `use`, which checks `Requires`
+): Alxia<…> & Requiring<Requires>; // an app, given to `app.plugin`, which checks `Requires`
 
 interface RateLimitOptions<Requires extends object = Empty> {
 	readonly limit: number;
@@ -38,7 +38,7 @@ interface RateLimitOptions<Requires extends object = Empty> {
 ```
 
 `rateLimit` returns an app whose single route hook counts the request. Given
-to `use`, it adds `rateLimit` to the context of every route declared after
+to `app.plugin`, it adds `rateLimit` to the context of every route declared after
 it, and each of those routes may answer its 429. `Requires` is what `key`
 and `skip` read beyond `BaseContext`; see [Reading the app's context](#reading-the-apps-context).
 
@@ -72,7 +72,7 @@ reads. Behind a proxy, that is the proxy's address unless you set `ip`:
 const app = alxia({
 	ip: (request, server) =>
 		request.headers.get('x-real-ip') ?? server?.requestIP(request)?.address,
-}).use(rateLimit({ limit: 100, windowMs: 60_000 }));
+}).plugin(rateLimit({ limit: 100, windowMs: 60_000 }));
 ```
 
 Count by something else — an API key, a token — by returning it from `key`.
@@ -80,7 +80,7 @@ It may be async. A request whose key is `undefined` is not counted: it passes,
 gets no rate-limit header, and its route reads `rateLimit` as `undefined`.
 
 ```ts
-app.use(
+app.plugin(
 	rateLimit({
 		limit: 1_000,
 		windowMs: 60 * 60_000,
@@ -100,7 +100,7 @@ A request `skip` returns `true` for is not counted, exactly like one whose
 key is `undefined`. It is synchronous.
 
 ```ts
-app.use(
+app.plugin(
 	rateLimit({
 		limit: 100,
 		windowMs: 60_000,
@@ -125,11 +125,11 @@ const perUser = rateLimit<{ user: { id: string; role: string } }>({
 });
 
 const app = alxia()
-	.use(auth) // derives user, or answers 401
-	.use(perUser)
+	.plugin(auth) // derives user, or answers 401
+	.plugin(perUser)
 	.get('/search', handler);
 
-alxia().use(perUser);
+alxia().plugin(perUser);
 // error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
@@ -165,7 +165,7 @@ counts live in that process and are lost when it stops. See
 
 The limit is a route hook, so order decides, at runtime and in the types:
 
-- a route declared **before** `use(rateLimit(…))` is not counted, and
+- a route declared **before** `plugin(rateLimit(…))` is not counted, and
   never answers the 429;
 - a route declared **after** it is counted, and may answer the 429;
 - inside a [group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md#groups),
@@ -176,10 +176,10 @@ const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok'))                 // never counted
 	.group('/auth', (auth) =>
 		auth
-			.use(rateLimit({ limit: 5, windowMs: 15 * 60_000 }))         // 5 per 15 minutes
+			.plugin(rateLimit({ limit: 5, windowMs: 15 * 60_000 }))         // 5 per 15 minutes
 			.post('/login', ({ reply }) => reply(200, 'ok')),
 	)
-	.use(rateLimit({ limit: 100, windowMs: 60_000 }))               // 100 per minute
+	.plugin(rateLimit({ limit: 100, windowMs: 60_000 }))               // 100 per minute
 	.get('/search', ({ reply }) => reply(200, []));                  // the group's limit does not reach it
 ```
 
@@ -194,8 +194,8 @@ other `headers: false`. A route reads the `rateLimit` of the later one.
 
 ```ts
 app
-	.use(rateLimit({ limit: 10, windowMs: 1_000 }))                      // a burst
-	.use(rateLimit({ limit: 1_000, windowMs: 60 * 60_000, headers: false })) // an hour
+	.plugin(rateLimit({ limit: 10, windowMs: 1_000 }))                      // a burst
+	.plugin(rateLimit({ limit: 1_000, windowMs: 60 * 60_000, headers: false })) // an hour
 	.get('/search', ({ rateLimit, reply }) => reply(200, rateLimit ?? null)); // the hourly limit's info
 ```
 
@@ -216,7 +216,7 @@ counted, by `skip` or an `undefined` key.
 
 ```ts
 app
-	.use(rateLimit({ limit: 100, windowMs: 60_000 }))
+	.plugin(rateLimit({ limit: 100, windowMs: 60_000 }))
 	.get('/quota', ({ rateLimit, reply }) =>
 		rateLimit === undefined
 			? reply(200, { limited: false as const })
@@ -328,7 +328,7 @@ counts in Redis, with GCRA timed by the Redis server's clock.
 ```ts
 import { redisStore } from '@alxia/redis';
 
-app.use(
+app.plugin(
 	rateLimit({
 		limit: 100,
 		windowMs: 60_000,
@@ -353,7 +353,7 @@ const passwords = new Map([['ada', 'lovelace']]);
 export const app = alxia()
 	.group('/auth', (auth) =>
 		auth
-			.use(rateLimit({ limit: 5, windowMs: 15 * 60_000, store: attempts }))
+			.plugin(rateLimit({ limit: 5, windowMs: 15 * 60_000, store: attempts }))
 			.post(
 				'/login',
 				validate({ body: z.object({ name: z.string(), password: z.string() }) }),
@@ -389,7 +389,7 @@ import { alxia } from '@alxia/core';
 import { rateLimit } from '@alxia/rate-limit';
 
 const app = alxia({ ip: (request) => request.headers.get('x-ip') ?? undefined })
-	.use(rateLimit({ limit: 2, windowMs: 60_000 }))
+	.plugin(rateLimit({ limit: 2, windowMs: 60_000 }))
 	.get('/limited', ({ rateLimit, reply }) => reply(200, rateLimit?.remaining ?? -1));
 
 test('answers 429 past the limit, per address', async () => {

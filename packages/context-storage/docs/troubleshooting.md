@@ -32,10 +32,10 @@ error TS2769: No overload matches this call.
     Argument of type '<App = undefined>(...uncalled: readonly never[]) => ContextStoragePlugin<App>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => ContextStoragePlugin<undefined>'.
 ```
 
-**When:** at startup, on `.use(contextStorage)`: the factory given to `use`
-without being called.
+**When:** at startup, on `.plugin(contextStorage)`: the factory given to
+`app.plugin` without being called.
 
-**Why:** `use` takes a function as a plugin and calls it with the app.
+**Why:** `app.plugin` calls a function it is given with the app, as a plugin.
 Called that way, `contextStorage` would return a new, empty plugin app,
 and every route declared after it would land on an app nobody serves; it
 refuses the argument instead.
@@ -45,7 +45,7 @@ refuses the argument instead.
 ```ts
 export const requestContext = contextStorage<typeof base>();
 
-const app = base.use(requestContext);
+const app = base.plugin(requestContext);
 ```
 
 ### `ContextStorageError: getContext(): called outside a request — use tryGetContext(), or runWithContext() in a job or a test`
@@ -113,7 +113,7 @@ shows them; align the versions the app and its dependencies ask for.
 
 **When:** in a request, but not inside a route declared after the plugin:
 
-- in a route declared **before** `use(requestContext)`, or outside the
+- in a route declared **before** `plugin(requestContext)`, or outside the
   `group` it is used in;
 - in an `onRequest` hook, which runs before routing;
 - in an `onResponse` hook, for a `404`, or for a request a hook declared
@@ -124,11 +124,11 @@ shows them; align the versions the app and its dependencies ask for.
 route's context only for the routes declared after it: until then there is
 a request and no route.
 
-**Fix:** use the plugin before the routes whose code reads it:
+**Fix:** mount the plugin before the routes whose code reads it:
 
 ```ts
 const app = base
-	.use(requestContext) // before every route that reads it
+	.plugin(requestContext) // before every route that reads it
 	.get('/orders', async ({ reply }) => reply(200, await listOrders()));
 ```
 
@@ -157,7 +157,7 @@ throw — but the response was already sent. The context is stale, not gone.
 detach only what does not:
 
 ```ts
-const app = base.use(requestContext).get('/orders', async ({ reply }) => {
+const app = base.plugin(requestContext).get('/orders', async ({ reply }) => {
 	const orders = await listOrders(); // sets cache-control while the response is open
 	void sendReceipt();                // detached: must not touch `set`
 	return reply(200, orders);
@@ -176,10 +176,10 @@ error TS7022: 'requestContext' implicitly has type 'any' because it does not hav
 
 Often with `TS2448: Block-scoped variable 'requestContext' used before its declaration.`
 
-**When:** the plugin is typed by the app that uses it:
+**When:** the plugin is typed by the app that mounts it:
 
 ```ts
-export const app = alxia().decorate({ db }).use(requestContext).get(/* … */);
+export const app = alxia().decorate({ db }).plugin(requestContext).get(/* … */);
 export const requestContext = contextStorage<typeof app>(); // circular
 ```
 
@@ -190,7 +190,7 @@ export const requestContext = contextStorage<typeof app>(); // circular
 ```ts
 export const base = alxia().decorate({ db });
 export const requestContext = contextStorage<typeof base>();
-export const app = base.use(requestContext).get('/orders', ({ reply }) => reply(200, 'ok'));
+export const app = base.plugin(requestContext).get('/orders', ({ reply }) => reply(200, 'ok'));
 ```
 
 ### `Property 'user' does not exist on type 'BaseContext'.`
@@ -208,7 +208,7 @@ Also as `Property 'user' does not exist on type 'BaseContext & Empty & { readonl
 - it is `contextStorage()` given to the registered `base` itself, which
   cannot read `Register` while `base` is being typed; or
 - it is typed by `base`, and the hook adding `user` comes after it:
-  `base.use(requestContext).derive(() => ({ user }))`.
+  `base.plugin(requestContext).derive(() => ({ user }))`.
 
 **Why:** `context()` returns `ContextOf<App>`: what a route declared next on
 `App` reads. With no `App`, that is `BaseContext`; a hook after `App` is
@@ -298,15 +298,15 @@ what that app's hooks add:
 const base = alxia().derive(({ request }) => ({ user: request.headers.get('x-user') ?? 'anonymous' }));
 const requestContext = contextStorage<typeof base>();
 
-alxia().use(requestContext);
+alxia().plugin(requestContext);
 ```
 
 **Why:** `context()` would return a `user` that no hook of this app adds:
 at runtime it would be `undefined`.
 
-**Fix:** use the plugin on the app it is typed by, after `base`:
+**Fix:** mount the plugin on the app it is typed by, after `base`:
 
 ```ts
-base.use(requestContext);
+base.plugin(requestContext);
 ```
 

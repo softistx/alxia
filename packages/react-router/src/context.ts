@@ -25,7 +25,7 @@ export const alxiaContext = createContext<unknown>(MISSING);
  *
  * ```ts
  * // app/server.ts
- * const server = createServer({ configure: (app) => app.use(session) });
+ * const server = createServer({ configure: (app) => app.plugin(session) });
  * export default server;
  *
  * declare module '@alxia/react-router' {

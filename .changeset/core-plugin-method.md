@@ -1,0 +1,5 @@
+---
+"@alxia/core": minor
+---
+
+Plugins get their own method, `app.plugin(plugin)`: an app — a sub-app, the routes of `defineRoutes`, a plugin of `definePlugin` — or a function given the app, such as `cors()`. It checks what the plugin requires of the app (`ProvidedBy`, `RequiredIn`, `Mounted`), mounts its routes behind the app's middlewares and takes up its hooks, as `use(plugin)` did. A function whose result is not an app throws `plugin(): the plugin function returned …, not an app`, and a middleware given to it throws. `use(...)` is for middlewares: its plugin forms stay as `@deprecated` overloads (`PluginForms`) and a runtime adapter, which now throws the same way, so a guard written `(ctx, next) => …` without `defineMiddleware` and given to `use` fails at startup instead of being called once as a plugin and never on a request. In the next minor, `use` will take plain `(ctx, next)` functions and its plugin forms will go. The message of a missing requirement now ends `add the plugin or middleware that gives it first`. New type: `PluginMethod`; `Mounted` and `RequiredIn` move to it, exported as before.

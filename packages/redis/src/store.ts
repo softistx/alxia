@@ -17,7 +17,7 @@ export interface RedisStoreOptions {
  * server's clock, and a refused request counts nothing.
  *
  * ```ts
- * app.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis.client, { name: 'api' }) }));
+ * app.plugin(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis.client, { name: 'api' }) }));
  * ```
  */
 export function redisStore(

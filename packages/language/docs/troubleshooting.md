@@ -79,17 +79,17 @@ error TS2339: Property 'language' does not exist on type 'Context<Empty, "/", Em
 ```
 
 **When:** a route reads `language` but is declared before
-`.use(language(…))`, or in another app or group than the one that uses it.
+`.plugin(language(…))`, or in another app or group than the one that mounts it.
 
 **Why:** the plugin is a route hook: it applies to the routes declared
 after it, at runtime and in the types alike. A route before it never runs
 it.
 
-**Fix:** use the plugin first:
+**Fix:** mount the plugin first:
 
 ```ts
 const app = alxia()
-	.use(language({ supported: ['en', 'fr'], fallback: 'en' }))
+	.plugin(language({ supported: ['en', 'fr'], fallback: 'en' }))
 	.get('/', ({ language: current, reply }) => reply(200, current));
 ```
 
@@ -103,14 +103,14 @@ error TS2769: No overload matches this call.
         Type 'Alxia<Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback
 ```
 
-**When:** `app.use(language)`, without calling it.
+**When:** `app.plugin(language)`, without calling it.
 
 **Why:** `language` makes the plugin from its options; it is not the plugin.
 
 **Fix:**
 
 ```ts
-alxia().use(language({ supported: ['en', 'fr'], fallback: 'en' }));
+alxia().plugin(language({ supported: ['en', 'fr'], fallback: 'en' }));
 ```
 
 ### `Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ en: string; fr: string; }'`
@@ -126,7 +126,7 @@ declared apart from the call without `as const`:
 ```ts
 const langs = ['en', 'fr'];                      // string[]
 alxia()
-	.use(language({ supported: langs, fallback: 'en' }))
+	.plugin(language({ supported: langs, fallback: 'en' }))
 	.get('/', ({ language: current, reply }) => reply(200, greetings[current]));
 ```
 
@@ -143,7 +143,7 @@ type Language = (typeof supported)[number];       // 'en' | 'fr'
 const greetings: Record<Language, string> = { en: 'Hello', fr: 'Bonjour' };
 
 alxia()
-	.use(language({ supported, fallback: 'en' }))
+	.plugin(language({ supported, fallback: 'en' }))
 	.get('/', ({ language: current, reply }) => reply(200, greetings[current]));
 ```
 
@@ -191,7 +191,7 @@ there, before `Accept-Language`:
 const supported = ['en', 'fr'] as const;
 
 const app = alxia()
-	.use(language({ supported, fallback: 'en' }))
+	.plugin(language({ supported, fallback: 'en' }))
 	.put('/preferences/language/:lang', ({ params, set, reply }) => {
 		const chosen = match(params.lang, supported);
 		if (chosen === undefined) return reply(400, { error: 'unsupported_language' as const });
@@ -209,7 +209,7 @@ signs the user in, and annotate `resolve` to read it — see
 ```ts
 const app = alxia()
 	.derive(async ({ request }) => ({ saved: await preferences.find(request) }))
-	.use(
+	.plugin(
 		language({
 			supported,
 			fallback: 'en',
@@ -246,7 +246,7 @@ const byUser = language({
 	resolve: ({ user }: BaseContext & { user: User }) => user.language ?? undefined,
 });
 
-alxia().use(auth).use(byUser); // auth derives user
+alxia().plugin(auth).plugin(byUser); // auth derives user
 ```
 
 See [Reading the app's context](guide.md#reading-the-apps-context).
@@ -262,17 +262,17 @@ error TS2769: No overload matches this call.
 
 **When:** the plugin's `resolve` is annotated to read `user`, and it is
 used on an app — or in a group — whose context has no `user` at that point:
-`alxia().use(byUser)`, or `use(byUser)` before `use(auth)`.
+`alxia().plugin(byUser)`, or `plugin(byUser)` before `plugin(auth)`.
 
 **Why:** an annotated `resolve` makes the plugin require what it reads, and
-`use` checks the app's context against it, so `resolve` never runs without
+`app.plugin` checks the app's context against it, so `resolve` never runs without
 it.
 
-**Fix:** use the plugin that adds `user` first, with the type `resolve`
+**Fix:** mount the plugin that adds `user` first, with the type `resolve`
 reads:
 
 ```ts
-alxia().use(auth).use(byUser);
+alxia().plugin(auth).plugin(byUser);
 ```
 
 More on this message in
@@ -290,7 +290,7 @@ error TS2769: No overload matches this call.
 `resolve`'s parameter is annotated with: a `User | null` where `resolve`
 reads `User`, or a user of another shape.
 
-**Why:** `use` checks each key the plugin reads against the app's context;
+**Why:** `app.plugin` checks each key the plugin reads against the app's context;
 a narrower type passes, a wider or different one does not.
 
 **Fix:** annotate `resolve` with the type the app gives — `User | null`,
@@ -325,7 +325,7 @@ reads, so the plugin would require nothing, and an app without a `user`
 would be accepted, and throw on every request. The plugin is refused
 instead.
 
-**Fix:** annotate what `resolve` reads, and use the plugin that adds it
+**Fix:** annotate what `resolve` reads, and mount the plugin that adds it
 first:
 
 ```ts
@@ -335,7 +335,7 @@ const byUser = language({
 	resolve: ({ user }: BaseContext & { user: User }) => user.language ?? undefined,
 });
 
-alxia().use(auth).use(byUser);
+alxia().plugin(auth).plugin(byUser);
 ```
 
 Or leave it unannotated when it reads only the request:
@@ -416,7 +416,7 @@ and give a cache the same headers:
 import { alxia, vary, withHeaders } from '@alxia/core';
 
 alxia()
-	.use(
+	.plugin(
 		language({
 			supported: ['en', 'fr'],
 			fallback: 'en',
@@ -445,7 +445,7 @@ it from the path or route on it. `/fr/products` matches no route, so the
 
 ```ts
 alxia()
-	.use(language({ supported: ['en', 'fr'], fallback: 'en', order: ['path', 'header'] }))
+	.plugin(language({ supported: ['en', 'fr'], fallback: 'en', order: ['path', 'header'] }))
 	.get('/:lang/products', ({ language: current, reply }) => reply(200, current));
 ```
 

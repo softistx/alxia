@@ -102,7 +102,7 @@ import { createServer } from '@alxia/react-router';
 const server = createServer({
 	configure: (app) =>
 		app
-			.use(logger())
+			.plugin(logger())
 			.get('/api/health', ({ reply }) => reply.ok({ ok: true }))
 			.derive(({ request }) => {
 				const name = request.headers.get('x-user');
@@ -167,7 +167,7 @@ Router puts it on every script it renders, so `script-src` needs no
 ```ts
 // app/server.ts
 configure: (app) =>
-	app.use(
+	app.plugin(
 		secureHeaders({
 			nonce: true,
 			contentSecurityPolicy:
@@ -238,7 +238,7 @@ import { createServer } from '@alxia/react-router';
 import { greetingContext } from './context'; // createContext<string>('unset'), in app/context.ts
 
 export default createServer({
-	beforeAll: (app) => app.use(logger()), // runs before the client's files too
+	beforeAll: (app) => app.plugin(logger()), // runs before the client's files too
 	configure: (app) => app.get('/api/health', ({ reply }) => reply.ok({ ok: true })),
 	getLoadContext: (_ctx, context) => context.set(greetingContext, 'hello'),
 	listen: { idleTimeout: 30 }, // its port and hostname, if given, win over PORT and HOST

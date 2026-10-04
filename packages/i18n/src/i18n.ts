@@ -100,7 +100,7 @@ export interface I18nContext<Key extends string> {
  *
  * ```ts
  * const i18n = createI18n({ resources: { en, fr }, fallback: 'en' });
- * app.use(i18n).get('/', ({ t, reply }) => reply(200, t('home.title')));
+ * app.plugin(i18n).get('/', ({ t, reply }) => reply(200, t('home.title')));
  * ```
  *
  * The plugin registers the request's language as one of `@nxgt/i18n`'s
@@ -135,7 +135,7 @@ export function createI18n<
 	// nxgt's own getLanguage() and translate speak the request's language too.
 	registerLanguageSource(requestLanguage);
 
-	// The plugin requires what `resolve` reads, and `use` checks the app gives
+	// The plugin requires what `resolve` reads, and `app.plugin` checks the app gives
 	// it; the `language()` inside is then handed `resolve` as reading only
 	// `BaseContext`, since a context that is a type parameter defers the check.
 	const detected = language<Language>({

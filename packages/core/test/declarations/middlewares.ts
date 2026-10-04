@@ -85,3 +85,18 @@ export function scoped() {
 			teams.use(timed).get('/', ({ user, reply }) => reply(200, user)),
 		);
 }
+
+// `validate` and `responds` made once and exported name `BuiltinMark`; an
+// app that took a plugin through `plugin` names what the plugin adds.
+export const checkedPing = validate({ body: Ping });
+export const respondsPing = responds(putPing);
+
+export function plugged() {
+	const tenancy = alxia().decorate({ tenant: 'acme' as const });
+	return alxia()
+		.plugin(tenancy)
+		.route(putPing, respondsPing, checkedPing, ({ body, reply }) =>
+			reply(200, body),
+		)
+		.get('/tenant', ({ tenant, reply }) => reply(200, tenant));
+}

@@ -15,7 +15,7 @@ const schema = createSchema({
 
 const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok'))
-	.use((app) => graphql(app, { schema })); // GET and POST /graphql
+	.plugin((app) => graphql(app, { schema })); // GET and POST /graphql
 
 app.listen(3000);
 ```
@@ -35,11 +35,11 @@ function graphql<Ctx, Prefix, Shortcuts, SchemaCtx, UserCtx = Empty, const Path 
 ```
 
 `graphql` declares a `GET` and a `POST` route at `path` on `app`, and returns
-`app`, its type unchanged. Hand it to `use` as a function, so
+`app`, its type unchanged. Hand it to `app.plugin` as a function, so
 it stays in the chain and sees the app as typed so far:
 
 ```ts
-const app = base.use((app) => graphql(app, { schema }));
+const app = base.plugin((app) => graphql(app, { schema }));
 ```
 
 Calling it directly does the same: `graphql(base, { schema })` declares the
@@ -68,9 +68,9 @@ mounted into:
 import { alxia } from '@alxia/core';
 
 const api = alxia({ prefix: '/api' })
-	.use((app) => graphql(app, { schema, path: '/gql' })); // /api/gql
+	.plugin((app) => graphql(app, { schema, path: '/gql' })); // /api/gql
 
-const root = alxia({ prefix: '/v1' }).use(api);           // /v1/api/gql
+const root = alxia({ prefix: '/v1' }).plugin(api);           // /v1/api/gql
 
 root.routes.map((route) => `${route.method} ${route.path}`); // ['GET /v1/api/gql', 'POST /v1/api/gql']
 ```
@@ -81,8 +81,8 @@ own path:
 
 ```ts
 const app = alxia()
-	.use((app) => graphql(app, { schema }))
-	.use((app) => graphql(app, { schema: admin, path: '/admin/graphql' }));
+	.plugin((app) => graphql(app, { schema }))
+	.plugin((app) => graphql(app, { schema: admin, path: '/admin/graphql' }));
 ```
 
 ## Behind the app's hooks
@@ -98,10 +98,10 @@ const app = alxia()
 			? { viewer: 'service' }
 			: reply(401, { error: 'unauthorized' as const }),
 	)
-	.use((app) => graphql(app, { schema })); // 401 without the token
+	.plugin((app) => graphql(app, { schema })); // 401 without the token
 ```
 
-A hook declared **after** `use` does not run for it: the endpoint answers
+A hook declared **after** `app.plugin` does not run for it: the endpoint answers
 without it. The order is core's, explained in
 [Hooks](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/hooks.md#route-hooks-and-global-hooks).
 Global hooks — `onRequest`, `onResponse`, `around`, and the plugins built on
@@ -151,7 +151,7 @@ const schema = createSchema({
 	resolvers: { Query: { hello: (_, { name }: { name: string }) => `hello ${name}` } },
 });
 
-const app = alxia().use((app) => graphql(app, { schema, logging: false }));
+const app = alxia().plugin((app) => graphql(app, { schema, logging: false }));
 
 const execute = (query: string, variables?: Record<string, unknown>) =>
 	app.request('/graphql', {

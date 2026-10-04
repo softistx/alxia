@@ -36,7 +36,7 @@ import { z } from 'zod';
 
 const app = alxia()
 	.post('/login', ...)                                    // open
-	.use(bearer({ jwt, schema: z.object({ sub: z.string(), role: z.enum(['admin', 'user']) }) }))
+	.plugin(bearer({ jwt, schema: z.object({ sub: z.string(), role: z.enum(['admin', 'user']) }) }))
 	.get('/me', ({ user, reply }) => reply(200, user));    // user: { sub: string; role: ... }
 ```
 

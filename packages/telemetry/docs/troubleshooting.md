@@ -42,17 +42,17 @@ error TS2339: Property 'span' does not exist on type 'Context<Empty, "/before", 
 ```
 
 **When:** a route reads `span` or `telemetry`, and is declared before
-`use(telemetry(...))`.
+`plugin(telemetry(...))`.
 
 **Why:** the plugin gives `span` and `telemetry` to the routes declared
 after it. The request is still traced, since the span is opened by a global
 hook; the route only cannot reach it.
 
-**Fix:** use the plugin first:
+**Fix:** mount the plugin first:
 
 ```ts
 const app = alxia()
-	.use(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
+	.plugin(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
 	.get('/orders/:id', ({ params, span, reply }) => {
 		span?.attribute('order.id', params.id);
 		return reply(200, { id: params.id });
@@ -69,7 +69,7 @@ error TS2769: No overload matches this call.
         Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'.
 ```
 
-**When:** `app.use(telemetry)`, without calling it.
+**When:** `app.plugin(telemetry)`, without calling it.
 
 **Why:** `telemetry` makes the plugin; it is not the plugin, and it needs a
 `service` or an `instance`.
@@ -77,7 +77,7 @@ error TS2769: No overload matches this call.
 **Fix:**
 
 ```ts
-alxia().use(telemetry({ service: 'checkout', exporters: [consoleExporter()] }));
+alxia().plugin(telemetry({ service: 'checkout', exporters: [consoleExporter()] }));
 ```
 
 ### `Property 'service' is missing in type '…' but required in type '{ readonly service: string; readonly instance?: undefined; }'`
@@ -212,7 +212,7 @@ plugin never closes the telemetry, not even one it built from `service`.
 
 ```ts
 const app = alxia()
-	.use(tracing)
+	.plugin(tracing)
 	.onStop(() => tracing.telemetry.close());
 
 process.on('SIGTERM', async () => {
@@ -253,7 +253,7 @@ around it finds none.
 ```ts
 const instance = createTelemetry('checkout', { exporters: [consoleExporter()] }).install();
 
-alxia().use(telemetry({ instance }));
+alxia().plugin(telemetry({ instance }));
 ```
 
 ### Logs carry a `traceId`, but its span is never exported
@@ -283,7 +283,7 @@ writing to it; the requests are answered as usual.
 
 ```ts
 const instance = createTelemetry('test', { exporters: [exporter] });
-const app = alxia().use(telemetry({ instance }));
+const app = alxia().plugin(telemetry({ instance }));
 ```
 
 ### No span for a WebSocket connection
@@ -365,7 +365,7 @@ event says so, and the status stays `ok`: the server did nothing wrong.
 dashboard, filter on its route, or leave it untraced:
 
 ```ts
-app.use(telemetry({ service: 'checkout', exporters, traced: (ctx) => ctx.url.pathname !== '/events' }));
+app.plugin(telemetry({ service: 'checkout', exporters, traced: (ctx) => ctx.url.pathname !== '/events' }));
 ```
 
 ### A span has an exception, and its status is `ok`

@@ -126,12 +126,13 @@ is always listed.
 
 `app.route(operation, ...middlewares, handler)`, in `@alxia/core`, gives a
 route declared from an operation the middlewares of any route. The
-operation's schema is two of them: a `responds` of its responses, first, and
-a `validate` of its request just before the handler, so an `auth` placed
-before it answers 401 before the body is read. `validate(operation)`,
-given the same operation, validates where it stands instead, once. Put it
-after the auth: an anonymous client then gets no body parsed, and no
-validation issues back, which would reveal the schema:
+operation's schema is two of them, just before the handler: a `validate` of
+its request, then a `responds` of its responses, which checks the handler's
+reply alone. An `auth` placed before them answers 401 before the body is
+read. `validate(operation)`, given the same operation, validates where it
+stands instead, once. Put it after the auth: an anonymous client then gets
+no body parsed, and no validation issues back, which would reveal the
+schema:
 
 ```ts
 import { alxia, defineMiddleware, validate } from '@alxia/core';
@@ -150,9 +151,20 @@ matchesSpec(app, api); // the routes are matched as any others: by method and pa
 ```
 
 The checks read `app.routes`, so middlewares change nothing for them. A
-reply a middleware sends with a status the operation declares, such as
-`auth`'s 401 when the document declares one, is checked against that
-status's schema; one with a status it does not declare is sent as it is.
+reply a middleware sends, such as `auth`'s 401, is sent as it is, even when
+the document declares its status: the implicit `responds` checks the
+handler's. To check the middlewares' replies too, place
+`responds(operation)` before them; the route then adds no other:
+
+```ts
+import { responds } from '@alxia/core';
+
+app.route(api.adoptPet, responds(api.adoptPet), auth, ({ params, reply }) => reply.created(adopt(params.petId)));
+```
+
+`responds(operation)` reads the operation's `schema.response`, and throws
+`responds(): the operation GET /health declares no response` for one that
+declares none.
 
 ## How a route is matched
 
@@ -232,7 +244,7 @@ implemented(app, operations);
 app.listen(3000);
 ```
 
-Call it after the last `route`, `use` and `group`: a route declared later is
+Call it after the last `route`, `use`, `plugin` and `group`: a route declared later is
 not in `app.routes` yet.
 
 ## What it cannot see

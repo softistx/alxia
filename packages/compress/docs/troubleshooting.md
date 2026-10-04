@@ -43,7 +43,7 @@ what a client gets when none is chosen — and Brotli's token is `br`.
 **Fix:** use the tokens, and leave `identity` out:
 
 ```ts
-app.use(compress({ encodings: ['br', 'gzip'] }));
+app.plugin(compress({ encodings: ['br', 'gzip'] }));
 ```
 
 ### `Type 'RegExp' is not assignable to type '(type: string) => boolean'`
@@ -60,12 +60,12 @@ error TS2322: Type 'RegExp' is not assignable to type '(type: string) => boolean
 **Fix:** wrap the expression:
 
 ```ts
-app.use(compress({ compressible: (type) => /json|text\//.test(type) }));
+app.plugin(compress({ compressible: (type) => /json|text\//.test(type) }));
 ```
 
 ### `Type 'Alxia<…>' has no properties in common with type 'CompressOptions'`
 
-**When:** passing `compress` to `use` without calling it.
+**When:** passing `compress` to `app.plugin` without calling it.
 
 ```text
 error TS2769: No overload matches this call.
@@ -81,7 +81,7 @@ it returns.
 **Fix:**
 
 ```ts
-app.use(compress());
+app.plugin(compress());
 ```
 
 ## Responses
@@ -100,7 +100,7 @@ app.use(compress());
 | the response already has a `Content-Encoding` | a precompressed file from `static(…, { precompressed })` |
 | its `Cache-Control` holds `no-transform` | |
 | its `Content-Length` is under `threshold` (1024 by default) | a short JSON error, a small string, a small file from `static` or `file` |
-| `compress()` is not on this app | it was `use`d on another app, or not at all |
+| `compress()` is not on this app | it was given to `app.plugin` on another app, or not at all |
 
 **Fix:** ask for an encoding to check the plugin works:
 
@@ -115,7 +115,7 @@ then lower `threshold` or widen `compressible` if the response is one you
 want compressed:
 
 ```ts
-app.use(compress({ threshold: 256 }));
+app.plugin(compress({ threshold: 256 }));
 ```
 
 ### `Content-Encoding: gzip` on a tiny body, larger than the original
@@ -151,7 +151,7 @@ the body reads the encoded bytes.
 ```ts
 const app = alxia()
 	.onResponse((response) => withHeaders(response, (headers) => headers.set('cache-control', 'no-transform')))
-	.use(compress());
+	.plugin(compress());
 ```
 
 A `Cache-Control` set by the handler itself (`reply(200, body, { headers })`
@@ -274,7 +274,7 @@ out of compression:
 // The default test, as the guide's `compressible` section spells it.
 const defaults = /^(text\/(?!event-stream)|application\/(.+\+)?(json|javascript|xml)|image\/svg\+xml)/i;
 
-app.use(compress({ compressible: (type) => defaults.test(type) && !type.startsWith('text/csv') }));
+app.plugin(compress({ compressible: (type) => defaults.test(type) && !type.startsWith('text/csv') }));
 ```
 
 ### `Vary: Accept-Encoding` on a response that is not compressed

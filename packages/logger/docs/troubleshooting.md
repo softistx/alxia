@@ -40,17 +40,17 @@ error TS2339: Property 'log' does not exist on type 'Context<Empty, "/early", Em
 The same comes for `requestId`.
 
 **When:** a route reads `log` or `requestId`, but is declared before
-`use(logger())`.
+`plugin(logger())`.
 
 **Why:** both come from the plugin's `derive`, which reaches only the
 routes declared after it. At runtime too, `ctx.log` would be `undefined`
 there.
 
-**Fix:** use the plugin first:
+**Fix:** mount the plugin first:
 
 ```ts
 const app = alxia()
-	.use(logger())
+	.plugin(logger())
 	.get('/early', ({ log, reply }) => {
 		log.info('early');
 		return reply(200, 'ok');
@@ -71,7 +71,7 @@ plugin's `derive` had run, when there is no `log` yet.
 **Fix:** call it optionally:
 
 ```ts
-app.use(logger()).onError((error, { log }) => {
+app.plugin(logger()).onError((error, { log }) => {
 	log?.error('request failed', { error: String(error) });
 	return undefined;
 });
@@ -96,7 +96,7 @@ the one named by `header`, `x-request-id` by default.
 /^[\w.:@-]{1,128}$/.test('abc-123'); // true: kept
 /^[\w.:@-]{1,128}$/.test('a b');     // false: replaced
 
-app.use(logger({ header: 'x-correlation-id' })); // if your proxy uses another header
+app.plugin(logger({ header: 'x-correlation-id' })); // if your proxy uses another header
 ```
 
 ### The `X-Request-Id` is a UUID, not the id `generateId` made
@@ -113,8 +113,8 @@ throws is replaced too; its error is in the server log, from
 **Fix:** make an id that matches:
 
 ```ts
-app.use(logger({ generateId: () => `job:${crypto.randomUUID()}` })); // kept
-app.use(logger({ generateId: () => 'job 7' }));                      // a space: replaced
+app.plugin(logger({ generateId: () => `job:${crypto.randomUUID()}` })); // kept
+app.plugin(logger({ generateId: () => 'job 7' }));                      // a space: replaced
 ```
 
 ## The log
@@ -131,7 +131,7 @@ client sends, so two clients can share an id.
 **Fix:** turn it off where no proxy sets the header:
 
 ```ts
-app.use(logger({ trustIncomingId: false }));
+app.plugin(logger({ trustIncomingId: false }));
 ```
 
 ### The entries have no `ip`, or the proxy's
@@ -152,7 +152,7 @@ const app = alxia({
 	ip: (request, server) =>
 		request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
 		server?.requestIP(request)?.address,
-}).use(logger());
+}).plugin(logger());
 ```
 
 ### `duration` is `0`, or shorter than the request took
@@ -169,14 +169,14 @@ the clock stops when the response is handed to Bun, not when its last byte
 has been sent: only a streamed body, one with no `Content-Length`, is
 timed to its end.
 
-**Fix:** use the plugin first, so it times every other hook:
+**Fix:** mount the plugin first, so it times every other hook:
 
 ```ts
 import { alxia } from '@alxia/core';
 import { cors } from '@alxia/cors';
 import { logger } from '@alxia/logger';
 
-const app = alxia().use(logger()).use(cors());
+const app = alxia().plugin(logger()).plugin(cors());
 ```
 
 A large file sent to a slow client is the case that stays short: Bun sends
@@ -200,7 +200,7 @@ To keep an event stream's `warn` out of an alert, filter on its path or on
 `outcome`, or `skip` it:
 
 ```ts
-app.use(logger({ skip: (_, url) => url.pathname === '/events' }));
+app.plugin(logger({ skip: (_, url) => url.pathname === '/events' }));
 ```
 
 ### A WebSocket connection has no entry
@@ -215,7 +215,7 @@ upgrade response has no `X-Request-Id`.
 
 ### Requests outside the group are logged
 
-**When:** `use(logger())` sits inside a `group`, and requests to routes
+**When:** `plugin(logger())` sits inside a `group`, and requests to routes
 outside the group, or to no route at all, are logged and get the header.
 
 **Why:** the plugin's `onRequest` and `onResponse` are global hooks: they
@@ -225,7 +225,7 @@ apply to the whole app, wherever they are declared. Only `log` and
 **Fix:** to leave requests out of the log, name them in `skip`:
 
 ```ts
-app.group('/api', (api) => api.use(logger({ skip: (_, url) => !url.pathname.startsWith('/api/') })));
+app.group('/api', (api) => api.plugin(logger({ skip: (_, url) => !url.pathname.startsWith('/api/') })));
 ```
 
 ### A skipped path still shows up in the log
@@ -241,7 +241,7 @@ their entries:
 
 ```ts
 app
-	.use(logger({ skip: (_, url) => url.pathname === '/health' }))
+	.plugin(logger({ skip: (_, url) => url.pathname === '/health' }))
 	.get('/health', ({ reply }) => reply(200, 'ok')); // no entry at all
 ```
 

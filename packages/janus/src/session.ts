@@ -39,7 +39,7 @@ type UserOf<A, T> = Extract<UserOfAuth<A>, { readonly type: T }>;
  * handed a cookie), and never over a session cookie the route set itself.
  *
  * ```ts
- * app.use(session(accounts, { required: true })).get('/me', ({ user, reply }) => reply.ok(user));
+ * app.plugin(session(accounts, { required: true })).get('/me', ({ user, reply }) => reply.ok(user));
  * ```
  */
 export function session<

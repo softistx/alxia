@@ -15,7 +15,7 @@ const app = alxia()
 		await products.invalidateTag('products');       // every product page runs again
 		return reply(201, { saved: true });
 	})
-	.use(products)
+	.plugin(products)
 	.get('/products', ({ reply }) => reply(200, []))
 	.get('/products/:id', ({ params, reply }) => reply(200, { id: params.id }));
 ```
@@ -48,7 +48,7 @@ const catalogue = cache({
 });
 
 const app = alxia()
-	.use(catalogue)
+	.plugin(catalogue)
 	.get('/products', ({ reply }) => reply(200, []))
 	.get('/products/:id', ({ params, cache, reply }) => {
 		cache.tag(`product:${params.id}`);
@@ -79,7 +79,7 @@ import { cache } from '@alxia/cache';
 
 const products = cache({ ttl: 300, vary: ['accept-language'] });
 const app = alxia({ prefix: '/api' })
-	.use(products)
+	.plugin(products)
 	.get('/products', ({ reply }) => reply.ok([]));
 
 await products.invalidate('/api/products');        // GET /api/products, in every language
@@ -143,8 +143,8 @@ const shortLived = cache({ ttl: 10, store, tags: () => ['products'] });
 const longLived = cache({ ttl: 600, store, tags: () => ['products'] });
 
 const app = alxia()
-	.group((g) => g.use(shortLived).get('/products/stock', ({ reply }) => reply(200, 5)))
-	.group((g) => g.use(longLived).get('/products', ({ reply }) => reply(200, [])));
+	.group((g) => g.plugin(shortLived).get('/products/stock', ({ reply }) => reply(200, 5)))
+	.group((g) => g.plugin(longLived).get('/products', ({ reply }) => reply(200, [])));
 
 await shortLived.invalidateTag('products');  // both routes run again
 ```
@@ -172,7 +172,7 @@ test('invalidated by path, and by tag', async () => {
 	let runs = 0;
 	const products = cache({ ttl: 60, tags: () => ['products'] });
 	const app = alxia()
-		.use(products)
+		.plugin(products)
 		.get('/products', ({ reply }) => reply(200, { runs: ++runs }));
 
 	await app.request('/products');

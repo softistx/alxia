@@ -25,7 +25,7 @@ import { createSchema } from 'graphql-yoga';
 
 const base = alxia()
 	.decorate({ db })
-	.use(bearer({ jwt, schema: Claims }));        // every route after it needs a token
+	.plugin(bearer({ jwt, schema: Claims }));        // every route after it needs a token
 
 const schema = createSchema<GraphQLContext<typeof base>>({
 	typeDefs: /* GraphQL */ `type Query { me: String! }`,
@@ -34,13 +34,13 @@ const schema = createSchema<GraphQLContext<typeof base>>({
 	},
 });
 
-const app = base.use((app) => graphql(app, { schema }));   // POST and GET /graphql
+const app = base.plugin((app) => graphql(app, { schema }));   // POST and GET /graphql
 app.listen(3000);
 ```
 
 `graphql(app, options)` adds `GET` and `POST` routes at `path` —
 `/graphql` by default, under the app's prefix — and returns the app. Given
-to `use` as a function, it stays in the chain and sees the app's type.
+to `app.plugin` as a function, it stays in the chain and sees the app's type.
 
 ## The context
 

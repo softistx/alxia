@@ -19,7 +19,7 @@ const supported = ['en', 'fr', 'pt-BR'] as const;
 const greetings: Record<(typeof supported)[number], string> = { en: 'Hello', fr: 'Bonjour', 'pt-BR': 'Olá' };
 
 const app = alxia()
-	.use(language({ supported, fallback: 'en' }))
+	.plugin(language({ supported, fallback: 'en' }))
 	.get('/', ({ language, reply }) => reply(200, greetings[language])); // 'en' | 'fr' | 'pt-BR'
 
 app.listen(3000);
@@ -58,8 +58,8 @@ const byUser = language({
 	resolve: ({ user }: BaseContext & { user: { language: string } | null }) => user?.language,
 });
 
-alxia().use(auth).use(byUser); // auth derives user
-alxia().use(byUser); // a compile error: this app gives no `user`
+alxia().plugin(auth).plugin(byUser); // auth derives user
+alxia().plugin(byUser); // a compile error: this app gives no `user`
 ```
 
 A `resolve` annotated `any` would require nothing, so the plugin is refused

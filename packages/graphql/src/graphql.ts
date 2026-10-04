@@ -35,7 +35,7 @@ export type ServerContext<Ctx> = Omit<BaseContext & Ctx, RouteOnly>;
  * the `context` option adds. Type a schema with it:
  *
  * ```ts
- * const base = alxia().use(bearer({ jwt }));
+ * const base = alxia().plugin(bearer({ jwt }));
  * const schema = createSchema<GraphQLContext<typeof base>>({ ... });
  * ```
  */
@@ -110,7 +110,7 @@ type ProvidesContext<Provided, Required> = Provided extends Required
  *
  * ```ts
  * const app = alxia()
- *   .use(bearer({ jwt }))
+ *   .plugin(bearer({ jwt }))
  *   .plugin((app) => graphql(app, { schema, plugins: [useDepthLimit()] }));
  * ```
  */
