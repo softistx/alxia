@@ -29,6 +29,8 @@ export function routeContext(
 	definition: RouteDefinition | SocketDefinition,
 	request: RequestContext,
 	pathParams: Record<string, string>,
+	/** `ctx.route`: the route's declared path; none for a request no route matches. */
+	route: string | undefined,
 ): { ctx: Record<string, unknown> & BaseContext; set: ResponseSettings } {
 	let sent: Bun.CookieMap | undefined;
 	const set: ResponseSettings & { readonly touched: () => boolean } = {
@@ -54,7 +56,7 @@ export function routeContext(
 		...(limit === undefined
 			? {}
 			: { request: limitBody(request.request, limit) }),
-		route: definition.path,
+		route,
 		pathParams,
 		// As they arrived, until validation sets the schemas' output: what
 		// the hooks of a route's list read as `params` and `query`.

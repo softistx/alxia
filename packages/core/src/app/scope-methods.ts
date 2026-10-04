@@ -73,6 +73,10 @@ export interface WrapMethod<
 	 * .wrap(async ({ request, reply }, next) =>
 	 *   (await locks.tryRun(request, next)) ?? reply(409, { error: 'busy' as const }))
 	 * ```
+	 *
+	 * @deprecated A middleware that awaits `next()`, given to `use`, does
+	 * the same; a refusal reaches it thrown, where a `wrap`'s `next()`
+	 * resolves to its 400. See the upgrading guide.
 	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	<Result extends AnyReply | Response>(
@@ -117,6 +121,10 @@ export interface ErrorMethod<
 	 * A hook that turns an error thrown by a route declared after it into a
 	 * reply. Returning nothing lets the next one try; past the last, an
 	 * `HttpError` is answered as it says and anything else as a 500.
+	 *
+	 * @deprecated A middleware given to `use` catches what the rest
+	 * throws: `try { return await next() } catch (error) { … }`, returning
+	 * a reply or throwing it on. See the upgrading guide.
 	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	<Result extends AnyReply | undefined | void>(

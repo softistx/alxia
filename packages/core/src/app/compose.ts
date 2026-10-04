@@ -4,7 +4,7 @@
  */
 import { joinPath } from '../router/paths';
 import { type AppState, mount, register } from './app-state';
-import { isMiddleware } from './define-middleware';
+import { useMiddlewares } from './declare-hooks';
 import { refuseShadowedPages } from './pages';
 import { mergeGlobals } from './runtime';
 import type { AnyAlxia } from './signatures';
@@ -45,6 +45,29 @@ export function group(
 }
 
 /**
+ * `app.use(...args)` or `app.plugin(...args)`: middlewares made by
+ * `defineMiddleware` — given to `plugin`, the deprecated form of `use` —
+ * else a plugin, mounted. `stateOf` reads an app's state, and tells an
+ * app from anything else.
+ */
+export function compose(
+	state: AppState,
+	label: 'use()' | 'plugin()',
+	args: readonly unknown[],
+	app: AnyAlxia,
+	stateOf: (value: unknown) => AppState | undefined,
+): AnyAlxia {
+	if (useMiddlewares(state, args, label === 'use()')) return app;
+	const plugin = pluginOf(label, args);
+	const isApp = (value: unknown): value is AnyAlxia =>
+		stateOf(value) !== undefined;
+	const mounted = pluginApp(label, plugin, app, isApp);
+	if (mounted !== plugin) return mounted;
+	usePlugin(state, stateOf(plugin) as AppState);
+	return app;
+}
+
+/**
  * The plugin `plugin` is given, or `use` in its deprecated plugin form —
  * a function `defineMiddleware` made was read before, as a middleware —
  * alone.
@@ -82,7 +105,7 @@ export function pluginApp(
 			`${label}: the plugin is neither an app nor a function; a middleware is made with defineMiddleware() and given to use()`,
 		);
 	}
-	if (isMiddleware(plugin) || builtinOf(plugin) !== undefined) {
+	if (builtinOf(plugin) !== undefined) {
 		throw new TypeError(
 			`${label}: a middleware is given to use(), not taken for a plugin`,
 		);

@@ -10,7 +10,8 @@ import {
 import type { BodyParser } from '../request/read';
 import { check, type StandardSchemaV1 } from '../schema/standard-schema';
 import type { Socket } from '../ws/types';
-import { chain, fail } from './chain';
+import { fail, RUN } from './boundary';
+import { chain } from './chain';
 import { routeContext } from './context';
 import type { SocketDefinition } from './definition';
 import { routingError } from './send';
@@ -34,7 +35,12 @@ export async function upgradeSocket(
 	parsers: readonly BodyParser[],
 	validateResponses: boolean,
 ): Promise<Response | typeof UPGRADED> {
-	const { ctx, set } = routeContext(definition, request, rawParams);
+	const { ctx, set } = routeContext(
+		definition,
+		request,
+		rawParams,
+		definition.path,
+	);
 	const server = request.server;
 	try {
 		const run = {
@@ -45,6 +51,7 @@ export async function upgradeSocket(
 			parsers,
 			validateResponses,
 		};
+		(ctx as { [RUN]?: typeof run })[RUN] = run;
 		return await chain<typeof UPGRADED>(run, ctx, async (validated) => {
 			if (server === undefined) {
 				return routingError(426, 'upgrade_required');
@@ -60,7 +67,8 @@ export async function upgradeSocket(
 			return upgraded ? UPGRADED : routingError(426, 'upgrade_required');
 		});
 	} catch (error) {
-		return fail(definition, error, ctx);
+		(request as { error: unknown }).error = error;
+		return fail(definition, error, ctx, validateResponses);
 	}
 }
 

@@ -31,19 +31,23 @@ export function wrap(state: AppState, hook: WrapHook): void {
 /**
  * `app.use(...middlewares)` or `app.use(path, ...middlewares)`, when its
  * arguments are these: each a middleware `defineMiddleware` made, for the
- * routes declared next — those under `path`, given one. Whether they
- * were: anything else is a plugin, which `use` takes alone.
+ * routes declared next — those under `path`, given one — and for every
+ * request no route matches. Whether they were: anything else is a
+ * plugin, which `use` takes alone. `app.plugin(...middlewares)`, the
+ * deprecated form, takes no `path`.
  */
 export function useMiddlewares(
 	state: AppState,
 	args: readonly unknown[],
+	paths = true,
 ): boolean {
 	const [first, ...rest] = args;
-	const scoped = typeof first === 'string';
+	const scoped = paths && typeof first === 'string';
 	if (!scoped && !isMiddleware(first) && builtinOf(first) === undefined) {
 		return false;
 	}
-	const label = scoped ? `use("${first}")` : 'use()';
+	if (!paths && !isMiddleware(first)) return false;
+	const label = scoped ? `use("${first}")` : paths ? 'use()' : 'plugin()';
 	const middlewares = scoped ? rest : args;
 	if (middlewares.length === 0) {
 		throw new TypeError(`${label}: no middleware is given`);
@@ -60,7 +64,7 @@ export function useMiddlewares(
 			);
 		}
 	});
-	const path = scoped ? scopePath(state.prefix, first) : undefined;
+	const path = scoped ? scopePath(state.prefix, first as string) : undefined;
 	for (const middleware of middlewares) {
 		state.scope.chain({ kind: 'middleware', run: middleware as never }, path);
 	}

@@ -109,6 +109,11 @@ export interface RefusalMethod<
 	 * .onRefusal('body_limit', { response: { 413: TooLarge } }, (refusal, { reply }) =>
 	 *   reply(413, { limit: refusal.limit }))
 	 * ```
+	 *
+	 * @deprecated A refusal is thrown now — a `ValidationError`, a
+	 * `ContentTooLargeError` — so a middleware before the `validate`
+	 * answers it: `try { return await next() } catch (error) { … }`,
+	 * reading `refusalOf(error)`. See the upgrading guide.
 	 */
 	<Result extends Reply<ClientErrorStatus, any> | undefined | void>(
 		hook: (refusal: Refusal, ctx: BaseContext & Ctx) => MaybePromise<Result>,
@@ -117,7 +122,14 @@ export interface RefusalMethod<
 		Prefix,
 		Exclude<Shortcuts, Refusing> | RefusalsOf<Extract<Result, AnyReply>, Result>
 	>;
-	/** The hook answering every kind of refusal, its replies typed by `schema`. */
+	/**
+	 * The hook answering every kind of refusal, its replies typed by `schema`.
+	 *
+	 * @deprecated A refusal is thrown now — a `ValidationError`, a
+	 * `ContentTooLargeError` — so a middleware before the `validate`
+	 * answers it: `try { return await next() } catch (error) { … }`,
+	 * reading `refusalOf(error)`. See the upgrading guide.
+	 */
 	<
 		Responses extends RefusalResponses,
 		Result extends DeclaredReply<Responses> | undefined | void,
@@ -134,7 +146,14 @@ export interface RefusalMethod<
 		| Exclude<Shortcuts, Refusing>
 		| RefusalsOf<DeclaredRefusal<Responses>, Result>
 	>;
-	/** The hook answering one `kind` of refusal, read narrowed. */
+	/**
+	 * The hook answering one `kind` of refusal, read narrowed.
+	 *
+	 * @deprecated A refusal is thrown now — a `ValidationError`, a
+	 * `ContentTooLargeError` — so a middleware before the `validate`
+	 * answers it: `try { return await next() } catch (error) { … }`,
+	 * reading `refusalOf(error)`. See the upgrading guide.
+	 */
 	<
 		Kind extends RefusalKind,
 		Result extends Reply<ClientErrorStatus, any> | undefined | void,
@@ -150,7 +169,14 @@ export interface RefusalMethod<
 		| Exclude<Shortcuts, RefusingKind<Kind>>
 		| KindRefusalsOf<Kind, Extract<Result, AnyReply>, Result>
 	>;
-	/** The hook answering one `kind` of refusal, its replies typed by `schema`. */
+	/**
+	 * The hook answering one `kind` of refusal, its replies typed by `schema`.
+	 *
+	 * @deprecated A refusal is thrown now — a `ValidationError`, a
+	 * `ContentTooLargeError` — so a middleware before the `validate`
+	 * answers it: `try { return await next() } catch (error) { … }`,
+	 * reading `refusalOf(error)`. See the upgrading guide.
+	 */
 	<
 		Kind extends RefusalKind,
 		Responses extends RefusalResponses,

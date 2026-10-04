@@ -9,13 +9,7 @@ import type {
 	StopHookMethod,
 } from './app-hooks';
 import { type AppState, createState } from './app-state';
-import {
-	type GroupArgs,
-	group,
-	pluginApp,
-	pluginOf,
-	usePlugin,
-} from './compose';
+import { compose, type GroupArgs, group } from './compose';
 import type { GroupMethod, UseMethod } from './compose-methods';
 import * as hooks from './declare-hooks';
 import * as declare from './declare-routes';
@@ -33,7 +27,7 @@ import type {
 } from './scope-methods';
 import { startServer, stopServer } from './serving';
 import type { ListenMethod, RequestMethod } from './serving-methods';
-import type { AlxiaOptions, AnyAlxia, RefusalMethod } from './signatures';
+import type { AlxiaOptions, RefusalMethod } from './signatures';
 import { type SocketData, websocketHandler } from './socket';
 import type { SocketMethod } from './socket-method';
 import type { FileMethod, PageMethod, StaticMethod } from './static-methods';
@@ -137,16 +131,10 @@ export class Alxia<
 				return [child, child.#state];
 			}),
 	);
-	readonly use: UseMethod<this, Ctx, Prefix, Shortcuts> = ((
-		...args: unknown[]
-	) =>
-		// Anything but middlewares is the plugin form of 0.3, deprecated.
-		hooks.useMiddlewares(this.#state, args)
-			? this
-			: this.#plugin('use()', args)) as never;
-	readonly plugin: PluginMethod<this, Ctx, Prefix, Shortcuts> = ((
-		...args: unknown[]
-	) => this.#plugin('plugin()', args)) as never;
+	readonly use: UseMethod<this, Ctx, Prefix, Shortcuts> =
+		this.#compose('use()');
+	readonly plugin: PluginMethod<this, Ctx, Prefix, Shortcuts> =
+		this.#compose('plugin()');
 
 	/** Every route, in the order declared: what `@alxia/openapi`'s `matchesSpec` checks against the document. */
 	get routes(): readonly RouteDefinition[] {
@@ -202,13 +190,12 @@ export class Alxia<
 		await stopServer(this.#state.runtime, server, closeActiveConnections);
 	}
 
-	/** Mounts the plugin `args` hold: an app taken in, or a function's app. */
-	#plugin(label: string, args: readonly unknown[]): AnyAlxia {
-		const plugin = pluginOf(label, args);
-		const app = pluginApp(label, plugin, this, (v) => v instanceof Alxia);
-		if (app !== plugin) return app;
-		usePlugin(this.#state, (plugin as Alxia).#state);
-		return this;
+	/** `use` or `plugin`: middlewares, else the plugin `args` hold, see `compose`. */
+	#compose(label: 'use()' | 'plugin()'): never {
+		return ((...args: unknown[]) =>
+			compose(this.#state, label, args, this, (value) =>
+				value instanceof Alxia ? value.#state : undefined,
+			)) as never;
 	}
 
 	/** A route method: its arguments read when it is called, see `RouteMethod`. */

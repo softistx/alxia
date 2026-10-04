@@ -13,6 +13,7 @@ import type {
 import type { BaseContext } from './types';
 
 type Ctx = Record<string, unknown> & BaseContext;
+type Definition = RouteDefinition | SocketDefinition;
 
 /** A `wrap` hook run around `rest`: its reply, or the response it returns. */
 export async function wrapped(
@@ -29,14 +30,16 @@ export async function wrapped(
  * context and runs `rest`, once, before the middleware settles: its
  * result, or a promise of it.
  *
+ * - `next()`'s own promise returned, the usual `return next(added)`: that
+ *   promise, as it is — the chain pays nothing more for it.
  * - Nothing returned once `next()` was called: the rest's response, as
  *   Koa and Hono answer `await next()` with no return.
  * - A reply of its own returned before the `next()` it called settled —
  *   `next(); return reply(403)`: the rest runs anyway, so the reply is
  *   sent once it has, with a warning, and an error the rest throws then
- *   is logged. An error of the rest that settled before the middleware
- *   did is taken as read — a `try { await next() } catch` is the usual
- *   way — and never left unhandled either.
+ *   is logged. An error of the rest the middleware does not read is never
+ *   left unhandled: `next()`'s promise is given a handler before any
+ *   rejection could be reported, unless the middleware returned it.
  * - What `rest` resolves to that is not a response — a socket's upgrade —
  *   reaches the middleware as a stand-in response. The socket is open by
  *   then: what the middleware returns after it, or throws, is ignored, as
@@ -47,75 +50,143 @@ export function middleware(
 	ctx: Ctx,
 	merge: (ctx: Ctx, added: object) => void,
 	rest: () => Promise<unknown>,
-	definition: RouteDefinition | SocketDefinition,
+	definition: Definition,
 ): unknown {
-	const route = 'method' in definition;
-	let state: 'idle' | 'called' | 'settled' = 'idle';
-	let pending: Promise<unknown> | undefined;
-	let parked: Parked | undefined;
-	const next = (added?: object): Promise<Response> => {
-		if (state !== 'idle') {
+	return new Call(hook, ctx, merge, rest, definition).run();
+}
+
+/** One middleware's call, and the `next` it is given. */
+class Call {
+	readonly #hook: MiddlewareHook;
+	readonly #ctx: Ctx;
+	readonly #merge: (ctx: Ctx, added: object) => void;
+	readonly #rest: () => Promise<unknown>;
+	readonly #definition: Definition;
+	#state: 'idle' | 'called' | 'settled' = 'idle';
+	/** Whether the middleware is still running its synchronous part. */
+	#inline = true;
+	#pending: Promise<unknown> | undefined;
+	#parked: Parked | undefined;
+
+	constructor(
+		hook: MiddlewareHook,
+		ctx: Ctx,
+		merge: (ctx: Ctx, added: object) => void,
+		rest: () => Promise<unknown>,
+		definition: Definition,
+	) {
+		this.#hook = hook;
+		this.#ctx = ctx;
+		this.#merge = merge;
+		this.#rest = rest;
+		this.#definition = definition;
+	}
+
+	readonly next = (added?: object): Promise<Response> => {
+		if (this.#state !== 'idle') {
 			throw failure(
-				definition,
-				state === 'called'
+				this.#definition,
+				this.#state === 'called'
 					? 'a middleware called next() twice'
 					: 'a middleware called next() after it returned',
 			);
 		}
-		state = 'called';
-		if (added !== null && typeof added === 'object') merge(ctx, added);
-		pending = route
-			? rest()
-			: rest().then((downstream) => {
-					if (downstream instanceof Response) return downstream;
-					parked = { stand: new Response(null), value: downstream };
-					return parked.stand;
-				});
-		// Handled from the start: an error the middleware does not read is
-		// logged when it settles, never reported as unhandled.
-		pending.catch(ignore);
+		this.#state = 'called';
+		if (added !== null && typeof added === 'object') {
+			this.#merge(this.#ctx, added);
+		}
+		const pending =
+			'method' in this.#definition
+				? this.#rest()
+				: this.#rest().then((downstream) => this.#park(downstream));
+		this.#pending = pending;
+		// Called once the middleware's promise is out: handled now.
+		if (!this.#inline) pending.catch(ignore);
 		return pending as Promise<Response>;
 	};
-	const settle = (result: unknown): unknown => {
-		state = 'settled';
-		if (pending === undefined) return own(hook, definition, result, parked);
-		if (result === undefined) {
-			return pending.then((downstream) => parked?.value ?? downstream);
+
+	run(): unknown {
+		let result: unknown;
+		try {
+			result = this.#hook(this.#ctx, this.next);
+		} catch (error) {
+			return this.#thrown(error);
 		}
-		if (Bun.peek.status(pending) !== 'pending') {
-			return own(hook, definition, result, parked);
+		this.#inline = false;
+		const pending = this.#pending;
+		if (pending !== undefined && result === pending) {
+			this.#state = 'settled';
+			if (this.#parked === undefined && 'method' in this.#definition) {
+				return pending;
+			}
+			return pending.then((downstream) => this.#parked?.value ?? downstream);
 		}
-		console.warn(
-			`${labelOf(definition)}: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`,
+		// Called, not returned: whatever the middleware does with it.
+		pending?.catch(ignore);
+		if (!(result instanceof Promise)) return this.#settle(result);
+		if ('method' in this.#definition) {
+			return result.then(
+				(settled) => this.#settle(settled),
+				(error: unknown) => this.#thrown(error),
+			);
+		}
+		return result.then(
+			(settled) => this.#settle(settled),
+			(error: unknown) => {
+				if (this.#parked === undefined) return this.#thrown(error);
+				console.error(error);
+				return this.#parked.value;
+			},
 		);
-		const after = () => own(hook, definition, result, parked);
+	}
+
+	/** A socket's upgrade, parked: the middleware reads a stand-in response. */
+	#park(downstream: unknown): Response {
+		if (downstream instanceof Response) return downstream;
+		this.#parked = { stand: new Response(null), value: downstream };
+		return this.#parked.stand;
+	}
+
+	#settle(result: unknown): unknown {
+		this.#state = 'settled';
+		const pending = this.#pending;
+		if (pending === undefined) return this.#own(result);
+		if (result === undefined) {
+			return pending.then((downstream) => this.#parked?.value ?? downstream);
+		}
+		if (Bun.peek.status(pending) !== 'pending') return this.#own(result);
+		console.warn(
+			`${labelOf(this.#definition)}: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`,
+		);
+		const after = () => this.#own(result);
 		return pending.then(after, (error: unknown) => {
 			console.error(error);
 			return after();
 		});
-	};
-	// A middleware that throws while the `next()` it called still runs:
-	// the rest's error, if any, is logged, the middleware's goes on to
-	// `onError`.
-	const thrown = (error: unknown): never => {
+	}
+
+	/**
+	 * A middleware that throws while the `next()` it called still runs:
+	 * the rest's error, if any, is logged, the middleware's goes on.
+	 */
+	#thrown(error: unknown): never {
+		const pending = this.#pending;
 		if (pending !== undefined && Bun.peek.status(pending) === 'pending') {
 			pending.catch(console.error);
 		}
 		throw error;
-	};
-	let result: unknown;
-	try {
-		result = hook(ctx, next);
-	} catch (error) {
-		thrown(error);
 	}
-	if (!(result instanceof Promise)) return settle(result);
-	if (route) return result.then(settle, thrown);
-	return result.then(settle, (error: unknown) => {
-		if (parked === undefined) return thrown(error);
-		console.error(error);
-		return parked.value;
-	});
+
+	/** What the middleware's own result answers: the upgrade once parked, else its reply or `Response`. */
+	#own(result: unknown): unknown {
+		if (this.#parked !== undefined) return this.#parked.value;
+		if (result instanceof Reply || result instanceof Response) return result;
+		const name = this.#hook.name ? ` (${this.#hook.name})` : '';
+		throw failure(
+			this.#definition,
+			`a middleware${name} returned ${result === undefined ? 'nothing' : typeof result}: return next(), a reply or a Response`,
+		);
+	}
 }
 
 function ignore(): void {}
@@ -126,29 +197,10 @@ interface Parked {
 	readonly value: unknown;
 }
 
-/** What a middleware's own result answers: the upgrade once parked, else its reply or `Response`. */
-function own(
-	hook: MiddlewareHook,
-	definition: RouteDefinition | SocketDefinition,
-	result: unknown,
-	parked: Parked | undefined,
-): unknown {
-	if (parked !== undefined) return parked.value;
-	if (result instanceof Reply || result instanceof Response) return result;
-	const name = hook.name ? ` (${hook.name})` : '';
-	throw failure(
-		definition,
-		`a middleware${name} returned ${result === undefined ? 'nothing' : typeof result}: return next(), a reply or a Response`,
-	);
-}
-
-function labelOf(definition: RouteDefinition | SocketDefinition): string {
+function labelOf(definition: Definition): string {
 	return `${'method' in definition ? definition.method : 'WS'} ${definition.path}`;
 }
 
-function failure(
-	definition: RouteDefinition | SocketDefinition,
-	why: string,
-): TypeError {
+function failure(definition: Definition, why: string): TypeError {
 	return new TypeError(`${labelOf(definition)}: ${why}`);
 }

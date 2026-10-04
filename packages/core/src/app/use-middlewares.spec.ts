@@ -73,14 +73,21 @@ describe('app.use(...middlewares)', () => {
 		expect(await (await app.request('/', user)).text()).toBe('ada');
 	});
 
-	test('a 404 and a 405 do not pass through them', async () => {
+	test('a 404 and a 405 pass through them, a use() after the last route included', async () => {
 		const log: string[] = [];
 		const app = alxia()
-			.use(logs(log, 'scope'))
-			.get('/', ({ reply }) => reply(200, 'ok'));
+			.use(logs(log, 'before'))
+			.get('/', ({ reply }) => reply(200, 'ok'))
+			.use(logs(log, 'after'));
 		expect((await app.request('/missing')).status).toBe(404);
-		expect((await app.request('/', { method: 'POST' })).status).toBe(405);
-		expect(log).toEqual([]);
+		const refused = await app.request('/', { method: 'POST' });
+		expect(refused.status).toBe(405);
+		expect(refused.headers.get('allow')).toBe('GET');
+		expect(log).toEqual(['before', 'after', 'before', 'after']);
+		// The route runs only what was declared before it.
+		log.length = 0;
+		expect((await app.request('/')).status).toBe(200);
+		expect(log).toEqual(['before']);
 	});
 
 	test('a function not made by defineMiddleware is a plugin, as before', async () => {

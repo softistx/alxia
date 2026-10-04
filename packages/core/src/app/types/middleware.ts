@@ -83,6 +83,8 @@ export interface BuiltinMark<Kind extends 'validate' | 'responds'> {
  */
 export type MiddlewareBase<Ctx, Path extends string> = BaseContext &
 	Ctx & {
+		/** A route's middleware runs once it matched: its path as declared. */
+		readonly route: string;
 		readonly params: PathParams<Path>;
 		readonly pathParams: PathParams<Path>;
 		readonly query: RawRequestParts['query'];

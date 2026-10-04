@@ -122,6 +122,54 @@ export class ContentTooLargeError extends HttpError<413, ContentTooLargeBody> {
 }
 
 /**
+ * A request a `validate` refused: what it throws, carrying the refusal.
+ * Thrown, so that a middleware before the `validate` answers it in its
+ * own format — `try { return await next() } catch (error) { … }`, reading
+ * `refusalOf(error)` — before the default does: the route's `onRefusal`
+ * hooks, deprecated, then the 400 of `ValidationErrorBody`. The `onError`
+ * hooks never see it.
+ */
+export class ValidationError extends HttpError<400, ValidationErrorBody> {
+	override readonly name = 'ValidationError';
+	readonly refusal: ValidationRefusal;
+
+	constructor(refusal: ValidationRefusal) {
+		super(
+			400,
+			{ error: 'validation', issues: refusal.issues },
+			`The request's ${refusal.part} is invalid`,
+		);
+		this.refusal = refusal;
+	}
+}
+
+/**
+ * The refusal `error` is, as an `onRefusal` hook reads it: a
+ * `ValidationError` a `validate` threw, or the `ContentTooLargeError` a
+ * body past its limit throws; `undefined` for any other error. What a
+ * middleware reads to answer a refusal itself:
+ *
+ * ```ts
+ * const problems = defineMiddleware(async ({ reply }, next) => {
+ *   try {
+ *     return await next();
+ *   } catch (error) {
+ *     const refusal = refusalOf(error);
+ *     if (refusal?.kind !== 'validation') throw error;
+ *     return reply(422, { detail: `the ${refusal.part} is invalid` });
+ *   }
+ * });
+ * ```
+ */
+export function refusalOf(error: unknown): Refusal | undefined {
+	if (error instanceof ValidationError) return error.refusal;
+	if (error instanceof ContentTooLargeError) {
+		return { kind: 'body_limit', limit: error.limit };
+	}
+	return undefined;
+}
+
+/**
  * A reply that did not match the schema its route declares for its status.
  * It is answered as a 500: the client must never read an undeclared shape.
  */

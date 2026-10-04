@@ -2,7 +2,11 @@
  * What a `validate` step does in a route's chain: each part of the request
  * it has a schema for checked, and the request refused when one fails.
  */
-import type { RequestPart, ValidationIssue } from '../errors/errors';
+import {
+	type RequestPart,
+	ValidationError,
+	type ValidationIssue,
+} from '../errors/errors';
 import {
 	type BodyParser,
 	readBody,
@@ -11,7 +15,6 @@ import {
 } from '../request/read';
 import { check, type StandardSchemaV1 } from '../schema/standard-schema';
 import type { RouteDefinition, SocketDefinition } from './definition';
-import { refuse } from './refusal';
 import type { BaseContext, RequestContext, ResponseSettings } from './types';
 import type { RequestSchemas } from './validate';
 
@@ -30,8 +33,9 @@ export interface ChainRun {
 }
 
 /**
- * The request checked by `schemas`: the context what follows reads, or the
- * response that refuses it. Each part is read as it arrived, `cookies`
+ * The request checked by `schemas`: the context what follows reads, or a
+ * `ValidationError` thrown, which the middlewares before it may answer,
+ * and the route's `onRefusal` hooks or the default 400 otherwise. Each part is read as it arrived, `cookies`
  * included — those of the route's own context, never the output of an
  * earlier `validate`. A part it has no schema for is left as it is: what
  * a middleware of `use` passed `next` stays, the form of 0.3's validation
@@ -42,7 +46,7 @@ export async function validateStep(
 	schemas: RequestSchemas,
 	ctx: Ctx,
 	cookies: unknown,
-): Promise<{ readonly refused: Response } | { readonly ctx: Ctx }> {
+): Promise<Ctx> {
 	const { request } = run;
 	const issues: ValidationIssue[] = [];
 	let part: RequestPart | undefined;
@@ -80,19 +84,9 @@ export async function validateStep(
 		}
 	}
 	if (part === undefined) {
-		return {
-			ctx: validCookies === undefined ? ctx : withCookies(ctx, validCookies),
-		};
+		return validCookies === undefined ? ctx : withCookies(ctx, validCookies);
 	}
-	return {
-		refused: await refuse(
-			run.definition,
-			{ kind: 'validation', part, issues },
-			run.set,
-			ctx,
-			run.validateResponses,
-		),
-	};
+	throw new ValidationError({ kind: 'validation', part, issues });
 }
 
 /** The body read and checked: set on `ctx`, or the issues that refuse it. */

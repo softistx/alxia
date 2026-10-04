@@ -51,8 +51,12 @@ export interface ResponseSettings {
 
 /** What every route hook and handler reads, before the request is validated. */
 export interface BaseContext extends RequestContext {
-	/** The route's path as declared, `/users/:id`, not as requested. */
-	readonly route: string;
+	/**
+	 * The route's path as declared, `/users/:id`, not as requested; none in
+	 * a hook or middleware that runs on a request no route matches, before
+	 * its 404 or 405. A handler's is always the route's.
+	 */
+	readonly route: string | undefined;
 	/**
 	 * The path parameters as they arrived, before the route's `params`
 	 * schema: what a hook reads, since it runs before validation.
@@ -74,9 +78,11 @@ export interface BaseContext extends RequestContext {
 /** What a handler reads: the request validated, and what each hook added. */
 export type Context<Ctx, Path extends string, Schema> = Omit<
 	BaseContext,
-	'reply' | 'cookies'
+	'reply' | 'cookies' | 'route'
 > &
 	Ctx & {
+		/** The route's path as declared, `/users/:id`, not as requested. */
+		readonly route: string;
 		readonly params: OutputAt<Schema, 'params', PathParams<Path>>;
 		readonly query: OutputAt<
 			Schema,
