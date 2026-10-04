@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.1.4
+
+### Patch Changes
+
+- [#117](https://github.com/softistx/alxia/pull/117) [`77d98d0`](https://github.com/softistx/alxia/commit/77d98d046e3fe7dae866ece6ccfe0c9617f4fa8c) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Every template's `Dockerfile` now runs the app on `oven/bun:1-alpine`, the build stages staying on `oven/bun:1`: each image is about 130 MB, where it was about 345 MB, and still runs as the non-root `bun` user. The `api` project's `src/server.ts` stops the app on `SIGINT` and `SIGTERM`, so `docker stop` no longer waits for its timeout. A native addon built for glibc alone does not load on Alpine: the troubleshooting page says to put the final stage back on `oven/bun:1`.
+
 ## 0.1.3
 
 ### Patch Changes
