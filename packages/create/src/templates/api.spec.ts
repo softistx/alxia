@@ -10,7 +10,6 @@ import { apiFiles, apiManifest } from './api';
 // against them with no install. scripts/verify-templates.ts does the same
 // from the packed tarballs, installed.
 const dir = join(import.meta.dir, '..', '..', '.fixture-api');
-const tsc = Bun.resolveSync('typescript/bin/tsc', import.meta.dir);
 
 beforeAll(async () => {
 	await rm(dir, { recursive: true, force: true });
@@ -46,9 +45,12 @@ describe('the api template', () => {
 	});
 
 	test("typechecks under this repository's strictest settings", async () => {
-		const result = await $`${process.execPath} ${tsc} --noEmit -p ${dir}`
-			.nothrow()
-			.quiet();
+		const result = // The workspace's tsc, from node_modules/.bin, on Bun: TypeScript 7 exports
+			// no bin/tsc to resolve, and a runner may have no node.
+			await $`${process.execPath} --bun tsc --noEmit -p ${dir}`
+				.cwd(import.meta.dir)
+				.nothrow()
+				.quiet();
 		expect(result.stdout.toString()).toBe('');
 		expect(result.exitCode).toBe(0);
 	});
