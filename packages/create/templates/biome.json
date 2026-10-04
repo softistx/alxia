@@ -1,26 +1,4 @@
 {
   "root": false,
-  "extends": "//",
-  "formatter": { "indentStyle": "space" },
-  "javascript": { "formatter": { "quoteStyle": "double" } },
-  "css": {
-    "parser": { "tailwindDirectives": true },
-    "formatter": { "enabled": false }
-  },
-  "assist": { "actions": { "source": { "organizeImports": "off" } } },
-  "linter": {
-    "rules": { "correctness": { "noEmptyPattern": "off" } }
-  },
-  "overrides": [
-    {
-      "includes": ["api/**"],
-      "formatter": { "indentStyle": "tab" },
-      "javascript": { "formatter": { "quoteStyle": "single" } },
-      "assist": { "actions": { "source": { "organizeImports": "on" } } }
-    },
-    {
-      "includes": ["react-router/app/welcome/**"],
-      "linter": { "rules": { "a11y": { "noSvgWithoutTitle": "off" } } }
-    }
-  ]
+  "extends": ["./api/_biome.json", "./react-router/_biome.json"]
 }

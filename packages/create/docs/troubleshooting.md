@@ -41,6 +41,12 @@ nothing — the symptom.
 - [`error: … is linked against glibc (DT_NEEDED libm.so.6), but this Bun build uses musl.`](#error--is-linked-against-glibc-dt_needed-libmso6-but-this-bun-build-uses-musl)
 - [The project's `@alxia/*` are older than npm's latest](#the-projects-alxia-are-older-than-npms-latest)
 
+**Biome**
+
+- [`bun ci` installs, and checks nothing](#bun-ci-installs-and-checks-nothing)
+- [`× Found a nested root configuration, but there's already a root configuration.`](#-found-a-nested-root-configuration-but-theres-already-a-root-configuration)
+- [`× Biome couldn't find an ignore file in the following folder: …`](#-biome-couldnt-find-an-ignore-file-in-the-following-folder-)
+
 ## Before it runs
 
 ### `error: GET https://registry.npmjs.org/@alxia%2fcreate - 404`
@@ -372,3 +378,62 @@ an existing project
 `bun add @alxia/core@latest @alxia/react-router@latest` (`react-router`), reading
 [`@alxia/core`'s upgrading page](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md)
 for what a minor changed.
+
+## Biome
+
+### `bun ci` installs, and checks nothing
+
+**Symptom:** `bun ci` in a project prints an install, `bun install
+v1.4.2`, and no Biome output; a CI step meant to lint passes whatever the
+code.
+
+**Why:** `bun ci` is Bun's own command, `bun install --frozen-lockfile`,
+and a command Bun knows wins over a script. The projects name their
+read-only check `check:ci` for that reason
+([Lint and format](guide.md#lint-and-format)).
+
+**Fix:** run the script by `bun run`:
+
+```sh
+bun run check:ci   # biome ci alone
+bun run verify     # biome ci, typecheck, then test or build
+```
+
+### `× Found a nested root configuration, but there's already a root configuration.`
+
+**When:** Biome runs from a folder above the project that has its own
+`biome.json`: the project was created inside a monorepo, and `biome ci`
+runs from the monorepo's root.
+
+**Why:** the project's `biome.json` is a root configuration, so that it
+works on its own. Biome takes one root per run; a configuration below it
+must say it is nested.
+
+**Fix:** to keep the monorepo's settings and add the project's, make the
+project's nested, at the top of its `biome.json`:
+
+```json
+{
+  "root": false,
+  "extends": "//",
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json"
+}
+```
+
+and keep the rest of the file. `"extends": "//"` takes the root's
+settings, which the project's own override. To use the monorepo's
+settings alone, delete the project's `biome.json` and its
+`@biomejs/biome`.
+
+### `× Biome couldn't find an ignore file in the following folder: …`
+
+**When:** `bun run check:ci`, `check`, `lint` or `format` in a project
+whose `.gitignore` was deleted or renamed.
+
+**Why:** `biome.json` sets `vcs.useIgnoreFile`, which skips what
+`.gitignore` names, and Biome refuses to run without the file it was told
+to read.
+
+**Fix:** put a `.gitignore` back, even an empty one, or set
+`"useIgnoreFile": false` in `biome.json`'s `vcs`: `files.includes` still
+skips the build output.

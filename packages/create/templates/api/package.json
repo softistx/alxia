@@ -1,21 +1,27 @@
 {
-	"name": "my-api",
-	"private": true,
-	"type": "module",
-	"scripts": {
-		"dev": "bun --watch src/server.ts",
-		"build": "bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked",
-		"start": "bun dist/server.js",
-		"test": "bun test",
-		"typecheck": "tsc --noEmit"
-	},
-	"dependencies": {
-		"@alxia/core": "workspace:^",
-		"zod": "^4.2.0"
-	},
-	"devDependencies": {
-		"@alxia/client": "workspace:^",
-		"@types/bun": "^1.4.2",
-		"typescript": "^6.0.3"
-	}
+  "name": "my-api",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/server.ts",
+    "build": "bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked",
+    "start": "bun dist/server.js",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint",
+    "format": "biome format --write",
+    "check": "biome check --write",
+    "check:ci": "biome ci",
+    "verify": "bun run check:ci && bun run typecheck && bun run test"
+  },
+  "dependencies": {
+    "@alxia/core": "workspace:^",
+    "zod": "^4.2.0"
+  },
+  "devDependencies": {
+    "@alxia/client": "workspace:^",
+    "@biomejs/biome": "2.5.15",
+    "@types/bun": "^1.4.2",
+    "typescript": "^6.0.3"
+  }
 }

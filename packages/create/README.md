@@ -28,8 +28,8 @@ bun create @alxia my-site --template react-router
 
 | template | what it writes |
 | --- | --- |
-| `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a hook made with `defineHook` that answers 401 without an API key; a `bun test` spec calling it with `app.request()` and through `@alxia/client`, typed; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, a `Dockerfile` running on `oven/bun:1-alpine`, `.dockerignore`, `.gitignore`, `.env.example` and a README |
-| `react-router` | React Router's official template, as `create-react-router` writes it, shipped in this package and copied, with [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun, and a `Dockerfile` running on `oven/bun:1-alpine` in place of React Router's Node one. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
+| `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a hook made with `defineHook` that answers 401 without an API key; a `bun test` spec calling it with `app.request()` and through `@alxia/client`, typed; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, Biome (`biome.json`, `lint`, `format`, `check`, `check:ci`, `verify`), a `Dockerfile` running on `oven/bun:1-alpine`, `.dockerignore`, `.gitignore`, `.env.example`, `.vscode/` and a README |
+| `react-router` | React Router's official template, as `create-react-router` writes it, shipped in this package and copied, with [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun, a `Dockerfile` running on `oven/bun:1-alpine` in place of React Router's Node one, and Biome as the `api` project has it, the scaffold formatted by it once. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
 
 The heart of the `api` project, its route and hook (the whole file, with
 its imports and schemas, is in the [guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#the-api-template)):
@@ -37,19 +37,46 @@ its imports and schemas, is in the [guide](https://github.com/softistx/alxia/blo
 ```ts
 // src/app.ts, in part
 const requireKey = defineHook(({ request, reply }) =>
-	request.headers.get('x-api-key') === apiKey
-		? undefined
-		: reply(401, { error: 'unauthorized' as const }),
+  request.headers.get("x-api-key") === apiKey
+    ? undefined
+    : reply(401, { error: "unauthorized" as const }),
 );
 
 export const app = alxia()
-	.decorate({ todos })
-	.post('/todos', [requireKey], { body: NewTodo, response: { 201: Todo } }, ({ body, todos, reply }) => {
-		const todo = { id: todos.length + 1, title: body.title, done: false };
-		todos.push(todo);
-		return reply.created(todo);
-	});
+  .decorate({ todos })
+  .post("/todos", [requireKey], { body: NewTodo, response: { 201: Todo } }, ({ body, todos, reply }) => {
+    const todo = { id: todos.length + 1, title: body.title, done: false };
+    todos.push(todo);
+    return reply.created(todo);
+  });
 ```
+
+## Lint and format
+
+Both projects ship [Biome](https://biomejs.dev), set up the same way: a
+`biome.json` of their own with Biome's recommended rules, spaces and
+double quotes, imports sorted, the build output and `.react-router/`
+skipped; `@biomejs/biome` pinned exactly, as Biome asks; and
+`.vscode/` recommending its extension, formatting on save. A new project
+passes `bun run check:ci` with no finding.
+
+| script | runs |
+| --- | --- |
+| `bun run check` | `biome check --write`: lint, format and sort imports, fixing what it can |
+| `bun run lint` | `biome lint` |
+| `bun run format` | `biome format --write` |
+| `bun run check:ci` | `biome ci`: what CI runs, read-only |
+| `bun run verify` | `check:ci`, `typecheck`, then `test` (`api`) or `build` (`react-router`) |
+
+```sh
+cd my-api
+bun run verify
+```
+
+`check:ci` and not `ci`, since `bun ci` is Bun's frozen-lockfile install,
+which a script named `ci` would not replace. The
+[guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#lint-and-format)
+has the settings and why.
 
 ## Docker
 
@@ -113,7 +140,9 @@ or CI.
   `^6.0.3 || ^7.0.0`, Vite within `^7.0.0 || ^8.0.0`, React Router and its
   packages within `^8.0.0`, Zod within `^4.2.0`; what no alxia package
   constrains goes to npm's `latest`. A newer major outside alxia's range is
-  left out, and the output says so. The registry is the one
+  left out, and the output says so.
+- **Biome** is pinned exactly, and written exactly: the newest release of
+  the template's major, `2.5.15` writing `2.6.0` but never `3.0.0`. The registry is the one
   `BUN_CONFIG_REGISTRY` or `npm_config_registry` names, else npmjs.org;
   when it does not answer, the template's own versions stay, with a warning.
 
@@ -135,6 +164,6 @@ the project it writes installs with `bun install`.
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md): each template file by file, what the `react-router` template adds to React Router's, each `Dockerfile`, how versions are chosen, and running it in CI.
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md): each template file by file, what the `react-router` template adds to React Router's, Biome's settings, each `Dockerfile`, how versions are chosen, and running it in CI.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md): each message the command prints, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/create/docs/roadmap.md): what is coming, and what is not planned.

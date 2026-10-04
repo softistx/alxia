@@ -4,7 +4,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { TEMPLATES as NAMES } from './args';
-import { copyTemplate, TEMPLATES } from './copy';
+import { copyTemplate, TEMPLATES, withName } from './copy';
+import { packageName } from './target';
 
 const ALXIA = {
 	'@alxia/client': '^0.2.1',
@@ -89,7 +90,92 @@ describe('copyTemplate', () => {
 	});
 });
 
+describe('withName', () => {
+	test('replaces the placeholder as a whole word only', async () => {
+		const file = new Blob([
+			'docker build -t my-app .\nmy-app-old, my-apps, the-my-app, `my-app`\n',
+		]);
+		expect(await (await withName(file, 'my-app', 'web')).text()).toBe(
+			'docker build -t web .\nmy-app-old, my-apps, the-my-app, `web`\n',
+		);
+	});
+
+	test('gives back a file that names none, or is not text, as it is', async () => {
+		const text = new Blob(['nothing here\n']);
+		expect(await withName(text, 'my-app', 'web')).toBe(text);
+		const icon = new Blob([new Uint8Array([0, 0, 1, 0, 0xff, 0xfe, 0x6d])]);
+		expect(await withName(icon, 'my-app', 'web')).toBe(icon);
+	});
+});
+
+describe('a project named "Mon Super Projet"', () => {
+	for (const name of NAMES) {
+		test(`${name}: no file names the template's own name, and its README's docker commands name the project`, async () => {
+			const project = packageName('Mon Super Projet');
+			expect(project).toBe('mon-super-projet');
+			const { manifest, files } = await copyTemplate(name, project, ALXIA);
+			expect(manifest['name']).toBe(project);
+			const naming: string[] = [];
+			for (const [path, file] of Object.entries(files)) {
+				if (/\b(my-api|my-app)\b/.test(await file.text())) naming.push(path);
+			}
+			expect(naming).toEqual([]);
+			const docker = ((await files['README.md']?.text()) ?? '')
+				.split('\n')
+				.filter((line) => /^docker (build|run) /.test(line));
+			expect(docker.length).toBe(2);
+			for (const line of docker) expect(line).toMatch(/ mon-super-projet( |$)/);
+		});
+	}
+});
+
 describe('the stored templates', () => {
+	test('pin @biomejs/biome exactly, at the version that checks them here, with the same scripts and style', async () => {
+		const workspace = (
+			await Bun.file(
+				Bun.resolveSync('@biomejs/biome/package.json', import.meta.dir),
+			).json()
+		).version;
+		const read = (name: string, file: string) =>
+			Bun.file(join(TEMPLATES, name, file)).json();
+		const stored = async (name: string) => ({
+			manifest: await read(name, 'package.json'),
+			config: await read(name, '_biome.json'),
+		});
+		const api = await stored('api');
+		const web = await stored('react-router');
+		for (const { manifest } of [api, web]) {
+			expect(manifest.devDependencies['@biomejs/biome']).toBe(workspace);
+		}
+		const biomeScripts = (scripts: Record<string, string>) =>
+			Object.fromEntries(
+				Object.entries(scripts).filter(([key]) =>
+					['lint', 'format', 'check', 'check:ci'].includes(key),
+				),
+			);
+		expect(biomeScripts(api.manifest.scripts)).toEqual({
+			lint: 'biome lint',
+			format: 'biome format --write',
+			check: 'biome check --write',
+			'check:ci': 'biome ci',
+		});
+		expect(biomeScripts(web.manifest.scripts)).toEqual(
+			biomeScripts(api.manifest.scripts),
+		);
+		// One style for every new project, whichever template made it.
+		for (const key of ['$schema', 'vcs', 'formatter', 'javascript', 'assist']) {
+			expect({ key, value: web.config[key] }).toEqual({
+				key,
+				value: api.config[key],
+			});
+		}
+		expect(
+			await Bun.file(
+				join(TEMPLATES, 'react-router/.vscode/settings.json'),
+			).text(),
+		).toBe(await Bun.file(join(TEMPLATES, 'api/.vscode/settings.json')).text());
+	});
+
 	test('are the ones the command offers', async () => {
 		const dirs = (await readdir(TEMPLATES, { withFileTypes: true }))
 			.filter((entry) => entry.isDirectory())
@@ -104,7 +190,7 @@ describe('the stored templates', () => {
 				expect(paths).toContain('gitignore');
 				for (const path of paths) {
 					expect(path).not.toMatch(
-						/(^|\/)(\.gitignore|bunfig\.toml|\.npmrc|bun\.lockb?|package-lock\.json)$|(^|\/)(\.react-router|node_modules|build|dist)\//,
+						/(^|\/)(\.gitignore|bunfig\.toml|biome\.json|\.npmrc|bun\.lockb?|package-lock\.json)$|(^|\/)(\.react-router|node_modules|build|dist)\//,
 					);
 				}
 			});

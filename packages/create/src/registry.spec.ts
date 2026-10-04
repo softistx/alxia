@@ -3,6 +3,7 @@ import { fakeRegistry } from '../test/registry';
 import {
 	allowedRange,
 	bumpDependencies,
+	isExact,
 	type Manifest,
 	newestOfMinor,
 	newestWithin,
@@ -19,6 +20,7 @@ const VERSIONS = {
 	'@types/node': ['22.20.5', '26.6.4'],
 	zod: ['3.25.0', '4.2.0', '4.6.5'],
 	isbot: ['5.1.36', '5.2.2'],
+	'@biomejs/biome': ['2.5.15', '2.5.16', '2.6.0', '3.0.0'],
 };
 
 let stop: (() => void) | undefined;
@@ -38,6 +40,21 @@ describe('allowedRange', () => {
 		expect(allowedRange('react-router')).toBe('^8.0.0');
 		expect(allowedRange('@react-router/dev')).toBe('^8.0.0');
 		expect(allowedRange('isbot')).toBeUndefined();
+	});
+});
+
+describe('isExact', () => {
+	test('one version, with no operator, is exact', () => {
+		expect(isExact('2.5.15')).toBe(true);
+		for (const range of [
+			'^2.5.15',
+			'~2.5.15',
+			'2.x',
+			'>=2.5.15',
+			'^22',
+			'latest',
+		])
+			expect(isExact(range)).toBe(false);
 	});
 });
 
@@ -120,6 +137,21 @@ describe('bumpDependencies', () => {
 			devDependencies: { '@types/node': '^26.6.4' },
 		});
 		expect(bumped.held).toEqual([]);
+	});
+
+	test('an exact pin stays exact, moved to the newest of its own major', async () => {
+		const { url } = registry();
+		const manifest: Manifest = {
+			devDependencies: { '@biomejs/biome': '2.5.15' },
+		};
+		const bumped = await bumpDependencies(manifest, { url });
+		expect(manifest).toEqual({
+			devDependencies: { '@biomejs/biome': '2.6.0' },
+		});
+		expect(bumped.moved).toEqual(['@biomejs/biome 2.5.15 -> 2.6.0']);
+		expect(bumped.held).toEqual([
+			"@biomejs/biome: kept to ^2.5.15, where the newest is 2.6.0; npm's latest, 3.0.0, is outside it",
+		]);
 	});
 
 	test("React Router's packages take react-router's version, which @react-router/node pins", async () => {

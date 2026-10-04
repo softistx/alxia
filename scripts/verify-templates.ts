@@ -1,7 +1,8 @@
 /**
  * Runs `bun create @alxia` as a user would, from the packed tarballs, for
  * each template, then proves the project it wrote works: it installs, its
- * `typecheck`, `test` and `build` pass, its production server answers, and
+ * `typecheck`, `test` and `build` pass, then `check:ci` (Biome) with no
+ * error, warning or info, over what they generated, its production server answers, and
  * so does the image its `Dockerfile` builds (`templates/docker.ts`): skipped
  * locally with no Docker daemon, a failure on CI.
  *
@@ -45,6 +46,9 @@ const CHECKS: readonly Check[] = [
 			'.gitignore',
 			'.dockerignore',
 			'.env.example',
+			'.vscode/extensions.json',
+			'.vscode/settings.json',
+			'biome.json',
 			'Dockerfile',
 			'src/app.ts',
 		],
@@ -61,6 +65,8 @@ const CHECKS: readonly Check[] = [
 		template: 'react-router',
 		files: [
 			'.gitignore',
+			'.vscode/extensions.json',
+			'biome.json',
 			'bunfig.toml',
 			'Dockerfile',
 			'vite.config.ts',
@@ -81,13 +87,17 @@ function report(passed: boolean, what: string): boolean {
 /**
  * `bun publish` leaves every `.gitignore` and `bunfig.toml` out of a
  * tarball, so the templates ship them as `gitignore` and `_bunfig.toml`,
- * renamed when they are copied.
+ * renamed when they are copied; `biome.json` is `_biome.json`, which this
+ * repository's Biome would refuse as a nested root. `.vscode/` ships as it is.
  */
 const SHIPPED: Readonly<Record<Check['template'], readonly string[]>> = {
 	api: [
 		'gitignore',
+		'_biome.json',
 		'.dockerignore',
 		'.env.example',
+		'.vscode/extensions.json',
+		'.vscode/settings.json',
 		'Dockerfile',
 		'package.json',
 		'src/app.ts',
@@ -95,7 +105,10 @@ const SHIPPED: Readonly<Record<Check['template'], readonly string[]>> = {
 	'react-router': [
 		'gitignore',
 		'_bunfig.toml',
+		'_biome.json',
 		'.dockerignore',
+		'.vscode/extensions.json',
+		'.vscode/settings.json',
 		'Dockerfile',
 		'package.json',
 		'vite.config.ts',
@@ -129,6 +142,31 @@ async function helpRuns(workdir: string, env: Record<string, string>) {
 		help.stdout.toString().startsWith('Usage: bun create @alxia');
 	if (!usage) console.error(help.stdout.toString(), help.stderr.toString());
 	return report(usage, 'bunx @alxia/create --help');
+}
+
+/**
+ * `bun run check:ci` on the project, after its scripts wrote `dist/`,
+ * `build/` and `.react-router/`, which its `biome.json` skips: no error,
+ * warning or info. `biome ci` exits 0 on a warning; this does not.
+ */
+async function biomeClean(
+	template: string,
+	dir: string,
+	env: Record<string, string>,
+): Promise<boolean> {
+	console.log(`\n=== ${template}: bun run check:ci\n`);
+	const run = await $`bun run check:ci --colors=off`
+		.cwd(dir)
+		.env(env)
+		.nothrow()
+		.quiet();
+	const output = `${run.stdout}${run.stderr}`;
+	console.log(output);
+	const diagnostics = output.match(/Found \d+ (error|warning|info)s?/g) ?? [];
+	return report(
+		run.exitCode === 0 && diagnostics.length === 0,
+		`${template}: bun run check:ci exited ${run.exitCode}${diagnostics.length > 0 ? `, ${diagnostics.join(', ')}` : ', no diagnostic'}`,
+	);
 }
 
 /** Creates `check`'s template in `workdir`, then runs its scripts and its server. */
@@ -176,6 +214,7 @@ async function templateWorks(
 			`${check.template}: bun run ${script} exited ${run.exitCode}`,
 		);
 	}
+	ok = (await biomeClean(check.template, dir, env)) && ok;
 	const status = await served(dir, env, check.request);
 	ok =
 		report(

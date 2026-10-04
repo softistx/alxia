@@ -6,6 +6,7 @@ chooses the versions it writes.
 - [Running it](#running-it)
 - [The `api` template](#the-api-template)
 - [The `react-router` template](#the-react-router-template)
+- [Lint and format](#lint-and-format)
 - [Docker](#docker)
 - [Versions](#versions)
 - [In a script or CI](#in-a-script-or-ci)
@@ -45,7 +46,10 @@ What the command line gives is not asked: `bun create @alxia my-app
 --template react-router` asks nothing. The directory must be empty or not
 exist yet; `.` writes into the current one, when it is empty, and the next
 steps then start at `bun dev`. The package name in `package.json` is the
-directory's name, lowercased, with `-` for anything npm refuses.
+directory's name, lowercased, with `-` for anything npm refuses, and the
+same name replaces the template's own (`my-api`, `my-app`) in its other
+files, as the README's `docker build -t` and `docker run`: `bun create
+@alxia "Mon Super Projet"` writes `mon-super-projet` in both.
 
 `bun create @alxia` is `bunx @alxia/create`: Bun maps `bun create @scope`
 to the package `@scope/create`, and npm maps `npm create @scope` the same
@@ -53,12 +57,15 @@ way. Any of the three runs the same bin, on Bun.
 
 Both templates are files shipped in this package, under
 `templates/api/` and `templates/react-router/`, and copied as they are:
-nothing is downloaded but the dependencies, and only `package.json` is
-written again, with the directory's name, alxia's versions and the newest
-of the others ([Versions](#versions)). Two files are stored under another
-name, since `bun publish` leaves them out of a tarball, and take theirs
-back on the copy: `gitignore` is written as `.gitignore`, `_bunfig.toml`
-as `bunfig.toml`.
+nothing is downloaded but the dependencies. `package.json` is written
+again, with the directory's name, alxia's versions and the newest of the
+others ([Versions](#versions)); in every other text file, the template's
+own name, as a whole word, becomes the project's. Three files are stored
+under another name and take theirs back on the copy: `gitignore` is
+written as `.gitignore` and `_bunfig.toml` as `bunfig.toml`, since `bun
+publish` leaves those out of a tarball, and `_biome.json` as `biome.json`,
+since alxia's own Biome refuses a second root configuration inside its
+repository ([Lint and format](#lint-and-format)).
 
 ## The `api` template
 
@@ -70,6 +77,8 @@ my-api/
 │   └── server.ts     app.listen(PORT), stopped on SIGTERM
 ├── package.json
 ├── tsconfig.json
+├── biome.json        Biome: lint, format, imports sorted
+├── .vscode/          Biome's extension recommended, format on save
 ├── Dockerfile        bun run build, then dist/ alone, on oven/bun:1-alpine
 ├── .dockerignore
 ├── .env.example      PORT and API_KEY, for a .env Bun loads
@@ -81,35 +90,35 @@ my-api/
 body validated by a Zod schema, a declared reply, and a hook of its own.
 
 ```ts
-import { alxia, defineHook } from '@alxia/core';
-import { z } from 'zod';
+import { alxia, defineHook } from "@alxia/core";
+import { z } from "zod";
 
 const Todo = z.object({ id: z.number(), title: z.string(), done: z.boolean() });
 const NewTodo = z.object({ title: z.string().min(1) });
 
 /** Set API_KEY in the environment: this default is for development. */
-export const apiKey = Bun.env['API_KEY'] ?? 'dev-key';
+export const apiKey = Bun.env["API_KEY"] ?? "dev-key";
 
 const requireKey = defineHook(({ request, reply }) =>
-	request.headers.get('x-api-key') === apiKey
-		? undefined
-		: reply(401, { error: 'unauthorized' as const }),
+  request.headers.get("x-api-key") === apiKey
+    ? undefined
+    : reply(401, { error: "unauthorized" as const }),
 );
 
 const todos: z.infer<typeof Todo>[] = [];
 
 export const app = alxia()
-	.decorate({ todos })
-	.post(
-		'/todos',
-		[requireKey],
-		{ body: NewTodo, response: { 201: Todo } },
-		({ body, todos, reply }) => {
-			const todo = { id: todos.length + 1, title: body.title, done: false };
-			todos.push(todo);
-			return reply.created(todo);
-		},
-	);
+  .decorate({ todos })
+  .post(
+    "/todos",
+    [requireKey],
+    { body: NewTodo, response: { 201: Todo } },
+    ({ body, todos, reply }) => {
+      const todo = { id: todos.length + 1, title: body.title, done: false };
+      todos.push(todo);
+      return reply.created(todo);
+    },
+  );
 
 export type App = typeof app;
 ```
@@ -126,10 +135,10 @@ JSON body, then `@alxia/client` given the app itself, whose result is typed
 by status:
 
 ```ts
-const api = client(app, { headers: { 'x-api-key': apiKey } });
-const created = await api.post('/todos', { body: { title: 'Call it typed' } });
+const api = client(app, { headers: { "x-api-key": apiKey } });
+const created = await api.post("/todos", { body: { title: "Call it typed" } });
 if (created.status !== 201) throw new Error(`got ${created.status}`);
-expect(created.data.title).toBe('Call it typed'); // data is the Todo schema's type
+expect(created.data.title).toBe("Call it typed"); // data is the Todo schema's type
 ```
 
 The scripts:
@@ -141,6 +150,10 @@ The scripts:
 | `bun run typecheck` | `tsc --noEmit` |
 | `bun run build` | `bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked`: one file, its dependencies bundled |
 | `bun start` | `bun dist/server.js`: the build, after `bun run build` |
+| `bun run check` | `biome check --write`: lint, format, sort imports, fixing what it can |
+| `bun run lint`, `bun run format` | `biome lint`, `biome format --write` |
+| `bun run check:ci` | `biome ci`: read-only, for CI |
+| `bun run verify` | `check:ci`, `typecheck`, then `test` |
 
 `start` runs what `build` wrote, as production and the image do:
 
@@ -162,9 +175,10 @@ keeps out of git and `.dockerignore` out of the image.
 `tsconfig.json` holds the settings alxia's own packages are checked under:
 `strict`, and past it `exactOptionalPropertyTypes`,
 `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`,
-`noUnusedLocals` and the rest. Hence `Bun.env['API_KEY']` and not
-`Bun.env.API_KEY`. Loosen what you would rather not keep: alxia's types
-compile under each one, and under none.
+`noUnusedLocals` and the rest. Hence `Bun.env["API_KEY"]` and not
+`Bun.env.API_KEY`, and Biome's `useLiteralKeys`, which would ask for the
+second, is off in `biome.json`. Loosen what you would rather not keep:
+alxia's types compile under each one, and under none.
 
 ## The `react-router` template
 
@@ -195,6 +209,19 @@ before `bun install`. The change, against React Router's files:
 +  plugins: [tailwindcss(), reactRouter(), alxia()],
 ```
 
+```diff
+ // package.json
+   "scripts": {
++    "lint": "biome lint",
++    "format": "biome format --write",
++    "check": "biome check --write",
++    "check:ci": "biome ci",
++    "verify": "bun run check:ci && bun run typecheck && bun run build"
+   },
+   "devDependencies": {
++    "@biomejs/biome": "2.5.15",
+```
+
 ```toml
 # bunfig.toml, new
 [run]
@@ -204,7 +231,12 @@ bun = true
 ```
 
 The `Dockerfile` is alxia's, in place of React Router's, which builds and
-runs on Node ([Docker](#docker)). Every other file is React Router's:
+runs on Node ([Docker](#docker)). `biome.json` and `.vscode/` are new,
+and the README gains a Lint and format section
+([Lint and format](#lint-and-format)); Biome formatted the scaffold once,
+which changed three of its files: `app/app.css`'s font list wraps
+differently, and `app/routes.ts` and `app/routes/home.tsx` have their
+imports sorted. Every other file is React Router's:
 `app/`, `public/`, `tsconfig.json`, `react-router.config.ts`, its
 `README.md` (with Bun's commands where it wrote npm's: `bun install`,
 `bun dev`, `bun run build`), `.gitignore` and `.dockerignore`. `package.json` takes the directory's name, and its
@@ -227,6 +259,95 @@ bunx alxia-react-router reveal
 
 The [`@alxia/react-router` guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md)
 goes from there.
+
+## Lint and format
+
+Both projects lint and format with [Biome](https://biomejs.dev), in one
+style whichever template wrote them. Their `biome.json` is a root
+configuration of its own, extending nothing:
+
+```json
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  "files": { "includes": ["**", "!!**/build", "!!**/.react-router"] },
+  "formatter": { "enabled": true, "indentStyle": "space" },
+  "css": { "parser": { "tailwindDirectives": true } },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "preset": "recommended",
+      "correctness": { "noEmptyPattern": "off" }
+    }
+  },
+  "assist": {
+    "enabled": true,
+    "actions": { "source": { "organizeImports": "on" } }
+  },
+  "overrides": [
+    {
+      "includes": ["**/app/welcome/**"],
+      "linter": { "rules": { "a11y": { "noSvgWithoutTitle": "off" } } }
+    }
+  ]
+}
+```
+
+That is the `react-router` project's, written here compact. The `api`
+project's skips `dist/` instead of `build/` and `.react-router/`, has no
+CSS settings and no overrides, and turns `complexity.useLiteralKeys` off
+in place of `noEmptyPattern` ([the `api` template](#the-api-template)).
+
+- **The style is Biome's default but for spaces**: two spaces, double
+  quotes, 80 columns. React Router's scaffold is written so, and so is
+  the `package.json` the command writes: formatting the scaffold once
+  changed three of its files, where tabs would change every line. The
+  `api` project takes the same style, so the two read alike.
+- **`$schema` is the installed Biome's own schema**, so an editor checks
+  the file against the version `bun install` put in `node_modules`,
+  whichever the command wrote.
+- **What is generated is skipped.** `files.includes` leaves `dist/`, or
+  `build/` and `.react-router/`, out, and `vcs.useIgnoreFile` every path
+  `.gitignore` names, the project in a git repository or not.
+- **Two rules are off in the `react-router` project, for the scaffold's
+  own code.** `noEmptyPattern`: `meta({}: Route.MetaArgs)` is React
+  Router's idiom for a route module's function that reads none of its
+  arguments. `noSvgWithoutTitle`, under `app/welcome/` alone: the welcome
+  page's logos, which a project replaces.
+- **`css.parser.tailwindDirectives`** lets Biome read Tailwind v4's
+  `@import "tailwindcss"` and `@theme` in `app/app.css`.
+
+`@biomejs/biome` is a devDependency pinned exactly, as Biome recommends,
+since a release may format differently. The command moves it to the
+newest release of the same major and keeps it exact
+([Versions](#versions)). To move it later:
+
+```sh
+bun add --dev --exact @biomejs/biome@latest
+bunx biome migrate --write
+```
+
+| script | runs |
+| --- | --- |
+| `bun run check` | `biome check --write`: lint, format and sort imports, fixing what it can |
+| `bun run lint` | `biome lint` |
+| `bun run format` | `biome format --write` |
+| `bun run check:ci` | `biome ci`: changes nothing, and fails on any error |
+| `bun run verify` | `check:ci`, `typecheck`, then `test` (`api`) or `build` (`react-router`) |
+
+The read-only one is `check:ci`, not `ci`: `bun ci` is Bun's
+`bun install --frozen-lockfile`, and a script named `ci` would only run
+as `bun run ci`. A CI job runs:
+
+```sh
+bun install --frozen-lockfile
+bun run verify
+```
+
+`.vscode/extensions.json` recommends Biome's extension, `biomejs.biome`,
+and `.vscode/settings.json` makes it the default formatter, formatting on
+save. Another editor reads `biome.json` through Biome's own extension for
+it.
 
 ## Docker
 
@@ -319,7 +440,8 @@ are in
 A template ships the versions it was generated with, and React Router's
 lags behind its own releases. So before installing, the command
 asks the registry for every dependency's versions, and writes `^` the
-newest one alxia accepts:
+newest one alxia accepts, or the version alone for a dependency the
+template pins exactly:
 
 | dependency | moved to the newest within |
 | --- | --- |
@@ -328,6 +450,7 @@ newest one alxia accepts:
 | `zod` | `^4.2.0`, `@alxia/zod`'s |
 | `vite` | `^7.0.0 \|\| ^8.0.0`, `@alxia/react-router`'s |
 | `react-router`, `@react-router/*` | `^8.0.0`, `@alxia/react-router`'s; the `@react-router/*` packages take `react-router`'s version, which `@react-router/node` pins exactly |
+| `@biomejs/biome` | its own major, from the exact version the template pins: written exactly, `2.6.0`, never `^` |
 | anything else: `react`, `isbot`, Tailwind, `@types/*` | no alxia range: npm's `latest` |
 
 The command prints each move, and each newer major it left out:
