@@ -1,10 +1,59 @@
 # Upgrading to the next release
 
-This page lists what the next release changes for an app built on
+This page lists what the next releases change for an app built on
 `@alxia/core`: what changed, the code before and after, and whether it can
-break yours. The next release is `@alxia/core` 0.3.0, with `@alxia/openapi`
-0.3.0 and 0.2.0 of `@alxia/logger`, `@alxia/telemetry`,
-`@alxia/secure-headers`, `@alxia/react-router` and `@alxia/openapi-routes`.
+break yours.
+
+## Next release: `@alxia/core` 0.3.1
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [The app's methods typed by interfaces](#the-apps-methods-typed-by-interfaces) | core | only a subclass of `Alxia` that overrides one of them |
+
+A range request on an empty file is also answered as RFC 9110 says: a
+`200` for a suffix range, a `416` otherwise; see the
+[CHANGELOG](../CHANGELOG.md).
+
+### The app's methods typed by interfaces
+
+**What changed.** No call, type or behaviour an app relies on. Each member
+of `Alxia` that was still a method — `static`, `file`, `page`, `decorate`,
+`derive`, `wrap`, `bodyLimit`, `onError`, `onRequest`, `onResponse`,
+`around`, `onStart`, `onStop`, `parser`, `group`, `use`, `request`,
+`listen` — is now a readonly property typed by an interface of its own, as
+`get`, `ws` and `onRefusal` already were. The interface holds the overloads
+and their documentation, which an editor shows on hover as before. One
+difference is visible: a method taken off the app, `const { derive } = app`,
+now stays bound to it.
+
+```ts
+// unchanged
+app.derive(auth).onRequest(cors).group('/admin', (admin) => admin.get('/stats', handler));
+```
+
+**Can it break your code.** Only a class that extends `Alxia` and overrides
+one of these. In TypeScript a method cannot override a property, so it no
+longer compiles; in JavaScript, or past a `@ts-ignore`, the overriding
+method is shadowed by the property and never runs. Wrap the app in a
+function plugin instead:
+
+```ts
+const audited: Plugin = (app) => app.onRequest(({ request }) => void audit(request));
+alxia().use(audited);
+```
+
+New exports, so an app's type can be named in a declaration file:
+`StaticMethod`, `FileMethod`, `PageMethod`, `DecorateMethod`,
+`DeriveMethod`, `WrapMethod`, `BodyLimitMethod`, `ErrorMethod`,
+`RequestHookMethod`, `ResponseHookMethod`, `AroundMethod`,
+`StartHookMethod`, `StopHookMethod`, `ParserMethod`, `GroupMethod`,
+`UseMethod`, `RequestMethod`, `ListenMethod`.
+
+## 0.3.0
+
+`@alxia/core` 0.3.0 ships with `@alxia/openapi` 0.3.0 and 0.2.0 of
+`@alxia/logger`, `@alxia/telemetry`, `@alxia/secure-headers`,
+`@alxia/react-router` and `@alxia/openapi-routes`.
 
 **Upgrade every `@alxia/*` package together.** Each one names `@alxia/core`
 as a peer by a `^0.2` range, which 0.3.0 is outside of; their next releases
@@ -23,9 +72,8 @@ bun add @alxia/core@latest @alxia/client@latest @alxia/openapi@latest # and ever
 | [`matchesSpec`, the new name of `exactly`](#matchesspec-the-new-name-of-exactly) | openapi-routes | no; `exactly` is deprecated |
 | [Streamed bodies timed to their last byte](#streamed-bodies-timed-to-their-last-byte) | logger, telemetry | dashboards and tests that read a streamed request's entry or span |
 | [A CSP nonce per request](#a-csp-nonce-per-request) | secure-headers, react-router | no; opt-in |
-| [The app's methods typed by interfaces](#the-apps-methods-typed-by-interfaces) | core | only a subclass of `Alxia` that overrides a method |
 
-## Hooks on one route
+### Hooks on one route
 
 **What changed.** Every route method takes a list of hooks after its path:
 `app.<method>(path, [hooks], [schema,] handler)`,
@@ -71,7 +119,7 @@ type threads its list with. See
 [Hooks: hooks on one route](guide/hooks.md#hooks-on-one-route) and
 [Middleware: a route's own hooks](guide/middleware.md#a-routes-own-hooks).
 
-## The request's cookies on every hook
+### The request's cookies on every hook
 
 **What changed.** `cookies` is on `BaseContext`: every route hook —
 `derive`, `wrap`, `onError`, `onRefusal` — reads the request's cookies as
@@ -138,7 +186,7 @@ always `null`, and still is. Read `ctx.cookies` instead
 
 See [Hooks: reading the request's cookies](guide/hooks.md#reading-the-requests-cookies).
 
-## Route paths checked by the types
+### Route paths checked by the types
 
 **What changed.** A route path written as a literal that the app would
 refuse when the route is declared no longer compiles. Before, it compiled,
@@ -189,7 +237,7 @@ export function servedAt<const P extends RoutePath>(path: PathAt<'', P, StaticPa
 
 New exports: `PathAt`, `CheckedPath` and `StaticPath`.
 
-## `onRefusal(kind, …)`
+### `onRefusal(kind, …)`
 
 **What changed.** `onRefusal` takes a kind first, `'validation'` or
 `'body_limit'`, for a hook that answers that kind alone. It reads its
@@ -229,34 +277,7 @@ New exports: `RefusalKind`, `RefusalOfKind`, `RefusalHandlersByKind`,
 `RefusalMethod`, and the marks `RefusingKind`, `KindFallsBack`,
 `KindRefusalsOf`, `KindOutcome`, `OneKind`.
 
-## The app's methods typed by interfaces
-
-**What changed.** Nothing an app calls. Each method of `Alxia` that was
-still a method — `static`, `file`, `page`, `decorate`, `derive`, `wrap`,
-`bodyLimit`, `onError`, `onRequest`, `onResponse`, `around`, `onStart`,
-`onStop`, `parser`, `group`, `use`, `request`, `listen` — is now a readonly
-property typed by an interface of its own, as `get`, `ws` and `onRefusal`
-already were. The interface holds the overloads and their documentation,
-which an editor shows on hover as before. The calls, their types and what
-they do are the same.
-
-```ts
-// unchanged
-app.derive(auth).onRequest(cors).group('/admin', (admin) => admin.get('/stats', handler));
-```
-
-**Can it break your code.** Only a class that extends `Alxia` and overrides
-one of these: a property cannot be overridden by a method. Wrap the app
-in a function plugin instead, or override with a property of the same type.
-A method taken off the app, `const { derive } = app`, now stays bound to it.
-New exports, so an app's type can be named in a declaration file:
-`StaticMethod`, `FileMethod`, `PageMethod`, `DecorateMethod`,
-`DeriveMethod`, `WrapMethod`, `BodyLimitMethod`, `ErrorMethod`,
-`RequestHookMethod`, `ResponseHookMethod`, `AroundMethod`,
-`StartHookMethod`, `StopHookMethod`, `ParserMethod`, `GroupMethod`,
-`UseMethod`, `RequestMethod`, `ListenMethod`.
-
-## `matchesSpec`, the new name of `exactly`
+### `matchesSpec`, the new name of `exactly`
 
 **What changed.** In `@alxia/openapi-routes`, `exactly(app, operations)` is
 renamed `matchesSpec`, and `ExactlyOptions` `MatchesSpecOptions`.
@@ -275,7 +296,7 @@ matchesSpec(app, operations);
 deprecated, and their messages still start with `exactly():`. See
 [`@alxia/openapi-routes`](https://github.com/softistx/alxia/blob/develop/packages/openapi-routes/docs/guide.md#matchesspec).
 
-## Streamed bodies timed to their last byte
+### Streamed bodies timed to their last byte
 
 **What changed.** A streamed body — a page rendered as it goes, an event
 stream, a `ReadableStream` reply — is now timed until it has been sent:
@@ -311,7 +332,7 @@ await response.body?.cancel(); // or `await response.text()` for a body that end
 See [`@alxia/logger`: a streamed body](https://github.com/softistx/alxia/blob/develop/packages/logger/docs/guide.md#a-streamed-body)
 and [`@alxia/telemetry`: a streamed body](https://github.com/softistx/alxia/blob/develop/packages/telemetry/docs/guide.md#a-streamed-body).
 
-## A CSP nonce per request
+### A CSP nonce per request
 
 **What changed.** `secureHeaders({ nonce: true })` makes a fresh nonce for
 each request, adds it to the policy's `script-src` and `script-src-elem`

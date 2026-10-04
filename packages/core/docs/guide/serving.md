@@ -18,7 +18,7 @@ process.on('SIGTERM', () => app.stop());
 ## `listen(options?)`
 
 ```ts
-listen(options?: ListenOptions | number): Bun.Server<unknown>
+readonly listen: (options?: ListenOptions | number) => Bun.Server<unknown>;
 ```
 
 `Bun.serve` with the app. A number is the port. Each declared path goes to
@@ -51,7 +51,7 @@ Every `onStart` hook then runs with it ([Hooks](hooks.md#onstart-and-onstop)).
 
 ```ts
 readonly fetch: (request: Request, server?: Bun.Server<unknown>) => Promise<Response>;
-request(path: string, init?: RequestInit): Promise<Response>;
+readonly request: (path: string, init?: RequestInit) => Promise<Response>;
 ```
 
 `app.fetch` is the whole app as a fetch handler — every hook, routing,
