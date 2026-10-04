@@ -40,6 +40,12 @@ ws<const Path extends RoutePath, Schema extends SocketSchema = Empty>(
 	schema: Schema,
 	handlers: SocketHandlers<SocketContext<Ctx, Path, Schema>, SocketSend<Schema>, SocketMessage<Schema>>,
 ): Alxia<…>
+ws<const Path extends RoutePath, const Hooks extends readonly AnyRouteHook[], Schema extends SocketSchema = Empty>(
+	path: Path,
+	hooks: Hooks, // each checked as a route's list is: at most 8
+	schema: Schema,
+	handlers: SocketHandlers<SocketContext<Ctx & /* what the hooks add */, Path, Schema>, SocketSend<Schema>, SocketMessage<Schema>>,
+): Alxia<…>
 ```
 
 The schema is required; `{}` validates nothing. With a list of hooks

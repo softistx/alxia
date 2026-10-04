@@ -160,7 +160,7 @@ export type ThreadHooks<
 > = number extends Hooks['length']
 	? {
 			readonly checks: {
-				readonly '~hooks': "a route's hooks are a list written in the call, [canView, canEdit]: a list of unknown length cannot be checked";
+				readonly '~hooks': "a route's hooks are a list written in the call, [first, second]: a list of unknown length cannot be checked";
 			};
 			readonly added: Empty;
 			readonly replies: never;

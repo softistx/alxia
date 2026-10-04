@@ -643,8 +643,9 @@ interface BaseContext extends RequestContext {   // derive, wrap, onError, onRef
 
 A hook in a route's list reads `HookContext<Requires>`: `BaseContext`, the
 raw `params` and `query`, and what it names. A handler reads
-`BaseContext`, what every hook before it added, and the validated `params`, `query`, `headers`, `cookies` and `body`: a `cookies`
-schema's output replaces the request's map for the handler alone. `ContextOf<App>`
+`BaseContext`, what every hook before it added, and the validated
+`params`, `query`, `headers`, `cookies` and `body`: a `cookies` schema's
+output replaces the request's map for the handler alone. `ContextOf<App>`
 names that context outside the chain ([The app's type](types.md#contextofapp)).
 
 ## See also

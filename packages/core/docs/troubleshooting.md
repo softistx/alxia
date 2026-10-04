@@ -27,7 +27,7 @@ a trap that prints nothing is headed by its symptom.
 - [`the hook reads the cookie "…" as another type than the string it arrives as`](#the-hook-reads-the-cookie--as-another-type-than-the-string-it-arrives-as)
 - [`the hook reads "body", which no hook reads: the body is validated after the hooks, so read it in the handler`](#the-hook-reads-body-which-no-hook-reads-the-body-is-validated-after-the-hooks-so-read-it-in-the-handler)
 - [`this route's context does not give what the hook reads`](#this-routes-context-does-not-give-what-the-hook-reads)
-- [`a route's hooks are a list written in the call, [canView, canEdit]: a list of unknown length cannot be checked`](#a-routes-hooks-are-a-list-written-in-the-call-canview-canedit-a-list-of-unknown-length-cannot-be-checked)
+- [`a route's hooks are a list written in the call, [first, second]: a list of unknown length cannot be checked`](#a-routes-hooks-are-a-list-written-in-the-call-first-second-a-list-of-unknown-length-cannot-be-checked)
 - [`a route takes at most 8 hooks in its list: derive the rest in a group around it`](#a-route-takes-at-most-8-hooks-in-its-list-derive-the-rest-in-a-group-around-it)
 - [`Type '…' is not assignable to type 'MaybePromise<unique symbol>'`](#type--is-not-assignable-to-type-maybepromiseunique-symbol)
 - [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
@@ -550,7 +550,7 @@ union, or a symbol key.
 
 **Fix:** name the requirement as an object type with string keys.
 
-### `a route's hooks are a list written in the call, [canView, canEdit]: a list of unknown length cannot be checked`
+### `a route's hooks are a list written in the call, [first, second]: a list of unknown length cannot be checked`
 
 **When:** a route is given its hooks as an array typed `AnyRouteHook[]` —
 built elsewhere, or annotated — rather than written in the call.
@@ -564,7 +564,7 @@ app.get('/bookmarks/:id', guards, handler);
 takes knowing each one's place: a list of unknown length has none.
 
 **Fix:** write the list in the call, `[canView]`, or keep it as a tuple:
-`const guards = [canView, canEdit] as const`.
+`const guards = [canView, loadBookmark, canEdit] as const`.
 
 The message can also follow an error of a route **without** a list — a
 schema the route refuses, `get('/a/:id', { params: … }, handler)` — as the
