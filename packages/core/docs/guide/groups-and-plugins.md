@@ -3,8 +3,8 @@
 This page covers splitting an app: route files that read the app's context
 with `defineRoutes`, groups that scope hooks and middlewares to some
 routes, `use` giving middlewares to the routes after it, an app given to
-`use` bringing its routes and typed context, and a function plugin adding
-global hooks.
+`plugin` bringing its routes and typed context, and a function plugin,
+given to `plugin` too, adding global hooks.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -18,8 +18,8 @@ const posts = alxia({ prefix: '/posts' }).get('/:id', ({ params, reply }) =>
 );
 
 const app = alxia({ prefix: '/api' })
-	.use(auth)
-	.use(posts)                                       // GET /api/posts/:id
+	.plugin(auth)
+	.plugin(posts)                                    // GET /api/posts/:id
 	.get('/me', ({ user, reply }) => reply(200, user)); // GET /api/me, ctx.user typed
 ```
 
@@ -63,15 +63,15 @@ export const todos = defineRoutes('/todos')
 import { base } from './context';
 import { todos } from './routes/todos';
 
-export const app = base.use(todos); // GET /todos, POST /todos
+export const app = base.plugin(todos); // GET /todos, POST /todos
 ```
 
 - **`defineRoutes(prefix?)`** is `alxia({ prefix })` at runtime: a plugin,
-  mounted by `use` as any app is. Its type starts from the registered
+  mounted by `plugin` as any app is. Its type starts from the registered
   context, and it carries that context as its requirement through every
-  route, `derive` and `use` declared on it.
-- **`use` checks the requirement.** Mounting the routes on an app that
-  does not give the context — `alxia().use(todos)`, `alxia().use(() =>
+  route, `derive`, `use` and `plugin` declared on it.
+- **`plugin` checks the requirement.** Mounting the routes on an app that
+  does not give the context — `alxia().plugin(todos)`, `alxia().plugin(() =>
   todos)`, `alxia().group(() => todos)`, or `base` before the `derive`
   that adds `user` — is the compile error of
   [a plugin that needs an earlier one](writing-a-plugin.md#a-plugin-that-needs-an-earlier-one).
@@ -164,16 +164,23 @@ apply everywhere, as they would declared outside it.
 
 ## Plugins
 
-A plugin is either an **app** or a **function**. `use` reads a function
-made by `defineMiddleware` as a middleware
-([Middleware: `use`](middleware.md#use-for-every-route-after-it)); any other function is
-a plugin.
+A plugin is either an **app** or a **function**, mounted by
+`app.plugin(…)`. Middlewares go to `use`
+([Middleware: `use`](middleware.md#use-for-every-route-after-it)).
 
-| | Adds | Type of the app after `use` |
+| | Adds | Type of the app after it |
 | --- | --- | --- |
 | middlewares, `use(auth)`, `use(path, guard)` | middlewares for the routes declared after it | grows by what they add; `use(path, …)` adds nothing |
-| an app, `use(otherApp)` | routes, route hooks, context, typed replies, global hooks, its [`bodyLimit()`](routes.md#body-size-bodylimit) | grows: its routes and context are added |
-| a function, `use(plugin)` | global hooks | unchanged |
+| an app, `plugin(otherApp)` | routes, route hooks, context, typed replies, global hooks, its [`bodyLimit()`](routes.md#body-size-bodylimit) | grows: its routes and context are added |
+| a function, `plugin(fn)` | global hooks | unchanged |
+
+`plugin` throws where it is called when a function given to it returns
+anything but an app (a promise it returned is left handled), and for a
+middleware, more than one argument, or a value that is neither an app nor
+a function ([Troubleshooting](../troubleshooting.md#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-made-with-definemiddleware-and-given-to-use)).
+`use(plugin)`, the form of 0.3, still mounts a plugin, deprecated, and
+throws the same way; in the next minor `use` takes middlewares alone
+([Upgrading](../upgrading.md#plugins-move-to-appplugin)).
 
 The app's own `bodyLimit()` does not reach an app plugin's routes: they
 keep the limit they were declared with ([Routes](routes.md#body-size-bodylimit)).
@@ -181,28 +188,28 @@ keep the limit they were declared with ([Routes](routes.md#body-size-bodylimit))
 ### An app as a plugin
 
 ```ts
-use(plugin: Alxia<PluginCtx, PluginPrefix, PluginShortcuts>): Alxia<…>
+plugin(plugin: Alxia<PluginCtx, PluginPrefix, PluginShortcuts>): Alxia<…>
 ```
 
 - Its **routes** are mounted under this app's prefix and behind this app's
-  route hooks declared so far: `alxia({ prefix: '/api' }).use(posts)`
+  route hooks declared so far: `alxia({ prefix: '/api' }).plugin(posts)`
   serves `posts`' `/posts/:id` at `/api/posts/:id`.
 - Its **route hooks and middlewares** then apply to the routes declared on
-  this app after `use`: an `auth` plugin can be a `use(auth)` and nothing
+  this app after `plugin`: an `auth` plugin can be a `plugin(auth)` and nothing
   else. A path it gave `use` is joined to this app's prefix, as its routes
   are.
 - Its **`onError` hooks** are tried before this app's, for its own routes.
 - Its **`onRefusal` hook** answers its own routes' refused requests. Its
-  routes without one take this app's, declared before `use`. The plugin's
-  hook then replaces this app's for the routes declared after `use`
+  routes without one take this app's, declared before `plugin`. The plugin's
+  hook then replaces this app's for the routes declared after `plugin`
   ([Hooks](hooks.md#onrefusal)). A plugin's hook of one kind,
   `onRefusal('validation', …)`, answers that kind before this app's hooks
-  of that kind, and replaces this app's hook of that kind alone after `use`
+  of that kind, and replaces this app's hook of that kind alone after `plugin`
   ([One hook per kind](hooks.md#one-hook-per-kind)).
 - Its **global hooks**, body parsers and [pages](static-files.md#bun-html-bundles)
   become this app's.
 
-**A plugin is read once, when `use` is called.** A route added to it
+**A plugin is read once, when `plugin` is called.** A route added to it
 afterwards is not mounted: declare it completely first.
 
 ```ts
@@ -221,7 +228,7 @@ export const rateLimit = (limit: number) =>
 // app.ts
 const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok'))  // not limited
-	.use(rateLimit(100))
+	.plugin(rateLimit(100))
 	.get('/search', ({ reply }) => reply(200, []));     // may answer 429
 ```
 
@@ -232,7 +239,13 @@ type Plugin = <App extends AnyAlxia>(app: App) => App;
 ```
 
 A function given the app that returns it, with global hooks added. Its
-type is unchanged, so it composes anywhere in the chain:
+type is unchanged, so it composes anywhere in the chain. It must return
+the app: `plugin` throws on `undefined`, a promise or anything else.
+
+```ts
+plugin<Result extends AnyAlxia>(plugin: (app: App) => Result): Result
+```
+
 
 ```ts
 import { alxia, type Plugin, withHeaders } from '@alxia/core';
@@ -246,7 +259,7 @@ const poweredBy =
 
 const app = alxia()
 	.get('/a', ({ reply }) => reply(200, 'a'))
-	.use(poweredBy('alxia'));
+	.plugin(poweredBy('alxia'));
 ```
 
 A function plugin must only add **global** hooks: a route hook it added
@@ -256,7 +269,7 @@ plugin.
 ### A plugin that needs an earlier one
 
 `definePlugin<Requires>()` builds an app plugin that reads what an earlier
-plugin added, such as a `user`. `use` refuses it at compile time on an app
+plugin added, such as a `user`. `plugin` refuses it at compile time on an app
 whose context does not give `Requires`. See
 [Writing a plugin](writing-a-plugin.md#a-plugin-that-needs-an-earlier-one).
 
@@ -270,7 +283,7 @@ them:
 | `withHeaders` | `(response: Response, edit: (headers: Headers) => void) => Response` | editing a response's headers, copying it when they are immutable; an error of `edit` is thrown with the body unread (on a mutable response, headers set before it stay); on immutable headers `edit` runs twice, so keep it free of side effects |
 | `vary` | `(headers: Headers, value: string) => void` | adding to `Vary` once, leaving `*` alone; `*` itself replaces every name, and an empty name adds nothing |
 | `check` | `(schema: StandardSchemaV1, value: unknown, target: ValidationTarget) => Promise<Checked>` | running a schema as a route does: its output, or its issues |
-| `joinPath` | `<Prefix extends string, Path extends string>(prefix: Prefix, path: Path) => JoinPath<Prefix, Path>` | a path under a prefix, as `alxia({ prefix })`, `group` and `use` join them: `/` under `/api` is `/api`, and `''` leaves the path as it is |
+| `joinPath` | `<Prefix extends string, Path extends string>(prefix: Prefix, path: Path) => JoinPath<Prefix, Path>` | a path under a prefix, as `alxia({ prefix })`, `group`, `use` and `plugin` join them: `/` under `/api` is `/api`, and `''` leaves the path as it is |
 | `shapeOf` | `(path: string) => string` | the path with its parameter names erased, as the router compares two paths: `'/pets/:'` for `/pets/:id` and `/pets/:petId` alike. Only a whole `:name` segment is a parameter, and a `:` anywhere else throws. Throws the `TypeError` of [Paths](routes.md#paths) for a path no route may be declared at |
 
 ```ts
@@ -322,4 +335,4 @@ of any shape.
 - [Writing a plugin](writing-a-plugin.md): choosing between an app, a
   `Plugin` function and `definePlugin`, with an example of each.
 - [Hooks](hooks.md): what each hook does.
-- [The app's type](types.md): what `use` adds to the context, `ContextOf`.
+- [The app's type](types.md): what `use` and `plugin` add to the context, `ContextOf`.

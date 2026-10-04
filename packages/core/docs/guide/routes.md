@@ -107,15 +107,18 @@ are plain data — `{ method, path, schema? }` — instead of arguments: an
 operation written once and shared between modules, or one a code generator
 writes from an OpenAPI document.
 `route(operation, ...middlewares, handler)` takes the middlewares of any
-route, up to 8, and reads the operation's `schema` as two of them: a
-`responds` of its `response`, first, which checks every reply with a status
-it declares, a middleware's included; and a `validate` of its request
-parts, just before the handler, so a middleware placed before it reads the
-request as it arrived and an `auth` answers 401 before the body is read.
-Given `validate(operation)` among the middlewares, the route validates
-there instead, once ([Middlewares on a route declared as data](#middlewares-on-a-route-declared-as-data)).
+route, up to 8, and reads the operation's `schema` as two more, just
+before the handler: a `validate` of its request parts, so a middleware
+reads the request as it arrived and an `auth` answers 401 before the body
+is read; then a `responds` of its `response`, which checks the handler's
+reply — a middleware's reply, an auth's 401, is its own. Given
+`validate(operation)` or `responds(operation)` among the middlewares, the
+route runs it there instead, once
+([Middlewares on a route declared as data](#middlewares-on-a-route-declared-as-data)).
 `route(operation, [hooks], handler)`, a list of hooks, is the form of 0.3,
-deprecated ([Hooks on one route](hooks.md#hooks-on-one-route)).
+deprecated ([Hooks on one route](hooks.md#hooks-on-one-route)); given
+middlewares after the list too, it throws
+[`GET /pets/:petId: a list of hooks and middlewares are two forms, never mixed: …`](../troubleshooting.md#get--a-list-of-hooks-and-middlewares-are-two-forms-never-mixed-give-the-hooks-as-middlewares-made-by-definemiddleware).
 
 ```ts
 // operations.ts: data, importing only the schemas
@@ -149,7 +152,7 @@ const app = alxia({ prefix: '/api' })
 // GET /api/pets/1 → 200, GET /api/pets/x → 400, GET /api/health → "ok"
 ```
 
-It is exactly the route `app[method](path, options, responds(…), validate(…), handler)`
+It is exactly the route `app[method](path, options, ...middlewares, validate(…), responds(…), handler)`
 declares from the same schemas, at its path under the prefix
 (`'/api/pets/:petId'` above): the same context, and the same checks, at
 compile time — a params schema that does not
@@ -182,15 +185,16 @@ type OperationSchema<Operation> = Operation extends { readonly schema: infer Sch
 <const Op extends RouteOperation, R1 extends MiddlewareReturn, Result>(
 	operation: CheckedOperation<Prefix, Op>, // one method, a literal path, a schema that reads it
 	m1: Middleware</* the route's context before the operation's validate */, R1>,
-	handler: (ctx: /* … what m1 added, the validated parts, reply typed by the responses */) => MaybePromise<Result>,
+	handler: (ctx: /* … what m1 added, the validated parts, reply typed by the implicit responds */) => MaybePromise<Result>,
 ) => Alxia</* … the app, unchanged in type */>;
 ```
 
 ### Middlewares on a route declared as data
 
-The operation's `validate` stands just before the handler unless you place
-it: `validate(operation)` validates the operation's request parts where it
-stands, and the route runs no other. A `validate` counts as the
+The operation's `validate` and `responds` stand just before the handler,
+in that order, unless you place them: `validate(operation)` validates the
+operation's request parts where it stands, and the route runs no other;
+`responds(operation)` likewise. A `validate` counts as the
 operation's when it checks each of those parts by the very schema the
 operation names, so `validate(renamePet)` on a route declared from a copy,
 `{ ...renamePet, path }`, counts too. A `validate` of other schemas is one
@@ -238,12 +242,26 @@ const app = alxia()
 	);
 ```
 
-The operation's `responds` stands first, so it checks `auth`'s 401 too,
-against the schema the operation declares for it: a reply a middleware
-makes with a declared status is sent as its schema's output, or refused
-with a 500. A status the operation does not declare is sent as it is.
-Before the operation's `validate`, a middleware reads `params` as strings
-and `body` as `undefined`, as on any route.
+The operation's `responds` stands just before the handler, so it checks
+the handler's reply alone: `auth`'s 401 is sent as it is, though the
+operation declares a schema for it. To check the middlewares' replies by
+the operation's responses too, place `responds(operation)` before them — a
+reply a middleware after it makes with a declared status is then sent as
+its schema's output, or refused with a 500, as before 0.4:
+
+```ts
+import { responds } from '@alxia/core';
+
+app.route(renamePet, responds(renamePet), auth, ({ user, params, body, reply }) =>
+	reply(200, { id: params.petId, name: `${body.name} (by ${user})` }),
+); // auth's 401 checked by the operation's 401 schema
+```
+
+`responds(operation)` reads `schema.response`, and throws
+[`responds(): the operation PATCH /pets/:petId declares no response`](../troubleshooting.md#responds-the-operation-get--declares-no-response)
+where it is called when there is none. Before the operation's `validate`,
+a middleware reads `params` as strings and `body` as `undefined`, as on
+any route.
 
 ## Paths
 
@@ -287,7 +305,7 @@ The type reads a path's own syntax — the rows from `'/a/*/b'` to
 `'/a/./b'`; `'users'` fails on `RoutePath` instead — under the app's
 prefix and the group's. Left to the `TypeError` are a literal the URL
 percent-encodes (`/café`), a path typed `string` or holding a
-`` `${string}` ``, a plugin's routes under the prefix `use` gives them, and
+`` `${string}` ``, a plugin's routes under the prefix `plugin` gives them, and
 what takes two routes: a shape or a method and path declared twice
 ([troubleshooting](../troubleshooting.md#argument-of-type--is-not-assignable-to-parameter-of-type-invalid-path-)).
 
@@ -348,7 +366,15 @@ Two middlewares the core runs itself, placed among the route's others:
 ```ts
 validate(schemas: { params?, query?, headers?, cookies?, body? }): Middleware; // each any Standard Schema
 responds(responses: { [status: number]: StandardSchemaV1 }): Middleware;
+validate(operation: RouteOperation): Middleware; // its schema's request parts
+responds(operation: RouteOperation): Middleware; // its schema.response
 ```
+
+Each is marked as the core's own — at runtime with
+`Symbol.for('alxia.builtin')`, in its type with `BuiltinMark<'validate'>`
+or `BuiltinMark<'responds'>` — so a route tells one apart from your
+middlewares, even made by another copy of `@alxia/core`. A route with no
+middleware and no schema runs no validation step at all.
 
 `validate` reads each part it is given a schema for, and passes the
 schema's **output** on, typed, to the middlewares after it and the handler:
@@ -359,7 +385,7 @@ a schema that coerces turns `"7"` into `7`, a default fills a missing key.
 | `params` | the path parameters, which arrive as strings; a key the path lacks, optional or not, does not compile ([below](#what-the-types-refuse)) | `{ readonly id: string }`, from the path; `pathParams` holds them, after a `validate` too |
 | `query` | the query string | `Readonly<Record<string, string \| readonly string[]>>` |
 | `headers` | the request headers, names lowercased | `Readonly<Record<string, string>>` |
-| `cookies` | the `Cookie` header, by name | `Readonly<Record<string, string>>`; the hooks, `onError` and `onRefusal` always read these |
+| `cookies` | the `Cookie` header, by name; a second `validate` of the cookies reads the request's again, not what the first gave back | `Readonly<Record<string, string>>`; the hooks, `onError` and `onRefusal` always read these |
 | `body` | the body, parsed by its `content-type` | `undefined`: read `ctx.request` yourself |
 
 `responds` declares the body of each status the route may answer. The
@@ -484,7 +510,7 @@ cap its own body below that limit:
 | `bodyLimit` in a route's options | that route, whatever `bodyLimit()` was called before it |
 | `app.bodyLimit(bytes)` | every route declared after it on the app, a group's included |
 | `group.bodyLimit(bytes)` inside a group | the group's routes declared after it, never the app's |
-| a plugin's routes, given to `use` | their own limit only: the app's `bodyLimit()` never reaches them. A `bodyLimit()` the plugin calls applies to the app's routes declared after `use`, as its hooks do |
+| a plugin's routes, given to `plugin` | their own limit only: the app's `bodyLimit()` never reaches them. A `bodyLimit()` the plugin calls applies to the app's routes declared after `plugin`, as its hooks do |
 
 ```ts
 import { alxia, validate } from '@alxia/core';
@@ -713,7 +739,8 @@ app.get(path, [canView], handler);
 A schema there validates the request just before the handler, after the
 list, with `responds` checking the handler's reply: at runtime it becomes
 `validate(…)` and `responds(…)` placed last, so the route answers exactly as
-it did. Its `bodyLimit` and `detail` move to the options:
+it did. The parts it has no schema for are left as they are: a `body` a
+`use` middleware passed `next` reaches the handler. Its `bodyLimit` and `detail` move to the options:
 
 ```ts
 // deprecated

@@ -101,7 +101,7 @@ every flow ends with, and the sign-in call stays on the instance:
 const accounts = janus({ … }); // the instance: named `accounts` in the docs, so `auth` is free
 
 app
-	.use(session(accounts))
+	.plugin(session(accounts))
 	.post('/sign-in', validate({ body: Credentials }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.patient.signIn(body, { device: auth.device });
 		return reply.ok({ id: auth.send(signedIn).id }); // session cookie, device cookie
@@ -168,8 +168,8 @@ const tenant = definePlugin<{ user: { tenantId: string } }>()((app) =>
 	app.derive(({ user }) => ({ tenant: tenants.get(user.tenantId) })),
 );
 
-base.use(session(accounts, { required: true })).use(tenant); // ok
-alxia().use(tenant); // compile error: the app gives no `user`
+base.plugin(session(accounts, { required: true })).plugin(tenant); // ok
+alxia().plugin(tenant); // compile error: the app gives no `user`
 ```
 
 It also adds a guide page, "Writing a plugin", covering an app plugin, a

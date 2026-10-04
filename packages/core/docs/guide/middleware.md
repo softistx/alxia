@@ -48,8 +48,8 @@ const app = alxia()
 | `onResponse(hook)` | a header on every response, compression | the whole app | after everything else, 404s included | it replaces the response; keep its status | no |
 | `around(hook)` | a request id in `AsyncLocalStorage`, a timer, a span | the whole app | outermost | yes, with a raw `Response` | no |
 | [`group(build)`](#group) | scoping hooks to some routes | the routes inside it | — | — | what its routes declare |
-| [`use(app)`](#use-and-defineplugin), `definePlugin` | routes, hooks and context shared across apps | its routes, then the routes declared after `use` | — | its hooks can | as if written inline |
-| `use(plugin)`, a `Plugin` function | global hooks shared across apps | the whole app | — | its hooks can | no |
+| [`plugin(app)`](#plugin-and-defineplugin), `definePlugin` | routes, hooks and context shared across apps | its routes, then the routes declared after `plugin` | — | its hooks can | as if written inline |
+| `plugin(fn)`, a `Plugin` function | global hooks shared across apps | the whole app | — | its hooks can | no |
 | [A route's own hooks](#a-routes-own-hooks), `[canView]` — **deprecated** | what a middleware does now | one route | after the scope's hooks, before its schema | yes | as a middleware's |
 
 "Typed" is what the handler and the middlewares after it read. alxia is
@@ -77,7 +77,7 @@ declares. What is in `app.routes` is what a tool reading it sees:
   `app.group('/admin', (admin) => admin.use(auth).get(…))`.
 - **Every request, routed or not, and nothing a client is generated for**: a
   global hook, `onRequest`, `onResponse` or `around`.
-- **The same hooks or routes in several apps**: a [plugin](#use-and-defineplugin).
+- **The same hooks or routes in several apps**: a [plugin](#plugin-and-defineplugin).
 
 A middleware on a route and one given to `use` are the same function, and
 run and type the same way; they differ in how far they reach. When every
@@ -181,7 +181,9 @@ const app = alxia()
 // POST /drafts, no x-user, {"title":""} → 400
 ```
 
-`responds` stands somewhere too. It checks the handler's reply, which must
+`responds` stands somewhere too — on a `route(operation, …)`, the
+operation's stands just before the handler, unless `responds(operation)`
+is placed ([Routes](routes.md#middlewares-on-a-route-declared-as-data)). It checks the handler's reply, which must
 have a status it declares, and a reply a middleware after it makes with a
 status it declares. A middleware's reply made before it, or with a status
 it does not declare, is sent as it is:
@@ -355,12 +357,18 @@ const exclusive = defineMiddleware<{ pathParams: { id: string } }>()(
 | `next()`, `next(added)` | runs the rest; `added` is merged into the context of what follows, and typed there |
 | a reply, `reply(…)`, `redirect(…)` | ends the request with it |
 | a `Response` | sent as it is |
-| anything else, or nothing | a `TypeError` naming the route — `GET /x: a middleware (name) returned nothing: return next(), a reply or a Response` — answered as a 500 |
+| nothing, once it called `next()` — `await next()` with no `return`, or `next()` not awaited | the rest's response, as Koa and Hono answer |
+| anything else, or nothing without calling `next()` | a `TypeError` naming the route — `GET /x: a middleware (name) returned nothing: return next(), a reply or a Response` — answered as a 500 |
 
 `next()` is called once at most, before the middleware returns: a second
 call throws `GET /x: a middleware called next() twice`, and a call after it
 returned `GET /x: a middleware called next() after it returned` — the rest
-of the route never runs then. Both are a 500. A route takes up to 8
+of the route never runs then. Both are a 500. A middleware that returns a
+reply of its own before the `next()` it called settled — `next(); return
+reply(403)` — has started the rest, which runs anyway: its reply is sent
+once the rest has run, `console.warn` says `GET /x: a middleware returned
+before the next() it called settled: …`, and an error the rest throws is
+logged rather than left unhandled. Decide before calling `next()`. A route takes up to 8
 middlewares, `validate` and `responds` included; a ninth does not compile.
 `ws` takes them on the upgrade ([WebSockets](websockets.md#the-upgrade));
 `route`, `static`, `file` and `page` do not.
@@ -371,7 +379,8 @@ defineMiddleware<Requires>(): (middleware: Middleware<Requires, Result>) => Midd
 
 type Middleware<Requires = Empty, Result = MiddlewareReturn> = (ctx: MiddlewareContext<Requires>, next: NextFunction) => Result;
 type MiddlewareContext<Requires = Empty> = BaseContext & Requires;
-type MiddlewareReturn = MaybePromise<Next<any, any> | AnyReply | Response>; // MaybePromise<MiddlewareResult>
+type MiddlewareResult = Next | AnyReply | Response; // the brand is Next's, never any
+type MiddlewareReturn = MaybePromise<MiddlewareResult>;
 
 interface NextFunction {
 	(): Promise<Next>;
@@ -409,9 +418,13 @@ const app = alxia()
 // GET /me answers 200, 401 or 500
 ```
 
-`use` tells a middleware from a plugin by the mark `defineMiddleware` puts
-on it: a plain `(ctx, next) => …` given to `use` is called as a plugin,
-with the app. A route takes a plain function; `use` does not.
+`use` takes middlewares made by `defineMiddleware`; a plugin goes to
+[`plugin`](#plugin-and-defineplugin). `use(plugin)` still mounts one, deprecated,
+and tells the two apart by the mark `defineMiddleware` puts on a
+middleware: a plain `(ctx, next) => …` given to `use` is called once as a
+plugin, with the app, and `use` throws when it returns no app —
+[`use(): the plugin function returned a promise, …`](../troubleshooting.md#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-made-with-definemiddleware-and-given-to-use).
+A route takes a plain function. In the next minor, `use` takes one too.
 
 ### `use` with a path
 
@@ -682,11 +695,12 @@ const app = alxia()
 `group(build)` with no prefix is a scope alone. See
 [Groups and plugins: groups](groups-and-plugins.md#groups).
 
-### `use` and `definePlugin`
+### `plugin` and `definePlugin`
 
-An app given to `use` brings its routes, and its route hooks and
-middlewares then apply to the routes declared after `use`. A `Plugin` function adds global hooks and
-leaves the type alone. `definePlugin<Requires>()` builds an app plugin that
+An app given to `plugin` brings its routes, and its route hooks and
+middlewares then apply to the routes declared after `plugin`. A `Plugin`
+function, given to `plugin` too, adds global hooks, returns the app and
+leaves the type alone; `plugin` throws when it returns anything else. `definePlugin<Requires>()` builds an app plugin that
 reads what an earlier one added.
 
 ```ts
@@ -710,9 +724,9 @@ const timing: Plugin = (app) =>
 	});
 
 const app = alxia()
-	.use(timing)
-	.use(auth)
-	.use(audit) // compiles: auth adds a user with an id
+	.plugin(timing)
+	.plugin(auth)
+	.plugin(audit) // compiles: auth adds a user with an id
 	.get('/whoami', ({ audit, reply }) => reply(200, audit));
 ```
 
@@ -725,7 +739,7 @@ See [Groups and plugins: plugins](groups-and-plugins.md#plugins) and
   and the 400.
 - [Hooks](hooks.md): every hook's signature, options and edge cases.
 - [Groups and plugins](groups-and-plugins.md): scoping, prefixes and what
-  `use` mounts.
+  `plugin` mounts.
 - [Replies](replies.md): `reply`, `set`, and how errors become responses.
 - [Upgrading](../upgrading.md): moving a list of hooks and a schema to
   middlewares.
