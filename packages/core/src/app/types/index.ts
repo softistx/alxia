@@ -18,6 +18,7 @@ export type {
 	Middleware,
 	MiddlewareBase,
 	MiddlewareContext,
+	MiddlewareMark,
 	MiddlewareResult,
 	MiddlewareReturn,
 	Next,

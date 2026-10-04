@@ -1,12 +1,14 @@
 /**
  * The types of how an app is put together from parts: `group`, routes in a
- * scope of their own; `use`, a plugin.
+ * scope of their own; `use`, middlewares for the routes after it, or a
+ * plugin.
  */
 import type { AnyReply } from '../reply/reply';
 import type { JoinPath, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
 import type { AnyAlxia } from './signatures';
 import type { Empty, ProvidedBy, ThenShortcuts } from './types';
+import type { UseForms } from './use-forms';
 
 /** `app.group(prefix, build)` or `app.group(build)`. */
 export interface GroupMethod<
@@ -32,8 +34,21 @@ export interface GroupMethod<
 	): Alxia<Ctx, Prefix, Shortcuts>;
 }
 
-/** `app.use(plugin)`: an app, or a function given this app. */
+/**
+ * `app.use(...middlewares)`, `app.use(path, ...middlewares)`, see
+ * `UseForms`; or `app.use(plugin)`, see `PluginForms`. A function made by
+ * `defineMiddleware` is a middleware; any other function is a plugin.
+ */
 export interface UseMethod<
+	App,
+	Ctx extends object,
+	Prefix extends string,
+	Shortcuts extends AnyReply,
+> extends UseForms<Ctx, Prefix, Shortcuts>,
+		PluginForms<App, Ctx, Prefix, Shortcuts> {}
+
+/** `app.use(plugin)`: an app, or a function given this app. */
+export interface PluginForms<
 	App,
 	Ctx extends object,
 	Prefix extends string,

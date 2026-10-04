@@ -43,6 +43,30 @@ export function group(
 }
 
 /**
+ * The plugin `use` is given, alone: an app, or a function given the app.
+ * A function `defineMiddleware` made was read before, as a middleware.
+ * `isApp` tells an app.
+ */
+export function pluginOf(
+	args: readonly unknown[],
+	isApp: (value: unknown) => value is AnyAlxia,
+): AnyAlxia | ((app: AnyAlxia) => AnyAlxia) {
+	const [plugin] = args;
+	if (args.length === 0) {
+		throw new TypeError('use(): nothing is given: a plugin, or middlewares');
+	}
+	if (args.length !== 1) {
+		throw new TypeError(
+			'use(): a plugin is given alone; middlewares are made with defineMiddleware()',
+		);
+	}
+	if (isApp(plugin) || typeof plugin === 'function') return plugin as never;
+	throw new TypeError(
+		"use(): the plugin is neither an app nor a function; a middleware is made with defineMiddleware(), and a hook of defineHook() or defineWrap() goes in a route's list",
+	);
+}
+
+/**
  * `app.use(plugin)`, an app: its routes under this app's prefix and behind
  * its hooks, its hooks for the routes declared after it, its global hooks.
  */
@@ -59,6 +83,6 @@ export function usePlugin(state: AppState, plugin: AppState): void {
 			state.scope.behind(socket, joinPath(state.prefix, socket.path)),
 		);
 	}
-	state.scope.absorb(plugin.scope);
+	state.scope.absorb(plugin.scope, state.prefix);
 	mergeGlobals(state.runtime, plugin.runtime.globals, state.prefix);
 }

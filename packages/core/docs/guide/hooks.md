@@ -25,7 +25,8 @@ const app = alxia()
 | | Applies to | Declared with |
 | --- | --- | --- |
 | route hooks | the routes declared **after** them, in the same app or [group](groups-and-plugins.md#groups) | `decorate`, `derive`, `wrap`, `onError`, `onRefusal` |
-| middlewares | the routes they are given to, after the route hooks in force | `defineMiddleware`, `validate`, `responds`, after the path ([Middleware](middleware.md#a-routes-middlewares)) |
+| scope middlewares | the routes declared **after** them, in the same app or group; with a path, those under it | `use(...middlewares)`, `use(path, ...middlewares)` ([Middleware](middleware.md#use-for-every-route-after-it)) |
+| middlewares | the routes they are given to, after the route hooks and scope middlewares in force | `defineMiddleware`, `validate`, `responds`, after the path ([Middleware](middleware.md#a-routes-middlewares)) |
 | global hooks | every request to the app, wherever they are declared | `around`, `onRequest`, `onResponse`, `onStart`, `onStop`, `parser` |
 | hooks on one route — **deprecated** | that route alone, after the route hooks in force | a list after its path: `defineHook`, `defineWrap` ([below](#hooks-on-one-route)) |
 
@@ -39,7 +40,7 @@ what it adds.
 around (first declared outermost)
 └─ onRequest hooks           ← a Response here is sent as it is
    └─ routing                ← 404, 405, 426
-      └─ route hooks, in order: derive / decorate / wrap
+      └─ route hooks and use() middlewares, in order: derive / decorate / wrap / use
          └─ the route's middlewares, in order, validate and responds where they stand
             ├─ validate      ← 400, or the onRefusal hook's reply
             └─ handler       ← its reply checked by the responds before it
@@ -82,7 +83,9 @@ const app = alxia()
 derive<Result>(hook: (ctx: BaseContext & Ctx) => MaybePromise<Result>): Alxia<…>
 ```
 
-Runs on every request to a route declared after it. What it returns:
+Runs on every request to a route declared after it: the shorthand for a
+middleware given to `use` that only adds
+([Middleware: `use`](middleware.md#use-for-every-route-after-it)). What it returns:
 
 | Returns | Effect |
 | --- | --- |

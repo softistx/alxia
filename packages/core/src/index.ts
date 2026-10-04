@@ -7,7 +7,11 @@ export type {
 	StartHookMethod,
 	StopHookMethod,
 } from './app/app-hooks';
-export type { GroupMethod, UseMethod } from './app/compose-methods';
+export type {
+	GroupMethod,
+	PluginForms,
+	UseMethod,
+} from './app/compose-methods';
 export { defineHook, defineWrap } from './app/define-hook';
 export { defineMiddleware } from './app/define-middleware';
 export { definePlugin } from './app/define-plugin';
@@ -99,6 +103,7 @@ export type {
 	Method,
 	Middleware,
 	MiddlewareContext,
+	MiddlewareMark,
 	MiddlewareResult,
 	MiddlewareReturn,
 	Next,
@@ -131,6 +136,14 @@ export type {
 	TypedShortcuts,
 	ValidSchema,
 } from './app/types';
+export type {
+	AddingNothing,
+	AppAfterUse,
+	PathMiddleware,
+	ScopeMiddleware,
+	ScopePathAt,
+	UseForms,
+} from './app/use-forms';
 export {
 	type RequestSchemas,
 	responds,

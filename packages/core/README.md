@@ -141,7 +141,9 @@ const app = alxia().post(
 | --- | --- |
 | `app.<method>(path, options?, ...middlewares, handler)` | up to 8 middlewares, each reading what the ones before it added; the handler last |
 | `options` | `bodyLimit` (bytes, a 413 past it) and `detail` (what OpenAPI says of the route); a schema there does not compile, and throws where the route is declared |
-| `defineMiddleware(fn)` | types `fn`, and returns it |
+| `defineMiddleware(fn)` | types `fn`, marks it as a middleware, and returns it |
+| `app.use(...middlewares)` | up to 8 `defineMiddleware`s for every route declared after it, before the route's own, what each adds typed after it |
+| `app.use(path, ...middlewares)` | the same for the routes under `path` alone; they may add nothing |
 | `defineMiddleware<{ user: User; pathParams: { id: string } }>()(fn)` | a middleware that reads more than the base context; a route that does not give it, where the middleware is placed, does not compile |
 | `validate({ params, query, headers, cookies, body })` | any Standard Schema per part; what follows reads their output. Before it, a middleware reads the request as it arrived: `params` as strings, `query` raw, `body` `undefined` |
 | `responds({ 200: Post, 404: NotFound })` | the handler's `reply` typed by the statuses, and its reply checked and sent as its schema's output: a body it refuses is a 500. A middleware after it that replies with a declared status is checked too; any other status it sends as it is |
@@ -165,6 +167,56 @@ app.patch('/posts/:id', canView, validate({ params: PostId, body: Update }), res
 
 [Upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md)
 has each one, before and after.
+
+### Middlewares for the routes after them: `use`
+
+`app.use(...middlewares)` runs them on every route declared after it, in
+this app or group, before the route's own; what they pass `next` is typed
+in those routes, and not in the routes before. `app.use(path,
+...middlewares)` runs them on the routes under `path` alone, matched once,
+when each route is declared, and they may add nothing to the context: to
+add to a subtree's, `use` them in a group.
+
+```ts
+import { alxia, defineMiddleware } from '@alxia/core';
+
+const auth = defineMiddleware(({ request, reply }, next) => {
+	const id = request.headers.get('x-user');
+	return id ? next({ user: { id } }) : reply(401, { error: 'unauthorized' as const });
+});
+const admin = defineMiddleware(({ request, reply }, next) =>
+	request.headers.has('x-admin') ? next() : reply(403, { error: 'forbidden' as const }),
+);
+const timed = defineMiddleware(async (_ctx, next) => {
+	const response = await next();
+	response.headers.set('x-timed', '1');
+	return response;
+});
+const loadTeams = defineMiddleware<{ user: { id: string } }>()(({ user }, next) =>
+	next({ teams: [`${user.id}'s team`] }),
+);
+
+alxia()
+	.get('/health', ({ reply }) => reply(200, 'ok')) // declared before use(auth): open
+	.use(auth)                                       // every route after: a 401, or `user` typed
+	.use('/admin', admin)                            // /admin and under: a 403 next
+	.get('/me', ({ user, reply }) => reply(200, user))
+	.get('/admin/stats', timed, ({ reply }) => reply(200, { users: 1 })) // auth, admin, timed, handler
+	.group('/teams', (teams) =>
+		teams.use(loadTeams).get('/', ({ teams, reply }) => reply(200, teams)), // adds, in a group
+	);
+```
+
+| Path | Runs on |
+| --- | --- |
+| `'/admin'` | `/admin` and every route under it, segment by segment: not `/administrators` |
+| `'/admin/*'` | the routes under `/admin`, not `/admin` itself |
+| `'/users/:any/posts'` | `:any` is any one segment: `/users/:id/posts`, `/users/me/posts/:postId`; a literal matches that literal alone |
+
+`use` tells a middleware by the mark `defineMiddleware` puts on it: any
+other function is a plugin, called with the app. Only a route the request
+matched runs them, so a 404 or a 405 never does; a socket runs them on its
+upgrade. `derive` stays, the shorthand for a middleware that only adds.
 
 ## Requests
 
@@ -536,17 +588,18 @@ Global hooks apply to the whole app, wherever they are declared:
 
 ```ts
 app.group('/admin', (admin) =>
-	admin.derive(requireAdmin).get('/stats', ...),   // the guard applies here only
+	admin.use(requireAdmin).get('/stats', ...),   // the guard, and what it adds, apply here only
 );
 ```
 
-A group's routes are under its prefix and keep the hooks declared before
-it; the hooks it adds stay inside. `group(build)`, without a prefix, is a
-scope alone.
+A group's routes are under its prefix and keep the hooks and middlewares
+declared before it; the ones it adds stay inside. `group(build)`, without a
+prefix, is a scope alone.
 
 ## Plugins
 
-A plugin is an app, or a function.
+A plugin is an app, or a function — any function but one `defineMiddleware`
+made, which `use` reads as a middleware.
 
 ```ts
 // an app: its routes, its context, its replies — all typed
@@ -617,12 +670,13 @@ covers all three kinds.
 | `AnyReply`, `FreeReplyFunction`, `TypedReplyFunction`, `DeclaredReply`, `RedirectFunction` | any reply, `reply` without and behind a `responds`, every reply a route with schemas may return, `redirect` |
 | `FreeShortcuts`, `TypedShortcuts`, `SHORTCUTS`, `Shortcuts` | `reply`'s shortcuts without and with schemas, and the status of each |
 | `Plugin`, `AnyAlxia` | a function plugin, any app |
-| `defineMiddleware(fn)`, `defineMiddleware<Requires>()(fn)` | a middleware, `(ctx, next) => …`, typed and returned as it is: `next(added)` adds `added` to the context after it, a reply ends the request, a `Response` is sent as it is; `Requires` is what it reads beyond `BaseContext`, which the route must give where it is placed |
+| `defineMiddleware(fn)`, `defineMiddleware<Requires>()(fn)`, `MiddlewareMark` | a middleware, `(ctx, next) => …`, typed, marked as one for `use`, and returned: `next(added)` adds `added` to the context after it, a reply ends the request, a `Response` is sent as it is; `Requires` is what it reads beyond `BaseContext`, which the route must give where it is placed |
 | `validate(schemas)`, `validate(operation)`, `RequestSchemas`, `Validated<Schemas>`, `ValidateRequires<Schemas>` | the middleware that validates `params`, `query`, `headers`, `cookies` and `body`, each with any Standard Schema — or the request parts of an operation's `schema`, which its `route` then validates nowhere else; what it takes, what it passes on, the path parameters its `params` schema must read |
 | `responds(responses)` | the middleware that types the handler's `reply` by the statuses it declares, and checks the replies after it of those statuses against their schemas |
 | `Middleware<Requires, Result>`, `MiddlewareContext<Requires>`, `MiddlewareResult`, `MiddlewareReturn`, `Next<Added, Schema>`, `NextFunction` | a middleware, what it reads (`BaseContext & Requires`), what it may return, and `next`: called once at most, it resolves to the rest of the route's `Response`, branded by what was added |
 | `RouteOptions`, `SocketOptions` | a route's options, `bodyLimit` and `detail`; a socket's, `message`, `send` and `detail` |
 | `RouteMethod`'s `MiddlewareForms`, `OptionsForms` and `DeprecatedForms`; `SocketMethod`'s `SocketForms`, `SocketOptionsForms` and `DeprecatedSocketForms`; `RouteApp`, `AppWithRoute` | the forms of a route method and of `ws`: with and without options, and those of 0.3; the app's types and the method, as those forms read them; the app a call returns, unchanged in type. Exported so an app's type can be named in a declaration file |
+| `UseForms`, `PluginForms`, `ScopeMiddleware`, `PathMiddleware`, `AddingNothing`, `ScopePathAt`, `AppAfterUse` | the forms of `use` — middlewares, with a path or without, and a plugin — what each middleware form takes, the check that a middleware given a path adds nothing (`Invalid middleware: …`), the check of that path (a route's, with no trailing `/`), and the app after them. Exported so an app's type can be named in a declaration file |
 | `defineHook(hook)`, `defineHook<Requires>()(hook)`, `defineWrap(hook)`, `defineWrap<Requires>()(hook)` | deprecated: a hook for a route's list, `app.get(path, [hook], schema?, handler)`, and one around the rest of it. Still run as in 0.3; write a `defineMiddleware` instead |
 | `RouteHook<Requires, Result>`, `RouteWrap<Requires, Result>`, `AnyRouteHook`, `HookContext<Requires>`, `RawRequestParts` | what `defineHook` and `defineWrap` make, and what such a hook reads: `BaseContext`, the `params` and `query` as they arrived, and `Requires` |
 | `ThreadHooks<Base, Hooks>`, `RouteHookBase<Ctx, Path>`, `HookProvided<Given, Requires>`, `AddedBy<Hook>`, `RepliesBy<Hook>`, `MaxRouteHooks`, `NoHookYet` | how a route's type threads a deprecated list of hooks, bounded at 8. Exported so an app's type can be named in a declaration file |

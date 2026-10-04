@@ -9,7 +9,7 @@ import type {
 	StopHookMethod,
 } from './app-hooks';
 import { type AppState, createState } from './app-state';
-import { type GroupArgs, group, usePlugin } from './compose';
+import { type GroupArgs, group, pluginOf, usePlugin } from './compose';
 import type { GroupMethod, UseMethod } from './compose-methods';
 import * as hooks from './declare-hooks';
 import * as declare from './declare-routes';
@@ -26,7 +26,7 @@ import type {
 } from './scope-methods';
 import { startServer, stopServer } from './serving';
 import type { ListenMethod, RequestMethod } from './serving-methods';
-import type { AlxiaOptions, AnyAlxia, RefusalMethod } from './signatures';
+import type { AlxiaOptions, RefusalMethod } from './signatures';
 import { type SocketData, websocketHandler } from './socket';
 import type { SocketMethod } from './socket-method';
 import type { FileMethod, PageMethod, StaticMethod } from './static-methods';
@@ -134,8 +134,10 @@ export class Alxia<
 			}),
 	);
 	readonly use: UseMethod<this, Ctx, Prefix, Shortcuts> = ((
-		plugin: AnyAlxia | ((app: this) => AnyAlxia),
+		...args: unknown[]
 	) => {
+		if (hooks.useMiddlewares(this.#state, args)) return this;
+		const plugin = pluginOf(args, (value) => value instanceof Alxia);
 		if (!(plugin instanceof Alxia)) return plugin(this);
 		usePlugin(this.#state, plugin.#state);
 		return this;

@@ -9,6 +9,7 @@ break yours.
 | Change | Package | Can it break your code |
 | --- | --- | --- |
 | [One middleware model](#one-middleware-model) | core | no: the forms of 0.3 still work, deprecated |
+| [Middlewares for the routes after them: `use`](#middlewares-for-the-routes-after-them-use) | core | no: `use` still takes a plugin as before |
 | [No more client: spec first](#no-more-client-spec-first) | core, client, graphql, janus, secure-headers, context-storage, react-router | yes: `@alxia/client`, `RoutesOf` and the route table are gone, and `Alxia` takes three type parameters |
 
 ### One middleware model
@@ -276,6 +277,53 @@ app.get('/me', responds({ 200: User }), auth, handler);
 // declare the 401 to check auth's reply too
 app.get('/me', responds({ 200: User, 401: Unauthorized }), auth, handler);
 ```
+
+### Middlewares for the routes after them: `use`
+
+**What changed.** `use` takes middlewares made by `defineMiddleware`, up to
+8 in one call, for every route declared after it in the app or group,
+before the route's own. What they pass `next` is typed in those routes.
+`use(path, ...middlewares)` runs them on the routes under `path` alone —
+`/admin`, `/admin/*`, `:name` segments — matched when each route is
+declared; those may add nothing to the context, a compile error
+(`Invalid middleware: …`) otherwise. To add to a subtree's context, `use`
+them in a group. `defineMiddleware` marks what it makes, and `use` reads
+the mark: any other function is a plugin, as before. `derive` stays, the
+shorthand for a middleware that only adds.
+
+```ts
+// before: a derive for every route after a point, a guard repeated on each route
+alxia()
+	.derive(({ request, reply }) => {
+		const id = request.headers.get('x-user');
+		return id ? { user: { id } } : reply(401, { error: 'unauthorized' as const });
+	})
+	.get('/admin/stats', admin, handler)
+	.get('/admin/users', admin, handler);
+
+// now: the middleware given to use, the guard given once for the subtree
+const auth = defineMiddleware(({ request, reply }, next) => {
+	const id = request.headers.get('x-user');
+	return id ? next({ user: { id } }) : reply(401, { error: 'unauthorized' as const });
+});
+alxia()
+	.use(auth)
+	.use('/admin', admin)
+	.get('/admin/stats', handler)
+	.get('/admin/users', handler);
+```
+
+**Can it break your code?** No. `use(app)`, `use(plugin)` and
+`definePlugin` work as they did. Three calls that never worked now throw
+where they are made, saying why: `use` given a plugin and more arguments,
+`use` given what is neither an app nor a function (a hook of
+`defineHook`), and `use()` given nothing. A plain `(ctx, next) => …` given to `use` is still called
+as a plugin: wrap it in `defineMiddleware`
+([Troubleshooting](troubleshooting.md#my-middleware-was-treated-as-a-plugin)).
+
+New exports: the types `MiddlewareMark`, `UseForms`, `PluginForms`,
+`ScopeMiddleware`, `PathMiddleware`, `AddingNothing`, `ScopePathAt` and
+`AppAfterUse`.
 
 ### No more client: spec first
 

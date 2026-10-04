@@ -8,7 +8,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 
 | package | what it is | peers |
 | --- | --- | --- |
-| `@alxia/core` | the framework: routes and their middlewares (`defineMiddleware`, `validate`, `responds`), hooks, groups, plugins, cookies, SSE, WebSockets | — |
+| `@alxia/core` | the framework: routes and their middlewares (`defineMiddleware`, `validate`, `responds`, `use(...middlewares)` for the routes after it), hooks, groups, plugins, cookies, SSE, WebSockets | — |
 | `@alxia/openapi` | the OpenAPI 3.2 document of an app, from its route schemas | core |
 | `@alxia/openapi-routes` | `implemented` and `matchesSpec`: every operation of an OpenAPI document has a route, read from `app.routes` | core |
 | `@alxia/zod` | Zod coercions (`zq`) and the OpenAPI converter | zod |
@@ -90,13 +90,21 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   type. A handler cannot return a raw `Response`. A global hook's
   `Response` is outside the contract: use it only for what no operation
   describes.
-- **Order is meaning.** A route hook applies to the routes declared after
-  it, at runtime and in the types alike; a group's stay inside it. A
+- **Order is meaning.** A route hook, and a middleware given to `use`,
+  applies to the routes declared after it, at runtime and in the types
+  alike; a group's stay inside it. A
   route's middlewares run in the order given, `validate` and `responds`
   among them, and what one passes `next` is typed only after it. Global
   hooks apply everywhere. Keep the two in step.
 - **One route model.** A route, a socket's upgrade and `route(operation)`
-  take the same `...middlewares`. The forms of 0.3 (a list of hooks, a
+  take the same `...middlewares`, and `use(...middlewares)` gives them to
+  every route declared after it, before the route's own, in the scope
+  chain the route hooks are in: matched against a route's declared path
+  when it is declared (`use(path, …)`), never per request, so the chain
+  `chain.ts` runs is the same. `use` tells a middleware from a plugin by
+  the mark `defineMiddleware` sets, and a middleware given a path adds
+  nothing, a compile error otherwise: a subtree's context is a group's.
+  `derive` stays, the shorthand for a middleware that only adds. The forms of 0.3 (a list of hooks, a
   schema before the handler, `defineHook`, `defineWrap`) are deprecated
   adapters in `@alxia/core`, kept until they are removed: no other package,
   template or example writes them, but the specs of `@alxia/openapi`,

@@ -41,6 +41,8 @@ a trap that prints nothing is headed by its symptom.
 - [`route() needs the path as a literal: declare the operation as const`](#route-needs-the-path-as-a-literal-declare-the-operation-as-const)
 - [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
 - [`Argument of type '"…"' is not assignable to parameter of type '"Invalid path: …"'`](#argument-of-type--is-not-assignable-to-parameter-of-type-invalid-path-)
+- [`… is not assignable to type '"Invalid middleware: a middleware given a path may add nothing to the context, …"'`](#-is-not-assignable-to-type-invalid-middleware-a-middleware-given-a-path-may-add-nothing-to-the-context-)
+- [`… is not assignable to parameter of type 'Alxia<object, string, AnyReply> & …'`, on `use(middleware)`](#-is-not-assignable-to-parameter-of-type-alxiaobject-string-anyreply---on-usemiddleware)
 - [`Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`](#type-reply500--is-not-assignable-to-type-maybepromisevoid--replyclienterrorstatus-any--undefined)
 - [`'500' does not exist in type 'RefusalResponses'`](#500-does-not-exist-in-type-refusalresponses)
 - [`The inferred type of '…' cannot be named without a reference to '…' from '…/@alxia/core/dist/…'`](#the-inferred-type-of--cannot-be-named-without-a-reference-to--from-alxiacoredist)
@@ -72,6 +74,10 @@ a trap that prints nothing is headed by its symptom.
 - [`GET /…: the handler is missing`](#get--the-handler-is-missing)
 - [`POST /…: bodyLimit must be a whole number of bytes, 0 or more; got …`](#post--bodylimit-must-be-a-whole-number-of-bytes-0-or-more-got-)
 - [`group(): build is missing`](#group-build-is-missing)
+- [`use(): middleware 2 was not made by defineMiddleware()`](#use-middleware-2-was-not-made-by-definemiddleware), and `use(): middleware 1 is a validate() or responds(), which belongs to a route`
+- [`use("…"): no middleware is given`](#use-no-middleware-is-given), and `use("/a/*/b"): "/a/*/b": "*" may only end a path`
+- [`use("/admin/"): a path given to use() does not end with "/"`](#useadmin-a-path-given-to-use-does-not-end-with-)
+- [`use(): a plugin is given alone; middlewares are made with defineMiddleware()`](#use-a-plugin-is-given-alone-middlewares-are-made-with-definemiddleware), `use(): the plugin is neither an app nor a function; …` and `use(): nothing is given: a plugin, or middlewares`
 - [`onRefusal(): the hook is missing`](#onrefusal-the-hook-is-missing)
 - [`onRefusal(): "…" is no kind of refusal; expected 'validation' or 'body_limit'`](#onrefusal--is-no-kind-of-refusal-expected-validation-or-body_limit)
 - [`page(): /… is already served`](#page--is-already-served)
@@ -92,6 +98,8 @@ a trap that prints nothing is headed by its symptom.
 **Hooks**
 
 - [`set.cookies.get()` returns null in a hook](#setcookiesget-returns-null-in-a-hook)
+- [My middleware was treated as a plugin](#my-middleware-was-treated-as-a-plugin)
+- [A `use(path)` guard did not run on a request under its path](#a-usepath-guard-did-not-run-on-a-request-under-its-path)
 
 **Routing**
 
@@ -1057,6 +1065,7 @@ would refuse when the route is declared. After `Invalid path:` comes the
 | `'/*.js'` | `"/*.js": "*" may only be a whole segment, as a wildcard` |
 | `'/a/./b'` | `"/a/./b": "." is a dot segment, which a request's URL never keeps` |
 | `static('/assets/*', …)` | `"/assets/*/*": "*" may only end a path`: `static` adds the `/*` |
+| `use('/admin/', guard)` | `"/admin/": a path given to use() does not end with "/"` ([below](#useadmin-a-path-given-to-use-does-not-end-with-)) |
 
 For `route()` the message is on the operation's `path`:
 
@@ -1116,6 +1125,64 @@ export function servedAt<const P extends RoutePath>(path: PathAt<'', P, StaticPa
 
 routedAt('/pets/:id'); // routes '/pets/:id'
 routedAt('/at/10:30'); // does not compile: Invalid path: …
+```
+
+### `… is not assignable to type '"Invalid middleware: a middleware given a path may add nothing to the context, …"'`
+
+```text
+error TS2769: No overload matches this call.
+  …
+      Type 'Middleware<Empty, Reply<401, …> | Promise<Next<{ user: User; }, Empty>>> & MiddlewareMark' is not assignable to type '"Invalid middleware: a middleware given a path may add nothing to the context, and this one passes \"user\" to next(): give it to the routes of a group instead, app.group(path, (group) => group.use(middleware))"'.
+```
+
+**When:** `use(path, ...middlewares)` is given a middleware that passes
+`next` an object — `next({ user })` — such as an `auth`:
+
+```ts
+app.use('/admin', auth); // auth returns next({ user })
+```
+
+**Why:** a middleware given a path runs on some of the routes declared
+after it and not on others, which the app's type cannot follow: what it
+adds would be typed on every route, or on none. So it may add nothing:
+`next()`, a reply or a `Response`.
+
+**Fix:** to add to a subtree's context, `use` the middleware in a group,
+whose routes are that subtree, typed:
+
+```ts
+app.group('/admin', (admin) => admin.use(auth).get('/me', ({ user, reply }) => reply(200, user)));
+```
+
+A guard that only answers or passes, `next()`, can stay on the path:
+`app.use('/admin', requireAdmin)`.
+
+### `… is not assignable to parameter of type 'Alxia<object, string, AnyReply> & …'`, on `use(middleware)`
+
+```text
+error TS2769: No overload matches this call.
+  The last overload gave the following error.
+    Argument of type 'Middleware<{ user: User; }, …> & MiddlewareMark' is not assignable to parameter of type 'Alxia<object, string, AnyReply> & { readonly '~requires'?: Empty; }'.
+```
+
+**When:** `use` is given a middleware made by `defineMiddleware<Requires>()`
+— one that reads a `user` — where no middleware, hook or plugin before it
+adds what it reads:
+
+```ts
+const canPost = defineMiddleware<{ user: User }>()(({ user, reply }, next) => …);
+alxia().use(canPost); // nothing before it adds `user`
+```
+
+**Why:** no middleware form of `use` takes it, so TypeScript reports the
+last form it tried, the plugin's, which names an app rather than the
+missing `user`.
+
+**Fix:** give it after what adds what it reads, in the same call or an
+earlier one:
+
+```ts
+alxia().use(auth, canPost); // auth passes next({ user })
 ```
 
 ### `Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`
@@ -1614,6 +1681,67 @@ app.post('/upload', { bodyLimit: 25 * 1024 * 1024 }, handler);
 app.group('/admin', (admin) => admin.derive(requireAdmin).get('/stats', stats));
 ```
 
+### `use(): middleware 2 was not made by defineMiddleware()`
+
+**When:** `use(first, second, …)`, whose first argument is a middleware
+made by `defineMiddleware` or a path, is given something else among them:
+a plain function, or — as `use(): middleware 1 is a validate() or
+responds(), which belongs to a route` says — a `validate(…)` or
+`responds(…)`. The types refuse both, so this comes from JavaScript or a
+cast. Given a path first, the message starts with it:
+`use("/admin"): middleware 1 was not made by defineMiddleware()`.
+
+**Why:** `use` tells a middleware from a plugin by the mark
+`defineMiddleware` puts on it. `validate` and `responds` declare one
+route's schemas, and belong among its middlewares.
+
+**Fix:** wrap the function, and give the schemas to the route:
+
+```ts
+const timed = defineMiddleware(async (_ctx, next) => next());
+app.use(auth, timed).post('/posts', validate({ body: Post }), handler);
+```
+
+### `use("…"): no middleware is given`
+
+**When:** `use(path)` is called with a path and no middleware, or with a
+path a route could not be declared at: `use("/a/*/b"): "/a/*/b": "*" may
+only end a path` gives the reason, as [Building the app](#building-the-app)
+lists them for a route.
+
+**Why:** a string first is read as the path of the middlewares after it,
+checked as a route path is; with none after it, `use` would do nothing.
+
+**Fix:** give the middlewares after the path, and a path written as a
+route's: `app.use('/admin/*', requireAdmin)`.
+
+### `use("/admin/"): a path given to use() does not end with "/"`
+
+**When:** `use` is given a path that ends with `/`, other than `/` itself.
+Written as a literal, the types refuse it first: `Invalid path: "/admin/":
+a path given to use() does not end with "/"`.
+
+**Why:** a path given to `use` is matched segment by segment against the
+routes' declared paths, and `/admin/` asks for an empty last segment no
+route has: the middleware would run on no route, a guard guarding
+nothing.
+
+**Fix:** drop the slash: `use('/admin', guard)` for `/admin` and under,
+`use('/admin/*', guard)` for under it alone.
+
+### `use(): a plugin is given alone; middlewares are made with defineMiddleware()`
+
+**When:** `use` is given an app or a plugin function followed by more
+arguments — `use(auth, logger)` where `auth` is a plain function or an
+app — or, as `use(): the plugin is neither an app nor a function; …`
+says, something that is neither: a hook made by `defineHook` or
+`defineWrap`, an object. `use()` given nothing says `use(): nothing is
+given`.
+
+**Fix:** one plugin per `use`, `use(a).use(b)`; middlewares, several to a
+call, made by `defineMiddleware`; a hook of `defineHook` in a route's list,
+or better rewritten as a middleware ([Upgrading](upgrading.md#migrating-to-middlewares)).
+
 ### `onRefusal(): the hook is missing`
 
 **When:** `onRefusal` is given its schemas but no hook, or a kind with no
@@ -1973,6 +2101,52 @@ has:
 A `validate({ cookies })` validates them for the middlewares after it and
 the handler; a hook reads them as they arrived
 ([Hooks](guide/hooks.md#reading-the-requests-cookies)).
+
+### My middleware was treated as a plugin
+
+**When:** a function written as a middleware, `(ctx, next) => …`, is given
+to `use` without `defineMiddleware`. `use` throws where it is called —
+`TypeError: next is not a function`, or another error of the function run
+with the app as `ctx` — or, if the function never calls `next`, returns
+whatever it returned and runs on no route:
+
+```ts
+const auth = async ({ request, reply }, next) => { … }; // a plain function
+app.use(auth); // called as a plugin: auth(app)
+```
+
+**Why:** a plugin is a function too, `(app) => app`. `use` tells the two
+apart by the mark `defineMiddleware` puts on a middleware, and calls any
+other function as a plugin, with the app, as it always has. A route's own
+middlewares take a plain function: only `use` needs the mark.
+
+**Fix:** make it with `defineMiddleware`:
+
+```ts
+const auth = defineMiddleware(async ({ request, reply }, next) => { … });
+app.use(auth);
+```
+
+The types say so first: a plain `(ctx, next) => …` given to `use` does not
+compile, since a plugin takes the app alone and returns an app.
+
+### A `use(path)` guard did not run on a request under its path
+
+**When:** `use('/admin', guard)` is in force, yet a request to `/admin` or
+`/admin/x` is answered without the guard:
+
+```ts
+app.use('/admin', guard).get('/:section', handler); // GET /admin: no guard
+```
+
+**Why:** the path is matched once, against the path each route is
+declared at, not against the request's URL. `/:section` is not under
+`/admin`, though it serves `GET /admin`; a wildcard route, `/files/*`, is
+not under `/files/:id/secret` either.
+
+**Fix:** declare the guarded routes at paths under the guard's, or put
+them in a group and `use` the guard there, or give the guard to the
+route itself: `app.get('/:section', guard, handler)`.
 
 ## Routing
 

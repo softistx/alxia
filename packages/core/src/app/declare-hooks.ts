@@ -4,9 +4,12 @@
  */
 import type { BodyParser } from '../request/read';
 import type { AppState } from './app-state';
+import { isMiddleware } from './define-middleware';
 import type { DeriveHook, ErrorHook, Globals, WrapHook } from './definition';
 import { refusalHandler, refusalKind } from './refusal-handlers';
+import { scopePath } from './scope-path';
 import type { RefusalSchema } from './types';
+import { builtinOf } from './validate';
 
 type AnyRefusalHook = (refusal: never, ctx: never) => unknown;
 
@@ -23,6 +26,45 @@ export function derive(state: AppState, hook: DeriveHook): void {
 /** `app.wrap(hook)`. */
 export function wrap(state: AppState, hook: WrapHook): void {
 	state.scope.chain({ kind: 'wrap', run: hook });
+}
+
+/**
+ * `app.use(...middlewares)` or `app.use(path, ...middlewares)`, when its
+ * arguments are these: each a middleware `defineMiddleware` made, for the
+ * routes declared next — those under `path`, given one. Whether they
+ * were: anything else is a plugin, which `use` takes alone.
+ */
+export function useMiddlewares(
+	state: AppState,
+	args: readonly unknown[],
+): boolean {
+	const [first, ...rest] = args;
+	const scoped = typeof first === 'string';
+	if (!scoped && !isMiddleware(first) && builtinOf(first) === undefined) {
+		return false;
+	}
+	const label = scoped ? `use("${first}")` : 'use()';
+	const middlewares = scoped ? rest : args;
+	if (middlewares.length === 0) {
+		throw new TypeError(`${label}: no middleware is given`);
+	}
+	middlewares.forEach((middleware, index) => {
+		if (builtinOf(middleware) !== undefined) {
+			throw new TypeError(
+				`${label}: middleware ${index + 1} is a validate() or responds(), which belongs to a route`,
+			);
+		}
+		if (!isMiddleware(middleware)) {
+			throw new TypeError(
+				`${label}: middleware ${index + 1} was not made by defineMiddleware()`,
+			);
+		}
+	});
+	const path = scoped ? scopePath(state.prefix, first) : undefined;
+	for (const middleware of middlewares) {
+		state.scope.chain({ kind: 'middleware', run: middleware as never }, path);
+	}
+	return true;
 }
 
 /** `app.bodyLimit(bytes)`. */

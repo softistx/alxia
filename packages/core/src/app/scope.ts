@@ -1,7 +1,8 @@
 /**
  * The route hooks in force where a route is declared: what `derive`,
- * `decorate`, `wrap`, `onError`, `onRefusal` and `bodyLimit` add for the
- * routes declared after them, and what each definition carries of them.
+ * `decorate`, `wrap`, `use(...middlewares)`, `onError`, `onRefusal` and
+ * `bodyLimit` add for the routes declared after them, and what each
+ * definition carries of them.
  */
 import type { RefusalKind } from '../errors/errors';
 import { checkLimit } from '../request/limit';
@@ -13,7 +14,14 @@ import type {
 	SocketDefinition,
 } from './definition';
 import { behind, byKind, type Refusals, then } from './refusal-handlers';
+import { inScope, rebase, type ScopePath } from './scope-path';
 import type { RouteSchema } from './types';
+
+/** A hook of the chain in force, and the paths it runs on: all, without one. */
+interface Scoped {
+	readonly hook: ChainHook;
+	readonly path?: ScopePath | undefined;
+}
 
 /** The hooks a route or socket route declared now runs. */
 type ScopedHooks = Pick<
@@ -22,15 +30,18 @@ type ScopedHooks = Pick<
 >;
 
 export class Scope {
-	#derive: ChainHook[] = [];
+	#derive: Scoped[] = [];
 	#onError: ErrorHook[] = [];
 	#refusals: Refusals = {};
 	/** The `bodyLimit` of the routes declared next, unless theirs says otherwise. */
 	#bodyLimit: number | undefined;
 
-	/** Adds a `derive` or `wrap` hook for the routes declared next. */
-	chain(hook: ChainHook): void {
-		this.#derive.push(hook);
+	/**
+	 * Adds a `derive`, a `wrap` or a middleware for the routes declared
+	 * next: those `path` matches, given one.
+	 */
+	chain(hook: ChainHook, path?: ScopePath): void {
+		this.#derive.push({ hook, path });
 	}
 
 	/** Adds an `onError` hook for the routes declared next. */
@@ -65,10 +76,13 @@ export class Scope {
 		return copy;
 	}
 
-	/** The hooks of a route declared now: those in force, then its own list's. */
-	hooks(own: readonly ChainHook[] = []): ScopedHooks {
+	/**
+	 * The hooks of a route declared now at `path`, its full path: those in
+	 * force that run on it, in the order declared, then its own.
+	 */
+	hooks(path: string, own: readonly ChainHook[] = []): ScopedHooks {
 		return {
-			derive: [...this.#derive, ...own],
+			derive: [...this.#chainAt(path), ...own],
 			onError: [...this.#onError],
 			refusal: this.#refusals.refusal,
 			...byKind(this.#refusals.refusalByKind),
@@ -97,17 +111,35 @@ export class Scope {
 		return {
 			...definition,
 			path,
-			derive: [...this.#derive, ...definition.derive],
+			derive: [...this.#chainAt(path), ...definition.derive],
 			onError: [...definition.onError, ...this.#onError],
 			...behind(definition, this.#refusals),
 		};
 	}
 
-	/** Takes up the hooks of a plugin, for the routes declared after it. */
-	absorb(plugin: Scope): void {
-		this.#derive = [...this.#derive, ...plugin.#derive];
+	/**
+	 * Takes up the hooks of a plugin, for the routes declared after it: its
+	 * scoped middlewares under `prefix`, as its routes are.
+	 */
+	absorb(plugin: Scope, prefix: string): void {
+		const taken = plugin.#derive.map(({ hook, path }) => ({
+			hook,
+			path: path === undefined ? undefined : rebase(path, prefix),
+		}));
+		this.#derive = [...this.#derive, ...taken];
 		this.#onError = [...plugin.#onError, ...this.#onError];
 		this.#refusals = then(this.#refusals, plugin.#refusals);
 		this.#bodyLimit = plugin.#bodyLimit ?? this.#bodyLimit;
+	}
+
+	/** The chain in force that runs on a route at `path`. */
+	#chainAt(path: string): ChainHook[] {
+		const chain: ChainHook[] = [];
+		for (const scoped of this.#derive) {
+			if (scoped.path === undefined || inScope(scoped.path, path)) {
+				chain.push(scoped.hook);
+			}
+		}
+		return chain;
 	}
 }

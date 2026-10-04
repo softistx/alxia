@@ -20,6 +20,13 @@ number on it. Every release, with each change it made, is in
   `validate(operation)` is placed. The 0.3 forms — a list of hooks, a
   schema before the handler, `defineHook`, `defineWrap` — keep working,
   deprecated.
+- **Middlewares for every route after a point.** `app.use(auth)` runs a
+  `defineMiddleware` on every route declared after it, before the route's
+  own, and types what it adds there; `app.use('/admin', requireAdmin)`
+  guards the routes under a path, matched when each is declared, and adds
+  nothing; a group's `use` adds to its subtree's context. `derive` stays,
+  the shorthand for a middleware that only adds
+  ([Upgrading](upgrading.md#middlewares-for-the-routes-after-them-use)).
 - **Spec first, no client typed from the app.** The OpenAPI document is the
   contract, and a client is generated from it with the generator you
   choose — the examples use `@nxgt/openapi-codegen`. `Alxia` takes
@@ -46,6 +53,10 @@ number on it. Every release, with each change it made, is in
   a list of hooks after the path or after an operation, a schema before the
   handler, `defineHook` and `defineWrap` are gone, leaving one way to
   declare a route.
+- **`derive` written as a `use` middleware.** Once `use` has carried a
+  release, `derive`, `decorate` and `wrap` may be deprecated in favour of
+  the middleware that does the same, leaving one way to add to the
+  context.
 - **The plugin guards as middlewares too.** `bearer`, `permission`,
   `rateLimit`, `cache` and `idempotency` are app plugins: given to `use`,
   they guard every route declared after them, in a group for some. A

@@ -89,7 +89,9 @@ export const BUILTIN: unique symbol = Symbol('alxia.builtin');
 
 /** The step a middleware made by `validate` or `responds` stands for, or nothing. */
 export function builtinOf(middleware: unknown): BuiltinStep | undefined {
-	return (middleware as { [BUILTIN]?: BuiltinStep })[BUILTIN];
+	return (middleware as { [BUILTIN]?: BuiltinStep } | null | undefined)?.[
+		BUILTIN
+	];
 }
 
 /*
