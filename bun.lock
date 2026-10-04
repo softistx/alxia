@@ -42,7 +42,7 @@
     },
     "packages/cache": {
       "name": "@alxia/cache",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
@@ -55,7 +55,7 @@
     },
     "packages/client": {
       "name": "@alxia/client",
-      "version": "0.2.0",
+      "version": "0.2.1",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
@@ -68,7 +68,7 @@
     },
     "packages/compress": {
       "name": "@alxia/compress",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
@@ -82,7 +82,7 @@
     },
     "packages/context-storage": {
       "name": "@alxia/context-storage",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
@@ -95,7 +95,7 @@
     },
     "packages/core": {
       "name": "@alxia/core",
-      "version": "0.2.2",
+      "version": "0.3.0",
       "devDependencies": {
         "@types/bun": "^1.4.2",
         "zod": "^4.1.0",
@@ -106,7 +106,7 @@
     },
     "packages/cors": {
       "name": "@alxia/cors",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
@@ -131,7 +131,7 @@
     },
     "packages/graphql": {
       "name": "@alxia/graphql",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
@@ -147,7 +147,7 @@
     },
     "packages/i18n": {
       "name": "@alxia/i18n",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@alxia/language": "workspace:^",
@@ -163,7 +163,7 @@
     },
     "packages/janus": {
       "name": "@alxia/janus",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
@@ -179,7 +179,7 @@
     },
     "packages/jwt": {
       "name": "@alxia/jwt",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
@@ -193,7 +193,7 @@
     },
     "packages/language": {
       "name": "@alxia/language",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
@@ -205,7 +205,7 @@
     },
     "packages/logger": {
       "name": "@alxia/logger",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
@@ -219,7 +219,7 @@
     },
     "packages/openapi": {
       "name": "@alxia/openapi",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
@@ -232,7 +232,7 @@
     },
     "packages/openapi-routes": {
       "name": "@alxia/openapi-routes",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
@@ -245,7 +245,7 @@
     },
     "packages/rate-limit": {
       "name": "@alxia/rate-limit",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
@@ -259,7 +259,7 @@
     },
     "packages/react-router": {
       "name": "@alxia/react-router",
-      "version": "0.1.2",
+      "version": "0.2.0",
       "bin": {
         "alxia-react-router": "./dist/cli/index.js",
       },
@@ -289,7 +289,7 @@
     },
     "packages/redis": {
       "name": "@alxia/redis",
-      "version": "0.1.2",
+      "version": "0.1.3",
       "devDependencies": {
         "@alxia/cache": "workspace:^",
         "@alxia/client": "workspace:^",
@@ -316,7 +316,7 @@
     },
     "packages/secure-headers": {
       "name": "@alxia/secure-headers",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
@@ -330,7 +330,7 @@
     },
     "packages/telemetry": {
       "name": "@alxia/telemetry",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "devDependencies": {
         "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",

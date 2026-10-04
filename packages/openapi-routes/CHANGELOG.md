@@ -1,5 +1,16 @@
 # @alxia/openapi-routes
 
+## 0.2.0
+
+### Minor Changes
+
+- [#98](https://github.com/softistx/alxia/pull/98) [`ccf30df`](https://github.com/softistx/alxia/commit/ccf30df35170f388740249025d1ba1d083608f93) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `matchesSpec(app, operations)` is the new name of `exactly`: one call that throws when an operation of the spec has no route, or a route is not in the spec. `exactly` and `ExactlyOptions` still work, deprecated.
+
+### Patch Changes
+
+- Updated dependencies [[`56ffcb9`](https://github.com/softistx/alxia/commit/56ffcb93a5155568ec002ab6fee332369bac3f30), [`a01ebed`](https://github.com/softistx/alxia/commit/a01ebed5745c5f863193f54bea8172abf51df85b), [`c9d43b7`](https://github.com/softistx/alxia/commit/c9d43b78f5ea9137e9ba56621e7ad89095621cff), [`f9a0ae7`](https://github.com/softistx/alxia/commit/f9a0ae7de698a63a94bb4aa4dfc2af33303827f2), [`8beb606`](https://github.com/softistx/alxia/commit/8beb606f81aa02bbdd068a674fa13385c4e52183)]:
+  - @alxia/core@0.3.0
+
 ## 0.1.1
 
 ### Patch Changes
