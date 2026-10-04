@@ -238,8 +238,11 @@ differs in these ways.
 ## Group and plugin scope
 
 A hook or middleware declared in a [group](groups-and-plugins.md#groups)
-stays with the group's routes: it does not run on an unmatched request, even
-one under the group's prefix.
+stays inside the group: it runs on the group's routes and on an unmatched
+request under the group's prefix (before its 404 or 405), never on a route
+declared after the group nor on a request outside the prefix. A group without
+a prefix of its own adds nothing to unmatched requests, and a plugin with a
+prefix of its own behaves like such a group once mounted.
 
 | | Scope |
 | --- | --- |

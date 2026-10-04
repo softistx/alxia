@@ -282,9 +282,10 @@ path gets the `401`, not the `404`; scope it with a `group`, or with a path
 (`use('/api', authenticated)`, a guard that adds nothing to the context), to
 guard only some routes.
 
-Declare it on the app itself, not in a `group`. A group's middlewares stay
-with the group's routes: they do not run on a request no route matches, and
-a preflight is one, since the group has no `OPTIONS` route. A route
+Declare it on the app itself, not in a `group`. A group's middlewares run on
+its routes and on a request no route matches under its prefix, a preflight
+included, but not outside it: a `cors()` in `group('/api')` answers the
+preflights of `/api/…` and none of the other paths. A route
 declared before `app.use(cors())` is not covered either. An app mounted with
 `app.plugin(otherApp)` brings its middlewares to the app, unmatched requests
 included, so a plugin app may hold the `cors()`; an app has one CORS policy.

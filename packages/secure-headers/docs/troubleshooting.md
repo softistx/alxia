@@ -40,7 +40,7 @@ or a header in the wrong place.
 - [`X-Powered-By` or `Server` is still sent](#x-powered-by-or-server-is-still-sent)
 - [A response arrives without the headers](#a-response-arrives-without-the-headers)
 - [A 404 or a route outside a group has no headers](#a-404-or-a-route-outside-a-group-has-no-headers)
-- [A `try`/`catch` middleware never sees the error](#a-trycatch-middleware-never-sees-the-error)
+- [A `try`/`catch` middleware's reply has no headers](#a-trycatch-middlewares-reply-has-no-headers)
 - [A route has no headers, though the others do](#a-route-has-no-headers-though-the-others-do)
 
 ## Types
@@ -565,9 +565,9 @@ const app = alxia().use(timing).use(secureHeaders());
 **When:** `secureHeaders` is used inside a `group`, and a route outside the
 group, or a request that matches no route, comes back without them.
 
-**Why:** a middleware declared in a `group` stays with the group's routes: it
-does not run on a request no route matches, even one under the group's
-prefix, nor on the routes outside the group.
+**Why:** a middleware declared in a `group` stays inside the group: it runs
+on its routes and on a request no route matches under its prefix, and on
+nothing else: not on a route outside the group, nor declared after it.
 
 **Fix:** use it on the app, and give the routes that differ their own
 values on their replies:
@@ -588,18 +588,20 @@ const app = alxia()
 	);
 ```
 
-### A `try`/`catch` middleware never sees the error
+### A `try`/`catch` middleware's reply has no headers
 
-**When:** a middleware wraps `next()` in a `try`/`catch` to answer errors
-in its own format, and a route's thrown error still gets the default reply.
+**When:** a middleware wraps `next()` in a `try`/`catch` to answer errors in
+its own format, is declared before `secureHeaders()`, and its reply comes
+back without the security headers.
 
-**Why:** `secureHeaders` settles `next()`: it turns a rejection into the
-answer the route boundary would give (`onError`, the `HttpError`'s status,
-or a 500) before the rejection can travel further out. A `try`/`catch`
-declared **before** it, like one before `logger()` or `cors()`, sees a
-resolved response.
+**Why:** `secureHeaders` settles `next()`: it sets the headers on the response
+the route boundary would give (`onError`, the `HttpError`'s status, or a
+500), then the error goes on to the middlewares around it. A `try`/`catch`
+declared **before** it catches the error, but its reply is made outside
+`secureHeaders`, so it carries no headers; the 500 inside did.
 
-**Fix:** declare the error-handling middleware after `secureHeaders`:
+**Fix:** declare the error-handling middleware after `secureHeaders`, so
+the headers are set on its reply:
 
 ```ts
 import { alxia, defineMiddleware } from '@alxia/core';

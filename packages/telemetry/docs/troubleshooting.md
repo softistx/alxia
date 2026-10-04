@@ -309,8 +309,8 @@ app.ws('/rooms/:room', {}, {
 
 **Why:** the span is opened by `use(telemetry(...))`, which runs on every
 request the app takes, an unmatched one included. A request is missing when
-`telemetry()` sits inside a `group` (a group's middlewares do not run on an
-unmatched request), when `traced` said no, or when another middleware
+`telemetry()` sits inside a `group` (it sees the group's routes and the
+unmatched requests under its prefix, nothing else), when `traced` said no, or when another middleware
 declared before it answered without calling `next()` (a preflight, a 401):
 it is outside the span.
 

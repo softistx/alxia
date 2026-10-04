@@ -692,7 +692,8 @@ const todos = defineRoutes('/todos').use(requireAdmin).get('/', listTodos);
 const app = base.plugin(todos).get('/public', ({ reply }) => reply(200, 'open'));
 // GET /todos, GET /todos/missing → requireAdmin; GET /public, GET /missing → no requireAdmin
 ```
- `definePlugin<Requires>()` builds an app plugin that reads
+
+`definePlugin<Requires>()` builds an app plugin that reads
 what an earlier one added. A `Plugin` function given to `plugin`, `(app) =>
 app`, returns the app; `plugin` throws when it returns anything else.
 

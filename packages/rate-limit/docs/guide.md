@@ -182,8 +182,9 @@ The limit is a middleware, so order decides, at runtime and in the types:
   past the limit the 429 comes before the 404. Spamming missing paths spends
   the allowance;
 - inside a [group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md#groups),
-  the limit stays with the group's routes: it does not run on an unmatched
-  request, even one under the group's prefix;
+  the limit stays inside it: its routes, and an unmatched request under the
+  group's prefix, never a route declared after the group nor a path outside
+  the prefix;
 - a path-scoped `use('/api', rateLimit(…))` does not compile: a middleware
   given a path may add nothing to the context, and the limit adds
   `rateLimit`. A group is the scope.

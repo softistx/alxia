@@ -665,9 +665,10 @@ app.group('/admin', (admin) =>
 ```
 
 A group's routes are under its prefix and keep the hooks and middlewares
-declared before it; the ones it adds stay inside, and do not run on a request
-no route matches, even one under its prefix. `group(build)`, without a
-prefix, is a scope alone.
+declared before it; the ones it adds stay inside: its routes, and a request no
+route matches under its prefix, before the 404 or 405; never a route declared
+after the group, nor a request outside the prefix. `group(build)`, without a
+prefix, is a scope alone, and adds nothing to unmatched requests.
 
 ## Plugins
 
