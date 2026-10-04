@@ -82,7 +82,9 @@ with `--frozen-lockfile`. The
 [guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#docker)
 has the stages, and
 [troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md#error-cannot-find-package--from-appdistserverjs)
-what to do for a dependency that cannot be bundled.
+what to do for a dependency that cannot be bundled, and for a
+[native addon built for glibc alone](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md#error--is-linked-against-glibc-dt_needed-libmso6-but-this-bun-build-uses-musl),
+which does not load on Alpine.
 
 ## Options
 

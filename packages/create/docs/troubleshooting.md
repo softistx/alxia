@@ -330,7 +330,9 @@ external.
 
 The container stops at startup, or at the first request that loads the
 package, with the path of a `.node` file in `node_modules` and
-`code: "ERR_DLOPEN_FAILED"`.
+`code: "ERR_DLOPEN_FAILED"`. The library named after `DT_NEEDED` is
+whichever one the addon links first: `libc.so.6`, `libstdc++.so.6` or
+another; the fix is the same.
 
 **When:** a package is kept external and installed beside the build, as
 the previous entry says, and it loads a native addon built for glibc
@@ -340,8 +342,8 @@ alone.
 musl. The bundle is JavaScript, which runs the same there, but a `.node`
 file is compiled against one C library, and one compiled for glibc
 cannot load on musl, even with `gcompat`. A package that publishes a
-musl build too, as `sharp` does, works: `bun install` puts both variants
-in `node_modules`, and the package picks musl's.
+musl build too, as `sharp` does, works: `bun install`, `--production` too,
+puts both variants in `node_modules`, and the package picks musl's.
 
 **Fix:** run the final stage on Debian's image, `oven/bun:1`, which
 holds glibc. The build stages stay as they are:

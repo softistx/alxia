@@ -168,7 +168,8 @@ the app once `start` runs Bun. This one replaces it, the same one
 [`@alxia/create`](https://github.com/softistx/alxia/tree/develop/packages/create)'s
 `react-router` template ships: multi-stage, every dependency and
 `bun run build` in a stage of their own on `oven/bun:1`, and a final
-image on `oven/bun:1-alpine`, about 130 MB, holding `build/` alone, no `node_modules`, running
+image on `oven/bun:1-alpine`, about 130 MB, holding `build/` alone, no
+`node_modules`, running
 `bun --no-install build/server/index.js` as the image's non-root `bun`
 user. The
 plugin bundles every package into `build/server/index.js` under
