@@ -5,7 +5,7 @@ import { type Setting, secureHeaders } from './secure-headers';
 describe('secureHeaders', () => {
 	test('sets the defaults, keeps what a route set, takes options', async () => {
 		const app = alxia()
-			.plugin(
+			.use(
 				secureHeaders({ referrerPolicy: 'same-origin', xFrameOptions: false }),
 			)
 			.get('/page', ({ reply }) =>
@@ -31,7 +31,7 @@ describe('secureHeaders', () => {
 
 	test('sends every default, exactly, with no nonce anywhere', async () => {
 		const app = alxia()
-			.plugin(secureHeaders())
+			.use(secureHeaders())
 			.get('/', (ctx) => ctx.reply(200, String('nonce' in ctx)));
 		const response = await app.request('/');
 		expect(await response.text()).toBe('false');
@@ -57,10 +57,38 @@ describe('secureHeaders', () => {
 	});
 
 	test('a 404 is covered too', async () => {
-		const app = alxia().plugin(secureHeaders());
+		const app = alxia().use(secureHeaders());
 		const response = await app.request('/nope');
 		expect(response.status).toBe(404);
 		expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+	});
+
+	test('an error answered by onError, and a 500, are covered too', async () => {
+		const original = console.error;
+		console.error = () => {};
+		try {
+			const app = alxia()
+				.use(secureHeaders())
+				.onError((error, { reply }) =>
+					error instanceof RangeError ? reply(409, 'taken') : undefined,
+				)
+				.get('/taken', () => {
+					throw new RangeError('taken');
+				})
+				.get('/boom', () => {
+					throw new Error('boom');
+				});
+			for (const [path, status] of [
+				['/taken', 409],
+				['/boom', 500],
+			] as const) {
+				const response = await app.request(path);
+				expect(response.status).toBe(status);
+				expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+			}
+		} finally {
+			console.error = original;
+		}
 	});
 
 	test('an empty value is refused, at once: false leaves a header out', () => {

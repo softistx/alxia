@@ -7,6 +7,7 @@ export {
 export {
 	bodyOf,
 	type JanusErrorBody,
+	type JanusErrors,
 	type JanusErrorsOptions,
 	janusErrors,
 	statusOf,
@@ -24,6 +25,7 @@ export type {
 } from './permission-options';
 export { type SendSessionOptions, sendSession, signOut } from './send';
 export {
+	type SessionMiddleware,
 	type SessionOptions,
 	session,
 	type UnauthenticatedBody,

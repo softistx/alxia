@@ -14,7 +14,7 @@ const tracing = telemetry({
 
 export function traced() {
 	return alxia()
-		.plugin(tracing)
+		.use(tracing)
 		.get('/', ({ span, telemetry: instance, reply }) =>
 			reply(200, {
 				traced: span !== undefined,

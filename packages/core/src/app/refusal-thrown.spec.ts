@@ -198,3 +198,43 @@ describe('settle(ctx, next())', () => {
 		expect(statuses).toEqual([422]);
 	});
 });
+
+describe('next.behind()', () => {
+	test('runs the rest behind a reply sent at once', async () => {
+		const { promise: release, resolve } = Promise.withResolvers<void>();
+		let refreshed: Promise<Response> | undefined;
+		const app = alxia()
+			.use(
+				defineMiddleware(({ reply }, next) => {
+					refreshed = next.behind();
+					return reply(200, 'stale');
+				}),
+			)
+			.get('/', async ({ reply }) => {
+				await release;
+				return reply(200, 'fresh');
+			});
+		const served = await app.request('/');
+		expect(await served.text()).toBe('stale');
+		resolve();
+		expect(await (await (refreshed as Promise<Response>)).text()).toBe('fresh');
+	});
+
+	test('merges what it is given, as next(added) does', async () => {
+		let refreshed: Promise<Response> | undefined;
+		const app = alxia()
+			.use(
+				defineMiddleware(({ reply }, next) => {
+					refreshed = next.behind({ by: 'refresh' });
+					return reply(200, 'stale');
+				}),
+			)
+			.get('/', (ctx) =>
+				ctx.reply(200, String((ctx as unknown as { by: string }).by)),
+			);
+		expect(await (await app.request('/')).text()).toBe('stale');
+		expect(await (await (refreshed as Promise<Response>)).text()).toBe(
+			'refresh',
+		);
+	});
+});

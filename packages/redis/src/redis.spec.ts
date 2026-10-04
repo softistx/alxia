@@ -66,7 +66,7 @@ let runs = 0;
 const makeApp = () =>
 	alxia({ ip: () => '1.2.3.4' })
 		.post('/open', ({ reply }) => reply(201, ++runs))
-		.plugin(idempotency(db.client, { name: 'payments' }))
+		.use(idempotency(db.client, { name: 'payments' }))
 		.post(
 			'/payments',
 			validate({ body: z.object({ amount: z.number() }) }),

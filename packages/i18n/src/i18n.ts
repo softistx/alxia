@@ -1,6 +1,17 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
-import { type BaseContext, definePlugin, type RequiresOf } from '@alxia/core';
-import { type LanguageOptions, language } from '@alxia/language';
+import {
+	type BaseContext,
+	defineMiddleware,
+	type Next,
+	type NextFunction,
+	type RequiresOf,
+	settle,
+} from '@alxia/core';
+import {
+	type LanguageContext,
+	type LanguageOptions,
+	language,
+} from '@alxia/language';
 import {
 	createTranslator,
 	registerLanguageSource,
@@ -74,10 +85,18 @@ export interface I18nOptions<
 }
 
 /**
- * The request's language as `@nxgt/i18n` hears it: the first an i18n plugin
- * read, when an app uses several. Opened fresh by each plugin's `around`.
+ * The request's language as `@nxgt/i18n` hears it: the first an i18n
+ * middleware read, when an app uses several. Opened for each request —
+ * one made from inside another included — by the first that runs on it.
  */
-const requests = new AsyncLocalStorage<{ language?: string }>();
+const requests = new AsyncLocalStorage<{ url: URL; language?: string }>();
+
+/** Runs `work` with the request `url`'s store open: the one in force, or a fresh one. */
+function hearing<T>(url: URL, work: () => T): T {
+	return requests.getStore()?.url === url
+		? work()
+		: requests.run({ url }, work);
+}
 
 /** `@nxgt/i18n`'s source: one function, so registering it again keeps one. */
 const requestLanguage = () => requests.getStore()?.language;
@@ -89,23 +108,24 @@ export interface I18nContext<Key extends string> {
 }
 
 /**
- * Translations, as a plugin, on [`@nxgt/i18n`](https://www.npmjs.com/package/@nxgt/i18n):
+ * Translations, as a middleware, on [`@nxgt/i18n`](https://www.npmjs.com/package/@nxgt/i18n):
  * `@alxia/language` reads the request's language among the catalogues', and
  * the routes declared after it read `language` and `t`, bound to it. Keys
  * are typed by the fallback's catalogue; messages are ICU — plurals,
  * selects, numbers — and a missing key answers itself.
  *
- * The plugin's own `t()` translates anywhere a request runs — a service, an
- * error's message — in that request's language, and in the fallback outside.
+ * Its own `t()` translates anywhere a request runs after it — a service,
+ * the answer to an error, an `onError` hook's included — in that
+ * request's language, and in the fallback outside.
  *
  * ```ts
  * const i18n = createI18n({ resources: { en, fr }, fallback: 'en' });
- * app.plugin(i18n).get('/', ({ t, reply }) => reply(200, t('home.title')));
+ * app.use(i18n).get('/', ({ t, reply }) => reply(200, t('home.title')));
  * ```
  *
- * The plugin registers the request's language as one of `@nxgt/i18n`'s
- * language sources, so its own `getLanguage()` and `translate` — and every
- * nxgt package that translates through them — speak it too.
+ * It registers the request's language as one of `@nxgt/i18n`'s language
+ * sources, so its own `getLanguage()` and `translate` — and every nxgt
+ * package that translates through them — speak it too.
  */
 export function createI18n<
 	const C extends Catalogues,
@@ -120,10 +140,10 @@ export function createI18n<
 		resources as Record<string, unknown>,
 	);
 	/**
-	 * This plugin's language for the request running, once `@alxia/language`
-	 * has read it. A global `around` hook opens it fresh for each request —
-	 * one made from inside another included — so it holds for everything the
-	 * request runs, `onError` hooks too, which run after the route failed.
+	 * This middleware's language for the request running, once
+	 * `@alxia/language` has read it. Opened fresh for each request — one
+	 * made from inside another included — around everything after it, the
+	 * answer to an error included: `settle` answers it inside.
 	 */
 	const current = new AsyncLocalStorage<{ language?: Language }>();
 	const spoken = (): Language => current.getStore()?.language ?? fallback;
@@ -146,20 +166,28 @@ export function createI18n<
 			? {}
 			: { resolve: resolve as (ctx: BaseContext) => string | undefined }),
 	});
-	const plugin = definePlugin<RequiresOf<Ctx, 'resolve'>>()((app) =>
-		app
-			.around((_ctx, next) => current.run({}, () => requests.run({}, next)))
-			.plugin(detected)
-			.derive(({ language: lang }): I18nContext<Key> => {
-				const own = current.getStore();
-				if (own !== undefined) own.language = lang;
-				const heard = requests.getStore();
-				if (heard !== undefined) heard.language ??= lang;
-				return { t: translate(lang) };
-			}),
+	// What the routes after it read, once `@alxia/language` has read it.
+	type Added = LanguageContext<Language> & I18nContext<Key>;
+	const middleware = defineMiddleware<RequiresOf<Ctx, 'resolve'>>()(
+		(ctx, next): Promise<Next<Added>> => {
+			const own: { language?: Language } = {};
+			const found = (heard: LanguageContext<Language>) => {
+				own.language = heard.language;
+				const store = requests.getStore();
+				if (store !== undefined) store.language ??= heard.language;
+				return settle(ctx, next({ ...heard, t: translate(heard.language) }));
+			};
+			// `language()`'s middleware, run inline: its `next` is this one's.
+			const detecting = Object.assign(found, {
+				behind: next.behind,
+			}) as unknown as NextFunction;
+			return current.run(own, () =>
+				hearing(ctx.url, () => detected(ctx as never, detecting)),
+			) as Promise<Next<Added>>;
+		},
 	);
 
-	return Object.assign(plugin, {
+	return Object.assign(middleware, {
 		/** Translates into the current request's language, or the fallback outside one. */
 		t: ((key, context) => translate(spoken())(key, context)) as Translate<Key>,
 		/** The current request's language, or the fallback outside one. */

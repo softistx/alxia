@@ -1,4 +1,8 @@
-import { type BaseContext, definePlugin, type RequiresOf } from '@alxia/core';
+import {
+	type BaseContext,
+	defineMiddleware,
+	type RequiresOf,
+} from '@alxia/core';
 import { decide, respond, type Settings } from './decide';
 import type { LanguageContext, LanguageSource } from './types';
 
@@ -47,14 +51,14 @@ export interface LanguageOptions<
 }
 
 /**
- * The request's language, as a plugin: the routes declared after it read
+ * The request's language, as a middleware: the routes declared after it read
  * `language`, typed as one of `supported` — never a string a client made
  * up. It is read from the query, a cookie, a path segment and
  * `Accept-Language` — weights, `fr-CA` for `fr`, `fr` for `fr-FR` — in the
  * order given, then `fallback`.
  *
  * ```ts
- * app.plugin(language({ supported: ['en', 'fr'], fallback: 'en' }))
+ * app.use(language({ supported: ['en', 'fr'], fallback: 'en' }))
  *    .get('/', ({ language, reply }) => reply(200, language)); // 'en' | 'fr'
  * ```
  */
@@ -85,11 +89,9 @@ export function language<
 			`language(): the fallback "${settings.fallback}" is not supported`,
 		);
 	}
-	return definePlugin<RequiresOf<Ctx, 'resolve'>>()((app) =>
-		app.derive((ctx): LanguageContext<L> => {
-			const found = decide(settings, ctx);
-			respond(settings, ctx, found);
-			return found;
-		}),
-	);
+	return defineMiddleware<RequiresOf<Ctx, 'resolve'>>()((ctx, next) => {
+		const found: LanguageContext<L> = decide(settings, ctx);
+		respond(settings, ctx, found);
+		return next(found);
+	});
 }

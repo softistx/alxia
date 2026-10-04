@@ -82,7 +82,21 @@ class Call {
 		this.#definition = definition;
 	}
 
-	readonly next = (added?: object): Promise<Response> => {
+	/** Whether `next.behind()` ran the rest: the middleware's own reply does not wait for it. */
+	#behind = false;
+
+	readonly next: ((added?: object) => Promise<Response>) & {
+		behind: (added?: object) => Promise<Response>;
+	} = Object.assign((added?: object) => this.#call(added), {
+		behind: (added?: object) => {
+			const pending = this.#call(added);
+			this.#behind = true;
+			pending.catch(ignore);
+			return pending;
+		},
+	});
+
+	#call(added: object | undefined): Promise<Response> {
 		if (this.#state !== 'idle') {
 			throw failure(
 				this.#definition,
@@ -103,7 +117,7 @@ class Call {
 		// Called once the middleware's promise is out: handled now.
 		if (!this.#inline) pending.catch(ignore);
 		return pending as Promise<Response>;
-	};
+	}
 
 	run(): unknown {
 		let result: unknown;
@@ -154,7 +168,9 @@ class Call {
 		if (result === undefined) {
 			return pending.then((downstream) => this.#parked?.value ?? downstream);
 		}
-		if (Bun.peek.status(pending) !== 'pending') return this.#own(result);
+		if (this.#behind || Bun.peek.status(pending) !== 'pending') {
+			return this.#own(result);
+		}
 		console.warn(
 			`${labelOf(this.#definition)}: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`,
 		);

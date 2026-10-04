@@ -1,4 +1,11 @@
-import { type BaseContext, definePlugin, type Empty } from '@alxia/core';
+import {
+	type BaseContext,
+	defineMiddleware,
+	type Empty,
+	type Middleware,
+	type MiddlewareMark,
+	type Next,
+} from '@alxia/core';
 import { requestControls } from './control';
 import { type Loaded, refreshBehind, singleFlight } from './flight';
 import { storeGuard } from './guard';
@@ -61,9 +68,20 @@ export interface Cache {
 }
 
 /**
- * Responses kept and served again, as a plugin: a `GET` to a route declared
- * after it is answered from the store while fresh, and from the route
- * otherwise. Concurrent misses run the route once. Stale, it is served at
+ * What `cache()` makes: a middleware that requires `Requires` of the app
+ * and gives `cache`, with the hands to empty it.
+ */
+export type CacheMiddleware<Requires extends object = Empty> = Middleware<
+	Requires,
+	Promise<Response | Next<{ cache: CacheControls }>>
+> &
+	MiddlewareMark &
+	Cache;
+
+/**
+ * Responses kept and served again, as a middleware: a `GET` to a route
+ * declared after it is answered from the store while fresh, and from the
+ * route otherwise. Concurrent misses run the route once. Stale, it is served at
  * once and refreshed behind. A response that says `no-store` or `private`,
  * sets a cookie, or has another status is never kept.
  *
@@ -72,16 +90,16 @@ export interface Cache {
  *
  * ```ts
  * const products = cache({ ttl: 60, staleWhileRevalidate: 300, tags: () => ['products'] });
- * app.plugin(products).get('/products', ...);
+ * app.use(products).get('/products', ...);
  * await products.invalidateTag('products');
  * ```
  *
- * A `key` or `tags` that reads what an earlier plugin added names it, and
+ * A `key` or `tags` that reads what an earlier middleware added names it, and
  * the app must then give it: `cache<{ user: User }>({ tags: ({ user }) => [user.id], … })`.
  */
 export function cache<Requires extends object = Empty>(
 	options: CacheOptions<Requires>,
-) {
+): NoInfer<CacheMiddleware<Requires>> {
 	const store = options.store ?? new MemoryCacheStore();
 	const ttl = options.ttl * 1000;
 	const stale = (options.staleWhileRevalidate ?? 0) * 1000;
@@ -131,33 +149,31 @@ export function cache<Requires extends object = Empty>(
 
 	const label = (says: 'HIT' | 'STALE' | 'MISS') => (debug ? says : undefined);
 
-	const plugin = definePlugin<Requires>()((app) =>
-		app
-			.derive(({ request }) => {
-				const cacheControls: CacheControls = controls.open(request);
-				return { cache: cacheControls };
-			})
-			.wrap(async (ctx, next) => {
-				const { request } = ctx;
-				const key = bypasses(request, honorNoCache) ? undefined : keyOf(ctx);
-				if (key === undefined) return next();
+	const middleware = defineMiddleware<Requires>()(async (ctx, next) => {
+		const { request } = ctx;
+		const added: { cache: CacheControls } = { cache: controls.open(request) };
+		const key = bypasses(request, honorNoCache) ? undefined : keyOf(ctx);
+		if (key === undefined) return next(added);
+		const rest = () => next(added);
 
-				const found = await attempt(() => store.get(key), undefined);
-				const worth = found === undefined ? undefined : freshness(found);
-				if (found !== undefined && worth === 'fresh') {
-					return respond(request, found, label('HIT'));
-				}
-				if (found !== undefined && worth === 'stale') {
-					if (!flight.has(key)) refreshBehind(load(key, ctx, next));
-					return respond(request, found, label('STALE'));
-				}
-				const loaded = await load(key, ctx, next);
-				if (loaded instanceof Response) return loaded;
-				return respond(request, loaded, label('MISS'));
-			}),
-	);
+		const found = await attempt(() => store.get(key), undefined);
+		const worth = found === undefined ? undefined : freshness(found);
+		if (found !== undefined && worth === 'fresh') {
+			return respond(request, found, label('HIT'));
+		}
+		if (found !== undefined && worth === 'stale') {
+			// Served at once; the route runs behind it, unless a refresh already does.
+			if (!flight.has(key)) {
+				refreshBehind(load(key, ctx, () => next.behind(added)));
+			}
+			return respond(request, found, label('STALE'));
+		}
+		const loaded = await load(key, ctx, rest);
+		if (loaded instanceof Response) return loaded;
+		return respond(request, loaded, label('MISS'));
+	});
 
-	return Object.assign(plugin, handlesOf(store));
+	return Object.assign(middleware, handlesOf(store));
 }
 
 /** The hands to empty a cache: by the path a request asked, or by tag. */

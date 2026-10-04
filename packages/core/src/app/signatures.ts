@@ -198,9 +198,9 @@ export interface RefusalMethod<
 }
 
 /**
- * What a route declared next on `App` reads: the context its hooks build —
- * `decorate`, `derive`, every plugin's — on top of the base context. A
- * GraphQL schema, a service, types its own context with it.
+ * What a route declared next on `App` reads: the context its hooks and
+ * middlewares build — `decorate`, `derive`, `use` — on top of the base
+ * context. A GraphQL schema, a service, types its own context with it.
  */
 export type ContextOf<App> = App extends { readonly '~context': infer Ctx }
 	? BaseContext & Ctx

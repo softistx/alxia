@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { alxia, eventStream, responds } from '@alxia/core';
+import { alxia, defineMiddleware, eventStream, responds } from '@alxia/core';
 import { z } from 'zod';
 import { type LogEntry, logger } from './logger';
 
@@ -54,7 +54,7 @@ async function until(done: () => boolean): Promise<void> {
 describe('a streamed body', () => {
 	const entries: LogEntry[] = [];
 	const app = alxia()
-		.plugin(logger({ write: (entry) => entries.push(entry) }))
+		.use(logger({ write: (entry) => entries.push(entry) }))
 		.get('/slow', ({ reply }) => reply(200, slow()))
 		.get('/failing', ({ reply }) => reply(200, failing()))
 		.get('/ticks', responds({ 200: Tick }), ({ reply }) => reply(200, ticks()))
@@ -141,10 +141,14 @@ describe('a body that is not streamed', () => {
 		headers: { 'content-length': '5' },
 	});
 	const app = alxia()
-		.plugin(logger({ write: (entry) => entries.push(entry) }))
+		.use(logger({ write: (entry) => entries.push(entry) }))
 		.get('/text', ({ reply }) => reply(200, 'hello'))
 		.get('/empty', ({ reply }) => reply(204))
-		.onRequest(({ url }) => (url.pathname === '/raw' ? text : undefined));
+		.use(
+			defineMiddleware(({ url }, next) =>
+				url.pathname === '/raw' ? text : next(),
+			),
+		);
 
 	test('is logged at once, its response untouched', async () => {
 		entries.length = 0;
@@ -169,7 +173,7 @@ describe('a streamed body without a server', () => {
 		const entries: LogEntry[] = [];
 		released.length = 0;
 		const app = alxia()
-			.plugin(logger({ write: (entry) => entries.push(entry) }))
+			.use(logger({ write: (entry) => entries.push(entry) }))
 			.get('/ticks', responds({ 200: Tick }), ({ reply }) =>
 				reply(200, ticks()),
 			)

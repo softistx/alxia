@@ -62,7 +62,7 @@ function page(fail = false): ReadableStream<Uint8Array> {
 
 const html = { 'content-type': 'text/html;charset=utf-8' };
 const app = alxia()
-	.plugin(compress({ threshold: 0 }))
+	.use(compress({ threshold: 0 }))
 	.get('/page', ({ reply }) => reply(200, page(), { headers: html }))
 	.get('/broken', ({ reply }) => reply(200, page(true), { headers: html }))
 	.get('/whole', ({ reply }) => reply(200, SHELL + LATE, { headers: html }))
@@ -144,7 +144,7 @@ describe('a streamed body is flushed as it comes', () => {
 		);
 		const stream = (spread: boolean) =>
 			alxia()
-				.plugin(compress())
+				.use(compress())
 				.get('/rows', ({ reply }) =>
 					reply(
 						200,
@@ -172,7 +172,7 @@ describe('a streamed body is flushed as it comes', () => {
 
 	test('an event stream, when compressible says so, gets each event at once', async () => {
 		const events = alxia()
-			.plugin(compress({ compressible: () => true }))
+			.use(compress({ compressible: () => true }))
 			.get('/ticks', ({ reply }) =>
 				reply(
 					200,

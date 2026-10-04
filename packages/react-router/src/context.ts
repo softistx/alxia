@@ -98,12 +98,17 @@ export type RegisteredApp = RegisteredOf<Register>;
  */
 export function alxiaOf<
 	App extends AnyAlxia | ReactRouterServer<AnyAlxia> = RegisteredApp,
->(context: Readonly<RouterContextProvider>): ContextOf<AppOf<App>> {
+>(
+	context: Readonly<RouterContextProvider>,
+): ContextOf<AppOf<App>> & {
+	/** The catch-all's route, which every request reaching React Router matched. */
+	readonly route: string;
+} {
 	const value = context.get(alxiaContext);
 	if (value === MISSING) {
 		throw new Error(
 			"alxiaOf(): this request has no alxia context. Serve the React Router app through alxia: add alxia() from @alxia/react-router/vite to vite.config.ts's plugins, or, with a server of your own, serve the build through reactRouter() from @alxia/react-router.",
 		);
 	}
-	return value as ContextOf<AppOf<App>>;
+	return value as ContextOf<AppOf<App>> & { readonly route: string };
 }

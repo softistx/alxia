@@ -6,16 +6,14 @@ import { MemoryStore, rateLimit } from '@alxia/rate-limit';
 
 export function limited() {
 	return alxia()
-		.plugin(
-			rateLimit({ limit: 100, windowMs: 60_000, store: new MemoryStore() }),
-		)
+		.use(rateLimit({ limit: 100, windowMs: 60_000, store: new MemoryStore() }))
 		.get('/', ({ rateLimit: info, reply }) => reply(200, info?.remaining ?? 0));
 }
 
 export function limitedByUser() {
 	return alxia()
 		.derive(() => ({ user: { id: 'u' } }))
-		.plugin(
+		.use(
 			rateLimit<{ user: { id: string } }>({
 				limit: 10,
 				windowMs: 1_000,
