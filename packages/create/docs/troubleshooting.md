@@ -233,9 +233,8 @@ project is complete; only `node_modules` is missing.
 
 **Why:** the project's `Dockerfile` installs exactly what `bun.lock`
 records, and `package.json` now asks for something it does not: a
-dependency added or changed by hand, without `bun install`, or a project
-written with `--no-install`, whose `bun.lock` does not exist yet and was
-made by a later `bun install` that was not committed.
+dependency added or changed by hand, without `bun install`, or a `bun.lock` left
+behind in a clone where `package.json` moved on without it.
 
 **Fix:** run `bun install`, commit `bun.lock`, and build again. The other
 traps of the image, a write refused to the `bun` user among them, are in

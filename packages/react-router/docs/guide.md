@@ -226,7 +226,7 @@ with nothing to configure. It adds to Vite's `ssr` environment, under
 A package written for Bun, then, gives the build the variant Bun would
 load, and Bun's own modules are used as they are:
 
-```json
+```jsonc
 // node_modules/some-package/package.json
 { "exports": { "bun": "./bun.js", "default": "./node.js" } }
 ```
@@ -264,8 +264,9 @@ What the plugin leaves alone:
 - **No polyfill is added.** Vite adds none to a server build, and the
   plugin adds none.
 - **The client build** is a browser's, as before: none of this reaches
-  it. A Bun module imported by code that reaches the client fails the
-  build ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#-is-not-exported-by-__vite-browser-external-imported-by-)).
+  it. A Bun module imported by code that reaches the client is replaced
+  by an empty module there: Vite 7 fails the build, Vite 8 fails in the
+  browser ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#module--has-been-externalized-for-browser-compatibility-imported-by-)).
 
 What the app sets wins. The plugin adds to the `ssr` environment once
 every plugin's `config` has run, and Vite merges what it adds by

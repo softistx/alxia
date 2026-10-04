@@ -76,11 +76,12 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 			const bundler = serverBuildOptions(meta.rolldownVersion !== undefined);
 			return { environments: { ssr: { build: bundler as never } } };
 		},
-		configEnvironment(name, options) {
+		configEnvironment(name, options, env) {
 			// After every config hook, React Router's included: the server
 			// environment as the app and the plugins left it, built for Bun.
-			if (name === 'ssr') return bunEnvironment(options);
-			return undefined;
+			// An app that chose `ssr.target: 'webworker'` keeps Vite's own.
+			if (name !== 'ssr' || env.isSsrTargetWebworker === true) return;
+			return bunEnvironment(options);
 		},
 		configResolved(resolved) {
 			config = resolved;

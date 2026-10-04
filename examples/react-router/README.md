@@ -4,7 +4,7 @@ React Router's official template, served by
 [alxia](https://github.com/softistx/alxia/tree/develop/packages/core) under
 Bun through
 [`@alxia/react-router`](https://github.com/softistx/alxia/tree/develop/packages/react-router).
-The setup is three lines. The rest of the example shows what an optional
+The setup is four small changes. The rest of the example shows what an optional
 `app/server.ts` adds on top.
 
 It declares the packages by their npm versions (`^0.1.0`), as an app of

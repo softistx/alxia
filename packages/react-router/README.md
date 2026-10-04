@@ -410,4 +410,4 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev, the build and `vite preview` work, what the build sets for Bun, customising the server, typing the loaders, the app's own keys, a CSP nonce, escape hatches, WebSockets, the client's files, OpenAPI, testing and deploying, with Docker.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
-- [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these three lines, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.
+- [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.

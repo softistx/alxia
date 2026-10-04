@@ -33,7 +33,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`alxia-react-router: build/server/index.js does not exist. Run react-router build before vite preview.`](#alxia-react-router-buildserverindexjs-does-not-exist-run-react-router-build-before-vite-preview)
 - [`alxia-react-router: build/server/index.js is not alxia's server: its default export has no fetch. …`](#alxia-react-router-buildserverindexjs-is-not-alxias-server-its-default-export-has-no-fetch-)
 - [`warn: incorrect peer dependency "typescript@5.9.3"`](#warn-incorrect-peer-dependency-typescript593)
-- [`"…" is not exported by "__vite-browser-external", imported by "…"`](#-is-not-exported-by-__vite-browser-external-imported-by-)
+- [`Module "…" has been externalized for browser compatibility, imported by "…"`](#module--has-been-externalized-for-browser-compatibility-imported-by-)
 - [`error: lockfile had changes, but lockfile is frozen`](#error-lockfile-had-changes-but-lockfile-is-frozen)
 - [`EACCES: permission denied, open '/app/…'`](#eacces-permission-denied-open-app)
 
@@ -594,14 +594,20 @@ alxia is tested on:
 bun add -d typescript@^6
 ```
 
-### `"…" is not exported by "__vite-browser-external", imported by "…"`
+### `Module "…" has been externalized for browser compatibility, imported by "…"`
 
-`react-router build` fails building the client, after Vite warned
-`Module "bun:sqlite" has been externalized for browser compatibility`:
+`react-router build` warns it while building the client, for
+`Module "bun:sqlite"` or `Module "bun"`. What follows depends on Vite:
 
-```
-RollupError: app/routes/todos.tsx (1:9): "Database" is not exported by "__vite-browser-external", imported by "app/routes/todos.tsx".
-```
+- **Vite 7** then fails the build:
+
+  ```
+  RollupError: app/routes/todos.tsx (1:9): "Database" is not exported by "__vite-browser-external", imported by "app/routes/todos.tsx".
+  ```
+
+- **Vite 8** builds, and the page fails in the browser instead, with
+  `TypeError: … is not a constructor` or `… is not a function` once it
+  hydrates.
 
 **Why:** a route module imports one of Bun's modules, `bun` or `bun:*`,
 and uses it outside its `loader` and `action`, in the component or at the

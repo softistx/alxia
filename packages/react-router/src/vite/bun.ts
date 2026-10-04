@@ -7,7 +7,7 @@ import { builtinModules } from 'node:module';
 import type { EnvironmentOptions } from 'vite';
 
 /** The export condition Bun resolves a package by, and the plugin adds. */
-export const BUN_CONDITION = 'bun';
+const BUN_CONDITION = 'bun';
 
 /**
  * Vite's own builtins for a server environment (its `nodeLikeBuiltins`),
@@ -68,7 +68,9 @@ function adding<T extends string | RegExp>(
  *   level or on the environment.
  *
  * `ssr.target` stays `node`: Bun runs Node's modules, and `webworker`
- * would bundle every dependency with the browser's conditions.
+ * would bundle every dependency with the browser's conditions. An app that
+ * sets `webworker` itself gets none of this: the plugin leaves that
+ * environment to Vite's own defaults.
  */
 export function bunEnvironment(
 	options: EnvironmentOptions,

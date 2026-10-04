@@ -122,6 +122,19 @@ describe('the ssr environment, as Vite resolves it with the plugin', () => {
 		expect(ssr.resolve.builtins).toContain('bun');
 	});
 
+	test("ssr.target: 'webworker', the app's own choice, keeps Vite's defaults", async () => {
+		const worker = await configFile(fixture.root, 'worker', (source) =>
+			source.replace(
+				"ssr: { external: ['@alxia/react-router', '@alxia/core'] }",
+				"ssr: { target: 'webworker', external: ['@alxia/react-router', '@alxia/core'] }",
+			),
+		);
+		const ssr = await ssrOf('build', worker);
+		expect(ssr.resolve.conditions).not.toContain('bun');
+		expect(ssr.resolve.externalConditions).not.toContain('bun');
+		expect(ssr.build.target).not.toBe('esnext');
+	});
+
 	test("the app's own conditions and target win, at either level", async () => {
 		const top = await configFile(fixture.root, 'own-top', (source) =>
 			source
