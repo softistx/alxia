@@ -28,6 +28,7 @@ nothing — the symptom.
 
 - [`create-alxia: create-react-router's … is not what this @alxia/create expects: …`](#create-alxia-create-react-routers--is-not-what-this-alxiacreate-expects-)
 - [`create-alxia: failed: create-react-router exited with 1.`](#create-alxia-failed-create-react-router-exited-with-1)
+- [`create-alxia: failed: …`](#create-alxia-failed-)
 - [`create-alxia: warning: the registry did not answer for …; kept the versions the template ships.`](#create-alxia-warning-the-registry-did-not-answer-for--kept-the-versions-the-template-ships)
 - [`typescript: kept to ^6.0.3 || ^7.0.0, where the newest is 7.0.2; npm's latest, 8.0.0, is outside it`](#typescript-kept-to-603--700-where-the-newest-is-702-npms-latest-800-is-outside-it)
 - [`create-alxia: bun install failed; the files are written.`](#create-alxia-bun-install-failed-the-files-are-written)
@@ -43,7 +44,7 @@ nothing — the symptom.
 
 **When:** `bun create @alxia` (or `bunx @alxia/create`) is run against a
 registry that has no `@alxia/create`: a mirror or a company registry that
-does not proxy npm's.
+does not proxy npm's. The URL is that registry's, not npmjs.org's.
 
 **Why:** `bun create @alxia` installs `@alxia/create` from the registry Bun
 is configured with, then runs its bin.
@@ -79,6 +80,8 @@ prompt was answered with one.
 ### `create-alxia: --template needs a template: api or react-router.`
 
 **When:** `--template` is the last argument, or `--template=` is empty.
+The message names the option as typed: `-t needs a template` for `-t`,
+`--template= needs a template` for the empty form.
 
 **Fix:** name one: `bun create @alxia my-app --template api`.
 
@@ -148,15 +151,20 @@ project beside it and move the files in.
 
 **When:** the `react-router` template, after `create-react-router` ran.
 The message names the file — `package.json`, `vite.config.ts` or
-`bunfig.toml` — and what was expected in it: `reactRouter()` from
-`"@react-router/dev/vite"` called once in `plugins: [...]`, the scripts
-`dev: react-router dev` and `build: react-router build` and a `start`, no
-`bunfig.toml`.
+`bunfig.toml` — and what was expected of it:
+
+- `it is missing`: no `package.json` or `vite.config.ts`;
+- `react-router in its dependencies, and the scripts dev: react-router dev, build: react-router build and a start`;
+- `reactRouter() from "@react-router/dev/vite", called once in plugins: [...]`;
+- `it already imports @alxia/react-router/vite`;
+- `none, and there is one`: a `bunfig.toml` already.
 
 **Why:** React Router's template changed since this `@alxia/create` was
 released, and the edits that add alxia check each file before changing it
 rather than write a project that does not start. What was written is
-removed: the directory is as it was before the command.
+removed: the target directory is emptied when it was there, removed when
+it was not. A parent directory the command created for it, as `a/b` for
+`a/b/my-site`, stays.
 
 **Fix:** run the newest `@alxia/create`, whose edits follow the newest
 template:
@@ -179,6 +187,15 @@ from GitHub.
 
 **Fix:** what its output says, then run the command again: what was
 written is removed.
+
+### `create-alxia: failed: …`
+
+**When:** any other error while writing the project, with the error's own
+message after `failed:` — most often the file system: `EACCES` writing
+into a directory the user cannot write to, `ENOSPC` with the disk full.
+
+**Fix:** what the message names, then run the command again: what was
+written is removed, as above.
 
 ### `create-alxia: warning: the registry did not answer for …; kept the versions the template ships.`
 

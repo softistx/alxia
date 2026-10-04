@@ -1,5 +1,8 @@
 # Guide
 
+How `bun create @alxia` asks, what each template writes, and how it
+chooses the versions it writes.
+
 - [Running it](#running-it)
 - [The `api` template](#the-api-template)
 - [The `react-router` template](#the-react-router-template)
@@ -29,6 +32,13 @@ Done: my-app holds the api template. Next:
   cd my-app
   bun dev
 ```
+
+| option | default | |
+| --- | --- | --- |
+| `[dir]` | asked, `alxia-app` | where to write: empty, or not there yet |
+| `--template <name>`, `--template=<name>`, `-t <name>` | asked, `api` | `api` or `react-router` |
+| `--no-install` | install | write the files, skip `bun install` |
+| `--help`, `-h` | | the usage, and nothing else |
 
 What the command line gives is not asked: `bun create @alxia my-app
 --template react-router` asks nothing. The directory must be empty or not

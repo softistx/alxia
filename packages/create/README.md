@@ -31,10 +31,11 @@ bun create @alxia my-site --template react-router
 | `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a hook made with `defineHook` that answers 401 without an API key; a `bun test` spec calling it with `app.request()` and through `@alxia/client`, typed; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, `.gitignore` and a README |
 | `react-router` | React Router's own template, written by its `create-react-router`, then [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
 
-The `api` project, once written:
+The heart of the `api` project, its route and hook (the whole file, with
+its imports and schemas, is in the [guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#the-api-template)):
 
 ```ts
-// src/app.ts
+// src/app.ts, in part
 const requireKey = defineHook(({ request, reply }) =>
 	request.headers.get('x-api-key') === apiKey
 		? undefined
