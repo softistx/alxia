@@ -14,8 +14,10 @@ RUN bun run build
 # command, written out so that Bun is the container's process, and
 # --no-install: with no node_modules, Bun would otherwise fetch a package
 # the build left out from the registry at startup, where this fails. The
-# server listens on PORT (3000); set API_KEY.
-FROM oven/bun:1
+# server listens on PORT (3000); set API_KEY. On Alpine, about 200 MB
+# lighter: the bundle is JavaScript, which runs the same on musl. A native
+# addon built for glibc alone needs oven/bun:1 here.
+FROM oven/bun:1-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/dist ./dist

@@ -328,7 +328,8 @@ has each option and why.
 
 ## Docker
 
-A multi-stage `Dockerfile` on Bun's official image, as `@alxia/create`'s
+A multi-stage `Dockerfile` on Bun's official images, built on Debian's
+and run on Alpine's, as `@alxia/create`'s
 `react-router` template ships it. For an app from `create-react-router`,
 it replaces the template's, which runs on Node. The build is
 self-contained, so the image holds `build/` alone, no `node_modules`:
@@ -341,7 +342,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run build
 
-FROM oven/bun:1
+FROM oven/bun:1-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/build ./build

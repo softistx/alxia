@@ -69,7 +69,7 @@ describe('the api template', () => {
 		expect(build).toStartWith('FROM oven/bun:1 AS build\n');
 		expect(build).toContain('RUN bun install --frozen-lockfile\n');
 		expect(build).toContain('RUN bun run build\n');
-		expect(final).toStartWith('FROM oven/bun:1\n');
+		expect(final).toStartWith('FROM oven/bun:1-alpine\n');
 		expect(final?.match(/^COPY .+$/gm)).toEqual([
 			'COPY --from=build /app/dist ./dist',
 		]);
@@ -109,6 +109,10 @@ describe('the api template', () => {
 				body: JSON.stringify({ title: 'From dist alone' }),
 			});
 			expect(response.status).toBe(201);
+			// SIGTERM stops it: in a container Bun is process 1, which a signal
+			// with no handler leaves running until docker stop's timeout.
+			server.kill('SIGTERM');
+			expect(await server.exited).toBe(0);
 		} finally {
 			server.kill();
 			await rm(alone, { recursive: true, force: true });

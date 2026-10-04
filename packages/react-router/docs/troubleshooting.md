@@ -727,6 +727,12 @@ COPY --from=production-dependencies /app/node_modules ./node_modules
 `grep '^import' build/server/index.js` lists what the build still
 imports: `node:*`, `bun`, `bun:*` and the packages `ssr.external` names.
 
+The image runs on `oven/bun:1-alpine`, whose C library is musl. A native
+addon built for glibc alone then stops it with
+`… is linked against glibc (DT_NEEDED …), but this Bun build uses musl.`:
+put the final stage back on `oven/bun:1`
+([`@alxia/create`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md#error--is-linked-against-glibc-dt_needed-libmso6-but-this-bun-build-uses-musl)).
+
 ## Types
 
 ### `Property '…' does not exist on type 'BaseContext & …'`

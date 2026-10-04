@@ -38,6 +38,7 @@ nothing — the symptom.
 - [`error: lockfile had changes, but lockfile is frozen`](#error-lockfile-had-changes-but-lockfile-is-frozen)
 - [`error: Module not found "dist/server.js"`](#error-module-not-found-distserverjs)
 - [`error: Cannot find package '…' from '/app/dist/server.js'`](#error-cannot-find-package--from-appdistserverjs)
+- [`error: … is linked against glibc (DT_NEEDED libm.so.6), but this Bun build uses musl.`](#error--is-linked-against-glibc-dt_needed-libmso6-but-this-bun-build-uses-musl)
 - [The project's `@alxia/*` are older than npm's latest](#the-projects-alxia-are-older-than-npms-latest)
 
 ## Before it runs
@@ -324,6 +325,35 @@ COPY --from=production-dependencies /app/node_modules ./node_modules
 `grep '^import' dist/server.js` (or `build/server/index.js`) lists what
 the bundle still imports: Node's and Bun's modules, and the packages left
 external.
+
+### `error: … is linked against glibc (DT_NEEDED libm.so.6), but this Bun build uses musl.`
+
+The container stops at startup, or at the first request that loads the
+package, with the path of a `.node` file in `node_modules` and
+`code: "ERR_DLOPEN_FAILED"`. The library named after `DT_NEEDED` is
+whichever one the addon links first: `libc.so.6`, `libstdc++.so.6` or
+another; the fix is the same.
+
+**When:** a package is kept external and installed beside the build, as
+the previous entry says, and it loads a native addon built for glibc
+alone.
+
+**Why:** the final stage is `oven/bun:1-alpine`, whose C library is
+musl. The bundle is JavaScript, which runs the same there, but a `.node`
+file is compiled against one C library, and one compiled for glibc
+cannot load on musl, even with `gcompat`. A package that publishes a
+musl build too, as `sharp` does, works: `bun install`, `--production` too,
+puts both variants in `node_modules`, and the package picks musl's.
+
+**Fix:** run the final stage on Debian's image, `oven/bun:1`, which
+holds glibc. The build stages stay as they are:
+
+```dockerfile
+# The final stage.
+FROM oven/bun:1
+```
+
+The image is about 200 MB larger.
 
 ### The project's `@alxia/*` are older than npm's latest
 

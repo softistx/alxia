@@ -1083,7 +1083,8 @@ no `node_modules`, unless the app keeps a package external with
 The `react-router` template of
 [`@alxia/create`](https://github.com/softistx/alxia/tree/develop/packages/create)
 and the [example](https://github.com/softistx/alxia/tree/develop/examples/react-router)
-ship this `Dockerfile`, on Bun's official image. For an app started from
+ship this `Dockerfile`, on Bun's official images: built on `oven/bun:1`,
+Debian's, and run on `oven/bun:1-alpine`, about 130 MB. For an app started from
 `create-react-router`, it replaces the template's, which builds and runs
 on Node:
 
@@ -1106,8 +1107,10 @@ RUN bun run build
 # command, and --no-install: with no node_modules, Bun would otherwise
 # fetch a package the build left out from the registry at startup,
 # where this fails.
-# The server listens on PORT (3000) and HOST (0.0.0.0).
-FROM oven/bun:1
+# The server listens on PORT (3000) and HOST (0.0.0.0). On Alpine, about
+# 200 MB lighter: build/ is JavaScript, which runs the same on musl. A
+# native addon built for glibc alone needs oven/bun:1 here.
+FROM oven/bun:1-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/build ./build
@@ -1133,6 +1136,11 @@ startup, where Bun would otherwise fetch it from npm.
   gets the versions you tested, and a `package.json` changed without a
   `bun install` fails the build
   ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#error-lockfile-had-changes-but-lockfile-is-frozen)).
+- **The final stage is Alpine's**, musl where the build stage has glibc.
+  `build/` is JavaScript, which runs the same on both. A native addon
+  kept external and built for glibc alone does not load there: put the
+  final stage back on `oven/bun:1`
+  ([`@alxia/create`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md#error--is-linked-against-glibc-dt_needed-libmso6-but-this-bun-build-uses-musl)).
 - **The server runs as `bun`**, a user with no write access to `/app`.
   Write files to a volume the user owns
   ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#eacces-permission-denied-open-app)).

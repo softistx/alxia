@@ -30,6 +30,13 @@ Nothing scheduled yet.
 
 ### Next release
 
+- **The images run on Alpine.** Every `Dockerfile`'s final stage is
+  `oven/bun:1-alpine`, the build stages staying on `oven/bun:1`: each
+  image is about 130 MB, where it was about 345 MB. The `api` project
+  stops on `SIGTERM`, so `docker stop` no longer waits.
+
+### 0.1.3
+
 - **Every `Dockerfile` builds, and the image holds the build alone.** The
   `api` template's builds `dist/server.js`, bundled, minified and source
   mapped, and runs it with no `node_modules` and no `src/`; `start` runs
@@ -37,6 +44,9 @@ Nothing scheduled yet.
   copies `build/` alone, which `@alxia/react-router`'s plugin now bundles
   whole. Each image is about 50 MB (api) and 150 MB (react-router)
   smaller.
+
+### 0.1.2
+
 - **The `api` template is files, copied, with a `Dockerfile`.** It ships
   under `templates/api/` and is copied as `react-router`'s is. New in it:
   a `Dockerfile` on `oven/bun:1`, `.dockerignore` and `.env.example`.

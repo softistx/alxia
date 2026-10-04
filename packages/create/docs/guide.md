@@ -67,10 +67,10 @@ my-api/
 ├── src/
 │   ├── app.ts        the app, and its type
 │   ├── app.spec.ts   bun test: app.request() and @alxia/client
-│   └── server.ts     app.listen(PORT)
+│   └── server.ts     app.listen(PORT), stopped on SIGTERM
 ├── package.json
 ├── tsconfig.json
-├── Dockerfile        bun run build, then dist/ alone, on oven/bun:1
+├── Dockerfile        bun run build, then dist/ alone, on oven/bun:1-alpine
 ├── .dockerignore
 ├── .env.example      PORT and API_KEY, for a .env Bun loads
 ├── .gitignore
@@ -230,15 +230,25 @@ goes from there.
 
 ## Docker
 
-Each project's `Dockerfile` runs it on Bun, on the official `oven/bun:1`
-image, as the image's non-root `bun` user. The installs are
+Each project's `Dockerfile` builds it on Bun's official `oven/bun:1`
+image, Debian's, and runs it on `oven/bun:1-alpine`, as that image's
+non-root `bun` user (uid 1000). The installs are
 `--frozen-lockfile`, from the `bun.lock` the command's `bun install`
 wrote: commit it.
 
 Each one builds in a stage of its own, and the image holds the build
 output alone: no `node_modules`, no sources. The dependencies are inside
 the bundle, so the image is the base image and a few hundred kilobytes to
-a few megabytes. A dependency that cannot be bundled is kept external and
+a few megabytes: about 130 MB, where the same build on `oven/bun:1` is
+about 345 MB.
+
+The build stages stay on Debian: the tools a build runs, Vite's,
+Tailwind's and any package's install script, are tried on glibc first,
+and Alpine saves nothing there, since the stage is not shipped. What is
+shipped is JavaScript, which Bun runs the same on musl. A native addon is
+the exception: one built for glibc alone cannot load on Alpine, and the
+final stage goes back to `oven/bun:1`
+([troubleshooting](troubleshooting.md#error--is-linked-against-glibc-dt_needed-libmso6-but-this-bun-build-uses-musl)). A dependency that cannot be bundled is kept external and
 copied in: see
 [troubleshooting](troubleshooting.md#error-cannot-find-package--from-appdistserverjs).
 
@@ -250,7 +260,8 @@ Two stages: every dependency, installed with
 running `bun --no-install dist/server.js`, `start`'s command with
 Bun's `--no-install` (not create-alxia's option of the same name), so that a package missing from the bundle fails at
 startup rather than being fetched from npm, written out so that Bun
-is the container's process.
+is the container's process. `src/server.ts` stops the app on `SIGTERM`:
+as process 1, Bun would otherwise ignore it, and `docker stop` would wait.
 
 ```dockerfile
 FROM oven/bun:1 AS build
@@ -260,7 +271,7 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run build
 
-FROM oven/bun:1
+FROM oven/bun:1-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/dist ./dist
