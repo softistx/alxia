@@ -282,7 +282,8 @@ the build was told to leave external, or one that cannot be bundled, a
 native addon (a `.node` file) or a package that reads files of its own
 folder at runtime.
 
-The image runs `bun --no-install`: without the flag, Bun finds no
+The image runs `bun --no-install`, Bun's flag, not create-alxia's
+option of the same name: without the flag, Bun finds no
 `node_modules` and fetches the missing package from npm at startup, at
 whatever version npm has, instead of failing.
 

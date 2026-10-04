@@ -59,10 +59,10 @@ builds in a stage of its own, and the image holds the build output alone,
 no `node_modules`:
 
 - `api`: `bun run build` bundles `src/server.ts` and its dependencies into
-  `dist/server.js`; the image holds `dist/` and runs `bun dist/server.js`.
+  `dist/server.js`; the image holds `dist/` and runs `bun --no-install dist/server.js`.
 - `react-router`: `bun run build`, every dependency bundled into
   `build/server/index.js` by `@alxia/react-router`'s plugin; the image
-  holds `build/` and runs `bun build/server/index.js`.
+  holds `build/` and runs `bun --no-install build/server/index.js`.
 
 ```sh
 cd my-api

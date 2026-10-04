@@ -169,7 +169,8 @@ the app once `start` runs Bun. This one replaces it, the same one
 `react-router` template ships: multi-stage on `oven/bun:1`, every
 dependency and `bun run build` in a stage of their own, and a final image
 holding `build/` alone, no `node_modules`, running
-`bun build/server/index.js` as the image's non-root `bun` user. The
+`bun --no-install build/server/index.js` as the image's non-root `bun`
+user. The
 plugin bundles every package into `build/server/index.js` under
 `react-router build`, so `build/` needs nothing else
 ([Self-contained](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#self-contained)).

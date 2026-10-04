@@ -248,7 +248,7 @@ Two stages: every dependency, installed with
 `bun install --frozen-lockfile`, then `bun run build`, which writes
 `dist/server.js` and its source map; then an image with `dist/` alone,
 running `bun --no-install dist/server.js`, `start`'s command with
-`--no-install`, so that a package missing from the bundle fails at
+Bun's `--no-install` (not create-alxia's option of the same name), so that a package missing from the bundle fails at
 startup rather than being fetched from npm, written out so that Bun
 is the container's process.
 
