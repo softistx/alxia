@@ -1,8 +1,9 @@
 /**
  * Runs `bun create @alxia` as a user would, from the packed tarballs, for
  * each template, then proves the project it wrote works: it installs, its
- * `typecheck`, `test` and `build` pass, its production server answers, and,
- * where a Docker daemon answers, so does the image its `Dockerfile` builds.
+ * `typecheck`, `test` and `build` pass, its production server answers, and
+ * so does the image its `Dockerfile` builds (`templates/docker.ts`): skipped
+ * locally with no Docker daemon, a failure on CI.
  *
  * Every package is packed, and served by a registry on localhost that passes
  * every other request to npm's (`templates/registry.ts`). Bun is pointed at
@@ -10,9 +11,9 @@
  * directory of its own, so neither `@alxia/create` nor a package it installs
  * comes from the published versions. What is not alxia's — React Router,
  * Zod, Vite, TypeScript — comes from npm at the newest versions
- * `@alxia/create` resolves today, so this needs the network,
- * and an upstream release can turn it red with no change here. It runs in CI
- * as the `Templates` job, informational like `Newest peers`.
+ * `@alxia/create` resolves today, so this needs the network, and an upstream
+ * release can turn it red with no change here. It runs in CI as the
+ * `Templates` job, informational like `Newest peers`.
  *
  * `bun run build` first: it packs `dist/`.
  */
@@ -24,98 +25,9 @@ import { pack } from './artifacts/install';
 import { readPackages } from './artifacts/packages';
 import { staleBuilds } from './artifacts/stale';
 import type { Tarball } from './artifacts/tarball';
+import { dockerRuns, dockerServed } from './templates/docker';
 import { startRegistry } from './templates/registry';
-
-/** A port nothing listens on, for a server this script starts. */
-function freePort(): number {
-	const probe = Bun.serve({ port: 0, fetch: () => new Response() });
-	const { port } = probe;
-	probe.stop(true);
-	if (port === undefined) throw new Error('no free port');
-	return port;
-}
-
-/** What `request` answers on `port` within 20 seconds, or 0. */
-async function answered(
-	port: number,
-	request: (base: string) => Promise<Response>,
-): Promise<number> {
-	const deadline = Date.now() + 20_000;
-	while (Date.now() < deadline) {
-		const status = await request(`http://localhost:${port}`).then(
-			(response) => response.status,
-			() => undefined,
-		);
-		if (status !== undefined) return status;
-		await Bun.sleep(250);
-	}
-	return 0;
-}
-
-/** Starts `bun run start` in `dir` and resolves to what `request` answers. */
-async function served(
-	dir: string,
-	env: Record<string, string>,
-	request: (base: string) => Promise<Response>,
-): Promise<number> {
-	const port = freePort();
-	const server = Bun.spawn(['bun', 'run', 'start'], {
-		cwd: dir,
-		env: { ...env, PORT: String(port), NODE_ENV: 'production' },
-		stdout: 'inherit',
-		stderr: 'inherit',
-	});
-	try {
-		return await answered(port, request);
-	} finally {
-		server.kill();
-		await server.exited;
-	}
-}
-
-/** Whether a Docker daemon answers: CI's ubuntu runners have one. */
-async function dockerRuns(): Promise<boolean> {
-	const info = await $`docker info --format {{.ServerVersion}}`
-		.nothrow()
-		.quiet();
-	return info.exitCode === 0;
-}
-
-/**
- * Builds the project's `Dockerfile`, runs the image and resolves to what
- * `request` answers from the container. `bun.lock` names the packed
- * tarballs on the registry at localhost, which is not the build's: it is
- * pointed at the host as `host.docker.internal` first, which Docker Desktop
- * resolves and `--add-host` maps on Linux. The registry listens on every
- * interface.
- */
-async function dockerServed(
-	dir: string,
-	tag: string,
-	registryUrl: string,
-	request: (base: string) => Promise<Response>,
-): Promise<number> {
-	const lock = Bun.file(join(dir, 'bun.lock'));
-	const host = registryUrl.replace('//localhost:', '//host.docker.internal:');
-	await Bun.write(lock, (await lock.text()).replaceAll(registryUrl, host));
-	const built =
-		await $`docker build --add-host=host.docker.internal:host-gateway -t ${tag} .`
-			.cwd(dir)
-			.nothrow();
-	if (built.exitCode !== 0) return -1;
-	const port = freePort();
-	const name = `${tag}-${port}`;
-	try {
-		const ran =
-			await $`docker run -d --rm --name ${name} -p ${port}:3000 ${tag}`.nothrow();
-		if (ran.exitCode !== 0) return -1;
-		return await answered(port, request);
-	} finally {
-		await $`docker logs ${name}`.nothrow();
-		await $`docker rm -f ${name}`.nothrow().quiet();
-		await $`docker rmi ${tag}`.nothrow().quiet();
-	}
-}
+import { served } from './templates/serve';
 
 interface Check {
 	readonly template: 'api' | 'react-router';
@@ -317,7 +229,9 @@ async function main(): Promise<boolean> {
 		let ok = templateShipped(packed.tarballs);
 		ok = (await helpRuns(workdir, env)) && ok;
 		const docker = await dockerRuns();
-		if (!docker) console.log('skip docker build: no Docker daemon answers');
+		// CI's runners have a daemon: one missing there is a failure.
+		if (!docker)
+			ok = report(!process.env['CI'], 'docker: no daemon, skipped') && ok;
 		for (const check of CHECKS) {
 			ok =
 				(await templateWorks(check, workdir, env, registry.url, docker)) && ok;

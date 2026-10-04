@@ -51,6 +51,15 @@ directory's name, lowercased, with `-` for anything npm refuses.
 to the package `@scope/create`, and npm maps `npm create @scope` the same
 way. Any of the three runs the same bin, on Bun.
 
+Both templates are files shipped in this package, under
+`templates/api/` and `templates/react-router/`, and copied as they are:
+nothing is downloaded but the dependencies, and only `package.json` is
+written again, with the directory's name, alxia's versions and the newest
+of the others ([Versions](#versions)). Two files are stored under another
+name, since `bun publish` leaves them out of a tarball, and take theirs
+back on the copy: `gitignore` is written as `.gitignore`, `_bunfig.toml`
+as `bunfig.toml`.
+
 ## The `api` template
 
 ```
@@ -68,13 +77,6 @@ my-api/
 └── README.md
 ```
 
-Both templates are files shipped in this package, under
-`templates/api/` and `templates/react-router/`, and copied as they are:
-only `package.json` is written again, with the directory's name, alxia's
-versions and the newest of the others ([Versions](#versions)). Two files
-are stored under another name, since `bun publish` leaves them out of a
-tarball, and take theirs back on the copy: `gitignore` is written as
-`.gitignore`, `_bunfig.toml` as `bunfig.toml`.
 
 `src/app.ts` is one route, `POST /todos`, with what a real one needs: a
 body validated by a Zod schema, a declared reply, and a hook of its own.

@@ -48,6 +48,35 @@ describe('copyTemplate', () => {
 		});
 	});
 
+	test('leaves out a dependency field the template has none of', async () => {
+		await Bun.write(
+			join(root, 'react-router', 'package.json'),
+			JSON.stringify({ dependencies: { '@alxia/core': 'workspace:^' } }),
+		);
+		const { manifest } = await copyTemplate(
+			'react-router',
+			'mine',
+			ALXIA,
+			root,
+		);
+		expect(manifest).toEqual({
+			name: 'mine',
+			dependencies: { '@alxia/core': '^0.3.0' },
+		});
+	});
+
+	test('refuses an @alxia/* package at workspace: it has no version for', async () => {
+		await Bun.write(
+			join(root, 'react-router', 'package.json'),
+			JSON.stringify({ dependencies: { '@alxia/zod': 'workspace:^' } }),
+		);
+		await expect(
+			copyTemplate('react-router', 'mine', ALXIA, root),
+		).rejects.toThrow(
+			'the react-router template names @alxia/zod at workspace:, which this @alxia/create has no version for',
+		);
+	});
+
 	test('renames gitignore and _bunfig.toml, and leaves .DS_Store and package.json out', async () => {
 		const { files } = await copyTemplate('api', 'mine', ALXIA, root);
 		expect(Object.keys(files).sort()).toEqual([

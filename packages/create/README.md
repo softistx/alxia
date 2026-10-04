@@ -67,6 +67,12 @@ docker build -t my-api .
 docker run -p 3000:3000 -e API_KEY=change-me my-api
 ```
 
+```sh
+cd my-site
+docker build -t my-site .
+docker run -p 3000:3000 my-site
+```
+
 Commit the `bun.lock` that `bun install` wrote: the image installs from it
 with `--frozen-lockfile`. The
 [guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#docker)

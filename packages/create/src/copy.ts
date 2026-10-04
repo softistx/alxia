@@ -49,8 +49,15 @@ export async function copyTemplate(
 		manifest[field] = Object.fromEntries(
 			Object.entries(deps).map(([pkg, range]) => [
 				pkg,
-				pkg in alxia ? alxia[pkg as AlxiaPackage] : range,
+				Object.hasOwn(alxia, pkg) ? alxia[pkg as AlxiaPackage] : range,
 			]),
+		);
+	}
+	// A range only the workspace resolves would make the project uninstallable.
+	const left = JSON.stringify(manifest).match(/"([^"]+)":"workspace:/);
+	if (left) {
+		throw new Error(
+			`the ${template} template names ${left[1]} at workspace:, which this @alxia/create has no version for`,
 		);
 	}
 	const files: Record<string, Blob> = {};
