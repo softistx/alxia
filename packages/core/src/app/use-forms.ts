@@ -10,7 +10,7 @@ import type { Alxia } from './alxia';
 import type {
 	AddedOf,
 	BaseContext,
-	MiddlewareMark,
+	MadeByDefineMiddleware,
 	MiddlewareReturn,
 	NextFunction,
 	ThreadContext,
@@ -28,7 +28,7 @@ export type ScopeMiddleware<
 	ctx: BaseContext & ThreadContext<Ctx, Before>,
 	next: NextFunction,
 ) => Result) &
-	MiddlewareMark;
+	MadeByDefineMiddleware;
 
 /** The app after `use` took the middlewares that returned `Results`. */
 export type AppAfterUse<
@@ -76,7 +76,7 @@ export type PathMiddleware<Ctx extends object> = ((
 	ctx: BaseContext & Ctx,
 	next: NextFunction,
 ) => MiddlewareReturn) &
-	MiddlewareMark;
+	MadeByDefineMiddleware;
 
 /** `app.use(...middlewares)` and `app.use(path, ...middlewares)`. */
 export interface UseForms<

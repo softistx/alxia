@@ -6,21 +6,16 @@
  * and fall back on the same minor when the registry does not have the
  * version those ranges start at yet.
  */
+import { packuments, type Registry } from './packument';
 import { PEER_RANGES } from './versions';
+
+export { type Registry, registryUrl } from './packument';
 
 /** The dependency fields of a manifest, as a template writes them. */
 export interface Manifest {
 	dependencies?: Record<string, string>;
 	devDependencies?: Record<string, string>;
 	[key: string]: unknown;
-}
-
-/** How to reach the registry: its URL, and the `fetch` to call it with. */
-export interface Registry {
-	readonly url: string;
-	readonly fetch?: (request: Request) => Promise<Response>;
-	/** How long one package's metadata may take, in milliseconds. */
-	readonly timeout?: number;
 }
 
 /** What a bump changed, and what it could not. */
@@ -41,15 +36,6 @@ export interface Bumped {
 	readonly behind: string[];
 }
 
-/** The registry to resolve against: the one Bun or npm was given, or npm's. */
-export function registryUrl(env: Record<string, string | undefined>): string {
-	const url =
-		env['BUN_CONFIG_REGISTRY'] ||
-		env['npm_config_registry'] ||
-		'https://registry.npmjs.org';
-	return url.replace(/\/+$/, '');
-}
-
 /**
  * The range alxia's peers hold `name` to — React Router's packages follow
  * `react-router`'s — or undefined when none does, and npm's `latest` is
@@ -64,11 +50,6 @@ export function allowedRange(name: string): string | undefined {
 		: undefined;
 }
 
-interface Packument {
-	readonly 'dist-tags'?: Record<string, string>;
-	readonly versions?: Record<string, unknown>;
-}
-
 /** The newest release (not a prerelease) of `versions` within `range`. */
 export function newestWithin(
 	versions: readonly string[],
@@ -78,18 +59,6 @@ export function newestWithin(
 		.filter((v) => !v.includes('-') && Bun.semver.satisfies(v, range))
 		.sort(Bun.semver.order)
 		.at(-1);
-}
-
-async function packument(name: string, registry: Registry): Promise<Packument> {
-	const call = registry.fetch ?? ((request: Request) => fetch(request));
-	const response = await call(
-		new Request(`${registry.url}/${name.replace('/', '%2f')}`, {
-			headers: { accept: 'application/vnd.npm.install-v1+json' },
-			signal: AbortSignal.timeout(registry.timeout ?? 5000),
-		}),
-	);
-	if (!response.ok) throw new Error(`${response.status}`);
-	return (await response.json()) as Packument;
 }
 
 /** Within `range`, the newest; with none, npm's `latest`. */
@@ -173,17 +142,7 @@ export async function bumpDependencies(
 ): Promise<Bumped> {
 	const fields = ['dependencies', 'devDependencies'] as const;
 	const names = fields.flatMap((field) => Object.keys(manifest[field] ?? {}));
-	const fetched = new Map(
-		await Promise.all(
-			names.map(
-				async (name) =>
-					[
-						name,
-						await packument(name, registry).catch(() => undefined),
-					] as const,
-			),
-		),
-	);
+	const fetched = await packuments(names, registry);
 	const moved: string[] = [];
 	const held: string[] = [];
 	const failed: string[] = [];

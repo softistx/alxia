@@ -47,6 +47,7 @@ and adds the headers to every response that comes back through it, a
 | --- | --- |
 | `cors(options?)` | the middleware, for `app.use` |
 | `CorsOptions`, `CorsOrigin` | its options |
+| `CorsMiddleware` | what `cors()` returns: a middleware that adds nothing to the context |
 
 ## Traps
 

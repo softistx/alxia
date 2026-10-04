@@ -1,6 +1,7 @@
 export {
 	ContextStorageError,
 	type ContextStorageErrorCode,
+	type ContextStorageMiddleware,
 	type ContextStoragePlugin,
 	contextStorage,
 	getContext,

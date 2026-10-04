@@ -26,6 +26,7 @@ export function createRuntime(
 			onStart: [],
 			onStop: [],
 			parsers: [],
+			middlewares: [],
 			pages: new Map(),
 		},
 		validateResponses: options.validateResponses ?? true,
@@ -51,6 +52,7 @@ export function mergeGlobals(
 	runtime.globals.onStart.push(...globals.onStart);
 	runtime.globals.onStop.push(...globals.onStop);
 	runtime.globals.parsers.push(...globals.parsers);
+	runtime.globals.middlewares.push(...globals.middlewares);
 	for (const [path, bundle] of globals.pages) {
 		addPage(runtime, joinPath(prefix, path), bundle);
 	}

@@ -90,7 +90,9 @@ issues, a minimum length, attempts left, seconds to wait (with
 called for the 5xx. Anything else goes on, thrown, to the middlewares before
 it. Declared after `session()`, it would not see the session's
 `STORE_FAILED`: it goes first, and after the observers (`logger()`,
-`secureHeaders()`), which settle `next()`.
+`secureHeaders()`), so that they see its reply. An observer settles
+`next()` without swallowing the error, so `janusErrors()` before one, or
+before `createI18n()`, still answers it.
 
 | status | codes |
 | --- | --- |
@@ -168,7 +170,7 @@ const byTenant = permission(
 		tenant.records.get(pathParams['id'] ?? '') ?? null,
 );
 
-alxia().use(tenancy).use(session(accounts)).use(byTenant); // tenancy derives tenant
+alxia().plugin(tenancy).use(session(accounts)).use(byTenant); // tenancy derives tenant
 alxia().use(session(accounts)).use(byTenant); // a compile error: this app gives no `tenant`
 ```
 

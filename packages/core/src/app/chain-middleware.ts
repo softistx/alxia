@@ -10,6 +10,7 @@ import type {
 	SocketDefinition,
 	WrapHook,
 } from './definition';
+import { settledFrom } from './settled';
 import type { BaseContext } from './types';
 
 type Ctx = Record<string, unknown> & BaseContext;
@@ -177,6 +178,9 @@ class Call {
 			return pending.then((downstream) => this.#parked?.value ?? downstream);
 		}
 		if (this.#behind || Bun.peek.status(pending) !== 'pending') {
+			// It settled the rest's error: the error goes on, its response kept.
+			const settled = settledFrom(this.#ctx, pending, result);
+			if (settled !== undefined) throw settled.error;
 			return this.#own(result);
 		}
 		console.warn(
@@ -190,14 +194,15 @@ class Call {
 	}
 
 	/**
-	 * A middleware that throws while the `next()` it called still runs:
-	 * the rest's error, if any, is logged, the middleware's goes on.
+	 * A middleware that throws after the `next()` it called: the rest's
+	 * error, if any, is logged — whether the rest still runs or already
+	 * rejected, never left unhandled — and the middleware's goes on.
 	 */
 	#thrown(error: unknown): never {
-		const pending = this.#pending;
-		if (pending !== undefined && Bun.peek.status(pending) === 'pending') {
-			pending.catch(console.error);
-		}
+		// The rest's own error, rethrown, goes on: logged once, where answered.
+		this.#pending?.catch((rest: unknown) => {
+			if (rest !== error) console.error(rest);
+		});
 		throw error;
 	}
 

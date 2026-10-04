@@ -5,24 +5,28 @@
  */
 import { HttpError, refusalOf } from '../errors/errors';
 import { Reply, toResponse } from '../reply/reply';
-import type { BodyParser } from '../request/read';
 import { chain } from './chain';
 import { routeContext } from './context';
-import type { RouteDefinition, Runtime, SocketDefinition } from './definition';
+import type {
+	Globals,
+	RouteDefinition,
+	Runtime,
+	SocketDefinition,
+} from './definition';
 import { refuse } from './refusal';
 import { clientGone, failed, internalError, routingError, send } from './send';
+import { RUN, runOf, settledResponse } from './settled';
 import type { BaseContext, Method, RequestContext } from './types';
 import type { ChainRun } from './validation';
 
-/** Where a route's context keeps its run, for `settle`: shared by every copy of core. */
-export const RUN: unique symbol = Symbol.for('alxia.run');
+export { RUN } from './settled';
 
 /** A route's request, from its chain to its handler's reply, sent. */
 export async function handle(
 	route: RouteDefinition,
 	request: RequestContext,
 	rawParams: Record<string, string>,
-	parsers: readonly BodyParser[],
+	globals: Pick<Globals, 'parsers' | 'middlewares'>,
 	validateResponses: boolean,
 	/** Whether a route matched: else `ctx.route` is none, as for the 404 it ends with. */
 	matched = true,
@@ -34,8 +38,9 @@ export async function handle(
 		request,
 		rawParams,
 		set,
-		parsers,
+		parsers: globals.parsers,
 		validateResponses,
+		appWide: globals.middlewares,
 	};
 	(ctx as { [RUN]?: ChainRun })[RUN] = run;
 	try {
@@ -52,7 +57,10 @@ export async function handle(
 		});
 	} catch (error) {
 		(request as { error: unknown }).error = error;
-		return fail(route, error, ctx, validateResponses);
+		// An error the observers settled: the response they made of it.
+		return (
+			settledResponse(run, error) ?? fail(route, error, ctx, validateResponses)
+		);
 	}
 }
 
@@ -75,7 +83,9 @@ export function unmatched(
 				? 'method_not_allowed'
 				: 'upgrade_required';
 	const hooks = runtime.unmatched();
-	if (hooks.derive.length === 0) return routingError(status, error, allowed);
+	if (hooks.derive.length === 0 && runtime.globals.middlewares.length === 0) {
+		return routingError(status, error, allowed);
+	}
 	const headers = allowed === undefined ? {} : { allow: allowed.join(', ') };
 	const definition: RouteDefinition = {
 		method: request.request.method as Method,
@@ -88,7 +98,7 @@ export function unmatched(
 		definition,
 		request,
 		{},
-		runtime.globals.parsers,
+		runtime.globals,
 		runtime.validateResponses,
 		false,
 	);
@@ -149,9 +159,11 @@ export async function fail(
  * });
  * ```
  *
- * The middlewares around it then see that response, not the error: a
- * middleware that answers errors itself goes inside it — given to `use`
- * after it, or to the route. The error stays on `ctx.error`.
+ * The error is not swallowed: once the middleware returns the response,
+ * the error goes on to the middlewares around it, so a try/catch there
+ * still catches it, and another `settle` there reads the response this
+ * one returned. When none answers it, that response is the one sent. The
+ * error stays on `ctx.error`.
  */
 export async function settle<Settled extends Response>(
 	ctx: object,
@@ -160,24 +172,28 @@ export async function settle<Settled extends Response>(
 	try {
 		return await pending;
 	} catch (error) {
-		const run = (ctx as { [RUN]?: ChainRun })[RUN];
+		const run = runOf(ctx);
 		(ctx as { error: unknown }).error = error;
-		if (run === undefined) {
-			const { request } = ctx as Partial<BaseContext>;
-			if (error instanceof HttpError) {
-				return toResponse(error.status, error.body, new Headers()) as Settled;
-			}
-			return failed(
-				error,
-				request ?? new Request('http://localhost'),
-			) as Settled;
-		}
+		if (run === undefined) return outside(ctx, error) as Settled;
 		(run.request as { error: unknown }).error = error;
-		return (await fail(
-			run.definition,
-			error,
-			ctx as BaseContext,
-			run.validateResponses,
-		)) as Settled;
+		const response =
+			settledResponse(run, error) ??
+			(await fail(
+				run.definition,
+				error,
+				ctx as BaseContext,
+				run.validateResponses,
+			));
+		run.settled = { pending, error };
+		return response as Settled;
 	}
+}
+
+/** `settle` on a context no route runs: an `HttpError` as it says, a 500. */
+function outside(ctx: object, error: unknown): Response {
+	const { request } = ctx as Partial<BaseContext>;
+	if (error instanceof HttpError) {
+		return toResponse(error.status, error.body, new Headers());
+	}
+	return failed(error, request ?? new Request('http://localhost'));
 }

@@ -10,6 +10,7 @@ export {
 } from './attributes';
 export {
 	type TelemetryContext,
+	type TelemetryMiddleware,
 	type TelemetryPluginOptions,
 	telemetry,
 } from './telemetry';

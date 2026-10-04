@@ -89,6 +89,7 @@ on every app: annotate what it reads, or leave it unannotated.
 | `negotiate(header, supported)` | the supported language `Accept-Language` prefers |
 | `parseAcceptLanguage(header)`, `match(tag, supported)` | its parts |
 | `LanguageContext`, `LanguageSource`, `Accepted` | its types |
+| `LanguageMiddleware<L, Requires>` | what `language()` returns: a middleware adding `LanguageContext<L>`, requiring of the app what `resolve` reads |
 
 ## Documentation
 

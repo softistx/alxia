@@ -415,11 +415,12 @@ const app = alxia().get(
 );
 ```
 
-Both declare their schemas on the route, `app.routes[i].schema`: at run
-time `validate`'s check what a client sends, and `responds`' what it may
-read — what the OpenAPI document a client is generated from declares, its
-400 included. A route bound to a generated operation, `route(operation, …)`,
-takes both from the document. Where
+At run time `validate`'s schemas check what a client sends, and
+`responds`' what it may read — what the OpenAPI document a client is
+generated from declares, its 400 included. The document declares them, not
+the app: `app.routes[i].schema` holds the route's options alone. A route bound to a generated operation, `route(operation, …)`,
+takes both from the document, into its chain (`app.routes[i].schema`
+keeps its `detail`). Where
 each stands changes which answer comes first, a 401 or a 400
 ([Middleware](middleware.md#where-validate-stands)).
 
@@ -684,9 +685,10 @@ const app = alxia()
 ```
 
 Give it before the `validate` — on the app with `use`, or among the route's
-middlewares — and after the observers (`logger()`, `secureHeaders()`): an
-observer settles `next()`, which answers an error before a middleware outside
-it could catch it ([Middleware](middleware.md)). The `onRefusal` hook of 0.3
+middlewares — and after the observers (`logger()`, `secureHeaders()`): so
+the observers also see its reply: an observer settles `next()` and the error
+goes on, so a `try`/`catch` catches it wherever it is declared
+([Middleware](middleware.md)). The `onRefusal` hook of 0.3
 still answers a refusal for the routes declared after it, and is deprecated for
 this middleware.
 

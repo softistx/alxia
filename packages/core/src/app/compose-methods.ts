@@ -6,7 +6,7 @@
 import type { AnyReply } from '../reply/reply';
 import type { JoinPath, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
-import type { Mounted, RequiredIn } from './plugin-method';
+import type { MountedIn, RequiredIn } from './plugin-method';
 import type { AnyAlxia } from './signatures';
 import type { Empty, ProvidedBy, ThenShortcuts } from './types';
 import type { UseForms } from './use-forms';
@@ -45,7 +45,8 @@ export interface GroupMethod<
  * see `PluginForms`. A function made by `defineMiddleware` is a
  * middleware; any other function is a plugin. The plugin forms come first,
  * so that a middleware a route's context does not give is reported on the
- * middleware forms, naming the key.
+ * middleware forms, naming the key: TypeScript 7 prints the last overload
+ * alone, and TypeScript 6 lists the plugin forms, then them.
  */
 export interface UseMethod<
 	App,
@@ -88,7 +89,7 @@ export interface PluginForms<
 		} & ProvidedBy<Ctx, PluginRequires> &
 			ProvidedBy<Ctx, RequiredIn<PluginCtx>>,
 	): Alxia<
-		Ctx & Mounted<PluginCtx>,
+		MountedIn<Ctx, PluginCtx, PluginPrefix>,
 		Prefix,
 		ThenShortcuts<Shortcuts, PluginShortcuts>
 	>;

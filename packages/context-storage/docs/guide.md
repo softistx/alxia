@@ -34,10 +34,11 @@ context of the request that called it, and never another's.
 ```ts
 // `uncalled` takes nothing: it makes `use(contextStorage)` a compile error.
 // `App` defaults to the app `Register` names in `@alxia/core` (`RegisteredBase`)
-function contextStorage<App = RegisteredBase>(...uncalled: readonly never[]): ContextStoragePlugin<App>;
+function contextStorage<App = RegisteredBase>(...uncalled: readonly never[]): ContextStorageMiddleware<App>;
 
-// A middleware: it requires `App`'s context of the app that mounts it
-type ContextStoragePlugin<App> = Middleware<
+// A middleware: it requires `App`'s context of the app that mounts it.
+// `ContextStoragePlugin<App>`, its name in 0.3, is a deprecated alias.
+type ContextStorageMiddleware<App> = Middleware<
 	RequiresOf<StoredContext<App>, 'context'>,
 	Promise<Response>
 > &

@@ -73,3 +73,7 @@ export function withCaches<const Caches extends Record<string, AnyCache>>(
 		.plugin(redis(client, { caches }))
 		.get('/', ({ caches: bound, reply }) => reply(200, Object.keys(bound)));
 }
+
+export function guard() {
+	return idempotency(client, { name: 'refunds', wait: 1_000 });
+}

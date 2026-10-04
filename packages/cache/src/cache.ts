@@ -9,7 +9,7 @@ import {
 import { requestControls } from './control';
 import { type Loaded, refreshBehind, singleFlight } from './flight';
 import { storeGuard } from './guard';
-import { keepable, toCached } from './keep';
+import { type KeyedBy, keepable, shareable, toCached } from './keep';
 import { defaultKey, pathTag } from './keys';
 import { bypasses, freshness } from './lookup';
 import { respond } from './respond';
@@ -83,7 +83,10 @@ export type CacheMiddleware<Requires extends object = Empty> = Middleware<
  * declared after it is answered from the store while fresh, and from the
  * route otherwise. Concurrent misses run the route once. Stale, it is served at
  * once and refreshed behind. A response that says `no-store` or `private`,
- * sets a cookie, or has another status is never kept.
+ * sets a cookie, or has another status is never kept; nor is the answer to a
+ * request carrying `Authorization` or `Cookie`, unless it says `public`,
+ * `s-maxage` or `must-revalidate`, or the key tells senders apart: `vary`
+ * naming the header, or, for a cookie, a `key` of the app's own.
  *
  * Every kept response gets a weak `ETag` from its body when it has none, so
  * a client whose copy is current gets a 304.
@@ -100,21 +103,9 @@ export type CacheMiddleware<Requires extends object = Empty> = Middleware<
 export function cache<Requires extends object = Empty>(
 	options: CacheOptions<Requires>,
 ): NoInfer<CacheMiddleware<Requires>> {
-	const store = options.store ?? new MemoryCacheStore();
-	const ttl = options.ttl * 1000;
-	const stale = (options.staleWhileRevalidate ?? 0) * 1000;
-	const vary = (options.vary ?? []).map((name) => name.toLowerCase());
-	const statuses = new Set(options.statuses ?? [200]);
-	const debug = options.debugHeaders ?? true;
-	const honorNoCache = options.honorClientNoCache ?? false;
-	const keyOf =
-		options.key ??
-		((ctx: BaseContext & Requires) =>
-			defaultKey(
-				`${ctx.url.pathname}${ctx.url.search}`,
-				vary,
-				ctx.request.headers,
-			));
+	const { store, ttl, stale, vary, statuses, debug, honorNoCache, ...keys } =
+		settingsOf(options);
+	const { keyOf, keyedBy } = keys;
 	const controls = requestControls();
 	const attempt = storeGuard();
 	const flight = singleFlight();
@@ -127,7 +118,12 @@ export function cache<Requires extends object = Empty>(
 	): Promise<Loaded> => {
 		const response = await next();
 		const control = controls.get(ctx.request);
-		if (!keepable(response, control, statuses)) return { own: response };
+		if (
+			!keepable(response, control, statuses) ||
+			!shareable(ctx.request, response, keyedBy)
+		) {
+			return { own: response };
+		}
 		const cached = await toCached(response, {
 			ttl,
 			stale,
@@ -176,6 +172,33 @@ export function cache<Requires extends object = Empty>(
 	});
 
 	return Object.assign(middleware, handlesOf(store));
+}
+
+/** The options with their defaults: milliseconds, lower-case header names, the key of a request and what it tells apart. */
+function settingsOf<Requires extends object>(options: CacheOptions<Requires>) {
+	const vary = (options.vary ?? []).map((name) => name.toLowerCase());
+	const keyedBy: KeyedBy = {
+		authorization: vary.includes('authorization'),
+		cookie: options.key !== undefined || vary.includes('cookie'),
+	};
+	return {
+		store: options.store ?? new MemoryCacheStore(),
+		ttl: options.ttl * 1000,
+		stale: (options.staleWhileRevalidate ?? 0) * 1000,
+		vary,
+		statuses: new Set(options.statuses ?? [200]),
+		debug: options.debugHeaders ?? true,
+		honorNoCache: options.honorClientNoCache ?? false,
+		keyOf:
+			options.key ??
+			((ctx: BaseContext & Requires) =>
+				defaultKey(
+					`${ctx.url.pathname}${ctx.url.search}`,
+					vary,
+					ctx.request.headers,
+				)),
+		keyedBy,
+	};
 }
 
 /** The hands to empty a cache: by the path a request asked, or by tag. */

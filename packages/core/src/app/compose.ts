@@ -42,6 +42,8 @@ export function group(
 	refuseShadowedPages(state.runtime, before);
 	for (const route of built.routes) register(state, route);
 	for (const socket of built.sockets) mount(state, socket);
+	// A group with a prefix of its own guards what no route answers under it.
+	if (prefix !== state.prefix) state.scope.enclose(childState.scope, prefix);
 }
 
 /**
@@ -123,18 +125,13 @@ export function pluginApp(
  * its hooks, its hooks for the routes declared after it, its global hooks.
  */
 export function usePlugin(state: AppState, plugin: AppState): void {
+	const { prefix, scope } = state;
 	for (const route of plugin.routes) {
-		register(
-			state,
-			state.scope.behind(route, joinPath(state.prefix, route.path)),
-		);
+		register(state, scope.behind(route, joinPath(prefix, route.path), prefix));
 	}
 	for (const socket of plugin.sockets) {
-		mount(
-			state,
-			state.scope.behind(socket, joinPath(state.prefix, socket.path)),
-		);
+		mount(state, scope.behind(socket, joinPath(prefix, socket.path), prefix));
 	}
-	state.scope.absorb(plugin.scope, state.prefix);
+	scope.absorb(plugin.scope, prefix, plugin.prefix);
 	mergeGlobals(state.runtime, plugin.runtime.globals, state.prefix);
 }

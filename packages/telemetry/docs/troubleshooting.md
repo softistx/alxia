@@ -309,8 +309,8 @@ app.ws('/rooms/:room', {}, {
 
 **Why:** the span is opened by `use(telemetry(...))`, which runs on every
 request the app takes, an unmatched one included. A request is missing when
-`telemetry()` sits inside a `group` (a group's middlewares do not run on an
-unmatched request), when `traced` said no, or when another middleware
+`telemetry()` sits inside a `group` (it sees the group's routes and the
+unmatched requests under its prefix, nothing else), when `traced` said no, or when another middleware
 declared before it answered without calling `next()` (a preflight, a 401):
 it is outside the span.
 
@@ -390,8 +390,9 @@ app.use(telemetry({ service: 'checkout', exporters, traced: (ctx) => ctx.url.pat
 
 ### A span has an exception, and its status is `ok`
 
-**When:** a route throws, and an error-handling middleware or an `onError`
-hook answers with a `4xx`.
+**When:** a route throws, and the route boundary (an `HttpError`, a
+deprecated `onError` hook) answers with a `4xx`. An error-handling middleware
+that catches it leaves the span `ok` with no exception at all.
 
 **Why:** the error is recorded as the span's exception, but only a
 `5xx`, or a streamed body that fails midway, makes a span an error: a

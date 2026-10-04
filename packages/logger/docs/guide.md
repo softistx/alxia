@@ -401,8 +401,8 @@ app
 
 The entry `request failed` comes first, then `GET /boom 500` at `error`
 level, both with the same `requestId`. A `try`/`catch` declared **before**
-`logger()` never sees the error: `logger()` settles `next()`, so the route
-boundary has already answered it (see
+`logger()` still catches the error, but `logger()` logs the response the
+error would be answered with, not the catcher's reply (see
 [Where it sits in the app](#where-it-sits-in-the-app)).
 
 The deprecated `onError` hook still works, and still reads `log` after the
@@ -424,12 +424,14 @@ runs on **every** request, so:
   Observers (`logger`, `telemetry`, `secureHeaders`, `cors`, `compress`)
   go first, so they wrap everything, 404s included;
 - an error-handling middleware, a `try`/`catch` around `next()`, goes
-  **after** `logger()`: `logger()` settles `next()`, which answers an error
-  with the route's `onError`, `HttpError` or 500 before an outer `try`/`catch`
-  could see it;
-- a `use()` inside a `group` stays with the group's routes: a request that
-  matches none of them is not logged by it. To log everything, `use` it on
-  the app.
+  **after** `logger()`: `logger()` settles `next()` and logs the response the
+  error would be answered with (the route's `onError`, `HttpError` or 500),
+  then the error goes on, so a `try`/`catch` catches it wherever it stands,
+  and is logged only when it stands after `logger()`;
+- a `use()` inside a `group` stays inside it: its routes, and a request no
+  route matches under the group's prefix, are logged by it; nothing outside
+  the prefix, nor a route declared after the group. To log everything, `use`
+  it on the app.
 
 ```ts
 import { alxia } from '@alxia/core';

@@ -14,13 +14,19 @@ import type {
 	SocketDefinition,
 } from './definition';
 import { behind, byKind, type Refusals, then } from './refusal-handlers';
-import { reach, rebase, type ScopePath } from './scope-path';
+import { prefixPath, reach, rebase, type ScopePath } from './scope-path';
 import type { RouteSchema } from './types';
 
-/** A hook of the chain in force, and the paths it runs on: all, without one. */
+/**
+ * A hook of the chain in force, and the paths it runs on: all, without
+ * one. `enclosed`: a group's or a prefixed plugin's, which runs on the
+ * requests no route matches under its path, and on no route declared
+ * after it.
+ */
 interface Scoped {
 	readonly hook: ChainHook;
 	readonly path?: ScopePath | undefined;
+	readonly enclosed?: true;
 }
 
 /** The hooks a route or socket route declared now runs. */
@@ -37,6 +43,8 @@ export class Scope {
 	#bodyLimit: number | undefined;
 	/** What `unmatched` built, until a hook is added. */
 	#unmatched: ScopedHooks | undefined;
+	/** How many hooks of the chain a group's scope took from the app's: the rest are its own. */
+	#inherited = 0;
 
 	/**
 	 * Adds a `derive`, a `wrap` or a middleware for the routes declared
@@ -79,6 +87,7 @@ export class Scope {
 		copy.#onError = [...this.#onError];
 		copy.#refusals = this.#refusals;
 		copy.#bodyLimit = this.#bodyLimit;
+		copy.#inherited = this.#derive.length;
 		return copy;
 	}
 
@@ -108,7 +117,8 @@ export class Scope {
 			derive: this.#derive
 				.filter(({ hook }) => hook.kind !== 'wrap')
 				.map(({ hook, path }) =>
-					path === undefined || hook.kind !== 'middleware'
+					path === undefined ||
+					(hook.kind !== 'middleware' && hook.kind !== 'derive')
 						? hook
 						: { ...hook, when: path },
 				),
@@ -130,36 +140,68 @@ export class Scope {
 	}
 
 	/**
-	 * A plugin's route behind this scope: this scope's `derive` hooks before
-	 * its own, its `onError` hooks before this scope's, its `onRefusal`
-	 * handler unless it has none.
+	 * A plugin's route behind this scope, mounted at `path` under `prefix`:
+	 * this scope's `derive` hooks before its own, whose paths move under
+	 * `prefix` with it, its `onError` hooks before this scope's, its
+	 * `onRefusal` handler unless it has none.
 	 */
 	behind<Definition extends RouteDefinition | SocketDefinition>(
 		definition: Definition,
 		path: string,
+		prefix: string,
 	): Definition {
+		const own =
+			prefix === ''
+				? definition.derive
+				: definition.derive.map((hook) =>
+						'when' in hook && hook.when !== undefined
+							? { ...hook, when: rebase(hook.when, prefix) }
+							: hook,
+					);
 		return {
 			...definition,
 			path,
-			derive: [...this.#chainAt(path), ...definition.derive],
+			derive: [...this.#chainAt(path), ...own],
 			onError: [...definition.onError, ...this.#onError],
 			...behind(definition, this.#refusals),
 		};
 	}
 
 	/**
-	 * Takes up the hooks of a plugin, for the routes declared after it: its
-	 * scoped middlewares under `prefix`, as its routes are.
+	 * Takes up the hooks of a plugin mounted under `prefix`, its scoped
+	 * middlewares' paths under it as its routes are. A plugin without a
+	 * prefix of its own gives its chain to the routes declared after it; one
+	 * with `own`, its prefix, keeps it to its routes, as a group does: its
+	 * hooks run on the requests no route matches under that prefix alone.
 	 */
-	absorb(plugin: Scope, prefix: string): void {
-		const taken = plugin.#derive.map(({ hook, path }) => ({
-			hook,
-			path: path === undefined ? undefined : rebase(path, prefix),
-		}));
+	absorb(plugin: Scope, prefix: string, own = ''): void {
+		const at = own === '' ? undefined : prefixPath(own);
+		const taken = plugin.#derive.map(({ hook, path, enclosed }) => {
+			const scoped = path ?? at;
+			return {
+				hook,
+				path: scoped === undefined ? undefined : rebase(scoped, prefix),
+				...(enclosed || at !== undefined ? { enclosed: true as const } : {}),
+			};
+		});
 		this.#derive = [...this.#derive, ...taken];
 		this.#onError = [...plugin.#onError, ...this.#onError];
 		this.#refusals = then(this.#refusals, plugin.#refusals);
 		this.#bodyLimit = plugin.#bodyLimit ?? this.#bodyLimit;
+		this.#unmatched = undefined;
+	}
+
+	/**
+	 * Takes up the chain a group at `prefix` added to its copy of this
+	 * scope, for the requests no route matches under it: the group's routes
+	 * have it, and no route declared after the group does.
+	 */
+	enclose(group: Scope, prefix: string): void {
+		const at = prefixPath(prefix);
+		for (const { hook, path } of group.#derive.slice(group.#inherited)) {
+			if (hook.kind === 'wrap') continue;
+			this.#derive.push({ hook, path: path ?? at, enclosed: true });
+		}
 		this.#unmatched = undefined;
 	}
 
@@ -170,7 +212,8 @@ export class Scope {
 	 */
 	#chainAt(path: string): ChainHook[] {
 		const chain: ChainHook[] = [];
-		for (const { hook, path: scoped } of this.#derive) {
+		for (const { hook, path: scoped, enclosed } of this.#derive) {
+			if (enclosed) continue;
 			if (scoped === undefined || hook.kind !== 'middleware') {
 				chain.push(hook);
 				continue;

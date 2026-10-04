@@ -280,9 +280,10 @@ A middleware that must see the response the client will get, an error's
 included — a logger, a header on every response — settles `next()` instead of
 catching it: `await settle(ctx, next())` resolves to the boundary's answer
 (the `onError` hooks, the `HttpError`, the 500) and keeps the error on
-`ctx.error`. Give such an observer first, and a middleware that answers
-errors after it: the observer settles the error before an outer `try` could
-see it ([Middleware](middleware.md)).
+`ctx.error`. The error then goes on to the middlewares around the observer,
+so a `try`/`catch` catches it wherever it is declared; give such an observer
+first and the middleware that answers errors after it, so the observer also
+sees its reply ([Middleware](middleware.md)).
 
 ```ts
 class HttpError<Status extends number = number, Body = unknown> extends Error {

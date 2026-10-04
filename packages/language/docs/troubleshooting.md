@@ -17,8 +17,8 @@ the response does that you did not expect.
 - [`Type 'string | null' is not assignable to type 'string | undefined'`](#type-string--null-is-not-assignable-to-type-string--undefined)
 - [`Type 'Promise<string>' is not assignable to type 'string'`](#type-promisestring-is-not-assignable-to-type-string)
 - [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
-- [`the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first`](#the-plugin-reads-user-which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
-- [`the plugin reads "user", which this app's context gives with another type`](#the-plugin-reads-user-which-this-apps-context-gives-with-another-type)
+- [`Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'`](#property-user-is-missing-in-type-basecontext--empty-but-required-in-type--user-user--null-)
+- [`Types of property 'user' are incompatible`](#types-of-property-user-are-incompatible)
 - [`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
 **Responses**
@@ -251,13 +251,13 @@ alxia().plugin(auth).use(byUser); // auth derives user
 
 See [Reading the app's context](guide.md#reading-the-apps-context).
 
-### `the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first`
+### `Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'`
 
 ```text
 error TS2769: No overload matches this call.
   …
-        Types of property ''~requires'' are incompatible.
-          Type '{ user: User; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: add the plugin or middleware that gives it first"'.
+          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ user: User | null; }>'.
+            Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'.
 ```
 
 **When:** the middleware's `resolve` is annotated to read `user`, and it is
@@ -278,12 +278,16 @@ alxia().plugin(auth).use(byUser);
 More on this message in
 [`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first).
 
-### `the plugin reads "user", which this app's context gives with another type`
+### `Types of property 'user' are incompatible`
 
 ```text
 error TS2769: No overload matches this call.
   …
-          Type '{ user: User; }' is not assignable to type '"the plugin reads \"user\", which this app's context gives with another type"'.
+          Type 'BaseContext & Empty & { user: User | null; }' is not assignable to type 'MiddlewareContext<{ user: User; }>'.
+            Type 'BaseContext & Empty & { user: User | null; }' is not assignable to type '{ user: User; }'.
+              Types of property 'user' are incompatible.
+                Type 'User | null' is not assignable to type 'User'.
+                  Type 'null' is not assignable to type 'User'.
 ```
 
 **When:** the app gives a `user`, but of a type that does not fit the one
@@ -312,8 +316,8 @@ More on this message in
 ```text
 error TS2769: No overload matches this call.
   …
-        Types of property ''~requires'' are incompatible.
-          Type '{ readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"; }' is not assignable to type '"the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"'.
+          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"; }>'.
+            Property ''~any'' is missing in type 'BaseContext & Empty' but required in type '{ readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"; }'.
 ```
 
 **When:** `resolve`'s parameter is annotated `any` —
@@ -406,7 +410,7 @@ Cookie` with the default `order`, and a reply's own `Vary` adds to it. Two
 things still leave a header out:
 
 - what `resolve` reads, unless the `vary` option names it;
-- a middleware (or a deprecated `onResponse` hook) that sets `Vary` with
+- a middleware that sets `Vary` with
   `headers.set` instead of `@alxia/core`'s `vary`, which replaces every
   name before it.
 
@@ -414,9 +418,14 @@ things still leave a header out:
 and give a cache the same headers:
 
 ```ts
-import { alxia, vary, withHeaders } from '@alxia/core';
+import { alxia, defineMiddleware, settle, vary, withHeaders } from '@alxia/core';
 
 alxia()
+	.use(
+		defineMiddleware(async (ctx, next) =>
+			withHeaders(await settle(ctx, next()), (headers) => vary(headers, 'Accept-Encoding')),
+		),
+	)
 	.use(
 		language({
 			supported: ['en', 'fr'],
@@ -424,8 +433,7 @@ alxia()
 			resolve: (ctx) => ctx.request.headers.get('x-preferred-language') ?? undefined,
 			vary: ['X-Preferred-Language'],
 		}),
-	)
-	.onResponse((response) => withHeaders(response, (headers) => vary(headers, 'Accept-Encoding')));
+	);
 // Vary: Accept-Language, Cookie, X-Preferred-Language, Accept-Encoding
 ```
 

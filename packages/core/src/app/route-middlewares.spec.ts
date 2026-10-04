@@ -111,18 +111,6 @@ describe('route(operation, ...middlewares, handler)', () => {
 		}
 	});
 
-	test('declares the operation on the route, as OpenAPI reads it', () => {
-		const app = alxia().route(updatePet, auth, ({ reply }) =>
-			reply(200, { id: 1, name: 'x' }),
-		);
-		expect(app.routes[0]?.schema).toEqual({
-			detail: { operationId: 'updatePet' },
-			response: updatePet.schema.response,
-			params: updatePet.schema.params,
-			body: updatePet.schema.body,
-		});
-	});
-
 	test('the mistakes a route method refuses', () => {
 		const _mistakes = () => {
 			// @ts-expect-error 201 is not declared by the operation

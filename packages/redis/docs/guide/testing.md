@@ -61,8 +61,9 @@ it, as below.
 ## Give each test a client address
 
 `app.request()` has no socket, so `ctx.ip` is `undefined`. A rate limit
-then counts nothing, and idempotency scopes every key to `anyone`. Pass the
-app an `ip` that answers, as above, or one per test to stand for two
+then counts nothing, and idempotency guards nothing: each request runs, and
+it warns once that no client scope could be derived. Pass the app an `ip`
+that answers, as above, or one per test to stand for two
 clients:
 
 ```ts

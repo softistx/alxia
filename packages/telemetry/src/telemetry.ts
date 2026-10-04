@@ -1,5 +1,8 @@
 import {
 	defineMiddleware,
+	type Empty,
+	type Middleware,
+	type MiddlewareMark,
 	type Next,
 	type RequestContext,
 	settle,
@@ -56,6 +59,16 @@ export interface TelemetryContext {
 }
 
 /**
+ * What `telemetry()` makes: a middleware that gives `span` and
+ * `telemetry`, with the telemetry on it, to close on stop.
+ */
+export type TelemetryMiddleware = Middleware<
+	Empty,
+	Promise<Next<TelemetryContext>>
+> &
+	MiddlewareMark & { telemetry: Telemetry };
+
+/**
  * One server span per request, with [`@nxgt/telemetry`](https://www.npmjs.com/package/@nxgt/telemetry),
  * as a middleware.
  *
@@ -82,7 +95,9 @@ export interface TelemetryContext {
  * app.onStop(() => tracing.telemetry.close());
  * ```
  */
-export function telemetry(options: TelemetryPluginOptions) {
+export function telemetry(
+	options: TelemetryPluginOptions,
+): TelemetryMiddleware {
 	const instance =
 		options.instance ?? createTelemetry(options.service, options).install();
 	const traced = guarded(options.traced ?? (() => true), () => true);

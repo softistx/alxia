@@ -16,6 +16,8 @@ export interface AppState {
 	readonly sockets: SocketDefinition[];
 	/** The route hooks in force for the routes declared next. */
 	scope: Scope;
+	/** Whether `late-use.ts` warned already: once per app. */
+	warnedLate?: boolean;
 }
 
 /** A new app's state; a prefix that does not start with "/", or ends with one, throws. */

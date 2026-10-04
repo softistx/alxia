@@ -261,13 +261,13 @@ const app = alxia()
 	.get('/', ({ language: current, reply }) => reply(200, current)); // 'en' | 'fr'
 
 alxia().use(byUser);
-// error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
+// error: Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'
 ```
 
 The annotation may be `BaseContext & { user: User }` or `{ user: User }`
 alone; either way the middleware requires `{ user: User }`. An app whose `user`
 has a type that does not fit it is refused too —
-`the plugin reads "user", which this app's context gives with another type` —
+`Types of property 'user' are incompatible` —
 while a narrower one passes: an app deriving `user: User` may use a middleware
 that reads `User | null`. Annotating a key `BaseContext` already has with
 a type it does not give — `({ url }: { url: string })` — is refused the

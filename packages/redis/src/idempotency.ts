@@ -1,4 +1,12 @@
-import { type BaseContext, defineMiddleware, settle } from '@alxia/core';
+import {
+	type BaseContext,
+	defineMiddleware,
+	type Empty,
+	type Middleware,
+	type MiddlewareMark,
+	type Reply,
+	settle,
+} from '@alxia/core';
 import {
 	bindIdempotency,
 	defineIdempotency,
@@ -25,7 +33,9 @@ export interface IdempotencyOptions {
 	/**
 	 * Whose key it is: keys are scoped by the route and by this, so two
 	 * clients choosing the same key never see each other's response. The
-	 * client's address by default; a user id when there is one.
+	 * client's address by default; a user id when there is one. A request
+	 * it gives no scope for runs unguarded — nothing stored, nothing
+	 * replayed — with a warning, once.
 	 */
 	readonly scope?: (ctx: BaseContext) => string | undefined;
 }
@@ -40,6 +50,21 @@ export interface IdempotencyErrorBody {
 	/** Seconds until a running request should be over: with `idempotency_in_progress`. */
 	readonly retryAfter?: number;
 }
+
+/**
+ * What `idempotency()` makes: a middleware that adds nothing to the
+ * context, and may answer a 400, a 409 or a 422.
+ */
+export type IdempotencyMiddleware = Middleware<
+	Empty,
+	Promise<
+		| Response
+		| Reply<400, IdempotencyErrorBody>
+		| Reply<409, IdempotencyErrorBody>
+		| Reply<422, IdempotencyErrorBody>
+	>
+> &
+	MiddlewareMark;
 
 const Stored = z.object({
 	status: z.number().int(),
@@ -80,7 +105,10 @@ class Unstored extends Error {
  * app.use(idempotency(redis.client, { name: 'payments' })).post('/payments', ...);
  * ```
  */
-export function idempotency(client: RedisClient, options: IdempotencyOptions) {
+export function idempotency(
+	client: RedisClient,
+	options: IdempotencyOptions,
+): IdempotencyMiddleware {
 	const methods = new Set(options.methods ?? ['POST', 'PATCH']);
 	const header = options.header ?? 'idempotency-key';
 	const scope = options.scope ?? ((ctx: BaseContext) => ctx.ip);
@@ -94,6 +122,12 @@ export function idempotency(client: RedisClient, options: IdempotencyOptions) {
 			schema: Stored,
 		}),
 	);
+	let warned = false;
+	const warnUnscoped = () => {
+		if (warned) return;
+		warned = true;
+		console.warn(unscopedWarning(options.name));
+	};
 	const refuse = (
 		error: IdempotencyErrorBody['error'],
 		retryAfter?: number,
@@ -114,14 +148,13 @@ export function idempotency(client: RedisClient, options: IdempotencyOptions) {
 		}
 		if (!KEY.test(key)) return reply(400, refuse('idempotency_key_invalid'));
 
-		const body = new Uint8Array(await request.clone().arrayBuffer());
-		const head = new TextEncoder().encode(
-			`${request.method} ${ctx.url.pathname}${ctx.url.search}\n`,
-		);
-		const fingerprint = new Uint8Array(head.length + body.length);
-		fingerprint.set(head);
-		fingerprint.set(body, head.length);
-		const id = `${route}:${scope(ctx) ?? 'anyone'}:${key}`;
+		const scoped = scope(ctx);
+		if (scoped === undefined) {
+			warnUnscoped();
+			return next();
+		}
+		const id = `${route}:${scoped}:${key}`;
+		const fingerprint = await fingerprintOf(request, ctx.url);
 
 		try {
 			const { value, replayed } = await bound.run(
@@ -150,6 +183,23 @@ export function idempotency(client: RedisClient, options: IdempotencyOptions) {
 			throw error;
 		}
 	});
+}
+
+/** The warning a request with no scope prints, once per middleware. */
+function unscopedWarning(name: string): string {
+	return `idempotency "${name}": no client scope could be derived (ctx.ip is undefined and no scope option returned one), so these requests run unguarded, nothing stored or replayed. Pass a scope option, (ctx) => a user id, or an ip option to alxia().`;
+}
+
+/** What a key is bound to: the method, the path and query, the body. */
+async function fingerprintOf(request: Request, url: URL): Promise<Uint8Array> {
+	const body = new Uint8Array(await request.clone().arrayBuffer());
+	const head = new TextEncoder().encode(
+		`${request.method} ${url.pathname}${url.search}\n`,
+	);
+	const fingerprint = new Uint8Array(head.length + body.length);
+	fingerprint.set(head);
+	fingerprint.set(body, head.length);
+	return fingerprint;
 }
 
 async function store(response: Response): Promise<Stored> {

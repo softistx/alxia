@@ -25,7 +25,7 @@ where the middleware sits in the app, and what those options return.
 - [`duration` is `0`, or shorter than the request took](#duration-is-0-or-shorter-than-the-request-took)
 - [A streamed request's entry comes long after the request](#a-streamed-requests-entry-comes-long-after-the-request)
 - [A WebSocket connection has no entry](#a-websocket-connection-has-no-entry)
-- [A `try`/`catch` before `logger()` never sees the error](#a-trycatch-before-logger-never-sees-the-error)
+- [`logger()` logs a 500, not the reply of my `try`/`catch` middleware](#logger-logs-a-500-not-the-reply-of-my-trycatch-middleware)
 - [Requests outside the group are not logged](#requests-outside-the-group-are-not-logged)
 - [A skipped path still shows up in the log](#a-skipped-path-still-shows-up-in-the-log)
 - [A field given to `log` is replaced](#a-field-given-to-log-is-replaced)
@@ -63,21 +63,29 @@ const app = alxia()
 error TS18048: 'log' is possibly 'undefined'.
 ```
 
-**When:** an `onError` hook (deprecated) declared after the middleware calls
-`log.error(…)`.
+**When:** a deprecated `onError` hook, or a callback that runs outside the
+chain, calls `log.error(…)`.
 
 **Why:** an `onError` hook also runs for an error thrown before
 `logger()` had run, when there is no `log` yet. A middleware after
-`logger()` has no such doubt: read `log` there, and catch with a
-`try`/`catch` around `next()`.
+`logger()` has no such doubt: `log` is typed there.
 
-**Fix:** call it optionally:
+**Fix:** catch in a middleware declared after `logger()`, with a `try`/`catch`
+around `next()`, and read `log` there:
 
 ```ts
-app.use(logger()).onError((error, { log }) => {
-	log?.error('request failed', { error: String(error) });
-	return undefined;
-});
+import { alxia, defineMiddleware } from '@alxia/core';
+
+app.use(logger()).use(
+	defineMiddleware(async ({ log }, next) => {
+		try {
+			return await next();
+		} catch (error) {
+			log.error('request failed', { error: String(error) });
+			throw error; // rethrow what is not yours
+		}
+	}),
+);
 ```
 
 ## Responses
@@ -216,17 +224,21 @@ nothing for `logger()` to settle and no entry is written.
 
 **Fix:** log from the socket's handlers yourself, with `write`'s sink.
 
-### A `try`/`catch` before `logger()` never sees the error
+### `logger()` logs a 500, not the reply of my `try`/`catch` middleware
 
-**When:** a middleware wraps `next()` in a `try`/`catch`, is declared
-before `logger()`, and its `catch` never runs for a route that throws.
+**When:** a middleware wraps `next()` in a `try`/`catch` and answers errors
+in its own format (a 503, a problem document), and the log line for that
+request shows a 500.
 
-**Why:** `logger()` settles `next()`: an error is answered there, with the
-route's `onError`, the `HttpError`'s status or a 500, so what reaches the
-outer middleware is a response, not a rejection. The same holds for
-`telemetry()` and `secureHeaders()`.
+**Why:** `logger()` settles `next()`: it logs the response the error would be
+answered with, a 500 when no `onError` or `HttpError` says otherwise, then
+the error goes on to the middlewares around it. Declared **before**
+`logger()`, the catcher still catches the error, but the logger inside it
+saw the 500, not its reply. The same holds for `telemetry()` and
+`secureHeaders()`.
 
-**Fix:** declare the error-handling middleware after the observers:
+**Fix:** declare the error-handling middleware after the observers, so they
+see its reply:
 
 ```ts
 import { alxia, defineMiddleware } from '@alxia/core';
@@ -250,8 +262,9 @@ const app = alxia()
 **When:** `use(logger())` sits inside a `group`, and requests to routes
 outside the group, or to no route at all, get no entry and no header.
 
-**Why:** a group's middlewares stay with the group's routes. They do not
-run on an unmatched request, even one under the group's prefix.
+**Why:** a group's middlewares stay inside the group: its routes, and the
+unmatched requests under its prefix. Nothing outside the prefix, and no route
+declared after the group, is logged by it.
 
 **Fix:** `use` it on the app, and leave requests out with `skip`:
 

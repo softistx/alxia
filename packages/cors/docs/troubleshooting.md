@@ -31,7 +31,7 @@ Firefox and Safari say the same thing in other words.
 **Types**
 
 - [`Type 'false' is not assignable to type 'CorsOrigin | undefined'`](#type-false-is-not-assignable-to-type-corsorigin--undefined)
-- [`Type 'Alxia<…>' has no properties in common with type 'CorsOptions'`](#type-alxia-has-no-properties-in-common-with-type-corsoptions)
+- [`Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'`](#type-corsmiddleware-is-not-assignable-to-type-middlewarereturn)
 - [`Type 'string' is not assignable to type 'readonly string[]'`](#type-string-is-not-assignable-to-type-readonly-string)
 
 ## In the browser
@@ -66,9 +66,8 @@ error status.
 
 - the app does not use `cors()`, and routing answers the `OPTIONS` with a
   `405` — see [the next section](#405-errormethod_not_allowed-on-an-options-request);
-- `cors()` is declared in a `group`: a group's middlewares do not run on a
-  request no route matches, and a preflight is one, so the app answers the
-  `405`;
+- `cors()` is declared in a `group`: it answers the preflights under the
+  group's prefix, and not the others, which the app answers with a `405`;
 - a middleware declared **before** `cors()` returned a response — a `401`
   for a missing token, a `429` — and middlewares run in the order they are
   declared. A browser never sends credentials on a preflight, so an
@@ -173,8 +172,7 @@ cors({ origin: 'https://app.example.com', exposedHeaders: ['x-total', 'etag'] })
 **When:** an `OPTIONS` request to a path that has routes for other
 methods.
 
-**Why:** either the app does not use `cors()` (or uses it in a `group`, which
-does not run on a request no route matches), or the request is not a
+**Why:** either the app does not use `cors()` (or uses it in a `group` whose prefix the path is not under), or the request is not a
 preflight: `cors()` only answers an `OPTIONS` that carries
 `Access-Control-Request-Method`, as a browser's does. A plain `OPTIONS` —
 from `curl`, or a test that forgets the header — goes to routing like any
@@ -272,11 +270,11 @@ app.derive(({ request, reply }) =>
 **When:** an `origin` function throws — typically `new URL(origin)` on the
 `Origin: null` that a sandboxed iframe or a page opened from a file sends.
 
-**Why:** the function runs in the middleware. On a preflight, the throw
-becomes a `500 {"error":"internal"}` without CORS headers. On any other
-request, the route has already answered: the error is logged and the
-response is sent as the route made it, without CORS headers, so the browser
-refuses it as it would a refused origin.
+**Why:** the function runs in the middleware, which logs the throw and
+treats the origin as refused: a throw costs the CORS headers, never the
+response. A preflight is answered with its `204`, without them; any other
+request gets the route's answer, without them. The browser refuses both as
+it would a refused origin.
 
 **Fix:** make the function total — it returns `false` for what it cannot
 read:
@@ -310,15 +308,17 @@ const base = alxia();
 const app = origins ? base.use(cors({ origin: origins })) : base;
 ```
 
-### `Type 'Alxia<…>' has no properties in common with type 'CorsOptions'`
+### `Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'`
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '(options?: CorsOptions | undefined) => NoInfer<Middleware<Empty, Promise<Response>> & MiddlewareMark>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
-      Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, "", never>' has no properties in common with type 'CorsOptions'.
+  The last overload gave the following error.
+    Argument of type '(options?: CorsOptions) => CorsMiddleware' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
+      Type '(options?: CorsOptions) => CorsMiddleware' is not assignable to type '(ctx: BaseContext & Empty, next: NextFunction) => MiddlewareReturn'.
+        Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'.
 ```
+
+TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
 
 **When:** `app.use(cors)`, without calling it.
 

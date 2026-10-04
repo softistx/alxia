@@ -46,11 +46,13 @@ around the router's answer, in the order declared: an onion. Code before
    is the route's path as declared (`/users/:id`), or `undefined` on a
    request no route matches: a 404, a 405, a 426, an `OPTIONS` to a path
    with no `OPTIONS` route.
-4. **The app's chain**, in the order declared: every `use(middleware)`,
-   `derive`, `decorate` and `wrap` — the app's, then the group's, a
-   plugin's after those of the app that uses it. A `use(path, …)` one runs
-   when the request's path is under `path`. A middleware that returns a
-   reply or a `Response` ends the request there.
+4. **The app's chain**, in the order declared: first the middlewares given
+   to the deprecated `plugin(middleware)`, which run app-wide as 0.3's
+   global hooks did, then every `use(middleware)`, `derive`, `decorate`
+   and `wrap` — the app's, then the group's, a plugin's after those of the
+   app that uses it. A `use(path, …)` one runs when the request's path is
+   under `path`. A middleware that returns a reply or a `Response` ends the
+   request there.
 5. **The route's own middlewares**, in the order given: the ones a route is
    given after its path, `validate` and `responds` where they stand.
 6. **The handler** — or, when no route matched, the router's 404, 405 or
@@ -122,10 +124,17 @@ Three rules follow, each spec'd:
   A guard on the app guards what is not there too: scope it with a
   [group](#group) or a path (`use('/api', guard)`) to guard some routes only.
 
-- **A group's middlewares stay with the group's routes**: they do not run on
-  an unmatched request, even one under the group's prefix. A plugin's
-  (`app.plugin(otherApp)`) are the app's: they run on unmatched requests
-  too.
+- **A group's middlewares stay under the group's prefix**: they run on the
+  group's routes and on an unmatched request under its prefix, before its
+  404 or 405 — so `DELETE /admin/secret` behind `group('/admin', g =>
+  g.use(guard).get('/secret', …))` is the guard's 401, not a 405 whose
+  `Allow` tells what is there — and on nothing else: no route declared
+  after the group, no request outside its prefix. A group without a prefix
+  of its own adds none to unmatched requests. A plugin with a prefix of its
+  own (`alxia({ prefix: '/todos' })`, `defineRoutes('/todos')`) is such a
+  group once mounted. A plugin without one (`app.plugin(otherApp)`) gives
+  its middlewares to the app: the routes declared after it, and every
+  unmatched request.
 
 Where an observer or an error handler stands in the chain matters, and is
 [below](#ordering).
@@ -192,11 +201,13 @@ sees.
 - **Observers first.** What watches every request — a logger, a tracing
   span, security headers, CORS, compression — is given to `use` first, so it
   wraps everything after it, a 404 included.
-- **An error handler after the observers.** An observer settles `next()`
-  ([below](#settle-see-the-response-the-client-gets)): it answers an error
-  with the route's `onError`, `HttpError` or 500 before an outer `try`/`catch`
-  could see it. A middleware that answers errors itself goes inside the
-  observers, so declare it after them.
+- **An error handler anywhere.** An observer settles `next()`
+  ([below](#settle-see-the-response-the-client-gets)): it reads the
+  response the error would be answered with, and the error goes on. A
+  `try`/`catch` middleware catches it whether it is given before the
+  observers or after them; given after them, the observers also see its
+  reply, so that is still the place to give it. `use(janusErrors()).use(i18n).use(session())`
+  answers a janus error as janus says.
 - **A guard on the app runs on unmatched requests too**: an anonymous
   request to a missing path gets the 401, not the 404. Scope the guard with a
   group or a path to guard some routes only.
@@ -496,7 +507,21 @@ middleware: a plain `(ctx, next) => …` given to `use` is called once as a
 plugin, with the app, and `use` throws when it returns no app —
 [`use(): the plugin function returned a promise, …`](../troubleshooting.md#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-made-with-definemiddleware-and-given-to-use).
 A route takes a plain function. In the next minor, `use` takes one too.
-`app.plugin(middleware)` is the deprecated alias of `app.use(middleware)`.
+`app.plugin(middleware)`, deprecated, keeps the meaning of 0.3, where
+those middlewares were global hooks: it runs app-wide, on every route
+declared before it and after it and on every unmatched request, before
+the app's chain. What it adds to the context is typed only for the routes
+after it. Given after routes, in development (`NODE_ENV` neither
+`production` nor `test`), it warns once, naming them.
+
+`use(middleware)` given after routes does not run on them, by design — a
+`use()` after a route runs on unmatched requests and on the routes after
+it. In development it warns once per app, naming the routes declared
+before it, in case they needed it:
+
+```
+use(): the middleware runs on the routes declared after it and on requests no route matches, not on the route (GET /health) declared before it. Give it to use() before them if they need it.
+```
 
 ### `use` with a path
 
@@ -512,7 +537,17 @@ routes, compiled once when `use` is called.
 
 It runs for a route whose request path matches — a `/users/:id` route
 requested as `/users/admin` runs `use('/users/admin', guard)` — and for an
-unmatched request under the path, before its 404:
+unmatched request under the path, before its 404.
+
+The request's path is read as the router, the static files and React
+Router read it, and fails closed: each segment is decoded (an encoded `/`,
+`%2F`, splits it), empty segments are collapsed (`//admin`, a trailing
+`/`), and segments are compared **without case**, on purpose: React
+Router's matching ignores case, and so does the file system of macOS. So
+`/%61dmin/x`, `//admin/x`, `/admin%2Fx` and `/ADMIN/x` all run
+`use('/admin', guard)`. A segment that does not decode, or a `.` or `..`
+left in it once decoded, runs the middleware too. A route declared at a
+fixed path is still settled when it is declared, at no cost per request.
 
 ```ts
 import { alxia, defineMiddleware } from '@alxia/core';
@@ -613,8 +648,10 @@ does the same on the routes it is given to. See
 
 ### `group`
 
-Middlewares declared inside a group apply to its routes only, and not to an
-unmatched request. The group's routes keep every one declared before it.
+Middlewares declared inside a group apply to its routes, and to an
+unmatched request under its prefix, before the 404 or 405: never to a
+route declared after the group. The group's routes keep every one
+declared before it.
 `use` in a group is how a subtree's context is added to:
 
 ```ts
@@ -633,7 +670,7 @@ const app = alxia()
 			.get('/stats', ({ admin, reply }) => reply(200, { users: 1, admin })),
 	)
 	.get('/public', ({ reply }) => reply(200, 'open')); // no 403 here
-// GET /admin/missing → 404, the group's guard does not run on it
+// GET /admin/missing → 403 without x-admin, 404 with it; GET /missing → 404
 ```
 
 `group(build)` with no prefix is a scope alone. See
@@ -641,9 +678,22 @@ const app = alxia()
 
 ### `plugin` and `definePlugin`
 
-An app given to `plugin` brings its routes, and its middlewares then apply to
-the routes declared after `plugin` — and to unmatched requests, as the
-app's own do. `definePlugin<Requires>()` builds an app plugin that reads
+An app given to `plugin` brings its routes, behind the app's middlewares,
+its own `use(path, …)` moved under the prefix it is mounted at. A plugin
+without a prefix of its own gives its middlewares to the routes declared
+after `plugin` — and to unmatched requests, as the app's own do. One with
+a prefix of its own, `alxia({ prefix: '/todos' })` or
+`defineRoutes('/todos')`, keeps them under that prefix, as a group does:
+its routes, and the unmatched requests under it. It then adds nothing to
+the context of the routes after it, in the types too.
+
+```ts
+const todos = defineRoutes('/todos').use(requireAdmin).get('/', listTodos);
+const app = base.plugin(todos).get('/public', ({ reply }) => reply(200, 'open'));
+// GET /todos, GET /todos/missing → requireAdmin; GET /public, GET /missing → no requireAdmin
+```
+
+`definePlugin<Requires>()` builds an app plugin that reads
 what an earlier one added. A `Plugin` function given to `plugin`, `(app) =>
 app`, returns the app; `plugin` throws when it returns anything else.
 
@@ -700,8 +750,19 @@ const app = alxia()
 function settle<Settled extends Response>(ctx: object, pending: Promise<Settled>): Promise<Settled>;
 ```
 
-The middlewares around a `settle` see its response, not the error: that is
-why an [error handler goes after the observers](#ordering).
+`settle` does not swallow the error. Once the middleware returns the
+response, the error goes on to the middlewares around it: a `try`/`catch`
+there still catches it, and a `settle` there reads the response this one
+returned, its headers included. When nothing catches it, that response —
+what the observers made of it, the outermost last — is the one sent. So
+an [error handler](#ordering) works wherever it is given; given after the
+observers, they see its reply too.
+
+The error goes on when the observer gives `settle` its `next()` itself and
+returns the `Response` `settle` resolved to, or one made from it. A
+middleware that settles `next().then(…)`, or returns a reply of its own
+after `settle`, answers the error there, as a `try`/`catch` that does not
+rethrow does: a middleware around it sees that answer, not the error.
 
 ### Answering a refusal or an error
 

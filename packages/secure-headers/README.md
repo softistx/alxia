@@ -96,21 +96,23 @@ value is refused at startup. `nonce` is off by default.
 
 | export | |
 | --- | --- |
-| `secureHeaders(options?)` | the middleware, for `app.use`: a `SecureHeaders`, or with `nonce: true` a `NoncePlugin` |
+| `secureHeaders(options?)` | the middleware, for `app.use`: a `SecureHeaders`, or with `nonce: true` a `NonceMiddleware` |
 | `SecureHeadersOptions` | its options: the headers and `hidePoweredBy`; `nonce` is added by each overload |
 | `Setting` | a header option's type: its value, or `false` to leave it out |
 | `NONCE` | where the nonce goes in `contentSecurityPolicy`, each time it is named |
 | `NonceContext` | what `nonce: true` adds to the context: `nonce`, a string |
 | `SecureHeaders` | what `secureHeaders()` returns: a middleware that adds nothing to the context |
-| `NoncePlugin` | what `secureHeaders({ nonce: true })` returns: a middleware adding `NonceContext` |
+| `NonceMiddleware` | what `secureHeaders({ nonce: true })` returns: a middleware adding `NonceContext` |
+| `NoncePlugin` | deprecated: the former name of `NonceMiddleware` |
 
 ## Traps
 
 `use` it first: a route declared before `app.use(secureHeaders())` gets no
-header, and `ctx.nonce` exists only on routes declared after it. A
-`try`/`catch` middleware declared before it never sees an error: it settles
-`next()`, so the route's own error reply, or a 500, already carries the
-headers. Declare error-handling middleware after it.
+header, and `ctx.nonce` exists only on routes declared after it. It
+settles `next()` without swallowing the error: a `try`/`catch` middleware
+catches it wherever it stands, but only one declared after
+`secureHeaders()` has the headers on its reply. Declare error-handling
+middleware after it.
 
 ```ts
 const app = alxia().use(secureHeaders()).use(errorHandler).get(...);

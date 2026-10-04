@@ -28,9 +28,26 @@ number on it. Every release, with each change it made, is in
   preflight — runs them all, so a guard answers a missing path and an
   observer sees every response. `app.use('/admin', requireAdmin)` guards the
   requests under a path, matched against the request's path, and adds
-  nothing; a group's `use` adds to its subtree's context and stays with its
-  routes. `derive` stays, the shorthand for a middleware that only adds
+  nothing; a group's `use` adds to its subtree's context and stays inside it:
+  its routes, and the unmatched requests under its prefix. `derive` stays, the shorthand for a middleware that only adds
   ([Upgrading](upgrading.md#middlewares-for-every-request-use)).
+- **`use(path)` reads the path as the router does.** The request's path is
+  decoded, an encoded `/` splits a segment, empty ones collapse and the
+  comparison ignores case, so `/Admin//x` and `/%61dmin/x` meet
+  `use('/admin', guard)`; a path that cannot be read is refused, never let
+  through.
+- **A group, and a plugin with a prefix, guard what is under it.** A group's
+  middlewares run on its routes and on a request no route matches under its
+  prefix, before the 404 or 405, so a guard answers `DELETE /admin/secret`
+  with its 401; never on a route declared after the group, nor outside the
+  prefix. A plugin with a prefix of its own (`alxia({ prefix })`,
+  `defineRoutes('/x')`) behaves the same once mounted, and adds nothing to
+  the context of the routes after it.
+- **`settle` no longer swallows the error.** An observer — `logger`,
+  `telemetry`, `secureHeaders`, `cors`, `compress` — reads the response the
+  client would get, then the error goes on to the middlewares around it, so a
+  try/catch middleware catches it wherever it is declared; when none does,
+  the response the observer made is sent.
 - **Middlewares replace the request hooks.** `onRequest`, `onResponse`,
   `around`, `wrap`, `onError` and `onRefusal` are deprecated, and still run
   as in 0.3, for a middleware: code before and after `await next()`; a

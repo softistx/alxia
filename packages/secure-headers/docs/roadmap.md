@@ -9,7 +9,7 @@ number on it. Every release, with each change it made, is in
 
 - **Secure headers as a middleware.** `app.use(secureHeaders())`, declared
   first, sets the headers on every response that comes back through it, a
-  404's, an error's and a 500's included; `NoncePlugin` gives `nonce` to the
+  404's, an error's and a 500's included; `NonceMiddleware` gives `nonce` to the
   routes after it and `SecureHeaders` is the plain one.
   `app.plugin(secureHeaders())` keeps working as a deprecated alias.
 

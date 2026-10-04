@@ -8,6 +8,7 @@
 		"node_modules",
 		"dist",
 		"test/register",
+		"test/messages",
 		"test/declarations/registered.ts"
 	]
 }

@@ -105,7 +105,7 @@ cors({ origin: (origin) => allowed.has(origin) });             // your own decis
 | a string | that origin, compared exactly: `'https://app.example.com/'` never matches, nor does `http://` for `https://` |
 | a `RegExp` | every origin it `test`s true on: anchor it with `^` and `$`, or `/example\.com/` also matches `https://example.com.evil.net` |
 | a list | any of its strings or patterns |
-| a function | every origin it returns `true` for; on a request, a throw is logged and the response leaves without CORS headers; on a preflight, it is a 500 — see [the troubleshooting entry](troubleshooting.md#typeerror-invalid-url) |
+| a function | every origin it returns `true` for; a throw is logged and costs the CORS headers, never the response: a request gets the route's answer, a preflight its 204, both without them — see [the troubleshooting entry](troubleshooting.md#typeerror-invalid-url) |
 
 What the response carries depends on the form and on `credentials`:
 
@@ -278,12 +278,14 @@ const app = alxia()
 The `401` itself still carries the CORS headers, so the script can read it:
 `cors()` settles what the guard returns on its way out. A guard on the app
 runs on a request no route matches too, so an anonymous request to a missing
-path gets the `401`, not the `404`; scope it with a `group` or a path
-(`use('/api', authenticated)`) to guard only some routes.
+path gets the `401`, not the `404`; scope it with a `group`, or with a path
+(`use('/api', authenticated)`, a guard that adds nothing to the context), to
+guard only some routes.
 
-Declare it on the app itself, not in a `group`. A group's middlewares stay
-with the group's routes: they do not run on a request no route matches, and
-a preflight is one, since the group has no `OPTIONS` route. A route
+Declare it on the app itself, not in a `group`. A group's middlewares run on
+its routes and on a request no route matches under its prefix, a preflight
+included, but not outside it: a `cors()` in `group('/api')` answers the
+preflights of `/api/…` and none of the other paths. A route
 declared before `app.use(cors())` is not covered either. An app mounted with
 `app.plugin(otherApp)` brings its middlewares to the app, unmatched requests
 included, so a plugin app may hold the `cors()`; an app has one CORS policy.

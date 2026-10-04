@@ -148,32 +148,41 @@ unmatched request still gets its span). A
 | The response | The span's status | Its exception |
 | --- | --- | --- |
 | `2xx`, `3xx`, `4xx` replied | `ok` | none |
-| a `4xx` an error-handling middleware or an `onError` hook made of a thrown error | `ok` | the error |
+| a `4xx` an error-handling middleware made of a thrown error | `ok` | none: the middleware caught it |
+| a `4xx` the route boundary made of a thrown error (a deprecated `onError` hook, an `HttpError`) | `ok` | the error |
 | `499`, the client hung up mid-request | `ok` | the `AbortError` |
 | a `5xx` from a throw | `error` | the error |
 | a `5xx` the route replied | `error` | none |
 | a streamed body that failed midway ([A streamed body](#a-streamed-body)) | `error` | the stream's error |
 
 A `401` a guard answered is the server working, so a 4xx never marks a
-span. The error the route failed with is still recorded, as `ctx.error`
-holds it. Here an `onError` hook (deprecated, but still the way to answer
-at the route boundary) turns it into a 400:
+span. An error that reaches the route boundary is still recorded, as
+`ctx.error` holds it. One an error-handling middleware catches is not: the
+span sees only the 400 it answered. Here a middleware after `telemetry`
+turns a `RangeError` into a 400:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, defineMiddleware } from '@alxia/core';
 import { telemetry } from '@alxia/telemetry';
 import { consoleExporter } from '@nxgt/telemetry';
 
 const app = alxia()
 	.use(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
-	.onError((error, { reply }) =>
-		error instanceof RangeError ? reply(400, { error: 'out_of_range' as const }) : undefined,
+	.use(
+		defineMiddleware(async ({ reply }, next) => {
+			try {
+				return await next();
+			} catch (error) {
+				if (error instanceof RangeError) return reply(400, { error: 'out_of_range' as const });
+				throw error;
+			}
+		}),
 	)
 	.get('/range', () => {
 		throw new RangeError('out of range');
 	});
 
-await app.request('/range'); // 400; the span is ok, with `out of range` as its exception
+await app.request('/range'); // 400; the span is ok, with no exception: the middleware caught it
 ```
 
 ### What it records

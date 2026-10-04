@@ -98,7 +98,10 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   describes.
 - **Order is meaning.** A middleware given to `use`, and a route hook,
   applies to the routes declared after it, at runtime and in the types
-  alike; a group's stay inside it. The app's `use()` middlewares also wrap
+  alike; a group's stay inside it — its routes, and the requests no route
+  matches under its prefix — and so do a plugin's that has a prefix of its
+  own (`Scope.enclose`, `absorb`), which then adds nothing to the context
+  after it (`MountedIn`). The app's `use()` middlewares also wrap
   the router: a request no route matches — a 404, a 405, a preflight —
   runs every one of them, wherever declared, in declaration order, then
   its answer, so a `use()` after a route runs on unmatched requests and
@@ -107,24 +110,33 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   typed only after it. Errors are rejections through `next()`; what no
   middleware catches is answered at the route boundary, outermost — the
   deprecated `onError` and `onRefusal`, an `HttpError`'s status, a 500 —
-  and `settle(ctx, next())` gives an observer that answer early. So an
-  observer (logger, telemetry, secure-headers, cors, compress) goes first,
-  and a try/catch middleware after the observers. Keep the runtime and the
-  types in step.
+  and `settle(ctx, next())` gives an observer that answer early without
+  swallowing the error: once the observer returns, the error goes on to
+  the middlewares around it (`settled.ts`), and the response it made is
+  sent when none catches it. So an observer (logger, telemetry,
+  secure-headers, cors, compress) goes first, and a try/catch middleware
+  after the observers, so they see its reply; it catches the error
+  wherever it stands. Keep the runtime and the types in step.
 - **One route model.** A route, a socket's upgrade and `route(operation)`
   take the same `...middlewares`, and `use(...middlewares)` gives them to
   every route declared after it, before the route's own, in the scope
   chain the route hooks are in. `use(path, …)` is matched against the
   request's path: decided at declaration when the route's own pattern
   settles it (`reach` in `scope-path.ts`), checked per request with a
-  pattern compiled once, allocating nothing, when it does not, so a
+  pattern compiled once when it does not, so a
   `/users/:id` route requested as `/users/admin` runs
-  `use('/users/admin', …)`. `chain.ts` runs a route's chain and the
+  `use('/users/admin', …)`. The request's path is read fail closed, as the
+  router, the static files and React Router read it: segments decoded, an
+  encoded `/` splitting one, empty ones collapsed, compared without case;
+  a path without `%` nor `/.` is read in place, allocating nothing. A
+  plugin's `use(path, …)` is rebased with its routes when it is mounted. `chain.ts` runs a route's chain and the
   unmatched chain alike. The request hooks of 0.3 (`onRequest`,
   `onResponse`, `around`, `wrap`, `onError`, `onRefusal`) are deprecated
   adapters keeping their 0.3 behaviour; every package plugin that
   installed them is a middleware given to `use`, under its old factory
-  name, and `plugin(middleware)` is a deprecated alias of `use`. `use` tells a middleware from a plugin, its
+  name, and `plugin(middleware)`, deprecated, keeps 0.3's meaning of
+  those global hooks: app-wide (`Globals.middlewares`), on the routes
+  declared before it too, before the app's chain. `use` tells a middleware from a plugin, its
   deprecated form, by the mark `defineMiddleware` sets (and `validate` and
   `responds` theirs, both `Symbol.for`, shared by two copies of core), and
   a middleware given a path adds
@@ -155,6 +167,7 @@ core ◄── openapi, graphql, cors, secure-headers, compress, rate-limit, jwt
          telemetry, janus, context-storage, cache, language
          openapi ◄── openapi-routes   (deprecated: a re-export)
          i18n ◄── language
+         janus   (dev: i18n, language, @nxgt/i18n for its specs)
          redis ◄── rate-limit, cache (optional peers: the stores' contracts)
          react-router   (peers: react-router; vite, optional, for /vite; dev: openapi, compress for its specs)
 zod             (peer: zod; dev: core for its specs)

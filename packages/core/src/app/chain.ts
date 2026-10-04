@@ -12,7 +12,7 @@ import type { StatusCode } from '../types/status';
 import { middleware, wrapped } from './chain-middleware';
 import type { ChainHook } from './definition';
 import { refuse } from './refusal';
-import { matches } from './scope-path';
+import { matches, type ScopePath } from './scope-path';
 import { checkReply, isRedirect, send } from './send';
 import type { BaseContext, ResponseSchemas } from './types';
 import { type ChainRun, validateStep } from './validation';
@@ -20,6 +20,8 @@ import { type ChainRun, validateStep } from './validation';
 type Ctx = Record<string, unknown> & BaseContext;
 type Settles<T> = T | Promise<T>;
 type Responses = ResponseSchemas | undefined;
+
+const NONE: readonly ChainHook[] = [];
 
 /**
  * Runs the chain of a route, step by step: a `derive` adds to the context
@@ -51,6 +53,8 @@ class Runner<Last> {
 	readonly #ctx: Ctx;
 	readonly #last: (ctx: Ctx) => Promise<AnyReply | Response | Last>;
 	readonly #socket: boolean;
+	/** The app-wide middlewares, steps before the route's chain. */
+	readonly #before: readonly ChainHook[];
 
 	constructor(
 		run: ChainRun,
@@ -61,6 +65,7 @@ class Runner<Last> {
 		this.#ctx = ctx;
 		this.#last = last;
 		this.#socket = !('method' in run.definition);
+		this.#before = run.appWide ?? NONE;
 	}
 
 	/**
@@ -75,14 +80,18 @@ class Runner<Last> {
 
 	step(from: number, ctx: Ctx, given: Responses): Settles<Response | Last> {
 		const steps = this.#run.definition.derive;
+		const before = this.#before;
 		let responses = given;
 		for (let index = from; ; index++) {
-			const hook = steps[index] as ChainHook | undefined;
+			const hook = (
+				index < before.length ? before[index] : steps[index - before.length]
+			) as ChainHook | undefined;
 			if (hook === undefined) {
 				return this.#answer(this.#last(ctx), responses, true);
 			}
 			switch (hook.kind) {
 				case 'derive': {
+					if (hook.when !== undefined && !this.#under(hook.when)) continue;
 					const added = hook.run(ctx);
 					if (added instanceof Promise) {
 						const at = responses;
@@ -105,13 +114,7 @@ class Runner<Last> {
 					if (this.#socket) continue;
 					return this.#wrap(hook.run, index + 1, ctx, responses);
 				case 'middleware': {
-					const { when } = hook;
-					if (
-						when !== undefined &&
-						!matches(when, this.#run.request.url.pathname)
-					) {
-						continue;
-					}
+					if (hook.when !== undefined && !this.#under(hook.when)) continue;
 					const at = responses;
 					let downstream: Promise<Response | Last> | undefined;
 					const result = middleware(
@@ -130,6 +133,11 @@ class Runner<Last> {
 				}
 			}
 		}
+	}
+
+	/** Whether the request is under `path`, which a scoped step runs on alone. */
+	#under(path: ScopePath): boolean {
+		return matches(path, this.#run.request.url.pathname);
 	}
 
 	/** A `derive`'s promise, settled: a reply ends the request, an object is added. */

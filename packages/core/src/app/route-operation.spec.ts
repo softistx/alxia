@@ -51,7 +51,6 @@ describe('the implicit responds of route(operation)', () => {
 			expect(
 				(await app.request('/pets/1', { headers: { 'x-user': 'a' } })).status,
 			).toBe(200);
-			expect(app.routes[0]?.schema.response).toEqual(getPet.schema.response);
 		} finally {
 			error.mockRestore();
 		}
@@ -95,5 +94,21 @@ describe('the forms of 0.3 and the middleware forms', () => {
 		).toThrow(
 			'GET /pets/:petId: a list of hooks and middlewares are two forms, never mixed',
 		);
+	});
+});
+
+describe('app.routes, of route(operation)', () => {
+	test('holds the route options alone: the schemas stay in its chain', async () => {
+		const operation = {
+			...getPet,
+			schema: { ...getPet.schema, detail: { operationId: 'getPet' } },
+		} as const;
+		const app = alxia().route(operation, ({ params, reply }) =>
+			reply(200, { id: params.petId, name: 'Rex' }),
+		);
+		expect(app.routes[0]?.schema).toEqual({
+			detail: { operationId: 'getPet' },
+		});
+		expect((await app.request('/pets/x')).status).toBe(400);
 	});
 });

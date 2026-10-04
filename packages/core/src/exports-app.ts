@@ -42,6 +42,7 @@ export type {
 } from './app/operation-types';
 export type {
 	Mounted,
+	MountedIn,
 	PluginMethod,
 	RequiredIn,
 } from './app/plugin-method';
@@ -110,6 +111,7 @@ export type {
 	HookProvided,
 	KindFallsBack,
 	KindRefusalsOf,
+	MadeByDefineMiddleware,
 	MaxRouteHooks,
 	MaybePromise,
 	Method,

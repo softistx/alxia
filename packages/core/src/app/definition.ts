@@ -42,7 +42,12 @@ export type MiddlewareHook = (
  * by that schema rather than by its own.
  */
 export type ChainHook =
-	| { readonly kind: 'derive'; readonly run: DeriveHook }
+	| {
+			readonly kind: 'derive';
+			readonly run: DeriveHook;
+			/** A group's or a prefixed plugin's, on a request no route matches: run only under its prefix. */
+			readonly when?: ScopePath;
+	  }
 	| { readonly kind: 'wrap'; readonly run: WrapHook }
 	| {
 			readonly kind: 'middleware';
@@ -160,6 +165,12 @@ export interface Globals {
 	readonly onStart: StartHook[];
 	readonly onStop: StopHook[];
 	readonly parsers: BodyParser[];
+	/**
+	 * The middlewares given to `plugin(middleware)`, deprecated: run first
+	 * on every route and every request no route matches, wherever declared,
+	 * as the global hooks of 0.3 they replace ran.
+	 */
+	readonly middlewares: ChainHook[];
 	/** Bun's HTML bundles, by their full path: served by `Bun.serve` itself. */
 	readonly pages: Map<string, Bun.HTMLBundle>;
 }

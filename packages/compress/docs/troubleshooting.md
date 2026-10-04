@@ -9,7 +9,7 @@ header you read in the response.
 
 - [`Type '"identity"' is not assignable to type 'Encoding'`](#type-identity-is-not-assignable-to-type-encoding)
 - [`Type 'RegExp' is not assignable to type '(type: string) => boolean'`](#type-regexp-is-not-assignable-to-type-type-string--boolean)
-- [`Type 'Alxia<…>' has no properties in common with type 'CompressOptions'`](#type-alxia-has-no-properties-in-common-with-type-compressoptions)
+- [`Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn'`](#type-compressmiddleware-is-not-assignable-to-type-middlewarereturn)
 
 **Responses**
 
@@ -63,17 +63,19 @@ error TS2322: Type 'RegExp' is not assignable to type '(type: string) => boolean
 app.use(compress({ compressible: (type) => /json|text\//.test(type) }));
 ```
 
-### `Type 'Alxia<…>' has no properties in common with type 'CompressOptions'`
+### `Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn'`
 
 **When:** passing `compress` to `app.use` without calling it.
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '(options?: CompressOptions | undefined) => NoInfer<Middleware<Empty, Promise<Response>> & MiddlewareMark>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
-      Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, "", never>' has no properties in common with type 'CompressOptions'.
+  The last overload gave the following error.
+    Argument of type '(options?: CompressOptions) => CompressMiddleware' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
+      Type '(options?: CompressOptions) => CompressMiddleware' is not assignable to type '(ctx: BaseContext & Empty, next: NextFunction) => MiddlewareReturn'.
+        Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn'.
 ```
+
+TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
 
 **Why:** `compress` builds the middleware from its options; the middleware
 is what it returns.

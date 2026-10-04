@@ -481,8 +481,9 @@ client's files, which sit between `beforeAll` and `configure`. What must see
 every request, the client's files included, goes in `beforeAll`: the logger,
 `@alxia/cors`, `@alxia/compress`, `@alxia/secure-headers`. A guard on the app
 answers a request no route matches too: an anonymous request to a missing path
-gets the 401, not the 404. Scope it with a path, `use('/app', guard)`, or a
-`group` to guard only some routes.
+gets the 401, not the 404. Scope it with a path, `use('/app', guard)`
+(a guard that adds nothing to the context: `bearer` and `session` add `user`),
+to guard only some pages.
 
 ```ts
 // app/server.ts: a guard on everything, the assets included

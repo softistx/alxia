@@ -14,7 +14,12 @@ import {
 	readQuery,
 } from '../request/read';
 import { check, type StandardSchemaV1 } from '../schema/standard-schema';
-import type { RouteDefinition, SocketDefinition } from './definition';
+import type {
+	ChainHook,
+	RouteDefinition,
+	SocketDefinition,
+} from './definition';
+import type { Settled } from './settled';
 import type { BaseContext, RequestContext, ResponseSettings } from './types';
 import type { RequestSchemas } from './validate';
 
@@ -28,6 +33,10 @@ export interface ChainRun {
 	readonly set: ResponseSettings;
 	readonly parsers: readonly BodyParser[];
 	readonly validateResponses: boolean;
+	/** The app-wide middlewares, of `plugin(middleware)`: run before the route's chain. */
+	readonly appWide?: readonly ChainHook[];
+	/** The error `settle` answered last, and what the observers made of it. */
+	settled?: Settled;
 	/** The body, read once by the first `validate` that reads it. */
 	body?: ReturnType<typeof readBody>;
 }

@@ -21,7 +21,7 @@ Every response of that app now carries the headers below, and none carries
 ## The signature
 
 ```ts
-function secureHeaders(options: SecureHeadersOptions & { readonly nonce: true }): NoncePlugin;
+function secureHeaders(options: SecureHeadersOptions & { readonly nonce: true }): NonceMiddleware;
 function secureHeaders(options?: SecureHeadersOptions & { readonly nonce?: false }): SecureHeaders;
 
 interface SecureHeadersOptions {
@@ -59,7 +59,7 @@ The options are read once, when `secureHeaders(…)` is called; the header
 values are fixed from then on, but for the nonce, which is new on every
 request.
 
-With `nonce: true` it returns a `NoncePlugin` instead: a middleware, still
+With `nonce: true` it returns a `NonceMiddleware` instead: a middleware, still
 given to `app.use` called, that covers the same responses as above, and which
 adds `nonce` to the context of the routes declared after it
 ([below](#a-nonce-per-request)).
@@ -339,10 +339,11 @@ const app = alxia()
 Declare `secureHeaders()` among the observers, first: `logger()`,
 `telemetry()`, `secureHeaders()`, `cors()`, `compress()`. An
 error-handling middleware — a `try`/`catch` around `next()`, or
-`janusErrors()` — goes **after** it. `secureHeaders()` settles `next()`, so
-an error is answered with the route's `onError` reply, its `HttpError`'s
-status, or a 500 before a `try`/`catch` declared before it could see it, and
-carries the headers either way. A guard on the app (`bearer`, a required
+`janusErrors()` — goes **after** it. `secureHeaders()` settles `next()`: it
+sets the headers on the response the error would be answered with (the
+route's `onError` reply, its `HttpError`'s status, or a 500), then the error
+goes on, so a `try`/`catch` catches it wherever it is declared; declared
+before `secureHeaders()`, its reply does not carry the headers. A guard on the app (`bearer`, a required
 session) declared before it answers its `401` without them.
 
 The deprecated `onResponse` and `around` hooks still run outside every

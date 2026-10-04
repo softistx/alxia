@@ -1,4 +1,12 @@
-import { defineMiddleware, settle, vary, withHeaders } from '@alxia/core';
+import {
+	defineMiddleware,
+	type Empty,
+	type Middleware,
+	type MiddlewareMark,
+	settle,
+	vary,
+	withHeaders,
+} from '@alxia/core';
 
 /** Which origins may call: every one, a list, a pattern, or a decision per origin. */
 export type CorsOrigin =
@@ -29,6 +37,10 @@ export interface CorsOptions {
 	readonly privateNetwork?: boolean;
 }
 
+/** What `cors()` makes: a middleware that adds nothing to the context. */
+export type CorsMiddleware = Middleware<Empty, Promise<Response>> &
+	MiddlewareMark;
+
 const METHODS = [
 	'GET',
 	'HEAD',
@@ -51,7 +63,7 @@ const METHODS = [
  * const app = alxia().use(cors({ origin: ['https://app.example.com'], credentials: true }));
  * ```
  */
-export function cors(options: CorsOptions = {}) {
+export function cors(options: CorsOptions = {}): CorsMiddleware {
 	const allows = matcher(options.origin ?? true);
 	const methods = (options.methods ?? METHODS).join(', ');
 	const exposed = options.exposedHeaders?.join(', ');
@@ -62,7 +74,15 @@ export function cors(options: CorsOptions = {}) {
 			if (!options.credentials) return '*';
 			return origin ?? undefined;
 		}
-		return origin !== null && allows(origin) ? origin : undefined;
+		if (origin === null) return undefined;
+		try {
+			return allows(origin) ? origin : undefined;
+		} catch (error) {
+			// An `origin` function that throws costs the headers, never the
+			// response: a preflight's 204 and a route's answer alike.
+			console.error(error);
+			return undefined;
+		}
 	};
 
 	const common = (headers: Headers, origin: string | null) => {
@@ -112,18 +132,12 @@ export function cors(options: CorsOptions = {}) {
 		}
 		const response = await settle(ctx, next());
 		const origin = request.headers.get('origin');
-		try {
-			if (origin === null && allowOrigin(null) !== '*') return response;
-			return withHeaders(response, (headers) => {
-				if (common(headers, origin) && exposed) {
-					headers.set('access-control-expose-headers', exposed);
-				}
-			});
-		} catch (error) {
-			// An `origin` function that throws costs the headers, never the response.
-			console.error(error);
-			return response;
-		}
+		if (origin === null && allowOrigin(null) !== '*') return response;
+		return withHeaders(response, (headers) => {
+			if (common(headers, origin) && exposed) {
+				headers.set('access-control-expose-headers', exposed);
+			}
+		});
 	});
 }
 

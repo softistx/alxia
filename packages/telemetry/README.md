@@ -93,6 +93,7 @@ A `traced` or `spanName` that throws costs its answer, never the request.
 | --- | --- |
 | `telemetry(options)` | the middleware, given to `app.use`, with the telemetry it writes to as `.telemetry`; what is after it reads `span` and `telemetry` |
 | `TelemetryContext` | what it adds to the context: `span` and `telemetry` |
+| `TelemetryMiddleware` | what `telemetry()` returns: a middleware adding `TelemetryContext`, with `.telemetry` |
 | `TelemetryPluginOptions` | its options: `service` and `@nxgt/telemetry`'s options, or an `instance`; `traced`, `spanName`, `traceResponse` |
 | `HTTP_METHOD`, `URL_PATH`, `URL_SCHEME`, `HTTP_ROUTE`, `HTTP_STATUS`, `SERVER_ADDRESS`, `SERVER_PORT`, `CLIENT_ADDRESS` | the attribute names a server span carries: `http.request.method`, `url.path`, `url.scheme`, `http.route`, `http.response.status_code`, `server.address`, `server.port`, `client.address` |
 
