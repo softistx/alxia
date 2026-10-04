@@ -157,7 +157,7 @@ jobs:
     # create-react-router, TypeScript, Vite — comes from npm at the newest
     # versions @alxia/create resolves, so an upstream release can turn it red
     # with no change here: informational, like the two jobs above. Measured
-    # locally at about a minute; most of it is the installs.
+    # locally at 18 seconds, most of it the installs.
     name: Templates
     runs-on: ubuntu-latest
     timeout-minutes: 10

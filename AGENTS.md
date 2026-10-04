@@ -195,7 +195,7 @@ installed tarball with `--help`.
   `bun run start` answers (`POST /todos` 201, `GET /` 200). It also runs
   `bunx @alxia/create --help`. It needs the network: `create-react-router`
   and every non-alxia dependency come from npm, at the newest versions
-  `@alxia/create` resolves. About a minute; kept out of `bun run test`.
+  `@alxia/create` resolves. 18 seconds measured locally; kept out of `bun run test`.
 
 The last three resolve without a lockfile, so an upstream release can turn
 them red with no change here. They are informational: read them, never make
