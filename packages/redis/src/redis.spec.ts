@@ -119,6 +119,34 @@ describe('idempotency', () => {
 		expect(await reused.json()).toEqual({ error: 'idempotency_key_reused' });
 	});
 
+	test('a request no route matches passes through, its key never taken', async () => {
+		const missing = () =>
+			app.request('/nowhere', {
+				method: 'POST',
+				headers: { 'idempotency-key': 'k-404' },
+			});
+		expect((await missing()).status).toBe(404);
+		const again = await missing();
+		expect(again.status).toBe(404);
+		expect(again.headers.get('idempotent-replayed')).toBeNull();
+	});
+
+	test('a refusal is kept and replayed, as the route answered it', async () => {
+		const refuse = () =>
+			app.request('/payments', {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					'idempotency-key': 'k-400',
+				},
+				body: '{}',
+			});
+		expect((await refuse()).status).toBe(400);
+		const again = await refuse();
+		expect(again.status).toBe(400);
+		expect(again.headers.get('idempotent-replayed')).toBe('true');
+	});
+
 	test('a 5xx is not kept: the key is free again', async () => {
 		const original = console.error;
 		console.error = () => {};

@@ -104,11 +104,14 @@ export class Scope {
 	 */
 	unmatched(): ScopedHooks {
 		this.#unmatched ??= {
-			derive: this.#derive.map(({ hook, path }) =>
-				path === undefined || hook.kind !== 'middleware'
-					? hook
-					: { ...hook, when: path },
-			),
+			// A `wrap`, deprecated, keeps 0.3's rule: it never runs on a 404.
+			derive: this.#derive
+				.filter(({ hook }) => hook.kind !== 'wrap')
+				.map(({ hook, path }) =>
+					path === undefined || hook.kind !== 'middleware'
+						? hook
+						: { ...hook, when: path },
+				),
 			onError: [...this.#onError],
 			refusal: this.#refusals.refusal,
 			...byKind(this.#refusals.refusalByKind),

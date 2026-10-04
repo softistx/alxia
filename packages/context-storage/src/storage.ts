@@ -17,7 +17,7 @@ import {
 export type ContextStorageErrorCode =
 	/** Called outside any request: at startup, in a job, after the response. */
 	| 'OUTSIDE_REQUEST'
-	/** In a request, but not in a route declared after `contextStorage()`: a 404, a hook, a route before it. */
+	/** In a request `contextStorage()` ran on, but that reached no route: a 404, a 405. A route it did not run on is `OUTSIDE_REQUEST`. */
 	| 'NOT_ROUTED';
 
 export class ContextStorageError extends Error {
@@ -52,7 +52,7 @@ const storage = new AsyncLocalStorage<Holder>();
  * Throws a `ContextStorageError` outside a route declared after
  * `contextStorage()`.
  *
- * `Ctx` types what the hooks added; prefer the typed `context()` of the plugin
+ * `Ctx` types what the hooks added; prefer the typed `context()` of the middleware
  * itself, typed by the app.
  */
 export function getContext<Ctx extends object = Empty>(): BaseContext & Ctx {
@@ -144,10 +144,10 @@ export function contextStorage<App = RegisteredBase>(
 	...uncalled: readonly never[]
 ): ContextStoragePlugin<App> {
 	if (uncalled.length > 0) {
-		// `plugin(contextStorage)`: the app is handed to the factory, and what
+		// `use(contextStorage)`: the app is handed to the factory, and what
 		// follows would be declared on a plugin nobody serves.
 		throw new TypeError(
-			'contextStorage is a factory: use(contextStorage()), not plugin(contextStorage)',
+			'contextStorage is a factory: use(contextStorage()), not use(contextStorage)',
 		);
 	}
 	const middleware = defineMiddleware((ctx, next) => {

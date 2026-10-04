@@ -11,7 +11,7 @@ import { type Decision, MemoryStore, type RateLimitStore } from './store';
 
 /**
  * `Requires` is what `key` and `skip` read from the context beyond
- * `BaseContext` — a `user` an earlier plugin adds — and what the app that
+ * `BaseContext` — a `user` an earlier middleware adds — and what the app that
  * uses the limit must then give.
  */
 export interface RateLimitOptions<Requires extends object = Empty> {

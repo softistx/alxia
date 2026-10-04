@@ -11,7 +11,7 @@ const MISSING: unique symbol = Symbol('alxia context missing');
 
 /**
  * The key `reactRouter()` sets on React Router's context provider, on every
- * request, to what alxia's hooks built for it. It lives in this package, so
+ * request, to what alxia's middlewares built for it. It lives in this package, so
  * it is one object whichever way the server was built or loaded: a key made
  * in the app's own `app/` folder is copied into React Router's build, and
  * the server that imports it separately sets a different one.
@@ -25,7 +25,7 @@ export const alxiaContext = createContext<unknown>(MISSING);
  *
  * ```ts
  * // app/server.ts
- * const server = createServer({ configure: (app) => app.plugin(session) });
+ * const server = createServer({ configure: (app) => app.use(session) });
  * export default server;
  *
  * declare module '@alxia/react-router' {
@@ -80,7 +80,7 @@ export type RegisteredOf<
 export type RegisteredApp = RegisteredOf<Register>;
 
 /**
- * What alxia's hooks built for this request, read in a loader, an action or
+ * What alxia's middlewares built for this request, read in a loader, an action or
  * a middleware, typed by the app: the server `Register` names, or the one
  * given as the type argument — `typeof server`, or an app *before* the
  * catch-all. With neither, the app `@alxia/core`'s `Register` names, and

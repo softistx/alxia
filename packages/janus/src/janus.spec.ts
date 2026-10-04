@@ -3,6 +3,7 @@ import {
 	alxia,
 	type BaseContext,
 	type Empty,
+	HttpError,
 	type Middleware,
 	validate,
 } from '@alxia/core';
@@ -297,6 +298,43 @@ describe('session', () => {
 				.getSetCookie()
 				.filter((value) => value.startsWith('janus-session=')),
 		).toHaveLength(1);
+	});
+
+	test('a renewal rides a refusal and an error answer too', async () => {
+		const { auth, clock } = setup();
+		await auth.patient.signUp({ ...ada, password });
+		const { token } = await auth.patient.signIn({ email: ada.email, password });
+		const app = alxia()
+			.use(session(auth, { required: true }))
+			.post(
+				'/notes',
+				validate({ body: z.object({ title: z.string() }) }),
+				({ reply }) => reply(201, 'ok'),
+			)
+			.get('/teapot', () => {
+				throw new HttpError(418, 'teapot');
+			});
+		const renewedOn = (response: Response) =>
+			response.headers
+				.getSetCookie()
+				.some((value) => value.startsWith('janus-session='));
+		clock.advance(2 * DAY);
+		const refused = await app.request('/notes', {
+			method: 'POST',
+			headers: {
+				cookie: `janus-session=${token}`,
+				'content-type': 'application/json',
+			},
+			body: '{}',
+		});
+		expect(refused.status).toBe(400);
+		expect(renewedOn(refused)).toBe(true);
+		clock.advance(2 * DAY);
+		const teapot = await app.request('/teapot', {
+			headers: { cookie: `janus-session=${token}` },
+		});
+		expect(teapot.status).toBe(418);
+		expect(renewedOn(teapot)).toBe(true);
 	});
 
 	test('auth.send sets the device cookie under the name session() gives', async () => {

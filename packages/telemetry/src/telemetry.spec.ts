@@ -140,4 +140,15 @@ describe('telemetry', () => {
 		await instance.close();
 		expect(spans()).toHaveLength(0);
 	});
+
+	test('a request no route matches gets a span too, named for its path', async () => {
+		const { instance, spans } = collecting();
+		const response = await appWith(instance).request('/missing');
+		await instance.close();
+		expect(response.status).toBe(404);
+		const [span] = spans();
+		expect(span?.name).toBe('GET /missing');
+		expect(span?.attributes['http.response.status_code']).toBe(404);
+		expect(span?.attributes['http.route']).toBeUndefined();
+	});
 });

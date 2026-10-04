@@ -95,4 +95,12 @@ describe('rateLimit', () => {
 		};
 		expect(_refused).toBeFunction();
 	});
+
+	test('on the app, a request no route matches is counted too', async () => {
+		const limited = alxia()
+			.use(rateLimit({ limit: 1, windowMs: 60_000, key: () => 'one' }))
+			.get('/', ({ reply }) => reply(200, 'ok'));
+		expect((await limited.request('/missing')).status).toBe(404);
+		expect((await limited.request('/missing')).status).toBe(429);
+	});
 });

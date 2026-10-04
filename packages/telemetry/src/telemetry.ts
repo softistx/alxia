@@ -26,7 +26,7 @@ interface Hooks {
 	 * that decides which requests do not matter hides the one that did.
 	 */
 	readonly traced?: (ctx: RequestContext) => boolean;
-	/** The span's name before routing. `"<METHOD> <path>"` by default, then `"<METHOD> <route>"`. */
+	/** The name the span opens with. `"<METHOD> <path>"` by default; renamed `"<METHOD> <route>"` once answered, when a route matched. */
 	readonly spanName?: (ctx: RequestContext) => string;
 	/** Whether the response says `traceparent` back, so a caller can find the trace. Off by default. */
 	readonly traceResponse?: boolean;

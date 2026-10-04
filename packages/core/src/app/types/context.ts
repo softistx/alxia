@@ -13,9 +13,10 @@ export interface RequestContext {
 	/** The client's address, as the app's `ip` option reads it. */
 	readonly ip: string | undefined;
 	/**
-	 * The route the request reached, as declared — `/users/:id` — once
-	 * routing has run; `undefined` before, and for a request that reached
-	 * none. What an `around` hook names a span after.
+	 * The route the request reached, as declared — `/users/:id`: routing
+	 * runs before every middleware, so each one reads it; `undefined` for a
+	 * request that reached none, and in a deprecated `onRequest` or
+	 * `around`, which run before routing.
 	 */
 	readonly route: string | undefined;
 	/** The error a route failed with, once it has: what became its 500, or its `onError` reply. */

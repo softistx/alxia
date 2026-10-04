@@ -122,7 +122,7 @@ describe('contextStorage', () => {
 
 		// @ts-expect-error the factory, uncalled
 		expect(() => alxia().use(contextStorage)).toThrow(
-			'contextStorage is a factory: use(contextStorage()), not plugin(contextStorage)',
+			'contextStorage is a factory: use(contextStorage()), not use(contextStorage)',
 		);
 	});
 

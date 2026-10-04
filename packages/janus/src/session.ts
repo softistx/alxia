@@ -5,6 +5,7 @@ import {
 	type MiddlewareMark,
 	type Next,
 	type Reply,
+	settle,
 	withHeaders,
 } from '@alxia/core';
 import type { Session } from '@nxgt/janus';
@@ -110,11 +111,15 @@ export function session(
 			send: (signedIn) => sendSession(ctx, auth, signedIn, options),
 			signOut: () => signOut(ctx, auth),
 		};
-		const response = await next({
-			user: found?.user ?? null,
-			session: found?.session ?? null,
-			auth: bound,
-		});
+		// Settled: a refusal's 400, an error's answer, still carry the renewal.
+		const response = await settle(
+			ctx,
+			next({
+				user: found?.user ?? null,
+				session: found?.session ?? null,
+				auth: bound,
+			}),
+		);
 		return found?.renewed === true
 			? renewed(auth, request, found, response)
 			: response;

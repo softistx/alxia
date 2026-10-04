@@ -187,4 +187,17 @@ describe('bearer', () => {
 		expect(refused.reason).toBe('claims');
 		expect(refused.issues[0].target).toBe('cookies');
 	});
+
+	test('on the app, a request no route matches is refused before its 404', async () => {
+		const jwt = createJwt({ secret });
+		const app = alxia()
+			.use(bearer({ jwt }))
+			.get('/me', ({ user, reply }) => reply(200, user.sub ?? ''));
+		expect((await app.request('/missing')).status).toBe(401);
+		const token = await jwt.sign({ sub: 'ada' });
+		const missing = await app.request('/missing', {
+			headers: { authorization: `Bearer ${token}` },
+		});
+		expect(missing.status).toBe(404);
+	});
 });

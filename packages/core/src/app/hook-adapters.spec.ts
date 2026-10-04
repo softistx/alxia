@@ -190,6 +190,7 @@ describe('the request hooks, deprecated, and their middlewares', () => {
 		// resolves to the 400.
 		expect(results[0]).toEqual((await answers(wrapped))[0]);
 		expect((results[1] as unknown[])[2]).toBe('wrapped');
+		expect(((await answers(wrapped))[1] as unknown[])[2]).toBeNull();
 		expect((results[4] as unknown[])[2]).toBeNull();
 	});
 });

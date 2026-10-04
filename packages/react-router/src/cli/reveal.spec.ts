@@ -20,7 +20,7 @@ async function run(root: string, ...args: string[]) {
 }
 
 const WROTE = (file: string) =>
-	`alxia-react-router: wrote ${file}, the server alxia() runs by default.\nNext: uncomment configure in ${file} to add the app's hooks and /api; bun run dev picks it up.`;
+	`alxia-react-router: wrote ${file}, the server alxia() runs by default.\nNext: uncomment configure in ${file} to add the app's middlewares and /api; bun run dev picks it up.`;
 
 describe('alxia-react-router reveal', () => {
 	let root: string;

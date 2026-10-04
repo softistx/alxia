@@ -290,4 +290,15 @@ describe('MemoryCacheStore', () => {
 		store.deleteTag('t');
 		expect(store.get('b')).toBeUndefined();
 	});
+
+	test('a request no route matches is never kept', async () => {
+		const store = new MemoryCacheStore();
+		const app = alxia()
+			.use(cache({ ttl: 60, store, statuses: [200, 404] }))
+			.get('/here', ({ reply }) => reply(200, 'here'));
+		expect((await app.request('/missing')).status).toBe(404);
+		expect((await app.request('/missing')).headers.get('x-cache')).toBeNull();
+		expect((await app.request('/here')).headers.get('x-cache')).toBe('MISS');
+		expect((await app.request('/here')).headers.get('x-cache')).toBe('HIT');
+	});
 });

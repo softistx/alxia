@@ -17,7 +17,7 @@ import { type CacheStore, MemoryCacheStore } from './store';
 
 /**
  * `Requires` is what `key` and `tags` read from the context beyond
- * `BaseContext` — a `user` an earlier plugin adds — and what the app that
+ * `BaseContext` — a `user` an earlier middleware adds — and what the app that
  * uses the cache must then give.
  */
 export interface CacheOptions<Requires extends object = Empty> {
@@ -49,7 +49,7 @@ export interface CacheOptions<Requires extends object = Empty> {
 
 /** What the routes behind the cache read. */
 export interface CacheControls {
-	/** Tags the response being built, beyond the plugin's `tags`. Tags starting `alxia:` are the plugin's own. */
+	/** Tags the response being built, beyond the middleware's `tags`. Tags starting `alxia:` are the cache's own. */
 	tag(...tags: string[]): void;
 	/** Keeps this response out of the cache. */
 	skip(): void;
@@ -152,10 +152,12 @@ export function cache<Requires extends object = Empty>(
 	const middleware = defineMiddleware<Requires>()(async (ctx, next) => {
 		const { request } = ctx;
 		const added: { cache: CacheControls } = { cache: controls.open(request) };
-		const key = bypasses(request, honorNoCache) ? undefined : keyOf(ctx);
+		// A request no route matches is never kept: there is no route to answer it again.
+		const key =
+			ctx.route === undefined || bypasses(request, honorNoCache)
+				? undefined
+				: keyOf(ctx);
 		if (key === undefined) return next(added);
-		const rest = () => next(added);
-
 		const found = await attempt(() => store.get(key), undefined);
 		const worth = found === undefined ? undefined : freshness(found);
 		if (found !== undefined && worth === 'fresh') {
@@ -168,7 +170,7 @@ export function cache<Requires extends object = Empty>(
 			}
 			return respond(request, found, label('STALE'));
 		}
-		const loaded = await load(key, ctx, rest);
+		const loaded = await load(key, ctx, () => next(added));
 		if (loaded instanceof Response) return loaded;
 		return respond(request, loaded, label('MISS'));
 	});
