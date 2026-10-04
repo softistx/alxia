@@ -31,11 +31,13 @@ const app = alxia()
 | Way | For | Applies to | Runs | Can end the request | Typed, and documented |
 | --- | --- | --- | --- | --- | --- |
 | [A route's middlewares](#a-routes-middlewares), `app.post(path, auth, canEdit, …, handler)` | authenticating, a check, a load, a timer or a lock that some routes need, written once with `defineMiddleware` | the routes it is given to | after the scope's hooks, in the order given | yes, with a reply or any `Response` | what it passes `next`, in that route's context. Not in OpenAPI |
+| [`use(...middlewares)`](#use-for-every-route-after-it) | the same middlewares, for every route after a point: authenticating, a timer | the routes declared after it, in this app or group | after the hooks declared before it, before the route's own middlewares | yes, with a reply or any `Response` | what it passes `next`, in the context of those routes. Not in OpenAPI |
+| [`use(path, ...middlewares)`](#use-with-a-path) | a guard for a subtree: `/admin` | the routes declared after it under `path`, matched when each is declared | as above | yes, with a reply or any `Response` | nothing: it may add nothing to the context. Not in OpenAPI |
 | [`validate(schemas)`](#validate-and-responds) | validating `params`, `query`, `headers`, `cookies` or `body` | the route it is given to | where it stands among the middlewares | yes, a 400 or the `onRefusal` hook's reply | the validated parts, in the context after it; its schemas and the 400, in OpenAPI |
 | [`responds(responses)`](#validate-and-responds) | declaring what a route answers, and checking it | the route it is given to | on the handler's reply, and on a reply made after it with a status it declares | a reply it refuses becomes a 500 | the handler's `reply` typed by its statuses; its statuses, in OpenAPI |
 | A route's options, `{ bodyLimit, detail }` | capping one route's body; what OpenAPI says of it | one route | whenever the body is read | yes, a 413 | the 413, in OpenAPI |
 | [`decorate(values)`](#decorate) | a database, a logger, a config | the routes declared after it | before the route's middlewares | no | its values, in the context |
-| [`derive(hook)`](#derive) | authenticating every route after a point, loading what they read | the routes declared after it | before the route's middlewares | yes, with a reply | what it adds, in the context. Not in OpenAPI |
+| [`derive(hook)`](#derive) | the shorthand for a `use` middleware that only adds: loading what every route after a point reads | the routes declared after it | before the route's middlewares | yes, with a reply | what it adds, in the context. Not in OpenAPI |
 | [`wrap(hook)`](#wrap) | a transaction, a lock, an idempotency key, a header from the response, for every route after a point | the routes declared after it | around the route's middlewares and the handler | yes, with a reply, or any `Response` | nothing. Not in OpenAPI |
 | [`bodyLimit(bytes)`](#bodylimit) | capping request bodies | the routes declared after it | whenever the body is read | yes, a 413 | the 413, in OpenAPI |
 | [`onRefusal(hook)`](#onrefusal) | answering a 400 or a 413 in your own format | the routes declared after it | when a `validate` or the body limit refuses | yes, with a 4xx reply | a `4XX` with no body in OpenAPI |
@@ -63,26 +65,31 @@ no schema, so the OpenAPI document cannot describe it: only `validate`,
 - **Some routes need it**: a middleware. It is named on each route, so the
   route says what guards it, and a check can differ route by route —
   `canView` here, `canEdit` there.
-- **Every route after a point needs it**: a `derive`, `decorate` or `wrap`,
-  in a [group](#group) when only some of them do. Written once, it reaches
-  every route declared after it, a plugin's included.
+- **Every route after a point needs it**: `use(middleware)` — or a
+  `derive`, `decorate` or `wrap` — in a [group](#group) when only some of
+  them do. Written once, it reaches every route declared after it, a
+  plugin's included.
+- **A subtree needs a guard that adds nothing**: `use('/admin', guard)`.
+  To add to a subtree's context, `use` the middleware in a group:
+  `app.group('/admin', (admin) => admin.use(auth).get(…))`.
 - **Every request, routed or not, and nothing a client is generated for**: a
   global hook, `onRequest`, `onResponse` or `around`.
 - **The same hooks or routes in several apps**: a [plugin](#use-and-defineplugin).
 
-A middleware and a `derive` run the same way and type the same way; they
-differ in how far they reach. When every route of a group takes the same
-middleware, a `derive` in the group says it once.
+A middleware on a route and one given to `use` are the same function, and
+run and type the same way; they differ in how far they reach. When every
+route of a group takes the same middleware, `use` in the group says it
+once.
 
 Two rules decide the rest:
 
 - **Order is meaning.** A route's middlewares run in the order given, and
   that order decides which answer a client gets first: see
   [Where `validate` stands](#where-validate-stands). A hook declared on the
-  chain — `decorate`, `derive`, `wrap`, `bodyLimit`, `onRefusal`,
-  `onError` — applies to the routes declared after it, at runtime and in the
-  types alike. A route declared before a `derive` neither runs it nor reads
-  what it adds.
+  chain — `use(...middlewares)`, `decorate`, `derive`, `wrap`, `bodyLimit`,
+  `onRefusal`, `onError` — applies to the routes declared after it, at
+  runtime and in the types alike. A route declared before a `use(auth)`
+  neither runs it nor reads what it adds.
 - **Global hooks are global.** `onRequest`, `onResponse` and `around` apply
   to every request wherever they are declared, inside a group or a plugin
   included. What they answer is in no route's OpenAPI document: use them
@@ -95,11 +102,13 @@ Two rules decide the rest:
 2. **`onRequest`** hooks, in the order declared. A `Response` one returns
    skips to step 9.
 3. **Routing.** No route: `404`, `405` or `426`, then step 9.
-4. **The scope's route hooks**, in the order declared: the app's, then the
-   group's, a plugin's after the hooks of the app that uses it. A `derive`
-   or `decorate` runs and adds to the context; a `wrap` calls `next()` to run
-   the rest. A reply from any of them ends the request, and the `wrap`s
-   around it see it as the response.
+4. **The scope's middlewares and route hooks**, in the order declared: the
+   app's, then the group's, a plugin's after those of the app that uses it.
+   A middleware given to `use` — with a path, only if the route is under
+   it — runs as a route's own does; a `derive` or `decorate` runs and adds
+   to the context; a `wrap` calls `next()` to run the rest. A reply from
+   any of them ends the request, and the `wrap`s and middlewares around it
+   see it as the response. A 404 or a 405 never reaches them.
 5. **The route's middlewares**, in the order given:
    - a middleware runs, and `next(added)` runs the rest with `added` in the
      context; a reply or a `Response` it returns ends the request there;
@@ -128,9 +137,9 @@ Two rules decide the rest:
 
 ```
 around ─┐
-        onRequest ─ routing ─ scope hooks ─ middlewares: auth ─ validate ─ responds ─ … ─ handler
-                                  └─ wrap ───────└─ a middleware awaiting next() ─────────┘   ← unwinds here
-                              onError / onRefusal(body_limit)                                  ← what was thrown
+        onRequest ─ routing ─ use() and scope hooks ─ route middlewares: auth ─ validate ─ responds ─ … ─ handler
+                              └─ wrap, a use() middleware ─└─ a middleware awaiting next() ────────────────┘   ← unwinds here
+                              onError / onRefusal(body_limit)                                                   ← what was thrown
         onResponse
 around ─┘
 ```
@@ -372,6 +381,73 @@ A middleware written inline, `app.get(path, (ctx, next) => next({ a: 1 }), handl
 needs no `defineMiddleware`: its context is the route's, typed as it is
 written.
 
+### `use` for every route after it
+
+Up to 8 middlewares made by `defineMiddleware`, run on every route declared
+after `use` in this app or group, before the route's own, in the order
+given. What each passes `next` is typed in those routes, as a route's own
+middleware's is; a route declared before `use` neither runs them nor reads
+it. A socket runs them on its upgrade, as it runs its own.
+
+```ts
+import { alxia, defineMiddleware } from '@alxia/core';
+
+const tokens = new Map([['Bearer ada', { id: 'u1' }]]);
+
+const auth = defineMiddleware(({ request, reply }, next) => {
+	const user = tokens.get(request.headers.get('authorization') ?? '');
+	return user ? next({ user }) : reply(401, { error: 'unauthenticated' as const });
+});
+
+const app = alxia()
+	.get('/health', ({ reply }) => reply(200, 'ok')) // before use: no 401
+	.use(auth)
+	.get('/me', ({ user, reply }) => reply(200, user)); // `user` typed
+// GET /me answers 200, 401 or 500
+```
+
+`use` tells a middleware from a plugin by the mark `defineMiddleware` puts
+on it: a plain `(ctx, next) => …` given to `use` is called as a plugin,
+with the app. A route takes a plain function; `use` does not.
+
+### `use` with a path
+
+The same, for the routes declared after it whose path is under `path`,
+matched once, when each route is declared: no request pays for it.
+
+| `path` | Runs on |
+| --- | --- |
+| `'/admin'` | `/admin` and every route under it, segment by segment: not `/administrators` |
+| `'/admin/*'` | the routes under `/admin`, not `/admin` itself |
+| `'/users/:any/posts'` | `:any` is any one segment — a literal, a parameter or a wildcard: `/users/:id/posts`, `/users/me/posts/:postId`. A literal matches that literal alone: `'/users/me'` is not `/users/:id` |
+
+`path` is joined to the prefix of the app or group `use` is called on, and
+checked as a route path is. The middlewares may add nothing to the
+context: `next()`, a reply or a `Response`. One that passes `next` an
+object does not compile:
+
+```ts
+const admin = defineMiddleware(({ request, reply }, next) =>
+	request.headers.get('x-admin') === 'yes' ? next() : reply(403, { error: 'forbidden' as const }),
+);
+
+alxia().use('/admin', admin).get('/admin/stats', ({ reply }) => reply(200, { users: 1 }));
+
+alxia().use('/admin', auth);
+// Invalid middleware: a middleware given a path may add nothing to the context, …
+
+alxia().group('/admin', (admin) => admin.use(auth).get('/me', ({ user, reply }) => reply(200, user)));
+```
+
+What a path-scoped middleware adds would reach some routes and not others,
+which no type can follow; a group is that subtree, typed.
+
+The path is matched against each route's declared path, not the request's
+URL: `use('/admin', guard)` does not run on a route declared at
+`/:section`, though that route serves `GET /admin`. A path ending in `/`
+is refused, since it would match no route
+([Troubleshooting](../troubleshooting.md#a-usepath-guard-did-not-run-on-a-request-under-its-path)).
+
 ### `validate` and `responds`
 
 Middlewares the core runs itself: `validate` checks the parts of the request
@@ -430,8 +506,10 @@ const app = alxia()
 // GET /me answers 200, 401 or 500
 ```
 
-For some routes rather than every route after a point, a middleware
-returning `next({ user })` does the same. See [Hooks: `derive`](hooks.md#derive).
+`derive` is the shorthand for a middleware given to `use` that only adds:
+`use(defineMiddleware((ctx, next) => next({ … })))`. A middleware returning
+`next({ user })` does the same on the routes it is given to. See
+[Hooks: `derive`](hooks.md#derive).
 
 ### `wrap`
 
@@ -576,19 +654,24 @@ See [Hooks: global hooks](hooks.md#global-hooks).
 
 ### `group`
 
-Hooks declared inside a group apply to its routes only. The group's routes
-keep every hook declared before it.
+Hooks and middlewares declared inside a group apply to its routes only.
+The group's routes keep every one declared before it. `use` in a group is
+how a subtree's context is added to:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, defineMiddleware } from '@alxia/core';
 
 const app = alxia()
 	.group('/admin', (admin) =>
 		admin
-			.derive(({ request, reply }) =>
-				request.headers.get('x-admin') === 'yes' ? undefined : reply(403, { error: 'forbidden' as const }),
+			.use(
+				defineMiddleware(({ request, reply }, next) =>
+					request.headers.get('x-admin') === 'yes'
+						? next({ admin: true as const })
+						: reply(403, { error: 'forbidden' as const }),
+				),
 			)
-			.get('/stats', ({ reply }) => reply(200, { users: 1 })),
+			.get('/stats', ({ admin, reply }) => reply(200, { users: 1, admin })),
 	)
 	.get('/public', ({ reply }) => reply(200, 'open')); // no 403 here
 ```
@@ -598,8 +681,8 @@ const app = alxia()
 
 ### `use` and `definePlugin`
 
-An app given to `use` brings its routes, and its route hooks then apply to
-the routes declared after `use`. A `Plugin` function adds global hooks and
+An app given to `use` brings its routes, and its route hooks and
+middlewares then apply to the routes declared after `use`. A `Plugin` function adds global hooks and
 leaves the type alone. `definePlugin<Requires>()` builds an app plugin that
 reads what an earlier one added.
 

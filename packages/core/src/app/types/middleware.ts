@@ -57,6 +57,15 @@ export type Middleware<Requires = Empty, Result = MiddlewareReturn> = (
 ) => Result;
 
 /**
+ * What `defineMiddleware` marks its middleware with, which `app.use` reads
+ * to tell it from a plugin written as a function. Never set as such: at
+ * runtime the mark is a symbol on the function.
+ */
+export interface MiddlewareMark {
+	readonly '~middleware': true;
+}
+
+/**
  * What a route's first middleware reads: the base context, what the hooks
  * before the route added, and the request as it arrived — the path
  * parameters and query as strings, the headers, and no body until a

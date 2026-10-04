@@ -37,7 +37,7 @@ export function addRoute(
 		schema,
 		...(bodyLimit === undefined ? {} : { bodyLimit }),
 		handler: args.last,
-		...state.scope.hooks(derive),
+		...state.scope.hooks(full, derive),
 	});
 }
 
@@ -108,6 +108,6 @@ export function addSocket(
 		path: full,
 		schema: schema as SocketSchema,
 		handlers: args.last,
-		...state.scope.hooks(derive),
+		...state.scope.hooks(full, derive),
 	});
 }

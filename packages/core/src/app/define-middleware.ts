@@ -2,7 +2,27 @@
  * `defineMiddleware`: a middleware written once and given to as many routes
  * as read it.
  */
-import type { Empty, Middleware, MiddlewareReturn, NoHookYet } from './types';
+import type {
+	Empty,
+	Middleware,
+	MiddlewareMark,
+	MiddlewareReturn,
+	NoHookYet,
+} from './types';
+
+/** Where a function `defineMiddleware` made carries its mark. */
+const MIDDLEWARE: unique symbol = Symbol.for('alxia.middleware');
+
+/**
+ * Whether `value` was made by `defineMiddleware`: what `use` reads to tell
+ * a middleware from a plugin written as a function.
+ */
+export function isMiddleware(value: unknown): boolean {
+	return (
+		typeof value === 'function' &&
+		(value as { [MIDDLEWARE]?: true })[MIDDLEWARE] === true
+	);
+}
 
 /**
  * A middleware: `(ctx, next) => …`, given to a route after its path, or
@@ -44,7 +64,9 @@ import type { Empty, Middleware, MiddlewareReturn, NoHookYet } from './types';
  * );
  * ```
  *
- * The middleware is the function itself: `defineMiddleware` only types it.
+ * The middleware is the function itself, marked as one: `app.use(auth)`
+ * reads the mark to tell it from a plugin written as a function, and runs
+ * it on every route declared after it. A route takes a plain function too.
  */
 export function defineMiddleware<
 	Requires extends object = Empty,
@@ -53,14 +75,14 @@ export function defineMiddleware<
 	middleware?: Middleware<Requires, Result>,
 ): NoInfer<
 	0 extends 1 & Result
-		? Middleware<Requires, Result>
+		? Middleware<Requires, Result> & MiddlewareMark
 		: [Result] extends [NoHookYet]
 			? [NoHookYet] extends [Result]
 				? <Returned extends MiddlewareReturn>(
 						middleware: Middleware<Requires, Returned>,
-					) => Middleware<Requires, Returned>
-				: Middleware<Requires, Result>
-			: Middleware<Requires, Result>
+					) => Middleware<Requires, Returned> & MiddlewareMark
+				: Middleware<Requires, Result> & MiddlewareMark
+			: Middleware<Requires, Result> & MiddlewareMark
 > {
 	if (middleware === undefined) return checked as never;
 	return checked(middleware) as never;
@@ -70,5 +92,5 @@ function checked<Fn>(middleware: Fn): Fn {
 	if (typeof middleware !== 'function') {
 		throw new TypeError('defineMiddleware(): the middleware is not a function');
 	}
-	return middleware;
+	return Object.defineProperty(middleware, MIDDLEWARE, { value: true });
 }

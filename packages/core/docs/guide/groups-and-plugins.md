@@ -1,8 +1,9 @@
 # Groups and plugins
 
-This page covers splitting an app: groups scope hooks to some routes, an
-app given to `use` brings its routes and typed context, and a function
-plugin adds global hooks.
+This page covers splitting an app: groups scope hooks and middlewares to
+some routes, `use` gives middlewares to the routes after it, an app given
+to `use` brings its routes and typed context, and a function plugin adds
+global hooks.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -63,16 +64,50 @@ const app = alxia()
 
 The types follow: `/admin/stats` may answer the 403, `/public` may not.
 
+### Middlewares in a group
+
+`use(...middlewares)` in a group runs them on the group's routes declared
+after it, and types what they add there alone: it is how a subtree's
+context is added to. `use(path, ...middlewares)` guards a subtree without
+a group, but its middlewares may add nothing
+([Middleware: `use(path, …)`](middleware.md#use-with-a-path)).
+
+```ts
+import { alxia, defineMiddleware } from '@alxia/core';
+
+const auth = defineMiddleware(({ request, reply }, next) => {
+	const id = request.headers.get('x-user');
+	return id ? next({ user: { id } }) : reply(401, { error: 'unauthenticated' as const });
+});
+const noBots = defineMiddleware(({ request, reply }, next) =>
+	request.headers.get('user-agent')?.includes('bot') ? reply(403, { error: 'no bots' as const }) : next(),
+);
+
+const app = alxia({ prefix: '/api' })
+	.use('/admin', noBots) // /api/admin and under: the path is joined to the prefix
+	.group('/admin', (admin) =>
+		admin.use(auth).get('/me', ({ user, reply }) => reply(200, user)), // noBots, auth, handler
+	)
+	.get('/public', ({ reply }) => reply(200, 'open')); // neither
+```
+
+A path given to `use` in a group is joined to the group's prefix:
+`group('/v1', (v1) => v1.use('/admin', guard))` guards `/v1/admin`.
+
 `build` must return the chain it was given — `(admin) => admin.get(…)`.
 A group's global hooks (`onRequest`, `onResponse`, …) are the app's: they
 apply everywhere, as they would declared outside it.
 
 ## Plugins
 
-A plugin is either an **app** or a **function**.
+A plugin is either an **app** or a **function**. `use` reads a function
+made by `defineMiddleware` as a middleware
+([Middleware: `use`](middleware.md#use-for-every-route-after-it)); any other function is
+a plugin.
 
 | | Adds | Type of the app after `use` |
 | --- | --- | --- |
+| middlewares, `use(auth)`, `use(path, guard)` | middlewares for the routes declared after it | grows by what they add; `use(path, …)` adds nothing |
 | an app, `use(otherApp)` | routes, route hooks, context, typed replies, global hooks, its [`bodyLimit()`](routes.md#body-size-bodylimit) | grows: its routes and context are added |
 | a function, `use(plugin)` | global hooks | unchanged |
 
@@ -88,8 +123,10 @@ use(plugin: Alxia<PluginCtx, PluginPrefix, PluginShortcuts>): Alxia<…>
 - Its **routes** are mounted under this app's prefix and behind this app's
   route hooks declared so far: `alxia({ prefix: '/api' }).use(posts)`
   serves `posts`' `/posts/:id` at `/api/posts/:id`.
-- Its **route hooks** then apply to the routes declared on this app after
-  `use`: an `auth` plugin can be a `derive` and nothing else.
+- Its **route hooks and middlewares** then apply to the routes declared on
+  this app after `use`: an `auth` plugin can be a `use(auth)` and nothing
+  else. A path it gave `use` is joined to this app's prefix, as its routes
+  are.
 - Its **`onError` hooks** are tried before this app's, for its own routes.
 - Its **`onRefusal` hook** answers its own routes' refused requests. Its
   routes without one take this app's, declared before `use`. The plugin's

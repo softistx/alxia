@@ -67,3 +67,21 @@ export function operations() {
 			({ body, reply }) => reply(200, body),
 		);
 }
+
+// Scope middlewares, through `use`: an exported middleware names
+// `MiddlewareMark`, and an app that took them names what they add.
+export const adminOnly = defineMiddleware(({ request, reply }, next) =>
+	request.headers.has('x-admin')
+		? next()
+		: reply(403, { error: 'forbidden' as const }),
+);
+
+export function scoped() {
+	return alxia()
+		.use('/admin', adminOnly)
+		.use(authed, owner)
+		.get('/me', ({ user, owner: o, reply }) => reply(200, { user, owner: o }))
+		.group('/teams', (teams) =>
+			teams.use(timed).get('/', ({ user, reply }) => reply(200, user)),
+		);
+}

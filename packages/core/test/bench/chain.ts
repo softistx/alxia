@@ -1,9 +1,10 @@
 /**
  * The chain's cost: a route behind 3 middlewares, in the middleware form,
- * against the same route behind a list of 3 hooks, the form of 0.3. Run
- * from the package: `bun test/bench/chain.ts`. Prints the median time of a
- * request in each form and the ratio; the middleware form should stay
- * within 10% of the list.
+ * against the same route behind a list of 3 hooks, the form of 0.3, and
+ * behind the same 3 given to `use`. Run from the package:
+ * `bun test/bench/chain.ts`. Prints the median time of a request in each
+ * form and the ratios; the middleware forms should stay within 10% of the
+ * list.
  */
 import { alxia, defineHook, defineMiddleware } from '@alxia/core';
 
@@ -27,6 +28,10 @@ const middlewares = alxia().get('/', ma, mb, mc, ({ c, reply }) =>
 	reply(200, c),
 );
 
+const scoped = alxia()
+	.use(ma, mb, mc)
+	.get('/', ({ c, reply }) => reply(200, c));
+
 const request = new Request('http://localhost/');
 
 async function round(app: { fetch: (r: Request) => Promise<Response> }) {
@@ -40,13 +45,22 @@ const median = (values: number[]) =>
 
 await round(hooks);
 await round(middlewares);
-const times = { hooks: [] as number[], middlewares: [] as number[] };
+await round(scoped);
+const times = {
+	hooks: [] as number[],
+	middlewares: [] as number[],
+	scoped: [] as number[],
+};
 for (let i = 0; i < ROUNDS; i++) {
 	times.hooks.push(await round(hooks));
 	times.middlewares.push(await round(middlewares));
+	times.scoped.push(await round(scoped));
 }
 const old = median(times.hooks);
 const now = median(times.middlewares);
+const used = median(times.scoped);
 console.log(`[hooks] list, 3 hooks:   ${old.toFixed(0)} ns/request`);
 console.log(`middlewares, 3:          ${now.toFixed(0)} ns/request`);
+console.log(`use(), 3:                ${used.toFixed(0)} ns/request`);
 console.log(`ratio:                   ${(now / old).toFixed(3)}`);
+console.log(`ratio, use():            ${(used / old).toFixed(3)}`);
