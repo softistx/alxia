@@ -71,9 +71,13 @@ the handler, or where `validate(operation)` stands. The checks match it as
 any other route:
 
 ```ts
-import { alxia, validate } from '@alxia/core';
+import { alxia, defineMiddleware, validate } from '@alxia/core';
 import { matchesSpec } from '@alxia/openapi-routes';
 import { operations } from './generated/alxia';
+
+const auth = defineMiddleware(({ request, reply }, next) =>
+	request.headers.has('authorization') ? next() : reply(401, { error: 'unauthorized' as const }),
+);
 
 const app = alxia()
 	.route(operations.renamePet, auth, ({ params, body, reply }) => reply.ok(rename(params.petId, body.name)))

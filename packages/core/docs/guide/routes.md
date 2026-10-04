@@ -155,7 +155,7 @@ const app = alxia({ prefix: '/api' })
 It is exactly the route `app[method](path, options, responds(…), validate(…), handler)`
 declares from the same schemas: the same context, the same entry in
 `RoutesOf` (`'/api/pets/:petId'` above, the prefix applied), and the same
-compile errors — a params schema that does not
+checks, at compile time — a params schema that does not
 read the path, an unknown schema key, a status the operation does not declare.
 `method` is any `Method`, `QUERY` included; an operation without `schema` is
 a route without one.

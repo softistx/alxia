@@ -107,7 +107,7 @@ challenge, and `send` refuses the union at compile time
 Switch on `status` first:
 
 ```ts
-.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 	const result = await accounts.signIn(body);
 	if (result.status === 'secondFactor') {
 		return reply.ok({ status: result.status, challenge: result.challenge });
