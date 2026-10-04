@@ -2,7 +2,7 @@ import { afterAll, describe, expect, test } from 'bun:test';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { alxiaRanges, highestMajor, PEER_RANGES } from './versions';
+import { alxiaRanges, PEER_RANGES } from './versions';
 
 const PACKAGES = new URL('../..', import.meta.url).pathname;
 const peersOf = async (dir: string): Promise<Record<string, string>> =>
@@ -25,15 +25,6 @@ describe('PEER_RANGES', () => {
 		for (const dir of ['client', 'react-router', 'zod']) {
 			expect((await peersOf(dir))['typescript']).toBe(PEER_RANGES.typescript);
 		}
-	});
-});
-
-describe('highestMajor', () => {
-	test('the highest major a range names', () => {
-		expect(highestMajor('^8.0.0')).toBe(8);
-		expect(highestMajor('^7.0.0 || ^8.0.0')).toBe(8);
-		expect(highestMajor('>=19.2.7')).toBe(19);
-		expect(() => highestMajor('*')).toThrow('no major in range *');
 	});
 });
 

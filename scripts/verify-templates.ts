@@ -7,9 +7,9 @@
  * every other request to npm's (`templates/registry.ts`). Bun is pointed at
  * it with `BUN_CONFIG_REGISTRY`, with an empty cache and temporary
  * directory of its own, so neither `@alxia/create` nor a package it installs
- * comes from the published versions. What is not alxia's — React Router's
- * `create-react-router`, Zod, Vite, TypeScript — comes from npm at the
- * newest versions `@alxia/create` resolves today, so this needs the network,
+ * comes from the published versions. What is not alxia's — React Router,
+ * Zod, Vite, TypeScript — comes from npm at the newest versions
+ * `@alxia/create` resolves today, so this needs the network,
  * and an upstream release can turn it red with no change here. It runs in CI
  * as the `Templates` job, informational like `Newest peers`.
  *
@@ -22,6 +22,7 @@ import { $ } from 'bun';
 import { pack } from './artifacts/install';
 import { readPackages } from './artifacts/packages';
 import { staleBuilds } from './artifacts/stale';
+import type { Tarball } from './artifacts/tarball';
 import { startRegistry } from './templates/registry';
 
 /** A port nothing listens on, for a server this script starts. */
@@ -65,6 +66,8 @@ async function served(
 
 interface Check {
 	readonly template: 'api' | 'react-router';
+	/** Files the project must hold, as a template copied them. */
+	readonly files: readonly string[];
 	readonly scripts: readonly string[];
 	readonly request: (base: string) => Promise<Response>;
 	readonly expected: number;
@@ -73,6 +76,7 @@ interface Check {
 const CHECKS: readonly Check[] = [
 	{
 		template: 'api',
+		files: ['.gitignore', 'src/app.ts'],
 		scripts: ['typecheck', 'test', 'build'],
 		request: (base) =>
 			fetch(`${base}/todos`, {
@@ -84,6 +88,7 @@ const CHECKS: readonly Check[] = [
 	},
 	{
 		template: 'react-router',
+		files: ['.gitignore', 'bunfig.toml', 'vite.config.ts', 'app/root.tsx'],
 		scripts: ['typecheck', 'build'],
 		request: (base) => fetch(`${base}/`),
 		expected: 200,
@@ -94,6 +99,24 @@ const CHECKS: readonly Check[] = [
 function report(passed: boolean, what: string): boolean {
 	console.log(`${passed ? 'ok  ' : 'FAIL'} ${what}`);
 	return passed;
+}
+
+/**
+ * `bun publish` leaves every `.gitignore` and `bunfig.toml` out of a
+ * tarball, so the `react-router` template ships them as `gitignore` and
+ * `_bunfig.toml`, renamed when it is copied.
+ */
+function templateShipped(tarballs: readonly Tarball[]): boolean {
+	const create = tarballs.find(
+		({ manifest }) => manifest['name'] === '@alxia/create',
+	);
+	const entries = create?.entries ?? [];
+	return report(
+		['gitignore', '_bunfig.toml', 'package.json', 'vite.config.ts'].every(
+			(file) => entries.includes(`package/templates/react-router/${file}`),
+		),
+		"@alxia/create's tarball holds templates/react-router, gitignore and _bunfig.toml included",
+	);
 }
 
 /** `bun create @alxia` is `bunx @alxia/create`: the same bin, run alone. */
@@ -137,6 +160,12 @@ async function templateWorks(
 		lock.includes(`${registryUrl}/-/@alxia-core-`),
 		`${check.template}: @alxia/core installed from the packed tarball`,
 	);
+	for (const file of check.files) {
+		ok &&= report(
+			await Bun.file(join(dir, file)).exists(),
+			`${check.template}: wrote ${file}`,
+		);
+	}
 	console.log(
 		`\n${check.template}'s package.json:\n${await Bun.file(join(dir, 'package.json')).text()}`,
 	);
@@ -185,7 +214,8 @@ async function main(): Promise<boolean> {
 		TMPDIR: join(workdir, 'tmp'),
 	};
 	try {
-		let ok = await helpRuns(workdir, env);
+		let ok = templateShipped(packed.tarballs);
+		ok = (await helpRuns(workdir, env)) && ok;
 		for (const check of CHECKS) {
 			ok = (await templateWorks(check, workdir, env, registry.url)) && ok;
 		}

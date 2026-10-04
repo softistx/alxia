@@ -33,15 +33,6 @@ export const PEER_RANGES = {
 	vite: '^7.0.0 || ^8.0.0',
 } as const;
 
-/** The highest major a range such as `^7.0.0 || ^8.0.0` names. */
-export function highestMajor(range: string): number {
-	const majors = [...range.matchAll(/(?:^|[\s|^~>=])(\d+)/g)].map((match) =>
-		Number(match[1]),
-	);
-	if (majors.length === 0) throw new Error(`no major in range ${range}`);
-	return Math.max(...majors);
-}
-
 /**
  * The range a generated project declares for each `@alxia/*` package: what
  * this package's own `package.json` says. Published, that is `^<version>`,

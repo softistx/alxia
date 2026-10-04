@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, test } from 'bun:test';
-import { fakeRegistry } from '../test/scaffold';
+import { fakeRegistry } from '../test/registry';
 import {
 	allowedRange,
 	bumpDependencies,
 	type Manifest,
 	newestWithin,
 	registryUrl,
+	sameMinor,
 } from './registry';
 
 const VERSIONS = {
@@ -44,6 +45,14 @@ describe('newestWithin', () => {
 		expect(newestWithin(VERSIONS.typescript, '^6.0.3 || ^7.0.0')).toBe('7.0.2');
 		expect(newestWithin(VERSIONS.vite, '^7.0.0')).toBe('7.3.0');
 		expect(newestWithin(VERSIONS.zod, '^5.0.0')).toBeUndefined();
+	});
+});
+
+describe('sameMinor', () => {
+	test("the minor of a range's first version, or undefined", () => {
+		expect(sameMinor('^0.3.1')).toBe('~0.3.0');
+		expect(sameMinor('^1.4.2')).toBe('~1.4.0');
+		expect(sameMinor('*')).toBeUndefined();
 	});
 });
 
@@ -122,21 +131,63 @@ describe('bumpDependencies', () => {
 		});
 	});
 
-	test('leaves what `keep` names, and never asks the registry for it', async () => {
-		const fake = registry();
+	test('moves what `built` names within the range it gives, before any peer range', async () => {
+		const fake = fakeRegistry({
+			'@alxia/core': ['0.3.0', '0.3.1', '0.3.4', '0.4.0'],
+			zod: ['4.6.5'],
+		});
+		stop = fake.stop;
 		const manifest: Manifest = {
-			dependencies: { '@alxia/core': '^0.3.0', zod: '^4.2.0' },
+			dependencies: { '@alxia/core': '^0.3.1', zod: '^4.2.0' },
 		};
-		await bumpDependencies(
+		const bumped = await bumpDependencies(
 			manifest,
 			{ url: fake.url },
-			new Set(['@alxia/core']),
+			{ '@alxia/core': '^0.3.1', zod: '~4.2.0' },
 		);
 		expect(manifest.dependencies).toEqual({
-			'@alxia/core': '^0.3.0',
-			zod: '^4.6.5',
+			'@alxia/core': '^0.3.4',
+			zod: '^4.2.0',
 		});
-		expect(fake.requested).toEqual(['zod']);
+		expect(bumped.held).toContain(
+			"@alxia/core: kept to ^0.3.1, where the newest is 0.3.4; npm's latest, 0.4.0, is outside it",
+		);
+		expect(bumped.unmatched).toEqual([
+			'zod: no release within ~4.2.0; kept ^4.2.0',
+		]);
+	});
+
+	test('a version npm has not propagated yet: the newest of the same minor, which ^ keeps within the range', async () => {
+		// @alxia/core 0.3.1 published a minute ago, not on this registry yet.
+		const fake = fakeRegistry({ '@alxia/core': ['0.2.9', '0.3.0'] });
+		stop = fake.stop;
+		const manifest: Manifest = { dependencies: { '@alxia/core': '^0.3.1' } };
+		const bumped = await bumpDependencies(
+			manifest,
+			{ url: fake.url },
+			{ '@alxia/core': '^0.3.1' },
+		);
+		expect(manifest.dependencies).toEqual({ '@alxia/core': '^0.3.0' });
+		expect(Bun.semver.satisfies('0.3.1', '^0.3.0')).toBe(true);
+		expect(bumped.behind).toEqual([
+			'@alxia/core: the registry has no release within ^0.3.1 yet; wrote ^0.3.0, the newest of ~0.3.0',
+		]);
+		expect(bumped.unmatched).toEqual([]);
+	});
+
+	test('nothing on the same minor either: the version kept, and said', async () => {
+		const fake = fakeRegistry({ '@alxia/core': ['0.2.9'] });
+		stop = fake.stop;
+		const manifest: Manifest = { dependencies: { '@alxia/core': '^0.3.1' } };
+		const bumped = await bumpDependencies(
+			manifest,
+			{ url: fake.url },
+			{ '@alxia/core': '^0.3.1' },
+		);
+		expect(manifest.dependencies).toEqual({ '@alxia/core': '^0.3.1' });
+		expect(bumped.unmatched).toEqual([
+			'@alxia/core: no release within ^0.3.1; kept ^0.3.1',
+		]);
 	});
 
 	test('a package the registry does not answer for keeps its version, and is named', async () => {
@@ -172,6 +223,7 @@ describe('bumpDependencies', () => {
 			held: [],
 			failed: ['zod'],
 			unmatched: [],
+			behind: [],
 		});
 	});
 
@@ -186,6 +238,7 @@ describe('bumpDependencies', () => {
 			held: [],
 			failed: [],
 			unmatched: ['zod: no release within ^4.2.0; kept ^4.2.0'],
+			behind: [],
 		});
 	});
 });

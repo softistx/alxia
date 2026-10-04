@@ -26,12 +26,11 @@ nothing — the symptom.
 
 **Writing the project**
 
-- [`create-alxia: create-react-router's … is not what this @alxia/create expects: …`](#create-alxia-create-react-routers--is-not-what-this-alxiacreate-expects-)
-- [`create-alxia: failed: create-react-router exited with 1.`](#create-alxia-failed-create-react-router-exited-with-1)
 - [`create-alxia: failed: …`](#create-alxia-failed-)
 - [`create-alxia: warning: the registry did not answer for …; kept the versions the template ships.`](#create-alxia-warning-the-registry-did-not-answer-for--kept-the-versions-the-template-ships)
 - [`typescript: kept to ^6.0.3 || ^7.0.0, where the newest is 7.0.2; npm's latest, 8.0.0, is outside it`](#typescript-kept-to-603--700-where-the-newest-is-702-npms-latest-800-is-outside-it)
 - [`zod: no release within ^4.2.0; kept ^4.2.0`](#zod-no-release-within-420-kept-420)
+- [`@alxia/core: the registry has no release within ^0.3.1 yet; wrote ^0.3.0, the newest of ~0.3.0`](#alxiacore-the-registry-has-no-release-within-031-yet-wrote-030-the-newest-of-030)
 - [`create-alxia: bun install failed; the files are written.`](#create-alxia-bun-install-failed-the-files-are-written)
 
 **After**
@@ -148,47 +147,6 @@ project beside it and move the files in.
 
 ## Writing the project
 
-### `create-alxia: create-react-router's … is not what this @alxia/create expects: …`
-
-**When:** the `react-router` template, after `create-react-router` ran.
-The message names the file — `package.json`, `vite.config.ts` or
-`bunfig.toml` — and what was expected of it:
-
-- `it is missing`: no `package.json` or `vite.config.ts`;
-- `react-router in its dependencies, and the scripts dev: react-router dev, build: react-router build and a start`;
-- `reactRouter() from "@react-router/dev/vite", called once in plugins: [...]`;
-- `it already imports @alxia/react-router/vite`;
-- `none, and there is one`: a `bunfig.toml` already.
-
-**Why:** React Router's template changed since this `@alxia/create` was
-released, and the edits that add alxia check each file before changing it
-rather than write a project that does not start. What was written is
-removed: the target directory is emptied when it was there, removed when
-it was not. A parent directory the command created for it, as `a/b` for
-`a/b/my-site`, stays.
-
-**Fix:** run the newest `@alxia/create`, whose edits follow the newest
-template:
-
-```sh
-bunx @alxia/create@latest my-site --template react-router
-```
-
-If that one refuses too, add alxia to React Router's template by hand, as
-[`@alxia/react-router`'s README](https://www.npmjs.com/package/@alxia/react-router)
-shows (`bun add`, `alxia()` in `vite.config.ts`, `start`), and open an
-issue.
-
-### `create-alxia: failed: create-react-router exited with 1.`
-
-**When:** the `react-router` template, when `create-react-router` itself
-failed; its own output, just above, says why. Most often the network:
-`bunx` could not fetch it, or it could not fetch React Router's template
-from GitHub.
-
-**Fix:** what its output says, then run the command again: what was
-written is removed.
-
 ### `create-alxia: failed: …`
 
 **When:** any other error while writing the project, with the error's own
@@ -196,7 +154,8 @@ message after `failed:` — most often the file system: `EACCES` writing
 into a directory the user cannot write to, `ENOSPC` with the disk full.
 
 **Fix:** what the message names, then run the command again: what was
-written is removed, as above.
+written is removed — the target directory is emptied when it was there,
+removed when it was not.
 
 ### `create-alxia: warning: the registry did not answer for …; kept the versions the template ships.`
 
@@ -236,6 +195,20 @@ holds only some versions, most often. The template's own version is kept.
 the mirror fetch the missing ones, or write a version within the range by
 hand after the project is created.
 
+### `@alxia/core: the registry has no release within ^0.3.1 yet; wrote ^0.3.0, the newest of ~0.3.0`
+
+**When:** a notice, not an error, right after an alxia release: the
+registry lists `@alxia/create`'s new version but not yet the
+`@alxia/core` (or `@alxia/client`, `@alxia/react-router`) published beside
+it. npm can take a few minutes to serve a version everywhere.
+
+**Why:** a project written with `^0.3.1` would fail its `bun install` with
+`No version matching "^0.3.1" found`. The command writes the newest release
+of the same minor instead; `^0.3.0` still takes 0.3.1.
+
+**Fix:** nothing to do. Once the registry serves the new version,
+`bun update @alxia/core` moves the project to it.
+
 ### `create-alxia: bun install failed; the files are written.`
 
 **When:** `bun install` exited non-zero in the new project; its output,
@@ -264,12 +237,14 @@ says.
 
 ### The project's `@alxia/*` are older than npm's latest
 
-**Symptom:** a fresh project declares `@alxia/core` at `^0.3.0` while npm
-has `0.4.0`.
+**Symptom:** a fresh project declares `@alxia/core` at `^0.3.4` while npm
+has `0.4.0`, and the output said `@alxia/core: kept to ^0.3.1, where the
+newest is 0.3.4; npm's latest, 0.4.0, is outside it`.
 
-**Why:** alxia's packages are written at the versions the `@alxia/create`
-that ran was published with ([Versions](guide.md#versions)), and a release
-of `@alxia/core` alone does not release a new `@alxia/create`.
+**Why:** alxia's packages move only within the ranges the `@alxia/create`
+that ran was published with ([Versions](guide.md#versions)): a new minor
+is outside them, and a release of `@alxia/core` alone does not release a
+new `@alxia/create`.
 
 **Fix:** `bunx @alxia/create@latest` for the newest `@alxia/create`, and in
 an existing project

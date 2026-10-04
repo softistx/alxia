@@ -1,7 +1,10 @@
 /**
  * Moves a generated project's dependencies to their newest versions on the
  * registry, within what alxia accepts: a template ships the versions it was
- * written with, and React Router's lags behind its own releases.
+ * written with, and React Router's lags behind its own releases. alxia's own
+ * packages move within the ranges this `@alxia/create` was published with,
+ * and fall back on the same minor when the registry does not have the
+ * version those ranges start at yet.
  */
 import { PEER_RANGES } from './versions';
 
@@ -30,6 +33,12 @@ export interface Bumped {
 	readonly failed: string[];
 	/** A package with no release within its range: its version is unchanged. */
 	readonly unmatched: string[];
+	/**
+	 * An `@alxia/*` package whose version the range starts at is not on the
+	 * registry yet, as just after a release: the newest of the same minor
+	 * was written instead.
+	 */
+	readonly behind: string[];
 }
 
 /** The registry to resolve against: the one Bun or npm was given, or npm's. */
@@ -96,22 +105,33 @@ function choose(
 }
 
 /**
- * Rewrites every dependency of `manifest` but those in `keep` to `^` its
- * newest version: within the range alxia's peers hold it to, or npm's
- * `latest` when none does. React Router's own packages take the
- * version `react-router` resolved to, when they have it: `@react-router/node`
- * pins `react-router` exactly. A package whose metadata fails to arrive keeps
- * its version, and is named in `failed`.
+ * `range`'s own minor, from its first version: `~0.3.0` for `^0.3.1`, or
+ * undefined for a range that names no version.
+ */
+export function sameMinor(range: string): string | undefined {
+	const match = /(\d+)\.(\d+)\.\d+/.exec(range);
+	return match ? `~${match[1]}.${match[2]}.0` : undefined;
+}
+
+/**
+ * Rewrites every dependency of `manifest` to `^` its newest version: within
+ * `built[name]` for a package it names — alxia's, at the ranges this
+ * `@alxia/create` was published with — else within the range alxia's peers
+ * hold it to, else npm's `latest`. A package of `built` with no release in
+ * its range, as when npm has not yet propagated a version published minutes
+ * ago, takes the newest of the range's own minor, named in `behind`: `^` it
+ * is still within the range. React Router's own packages take the version
+ * `react-router` resolved to, when they have it: `@react-router/node` pins
+ * `react-router` exactly. A package whose metadata fails to arrive keeps its
+ * version, and is named in `failed`.
  */
 export async function bumpDependencies(
 	manifest: Manifest,
 	registry: Registry,
-	keep: ReadonlySet<string> = new Set(),
+	built: Readonly<Record<string, string>> = {},
 ): Promise<Bumped> {
 	const fields = ['dependencies', 'devDependencies'] as const;
-	const names = fields.flatMap((field) =>
-		Object.keys(manifest[field] ?? {}).filter((name) => !keep.has(name)),
-	);
+	const names = fields.flatMap((field) => Object.keys(manifest[field] ?? {}));
 	const fetched = new Map(
 		await Promise.all(
 			names.map(
@@ -127,6 +147,7 @@ export async function bumpDependencies(
 	const held: string[] = [];
 	const failed: string[] = [];
 	const unmatched: string[] = [];
+	const behind: string[] = [];
 	const chosen = new Map<string, string>();
 	// react-router first: its siblings follow the version it settles on.
 	const ordered = [...names].sort(
@@ -143,13 +164,23 @@ export async function bumpDependencies(
 			continue;
 		}
 		const versions = Object.keys(meta.versions);
-		const range = allowedRange(name);
+		const pinned = built[name];
+		const range = pinned ?? allowedRange(name);
 		const latest = meta['dist-tags']?.['latest'];
 		const follow = chosen.get('react-router');
-		const version =
+		let version =
 			name.startsWith('@react-router/') && follow && versions.includes(follow)
 				? follow
 				: choose(versions, range, latest);
+		const minor = pinned === undefined ? undefined : sameMinor(pinned);
+		if (version === undefined && minor) {
+			version = newestWithin(versions, minor);
+			if (version !== undefined) {
+				behind.push(
+					`${name}: the registry has no release within ${range} yet; wrote ^${version}, the newest of ${minor}`,
+				);
+			}
+		}
 		if (version === undefined) {
 			unmatched.push(
 				`${name}: no release within ${range ?? 'any range'}; kept ${current}`,
@@ -171,5 +202,5 @@ export async function bumpDependencies(
 		if (next !== current) moved.push(`${name} ${current} -> ${next}`);
 		deps[name] = next;
 	}
-	return { moved, held, failed, unmatched };
+	return { moved, held, failed, unmatched, behind };
 }

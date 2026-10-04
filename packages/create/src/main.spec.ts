@@ -9,10 +9,15 @@ import {
 import { mkdir, mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { fakeRegistry, writeScaffold } from '../test/scaffold';
+import { fakeRegistry } from '../test/registry';
 import { type Io, main, packageName, USAGE } from './main';
-import { BUNFIG } from './templates/react-router';
 import { alxiaRanges } from './versions';
+
+const ALXIA = await alxiaRanges();
+/** The version each `@alxia/*` range starts at: `0.3.1` for `^0.3.1`. */
+const ALXIA_VERSIONS = Object.fromEntries(
+	Object.entries(ALXIA).map(([name, range]) => [name, [range.slice(1)]]),
+);
 
 const VERSIONS = {
 	zod: ['4.2.0', '4.6.5'],
@@ -31,6 +36,7 @@ const VERSIONS = {
 	'@types/react': ['19.3.0'],
 	'@types/react-dom': ['19.3.0'],
 	vite: ['8.3.2'],
+	...ALXIA_VERSIONS,
 };
 
 interface Fake {
@@ -48,6 +54,7 @@ beforeEach(async () => {
 	roots.push(root);
 	registry = fakeRegistry(VERSIONS);
 });
+const TEMPLATE = new URL('../templates/react-router/', import.meta.url);
 afterEach(() => registry.stop());
 afterAll(async () => {
 	for (const dir of roots) await rm(dir, { recursive: true, force: true });
@@ -55,14 +62,13 @@ afterAll(async () => {
 
 /**
  * An `Io` that answers `answers` in turn (null: no terminal), runs nothing
- * but records each command — `create-react-router` writes `scaffold` — and
- * exits each with `codes[command]`, 0 by default.
+ * but records each command, and exits `bun install` with `codes.install`, 0
+ * by default.
  */
 function fake(
 	options: {
 		answers?: (string | null)[];
-		scaffold?: Parameters<typeof writeScaffold>[1] | 'none';
-		codes?: { install?: number; scaffold?: number };
+		codes?: { install?: number };
 		registryUrl?: string;
 	} = {},
 ): Fake {
@@ -81,14 +87,7 @@ function fake(
 			ask: () => (answers.length > 0 ? answers.shift() : undefined),
 			run: async (command, cwd) => {
 				ran.push({ command, cwd });
-				if (command[1] === 'install') return options.codes?.install ?? 0;
-				if (options.scaffold !== 'none') {
-					await writeScaffold(
-						join(cwd, command[3] as string),
-						options.scaffold,
-					);
-				}
-				return options.codes?.scaffold ?? 0;
+				return options.codes?.install ?? 0;
 			},
 			env: { BUN_CONFIG_REGISTRY: options.registryUrl ?? registry.url },
 		},
@@ -164,12 +163,11 @@ describe('create-alxia', () => {
 		expect(
 			await main(['my-api', '--template', 'api', '--no-install'], root, io),
 		).toBe(0);
-		const alxia = await alxiaRanges();
 		expect(await json(join(root, 'my-api', 'package.json'))).toMatchObject({
 			name: 'my-api',
-			dependencies: { '@alxia/core': alxia['@alxia/core'], zod: '^4.6.5' },
+			dependencies: { '@alxia/core': ALXIA['@alxia/core'], zod: '^4.6.5' },
 			devDependencies: {
-				'@alxia/client': alxia['@alxia/client'],
+				'@alxia/client': ALXIA['@alxia/client'],
 				'@types/bun': '^1.4.2',
 				typescript: '^7.0.2',
 			},
@@ -220,22 +218,18 @@ describe('create-alxia', () => {
 		);
 	});
 
-	test('react-router: the official scaffold, then alxia added to it', async () => {
+	test('react-router: the stored template copied, alxia at its versions, the rest at the newest', async () => {
 		const { io, ran } = fake();
 		expect(await main(['web', '--template', 'react-router'], root, io)).toBe(0);
-		expect(ran[0]?.command.slice(1, 4)).toEqual([
-			'x',
-			'create-react-router@8',
-			'web',
-		]);
-		expect(ran[0]?.cwd).toBe(root);
 		const dir = join(root, 'web');
+		// Nothing but bun install runs: no create-react-router.
+		expect(ran).toEqual([{ command: [process.execPath, 'install'], cwd: dir }]);
 		const manifest = await json(join(dir, 'package.json'));
-		const alxia = await alxiaRanges();
+		expect(manifest.name).toBe('web');
 		expect(manifest.scripts.start).toBe('bun build/server/index.js');
 		expect(manifest.dependencies).toEqual({
-			'@alxia/core': alxia['@alxia/core'],
-			'@alxia/react-router': alxia['@alxia/react-router'],
+			'@alxia/core': ALXIA['@alxia/core'],
+			'@alxia/react-router': ALXIA['@alxia/react-router'],
 			'@react-router/node': '^8.4.0',
 			'@react-router/serve': '^8.4.0',
 			isbot: '^5.2.2',
@@ -244,39 +238,39 @@ describe('create-alxia', () => {
 			'react-router': '^8.4.0',
 		});
 		expect(manifest.devDependencies.typescript).toBe('^7.0.2');
-		expect(await Bun.file(join(dir, 'vite.config.ts')).text()).toContain(
-			'plugins: [tailwindcss(), reactRouter(), alxia()]',
-		);
-		expect(await Bun.file(join(dir, 'bunfig.toml')).text()).toBe(BUNFIG);
-		expect(ran[1]?.command).toEqual([process.execPath, 'install']);
+		for (const [file, stored] of [
+			['vite.config.ts', 'vite.config.ts'],
+			['app/root.tsx', 'app/root.tsx'],
+			['.gitignore', 'gitignore'],
+			['bunfig.toml', '_bunfig.toml'],
+		] as const) {
+			expect(await Bun.file(join(dir, file)).text()).toBe(
+				await Bun.file(new URL(stored, TEMPLATE)).text(),
+			);
+		}
+		expect(await Bun.file(join(dir, 'gitignore')).exists()).toBe(false);
+		expect(await Bun.file(join(dir, '_bunfig.toml')).exists()).toBe(false);
 	});
 
-	test('a scaffold it does not know: refused, and nothing left behind', async () => {
-		const { io, err, ran } = fake({
-			scaffold: { viteConfig: 'export default {};\n' },
+	test('an @alxia/* version npm has not propagated yet: the newest of its minor, still within its range', async () => {
+		const [major, minor] = ALXIA['@alxia/core'].slice(1).split('.');
+		registry.stop();
+		// The registry has the minor's .0, and the newest of the minor before,
+		// but not the version this @alxia/create was published beside.
+		registry = fakeRegistry({
+			...VERSIONS,
+			'@alxia/core': [`${major}.${Number(minor) - 1}.9`, `${major}.${minor}.0`],
 		});
-		expect(await main(['web', '--template', 'react-router'], root, io)).toBe(1);
-		expect(err[0]).toStartWith(
-			"create-alxia: create-react-router's vite.config.ts is not what this @alxia/create expects",
+		const { io, out } = fake();
+		expect(
+			await main(['my-api', '--template', 'api', '--no-install'], root, io),
+		).toBe(0);
+		const written = (await json(join(root, 'my-api', 'package.json')))
+			.dependencies['@alxia/core'];
+		expect(written).toBe(`^${major}.${minor}.0`);
+		expect(out).toContain(
+			`  @alxia/core: the registry has no release within ${ALXIA['@alxia/core']} yet; wrote ^${major}.${minor}.0, the newest of ~${major}.${minor}.0`,
 		);
-		expect(await readdir(root)).toEqual([]);
-		expect(ran).toHaveLength(1);
-	});
-
-	test('a scaffold it does not know, in an empty directory that was there: emptied, kept', async () => {
-		await mkdir(join(root, 'web'));
-		const { io } = fake({ scaffold: { viteConfig: 'export default {};\n' } });
-		expect(await main(['web', '--template', 'react-router'], root, io)).toBe(1);
-		expect(await readdir(join(root, 'web'))).toEqual([]);
-	});
-
-	test('create-react-router failing fails the command', async () => {
-		const { io, err } = fake({ scaffold: 'none', codes: { scaffold: 2 } });
-		expect(await main(['web', '--template', 'react-router'], root, io)).toBe(1);
-		expect(err).toEqual([
-			'create-alxia: failed: create-react-router exited with 2.',
-		]);
-		expect(await readdir(root)).toEqual([]);
 	});
 
 	test('a registry that does not answer: the template versions kept, with a warning', async () => {
@@ -285,7 +279,7 @@ describe('create-alxia', () => {
 			await main(['my-api', '--template', 'api', '--no-install'], root, io),
 		).toBe(0);
 		expect(err[0]).toBe(
-			'create-alxia: warning: the registry did not answer for zod, @types/bun, typescript; kept the versions the template ships.',
+			'create-alxia: warning: the registry did not answer for @alxia/core, zod, @alxia/client, @types/bun, typescript; kept the versions the template ships.',
 		);
 		expect(
 			(await json(join(root, 'my-api', 'package.json'))).devDependencies

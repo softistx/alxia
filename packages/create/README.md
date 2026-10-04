@@ -29,7 +29,7 @@ bun create @alxia my-site --template react-router
 | template | what it writes |
 | --- | --- |
 | `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a hook made with `defineHook` that answers 401 without an API key; a `bun test` spec calling it with `app.request()` and through `@alxia/client`, typed; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, `.gitignore` and a README |
-| `react-router` | React Router's own template, written by its `create-react-router`, then [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
+| `react-router` | React Router's official template, as `create-react-router` writes it, shipped in this package and copied, with [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
 
 The heart of the `api` project, its route and hook (the whole file, with
 its imports and schemas, is in the [guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#the-api-template)):
@@ -65,9 +65,13 @@ or CI.
 
 ## Versions
 
-- **alxia's packages** are at the versions this release of `@alxia/create`
-  was published with, as `^` ranges: `@alxia/core`, `@alxia/client`,
-  `@alxia/react-router`. `bunx @alxia/create@<version>` picks an older set.
+- **alxia's packages** — `@alxia/core`, `@alxia/client`,
+  `@alxia/react-router` — are moved to the newest version on the registry
+  within the ranges this release of `@alxia/create` was published with:
+  `^0.3.1` writes `^0.3.4` once 0.3.4 is out, never `^0.4.0`. Just after a
+  release, while the registry does not serve that version yet, the newest of
+  the same minor is written (`^0.3.0`, which takes 0.3.1 once it arrives),
+  and the output says so. `bunx @alxia/create@<version>` picks an older set.
 - **Everything else** — Zod, TypeScript, Vite, React, React Router, Tailwind
   — is moved to the newest version on the registry when the project is
   written, within the range alxia's packages accept: TypeScript within
@@ -96,6 +100,6 @@ the project it writes installs with `bun install`.
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md): each template file by file, what the `react-router` template changes in React Router's, how versions are chosen, and running it in CI.
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md): each template file by file, what the `react-router` template adds to React Router's, how versions are chosen, and running it in CI.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md): each message the command prints, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/create/docs/roadmap.md): what is coming, and what is not planned.

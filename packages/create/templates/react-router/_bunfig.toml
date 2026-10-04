@@ -1,0 +1,4 @@
+[run]
+# The React Router CLI is a node script: this starts it on Bun, which
+# alxia's server needs, even where a node is installed.
+bun = true
