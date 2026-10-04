@@ -1,8 +1,9 @@
 # Groups and plugins
 
-This page covers splitting an app: groups scope hooks and middlewares to
-some routes, `use` gives middlewares to the routes after it, an app given
-to `use` brings its routes and typed context, and a function plugin adds
+This page covers splitting an app: route files that read the app's context
+with `defineRoutes`, groups that scope hooks and middlewares to some
+routes, `use` giving middlewares to the routes after it, an app given to
+`use` bringing its routes and typed context, and a function plugin adding
 global hooks.
 
 ```ts
@@ -21,6 +22,68 @@ const app = alxia({ prefix: '/api' })
 	.use(posts)                                       // GET /api/posts/:id
 	.get('/me', ({ user, reply }) => reply(200, user)); // GET /api/me, ctx.user typed
 ```
+
+## Splitting the app across files
+
+Put what builds the context in one file, the base, and register it; each
+file of routes then starts from that context with `defineRoutes`, and
+imports `@alxia/core` alone:
+
+```ts
+// src/context.ts
+import { alxia } from '@alxia/core';
+
+export const base = alxia()
+	.decorate({ db })
+	.derive(async ({ request, reply }) => {
+		const user = await session(request);
+		return user ? { user } : reply(401, { error: 'unauthorized' as const });
+	});
+
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+```
+
+```ts
+// src/routes/todos.ts
+import { defineRoutes, validate } from '@alxia/core';
+
+export const todos = defineRoutes('/todos')
+	.get('/', ({ db, user, reply }) => reply(200, db.todos.of(user.id)))
+	.post('/', validate({ body: NewTodo }), ({ db, user, body, reply }) =>
+		reply(201, db.todos.add(user.id, body)),
+	);
+```
+
+```ts
+// src/app.ts
+import { base } from './context';
+import { todos } from './routes/todos';
+
+export const app = base.use(todos); // GET /todos, POST /todos
+```
+
+- **`defineRoutes(prefix?)`** is `alxia({ prefix })` at runtime: a plugin,
+  mounted by `use` as any app is. Its type starts from the registered
+  context, and it carries that context as its requirement through every
+  route, `derive` and `use` declared on it.
+- **`use` checks the requirement.** Mounting the routes on an app that
+  does not give the context — `alxia().use(todos)`, or `base` before the
+  `derive` that adds `user` — is the compile error of
+  [a plugin that needs an earlier one](writing-a-plugin.md#a-plugin-that-needs-an-earlier-one).
+- **Spec first, the same way.** `defineRoutes().route(operations.listTodos,
+  handler)`: an operation's path is already whole, so give no prefix.
+- **Register `base`, not `app`.** `app` mounts `todos`, whose type reads
+  `Register`: registered, `app` would be typed by itself, `TS7022`
+  ([The app's type](types.md#register-and-appcontext)).
+
+Without `Register`, `defineRoutes` starts from `BaseContext` and requires
+nothing, and a file of routes can still export an app of its own, as
+`posts` above, or a [`definePlugin`](writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
+naming what it reads.
 
 ## Prefixes
 

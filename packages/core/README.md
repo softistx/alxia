@@ -643,6 +643,52 @@ alxia().use(auth).use(tenant); // ok: auth adds a user, or answers 401
 alxia().use(tenant);           // compile error: the plugin reads "user", which this app's context does not give
 ```
 
+### Route files: `Register` and `defineRoutes`
+
+Register the chain that builds the context once, and a file of routes
+reads it with no import of the app:
+
+```ts
+// src/context.ts — the base: what every route reads
+import { alxia } from '@alxia/core';
+
+export const base = alxia()
+	.decorate({ db })
+	.derive(async ({ request, reply }) => {
+		const user = await session(request);
+		return user ? { user } : reply(401, { error: 'unauthorized' as const });
+	});
+
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+
+// src/routes/todos.ts — imports @alxia/core, not the app
+import { defineRoutes } from '@alxia/core';
+
+export const todos = defineRoutes('/todos')
+	.get('/', ({ db, user, reply }) => reply(200, db.todos.of(user.id)));
+
+// src/app.ts
+import { alxia } from '@alxia/core';
+import { base } from './context';
+import { todos } from './routes/todos';
+
+export const app = base.use(todos);
+alxia().use(todos); // compile error: the plugin reads "user", which this app's context does not give
+```
+
+`defineRoutes(prefix?)` is `alxia({ prefix })` typed with the registered
+context, which it requires of the app that mounts it. `AppContext` is that
+context, for a service or a resolver. Register `base`, never the app that
+mounts the routes: their type reads `Register`, so the app would be typed
+by itself (TS7022). Nothing registered, `AppContext` is `BaseContext`. A
+`defineMiddleware` still reads `BaseContext` alone; one that needs the
+registered context says so, `defineMiddleware<AppContext>()(fn)`, and is
+checked where it is given.
+
 A tool that reads `app.routes` — a route check, a document — finds a path
 as the core declares and matches it with `joinPath` and `shapeOf`:
 
@@ -686,6 +732,10 @@ covers all three kinds.
 | `defineHook(hook)`, `defineHook<Requires>()(hook)`, `defineWrap(hook)`, `defineWrap<Requires>()(hook)` | deprecated: a hook for a route's list, `app.get(path, [hook], schema?, handler)`, and one around the rest of it. Still run as in 0.3; write a `defineMiddleware` instead |
 | `RouteHook<Requires, Result>`, `RouteWrap<Requires, Result>`, `AnyRouteHook`, `HookContext<Requires>`, `RawRequestParts` | what `defineHook` and `defineWrap` make, and what such a hook reads: `BaseContext`, the `params` and `query` as they arrived, and `Requires` |
 | `ThreadHooks<Base, Hooks>`, `RouteHookBase<Ctx, Path>`, `HookProvided<Given, Requires>`, `AddedBy<Hook>`, `RepliesBy<Hook>`, `MaxRouteHooks`, `NoHookYet` | how a route's type threads a deprecated list of hooks, bounded at 8. Exported so an app's type can be named in a declaration file |
+| `Register`, `AppContext` | the interface an app augments with `context: typeof base`, and that base's context: `BaseContext` when nothing is registered |
+| `defineRoutes(prefix?)` | an app plugin built on the registered context, requiring it of the app that `use`s it: a file of routes with no import of the app |
+| `RegisteredOf<R>`, `RegisteredBase`, `InvalidRegister`, `RoutesContext` | the app a `Register`-shaped interface names (a fresh app when it names none), the one `Register` names, what a `context` that is not an app reads as (every key of the app's own a compile error), and the context `defineRoutes` starts from, its requirement in it |
+| `RequiredIn<PluginCtx>`, `Mounted<PluginCtx>` | what a `defineRoutes` plugin's context requires of the app that mounts it, and what it adds to it. Exported so an app's type can be named in a declaration file |
 | `definePlugin<Requires>()(build)` | an app plugin built on an app whose context has `Requires`; `use` refuses it on an app that does not give them |
 | `Requiring<Requires>`, `ProvidedBy<Ctx, Requires>` | the marker on a `definePlugin` plugin, and the check `use` makes of it |
 | `RequiresOf<Ctx, Callback?>` | what a callback annotated `Ctx` reads beyond `BaseContext` — `{ user: User }` for `BaseContext & { user: User }`, `Empty` for nothing more: the `Requires` of a plugin that infers it from a callback it is given. A callback annotated `any` is refused on every app, with a message naming `Callback` |

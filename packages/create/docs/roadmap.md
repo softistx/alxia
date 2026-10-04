@@ -7,7 +7,11 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **The `api` project split across files.** `src/context.ts` holds the
+  base the routes read and registers it with `@alxia/core`'s `Register`;
+  `src/routes/todos.ts` binds the operations with `defineRoutes()`,
+  reading that context with no import of the app; `src/app.ts` mounts
+  them, `base.use(todoRoutes)`.
 
 ## Next
 

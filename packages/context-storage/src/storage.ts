@@ -5,7 +5,10 @@ import {
 	type BaseContext,
 	type ContextOf,
 	type Empty,
+	type RegisteredBase,
 	type RequestContext,
+	type RequiresOf,
+	type Requiring,
 } from '@alxia/core';
 
 /** Why there is no context to read. */
@@ -87,15 +90,23 @@ export function runWithContext<T>(ctx: BaseContext, work: () => T): T {
 	return storage.run({ request: ctx, ctx }, work);
 }
 
-/** The plugin, and its context typed by the app it follows. */
-export type ContextStoragePlugin<App> = Alxia<Empty, '', never> & {
-	/** `getContext()`, typed by `App`. */
-	context(): ContextOf<App> extends never ? BaseContext : ContextOf<App>;
-	/** `tryGetContext()`, typed by `App`. */
-	tryContext():
-		| (ContextOf<App> extends never ? BaseContext : ContextOf<App>)
-		| undefined;
-};
+/**
+ * The plugin, and its context typed by the app it follows. It requires
+ * that context of the app that uses it, beyond the base context: `use` on
+ * an app that does not give it is a compile error.
+ */
+export type ContextStoragePlugin<App> = Alxia<Empty, '', never> &
+	Requiring<RequiresOf<StoredContext<App>, 'context'>> & {
+		/** `getContext()`, typed by `App`. */
+		context(): StoredContext<App>;
+		/** `tryGetContext()`, typed by `App`. */
+		tryContext(): StoredContext<App> | undefined;
+	};
+
+/** What `context()` reads: the context of `App`, or the base context when `App` is no app. */
+export type StoredContext<App> = [ContextOf<App>] extends [never]
+	? BaseContext
+	: ContextOf<App>;
 
 /**
  * The request's context, anywhere it runs, as a plugin: from the routes
@@ -105,7 +116,9 @@ export type ContextStoragePlugin<App> = Alxia<Empty, '', never> & {
  *
  * Typed by the app it is used on: give the plugin that app's type, and its
  * `context()` returns what its routes read — the `user` a session derived, the
- * `db` decorated.
+ * `db` decorated. Given none, the app `Register` names in `@alxia/core`
+ * (`BaseContext` when nothing is registered). Either way the app that uses
+ * it must give that context: using it before is a compile error.
  *
  * ```ts
  * const base = alxia().decorate({ db }).use(session(auth, { required: true }));
@@ -119,7 +132,7 @@ export type ContextStoragePlugin<App> = Alxia<Empty, '', never> & {
  * };
  * ```
  */
-export function contextStorage<App = undefined>(
+export function contextStorage<App = RegisteredBase>(
 	...uncalled: readonly never[]
 ): ContextStoragePlugin<App> {
 	if (uncalled.length > 0) {

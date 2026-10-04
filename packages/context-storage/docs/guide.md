@@ -202,7 +202,7 @@ return what a route declared next on that app would read: `ContextOf<App>`.
 
 | `App` | `context()` returns |
 | --- | --- |
-| none: `contextStorage()` | `BaseContext`: the request, `set`, `reply`, `redirect`, `route`, `pathParams` |
+| none: `contextStorage()` | the context `@alxia/core`'s `Register` names, `AppContext`; with nothing registered, `BaseContext`: the request, `set`, `reply`, `redirect`, `route`, `pathParams` |
 | `typeof base` | `ContextOf<typeof base>`: `BaseContext` plus everything `base`'s `decorate`, `derive` and plugins added |
 
 ```ts
@@ -223,12 +223,34 @@ export function whoIsAsking(): string {
 }
 ```
 
-Three rules follow from typing by an app:
+With `Register` augmented beside `base`
+([`@alxia/core`'s `Register`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/types.md#register-and-appcontext)),
+`contextStorage()` is `contextStorage<typeof base>()` with no import of
+`base`:
+
+```ts
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+
+export const requestContext = contextStorage(); // context().user: string
+```
+
+Four rules follow from typing by an app:
+
+- **The app that uses it must give that context.** The plugin requires
+  what `context()` reads beyond `BaseContext`, as a `definePlugin` does:
+  `alxia().use(contextStorage<typeof base>())` is a compile error, since
+  `context()` would claim a `user` that no hook of that app adds.
 
 - **Type it by the app before the plugin, never by the app that uses it.**
   `const app = alxia().use(requestContext)…` with
   `requestContext = contextStorage<typeof app>()` is a circular type, which
-  `tsc` refuses with `TS7022`. Declare `base` first, as above.
+  `tsc` refuses with `TS7022`. Declare `base` first, as above. Registered,
+  the same holds: give `contextStorage()` to the app after `base`, never
+  to the registered `base` itself.
 - **What a hook after the plugin adds is there at runtime, not in the
   type.** `context()` knows `base`, so a `derive` added after
   `base.use(requestContext)` is missing from its type. Put the hooks whose

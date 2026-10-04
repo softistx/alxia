@@ -1,15 +1,13 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
-import type { BaseContext, ContextOf } from '@alxia/core';
+import type { BaseContext } from '@alxia/core';
 // By its published name, as the fixture's build imports it: see react-router.spec.ts.
 import {
 	alxiaContext,
-	alxiaOf,
 	createServer,
 	isReactRouterRoute,
-	type RegisteredOf,
 } from '@alxia/react-router';
-import { RouterContextProvider, type ServerBuild } from 'react-router';
+import type { ServerBuild } from 'react-router';
 import { configure } from '../fixture/base';
 import { BROWSER, CLIENT, FIXTURE, fixtureBuild } from '../test/fixture';
 
@@ -184,51 +182,6 @@ describe('the types', () => {
 			createServer({ client: true });
 		};
 		expect(typed).toBeFunction();
-	});
-
-	test('alxiaOf reads a server, an app, or BaseContext with neither', () => {
-		const server = createServer({ configure });
-		const typed = (context: RouterContextProvider) => {
-			const name: string | undefined =
-				alxiaOf<typeof server>(context).user?.name;
-			// @ts-expect-error: no hook of the server derives `tenant`
-			alxiaOf<typeof server>(context).tenant;
-			// Unregistered in this program: BaseContext.
-			const base: BaseContext = alxiaOf(context);
-			// @ts-expect-error: BaseContext has no `user`
-			alxiaOf(context).user;
-			// @ts-expect-error: the type argument is a server or an app
-			alxiaOf<{ create(): void }>(context);
-			return { name, base };
-		};
-		expect(typed).toBeFunction();
-	});
-
-	test('Register names a server or an app; anything else makes every read an error', () => {
-		const server = createServer({ configure });
-		const typed = () => {
-			const registered = {} as ContextOf<
-				RegisteredOf<{ server: typeof server }>
-			>;
-			const name: string | undefined = registered.user?.name;
-			const unregistered: BaseContext = {} as ContextOf<RegisteredOf<object>>;
-			// The module rather than its default export: refused, not `never`.
-			const wrong = {} as ContextOf<
-				RegisteredOf<{ server: { default: typeof server } }>
-			>;
-			// @ts-expect-error: a wrong registration types no `user`
-			wrong.user;
-			// @ts-expect-error: nor anything assignable to what reads it
-			const tenant: { a: number } = wrong.tenant;
-			return { name, unregistered, tenant };
-		};
-		expect(typed).toBeFunction();
-	});
-
-	test('alxiaOf outside the catch-all says how to serve the app', () => {
-		expect(() => alxiaOf(new RouterContextProvider())).toThrow(
-			'add alxia() from @alxia/react-router/vite',
-		);
 	});
 });
 

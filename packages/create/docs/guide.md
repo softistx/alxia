@@ -77,7 +77,9 @@ my-api/
 ├── openapi-codegen.config.ts  how `bun run generate` reads it
 ├── src/
 │   ├── generated/             what `bun run generate` writes: committed, never edited
-│   ├── app.ts                 the app: one route per operation, and its type
+│   ├── context.ts             the base: what every route reads, and its Register
+│   ├── routes/todos.ts        defineRoutes(): one route per operation
+│   ├── app.ts                 the app: the base, then the routes, and its type
 │   ├── app.spec.ts            bun test: app.request(), no port, and matchesSpec
 │   └── server.ts              app.listen(PORT), stopped on SIGTERM
 ├── package.json
@@ -243,15 +245,44 @@ instead:
   operation is left out of `alxia.ts` with a warning; declare that route
   by hand with `@alxia/core`'s `eventStream`.
 
-### `src/app.ts`
+### `src/context.ts`
 
 ```ts
-import { alxia, defineMiddleware } from "@alxia/core";
-import { operations } from "./generated/alxia";
+import { alxia } from "@alxia/core";
 import type { Todo } from "./generated/types";
 
 /** Set API_KEY in the environment: this default is for development. */
 export const apiKey = Bun.env["API_KEY"] ?? "dev-key";
+
+const todos: Todo[] = [];
+
+// The base: what every route reads, decorated or derived here. It is
+// registered below, so a route file reads it with no import of the app.
+export const base = alxia().decorate({ todos });
+
+// Register the base, never the app: the app mounts the route files, whose
+// type reads this, and would then be typed by itself.
+declare module "@alxia/core" {
+  interface Register {
+    context: typeof base;
+  }
+}
+```
+
+The base is what every route reads: here the todos, decorated. Register it
+once, and each route file reads that context with no import of the app
+([Register and AppContext](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/types.md#register-and-appcontext)).
+Register `base`, never `app`: `app` mounts the route files, whose type
+reads `Register`, so it would be typed by itself, `TS7022`. A `derive`
+for a `user` from a session goes here too, and every route then reads
+`user` typed.
+
+### `src/routes/todos.ts`
+
+```ts
+import { defineMiddleware, defineRoutes } from "@alxia/core";
+import { apiKey } from "../context";
+import { operations } from "../generated/alxia";
 
 // A middleware of the routes it is given to: it answers 401 without the key,
 // before the body is read. openapi.yaml declares that 401.
@@ -261,10 +292,13 @@ const requireKey = defineMiddleware(({ request, reply }, next) =>
     : reply(401, { error: "unauthorized" as const }),
 );
 
-const todos: Todo[] = [];
-
-export const app = alxia()
-  .decorate({ todos })
+// Each route is an operation of openapi.yaml, generated into
+// src/generated/alxia.ts: its method, path and schemas come from the spec,
+// so the handler is all that is written here. The request is validated
+// just before the handler, and every reply against the spec's responses.
+// `todos` is the registered context's: defineRoutes() reads it, and the
+// app that mounts these routes must give it.
+export const todoRoutes = defineRoutes()
   .route(operations.listTodos, ({ todos, reply }) => reply.ok(todos))
   .route(operations.createTodo, requireKey, ({ body, todos, reply }) => {
     const todo = { id: todos.length + 1, title: body.title, done: false };
@@ -277,6 +311,22 @@ export const app = alxia()
       ? reply.ok(todo)
       : reply.notFound({ error: "not_found" as const });
   });
+```
+
+`defineRoutes()` is a plugin, `alxia()` at runtime, typed with the
+registered context: the handlers read `todos`. It requires that context
+of the app that mounts it, so `alxia().use(todoRoutes)` is a compile
+error. It takes no prefix here: an operation's path is already whole.
+
+### `src/app.ts`
+
+```ts
+import { base } from "./context";
+import { todoRoutes } from "./routes/todos";
+
+// The base, then the route files: each requires the base's context, so
+// mounting one before it is a compile error.
+export const app = base.use(todoRoutes);
 
 export type App = typeof app;
 ```
@@ -379,7 +429,7 @@ A route starts in `openapi.yaml`. To add `DELETE /todos/{id}`:
    TypeError: matchesSpec(): 1 operation has no route: DELETE /todos/:id (deleteTodo)
    ```
 
-3. Bind it in `src/app.ts`, after the `getTodo` route:
+3. Bind it in `src/routes/todos.ts`, after the `getTodo` route:
 
    ```ts
      .route(operations.deleteTodo, requireKey, ({ params, todos, reply }) => {

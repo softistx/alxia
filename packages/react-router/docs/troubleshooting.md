@@ -745,7 +745,9 @@ error TS2339: Property 'tenant' does not exist on type 'BaseContext & Empty & { 
 destructures, something no hook of the server derives. With the type
 `'BaseContext & Empty'` alone, `alxiaOf(context)` has no server to read:
 `app/server.ts` has no `Register` declaration, or there is no
-`app/server.ts`.
+`app/server.ts`, and `@alxia/core`'s `Register` names no base either.
+With core's `Register` alone, `alxiaOf` reads that base: a key
+`configure` adds after it is missing.
 
 **Why:** the type is the app's context at the point of the catch-all, as
 for any route: "order is meaning".

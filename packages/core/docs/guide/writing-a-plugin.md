@@ -242,13 +242,40 @@ same as `alxia()`.
 `ContextOf<typeof tenant>` is `BaseContext`, `Requires` and what the plugin
 adds: what a route declared after it reads.
 
-### Not global augmentation
+### Register the base, not a key
 
 alxia does not support `declare module '@alxia/core' { interface Context {
 user: User } }`. That would type `user` on every route, including those
 declared before the plugin that adds it, and at runtime those routes have
-no `user`. `definePlugin` keeps the rule that a route reads only what a
-hook declared before it added.
+no `user`.
+
+What an app registers instead is the chain that builds its context, `base`
+([The app's type](types.md#register-and-appcontext)):
+
+```ts
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+```
+
+That is sound where the key was not, because nothing reads it unchecked:
+
+- **No route reads it by default.** `alxia()` and `defineMiddleware(fn)`
+  still start from `BaseContext`, and a route reads only what was added
+  before it.
+- **What reads it requires it.** `defineRoutes()` carries the registered
+  context as a requirement, like `definePlugin`'s, so `use` refuses it on
+  an app that does not give it yet; so do `defineMiddleware<AppContext>()`
+  and `contextStorage()`.
+- **It names a real chain.** The type is `typeof base`, what `decorate`,
+  `derive` and `use` built, not a key written by hand that no hook has to
+  match.
+
+A plugin published for several apps should not read `Register`: each app
+registers its own base, and the plugin cannot know it. Name what it reads
+with `definePlugin<Requires>()`, as above.
 
 ## See also
 

@@ -1,5 +1,7 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { alxia, type BaseContext, validate } from '@alxia/core';
+import { join } from 'node:path';
+import { alxia, type BaseContext, type Empty, validate } from '@alxia/core';
+import { $ } from 'bun';
 import { z } from 'zod';
 import {
 	ContextStorageError,
@@ -118,4 +120,24 @@ describe('contextStorage', () => {
 		} as unknown as BaseContext;
 		expect(await runWithContext(fake, greet)).toBe('hi job');
 	});
+
+	test('typed by the app it names, which the app that uses it must give', () => {
+		expectTypeOf(contextStorage().context).returns.toEqualTypeOf<
+			BaseContext & Empty
+		>();
+		// @ts-expect-error: an app that gives no `user` cannot use it
+		alxia().use(contextStorage<typeof base>());
+		expect(() => base.use(contextStorage<typeof base>())).not.toThrow();
+	});
+
+	test('with no type argument, typed by the app Register names', async () => {
+		// `test/register`, a program of its own, through the workspace's tsc:
+		// its refusal is a @ts-expect-error, so no output is each one failing.
+		const dir = join(import.meta.dir, '..', 'test', 'register');
+		const result = await $`${process.execPath} --bun tsc --noEmit -p ${dir}`
+			.cwd(import.meta.dir)
+			.nothrow()
+			.quiet();
+		expect(result.stdout.toString() + result.stderr.toString()).toBe('');
+	}, 30_000);
 });

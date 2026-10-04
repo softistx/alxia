@@ -2,9 +2,9 @@
  * The key under which `reactRouter()` hands every loader, action and
  * middleware the request's alxia context, and the typed way to read it.
  */
-import type { Alxia, AnyAlxia, ContextOf } from '@alxia/core';
+import type { Alxia, AnyAlxia, ContextOf, RegisteredBase } from '@alxia/core';
 import { createContext, type RouterContextProvider } from 'react-router';
-import type { FreshApp, ReactRouterServer } from './server';
+import type { ReactRouterServer } from './server';
 
 /** The default of the key: no catch-all set it. */
 const MISSING: unique symbol = Symbol('alxia context missing');
@@ -35,7 +35,10 @@ export const alxiaContext = createContext<unknown>(MISSING);
  * }
  * ```
  *
- * Unregistered, `alxiaOf(context)` reads `BaseContext`.
+ * Unregistered here, `alxiaOf(context)` reads the app `@alxia/core`'s own
+ * `Register` names as its `context`, and `BaseContext` when neither is
+ * declared. When both are, this one wins: the server's app is the whole
+ * app the pages run behind, the base's context and all `configure` adds.
  */
 // biome-ignore lint/suspicious/noEmptyInterface: an app augments it
 export interface Register {}
@@ -57,21 +60,31 @@ export type InvalidRegister = Alxia<
 	never
 >;
 
-/** The app `alxiaOf` reads for a `Register` interface: its server's, a fresh one, or `InvalidRegister`. */
-export type RegisteredOf<R> = R extends { readonly server: infer Server }
+/**
+ * The app `alxiaOf` reads for a `Register` interface: its server's, or
+ * `InvalidRegister`; with no server, `Core`, the app `@alxia/core`'s
+ * `Register` names (a fresh one when it names none).
+ */
+export type RegisteredOf<
+	R,
+	Core extends AnyAlxia = RegisteredBase,
+> = R extends {
+	readonly server: infer Server;
+}
 	? Server extends AnyAlxia | ReactRouterServer<AnyAlxia>
 		? AppOf<Server>
 		: InvalidRegister
-	: FreshApp;
+	: Core;
 
-/** What `alxiaOf` reads with no type argument: the registered server's app, or a fresh one. */
+/** What `alxiaOf` reads with no type argument: the registered server's app, else core's registered app, else a fresh one. */
 export type RegisteredApp = RegisteredOf<Register>;
 
 /**
  * What alxia's hooks built for this request, read in a loader, an action or
  * a middleware, typed by the app: the server `Register` names, or the one
  * given as the type argument — `typeof server`, or an app *before* the
- * catch-all. With neither, `BaseContext`.
+ * catch-all. With neither, the app `@alxia/core`'s `Register` names, and
+ * `BaseContext` when nothing is registered.
  *
  * ```ts
  * export async function loader({ context }: Route.LoaderArgs) {

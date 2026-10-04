@@ -146,6 +146,17 @@ Rejected: global augmentation (`declare module '@alxia/core' { interface
 Context { … } }`). It would type `user` on routes declared before the plugin
 that adds it, which is a lie the compiler would then repeat.
 
+Revisited at 0.4.0, and adopted in another shape: the app registers the
+chain that builds its context, never a key —
+`declare module '@alxia/core' { interface Register { context: typeof base } }`.
+Nothing reads it unchecked: `alxia()` and `defineMiddleware(fn)` still start
+from `BaseContext`; `defineRoutes()` carries the registered context as a
+requirement that `use` checks, as `definePlugin`'s; `AppContext`,
+`defineMiddleware<AppContext>()` and `contextStorage()` are opted into.
+The base is registered rather than the app because the app mounts the
+route files, whose type reads `Register`: TypeScript would type the app
+by itself, `TS7022`.
+
 The gap is a plugin that **needs** what an earlier one added: a permission
 check that reads `user`, a tenant scope that reads `session`. Today it is
 typed by hand, with `contextStorage<typeof base>()` and janus's
