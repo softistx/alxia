@@ -144,7 +144,8 @@ Three consequences:
   the validated body.
 - **A hook must not read the body itself.** `await request.json()` in a
   `derive` uses the body up, and validation then fails with
-  `TypeError: Body already used`, answered as a 500.
+  `TypeError: Body already used`, answered as a 500
+  ([Troubleshooting](../troubleshooting.md#typeerror-body-already-used)).
 
 ## Reading cookies
 

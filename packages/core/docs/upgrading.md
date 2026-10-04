@@ -276,7 +276,7 @@ and [`@alxia/react-router`: a CSP nonce](https://github.com/softistx/alxia/blob/
 
 ## From 0.2.0 or earlier
 
-`@alxia/core` 0.2.1 already changed one thing an app may see: **a client
+`@alxia/core` 0.2.1 already shipped this, so it is not part of the next release. If you are upgrading from 0.2.0 or earlier, it changes one thing an app may see: **a client
 that hangs up mid-request** is no longer logged and answered 500. Nothing
 is printed, no `onError` hook runs, and the request gets a bodyless `499`
 that only `onResponse` hooks — a logger's — see.
