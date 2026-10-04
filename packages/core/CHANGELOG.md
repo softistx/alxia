@@ -1,5 +1,15 @@
 # @alxia/core
 
+## 0.3.1
+
+### Patch Changes
+
+- [#106](https://github.com/softistx/alxia/pull/106) [`044186d`](https://github.com/softistx/alxia/commit/044186d0e3b52d8634e67162e7c2c93c983592b0) Thanks [@SteveGT96](https://github.com/SteveGT96)! - A range request on an empty file no longer answers `206` with `Content-Range: bytes 0--1/0`. A suffix range (`bytes=-5`), the only one RFC 9110 calls satisfiable on an empty file, is served whole as a `200`; any other range (`bytes=0-`, `bytes=-0`) is a `416` with `Content-Range: bytes */0`.
+
+- [#108](https://github.com/softistx/alxia/pull/108) [`7a3ca53`](https://github.com/softistx/alxia/commit/7a3ca53fb7369ba2f1c87aa3633a39f61c30457a) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The README's new **Getting started** and the getting-started guide point at `bun create @alxia`, which writes a new app from a template.
+
+- [#109](https://github.com/softistx/alxia/pull/109) [`88307ca`](https://github.com/softistx/alxia/commit/88307ca159ed6b7e75b82ea836b6927fdc624879) Thanks [@SteveGT96](https://github.com/SteveGT96)! - internal: alxia.ts split into its method signatures, no API change. `static`, `file`, `page`, `decorate`, `derive`, `wrap`, `bodyLimit`, `onError`, `onRequest`, `onResponse`, `around`, `onStart`, `onStop`, `parser`, `group`, `use`, `request` and `listen` are now readonly properties typed by interfaces of their own, as `get`, `ws` and `onRefusal` already were; the calls, their types, their behaviour and their documentation are unchanged. Exported so an app's type can be named in a declaration file: `StaticMethod`, `FileMethod`, `PageMethod`, `DecorateMethod`, `DeriveMethod`, `WrapMethod`, `BodyLimitMethod`, `ErrorMethod`, `RequestHookMethod`, `ResponseHookMethod`, `AroundMethod`, `StartHookMethod`, `StopHookMethod`, `ParserMethod`, `GroupMethod`, `UseMethod`, `RequestMethod`, `ListenMethod`. A subclass of `Alxia` that overrides one of these as a method no longer compiles: a property cannot be overridden by a method; wrap the app in a function plugin instead.
+
 ## 0.3.0
 
 ### Minor Changes
