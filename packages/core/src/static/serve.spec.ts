@@ -21,6 +21,7 @@ beforeAll(async () => {
 	await writeFile(join(root, 'index.html'), '<h1>app</h1>');
 	await writeFile(join(root, 'about.html'), '<h1>about</h1>');
 	await writeFile(join(root, 'big.txt'), big);
+	await writeFile(join(root, 'empty.txt'), '');
 	await writeFile(join(root, 'app.js'), 'console.log(1)');
 	await writeFile(join(root, 'app.js.gz'), gzipSync('console.log(1)'));
 	await writeFile(join(root, 'module.wasm'), new Uint8Array([0, 97, 115, 109]));
@@ -110,6 +111,28 @@ describe('app.static', () => {
 		expect(beyond.headers.get('content-range')).toBe(`bytes */${big.length}`);
 		const stale = await app.request('/files/big.txt', {
 			headers: { range: 'bytes=0-9', 'if-range': 'W/"old"' },
+		});
+		expect(stale.status).toBe(200);
+	});
+
+	test('an empty file: a suffix range is served whole, any other is a 416', async () => {
+		const app = make();
+		const suffix = await app.request('/files/empty.txt', {
+			headers: { range: 'bytes=-5' },
+		});
+		expect(suffix.status).toBe(200);
+		expect(suffix.headers.get('content-range')).toBeNull();
+		expect(await suffix.text()).toBe('');
+		for (const method of ['GET', 'HEAD']) {
+			const response = await app.request('/files/empty.txt', {
+				method,
+				headers: { range: 'bytes=0-' },
+			});
+			expect(response.status).toBe(416);
+			expect(response.headers.get('content-range')).toBe('bytes */0');
+		}
+		const stale = await app.request('/files/empty.txt', {
+			headers: { range: 'bytes=0-', 'if-range': 'W/"old"' },
 		});
 		expect(stale.status).toBe(200);
 	});

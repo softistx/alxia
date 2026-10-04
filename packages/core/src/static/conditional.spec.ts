@@ -11,4 +11,11 @@ describe('parseRange', () => {
 		expect(parseRange('bytes=0-1,3-4', 10)).toBeUndefined();
 		expect(parseRange('items=0-1', 10)).toBeUndefined();
 	});
+
+	test('an empty file: a suffix is ignored, any other range unsatisfiable', () => {
+		expect(parseRange('bytes=-5', 0)).toBeUndefined();
+		expect(parseRange('bytes=-0', 0)).toBe('unsatisfiable');
+		expect(parseRange('bytes=0-', 0)).toBe('unsatisfiable');
+		expect(parseRange('bytes=0-0', 0)).toBe('unsatisfiable');
+	});
 });
