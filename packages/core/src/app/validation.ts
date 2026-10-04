@@ -106,7 +106,12 @@ async function validateBody(
 	return undefined;
 }
 
-/** `ctx`, its cookies the validated ones: what follows the validation reads. */
+/**
+ * `ctx`, its cookies the validated ones: what follows the validation reads.
+ * A copy, so that the route's own context keeps the request's cookies.
+ * When two `validate`s check the cookies, a middleware between them keeps
+ * the first copy it was given: what it reads is the first validation's.
+ */
 function withCookies(ctx: Ctx, cookies: { value: unknown }): Ctx {
 	const copy: Record<string, unknown> = { ...ctx };
 	copy['cookies'] = cookies.value;

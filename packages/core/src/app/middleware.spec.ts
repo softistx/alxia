@@ -186,10 +186,9 @@ describe('a middleware', () => {
 				},
 			);
 			expect((await app.request('/')).status).toBe(202);
-			expect(late).rejects.toThrow(
+			await expect(late).rejects.toThrow(
 				'GET /: a middleware called next() after it returned',
 			);
-			await late?.catch(() => {});
 			expect(ran).toBe(false);
 		} finally {
 			error.mockRestore();

@@ -8,13 +8,9 @@ import { ContentTooLargeError, HttpError } from '../errors/errors';
 import { type AnyReply, Reply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
 import type { StatusCode } from '../types/status';
+import { middleware, wrapped } from './chain-middleware';
 import { routeContext } from './context';
-import type {
-	MiddlewareHook,
-	RouteDefinition,
-	SocketDefinition,
-	WrapHook,
-} from './definition';
+import type { RouteDefinition, SocketDefinition } from './definition';
 import { refuse } from './refusal';
 import {
 	checkReply,
@@ -43,11 +39,9 @@ export async function chain<Last>(
 	ctx: Ctx,
 	last: (ctx: Ctx) => Promise<AnyReply | Response | Last>,
 ): Promise<Response | Last> {
-	const { definition, set } = run;
+	const { definition } = run;
 	const steps = definition.derive;
 	const socket = !('method' in definition);
-	const method = socket ? 'WS' : definition.method;
-	const signal = run.request.request.signal;
 	// What a step adds goes on the context it runs with and on the route's
 	// own, which `onError` reads: after a `validate` of the cookies, the
 	// steps run with a copy holding the validated ones.
@@ -55,31 +49,11 @@ export async function chain<Last>(
 		Object.assign(current, added);
 		if (current !== ctx) Object.assign(ctx, added);
 	};
-	// Synchronous but for a reply a `responds` checks: most steps await
-	// nothing more. The handler's reply must have a status `responds`
-	// declares; a middleware's is checked when its status is declared, and
-	// sent as it is otherwise, as its type says.
 	const answer = (
-		result: unknown,
+		result: AnyReply | Response | Last,
 		responses: ResponseSchemas | undefined,
 		handler = false,
-	): Response | Last | Promise<Response> => {
-		if (!(result instanceof Reply)) return result as Response | Last;
-		if (
-			responses === undefined ||
-			isRedirect(result) ||
-			(!handler && responses[result.status as StatusCode] === undefined)
-		) {
-			return send(result, set, signal);
-		}
-		return checkReply(
-			method,
-			definition.path,
-			responses,
-			result,
-			run.validateResponses,
-		).then((checked) => send(checked, set, signal));
-	};
+	) => sent(run, result, responses, handler);
 	const step = async (
 		index: number,
 		ctx: Ctx,
@@ -101,11 +75,15 @@ export async function chain<Last>(
 			}
 			case 'wrap':
 				if (socket) return rest();
-				return answer(await wrapped(hook.run, ctx, rest), responses);
+				// A wrap or a middleware returns the rest's response, or its own.
+				return answer(
+					(await wrapped(hook.run, ctx, rest)) as Response | Last,
+					responses,
+				);
 			case 'middleware': {
 				let result = middleware(hook.run, ctx, merge, rest, run.definition);
 				if (result instanceof Promise) result = await result;
-				return answer(result, responses);
+				return answer(result as AnyReply | Response | Last, responses);
 			}
 			case 'validate': {
 				const raw = hook.raw === true;
@@ -120,66 +98,36 @@ export async function chain<Last>(
 	return step(0, ctx, undefined);
 }
 
-/** A `wrap` hook run around `rest`: its reply, or the response it returns. */
-async function wrapped(
-	hook: WrapHook,
-	ctx: Ctx,
-	rest: () => Promise<unknown>,
-): Promise<unknown> {
-	const result = hook(ctx, rest as () => Promise<Response>);
-	return result instanceof Promise ? await result : result;
-}
-
 /**
- * A middleware run with `next`, which merges what it is given into the
- * context and runs `rest`, once, before the middleware settles: its
- * result, or a promise of it. What `rest` resolves to that is not a
- * response — a socket's upgrade — reaches the middleware as a stand-in
- * response, which it must return as it is: the socket is open by then.
+ * A step's result as the chain returns it: a reply sent, once checked by
+ * the `responds` in force. Synchronous but for a reply it checks. The
+ * handler's reply must have a status `responds` declares; a middleware's
+ * is checked when its status is declared, and sent as it is otherwise, as
+ * its type says.
  */
-function middleware(
-	hook: MiddlewareHook,
-	ctx: Ctx,
-	merge: (ctx: Ctx, added: object) => void,
-	rest: () => Promise<unknown>,
-	definition: RouteDefinition | SocketDefinition,
-): unknown {
-	const fail = (why: string) =>
-		new TypeError(
-			`${'method' in definition ? definition.method : 'WS'} ${definition.path}: ${why}`,
-		);
-	let state: 'idle' | 'called' | 'settled' = 'idle';
-	let parked: { stand: Response; value: unknown } | undefined;
-	const next = (added?: object): Promise<Response> => {
-		if (state === 'called') throw fail('a middleware called next() twice');
-		if (state === 'settled') {
-			throw fail('a middleware called next() after it returned');
-		}
-		state = 'called';
-		if (added !== null && typeof added === 'object') merge(ctx, added);
-		if ('method' in definition) return rest() as Promise<Response>;
-		return rest().then((downstream) => {
-			if (downstream instanceof Response) return downstream;
-			parked = { stand: new Response(null), value: downstream };
-			return parked.stand;
-		});
-	};
-	const settle = (result: unknown): unknown => {
-		state = 'settled';
-		if (parked !== undefined) {
-			if (result === parked.stand) return parked.value;
-			throw fail(
-				'a middleware returned another response than next() resolved to, once the socket was open: return it as it is',
-			);
-		}
-		if (result instanceof Reply || result instanceof Response) return result;
-		const name = hook.name ? ` (${hook.name})` : '';
-		throw fail(
-			`a middleware${name} returned ${result === undefined ? 'nothing' : typeof result}: return next(), a reply or a Response`,
-		);
-	};
-	const result = hook(ctx, next);
-	return result instanceof Promise ? result.then(settle) : settle(result);
+function sent<Last>(
+	run: ChainRun,
+	result: AnyReply | Response | Last,
+	responses: ResponseSchemas | undefined,
+	handler: boolean,
+): Response | Last | Promise<Response> {
+	if (!(result instanceof Reply)) return result;
+	const { definition, set } = run;
+	const signal = run.request.request.signal;
+	if (
+		responses === undefined ||
+		isRedirect(result) ||
+		(!handler && responses[result.status as StatusCode] === undefined)
+	) {
+		return send(result, set, signal);
+	}
+	return checkReply(
+		'method' in definition ? definition.method : 'WS',
+		definition.path,
+		responses,
+		result,
+		run.validateResponses,
+	).then((checked) => send(checked, set, signal));
 }
 
 /** A route's request, from its chain to its handler's reply, sent. */

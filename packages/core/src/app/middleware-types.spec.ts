@@ -146,6 +146,22 @@ describe('validate and responds', () => {
 			validate({ params: z.object({ id: z.string() }) }),
 			({ reply }) => reply(200, 'x'),
 		);
+		alxia().get(
+			'/users/:id',
+			// @ts-expect-error "/users/:id" declares no `extra`, optional or not
+			validate({
+				params: z.object({ id: z.string(), extra: z.string().optional() }),
+			}),
+			({ reply }) => reply(200, 'x'),
+		);
+		alxia().ws(
+			'/users/:id',
+			// @ts-expect-error the same on a socket's upgrade
+			validate({
+				params: z.object({ id: z.string(), extra: z.string().optional() }),
+			}),
+			{ message: () => {} },
+		);
 		// @ts-expect-error "response" is not a part validate() reads
 		validate({ response: Post });
 	});

@@ -32,12 +32,18 @@ export type Validated<Schemas> = {
 
 /**
  * What `validate` reads of the route: the path parameters its `params`
- * schema takes, which must be the path's, as strings.
+ * schema takes, which must be the path's, as strings. Each is required,
+ * an optional one included: a path declares every parameter it has, so a
+ * key the schema reads and the path lacks is refused.
  */
 export type ValidateRequires<Schemas> = Schemas extends {
 	readonly params: infer Params extends StandardSchemaV1;
 }
-	? { readonly pathParams: InferInput<Params> }
+	? {
+			readonly pathParams: {
+				readonly [Name in keyof InferInput<Params>]-?: InferInput<Params>[Name];
+			};
+		}
 	: Empty;
 
 type KnownParts<Schemas> = [
@@ -123,8 +129,10 @@ export function validate<const Schemas extends RequestSchemas>(
  *
  * A reply of a middleware after it is checked when its status is declared,
  * and sent as it is otherwise, as the route's type says; one of a
- * middleware before it is not checked. A redirect passes. A socket route
- * refuses it: it sends no reply.
+ * middleware before it is not checked. Its type is the middleware's own,
+ * not the schema's: a declared status with a body the schema refuses
+ * compiles, and is answered 500 like the handler's. A redirect passes. A
+ * socket route refuses it: it sends no reply.
  */
 export function responds<const Responses extends ResponseSchemas>(
 	responses: Responses & KnownStatuses<Responses>,
