@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/openapi",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "The OpenAPI 3.2 document of an @alxia/core app, from its route schemas",
 	"license": "MIT",
 	"type": "module",
