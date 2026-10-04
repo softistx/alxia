@@ -148,7 +148,7 @@ that does not exist is a 404.
 | 200 | the file | the file |
 | 304 | `If-None-Match` matches the `ETag`, or, without it, `If-Modified-Since` is not older than the file | none |
 | 206 | a single `Range` the file satisfies; with `If-Range`, only when it names the current copy | the slice, with `Content-Range` |
-| 416 | a `Range` past the end | `{ "error": "range_not_satisfiable" }`, `Content-Range: bytes */<size>` |
+| 416 | a `Range` past the end, or any `Range` of an empty file | `{ "error": "range_not_satisfiable" }`, `Content-Range: bytes */<size>` |
 | 404 | no file, a dotfile, a path that leaves the source | `{ "error": "not_found" }` |
 
 - `HEAD` answers the same headers without the body, as for every `GET`
