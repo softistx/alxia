@@ -167,6 +167,25 @@ describe('bumpDependencies', () => {
 			timeout: 50,
 		});
 		expect(manifest.dependencies).toEqual({ zod: '^4.2.0' });
-		expect(bumped).toEqual({ moved: [], held: [], failed: ['zod'] });
+		expect(bumped).toEqual({
+			moved: [],
+			held: [],
+			failed: ['zod'],
+			unmatched: [],
+		});
+	});
+
+	test('a package with no release in its range keeps its version, and says so', async () => {
+		const fake = fakeRegistry({ zod: ['3.25.0', '5.0.0'] });
+		stop = fake.stop;
+		const manifest: Manifest = { dependencies: { zod: '^4.2.0' } };
+		const bumped = await bumpDependencies(manifest, { url: fake.url });
+		expect(manifest.dependencies).toEqual({ zod: '^4.2.0' });
+		expect(bumped).toEqual({
+			moved: [],
+			held: [],
+			failed: [],
+			unmatched: ['zod: no release within ^4.2.0; kept ^4.2.0'],
+		});
 	});
 });

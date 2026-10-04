@@ -192,6 +192,23 @@ describe('create-alxia', () => {
 		expect(await readdir(dir)).toEqual(['notes.txt']);
 	});
 
+	test('names only the first three entries of a directory that is not empty', async () => {
+		for (const file of ['a', 'b', 'c', 'd'])
+			await Bun.write(join(root, 'taken', file), '');
+		const { io, err } = fake();
+		expect(await main(['taken', '--template', 'api'], root, io)).toBe(1);
+		expect(err[0]).toStartWith(
+			'create-alxia: taken is not empty (a, b, c, ...), and',
+		);
+	});
+
+	test('refuses a file in place of the directory', async () => {
+		await Bun.write(join(root, 'taken'), 'a file');
+		const { io, err } = fake();
+		expect(await main(['taken', '--template', 'api'], root, io)).toBe(1);
+		expect(err).toEqual(['create-alxia: taken exists and is not a directory.']);
+	});
+
 	test('writes into an empty directory it is run in, with no cd to take', async () => {
 		const dir = join(root, 'here');
 		await mkdir(dir);

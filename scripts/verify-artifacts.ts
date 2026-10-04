@@ -67,7 +67,8 @@ async function tarballsSound({ tarballs }: Packed): Promise<boolean> {
 			'on no registry, an exact pin on a sibling, a sibling range that\n' +
 			'excludes the sibling published beside it, a package that lists\n' +
 			'itself, a license other than MIT or no LICENSE shipped, a `files`\n' +
-			'entry the tarball does not hold, or test code shipped. See AGENTS.md.',
+			'entry the tarball does not hold, test code shipped, or a `workspace:`\n' +
+			'range the pack left. See AGENTS.md.',
 	);
 	return false;
 }

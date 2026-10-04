@@ -97,6 +97,18 @@ describe('addAlxia', () => {
 		expect(manifest.devDependencies).toEqual(SCAFFOLD_MANIFEST.devDependencies);
 	});
 
+	test('refuses a manifest without react-router, or without a start', () => {
+		const { 'react-router': _, ...dependencies } =
+			SCAFFOLD_MANIFEST.dependencies;
+		expect(() =>
+			addAlxia({ ...SCAFFOLD_MANIFEST, dependencies }, ALXIA),
+		).toThrow('react-router in its dependencies');
+		const { start: __, ...scripts } = SCAFFOLD_MANIFEST.scripts;
+		expect(() => addAlxia({ ...SCAFFOLD_MANIFEST, scripts }, ALXIA)).toThrow(
+			ScaffoldChanged,
+		);
+	});
+
 	test("refuses a manifest whose scripts are not React Router's", () => {
 		const manifest = structuredClone(SCAFFOLD_MANIFEST);
 		manifest.scripts.dev = 'vite';

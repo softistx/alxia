@@ -1,5 +1,8 @@
 /** The command line of `create-alxia`, read into what to create. */
 
+/** The command's name, which starts every line it prints to stderr. */
+export const NAME = 'create-alxia';
+
 /** The templates, in the order the prompt lists them. */
 export const TEMPLATES = ['api', 'react-router'] as const;
 export type Template = (typeof TEMPLATES)[number];

@@ -28,6 +28,8 @@ export interface Bumped {
 	readonly held: string[];
 	/** A package whose metadata did not arrive: its version is unchanged. */
 	readonly failed: string[];
+	/** A package with no release within its range: its version is unchanged. */
+	readonly unmatched: string[];
 }
 
 /** The registry to resolve against: the one Bun or npm was given, or npm's. */
@@ -124,6 +126,7 @@ export async function bumpDependencies(
 	const moved: string[] = [];
 	const held: string[] = [];
 	const failed: string[] = [];
+	const unmatched: string[] = [];
 	const chosen = new Map<string, string>();
 	// react-router first: its siblings follow the version it settles on.
 	const ordered = [...names].sort(
@@ -148,7 +151,9 @@ export async function bumpDependencies(
 				? follow
 				: choose(versions, range, latest);
 		if (version === undefined) {
-			failed.push(name);
+			unmatched.push(
+				`${name}: no release within ${range ?? 'any range'}; kept ${current}`,
+			);
 			continue;
 		}
 		chosen.set(name, version);
@@ -166,5 +171,5 @@ export async function bumpDependencies(
 		if (next !== current) moved.push(`${name} ${current} -> ${next}`);
 		deps[name] = next;
 	}
-	return { moved, held, failed };
+	return { moved, held, failed, unmatched };
 }

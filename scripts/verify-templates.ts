@@ -90,6 +90,73 @@ const CHECKS: readonly Check[] = [
 	},
 ];
 
+/** Prints `ok` or `FAIL` and the check's name; whether it passed. */
+function report(passed: boolean, what: string): boolean {
+	console.log(`${passed ? 'ok  ' : 'FAIL'} ${what}`);
+	return passed;
+}
+
+/** `bun create @alxia` is `bunx @alxia/create`: the same bin, run alone. */
+async function helpRuns(workdir: string, env: Record<string, string>) {
+	const help = await $`bunx @alxia/create --help`
+		.cwd(workdir)
+		.env(env)
+		.nothrow()
+		.quiet();
+	const usage =
+		help.exitCode === 0 &&
+		help.stdout.toString().startsWith('Usage: bun create @alxia');
+	if (!usage) console.error(help.stdout.toString(), help.stderr.toString());
+	return report(usage, 'bunx @alxia/create --help');
+}
+
+/** Creates `check`'s template in `workdir`, then runs its scripts and its server. */
+async function templateWorks(
+	check: Check,
+	workdir: string,
+	env: Record<string, string>,
+	registryUrl: string,
+): Promise<boolean> {
+	const name = `my-${check.template}`;
+	const dir = join(workdir, name);
+	console.log(`\n=== bun create @alxia ${name} --template ${check.template}\n`);
+	const created =
+		await $`bun create @alxia ${name} --template ${check.template}`
+			.cwd(workdir)
+			.env(env)
+			.nothrow();
+	if (created.exitCode !== 0) {
+		return report(
+			false,
+			`${check.template}: bun create exited ${created.exitCode}`,
+		);
+	}
+	// The project's alxia packages are this checkout's, not npm's.
+	const lock = await Bun.file(join(dir, 'bun.lock')).text();
+	let ok = report(
+		lock.includes(`${registryUrl}/-/@alxia-core-`),
+		`${check.template}: @alxia/core installed from the packed tarball`,
+	);
+	console.log(
+		`\n${check.template}'s package.json:\n${await Bun.file(join(dir, 'package.json')).text()}`,
+	);
+	for (const script of check.scripts) {
+		console.log(`\n=== ${check.template}: bun run ${script}\n`);
+		const run = await $`bun run ${script}`.cwd(dir).env(env).nothrow();
+		ok &&= report(
+			run.exitCode === 0,
+			`${check.template}: bun run ${script} exited ${run.exitCode}`,
+		);
+	}
+	const status = await served(dir, env, check.request);
+	return (
+		report(
+			status === check.expected,
+			`${check.template}: bun run start answered ${status}, expected ${check.expected}`,
+		) && ok
+	);
+}
+
 async function main(): Promise<boolean> {
 	const packages = await readPackages();
 	const stale = await staleBuilds(packages);
@@ -101,6 +168,7 @@ async function main(): Promise<boolean> {
 	}
 	const workdir = await mkdtemp(join(tmpdir(), 'alxia-templates-'));
 	await mkdir(join(workdir, 'tarballs'));
+	await mkdir(join(workdir, 'tmp'));
 	const packed = await pack(join(workdir, 'tarballs'), packages);
 	const registry = await startRegistry(
 		packed.tarballs.map(({ manifest }) => ({
@@ -116,71 +184,16 @@ async function main(): Promise<boolean> {
 		BUN_INSTALL_CACHE_DIR: join(workdir, 'cache'),
 		TMPDIR: join(workdir, 'tmp'),
 	};
-	await mkdir(env['TMPDIR'] as string, { recursive: true });
-	let ok = true;
 	try {
-		// `bun create @alxia` is `bunx @alxia/create`: the same bin, run alone.
-		const help = await $`bunx @alxia/create --help`
-			.cwd(workdir)
-			.env(env)
-			.nothrow()
-			.quiet();
-		const usage =
-			help.exitCode === 0 &&
-			help.stdout.toString().startsWith('Usage: bun create @alxia');
-		console.log(`${usage ? 'ok  ' : 'FAIL'} bunx @alxia/create --help`);
-		if (!usage) console.error(help.stdout.toString(), help.stderr.toString());
-		ok &&= usage;
+		let ok = await helpRuns(workdir, env);
 		for (const check of CHECKS) {
-			const name = `my-${check.template}`;
-			const dir = join(workdir, name);
-			console.log(
-				`\n=== bun create @alxia ${name} --template ${check.template}\n`,
-			);
-			const created =
-				await $`bun create @alxia ${name} --template ${check.template}`
-					.cwd(workdir)
-					.env(env)
-					.nothrow();
-			if (created.exitCode !== 0) {
-				console.error(
-					`FAIL ${check.template}: bun create exited ${created.exitCode}`,
-				);
-				ok = false;
-				continue;
-			}
-			// The project's alxia packages are this checkout's, not npm's.
-			const lock = await Bun.file(join(dir, 'bun.lock')).text();
-			const local = lock.includes(`${registry.url}/-/@alxia-core-`);
-			console.log(
-				`${local ? 'ok  ' : 'FAIL'} ${check.template}: @alxia/core installed from the packed tarball`,
-			);
-			ok &&= local;
-			console.log(
-				`\n${check.template}'s package.json:\n${await Bun.file(join(dir, 'package.json')).text()}`,
-			);
-			for (const script of check.scripts) {
-				console.log(`\n=== ${check.template}: bun run ${script}\n`);
-				const run = await $`bun run ${script}`.cwd(dir).env(env).nothrow();
-				if (run.exitCode !== 0) {
-					console.error(
-						`FAIL ${check.template}: bun run ${script} exited ${run.exitCode}`,
-					);
-					ok = false;
-				}
-			}
-			const status = await served(dir, env, check.request);
-			const passed = status === check.expected;
-			console.log(
-				`${passed ? 'ok  ' : 'FAIL'} ${check.template}: bun run start answered ${status}, expected ${check.expected}`,
-			);
-			ok &&= passed;
+			ok = (await templateWorks(check, workdir, env, registry.url)) && ok;
 		}
+		return ok;
 	} finally {
 		registry.stop();
 		await rm(workdir, { recursive: true, force: true });
 	}
-	return ok;
 }
 
 if (import.meta.main && !(await main())) {

@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { accessProblems, manifestShapeProblems } from './manifest';
+import {
+	accessProblems,
+	manifestShapeProblems,
+	workspaceProblems,
+} from './manifest';
 
 describe('manifestShapeProblems', () => {
 	const httpyz = { name: '@alxia/core', version: '0.4.0' };
@@ -83,6 +87,28 @@ describe('accessProblems', () => {
 	test('refuses a scoped package with no publishConfig', () => {
 		expect(accessProblems({ name: '@alxia/core' })).toEqual([
 			'@alxia/core: publishConfig.access is not "public"; bun publish would publish this scoped package as restricted',
+		]);
+	});
+});
+
+describe('workspaceProblems', () => {
+	test('accepts a packed manifest whose ranges are versions', () => {
+		expect(
+			workspaceProblems({
+				name: '@alxia/create',
+				devDependencies: { '@alxia/core': '^0.3.0' },
+			}),
+		).toEqual([]);
+	});
+
+	test('refuses a workspace: range the pack left, devDependencies included', () => {
+		expect(
+			workspaceProblems({
+				name: '@alxia/create',
+				devDependencies: { '@alxia/core': 'workspace:^' },
+			}),
+		).toEqual([
+			'@alxia/create: devDependencies.@alxia/core = workspace:^ in the packed manifest; bun pm pack should have written the version',
 		]);
 	});
 });

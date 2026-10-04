@@ -31,6 +31,7 @@ nothing — the symptom.
 - [`create-alxia: failed: …`](#create-alxia-failed-)
 - [`create-alxia: warning: the registry did not answer for …; kept the versions the template ships.`](#create-alxia-warning-the-registry-did-not-answer-for--kept-the-versions-the-template-ships)
 - [`typescript: kept to ^6.0.3 || ^7.0.0, where the newest is 7.0.2; npm's latest, 8.0.0, is outside it`](#typescript-kept-to-603--700-where-the-newest-is-702-npms-latest-800-is-outside-it)
+- [`zod: no release within ^4.2.0; kept ^4.2.0`](#zod-no-release-within-420-kept-420)
 - [`create-alxia: bun install failed; the files are written.`](#create-alxia-bun-install-failed-the-files-are-written)
 
 **After**
@@ -224,6 +225,16 @@ project gets the newest version inside the range.
 
 **Fix:** nothing to do. The range widens in a release of alxia's packages
 once the major is tested, and the next `@alxia/create` takes it.
+
+### `zod: no release within ^4.2.0; kept ^4.2.0`
+
+**When:** a notice: the registry answered for the package, but none of its
+releases is in the range alxia's packages accept — a registry mirror that
+holds only some versions, most often. The template's own version is kept.
+
+**Fix:** check what the registry holds (`bun pm view zod versions`), let
+the mirror fetch the missing ones, or write a version within the range by
+hand after the project is created.
 
 ### `create-alxia: bun install failed; the files are written.`
 
