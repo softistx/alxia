@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/openapi-routes",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "Deprecated: moved to @alxia/openapi, which this release re-exports",
 	"license": "MIT",
 	"type": "module",

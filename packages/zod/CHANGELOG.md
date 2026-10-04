@@ -1,5 +1,17 @@
 # @alxia/zod
 
+## 0.1.1
+
+### Patch Changes
+
+- [#134](https://github.com/softistx/alxia/pull/134) [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The examples are written in `@alxia/core`'s middleware model: a route's body or query is validated by `validate({ … })` and its replies by `responds({ … })`, among its middlewares, in place of a schema before the handler.
+
+- [#134](https://github.com/softistx/alxia/pull/134) [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The docs no longer use `@alxia/client`, which is retired: alxia is OpenAPI spec first, and a typed client is generated from the API's OpenAPI document. The examples call the app with `app.request()`.
+
+- [#134](https://github.com/softistx/alxia/pull/134) [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `zodConverter` is marked `@deprecated`: it served the `convert` option of the retired `@alxia/openapi` document writer, and nothing in alxia reads it any more. It stays exported and unchanged; Zod's own `z.toJSONSchema` does the same.
+
+- [#134](https://github.com/softistx/alxia/pull/134) [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `zodConverter(schema, side)` takes a Zod schema directly: its parameter type now accepts what Zod's `~standard.jsonSchema` takes, where TypeScript refused a Zod schema passed outside `@alxia/openapi`'s converter option. Its docs no longer name the retired `@alxia/openapi` document writer: it is a Zod schema as JSON Schema 2020-12, as it crosses the wire.
+
 ## 0.1.0
 
 ### Minor Changes

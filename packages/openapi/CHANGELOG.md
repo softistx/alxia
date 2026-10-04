@@ -6,6 +6,20 @@ under that name. The `@alxia/openapi` of 0.1.0 to 0.3.0, which wrote an OpenAPI
 document from an app's route schemas, is retired; its changelog is
 [in the repository's history](https://github.com/softistx/alxia/blob/3f80253/packages/openapi/CHANGELOG.md).
 
+## 0.4.0
+
+### Minor Changes
+
+- [#134](https://github.com/softistx/alxia/pull/134) [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `@alxia/openapi` is now alxia's spec-first toolkit, the package that was `@alxia/openapi-routes`: `implemented(app, operations)` and `matchesSpec(app, operations)` check an app's routes against the operations `@nxgt/openapi-codegen`'s `alxia` option generates from the OpenAPI document, bound with `@alxia/core`'s `route(operation, ...middlewares, handler)`. Its exports are `@alxia/openapi-routes` 0.2's, unchanged: change the import. The `@alxia/openapi` of 0.3 and before, which wrote an OpenAPI document from an app's route schemas (`openapi`, `docs`, `toJsonSchema`, `Converter` and the rest), is retired: alxia is OpenAPI spec first, so the document is the source and is written, not generated from the app. This version follows 0.3.0, the last of the retired package, so that npm's `latest` is the new one. See `@alxia/core`'s upgrading guide.
+
+### Patch Changes
+
+- [#134](https://github.com/softistx/alxia/pull/134) [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The README and the guide show routes declared with `route(operation, ...middlewares, handler)`, `@alxia/core`'s middleware form, and how `implemented` and `matchesSpec` match them: as any other route.
+
+- [#134](https://github.com/softistx/alxia/pull/134) [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The docs and examples mount each plugin app with `@alxia/core`'s new `app.plugin(…)` — `base.plugin(todoRoutes)`, `app.plugin(redis(client))` — `use(…)` being for middlewares, its plugin forms deprecated. `@alxia/i18n` mounts its language plugin the same way inside, and `@alxia/context-storage`'s factory, given uncalled, now says `contextStorage is a factory: use(contextStorage()), not use(contextStorage)`. `@alxia/openapi`'s guides say where `route(operation)` checks replies: the handler's, just before it, a middleware's reply sent as it is, unless `responds(operation)` stands among the middlewares.
+- Updated dependencies [[`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd), [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd), [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd), [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd), [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd), [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd), [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd), [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd), [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd), [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd)]:
+  - @alxia/core@0.4.0
+
 ## 0.2.0
 
 ### Minor Changes
