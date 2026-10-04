@@ -1,16 +1,13 @@
-export {
-	Alxia,
-	type AlxiaOptions,
-	type AnyAlxia,
-	alxia,
-	type ContextOf,
-	type ListenOptions,
-	type Plugin,
-	type RefusalMethod,
-	type RouteMethod,
-	type RoutesOf,
-	type SocketMethod,
-} from './app/alxia';
+export { Alxia, alxia } from './app/alxia';
+export type {
+	AroundMethod,
+	ParserMethod,
+	RequestHookMethod,
+	ResponseHookMethod,
+	StartHookMethod,
+	StopHookMethod,
+} from './app/app-hooks';
+export type { GroupMethod, UseMethod } from './app/compose-methods';
 export { defineHook, defineWrap } from './app/define-hook';
 export { definePlugin } from './app/define-plugin';
 export type {
@@ -25,12 +22,36 @@ export type {
 	StartHook,
 	StopHook,
 } from './app/definition';
+export type { RouteMethod } from './app/route-method';
 export type {
 	CheckedOperation,
 	OperationMethod,
 	OperationSchema,
 	RouteOperation,
 } from './app/route-operation';
+export type {
+	BodyLimitMethod,
+	DecorateMethod,
+	DeriveMethod,
+	ErrorMethod,
+	WrapMethod,
+} from './app/scope-methods';
+export type { ListenMethod, RequestMethod } from './app/serving-methods';
+export type {
+	AlxiaOptions,
+	AnyAlxia,
+	ContextOf,
+	ListenOptions,
+	Plugin,
+	RefusalMethod,
+	RoutesOf,
+} from './app/signatures';
+export type { SocketMethod } from './app/socket-method';
+export type {
+	FileMethod,
+	PageMethod,
+	StaticMethod,
+} from './app/static-methods';
 export type {
 	AddedBy,
 	AnyRouteHook,

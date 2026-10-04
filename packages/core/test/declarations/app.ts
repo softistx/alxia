@@ -191,3 +191,30 @@ export function hooked() {
 			},
 		);
 }
+
+// The app's methods taken as values: each is typed by an interface of its
+// own, which a declaration names through `@alxia/core`.
+export function methods() {
+	const app = alxia().derive(() => ({ user: 'u' }));
+	return {
+		static: app.static,
+		file: app.file,
+		page: app.page,
+		decorate: app.decorate,
+		derive: app.derive,
+		wrap: app.wrap,
+		bodyLimit: app.bodyLimit,
+		onError: app.onError,
+		onRefusal: app.onRefusal,
+		onRequest: app.onRequest,
+		onResponse: app.onResponse,
+		around: app.around,
+		onStart: app.onStart,
+		onStop: app.onStop,
+		parser: app.parser,
+		group: app.group,
+		use: app.use,
+		request: app.request,
+		listen: app.listen,
+	};
+}

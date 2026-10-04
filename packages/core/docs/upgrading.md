@@ -23,6 +23,7 @@ bun add @alxia/core@latest @alxia/client@latest @alxia/openapi@latest # and ever
 | [`matchesSpec`, the new name of `exactly`](#matchesspec-the-new-name-of-exactly) | openapi-routes | no; `exactly` is deprecated |
 | [Streamed bodies timed to their last byte](#streamed-bodies-timed-to-their-last-byte) | logger, telemetry | dashboards and tests that read a streamed request's entry or span |
 | [A CSP nonce per request](#a-csp-nonce-per-request) | secure-headers, react-router | no; opt-in |
+| [The app's methods typed by interfaces](#the-apps-methods-typed-by-interfaces) | core | only a subclass of `Alxia` that overrides a method |
 
 ## Hooks on one route
 
@@ -227,6 +228,33 @@ kind may refuse. See [One hook per kind](guide/hooks.md#one-hook-per-kind).
 New exports: `RefusalKind`, `RefusalOfKind`, `RefusalHandlersByKind`,
 `RefusalMethod`, and the marks `RefusingKind`, `KindFallsBack`,
 `KindRefusalsOf`, `KindOutcome`, `OneKind`.
+
+## The app's methods typed by interfaces
+
+**What changed.** Nothing an app calls. Each method of `Alxia` that was
+still a method — `static`, `file`, `page`, `decorate`, `derive`, `wrap`,
+`bodyLimit`, `onError`, `onRequest`, `onResponse`, `around`, `onStart`,
+`onStop`, `parser`, `group`, `use`, `request`, `listen` — is now a readonly
+property typed by an interface of its own, as `get`, `ws` and `onRefusal`
+already were. The interface holds the overloads and their documentation,
+which an editor shows on hover as before. The calls, their types and what
+they do are the same.
+
+```ts
+// unchanged
+app.derive(auth).onRequest(cors).group('/admin', (admin) => admin.get('/stats', handler));
+```
+
+**Can it break your code.** Only a class that extends `Alxia` and overrides
+one of these: a property cannot be overridden by a method. Wrap the app
+in a function plugin instead, or override with a property of the same type.
+A method taken off the app, `const { derive } = app`, now stays bound to it.
+New exports, so an app's type can be named in a declaration file:
+`StaticMethod`, `FileMethod`, `PageMethod`, `DecorateMethod`,
+`DeriveMethod`, `WrapMethod`, `BodyLimitMethod`, `ErrorMethod`,
+`RequestHookMethod`, `ResponseHookMethod`, `AroundMethod`,
+`StartHookMethod`, `StopHookMethod`, `ParserMethod`, `GroupMethod`,
+`UseMethod`, `RequestMethod`, `ListenMethod`.
 
 ## `matchesSpec`, the new name of `exactly`
 

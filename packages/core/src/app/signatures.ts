@@ -1,6 +1,6 @@
 /**
- * The options of an app and of its `listen`, and the types its methods are
- * written in.
+ * The options of an app and of its `listen`, the types its methods are
+ * written in, and what a type reads of an app.
  */
 import type { Refusal, RefusalKind, RefusalOfKind } from '../errors/errors';
 import type { AnyReply, Reply } from '../reply/reply';
@@ -71,6 +71,46 @@ export interface RefusalMethod<
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
+	/**
+	 * A hook that answers a request a route declared after it refuses
+	 * before its handler runs: one its schemas refuse, the default of which
+	 * is `400 { error: 'validation', issues }`, or one whose body passes its
+	 * `bodyLimit`, the default of which is
+	 * `413 { error: 'content_too_large', limit }`. The hook reads
+	 * the refusal — its `kind`: `validation`, with the `part` that failed
+	 * and the `issues`, or `body_limit`, with the route's `limit` — and
+	 * returns a reply with a 4xx status, or nothing for that kind's default.
+	 * The last one declared before a route is the one in force; a group's
+	 * stays inside it. Its reply replaces the default 400 in the type of
+	 * every such route that validates, so the client reads it:
+	 *
+	 * ```ts
+	 * .onRefusal((refusal) => refusal.kind === 'validation'
+	 *   ? problem({ type: 'urn:example:invalid', status: 400, detail: `the ${refusal.part} is invalid` })
+	 *   : problem({ type: 'urn:example:limit', status: 413, limit: refusal.limit }))
+	 * ```
+	 *
+	 * Given schemas first, its `reply` is typed by them, its reply is
+	 * checked and sent as their output, and `@alxia/openapi` documents it:
+	 *
+	 * ```ts
+	 * .onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' },
+	 *   (refusal, { reply }) => reply(400, { type: 'urn:example:invalid', status: 400, detail: refusal.kind }))
+	 * ```
+	 *
+	 * Given a kind first, the hook answers that kind alone and reads it
+	 * narrowed; its schemas, if any, type and document that kind's replies
+	 * apart. A kind with no hook of its own, or whose hook returns nothing,
+	 * falls back to the general hook, then to the default. A general hook
+	 * declared after it replaces it; one of the same kind too:
+	 *
+	 * ```ts
+	 * .onRefusal('validation', { response: { 400: Invalid } }, (refusal, { reply }) =>
+	 *   reply(400, { detail: `the ${refusal.part} is invalid` }))
+	 * .onRefusal('body_limit', { response: { 413: TooLarge } }, (refusal, { reply }) =>
+	 *   reply(413, { limit: refusal.limit }))
+	 * ```
+	 */
 	<Result extends Reply<ClientErrorStatus, any> | undefined | void>(
 		hook: (refusal: Refusal, ctx: BaseContext & Ctx) => MaybePromise<Result>,
 	): Alxia<
@@ -79,6 +119,7 @@ export interface RefusalMethod<
 		Prefix,
 		Exclude<Shortcuts, Refusing> | RefusalsOf<Extract<Result, AnyReply>, Result>
 	>;
+	/** The hook answering every kind of refusal, its replies typed by `schema`. */
 	<
 		Responses extends RefusalResponses,
 		Result extends DeclaredReply<Responses> | undefined | void,
@@ -96,6 +137,7 @@ export interface RefusalMethod<
 		| Exclude<Shortcuts, Refusing>
 		| RefusalsOf<DeclaredRefusal<Responses>, Result>
 	>;
+	/** The hook answering one `kind` of refusal, read narrowed. */
 	<
 		Kind extends RefusalKind,
 		Result extends Reply<ClientErrorStatus, any> | undefined | void,
@@ -112,6 +154,7 @@ export interface RefusalMethod<
 		| Exclude<Shortcuts, RefusingKind<Kind>>
 		| KindRefusalsOf<Kind, Extract<Result, AnyReply>, Result>
 	>;
+	/** The hook answering one `kind` of refusal, its replies typed by `schema`. */
 	<
 		Kind extends RefusalKind,
 		Responses extends RefusalResponses,
@@ -133,4 +176,16 @@ export interface RefusalMethod<
 	>;
 }
 
-export type { RouteMethod } from './route-method';
+/** The route table of an app, as the client reads it. */
+export type RoutesOf<App> = App extends { readonly '~routes': infer Routes }
+	? Routes
+	: never;
+
+/**
+ * What a route declared next on `App` reads: the context its hooks build —
+ * `decorate`, `derive`, every plugin's — on top of the base context. A
+ * GraphQL schema, a service, types its own context with it.
+ */
+export type ContextOf<App> = App extends { readonly '~context': infer Ctx }
+	? BaseContext & Ctx
+	: never;
