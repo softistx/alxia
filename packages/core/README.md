@@ -478,8 +478,8 @@ the response, which the hook returns — or a reply of its own, typed like a
 
 `derive`, `decorate` and `wrap` are the shape of a middleware for every
 route after them; none of them is deprecated. A route's own list of hooks,
-`app.get(path, [canView], …)` made with `defineHook` or `defineWrap`, is:
-give the same checks as middlewares.
+`app.get(path, [canView], …)` made with `defineHook` or `defineWrap`, is
+deprecated: give the same checks as middlewares.
 
 The hooks, and the middlewares before a `validate`, read the request as it
 arrived: `pathParams` holds the path's parameters as strings, and `cookies`

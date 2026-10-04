@@ -22,7 +22,7 @@ number on it. Every release, with each change it made, is in
 
 - **Middlewares from the plugin packages.** The packages that give a route
   hook today — `@alxia/jwt`, `@alxia/janus`, `@alxia/rate-limit`,
-  `@alxia/cache`, `@alxia/idempotency`, `@alxia/secure-headers`,
+  `@alxia/cache`, `@alxia/redis` (its idempotency hook), `@alxia/secure-headers`,
   `@alxia/logger`, `@alxia/telemetry`, `@alxia/context-storage`,
   `@alxia/graphql`, `@alxia/react-router` — give middlewares made by
   `defineMiddleware`, placed among a route's own.
@@ -63,8 +63,9 @@ number on it. Every release, with each change it made, is in
   public API only, so an app ships only what it uses.
 - **A raw `Response` from a handler.** A handler answers with `reply`, so the
   client's type holds every status a route can send; a `Response` would be
-  outside that contract. A global hook (`onRequest`, `onResponse`) can still
-  return one, for what a typed client never asks.
+  outside that contract. A route middleware or a `wrap` may return one, sent
+  as it is, and so may a global hook (`onRequest`, `onResponse`), for what a
+  typed client never asks.
 
 ## Shipped
 

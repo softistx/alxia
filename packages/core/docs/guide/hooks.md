@@ -323,21 +323,23 @@ naming the key ([Troubleshooting](../troubleshooting.md#the-hook-reads--which-th
 Name the requirement before the hook — `defineHook<{ user: User }>()(…)`,
 not `defineHook<{ user: User }>(…)`, which does not compile.
 
-### The list or a group's `derive`?
+### A middleware or a group's `derive`?
 
-Both run the same hooks the same way; they differ in where the hook is
-written and how far it reaches.
+The deprecated list's place is now a route's middlewares. They and a
+group's `derive` differ in where the check is written and how far it
+reaches.
 
-| | `[hook]` on the route | `group(g => g.derive(hook).…)` |
+| | a middleware on the route | `group(g => g.derive(hook).…)` |
 | --- | --- | --- |
 | applies to | one route | every route of the group, declared after it |
-| written | once with `defineHook`, then named on each route | inline, where its context is already typed |
+| written | once with `defineMiddleware`, then named on each route | inline, where its context is already typed |
 | reads | what it names in `Requires`, checked on each route | the group's context, typed as it is written |
 | best for | a check that differs route by route: `canView` here, `canEdit` there, on routes of one path | a guard that every route in a prefix shares: an admin area, an API version |
 
-When three routes of the same group take the same list, a `derive` in a
-group of their own says it once. When the routes of one path each check
-something else, the list keeps each check beside the route it guards.
+When three routes of the same group take the same middleware, a `derive`
+in a group of their own says it once. When the routes of one path each
+check something else, a middleware keeps each check beside the route it
+guards.
 
 ### The type cost
 

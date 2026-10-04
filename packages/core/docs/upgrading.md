@@ -58,7 +58,7 @@ behaves as in 0.3: a schema before the handler becomes a `validate` and a
 form; move each one over when you next touch it, with the steps below.
 
 New exports: `defineMiddleware`, `validate`, `responds`, and the types
-`Middleware`, `MiddlewareContext`, `MiddlewareBase`, `MiddlewareResult`,
+`Middleware`, `MiddlewareContext`, `MiddlewareResult`,
 `MiddlewareReturn`, `Next`, `NextFunction`, `RequestSchemas`, `Validated`,
 `ValidateRequires`, `RouteOptions`, `SocketOptions`, and the types a route
 threads its middlewares with.
@@ -108,7 +108,7 @@ always the path's strings. A middleware that returns nothing is a 500,
 with this error logged:
 
 ```text
-TypeError: GET /posts/1: a middleware (canView) returned nothing: return next(), a reply or a Response
+TypeError: GET /posts/:id: a middleware returned nothing: return next(), a reply or a Response
 ```
 
 #### 2. `defineWrap` becomes a middleware that awaits `next()`
@@ -138,7 +138,7 @@ const exclusive = defineMiddleware<{ pathParams: { id: string } }>()(
 ```
 
 Call `next()` once; a second call is a 500, with
-`GET /posts/1: a middleware called next() twice` logged.
+`GET /posts/:id: a middleware called next() twice` logged.
 
 #### 3. The list of hooks becomes middlewares after the path
 
@@ -619,6 +619,19 @@ refused at startup. See
 [`@alxia/secure-headers`: a nonce per request](https://github.com/softistx/alxia/blob/develop/packages/secure-headers/docs/guide.md#a-nonce-per-request)
 and [`@alxia/react-router`: a CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#a-csp-nonce).
 
+### Other packages in 0.3.0
+
+These packages changed with 0.3.0, each with its own docs:
+
+- `@alxia/openapi` 0.3.0 — each `onRefusal` kind's statuses on the routes that kind may refuse: [its docs](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/README.md).
+- `@alxia/logger` 0.2.0, `@alxia/telemetry` 0.2.0 — [above](#streamed-bodies-timed-to-their-last-byte).
+- `@alxia/secure-headers` 0.2.0, `@alxia/react-router` 0.2.0 — [above](#a-csp-nonce-per-request).
+- `@alxia/openapi-routes` 0.2.0 — [above](#matchesspec-the-new-name-of-exactly).
+
+Every other `@alxia/*` package, `@alxia/client` included, got a patch
+release whose only change is its peer range on `@alxia/core`; its own docs
+have nothing new.
+
 ## From 0.2.0 or earlier
 
 `@alxia/core` 0.2.1 already shipped this, so it is not part of the next release. If you are upgrading from 0.2.0 or earlier, it changes one thing an app may see: **a client
@@ -637,16 +650,3 @@ app.onResponse((response, { request }) => {
 It cannot break code, but a log or an alert counting 500s sees fewer. An
 error the app throws after the client left is still logged and answered
 500. See [Replies: errors](guide/replies.md#errors).
-
-## Other packages
-
-These packages change with this release, each with its own docs:
-
-- `@alxia/openapi` 0.3.0 — each `onRefusal` kind's statuses on the routes that kind may refuse: [its docs](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/README.md).
-- `@alxia/logger` 0.2.0, `@alxia/telemetry` 0.2.0 — [above](#streamed-bodies-timed-to-their-last-byte).
-- `@alxia/secure-headers` 0.2.0, `@alxia/react-router` 0.2.0 — [above](#a-csp-nonce-per-request).
-- `@alxia/openapi-routes` 0.2.0 — [above](#matchesspec-the-new-name-of-exactly).
-
-Every other `@alxia/*` package, `@alxia/client` included, gets a patch
-release whose only change is its peer range on `@alxia/core`; its own docs
-have nothing new.

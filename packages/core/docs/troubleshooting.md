@@ -63,7 +63,7 @@ a trap that prints nothing is headed by its symptom.
 - [`defineHook(): the hook is not a function`](#definehook-the-hook-is-not-a-function)
 - [`GET /…: middleware 1 is not a function: make it with defineMiddleware(), validate() or responds()`](#get--middleware-1-is-not-a-function-make-it-with-definemiddleware-validate-or-responds)
 - [`GET /…: the options hold no schema: give validate(…) and responds(…) among the middlewares`](#get--the-options-hold-no-schema-give-validate-and-responds-among-the-middlewares)
-- [`WS /…: responds() checks replies, and a socket route sends none: check its messages with the `send` option`](#ws--responds-checks-replies-and-a-socket-route-sends-none-check-its-messages-with-the-send-option)
+- [``WS /…: responds() checks replies, and a socket route sends none: check its messages with the `send` option``](#ws--responds-checks-replies-and-a-socket-route-sends-none-check-its-messages-with-the-send-option)
 - [`defineMiddleware(): the middleware is not a function`](#definemiddleware-the-middleware-is-not-a-function)
 - [`validate(): the schemas are not an object`](#validate-the-schemas-are-not-an-object), and `responds(): …`
 - [`GET /…: the handler is missing`](#get--the-handler-is-missing)
@@ -951,8 +951,10 @@ such as `response`, or a misspelt `quey`.
 error TS2353: Object literal may only specify known properties, and 'response' does not exist in type 'RequestSchemas'.
 ```
 
-When the schemas are a variable, the message is
-`"response" is not a part validate() reads: params, query, headers, cookies or body`.
+When the schemas are a variable that also holds a part, the message is
+`"response" is not a part validate() reads: params, query, headers, cookies or body`;
+one holding only unknown keys, `const s = { response: Post }`, gives
+`TS2559: Type '…' has no properties in common with type 'RequestSchemas'`.
 
 **Why:** `validate` reads the request: `params`, `query`, `headers`,
 `cookies` and `body`. The statuses a route answers are `responds`'.
@@ -1452,7 +1454,7 @@ what a `validate` among them did.
 app.post('/posts', { bodyLimit: 1024 }, auth, validate({ body: Post }), responds({ 201: Post }), handler);
 ```
 
-### `WS /…: responds() checks replies, and a socket route sends none: check its messages with the `send` option`
+### ``WS /…: responds() checks replies, and a socket route sends none: check its messages with the `send` option``
 
 **When:** `responds(…)` is given to `ws(…)`. The types refuse it too: the
 handlers object is then typed by this message.
@@ -1464,7 +1466,9 @@ schema.
 **Fix:**
 
 ```ts
-app.ws('/rooms/:room', { send: Chat }, auth, { message: (socket, chat) => socket.send(chat) });
+app.ws('/rooms/:room', { message: Chat, send: Chat }, auth, {
+	message: (socket, chat) => socket.send(chat),
+});
 ```
 
 ### `defineMiddleware(): the middleware is not a function`
@@ -1978,7 +1982,7 @@ app.post('/users', responds({ 201: User, 409: Conflict }), handler);
 ### `TypeError: … a middleware (…) returned nothing: return next(), a reply or a Response`
 
 ```text
-TypeError: GET /posts: a middleware (audit) returned nothing: return next(), a reply or a Response
+TypeError: GET /posts: a middleware returned nothing: return next(), a reply or a Response
 ```
 
 **When:** a middleware returns something other than what `next()`
