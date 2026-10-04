@@ -1363,7 +1363,7 @@ const socket = new WebSocket(new URL('/rooms/lobby', server.url.href.replace('ht
 ### `416 {"error":"range_not_satisfiable"}`
 
 **When:** a `static` or `file` route gets a `Range` that starts past the
-end of the file, or, on an empty file, any range but a suffix one
+end of the file, or, on an empty file, any range but a non-zero suffix
 (`bytes=-5` is served whole, as a 200). The response carries
 `Content-Range: bytes */<size>`.
 
@@ -1371,7 +1371,7 @@ end of the file, or, on an empty file, any range but a suffix one
 computed the range wrongly.
 
 **Fix:** read the size from `Content-Range` and ask again, or drop the
-`Range` header; for an empty file (`bytes */0`), drop it. `ranges: false` turns range support off for that route:
+`Range` header, as for an empty file (`bytes */0`). `ranges: false` turns range support off for that route:
 
 ```ts
 app.static('/media', join(import.meta.dir, 'media'), { ranges: false });
