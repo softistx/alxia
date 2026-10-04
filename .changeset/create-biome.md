@@ -1,5 +1,0 @@
----
-"@alxia/create": patch
----
-
-Both templates now ship Biome, set up: a `biome.json` of the project's own (Biome's recommended rules, two spaces and double quotes, imports sorted, Tailwind's directives read in the `react-router` project's CSS, `dist/`, `build/` and `.react-router/` skipped), `@biomejs/biome` as a devDependency pinned exactly, which the command moves to the newest patch of the same minor and keeps exact, and the scripts `lint`, `format`, `check` (`biome check --write`), `check:ci` (`biome ci`, named so since `bun ci` is Bun's install) and `verify` (`check:ci`, `typecheck`, then `test` or `build`). `.vscode/` recommends Biome's extension and formats on save. A new project passes `bun run check:ci` with no finding; the `api` template is now in that style, and Biome formatted three files of React Router's scaffold once. The name given to the command now also replaces the template's own (`my-api`, `my-app`) in the project's other files, as its README's `docker build -t` and `docker run`.
