@@ -77,7 +77,6 @@ my-api/
 └── README.md
 ```
 
-
 `src/app.ts` is one route, `POST /todos`, with what a real one needs: a
 body validated by a Zod schema, a declared reply, and a hook of its own.
 

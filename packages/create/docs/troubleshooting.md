@@ -158,6 +158,19 @@ written is removed — the target directory is emptied when it was there,
 removed when it was not. A parent directory the command created for it, as
 `a/b` for `a/b/my-site`, stays.
 
+### `create-alxia: failed: the api template names @alxia/zod at workspace:, which this @alxia/create has no version for`
+
+**When:** at once, before anything is written; the template and package
+vary.
+
+**Why:** a template names an `@alxia/*` package at `workspace:^`, which
+the command replaces with the version it was published beside, and this
+release has none for that package. It is a broken `@alxia/create`
+release, not your setup.
+
+**Fix:** run the previous release, `bunx @alxia/create@<version>`, and
+report it on [GitHub](https://github.com/softistx/alxia/issues).
+
 ### `create-alxia: warning: the registry did not answer for …; kept the versions the template ships.`
 
 **When:** a dependency's metadata did not arrive within five seconds, or
