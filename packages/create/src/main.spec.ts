@@ -77,7 +77,8 @@ function fake(
 		io: {
 			out: (line) => out.push(line),
 			err: (line) => err.push(line),
-			ask: () => (answers.length > 0 ? (answers.shift() ?? null) : null),
+			// No answers left: no terminal.
+			ask: () => (answers.length > 0 ? answers.shift() : undefined),
 			run: async (command, cwd) => {
 				ran.push({ command, cwd });
 				if (command[1] === 'install') return options.codes?.install ?? 0;
@@ -139,6 +140,15 @@ describe('create-alxia', () => {
 		expect(out.at(-1)).toBe(
 			'\nDone: my-api holds the api template. Next:\n\n  cd my-api\n  bun dev\n',
 		);
+	});
+
+	test('input ended at a question (Ctrl-D): cancelled, nothing written', async () => {
+		for (const answers of [[null], ['my-api', null]]) {
+			const { io, err } = fake({ answers });
+			expect(await main([], root, io)).toBe(1);
+			expect(err).toEqual(['create-alxia: cancelled, nothing written.']);
+			expect(await readdir(root)).toEqual([]);
+		}
 	});
 
 	test('an unknown template answered is refused', async () => {

@@ -17,6 +17,7 @@ nothing — the symptom.
 - [`create-alxia: one directory only, given a and b.`](#create-alxia-one-directory-only-given-a-and-b)
 - [`create-alxia: no directory given, and no terminal to ask in.`](#create-alxia-no-directory-given-and-no-terminal-to-ask-in)
 - [`create-alxia: no --template given, and no terminal to ask in.`](#create-alxia-no---template-given-and-no-terminal-to-ask-in)
+- [`create-alxia: cancelled, nothing written.`](#create-alxia-cancelled-nothing-written)
 
 **The directory**
 
@@ -111,6 +112,15 @@ terminal: a script, CI, a pipe.
 **When:** a directory but no `--template`, with no terminal.
 
 **Fix:** add `--template api` or `--template react-router`.
+
+### `create-alxia: cancelled, nothing written.`
+
+**When:** a question was answered with the end of the input — Ctrl-D, or
+a pipe that closed — before the project was written.
+
+**Fix:** run the command again and answer, or give both on the command
+line: `bun create @alxia my-app --template api`. An empty answer takes the
+default in brackets.
 
 ## The directory
 

@@ -32,8 +32,14 @@ Options:
 export interface Io {
 	readonly out: (line: string) => void;
 	readonly err: (line: string) => void;
-	/** An answer to `question`, `fallback` when empty; null when there is no terminal. */
-	readonly ask: (question: string, fallback: string) => string | null;
+	/**
+	 * An answer to `question`, `fallback` when empty; undefined when there is
+	 * no terminal to ask in, null when the input ended (Ctrl-D) unanswered.
+	 */
+	readonly ask: (
+		question: string,
+		fallback: string,
+	) => string | null | undefined;
 	/** Runs a command in `cwd` with the terminal's streams; its exit code. */
 	readonly run: (command: readonly string[], cwd: string) => Promise<number>;
 	readonly env: Record<string, string | undefined>;
@@ -47,8 +53,10 @@ export function processIo(): Io {
 		out: (line) => console.log(line),
 		err: (line) => console.error(line),
 		ask: (question, fallback) => {
-			if (!process.stdin.isTTY) return null;
-			const answer = prompt(`${question} (${fallback})`);
+			if (!process.stdin.isTTY) return undefined;
+			// Bun's prompt() prints the default as `[fallback]`, gives it for an
+			// empty line, and null at the end of the input.
+			const answer = prompt(question, fallback);
 			return answer === null ? null : answer.trim() || fallback;
 		},
 		run: async (command, cwd) =>
@@ -102,12 +110,20 @@ export async function main(
 	const dir =
 		options.dir ?? io.ask('Where should the project go?', 'alxia-app');
 	if (dir === null) {
+		io.err(`${NAME}: cancelled, nothing written.`);
+		return 1;
+	}
+	if (dir === undefined) {
 		io.err(
 			`${NAME}: no directory given, and no terminal to ask in.\n\n${USAGE}`,
 		);
 		return 1;
 	}
 	const template = options.template ?? askTemplate(io);
+	if (template === null) {
+		io.err(`${NAME}: cancelled, nothing written.`);
+		return 1;
+	}
 	if (typeof template === 'object') {
 		io.err(`${NAME}: ${template.error}\n\n${USAGE}`);
 		return 1;
@@ -164,9 +180,11 @@ async function clean(target: string, existed: boolean): Promise<void> {
 	}
 }
 
-function askTemplate(io: Io): Template | { error: string } {
+/** The template answered; null when cancelled. */
+function askTemplate(io: Io): Template | { error: string } | null {
 	const answer = io.ask(`Which template? ${TEMPLATES.join(' or ')}`, 'api');
-	if (answer === null) {
+	if (answer === null) return null;
+	if (answer === undefined) {
 		return { error: 'no --template given, and no terminal to ask in.' };
 	}
 	return isTemplate(answer)

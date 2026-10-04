@@ -16,8 +16,8 @@ With no arguments it asks two questions, each with a default an empty
 answer takes:
 
 ```
-Where should the project go? (alxia-app) my-app
-Which template? api or react-router (api)
+Where should the project go? [alxia-app] my-app
+Which template? api or react-router [api]
 ```
 
 then writes the project, runs `bun install` in it, and prints what to run
