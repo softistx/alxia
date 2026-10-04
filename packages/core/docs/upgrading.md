@@ -68,6 +68,10 @@ threads an operation's schemas with (`OperationParts`, `OperationOptions`,
 `OperationResponds`, `OperationValidate`, `OperationApp`). `validate` also
 takes an operation.
 
+A request's body is read once: a second `validate` of the body on one
+route checks what the first read, where it used to fail with
+`TypeError: Body already used`.
+
 ### Migrating to middlewares
 
 #### 1. `defineHook` becomes `defineMiddleware`
