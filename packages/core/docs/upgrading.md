@@ -342,10 +342,13 @@ error the app throws after the client left is still logged and answered
 
 ## Other packages
 
-Every other `@alxia/*` package gets a patch release whose only change is
-its peer range on `@alxia/core`; its own docs have nothing new.
+These packages change with this release, each with its own docs:
 
 - `@alxia/openapi` 0.3.0 — each `onRefusal` kind's statuses on the routes that kind may refuse: [its docs](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/README.md).
 - `@alxia/logger` 0.2.0, `@alxia/telemetry` 0.2.0 — [above](#streamed-bodies-timed-to-their-last-byte).
 - `@alxia/secure-headers` 0.2.0, `@alxia/react-router` 0.2.0 — [above](#a-csp-nonce-per-request).
 - `@alxia/openapi-routes` 0.2.0 — [above](#matchesspec-the-new-name-of-exactly).
+
+Every other `@alxia/*` package, `@alxia/client` included, gets a patch
+release whose only change is its peer range on `@alxia/core`; its own docs
+have nothing new.

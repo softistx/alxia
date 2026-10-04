@@ -70,8 +70,8 @@ Two rules decide the rest:
 1. **`around`** hooks, the first declared outermost. A WebSocket upgrade
    skips them.
 2. **`onRequest`** hooks, in the order declared. A `Response` one returns
-   skips to step 9.
-3. **Routing.** No route: `404`, `405` or `426`, then step 9.
+   skips to step 10.
+3. **Routing.** No route: `404`, `405` or `426`, then step 10.
 4. **The scope's route hooks**, in the order declared: the app's, then the
    group's, a plugin's after the hooks of the app that uses it. A `derive`
    or `decorate` runs and adds to the context; a `wrap` calls `next()` to run
