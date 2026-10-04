@@ -96,3 +96,58 @@ describe('a middleware that returns before the next() it called settled', () => 
 		}
 	});
 });
+
+describe("the rest's error, when the middleware does not read it", () => {
+	const failing = async () => {
+		await new Promise((resolve) => setTimeout(resolve, 1));
+		throw new Error('the rest failed');
+	};
+
+	test('is logged when the rest failed before the middleware returned', async () => {
+		const error = spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const app = alxia().get(
+				'/',
+				(async (
+					ctx: { reply: (status: 403, body: string) => unknown },
+					next: () => Promise<Response>,
+				) => {
+					next();
+					await new Promise((resolve) => setTimeout(resolve, 5));
+					return ctx.reply(403, 'no');
+				}) as never,
+				failing,
+			);
+			expect((await app.request('/')).status).toBe(403);
+			await settled();
+			expect(unhandled).toEqual([]);
+			expect(String(error.mock.calls[0]?.[0])).toContain('the rest failed');
+		} finally {
+			error.mockRestore();
+		}
+	});
+
+	test('is logged when the middleware throws after calling next()', async () => {
+		const error = spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const app = alxia().get(
+				'/',
+				((_ctx: unknown, next: () => Promise<Response>) => {
+					next();
+					throw new Error('the middleware failed');
+				}) as never,
+				failing,
+			);
+			expect((await app.request('/')).status).toBe(500);
+			await settled();
+			expect(unhandled).toEqual([]);
+			expect(
+				error.mock.calls.some((call) =>
+					String(call[0]).includes('the rest failed'),
+				),
+			).toBe(true);
+		} finally {
+			error.mockRestore();
+		}
+	});
+});

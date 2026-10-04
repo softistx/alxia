@@ -33,8 +33,9 @@ export async function wrapped(
  *   Koa and Hono answer `await next()` with no return.
  * - A reply of its own returned before the `next()` it called settled —
  *   `next(); return reply(403)`: the rest runs anyway, so the reply is
- *   sent once it has, and an error it throws is logged, not left
- *   unhandled.
+ *   sent once it has, with a warning. An error of the rest the middleware
+ *   did not read — it returned or threw without awaiting `next()` — is
+ *   logged, never left unhandled.
  * - What `rest` resolves to that is not a response — a socket's upgrade —
  *   reaches the middleware as a stand-in response. The socket is open by
  *   then: what the middleware returns after it, or throws, is ignored, as
@@ -69,6 +70,9 @@ export function middleware(
 					parked = { stand: new Response(null), value: downstream };
 					return parked.stand;
 				});
+		// Handled from the start: an error the middleware does not read is
+		// logged when it settles, never reported as unhandled.
+		pending.catch(ignore);
 		return pending as Promise<Response>;
 	};
 	const settle = (result: unknown): unknown => {
@@ -77,27 +81,45 @@ export function middleware(
 		if (result === undefined) {
 			return pending.then((downstream) => parked?.value ?? downstream);
 		}
-		if (Bun.peek.status(pending) !== 'pending') {
-			return own(hook, definition, result, parked);
+		const status = Bun.peek.status(pending);
+		if (status === 'fulfilled') return own(hook, definition, result, parked);
+		// Returned before the `next()` it called settled, or after it failed:
+		// the rest's error is logged.
+		if (status === 'pending') {
+			console.warn(
+				`${labelOf(definition)}: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`,
+			);
 		}
-		console.warn(
-			`${labelOf(definition)}: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`,
-		);
 		const after = () => own(hook, definition, result, parked);
 		return pending.then(after, (error: unknown) => {
 			console.error(error);
 			return after();
 		});
 	};
-	const result = hook(ctx, next);
+	// A middleware that throws once it called `next()`: the rest's error,
+	// if any, is logged, and the middleware's goes on to `onError`.
+	const thrown = (error: unknown): never => {
+		if (pending !== undefined && Bun.peek.status(pending) !== 'fulfilled') {
+			pending.catch(console.error);
+		}
+		throw error;
+	};
+	let result: unknown;
+	try {
+		result = hook(ctx, next);
+	} catch (error) {
+		thrown(error);
+	}
 	if (!(result instanceof Promise)) return settle(result);
-	if (route) return result.then(settle);
+	if (route) return result.then(settle, thrown);
 	return result.then(settle, (error: unknown) => {
-		if (parked === undefined) throw error;
+		if (parked === undefined) return thrown(error);
 		console.error(error);
 		return parked.value;
 	});
 }
+
+function ignore(): void {}
 
 /** A socket's upgrade, parked behind the stand-in response `next()` resolved to. */
 interface Parked {

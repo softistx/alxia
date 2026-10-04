@@ -56,7 +56,7 @@ export type AnyAlxia = Alxia<any, any, any>;
 /**
  * A plugin written as a function: it receives the app and returns it, with
  * global hooks added. A plugin that adds to the context or declares routes
- * is an app of its own, given to `use`.
+ * is an app of its own; both are given to `app.plugin`.
  */
 export type Plugin = <App extends AnyAlxia>(app: App) => App;
 

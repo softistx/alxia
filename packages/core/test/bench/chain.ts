@@ -6,12 +6,15 @@
  * form and the ratios; the middleware forms should stay within 10% of the
  * list.
  *
- * Measured when `next()` learned to settle soundly (a middleware returning
- * nothing, or returning before its `next()` settled), against the commit
- * before, on one machine: the middleware form 1180 → 1210 ns (+2.5%), the
- * list 1300 → 1055 ns and `use()` 1400 → 1205 ns, since a route with no
- * schema of its own runs no validation step any more. The ratio is about
- * 1.14 as a result: the list moved, not the middleware form.
+ * Measured when `next()` learned to settle soundly — a middleware returning
+ * nothing, returning before its `next()` settled, or leaving its error
+ * unread — against the commit before, on one machine: the middleware form
+ * 1180 → 1330 ns (+12%, most of it the handler each `next()` attaches so
+ * that an error nobody reads is never an unhandled rejection), the list
+ * 1300 → 1085 ns and `use()` 1400 → 1345 ns, since a route with no schema
+ * of its own runs no validation step any more. The ratio is about 1.22 as
+ * a result, past the 10% this bench asks: reported, and accepted for the
+ * soundness.
  */
 import { alxia, defineHook, defineMiddleware } from '@alxia/core';
 

@@ -12,13 +12,13 @@ import type { Empty, Requiring } from './types';
  *   app.derive(({ user }) => ({ tenant: tenants.get(user.tenantId) })),
  * );
  *
- * alxia().use(auth).use(tenant); // compiles: auth derives a user, or answers 401
- * alxia().use(tenant); // a compile error: this app gives no `user`
+ * alxia().plugin(auth).plugin(tenant); // compiles: auth derives a user, or answers 401
+ * alxia().plugin(tenant); // a compile error: this app gives no `user`
  * ```
  *
- * The plugin is an app, given to `use` like any other, built once, here.
- * `use` checks the app's context against `Requires`, so the plugin's hooks
- * never run without what they read.
+ * The plugin is an app, given to `plugin` like any other, built once,
+ * here. `plugin` checks the app's context against `Requires`, so the
+ * plugin's hooks never run without what they read.
  */
 export function definePlugin<Requires extends object = Empty>() {
 	return <Plugin extends AnyAlxia>(
@@ -38,8 +38,8 @@ export function definePlugin<Requires extends object = Empty>() {
  *   .get('/', ({ db, user, reply }) => reply(200, db.todos.of(user.id)));
  *
  * // src/app.ts
- * export const app = base.use(todos);
- * alxia().use(todos); // a compile error: this app gives no `user`
+ * export const app = base.plugin(todos);
+ * alxia().plugin(todos); // a compile error: this app gives no `user`
  * ```
  *
  * At runtime it is `alxia({ prefix })`. Unregistered, it starts from the
@@ -53,7 +53,7 @@ export function defineRoutes<const Prefix extends '' | RoutePath = ''>(
 
 /**
  * A fresh app typed as already giving `Requires`: what `definePlugin` and
- * `defineRoutes` build on. Only a type: `use` checks the requirement.
+ * `defineRoutes` build on. Only a type: `plugin` checks the requirement.
  */
 function requiring<Requires extends object, Prefix extends '' | RoutePath>(
 	prefix: Prefix | undefined,

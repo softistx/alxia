@@ -77,7 +77,7 @@ type AnyMessage<Requires> = [Requires] extends [never]
  *
  * A parameter annotated `any` — or `Record<string, any>`, any key as `any` —
  * would read anything and require nothing, so the check would be off
- * without a word: it gives a requirement `use` refuses on every app,
+ * without a word: it gives a requirement `plugin` refuses on every app,
  * naming `Callback` — `resolve`, `load` — in its message. `unknown` and
  * `object` read nothing without a cast, and give `Empty`, as an unannotated
  * parameter does.
