@@ -16,12 +16,14 @@ async function typecheck(name: string): Promise<string[]> {
 	return output.split(/\n(?=\S)/).filter((error) => error.includes('TS2769'));
 }
 
-test('a middleware is reported on the middleware form first, a plain function with the hint', async () => {
+test('a middleware is reported on the middleware form, a plain function with the hint', async () => {
 	const [missing, plain] = await typecheck('use');
-	const first = (error = '') => error.split('Overload 2 of')[0] ?? '';
-	expect(first(missing)).toContain('ScopeMiddleware');
-	expect(first(missing)).toContain("Property 'user' is missing");
-	expect(first(plain)).toContain(
+	// The middleware forms are the last overloads: TypeScript 7 prints the last alone.
+	const last = (error = '') =>
+		error.split(/Overload \d+ of \d+|The last overload/).at(-1) ?? '';
+	expect(last(missing)).toContain('ScopeMiddleware');
+	expect(last(missing)).toContain("Property 'user' is missing");
+	expect(last(plain)).toContain(
 		"not assignable to type 'MadeByDefineMiddleware'",
 	);
 });

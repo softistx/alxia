@@ -312,14 +312,13 @@ const app = origins ? base.use(cors({ origin: origins })) : base;
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 11, '(m1: ScopeMiddleware<Empty, [], MiddlewareReturn>): AppAfterUse<Empty, "", never, [MiddlewareReturn]>', gave the following error.
+  The last overload gave the following error.
     Argument of type '(options?: CorsOptions) => CorsMiddleware' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
       Type '(options?: CorsOptions) => CorsMiddleware' is not assignable to type '(ctx: BaseContext & Empty, next: NextFunction) => MiddlewareReturn'.
         Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'.
-  Overload 2 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    …
-        Type 'Alxia<Empty, "", never>' has no properties in common with type 'CorsOptions'.
 ```
+
+TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
 
 **When:** `app.use(cors)`, without calling it.
 

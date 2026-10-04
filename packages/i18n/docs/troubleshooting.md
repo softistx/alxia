@@ -151,12 +151,14 @@ const app = alxia()
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 11, '(m1: ScopeMiddleware<Empty, [], MiddlewareReturn>): AppAfterUse<Empty, "", never, [MiddlewareReturn]>', gave the following error.
+  The last overload gave the following error.
     Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => I18nMiddleware<keyof C & string, KeyOf<C[Fallback]>, RequiresOf<...>>' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
       …
         Types of parameters 'options' and 'ctx' are incompatible.
           Type 'BaseContext & Empty' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback
 ```
+
+TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
 
 **When:** `app.use(createI18n)`, without calling it.
 

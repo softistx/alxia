@@ -359,10 +359,12 @@ Give `auth` to the app before both, or mount a plugin without a prefix
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 11, '(m1: ScopeMiddleware<Empty, [], Promise<Response>>): …', gave the following error.
+  The last overload gave the following error.
     Argument of type '(ctx: …, next: …) => Promise<Response>' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], Promise<Response>>'.
       Type '(ctx: …, next: …) => Promise<Response>' is not assignable to type 'MadeByDefineMiddleware'.
 ```
+
+TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
 
 **When:** `app.use` is given a plain `(ctx, next) => …` function.
 
@@ -404,7 +406,8 @@ the deprecated middleware form, are noise: the message of the second is
 the one that matters.
 
 A middleware given to `use` whose context the app does not give reads
-otherwise: `use`'s middleware form is reported first, ending
+otherwise: `use`'s middleware form is reported last — alone, on
+TypeScript 7 — ending
 `Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: … }'`.
 
 Returned from a `group` or a plugin function, `group(() => todos)` or
@@ -905,6 +908,8 @@ for every route in a `derive` before them:
 ```ts
 app.post('/posts', auth, canPost, handler);
 ```
+
+TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
 
 ### `Property 'id' is missing in type 'Readonly<Record<string, string>> & PathParams<"…">'`
 

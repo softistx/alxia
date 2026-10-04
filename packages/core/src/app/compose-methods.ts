@@ -45,15 +45,16 @@ export interface GroupMethod<
  * see `PluginForms`. A function made by `defineMiddleware` is a
  * middleware; any other function is a plugin. The plugin forms come first,
  * so that a middleware a route's context does not give is reported on the
- * middleware forms, naming the key.
+ * middleware forms, naming the key: TypeScript 7 prints the last overload
+ * alone, and TypeScript 6 lists the plugin forms, then them.
  */
 export interface UseMethod<
 	App,
 	Ctx extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
-> extends UseForms<Ctx, Prefix, Shortcuts>,
-		PluginForms<App, Ctx, Prefix, Shortcuts> {}
+> extends PluginForms<App, Ctx, Prefix, Shortcuts>,
+		UseForms<Ctx, Prefix, Shortcuts> {}
 
 /** `app.use(plugin)`, deprecated: `app.plugin(plugin)`, see `PluginMethod`. */
 export interface PluginForms<

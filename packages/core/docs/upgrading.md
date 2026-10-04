@@ -354,7 +354,8 @@ reads `is not assignable to type 'MadeByDefineMiddleware'`), `UseForms`,
 `PluginForms` (deprecated), `ScopeMiddleware`, `PathMiddleware`,
 `AddingNothing`, `ScopePathAt` and `AppAfterUse`. A middleware the
 route's context does not give is reported on `use`'s middleware form
-first, before its deprecated plugin forms.
+last: TypeScript 7 prints the last overload alone, so the deprecated
+plugin forms come first, and the message names the missing key.
 
 ### Middlewares replace the request hooks
 
