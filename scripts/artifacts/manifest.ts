@@ -44,6 +44,11 @@ import { type Tarball, tarballProblems } from './tarball';
  *     publish without a word.
  *   - **test code**: a `*.spec.*`, a `*.test.*`, a snapshot, or a
  *     `<subject>.fixtures.*` file.
+ *   - a **`workspace:` range left in the packed manifest**, devDependencies
+ *     included: `bun pm pack` rewrites each to the sibling's version, and
+ *     `@alxia/create` reads its devDependencies at runtime as the versions of
+ *     the projects it writes. One left over resolves to nothing outside this
+ *     workspace.
  *   - a **scoped package without `publishConfig.access: "public"`**.
  *     `scripts/publish.ts` runs `bun publish`, which never reads the
  *     changeset config's `access`, and npm publishes a scoped package as
@@ -58,6 +63,7 @@ export async function manifestProblems(
 		...tarballs.flatMap(tarballProblems),
 		...manifestShapeProblems(manifests),
 		...manifests.flatMap(accessProblems),
+		...manifests.flatMap(workspaceProblems),
 	];
 	const own = new Set(manifests.map((m) => m.name as string));
 
@@ -80,6 +86,27 @@ export async function manifestProblems(
 	}
 
 	return problems;
+}
+
+/** A `workspace:` range the pack left in any dependency field. */
+export function workspaceProblems(manifest: Record<string, unknown>): string[] {
+	return [
+		'dependencies',
+		'devDependencies',
+		'peerDependencies',
+		'optionalDependencies',
+	].flatMap((field) =>
+		Object.entries<string>(
+			(manifest[field] as Record<string, string>) ?? {},
+		).flatMap(([dep, range]) =>
+			String(range).startsWith('workspace:')
+				? [
+						`${manifest.name}: ${field}.${dep} = ${range} in the packed manifest; ` +
+							'bun pm pack should have written the version',
+					]
+				: [],
+		),
+	);
 }
 
 /** A scoped package that `bun publish` would publish as restricted. */

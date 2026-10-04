@@ -1,0 +1,2 @@
+# the projects the specs generate, typecheck and test
+.fixture-*

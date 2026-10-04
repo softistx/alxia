@@ -148,3 +148,25 @@ jobs:
         run: bun run typecheck
       - name: Verify the built artifacts load
         run: bun run verify:artifacts
+
+  templates:
+    # `bun create @alxia` as a user runs it, from this checkout's packed
+    # tarballs, served by a registry on localhost that passes the rest to
+    # npm's: each template is written, installed, typechecked, tested and
+    # built, and its production server answered. What is not alxia's —
+    # create-react-router, TypeScript, Vite — comes from npm at the newest
+    # versions @alxia/create resolves, so an upstream release can turn it red
+    # with no change here: informational, like the two jobs above. Measured
+    # locally at 18 seconds, most of it the installs.
+    name: Templates
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup
+        uses: ./.github/actions/setup
+      - name: Build packages
+        run: bun run build
+      - name: Create each template and run it
+        run: bun run verify:templates

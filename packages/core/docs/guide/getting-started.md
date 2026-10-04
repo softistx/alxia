@@ -3,6 +3,12 @@
 This page takes an empty Bun project to a running, validated, tested app,
 and points at the page that goes deeper at each step.
 
+To skip ahead, `bun create @alxia my-app --template api` writes an app of
+the shape this page ends with — a route validated by Zod, behind a hook of
+its own, and a spec calling it in process and through the typed client —
+and installs it
+([`@alxia/create`](https://www.npmjs.com/package/@alxia/create)). By hand:
+
 ```sh
 bun add @alxia/core zod
 bun add -d typescript

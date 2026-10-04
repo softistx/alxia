@@ -59,7 +59,14 @@ export async function readPackages(): Promise<Pkg[]> {
 		const m = await Bun.file(join(ROOT, rel)).json();
 		if (m.private) continue;
 		const deps = new Set<string>();
-		for (const field of ['dependencies', 'peerDependencies']) {
+		// devDependencies too: `@alxia/create` reads its own, which name the
+		// versions the projects it writes install, so they must be on the
+		// registry before it is.
+		for (const field of [
+			'dependencies',
+			'peerDependencies',
+			'devDependencies',
+		]) {
 			for (const dep of Object.keys(m[field] ?? {})) {
 				if (dep.startsWith('@alxia/')) deps.add(dep);
 			}
@@ -75,7 +82,7 @@ export async function readPackages(): Promise<Pkg[]> {
 }
 
 /** Dependencies first, so a consumer is never on the registry before its dependency. */
-function inDependencyOrder(pkgs: Pkg[]): Pkg[] {
+export function inDependencyOrder(pkgs: Pkg[]): Pkg[] {
 	const byName = new Map(pkgs.map((p) => [p.name, p]));
 	const done = new Set<string>();
 	const order: Pkg[] = [];
