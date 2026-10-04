@@ -1,6 +1,8 @@
 import type { AnyReply } from '../reply/reply';
 import type { JoinPath, PathAt, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
+import type { OperationForms } from './operation-forms';
+import type { RouteApp } from './route-method';
 import type {
 	AnyRouteHook,
 	Context,
@@ -14,6 +16,7 @@ import type {
 	ThreadHooks,
 	ValidSchema,
 } from './types';
+import { builtinOf, responds, validate } from './validate';
 
 type IsUnion<T, All = T> = T extends unknown
 	? [All] extends [T]
@@ -73,49 +76,30 @@ export type CheckedOperation<
 		: { readonly path: OnePath<Prefix, Operation['path']> };
 
 /**
- * `app.route(operation, handler)`: a route declared as data — `{ method,
- * path, schema? }`, as an OpenAPI code generator writes it — and its
- * handler, the same route as `app[method](path, schema, handler)`,
- * with the three read from `operation`. With a list of hooks before the
- * handler, `app[method](path, hooks, schema, handler)`.
+ * `app.route(operation, ...middlewares, handler)`, see `OperationForms`;
+ * and the form of 0.3, deprecated: a list of hooks before the handler.
  */
 export interface OperationMethod<
 	Ctx extends object,
 	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
+> extends OperationForms<RouteApp<Method, Ctx, Routes, Prefix, Shortcuts>>,
+		DeprecatedOperationForm<Ctx, Routes, Prefix, Shortcuts> {}
+
+/** The form of `route` that 0.3 had, which the middleware form replaces. */
+export interface DeprecatedOperationForm<
+	Ctx extends object,
+	Routes extends object,
+	Prefix extends string,
+	Shortcuts extends AnyReply,
 > {
 	/**
-	 * A route declared as data — `{ method, path, schema? }`, as an OpenAPI
-	 * code generator writes it — and its handler: the same route as
-	 * `app[method](path, schema, handler)`.
+	 * @deprecated A list of hooks before the handler: give them as
+	 * middlewares, made by `defineMiddleware` —
+	 * `route(operation, ...middlewares, handler)`, see the upgrading guide.
 	 */
-	<
-		const Operation extends RouteOperation,
-		Result extends HandlerResult<OperationSchema<Operation>>,
-	>(
-		operation: CheckedOperation<Prefix, Operation>,
-		handler: (
-			ctx: Context<
-				Ctx,
-				JoinPath<Prefix, Operation['path']>,
-				OperationSchema<Operation>
-			>,
-		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes &
-			RouteEntryOf<
-				Operation['method'],
-				JoinPath<Prefix, Operation['path']>,
-				OperationSchema<Operation>,
-				Result,
-				Shortcuts
-			>,
-		Prefix,
-		Shortcuts
-	>;
-	/** A route declared as data, with a list of hooks before its handler. */
+	// biome-ignore lint/style/useShorthandFunctionType: one overload of `route`, deprecated on its own
 	<
 		const Operation extends RouteOperation,
 		const Hooks extends readonly [] | readonly AnyRouteHook[],
@@ -160,15 +144,37 @@ export interface OperationMethod<
 }
 
 /**
- * What `route(operation, ...rest)` passes `app[method]` after the path: the
- * list of hooks, if any, the operation's schema, then the handler.
+ * What `route(operation, ...rest)` passes `app[method]` after the path. The
+ * form of 0.3, a list of hooks first: the list, the operation's schema, the
+ * handler. Otherwise its options, a `responds` of its responses first, the
+ * middlewares, then a `validate` of its request parts just before the
+ * handler — unless a `validate(operation)` stands among the middlewares.
  */
 export function operationArgs(
 	operation: RouteOperation,
 	rest: readonly unknown[],
 ): unknown[] {
 	const schema = operation.schema ?? {};
-	return Array.isArray(rest[0])
-		? [rest[0], schema, rest[1]]
-		: [schema, rest[0]];
+	if (Array.isArray(rest[0])) return [rest[0], schema, rest[1]];
+	const { params, query, headers, cookies, body, response, ...options } =
+		schema;
+	const parts = Object.fromEntries(
+		Object.entries({ params, query, headers, cookies, body }).filter(
+			([, part]) => part !== undefined,
+		),
+	);
+	const middlewares = rest.slice(0, -1);
+	const placed = middlewares.some((middleware) => {
+		const step = builtinOf(middleware);
+		return step?.kind === 'validate' && step.operation === operation;
+	});
+	return [
+		options,
+		...(response === undefined ? [] : [responds(response as never)]),
+		...middlewares,
+		...(placed || Object.keys(parts).length === 0
+			? []
+			: [validate(parts as never)]),
+		...rest.slice(-1),
+	];
 }

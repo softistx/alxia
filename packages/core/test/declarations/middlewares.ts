@@ -48,3 +48,22 @@ export function middlewares() {
 			message: () => {},
 		});
 }
+
+// A route declared from an operation, with middlewares: it names the
+// operation's implicit `responds` and `validate`, and what they add.
+const putPing = {
+	method: 'PUT',
+	path: '/pings/:id',
+	schema: { body: Ping, response: { 200: Ping }, detail: { summary: 'x' } },
+} as const;
+
+export function operations() {
+	return alxia()
+		.route(putPing, authed, ({ body, reply }) => reply(200, body))
+		.route(
+			{ ...putPing, path: '/checked/:id' } as const,
+			validate(putPing),
+			authed,
+			({ body, reply }) => reply(200, body),
+		);
+}
