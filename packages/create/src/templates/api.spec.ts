@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { rm } from 'node:fs/promises';
+import { cp, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
 import { copyTemplate } from '../copy';
@@ -34,8 +35,9 @@ describe('the api template', () => {
 		);
 		expect(manifest['scripts']).toEqual({
 			dev: 'bun --watch src/server.ts',
-			build: 'bun build src/server.ts --target=bun --outdir=dist',
-			start: 'bun src/server.ts',
+			build:
+				'bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked',
+			start: 'bun dist/server.js',
 			test: 'bun test',
 			typecheck: 'tsc --noEmit',
 		});
@@ -50,7 +52,7 @@ describe('the api template', () => {
 		]);
 	});
 
-	test("its Dockerfile runs the start script's command, as Bun's user, with no build stage", async () => {
+	test("its Dockerfile builds, and runs the start script's command on dist/ alone, as Bun's user, never installing", async () => {
 		const { manifest, files } = await copyTemplate(
 			'api',
 			'my-api',
@@ -59,18 +61,59 @@ describe('the api template', () => {
 		const dockerfile = (await files['Dockerfile']?.text()) ?? '';
 		const scripts = manifest['scripts'] as Record<string, string>;
 		const cmd = JSON.parse(/^CMD (.+)$/m.exec(dockerfile)?.[1] ?? 'null');
-		expect(cmd.join(' ')).toBe(scripts['start']);
-		expect(dockerfile).toContain(
-			'RUN bun install --frozen-lockfile --production',
+		// start's command, and --no-install: no package is fetched at startup.
+		expect(cmd.join(' ')).toBe(
+			scripts['start']?.replace(/^bun /, 'bun --no-install '),
 		);
-		expect(dockerfile).toContain('\nUSER bun\n');
-		expect(dockerfile).not.toContain('bun run build');
-		expect(
-			dockerfile
-				.match(/^FROM .+$/gm)
-				?.every((line) => line.startsWith('FROM oven/bun:1')),
-		).toBe(true);
+		const [build, final] = dockerfile.split(/^(?=FROM )/m).slice(1);
+		expect(build).toStartWith('FROM oven/bun:1 AS build\n');
+		expect(build).toContain('RUN bun install --frozen-lockfile\n');
+		expect(build).toContain('RUN bun run build\n');
+		expect(final).toStartWith('FROM oven/bun:1\n');
+		expect(final?.match(/^COPY .+$/gm)).toEqual([
+			'COPY --from=build /app/dist ./dist',
+		]);
+		expect(final).toContain('\nUSER bun\n');
 	});
+
+	test('bun run build makes a dist/ that answers alone, with no node_modules', async () => {
+		const built = await $`${process.execPath} run build`
+			.cwd(dir)
+			.nothrow()
+			.quiet();
+		expect(built.exitCode).toBe(0);
+		const alone = await mkdtemp(join(tmpdir(), 'alxia-api-dist-'));
+		await cp(join(dir, 'dist'), join(alone, 'dist'), { recursive: true });
+		// --no-install, as the image runs it: Bun would fetch a missing package.
+		const server = Bun.spawn(
+			[process.execPath, '--no-install', 'dist/server.js'],
+			{
+				cwd: alone,
+				env: { PATH: process.env['PATH'] ?? '', PORT: '0' },
+				stdout: 'pipe',
+			},
+		);
+		try {
+			const reader = server.stdout.getReader();
+			let out = '';
+			let url: string | undefined;
+			while (url === undefined) {
+				const { done, value } = await reader.read();
+				if (done) throw new Error(`dist/server.js exited: ${out}`);
+				out += new TextDecoder().decode(value);
+				url = out.match(/listening on (\S+)/)?.[1];
+			}
+			const response = await fetch(new URL('/todos', url), {
+				method: 'POST',
+				headers: { 'content-type': 'application/json', 'x-api-key': 'dev-key' },
+				body: JSON.stringify({ title: 'From dist alone' }),
+			});
+			expect(response.status).toBe(201);
+		} finally {
+			server.kill();
+			await rm(alone, { recursive: true, force: true });
+		}
+	}, 30_000);
 
 	test('its .env.example names each variable the app reads', async () => {
 		const { files } = await copyTemplate('api', 'my-api', await alxiaRanges());

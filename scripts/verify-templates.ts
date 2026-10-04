@@ -27,7 +27,7 @@ import { staleBuilds } from './artifacts/stale';
 import type { Tarball } from './artifacts/tarball';
 import { dockerRuns, dockerServed } from './templates/docker';
 import { startRegistry } from './templates/registry';
-import { served } from './templates/serve';
+import { pageAndAsset, served } from './templates/serve';
 
 interface Check {
 	readonly template: 'api' | 'react-router';
@@ -67,7 +67,7 @@ const CHECKS: readonly Check[] = [
 			'app/root.tsx',
 		],
 		scripts: ['typecheck', 'build'],
-		request: (base) => fetch(`${base}/`),
+		request: pageAndAsset,
 		expected: 200,
 	},
 ];

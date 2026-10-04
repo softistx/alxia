@@ -47,6 +47,11 @@ Nothing scheduled yet.
 
 ### Next release
 
+- **A self-contained build.** `react-router build` bundles every package
+  into `build/server/index.js`, React, React Router and alxia included,
+  so `build/` runs with no `node_modules` and a Docker image copies it
+  alone. Never in dev; `ssr.external` keeps a package external, and
+  `ssr.external: true` every package.
 - **The server is built for Bun.** `alxia()` adds the `bun` export
   condition to the `ssr` environment's conditions and external
   conditions, keeps `bun` and `bun:*` external whichever runtime runs
@@ -55,7 +60,8 @@ Nothing scheduled yet.
   app sets is kept.
 - **A Docker image on Bun.** The guide's Deploying has the multi-stage
   `Dockerfile` on `oven/bun:1` that `@alxia/create`'s template and the
-  example ship, running `bun build/server/index.js` as a non-root user.
+  example ship, running `bun build/server/index.js` as a non-root user,
+  from `build/` alone.
 - **A per-request CSP nonce.** `nonceOf(loadContext)` reads the nonce that
   `@alxia/secure-headers`' `nonce: true`, or a `derive` of the app's own,
   put on the context, so `entry.server.tsx` hands it to `<ServerRouter

@@ -1,11 +1,7 @@
-# Bun builds the app and runs it: build/server/index.js is alxia's server,
-# which runs on Bun. Pinned to Bun 1, the major alxia supports.
-
-# The production dependencies alone, for the final image.
-FROM oven/bun:1 AS production-dependencies
-WORKDIR /app
-COPY package.json bun.lock* bunfig.toml* ./
-RUN bun install --frozen-lockfile --production
+# Bun builds the app, and the image holds build/ alone: alxia's plugin
+# bundles every dependency into build/server/index.js, alxia's server, which
+# runs on Bun with no node_modules. Pinned to Bun 1, the major alxia
+# supports.
 
 # Every dependency, then react-router build: build/client and
 # build/server/index.js.
@@ -16,14 +12,15 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run build
 
-# The build and the production dependencies, run as Bun's own non-root
-# user. The server listens on PORT (3000) and HOST (0.0.0.0).
+# The build, run as Bun's own non-root user with the start script's
+# command, and --no-install: with no node_modules, Bun would otherwise
+# fetch a package the build left out from the registry at startup,
+# where this fails.
+# The server listens on PORT (3000) and HOST (0.0.0.0).
 FROM oven/bun:1
 WORKDIR /app
 ENV NODE_ENV=production
-COPY package.json ./
-COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
 USER bun
 EXPOSE 3000
-CMD ["bun", "build/server/index.js"]
+CMD ["bun", "--no-install", "build/server/index.js"]

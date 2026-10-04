@@ -109,7 +109,7 @@ bun dev
 bun run build
 \`\`\`
 
-The build is production-ready: \`bun run start\` runs \`build/server/index.js\` on Bun.
+The build is production-ready and self-contained: \`bun run start\` runs \`build/server/index.js\` on Bun, with every dependency bundled into it, so \`build/\` needs no \`node_modules\`.
 
 Make sure to deploy the output of \`bun run build\`
 

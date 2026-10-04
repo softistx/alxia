@@ -36,6 +36,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`Module "…" has been externalized for browser compatibility, imported by "…"`](#module--has-been-externalized-for-browser-compatibility-imported-by-)
 - [`error: lockfile had changes, but lockfile is frozen`](#error-lockfile-had-changes-but-lockfile-is-frozen)
 - [`EACCES: permission denied, open '/app/…'`](#eacces-permission-denied-open-app)
+- [`error: Cannot find package '…' from '/app/build/server/index.js'`](#error-cannot-find-package--from-appbuildserverindexjs)
 
 **Types**
 
@@ -674,6 +675,57 @@ VOLUME /data
 ```ts
 const db = new Database('/data/app.sqlite');
 ```
+
+### `error: Cannot find package '…' from '/app/build/server/index.js'`
+
+`bun build/server/index.js`, in the container or from a copy of `build/`
+alone, stops at startup. For a package loaded with `require`, the message
+can read `Cannot find module '…'`. Or it starts, and a request fails with
+`ENOENT: no such file or directory, open '/app/build/…'`.
+
+**When:** the image holds `build/` alone, as the template's `Dockerfile`
+copies it, and the server imports a package that is not inside
+`build/server/index.js`:
+
+- the app keeps it external with `ssr.external`, and the image has no
+  `node_modules`;
+- or the build bundled it, but it reads a file of its own folder at
+  runtime (`new URL('./data.json', import.meta.url)`), or loads a native
+  addon (a `.node` file), neither of which bundling carries along.
+
+The image runs `bun --no-install`: without the flag, Bun finds no
+`node_modules` and fetches the missing package from npm at startup, at
+whatever version npm has, instead of failing.
+
+**Why:** under `react-router build` the plugin bundles every package into
+`build/server/index.js` ([Self-contained](guide.md#self-contained)), so
+the image needs no `node_modules`. What stays outside the file must be
+installed beside it.
+
+**Fix:** keep the package external, and give the image the production
+dependencies:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+	ssr: { external: ['sharp'] },
+	plugins: [reactRouter(), alxia()],
+});
+```
+
+```dockerfile
+# Dockerfile, before the build stage
+FROM oven/bun:1 AS production-dependencies
+WORKDIR /app
+COPY package.json bun.lock* bunfig.toml* ./
+RUN bun install --frozen-lockfile --production
+
+# Dockerfile, in the final stage, beside build/
+COPY --from=production-dependencies /app/node_modules ./node_modules
+```
+
+`grep '^import' build/server/index.js` lists what the build still
+imports: `node:*`, `bun`, `bun:*` and the packages `ssr.external` names.
 
 ## Types
 

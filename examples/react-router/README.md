@@ -166,11 +166,15 @@ targets `esnext`.
 The template's `Dockerfile` builds and runs on Node, which no longer runs
 the app once `start` runs Bun. This one replaces it, the same one
 [`@alxia/create`](https://github.com/softistx/alxia/tree/develop/packages/create)'s
-`react-router` template ships: multi-stage on `oven/bun:1`, the
-production dependencies in a stage of their own, `bun run build` in
-another, and a final image holding `build/` and the production
-`node_modules`, running `bun build/server/index.js` as the image's
-non-root `bun` user. The template's `.dockerignore` is kept.
+`react-router` template ships: multi-stage on `oven/bun:1`, every
+dependency and `bun run build` in a stage of their own, and a final image
+holding `build/` alone, no `node_modules`, running
+`bun --no-install build/server/index.js` as the image's non-root `bun`
+user. The
+plugin bundles every package into `build/server/index.js` under
+`react-router build`, so `build/` needs nothing else
+([Self-contained](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#self-contained)).
+The template's `.dockerignore` is kept.
 
 ```sh
 docker build -t react-router-example .
@@ -179,7 +183,11 @@ docker run -p 3000:3000 react-router-example
 
 Inside alxia's repository the example has no `bun.lock` of its own, the
 workspace's is at the root, so the image resolves the published
-`@alxia/*` versions its `package.json` names. An app of your own commits
+`@alxia/*` versions its `package.json` names. Until
+`@alxia/react-router` 0.4.0, the first whose plugin bundles the build, is
+published, that image's container stops at startup with
+[`Cannot find package '…'`](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#error-cannot-find-package--from-appbuildserverindexjs):
+its `build/` still imports the packages the image does not hold. An app of your own commits
 its `bun.lock`, which the image installs from with `--frozen-lockfile`.
 The package's
 [guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#docker)

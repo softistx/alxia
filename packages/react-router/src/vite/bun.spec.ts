@@ -167,8 +167,8 @@ describe('the ssr environment, as Vite resolves it with the plugin', () => {
 
 /**
  * Two packages that export a `bun` variant before their default one, as a
- * package written for Bun does: one bundled into the server build, one
- * left external, as dependencies are by default.
+ * package written for Bun does: one bundled into the server build, as every
+ * package is, one left external by the app's `ssr.external`.
  */
 async function addBunPackages(root: string) {
 	for (const name of ['bun-inlined', 'bun-external']) {
@@ -220,7 +220,7 @@ export default createServer({
 	return configFile(root, 'bun', (source) =>
 		source.replace(
 			"ssr: { external: ['@alxia/react-router', '@alxia/core'] }",
-			"ssr: { external: ['@alxia/react-router', '@alxia/core'], noExternal: ['bun-inlined'] }",
+			"ssr: { external: ['@alxia/react-router', '@alxia/core', 'bun-external'] }",
 		),
 	);
 }

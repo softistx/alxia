@@ -70,7 +70,7 @@ my-api/
 │   └── server.ts     app.listen(PORT)
 ├── package.json
 ├── tsconfig.json
-├── Dockerfile        the production dependencies and src/, on oven/bun:1
+├── Dockerfile        bun run build, then dist/ alone, on oven/bun:1
 ├── .dockerignore
 ├── .env.example      PORT and API_KEY, for a .env Bun loads
 ├── .gitignore
@@ -139,12 +139,20 @@ The scripts:
 | `bun dev` | `bun --watch src/server.ts`: restarted on every change, on `PORT` or 3000 |
 | `bun test` | the spec |
 | `bun run typecheck` | `tsc --noEmit` |
-| `bun run build` | `bun build src/server.ts --target=bun --outdir=dist`: one file, its dependencies bundled |
-| `bun start` | `bun src/server.ts`: Bun runs the TypeScript as it is, no build first |
+| `bun run build` | `bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked`: one file, its dependencies bundled |
+| `bun start` | `bun dist/server.js`: the build, after `bun run build` |
 
-`build` is for a host that has Bun and no `node_modules`: `dist/server.js`
-holds the dependencies, and runs as `bun dist/server.js`. `start`, `bun dev`
-and the image need no build.
+`start` runs what `build` wrote, as production and the image do:
+
+```sh
+bun run build && bun start
+```
+
+`dist/server.js` holds every dependency, so it runs on a host that has Bun
+and no `node_modules`. It is minified, and `dist/server.js.map` beside it
+is linked from it: Bun reads the map, so a stack trace names the lines of
+`src/`. `bun dev` and `bun test` run the TypeScript as it is, with no
+build.
 
 Bun loads `.env` on every command. `.env.example` names the two variables
 the app reads, `PORT` (3000 by default) and `API_KEY` (`dev-key` by
@@ -227,14 +235,40 @@ image, as the image's non-root `bun` user. The installs are
 `--frozen-lockfile`, from the `bun.lock` the command's `bun install`
 wrote: commit it.
 
+Each one builds in a stage of its own, and the image holds the build
+output alone: no `node_modules`, no sources. The dependencies are inside
+the bundle, so the image is the base image and a few hundred kilobytes to
+a few megabytes. A dependency that cannot be bundled is kept external and
+copied in: see
+[troubleshooting](troubleshooting.md#error-cannot-find-package--from-appdistserverjs).
+
 ### `api`
 
-Two stages: the production dependencies, installed with
-`bun install --frozen-lockfile --production`, then an image with them,
-`package.json` and `src/`, running `bun src/server.ts`, `start`'s command,
-written out so that Bun is the container's process. There is no build
-stage: Bun runs the TypeScript as it is, so a build would only add a
-second, full install and a bundle the image does not need.
+Two stages: every dependency, installed with
+`bun install --frozen-lockfile`, then `bun run build`, which writes
+`dist/server.js` and its source map; then an image with `dist/` alone,
+running `bun --no-install dist/server.js`, `start`'s command with
+Bun's `--no-install` (not create-alxia's option of the same name), so that a package missing from the bundle fails at
+startup rather than being fetched from npm, written out so that Bun
+is the container's process.
+
+```dockerfile
+FROM oven/bun:1 AS build
+WORKDIR /app
+COPY package.json bun.lock* bunfig.toml* ./
+RUN bun install --frozen-lockfile
+COPY . .
+RUN bun run build
+
+FROM oven/bun:1
+WORKDIR /app
+ENV NODE_ENV=production
+COPY --from=build /app/dist ./dist
+USER bun
+EXPOSE 3000
+CMD ["bun", "--no-install", "dist/server.js"]
+```
+
 `.dockerignore` keeps `node_modules`, `dist`, `.env`, the README and the
 specs out of the context.
 
@@ -249,11 +283,15 @@ default is for development.
 
 ### `react-router`
 
-Three stages: the production dependencies, then every dependency and
-`bun run build`, then an image with `build/` and the production
-`node_modules` alone, running `bun build/server/index.js`, `start`'s
-command. `.dockerignore` keeps `node_modules`, `build` and
-`.react-router` out of the context.
+Two stages: every dependency and `bun run build`, then an image with
+`build/` alone, running `bun --no-install build/server/index.js`,
+`start`'s command with `--no-install`.
+`@alxia/react-router`'s plugin bundles every package into
+`build/server/index.js` under `react-router build`, so `build/` needs no
+`node_modules`
+([Self-contained](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#self-contained)).
+`.dockerignore` keeps `node_modules`, `build` and `.react-router` out of
+the context.
 
 ```sh
 cd my-site

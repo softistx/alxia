@@ -154,6 +154,10 @@ server build inside it, into one file:
 - **The client folder is resolved against the built file**: `../client`,
   from React Router's `buildDirectory`, so it is found wherever the
   process starts.
+- **It is self-contained**: every package the server imports, React,
+  React Router and alxia included, is bundled into it
+  ([Self-contained](#self-contained)), so `build/` runs with no
+  `node_modules`.
 
 ```sh
 bun run build
@@ -214,14 +218,16 @@ and `configure`'s hooks run around it.
 
 `build/server/index.js` runs on Bun, and the plugin builds it for Bun,
 with nothing to configure. It adds to Vite's `ssr` environment, under
-`react-router dev` and `react-router build` alike:
+`react-router dev` and `react-router build` alike but for the last row,
+the build's alone:
 
 | option | what the plugin adds | why |
 | --- | --- | --- |
 | `resolve.conditions` | `bun` | a package bundled into the server whose `exports` has a `bun` condition is bundled as its Bun variant |
-| `resolve.externalConditions` | `bun` | a dependency left external is loaded as its Bun variant in dev too, as Bun loads it from the build |
+| `resolve.externalConditions` | `bun` | a dependency left external, as every one is in dev and one the app names in `ssr.external` is in the build, is loaded as its Bun variant, as Bun loads it |
 | `resolve.builtins` | `bun`, and `bun:*` (`bun:sqlite`, `bun:ffi`, …) | Bun's own modules stay imports of the build, whichever runtime runs Vite. Vite knows `bun:*`, and bare `bun` only when it runs on Bun |
 | `build.target` | `esnext` | the newest syntax is left as written: Bun runs it, and Vite's default targets browsers |
+| `resolve.noExternal` | `true`, under `react-router build` only | every package is bundled into `build/server/index.js`, so `build/` runs with no `node_modules` ([Self-contained](#self-contained)) |
 
 A package written for Bun, then, gives the build the variant Bun would
 load, and Bun's own modules are used as they are:
@@ -292,6 +298,60 @@ export default defineConfig({
 
 `ssr.resolve.conditions` at the top level is the same option, and is kept
 the same way.
+
+### Self-contained
+
+Under `react-router build`, the plugin sets `resolve.noExternal: true` on
+the `ssr` environment: Vite bundles every package the server imports into
+`build/server/index.js`, where it would otherwise leave each one under
+`node_modules` as an `import`. What the file still imports is Node's and
+Bun's own modules:
+
+```js
+// build/server/index.js, its imports
+import { createRequire } from "node:module";
+import { PassThrough } from "node:stream";
+// … and no "react", "react-router" or "@alxia/core"
+```
+
+So `build/` is all a server needs, beside Bun: a Docker image's last
+stage copies it alone ([Docker](#docker)). React and `react-dom/server`,
+React Router, alxia and its plugins bundle as they are, CommonJS included;
+the `bun` condition above picks each package's Bun variant. One copy of
+each package is in the file, so `alxiaContext` and the app's own keys are
+one object for the server and the routes. React Router's prerendering and
+`vite preview` load the same file.
+
+`react-router dev` is left as it was: Vite's SSR runner loads the
+packages from `node_modules`.
+
+What the app sets wins. Vite reads `external` before `noExternal`:
+
+- **`ssr.external: ['sharp']`**, or the same on
+  `environments.ssr.resolve.external`, keeps those packages external,
+  imported from `node_modules` at runtime. Use it for a package that
+  cannot be bundled: a native addon (a `.node` file), or one that reads
+  files of its own folder at runtime. The image must then hold that
+  package ([Docker](#docker)).
+- **`ssr.external: true`** keeps every package external, Vite's own
+  behaviour: the plugin adds no `noExternal` then, and the server needs
+  the production `node_modules` beside `build/`.
+- **`ssr.noExternal`**, a list, changes nothing: everything is bundled
+  already.
+
+```ts
+// vite.config.ts
+export default defineConfig({
+	// Bundled but for sharp, a native addon.
+	ssr: { external: ['sharp'] },
+	plugins: [reactRouter(), alxia()],
+});
+```
+
+A package the build could not bundle and was not told to leave external
+fails at runtime, from `build/` alone, with Bun's
+`Cannot find package '…'`: see
+[the troubleshooting entry](troubleshooting.md#error-cannot-find-package--from-appbuildserverindexjs).
 
 ## Customising the server
 
@@ -1013,9 +1073,10 @@ is `POST /?index`, not `POST /`.
 
 ## Deploying
 
-Run `bun run build`, then `bun build/server/index.js` beside the project's
-production `node_modules`: the build imports `react`, `react-router` and
-alxia from them, as any React Router server build does.
+Run `bun run build`, then `bun build/server/index.js`. The build is
+[self-contained](#self-contained): `build/` is all the server needs, with
+no `node_modules`, unless the app keeps a package external with
+`ssr.external`.
 
 ### Docker
 
@@ -1027,14 +1088,10 @@ ship this `Dockerfile`, on Bun's official image. For an app started from
 on Node:
 
 ```dockerfile
-# Bun builds the app and runs it: build/server/index.js is alxia's server,
-# which runs on Bun. Pinned to Bun 1, the major alxia supports.
-
-# The production dependencies alone, for the final image.
-FROM oven/bun:1 AS production-dependencies
-WORKDIR /app
-COPY package.json bun.lock* bunfig.toml* ./
-RUN bun install --frozen-lockfile --production
+# Bun builds the app, and the image holds build/ alone: alxia's plugin
+# bundles every dependency into build/server/index.js, alxia's server, which
+# runs on Bun with no node_modules. Pinned to Bun 1, the major alxia
+# supports.
 
 # Every dependency, then react-router build: build/client and
 # build/server/index.js.
@@ -1045,17 +1102,18 @@ RUN bun install --frozen-lockfile
 COPY . .
 RUN bun run build
 
-# The build and the production dependencies, run as Bun's own non-root
-# user. The server listens on PORT (3000) and HOST (0.0.0.0).
+# The build, run as Bun's own non-root user with the start script's
+# command, and --no-install: with no node_modules, Bun would otherwise
+# fetch a package the build left out from the registry at startup,
+# where this fails.
+# The server listens on PORT (3000) and HOST (0.0.0.0).
 FROM oven/bun:1
 WORKDIR /app
 ENV NODE_ENV=production
-COPY package.json ./
-COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
 USER bun
 EXPOSE 3000
-CMD ["bun", "build/server/index.js"]
+CMD ["bun", "--no-install", "build/server/index.js"]
 ```
 
 ```sh
@@ -1067,7 +1125,9 @@ Keep the template's `.dockerignore` beside it: `node_modules`, `build` and
 `.react-router` stay out of the context, so the image installs and builds
 its own. The `bunfig.toml` goes in, and `bun run build` runs React
 Router's CLI on Bun, as it does outside Docker. The image's command is
-`start`'s, run directly, so the platform's `SIGTERM` reaches the server.
+`start`'s, run directly, so the platform's `SIGTERM` reaches the server,
+with `--no-install`: a package missing from `build/` then fails at
+startup, where Bun would otherwise fetch it from npm.
 
 - **Commit `bun.lock`.** The installs are `--frozen-lockfile`: the image
   gets the versions you tested, and a `package.json` changed without a
@@ -1076,6 +1136,25 @@ Router's CLI on Bun, as it does outside Docker. The image's command is
 - **The server runs as `bun`**, a user with no write access to `/app`.
   Write files to a volume the user owns
   ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#eacces-permission-denied-open-app)).
+- **The image holds `build/` alone**, no `node_modules`: the build is
+  [self-contained](#self-contained). An app that keeps a package external
+  with `ssr.external` copies the production dependencies too, from a
+  stage of their own:
+
+  ```dockerfile
+  # Before the build stage: the production dependencies alone.
+  FROM oven/bun:1 AS production-dependencies
+  WORKDIR /app
+  COPY package.json bun.lock* bunfig.toml* ./
+  RUN bun install --frozen-lockfile --production
+
+  # In the final stage, beside build/.
+  COPY --from=production-dependencies /app/node_modules ./node_modules
+  ```
+
+  Without it, the container stops at startup with
+  `Cannot find package '…'`
+  ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#error-cannot-find-package--from-appbuildserverindexjs)).
 
 `PORT` and `HOST` set where the server listens. The platform's `SIGTERM`
 stops it once the requests in flight are answered, and runs the app's

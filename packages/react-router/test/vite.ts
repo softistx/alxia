@@ -76,7 +76,13 @@ export async function build(
 /** `bun build/server/index.js` on a free port, once it printed `<who> listening on <url>`. */
 export async function start(root: string, who: string) {
 	const child = Bun.spawn(
-		[process.execPath, join(root, 'build', 'server', 'index.js')],
+		// --no-install, as the image runs it: with no node_modules above it, Bun
+		// would fetch a package the build left out instead of failing.
+		[
+			process.execPath,
+			'--no-install',
+			join(root, 'build', 'server', 'index.js'),
+		],
 		{
 			cwd: root,
 			env: { ...process.env, PORT: '0', HOST: '127.0.0.1' },

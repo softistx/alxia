@@ -33,6 +33,8 @@ export async function dockerServed(
 			.cwd(dir)
 			.nothrow();
 	if (built.exitCode !== 0) return -1;
+	// The image's size, in the log: what a change to the Dockerfile costs.
+	await $`docker images ${tag} --format ${'{{.Repository}} {{.Size}}'}`.nothrow();
 	const port = freePort();
 	const name = `${tag}-${port}`;
 	try {

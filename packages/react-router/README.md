@@ -288,7 +288,9 @@ build, it adds:
   bundled, and loaded in dev, as that variant;
 - `bun` and `bun:*` to `resolve.builtins`: Bun's own modules stay imports
   of `build/server/index.js`;
-- `build.target: 'esnext'`, where Vite's default targets browsers.
+- `build.target: 'esnext'`, where Vite's default targets browsers;
+- in the build only, `resolve.noExternal: true`: every package is bundled
+  into `build/server/index.js`, so `build/` runs with no `node_modules`.
 
 ```ts
 // app/server.ts: Bun's modules, bundled as they are
@@ -308,7 +310,19 @@ export default createServer({
 What the app sets wins: its own conditions and builtins are kept, `bun` is
 added beside them, and a `build.target` it set is left as it is.
 `ssr.target` stays `node`, and no polyfill is added; an app that sets
-`ssr.target: 'webworker'` itself gets none of this, only Vite's defaults. The
+`ssr.target: 'webworker'` itself gets none of this, only Vite's defaults.
+A package that cannot be bundled, a native addon, stays external when the
+app names it, and every package does with `ssr.external: true`:
+
+```ts
+// vite.config.ts: sharp imported from node_modules at runtime
+export default defineConfig({
+	ssr: { external: ['sharp'] },
+	plugins: [reactRouter(), alxia()],
+});
+```
+
+The
 [guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#built-for-bun)
 has each option and why.
 
@@ -316,14 +330,10 @@ has each option and why.
 
 A multi-stage `Dockerfile` on Bun's official image, as `@alxia/create`'s
 `react-router` template ships it. For an app from `create-react-router`,
-it replaces the template's, which runs on Node:
+it replaces the template's, which runs on Node. The build is
+self-contained, so the image holds `build/` alone, no `node_modules`:
 
 ```dockerfile
-FROM oven/bun:1 AS production-dependencies
-WORKDIR /app
-COPY package.json bun.lock* bunfig.toml* ./
-RUN bun install --frozen-lockfile --production
-
 FROM oven/bun:1 AS build
 WORKDIR /app
 COPY package.json bun.lock* bunfig.toml* ./
@@ -334,12 +344,10 @@ RUN bun run build
 FROM oven/bun:1
 WORKDIR /app
 ENV NODE_ENV=production
-COPY package.json ./
-COPY --from=production-dependencies /app/node_modules ./node_modules
 COPY --from=build /app/build ./build
 USER bun
 EXPOSE 3000
-CMD ["bun", "build/server/index.js"]
+CMD ["bun", "--no-install", "build/server/index.js"]
 ```
 
 ```sh
@@ -350,7 +358,7 @@ docker run -p 3000:3000 my-app
 Keep the template's `.dockerignore`, and commit `bun.lock`. The server
 runs as the non-root `bun` user, on `PORT` (3000). The
 [guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#docker)
-has the commented file.
+has the commented file, and what to copy for a package left external.
 
 ## Traps
 

@@ -54,7 +54,7 @@ export function toBun(readme: string): string {
 		.replace(/^.*package-lock\.json.*$/m, '├── bun.lock')
 		.replace(
 			"If you're familiar with deploying Node applications, the built-in app server is production-ready.",
-			'The build is production-ready: `bun run start` runs `build/server/index.js` on Bun.',
+			'The build is production-ready and self-contained: `bun run start` runs `build/server/index.js` on Bun, with every dependency bundled into it, so `build/` needs no `node_modules`.',
 		)
 		.replaceAll('npm install', 'bun install')
 		.replaceAll('npm run dev', 'bun dev')

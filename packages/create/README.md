@@ -54,12 +54,15 @@ export const app = alxia()
 ## Docker
 
 Both projects build into an image as they are written, on `oven/bun:1`,
-the image running the app as the non-root `bun` user:
+the image running the app as the non-root `bun` user. Each `Dockerfile`
+builds in a stage of its own, and the image holds the build output alone,
+no `node_modules`:
 
-- `api`: the production dependencies, then `src/server.ts` run as it is.
-  Bun runs TypeScript, so there is no build stage.
-- `react-router`: the production dependencies, then `bun run build`, then
-  `bun build/server/index.js`.
+- `api`: `bun run build` bundles `src/server.ts` and its dependencies into
+  `dist/server.js`; the image holds `dist/` and runs `bun --no-install dist/server.js`.
+- `react-router`: `bun run build`, every dependency bundled into
+  `build/server/index.js` by `@alxia/react-router`'s plugin; the image
+  holds `build/` and runs `bun --no-install build/server/index.js`.
 
 ```sh
 cd my-api
@@ -76,7 +79,9 @@ docker run -p 3000:3000 my-site
 Commit the `bun.lock` that `bun install` wrote: the image installs from it
 with `--frozen-lockfile`. The
 [guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#docker)
-has the stages.
+has the stages, and
+[troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md#error-cannot-find-package--from-appdistserverjs)
+what to do for a dependency that cannot be bundled.
 
 ## Options
 

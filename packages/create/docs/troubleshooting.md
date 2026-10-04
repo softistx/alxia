@@ -36,6 +36,8 @@ nothing — the symptom.
 **After**
 
 - [`error: lockfile had changes, but lockfile is frozen`](#error-lockfile-had-changes-but-lockfile-is-frozen)
+- [`error: Module not found "dist/server.js"`](#error-module-not-found-distserverjs)
+- [`error: Cannot find package '…' from '/app/dist/server.js'`](#error-cannot-find-package--from-appdistserverjs)
 - [The project's `@alxia/*` are older than npm's latest](#the-projects-alxia-are-older-than-npms-latest)
 
 ## Before it runs
@@ -242,8 +244,7 @@ project is complete; only `node_modules` is missing.
 ### `error: lockfile had changes, but lockfile is frozen`
 
 **When:** `docker build` in a project stops at
-`RUN bun install --frozen-lockfile` (`react-router`) or
-`RUN bun install --frozen-lockfile --production` (`api`).
+`RUN bun install --frozen-lockfile`.
 
 **Why:** the project's `Dockerfile` installs exactly what `bun.lock`
 records, and `package.json` now asks for something it does not: a
@@ -253,6 +254,76 @@ behind in a clone where `package.json` moved on without it.
 **Fix:** run `bun install`, commit `bun.lock`, and build again. The other
 traps of the `react-router` image, a write refused to the `bun` user among them, are in
 [`@alxia/react-router`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#eacces-permission-denied-open-app).
+
+### `error: Module not found "dist/server.js"`
+
+**When:** `bun start` in an `api` project that was never built, or whose
+`dist/` was deleted.
+
+**Why:** `start` runs the build, `bun dist/server.js`, as the image does;
+it no longer runs `src/server.ts`. `bun dev` runs the sources.
+
+**Fix:** build first:
+
+```sh
+bun run build && bun start
+```
+
+### `error: Cannot find package '…' from '/app/dist/server.js'`
+
+The container stops at startup; in the `react-router` image the path is
+`/app/build/server/index.js`. For a package loaded with `require`, Bun
+writes `Cannot find module '…'`. Or the server starts and a request fails
+with `ENOENT: no such file or directory`.
+
+**When:** the image holds the build alone, `dist/` or `build/`, as the
+`Dockerfile` copies it, and a dependency is not inside the bundle: one
+the build was told to leave external, or one that cannot be bundled, a
+native addon (a `.node` file) or a package that reads files of its own
+folder at runtime.
+
+The image runs `bun --no-install`, Bun's flag, not create-alxia's
+option of the same name: without the flag, Bun finds no
+`node_modules` and fetches the missing package from npm at startup, at
+whatever version npm has, instead of failing.
+
+**Why:** the image has no `node_modules`. `bun run build` bundles every
+dependency into one file, and only what it leaves out must be installed
+beside it.
+
+**Fix:** mark the package external, and give the image the production
+dependencies. In `api`, in the `build` script:
+
+```json
+"build": "bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked --external sharp"
+```
+
+In `react-router`, in `vite.config.ts`:
+
+```ts
+export default defineConfig({
+	ssr: { external: ['sharp'] },
+	plugins: [tailwindcss(), reactRouter(), alxia()],
+});
+```
+
+Then in the `Dockerfile`, a stage for the production dependencies, copied
+beside the build:
+
+```dockerfile
+# Before the build stage.
+FROM oven/bun:1 AS production-dependencies
+WORKDIR /app
+COPY package.json bun.lock* bunfig.toml* ./
+RUN bun install --frozen-lockfile --production
+
+# In the final stage, before USER bun.
+COPY --from=production-dependencies /app/node_modules ./node_modules
+```
+
+`grep '^import' dist/server.js` (or `build/server/index.js`) lists what
+the bundle still imports: Node's and Bun's modules, and the packages left
+external.
 
 ### The project's `@alxia/*` are older than npm's latest
 
