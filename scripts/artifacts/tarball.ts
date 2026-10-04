@@ -82,7 +82,9 @@ export const TEST_CODE =
  * does not emit and `files` does not list. So no tarball holds any today, and
  * this holds the day that stops being true: a `<subject>.fixtures.ts` would
  * be emitted as a `.d.ts`, a published module importing `bun:test`, or a
- * sibling's source that is not in the tarball.
+ * sibling's source that is not in the tarball. A `templates/` folder is not
+ * the package's code but projects it writes, whose specs are theirs:
+ * `@alxia/create`'s `api` template ships `src/app.spec.ts` to copy.
  */
 export function testCodeProblems(
 	manifest: Record<string, unknown>,
@@ -90,6 +92,6 @@ export function testCodeProblems(
 ): string[] {
 	return entries
 		.map((path) => path.replace(/^package\//, ''))
-		.filter((path) => TEST_CODE.test(path))
+		.filter((path) => !path.startsWith('templates/') && TEST_CODE.test(path))
 		.map((path) => `${manifest.name}: the tarball ships test code: ${path}`);
 }

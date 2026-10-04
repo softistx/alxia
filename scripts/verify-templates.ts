@@ -1,7 +1,8 @@
 /**
  * Runs `bun create @alxia` as a user would, from the packed tarballs, for
  * each template, then proves the project it wrote works: it installs, its
- * `typecheck`, `test` and `build` pass, and its production server answers.
+ * `typecheck`, `test` and `build` pass, its production server answers, and,
+ * where a Docker daemon answers, so does the image its `Dockerfile` builds.
  *
  * Every package is packed, and served by a registry on localhost that passes
  * every other request to npm's (`templates/registry.ts`). Bun is pointed at
@@ -34,6 +35,23 @@ function freePort(): number {
 	return port;
 }
 
+/** What `request` answers on `port` within 20 seconds, or 0. */
+async function answered(
+	port: number,
+	request: (base: string) => Promise<Response>,
+): Promise<number> {
+	const deadline = Date.now() + 20_000;
+	while (Date.now() < deadline) {
+		const status = await request(`http://localhost:${port}`).then(
+			(response) => response.status,
+			() => undefined,
+		);
+		if (status !== undefined) return status;
+		await Bun.sleep(250);
+	}
+	return 0;
+}
+
 /** Starts `bun run start` in `dir` and resolves to what `request` answers. */
 async function served(
 	dir: string,
@@ -48,19 +66,54 @@ async function served(
 		stderr: 'inherit',
 	});
 	try {
-		const deadline = Date.now() + 20_000;
-		while (Date.now() < deadline) {
-			const status = await request(`http://localhost:${port}`).then(
-				(response) => response.status,
-				() => undefined,
-			);
-			if (status !== undefined) return status;
-			await Bun.sleep(250);
-		}
-		return 0;
+		return await answered(port, request);
 	} finally {
 		server.kill();
 		await server.exited;
+	}
+}
+
+/** Whether a Docker daemon answers: CI's ubuntu runners have one. */
+async function dockerRuns(): Promise<boolean> {
+	const info = await $`docker info --format {{.ServerVersion}}`
+		.nothrow()
+		.quiet();
+	return info.exitCode === 0;
+}
+
+/**
+ * Builds the project's `Dockerfile`, runs the image and resolves to what
+ * `request` answers from the container. `bun.lock` names the packed
+ * tarballs on the registry at localhost, which is not the build's: it is
+ * pointed at the host as `host.docker.internal` first, which Docker Desktop
+ * resolves and `--add-host` maps on Linux. The registry listens on every
+ * interface.
+ */
+async function dockerServed(
+	dir: string,
+	tag: string,
+	registryUrl: string,
+	request: (base: string) => Promise<Response>,
+): Promise<number> {
+	const lock = Bun.file(join(dir, 'bun.lock'));
+	const host = registryUrl.replace('//localhost:', '//host.docker.internal:');
+	await Bun.write(lock, (await lock.text()).replaceAll(registryUrl, host));
+	const built =
+		await $`docker build --add-host=host.docker.internal:host-gateway -t ${tag} .`
+			.cwd(dir)
+			.nothrow();
+	if (built.exitCode !== 0) return -1;
+	const port = freePort();
+	const name = `${tag}-${port}`;
+	try {
+		const ran =
+			await $`docker run -d --rm --name ${name} -p ${port}:3000 ${tag}`.nothrow();
+		if (ran.exitCode !== 0) return -1;
+		return await answered(port, request);
+	} finally {
+		await $`docker logs ${name}`.nothrow();
+		await $`docker rm -f ${name}`.nothrow().quiet();
+		await $`docker rmi ${tag}`.nothrow().quiet();
 	}
 }
 
@@ -76,7 +129,13 @@ interface Check {
 const CHECKS: readonly Check[] = [
 	{
 		template: 'api',
-		files: ['.gitignore', 'src/app.ts'],
+		files: [
+			'.gitignore',
+			'.dockerignore',
+			'.env.example',
+			'Dockerfile',
+			'src/app.ts',
+		],
 		scripts: ['typecheck', 'test', 'build'],
 		request: (base) =>
 			fetch(`${base}/todos`, {
@@ -88,7 +147,13 @@ const CHECKS: readonly Check[] = [
 	},
 	{
 		template: 'react-router',
-		files: ['.gitignore', 'bunfig.toml', 'vite.config.ts', 'app/root.tsx'],
+		files: [
+			'.gitignore',
+			'bunfig.toml',
+			'Dockerfile',
+			'vite.config.ts',
+			'app/root.tsx',
+		],
 		scripts: ['typecheck', 'build'],
 		request: (base) => fetch(`${base}/`),
 		expected: 200,
@@ -103,19 +168,40 @@ function report(passed: boolean, what: string): boolean {
 
 /**
  * `bun publish` leaves every `.gitignore` and `bunfig.toml` out of a
- * tarball, so the `react-router` template ships them as `gitignore` and
- * `_bunfig.toml`, renamed when it is copied.
+ * tarball, so the templates ship them as `gitignore` and `_bunfig.toml`,
+ * renamed when they are copied.
  */
+const SHIPPED: Readonly<Record<Check['template'], readonly string[]>> = {
+	api: [
+		'gitignore',
+		'.dockerignore',
+		'.env.example',
+		'Dockerfile',
+		'package.json',
+		'src/app.ts',
+	],
+	'react-router': [
+		'gitignore',
+		'_bunfig.toml',
+		'.dockerignore',
+		'Dockerfile',
+		'package.json',
+		'vite.config.ts',
+	],
+};
+
 function templateShipped(tarballs: readonly Tarball[]): boolean {
 	const create = tarballs.find(
 		({ manifest }) => manifest['name'] === '@alxia/create',
 	);
 	const entries = create?.entries ?? [];
-	return report(
-		['gitignore', '_bunfig.toml', 'package.json', 'vite.config.ts'].every(
-			(file) => entries.includes(`package/templates/react-router/${file}`),
+	return Object.entries(SHIPPED).every(([template, files]) =>
+		report(
+			files.every((file) =>
+				entries.includes(`package/templates/${template}/${file}`),
+			),
+			`@alxia/create's tarball holds templates/${template}: ${files.join(', ')}`,
 		),
-		"@alxia/create's tarball holds templates/react-router, gitignore and _bunfig.toml included",
 	);
 }
 
@@ -139,6 +225,7 @@ async function templateWorks(
 	workdir: string,
 	env: Record<string, string>,
 	registryUrl: string,
+	docker: boolean,
 ): Promise<boolean> {
 	const name = `my-${check.template}`;
 	const dir = join(workdir, name);
@@ -178,10 +265,23 @@ async function templateWorks(
 		);
 	}
 	const status = await served(dir, env, check.request);
-	return (
+	ok =
 		report(
 			status === check.expected,
 			`${check.template}: bun run start answered ${status}, expected ${check.expected}`,
+		) && ok;
+	if (!docker) return ok;
+	console.log(`\n=== ${check.template}: docker build, docker run\n`);
+	const contained = await dockerServed(
+		dir,
+		`alxia-template-${check.template}`,
+		registryUrl,
+		check.request,
+	);
+	return (
+		report(
+			contained === check.expected,
+			`${check.template}: its Docker image answered ${contained}, expected ${check.expected}`,
 		) && ok
 	);
 }
@@ -216,8 +316,11 @@ async function main(): Promise<boolean> {
 	try {
 		let ok = templateShipped(packed.tarballs);
 		ok = (await helpRuns(workdir, env)) && ok;
+		const docker = await dockerRuns();
+		if (!docker) console.log('skip docker build: no Docker daemon answers');
 		for (const check of CHECKS) {
-			ok = (await templateWorks(check, workdir, env, registry.url)) && ok;
+			ok =
+				(await templateWorks(check, workdir, env, registry.url, docker)) && ok;
 		}
 		return ok;
 	} finally {

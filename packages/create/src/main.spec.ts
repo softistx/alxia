@@ -130,7 +130,10 @@ describe('create-alxia', () => {
 		expect(await main([], root, io)).toBe(0);
 		const dir = join(root, 'my-api');
 		expect((await readdir(dir)).sort()).toEqual([
+			'.dockerignore',
+			'.env.example',
 			'.gitignore',
+			'Dockerfile',
 			'README.md',
 			'package.json',
 			'src',

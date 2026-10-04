@@ -30,6 +30,15 @@ Nothing scheduled yet.
 
 ### Next release
 
+- **The `api` template is files, copied, with a `Dockerfile`.** It ships
+  under `templates/api/` and is copied as `react-router`'s is. New in it:
+  a `Dockerfile` on `oven/bun:1` that installs the production
+  dependencies and runs `src/server.ts` as the non-root `bun` user,
+  `.dockerignore`, `.env.example`, and `start` running the source with no
+  build first.
+
+### 0.1.1
+
 - **The `react-router` template's `Dockerfile` runs on Bun.** It replaces
   React Router's Node one: multi-stage on `oven/bun:1`, the production
   dependencies apart, `bun run build`, then `bun build/server/index.js` as

@@ -89,6 +89,15 @@ describe('testCodeProblems', () => {
 		]);
 	});
 
+	test("allows a template's spec: a project the package writes, not its own code", () => {
+		expect(
+			testCodeProblems(x, [
+				'package/templates/api/src/app.spec.ts',
+				'package/src/templates/api.spec.ts',
+			]),
+		).toEqual(['x: the tarball ships test code: src/templates/api.spec.ts']);
+	});
+
 	test('allows a plain fixtures file: a package may ship one on purpose', () => {
 		expect(
 			testCodeProblems(x, [

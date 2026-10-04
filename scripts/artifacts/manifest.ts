@@ -43,7 +43,8 @@ import { type Tarball, tarballProblems } from './tarball';
  *     matches nothing, so a `docs` folder renamed or a mistyped entry would
  *     publish without a word.
  *   - **test code**: a `*.spec.*`, a `*.test.*`, a snapshot, or a
- *     `<subject>.fixtures.*` file.
+ *     `<subject>.fixtures.*` file, outside a `templates/` folder, whose
+ *     files are the projects a package writes.
  *   - a **`workspace:` range left in the packed manifest**, devDependencies
  *     included: `bun pm pack` rewrites each to the sibling's version, and
  *     `@alxia/create` reads its devDependencies at runtime as the versions of

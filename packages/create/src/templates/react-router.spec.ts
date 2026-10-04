@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { fileURLToPath } from 'node:url';
+import { copyTemplate, RENAMED } from '../copy';
 import { PEER_RANGES } from '../versions';
-import { RENAMED, reactRouterTemplate } from './react-router';
 
 const TEMPLATE = fileURLToPath(
 	new URL('../../templates/react-router', import.meta.url),
@@ -30,36 +30,6 @@ describe('the stored template', () => {
 		});
 	}
 
-	test('holds no lockfile, no generated types, nothing bun publish would drop', async () => {
-		const paths = await Array.fromAsync(
-			new Bun.Glob('**').scan({ cwd: TEMPLATE, dot: true }),
-		);
-		expect(paths).toEqual(expect.arrayContaining(Object.keys(RENAMED)));
-		for (const path of paths) {
-			expect(path).not.toMatch(
-				/(^|\/)(\.gitignore|bunfig\.toml|\.npmrc|bun\.lockb?|package-lock\.json)$|(^|\/)(\.react-router|node_modules|build)\//,
-			);
-		}
-	});
-
-	test('names no other package manager: its README, Dockerfile and scripts run Bun', async () => {
-		const other = /(^|[\s`(])(npm|npx|pnpm|yarn) /m;
-		const { scripts } = await stored('package.json').json();
-		for (const [where, text] of [
-			['README.md', await stored('README.md').text()],
-			['Dockerfile', await stored('Dockerfile').text()],
-			['package.json scripts', Object.values(scripts).join('\n')],
-		] as const) {
-			expect({ where, match: text.match(other)?.[0] ?? null }).toEqual({
-				where,
-				match: null,
-			});
-		}
-		expect(await stored('Dockerfile').text()).toContain(
-			'RUN bun install --frozen-lockfile',
-		);
-	});
-
 	test('its React Router is the major @alxia/react-router accepts', async () => {
 		const { dependencies, devDependencies } =
 			await stored('package.json').json();
@@ -77,9 +47,9 @@ describe('the stored template', () => {
 	});
 });
 
-describe('reactRouterTemplate', () => {
+describe("copyTemplate('react-router')", () => {
 	test("names the manifest, gives alxia's packages their ranges, and starts the build on Bun", async () => {
-		const { manifest } = await reactRouterTemplate(TEMPLATE, 'web', ALXIA);
+		const { manifest } = await copyTemplate('react-router', 'web', ALXIA);
 		expect(manifest['name']).toBe('web');
 		expect(manifest['scripts']).toEqual({
 			build: 'react-router build',
@@ -96,7 +66,7 @@ describe('reactRouterTemplate', () => {
 	});
 
 	test('every other file as stored, gitignore as .gitignore and _bunfig.toml as bunfig.toml', async () => {
-		const { files } = await reactRouterTemplate(TEMPLATE, 'web', ALXIA);
+		const { files } = await copyTemplate('react-router', 'web', ALXIA);
 		const paths = Object.keys(files);
 		expect(paths).not.toContain('gitignore');
 		expect(paths).not.toContain('_bunfig.toml');

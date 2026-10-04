@@ -228,8 +228,9 @@ project is complete; only `node_modules` is missing.
 
 ### `error: lockfile had changes, but lockfile is frozen`
 
-**When:** `docker build` in a `react-router` project stops at
-`RUN bun install --frozen-lockfile`.
+**When:** `docker build` in a project stops at
+`RUN bun install --frozen-lockfile` (`react-router`) or
+`RUN bun install --frozen-lockfile --production` (`api`).
 
 **Why:** the project's `Dockerfile` installs exactly what `bun.lock`
 records, and `package.json` now asks for something it does not: a
@@ -237,7 +238,7 @@ dependency added or changed by hand, without `bun install`, or a `bun.lock` left
 behind in a clone where `package.json` moved on without it.
 
 **Fix:** run `bun install`, commit `bun.lock`, and build again. The other
-traps of the image, a write refused to the `bun` user among them, are in
+traps of the `react-router` image, a write refused to the `bun` user among them, are in
 [`@alxia/react-router`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#eacces-permission-denied-open-app).
 
 ### The project's `@alxia/*` are older than npm's latest
