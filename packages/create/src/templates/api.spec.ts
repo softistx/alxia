@@ -22,7 +22,10 @@ beforeAll(async () => {
 	for (const [file, content] of Object.entries(files)) {
 		await Bun.write(join(dir, file), content);
 	}
-	await Bun.write(join(dir, 'package.json'), JSON.stringify(manifest, null, 2));
+	await Bun.write(
+		join(dir, 'package.json'),
+		`${JSON.stringify(manifest, null, 2)}\n`,
+	);
 });
 afterAll(() => rm(dir, { recursive: true, force: true }));
 
@@ -40,6 +43,11 @@ describe('the api template', () => {
 			start: 'bun dist/server.js',
 			test: 'bun test',
 			typecheck: 'tsc --noEmit',
+			lint: 'biome lint',
+			format: 'biome format --write',
+			check: 'biome check --write',
+			'check:ci': 'biome ci',
+			verify: 'bun run check:ci && bun run typecheck && bun run test',
 		});
 		expect(Object.keys(manifest.dependencies ?? {})).toEqual([
 			'@alxia/core',
@@ -47,6 +55,7 @@ describe('the api template', () => {
 		]);
 		expect(Object.keys(manifest.devDependencies ?? {})).toEqual([
 			'@alxia/client',
+			'@biomejs/biome',
 			'@types/bun',
 			'typescript',
 		]);
@@ -119,6 +128,19 @@ describe('the api template', () => {
 		}
 	}, 30_000);
 
+	test('bun run check:ci passes on the project and its build: no error, warning or info', async () => {
+		// After the build test: dist/ is there, minified, and must be skipped.
+		expect(await Bun.file(join(dir, 'dist/server.js')).exists()).toBe(true);
+		const result = await $`${process.execPath} run check:ci --colors=off`
+			.cwd(dir)
+			.nothrow()
+			.quiet();
+		const output = `${result.stdout}${result.stderr}`;
+		expect(output).not.toMatch(/Found \d+ (error|warning|info)/);
+		expect(output).toMatch(/Checked \d+ files/);
+		expect(result.exitCode).toBe(0);
+	});
+
 	test('its .env.example names each variable the app reads', async () => {
 		const { files } = await copyTemplate('api', 'my-api', await alxiaRanges());
 		const example = (await files['.env.example']?.text()) ?? '';
@@ -126,7 +148,7 @@ describe('the api template', () => {
 			(await files['src/app.ts']?.text()) ?? '',
 			(await files['src/server.ts']?.text()) ?? '',
 		].join('\n');
-		const read = [...source.matchAll(/Bun\.env\['(\w+)'\]/g)].map(
+		const read = [...source.matchAll(/Bun\.env\["(\w+)"\]/g)].map(
 			([, name]) => name,
 		);
 		expect(read.sort()).toEqual(['API_KEY', 'PORT']);

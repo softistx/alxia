@@ -1,25 +1,25 @@
 {
-	"compilerOptions": {
-		"types": ["bun"],
-		"lib": ["ESNext", "DOM"],
-		"target": "ESNext",
-		"module": "ESNext",
-		"moduleDetection": "force",
-		"moduleResolution": "bundler",
-		"verbatimModuleSyntax": true,
-		"noEmit": true,
-		"skipLibCheck": true,
-		"resolveJsonModule": true,
-		"strict": true,
-		"noImplicitOverride": true,
-		"noImplicitReturns": true,
-		"noFallthroughCasesInSwitch": true,
-		"noUncheckedIndexedAccess": true,
-		"exactOptionalPropertyTypes": true,
-		"noPropertyAccessFromIndexSignature": true,
-		"noUnusedLocals": true,
-		"noUnusedParameters": true,
-		"forceConsistentCasingInFileNames": true
-	},
-	"include": ["src"]
+  "compilerOptions": {
+    "types": ["bun"],
+    "lib": ["ESNext", "DOM"],
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "verbatimModuleSyntax": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "noImplicitOverride": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": ["src"]
 }

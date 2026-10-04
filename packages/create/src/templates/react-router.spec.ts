@@ -1,5 +1,8 @@
-import { describe, expect, test } from 'bun:test';
+import { afterAll, describe, expect, test } from 'bun:test';
+import { rm } from 'node:fs/promises';
+import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { $ } from 'bun';
 import { copyTemplate, RENAMED } from '../copy';
 import { PEER_RANGES } from '../versions';
 
@@ -56,6 +59,11 @@ describe("copyTemplate('react-router')", () => {
 			dev: 'react-router dev',
 			start: 'bun build/server/index.js',
 			typecheck: 'react-router typegen && tsc',
+			lint: 'biome lint',
+			format: 'biome format --write',
+			check: 'biome check --write',
+			'check:ci': 'biome ci',
+			verify: 'bun run check:ci && bun run typecheck && bun run build',
 		});
 		expect(manifest.dependencies).toMatchObject({
 			'@alxia/core': '^0.3.0',
@@ -77,8 +85,11 @@ describe("copyTemplate('react-router')", () => {
 				'.dockerignore',
 				'Dockerfile',
 				'README.md',
+				'.vscode/extensions.json',
+				'.vscode/settings.json',
 				'app/root.tsx',
 				'app/routes.ts',
+				'biome.json',
 				'bunfig.toml',
 				'public/favicon.ico',
 				'react-router.config.ts',
@@ -92,5 +103,45 @@ describe("copyTemplate('react-router')", () => {
 		expect(await files['public/favicon.ico']?.bytes()).toEqual(
 			await stored('public/favicon.ico').bytes(),
 		);
+	});
+});
+
+describe('a project from the template', () => {
+	// Inside the package, so `bun run` finds the workspace's biome. The
+	// generated output it must skip is faked, unformatted: verify:templates
+	// runs the same check after the real react-router typegen and build.
+	const dir = join(import.meta.dir, '..', '..', '.fixture-react-router');
+	afterAll(() => rm(dir, { recursive: true, force: true }));
+
+	test('passes bun run check:ci, skipping .react-router/ and build/: no error, warning or info', async () => {
+		await rm(dir, { recursive: true, force: true });
+		const { manifest, files } = await copyTemplate(
+			'react-router',
+			'web',
+			ALXIA,
+		);
+		for (const [file, content] of Object.entries(files)) {
+			await Bun.write(join(dir, file), content);
+		}
+		await Bun.write(
+			join(dir, 'package.json'),
+			`${JSON.stringify(manifest, null, 2)}\n`,
+		);
+		const unformatted = "export  const   x = 'generated'  ;\n";
+		await Bun.write(
+			join(dir, '.react-router/types/app/+types/root.ts'),
+			unformatted,
+		);
+		await Bun.write(join(dir, 'build/server/index.js'), unformatted);
+		const result = await $`${process.execPath} run check:ci --colors=off`
+			.cwd(dir)
+			.nothrow()
+			.quiet();
+		const output = `${result.stdout}${result.stderr}`;
+		expect(output).not.toMatch(/Found \d+ (error|warning|info)/);
+		expect(output).not.toContain('.react-router');
+		expect(output).not.toContain('build/server');
+		expect(output).toMatch(/Checked \d+ files/);
+		expect(result.exitCode).toBe(0);
 	});
 });

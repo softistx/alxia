@@ -7,6 +7,7 @@ An [alxia](https://github.com/softistx/alxia) app with
   its own hook, `requireKey`, answers 401 without the `x-api-key` header.
 - `src/server.ts`: listens on `PORT`, 3000 by default.
 - `src/app.spec.ts`: `app.request()` and `@alxia/client`, no port.
+- `biome.json`: Biome's lint and format settings ([Lint and format](#lint-and-format)).
 
 ## Environment
 
@@ -35,6 +36,32 @@ curl -X POST localhost:3000/todos \
 ```sh
 bun test         # src/app.spec.ts: in process, and through the typed client
 bun run typecheck
+```
+
+## Lint and format
+
+[Biome](https://biomejs.dev) lints and formats the project, as `biome.json`
+sets it: Biome's recommended rules, spaces, double quotes, imports
+sorted. What the build writes, `dist/`, is skipped.
+
+```sh
+bun run check      # lint, format and sort imports, fixing what it can
+bun run lint       # lint only
+bun run format     # format only, in place
+bun run check:ci   # what CI runs: changes nothing, fails on an error
+bun run verify     # check:ci, then typecheck, then test
+```
+
+`bun run check:ci`, not `bun ci`: `bun ci` is Bun's frozen-lockfile
+install. In VS Code, `.vscode/` recommends Biome's extension and formats
+on save with it.
+
+`@biomejs/biome` is pinned exactly, since a release of Biome may format
+differently. To move it:
+
+```sh
+bun add --dev --exact @biomejs/biome@latest
+bunx biome migrate --write
 ```
 
 ## Build

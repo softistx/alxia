@@ -2,8 +2,10 @@
  * Copies a template stored under `templates/<template>/`: the `api` one,
  * alxia's own, and the `react-router` one, React Router's official scaffold
  * with the layer `examples/react-router` adds on top. The files are copied
- * as they are; only `package.json` is rewritten, with the project's name
- * and alxia's versions in place of `workspace:^`.
+ * as they are, but for the project's name in place of the template's own
+ * (`my-api`, `my-app`) wherever a text file names it, as the README's
+ * `docker build -t` does; `package.json` is rewritten, with that name and
+ * alxia's versions in place of `workspace:^`.
  */
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,14 +23,39 @@ export const TEMPLATES = fileURLToPath(
 );
 
 /**
- * Files a template stores under another name, because a published tarball
- * would not hold them: `bun publish`, as `npm publish`, leaves every
- * `.gitignore` out, and Bun leaves `bunfig.toml` out too.
+ * Files a template stores under another name: a published tarball would not
+ * hold them — `bun publish`, as `npm publish`, leaves every `.gitignore`
+ * out, and Bun leaves `bunfig.toml` out too — or this repository's Biome
+ * would refuse them: a `biome.json` with no `"root": false` inside the
+ * workspace is a nested root configuration, an error, and the project's
+ * own must be a root.
  */
 export const RENAMED: Readonly<Record<string, string>> = {
 	gitignore: '.gitignore',
 	'_bunfig.toml': 'bunfig.toml',
+	'_biome.json': 'biome.json',
 };
+
+/**
+ * `file` with `name` for every whole-word `placeholder` in it, or `file`
+ * itself when it names none or is not UTF-8 text, as an icon.
+ */
+export async function withName(
+	file: Blob,
+	placeholder: string,
+	name: string,
+): Promise<Blob> {
+	let text: string;
+	try {
+		text = new TextDecoder('utf-8', { fatal: true }).decode(await file.bytes());
+	} catch {
+		return file;
+	}
+	const escaped = placeholder.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	const word = new RegExp(`(?<![\\w-])${escaped}(?![\\w-])`, 'g');
+	const named = text.replace(word, () => name);
+	return named === text ? file : new Blob([named]);
+}
 
 /**
  * `template`, from `root`: its manifest, named `name` with alxia's packages
@@ -64,7 +91,11 @@ export async function copyTemplate(
 	for await (const path of new Bun.Glob('**').scan({ cwd: dir, dot: true })) {
 		// A Finder file in a local checkout is not the template's.
 		if (path === 'package.json' || path.endsWith('.DS_Store')) continue;
-		files[RENAMED[path] ?? path] = Bun.file(join(dir, path));
+		const file = Bun.file(join(dir, path));
+		files[RENAMED[path] ?? path] =
+			typeof stored['name'] === 'string'
+				? await withName(file, stored['name'], name)
+				: file;
 	}
 	return { manifest, files };
 }

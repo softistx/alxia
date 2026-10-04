@@ -1,7 +1,8 @@
 /**
  * Runs `bun create @alxia` as a user would, from the packed tarballs, for
  * each template, then proves the project it wrote works: it installs, its
- * `typecheck`, `test` and `build` pass, its production server answers, and
+ * `typecheck`, `test` and `build` pass, then `check:ci` (Biome) with no
+ * error, warning or info, over what they generated, its production server answers, and
  * so does the image its `Dockerfile` builds (`templates/docker.ts`): skipped
  * locally with no Docker daemon, a failure on CI.
  *
@@ -24,13 +25,15 @@ import { $ } from 'bun';
 import { pack } from './artifacts/install';
 import { readPackages } from './artifacts/packages';
 import { staleBuilds } from './artifacts/stale';
-import type { Tarball } from './artifacts/tarball';
+import { biomeClean } from './templates/biome';
 import { dockerRuns, dockerServed } from './templates/docker';
 import { startRegistry } from './templates/registry';
+import { report } from './templates/report';
 import { pageAndAsset, served } from './templates/serve';
+import { type TemplateName, templateShipped } from './templates/shipped';
 
 interface Check {
-	readonly template: 'api' | 'react-router';
+	readonly template: TemplateName;
 	/** Files the project must hold, as a template copied them. */
 	readonly files: readonly string[];
 	readonly scripts: readonly string[];
@@ -45,6 +48,9 @@ const CHECKS: readonly Check[] = [
 			'.gitignore',
 			'.dockerignore',
 			'.env.example',
+			'.vscode/extensions.json',
+			'.vscode/settings.json',
+			'biome.json',
 			'Dockerfile',
 			'src/app.ts',
 		],
@@ -61,6 +67,8 @@ const CHECKS: readonly Check[] = [
 		template: 'react-router',
 		files: [
 			'.gitignore',
+			'.vscode/extensions.json',
+			'biome.json',
 			'bunfig.toml',
 			'Dockerfile',
 			'vite.config.ts',
@@ -71,51 +79,6 @@ const CHECKS: readonly Check[] = [
 		expected: 200,
 	},
 ];
-
-/** Prints `ok` or `FAIL` and the check's name; whether it passed. */
-function report(passed: boolean, what: string): boolean {
-	console.log(`${passed ? 'ok  ' : 'FAIL'} ${what}`);
-	return passed;
-}
-
-/**
- * `bun publish` leaves every `.gitignore` and `bunfig.toml` out of a
- * tarball, so the templates ship them as `gitignore` and `_bunfig.toml`,
- * renamed when they are copied.
- */
-const SHIPPED: Readonly<Record<Check['template'], readonly string[]>> = {
-	api: [
-		'gitignore',
-		'.dockerignore',
-		'.env.example',
-		'Dockerfile',
-		'package.json',
-		'src/app.ts',
-	],
-	'react-router': [
-		'gitignore',
-		'_bunfig.toml',
-		'.dockerignore',
-		'Dockerfile',
-		'package.json',
-		'vite.config.ts',
-	],
-};
-
-function templateShipped(tarballs: readonly Tarball[]): boolean {
-	const create = tarballs.find(
-		({ manifest }) => manifest['name'] === '@alxia/create',
-	);
-	const entries = create?.entries ?? [];
-	return Object.entries(SHIPPED).every(([template, files]) =>
-		report(
-			files.every((file) =>
-				entries.includes(`package/templates/${template}/${file}`),
-			),
-			`@alxia/create's tarball holds templates/${template}: ${files.join(', ')}`,
-		),
-	);
-}
 
 /** `bun create @alxia` is `bunx @alxia/create`: the same bin, run alone. */
 async function helpRuns(workdir: string, env: Record<string, string>) {
@@ -176,6 +139,7 @@ async function templateWorks(
 			`${check.template}: bun run ${script} exited ${run.exitCode}`,
 		);
 	}
+	ok = (await biomeClean(check.template, dir, env)) && ok;
 	const status = await served(dir, env, check.request);
 	ok =
 		report(

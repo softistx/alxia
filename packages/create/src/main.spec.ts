@@ -24,6 +24,7 @@ const VERSIONS = {
 	zod: ['4.2.0', '4.6.5'],
 	typescript: ['6.0.3', '7.0.2'],
 	'@types/bun': ['1.4.2'],
+	'@biomejs/biome': ['2.5.15', '2.5.16', '2.6.0', '3.0.0'],
 	'react-router': ['8.4.0'],
 	'@react-router/node': ['8.4.0'],
 	'@react-router/serve': ['8.4.0'],
@@ -133,12 +134,18 @@ describe('create-alxia', () => {
 			'.dockerignore',
 			'.env.example',
 			'.gitignore',
+			'.vscode',
 			'Dockerfile',
 			'README.md',
+			'biome.json',
 			'package.json',
 			'src',
 			'tsconfig.json',
 		]);
+		// Pinned exactly, as Biome asks, and held to the template's minor.
+		expect(
+			(await json(join(dir, 'package.json'))).devDependencies['@biomejs/biome'],
+		).toBe('2.5.16');
 		expect(ran).toEqual([{ command: [process.execPath, 'install'], cwd: dir }]);
 		expect(out.at(-1)).toBe(
 			'\nDone: my-api holds the api template. Next:\n\n  cd my-api\n  bun dev\n',
@@ -288,7 +295,7 @@ describe('create-alxia', () => {
 			await main(['my-api', '--template', 'api', '--no-install'], root, io),
 		).toBe(0);
 		expect(err[0]).toBe(
-			'create-alxia: warning: the registry did not answer for @alxia/core, zod, @alxia/client, @types/bun, typescript; kept the versions the template ships.',
+			'create-alxia: warning: the registry did not answer for @alxia/core, zod, @alxia/client, @biomejs/biome, @types/bun, typescript; kept the versions the template ships.',
 		);
 		expect(
 			(await json(join(root, 'my-api', 'package.json'))).devDependencies

@@ -30,6 +30,19 @@ Nothing scheduled yet.
 
 ### Next release
 
+- **Both projects lint and format with Biome.** Each has a `biome.json`
+  of its own (recommended rules, spaces and double quotes, imports
+  sorted, the build output skipped), `@biomejs/biome` pinned exactly,
+  the scripts `lint`, `format`, `check`, `check:ci` and `verify`, and
+  `.vscode/` recommending Biome's extension. A new project passes
+  `bun run check:ci` with no finding.
+- **The project's name in its README.** The name given to the command,
+  normalised, replaces the template's own, as a whole word, in every text
+  file, as the README's
+  `docker build -t` and `docker run`.
+
+### 0.1.4
+
 - **The images run on Alpine.** Every `Dockerfile`'s final stage is
   `oven/bun:1-alpine`, the build stages staying on `oven/bun:1`: each
   image is about 130 MB, where it was about 345 MB. The `api` project

@@ -78,6 +78,33 @@ Make sure to deploy the output of `bun run build`
 │   └── server/    # Server-side code
 ```
 
+## Lint and format
+
+[Biome](https://biomejs.dev) lints and formats the project, as `biome.json`
+sets it: Biome's recommended rules, spaces, double quotes, imports
+sorted. What the build and `react-router typegen` write, `build/` and
+`.react-router/`, is skipped.
+
+```bash
+bun run check      # lint, format and sort imports, fixing what it can
+bun run lint       # lint only
+bun run format     # format only, in place
+bun run check:ci   # what CI runs: changes nothing, fails on an error
+bun run verify     # check:ci, then typecheck, then build
+```
+
+`bun run check:ci`, not `bun ci`: `bun ci` is Bun's frozen-lockfile
+install. In VS Code, `.vscode/` recommends Biome's extension and formats
+on save with it.
+
+`@biomejs/biome` is pinned exactly, since a release of Biome may format
+differently. To move it:
+
+```bash
+bun add --dev --exact @biomejs/biome@latest
+bunx biome migrate --write
+```
+
 ## Styling
 
 This template comes with [Tailwind CSS](https://tailwindcss.com/) already configured for a simple default starting experience. You can use whatever CSS framework you prefer.
