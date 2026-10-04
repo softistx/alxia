@@ -138,3 +138,75 @@ describe('route(operation, ...middlewares, handler)', () => {
 		expect(_mistakes).toBeFunction();
 	});
 });
+
+describe('validate counted as the operation’s', () => {
+	test('by its schemas: a copy of the operation counts, another validate reads the body once more', async () => {
+		const reads: string[] = [];
+		const Title = z.object({ name: z.string().min(1) }).transform((body) => {
+			reads.push(body.name);
+			return body;
+		});
+		const op = {
+			method: 'POST',
+			path: '/pets',
+			schema: {
+				body: Title,
+				response: { 201: z.object({ name: z.string() }) },
+			},
+		} as const;
+		const copy = { ...op, path: '/copies' } as const;
+		const app = alxia()
+			.route(copy, validate(op), ({ body, reply }) => reply(201, body))
+			.route(
+				op,
+				validate({ body: z.object({ name: z.string() }) }),
+				({ body, reply }) => reply(201, body),
+			);
+		const post = (path: string) =>
+			app.request(path, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ name: 'Rex' }),
+			});
+		expect((await post('/copies')).status).toBe(201);
+		expect(reads).toEqual(['Rex']); // validated once
+		expect((await post('/pets')).status).toBe(201);
+		expect(reads).toEqual(['Rex', 'Rex']); // the other validate, then the operation's
+	});
+
+	test('what the types say of a part a middleware passes on', () => {
+		const op = {
+			method: 'GET',
+			path: '/pets',
+			schema: { response: { 200: z.object({ page: z.number() }) } },
+		} as const;
+		alxia().route(
+			op,
+			(_ctx, next) => next({ query: { page: 3 }, page: 3 }),
+			({ query, page, reply }) => {
+				// the operation has no query schema: typed as the request's own
+				expectTypeOf(query).toEqualTypeOf<
+					Readonly<Record<string, string | readonly string[]>>
+				>();
+				expectTypeOf(page).toEqualTypeOf<number>(); // another name: typed as it runs
+				return reply(200, { page });
+			},
+		);
+	});
+
+	test("an operation's params a route's path does not give is refused", () => {
+		const other = {
+			method: 'GET',
+			path: '/others/:other',
+			schema: { params: z.object({ other: z.string() }) },
+		} as const;
+		const _refused = () =>
+			alxia().route(
+				{ method: 'GET', path: '/pets' } as const,
+				// @ts-expect-error "/pets" gives no `other`
+				validate(other),
+				({ reply }) => reply(200, 'x'),
+			);
+		expect(_refused).toBeFunction();
+	});
+});

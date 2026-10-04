@@ -148,7 +148,8 @@ export interface DeprecatedOperationForm<
  * form of 0.3, a list of hooks first: the list, the operation's schema, the
  * handler. Otherwise its options, a `responds` of its responses first, the
  * middlewares, then a `validate` of its request parts just before the
- * handler — unless a `validate(operation)` stands among the middlewares.
+ * handler — unless a `validate` of each of those parts, by the same
+ * schemas, `validate(operation)`, stands among the middlewares.
  */
 export function operationArgs(
 	operation: RouteOperation,
@@ -164,9 +165,17 @@ export function operationArgs(
 		),
 	);
 	const middlewares = rest.slice(0, -1);
+	// The operation's validate placed among them: one that validates each of
+	// its parts with the very schema the operation names for it.
 	const placed = middlewares.some((middleware) => {
 		const step = builtinOf(middleware);
-		return step?.kind === 'validate' && step.operation === operation;
+		return (
+			step?.kind === 'validate' &&
+			Object.entries(parts).every(
+				([part, schema]) =>
+					step.schemas[part as keyof typeof step.schemas] === schema,
+			)
+		);
 	});
 	return [
 		options,

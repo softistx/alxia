@@ -81,12 +81,7 @@ type KnownStatuses<Responses> = [Exclude<keyof Responses, StatusCode>] extends [
 
 /** A step the chain runs itself, rather than as a function: what `validate` and `responds` make. */
 export type BuiltinStep =
-	| {
-			readonly kind: 'validate';
-			readonly schemas: RequestSchemas;
-			/** The operation it was given, which `route` then validates no more. */
-			readonly operation?: RouteOperation;
-	  }
+	| { readonly kind: 'validate'; readonly schemas: RequestSchemas }
 	| { readonly kind: 'responds'; readonly responses: ResponseSchemas };
 
 /** Where a middleware made by `validate` or `responds` carries its step. */
@@ -140,10 +135,7 @@ export function validate<const Schemas extends RequestSchemas | RouteOperation>(
 				return schema === undefined ? [] : [[part, schema]];
 			}),
 		);
-		return builtin(
-			{ kind: 'validate', schemas: parts, operation: schemas },
-			'validate',
-		);
+		return builtin({ kind: 'validate', schemas: parts }, 'validate');
 	}
 	return builtin(
 		{ kind: 'validate', schemas: schemas as RequestSchemas },

@@ -2160,7 +2160,8 @@ before the `validate` — a middleware placed before it, a `derive`, a
 
 **Why:** route hooks, and the middlewares before a `validate`, run before
 it. A request's body can be read once: the hook used it up, and the
-`validate`, which reads it next, fails.
+`validate`, which reads it next, fails. Two `validate`s of the body are
+not this: the second checks the body the first read.
 
 **Fix:** let the `validate` read the body, and do a check that needs it in
 a middleware placed after it, or in the handler: both read `body`, the

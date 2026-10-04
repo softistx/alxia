@@ -192,11 +192,22 @@ type OperationSchema<Operation> = Operation extends { readonly schema: infer Sch
 ### Middlewares on a route declared as data
 
 The operation's `validate` stands just before the handler unless you place
-it: `validate(operation)`, given the very operation the route is declared
-from, validates its request parts where it stands, and the route runs no
-other. A `validate` of other schemas, or of another operation, is one more
-middleware: the route still validates the operation's parts before the
-handler.
+it: `validate(operation)` validates the operation's request parts where it
+stands, and the route runs no other. A `validate` counts as the
+operation's when it checks each of those parts by the very schema the
+operation names, so `validate(renamePet)` on a route declared from a copy,
+`{ ...renamePet, path }`, counts too. A `validate` of other schemas is one
+more middleware: the route still validates the operation's parts before the
+handler, and the body, read once, is checked by both.
+
+Two things the types of `route` say differently from the runtime, both
+rare. A middleware placed after `validate(operation)` that passes
+`next({ body })` (or `params`, `query`, `headers`) is typed, in the
+handler, by the operation's schema, though the handler receives what the
+middleware passed. And on a route whose operation has no schema for a
+part, a middleware that passes that part to `next` sees it typed, in the
+handler, as the request's own: `query` raw, `body` `undefined`. Give such
+a value another name — `next({ page })` — and both are typed as they run.
 
 ```ts
 import { alxia, defineMiddleware, validate } from '@alxia/core';
