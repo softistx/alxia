@@ -12,7 +12,11 @@ number on it. Every release, with each change it made, is in
   `@alxia/core`'s `app.route(operation, ...middlewares, handler)` binds
   them, and `implemented` and `matchesSpec` check the app against them.
   The package that was `@alxia/openapi-routes` now carries this name;
-  `@alxia/openapi-routes` stays a while as a deprecated re-export.
+  `@alxia/openapi-routes` stays a while as a deprecated re-export. Same
+  `implemented`, `matchesSpec` and `exactly`, options and messages: change
+  the import. The docs cover the whole workflow, from the document to the
+  generated operations, routes with middlewares, the check and a client.
+  Shipped as 0.4.0.
 
 ## Next
 
@@ -42,14 +46,6 @@ Nothing scheduled yet.
   `@alxia/core`, whose types it reads, and `typescript` as peers.
 
 ## Shipped
-
-### 0.4.0
-
-- **A new name, spec first.** `@alxia/openapi-routes` becomes
-  `@alxia/openapi`, with the same `implemented`, `matchesSpec` and
-  `exactly`, options and messages: change the import. Its docs now cover
-  the whole workflow, from the document to the generated operations, routes
-  with middlewares, the check and a client.
 
 Before 0.4.0, the name `@alxia/openapi` (0.1.0 to 0.3.0) belonged to a
 different package, which wrote a document from the app's routes; it is

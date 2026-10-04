@@ -1,8 +1,8 @@
 # @alxia/openapi-routes
 
 **Deprecated: moved to [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi).**
-alxia is OpenAPI spec first, and the package that binds an app's routes to
-the operations of its document now carries that name. This last release
+alxia is OpenAPI spec first, and the package that checks an app's routes
+against the operations of its document now carries that name. This last release
 re-exports it, so an app that still imports `@alxia/openapi-routes` keeps
 working, with every export marked deprecated.
 
@@ -23,6 +23,16 @@ import { implemented, matchesSpec } from '@alxia/openapi';
 ```
 
 The functions are the same ones, with the same options and messages.
+
+## Peers
+
+This release imports `@alxia/openapi`, so it needs it installed beside it,
+with `@alxia/core` and `typescript`, as `@alxia/openapi` does. Bun installs
+missing peers by itself.
+
+```sh
+bun add -d @alxia/openapi-routes @alxia/openapi typescript
+```
 
 ## API
 

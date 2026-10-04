@@ -37,7 +37,7 @@ bun add -d typescript
 
 Everything else is a package of its own, to take or leave:
 [`@alxia/zod`](https://www.npmjs.com/package/@alxia/zod),
-`@alxia/openapi`,
+[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi),
 [`@alxia/graphql`](https://www.npmjs.com/package/@alxia/graphql),
 [`@alxia/cors`](https://www.npmjs.com/package/@alxia/cors),
 [`@alxia/secure-headers`](https://www.npmjs.com/package/@alxia/secure-headers),
@@ -278,7 +278,7 @@ Its reply replaces the 400 of every route after it that validates. Given schemas
 output.
 
 Given a kind first, a hook answers that kind alone, reads its refusal
-narrowed, and types and documents that kind's replies apart. A kind with no
+narrowed, and types and checks that kind's replies apart. A kind with no
 hook of its own, or whose hook returns nothing, falls back to the general
 hook, then to the default:
 

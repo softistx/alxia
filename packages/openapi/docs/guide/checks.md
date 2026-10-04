@@ -76,7 +76,7 @@ Both return nothing when the check passes, and throw a `TypeError` when it
 does not, listing everything that is wrong at once. An operation path no
 route may be declared at — `/pets/:pet-id`, `/a/*/b` — is the exception: it
 throws at once, with the core's reason for that path, since no route
-could serve it ([troubleshooting](troubleshooting.md#typeerror-implemented---is-not-a-parameter-name)).
+could serve it ([troubleshooting](../troubleshooting.md#typeerror-implemented---is-not-a-parameter-name)).
 
 ## `implemented`
 
@@ -193,8 +193,8 @@ implemented(app, api, { prefix: '/api' });
 ```
 
 Write the prefix as the app's: a leading `/` and no trailing one. `'api'`
-[does not compile](troubleshooting.md#type-pets-is-not-assignable-to-type-string), and `'/api/'` throws
-[`implemented(): the prefix "/api/" must start with "/" and not end with one`](troubleshooting.md#typeerror-implemented-the-prefix--must-start-with--and-not-end-with-one).
+[does not compile](../troubleshooting.md#type-pets-is-not-assignable-to-type-string), and `'/api/'` throws
+[`implemented(): the prefix "/api/" must start with "/" and not end with one`](../troubleshooting.md#typeerror-implemented-the-prefix--must-start-with--and-not-end-with-one).
 
 The messages then name the full paths, `GET /api/pets/:petId (getPet)`,
 since those are what the app is missing. For operations served under a

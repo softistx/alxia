@@ -233,8 +233,8 @@ the redirect is added to the route's outcomes.
 
 ## Errors
 
-Prefer returning a reply: its status is checked against `responds`, and
-documented. When code deep in a call throws, the error goes, in order:
+Prefer returning a reply: its status and body are checked against
+`responds`. When code deep in a call throws, the error goes, in order:
 
 1. to the route's `onError` hooks, declared before it, in the order
    declared. The first to return a reply answers ([Hooks](hooks.md#onerror));

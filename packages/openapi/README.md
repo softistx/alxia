@@ -11,7 +11,7 @@ route the document declares and nobody wrote fails a test, not a client.
 
 ```sh
 bun add -d @alxia/openapi typescript
-bun add -d @nxgt/openapi-codegen
+bun add -d --exact @nxgt/openapi-codegen
 bun add zod
 ```
 

@@ -22,8 +22,9 @@ export const app = alxia().route(operations.getTodo, ({ params, reply }) =>
 | [4. Check](#4-check-the-app-against-the-spec) | `@alxia/openapi`'s `matchesSpec` | a failing test while an operation has no route |
 | [5. A client](#5-a-client-from-the-same-document) | the generator of your choice | the other side of the contract |
 
-`bun create @alxia my-api --template api` writes all five; this page is
-what that project holds, explained.
+`bun create @alxia my-api --template api` does the first four, and its
+generated `paths.ts` is ready for step 5; this page is what that project
+holds, explained.
 
 ## 1. Write the document
 

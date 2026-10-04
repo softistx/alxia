@@ -231,6 +231,9 @@ or a `z.bigint()` with Zod's own conversion — `z.toJSONSchema(schema)`, or
 its Standard JSON Schema `'~standard'.jsonSchema` — to write it into an
 OpenAPI document or hand it to a JSON Schema tool.
 
+Also as `BigInt cannot be represented in JSON Schema` and `Transforms
+cannot be represented in JSON Schema`.
+
 **Why:** Zod refuses what JSON Schema cannot say, and one such field fails
 the whole object.
 

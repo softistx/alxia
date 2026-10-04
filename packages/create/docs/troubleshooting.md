@@ -32,6 +32,7 @@ print, or — for a trap that prints nothing — the symptom.
 - [`zod: no release within ^4.2.0; kept ^4.2.0`](#zod-no-release-within-420-kept-420)
 - [`@alxia/core: the registry has no release within ^0.3.1 yet; wrote ^0.3.0, the newest of ~0.3.0`](#alxiacore-the-registry-has-no-release-within-031-yet-wrote-030-the-newest-of-030)
 - [`create-alxia: bun install failed; the files are written.`](#create-alxia-bun-install-failed-the-files-are-written)
+- [`warn: incorrect peer dependency "typescript@7.0.2"`](#warn-incorrect-peer-dependency-typescript702)
 
 **After**
 
@@ -253,6 +254,23 @@ the next steps.
 
 **Fix:** what its output says, then `cd my-app && bun install`. The
 project is complete; only `node_modules` is missing.
+
+### `warn: incorrect peer dependency "typescript@7.0.2"`
+
+**When:** `bun install` in a new `api` project, the one `bun create @alxia`
+runs included, prints it once and finishes.
+
+**Why:** the project gets the newest TypeScript alxia's packages accept,
+`^6.0.3 || ^7.0.0`, and `@nxgt/openapi-codegen` 0.6.0, the generator the
+template pins, declares `typescript` `^6.0.3` alone. The generator never
+loads TypeScript, so nothing fails: `bun run generate`, `typecheck`, `test`
+and `build` all pass.
+
+**Fix:** none is needed. To silence it, hold the project to TypeScript 6:
+
+```sh
+bun add -d typescript@^6.0.3
+```
 
 ## After
 
