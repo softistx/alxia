@@ -13,11 +13,14 @@ COPY . .
 RUN bun run build
 
 # The build, run as Bun's own non-root user with the start script's
-# command. The server listens on PORT (3000) and HOST (0.0.0.0).
+# command, and --no-install: with no node_modules, Bun would otherwise
+# fetch a package the build left out from the registry at startup,
+# where this fails.
+# The server listens on PORT (3000) and HOST (0.0.0.0).
 FROM oven/bun:1
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/build ./build
 USER bun
 EXPOSE 3000
-CMD ["bun", "build/server/index.js"]
+CMD ["bun", "--no-install", "build/server/index.js"]

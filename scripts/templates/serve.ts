@@ -46,3 +46,21 @@ export async function served(
 		await server.exited;
 	}
 }
+
+/**
+ * `GET /`, then one of the client build's scripts it names: a client
+ * navigation loads. The page's answer when the script is served, else the
+ * script's; no script named at all is a 404, said so in the log.
+ */
+export async function pageAndAsset(base: string): Promise<Response> {
+	const page = await fetch(`${base}/`);
+	const html = await page.clone().text();
+	const asset = html.match(/\/assets\/[\w.-]+\.js/)?.[0];
+	if (asset === undefined) {
+		console.error(`GET / answered ${page.status} naming no /assets/*.js`);
+		return new Response(null, { status: 404 });
+	}
+	const served = await fetch(`${base}${asset}`);
+	if (!served.ok) console.error(`GET ${asset} answered ${served.status}`);
+	return served.ok ? page : served;
+}

@@ -4,6 +4,7 @@
  * no `node_modules`. A Docker image's final stage copies `build/` alone.
  */
 import type { EnvironmentOptions } from 'vite';
+import { bunEnvironment } from './bun';
 
 /**
  * What the plugin adds to the `ssr` environment under `react-router build`,
@@ -29,4 +30,18 @@ export function bundledEnvironment(
 ): EnvironmentOptions | undefined {
 	if (options.resolve?.external === true) return undefined;
 	return { resolve: { noExternal: true } };
+}
+
+/**
+ * Everything the plugin adds to the `ssr` environment: built for Bun under
+ * either command, and self-contained under `build` alone.
+ */
+export function ssrEnvironment(
+	options: EnvironmentOptions,
+	command: 'build' | 'serve',
+): EnvironmentOptions {
+	const added = bunEnvironment(options);
+	const bundled = command === 'build' ? bundledEnvironment(options) : undefined;
+	if (bundled === undefined) return added;
+	return { ...added, resolve: { ...added.resolve, ...bundled.resolve } };
 }

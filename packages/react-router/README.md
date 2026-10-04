@@ -347,7 +347,7 @@ ENV NODE_ENV=production
 COPY --from=build /app/build ./build
 USER bun
 EXPOSE 3000
-CMD ["bun", "build/server/index.js"]
+CMD ["bun", "--no-install", "build/server/index.js"]
 ```
 
 ```sh

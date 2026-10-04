@@ -7,8 +7,7 @@ import { relative } from 'node:path';
 // Types only: the plugin runs on whichever Vite the app has, never on a
 // copy of this package's own.
 import type { Plugin, ResolvedConfig } from 'vite';
-import { bunEnvironment } from './bun';
-import { bundledEnvironment } from './bundle';
+import { ssrEnvironment } from './bundle';
 import {
 	clientPath,
 	contextOf,
@@ -86,13 +85,9 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 			// environment as the app and the plugins left it, built for Bun.
 			// An app that chose `ssr.target: 'webworker'` keeps Vite's own.
 			if (name !== 'ssr' || env.isSsrTargetWebworker === true) return;
-			const added = bunEnvironment(options);
 			// Built, the server is self-contained; in dev, Vite's SSR runner
 			// loads the packages from node_modules.
-			const bundled =
-				env.command === 'build' ? bundledEnvironment(options) : undefined;
-			if (bundled === undefined) return added;
-			return { ...added, resolve: { ...added.resolve, ...bundled.resolve } };
+			return ssrEnvironment(options, env.command);
 		},
 		configResolved(resolved) {
 			config = resolved;

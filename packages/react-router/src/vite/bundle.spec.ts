@@ -14,12 +14,27 @@ const text = (html: string) => html.replaceAll('<!-- -->', '');
 /** The fixture's own externals, which the configs below replace. */
 const EXTERNALS = "ssr: { external: ['@alxia/react-router', '@alxia/core'] }";
 
-/** The bare specifiers `bundle` still imports: `import … from 'x'` and `import 'x'`. */
+/**
+ * The bare specifiers `bundle` still imports, statement by statement:
+ * `import … from 'x'`, `import 'x'` and `export … from 'x'`, minified or
+ * not. A `require` or `import()` left in would fail the run below, which
+ * starts the server with `--no-install` from `build/` alone.
+ */
 function bareImports(bundle: string): string[] {
 	return [
-		...bundle.matchAll(/^import\s(?:[^'"]*?from\s*)?["']([^"'./][^"']*)["']/gm),
+		...bundle.matchAll(
+			/(?:^|;)\s*(?:import|export)\b\s*(?:[^'";]*?\bfrom\s*)?["']([^"'./][^"']*)["']/gm,
+		),
 	].map((match) => match[1] as string);
 }
+
+test('bareImports reads each form, minified or not', () => {
+	expect(
+		bareImports(
+			'import{a}from"x";export*from"y";import"z";\nimport { b } from "./local";\nimport c from "w";',
+		).sort(),
+	).toEqual(['w', 'x', 'y', 'z']);
+});
 
 describe('bundledEnvironment', () => {
 	test('bundles every package', () => {
@@ -135,7 +150,6 @@ describe('react-router build, self-contained', () => {
 		for (const id of ['react', 'react-dom/server', 'react-router', 'isbot']) {
 			expect(imports).not.toContain(id);
 		}
-		expect(bundle).not.toMatch(/\brequire\(["']react["']\)/);
 	});
 
 	test('prerendering still read the bundle back', async () => {

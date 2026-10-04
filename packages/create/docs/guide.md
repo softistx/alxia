@@ -247,7 +247,9 @@ copied in: see
 Two stages: every dependency, installed with
 `bun install --frozen-lockfile`, then `bun run build`, which writes
 `dist/server.js` and its source map; then an image with `dist/` alone,
-running `bun dist/server.js`, `start`'s command, written out so that Bun
+running `bun --no-install dist/server.js`, `start`'s command with
+`--no-install`, so that a package missing from the bundle fails at
+startup rather than being fetched from npm, written out so that Bun
 is the container's process.
 
 ```dockerfile
@@ -264,7 +266,7 @@ ENV NODE_ENV=production
 COPY --from=build /app/dist ./dist
 USER bun
 EXPOSE 3000
-CMD ["bun", "dist/server.js"]
+CMD ["bun", "--no-install", "dist/server.js"]
 ```
 
 `.dockerignore` keeps `node_modules`, `dist`, `.env`, the README and the
@@ -282,7 +284,8 @@ default is for development.
 ### `react-router`
 
 Two stages: every dependency and `bun run build`, then an image with
-`build/` alone, running `bun build/server/index.js`, `start`'s command.
+`build/` alone, running `bun --no-install build/server/index.js`,
+`start`'s command with `--no-install`.
 `@alxia/react-router`'s plugin bundles every package into
 `build/server/index.js` under `react-router build`, so `build/` needs no
 `node_modules`

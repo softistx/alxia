@@ -693,6 +693,10 @@ copies it, and the server imports a package that is not inside
   runtime (`new URL('./data.json', import.meta.url)`), or loads a native
   addon (a `.node` file), neither of which bundling carries along.
 
+The image runs `bun --no-install`: without the flag, Bun finds no
+`node_modules` and fetches the missing package from npm at startup, at
+whatever version npm has, instead of failing.
+
 **Why:** under `react-router build` the plugin bundles every package into
 `build/server/index.js` ([Self-contained](guide.md#self-contained)), so
 the image needs no `node_modules`. What stays outside the file must be

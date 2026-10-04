@@ -64,7 +64,9 @@ The `Dockerfile` builds in a stage of its own, on `oven/bun:1`: it
 installs every dependency with `--frozen-lockfile`, from the `bun.lock`
 that `bun install` wrote (commit it), and runs `bun run build`. The image
 holds `dist/` alone, no `node_modules` and no `src/`, and runs
-`bun dist/server.js` as its non-root `bun` user.
+`bun --no-install dist/server.js` as its non-root `bun` user: a package
+missing from the bundle fails at startup instead of being fetched from
+npm.
 
 ```sh
 docker build -t my-api .

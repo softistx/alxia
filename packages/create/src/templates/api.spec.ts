@@ -52,7 +52,7 @@ describe('the api template', () => {
 		]);
 	});
 
-	test("its Dockerfile builds, and runs the start script's command on dist/ alone, as Bun's user", async () => {
+	test("its Dockerfile builds, and runs the start script's command on dist/ alone, as Bun's user, never installing", async () => {
 		const { manifest, files } = await copyTemplate(
 			'api',
 			'my-api',
@@ -61,7 +61,10 @@ describe('the api template', () => {
 		const dockerfile = (await files['Dockerfile']?.text()) ?? '';
 		const scripts = manifest['scripts'] as Record<string, string>;
 		const cmd = JSON.parse(/^CMD (.+)$/m.exec(dockerfile)?.[1] ?? 'null');
-		expect(cmd.join(' ')).toBe(scripts['start']);
+		// start's command, and --no-install: no package is fetched at startup.
+		expect(cmd.join(' ')).toBe(
+			scripts['start']?.replace(/^bun /, 'bun --no-install '),
+		);
 		const [build, final] = dockerfile.split(/^(?=FROM )/m).slice(1);
 		expect(build).toStartWith('FROM oven/bun:1 AS build\n');
 		expect(build).toContain('RUN bun install --frozen-lockfile\n');
@@ -81,11 +84,15 @@ describe('the api template', () => {
 		expect(built.exitCode).toBe(0);
 		const alone = await mkdtemp(join(tmpdir(), 'alxia-api-dist-'));
 		await cp(join(dir, 'dist'), join(alone, 'dist'), { recursive: true });
-		const server = Bun.spawn([process.execPath, 'dist/server.js'], {
-			cwd: alone,
-			env: { PATH: process.env['PATH'] ?? '', PORT: '0' },
-			stdout: 'pipe',
-		});
+		// --no-install, as the image runs it: Bun would fetch a missing package.
+		const server = Bun.spawn(
+			[process.execPath, '--no-install', 'dist/server.js'],
+			{
+				cwd: alone,
+				env: { PATH: process.env['PATH'] ?? '', PORT: '0' },
+				stdout: 'pipe',
+			},
+		);
 		try {
 			const reader = server.stdout.getReader();
 			let out = '';

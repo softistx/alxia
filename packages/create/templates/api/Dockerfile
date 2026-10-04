@@ -11,12 +11,14 @@ COPY . .
 RUN bun run build
 
 # The bundle, run as Bun's own non-root user with the start script's
-# command, written out so that Bun is the container's process. The server
-# listens on PORT (3000); set API_KEY.
+# command, written out so that Bun is the container's process, and
+# --no-install: with no node_modules, Bun would otherwise fetch a package
+# the build left out from the registry at startup, where this fails. The
+# server listens on PORT (3000); set API_KEY.
 FROM oven/bun:1
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/dist ./dist
 USER bun
 EXPOSE 3000
-CMD ["bun", "dist/server.js"]
+CMD ["bun", "--no-install", "dist/server.js"]

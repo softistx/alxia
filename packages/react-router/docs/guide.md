@@ -1103,14 +1103,17 @@ COPY . .
 RUN bun run build
 
 # The build, run as Bun's own non-root user with the start script's
-# command. The server listens on PORT (3000) and HOST (0.0.0.0).
+# command, and --no-install: with no node_modules, Bun would otherwise
+# fetch a package the build left out from the registry at startup,
+# where this fails.
+# The server listens on PORT (3000) and HOST (0.0.0.0).
 FROM oven/bun:1
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/build ./build
 USER bun
 EXPOSE 3000
-CMD ["bun", "build/server/index.js"]
+CMD ["bun", "--no-install", "build/server/index.js"]
 ```
 
 ```sh
@@ -1122,7 +1125,9 @@ Keep the template's `.dockerignore` beside it: `node_modules`, `build` and
 `.react-router` stay out of the context, so the image installs and builds
 its own. The `bunfig.toml` goes in, and `bun run build` runs React
 Router's CLI on Bun, as it does outside Docker. The image's command is
-`start`'s, run directly, so the platform's `SIGTERM` reaches the server.
+`start`'s, run directly, so the platform's `SIGTERM` reaches the server,
+with `--no-install`: a package missing from `build/` then fails at
+startup, where Bun would otherwise fetch it from npm.
 
 - **Commit `bun.lock`.** The installs are `--frozen-lockfile`: the image
   gets the versions you tested, and a `package.json` changed without a
