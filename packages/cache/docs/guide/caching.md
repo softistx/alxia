@@ -1,6 +1,6 @@
 # Caching responses
 
-This page covers the `cache()` plugin: which requests it answers, which
+This page covers `cache()`, a middleware: which requests it answers, which
 responses it keeps, each option, the headers it sends, and what a route
 behind it reads.
 
@@ -10,7 +10,7 @@ import { cache } from '@alxia/cache';
 
 const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok'))      // declared before: never cached
-	.plugin(cache({ ttl: 60, staleWhileRevalidate: 300 }))
+	.use(cache({ ttl: 60, staleWhileRevalidate: 300 }))
 	.get('/products', ({ reply }) => reply(200, [{ id: 1, name: 'Lamp' }]));
 
 app.listen({ port: 3000 });
@@ -23,8 +23,8 @@ curl -i localhost:3000/products   # x-cache: HIT, age: 0 — the route did not
 
 ## Which requests
 
-The plugin is a route hook: it applies to the routes declared **after**
-`plugin(cache(…))`, in the same app or group, and to no other. Within those:
+The cache is a middleware: it applies to the routes declared **after**
+`use(cache(…))`, in the same app or group, and to no other. Within those:
 
 - only `GET` and `HEAD` are looked up; every other method runs the route as
   if there were no cache, and still reads [`ctx.cache`](#what-a-route-reads).
@@ -35,7 +35,12 @@ The plugin is a route hook: it applies to the routes declared **after**
 - a request whose [`key`](keys-and-vary.md#a-key-of-your-own) is
   `undefined` is not looked up, nor kept;
 - with `honorClientNoCache: true`, a request that says
-  `Cache-Control: no-cache` runs the route, and its response is not kept.
+  `Cache-Control: no-cache` runs the route, and its response is not kept;
+- given to `app.use`, it runs on a request no route matches too, and lets it
+  through: a missing path is never looked up nor kept, even with `404` in
+  [`statuses`](#which-responses-are-kept) — the store holds only what a
+  route answered, one entry per path a route serves, never one per path a
+  client made up.
 
 ## The three answers
 
@@ -58,7 +63,7 @@ import { cache } from '@alxia/cache';
 test('ten concurrent misses run the route once', async () => {
 	let runs = 0;
 	const app = alxia()
-		.plugin(cache({ ttl: 60 }))
+		.use(cache({ ttl: 60 }))
 		.get('/products', async ({ reply }) => {
 			await Bun.sleep(20);
 			return reply(200, { runs: ++runs });
@@ -112,20 +117,20 @@ import { alxia } from '@alxia/core';
 import { cache } from '@alxia/cache';
 
 const app = alxia()
-	.plugin(cache({ ttl: 60 }))
+	.use(cache({ ttl: 60 }))
 	.get('/me', ({ request, reply }) =>
 		reply(200, { cookie: request.headers.get('cookie') }, { headers: { 'cache-control': 'private' } }),
 	); // concurrent requests: one run each, each with its own answer
 ```
 
-A route that is always personal still belongs before the plugin: it saves
+A route that is always personal still belongs before the cache: it saves
 the store lookup, and the wait on another request's run.
 
 ## Options
 
 ```ts
-cache<Requires extends object = Empty>(options: CacheOptions<Requires>): Alxia<…> & Requiring<Requires> & Cache
-// an app, given to `app.plugin`, which checks `Requires`; and the hands to empty it
+cache<Requires extends object = Empty>(options: CacheOptions<Requires>): CacheMiddleware<Requires>
+// a middleware, given to `app.use`, which checks `Requires`; and the hands to empty it
 ```
 
 `Requires` is what `key` and `tags` read beyond `BaseContext`, empty by
@@ -201,7 +206,7 @@ import { cache } from '@alxia/cache';
 
 test('a client whose copy is current gets a 304', async () => {
 	const app = alxia()
-		.plugin(cache({ ttl: 60 }))
+		.use(cache({ ttl: 60 }))
 		.get('/products', ({ reply }) => reply(200, []));
 
 	const first = await app.request('/products');
@@ -216,7 +221,7 @@ test('a client whose copy is current gets a 304', async () => {
 A browser sends `If-None-Match` on its own once it has the response with
 an `ETag`; curl does not unless you pass the header.
 
-The plugin sets no `Cache-Control` of its own: it caches on the server.
+The cache sets no `Cache-Control` of its own: it caches on the server.
 For a browser or a CDN to keep the response as well, the route says so —
 `public` is not `private`, so the response is still kept here:
 
@@ -230,17 +235,37 @@ app.get('/products', ({ reply }) =>
 
 A kept response keeps the route's status and headers, without
 `Content-Length` and `Date`, with its `ETag`, and with each `vary` header
-appended to `Vary` once. Headers that global hooks add after the route
-(`onResponse`, a CORS or compression plugin) are not kept: they are added
-again to every answer, from the cache or not.
+appended to `Vary` once. Headers that a middleware declared **before** the
+cache adds on the way out (CORS, secure headers, compression, a logger's
+request id) are not kept: they are added again to every answer, from the
+cache or not. That is the order to use. A middleware declared **after** the
+cache runs on a miss only, and what it adds is kept and replayed.
+
+```ts
+import { alxia, defineMiddleware } from '@alxia/core';
+import { cache } from '@alxia/cache';
+import { cors } from '@alxia/cors';
+
+const stamp = defineMiddleware(async (_ctx, next) => {
+	const response = await next();
+	response.headers.set('x-rendered-by', 'origin');
+	return response;
+});
+
+const app = alxia()
+	.use(cors())                          // every answer, a hit included
+	.use(cache({ ttl: 60 }))
+	.use(stamp)                           // a miss only; its header is kept
+	.get('/products', ({ reply }) => reply(200, []));
+```
 
 ## What a route reads
 
-Every route after the plugin reads `ctx.cache`:
+Every route after the cache reads `ctx.cache`:
 
 ```ts
 interface CacheControls {
-	/** Tags the response being built, beyond the plugin's `tags`. */
+	/** Tags the response being built, beyond the cache's `tags`. */
 	tag(...tags: string[]): void;
 	/** Keeps this response out of the cache. */
 	skip(): void;
@@ -252,7 +277,7 @@ import { alxia } from '@alxia/core';
 import { cache } from '@alxia/cache';
 
 const app = alxia()
-	.plugin(cache({ ttl: 60 }))
+	.use(cache({ ttl: 60 }))
 	.get('/products/:id', ({ params, cache, reply }) => {
 		cache.tag(`product:${params.id}`);               // invalidateTag('product:1') forgets it
 		return reply(200, { id: params.id });
@@ -264,13 +289,13 @@ const app = alxia()
 	});
 ```
 
-A route declared before the plugin has no `ctx.cache`; reading it is a
+A route declared before the cache has no `ctx.cache`; reading it is a
 compile error ([Troubleshooting](../troubleshooting.md#property-cache-does-not-exist-on-type-context)).
 
 ## The value `cache()` returns
 
-`cache()` returns the plugin — an app to give to `app.plugin` — with the handles
-of its store on it:
+`cache()` returns the middleware — to give to `app.use` — with the handles
+of its store on it. Its type is `CacheMiddleware<Requires>`:
 
 ```ts
 interface Cache {
@@ -310,7 +335,7 @@ export const app = alxia({ prefix: '/api' })
 		return reply(201, product);
 	})
 	.get('/me', ({ reply }) => reply(200, { name: 'Grace' }))  // before the cache: personal
-	.plugin(catalogue)
+	.use(catalogue)
 	.get('/products', ({ reply }) => reply(200, [...products.values()]))
 	.get('/products/:id', ({ params, cache, reply }) => {
 		cache.tag(`product:${params.id}`);

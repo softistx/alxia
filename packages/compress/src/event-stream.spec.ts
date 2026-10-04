@@ -72,7 +72,7 @@ function push(signal: AbortSignal, log: string[], closeAfterState: boolean) {
 
 function appWith(log: string[], compressible?: (type: string) => boolean) {
 	return alxia()
-		.plugin(compress(compressible === undefined ? {} : { compressible }))
+		.use(compress(compressible === undefined ? {} : { compressible }))
 		.get(
 			'/push',
 			validate({

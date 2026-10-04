@@ -1,5 +1,12 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { alxia, type BaseContext, type Empty, validate } from '@alxia/core';
+import {
+	alxia,
+	type BaseContext,
+	type Empty,
+	HttpError,
+	type Middleware,
+	validate,
+} from '@alxia/core';
 import {
 	createMemoryStores,
 	fixedClock,
@@ -19,6 +26,11 @@ import { janusErrors } from './errors';
 import { byParam, permission } from './permission';
 import { sendSession, signOut } from './send';
 import { type SessionOptions, session } from './session';
+
+/** What a middleware requires of the app that uses it: what its context reads beyond the base. */
+type Reads<M> =
+	M extends Middleware<infer Requires, infer _Result> ? Requires : never;
+const reads = <M>(_middleware: M) => undefined as unknown as Reads<M>;
 
 const ada = { email: 'ada@example.test', name: 'Ada Lovelace' };
 const password = 'correct horse';
@@ -75,7 +87,7 @@ function setup() {
 	]);
 
 	const app = alxia()
-		.plugin(janusErrors())
+		.use(janusErrors())
 		.post(
 			'/signup',
 			validate({
@@ -100,7 +112,7 @@ function setup() {
 		)
 		.post('/signout', async (ctx) => ctx.reply(200, await signOut(ctx, auth)))
 		.get('/whoami', async ({ reply }) => reply(200, 'anyone'))
-		.plugin(session(auth, { type: 'patient', required: true }))
+		.use(session(auth, { type: 'patient', required: true }))
 		.get('/me', ({ user, session: current, reply }) => {
 			expectTypeOf(user.email).toBeString();
 			expectTypeOf(current).toEqualTypeOf<Session>();
@@ -108,7 +120,7 @@ function setup() {
 		})
 		.group('/records/:id', (records_) =>
 			records_
-				.plugin(
+				.use(
 					permission(
 						access,
 						'view',
@@ -166,8 +178,8 @@ describe('session', () => {
 		const { auth } = setup();
 		await auth.patient.signUp({ ...ada, password });
 		const app = alxia()
-			.plugin(janusErrors())
-			.plugin(session(auth, { type: 'patient', device: { name: 'my-device' } }))
+			.use(janusErrors())
+			.use(session(auth, { type: 'patient', device: { name: 'my-device' } }))
 			.post(
 				'/signin',
 				validate({
@@ -218,7 +230,7 @@ describe('session', () => {
 		const { auth } = setup();
 		for (const required of [true, false]) {
 			const app = alxia()
-				.plugin(session(auth, { required }))
+				.use(session(auth, { required }))
 				.get('/me', ({ user, reply }) => {
 					const anonymous: typeof user = null; // compiles only if user may be null
 					void anonymous;
@@ -230,7 +242,7 @@ describe('session', () => {
 		// A wrapper forwarding the options as they are typed compiles too.
 		const forwarded = (options: SessionOptions<'patient'>) =>
 			session(auth, options);
-		expect(forwarded({}).routes).toEqual([]);
+		expect(forwarded({})).toBeFunction();
 	});
 
 	test('session() twice, one instance: a request is looked up once', async () => {
@@ -246,11 +258,11 @@ describe('session', () => {
 			}) as typeof auth.authenticate,
 		};
 		const app = alxia()
-			.plugin(janusErrors())
-			.plugin(session(counted))
-			.plugin(session(counted, { required: true }))
+			.use(janusErrors())
+			.use(session(counted))
+			.use(session(counted, { required: true }))
 			.get('/me', ({ user, reply }) => reply.ok({ type: user.type }))
-			.plugin(session(counted, { type: 'patient' }))
+			.use(session(counted, { type: 'patient' }))
 			.get('/patient', ({ reply }) => reply.ok('patient'));
 		const cookie = `janus-session=${token}`;
 		expect((await app.request('/me', { headers: { cookie } })).status).toBe(
@@ -274,8 +286,8 @@ describe('session', () => {
 		await auth.patient.signUp({ ...ada, password });
 		const { token } = await auth.patient.signIn({ email: ada.email, password });
 		const app = alxia()
-			.plugin(session(auth))
-			.plugin(session(auth, { required: true }))
+			.use(session(auth))
+			.use(session(auth, { required: true }))
 			.get('/me', ({ reply }) => reply.ok('me'));
 		clock.advance(2 * DAY);
 		const renewed = await app.request('/me', {
@@ -286,6 +298,43 @@ describe('session', () => {
 				.getSetCookie()
 				.filter((value) => value.startsWith('janus-session=')),
 		).toHaveLength(1);
+	});
+
+	test('a renewal rides a refusal and an error answer too', async () => {
+		const { auth, clock } = setup();
+		await auth.patient.signUp({ ...ada, password });
+		const { token } = await auth.patient.signIn({ email: ada.email, password });
+		const app = alxia()
+			.use(session(auth, { required: true }))
+			.post(
+				'/notes',
+				validate({ body: z.object({ title: z.string() }) }),
+				({ reply }) => reply(201, 'ok'),
+			)
+			.get('/teapot', () => {
+				throw new HttpError(418, 'teapot');
+			});
+		const renewedOn = (response: Response) =>
+			response.headers
+				.getSetCookie()
+				.some((value) => value.startsWith('janus-session='));
+		clock.advance(2 * DAY);
+		const refused = await app.request('/notes', {
+			method: 'POST',
+			headers: {
+				cookie: `janus-session=${token}`,
+				'content-type': 'application/json',
+			},
+			body: '{}',
+		});
+		expect(refused.status).toBe(400);
+		expect(renewedOn(refused)).toBe(true);
+		clock.advance(2 * DAY);
+		const teapot = await app.request('/teapot', {
+			headers: { cookie: `janus-session=${token}` },
+		});
+		expect(teapot.status).toBe(418);
+		expect(renewedOn(teapot)).toBe(true);
 	});
 
 	test('auth.send sets the device cookie under the name session() gives', async () => {
@@ -301,7 +350,7 @@ describe('session', () => {
 		});
 		await accounts.signUp({ ...ada, password });
 		const app = alxia()
-			.plugin(session(accounts, { device: { name: 'my-device' } }))
+			.use(session(accounts, { device: { name: 'my-device' } }))
 			.post(
 				'/signin',
 				validate({
@@ -428,7 +477,7 @@ describe('permission', () => {
 				ctx: ({ locked }: { locked: boolean }) => ({ locked }),
 			},
 		);
-		expectTypeOf(edit['~requires']).toEqualTypeOf<{
+		expectTypeOf(reads(edit)).toEqualTypeOf<{
 			tenant: Tenant;
 			member: typeof user.user | null;
 			locked: boolean;
@@ -441,7 +490,7 @@ describe('permission', () => {
 			}))
 			.group('/records/:id', (records) =>
 				records
-					.plugin(edit)
+					.use(edit)
 					.get('/', ({ object, reply }) => reply(200, { id: object.id })),
 			);
 		const status = async (path: string, headers: Record<string, string>) =>
@@ -457,25 +506,24 @@ describe('permission', () => {
 	test('unannotated callbacks read nothing more, and an app without what they read is refused', () => {
 		const { access } = setup();
 		const find = byParam('id', (id) => ({ id, doctorId: null }));
-		expectTypeOf(
-			permission(access, 'view', 'record', find, {
-				subject: (ctx) => {
-					expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
-					return null;
-				},
-			})['~requires'],
-		).toEqualTypeOf<Empty>();
+		const unannotated = permission(access, 'view', 'record', find, {
+			subject: (ctx) => {
+				expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
+				return null;
+			},
+		});
+		expectTypeOf(reads(unannotated)).toEqualTypeOf<Empty>();
 		const byMember = permission(access, 'view', 'record', find, {
 			subject: ({ member }: { member: { type: 'patient'; id: string } }) =>
 				member,
 		});
 		const _refused = () => {
 			// @ts-expect-error the plugin reads "member", which this app's context does not give
-			alxia().plugin(byMember);
+			alxia().use(byMember);
 			alxia()
 				.derive(() => ({ member: 1 }))
 				// @ts-expect-error the plugin reads "member", which this app's context gives with another type
-				.plugin(byMember);
+				.use(byMember);
 			const wrong = permission(
 				access,
 				'view',
@@ -486,7 +534,7 @@ describe('permission', () => {
 				}),
 			);
 			// @ts-expect-error the plugin reads "pathParams", which this app's context gives with another type
-			alxia().plugin(wrong);
+			alxia().use(wrong);
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -507,22 +555,18 @@ describe('permission', () => {
 		type Message<Callback extends string> = {
 			readonly '~any': `the plugin's ${Callback} reads its context as any: annotate what it reads, or leave it unannotated`;
 		};
-		expectTypeOf<(typeof byLoad)['~requires']>().toEqualTypeOf<
-			Message<'load'>
-		>();
-		expectTypeOf<(typeof bySubject)['~requires']>().toEqualTypeOf<
-			Message<'subject'>
-		>();
-		expectTypeOf<(typeof byCtx)['~requires']>().toEqualTypeOf<Message<'ctx'>>();
+		expectTypeOf<Reads<typeof byLoad>>().toEqualTypeOf<Message<'load'>>();
+		expectTypeOf<Reads<typeof bySubject>>().toEqualTypeOf<Message<'subject'>>();
+		expectTypeOf<Reads<typeof byCtx>>().toEqualTypeOf<Message<'ctx'>>();
 		const _refused = () => {
 			// @ts-expect-error the plugin's load reads its context as any
-			alxia().plugin(byLoad);
+			alxia().use(byLoad);
 			// @ts-expect-error the plugin's subject reads its context as any
-			alxia().plugin(bySubject);
+			alxia().use(bySubject);
 			alxia()
 				.derive(() => ({ locked: false }))
 				// @ts-expect-error the plugin's ctx reads its context as any, whatever the app gives
-				.plugin(byCtx);
+				.use(byCtx);
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -536,7 +580,7 @@ describe('permission', () => {
 			title: id,
 		}));
 		alxia()
-			.plugin(
+			.use(
 				permission(access, 'view', 'record', (ctx) => {
 					expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
 					return { id: 'r1', doctorId: null, title: 'x' } as Rec | null;
@@ -587,12 +631,12 @@ describe('permission', () => {
 				ctx: () => 1, // only the loose path takes any ctx
 			},
 		);
-		expectTypeOf(loose['~requires']).toEqualTypeOf<{
+		expectTypeOf(reads(loose)).toEqualTypeOf<{
 			member: { type: 'patient'; id: string };
 		}>();
 		const _refused = () => {
 			// @ts-expect-error the plugin reads "member", which this app's context does not give
-			alxia().plugin(loose);
+			alxia().use(loose);
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -601,7 +645,7 @@ describe('permission', () => {
 		const { access } = setup();
 		const app = alxia().group('/records/:id', (records) =>
 			records
-				.plugin(
+				.use(
 					permission(
 						access,
 						'view',

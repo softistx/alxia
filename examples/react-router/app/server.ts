@@ -1,5 +1,5 @@
 // Optional for a new app: without this file the plugin serves it with a
-// default server. With it, alxia's hooks run around every page and its
+// default server. With it, alxia's middlewares run around every page and its
 // data. This example's routes read what it derives (`user`, `log`), so
 // here it is required.
 import { compress } from "@alxia/compress";
@@ -14,9 +14,10 @@ import { addTodo, NewTodo, Todo } from "./todos.server";
 const server = createServer({
   configure: (app) =>
     app
-      .plugin(logger())
-      .plugin(compress())
-      .plugin(
+      // The observers go first, so they wrap everything after them.
+      .use(logger())
+      .use(compress())
+      .use(
         secureHeaders({
           // A fresh nonce per request, added to script-src: entry.server
           // reads it with nonceOf(loadContext), and React Router puts it on
@@ -41,7 +42,7 @@ const server = createServer({
         }),
       )
       // A tiny session: the user, from the cookie the sign-in sets. Every
-      // hook reads the request's cookies as `cookies`.
+      // middleware reads the request's cookies as `cookies`.
       .derive(({ cookies }) => ({ user: userOf(cookies) }))
       // alxia's own JSON route: its body validated, its reply checked. Under
       // /api, a prefix no page uses.

@@ -7,7 +7,9 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **Compression as a middleware.** `app.use(compress())` compresses every
+  response that comes back through it, a 404's and an error's included;
+  `app.plugin(compress())` keeps working as a deprecated alias.
 
 ## Next
 

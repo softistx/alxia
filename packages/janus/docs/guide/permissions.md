@@ -36,14 +36,19 @@ const records = new Map([['r1', { id: 'r1', title: 'Blood test' }]]);
 const findRecord = (id: string) => records.get(id) ?? null;
 
 const app = alxia()
-	.plugin(janusErrors())
-	.plugin(session(accounts))
+	.use(janusErrors())
+	.use(session(accounts))
 	.group('/records/:id', (record) =>
 		record
-			.plugin(permission(access, 'view', 'record', byParam('id', findRecord)))
+			.use(permission(access, 'view', 'record', byParam('id', findRecord)))
 			.get('/', ({ object, reply }) => reply(200, { title: object.title })),
 	);
 ```
+
+The guard lives in a `group`: given to the app's own `use`, it would also run
+on a request no route matches, and answer it 401 or 404 before the 404 it
+should get. `janusErrors()` is given to `use` before `session()`, so it
+answers what `session()` and the guard throw.
 
 `object` is what `findRecord` answered, typed as such. Granting access is
 `@nxgt/janus`'s:
@@ -64,7 +69,7 @@ await access.grant({ type: 'record', id: 'r1' }, 'owners', user); // user: what 
 | `options.ctx` | `(ctx: BaseContext, object: O) => …` | the context a condition of the permission reads; **required exactly when the permission has one**, refused otherwise |
 
 Each callback reads the request's `BaseContext`, and, when its parameter is
-annotated, what an earlier plugin added: see
+annotated, what an earlier middleware added: see
 [Reading the app's context](#reading-the-apps-context).
 
 It runs once per request, before the route:
@@ -181,11 +186,11 @@ const access = permissions({ model, store: relations });
 const records = new Map([['r1', { id: 'r1', title: 'Blood test', locked: false }]]);
 
 const app = alxia()
-	.plugin(janusErrors())
-	.plugin(session(accounts))
+	.use(janusErrors())
+	.use(session(accounts))
 	.group('/records/:id', (record) =>
 		record
-			.plugin(
+			.use(
 				permission(access, 'edit', 'record', byParam('id', (id) => records.get(id) ?? null), {
 					ctx: (_ctx, object) => ({ locked: object.locked }), // object: the loaded record
 				}),
@@ -206,7 +211,7 @@ request throws a `TypeError` and answers 500
 `subject` names another — an API key's service account, a user read from a
 header set by a gateway. It reads the `BaseContext`, so the request, the
 URL and the path parameters, not the route's validated headers — and, when
-its parameter is annotated, what an earlier plugin added
+its parameter is annotated, what an earlier middleware added
 ([Reading the app's context](#reading-the-apps-context)). `null` is
 anonymous, a 401:
 
@@ -222,12 +227,12 @@ permission(access, 'view', 'record', byParam('id', findRecord), {
 ## Reading the app's context
 
 `load`, `subject` and `ctx` read `BaseContext` — the request, the URL, the
-path parameters. To read what an earlier plugin added — a tenant, a member,
+path parameters. To read what an earlier middleware added — a tenant, a member,
 a feature flag — annotate the callback's parameter. `permission()` infers
 what each one reads from its annotation, while `access`, `permission`,
 `type` and the object stay inferred as before, and the guard is a
-[`definePlugin`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
-plugin: an app that does not give it before the guard cannot use it.
+[middleware that requires an earlier one](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md#a-plugin-that-needs-an-earlier-one):
+an app that does not give it before the guard cannot `use` it.
 
 ```ts
 import { alxia, type BaseContext } from '@alxia/core';
@@ -249,13 +254,13 @@ const edit = permission(
 // requires { tenant: Tenant; member: { type: 'user'; id: string } | null }
 
 const app = alxia()
-	.plugin(janusErrors())
-	.plugin(tenancy) // derives tenant and member
+	.use(janusErrors())
+	.use(tenancy) // derives tenant and member
 	.group('/records/:id', (record) =>
-		record.plugin(edit).put('/', ({ object, reply }) => reply(200, { title: object.title })),
+		record.use(edit).put('/', ({ object, reply }) => reply(200, { title: object.title })),
 	);
 
-alxia().plugin(edit);
+alxia().use(edit);
 // error, one message per missing key: the plugin reads "tenant", which this app's context does not give: add the plugin or middleware that gives it first
 //   | the plugin reads "member", which this app's context does not give: add the plugin or middleware that gives it first
 ```

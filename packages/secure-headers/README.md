@@ -14,18 +14,20 @@ bun add -d typescript
 ```ts
 import { secureHeaders } from '@alxia/secure-headers';
 
-app.plugin(secureHeaders());
-app.plugin(secureHeaders({ contentSecurityPolicy: "default-src 'self'", xFrameOptions: false }));
+app.use(secureHeaders());
+app.use(secureHeaders({ contentSecurityPolicy: "default-src 'self'", xFrameOptions: false }));
 ```
 
-A header a route sets itself is kept: a page that needs its own policy sets
-it on its reply.
+`secureHeaders()` is a middleware: every response that comes back through
+it carries the headers, a 404's, an error's and a refused preflight's
+included. A header a route sets itself is kept: a page that needs its own
+policy sets it on its reply.
 
 ## A nonce per request
 
 `nonce: true` makes a fresh nonce for each request (128 random bits,
 base64), puts it in the policy as `'nonce-…'`, and gives it to the routes
-declared after the plugin as `ctx.nonce`. The header and the context always
+declared after the middleware as `ctx.nonce`. The header and the context always
 carry the same one, so a page's inline scripts need no `'unsafe-inline'`.
 
 ```ts
@@ -33,7 +35,7 @@ import { alxia } from '@alxia/core';
 import { secureHeaders } from '@alxia/secure-headers';
 
 const app = alxia()
-	.plugin(
+	.use(
 		secureHeaders({
 			nonce: true,
 			// The nonce is added to script-src (and script-src-elem).
@@ -55,7 +57,7 @@ left as written:
 ```ts
 import { NONCE, secureHeaders } from '@alxia/secure-headers';
 
-app.plugin(
+app.use(
 	secureHeaders({
 		nonce: true,
 		contentSecurityPolicy: `default-src 'self'; script-src 'self' ${NONCE}; style-src 'self' ${NONCE}`,
@@ -94,15 +96,28 @@ value is refused at startup. `nonce` is off by default.
 
 | export | |
 | --- | --- |
-| `secureHeaders(options?)` | the plugin: a function `Plugin`, or with `nonce: true` a `NoncePlugin` |
+| `secureHeaders(options?)` | the middleware, for `app.use`: a `SecureHeaders`, or with `nonce: true` a `NoncePlugin` |
 | `SecureHeadersOptions` | its options: the headers and `hidePoweredBy`; `nonce` is added by each overload |
 | `Setting` | a header option's type: its value, or `false` to leave it out |
 | `NONCE` | where the nonce goes in `contentSecurityPolicy`, each time it is named |
 | `NonceContext` | what `nonce: true` adds to the context: `nonce`, a string |
-| `NoncePlugin` | what `secureHeaders({ nonce: true })` returns: an app plugin adding `NonceContext` |
+| `SecureHeaders` | what `secureHeaders()` returns: a middleware that adds nothing to the context |
+| `NoncePlugin` | what `secureHeaders({ nonce: true })` returns: a middleware adding `NonceContext` |
+
+## Traps
+
+`use` it first: a route declared before `app.use(secureHeaders())` gets no
+header, and `ctx.nonce` exists only on routes declared after it. A
+`try`/`catch` middleware declared before it never sees an error: it settles
+`next()`, so the route's own error reply, or a 500, already carries the
+headers. Declare error-handling middleware after it.
+
+```ts
+const app = alxia().use(secureHeaders()).use(errorHandler).get(...);
+```
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/secure-headers/docs): every option and its default, the per-request nonce, which responses get the headers, a page's own policy, the order with other hooks, and recipes.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/secure-headers/docs): every option and its default, the per-request nonce, which responses get the headers, a page's own policy, the order with other middlewares, and recipes.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/secure-headers/docs/troubleshooting.md): an error message or a browser refusal, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/secure-headers/docs/roadmap.md): what is coming, and what is not planned.

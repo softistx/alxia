@@ -11,13 +11,13 @@ import { cache, MemoryCacheStore } from '@alxia/cache';
 const store = new MemoryCacheStore({ maxEntries: 5_000, maxBytes: 128 * 1024 * 1024 });
 
 const app = alxia()
-	.plugin(cache({ ttl: 60, store }))
+	.use(cache({ ttl: 60, store }))
 	.get('/products', ({ reply }) => reply(200, []));
 ```
 
-The plugin does not know which store it was given: every store answers the
+The cache does not know which store it was given: every store answers the
 same `CacheStore` contract, and freshness — `ttl`, `staleWhileRevalidate` —
-is decided by the plugin, not the store.
+is decided by the cache, not the store.
 
 ## In memory: `MemoryCacheStore`
 
@@ -128,7 +128,7 @@ interface CachedResponse {
 }
 ```
 
-What the plugin relies on:
+What the cache relies on:
 
 | Method | Must |
 | --- | --- |
@@ -137,7 +137,7 @@ What the plugin relies on:
 | `delete` | forget `key`; a key that is not there is not an error |
 | `deleteTag` | forget every key whose response carries `tag` |
 
-`get` need not check freshness: the plugin reads `storedAt`, `ttl` and
+`get` need not check freshness: the cache reads `storedAt`, `ttl` and
 `stale` itself. Expiring at `keepFor` only bounds what the store holds.
 
 A store over any key-value service — here a plain `Map`, standing in for
@@ -191,7 +191,7 @@ is `deleteTag` of it. A store that drops `tags` leaves `invalidate` and
 
 ### Testing a store
 
-The plugin's own behaviour is the best test of a store: run an app on it.
+The cache's own behaviour is the best test of a store: run an app on it.
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -203,7 +203,7 @@ test('the store serves, and forgets by tag and by path', async () => {
 	let runs = 0;
 	const products = cache({ ttl: 60, store: mapCacheStore(), tags: () => ['products'] });
 	const app = alxia()
-		.plugin(products)
+		.use(products)
 		.get('/products', ({ reply }) => reply.ok({ runs: ++runs }));
 
 	await app.request('/products');
@@ -248,7 +248,7 @@ test('a store that cannot answer: the route answers', async () => {
 
 	const products = cache({ ttl: 60, store: broken });
 	const app = alxia()
-		.plugin(products)
+		.use(products)
 		.get('/products', ({ reply }) => reply.ok([]));
 
 	const response = await app.request('/products');   // logs "store down" once

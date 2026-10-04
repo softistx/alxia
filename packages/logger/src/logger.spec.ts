@@ -5,7 +5,7 @@ import { type LogEntry, logger } from './logger';
 describe('logger', () => {
 	const entries: LogEntry[] = [];
 	const app = alxia()
-		.plugin(
+		.use(
 			logger({
 				write: (entry) => entries.push(entry),
 				skip: (_, url) => url.pathname === '/health',
@@ -56,7 +56,7 @@ describe('logger', () => {
 		console.error = (error: unknown) => reported.push(error);
 		try {
 			const broken = alxia()
-				.plugin(
+				.use(
 					logger({
 						write: () => {
 							throw new Error('disk full');
@@ -92,7 +92,7 @@ describe('logger', () => {
 		console.error = (error: unknown) => reported.push(error);
 		try {
 			const app = alxia()
-				.plugin(
+				.use(
 					logger({
 						write: async () => {
 							throw new Error('remote down');
@@ -114,5 +114,46 @@ describe('logger', () => {
 		} finally {
 			console.error = original;
 		}
+	});
+});
+
+describe('logger, around everything after it', () => {
+	test('logs the status an error ends with: an onError reply, a refusal, a 500', async () => {
+		const entries: LogEntry[] = [];
+		const original = console.error;
+		console.error = () => {};
+		try {
+			const app = alxia()
+				.use(logger({ write: (entry) => entries.push(entry) }))
+				.onError((error, { reply }) =>
+					error instanceof RangeError ? reply(409, 'conflict') : undefined,
+				)
+				.get('/conflict', () => {
+					throw new RangeError('taken');
+				})
+				.get('/boom', () => {
+					throw new Error('boom');
+				});
+			const conflict = await app.request('/conflict');
+			expect(conflict.status).toBe(409);
+			expect(conflict.headers.get('x-request-id')).not.toBeNull();
+			const boom = await app.request('/boom');
+			expect(boom.headers.get('x-request-id')).not.toBeNull();
+			expect(entries.map((entry) => entry.status)).toEqual([409, 500]);
+		} finally {
+			console.error = original;
+		}
+	});
+
+	test('app.plugin(logger()), deprecated, still logs and types log', async () => {
+		const entries: LogEntry[] = [];
+		const app = alxia()
+			.plugin(logger({ write: (entry) => entries.push(entry) }))
+			.get('/', ({ requestId, reply }) => reply(200, requestId));
+		const response = await app.request('/');
+		expect(await response.text()).toBe(
+			response.headers.get('x-request-id') ?? '',
+		);
+		expect(entries).toHaveLength(1);
 	});
 });

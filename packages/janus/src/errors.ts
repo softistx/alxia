@@ -1,4 +1,11 @@
-import { alxia, type BaseContext } from '@alxia/core';
+import {
+	type BaseContext,
+	defineMiddleware,
+	type Middleware,
+	type MiddlewareMark,
+	type Next,
+	type Reply,
+} from '@alxia/core';
 import {
 	JanusError,
 	type JanusErrorCode,
@@ -50,38 +57,64 @@ export interface JanusErrorsOptions {
 	readonly report?: (error: JanusError, ctx: BaseContext) => unknown;
 }
 
+/** What `janusErrors()` makes: a middleware that answers what janus throws behind it. */
+export type JanusErrors = Middleware<
+	object,
+	Promise<Next | Reply<JanusErrorStatus, JanusErrorBody>>
+> &
+	MiddlewareMark;
+
 /**
- * Janus's errors answered, as a plugin: every `JanusError` a route declared
- * after it throws — a sign-in refused, a login taken, a store down — is
- * answered with janus's status and `bodyOf(error)`, typed on those routes.
- * A throttled sign-in carries `Retry-After`. Anything else goes on to the
- * app's next `onError`, or its 500.
+ * Janus's errors answered, as a middleware: every `JanusError` thrown
+ * behind it — by `session()`, `permission()`, a route — a sign-in
+ * refused, a login taken, a store down — is answered with janus's status
+ * and `bodyOf(error)`, typed on the routes declared after it. A throttled
+ * sign-in carries `Retry-After`. Anything else goes on, thrown, to the
+ * middlewares before it, the app's `onError` or its 500.
+ *
+ * Give it to `use` before `session()`, so that a store down while the
+ * session is read is answered too:
+ *
+ * ```ts
+ * app.use(janusErrors(), session(accounts)).post('/sign-in', ...);
+ * ```
  *
  * **`STORE_FAILED` is a 503**, never a 401 or a 404: an outage is not an
  * answer.
  */
-export function janusErrors(options: JanusErrorsOptions = {}) {
-	return alxia().onError((error, ctx) => {
-		if (!(error instanceof JanusError)) return undefined;
-		const status: JanusErrorStatus = statusOf(error.code);
-		if (status >= 500 && options.report !== undefined) {
-			Promise.resolve()
-				.then(() => options.report?.(error, ctx))
-				.catch((failure: unknown) =>
-					process.emitWarning(
-						`janusErrors(): report failed: ${String(failure)}`,
-					),
-				);
+export function janusErrors(options: JanusErrorsOptions = {}): JanusErrors {
+	return defineMiddleware(async (ctx, next) => {
+		try {
+			return await next();
+		} catch (error) {
+			if (!(error instanceof JanusError)) throw error;
+			return answer(error, ctx, options);
 		}
-		const body = bodyOf(error);
-		return ctx.reply(
-			status,
-			body,
-			error.retryAfter === undefined
-				? {}
-				: { headers: { 'retry-after': String(error.retryAfter) } },
-		);
 	});
+}
+
+/** A `JanusError`, answered: its status, its body, reported when a 5xx. */
+function answer(
+	error: JanusError,
+	ctx: BaseContext,
+	options: JanusErrorsOptions,
+): Reply<JanusErrorStatus, JanusErrorBody> {
+	const status: JanusErrorStatus = statusOf(error.code);
+	if (status >= 500 && options.report !== undefined) {
+		Promise.resolve()
+			.then(() => options.report?.(error, ctx))
+			.catch((failure: unknown) =>
+				process.emitWarning(`janusErrors(): report failed: ${String(failure)}`),
+			);
+	}
+	const body = bodyOf(error);
+	return ctx.reply(
+		status,
+		body,
+		error.retryAfter === undefined
+			? {}
+			: { headers: { 'retry-after': String(error.retryAfter) } },
+	);
 }
 
 export { statusOf };

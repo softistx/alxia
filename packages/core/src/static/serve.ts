@@ -126,7 +126,7 @@ export function fileHandler(
 		const path =
 			typeof file === 'string'
 				? file
-				: ((isBunFile(blob) ? blob.name : undefined) ?? ctx.route);
+				: ((isBunFile(blob) ? blob.name : undefined) ?? ctx.route ?? '');
 		return send(ctx, { file: blob, path }, options, undefined, false);
 	};
 }

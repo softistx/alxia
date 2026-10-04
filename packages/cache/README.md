@@ -1,7 +1,7 @@
 # @alxia/cache
 
 HTTP response caching for [alxia](https://www.npmjs.com/package/@alxia/core),
-with no dependency: fresh responses served again, stale ones served while
+as a middleware, with no dependency: fresh responses served again, stale ones served while
 they refresh, one route run for many concurrent misses, tags to empty it,
 ETags and 304s. In memory, or in Redis with
 [`@alxia/redis`](https://www.npmjs.com/package/@alxia/redis)'s
@@ -30,7 +30,7 @@ const app = alxia()
 		await products.invalidateTag('products');           // the next GET runs the route
 		return reply(201, body);
 	})
-	.plugin(products)                                         // the GETs after it are cached
+	.use(products)                                         // the GETs after it are cached
 	.get('/products', ({ reply }) => reply(200, [...catalogue.values()]))
 	.get('/products/:id', ({ params, cache, reply }) => {
 		cache.tag(`product:${params.id}`);                // a tag of its own
@@ -57,7 +57,9 @@ app.listen({ port: 3000 });
 - **A store that cannot answer** costs the cache, not the response: the
   route runs, nothing is kept, and the outage's first error is logged.
 - Only `GET` and `HEAD` — not `QUERY`, whose key would have to include its
-  body; only the routes declared after the plugin.
+  body; only the routes declared after the middleware. A request no route
+  matches passes through it, never looked up nor kept, even with `404` in
+  `statuses`: a 404 kept is a route's own.
 
 ## The key
 
@@ -78,7 +80,7 @@ await products.invalidate('/products');          // under each `vary` value, or 
 await products.invalidate('/products?page=2');   // another path: the query is part of it
 ```
 
-A `key` or `tags` that reads what an earlier plugin added names it as the
+A `key` or `tags` that reads what an earlier middleware added names it as the
 type argument; an app that does not give it before the cache cannot use it:
 
 ```ts
@@ -88,10 +90,10 @@ const perTenant = cache<{ user: { tenantId: string } }>({
 	tags: ({ user }) => [`tenant:${user.tenantId}`],
 });
 
-const auth = alxia().derive(() => ({ user: { tenantId: 'acme' } })); // your session plugin
+const auth = alxia().derive(() => ({ user: { tenantId: 'acme' } })); // your session middleware
 
-alxia().plugin(auth).plugin(perTenant);   // compiles: auth derives user
-alxia().plugin(perTenant);             // a compile error: no `user` in this app's context
+alxia().use(auth).use(perTenant);   // compiles: auth derives user
+alxia().use(perTenant);             // a compile error: no `user` in this app's context
 ```
 
 ## Two stores
@@ -117,7 +119,7 @@ across every process. A store of your own implements `CacheStore`: `get`,
 | `ttl` | required | seconds fresh |
 | `staleWhileRevalidate` | 0 | seconds served stale while refreshed |
 | `store` | `MemoryCacheStore` | |
-| `key` | path and query | `(ctx) => string \| undefined`; `cache<{ user: User }>(…)` lets it read a `user` an earlier plugin adds |
+| `key` | path and query | `(ctx) => string \| undefined`; `cache<{ user: User }>(…)` lets it read a `user` an earlier middleware adds |
 | `vary` | none | request headers the response depends on |
 | `statuses` | `[200]` | |
 | `tags` | none | `(ctx) => string[]`, typed like `key` |
@@ -128,14 +130,14 @@ across every process. A store of your own implements `CacheStore`: `get`,
 
 | export | |
 | --- | --- |
-| `cache<Requires>(options)` | the plugin, with `invalidate(path)`, `invalidateTag(tag)` and `store`; routes after it read `cache.tag()` and `cache.skip()` |
+| `cache<Requires>(options)` | the middleware, with `invalidate(path)`, `invalidateTag(tag)` and `store`; routes after it read `cache.tag()` and `cache.skip()` |
 | `CacheOptions<Requires>` | its options: `ttl`, `staleWhileRevalidate`, `store`, `key`, `vary`, `statuses`, `tags`, `honorClientNoCache`, `debugHeaders` |
 | `defaultKey(path, vary, headers)` | the default key: the path and query, then each varying header's value |
 | `pathTag(path)` | the tag every kept response carries for its path, `alxia:path:<path>`: what `invalidate(path)` deletes |
 | `MemoryCacheStore` | the in-process store: least recently used |
 | `MemoryCacheOptions` | its options: `maxEntries`, `maxBytes` |
 | `CacheStore`, `CachedResponse` | a store's contract |
-| `Cache`, `CacheControls` | the plugin's handles, and what the routes behind it read |
+| `Cache`, `CacheControls`, `CacheMiddleware<Requires>` | the middleware's handles, what the routes behind it read, and the type `cache()` returns |
 
 ## Documentation
 

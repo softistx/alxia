@@ -6,7 +6,7 @@ import { logger } from '@alxia/logger';
 
 export function logged() {
 	return alxia()
-		.plugin(
+		.use(
 			logger({
 				header: 'x-trace-id',
 				skip: (_request, url) => url.pathname === '/health',

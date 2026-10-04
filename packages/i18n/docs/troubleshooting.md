@@ -93,7 +93,7 @@ function translatedWith<const C extends Catalogues, const Fallback extends keyof
 	resources: C,
 	fallback: Fallback,
 ) {
-	return alxia().plugin(createI18n({ resources, fallback }));
+	return alxia().use(createI18n({ resources, fallback }));
 }
 ```
 
@@ -134,16 +134,16 @@ error TS2339: Property 't' does not exist on type 'Context<Empty, "/", Empty>'.
 ```
 
 **When:** a route reads `t` — or `language` — but is declared before
-`.plugin(i18n)`, or in another app or group than the one that mounts it.
+`.use(i18n)`, or in another app or group than the one that mounts it.
 
-**Why:** the plugin is a route hook: it applies to the routes declared
-after it, at runtime and in the types alike.
+**Why:** the middleware applies to what is declared after it, at runtime
+and in the types alike.
 
-**Fix:** mount the plugin first:
+**Fix:** `use` it first:
 
 ```ts
 const app = alxia()
-	.plugin(i18n)
+	.use(i18n)
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 ```
 
@@ -151,23 +151,23 @@ const app = alxia()
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(plugin: (app: Alxia<Empty, "", never>) => Alxia<Empty & LanguageContext<string> & I18nContext<string>, "", never> & Requiring<...> & { ...; }): Alxia<...> & ... 1 more ... & { ...; }', gave the following error.
-    Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => …' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => …'.
+  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
+    Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => Middleware<…>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
       Types of parameters 'options' and 'app' are incompatible.
         Type 'Alxia<Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback
 ```
 
-**When:** `app.plugin(createI18n)`, without calling it.
+**When:** `app.use(createI18n)`, without calling it.
 
-**Why:** `createI18n` makes the plugin from its options; it is not the
-plugin.
+**Why:** `createI18n` makes the middleware from its options; it is not the
+middleware.
 
 **Fix:** call it once, in a module of its own, and use what it returns:
 
 ```ts
 export const i18n = createI18n({ resources: { en, fr }, fallback: 'en' });
 
-const app = alxia().plugin(i18n);
+const app = alxia().use(i18n);
 ```
 
 ### `Object literal may only specify known properties, and 'supported' does not exist in type 'I18nOptions<…>'`
@@ -195,16 +195,18 @@ createI18n({ resources: { en }, fallback: 'en' });
 error TS2722: Cannot invoke an object which is possibly 'undefined'.
 ```
 
-**When:** an `onError` hook calls `t('…')` from its context.
+**When:** a deprecated `onError` hook calls `t('…')` from its context.
 
-**Why:** `onError` also handles what was thrown before the plugin ran —
-by a hook declared before it — so what the plugin adds is optional there.
+**Why:** `onError` also handles what was thrown before the middleware ran —
+by a middleware declared before it — so what it adds is optional there.
 
-**Fix:** call it optionally, with an answer for when it is missing:
+**Fix:** in an error-handling middleware declared after `.use(i18n)`, catch
+around `next()` and call `i18n.t()`, which always answers. Where an `onError`
+hook stays, call `t` optionally, with an answer for when it is missing:
 
 ```ts
 alxia()
-	.plugin(i18n)
+	.use(i18n)
 	.onError((error, { t, reply }) =>
 		error instanceof HttpError && error.status === 404
 			? reply(404, { error: t?.('errors.not-found') ?? 'Not found' })
@@ -212,7 +214,7 @@ alxia()
 	);
 ```
 
-Or call the plugin's own `i18n.t()`, which answers in the request's
+Or call the middleware's own `i18n.t()`, which answers in the request's
 language there too, and in the fallback when the error was thrown before
 the language was read.
 
@@ -243,17 +245,17 @@ export const i18n = createI18n({ resources: { en, fr }, fallback: 'en' });
 error TS2339: Property 'user' does not exist on type 'BaseContext'.
 ```
 
-**When:** `resolve` reads something a `derive` or a plugin before the
-i18n plugin added — a user, a session — and its parameter is not
+**When:** `resolve` reads something a `derive` or a middleware before the
+i18n middleware added — a user, a session — and its parameter is not
 annotated: `resolve: (ctx) => ctx.user.language`.
 
 **Why:** an unannotated `resolve` is typed with the request's `BaseContext`
-— `request`, `url`, `ip`, `pathParams`, `set` — not with what other hooks
-added. The plugin is built before it is used, so it cannot see the app it
+— `request`, `url`, `ip`, `pathParams`, `set` — not with what other middlewares
+added. The middleware is built before it is used, so it cannot see the app it
 will be used on.
 
-**Fix:** annotate the parameter with what it reads; the plugin then
-requires it of the app, before the plugin:
+**Fix:** annotate the parameter with what it reads; the middleware then
+requires it of the app, before it:
 
 ```ts
 const i18n = createI18n({
@@ -262,7 +264,7 @@ const i18n = createI18n({
 	resolve: ({ user }: BaseContext & { user: User | null }) => user?.language ?? undefined,
 });
 
-alxia().plugin(auth).plugin(i18n); // auth derives user
+alxia().plugin(auth).use(i18n); // auth derives user
 ```
 
 See [Reading the app's context](guide.md#reading-the-apps-context).
@@ -277,20 +279,20 @@ error TS2769: No overload matches this call.
 ```
 
 **When:** `resolve` is annotated to read `user` —
-`({ user }: BaseContext & { user: User | null }) => …` — and the plugin is
+`({ user }: BaseContext & { user: User | null }) => …` — and the middleware is
 used on an app, or in a group, whose context has no `user` at that point:
-`alxia().plugin(i18n)`, or `plugin(i18n)` before `plugin(auth)`.
+`alxia().use(i18n)`, or `use(i18n)` before `plugin(auth)`.
 
-**Why:** an annotated `resolve` makes the plugin require what it reads, and
-`app.plugin` checks the app's context against it, so `resolve` never runs without
+**Why:** an annotated `resolve` makes the middleware require what it reads, and
+`app.use` checks the app's context against it, so `resolve` never runs without
 it. An app whose `user` has another type is refused too, with
 `the plugin reads "user", which this app's context gives with another type`.
 
-**Fix:** mount the plugin that adds `user` first, with the type `resolve`
+**Fix:** mount what adds `user` first, with the type `resolve`
 reads:
 
 ```ts
-alxia().plugin(auth).plugin(i18n);
+alxia().plugin(auth).use(i18n);
 ```
 
 More on this message in
@@ -308,7 +310,7 @@ error TS2769: No overload matches this call.
 `resolve`'s parameter is annotated with: a `User | null` where `resolve`
 reads `User`, or a user of another shape.
 
-**Why:** `app.plugin` checks each key the plugin reads against the app's context;
+**Why:** `app.use` checks each key the middleware reads against the app's context;
 a narrower type passes, a wider or different one does not.
 
 **Fix:** annotate `resolve` with the type the app gives, and handle it
@@ -332,11 +334,11 @@ error TS2769: No overload matches this call.
 
 **When:** `resolve`'s parameter is annotated `any` —
 `resolve: (ctx: any) => ctx.user.language` — or `Record<string, any>`, and
-the plugin is used, on any app, whatever its context gives.
+the middleware is used, on any app, whatever its context gives.
 
 **Why:** an `any` parameter reads any key and says nothing of what it
-reads, so the plugin would require nothing, and an app without a `user`
-would be accepted, and throw on every request. The plugin is refused
+reads, so the middleware would require nothing, and an app without a `user`
+would be accepted, and throw on every request. It is refused
 instead.
 
 **Fix:** annotate what `resolve` reads —
@@ -409,25 +411,30 @@ export const i18n = createI18n({ resources: { en, de }, fallback: 'en' });
 ### `i18n.t()` answers in the fallback before the language is read
 
 **When:** a request is in French, but `i18n.t()`, `i18n.language()` or
-`@nxgt/i18n`'s `translate` answers in the fallback's language in an
-`onRequest` hook, an `around` hook declared before `.plugin(i18n)`, a route
-or `derive` declared before it, or the `onError` hook of an error one of
-those threw.
+`@nxgt/i18n`'s `translate` answers in the fallback's language in a
+middleware declared before `.use(i18n)`, in a route declared before it, or
+in the deprecated `onRequest` and `onResponse` hooks.
 
-**Why:** the plugin reads the request's language in a route hook, after
-the global hooks and the route hooks declared before it. Until then there
-is none to answer in. From there on — the route, what it calls, its
-`onError` and `onResponse` hooks — every call answers in it.
+**Why:** the middleware reads the request's language when the request
+reaches it, and holds it for what runs after it, the answer to an error
+included. What is declared before it, and the hooks that run outside the
+chain, run with no language to answer in.
 
-**Fix:** translate after the plugin: declare the routes and hooks that
-translate after `.plugin(i18n)`, and move what an `onRequest` hook renders
-into a `derive` declared after it:
+**Fix:** translate after the middleware: declare the middlewares and the
+routes that translate after `.use(i18n)`, and move what an `onRequest` hook
+renders into a middleware declared after it:
 
 ```ts
+import { alxia, defineMiddleware } from '@alxia/core';
+
 alxia()
-	.plugin(i18n)
-	.derive(({ request, reply }) =>
-		request.headers.has('x-busy') ? reply(503, { error: i18n.t('errors.service-unavailable') }) : undefined,
+	.use(i18n)
+	.use(
+		defineMiddleware(({ request, reply }, next) =>
+			request.headers.has('x-busy')
+				? reply(503, { error: i18n.t('errors.service-unavailable') })
+				: next(),
+		),
 	);
 ```
 
@@ -450,7 +457,7 @@ const de = { ...shared.en, errors: { ...shared.en.errors, 'not-found': 'Nicht ge
 const i18n = createI18n({ resources: { en: shared.en, de }, fallback: 'en' });
 
 alxia()
-	.plugin(i18n)
+	.use(i18n)
 	.get('/', ({ t, reply }) => reply(404, { error: t('errors.not-found') })); // ?lang=de → 'Nicht gefunden.'
 ```
 
@@ -480,18 +487,18 @@ translate('errors.not-found', undefined, 'fr');
 visitor's language is served to everyone after.
 
 **Why:** the response depends on `Accept-Language` and the language
-cookie. The plugin says so in `Vary`; a cache keyed on the URL alone
+cookie. The middleware says so in `Vary`; a cache keyed on the URL alone
 ignores it.
 
 **Fix:** give the cache the same headers:
 
 ```ts
 alxia()
-	.plugin(i18n)
-	.plugin(cache({ ttl: 60, vary: ['accept-language', 'cookie'] }));
+	.use(i18n)
+	.use(cache({ ttl: 60, vary: ['accept-language', 'cookie'] }));
 ```
 
-An `onResponse` hook that sets `Vary` with `headers.set` replaces the
-plugin's: see `@alxia/language`'s [troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#a-cache-serves-one-language-to-every-visitor),
+A middleware (or a deprecated `onResponse` hook) that sets `Vary` with `headers.set` replaces the
+middleware's: see `@alxia/language`'s [troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#a-cache-serves-one-language-to-every-visitor),
 which also covers a response in the wrong language — `curl` getting the
 fallback, a `?lang=` that does not stick, a `404` on `/fr/products`.

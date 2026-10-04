@@ -1,20 +1,22 @@
 /**
  * The chain's cost: a route behind 3 middlewares, in the middleware form,
- * against the same route behind a list of 3 hooks, the form of 0.3, and
- * behind the same 3 given to `use`. Run from the package:
- * `bun test/bench/chain.ts`. Prints the median time of a request in each
- * form and the ratios; the middleware forms should stay within 10% of the
- * list.
+ * against the same route behind a list of 3 hooks, the form of 0.3; the
+ * same 3 given to `use`, the app's middlewares; and a 404, on an app with
+ * none and on one with the 3 given to `use`, which a request no route
+ * matches runs. Run from the package: `bun test/bench/chain.ts`. Prints
+ * the median time of a request in each form and the ratios; the
+ * middleware forms should stay within 10% of the list.
  *
- * Measured when `next()` learned to settle soundly — a middleware returning
- * nothing, returning before its `next()` settled, or leaving its error
- * unread — against the commit before, on one machine: the middleware form
- * 1180 → 1330 ns (+12%, most of it the handler each `next()` attaches so
- * that an error nobody reads is never an unhandled rejection), the list
- * 1300 → 1085 ns and `use()` 1400 → 1345 ns, since a route with no schema
- * of its own runs no validation step any more. The ratio is about 1.22 as
- * a result, past the 10% this bench asks: reported, and accepted for the
- * soundness.
+ * #131 cost the middleware form 12% (1180 → 1330 ns on one machine): the
+ * handler each `next()` attached so that an error nobody reads is never
+ * an unhandled rejection. It is attached now only when the middleware
+ * does not return `next()`'s promise, which the chain then passes on
+ * without another `then`, and the steps that never wait run in one loop:
+ * measured on the same machine, the list 1090 → 944 ns, the middleware
+ * form 1325 → 1030 ns (a ratio of 1.09) and `use()` 1341 → 1007 ns.
+ * `next.behind` is one function shared by every call: an `Object.assign`
+ * of it onto each `next` cost the middleware form 15% again (a ratio of
+ * 1.24). A 404 costs some 470 ns bare, 1250 ns through three `use()`.
  */
 import { alxia, defineHook, defineMiddleware } from '@alxia/core';
 
@@ -33,18 +35,29 @@ const mc = defineMiddleware<{ b: number }>()(({ b }, next) =>
 	next({ c: b + 1 }),
 );
 
-const hooks = alxia().get('/', [a, b, c], ({ c, reply }) => reply(200, c));
-const middlewares = alxia().get('/', ma, mb, mc, ({ c, reply }) =>
-	reply(200, c),
-);
+const apps = {
+	hooks: alxia().get('/', [a, b, c], ({ c, reply }) => reply(200, c)),
+	middlewares: alxia().get('/', ma, mb, mc, ({ c, reply }) => reply(200, c)),
+	scoped: alxia()
+		.use(ma, mb, mc)
+		.get('/', ({ c, reply }) => reply(200, c)),
+	missing: alxia().get('/', ({ reply }) => reply(200, 'ok')),
+	missingScoped: alxia()
+		.use(ma, mb, mc)
+		.get('/', ({ reply }) => reply(200, 'ok')),
+};
+const requests = {
+	hooks: new Request('http://localhost/'),
+	middlewares: new Request('http://localhost/'),
+	scoped: new Request('http://localhost/'),
+	missing: new Request('http://localhost/missing'),
+	missingScoped: new Request('http://localhost/missing'),
+};
+type Name = keyof typeof apps;
 
-const scoped = alxia()
-	.use(ma, mb, mc)
-	.get('/', ({ c, reply }) => reply(200, c));
-
-const request = new Request('http://localhost/');
-
-async function round(app: { fetch: (r: Request) => Promise<Response> }) {
+async function round(name: Name) {
+	const app = apps[name];
+	const request = requests[name];
 	const started = Bun.nanoseconds();
 	for (let i = 0; i < REQUESTS; i++) await app.fetch(request);
 	return (Bun.nanoseconds() - started) / REQUESTS;
@@ -53,24 +66,22 @@ async function round(app: { fetch: (r: Request) => Promise<Response> }) {
 const median = (values: number[]) =>
 	[...values].sort((x, y) => x - y)[Math.floor(values.length / 2)] ?? 0;
 
-await round(hooks);
-await round(middlewares);
-await round(scoped);
-const times = {
-	hooks: [] as number[],
-	middlewares: [] as number[],
-	scoped: [] as number[],
-};
+const names = Object.keys(apps) as Name[];
+const times = Object.fromEntries(names.map((name) => [name, [] as number[]]));
+for (const name of names) await round(name);
 for (let i = 0; i < ROUNDS; i++) {
-	times.hooks.push(await round(hooks));
-	times.middlewares.push(await round(middlewares));
-	times.scoped.push(await round(scoped));
+	for (const name of names) times[name]?.push(await round(name));
 }
-const old = median(times.hooks);
-const now = median(times.middlewares);
-const used = median(times.scoped);
-console.log(`[hooks] list, 3 hooks:   ${old.toFixed(0)} ns/request`);
-console.log(`middlewares, 3:          ${now.toFixed(0)} ns/request`);
-console.log(`use(), 3:                ${used.toFixed(0)} ns/request`);
-console.log(`ratio:                   ${(now / old).toFixed(3)}`);
-console.log(`ratio, use():            ${(used / old).toFixed(3)}`);
+const at = (name: Name) => median(times[name] ?? []);
+const ns = (name: Name) => `${at(name).toFixed(0)} ns/request`;
+console.log(`[hooks] list, 3 hooks:   ${ns('hooks')}`);
+console.log(`middlewares, 3:          ${ns('middlewares')}`);
+console.log(`use(), 3:                ${ns('scoped')}`);
+console.log(`404:                     ${ns('missing')}`);
+console.log(`404 through use(), 3:    ${ns('missingScoped')}`);
+console.log(
+	`ratio:                   ${(at('middlewares') / at('hooks')).toFixed(3)}`,
+);
+console.log(
+	`ratio, use():            ${(at('scoped') / at('hooks')).toFixed(3)}`,
+);

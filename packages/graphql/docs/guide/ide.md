@@ -43,7 +43,7 @@ only `text/html` gets a [`406` with an empty
 body](../troubleshooting.md#406-with-an-empty-body) instead.
 
 Both IDEs run the schema's introspection and any operation against the
-endpoint, behind the same hooks as every other request: a guard before
+endpoint, behind the same middlewares as every other request: a guard before
 the endpoint guards the page too, and a browser without a token gets the
 guard's reply. Turn the IDE off in production unless you mean to publish
 it.
@@ -128,21 +128,23 @@ default-src 'self'; script-src 'self' 'unsafe-inline' https://embeddable-sandbox
 ## With `@alxia/secure-headers`
 
 `@alxia/secure-headers` keeps a header a response already has, so the
-IDE's policy survives it and every other route keeps the strict one. A hook
+IDE's policy survives it and every other route keeps the strict one. A middleware
 of your own that **overwrites** `Content-Security-Policy` on every
 response blocks the IDE's scripts, and the page stays blank: set it only
 when the response has none.
 
 ```ts
-import { alxia, withHeaders } from '@alxia/core';
+import { alxia, defineMiddleware, settle, withHeaders } from '@alxia/core';
+
+const defaultPolicy = defineMiddleware(async (ctx, next) =>
+	withHeaders(await settle(ctx, next()), (headers) => {
+		if (!headers.has('content-security-policy'))
+			headers.set('content-security-policy', "default-src 'self'");
+	}),
+);
 
 const app = alxia()
-	.onResponse((response) =>
-		withHeaders(response, (headers) => {
-			if (!headers.has('content-security-policy'))
-				headers.set('content-security-policy', "default-src 'self'");
-		}),
-	)
+	.use(defaultPolicy)
 	.plugin((app) => graphql(app, { schema }));
 ```
 
@@ -182,5 +184,5 @@ another server: `renderSandbox('https://api.example.com/graphql')`.
 
 ## See also
 
-- [Mounting the endpoint](endpoint.md): which hooks run before the page.
+- [Mounting the endpoint](endpoint.md): which middlewares run before the page.
 - [Troubleshooting](../troubleshooting.md#the-ide-page-is-blank): a blank IDE page.

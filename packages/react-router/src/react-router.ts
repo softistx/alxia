@@ -30,8 +30,8 @@ export interface ReactRouterOptions<Ctx> {
 	readonly mode?: 'development' | 'production';
 	/**
 	 * Sets the app's own keys on React Router's context provider, from the
-	 * context alxia's hooks built. `ctx` is typed by the app at the point of
-	 * `app.plugin`: reading what no hook before it derives is a compile error.
+	 * context alxia's middlewares built. `ctx` is typed by the app at the point of
+	 * `app.plugin`: reading what nothing before it adds is a compile error.
 	 * `alxiaContext` is always set, whether or not this is given.
 	 */
 	readonly getLoadContext?: (
@@ -69,9 +69,9 @@ export function isReactRouterRoute(route: RouteDefinition): boolean {
 
 /**
  * A React Router framework app, server rendered on `app`: `GET`, `POST`,
- * `PUT`, `PATCH` and `DELETE` at `/*`, behind every hook declared on `app`
- * before it. Each loader, action and middleware reads what those hooks
- * built through `alxiaOf<App>(context)`. The app's own routes — an `/api`
+ * `PUT`, `PATCH` and `DELETE` at `/*`, behind every middleware declared on `app`
+ * before it. Each loader, action and middleware reads what those added
+ * through `alxiaOf<App>(context)`. The app's own routes — an `/api`
  * — answer their paths, declared before it or after; the client build's
  * files are served when `client` is given.
  *
@@ -123,7 +123,7 @@ export function reactRouter<
 /**
  * Declares the client build's files on `app`, marked for
  * `isReactRouterRoute`: what `reactRouter()` does with `client`, apart, so
- * that `createServer()` serves them before the hooks of `configure`.
+ * that `createServer()` serves them before the middlewares of `configure`.
  */
 export function declareClient(app: AnyAlxia, client: string | URL): void {
 	declaring(app, () => serveClient(asRoutes(app), pathOf(client)));

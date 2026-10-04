@@ -137,9 +137,9 @@ the same way:
 
 There is no `reply.json` and no `reply.text`: a string is already sent as
 `text/plain` and an object as JSON ([How a body is sent](#how-a-body-is-sent)).
-A hook's `reply` has the shortcuts too: `return reply.unauthorized({ error:
-'unauthenticated' as const })` in a `derive` ends the request, like
-`reply(401, …)`.
+A middleware's `reply` has the shortcuts too: `return reply.unauthorized({ error:
+'unauthenticated' as const })` in a middleware or a `derive` ends the
+request, like `reply(401, …)`.
 
 ### `validateResponses`
 
@@ -161,8 +161,8 @@ its schema.
 | --- | --- | --- |
 | `undefined`, or a status `101`, `204`, `205`, `304` | no body | — |
 | a `string` | text | `content-type: text/plain;charset=utf-8` unless set, `content-length` |
-| a `Blob` (a `Bun.file`), `ArrayBuffer`, typed array | as it is | `content-length` unless set, so an `onResponse` hook can read the size; the type `Response` sets |
-| a `ReadableStream`, `FormData`, `URLSearchParams` | as it is | what `Response` sets: no `content-length` while the hooks run |
+| a `Blob` (a `Bun.file`), `ArrayBuffer`, typed array | as it is | `content-length` unless set, so a middleware after `await next()` can read the size; the type `Response` sets |
+| a `ReadableStream`, `FormData`, `URLSearchParams` | as it is | what `Response` sets: no `content-length` while the middlewares run |
 | an async iterable | [server-sent events](server-sent-events.md) | `content-type: text/event-stream`, `cache-control: no-cache`, `x-accel-buffering: no` |
 | anything else | JSON | `content-type: application/json` unless set, `content-length` |
 
@@ -181,7 +181,7 @@ makes of it ([The app's type](types.md#jsonifyt)).
 
 `set.headers` (a `Headers`) and `set.cookies` (a `Bun.CookieMap`, the
 response's) apply to the reply the request ends with, whatever its status: the handler's, a
-hook's, an `onError`'s, or the 400 of a refused request.
+middleware's, an error's, or the 400 of a refused request.
 
 ```ts
 app.post('/login', validate({ body: z.object({ user: z.string() }) }), ({ body, set, reply }) => {
@@ -209,8 +209,7 @@ error is sent without them.
 
 `set.cookies` holds only the response's: it starts empty, and
 `set.cookies.get` reads back what this response set. To read the request's
-cookies, read `ctx.cookies` — in a handler or any route hook (`derive`,
-`wrap`, `onError`, `onRefusal`) — or give the route
+cookies, read `ctx.cookies` — in a handler, a middleware or a `derive` — or give the route
 `validate({ cookies })` to validate them for what follows it
 ([Routes](routes.md#validate-and-responds), [Hooks](hooks.md#reading-the-requests-cookies)).
 
@@ -234,28 +233,41 @@ the redirect is added to the route's outcomes.
 ## Errors
 
 Prefer returning a reply: its status and body are checked against
-`responds`. When code deep in a call throws, the error goes, in order:
+`responds`. When code deep in a call throws, the error is a rejection of
+`next()` through the middlewares: one that wraps `next()` in a `try` sees
+it, and may answer it or throw it on. What no middleware catches reaches the
+route's boundary, which answers:
 
-1. to the route's `onError` hooks, declared before it, in the order
-   declared. The first to return a reply answers ([Hooks](hooks.md#onerror));
-2. if it is an `HttpError`, it is answered with its status and body;
-3. anything else is logged with `console.error` and answered
+1. an `HttpError` with its status and body;
+2. anything else is logged with `console.error` and answered
    `500 { "error": "internal" }`. Nothing of the error leaks.
 
-One error skips all three: the client hanging up mid-request, which
+The deprecated `onError` hooks, declared before the route, are tried first,
+in the order declared: the first to return a reply answers
+([Hooks](hooks.md#onerror)).
+
+One error skips all of it: the client hanging up mid-request, which
 reaches the app as the `AbortError` Bun's body read throws once
 `request.signal` is aborted. Nobody reads the answer, so nothing is logged,
-no `onError` hook runs, and the request gets a bodyless `499` that only
-`onResponse` hooks see. Any other error, a bug thrown after the client left
-included, goes the three steps above.
+no `onError` hook runs, and the request gets a bodyless `499` that only a
+middleware that settles `next()`, or a deprecated `onResponse` hook, sees.
+Any other error, a bug thrown after the client left included, goes the
+steps above.
 
 ```ts
-import { alxia, HttpError } from '@alxia/core';
+import { alxia, defineMiddleware, HttpError } from '@alxia/core';
+
+const ranges = defineMiddleware(async ({ reply }, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		if (!(error instanceof RangeError)) throw error; // not ours: the boundary answers
+		return reply(422, { error: 'range' as const });
+	}
+});
 
 const app = alxia()
-	.onError((error, { reply }) =>
-		error instanceof RangeError ? reply(422, { error: 'range' as const }) : undefined,
-	)
+	.use(ranges)
 	.get('/range', () => {
 		throw new RangeError(); // → 422 {"error":"range"}
 	})
@@ -263,6 +275,14 @@ const app = alxia()
 		throw new HttpError(418, { error: 'teapot' }); // → 418 {"error":"teapot"}
 	});
 ```
+
+A middleware that must see the response the client will get, an error's
+included — a logger, a header on every response — settles `next()` instead of
+catching it: `await settle(ctx, next())` resolves to the boundary's answer
+(the `onError` hooks, the `HttpError`, the 500) and keeps the error on
+`ctx.error`. Give such an observer first, and a middleware that answers
+errors after it: the observer settles the error before an outer `try` could
+see it ([Middleware](middleware.md)).
 
 ```ts
 class HttpError<Status extends number = number, Body = unknown> extends Error {
@@ -274,9 +294,12 @@ class HttpError<Status extends number = number, Body = unknown> extends Error {
 ```
 
 Core throws one subclass of its own, `ContentTooLargeError`, for a body past
-its route's `bodyLimit` ([Routes](routes.md#body-size-bodylimit)). The route
-answers it as a refusal, through [`onRefusal`](hooks.md#onrefusal), before
-any `onError` hook. Test for it with `instanceof`, not by `name`.
+its route's `bodyLimit` ([Routes](routes.md#body-size-bodylimit)), and a
+`validate` throws `ValidationError`, an `HttpError` of the 400. Both are
+refusals: `refusalOf(error)` reads them in a middleware, and the deprecated
+`onRefusal` hooks see them before any `onError` hook
+([Refusals in your own format](routes.md#refusals-in-your-own-format)). Test
+for them with `instanceof`, not by `name`.
 
 A thrown `HttpError` is answered as a status the route may never have
 declared: a client generated from the OpenAPI document does not expect it.
@@ -315,10 +338,9 @@ interface ProblemDetails<Status extends ClientErrorStatus | ServerErrorStatus> {
 
 On a route with `responds`, a problem is a reply like any other:
 its status must be declared and its body accepted by that status's schema.
-[`onRefusal`](hooks.md#onrefusal) answers a refused request with one, and
-a hook per kind declares a schema for each: `onRefusal('validation', { response: { 400: Invalid } }, hook)`
-and `onRefusal('body_limit', { response: { 413: TooLarge } }, hook)`
-([One hook per kind](hooks.md#one-hook-per-kind)). A client reads `application/problem+json` as JSON.
+A middleware before a `validate` answers a refused request with one, reading
+`refusalOf(error)` ([Refusals in your own format](routes.md#refusals-in-your-own-format)).
+A client reads `application/problem+json` as JSON.
 
 ## Types
 
@@ -343,4 +365,4 @@ may return.
 
 - [Server-sent events](server-sent-events.md): a reply that streams.
 - [Static files](static-files.md): files with ETags, ranges and 304s.
-- [Hooks](hooks.md): replies that end a request before the handler.
+- [Middleware](middleware.md): replies that end a request before the handler.

@@ -23,7 +23,7 @@ export function createState(options: AlxiaOptions<string>): AppState {
 	const prefix = options.prefix ?? '';
 	const state: AppState = {
 		prefix,
-		runtime: createRuntime(options),
+		runtime: createRuntime(options, () => state.scope.unmatched()),
 		routes: [],
 		sockets: [],
 		scope: new Scope(),

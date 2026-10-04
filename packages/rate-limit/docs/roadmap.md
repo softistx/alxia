@@ -7,7 +7,10 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **A middleware, not a plugin.** `app.use(rateLimit({ limit, windowMs }))` is
+  the form; `app.plugin(rateLimit(…))` keeps working, deprecated. Given to the
+  app, the limit also counts a request no route matches, and `RateLimit<Requires>`
+  names what `rateLimit()` returns.
 
 ## Next
 

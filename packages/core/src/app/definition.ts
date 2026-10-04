@@ -7,6 +7,8 @@ import type { AnyReply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
 import type { Router } from '../router/router';
 import type { SocketHandlers, SocketSchema } from '../ws/types';
+import type { ScopedHooks } from './scope';
+import type { ScopePath } from './scope-path';
 import type {
 	BaseContext,
 	MaybePromise,
@@ -42,7 +44,12 @@ export type MiddlewareHook = (
 export type ChainHook =
 	| { readonly kind: 'derive'; readonly run: DeriveHook }
 	| { readonly kind: 'wrap'; readonly run: WrapHook }
-	| { readonly kind: 'middleware'; readonly run: MiddlewareHook }
+	| {
+			readonly kind: 'middleware';
+			readonly run: MiddlewareHook;
+			/** Given a path by `use`, run only on a request under it. */
+			readonly when?: ScopePath;
+	  }
 	| {
 			readonly kind: 'validate';
 			readonly schemas: RequestSchemas;
@@ -160,6 +167,8 @@ export interface Globals {
 /** What a request reads of an app: its routes, its global hooks, its options. */
 export interface Runtime {
 	readonly router: Router<Definition>;
+	/** The chain a request no route matches runs: the app's own, every `use()` of it wherever declared. */
+	readonly unmatched: () => ScopedHooks;
 	/** Shared with the app's groups, whose global hooks are the app's. */
 	readonly globals: Globals;
 	readonly validateResponses: boolean;

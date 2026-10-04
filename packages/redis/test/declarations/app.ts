@@ -48,22 +48,20 @@ export function bare() {
 
 export function idempotent() {
 	return alxia()
-		.plugin(idempotency(client, { name: 'orders', required: true }))
+		.use(idempotency(client, { name: 'orders', required: true }))
 		.post('/orders', ({ reply }) => reply(201, { id: 'o1' }));
 }
 
 export function stores() {
 	return alxia()
-		.plugin(
+		.use(
 			rateLimit({
 				limit: 100,
 				windowMs: 60_000,
 				store: redisStore(client, { name: 'api' }),
 			}),
 		)
-		.plugin(
-			cache({ ttl: 60, store: redisCacheStore(client, { name: 'shop' }) }),
-		)
+		.use(cache({ ttl: 60, store: redisCacheStore(client, { name: 'shop' }) }))
 		.get('/', ({ reply }) => reply(200, 'ok'));
 }
 

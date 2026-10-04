@@ -1,15 +1,15 @@
 # Guide
 
 This page covers what `cors()` sends and when: each option, what it
-defaults to, what a refused origin gets, and where the plugin sits among an
-app's other hooks.
+defaults to, what a refused origin gets, and where the middleware sits among
+an app's others.
 
 ```ts
 import { alxia } from '@alxia/core';
 import { cors } from '@alxia/cors';
 
 const app = alxia()
-	.plugin(cors({ origin: 'https://app.example.com' }))
+	.use(cors({ origin: 'https://app.example.com' }))
 	.get('/data', ({ reply }) => reply(200, { ok: true }));
 
 app.listen(3000);
@@ -21,7 +21,7 @@ other route of the app. A script on any other origin cannot.
 ## The signature
 
 ```ts
-function cors(options?: CorsOptions): Plugin;
+function cors(options?: CorsOptions): Middleware<Empty, Promise<Response>>;
 
 type CorsOrigin =
 	| true
@@ -41,20 +41,24 @@ interface CorsOptions {
 }
 ```
 
-`cors()` returns a function plugin: pass it to `app.plugin`, called. It adds two
-global hooks, an `onRequest` and an `onResponse`, and nothing to the app's
-type.
+`cors()` returns a middleware from `@alxia/core`: pass it to `app.use`,
+called. It adds nothing to the context. `app.use` middlewares run on every
+request, in the order declared, and a request no route matches — a `404`,
+a `405`, a preflight to a path with no `OPTIONS` route — runs all of the
+app's top-level ones too. That is how `cors()` reaches a preflight and a
+`404`.
 
 ## What it does to a request
 
 | The request | What `cors()` does |
 | --- | --- |
-| a preflight: `OPTIONS` with an `Access-Control-Request-Method` header | answers it in `onRequest`, before routing, with a `204` and no body; no route runs, and the path need not exist |
-| any other request | lets it through, then adds the CORS headers to whatever response comes back |
+| a preflight: `OPTIONS` with an `Access-Control-Request-Method` header | answers it itself, with a `204` and no body, without calling `next()`: no route and no middleware after it runs, and the path need not exist |
+| any other request | calls `next()`, then adds the CORS headers to whatever response comes back |
 
 "Whatever response" is every response the app sends: a route's reply, a
 `404` or `405` from routing, a `400` from validation, a `500`, or a response
-another hook returned. A browser can then read the error body too, not only
+another middleware returned. It settles `next()` with `settle` from
+`@alxia/core`, so an error the routes threw is answered, then decorated. A browser can then read the error body too, not only
 the successes.
 
 ```ts
@@ -66,8 +70,8 @@ response.headers.get('access-control-allow-origin');   // 'https://app.example.c
 ```
 
 A plain `OPTIONS` request, one without `Access-Control-Request-Method`, is
-not a preflight: it goes to routing like any other method, and gets a `405`
-when no `options` route matches.
+not a preflight: it goes on to the routes like any other method, and gets a
+`405` when no `options` route matches.
 
 ## Options
 
@@ -101,7 +105,7 @@ cors({ origin: (origin) => allowed.has(origin) });             // your own decis
 | a string | that origin, compared exactly: `'https://app.example.com/'` never matches, nor does `http://` for `https://` |
 | a `RegExp` | every origin it `test`s true on: anchor it with `^` and `$`, or `/example\.com/` also matches `https://example.com.evil.net` |
 | a list | any of its strings or patterns |
-| a function | every origin it returns `true` for; a throw is logged, and the origin is refused (a preflight gets a 500) — see [the troubleshooting entry](troubleshooting.md#typeerror-invalid-url) |
+| a function | every origin it returns `true` for; on a request, a throw is logged and the response leaves without CORS headers; on a preflight, it is a 500 — see [the troubleshooting entry](troubleshooting.md#typeerror-invalid-url) |
 
 What the response carries depends on the form and on `credentials`:
 
@@ -118,7 +122,7 @@ route already sets, never replacing it:
 
 ```ts
 const app = alxia()
-	.plugin(cors({ origin: 'https://app.example.com' }))
+	.use(cors({ origin: 'https://app.example.com' }))
 	.get('/v', ({ reply }) => reply(200, 1, { headers: { vary: 'Accept-Encoding' } }));
 
 const response = await app.request('/v', { headers: { origin: 'https://app.example.com' } });
@@ -143,7 +147,7 @@ sends them when the call asks for it too:
 
 ```ts
 // the server
-alxia().plugin(cors({ origin: 'https://app.example.com', credentials: true }));
+alxia().use(cors({ origin: 'https://app.example.com', credentials: true }));
 
 // the browser, with fetch
 await fetch('https://api.example.com/me', { credentials: 'include' });
@@ -172,7 +176,7 @@ browser may send, not what a route answers.
 ### `allowedHeaders`
 
 The request headers a preflight allows, sent as
-`Access-Control-Allow-Headers`. By default, the plugin echoes the
+`Access-Control-Allow-Headers`. By default, the middleware echoes the
 preflight's `Access-Control-Request-Headers` — whatever the script asked to
 send — and adds `Access-Control-Request-Headers` to `Vary`. A list replaces
 that:
@@ -196,7 +200,7 @@ browser unless it is listed here:
 
 ```ts
 const app = alxia()
-	.plugin(cors({ origin: 'https://app.example.com', exposedHeaders: ['x-total', 'etag'] }))
+	.use(cors({ origin: 'https://app.example.com', exposedHeaders: ['x-total', 'etag'] }))
 	.get('/items', ({ reply }) => reply(200, [], { headers: { 'x-total': '0' } }));
 ```
 
@@ -252,31 +256,44 @@ Authenticate a route as if `cors()` were not there.
 
 ## Where it sits
 
-The preflight is answered in an `onRequest` hook, and `onRequest` hooks run
-in the order they were added. A hook added before `cors()` that returns a
-`Response` — a `401` for a missing token, say — answers the preflight first,
-without CORS headers, and the browser reports a failed preflight. Use
-`cors()` first:
+Middlewares nest: the first `use` is the outermost. A middleware declared
+before `cors()` that returns a `Response` — a `401` for a missing token,
+say — answers the preflight first, without CORS headers, and the browser
+reports a failed preflight. Use `cors()` first, and a guard after it:
 
 ```ts
+import { alxia, defineMiddleware } from '@alxia/core';
+import { cors } from '@alxia/cors';
+
+const authenticated = defineMiddleware((ctx, next) =>
+	ctx.request.headers.has('authorization') ? next() : new Response(null, { status: 401 }),
+);
+
 const app = alxia()
-	.plugin(cors({ origin: 'https://app.example.com' }))   // first: preflights stop here
-	.onRequest(({ request }) =>
-		request.headers.has('authorization') ? undefined : new Response(null, { status: 401 }),
-	)
+	.use(cors({ origin: 'https://app.example.com' })) // first: preflights stop here
+	.use(authenticated)
 	.get('/data', ({ reply }) => reply(200, { ok: true }));
 ```
 
-The `401` itself still carries the CORS headers, so the script can read it.
-Route hooks (`derive`, `wrap`) run after routing, so they never see a
-preflight.
+The `401` itself still carries the CORS headers, so the script can read it:
+`cors()` settles what the guard returns on its way out. A guard on the app
+runs on a request no route matches too, so an anonymous request to a missing
+path gets the `401`, not the `404`; scope it with a `group` or a path
+(`use('/api', authenticated)`) to guard only some routes.
 
-Its hooks are global: used inside a `group`, or in an app that is then
-mounted with `app.plugin`, `cors()` still applies to every route of the app it
-ends up in. An app has one CORS policy.
+Declare it on the app itself, not in a `group`. A group's middlewares stay
+with the group's routes: they do not run on a request no route matches, and
+a preflight is one, since the group has no `OPTIONS` route. A route
+declared before `app.use(cors())` is not covered either. An app mounted with
+`app.plugin(otherApp)` brings its middlewares to the app, unmatched requests
+included, so a plugin app may hold the `cors()`; an app has one CORS policy.
+
+Declare `cors()` after `logger()` and `secureHeaders()` so they see the
+preflight's `204` and the headers it adds, and before `compress()`, which
+compresses what comes back through it.
 
 `@alxia/graphql` leaves GraphQL Yoga's own CORS off by default, so the
-GraphQL endpoint follows this plugin like any other route.
+GraphQL endpoint follows this middleware like any other route.
 
 ## A realistic setup
 
@@ -291,7 +308,7 @@ import { cors } from '@alxia/cors';
 const origins = (process.env['CORS_ORIGINS'] ?? 'https://app.example.com').split(',');
 
 export const app = alxia()
-	.plugin(
+	.use(
 		cors({
 			origin: [...origins, /^http:\/\/localhost:\d+$/],
 			credentials: true,

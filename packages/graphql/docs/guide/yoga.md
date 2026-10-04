@@ -209,7 +209,7 @@ import { cors } from '@alxia/cors';
 import { graphql } from '@alxia/graphql';
 
 const app = alxia()
-	.plugin(cors({ origin: 'https://app.example.com', credentials: true }))
+	.use(cors({ origin: 'https://app.example.com', credentials: true }))
 	.plugin((app) => graphql(app, { schema }));
 // OPTIONS /graphql → 204, Access-Control-Allow-Origin: https://app.example.com
 ```

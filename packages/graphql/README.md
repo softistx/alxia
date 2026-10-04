@@ -2,8 +2,8 @@
 
 GraphQL for [alxia](https://www.npmjs.com/package/@alxia/core), served by
 [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server). The endpoint is a
-route like any other: behind the app's hooks, guarded by its guards, its
-resolvers reading the context those hooks built — typed, and checked.
+route like any other: behind the app's middlewares, guarded by its guards, its
+resolvers reading the context those middlewares built — typed, and checked.
 Yoga's plugin system is yours whole: Envelop's plugins and Yoga's own.
 
 ```sh
@@ -25,7 +25,7 @@ import { createSchema } from 'graphql-yoga';
 
 const base = alxia()
 	.decorate({ db })
-	.plugin(bearer({ jwt, schema: Claims }));        // every route after it needs a token
+	.use(bearer({ jwt, schema: Claims }));        // every route after it needs a token
 
 const schema = createSchema<GraphQLContext<typeof base>>({
 	typeDefs: /* GraphQL */ `type Query { me: String! }`,
@@ -45,7 +45,7 @@ to `app.plugin` as a function, it stays in the chain and sees the app's type.
 ## The context
 
 A resolver's context is Yoga's (`request`, `params`), the app's — every
-`decorate`, every `derive`, every plugin's: `user`, `db`, `log`,
+`decorate`, every `derive`, every middleware's: `user`, `db`, `log`,
 `requestId` — and `set`, through which it sets a header or a cookie:
 
 ```ts

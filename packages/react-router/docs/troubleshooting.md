@@ -55,6 +55,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [A page answers alxia's JSON 404 or 405 instead of rendering](#a-page-answers-alxias-json-404-or-405-instead-of-rendering)
 - [A streamed page arrives in one piece](#a-streamed-page-arrives-in-one-piece)
 - [The logger times a streamed page at a few milliseconds](#the-logger-times-a-streamed-page-at-a-few-milliseconds)
+- [A page, or a missing path, answers 401 behind a guard](#a-page-or-a-missing-path-answers-401-behind-a-guard)
+- [The logger, CORS or secure headers miss the client's files](#the-logger-cors-or-secure-headers-miss-the-clients-files)
 - [`ctx.server` is `undefined` under `react-router dev`](#ctxserver-is-undefined-under-react-router-dev)
 - [A `publish` under `react-router dev` misses the sockets opened before an edit](#a-publish-under-react-router-dev-misses-the-sockets-opened-before-an-edit)
 - [The build has a package's Node variant, not its `bun` one](#the-build-has-a-packages-node-variant-not-its-bun-one)
@@ -417,7 +419,7 @@ import { secureHeaders } from '@alxia/secure-headers';
 
 export default createServer({
 	configure: (app) =>
-		app.plugin(
+		app.use(
 			secureHeaders({
 				contentSecurityPolicy:
 					"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; form-action 'self'; base-uri 'self'; frame-ancestors 'none'",
@@ -742,7 +744,7 @@ error TS2339: Property 'tenant' does not exist on type 'BaseContext & Empty & { 
 ```
 
 **When:** a loader reads, through `alxiaOf`, or `getLoadContext`
-destructures, something no hook of the server derives. With the type
+destructures, something no middleware of the server derives. With the type
 `'BaseContext & Empty'` alone, `alxiaOf(context)` has no server to read:
 `app/server.ts` has no `Register` declaration, or there is no
 `app/server.ts`, and `@alxia/core`'s `Register` names no base either.
@@ -870,7 +872,7 @@ argument, `alxiaOf<Server>(context)`.
 error TS2375: Type '{ context: EntryContext; url: string; nonce: string | undefined; }' is not assignable to type 'ServerRouterProps' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
 ```
 
-**Why:** `nonceOf` returns `undefined` when no hook set a nonce, and
+**Why:** `nonceOf` returns `undefined` when no middleware set a nonce, and
 `ServerRouterProps.nonce` is optional without `undefined`. React's
 `nonce` option takes `undefined`, so only the prop complains.
 
@@ -995,9 +997,35 @@ deferred value later. If the whole page comes at once:
 page that streams for 800 ms is logged at its first byte. The duration is
 the server's time to first byte, not the page's.
 
+### A page, or a missing path, answers 401 behind a guard
+
+A guard given to `use` in `configure` or `beforeAll` runs on every request
+it is in front of, a request no route matches included, and answers before
+the 404. An anonymous request to `/nope` gets the 401, not the 404, and so
+does the login page the guard sits in front of. Scope the guard to what it
+guards, with a path or a `group`:
+
+```ts
+createServer({
+	configure: (app) => app.use('/account', bearer({ jwt })), // the pages under /account only
+});
+```
+
+### The logger, CORS or secure headers miss the client's files
+
+A middleware in `configure` runs for the routes declared after it. The
+client's files are declared before `configure`, after `beforeAll`: what must
+see them too goes in `beforeAll`.
+
+```ts
+createServer({
+	beforeAll: (app) => app.use(logger()).use(secureHeaders()),
+});
+```
+
 ### `ctx.server` is `undefined` under `react-router dev`
 
-A hook or a route reads `ctx.server`, or the app declares a `page()`,
+A middleware or a route reads `ctx.server`, or the app declares a `page()`,
 under `react-router dev` or `vite preview`; the same code works from
 `bun build/server/index.js`.
 
@@ -1006,7 +1034,7 @@ the preview server under `vite preview`. An HTTP request reaches the app
 through `app.fetch`, as in a test, not through `listen`: there is no
 `Bun.serve` behind it, so `ctx.server` is `undefined`, the default
 `ctx.ip` too, and a `page()` (Bun's HTML bundle) is not served. A socket's upgrade is the exception: the plugin relays it
-to a `Bun.serve` of the app, so its hooks read a server
+to a `Bun.serve` of the app, so its middlewares read a server
 ([WebSockets](guide.md#under-react-router-dev)).
 
 **Fix:** read `ctx.server` as optional, and publish to sockets from the

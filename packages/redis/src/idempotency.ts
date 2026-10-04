@@ -1,4 +1,4 @@
-import { alxia, type BaseContext } from '@alxia/core';
+import { type BaseContext, defineMiddleware, settle } from '@alxia/core';
 import {
 	bindIdempotency,
 	defineIdempotency,
@@ -63,10 +63,13 @@ class Unstored extends Error {
 }
 
 /**
- * Idempotent routes, as a plugin, with `@nxgt/redis-guard`: a `POST` or
+ * Idempotent routes, as a middleware, with `@nxgt/redis-guard`: a `POST` or
  * `PATCH` carrying an `Idempotency-Key` runs once per key, and every repeat
  * gets the first response back, marked `Idempotent-Replayed: true` — across
- * every process sharing the Redis. Routes declared after it are guarded.
+ * every process sharing the Redis. Routes declared after it are guarded; a
+ * request no route matches is not: there is no route to scope its key by.
+ * What is kept is the response the route answers, an error's answer
+ * included.
  *
  * A repeat while the first still runs is a 409, and the same key with
  * another request — method, path or body — a 422: both are part of every
@@ -74,7 +77,7 @@ class Unstored extends Error {
  * key is free again.
  *
  * ```ts
- * app.plugin(idempotency(redis.client, { name: 'payments' })).post('/payments', ...);
+ * app.use(idempotency(redis.client, { name: 'payments' })).post('/payments', ...);
  * ```
  */
 export function idempotency(client: RedisClient, options: IdempotencyOptions) {
@@ -100,9 +103,9 @@ export function idempotency(client: RedisClient, options: IdempotencyOptions) {
 		return body;
 	};
 
-	return alxia().wrap(async (ctx, next) => {
-		const { request, reply } = ctx;
-		if (!methods.has(request.method)) return next();
+	return defineMiddleware(async (ctx, next) => {
+		const { request, reply, route } = ctx;
+		if (route === undefined || !methods.has(request.method)) return next();
 		const key = request.headers.get(header);
 		if (key === null) {
 			return options.required
@@ -118,12 +121,12 @@ export function idempotency(client: RedisClient, options: IdempotencyOptions) {
 		const fingerprint = new Uint8Array(head.length + body.length);
 		fingerprint.set(head);
 		fingerprint.set(body, head.length);
-		const id = `${ctx.route}:${scope(ctx) ?? 'anyone'}:${key}`;
+		const id = `${route}:${scope(ctx) ?? 'anyone'}:${key}`;
 
 		try {
 			const { value, replayed } = await bound.run(
 				id,
-				async () => store(await next()),
+				async () => store(await settle(ctx, next())),
 				{
 					fingerprint,
 					...(options.wait === undefined ? {} : { wait: options.wait }),

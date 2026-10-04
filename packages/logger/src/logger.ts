@@ -1,4 +1,4 @@
-import { alxia, withHeaders } from '@alxia/core';
+import { defineMiddleware, settle, withHeaders } from '@alxia/core';
 import { type Outcome, settled, watched } from './body';
 import { ID, safeGenerate, safeSkip, safeWrite } from './guards';
 
@@ -57,19 +57,16 @@ export interface LoggerOptions {
 	readonly skip?: (request: Request, url: URL) => boolean;
 }
 
-interface State {
-	readonly id: string;
-	readonly start: number;
-}
-
 /**
- * Logging, as a plugin: every request gets an id — kept from the incoming
- * header, or made — sent back on its response, and one entry once
- * answered. The routes declared after it read `requestId`, and `log`, whose
- * entries carry the id.
+ * Logging, as a middleware: every request gets an id — kept from the
+ * incoming header, or made — sent back on its response, and one entry once
+ * answered. The routes declared after it read `requestId`, and `log`,
+ * whose entries carry the id. Give it to `use` first: its timing then
+ * holds everything after it, and a request no route matches — a 404, a
+ * 405 — is logged too, wherever it stands.
  *
  * ```ts
- * app.plugin(logger()).get('/', ({ log, reply }) => { log.info('home'); return reply(200); });
+ * app.use(logger()).get('/', ({ log, reply }) => { log.info('home'); return reply(200); });
  * ```
  */
 export function logger(options: LoggerOptions = {}) {
@@ -81,63 +78,52 @@ export function logger(options: LoggerOptions = {}) {
 	const skipped = safeSkip(options.skip);
 	const trust = options.trustIncomingId ?? true;
 	const timing = options.serverTiming ?? true;
-	const states = new WeakMap<Request, State>();
 
-	const stateOf = (request: Request): State => {
-		let state = states.get(request);
-		if (state === undefined) {
-			const incoming = request.headers.get(header);
-			state = {
-				id:
-					trust && incoming !== null && ID.test(incoming)
-						? incoming
-						: generate(),
-				start: performance.now(),
-			};
-			states.set(request, state);
-		}
-		return state;
-	};
-
-	return alxia()
-		.onRequest(({ request }) => {
-			stateOf(request);
-		})
-		.onResponse((response, { request, url, ip }) => {
-			const state = stateOf(request);
-			const duration = since(state.start);
-			const sent = withHeaders(response, (headers) => {
-				headers.set(header, state.id);
-				if (timing) headers.append('server-timing', `total;dur=${duration}`);
-			});
-			if (skipped(request, url)) return sent;
-			const answered: Answered = {
-				id: state.id,
-				method: request.method,
-				path: url.pathname,
-				status: sent.status,
-				ip,
-			};
-			const entry = (duration: number, streamed?: Streamed) =>
-				entryOf(answered, duration, streamed);
-			if (settled(sent)) {
-				write(entry(duration));
-				return sent;
-			}
-			// A stream: logged once it has been sent, or has stopped.
-			const body = watched(sent.body as ReadableStream<Uint8Array>, (outcome) =>
-				write(entry(since(state.start), { timeToHeaders: duration, outcome })),
-			);
-			return new Response(body, {
-				status: sent.status,
-				statusText: sent.statusText,
-				headers: sent.headers,
-			});
-		})
-		.derive(({ request }) => {
-			const { id } = stateOf(request);
-			return { requestId: id, log: logOf(write, id) };
+	return defineMiddleware(async (ctx, next) => {
+		const start = performance.now();
+		const { request, url, ip } = ctx;
+		const incoming = request.headers.get(header);
+		const id =
+			trust && incoming !== null && ID.test(incoming) ? incoming : generate();
+		const added: LoggerContext = { requestId: id, log: logOf(write, id) };
+		const response = await settle(ctx, next(added));
+		const duration = since(start);
+		const sent = withHeaders(response, (headers) => {
+			headers.set(header, id);
+			if (timing) headers.append('server-timing', `total;dur=${duration}`);
 		});
+		if (skipped(request, url)) return sent as typeof response;
+		const answered: Answered = {
+			id,
+			method: request.method,
+			path: url.pathname,
+			status: sent.status,
+			ip,
+		};
+		if (settled(sent)) {
+			write(entryOf(answered, duration));
+			return sent as typeof response;
+		}
+		// A stream: logged once it has been sent, or has stopped.
+		const body = watched(sent.body as ReadableStream<Uint8Array>, (outcome) =>
+			write(
+				entryOf(answered, since(start), { timeToHeaders: duration, outcome }),
+			),
+		);
+		return new Response(body, {
+			status: sent.status,
+			statusText: sent.statusText,
+			headers: sent.headers,
+		}) as typeof response;
+	});
+}
+
+/** What the routes after `logger()` read. */
+export interface LoggerContext {
+	/** This request's id: the incoming one when trusted, else a fresh one. */
+	readonly requestId: string;
+	/** Entries that carry the id. */
+	readonly log: RequestLog;
 }
 
 /** The log of the request `id`: each entry written through `write`. */

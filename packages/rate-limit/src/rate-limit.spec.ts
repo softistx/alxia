@@ -5,7 +5,7 @@ import { MemoryStore } from './store';
 
 const app = alxia({ ip: (request) => request.headers.get('x-ip') ?? undefined })
 	.get('/free', ({ reply }) => reply(200, 'free'))
-	.plugin(rateLimit({ limit: 2, windowMs: 60_000 }))
+	.use(rateLimit({ limit: 2, windowMs: 60_000 }))
 	.get('/limited', ({ rateLimit, reply }) =>
 		reply(200, rateLimit?.remaining ?? -1),
 	);
@@ -80,7 +80,7 @@ describe('rateLimit', () => {
 		});
 		const limited = alxia()
 			.plugin(session)
-			.plugin(perUser)
+			.use(perUser)
 			.get('/', ({ reply }) => reply(200, 'ok'));
 		const as = (user: string) =>
 			limited.request('/', { headers: { 'x-user': user } });
@@ -91,8 +91,16 @@ describe('rateLimit', () => {
 		expect((await as('admin')).status).toBe(200);
 		const _refused = () => {
 			// @ts-expect-error the plugin reads "user", which this app's context does not give
-			alxia().plugin(perUser);
+			alxia().use(perUser);
 		};
 		expect(_refused).toBeFunction();
+	});
+
+	test('on the app, a request no route matches is counted too', async () => {
+		const limited = alxia()
+			.use(rateLimit({ limit: 1, windowMs: 60_000, key: () => 'one' }))
+			.get('/', ({ reply }) => reply(200, 'ok'));
+		expect((await limited.request('/missing')).status).toBe(404);
+		expect((await limited.request('/missing')).status).toBe(429);
 	});
 });

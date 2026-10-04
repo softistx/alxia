@@ -14,7 +14,7 @@ import type {
 	SocketDefinition,
 } from './definition';
 import { behind, byKind, type Refusals, then } from './refusal-handlers';
-import { inScope, rebase, type ScopePath } from './scope-path';
+import { reach, rebase, type ScopePath } from './scope-path';
 import type { RouteSchema } from './types';
 
 /** A hook of the chain in force, and the paths it runs on: all, without one. */
@@ -24,7 +24,7 @@ interface Scoped {
 }
 
 /** The hooks a route or socket route declared now runs. */
-type ScopedHooks = Pick<
+export type ScopedHooks = Pick<
 	RouteDefinition,
 	'derive' | 'onError' | 'refusal' | 'refusalByKind'
 >;
@@ -35,6 +35,8 @@ export class Scope {
 	#refusals: Refusals = {};
 	/** The `bodyLimit` of the routes declared next, unless theirs says otherwise. */
 	#bodyLimit: number | undefined;
+	/** What `unmatched` built, until a hook is added. */
+	#unmatched: ScopedHooks | undefined;
 
 	/**
 	 * Adds a `derive`, a `wrap` or a middleware for the routes declared
@@ -42,16 +44,19 @@ export class Scope {
 	 */
 	chain(hook: ChainHook, path?: ScopePath): void {
 		this.#derive.push({ hook, path });
+		this.#unmatched = undefined;
 	}
 
 	/** Adds an `onError` hook for the routes declared next. */
 	onError(hook: ErrorHook): void {
 		this.#onError.push(hook);
+		this.#unmatched = undefined;
 	}
 
 	/** Sets the `onRefusal` handler in force for the routes declared next: of any kind, every other one replaced. */
 	refuseWith(handler: RefusalHandler): void {
 		this.#refusals = { refusal: handler };
+		this.#unmatched = undefined;
 	}
 
 	/** Sets the `onRefusal(kind, hook)` handler of `kind` for the routes declared next. */
@@ -59,6 +64,7 @@ export class Scope {
 		this.#refusals = then(this.#refusals, {
 			refusalByKind: { [kind]: [handler] },
 		});
+		this.#unmatched = undefined;
 	}
 
 	/** Sets the `bodyLimit` of the routes declared next. */
@@ -87,6 +93,30 @@ export class Scope {
 			refusal: this.#refusals.refusal,
 			...byKind(this.#refusals.refusalByKind),
 		};
+	}
+
+	/**
+	 * What a request no route matches runs: every hook of the chain, in the
+	 * order declared — those declared after the last route included — each
+	 * middleware given a path when the request is under it; then the 404,
+	 * 405 or 426. Its errors are answered by the `onError` and `onRefusal`
+	 * hooks in force at the end. Built once, until a hook is added.
+	 */
+	unmatched(): ScopedHooks {
+		this.#unmatched ??= {
+			// A `wrap`, deprecated, keeps 0.3's rule: it never runs on a 404.
+			derive: this.#derive
+				.filter(({ hook }) => hook.kind !== 'wrap')
+				.map(({ hook, path }) =>
+					path === undefined || hook.kind !== 'middleware'
+						? hook
+						: { ...hook, when: path },
+				),
+			onError: [...this.#onError],
+			refusal: this.#refusals.refusal,
+			...byKind(this.#refusals.refusalByKind),
+		};
+		return this.#unmatched;
 	}
 
 	/**
@@ -130,15 +160,24 @@ export class Scope {
 		this.#onError = [...plugin.#onError, ...this.#onError];
 		this.#refusals = then(this.#refusals, plugin.#refusals);
 		this.#bodyLimit = plugin.#bodyLimit ?? this.#bodyLimit;
+		this.#unmatched = undefined;
 	}
 
-	/** The chain in force that runs on a route at `path`. */
+	/**
+	 * The chain in force that runs on a route at `path`: a middleware given
+	 * a path, if the route always serves requests under it; checked against
+	 * each request's path when its parameters or wildcard decide.
+	 */
 	#chainAt(path: string): ChainHook[] {
 		const chain: ChainHook[] = [];
-		for (const scoped of this.#derive) {
-			if (scoped.path === undefined || inScope(scoped.path, path)) {
-				chain.push(scoped.hook);
+		for (const { hook, path: scoped } of this.#derive) {
+			if (scoped === undefined || hook.kind !== 'middleware') {
+				chain.push(hook);
+				continue;
 			}
+			const reached = reach(scoped, path);
+			if (reached === 'always') chain.push(hook);
+			else if (reached === 'maybe') chain.push({ ...hook, when: scoped });
 		}
 		return chain;
 	}

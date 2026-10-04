@@ -7,7 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **A middleware, not a plugin (0.4).** `app.use(language({ ... }))` runs on every request, a 404 included, which then says `Content-Language` and `Vary` too. `app.plugin(language(...))` still works, deprecated.
 
 ## Next
 
@@ -27,7 +27,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **The request's language, typed.** `alxia().plugin(language({ supported, fallback }))`
+- **The request's language, typed.** `alxia().use(language({ supported, fallback }))`
   gives the routes after it `language`, typed as one of `supported` — never
   a string a client made up — and `languageSource`, which says what decided.
 - **Four sources, in your order.** The query, a cookie, a path segment and

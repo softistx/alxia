@@ -15,7 +15,7 @@ const app = alxia()
 		await products.invalidateTag('products');       // every product page runs again
 		return reply(201, { saved: true });
 	})
-	.plugin(products)
+	.use(products)
 	.get('/products', ({ reply }) => reply(200, []))
 	.get('/products/:id', ({ params, reply }) => reply(200, { id: params.id }));
 ```
@@ -33,8 +33,8 @@ invalidateTag(tag: string): Promise<void>
 Forgets every response that carries `tag`, whatever its key. A response
 carries:
 
-- the tags of the plugin's `tags(ctx)`, computed for each response kept —
-  `cache<{ user: User }>(…)` lets it read what an earlier plugin added
+- the tags of the cache's `tags(ctx)`, computed for each response kept —
+  `cache<{ user: User }>(…)` lets it read what an earlier middleware added
   ([Reading the app's context](keys-and-vary.md#reading-the-apps-context));
 - the tags its route added with `ctx.cache.tag(…)`.
 
@@ -48,7 +48,7 @@ const catalogue = cache({
 });
 
 const app = alxia()
-	.plugin(catalogue)
+	.use(catalogue)
 	.get('/products', ({ reply }) => reply(200, []))
 	.get('/products/:id', ({ params, cache, reply }) => {
 		cache.tag(`product:${params.id}`);
@@ -79,7 +79,7 @@ import { cache } from '@alxia/cache';
 
 const products = cache({ ttl: 300, vary: ['accept-language'] });
 const app = alxia({ prefix: '/api' })
-	.plugin(products)
+	.use(products)
 	.get('/products', ({ reply }) => reply.ok([]));
 
 await products.invalidate('/api/products');        // GET /api/products, in every language
@@ -96,7 +96,7 @@ import { pathTag } from '@alxia/cache';
 pathTag('/api/products?page=2');   // 'alxia:path:/api/products?page=2'
 ```
 
-Tags starting `alxia:` are the plugin's: do not give one of yours that
+Tags starting `alxia:` are the cache's: do not give one of yours that
 prefix. A store of your own must remember each response's `tags`, or
 `invalidate` reaches nothing ([Writing a store](stores.md#writing-a-store)).
 
@@ -143,8 +143,8 @@ const shortLived = cache({ ttl: 10, store, tags: () => ['products'] });
 const longLived = cache({ ttl: 600, store, tags: () => ['products'] });
 
 const app = alxia()
-	.group((g) => g.plugin(shortLived).get('/products/stock', ({ reply }) => reply(200, 5)))
-	.group((g) => g.plugin(longLived).get('/products', ({ reply }) => reply(200, [])));
+	.group((g) => g.use(shortLived).get('/products/stock', ({ reply }) => reply(200, 5)))
+	.group((g) => g.use(longLived).get('/products', ({ reply }) => reply(200, [])));
 
 await shortLived.invalidateTag('products');  // both routes run again
 ```
@@ -172,7 +172,7 @@ test('invalidated by path, and by tag', async () => {
 	let runs = 0;
 	const products = cache({ ttl: 60, tags: () => ['products'] });
 	const app = alxia()
-		.plugin(products)
+		.use(products)
 		.get('/products', ({ reply }) => reply(200, { runs: ++runs }));
 
 	await app.request('/products');

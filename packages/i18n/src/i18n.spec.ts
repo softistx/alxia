@@ -1,5 +1,10 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { alxia, type BaseContext, type Empty } from '@alxia/core';
+import {
+	alxia,
+	type BaseContext,
+	type Empty,
+	type Middleware,
+} from '@alxia/core';
 import { getLanguage, type Path, resources as shared } from '@nxgt/i18n';
 import {
 	type Catalogues,
@@ -7,6 +12,11 @@ import {
 	type I18nContext,
 	type KeyOf,
 } from './i18n';
+
+/** What a middleware requires of the app that uses it: what its context reads beyond the base. */
+type Reads<M> =
+	M extends Middleware<infer Requires, infer _Result> ? Requires : never;
+const reads = <M>(_middleware: M) => undefined as unknown as Reads<M>;
 
 const en = {
 	...shared.en,
@@ -33,7 +43,7 @@ async function describeCart(count: number) {
 }
 
 const app = alxia()
-	.plugin(i18n)
+	.use(i18n)
 	.get('/', async ({ t, language, reply }) => {
 		expectTypeOf(language).toEqualTypeOf<'en' | 'fr'>();
 		return reply(200, {
@@ -117,7 +127,7 @@ describe('KeyOf', () => {
 			fallback: Fallback,
 		) =>
 			alxia()
-				.plugin(createI18n({ resources, fallback }))
+				.use(createI18n({ resources, fallback }))
 				.get('/', ({ language, reply }) => reply(200, language));
 		const routed = <
 			const C extends Catalogues,
@@ -149,11 +159,11 @@ describe("resolve reads the app's context", () => {
 	});
 
 	test("an annotated resolve speaks the user's language, the languages and keys still inferred", async () => {
-		expectTypeOf(byUser['~requires']).toEqualTypeOf<{ user: User | null }>();
+		expectTypeOf(reads(byUser)).toEqualTypeOf<{ user: User | null }>();
 		expectTypeOf(byUser.supported).toEqualTypeOf<('en' | 'fr')[]>();
 		const served = alxia()
 			.plugin(auth)
-			.plugin(byUser)
+			.use(byUser)
 			.get('/', ({ language, t, reply }) => {
 				expectTypeOf(language).toEqualTypeOf<'en' | 'fr'>();
 				return reply(200, t('home.title'));
@@ -176,9 +186,9 @@ describe("resolve reads the app's context", () => {
 				return undefined;
 			},
 		});
-		expectTypeOf(plain['~requires']).toEqualTypeOf<Empty>();
-		expectTypeOf(i18n['~requires']).toEqualTypeOf<Empty>();
-		alxia().plugin(plain).plugin(i18n);
+		expectTypeOf(reads(plain)).toEqualTypeOf<Empty>();
+		expectTypeOf(reads(i18n)).toEqualTypeOf<Empty>();
+		alxia().use(plain).use(i18n);
 	});
 
 	test('an app that does not give what resolve reads is refused, and so is any', () => {
@@ -189,13 +199,13 @@ describe("resolve reads the app's context", () => {
 		});
 		const _refused = () => {
 			// @ts-expect-error the plugin reads "user", which this app's context does not give
-			alxia().plugin(byUser);
+			alxia().use(byUser);
 			alxia()
 				.derive(() => ({ user: { language: 1 } }))
 				// @ts-expect-error the plugin reads "user", which this app's context gives with another type
-				.plugin(byUser);
+				.use(byUser);
 			// @ts-expect-error the plugin's resolve reads its context as any
-			alxia().plugin(auth).plugin(loose);
+			alxia().plugin(auth).use(loose);
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -204,7 +214,7 @@ describe("resolve reads the app's context", () => {
 describe('onError', () => {
 	test("an error hook speaks the request's language", async () => {
 		const failing = alxia()
-			.plugin(i18n)
+			.use(i18n)
 			.onError((_error, { reply }) =>
 				reply(500, { message: i18n.t('home.title'), nxgt: getLanguage() }),
 			)
@@ -225,8 +235,8 @@ describe('several plugins, and requests within requests', () => {
 			fallback: 'en',
 		});
 		const both = alxia()
-			.plugin(i18n)
-			.plugin(other)
+			.use(i18n)
+			.use(other)
 			.get('/', async ({ reply }) => {
 				await Bun.sleep(1);
 				return reply(200, [i18n.language(), other.language(), getLanguage()]);
@@ -240,10 +250,10 @@ describe('several plugins, and requests within requests', () => {
 
 	test('a request made from inside another leaves its language alone', async () => {
 		const inner = alxia()
-			.plugin(i18n)
+			.use(i18n)
 			.get('/', ({ reply }) => reply(200, i18n.language()));
 		const outer = alxia()
-			.plugin(i18n)
+			.use(i18n)
 			.get('/', async ({ reply }) => {
 				const before = i18n.language();
 				const nested = await (await inner.request('/?lang=en')).text();
@@ -260,7 +270,7 @@ describe('several plugins, and requests within requests', () => {
 describe("@nxgt/i18n's own getLanguage", () => {
 	test("speaks the alxia request's language", async () => {
 		const spoken = alxia()
-			.plugin(i18n)
+			.use(i18n)
 			.get('/nxgt', async ({ reply }) => {
 				await Bun.sleep(1);
 				return reply(200, getLanguage());

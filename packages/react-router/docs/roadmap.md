@@ -7,6 +7,11 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
+- **Middlewares around the pages.** `beforeAll` and `configure` take
+  `use(logger())`, `use(secureHeaders())` and the other middlewares of
+  alxia 0.4, which run on the pages, the client's files declared after
+  them, and every request no route matches; the hooks they replace still
+  work, deprecated.
 - **Loaders typed by core's `Register`.** `alxiaOf(context)` reads the base
   `@alxia/core`'s `Register` names when this package's names no server, so
   an app that registers its context once types its loaders too. This

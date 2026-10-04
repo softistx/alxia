@@ -7,9 +7,10 @@ only number on it. Every release, with each change it made, is in
 
 ## Now
 
+- **A middleware, not a plugin (0.4).** `app.use(contextStorage())` opens the store on every request, a 404 included: `getRequestContext()` works in every middleware after it, and an error is answered inside it, so an `onError` hook or a catching middleware still reads the context. `app.plugin(contextStorage())` still works, deprecated.
 - **Typed by `Register`.** With `@alxia/core`'s `Register` naming the
   base, `contextStorage()` needs no type argument: `context()` reads the
-  registered context. Typed either way, the plugin requires that context
+  registered context. Typed either way, the middleware requires that context
   of the app that mounts it, a compile error otherwise.
 
 ## Next
@@ -30,7 +31,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **The request's context anywhere it runs.** `alxia().plugin(contextStorage())`
+- **The request's context anywhere it runs.** `alxia().use(contextStorage())`
   lets a service, a repository or a logger read the context of the route
   that called it with `getContext()`, without it being passed down, through
   every `await`, timer and promise, and never another request's.
@@ -46,7 +47,7 @@ Nothing scheduled yet.
 - **A refusal that says why.** Where there is no context, `getContext()`
   throws a `ContextStorageError` coded `OUTSIDE_REQUEST` or `NOT_ROUTED`,
   and `tryGetContext()` returns `undefined`.
-  `plugin(contextStorage)`, the factory uncalled, fails `tsc` and throws a
+  `use(contextStorage)`, the factory uncalled, fails `tsc` and throws a
   `TypeError` at startup, rather than leaving the routes after it unserved.
 - **Ported from `hono/context-storage`.** One store, and `getContext()`
   read wherever it is called, as Hono's is: code written against one ports

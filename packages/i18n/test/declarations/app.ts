@@ -12,7 +12,7 @@ const i18n = createI18n({ resources: { en, fr }, fallback: 'en' });
 
 export function translated() {
 	return alxia()
-		.plugin(i18n)
+		.use(i18n)
 		.get('/', ({ t, language, reply }) =>
 			reply(200, { title: t('home.title'), language }),
 		);
@@ -21,7 +21,7 @@ export function translated() {
 export function translatedFor() {
 	return alxia()
 		.derive(() => ({ user: { language: 'fr' } }))
-		.plugin(
+		.use(
 			createI18n({
 				resources: { en, fr },
 				fallback: 'fr',
@@ -41,7 +41,7 @@ export function translatedWith<
 	const Fallback extends keyof C & string,
 >(resources: C, fallback: Fallback) {
 	return alxia()
-		.plugin(createI18n({ resources, fallback }))
+		.use(createI18n({ resources, fallback }))
 		.get('/', ({ language, reply }) => reply(200, language));
 }
 

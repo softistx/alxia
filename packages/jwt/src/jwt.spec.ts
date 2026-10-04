@@ -123,7 +123,7 @@ describe('createJwt keys', () => {
 describe('bearer', () => {
 	const jwt = createJwt({ secret });
 	const app = alxia()
-		.plugin(
+		.use(
 			bearer({
 				jwt,
 				schema: z.object({ sub: z.string(), role: z.enum(['admin', 'user']) }),
@@ -160,7 +160,7 @@ describe('bearer', () => {
 
 	test('a token read from a cookie', async () => {
 		const fromCookie = alxia()
-			.plugin(bearer({ jwt, cookie: 'token' }))
+			.use(bearer({ jwt, cookie: 'token' }))
 			.get('/me', ({ user, reply }) => reply(200, user.sub ?? ''));
 		const token = await jwt.sign({ sub: 'ada' });
 		const response = await fromCookie.request('/me', {
@@ -171,7 +171,7 @@ describe('bearer', () => {
 
 	test('claims read from a cookie are refused as the cookies', async () => {
 		const fromCookie = alxia()
-			.plugin(
+			.use(
 				bearer({
 					jwt,
 					cookie: 'token',
@@ -186,5 +186,18 @@ describe('bearer', () => {
 		const refused = await response.json();
 		expect(refused.reason).toBe('claims');
 		expect(refused.issues[0].target).toBe('cookies');
+	});
+
+	test('on the app, a request no route matches is refused before its 404', async () => {
+		const jwt = createJwt({ secret });
+		const app = alxia()
+			.use(bearer({ jwt }))
+			.get('/me', ({ user, reply }) => reply(200, user.sub ?? ''));
+		expect((await app.request('/missing')).status).toBe(401);
+		const token = await jwt.sign({ sub: 'ada' });
+		const missing = await app.request('/missing', {
+			headers: { authorization: `Bearer ${token}` },
+		});
+		expect(missing.status).toBe(404);
 	});
 });

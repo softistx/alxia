@@ -31,8 +31,8 @@ app.get(path, auth, validate(schemas), responds(responses), handler);
 The last argument is the handler, which returns the route's reply. Before
 it, the route's middlewares: functions made by `defineMiddleware`, written
 inline, or made by `validate` and `responds`. Each reads what the ones
-before it passed `next`; they run after the hooks in force, in the order
-given ([Middleware](middleware.md#a-routes-middlewares)). An object right
+before it passed `next`; they run after the `use` middlewares, `derive`s
+and `decorate`s declared before the route, in the order given ([Middleware](middleware.md#a-routes-middlewares)). An object right
 after the path is the route's options.
 
 `get`, `post`, `put`, `patch`, `delete`, `options`, `head` and `query` take
@@ -48,7 +48,7 @@ interface RouteMethod<M, Ctx, Prefix, Shortcuts>
 // MiddlewareForms: one overload per count of middlewares, 0 to 8. With two:
 <const Path extends RoutePath, R1 extends MiddlewareReturn, R2 extends MiddlewareReturn, Result extends …>(
 	path: Path, // a literal the app would refuse does not compile: `Invalid path: …`
-	m1: (ctx: /* the hooks' context, and the request as it arrived */, next: NextFunction) => R1,
+	m1: (ctx: /* the middlewares' context, and the request as it arrived */, next: NextFunction) => R1,
 	m2: (ctx: /* the same, and what m1 passed `next` */, next: NextFunction) => R2,
 	handler: (ctx: /* the same, and what m2 passed `next`; `reply` typed by a `responds` */) => MaybePromise<Result>,
 ): Alxia</* … the app, unchanged in type: a route adds nothing to it */>;
@@ -385,7 +385,7 @@ a schema that coerces turns `"7"` into `7`, a default fills a missing key.
 | `params` | the path parameters, which arrive as strings; a key the path lacks, optional or not, does not compile ([below](#what-the-types-refuse)) | `{ readonly id: string }`, from the path; `pathParams` holds them, after a `validate` too |
 | `query` | the query string | `Readonly<Record<string, string \| readonly string[]>>` |
 | `headers` | the request headers, names lowercased | `Readonly<Record<string, string>>` |
-| `cookies` | the `Cookie` header, by name; a second `validate` of the cookies reads the request's again, not what the first gave back | `Readonly<Record<string, string>>`; the hooks, `onError` and `onRefusal` always read these |
+| `cookies` | the `Cookie` header, by name; a second `validate` of the cookies reads the request's again, not what the first gave back | `Readonly<Record<string, string>>`; the middlewares before the `validate` read these |
 | `body` | the body, parsed by its `content-type` | `undefined`: read `ctx.request` yourself |
 
 `responds` declares the body of each status the route may answer. The
@@ -551,8 +551,8 @@ How a body is held to it, without reading it whole:
    body of exactly `bodyLimit` bytes is read.
 
 The count covers every reader of the body. That means the built-in JSON,
-form and text parsers, a [`parser`](#body-parsers) of the app's, a route
-hook (`derive`, `wrap`), a middleware, and a handler that reads `ctx.request.body` as a stream, as `/upload` does
+form and text parsers, a [`parser`](#body-parsers) of the app's, a
+`derive`, a middleware, and a handler that reads `ctx.request.body` as a stream, as `/upload` does
 above. That handler sees a stream like any other, and the stream fails once
 the count passes the limit. Measured on a 25 MiB limit through `listen`,
 with 256 MiB offered: the handler read 25 MiB, the client had sent about
@@ -561,9 +561,9 @@ with 256 MiB offered: the handler read 25 MiB, the client had sent about
 repeats that run: it holds the read and the growth under the limit, and the
 bytes sent within 8 MiB of it.
 
-A global hook, `onRequest` or `around`, runs before the route is known, so
-it reads the body whole. If one has read it, the route's limit is skipped:
-cap such a hook with `maxRequestBodySize`.
+A deprecated `onRequest` or `around` hook runs before the route is known,
+so it reads the body whole. If one has read it, the route's limit is
+skipped: cap such a hook with `maxRequestBodySize`.
 
 Past the limit the request is answered with a 413:
 
@@ -576,29 +576,38 @@ may answer it: declare it there in the OpenAPI document. A route with no limit n
 always has.
 
 What the read throws is a `ContentTooLargeError`, an `HttpError` with the
-route's `limit`. The route answers it as a refusal, as it answers a 400:
-the [`onRefusal`](hooks.md#onrefusal) hook in force reads
-`{ kind: 'body_limit', limit }` and may answer in another format, such as
-an RFC 9457 problem. The `onError` hooks never see it.
+route's `limit`. It is a refusal, as a 400 is: a middleware before the
+route catches it, `refusalOf(error)` reads `{ kind: 'body_limit', limit }`,
+and it may answer in another format, such as an RFC 9457 problem. Nobody
+catches it, and the answer is the default 413. The `onError` hooks never see
+it.
 
 ```ts
-import { alxia, problem, validate } from '@alxia/core';
+import { alxia, defineMiddleware, problem, refusalOf, validate } from '@alxia/core';
 import { z } from 'zod';
 
+const limits = defineMiddleware(async (_ctx, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		const refusal = refusalOf(error);
+		if (refusal?.kind !== 'body_limit') throw error; // a 400, or any other error: not ours
+		return problem({ type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: 'maxSizeRequest' });
+	}
+});
+
 const api = alxia()
-	.onRefusal((refusal) =>
-		refusal.kind === 'body_limit'
-			? problem({ type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: 'maxSizeRequest' })
-			: undefined,
-	)
+	.use(limits)
 	.post('/api', { bodyLimit: 10_000_000 }, validate({ body: z.unknown() }), ({ reply }) => reply(200, 'ok'));
 // a body past 10 MB → 413, application/problem+json:
 // { "type": "urn:ietf:params:jmap:error:limit", "status": 413, "limit": "maxSizeRequest" }
 ```
 
-The hook's replies then take the default 413's place on every route under
-a limit. A hook that returns nothing for a `body_limit` sends the default
-413 ([Hooks](hooks.md#onrefusal)).
+Its reply takes the default 413's place on every route under a limit; a
+middleware that rethrows leaves the default 413
+([Refusals in your own format](#refusals-in-your-own-format)). The
+`onRefusal` hook of 0.3 still answers a `body_limit` refusal, and is
+deprecated.
 
 A handler that streams its own response while it reads the body may have
 sent its headers before the count passes the limit. In that case its
@@ -636,13 +645,50 @@ interface ValidationIssue {
 
 Two codes are the framework's: `invalid_json` (the body is not JSON) and
 `unreadable_body` (a parser threw). Every route with a `validate` may
-answer the 400, and its OpenAPI document says so. The middlewares before the
-`validate` see it as the response of `next()`.
+answer the 400, and its OpenAPI document says so.
 
-The 400 is the default. [`onRefusal`](hooks.md#onrefusal) answers a refused
-request in your own format for the routes declared after it, such as an RFC
-9457 problem sent as `application/problem+json`. Its reply then takes the
-400's place on those routes.
+### Refusals in your own format
+
+What `validate` refuses it **throws**: a `ValidationError`, an `HttpError`
+of the 400 whose `refusal` is `{ kind: 'validation', part, issues }` and
+whose `body` is the default body above. A middleware before the `validate`
+sees it as a rejection of `next()`, not as a 400 response; one that does not
+catch it leaves the default. `refusalOf(error)` reads the refusal of a
+`ValidationError` or of a `ContentTooLargeError`, and is `undefined` for any
+other error:
+
+```ts
+import { alxia, defineMiddleware, problem, refusalOf, validate } from '@alxia/core';
+import { z } from 'zod';
+
+const problems = defineMiddleware(async (_ctx, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		const refusal = refusalOf(error);
+		if (refusal?.kind !== 'validation') throw error; // not a refusal, or not a 400: not ours
+		return problem({
+			type: 'https://example.com/problems/invalid-request',
+			status: 400,
+			detail: `the ${refusal.part} is invalid`,
+			errors: refusal.issues.map((issue) => ({ path: issue.path, message: issue.message })),
+		});
+	}
+});
+
+const app = alxia()
+	.use(problems) // before the routes that validate: the 400 is a problem+json
+	.post('/users', validate({ body: z.object({ name: z.string().min(1) }) }), ({ body, reply }) =>
+		reply(201, body),
+	);
+```
+
+Give it before the `validate` — on the app with `use`, or among the route's
+middlewares — and after the observers (`logger()`, `secureHeaders()`): an
+observer settles `next()`, which answers an error before a middleware outside
+it could catch it ([Middleware](middleware.md)). The `onRefusal` hook of 0.3
+still answers a refusal for the routes declared after it, and is deprecated for
+this middleware.
 
 ## What the types refuse
 
@@ -686,6 +732,10 @@ parameter of the path, as a string. What `reply` refuses is on
 [Replies](replies.md#with-response-schemas).
 
 ## Answered outside every route
+
+The `use` middlewares of the app run before these answers: a guard on the
+app answers a missing path with its 401, and an observer such as `logger()`
+sees the 404 (`ctx.route` is `undefined` there).
 
 | Request | Status | Body |
 | --- | --- | --- |
@@ -762,6 +812,6 @@ Each change is on [Upgrading](../upgrading.md); the list's hooks on
 - [Middleware: which way to use](middleware.md): where `validate` and
   `responds` stand among the route's middlewares, and the order a request
   runs them in.
-- [Hooks](hooks.md): what runs before the route's middlewares, and what it
-  adds to the context.
+- [Hooks](hooks.md): `derive` and `decorate`, which run before the route's
+  middlewares, and the deprecated request hooks.
 - [The app's type](types.md): `ContextOf`, and testing a route.

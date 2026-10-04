@@ -58,7 +58,7 @@ export async function main(
 			return 1;
 		}
 		output.out(
-			`${NAME}: wrote ${result.written}, the server alxia() runs by default.\nNext: uncomment configure in ${result.written} to add the app's hooks and /api; bun run dev picks it up.`,
+			`${NAME}: wrote ${result.written}, the server alxia() runs by default.\nNext: uncomment configure in ${result.written} to add the app's middlewares and /api; bun run dev picks it up.`,
 		);
 		return 0;
 	} catch (error) {

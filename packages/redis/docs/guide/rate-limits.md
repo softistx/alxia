@@ -14,7 +14,7 @@ import { connectRedis } from '@nxgt/redis';
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia()
-	.plugin(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
+	.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
 	.get('/search', ({ reply }) => reply(200, []));
 ```
 
@@ -77,7 +77,7 @@ const connection = await connectRedis(Bun.env['REDIS_URL']!);
 test('a full bucket, then a steady refill', async () => {
 	await connection.client.send('FLUSHDB', []);
 	const app = alxia({ ip: () => '1.2.3.4' })
-		.plugin(rateLimit({ limit: 5, windowMs: 2_000, store: redisStore(connection.client, { name: 'demo' }) }))
+		.use(rateLimit({ limit: 5, windowMs: 2_000, store: redisStore(connection.client, { name: 'demo' }) }))
 		.get('/', ({ reply }) => reply(200, 'ok'));
 
 	const burst = [];
@@ -109,10 +109,10 @@ const connection = await connectRedis(Bun.env['REDIS_URL']!);
 const app = alxia()
 	.group('/auth', (auth) =>
 		auth
-			.plugin(rateLimit({ limit: 5, windowMs: 15 * 60_000, store: redisStore(connection.client, { name: 'login' }) }))
+			.use(rateLimit({ limit: 5, windowMs: 15 * 60_000, store: redisStore(connection.client, { name: 'login' }) }))
 			.post('/login', ({ reply }) => reply(200, 'ok')),
 	)
-	.plugin(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
+	.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
 	.get('/search', ({ reply }) => reply(200, []));
 ```
 
@@ -157,7 +157,7 @@ const passwords = new Map([['ada', 'lovelace']]);
 
 const app = alxia().group('/auth', (auth) =>
 	auth
-		.plugin(rateLimit({ limit: 5, windowMs: 15 * 60_000, store: attempts }))
+		.use(rateLimit({ limit: 5, windowMs: 15 * 60_000, store: attempts }))
 		.post('/login', validate({ body: z.object({ name: z.string(), password: z.string() }) }), async ({ body, ip, reply }) => {
 			if (passwords.get(body.name) !== body.password) {
 				return reply(401, { error: 'invalid_credentials' as const });

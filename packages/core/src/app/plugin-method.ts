@@ -9,10 +9,12 @@ import type { Alxia } from './alxia';
 import type { AnyAlxia } from './signatures';
 import type {
 	Empty,
+	MiddlewareReturn,
 	ProvidedBy,
 	RequiringContext,
 	ThenShortcuts,
 } from './types';
+import type { AppAfterUse, ScopeMiddleware } from './use-forms';
 
 /** `app.plugin(plugin)`: an app, or a function given this app. */
 export interface PluginMethod<
@@ -64,6 +66,14 @@ export interface PluginMethod<
 		Prefix,
 		ThenShortcuts<Shortcuts, PluginShortcuts>
 	>;
+	/**
+	 * @deprecated A middleware is given to `app.use(middleware)`, which
+	 * this is: a package's factory — `logger()`, `cors()`, `bearer(…)` —
+	 * returns one now. See the upgrading guide.
+	 */
+	<R1 extends MiddlewareReturn>(
+		middleware: ScopeMiddleware<Ctx, [], R1>,
+	): AppAfterUse<Ctx, Prefix, Shortcuts, [R1]>;
 }
 
 /**

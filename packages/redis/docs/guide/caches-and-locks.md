@@ -202,7 +202,7 @@ const loadUser = async (id: string) => ({ id, name: 'Ada' });
 
 const app = alxia()
 	.plugin(redis(connection.client, { caches: { users } }))
-	.plugin(cache({ ttl: 60 }))
+	.use(cache({ ttl: 60 }))
 	.get('/users/:id', async ({ caches, cache, params, reply }) => {
 		cache.tag(`user:${params.id}`);                                    // the response cache
 		return reply.ok(await caches.users.remember(params.id, () => loadUser(params.id)));   // the Redis cache

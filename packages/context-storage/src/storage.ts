@@ -1,22 +1,23 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 import {
-	type Alxia,
-	alxia,
 	type BaseContext,
 	type ContextOf,
+	defineMiddleware,
 	type Empty,
+	type Middleware,
+	type MiddlewareMark,
 	type Mounted,
 	type RegisteredBase,
 	type RequestContext,
 	type RequiresOf,
-	type Requiring,
+	settle,
 } from '@alxia/core';
 
 /** Why there is no context to read. */
 export type ContextStorageErrorCode =
 	/** Called outside any request: at startup, in a job, after the response. */
 	| 'OUTSIDE_REQUEST'
-	/** In a request, but not in a route declared after `contextStorage()`: a 404, a hook, a route before it. */
+	/** In a request `contextStorage()` ran on, but that reached no route: a 404, a 405. A route it did not run on is `OUTSIDE_REQUEST`. */
 	| 'NOT_ROUTED';
 
 export class ContextStorageError extends Error {
@@ -51,7 +52,7 @@ const storage = new AsyncLocalStorage<Holder>();
  * Throws a `ContextStorageError` outside a route declared after
  * `contextStorage()`.
  *
- * `Ctx` types what the hooks added; prefer the typed `context()` of the plugin
+ * `Ctx` types what the hooks added; prefer the typed `context()` of the middleware
  * itself, typed by the app.
  */
 export function getContext<Ctx extends object = Empty>(): BaseContext & Ctx {
@@ -69,8 +70,8 @@ export function tryGetContext<Ctx extends object = Empty>():
 }
 
 /**
- * The request as every global hook sees it — before routing, in a 404, in
- * an `onResponse` — with the route it reached and the error it failed with.
+ * The request as a middleware sees it — in a 404 too — with the route it
+ * reached and the error it failed with.
  */
 export function getRequestContext(): RequestContext {
 	const holder = storage.getStore();
@@ -92,12 +93,15 @@ export function runWithContext<T>(ctx: BaseContext, work: () => T): T {
 }
 
 /**
- * The plugin, and its context typed by the app it follows. It requires
- * that context of the app that mounts it, beyond the base context: `app.plugin` on
- * an app that does not give it is a compile error.
+ * The middleware, and its context typed by the app it follows. It
+ * requires that context of the app that uses it, beyond the base context:
+ * `app.use` on an app that does not give it is a compile error.
  */
-export type ContextStoragePlugin<App> = Alxia<Empty, '', never> &
-	Requiring<RequiresOf<StoredContext<App>, 'context'>> & {
+export type ContextStoragePlugin<App> = Middleware<
+	RequiresOf<StoredContext<App>, 'context'>,
+	Promise<Response>
+> &
+	MiddlewareMark & {
 		/** `getContext()`, typed by `App`. */
 		context(): StoredContext<App>;
 		/** `tryGetContext()`, typed by `App`. */
@@ -110,10 +114,13 @@ export type StoredContext<App> = [ContextOf<App>] extends [never]
 	: Mounted<ContextOf<App>>;
 
 /**
- * The request's context, anywhere it runs, as a plugin: from the routes
- * declared after it, every function their handlers call — however deep,
- * through every `await` and timer — reads it with `getContext()`, without
- * it being passed down.
+ * The request's context, anywhere it runs, as a middleware: from the
+ * routes declared after it, every function their handlers call — however
+ * deep, through every `await` and timer — reads it with `getContext()`,
+ * without it being passed down; the answer to an error too, an `onError`
+ * hook's included. Give it to `use` before the middlewares whose errors
+ * your own middleware answers: what the rest throws is answered inside
+ * it, as the route would.
  *
  * Typed by the app it is used on: give the plugin that app's type, and its
  * `context()` returns what its routes read — the `user` a session derived, the
@@ -122,9 +129,9 @@ export type StoredContext<App> = [ContextOf<App>] extends [never]
  * it must give that context: using it before is a compile error.
  *
  * ```ts
- * const base = alxia().decorate({ db }).plugin(session(auth, { required: true }));
+ * const base = alxia().decorate({ db }).use(session(auth, { required: true }));
  * export const requestContext = contextStorage<typeof base>();
- * const app = base.plugin(requestContext).get('/orders', ({ reply }) => reply(200, listOrders()));
+ * const app = base.use(requestContext).get('/orders', ({ reply }) => reply(200, listOrders()));
  *
  * // orders.ts — no context passed
  * export const listOrders = () => {
@@ -137,24 +144,26 @@ export function contextStorage<App = RegisteredBase>(
 	...uncalled: readonly never[]
 ): ContextStoragePlugin<App> {
 	if (uncalled.length > 0) {
-		// `plugin(contextStorage)`: the app is handed to the factory, and what
+		// `use(contextStorage)`: the app is handed to the factory, and what
 		// follows would be declared on a plugin nobody serves.
 		throw new TypeError(
-			'contextStorage is a factory: plugin(contextStorage()), not plugin(contextStorage)',
+			'contextStorage is a factory: use(contextStorage()), not use(contextStorage)',
 		);
 	}
-	const plugin = alxia()
-		.around((request, next) => {
-			const current = storage.getStore();
-			if (current?.request.request === request.request) return next();
-			return storage.run({ request, ctx: undefined }, next);
-		})
-		.wrap((ctx, next) => {
-			const holder = storage.getStore();
-			if (holder !== undefined) holder.ctx = ctx;
-			return next();
-		});
-	return Object.assign(plugin, {
+	const middleware = defineMiddleware((ctx, next) => {
+		// A route's context; none for a request no route matches.
+		const routed = ctx.route === undefined ? undefined : ctx;
+		const current = storage.getStore();
+		// A second one, on the same request: the context it reaches is the route's.
+		if (current !== undefined && current.request.url === ctx.url) {
+			current.ctx = routed ?? current.ctx;
+			return settle(ctx, next());
+		}
+		return storage.run({ request: ctx, ctx: routed }, () =>
+			settle(ctx, next()),
+		);
+	});
+	return Object.assign(middleware, {
 		context: () => getContext(),
 		tryContext: () => tryGetContext(),
 	}) as unknown as ContextStoragePlugin<App>;

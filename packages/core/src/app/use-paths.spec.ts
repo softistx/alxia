@@ -134,12 +134,12 @@ describe('app.use(path, ...middlewares)', () => {
 		expect(refused.status).toBe(401);
 	});
 
-	test('matches the declared path: a parameter route is not under a literal', async () => {
+	test('matches the request path: a parameter route serving /admin runs the guard', async () => {
 		const app = alxia()
 			.use('/admin', admin)
-			.get('/:section', ({ reply }) => reply(200, 'unguarded'));
-		// `/admin` reaches `/:section`, declared at a path `/admin` does not match.
-		expect((await app.request('/admin')).status).toBe(200);
+			.get('/:section', ({ reply }) => reply(200, 'served'));
+		expect((await app.request('/admin')).status).toBe(401);
+		expect((await app.request('/public')).status).toBe(200);
 	});
 
 	test('refuses a path a route could not be declared at, or no middleware', () => {

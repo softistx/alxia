@@ -93,12 +93,8 @@ describe('app.plugin, given what is no plugin', () => {
 		expect(unhandled).toEqual([]);
 	});
 
-	test('refuses a middleware, nothing, two plugins, or what is neither an app nor a function', () => {
+	test('refuses a validate, nothing, two plugins, or what is neither an app nor a function', () => {
 		const untyped = alxia().plugin as (...args: unknown[]) => unknown;
-		const auth = defineMiddleware((_ctx, next) => next());
-		expect(() => untyped(auth)).toThrow(
-			'plugin(): a middleware is given to use(), not taken for a plugin',
-		);
 		expect(() => untyped(validate({}))).toThrow(
 			'plugin(): a middleware is given to use()',
 		);
@@ -108,6 +104,35 @@ describe('app.plugin, given what is no plugin', () => {
 		);
 		expect(() => untyped({})).toThrow(
 			'plugin(): the plugin is neither an app nor a function',
+		);
+	});
+});
+
+describe('app.plugin(middleware), deprecated', () => {
+	test('is use(middleware): typed for the routes after it, run on a request no route matches', async () => {
+		const seen: string[] = [];
+		const stamp = defineMiddleware(({ url }, next) => {
+			seen.push(url.pathname);
+			return next({ stamp: 'ok' as const });
+		});
+		const app = alxia()
+			.get('/before', ({ reply }) => reply(200, 'before'))
+			.plugin(stamp)
+			.get('/after', ({ stamp, reply }) => reply(200, stamp));
+		expect(await (await app.request('/after')).text()).toBe('ok');
+		expect((await app.request('/before')).status).toBe(200);
+		expect((await app.request('/missing')).status).toBe(404);
+		expect(seen).toEqual(['/after', '/missing']);
+	});
+
+	test('takes no path, and refuses a function not made by defineMiddleware beside one', () => {
+		const untyped = alxia().plugin as (...args: unknown[]) => unknown;
+		const auth = defineMiddleware((_ctx, next) => next());
+		expect(() => untyped(auth, () => {})).toThrow(
+			'plugin(): middleware 2 was not made by defineMiddleware()',
+		);
+		expect(() => untyped('/admin', auth)).toThrow(
+			'plugin(): a plugin is given alone',
 		);
 	});
 });

@@ -43,7 +43,7 @@ export interface ServerOptions<Before extends AnyAlxia, App extends AnyAlxia> {
 	 */
 	readonly beforeAll?: (app: FreshApp) => Before;
 	/**
-	 * The app the pages run behind: its plugins, its hooks, its `/api`.
+	 * The app the pages run behind: its middlewares, its plugins, its `/api`.
 	 * Declared after the client's files and before the catch-all. Returns
 	 * the app: what it builds is what the loaders read through `alxiaOf`.
 	 */
@@ -107,7 +107,7 @@ export interface ReactRouterServer<App extends AnyAlxia> {
  *
  * ```ts
  * const server = createServer({
- *   configure: (app) => app.plugin(logger()).get('/api/health', ({ reply }) => reply.ok({ ok: true })),
+ *   configure: (app) => app.use(logger()).get('/api/health', ({ reply }) => reply.ok({ ok: true })),
  * });
  * export default server;
  * ```

@@ -8,10 +8,17 @@ import type { Globals, Runtime } from './definition';
 import { addPage } from './pages';
 import type { AlxiaOptions } from './signatures';
 
-/** A new app's runtime: no route, no global hook. */
-export function createRuntime(options: AlxiaOptions<string>): Runtime {
+/**
+ * A new app's runtime: no route, no global hook; `unmatched` reads the
+ * chain of its scope.
+ */
+export function createRuntime(
+	options: AlxiaOptions<string>,
+	unmatched: Runtime['unmatched'],
+): Runtime {
 	return {
 		router: new Router(),
+		unmatched,
 		globals: {
 			around: [],
 			onRequest: [],

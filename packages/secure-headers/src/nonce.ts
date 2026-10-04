@@ -1,7 +1,6 @@
 /**
  * The per-request nonce of `secureHeaders({ nonce: true })`: where it goes
- * in the policy, how one is made, and how the context and the header read
- * the same one.
+ * in the policy, and how one is made.
  */
 
 /**
@@ -60,21 +59,4 @@ export function policyWithNonce(policy: string): (nonce: string) => string {
 export function freshNonce(): string {
 	const bytes = crypto.getRandomValues(new Uint8Array(16));
 	return btoa(String.fromCharCode(...bytes));
-}
-
-/**
- * One nonce per request, made when first asked for. Keyed by the request's
- * `URL`: the one object every hook and the route of a request share, where
- * a `bodyLimit` hands the route a `Request` of its own.
- */
-export function nonceStore(): (url: URL) => string {
-	const nonces = new WeakMap<URL, string>();
-	return (url) => {
-		let nonce = nonces.get(url);
-		if (nonce === undefined) {
-			nonce = freshNonce();
-			nonces.set(url, nonce);
-		}
-		return nonce;
-	};
 }

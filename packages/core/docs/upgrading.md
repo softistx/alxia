@@ -9,8 +9,9 @@ break yours.
 | Change | Package | Can it break your code |
 | --- | --- | --- |
 | [One middleware model](#one-middleware-model) | core | no: the forms of 0.3 still work, deprecated |
-| [Middlewares for the routes after them: `use`](#middlewares-for-the-routes-after-them-use) | core | no: new; a plugin goes to `plugin` |
-| [Plugins move to `app.plugin`](#plugins-move-to-appplugin) | core | no: `use(plugin)` still works, deprecated; a function given to it that returns no app now throws |
+| [Middlewares for every request: `use`](#middlewares-for-every-request-use) | core | no: new; `use` now runs on unmatched requests too |
+| [Middlewares replace the request hooks](#middlewares-replace-the-request-hooks) | core, logger, telemetry, compress, cors, secure-headers, rate-limit, cache, redis, context-storage, language, i18n, jwt, janus | yes, for an app that relies on a `use()`, `derive` or `decorate` not running on a 404, or on `ctx.route` being a `string` in a middleware: see the runtime changes |
+| [Plugins are apps: `app.plugin`](#plugins-are-apps-appplugin) | core | no: `plugin(middleware)` and `use(plugin)` still work, deprecated; a function given to `use` that returns no app now throws |
 | [How a middleware settles, and the details](#how-a-middleware-settles-and-the-details) | core | no: new behaviour of the new forms; a route mixing a list of hooks with middlewares now throws |
 | [alxia is OpenAPI spec first](#alxia-is-openapi-spec-first) | core, openapi | no: the document is the source, the routes run as before |
 | [No more client: spec first](#no-more-client-spec-first) | core, client, graphql, janus, secure-headers, context-storage, react-router | yes: `@alxia/client`, `RoutesOf` and the route table are gone, and `Alxia` takes three type parameters |
@@ -54,9 +55,11 @@ are `message`, `send` and `detail`. A route takes at most 8 middlewares.
 `app.route(operation, ...middlewares, handler)` takes the same middlewares,
 the operation's `schema` read as a `validate` and a `responds` just before
 the handler — or where `validate(operation)` and `responds(operation)`
-stand. `group`, `use`, and the hooks on the app — `derive`, `decorate`, `wrap`, `onError`,
-`onRefusal`, `bodyLimit`, `onRequest`, `onResponse`, `around` — are
-unchanged, and not deprecated.
+stand. `group`, `use`, `derive`, `decorate`, `bodyLimit`, `onStart`,
+`onStop` and `parser` are unchanged and not deprecated; `onRequest`,
+`onResponse`, `around`, `wrap`, `onError` and `onRefusal` are deprecated
+for middlewares ([Middlewares replace the request
+hooks](#middlewares-replace-the-request-hooks)).
 
 **Can it break your code.** No. The forms of 0.3 keep working, deprecated,
 for this minor at least: a list of hooks after the path, a schema before
@@ -224,7 +227,10 @@ A route with no options starts with its first middleware:
 in the options of a route with middlewares does not compile. The handler
 reads the same validated parts, and its `reply` is typed by `responds` as
 it was by `response`. A refused request is still answered by the
-`onRefusal` hook in force, by default `400 { error: 'validation', issues }`.
+`onRefusal` hook in force, deprecated, by default
+`400 { error: 'validation', issues }`; a middleware before the `validate`
+answers it in its own format instead
+([`ValidationError`](#validate-throws-a-validationerror)).
 A tool that reads `app.routes` finds the schemas of `validate` and
 `responds` on the route, as it found the route's schema.
 
@@ -267,8 +273,8 @@ app.post('/posts', auth, validate({ body: Post }), handler);
 app.post('/posts', validate({ body: Post }), auth, handler);
 ```
 
-The middlewares before `validate`, and the `onError` and `onRefusal` hooks,
-read the request as it arrived, its raw cookies included; what follows it
+The middlewares before `validate`, and the deprecated `onError` and
+`onRefusal` hooks, read the request as it arrived, its raw cookies included; what follows it
 reads the validated parts.
 
 **`responds` checks the replies made after it.** The handler's reply
@@ -285,19 +291,22 @@ app.get('/me', responds({ 200: User }), auth, handler);
 app.get('/me', responds({ 200: User, 401: Unauthorized }), auth, handler);
 ```
 
-### Middlewares for the routes after them: `use`
+### Middlewares for every request: `use`
 
 **What changed.** `use` takes middlewares made by `defineMiddleware`, up to
-8 in one call, for every route declared after it in the app or group,
-before the route's own. What they pass `next` is typed in those routes.
-`use(path, ...middlewares)` runs them on the routes under `path` alone —
-`/admin`, `/admin/*`, `:name` segments — matched when each route is
-declared; those may add nothing to the context, a compile error
-(`Invalid middleware: …`) otherwise. To add to a subtree's context, `use`
-them in a group. `defineMiddleware` marks what it makes, and `use` reads
-the mark: any other function is a plugin, in the deprecated form of
-[`use(plugin)`](#plugins-move-to-appplugin). `derive` stays, the shorthand
-for a middleware that only adds.
+8 in one call. They run on every request, in the order declared, and what
+they pass `next` is typed in the routes declared after them. A route runs
+the middlewares declared before it, then its own; a request no route
+matches runs all of them, wherever they were declared
+([Middlewares replace the request hooks](#middlewares-replace-the-request-hooks)).
+`use(path, ...middlewares)` runs them on the requests under `path` alone —
+`/admin`, `/admin/*`, `:name` segments — matched against the request's path
+when it arrives, with the syntax of a route's; those may add nothing to the
+context, a compile error (`Invalid middleware: …`) otherwise. To add to a
+subtree's context, `use` them in a group. `defineMiddleware` marks what it
+makes, and `use` reads the mark: any other function is a plugin, in the
+deprecated form of [`use(plugin)`](#plugins-are-apps-appplugin). `derive`
+stays, the shorthand for a middleware that only adds.
 
 ```ts
 // before: a derive for every route after a point, a guard repeated on each route
@@ -321,11 +330,15 @@ alxia()
 	.get('/admin/users', handler);
 ```
 
-**Can it break your code?** No. A plugin goes to `plugin` now;
-`use(app)` and `use(plugin)` still work, deprecated
-([Plugins move to `app.plugin`](#plugins-move-to-appplugin)). Calls that
-never worked now throw where they are made, saying why: `use` given a
-plugin and more arguments, `use` given what is neither an app nor a
+`use('/users/admin', guard)` guards a `/users/:id` route requested as
+`/users/admin`, and a request under `/users/admin` that no route matches:
+the path is the request's, not the route's.
+
+**Can it break your code?** No, but a `use` now also runs on a request no
+route matches: read
+[Middlewares replace the request hooks](#middlewares-replace-the-request-hooks).
+Calls that never worked now throw where they are made, saying why: `use`
+given a plugin and more arguments, `use` given what is neither an app nor a
 function (a hook of `defineHook`), `use()` given nothing, and a plain
 `(ctx, next) => …` given to `use`, called once as a plugin, which returns
 no app: wrap it in `defineMiddleware`
@@ -335,38 +348,327 @@ New exports: the types `MiddlewareMark`, `UseForms`, `PluginForms`
 (deprecated), `ScopeMiddleware`, `PathMiddleware`, `AddingNothing`,
 `ScopePathAt` and `AppAfterUse`.
 
-### Plugins move to `app.plugin`
+### Middlewares replace the request hooks
+
+**What changed.** A middleware does what `onRequest`, `onResponse`,
+`around`, `onError`, `onRefusal` and `wrap` did, in one form, in the place
+of the chain you give it. The hooks keep working as in 0.3 and are
+deprecated; every package plugin is a middleware now.
+
+Routing is decided first, so `ctx.route` is known in every middleware. Then
+the request runs the chain, and an error nobody caught is answered:
+
+1. The deprecated `onRequest` and `around` hooks, outermost.
+2. The `use` middlewares, `derive`, `decorate` and the deprecated `wrap`,
+   in the order declared, as Koa and Hono run them: code before `await next()` runs on
+   the way in, code after it on the way out.
+3. The route's own middlewares, then the handler — or, for a request no
+   route matches, the 404, 405 or 426.
+4. What nobody caught reaches the route boundary, outermost: the deprecated
+   `onError` and `onRefusal` hooks, then an `HttpError`'s own status, then a
+   500.
+
+**What changed at run time.**
+
+- **`use()` runs on every request**, a 404, a 405, a 426 and an OPTIONS
+  request to a path with no OPTIONS route included. A middleware may answer
+  before the 404: a 401, a preflight's 204. The middlewares, `derive`s and
+  `decorate`s declared **after** a route do not run for that route; they do
+  run for a request no route matches. A deprecated `wrap` keeps the rule of
+  0.3: it never runs on a request no route matches.
+
+  ```ts
+  const app = alxia()
+  	.use(auth)                                      // runs for /a and /missing
+  	.get('/a', ({ reply }) => reply(200, 'a'))
+  	.use(timed)                                     // not for /a; for /missing
+  	.get('/b', ({ reply }) => reply(200, 'b'));
+  ```
+
+- **`use(path, …)` matches the request's path**, at run time, with the
+  syntax of a route's path (`:param`, `*`). It runs for a route whose request
+  path matches and for an unmatched request under that path.
+- **`ctx.route` is `string | undefined`** on `BaseContext`: `undefined` in a
+  middleware of an unmatched request. A route's own middlewares and its
+  handler read a `string`.
+
+  ```ts
+  const seen = defineMiddleware(({ route, request }, next) => {
+  	console.log(route ?? `no route for ${request.method} ${new URL(request.url).pathname}`);
+  	return next();
+  });
+  ```
+
+- **A group's middlewares stay with its routes**: they do not run on an
+  unmatched request, even one under the group's prefix. The middlewares of
+  an app given to `plugin(app)` are the mounting app's: they run on
+  unmatched requests too.
+- **Errors are rejections through `next()`**: a middleware's
+  `try { return await next() } catch (error) { … }` sees what the rest threw,
+  an `HttpError` included.
+
+#### `validate` throws a `ValidationError`
+
+A request `validate` refuses throws `ValidationError`, an `HttpError` of
+the 400: `.refusal` is `{ kind: 'validation', part, issues }` and `.body` the
+default 400 body. A body past its limit throws `ContentTooLargeError` (413).
+`refusalOf(error)` gives the `Refusal` of either, `undefined` for any other
+error. A middleware **before** the `validate` answers it in its own format;
+nobody does, and the response is the default 400 or 413, or the deprecated
+`onRefusal` hook's.
+
+```ts
+import { defineMiddleware, refusalOf } from '@alxia/core';
+
+const problems = defineMiddleware(async ({ reply }, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		const refusal = refusalOf(error);
+		if (refusal?.kind !== 'validation') throw error;
+		return reply(422, { detail: `the ${refusal.part} is invalid` });
+	}
+});
+```
+
+#### `settle(ctx, next())` for a middleware that must see every response
+
+An observer — a logger, a header on every response — must see the final
+response, an error's included. `settle` resolves to what `next()` resolved
+to or, when it rejected, to the answer the route boundary would give (the
+`onError` and `onRefusal` hooks, an `HttpError`, a 500), and keeps the error
+on `ctx.error`.
+
+```ts
+import { defineMiddleware, settle } from '@alxia/core';
+
+const poweredBy = defineMiddleware(async (ctx, next) => {
+	const response = await settle(ctx, next());
+	response.headers.set('x-powered-by', 'alxia');
+	return response; // a 404 and a 500 carry it too
+});
+```
+
+`next.behind(added?)` runs the rest behind a reply the middleware returns at
+once; the rest's response goes to nobody. It is what serves a stale cache
+entry while the route refreshes it.
+
+#### Each hook, as a middleware
+
+| 0.3 | 0.4 | Status |
+| --- | --- | --- |
+| `onRequest(fn)` | `use(defineMiddleware((ctx, next) => early(ctx) ?? next()))`, first | deprecated; still runs before routing, before every middleware |
+| `onResponse(fn)` | `use(defineMiddleware(async (ctx, next) => fn(await settle(ctx, next()))))`, first | deprecated; still runs after everything |
+| `around(fn)` | `use(defineMiddleware((ctx, next) => … next() …))`, first | deprecated; still outermost |
+| `onError(fn)` | a `try { return await next() } catch (error) { … }` middleware | deprecated; still answers at the route boundary, after every middleware |
+| `onRefusal(fn)` | the same, reading `refusalOf(error)` | deprecated |
+| `wrap(fn)` | `use(defineMiddleware(async (ctx, next) => … await next() …))` | deprecated: see below |
+| `derive(fn)` | `use(defineMiddleware((ctx, next) => next(added)))` | **not** deprecated: the shorthand for adding to the context |
+| `decorate`, `onStart`, `onStop`, `parser`, `bodyLimit` | unchanged | stay |
+| `app.plugin(middleware)` | `app.use(middleware)` | deprecated alias, same behaviour |
+| `app.plugin(otherApp)`, `definePlugin` | unchanged | stay: a plugin is an app |
+
+```ts
+// onRequest: answer early
+// before
+alxia().onRequest(({ request }) =>
+	request.method === 'OPTIONS' ? new Response(null, { status: 204 }) : undefined,
+);
+// after
+alxia().use(
+	defineMiddleware(({ request }, next) =>
+		request.method === 'OPTIONS' ? new Response(null, { status: 204 }) : next(),
+	),
+);
+```
+
+```ts
+// onResponse: edit every response, a 404 and a 500 included
+// before
+alxia().onResponse((response) => {
+	response.headers.set('x-powered-by', 'alxia');
+});
+// after
+alxia().use(
+	defineMiddleware(async (ctx, next) => {
+		const response = await settle(ctx, next());
+		response.headers.set('x-powered-by', 'alxia');
+		return response;
+	}),
+);
+```
+
+```ts
+// around: a span, a transaction, a timer around the whole request
+// before
+alxia().around(async (ctx, next) => {
+	const started = performance.now();
+	const response = await next();
+	console.log(ctx.url.pathname, response.status, performance.now() - started);
+	return response;
+});
+// after: settle, so a 500 is logged with its status
+alxia().use(
+	defineMiddleware(async (ctx, next) => {
+		const started = performance.now();
+		const response = await settle(ctx, next());
+		console.log(ctx.url.pathname, response.status, performance.now() - started);
+		return response;
+	}),
+);
+```
+
+```ts
+// onError: answer one kind of error
+// before
+alxia().onError((error, { reply }) =>
+	error instanceof PaymentError ? reply(402, { error: 'payment_required' as const }) : undefined,
+);
+// after: rethrow what is not yours
+alxia().use(
+	defineMiddleware(async ({ reply }, next) => {
+		try {
+			return await next();
+		} catch (error) {
+			if (!(error instanceof PaymentError)) throw error;
+			return reply(402, { error: 'payment_required' as const });
+		}
+	}),
+);
+```
+
+```ts
+// onRefusal: answer a refused request in your own format
+// before
+alxia().onRefusal((refusal, { reply }) => reply(422, { detail: `the ${refusal.kind} refusal` }));
+// after: the `problems` middleware above, given before the routes that validate
+alxia().use(problems);
+```
+
+```ts
+// wrap: around the rest of the route
+// before
+alxia().wrap(async ({ request, reply }, next) =>
+	busy(request) ? reply(409, { error: 'busy' as const }) : next(),
+);
+// after
+alxia().use(
+	defineMiddleware(({ request, reply }, next) =>
+		busy(request) ? reply(409, { error: 'busy' as const }) : next(),
+	),
+);
+```
+
+Two differences from `wrap`: a `wrap` never runs on a 404 (it keeps the rule of 0.3), a middleware does;
+and a `wrap`'s `next()` resolves a refusal to the 400, where a
+middleware's rejects with the `ValidationError`. `derive` needs no change:
+`derive(fn)` and `use(defineMiddleware((ctx, next) => next(added)))` are the
+same.
+
+#### The package plugins are middlewares
+
+The factories keep their names. Give them to `use`: `app.use(logger())`.
+`app.plugin(logger())` still works, deprecated.
+
+```ts
+// before
+alxia().plugin(logger()).plugin(secureHeaders()).plugin(cors()).plugin(bearer({ jwt }));
+
+// now
+alxia().use(logger()).use(secureHeaders()).use(cors()).use(bearer({ jwt }));
+```
+
+| Package | Now |
+| --- | --- |
+| `@alxia/logger` | `app.use(logger())`, first; every request is logged — 404s, 405s, an `onError` reply, a 500. New type `LoggerContext` |
+| `@alxia/telemetry` | `app.use(telemetry({ … }))`, first; one server span per request, an unmatched one included, named `METHOD route` once matched and `METHOD path` otherwise; no span for a socket upgrade. New type `TelemetryContext` |
+| `@alxia/compress` | `app.use(compress())`: compresses every response after it, 404s and errors included |
+| `@alxia/cors` | `app.use(cors())`, **first**: answers a preflight for any path itself, before the 404 or 405, and adds its headers to every other response, errors included |
+| `@alxia/secure-headers` | `app.use(secureHeaders())`, first; every response, errors included. New type `SecureHeaders`; `{ nonce: true }` gives `nonce` |
+| `@alxia/rate-limit` | `app.use(rateLimit({ … }))`: counts every request it runs on, an unmatched one too when it is on the app. New type `RateLimit<Requires>` |
+| `@alxia/cache` | `app.use(cache({ … }))`: a stale entry is served at once and refreshed behind it with `next.behind`. New type `CacheMiddleware<Requires>` |
+| `@alxia/redis` `idempotency` | `app.use(idempotency(client, options))`: skips a request no route matches, and keeps the response the route answers, an `onError` reply included |
+| `@alxia/context-storage` | `app.use(contextStorage<typeof base>())`: `getRequestContext()` works in every middleware after it, 404s included; `getContext()` only in a request that reached a route |
+| `@alxia/language` | `app.use(language({ … }))` |
+| `@alxia/i18n` | `app.use(createI18n({ … }))`: `t()` works in every middleware and hook after it, an error's answer included |
+| `@alxia/jwt` `bearer` | `app.use(bearer({ jwt }))`: refuses every request it runs on with a 401, an unmatched one included when it is on the app. New type `Bearer<Schema>` |
+| `@alxia/janus` | `session()`, `permission()` and `janusErrors()` are middlewares. `janusErrors()` is a try/catch: it answers the errors thrown **behind** it, so `app.use(janusErrors(), session(accounts))`. New types `JanusErrors`, `SessionMiddleware` |
+
+#### The order to give them
+
+- **Observers first**: `logger`, `telemetry`, `secureHeaders`, `cors` and
+  `compress` go first, so they wrap everything, a 404 included.
+- **An error-handling middleware after the observers**: a try/catch
+  middleware, or `janusErrors()`. An observer settles `next()`, which
+  answers an error with the route's `onError`, `HttpError` or 500 before an
+  outer try/catch could see it.
+- **`janusErrors()` before `session()`.**
+- **A guard on the app answers a missing path too**: `bearer`, a required
+  `session` and `rateLimit` run on unmatched requests, so an anonymous request
+  to a path that does not exist gets the 401, not the 404. Scope the guard
+  with a `group`, `app.group('/api', (api) => api.use(bearer({ jwt })))`, to
+  guard some routes only. A path, `use('/api', guard)`, takes a middleware
+  that adds nothing to the context: not these.
+
+```ts
+import { alxia } from '@alxia/core';
+import { cors } from '@alxia/cors';
+import { logger } from '@alxia/logger';
+import { secureHeaders } from '@alxia/secure-headers';
+
+const app = alxia()
+	.use(logger(), secureHeaders(), cors())  // observers, first
+	.use(problems)                           // then what answers errors
+	.group('/api', (api) => api.use(auth).get('/me', ({ user, reply }) => reply(200, user)));
+```
+
+**Can it break your code?** Mostly no: the hooks and `plugin(middleware)`
+run as in 0.3. What a changed behaviour can break:
+
+- a `use()` — or a `derive`, `decorate` — that assumed a route, and now
+  also runs on a 404: read `ctx.route` as `string | undefined`, and
+  return `next()` for a request that is not yours;
+- a guard on the app that you relied on never answering a missing path;
+- a `wrap` moved to a middleware: its `next()` no longer resolves a refusal
+  to the 400, it rejects with the `ValidationError`;
+- an `onError` or `onRefusal` hook that you moved to a middleware: it
+  must be declared **after** the observers to see the error.
+
+### Plugins are apps: `app.plugin`
 
 **What changed.** A plugin is mounted by `app.plugin(…)`: an app — a
 sub-app, the routes of `defineRoutes`, a `definePlugin` — or a function
-`(app) => app` that adds global hooks. The requirement checks of
+`(app) => app` that adds to the app. The requirement checks of
 `definePlugin` and `defineRoutes` are on `plugin`, as is the prefix and
-the place behind the hooks declared before it. `use` is for middlewares.
+the place behind the middlewares declared before it. `use` is for
+middlewares, the package plugins included: they are middlewares now
+([Middlewares replace the request hooks](#the-package-plugins-are-middlewares)).
 
 ```ts
 // before
 alxia().use(cors()).use(auth).use(todos);
 
-// now
-alxia().plugin(cors()).plugin(auth).plugin(todos);
+// now: a middleware to use, an app to plugin
+alxia().use(cors()).use(auth).plugin(todos);
 ```
 
 `plugin` throws where it is called when a function given to it returns
 anything but an app, and leaves a promise it returned handled; it throws
-too for a middleware, for more than one argument, and for a value that is
-neither an app nor a function
+too for more than one argument, and for a value that is neither an app nor
+a function
 ([Troubleshooting](troubleshooting.md#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-made-with-definemiddleware-and-given-to-use)).
 
 **Can it break your code?** No, unless a plugin function returned no app.
-`use(plugin)` still mounts a plugin, deprecated, with the same checks. A
-function given to it that returns anything but an app now throws, where in
-0.3 `use` returned what it returned: a middleware written without
-`defineMiddleware`, `(ctx, next) => …`, given to `use` was called once as
-a plugin and never guarded a request. Now it throws
+`use(plugin)` still mounts a plugin, and `plugin(middleware)` still
+installs a middleware, both deprecated. A function given to `use` that
+returns anything but an app now throws, where in 0.3 `use` returned what it
+returned: a middleware written without `defineMiddleware`,
+`(ctx, next) => …`, given to `use` was called once as a plugin and never
+guarded a request. Now it throws
 `use(): the plugin function returned a promise, not an app: …`; wrap it in
-`defineMiddleware`. Replace each `.use(plugin)` by `.plugin(plugin)`; each
-`.use(middleware)` stays. In the next minor, the plugin forms of `use` are
-removed, and `use` takes any `(ctx, next)` function as a middleware
+`defineMiddleware`. Replace each `.use(app)` by `.plugin(app)` and each
+`.plugin(middleware)` by `.use(middleware)`. In the next minor, the plugin
+forms of `use` and the middleware form of `plugin` are removed
 ([Roadmap](roadmap.md)).
 
 New export: the type `PluginMethod`. `Mounted` and `RequiredIn` now come

@@ -1,4 +1,4 @@
-import { type Plugin, vary, withHeaders } from '@alxia/core';
+import { defineMiddleware, settle, vary, withHeaders } from '@alxia/core';
 
 /** Which origins may call: every one, a list, a pattern, or a decision per origin. */
 export type CorsOrigin =
@@ -41,14 +41,17 @@ const METHODS = [
 ];
 
 /**
- * CORS, as a plugin: a preflight is answered before routing, with a 204,
- * and every response to an allowed origin carries its headers.
+ * CORS, as a middleware: a preflight is answered with a 204, whatever its
+ * path, and every response to an allowed origin carries its headers — a
+ * 404's and an error's included. Give it to `use` first: a request no
+ * route matches, a preflight's among them, runs it wherever it stands,
+ * and a route runs it when declared after it.
  *
  * ```ts
- * const app = alxia().plugin(cors({ origin: ['https://app.example.com'], credentials: true }));
+ * const app = alxia().use(cors({ origin: ['https://app.example.com'], credentials: true }));
  * ```
  */
-export function cors(options: CorsOptions = {}): Plugin {
+export function cors(options: CorsOptions = {}) {
 	const allows = matcher(options.origin ?? true);
 	const methods = (options.methods ?? METHODS).join(', ');
 	const exposed = options.exposedHeaders?.join(', ');
@@ -73,53 +76,55 @@ export function cors(options: CorsOptions = {}): Plugin {
 		return true;
 	};
 
-	return (app) =>
-		app
-			.onRequest(({ request }) => {
-				const method = request.headers.get('access-control-request-method');
-				if (request.method !== 'OPTIONS' || method === null) return;
-				const headers = new Headers();
-				if (common(headers, request.headers.get('origin'))) {
-					headers.set('access-control-allow-methods', methods);
-					const requested = request.headers.get(
-						'access-control-request-headers',
-					);
-					const allowedHeaders =
-						options.allowedHeaders?.join(', ') ?? requested;
-					if (allowedHeaders) {
-						headers.set('access-control-allow-headers', allowedHeaders);
-					}
-					if (options.allowedHeaders === undefined) {
-						vary(headers, 'Access-Control-Request-Headers');
-					}
-					if (options.maxAge !== undefined) {
-						headers.set('access-control-max-age', String(options.maxAge));
-					}
-					if (
-						options.privateNetwork &&
-						request.headers.get('access-control-request-private-network') ===
-							'true'
-					) {
-						headers.set('access-control-allow-private-network', 'true');
-					}
+	/** The answer to a preflight: a 204, with what the origin may do. */
+	const preflight = (request: Request): Response => {
+		const headers = new Headers();
+		if (common(headers, request.headers.get('origin'))) {
+			headers.set('access-control-allow-methods', methods);
+			const requested = request.headers.get('access-control-request-headers');
+			const allowedHeaders = options.allowedHeaders?.join(', ') ?? requested;
+			if (allowedHeaders) {
+				headers.set('access-control-allow-headers', allowedHeaders);
+			}
+			if (options.allowedHeaders === undefined) {
+				vary(headers, 'Access-Control-Request-Headers');
+			}
+			if (options.maxAge !== undefined) {
+				headers.set('access-control-max-age', String(options.maxAge));
+			}
+			if (
+				options.privateNetwork &&
+				request.headers.get('access-control-request-private-network') === 'true'
+			) {
+				headers.set('access-control-allow-private-network', 'true');
+			}
+		}
+		return new Response(null, { status: 204, headers });
+	};
+
+	return defineMiddleware(async (ctx, next) => {
+		const { request } = ctx;
+		if (
+			request.method === 'OPTIONS' &&
+			request.headers.has('access-control-request-method')
+		) {
+			return preflight(request);
+		}
+		const response = await settle(ctx, next());
+		const origin = request.headers.get('origin');
+		try {
+			if (origin === null && allowOrigin(null) !== '*') return response;
+			return withHeaders(response, (headers) => {
+				if (common(headers, origin) && exposed) {
+					headers.set('access-control-expose-headers', exposed);
 				}
-				return new Response(null, { status: 204, headers });
-			})
-			.onResponse((response, { request }) => {
-				if (
-					request.method === 'OPTIONS' &&
-					request.headers.has('access-control-request-method')
-				) {
-					return;
-				}
-				const origin = request.headers.get('origin');
-				if (origin === null && allowOrigin(null) !== '*') return;
-				return withHeaders(response, (headers) => {
-					if (common(headers, origin) && exposed) {
-						headers.set('access-control-expose-headers', exposed);
-					}
-				});
 			});
+		} catch (error) {
+			// An `origin` function that throws costs the headers, never the response.
+			console.error(error);
+			return response;
+		}
+	});
 }
 
 function matcher(origin: CorsOrigin): (origin: string) => boolean {

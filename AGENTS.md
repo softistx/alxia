@@ -8,14 +8,14 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 
 | package | what it is | peers |
 | --- | --- | --- |
-| `@alxia/core` | the framework: routes and their middlewares (`defineMiddleware`, `validate`, `responds`, `use(...middlewares)` for the routes after it), hooks, groups, plugins (`plugin(…)`), cookies, SSE, WebSockets; `Register`, which an app augments with `context: typeof base`, the chain that builds its context, read by `AppContext` and `defineRoutes(prefix?)`, a plugin built on that context that requires it of the app mounting it | — |
+| `@alxia/core` | the framework: routes and their middlewares (`defineMiddleware`, `validate`, `responds`, `use(...middlewares)` for the routes after it and every request no route matches, `settle`, `refusalOf`), the deprecated request hooks, groups, plugins (`plugin(…)`), cookies, SSE, WebSockets; `Register`, which an app augments with `context: typeof base`, the chain that builds its context, read by `AppContext` and `defineRoutes(prefix?)`, a plugin built on that context that requires it of the app mounting it | — |
 | `@alxia/openapi` | OpenAPI spec first: `implemented` and `matchesSpec`, every operation `@nxgt/openapi-codegen`'s `alxia` option generates from the document has a route, read from `app.routes`, and no other. Formerly `@alxia/openapi-routes`, renamed at 0.4.0, after the 0.3.0 of the package that held the name and wrote a document from an app's schemas, retired. A client generator from the document is on its roadmap | core |
 | `@alxia/openapi-routes` | deprecated: a last release re-exporting `@alxia/openapi`, each export `@deprecated`; no docs/ | core, openapi |
 | `@alxia/zod` | Zod coercions (`zq`) and `zodConverter`, a Zod schema as JSON Schema 2020-12 | zod |
-| `@alxia/graphql` | GraphQL Yoga as a route: the app's hooks and typed context, Yoga's plugins | core, graphql-yoga, graphql |
-| `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its hooks, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js` built for Bun (the `ssr` environment gains the `bun` condition, `bun` and `bun:*` as builtins, `esnext`, all merged with the app's own) and self-contained under `react-router build` (`resolve.noExternal: true`, unless the app set `ssr.external: true`; a list it sets stays external), so `build/` runs with no `node_modules`; the `alxia-react-router reveal` bin writes the default server out | core, react-router; vite (optional, `/vite`) |
-| `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | function plugins: global hooks; `secureHeaders({ nonce: true })` is an app plugin, adding a typed `nonce` | core |
-| `@alxia/rate-limit`, `@alxia/jwt`, `@alxia/logger` | app plugins: typed context, typed replies, routes | core |
+| `@alxia/graphql` | GraphQL Yoga as a route: the app's middlewares and typed context, Yoga's plugins | core, graphql-yoga, graphql |
+| `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its middlewares, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js` built for Bun (the `ssr` environment gains the `bun` condition, `bun` and `bun:*` as builtins, `esnext`, all merged with the app's own) and self-contained under `react-router build` (`resolve.noExternal: true`, unless the app set `ssr.external: true`; a list it sets stays external), so `build/` runs with no `node_modules`; the `alxia-react-router reveal` bin writes the default server out | core, react-router; vite (optional, `/vite`) |
+| `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | middlewares given to `use` first, on every response, 404s included; `secureHeaders({ nonce: true })` adds a typed `nonce` | core |
+| `@alxia/rate-limit`, `@alxia/jwt`, `@alxia/logger` | middlewares given to `use`: typed context, typed replies | core |
 | `@alxia/env` | environment variables through any Standard Schema | — |
 | `@alxia/cache` | HTTP response caching, a store contract and a memory store | core |
 | `@alxia/language` | the request's language, typed by the supported ones | core |
@@ -71,11 +71,13 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   ships a memory store; `@alxia/redis` answers the same interface across
   processes. The plugin never knows which it was given.
 - **Modular by plugin, not by option.** A feature that can live outside the
-  core does, as a package. A plugin is either an app given to `plugin` —
-  it adds context, routes or typed replies — or a function `Plugin`, given
-  to `plugin` too, that adds global hooks and returns the app unchanged in
-  type; `plugin` throws when a function returns anything but an app. `use`
-  takes middlewares alone: its plugin forms of 0.3 are deprecated. Plugins use the
+  core does, as a package: a middleware given to `use` when it acts on
+  requests, a plugin when it adds routes or `decorate`s. A plugin is either
+  an app given to `plugin` — it adds context, routes or typed replies — or
+  a function `Plugin`, given to `plugin` too, that returns the app
+  unchanged in type; `plugin` throws when a function returns anything but
+  an app. `use` takes middlewares alone: its plugin forms of 0.3 are
+  deprecated. Plugins use the
   core's public API only: if one needs more, export it from the core.
 - **The types are the product.** A mistake a type can catch is a compile
   error: a params schema that does not read the path, an unknown key in a
@@ -94,18 +96,35 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   type. A handler cannot return a raw `Response`. A global hook's
   `Response` is outside the contract: use it only for what no operation
   describes.
-- **Order is meaning.** A route hook, and a middleware given to `use`,
+- **Order is meaning.** A middleware given to `use`, and a route hook,
   applies to the routes declared after it, at runtime and in the types
-  alike; a group's stay inside it. A
-  route's middlewares run in the order given, `validate` and `responds`
-  among them, and what one passes `next` is typed only after it. Global
-  hooks apply everywhere. Keep the two in step.
+  alike; a group's stay inside it. The app's `use()` middlewares also wrap
+  the router: a request no route matches — a 404, a 405, a preflight —
+  runs every one of them, wherever declared, in declaration order, then
+  its answer, so a `use()` after a route runs on unmatched requests and
+  never on that route. A route's middlewares run in the order given,
+  `validate` and `responds` among them, and what one passes `next` is
+  typed only after it. Errors are rejections through `next()`; what no
+  middleware catches is answered at the route boundary, outermost — the
+  deprecated `onError` and `onRefusal`, an `HttpError`'s status, a 500 —
+  and `settle(ctx, next())` gives an observer that answer early. So an
+  observer (logger, telemetry, secure-headers, cors, compress) goes first,
+  and a try/catch middleware after the observers. Keep the runtime and the
+  types in step.
 - **One route model.** A route, a socket's upgrade and `route(operation)`
   take the same `...middlewares`, and `use(...middlewares)` gives them to
   every route declared after it, before the route's own, in the scope
-  chain the route hooks are in: matched against a route's declared path
-  when it is declared (`use(path, …)`), never per request, so the chain
-  `chain.ts` runs is the same. `use` tells a middleware from a plugin, its
+  chain the route hooks are in. `use(path, …)` is matched against the
+  request's path: decided at declaration when the route's own pattern
+  settles it (`reach` in `scope-path.ts`), checked per request with a
+  pattern compiled once, allocating nothing, when it does not, so a
+  `/users/:id` route requested as `/users/admin` runs
+  `use('/users/admin', …)`. `chain.ts` runs a route's chain and the
+  unmatched chain alike. The request hooks of 0.3 (`onRequest`,
+  `onResponse`, `around`, `wrap`, `onError`, `onRefusal`) are deprecated
+  adapters keeping their 0.3 behaviour; every package plugin that
+  installed them is a middleware given to `use`, under its old factory
+  name, and `plugin(middleware)` is a deprecated alias of `use`. `use` tells a middleware from a plugin, its
   deprecated form, by the mark `defineMiddleware` sets (and `validate` and
   `responds` theirs, both `Symbol.for`, shared by two copies of core), and
   a middleware given a path adds

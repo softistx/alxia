@@ -18,7 +18,7 @@ const server = createServer({
 	// limit, a logger that should see every request. Returns the app.
 	// beforeAll: (app) => app,
 
-	// The app the pages run behind: its plugins, its hooks, its /api. What it
+	// The app the pages run behind: its middlewares, its plugins, its /api. What it
 	// builds is what alxiaOf(context) reads in the loaders. Returns the app.
 	// configure: (app) => app.get('/api/health', ({ reply }) => reply.ok({ ok: true })),
 

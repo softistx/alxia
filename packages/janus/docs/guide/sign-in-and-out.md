@@ -22,8 +22,8 @@ const SignUp = z.object({ email: z.string(), name: z.string(), password: z.strin
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.plugin(janusErrors()) // a refused sign-in answered 401, a login taken 409
-	.plugin(session(accounts)) // not required: the people signing in are anonymous
+	.use(janusErrors()) // a refused sign-in answered 401, a login taken 409
+	.use(session(accounts)) // not required: the people signing in are anonymous
 	.post('/signup', validate({ body: SignUp }), async ({ body, auth, reply }) => {
 		const signedUp = await accounts.signUp(body);
 		return reply.created({ id: auth.send(signedUp).id });
@@ -60,12 +60,12 @@ It takes a `SessionOpened` — anything holding a `token`, a `session` and
 a `user`, what `signUp`, `signIn` and the other flows of `janus()` that open
 a session answer — so it works after a sign-in by code, by link, or after
 a second factor is confirmed too. With a `deviceToken`, it sets the device
-cookie as well, with the plugin's `device` options ([below](#devices)).
+cookie as well, with the middleware's `device` options ([below](#devices)).
 
 The cookie's attributes — `name` (`janus-session`), `domain`, `path`
 (`'/'`), `sameSite` (`'lax'`), `secure` (`true`) — are set once, in
 `janus({ cookie })`, and `session()` reads and renews the same cookie. A
-route that sends a session keeps its own `Set-Cookie`: the plugin never
+route that sends a session keeps its own `Set-Cookie`: the middleware never
 overwrites it with the session the request came in with.
 
 ### A user type
@@ -91,8 +91,8 @@ const accounts = janus({
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.plugin(janusErrors())
-	.plugin(session(accounts))
+	.use(janusErrors())
+	.use(session(accounts))
 	.post('/patients/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.patient.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
@@ -167,8 +167,8 @@ const accounts = janus({
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.plugin(janusErrors())
-	.plugin(session(accounts))
+	.use(janusErrors())
+	.use(session(accounts))
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body, { device: auth.device });
 		return reply.ok({
@@ -202,7 +202,7 @@ and `ctx.auth.send` sets, so they always agree:
 const device = { name: 'shop-device', domain: 'example.com' };
 
 alxia()
-	.plugin(session(accounts, { device }))
+	.use(session(accounts, { device }))
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body, { device: auth.device });
 		return reply.ok({ id: auth.send(signedIn).id });
@@ -257,13 +257,13 @@ const accounts = janus({
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.plugin(janusErrors())
+	.use(janusErrors())
 	.post('/signin', validate({ body: SignIn }), async (ctx) => {
 		const signedIn = await accounts.signIn(ctx.body, { device: deviceOf(ctx) });
 		return ctx.reply.ok({ id: sendSession(ctx, accounts, signedIn).id });
 	})
 	.post('/signout', async (ctx) => ctx.reply.ok(await signOut(ctx, accounts)))
-	.plugin(session(accounts, { required: true }))
+	.use(session(accounts, { required: true }))
 	.get('/me', ({ user, reply }) => reply.ok({ name: user.name }));
 ```
 

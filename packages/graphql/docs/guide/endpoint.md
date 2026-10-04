@@ -1,7 +1,7 @@
 # Mounting the endpoint
 
 This page covers `graphql(app, options)`: where the endpoint is served, what
-it answers, which hooks run before it, and how to test it.
+it answers, which middlewares run before it, and how to test it.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -85,9 +85,9 @@ const app = alxia()
 	.plugin((app) => graphql(app, { schema: admin, path: '/admin/graphql' }));
 ```
 
-## Behind the app's hooks
+## Behind the app's middlewares
 
-The endpoint is a route like any other: every route hook declared **before**
+The endpoint is a route like any other: every middleware declared **before**
 it runs first, and one that replies ends the request there. A guard before
 it guards it:
 
@@ -101,14 +101,31 @@ const app = alxia()
 	.plugin((app) => graphql(app, { schema })); // 401 without the token
 ```
 
-A hook declared **after** `app.plugin` does not run for it: the endpoint answers
-without it. The order is core's, explained in
-[Hooks](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/hooks.md#route-hooks-and-global-hooks).
-Global hooks — `onRequest`, `onResponse`, `around`, and the plugins built on
-them, such as `@alxia/cors` or `@alxia/secure-headers` — apply wherever they
-are declared.
+A middleware declared **after** `app.plugin` does not run for the endpoint: it
+answers without it. Give the observers (`@alxia/logger`, `@alxia/cors`,
+`@alxia/secure-headers`, `@alxia/compress`) to `use` first, so they wrap the
+endpoint, and every other request, the 404s included:
 
-What the hooks added is in each resolver's context: that is the next page,
+```ts
+import { alxia } from '@alxia/core';
+import { cors } from '@alxia/cors';
+import { graphql } from '@alxia/graphql';
+import { logger } from '@alxia/logger';
+import { secureHeaders } from '@alxia/secure-headers';
+
+const app = alxia()
+	.use(logger())
+	.use(secureHeaders())
+	.use(cors({ origin: 'https://app.example.com' }))
+	.plugin((app) => graphql(app, { schema }));
+```
+
+A guard given to the app's `use` (`bearer`, a required session) also runs on
+a request no route matches: an anonymous request to a missing path is a 401,
+not a 404. The order is core's, explained in
+[Middlewares](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md).
+
+What the middlewares added is in each resolver's context: that is the next page,
 [The typed context](context.md).
 
 ## What it answers
@@ -123,7 +140,7 @@ IDE page ([GraphiQL and Apollo Sandbox](ide.md)).
 | `GET ?query=…` | the same, for a query; a mutation is a `405` |
 | `POST` a subscription with `Accept: text/event-stream` | `200`, a `text/event-stream` of results ([subscriptions](yoga.md#subscriptions)) |
 | `GET` from a browser (`Accept: text/html`), no `query` | the IDE page; with `ide: false`, a GraphQL answer (`Must provide query string.`) |
-| a hook replied first | that hook's reply, such as a `401` |
+| a middleware replied first | that middleware's reply, such as a `401` |
 
 ```text
 POST {"query":"{ nope }"}             → 200 {"errors":[{"message":"Cannot query field \"nope\" on type \"Query\".", … "extensions":{"code":"GRAPHQL_VALIDATION_FAILED"}}]}
@@ -132,7 +149,7 @@ POST {}                               → 200 {"errors":[{"message":"Must provid
 ```
 
 Both methods answer a body to read as GraphQL, whatever its status, and
-the replies of the hooks before them — a guard's `401`, say.
+the replies of the middlewares before them — a guard's `401`, say.
 
 ## Testing it
 

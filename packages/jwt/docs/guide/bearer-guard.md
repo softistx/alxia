@@ -1,7 +1,7 @@
 # The bearer guard
 
-This page covers `bearer`: a plugin that makes every route declared after
-it require a valid token, reads the token's claims as a typed `user`, and
+This page covers `bearer`: a middleware that makes every request it runs on
+require a valid token, reads the token's claims as a typed `user`, and
 answers a 401 otherwise.
 
 ```ts
@@ -12,7 +12,7 @@ const jwt = createJwt({ secret: Bun.env['JWT_SECRET']!, expiresIn: 3600 });
 
 const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok'))        // open: declared before the guard
-	.plugin(bearer({ jwt }))
+	.use(bearer({ jwt }))
 	.get('/me', ({ user, reply }) => reply(200, { sub: user.sub ?? null })); // user: JwtClaims
 
 app.listen(3000);
@@ -27,8 +27,14 @@ curl localhost:3000/me -H "authorization: Bearer $TOKEN"
 ```ts
 function bearer<Schema extends StandardSchemaV1 | undefined = undefined>(
 	options: BearerOptions<Schema>,
-): Alxia<{ user: User<Schema> }, '', Reply<401, UnauthorizedBody>>;
+): Bearer<Schema>;
+// a middleware that gives `user`, or answers the 401
 // User<Schema>: the schema's output, or JwtClaims without one
+
+type Bearer<Schema extends StandardSchemaV1 | undefined = undefined> = Middleware<
+	Empty,
+	Promise<Reply<401, UnauthorizedBody> | Next<{ user: User<Schema> }>>
+>;
 
 interface BearerOptions<Schema extends StandardSchemaV1 | undefined> {
 	readonly jwt: Jwt;
@@ -37,10 +43,17 @@ interface BearerOptions<Schema extends StandardSchemaV1 | undefined> {
 }
 ```
 
-`bearer` returns an app, given to `app.plugin`. Like any route hook, it applies to
-the routes declared **after** `app.plugin`, in the same app or
+`bearer` returns a middleware, given to `app.use`. It applies to the routes
+declared **after** `app.use`, in the same app or
 [group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md);
 a route declared before it is open, and cannot read `user`.
+
+Given to the app, it runs on **every** request, an unmatched one too: a request to a path no route serves is refused with the
+401 before its 404, so an anonymous caller learns nothing about which paths
+exist. Declared in a group, it stays with the group's routes, and an
+unmatched request under the group's prefix gets the 404. A path-scoped
+`use('/api', bearer(…))` does not compile: a middleware given a path may add
+nothing to the context, and `bearer` adds `user`.
 
 ### Options
 
@@ -63,7 +76,7 @@ on the header alone, even if the header's token is bad and the cookie's
 good.
 
 ```ts
-app.plugin(bearer({ jwt, cookie: 'token' }));
+app.use(bearer({ jwt, cookie: 'token' }));
 // Authorization: Bearer <token>      → the header's token
 // Cookie: token=<token>              → the cookie's token
 // Authorization: Basic …, + cookie   → the cookie's token
@@ -83,7 +96,7 @@ import { z } from 'zod';
 const Claims = z.object({ sub: z.string(), role: z.enum(['admin', 'user']) });
 
 const app = alxia()
-	.plugin(bearer({ jwt, schema: Claims }))
+	.use(bearer({ jwt, schema: Claims }))
 	.get('/me', ({ user, reply }) => reply(200, user)); // user: { sub: string; role: 'admin' | 'user' }
 ```
 
@@ -122,7 +135,7 @@ OpenAPI document, and the client you generate from it (with
 the schema's output:
 
 ```ts
-app.plugin(bearer({ jwt, schema: Claims })).get('/me', ({ user, reply }) =>
+app.use(bearer({ jwt, schema: Claims })).get('/me', ({ user, reply }) =>
 	reply(200, { role: user.role }), // 'admin' | 'user'
 );
 ```
@@ -143,13 +156,13 @@ the typed `user`, and its reply ends the request for the routes after it:
 
 ```ts
 const app = alxia()
-	.plugin(bearer({ jwt, schema: Claims }))
+	.use(bearer({ jwt, schema: Claims }))
 	.get('/me', ({ user, reply }) => reply(200, user))
 	.derive(({ user, reply }) => (user.role === 'admin' ? undefined : reply(403, { error: 'forbidden' as const })))
 	.get('/admin/stats', ({ reply }) => reply(200, { users: 42 })); // 200, 401 or 403
 ```
 
-To guard only some routes, put the guard in a group: its hooks stay inside
+To guard only some routes, put the guard in a group: its middlewares stay inside
 ([Groups and plugins](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md)).
 
 ## A login that sets the cookie
@@ -183,7 +196,7 @@ export const app = alxia()
 		set.cookies.delete('token');
 		return reply(204);
 	})
-	.plugin(bearer({ jwt, schema: Claims, cookie: 'token' }))
+	.use(bearer({ jwt, schema: Claims, cookie: 'token' }))
 	.get('/me', ({ user, reply }) => reply(200, user));
 ```
 

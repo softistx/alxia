@@ -21,19 +21,19 @@ const jwt = createJwt({ secret: 'a secret of at least thirty-two bytes!' });
 
 export function guarded() {
 	return alxia()
-		.plugin(bearer({ jwt, schema: Claims, cookie: 'session' }))
+		.use(bearer({ jwt, schema: Claims, cookie: 'session' }))
 		.get('/me', ({ user, reply }) => reply(200, user.role));
 }
 
 export function guardedByClaims() {
 	return alxia()
-		.plugin(bearer({ jwt }))
+		.use(bearer({ jwt }))
 		.get('/me', ({ user, reply }) => reply(200, user.sub ?? ''));
 }
 
 export function guardedBy<S extends StandardSchemaV1>(schema: S) {
 	return alxia()
-		.plugin(bearer({ jwt, schema }))
+		.use(bearer({ jwt, schema }))
 		.get('/me', ({ user, reply }) => reply(200, { user }));
 }
 

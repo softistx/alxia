@@ -36,6 +36,16 @@ export type Next<
 export interface NextFunction {
 	(): Promise<Next>;
 	<Added extends object>(added: Added): Promise<Next<Added>>;
+	/**
+	 * Runs the rest behind the response this middleware returns of its
+	 * own, which is sent without waiting for it: a stale cache entry served
+	 * at once while the route refreshes it. Resolves to the rest's
+	 * response, which nobody else reads; an error it throws rejects it.
+	 * `added` is merged as `next(added)` merges it; what it types comes
+	 * from the `next(added)` the middleware returns on its other paths.
+	 * Called once at most, in place of `next()`.
+	 */
+	behind(added?: object): Promise<Response>;
 }
 
 /** What a middleware may return: `next(…)`'s response, a reply, or a `Response` of its own. */
@@ -83,6 +93,8 @@ export interface BuiltinMark<Kind extends 'validate' | 'responds'> {
  */
 export type MiddlewareBase<Ctx, Path extends string> = BaseContext &
 	Ctx & {
+		/** A route's middleware runs once it matched: its path as declared. */
+		readonly route: string;
 		readonly params: PathParams<Path>;
 		readonly pathParams: PathParams<Path>;
 		readonly query: RawRequestParts['query'];

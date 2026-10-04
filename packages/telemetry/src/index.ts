@@ -8,4 +8,8 @@ export {
 	URL_PATH,
 	URL_SCHEME,
 } from './attributes';
-export { type TelemetryPluginOptions, telemetry } from './telemetry';
+export {
+	type TelemetryContext,
+	type TelemetryPluginOptions,
+	telemetry,
+} from './telemetry';

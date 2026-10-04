@@ -7,7 +7,11 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **Middlewares, not hooks.** `session()`, `permission()` and `janusErrors()`
+  are middlewares given to `use`. `janusErrors()` is a try/catch: it answers
+  the refusals thrown behind it, so it goes to `use` before `session()`. A
+  required `session()` on the app answers an anonymous request to a missing
+  path with its 401: scope it with a `group`. Lands in 0.4.
 
 ## Next
 

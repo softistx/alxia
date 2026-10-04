@@ -28,12 +28,12 @@ alxia — writes the project, installs it, and prints `cd my-app` and
 
 | Package | |
 | --- | --- |
-| [`@alxia/core`](packages/core) | routes on `Bun.serve`, validated with any Standard Schema; replies typed by status; hooks, groups and plugins; cookies, server-sent events and WebSockets, typed; static files and Bun's HTML bundles |
+| [`@alxia/core`](packages/core) | routes on `Bun.serve`, validated with any Standard Schema; replies typed by status; middlewares, groups and plugins; cookies, server-sent events and WebSockets, typed; static files and Bun's HTML bundles |
 | [`@alxia/zod`](packages/zod) | Zod 4: query and path coercions (`zq.int()`, `zq.array()`…), and a Zod schema as JSON Schema |
-| [`@alxia/graphql`](packages/graphql) | GraphQL with Yoga and its plugins: behind the app's hooks, resolvers reading its typed context, subscriptions over SSE, GraphiQL or Apollo Sandbox |
-| [`@alxia/react-router`](packages/react-router) | a React Router app served by alxia, under Bun: server rendering behind the app's hooks, loaders reading its typed context, `/api` routes beside the pages; one Vite plugin, no server file needed, for the dev server and a runnable build |
+| [`@alxia/graphql`](packages/graphql) | GraphQL with Yoga and its plugins: behind the app's middlewares, resolvers reading its typed context, subscriptions over SSE, GraphiQL or Apollo Sandbox |
+| [`@alxia/react-router`](packages/react-router) | a React Router app served by alxia, under Bun: server rendering behind the app's middlewares, loaders reading its typed context, `/api` routes beside the pages; one Vite plugin, no server file needed, for the dev server and a runnable build |
 | [`@alxia/openapi`](packages/openapi) | OpenAPI spec first: the routes bound to the operations `@nxgt/openapi-codegen` generates from the document, and a test that every operation has its route, and no other (`matchesSpec`). Formerly `@alxia/openapi-routes`, now deprecated |
-| [`@alxia/cors`](packages/cors) | CORS: preflights before routing, headers on every response |
+| [`@alxia/cors`](packages/cors) | CORS: a middleware that answers preflights before routing and adds its headers to every response |
 | [`@alxia/secure-headers`](packages/secure-headers) | HSTS, CSP, nosniff and the rest |
 | [`@alxia/rate-limit`](packages/rate-limit) | a rate limit: a 429 past it, with its headers; pluggable stores |
 | [`@alxia/cache`](packages/cache) | HTTP response caching: TTL, stale-while-revalidate, one load per miss, tags, ETags; in memory or Redis |
@@ -66,8 +66,8 @@ import { zq } from '@alxia/zod';
 import { z } from 'zod';
 
 const app = alxia()
-	.plugin(logger())
-	.plugin(cors())
+	.use(logger())
+	.use(cors())
 	.get(
 		'/users/:id',
 		validate({ params: z.object({ id: zq.int() }) }),

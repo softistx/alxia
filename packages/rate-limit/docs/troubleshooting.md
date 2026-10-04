@@ -24,19 +24,20 @@ nothing of its own; past the limit it answers a 429.
 - [Nothing is limited, and no `RateLimit-*` header is sent](#nothing-is-limited-and-no-ratelimit--header-is-sent)
 - [A client makes more than `limit` requests](#a-client-makes-more-than-limit-requests)
 - [A client is refused before `limit` requests](#a-client-is-refused-before-limit-requests)
+- [A missing path answers 429](#a-missing-path-answers-429)
 
 ## Types
 
 ### `Property 'user' does not exist on type 'BaseContext & Empty'`
 
-**When:** a `key` (or `skip`) reads something an earlier `derive` or plugin
+**When:** a `key` (or `skip`) reads something an earlier `derive` or middleware
 added to the context, and `rateLimit` is not told about it.
 
 ```text
 error TS2339: Property 'user' does not exist on type 'BaseContext & Empty'.
 ```
 
-**Why:** `key` and `skip` are typed with `BaseContext`, what every route hook
+**Why:** `key` and `skip` are typed with `BaseContext`, what every middleware
 reads — `request`, `url`, `ip`, `server`, `route`, `pathParams` — plus what
 you name as `rateLimit`'s type argument, and nothing else. `rateLimit` is
 built before it is used, so it cannot see the app it will be used on.
@@ -51,10 +52,10 @@ const perUser = rateLimit<{ user: { id: string } }>({
 	key: ({ user }) => user.id,
 });
 
-alxia().plugin(auth).plugin(perUser); // auth derives user
+alxia().use(auth).use(perUser); // auth derives user
 ```
 
-On an app that does not give `user`, `plugin(perUser)` is a compile error:
+On an app that does not give `user`, `use(perUser)` is a compile error:
 [`the plugin reads "user", which this app's context does not give`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first).
 
 ### `Type '() => Promise<boolean>' is not assignable to type '(ctx: BaseContext & Empty) => boolean'`
@@ -73,7 +74,7 @@ error TS2322: Type '() => Promise<boolean>' is not assignable to type '(ctx: Bas
 `undefined` for a request that should not be counted:
 
 ```ts
-app.plugin(
+app.use(
 	rateLimit({
 		limit: 100,
 		windowMs: 60_000,
@@ -99,7 +100,7 @@ returned `undefined` — which the default key does when `ctx.ip` is
 
 ```ts
 app
-	.plugin(rateLimit({ limit: 100, windowMs: 60_000 }))
+	.use(rateLimit({ limit: 100, windowMs: 60_000 }))
 	.get('/quota', ({ rateLimit, reply }) => reply(200, { remaining: rateLimit?.remaining ?? null }));
 ```
 
@@ -124,7 +125,7 @@ string, or `undefined` when the variable is unset: give it a default, and
 let an empty or non-numeric value still fail at startup, as it should:
 
 ```ts
-app.plugin(rateLimit({ limit: Number(Bun.env.RATE_LIMIT ?? 100), windowMs: 60_000 }));
+app.use(rateLimit({ limit: Number(Bun.env.RATE_LIMIT ?? 100), windowMs: 60_000 }));
 ```
 
 ## Responses
@@ -165,7 +166,7 @@ and only from a proxy you trust:
 const app = alxia({
 	ip: (request, server) =>
 		request.headers.get('x-real-ip') ?? server?.requestIP(request)?.address,
-}).plugin(rateLimit({ limit: 100, windowMs: 60_000 }));
+}).use(rateLimit({ limit: 100, windowMs: 60_000 }));
 ```
 
 ### Nothing is limited, and no `RateLimit-*` header is sent
@@ -178,13 +179,14 @@ the app through `app.fetch` or `app.request`.
 there is no connection, so the default `ip` is `undefined`, and so is the
 default key. A custom `key` returning `undefined`, or a `skip` returning
 `true`, does the same. (A route declared before the limit is not counted
-either, and never answers a 429.)
+either, and never answers a 429; nor is a request a group's limit does not
+run on.)
 
 **Fix:** in tests, read the address from a header you send:
 
 ```ts
 const app = alxia({ ip: (request) => request.headers.get('x-ip') ?? undefined })
-	.plugin(rateLimit({ limit: 2, windowMs: 60_000 }))
+	.use(rateLimit({ limit: 2, windowMs: 60_000 }))
 	.get('/limited', ({ reply }) => reply(200, 'ok'));
 
 await app.request('/limited', { headers: { 'x-ip': '1.1.1.1' } });
@@ -203,7 +205,7 @@ every count.
 ```ts
 import { redisStore } from '@alxia/redis';
 
-app.plugin(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis, { name: 'api' }) }));
+app.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis, { name: 'api' }) }));
 ```
 
 ### A client is refused before `limit` requests
@@ -220,12 +222,37 @@ app.plugin(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis, { 
   show the later one's numbers.
 - **Refused requests are counted.** The limit runs before the route
   validates the request, so a request answered 400 has spent one.
+- **Unmatched requests are counted.** On the app, the limit runs on a
+  request no route matches too, so a client probing missing paths spends
+  its allowance: see [A missing path answers 429](#a-missing-path-answers-429).
 
 **Fix:** give each limit its own `MemoryStore` — or none, and `rateLimit`
 creates one — and give all but one limit `headers: false`:
 
 ```ts
 app
-	.plugin(rateLimit({ limit: 10, windowMs: 1_000 }))
-	.plugin(rateLimit({ limit: 1_000, windowMs: 60 * 60_000, headers: false }));
+	.use(rateLimit({ limit: 10, windowMs: 1_000 }))
+	.use(rateLimit({ limit: 1_000, windowMs: 60 * 60_000, headers: false }));
+```
+
+### A missing path answers 429
+
+**When:** a request to a path no route serves answers `429`, not `404`, once
+the client is past the limit.
+
+**Why:** a limit given to `app.use` runs on every request, a request no
+route matches included, and answers before the 404. Declared after a route,
+it still runs for unmatched requests: only the routes before it are spared.
+A limit inside a `group` does not.
+
+**Fix:** that is the limit working. To count only some routes, scope it:
+
+```ts
+const app = alxia()
+	.get('/health', ({ reply }) => reply(200, 'ok'))
+	.group('/api', (api) =>
+		api
+			.use(rateLimit({ limit: 100, windowMs: 60_000 })) // /api routes only
+			.get('/search', ({ reply }) => reply(200, [])),
+	);
 ```

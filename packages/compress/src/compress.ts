@@ -1,6 +1,6 @@
 import { Duplex } from 'node:stream';
 import { constants, createBrotliCompress } from 'node:zlib';
-import { type Plugin, vary, withHeaders } from '@alxia/core';
+import { defineMiddleware, settle, vary, withHeaders } from '@alxia/core';
 import { BROTLI_QUALITY, flushing } from './flushing';
 
 export type Encoding = 'zstd' | 'br' | 'gzip' | 'deflate';
@@ -18,66 +18,81 @@ const COMPRESSIBLE =
 	/^(text\/(?!event-stream)|application\/(.+\+)?(json|javascript|xml)|image\/svg\+xml)/i;
 
 /**
- * Compression, as a plugin: each response worth it is streamed through the
+ * Compression, as a middleware: each response worth it — every one the
+ * routes after it and a request no route matches answer, an error's
+ * included — is streamed through the
  * best encoding both sides accept — zstd, Brotli, gzip or deflate — with
  * Bun's and Node's own codecs. A body with no `Content-Length` is flushed
  * as it comes, so a streamed page's shell leaves before its stream ends. An
  * event stream is left alone by default: `compressible` can opt it in, and
  * each event is then flushed in the same way.
+ *
+ * ```ts
+ * app.use(compress());
+ * ```
  */
-export function compress(options: CompressOptions = {}): Plugin {
-	const encodings = options.encodings ?? ['zstd', 'br', 'gzip', 'deflate'];
-	const threshold = options.threshold ?? 1024;
-	const compressible =
-		options.compressible ?? ((type) => COMPRESSIBLE.test(type));
-	return (app) =>
-		app.onResponse((response, { request }) => {
-			const type = response.headers.get('content-type') ?? '';
-			if (compressible(type)) {
-				response = withHeaders(response, (headers) =>
-					vary(headers, 'Accept-Encoding'),
-				);
-			}
-			if (
-				response.body === null ||
-				request.method === 'HEAD' ||
-				response.headers.has('content-encoding') ||
-				response.status === 204 ||
-				response.status === 206 ||
-				response.status === 304 ||
-				/\bno-transform\b/.test(response.headers.get('cache-control') ?? '') ||
-				!compressible(type)
-			) {
-				return response;
-			}
-			const length = response.headers.get('content-length');
-			if (length !== null && Number(length) < threshold) return response;
-			const encoding = negotiate(
-				request.headers.get('accept-encoding'),
-				encodings,
-			);
-			if (encoding === undefined) return response;
-			const headers = new Headers(response.headers);
-			headers.set('content-encoding', encoding);
-			headers.delete('content-length');
-			// A range of the encoded body is not a range of the file.
-			headers.delete('accept-ranges');
-			const etag = headers.get('etag');
-			if (etag !== null && !etag.startsWith('W/'))
-				headers.set('etag', `W/${etag}`);
-			// A body with no length is a stream: flushed as it comes, so a
-			// streamed page or an event leaves at once. One with a length is
-			// compressed whole, which compresses better.
-			const body =
-				length === null
-					? flushing(response.body, encoding)
-					: response.body.pipeThrough(compressor(encoding));
-			return new Response(body, {
-				status: response.status,
-				statusText: response.statusText,
-				headers,
-			});
-		});
+export function compress(options: CompressOptions = {}) {
+	const settings: Settings = {
+		encodings: options.encodings ?? ['zstd', 'br', 'gzip', 'deflate'],
+		threshold: options.threshold ?? 1024,
+		compressible: options.compressible ?? ((type) => COMPRESSIBLE.test(type)),
+	};
+	return defineMiddleware(async (ctx, next) =>
+		compressed(await settle(ctx, next()), ctx.request, settings),
+	);
+}
+
+interface Settings {
+	readonly encodings: readonly Encoding[];
+	readonly threshold: number;
+	readonly compressible: (type: string) => boolean;
+}
+
+/** `response`, encoded for `request` when it is worth it; as it is otherwise. */
+function compressed(
+	given: Response,
+	request: Request,
+	{ encodings, threshold, compressible }: Settings,
+): Response {
+	const type = given.headers.get('content-type') ?? '';
+	const response = compressible(type)
+		? withHeaders(given, (headers) => vary(headers, 'Accept-Encoding'))
+		: given;
+	if (
+		response.body === null ||
+		request.method === 'HEAD' ||
+		response.headers.has('content-encoding') ||
+		response.status === 204 ||
+		response.status === 206 ||
+		response.status === 304 ||
+		/\bno-transform\b/.test(response.headers.get('cache-control') ?? '') ||
+		!compressible(type)
+	) {
+		return response;
+	}
+	const length = response.headers.get('content-length');
+	if (length !== null && Number(length) < threshold) return response;
+	const encoding = negotiate(request.headers.get('accept-encoding'), encodings);
+	if (encoding === undefined) return response;
+	const headers = new Headers(response.headers);
+	headers.set('content-encoding', encoding);
+	headers.delete('content-length');
+	// A range of the encoded body is not a range of the file.
+	headers.delete('accept-ranges');
+	const etag = headers.get('etag');
+	if (etag !== null && !etag.startsWith('W/')) headers.set('etag', `W/${etag}`);
+	// A body with no length is a stream: flushed as it comes, so a
+	// streamed page or an event leaves at once. One with a length is
+	// compressed whole, which compresses better.
+	const body =
+		length === null
+			? flushing(response.body, encoding)
+			: response.body.pipeThrough(compressor(encoding));
+	return new Response(body, {
+		status: response.status,
+		statusText: response.statusText,
+		headers,
+	});
 }
 
 function compressor(

@@ -12,13 +12,13 @@ or a header in the wrong place.
 - [`No overload matches this call` … `is not assignable to type 'SecureHeadersOptions' with 'exactOptionalPropertyTypes: true'`](#no-overload-matches-this-call--is-not-assignable-to-type-secureheadersoptions-with-exactoptionalpropertytypes-true)
 - [`No overload matches this call` … `Object literal may only specify known properties, and '…' does not exist in type 'SecureHeadersOptions & …'`](#no-overload-matches-this-call--object-literal-may-only-specify-known-properties-and--does-not-exist-in-type-secureheadersoptions--)
 - [`No overload matches this call` … `Property 'nonce' is missing in type 'Alxia<Empty, "", never>'`](#no-overload-matches-this-call--property-nonce-is-missing-in-type-alxiaempty--never)
-- [`Property 'nonce' does not exist on type 'Context<…>'`](#property-nonce-does-not-exist-on-type-context)
+- [`Property 'nonce' does not exist on type 'RouteBase<…>'`](#property-nonce-does-not-exist-on-type-routebase)
 - [`No overload matches this call` … `Type 'boolean' is not assignable to type 'true'`](#no-overload-matches-this-call--type-boolean-is-not-assignable-to-type-true)
 
 **Runtime**
 
 - [`TypeError: secureHeaders: … is empty; give false to leave the … header out`](#typeerror-secureheaders--is-empty-give-false-to-leave-the--header-out)
-- [`TypeError: plugin(): the plugin function returned function, not an app: …`](#typeerror-plugin-the-plugin-function-returned-function-not-an-app-)
+- [`TypeError: use(): the plugin function returned function, not an app: …`](#typeerror-use-the-plugin-function-returned-function-not-an-app-)
 - [`TypeError: secureHeaders: nonce is on, but the content-security-policy has no script-src to add it to: …`](#typeerror-secureheaders-nonce-is-on-but-the-content-security-policy-has-no-script-src-to-add-it-to-)
 - [`TypeError: secureHeaders: nonce is on, but contentSecurityPolicy is false: …`](#typeerror-secureheaders-nonce-is-on-but-contentsecuritypolicy-is-false-)
 - [`TypeError: secureHeaders: contentSecurityPolicy names NONCE, but nonce is off: give nonce: true`](#typeerror-secureheaders-contentsecuritypolicy-names-nonce-but-nonce-is-off-give-nonce-true)
@@ -39,7 +39,9 @@ or a header in the wrong place.
 - [An option has no effect on a response](#an-option-has-no-effect-on-a-response)
 - [`X-Powered-By` or `Server` is still sent](#x-powered-by-or-server-is-still-sent)
 - [A response arrives without the headers](#a-response-arrives-without-the-headers)
-- [Routes outside a group get the headers](#routes-outside-a-group-get-the-headers)
+- [A 404 or a route outside a group has no headers](#a-404-or-a-route-outside-a-group-has-no-headers)
+- [A `try`/`catch` middleware never sees the error](#a-trycatch-middleware-never-sees-the-error)
+- [A route has no headers, though the others do](#a-route-has-no-headers-though-the-others-do)
 
 ## Types
 
@@ -51,7 +53,7 @@ or a header in the wrong place.
 error TS2769: No overload matches this call.
   Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin', gave the following error.
     Type 'true' is not assignable to type 'Setting'.
-  Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): Plugin', gave the following error.
+  Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): SecureHeaders', gave the following error.
     Type 'true' is not assignable to type 'Setting | undefined'.
 ```
 
@@ -69,7 +71,7 @@ policy.
 **Fix:** write the header as it goes out, or leave the key out:
 
 ```ts
-app.plugin(
+app.use(
 	secureHeaders({
 		contentSecurityPolicy: "default-src 'self'; img-src 'self' data:",
 		// xFrameOptions: true  →  leave it out for 'DENY'
@@ -87,7 +89,7 @@ error TS2769: No overload matches this call.
   Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin', gave the following error.
     Argument of type '{ xFrameOptions: undefined; }' is not assignable to parameter of type 'SecureHeadersOptions & { readonly nonce: true; }' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
       Type '{ xFrameOptions: undefined; }' is not assignable to type 'SecureHeadersOptions' with 'exactOptionalPropertyTypes: true'. Consider adding 'undefined' to the types of the target's properties.
-  Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): Plugin', gave the following error.
+  Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): SecureHeaders', gave the following error.
     Argument of type '{ xFrameOptions: undefined; }' is not assignable to parameter of type 'SecureHeadersOptions & { readonly nonce?: false; }' with 'exactOptionalPropertyTypes: true'. …
 ```
 
@@ -99,7 +101,7 @@ key present with `undefined` is not a key left out.
 ```ts
 const production = Bun.env.NODE_ENV === 'production';
 
-app.plugin(secureHeaders({ ...(production ? {} : { strictTransportSecurity: false }) }));
+app.use(secureHeaders({ ...(production ? {} : { strictTransportSecurity: false }) }));
 ```
 
 ### `No overload matches this call` … `Object literal may only specify known properties, and '…' does not exist in type 'SecureHeadersOptions & …'`
@@ -111,7 +113,7 @@ another library's name for one.
 error TS2769: No overload matches this call.
   Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin', gave the following error.
     Object literal may only specify known properties, and 'xPoweredBy' does not exist in type 'SecureHeadersOptions & { readonly nonce: true; }'.
-  Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): Plugin', gave the following error.
+  Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): SecureHeaders', gave the following error.
     Object literal may only specify known properties, and 'xPoweredBy' does not exist in type 'SecureHeadersOptions & { readonly nonce?: false; }'.
 ```
 
@@ -119,64 +121,69 @@ error TS2769: No overload matches this call.
 [guide](guide.md#the-options), plus `hidePoweredBy` and `nonce`. `X-Powered-By` and
 `Server` are governed by `hidePoweredBy`; anything else —
 `Content-Security-Policy-Report-Only`, `X-XSS-Protection` — is not sent by
-the plugin.
+the middleware.
 
-**Fix:** `hidePoweredBy` for those two; a hook of your own for another
+**Fix:** `hidePoweredBy` for those two; a middleware of your own for another
 header:
 
 ```ts
-import { alxia, withHeaders } from '@alxia/core';
+import { alxia, defineMiddleware, settle, withHeaders } from '@alxia/core';
 import { secureHeaders } from '@alxia/secure-headers';
 
+const reportOnly = defineMiddleware(async (ctx, next) =>
+	withHeaders(await settle(ctx, next()), (headers) =>
+		headers.set('content-security-policy-report-only', "default-src 'self'"),
+	),
+);
+
 const app = alxia()
-	.plugin(secureHeaders({ hidePoweredBy: true }))
-	.onResponse((response) =>
-		withHeaders(response, (headers) =>
-			headers.set('content-security-policy-report-only', "default-src 'self'"),
-		),
-	);
+	.use(secureHeaders({ hidePoweredBy: true }))
+	.use(reportOnly);
 ```
 
 ### `No overload matches this call` … `Property 'nonce' is missing in type 'Alxia<Empty, "", never>'`
 
-**When:** `secureHeaders` is given to `app.plugin` without being called.
+**When:** `secureHeaders` is given to `app.use` without being called.
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
+  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
     Argument of type '{ (options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin; (options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): Plugin; }' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
       Types of parameters 'options' and 'app' are incompatible.
         Type 'Alxia<Empty, "", never>' is not assignable to type 'SecureHeadersOptions & { readonly nonce: true; }'.
           Property 'nonce' is missing in type 'Alxia<Empty, "", never>' but required in type '{ readonly nonce: true; }'.
 ```
 
-**Why:** `secureHeaders` makes the plugin from its options; the plugin is
-what it returns. TypeScript tries the app as the options of its first
+**Why:** `secureHeaders` makes the middleware from its options; the
+middleware is what it returns. TypeScript tries the app as the options of its first
 overload, the nonce one, and says what that lacks.
 
 **Fix:** call it, with or without options:
 
 ```ts
-app.plugin(secureHeaders());
+app.use(secureHeaders());
 ```
 
-### `Property 'nonce' does not exist on type 'Context<…>'`
+### `Property 'nonce' does not exist on type 'RouteBase<…>'`
 
-**When:** a route or a hook reads `nonce` from its context.
+**When:** a route or a middleware reads `nonce` from its context.
 
 ```text
-error TS2339: Property 'nonce' does not exist on type 'Context<Empty, "/", Empty>'.
+error TS2339: Property 'nonce' does not exist on type 'RouteBase<RouteApp<"GET", Empty, "", never>, "/">'.
+error TS2339: Property 'nonce' does not exist on type 'BaseContext & Empty'.
 ```
 
+The second is a `derive` or a middleware.
+
 **Why:** only `secureHeaders({ nonce: true })` adds it, and only to the
-routes declared after its `app.plugin`. Without `nonce: true`, or on a route
+routes declared after its `app.use`. Without `nonce: true`, or on a route
 declared before it, there is none.
 
 **Fix:** turn it on, and declare the routes that read it after it:
 
 ```ts
 alxia()
-	.plugin(secureHeaders({ nonce: true, contentSecurityPolicy: "script-src 'self'" }))
+	.use(secureHeaders({ nonce: true, contentSecurityPolicy: "script-src 'self'" }))
 	.get('/', ({ nonce, reply }) => reply(200, nonce));
 ```
 
@@ -189,11 +196,11 @@ the environment, say.
 error TS2769: No overload matches this call.
   Overload 1 of 2, '(options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin', gave the following error.
     Type 'boolean' is not assignable to type 'true'.
-  Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): Plugin', gave the following error.
+  Overload 2 of 2, '(options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): SecureHeaders', gave the following error.
     Type 'boolean' is not assignable to type 'false'.
 ```
 
-**Why:** `nonce: true` changes the plugin's type, since it adds `nonce`
+**Why:** `nonce: true` changes the middleware's type, since it adds `nonce`
 to the context. A `boolean` leaves TypeScript unable to say whether the
 routes read one.
 
@@ -202,8 +209,8 @@ routes read one.
 ```ts
 const policy = "default-src 'self'; script-src 'self'";
 const app = useNonce
-	? alxia().plugin(secureHeaders({ nonce: true, contentSecurityPolicy: policy }))
-	: alxia().plugin(secureHeaders({ contentSecurityPolicy: policy }));
+	? alxia().use(secureHeaders({ nonce: true, contentSecurityPolicy: policy }))
+	: alxia().use(secureHeaders({ contentSecurityPolicy: policy }));
 ```
 
 Or keep it on everywhere: the nonce costs one random draw per request.
@@ -226,24 +233,29 @@ Only `false` leaves a header out.
 **Fix:**
 
 ```ts
-app.plugin(secureHeaders({ xFrameOptions: false }));
+app.use(secureHeaders({ xFrameOptions: false }));
 ```
 
-### `TypeError: plugin(): the plugin function returned function, not an app: …`
+### `TypeError: use(): the plugin function returned function, not an app: …`
 
 **When:** the same mistake as above in JavaScript, or past a cast:
-`alxia().plugin(secureHeaders)`, the factory given uncalled. It throws at
-startup.
+`alxia().use(secureHeaders)`, the factory given uncalled. It throws at
+startup:
 
-**Why:** `app.plugin` calls a function with the app, and expects the app
-back. Uncalled, `secureHeaders` reads the app as its options and returns
-a plugin, a function, not the app.
+```text
+TypeError: use(): the plugin function returned function, not an app: a plugin returns the app it is given; a middleware is made with defineMiddleware() and given to use()
+```
+
+**Why:** `app.use` takes a function that is not a middleware for a plugin:
+it calls it with the app, and expects the app back. Uncalled,
+`secureHeaders` reads the app as its options and returns a middleware, a
+function, not the app.
 
 **Fix:**
 
 ```ts
 const app = alxia()
-	.plugin(secureHeaders())
+	.use(secureHeaders())
 	.get('/', ({ reply }) => reply(200, 'ok'));
 ```
 
@@ -258,7 +270,7 @@ TypeError: secureHeaders: nonce is on, but the content-security-policy has no sc
 ```
 
 **Why:** the nonce goes in a directive. Without `script-src`, scripts fall
-back on `default-src`, and adding a `script-src` of the plugin's own would
+back on `default-src`, and adding a `script-src` of the middleware's own would
 change what else they may load.
 
 **Fix:** write the `script-src` you want, or say where the nonce goes:
@@ -266,8 +278,8 @@ change what else they may load.
 ```ts
 import { NONCE, secureHeaders } from '@alxia/secure-headers';
 
-app.plugin(secureHeaders({ nonce: true, contentSecurityPolicy: "default-src 'self'; script-src 'self'" }));
-app.plugin(secureHeaders({ nonce: true, contentSecurityPolicy: `default-src 'self' ${NONCE}` }));
+app.use(secureHeaders({ nonce: true, contentSecurityPolicy: "default-src 'self'; script-src 'self'" }));
+app.use(secureHeaders({ nonce: true, contentSecurityPolicy: `default-src 'self' ${NONCE}` }));
 ```
 
 ### `TypeError: secureHeaders: nonce is on, but contentSecurityPolicy is false: …`
@@ -282,7 +294,7 @@ TypeError: secureHeaders: nonce is on, but contentSecurityPolicy is false: a non
 no policy there is nothing for it to allow.
 
 **Fix:** give a policy, or drop `nonce`. A route that writes its own policy
-with `ctx.nonce` still needs the plugin's: give the app one, and let the
+with `ctx.nonce` still needs the middleware's: give the app one, and let the
 route's replace it ([guide](guide.md#who-reads-it)).
 
 ### `TypeError: secureHeaders: contentSecurityPolicy names NONCE, but nonce is off: give nonce: true`
@@ -303,7 +315,7 @@ browser's console.
 ```ts
 import { NONCE, secureHeaders } from '@alxia/secure-headers';
 
-app.plugin(secureHeaders({ nonce: true, contentSecurityPolicy: `script-src 'self' ${NONCE}` }));
+app.use(secureHeaders({ nonce: true, contentSecurityPolicy: `script-src 'self' ${NONCE}` }));
 ```
 
 ## In the browser
@@ -411,7 +423,7 @@ other.
 **Fix:** change both:
 
 ```ts
-app.plugin(
+app.use(
 	secureHeaders({
 		contentSecurityPolicy: "default-src 'none'; frame-ancestors 'self'",
 		xFrameOptions: 'SAMEORIGIN',
@@ -432,7 +444,7 @@ origin embed its responses. A CORS `fetch` is not concerned.
 routes that need it, on their reply:
 
 ```ts
-app.plugin(secureHeaders({ crossOriginResourcePolicy: 'cross-origin' }));
+app.use(secureHeaders({ crossOriginResourcePolicy: 'cross-origin' }));
 ```
 
 ### `window.opener` is `null` in a sign-in popup
@@ -447,7 +459,7 @@ browsing context group of its own, cut from any window of another origin.
 **Fix:**
 
 ```ts
-app.plugin(secureHeaders({ crossOriginOpenerPolicy: 'same-origin-allow-popups' }));
+app.use(secureHeaders({ crossOriginOpenerPolicy: 'same-origin-allow-popups' }));
 ```
 
 ### A subdomain on plain HTTP no longer opens
@@ -465,7 +477,7 @@ over HTTPS.
 header altogether where the app is not served over HTTPS:
 
 ```ts
-app.plugin(secureHeaders({ strictTransportSecurity: 'max-age=31536000' }));
+app.use(secureHeaders({ strictTransportSecurity: 'max-age=31536000' }));
 ```
 
 A browser that already stored the policy keeps it until it expires, or
@@ -477,9 +489,10 @@ until it reads `max-age=0` from the host over HTTPS.
 
 **When:** an option is set, and some responses still carry another value.
 
-**Why:** the plugin never overwrites a header the response already has.
-A route set it on its reply or on `set.headers`, an `onResponse` hook
-declared before `secureHeaders` set it, or one declared after overwrote it.
+**Why:** the middleware never overwrites a header the response already has.
+A route set it on its reply or on `set.headers`, a middleware declared
+after `secureHeaders` set it on the way out, or one declared before it
+overwrote it.
 `@alxia/graphql`'s IDE sets its own `Content-Security-Policy` on purpose.
 
 **Fix:** find what sets it on that route, and change it there:
@@ -494,22 +507,26 @@ console.log(response.headers.get('content-security-policy'));
 **When:** `hidePoweredBy` is on (the default), and one of them is on the
 response.
 
-**Why:** the plugin deletes them when its hook runs. An `onResponse` hook
-declared after `secureHeaders` that adds one runs later, and keeps it. A
-proxy in front of the app may add its own `Server` too.
+**Why:** the middleware deletes them when the response comes back through
+it. A middleware declared **before** `secureHeaders` that adds one sees the
+response after that, and keeps it; so does a deprecated `onResponse` hook,
+which runs after every middleware. A proxy in front of the app may add its
+own `Server` too.
 
-**Fix:** declare `secureHeaders` after the hook that adds the header, or
-stop that hook adding it:
+**Fix:** declare `secureHeaders` before the middleware that adds the header,
+or stop that middleware adding it:
 
 ```ts
-import { alxia, withHeaders } from '@alxia/core';
+import { alxia, defineMiddleware, settle, withHeaders } from '@alxia/core';
 import { secureHeaders } from '@alxia/secure-headers';
 
+const poweredBy = defineMiddleware(async (ctx, next) =>
+	withHeaders(await settle(ctx, next()), (headers) => headers.set('x-powered-by', 'my-app')),
+);
+
 const app = alxia()
-	.onResponse((response) =>
-		withHeaders(response, (headers) => headers.set('x-powered-by', 'my-app')),
-	)
-	.plugin(secureHeaders()); // its hook runs after, and deletes it
+	.use(secureHeaders()) // outermost: deletes the header on the way out
+	.use(poweredBy);
 ```
 
 ### A response arrives without the headers
@@ -517,20 +534,20 @@ const app = alxia()
 **When:** a response has none of the headers, though `secureHeaders` is
 in use.
 
-**Why:** the plugin is an `onResponse` hook, and three responses run no
-`onResponse` hook: a WebSocket upgrade that succeeds (the `101`), a page
+**Why:** the middleware decorates what comes back through it, and three
+responses do not: a WebSocket upgrade that succeeds (the `101`), a page
 served with `page()`, which `Bun.serve` answers itself, and the 500 sent
-when an `around` hook throws.
+when a deprecated `around` hook throws.
 
 **Fix:** serve a page that needs the headers through a route, `file` or
 `static` rather than `page()` — or give it its policy in its HTML with
 `<meta http-equiv="Content-Security-Policy" content="…">`, where browsers
-ignore `frame-ancestors`. An `around` hook whose own work may fail catches
-it and still returns what `next()` resolved to, which already carries the
-headers:
+ignore `frame-ancestors`. A middleware declared before `secureHeaders`,
+whose own work may fail, catches it and still returns what `next()`
+resolved to, which already carries the headers:
 
 ```ts
-app.around(async (_ctx, next) => {
+const timing = defineMiddleware(async (ctx, next) => {
 	const response = await next();
 	try {
 		recordTiming(response); // your own work
@@ -539,21 +556,28 @@ app.around(async (_ctx, next) => {
 	}
 	return response;
 });
+
+const app = alxia().use(timing).use(secureHeaders());
 ```
 
-### Routes outside a group get the headers
+### A 404 or a route outside a group has no headers
 
-**When:** `secureHeaders` is used inside a `group`, meant for its routes
-only, and every route of the app gets the headers.
+**When:** `secureHeaders` is used inside a `group`, and a route outside the
+group, or a request that matches no route, comes back without them.
 
-**Why:** it adds a global hook, and a group's global hooks are the app's.
+**Why:** a middleware declared in a `group` stays with the group's routes: it
+does not run on a request no route matches, even one under the group's
+prefix, nor on the routes outside the group.
 
 **Fix:** use it on the app, and give the routes that differ their own
 values on their replies:
 
 ```ts
+import { alxia } from '@alxia/core';
+import { secureHeaders } from '@alxia/secure-headers';
+
 const app = alxia()
-	.plugin(secureHeaders())
+	.use(secureHeaders())
 	.get('/embed', ({ reply }) =>
 		reply(200, 'ok', {
 			headers: {
@@ -562,4 +586,54 @@ const app = alxia()
 			},
 		}),
 	);
+```
+
+### A `try`/`catch` middleware never sees the error
+
+**When:** a middleware wraps `next()` in a `try`/`catch` to answer errors
+in its own format, and a route's thrown error still gets the default reply.
+
+**Why:** `secureHeaders` settles `next()`: it turns a rejection into the
+answer the route boundary would give (`onError`, the `HttpError`'s status,
+or a 500) before the rejection can travel further out. A `try`/`catch`
+declared **before** it, like one before `logger()` or `cors()`, sees a
+resolved response.
+
+**Fix:** declare the error-handling middleware after `secureHeaders`:
+
+```ts
+import { alxia, defineMiddleware } from '@alxia/core';
+import { secureHeaders } from '@alxia/secure-headers';
+
+const errors = defineMiddleware(async (_ctx, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		return Response.json({ error: String(error) }, { status: 500 });
+	}
+});
+
+const app = alxia()
+	.use(secureHeaders()) // first
+	.use(errors)
+	.get('/boom', () => {
+		throw new Error('boom');
+	});
+```
+
+### A route has no headers, though the others do
+
+**When:** one route's responses lack the headers, while a `404` or another
+route's have them.
+
+**Why:** a route declared **before** `app.use(secureHeaders())` does not run
+it. A request no route matches runs every top-level middleware wherever it
+is declared, which is why its `404` is covered.
+
+**Fix:** declare `secureHeaders` before the routes:
+
+```ts
+const app = alxia()
+	.use(secureHeaders())
+	.get('/early', ({ reply }) => reply(200, 'now covered'));
 ```

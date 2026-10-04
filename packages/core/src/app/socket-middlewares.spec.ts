@@ -1,5 +1,6 @@
 import { describe, expect, spyOn, test } from 'bun:test';
 import { z } from 'zod';
+import { refusalOf } from '../errors/errors';
 import { alxia } from './alxia';
 import { defineMiddleware } from './define-middleware';
 import { responds, validate } from './validate';
@@ -25,15 +26,20 @@ describe('a socket route, its middlewares and validate', () => {
 	});
 
 	test('runs its middlewares and validate on the upgrade, then opens', async () => {
-		const around: number[] = [];
+		const around: (number | string)[] = [];
 		const app = alxia().ws(
 			'/rooms/:room',
 			{ send: z.object({ room: z.string(), by: z.string() }) },
 			auth,
 			async (_ctx, next) => {
-				const response = await next();
-				around.push(response.status);
-				return response;
+				try {
+					const response = await next();
+					around.push(response.status);
+					return response;
+				} catch (error) {
+					around.push(refusalOf(error)?.kind ?? 'error');
+					throw error;
+				}
 			},
 			validate({ query: z.object({ v: z.literal('1') }) }),
 			{
@@ -67,8 +73,8 @@ describe('a socket route, its middlewares and validate', () => {
 			});
 			socket.close();
 			expect(received).toEqual({ room: 'lobby', by: 'ada' });
-			// The 400 went through it, then the upgrade's stand-in response.
-			expect(around).toEqual([400, 200]);
+			// The refusal reached it thrown, then the upgrade's stand-in response.
+			expect(around).toEqual(['validation', 200]);
 		} finally {
 			await server.stop(true);
 		}
