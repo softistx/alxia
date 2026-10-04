@@ -28,7 +28,7 @@ describe('nonceOf in entry.server', () => {
 		// A derive of the app's own: no @alxia/secure-headers needed.
 		const app = makeBase()
 			.derive(() => ({ nonce: 'bm9uY2Utb2YtYS1zcGVj' }))
-			.use((app) => reactRouter(app, { build }));
+			.plugin((app) => reactRouter(app, { build }));
 		for (const path of ['/', '/slow']) {
 			const scripts = scriptsOf(await page(app, path));
 			expect(scripts.length).toBeGreaterThan(1);
@@ -40,7 +40,7 @@ describe('nonceOf in entry.server', () => {
 	});
 
 	test('without a nonce on the context, no script carries one', async () => {
-		const app = makeBase().use((app) => reactRouter(app, { build }));
+		const app = makeBase().plugin((app) => reactRouter(app, { build }));
 		const html = await page(app, '/slow');
 		expect(scriptsOf(html).length).toBeGreaterThan(1);
 		expect(html).not.toContain('nonce=');

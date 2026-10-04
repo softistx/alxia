@@ -2,7 +2,7 @@
 
 This page covers `secureHeaders`: what it sends, how to change or drop each
 header, the per-request nonce, which responses it reaches, and how a page or
-another plugin sets its own policy.
+another middleware sets its own policy.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -21,8 +21,8 @@ Every response of that app now carries the headers below, and none carries
 ## The signature
 
 ```ts
-function secureHeaders(options: SecureHeadersOptions & { readonly nonce: true }): NoncePlugin;
-function secureHeaders(options?: SecureHeadersOptions & { readonly nonce?: false }): Plugin;
+function secureHeaders(options: SecureHeadersOptions & { readonly nonce: true }): NonceMiddleware;
+function secureHeaders(options?: SecureHeadersOptions & { readonly nonce?: false }): SecureHeaders;
 
 interface SecureHeadersOptions {
 	readonly contentSecurityPolicy?: string | false;
@@ -42,22 +42,25 @@ interface SecureHeadersOptions {
 ```
 
 `nonce` is not in `SecureHeadersOptions`: each overload adds it, so options
-typed by that interface still give the plain `Plugin`.
+typed by that interface still give the plain `SecureHeaders`.
 
-`secureHeaders` returns a function `Plugin` from `@alxia/core`: give it to
-`use`, called, and the app keeps its type. It adds one global `onResponse`
-hook, so where it sits in the chain does not matter for which routes it
-reaches: every route, declared before or after it, is covered. Used inside
-a `group`, it still covers the whole app — a group's global hooks are the
-app's. To vary a header for some routes, set it on their replies
+`secureHeaders` returns a middleware: give it to `app.use`, called, and the
+app keeps its type. `SecureHeaders` is a `Middleware` from `@alxia/core`
+that adds nothing to the context. It waits for the rest of the chain with
+`settle`, then sets the headers on the response, so it covers every route
+declared after it, and every request no route matches — a 404, a 405 —
+because those run all of the app's top-level middlewares too. A route
+declared **before** it is not covered. Used inside a `group`, it covers only
+that group's routes, and not a 404 under the group's prefix: declare it on
+the app. To vary a header for some routes, set it on their replies
 ([below](#a-header-a-route-sets-is-kept)).
 
 The options are read once, when `secureHeaders(…)` is called; the header
 values are fixed from then on, but for the nonce, which is new on every
 request.
 
-With `nonce: true` it returns a `NoncePlugin` instead: an app plugin, still
-given to `use` called, whose hook covers every route as above, and which
+With `nonce: true` it returns a `NonceMiddleware` instead: a middleware, still
+given to `app.use` called, that covers the same responses as above, and which
 adds `nonce` to the context of the routes declared after it
 ([below](#a-nonce-per-request)).
 
@@ -103,7 +106,7 @@ app.use(
 
 ### `false`
 
-`false` leaves the header out of every response the plugin touches.
+`false` leaves the header out of every response the middleware touches.
 
 ```ts
 app.use(secureHeaders({ xFrameOptions: false, strictTransportSecurity: false }));
@@ -143,11 +146,11 @@ const app = alxia()
 (await app.request('/')).headers.get('x-powered-by'); // null
 ```
 
-`hidePoweredBy: false` keeps whatever the route or another hook sent.
+`hidePoweredBy: false` keeps whatever the route or another middleware sent.
 
 ## A header a route sets is kept
 
-The plugin only fills in a header the response does not have yet. A route
+The middleware only fills in a header the response does not have yet. A route
 that needs its own policy sets it on its reply, and the other defaults
 still apply:
 
@@ -171,11 +174,10 @@ response.headers.get('x-frame-options');         // null                   — f
 ```
 
 `set.headers` in a handler or a `derive` works the same way, since it ends
-up on the response before the plugin reads it.
+up on the response before the middleware reads it.
 
-That is how `@alxia/openapi`'s reference page and `@alxia/graphql`'s IDE
-load under the strict default: each sets the `Content-Security-Policy` it
-needs, and `secureHeaders` keeps it.
+That is how `@alxia/graphql`'s IDE loads under the strict default: it sets
+the `Content-Security-Policy` it needs, and `secureHeaders` keeps it.
 
 ## A nonce per request
 
@@ -213,8 +215,8 @@ await response.text();
 ### What it is
 
 16 bytes from `crypto.getRandomValues`, base64: 24 characters, `==` at the
-end. Each request makes its own, when the first hook or route asks for it,
-and every reader of that request — the route, its hooks, the header — gets
+end. Each request makes its own, when the middleware runs,
+and every reader of that request — the route, its middlewares, the header — gets
 the same one. Two requests never share one.
 
 ### Where it goes in the policy
@@ -251,14 +253,15 @@ which take no nonce, stop applying
 
 ### Who reads it
 
-The header covers every response, as without the nonce: 404s, 500s and the
-routes declared before the plugin get a policy with a nonce of their own.
-`ctx.nonce` is typed and set on the routes declared **after** `use`, in
-their hooks and their handler, as any plugin's context:
+The header covers every response that comes back through the middleware, as
+without the nonce: a 404 and a 500 get a policy with a nonce of their own.
+`ctx.nonce` is typed and set on the routes declared **after** `app.use`, in
+their middlewares and their handler, as any middleware's context. A route
+declared before it gets neither a policy nor a `ctx.nonce`:
 
 ```ts
 alxia()
-	.get('/early', ({ reply }) => reply(200, 'policy with a nonce, no ctx.nonce'))
+	.get('/early', ({ reply }) => reply(200, 'no policy from this middleware, no ctx.nonce'))
 	.use(secureHeaders({ nonce: true, contentSecurityPolicy: "script-src 'self'" }))
 	.derive(({ nonce }) => ({ scriptTag: (code: string) => `<script nonce="${nonce}">${code}</script>` }))
 	.get('/late', ({ scriptTag, reply }) => reply(200, scriptTag('…')));
@@ -283,17 +286,18 @@ startup, so the placeholder never reaches a browser.
 
 ## Which responses get the headers
 
-The plugin runs as an `onResponse` hook, so it reaches what the app's
-`onResponse` hooks reach:
+The middleware settles `next()`: it sets the headers on the response the
+client would get, whatever produced it.
 
 | Response | Headers |
 | --- | --- |
 | a route's reply, `static` and `file` included | yes |
-| the core's 400, 404, 405 and 500 | yes |
-| a `Response` an `onRequest` hook returned (a CORS preflight, a redirect) | yes |
-| a WebSocket upgrade that succeeds (`101`) | no: `onResponse` hooks do not run for it |
-| a page served with `page()` | no: `Bun.serve` serves it, around no hook |
-| the 500 sent when an `around` hook itself throws | no |
+| the core's 400, 404, 405 and 500, and an `onError` reply | yes |
+| a `Response` another middleware returned (a CORS preflight, a redirect) | yes, when that middleware is declared after `secureHeaders` |
+| a route declared before `app.use(secureHeaders())` | no: the middleware does not run for it |
+| a WebSocket upgrade that succeeds (`101`) | no: the upgrade is not a response a middleware can decorate |
+| a page served with `page()` | no: `Bun.serve` serves it, around no middleware |
+| the 500 sent when a deprecated `around` hook itself throws | no |
 
 ```ts
 const app = alxia().use(secureHeaders());
@@ -303,58 +307,75 @@ response.status;                                // 404
 response.headers.get('x-content-type-options'); // 'nosniff'
 ```
 
-## Order with other `onResponse` hooks
+## Order with other middlewares
 
-`onResponse` hooks run in the order they are declared, and the plugin never
-overwrites a header that is already there. So:
+Middlewares nest: the first `use` is the outermost, and on the way out each
+one sees the response of the ones after it. The middleware never overwrites
+a header that is already there. So:
 
-- a hook declared **before** `secureHeaders` that sets one of its headers
-  wins;
-- a hook declared **after** it that sets one of its headers wins too, by
-  overwriting;
-- a hook declared **after** it that adds `X-Powered-By` or `Server` keeps
-  it: the plugin deleted them before that hook ran.
+- a middleware declared **after** `secureHeaders` that sets one of its
+  headers wins: `secureHeaders` finds it already there;
+- a middleware declared **before** it that sets one of its headers wins too,
+  by overwriting;
+- a middleware declared **before** it that adds `X-Powered-By` or `Server`
+  keeps it: `secureHeaders` deleted them before that one ran.
 
 ```ts
-import { alxia, withHeaders } from '@alxia/core';
+import { alxia, defineMiddleware, settle, withHeaders } from '@alxia/core';
 import { secureHeaders } from '@alxia/secure-headers';
 
+const referrerOrigin = defineMiddleware(async (ctx, next) =>
+	withHeaders(await settle(ctx, next()), (headers) => headers.set('referrer-policy', 'origin')),
+);
+
 const app = alxia()
-	.onResponse((response) =>
-		withHeaders(response, (headers) => headers.set('referrer-policy', 'origin')),
-	)
 	.use(secureHeaders())
+	.use(referrerOrigin)
 	.get('/', ({ reply }) => reply(200, 'ok'));
 
 (await app.request('/')).headers.get('referrer-policy'); // 'origin'
 ```
 
-## A header the plugin does not know
+Declare `secureHeaders()` among the observers, first: `logger()`,
+`telemetry()`, `secureHeaders()`, `cors()`, `compress()`. An
+error-handling middleware — a `try`/`catch` around `next()`, or
+`janusErrors()` — goes **after** it. `secureHeaders()` settles `next()`: it
+sets the headers on the response the error would be answered with (the
+route's `onError` reply, its `HttpError`'s status, or a 500), then the error
+goes on, so a `try`/`catch` catches it wherever it is declared; declared
+before `secureHeaders()`, its reply does not carry the headers. A guard on the app (`bearer`, a required
+session) declared before it answers its `401` without them.
 
-The plugin sends the twelve headers above and nothing else. Another one —
+The deprecated `onResponse` and `around` hooks still run outside every
+middleware: an `onResponse` hook sees the headers `secureHeaders` set,
+wherever it is declared.
+
+## A header the middleware does not know
+
+The middleware sends the twelve headers above and nothing else. Another one —
 `Content-Security-Policy-Report-Only` while a policy is being tried, say —
-is a hook of your own, with `withHeaders` from `@alxia/core`:
+is a middleware of your own, with `settle` and `withHeaders` from
+`@alxia/core`:
 
 ```ts
-import { alxia, withHeaders } from '@alxia/core';
+import { alxia, defineMiddleware, settle, withHeaders } from '@alxia/core';
 import { secureHeaders } from '@alxia/secure-headers';
+
+const reportOnly = defineMiddleware(async (ctx, next) =>
+	withHeaders(await settle(ctx, next()), (headers) => {
+		if (!headers.has('content-security-policy-report-only')) {
+			headers.set('content-security-policy-report-only', "default-src 'self'; report-to csp");
+		}
+	}),
+);
 
 const app = alxia()
 	.use(secureHeaders())
-	.onResponse((response) =>
-		withHeaders(response, (headers) => {
-			if (!headers.has('content-security-policy-report-only')) {
-				headers.set(
-					'content-security-policy-report-only',
-					"default-src 'self'; report-to csp",
-				);
-			}
-		}),
-	);
+	.use(reportOnly);
 ```
 
-See [Hooks](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/hooks.md#onresponse)
-in the core's guide for what an `onResponse` hook may do.
+See [Middleware](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md)
+in the core's guide for what a middleware may do.
 
 ## Recipes
 
@@ -481,6 +502,6 @@ test('a 404 is covered too', async () => {
 
 - [Troubleshooting](troubleshooting.md): a browser refuses something, or
   TypeScript does.
-- [Hooks](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/hooks.md)
+- [Middleware](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md)
   and [Groups and plugins](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md)
   in the core's guide.

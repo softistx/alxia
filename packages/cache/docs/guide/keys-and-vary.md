@@ -1,7 +1,7 @@
 # Keys and Vary
 
 This page covers what makes two requests "the same" to the cache: the
-default key, `vary`, a `key` of your own, reading what an earlier plugin
+default key, `vary`, a `key` of your own, reading what an earlier middleware
 added, and keeping personal responses out.
 
 ```ts
@@ -85,7 +85,7 @@ key?: (ctx: BaseContext & Requires) => string | undefined;
 
 `key` replaces the default key whole. It is synchronous and reads the
 `BaseContext` — `request`, `url`, `ip`, `server`, `route`, `pathParams` —
-and `Requires`, empty by default. To key by what an earlier plugin added,
+and `Requires`, empty by default. To key by what an earlier middleware added,
 see [Reading the app's context](#reading-the-apps-context).
 
 Keyed by the language the route actually answers in, two visitors who both
@@ -143,10 +143,10 @@ not by key.
 
 ## Reading the app's context
 
-To key or tag by what an earlier plugin added, such as a signed-in `user`
+To key or tag by what an earlier middleware added, such as a signed-in `user`
 and its tenant, name it as `cache`'s type argument. `key` and `tags` then
-read it, and the cache is a [`definePlugin`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
-plugin: an app that does not give `user` before it cannot use it.
+read it, and the app that uses the cache must give it first: an app that
+does not give `user` before it cannot use it.
 
 ```ts
 const perTenant = cache<{ user: { tenantId: string } }>({
@@ -156,18 +156,18 @@ const perTenant = cache<{ user: { tenantId: string } }>({
 });
 
 const auth = alxia().derive(({ request }) => ({
-	user: { tenantId: request.headers.get('x-tenant') ?? 'public' }, // your session plugin
+	user: { tenantId: request.headers.get('x-tenant') ?? 'public' }, // your session middleware
 }));
 
 const app = alxia()
-	.use(auth)
+	.plugin(auth)
 	.use(perTenant)
 	.get('/dashboard', ({ user, reply }) => reply(200, { tenant: user.tenantId }));
 
 await perTenant.invalidateTag('tenant:acme'); // one tenant's pages, every path
 
 alxia().use(perTenant);
-// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+// error: Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: { tenantId: string; }; }'
 ```
 
 The rule of [a key of your own](#a-key-of-your-own) still holds: the route
@@ -176,10 +176,25 @@ personal.
 
 ## Personal responses
 
-The default key does not read who is asking. A route that answers by the
-`Cookie` or `Authorization` header, behind a cache with the default key,
-and says nothing about it, serves the first visitor's answer to every later
-one. curl, sending no cookie, never shows it; a signed-in browser does.
+The default key does not read who is asking, so the cache reads the
+request instead (RFC 9111 §3.5): the answer to a request carrying
+`Authorization` or `Cookie` is never kept, unless
+
+- the response says it may be shared: `Cache-Control: public`, `s-maxage`
+  or `must-revalidate`;
+- `vary` names that header, so each value is a key of its own;
+- for `Cookie` only, the cache has a `key` of yours: your word that the key
+  tells users apart, as `perTenant` above does.
+
+```ts
+cache({ ttl: 60 });                                          // /me with a bearer token: runs for every caller, no X-Cache
+cache({ ttl: 60, vary: ['authorization'] });                 // kept per token
+cache<{ user: { id: string } }>({ ttl: 60, key: ({ user, url }) => `${user.id}:${url.pathname}` }); // a cookie session, kept per user
+```
+
+A `key` of yours that does not read the user, behind a cookie session,
+serves the first visitor's answer to every later one; so does a credential
+the cache does not know — an `X-Api-Key` header, a token in the query.
 
 A personal response that says so is never kept, nor shared with a
 concurrent request: it answers `Cache-Control: private` (or `no-store`),

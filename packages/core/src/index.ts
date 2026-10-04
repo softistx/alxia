@@ -1,117 +1,12 @@
 export { Alxia, alxia } from './app/alxia';
-export type {
-	AroundMethod,
-	ParserMethod,
-	RequestHookMethod,
-	ResponseHookMethod,
-	StartHookMethod,
-	StopHookMethod,
-} from './app/app-hooks';
-export type { GroupMethod, UseMethod } from './app/compose-methods';
-export { defineHook, defineWrap } from './app/define-hook';
-export { definePlugin } from './app/define-plugin';
-export type {
-	AroundHook,
-	RefusalHandler,
-	RefusalHandlersByKind,
-	RefusalHook,
-	RequestHook,
-	ResponseHook,
-	RouteDefinition,
-	SocketDefinition,
-	StartHook,
-	StopHook,
-} from './app/definition';
-export type { RouteMethod } from './app/route-method';
-export type {
-	CheckedOperation,
-	OperationMethod,
-	OperationSchema,
-	RouteOperation,
-} from './app/route-operation';
-export type {
-	BodyLimitMethod,
-	DecorateMethod,
-	DeriveMethod,
-	ErrorMethod,
-	WrapMethod,
-} from './app/scope-methods';
-export type { ListenMethod, RequestMethod } from './app/serving-methods';
-export type {
-	AlxiaOptions,
-	AnyAlxia,
-	ContextOf,
-	ListenOptions,
-	Plugin,
-	RefusalMethod,
-	RoutesOf,
-} from './app/signatures';
-export type { SocketMethod } from './app/socket-method';
-export type {
-	FileMethod,
-	PageMethod,
-	StaticMethod,
-} from './app/static-methods';
-export type {
-	AddedBy,
-	AnyRouteHook,
-	BaseContext,
-	BehindShortcuts,
-	BodyLimited,
-	BodyLimitShortcut,
-	Context,
-	DeclaredRefusal,
-	DeclaredReply,
-	DefaultLimitOutcome,
-	DefaultRefusalOutcome,
-	Empty,
-	FallsBack,
-	HandlerResult,
-	HookContext,
-	HookProvided,
-	IsLimited,
-	KindFallsBack,
-	KindOutcome,
-	KindRefusalsOf,
-	MaxRouteHooks,
-	MaybePromise,
-	Method,
-	NoHookYet,
-	OneKind,
-	Outcome,
-	OutcomeOf,
-	ProvidedBy,
-	RawRequestParts,
-	RedirectFunction,
-	RefusalOutcome,
-	RefusalResponses,
-	RefusalSchema,
-	RefusalsOf,
-	Refusing,
-	RefusingKind,
-	RepliesBy,
-	RequestContext,
-	RequiresOf,
-	Requiring,
-	ResponseCookies,
-	ResponseSchemas,
-	ResponseSettings,
-	RouteDetail,
-	RouteEntryOf,
-	RouteHook,
-	RouteHookBase,
-	RouteInput,
-	RouteOutput,
-	RouteRecord,
-	RouteSchema,
-	RouteTable,
-	RouteWrap,
-	ThenShortcuts,
-	ThreadHooks,
-	TypedReplyFunction,
-	TypedShortcuts,
-	ValidSchema,
-} from './app/types';
+export { settle } from './app/boundary';
+export {
+	type RequestSchemas,
+	responds,
+	type Validated,
+	type ValidateRequires,
+	validate,
+} from './app/validate';
 export {
 	type BodyLimitRefusal,
 	type ContentTooLargeBody,
@@ -124,11 +19,14 @@ export {
 	type RequestPart,
 	ResponseValidationError,
 	type RoutingErrorBody,
+	refusalOf,
+	ValidationError,
 	type ValidationErrorBody,
 	type ValidationIssue,
 	type ValidationRefusal,
 	type ValidationTarget,
 } from './errors/errors';
+export * from './exports-app';
 export { vary, withHeaders } from './reply/headers';
 export { type ProblemDetails, problem } from './reply/problem';
 export {
@@ -194,10 +92,8 @@ export type {
 export type {
 	Socket,
 	SocketContext,
-	SocketEntryOf,
 	SocketHandlers,
 	SocketMessage,
-	SocketRecord,
 	SocketSchema,
 	SocketSend,
 } from './ws/types';

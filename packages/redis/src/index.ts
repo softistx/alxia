@@ -8,6 +8,7 @@ export {
 } from './context';
 export {
 	type IdempotencyErrorBody,
+	type IdempotencyMiddleware,
 	type IdempotencyOptions,
 	idempotency,
 } from './idempotency';

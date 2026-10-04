@@ -1,8 +1,8 @@
 # Guide
 
 This page covers what `contextStorage()` stores and when, how code outside
-a handler reads it, how its type follows the app, where the plugin sits
-among an app's hooks, and what `AsyncLocalStorage` does and does not carry.
+a handler reads it, how its type follows the app, where the middleware sits
+among an app's middlewares, and what `AsyncLocalStorage` does and does not carry.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -32,13 +32,23 @@ context of the request that called it, and never another's.
 ## The signature
 
 ```ts
-// `uncalled` takes nothing: it makes `use(contextStorage)` a compile error
-function contextStorage<App = undefined>(...uncalled: readonly never[]): ContextStoragePlugin<App>;
+// `uncalled` takes nothing: it makes `use(contextStorage)` a compile error.
+// `App` defaults to the app `Register` names in `@alxia/core` (`RegisteredBase`)
+function contextStorage<App = RegisteredBase>(...uncalled: readonly never[]): ContextStorageMiddleware<App>;
 
-type ContextStoragePlugin<App> = Alxia<Empty, Empty, '', never> & {
-	context(): ContextOf<App> extends never ? BaseContext : ContextOf<App>;
-	tryContext(): (ContextOf<App> extends never ? BaseContext : ContextOf<App>) | undefined;
-};
+// A middleware: it requires `App`'s context of the app that mounts it.
+// `ContextStoragePlugin<App>`, its name in 0.3, is a deprecated alias.
+type ContextStorageMiddleware<App> = Middleware<
+	RequiresOf<StoredContext<App>, 'context'>,
+	Promise<Response>
+> &
+	MiddlewareMark & {
+		context(): StoredContext<App>;
+		tryContext(): StoredContext<App> | undefined;
+	};
+
+// What `context()` returns: `App`'s context, or `BaseContext` when `App` is no app
+type StoredContext<App> = [ContextOf<App>] extends [never] ? BaseContext : Mounted<ContextOf<App>>;
 
 function getContext<Ctx extends object = Empty>(): BaseContext & Ctx;
 function tryGetContext<Ctx extends object = Empty>(): (BaseContext & Ctx) | undefined;
@@ -54,9 +64,11 @@ class ContextStorageError extends Error {
 type ContextStorageErrorCode = 'OUTSIDE_REQUEST' | 'NOT_ROUTED';
 ```
 
-`contextStorage()` returns an app plugin: pass it to `use`, called — `use(contextStorage)` fails `tsc` with `TS2769` and throws a `TypeError` at startup ([troubleshooting](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)). It adds
-nothing to the app's type. `BaseContext`, `RequestContext` and `ContextOf`
-come from `@alxia/core`.
+`contextStorage()` returns a middleware: pass it to `app.use`, called — `use(contextStorage)` fails `tsc` with `TS2769` and throws a `TypeError` at startup ([troubleshooting](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)). It adds
+nothing to the app's type, but it requires `StoredContext<App>` of the app
+that mounts it: `app.use` on an app that does not give that context is a compile
+error. `BaseContext`, `RequestContext`, `ContextOf`, `RegisteredBase`,
+`Middleware`, `MiddlewareMark`, `RequiresOf` and `Mounted` come from `@alxia/core`.
 
 | Export | Returns | Where it would have nothing |
 | --- | --- | --- |
@@ -64,32 +76,39 @@ come from `@alxia/core`.
 | `requestContext.tryContext()` | the same | `undefined` |
 | `getContext<Ctx>()` | the route's context, as `BaseContext & Ctx`: `Ctx` is yours to state | throws a `ContextStorageError` |
 | `tryGetContext<Ctx>()` | the same | `undefined` |
-| `getRequestContext()` | the request as global hooks see it: `request`, `url`, `ip`, `server`, and once routing has run, `route` and `error` | throws a `ContextStorageError` coded `OUTSIDE_REQUEST` |
+| `getRequestContext()` | the request as a middleware sees it: `request`, `url`, `ip`, `server`, `route` (`undefined` when no route matched) and, once a route has failed, `error` | throws a `ContextStorageError` coded `OUTSIDE_REQUEST` |
 | `tryGetRequestContext()` | the same | `undefined` |
 | `runWithContext(ctx, work)` | what `work` returns, with `ctx` as the current context while it runs | — |
 
 There is one store per copy of the package: every `contextStorage()` writes
-to it, and `getContext()` reads it wherever it is called. Two plugins on one
+to it, and `getContext()` reads it wherever it is called. Two of them on one
 app read the same context.
 
 ## What it stores, and when
 
-The plugin adds two hooks. A global `around` hook opens a store for every
-request the app receives, wherever the plugin is used, holding the
-request's `RequestContext`. A route hook records the route's context in
-that store, for the routes declared after the plugin only. So what each
-function reads depends on where the code runs:
+`contextStorage()` is a middleware: it opens a store around the rest of the
+chain, holding the request's context, and records the route's context in
+it when the request reached a route. A `use()` on the app runs on every
+request, in declaration order, so what each function reads depends on
+whether the middleware ran on the request, and where the code runs
+relative to it:
 
 | Code running in | `getRequestContext()` | `tryGetRequestContext()` | `getContext()` | `tryGetContext()` |
 | --- | --- | --- | --- | --- |
-| an `onRequest` hook | the request, `route` still `undefined` | the same | throws `NOT_ROUTED` | `undefined` |
-| a route declared **before** the plugin, and its `onResponse` | the request | the same | throws `NOT_ROUTED` | `undefined` |
-| a `derive` or `wrap` declared after the plugin | the request | the same | the route's context, **before validation**: no `params`, `query` or `body` yet | the same |
-| the handler of a route declared after the plugin, and everything it calls | the request | the same | the context the handler receives — the same object | the same |
-| that route's `onError` and `onResponse` hooks | the request, with `route` and `error` | the same | the same context | the same |
-| an `onResponse` for a 404 | the request, `route` `undefined` | the same | throws `NOT_ROUTED` | `undefined` |
+| a middleware declared **before** it | throws `OUTSIDE_REQUEST` | `undefined` | throws `OUTSIDE_REQUEST` | `undefined` |
+| a middleware after it, on a request a route matched | the request, with its `route` | the same | the route's context, **before validation**: no `params`, `query` or `body` yet, and without what later middlewares add | the same |
+| a middleware after it, on a request no route matched (a 404, a 405) | the request, `route` `undefined` | the same | throws `NOT_ROUTED` | `undefined` |
+| the handler of a route the middleware ran on, and everything it calls | the request | the same | the context the handler receives, with what the middlewares added | the same |
+| a middleware that catches an error, after it | the request, with `route` and `error` | the same | the same context | the same |
+| a route declared **before** it, or outside the `group` it is used in | throws `OUTSIDE_REQUEST` | `undefined` | throws `OUTSIDE_REQUEST` | `undefined` |
+| the deprecated `onRequest` and `onResponse` hooks, which run outside the chain | throws `OUTSIDE_REQUEST` | `undefined` | throws `OUTSIDE_REQUEST` | `undefined` |
+| the deprecated `onError` and `onRefusal` hooks, which answer at the route boundary | the request, with `route` and `error` | the same | the same context | the same |
 | a socket's handlers (`open`, `message`, `close`) | throws `OUTSIDE_REQUEST` | `undefined` | throws `OUTSIDE_REQUEST` | `undefined` |
 | startup, a job, a timer started at startup | throws `OUTSIDE_REQUEST` | `undefined` | throws `OUTSIDE_REQUEST` | `undefined` |
+
+`contextStorage()` settles `next()`: an error the rest of the chain throws
+is answered inside the store, as the route would answer it, so a hook or
+a middleware that reads the context while answering an error still finds it.
 
 The two errors carry these messages:
 
@@ -116,13 +135,13 @@ Code that runs both in and out of requests uses `tryContext()`,
 
 The context is the whole of what the handler reads: the request, `set` to
 add a header or a cookie to the response, `reply` and `redirect`, and what
-every hook added — so a service three calls down can set a response header,
+every middleware added — so a service three calls down can set a response header,
 as `listOrders` does below.
 
 ## Reading it from outside the handler
 
-Keep the app's base and the plugin in a module of their own, and import the
-plugin from every service, repository or logger that reads it. The handlers
+Keep the app's base and the middleware in a module of their own, and import it
+from every service, repository or logger that reads it. The handlers
 then call those without passing anything down.
 
 ```ts
@@ -171,8 +190,8 @@ export const app = base
 ```
 
 A logger is the code that runs in and out of requests: at startup, in a 404,
-in a route. `tryGetRequestContext()` gives it the request wherever there is
-one, and `tryContext()` the user where a route was reached:
+in a route. `tryGetRequestContext()` gives it the request wherever the
+middleware ran, and `tryContext()` the user where a route was reached:
 
 ```ts
 // log.ts
@@ -202,8 +221,8 @@ return what a route declared next on that app would read: `ContextOf<App>`.
 
 | `App` | `context()` returns |
 | --- | --- |
-| none: `contextStorage()` | `BaseContext`: the request, `set`, `reply`, `redirect`, `route`, `pathParams` |
-| `typeof base` | `ContextOf<typeof base>`: `BaseContext` plus everything `base`'s `decorate`, `derive` and plugins added |
+| none: `contextStorage()` | the context `@alxia/core`'s `Register` names, `AppContext`; with nothing registered, `BaseContext`: the request, `set`, `reply`, `redirect`, `route`, `pathParams` |
+| `typeof base` | `ContextOf<typeof base>`: `BaseContext` plus everything `base`'s `decorate`, `derive` and middlewares added |
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -223,24 +242,46 @@ export function whoIsAsking(): string {
 }
 ```
 
-Three rules follow from typing by an app:
+With `Register` augmented beside `base`
+([`@alxia/core`'s `Register`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/types.md#register-and-appcontext)),
+`contextStorage()` is `contextStorage<typeof base>()` with no import of
+`base`:
 
-- **Type it by the app before the plugin, never by the app that uses it.**
+```ts
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+
+export const requestContext = contextStorage(); // context().user: string
+```
+
+Four rules follow from typing by an app:
+
+- **The app that mounts it must give that context.** The middleware requires
+  what `context()` reads beyond `BaseContext`, as a `definePlugin` does:
+  `alxia().use(contextStorage<typeof base>())` is a compile error, since
+  `context()` would claim a `user` that no middleware of that app adds.
+
+- **Type it by the app before the middleware, never by the app that mounts it.**
   `const app = alxia().use(requestContext)…` with
   `requestContext = contextStorage<typeof app>()` is a circular type, which
-  `tsc` refuses with `TS7022`. Declare `base` first, as above.
-- **What a hook after the plugin adds is there at runtime, not in the
+  `tsc` refuses with `TS7022`. Declare `base` first, as above. Registered,
+  the same holds: give `contextStorage()` to the app after `base`, never
+  to the registered `base` itself.
+- **What a middleware after it adds is there at runtime, not in the
   type.** `context()` knows `base`, so a `derive` added after
-  `base.use(requestContext)` is missing from its type. Put the hooks whose
-  values services read in `base`, or state the type with `getContext<Ctx>()`.
+  `base.use(requestContext)` is missing from its type. Put the middlewares
+  whose values services read in `base`, or state the type with `getContext<Ctx>()`.
 - **A route's own `params`, `query`, `body` and `headers` are not in it**:
-  they belong to one route's schema, not to the app. Read them in the
-  handler and pass them down, or state them:
+  they belong to one route's `validate(…)`, not to the app. Read them in
+  the handler and pass them down, or state them:
 
 ```ts
 import { getContext } from '@alxia/context-storage';
 
-// in code that only ever runs under GET /orders/:id, with a params schema
+// in code that only ever runs under GET /orders/:id, after its validate({ params })
 const { params } = getContext<{ params: { id: number } }>();
 ```
 
@@ -249,10 +290,10 @@ as `hono/context-storage`'s do: nothing checks it against the route.
 
 ## Where it sits
 
-The plugin's `around` hook is global: it applies to every request, wherever
-`use` is called. Its route hook applies to the routes declared after it, in
-the same app or group. So **use it before the routes whose code reads the
-context**, and after the hooks whose values services read:
+`app.use(contextStorage())` runs on every request, a 404 included, and
+wraps what is declared after it, in the same app or group. So **use it
+before the routes whose code reads the context**, and after the middlewares
+whose values services read:
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -263,26 +304,25 @@ const requestContext = contextStorage();
 const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok'))      // getContext() throws NOT_ROUTED here
 	.use(requestContext)
-	.derive(() => ({ startedAt: Date.now() }))            // after the plugin: may call code that reads it
+	.derive(() => ({ startedAt: Date.now() }))            // after it: may call code that reads it
 	.get('/me', ({ reply }) => reply(200, getContext().route)); // '/me'
 ```
 
-A hook declared before the plugin that ends the request — a `derive`
-answering `401` — ends it before the plugin's route hook runs: in that
-request's `onResponse`, `getContext()` throws `NOT_ROUTED`, and
-`getRequestContext()` still answers.
+A middleware declared before `contextStorage()` that ends the request, a
+`401` from a guard, ends it before the middleware runs: nothing it calls
+finds a store. Put the guards after `contextStorage()` when the code that
+answers needs the context; put it after the observers (`logger`,
+`telemetry`) and before an error-handling `try`/`catch` that reads it.
 
 | Placement | Effect |
 | --- | --- |
-| at the top of the chain | every route can read it; `context()` is typed `BaseContext` unless typed by an app declared before it |
+| first on the app | every route after it, and every middleware after it, can read it; a request no route matches gets `getRequestContext()` too; `context()` is typed `BaseContext` unless typed by an app declared before it |
 | after `decorate` and `derive` | the usual place: typed by them, and every route after reads it |
-| inside a `group` | the group's routes read it; a route outside the group throws `NOT_ROUTED` |
+| inside a `group` | the group's routes read it; a route outside the group, or a request no route matches, throws `OUTSIDE_REQUEST`: the middleware never ran |
 | twice | harmless: one store, one context per request |
 
-The plugin is an app like any other: `requestContext.get('/x', handler)` is the
-route method, and the context is read with `context()` and `tryContext()`.
-Declare routes on the app rather than on the plugin, and pass
-`contextStorage()` to `use` called — the uncalled form is
+`contextStorage()` is a middleware, not an app: declare routes on the app,
+and pass `contextStorage()` to `app.use` called — the uncalled form is
 [refused](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage).
 
 ## What `AsyncLocalStorage` carries
@@ -312,7 +352,7 @@ runs:
 | a `setInterval`, queue consumer or pool started at startup | nothing: `context()` throws `OUTSIDE_REQUEST`, `tryContext()` is `undefined` |
 | a function pushed into a queue in the request, and run by something started at startup | nothing, as above |
 | an `EventEmitter` listener | the context of the code that called `emit`, since listeners run synchronously |
-| a WebSocket's `open`, `message` and `close` | nothing: a socket's upgrade runs outside `around` |
+| a WebSocket's `open`, `message` and `close` | nothing: a socket's handlers run outside the chain |
 
 So work that outlives the request — a write-behind, an e-mail, an audit
 event — takes what it needs **before** it is detached, instead of reading

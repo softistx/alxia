@@ -2,7 +2,7 @@
 
 This page covers everything `rateLimit` does: which requests it counts, what
 it answers past the limit, the headers it sets, what a route and a client
-read, and where the counts are kept.
+read, and where the counts are kept. It is a middleware: `app.use(rateLimit(…))`.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -25,7 +25,7 @@ app.listen({ port: 3000 });
 ```ts
 function rateLimit<Requires extends object = Empty>(
 	options: RateLimitOptions<Requires>,
-): Alxia<…> & Requiring<Requires>; // an app, given to `use`, which checks `Requires`
+): RateLimit<Requires>; // a middleware, given to `app.use`, which checks `Requires`
 
 interface RateLimitOptions<Requires extends object = Empty> {
 	readonly limit: number;
@@ -37,10 +37,19 @@ interface RateLimitOptions<Requires extends object = Empty> {
 }
 ```
 
-`rateLimit` returns an app whose single route hook counts the request. Given
-to `use`, it adds `rateLimit` to the context of every route declared after
-it, and its 429 to each of those routes' types. `Requires` is what `key`
-and `skip` read beyond `BaseContext`; see [Reading the app's context](#reading-the-apps-context).
+`rateLimit` returns a middleware that counts the request. Given to `app.use`,
+it adds `rateLimit` to the context of every route declared after it, and each
+of those routes may answer its 429; it also counts a request no route
+matches, and answers its 429 before the 404 (see [Which requests are
+counted](#which-requests-are-counted)). `Requires` is what `key` and `skip`
+read beyond `BaseContext`; see [Reading the app's context](#reading-the-apps-context).
+
+```ts
+type RateLimit<Requires extends object = Empty> = Middleware<
+	Requires,
+	Promise<Reply<429, RateLimitedBody> | Next<{ rateLimit: RateLimitInfo | undefined }>>
+>;
+```
 
 ## Options
 
@@ -89,9 +98,9 @@ app.use(
 );
 ```
 
-`key` is typed with `BaseContext`, what every route hook reads: the request,
-`url`, `ip`, `server`, `route` and `pathParams`, and with `Requires`, empty
-by default. To read what an earlier plugin added, see [Reading the app's
+`key` is typed with `BaseContext`, what every middleware reads: the request,
+`url`, `ip`, `server`, `route` (`undefined` on a request no route matches) and `pathParams`, and with `Requires`, empty
+by default. To read what an earlier middleware added, see [Reading the app's
 context](#reading-the-apps-context).
 
 ### `skip`
@@ -111,10 +120,10 @@ app.use(
 
 ### Reading the app's context
 
-To count by what an earlier plugin added, such as a signed-in `user`, name
-it as `rateLimit`'s type argument. `key` and `skip` then read it, and the
-limit is a [`definePlugin`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
-plugin: an app that does not give `user` before it cannot use it.
+To count by what an earlier middleware added, such as a signed-in `user`,
+name it as `rateLimit`'s type argument. `key` and `skip` then read it, and
+the app that uses the limit must give it first: an app that does not give
+`user` before it cannot use it.
 
 ```ts
 const perUser = rateLimit<{ user: { id: string; role: string } }>({
@@ -125,12 +134,12 @@ const perUser = rateLimit<{ user: { id: string; role: string } }>({
 });
 
 const app = alxia()
-	.use(auth) // derives user, or answers 401
+	.plugin(auth) // derives user, or answers 401
 	.use(perUser)
 	.get('/search', handler);
 
 alxia().use(perUser);
-// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+// error: Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: { id: string; role: string; }; }'
 ```
 
 ### `headers`
@@ -163,13 +172,25 @@ counts live in that process and are lost when it stops. See
 
 ## Which requests are counted
 
-The limit is a route hook, so order decides, at runtime and in the types:
+The limit is a middleware, so order decides, at runtime and in the types:
 
-- a route declared **before** `use(rateLimit(…))` is not counted, and its
-  type has no 429;
+- a route declared **before** `use(rateLimit(…))` is not counted, and
+  never answers the 429;
 - a route declared **after** it is counted, and may answer the 429;
+- a request **no route matches** (a 404, a 405) is counted too, when the limit
+  is on the app: every top-level `use()` runs on it, wherever declared, and
+  past the limit the 429 comes before the 404. Spamming missing paths spends
+  the allowance;
 - inside a [group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md#groups),
-  the limit stays in the group.
+  the limit stays inside it: its routes, and an unmatched request under the
+  group's prefix, never a route declared after the group nor a path outside
+  the prefix;
+- a path-scoped `use('/api', rateLimit(…))` does not compile: a middleware
+  given a path may add nothing to the context, and the limit adds
+  `rateLimit`. A group is the scope.
+
+A guard on the app answers an anonymous caller of a missing path with its
+refusal, not the 404: that is the same rule for a rate limit.
 
 ```ts
 const app = alxia()
@@ -183,9 +204,8 @@ const app = alxia()
 	.get('/search', ({ reply }) => reply(200, []));                  // the group's limit does not reach it
 ```
 
-Route hooks run before the request is validated: a request the route
-refuses with a 400 has already been counted. A request that matches no route
-(a 404) never reaches the hook, and is not counted.
+The limit runs before the request is validated: a request the route
+refuses with a 400 has already been counted.
 
 Two limits on the same routes both count, and either may answer the 429 —
 a burst limit and an hourly one, say. Each sets its own headers on the
@@ -226,7 +246,7 @@ app
 
 ## The 429
 
-Past the limit the hook ends the request before the route runs:
+Past the limit the middleware ends the request before the route runs:
 
 ```text
 HTTP/1.1 429 Too Many Requests
@@ -249,29 +269,24 @@ interface RateLimitedBody {
 `retryAfter` and `Retry-After` are the same number. A refused request
 counts nothing: retrying after `retryAfter` seconds succeeds.
 
-## On the client
+## On the wire
 
-[`@alxia/client`](https://www.npmjs.com/package/@alxia/client) reads the
-429 from the app's type: a route after the limit resolves to a union with
-`429`, whose `data` is `{ error: 'rate_limited'; retryAfter: number }`.
+Every route after the limit may answer `429 { error: 'rate_limited',
+retryAfter }`; a route declared before it never does. Declare the 429 in
+your OpenAPI document, and the client you generate from it (with
+`@nxgt/openapi-codegen`, say) reads it typed. A caller waits, then tries
+again:
 
 ```ts
-import { client } from '@alxia/client';
-import type { App } from './server';
-
-const api = client<App>('http://localhost:3000');
-
 async function search() {
 	for (;;) {
-		const result = await api.get('/search');
-		if (result.status !== 429) return result;
-		await Bun.sleep(result.data.retryAfter * 1000); // wait, then try again
+		const response = await fetch('http://localhost:3000/search');
+		if (response.status !== 429) return response;
+		const { retryAfter } = await response.json();
+		await Bun.sleep(retryAfter * 1000); // wait, then try again
 	}
 }
 ```
-
-A route declared before the limit has no 429 in its type; comparing its
-status to `429` is a compile error.
 
 ## Stores
 
@@ -348,7 +363,7 @@ Keep a reference to the store to forget a key — the failed logins of an
 address that has just logged in:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { MemoryStore, rateLimit } from '@alxia/rate-limit';
 import { z } from 'zod';
 
@@ -361,7 +376,7 @@ export const app = alxia()
 			.use(rateLimit({ limit: 5, windowMs: 15 * 60_000, store: attempts }))
 			.post(
 				'/login',
-				{ body: z.object({ name: z.string(), password: z.string() }) },
+				validate({ body: z.object({ name: z.string(), password: z.string() }) }),
 				async ({ body, ip, reply }) => {
 					if (passwords.get(body.name) !== body.password) {
 						return reply(401, { error: 'invalid_credentials' as const });
@@ -390,7 +405,6 @@ nothing. Give the app an `ip` that reads a header, and send it:
 
 ```ts
 import { expect, test } from 'bun:test';
-import { client } from '@alxia/client';
 import { alxia } from '@alxia/core';
 import { rateLimit } from '@alxia/rate-limit';
 
@@ -399,15 +413,13 @@ const app = alxia({ ip: (request) => request.headers.get('x-ip') ?? undefined })
 	.get('/limited', ({ rateLimit, reply }) => reply(200, rateLimit?.remaining ?? -1));
 
 test('answers 429 past the limit, per address', async () => {
-	const api = client(app);
-	const init = { init: { headers: { 'x-ip': '1.1.1.1' } } };
-	expect((await api.get('/limited', init)).data).toBe(1);
-	await api.get('/limited', init);
-	const third = await api.get('/limited', init);
+	const from = (ip: string) => app.request('/limited', { headers: { 'x-ip': ip } });
+	expect(await (await from('1.1.1.1')).json()).toBe(1);
+	await from('1.1.1.1');
+	const third = await from('1.1.1.1');
 	expect(third.status).toBe(429);
-	expect(third.response.headers.get('retry-after')).toBe('60');
-	const other = await api.get('/limited', { init: { headers: { 'x-ip': '2.2.2.2' } } });
-	expect(other.status).toBe(200);
+	expect(third.headers.get('retry-after')).toBe('60');
+	expect((await from('2.2.2.2')).status).toBe(200);
 });
 ```
 
@@ -417,5 +429,5 @@ distinct `x-ip` in each, so one test does not spend another's allowance.
 ## See also
 
 - [Troubleshooting](troubleshooting.md): a message, and what to do about it.
-- [`@alxia/core`'s hooks](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/hooks.md):
-  how route hooks and their order work.
+- [`@alxia/core`'s middleware guide](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md):
+  how `use`, groups and their order work, and which requests a middleware runs on.

@@ -1,6 +1,6 @@
 # Caching responses
 
-This page covers the `cache()` plugin: which requests it answers, which
+This page covers `cache()`, a middleware: which requests it answers, which
 responses it keeps, each option, the headers it sends, and what a route
 behind it reads.
 
@@ -23,7 +23,7 @@ curl -i localhost:3000/products   # x-cache: HIT, age: 0 — the route did not
 
 ## Which requests
 
-The plugin is a route hook: it applies to the routes declared **after**
+The cache is a middleware: it applies to the routes declared **after**
 `use(cache(…))`, in the same app or group, and to no other. Within those:
 
 - only `GET` and `HEAD` are looked up; every other method runs the route as
@@ -35,7 +35,12 @@ The plugin is a route hook: it applies to the routes declared **after**
 - a request whose [`key`](keys-and-vary.md#a-key-of-your-own) is
   `undefined` is not looked up, nor kept;
 - with `honorClientNoCache: true`, a request that says
-  `Cache-Control: no-cache` runs the route, and its response is not kept.
+  `Cache-Control: no-cache` runs the route, and its response is not kept;
+- given to `app.use`, it runs on a request no route matches too, and lets it
+  through: a missing path is never looked up nor kept, even with `404` in
+  [`statuses`](#which-responses-are-kept) — the store holds only what a
+  route answered, one entry per path a route serves, never one per path a
+  client made up.
 
 ## The three answers
 
@@ -94,6 +99,8 @@ A response is kept only when all of these hold:
 | its status is in `statuses` (`[200]` by default) | a 500 or a 404 is not served again unless you say so |
 | its `Cache-Control` has neither `private` nor `no-store` | the route said it belongs to one client |
 | it sets no cookie | a `Set-Cookie` belongs to one client |
+| the request carries no `Authorization`, or the response says `public`, `s-maxage` or `must-revalidate`, or `vary` names `authorization` | an authorized request's answer belongs to its sender (RFC 9111 §3.5) |
+| the request carries no `Cookie`, or the response says `public`, `s-maxage` or `must-revalidate`, or `vary` names `cookie`, or the cache has a `key` of yours | the same, for a cookie session; a `key` of your own is your word that it tells users apart |
 | it is not `text/event-stream` | a stream has no end to keep |
 | the route did not call `cache.skip()` | the route said so |
 
@@ -118,14 +125,14 @@ const app = alxia()
 	); // concurrent requests: one run each, each with its own answer
 ```
 
-A route that is always personal still belongs before the plugin: it saves
+A route that is always personal still belongs before the cache: it saves
 the store lookup, and the wait on another request's run.
 
 ## Options
 
 ```ts
-cache<Requires extends object = Empty>(options: CacheOptions<Requires>): Alxia<…> & Requiring<Requires> & Cache
-// an app, given to `use`, which checks `Requires`; and the hands to empty it
+cache<Requires extends object = Empty>(options: CacheOptions<Requires>): CacheMiddleware<Requires>
+// a middleware, given to `app.use`, which checks `Requires`; and the hands to empty it
 ```
 
 `Requires` is what `key` and `tags` read beyond `BaseContext`, empty by
@@ -216,7 +223,7 @@ test('a client whose copy is current gets a 304', async () => {
 A browser sends `If-None-Match` on its own once it has the response with
 an `ETag`; curl does not unless you pass the header.
 
-The plugin sets no `Cache-Control` of its own: it caches on the server.
+The cache sets no `Cache-Control` of its own: it caches on the server.
 For a browser or a CDN to keep the response as well, the route says so —
 `public` is not `private`, so the response is still kept here:
 
@@ -230,17 +237,37 @@ app.get('/products', ({ reply }) =>
 
 A kept response keeps the route's status and headers, without
 `Content-Length` and `Date`, with its `ETag`, and with each `vary` header
-appended to `Vary` once. Headers that global hooks add after the route
-(`onResponse`, a CORS or compression plugin) are not kept: they are added
-again to every answer, from the cache or not.
+appended to `Vary` once. Headers that a middleware declared **before** the
+cache adds on the way out (CORS, secure headers, compression, a logger's
+request id) are not kept: they are added again to every answer, from the
+cache or not. That is the order to use. A middleware declared **after** the
+cache runs on a miss only, and what it adds is kept and replayed.
+
+```ts
+import { alxia, defineMiddleware } from '@alxia/core';
+import { cache } from '@alxia/cache';
+import { cors } from '@alxia/cors';
+
+const stamp = defineMiddleware(async (_ctx, next) => {
+	const response = await next();
+	response.headers.set('x-rendered-by', 'origin');
+	return response;
+});
+
+const app = alxia()
+	.use(cors())                          // every answer, a hit included
+	.use(cache({ ttl: 60 }))
+	.use(stamp)                           // a miss only; its header is kept
+	.get('/products', ({ reply }) => reply(200, []));
+```
 
 ## What a route reads
 
-Every route after the plugin reads `ctx.cache`:
+Every route after the cache reads `ctx.cache`:
 
 ```ts
 interface CacheControls {
-	/** Tags the response being built, beyond the plugin's `tags`. */
+	/** Tags the response being built, beyond the cache's `tags`. */
 	tag(...tags: string[]): void;
 	/** Keeps this response out of the cache. */
 	skip(): void;
@@ -264,13 +291,13 @@ const app = alxia()
 	});
 ```
 
-A route declared before the plugin has no `ctx.cache`; reading it is a
+A route declared before the cache has no `ctx.cache`; reading it is a
 compile error ([Troubleshooting](../troubleshooting.md#property-cache-does-not-exist-on-type-context)).
 
 ## The value `cache()` returns
 
-`cache()` returns the plugin — an app to give to `use` — with the handles
-of its store on it:
+`cache()` returns the middleware — to give to `app.use` — with the handles
+of its store on it. Its type is `CacheMiddleware<Requires>`:
 
 ```ts
 interface Cache {

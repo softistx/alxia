@@ -188,7 +188,7 @@ The realistic case: a route that checks credentials and answers a token,
 which the client then sends as `Authorization: Bearer <token>`.
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { createJwt } from '@alxia/jwt';
 import { z } from 'zod';
 
@@ -196,7 +196,7 @@ const jwt = createJwt({ secret: Bun.env['JWT_SECRET']!, issuer: 'api', expiresIn
 
 const app = alxia().post(
 	'/login',
-	{ body: z.object({ user: z.string(), password: z.string() }) },
+	validate({ body: z.object({ user: z.string(), password: z.string() }) }),
 	async ({ body, reply }) => {
 		const user = await findUser(body.user, body.password); // yours
 		if (user === undefined) return reply(401, { error: 'invalid_credentials' as const });

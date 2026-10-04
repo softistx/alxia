@@ -1,5 +1,4 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { client } from '@alxia/client';
 import { alxia } from '@alxia/core';
 import { z } from 'zod';
 import { bearer } from './bearer';
@@ -130,27 +129,28 @@ describe('bearer', () => {
 				schema: z.object({ sub: z.string(), role: z.enum(['admin', 'user']) }),
 			}),
 		)
-		.get('/me', ({ user, reply }) => reply(200, user));
-
-	test('a valid token: the claims, checked, as user', async () => {
-		const token = await jwt.sign({ sub: 'ada', role: 'admin' });
-		const result = await client(app).get('/me', {
-			init: { headers: { authorization: `Bearer ${token}` } },
-		});
-		expect(result.status).toBe(200);
-		if (result.status === 200) {
-			expectTypeOf(result.data).toEqualTypeOf<{
+		.get('/me', ({ user, reply }) => {
+			expectTypeOf(user).toEqualTypeOf<{
 				sub: string;
 				role: 'admin' | 'user';
 			}>();
-		}
+			return reply(200, user);
+		});
+
+	test('a valid token: the claims, checked, as user', async () => {
+		const token = await jwt.sign({ sub: 'ada', role: 'admin' });
+		const result = await app.request('/me', {
+			headers: { authorization: `Bearer ${token}` },
+		});
+		expect(result.status).toBe(200);
+		expect(await result.json()).toEqual({ sub: 'ada', role: 'admin' });
 	});
 
-	test('a 401, typed, for a missing token or refused claims', async () => {
-		const missing = await client(app).get('/me');
+	test('a 401 for a missing token or refused claims', async () => {
+		const missing = await app.request('/me');
 		expect(missing.status).toBe(401);
-		if (missing.status === 401) expect(missing.data.reason).toBe('missing');
-		expect(missing.response.headers.get('www-authenticate')).toBe('Bearer');
+		expect((await missing.json()).reason).toBe('missing');
+		expect(missing.headers.get('www-authenticate')).toBe('Bearer');
 		const token = await jwt.sign({ sub: 'ada', role: 'root' });
 		const claims = await app.request('/me', {
 			headers: { authorization: `Bearer ${token}` },
@@ -186,5 +186,18 @@ describe('bearer', () => {
 		const refused = await response.json();
 		expect(refused.reason).toBe('claims');
 		expect(refused.issues[0].target).toBe('cookies');
+	});
+
+	test('on the app, a request no route matches is refused before its 404', async () => {
+		const jwt = createJwt({ secret });
+		const app = alxia()
+			.use(bearer({ jwt }))
+			.get('/me', ({ user, reply }) => reply(200, user.sub ?? ''));
+		expect((await app.request('/missing')).status).toBe(401);
+		const token = await jwt.sign({ sub: 'ada' });
+		const missing = await app.request('/missing', {
+			headers: { authorization: `Bearer ${token}` },
+		});
+		expect(missing.status).toBe(404);
 	});
 });

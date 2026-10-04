@@ -145,7 +145,7 @@ and [ten years](../troubleshooting.md#typeerror-defineratelimit--would-take-long
 `store.reset(key)` forgets a key — after a successful login, say:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { rateLimit } from '@alxia/rate-limit';
 import { redisStore } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
@@ -158,7 +158,7 @@ const passwords = new Map([['ada', 'lovelace']]);
 const app = alxia().group('/auth', (auth) =>
 	auth
 		.use(rateLimit({ limit: 5, windowMs: 15 * 60_000, store: attempts }))
-		.post('/login', { body: z.object({ name: z.string(), password: z.string() }) }, async ({ body, ip, reply }) => {
+		.post('/login', validate({ body: z.object({ name: z.string(), password: z.string() }) }), async ({ body, ip, reply }) => {
 			if (passwords.get(body.name) !== body.password) {
 				return reply(401, { error: 'invalid_credentials' as const });
 			}

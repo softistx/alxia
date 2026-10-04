@@ -15,9 +15,9 @@ const app = alxia()
 	.get('/products', ({ reply }) => reply(200, []));
 ```
 
-The plugin does not know which store it was given: every store answers the
+The cache does not know which store it was given: every store answers the
 same `CacheStore` contract, and freshness — `ttl`, `staleWhileRevalidate` —
-is decided by the plugin, not the store.
+is decided by the cache, not the store.
 
 ## In memory: `MemoryCacheStore`
 
@@ -128,7 +128,7 @@ interface CachedResponse {
 }
 ```
 
-What the plugin relies on:
+What the cache relies on:
 
 | Method | Must |
 | --- | --- |
@@ -137,7 +137,7 @@ What the plugin relies on:
 | `delete` | forget `key`; a key that is not there is not an error |
 | `deleteTag` | forget every key whose response carries `tag` |
 
-`get` need not check freshness: the plugin reads `storedAt`, `ttl` and
+`get` need not check freshness: the cache reads `storedAt`, `ttl` and
 `stale` itself. Expiring at `keepFor` only bounds what the store holds.
 
 A store over any key-value service — here a plain `Map`, standing in for
@@ -191,7 +191,7 @@ is `deleteTag` of it. A store that drops `tags` leaves `invalidate` and
 
 ### Testing a store
 
-The plugin's own behaviour is the best test of a store: run an app on it.
+The cache's own behaviour is the best test of a store: run an app on it.
 
 ```ts
 import { expect, test } from 'bun:test';

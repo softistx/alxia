@@ -8,10 +8,10 @@ import { fileHandler, staticHandler } from '../static/serve';
 import type { FileOptions, FileSource, StaticOptions } from '../static/types';
 import type { SocketHandlers, SocketSchema } from '../ws/types';
 import { type AppState, mount, register } from './app-state';
-import { routeHooks } from './define-hook';
+import type { RouteDefinition } from './definition';
 import { addPage } from './pages';
-import { routeArgs } from './route-method';
 import { operationArgs, type RouteOperation } from './route-operation';
+import { routeArgs, routeChain } from './route-steps';
 import type { Method } from './types';
 
 /** `app[method](path, ...rest)`: a route, behind the hooks in force. */
@@ -21,17 +21,23 @@ export function addRoute(
 	path: string,
 	...rest: unknown[]
 ): void {
-	const { list, schema, handler } = routeArgs(method, path, rest);
 	const full = joinPath(state.prefix, path);
 	const label = `${method} ${full}`;
+	const args = routeArgs(
+		`${method} ${path}`,
+		rest,
+		(last): last is RouteDefinition['handler'] => typeof last === 'function',
+		'handler',
+	);
+	const { derive, schema } = routeChain(label, args);
 	const bodyLimit = state.scope.bodyLimitOf(schema, label);
 	register(state, {
 		method,
 		path: full,
 		schema,
 		...(bodyLimit === undefined ? {} : { bodyLimit }),
-		handler,
-		...state.scope.hooks(routeHooks(list, label)),
+		handler: args.last,
+		...state.scope.hooks(full, derive),
 	});
 }
 
@@ -79,21 +85,29 @@ export function addPageAt(
 	addPage(state.runtime, joinPath(state.prefix, path), bundle);
 }
 
-/** `app.ws(path, [hooks]?, schema, handlers)`: a socket route, behind the hooks in force. */
+/**
+ * `app.ws(path, options?, ...middlewares, handlers)`, or `app.ws(path,
+ * [hooks]?, schema, handlers)`: a socket route, behind the hooks in force.
+ */
 export function addSocket(
 	state: AppState,
 	path: string,
-	...rest:
-		| [SocketSchema, SocketHandlers<never, never, never>]
-		| [readonly unknown[], SocketSchema, SocketHandlers<never, never, never>]
+	...rest: unknown[]
 ): void {
-	const [list, schema, handlers] =
-		rest.length === 3 ? rest : ([[], ...rest] as const);
 	const full = joinPath(state.prefix, path);
+	const label = `WS ${full}`;
+	const args = routeArgs(
+		label,
+		rest,
+		(last): last is SocketHandlers<never, never, never> =>
+			last !== null && typeof last === 'object' && !Array.isArray(last),
+		'handlers object',
+	);
+	const { derive, schema } = routeChain(label, args, true);
 	mount(state, {
 		path: full,
-		schema,
-		handlers,
-		...state.scope.hooks(routeHooks(list, `WS ${full}`)),
+		schema: schema as SocketSchema,
+		handlers: args.last,
+		...state.scope.hooks(full, derive),
 	});
 }

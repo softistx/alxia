@@ -28,10 +28,10 @@ const schema = createSchema<GraphQLContext<typeof base>>({
 	},
 });
 
-const app = base.use((app) => graphql(app, { schema }));
+const app = base.plugin((app) => graphql(app, { schema }));
 ```
 
-Declare the hooks on a `base` app, type the schema with
+Declare the middlewares on a `base` app, type the schema with
 `GraphQLContext<typeof base>`, then mount the endpoint on it. The schema
 cannot be typed from `app` itself: `app` is built from the schema.
 
@@ -65,7 +65,7 @@ A resolver's context holds:
 | From | Fields |
 | --- | --- |
 | Yoga (`YogaInitialContext`) | `request`, and `params`: the GraphQL request's `query`, `variables`, `operationName`, `extensions` |
-| the app's hooks | everything `decorate` and `derive` added before the endpoint, and what plugins such as `@alxia/jwt`'s `bearer` add (`user`) |
+| the app's middlewares | everything `decorate` and `derive` added before the endpoint, and what middlewares such as `@alxia/jwt`'s `bearer` add (`user`) |
 | the route (`BaseContext`) | `url`, `ip`, `server`, `route`, `pathParams`, `error`, and `set` |
 | the `context` option | what it returns, as `UserContext` ([below](#the-context-option)) |
 
@@ -117,7 +117,7 @@ typed with a context the app does not build is refused, and the error names
 the missing field:
 
 ```ts
-const app = alxia().use((app) => graphql(app, { schema })); // no hook derives `viewer` or `users`
+const app = alxia().plugin((app) => graphql(app, { schema })); // no middleware derives `viewer` or `users`
 ```
 
 ```text
@@ -128,7 +128,7 @@ error TS2322: Type 'GraphQLSchemaWithContext<…>' is not assignable to type 'Gr
 
 With `exactOptionalPropertyTypes` on, the code is `TS2375`; the message
 ends the same way. The fix is to mount the endpoint on the
-app the schema was typed from, after its hooks:
+app the schema was typed from, after its middlewares:
 [Troubleshooting](../troubleshooting.md#the-schemas-resolvers-read-a-context-the-app-does-not-build-missing-).
 
 An untyped schema — `createSchema({ … })` with no type argument — passes
@@ -138,7 +138,7 @@ app's context.
 
 ## With a token: `@alxia/jwt`
 
-A guard plugin is a hook like any other. With `@alxia/jwt`'s `bearer`, the
+A guard is a middleware like any other, given to `use` before the endpoint. With `@alxia/jwt`'s `bearer`, the
 endpoint requires a token and `user` is the token's claims, typed by the
 schema you give it:
 
@@ -164,7 +164,7 @@ const schema = createSchema<GraphQLContext<typeof base>>({
 	},
 });
 
-const app = base.use((app) => graphql(app, { schema }));
+const app = base.plugin((app) => graphql(app, { schema }));
 ```
 
 The guard's `401` and its body are `@alxia/jwt`'s, described in its
@@ -186,7 +186,7 @@ const schema = createSchema<GraphQLContext<typeof base, Loaders>>({
 	},
 });
 
-const app = base.use((app) =>
+const app = base.plugin((app) =>
 	graphql(app, {
 		schema,
 		// annotate the argument: see below
@@ -219,6 +219,6 @@ as per-request data loaders.
 
 ## See also
 
-- [Mounting the endpoint](endpoint.md): which hooks run before it.
-- [Hooks](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/hooks.md),
+- [Mounting the endpoint](endpoint.md): which middlewares run before it.
+- [Middlewares](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md),
   in `@alxia/core`'s guide: `decorate` and `derive`.

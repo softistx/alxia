@@ -1,6 +1,6 @@
 /**
  * The types an app is made of: what a route declares, what its handler
- * reads, and the record of it the client is typed from. Each part lives in
+ * reads. Each part lives in
  * this folder; this file names what the rest of the package imports.
  */
 export type { Empty, MaybePromise, Method } from './common';
@@ -12,19 +12,31 @@ export type {
 	ResponseSettings,
 } from './context';
 export type {
-	BehindShortcuts,
+	AddedOf,
+	BuiltinMark,
+	HandlerContext,
+	MadeByDefineMiddleware,
+	Merge,
+	Middleware,
+	MiddlewareBase,
+	MiddlewareContext,
+	MiddlewareMark,
+	MiddlewareResult,
+	MiddlewareReturn,
+	Next,
+	NextFunction,
+	SchemaOf,
+	ThreadContext,
+	ThreadSchema,
+} from './middleware';
+export type {
 	BodyLimited,
 	BodyLimitShortcut,
 	DeclaredRefusal,
-	DefaultLimitOutcome,
-	DefaultRefusalOutcome,
 	FallsBack,
-	IsLimited,
 	KindFallsBack,
-	KindOutcome,
 	KindRefusalsOf,
 	OneKind,
-	RefusalOutcome,
 	RefusalResponses,
 	RefusalSchema,
 	RefusalsOf,
@@ -32,7 +44,12 @@ export type {
 	RefusingKind,
 	ThenShortcuts,
 } from './refusal';
-export type { ProvidedBy, RequiresOf, Requiring } from './requires';
+export type {
+	ProvidedBy,
+	RequiresOf,
+	Requiring,
+	RequiringContext,
+} from './requires';
 export type {
 	AddedBy,
 	AnyRouteHook,
@@ -47,15 +64,6 @@ export type {
 	RouteWrap,
 	ThreadHooks,
 } from './route-hooks';
-export type {
-	Outcome,
-	OutcomeOf,
-	RouteEntryOf,
-	RouteInput,
-	RouteOutput,
-	RouteRecord,
-	RouteTable,
-} from './route-table';
 export type { ResponseSchemas, RouteDetail, RouteSchema } from './schema';
 export type {
 	DeclaredReply,

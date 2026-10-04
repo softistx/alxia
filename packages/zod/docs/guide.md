@@ -2,27 +2,27 @@
 
 This page covers the two things `@alxia/zod` adds to an alxia app: the `zq`
 coercions, which read the text a request carries as the values a client
-means to send, and `zodConverter`, which documents a Zod schema in OpenAPI
-as it really crosses the wire.
+means to send, and `zodConverter`, which gives a Zod schema as JSON Schema
+2020-12 as it really crosses the wire.
 
 ```ts
-import { client } from '@alxia/client';
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { zq } from '@alxia/zod';
 import { z } from 'zod';
 
 const app = alxia().get(
 	'/items/:id',
-	{ params: z.object({ id: zq.int() }) },
+	validate({ params: z.object({ id: zq.int() }) }),
 	({ params, reply }) => reply(200, { id: params.id, next: params.id + 1 }),
 );
 
-const result = await client(app).get('/items/:id', { params: { id: 41 } });
-result.data; // { id: 41, next: 42 }
+const result = await app.request('/items/41');
+await result.json(); // { id: 41, next: 42 }
 ```
 
 The path arrives as the text `'41'`; the handler reads the number `41`, and
-the client is typed to send a number, not a string it would have to format.
+the schema's input, `number | string`, says a client may send the number
+itself, not a string it would have to format.
 
 ## The signature
 
@@ -50,8 +50,18 @@ declare const zq: {
 	json<Schema extends z.ZodType>(schema: Schema): z.ZodType<z.output<Schema>, string | Exclude<z.input<Schema>, readonly unknown[]>>;
 };
 
+// Any Zod schema as it is, zodConverter(Order, 'output'), or any Standard
+// Schema: one whose vendor is not 'zod' gives undefined.
 declare function zodConverter(
-	schema: { readonly '~standard': { readonly vendor: string } },
+	schema: {
+		readonly '~standard': {
+			readonly vendor: string;
+			readonly jsonSchema?: {
+				readonly input: (options: { readonly target: string }) => Record<string, unknown>;
+				readonly output: (options: { readonly target: string }) => Record<string, unknown>;
+			};
+		};
+	},
 	side: 'input' | 'output',
 ): Record<string, unknown> | undefined;
 ```
@@ -64,9 +74,9 @@ there as on any schema.
 
 Path parameters, the query string, headers and cookies are text. Zod's own
 `z.coerce.number()` reads that text, but its input is `unknown`, so a typed
-client accepts anything for the key. `z.number()` types the client right,
-but refuses the text the server receives. A `zq` coercion does both: the
-client is typed with the value, the server accepts the value or its text.
+client accepts anything for the key. `z.number()` has the right input,
+but refuses the text the server receives. A `zq` coercion does both: its
+input is the value, the server accepts the value or its text.
 
 | | `z.number()` | `z.coerce.number()` | `zq.number()` |
 | --- | --- | --- | --- |
@@ -81,18 +91,17 @@ numbers, booleans and arrays, so `z.number()` is right there.
 ```ts
 app.get(
 	'/reports',
-	{
+	validate({
 		query: z.object({ year: zq.int(), draft: zq.boolean().optional() }),
 		headers: z.object({ 'x-page-size': zq.int().default(20) }),
 		cookies: z.object({ beta: zq.boolean().default(false) }),
-	},
+	}),
 	({ query, headers, cookies, reply }) =>
 		reply(200, { year: query.year, size: headers['x-page-size'], beta: cookies.beta }),
 );
 ```
 
-When the client sends a value, it turns it into text the coercion reads
-back: a number or a boolean with `String`, a `Date` with `toISOString()`, an
+A client sends a value as text the coercion reads back: a number or a boolean with `String`, a `Date` with `toISOString()`, an
 object as JSON, and each item of an array under the same key.
 
 ### `zq.number()`
@@ -222,8 +231,8 @@ Range.parse('{"min":1,"max":5}'); // { min: 1, max: 5 }
 Range.parse({ min: 1, max: 5 });   // { min: 1, max: 5 }, already parsed
 ```
 
-The client is typed with the schema's input and sends an object as its JSON,
-so it writes `query: { range: { min: 1, max: 5 } }`. Text that is not JSON
+A client typed by the schema's input sends an object as its JSON text,
+`?range={"min":1,"max":5}`. Text that is not JSON
 is refused with `Expected JSON`; JSON that does not match the schema is
 refused with the schema's own issue, at the path inside it:
 
@@ -231,7 +240,7 @@ refused with the schema's own issue, at the path inside it:
 ?range={"min":"x","max":5}   →  path ["range", "min"]: Invalid input: expected number, received string
 ```
 
-An array is the exception: the client is typed to send it as its JSON
+An array is the exception: its input is its JSON
 text, a `string`, not as the array. A query sends a list as one value per
 key, `?ids=1&ids=2`, which is not JSON, so an array given as itself could
 never reach the schema:
@@ -239,11 +248,11 @@ never reach the schema:
 ```ts
 const app = alxia().get(
 	'/ids',
-	{ query: z.object({ ids: zq.json(z.array(z.number())) }) },
+	validate({ query: z.object({ ids: zq.json(z.array(z.number())) }) }),
 	({ query, reply }) => reply(200, query.ids), // number[]
 );
 
-await client(app).get('/ids', { query: { ids: JSON.stringify([1, 2]) } }); // ?ids=[1,2]
+await app.request(`/ids?${new URLSearchParams({ ids: JSON.stringify([1, 2]) })}`); // ?ids=[1,2]
 ```
 
 For a list a key repeats, use [`zq.array(item)`](#zqarrayitem) instead.
@@ -277,69 +286,68 @@ problem. From `GET /items/x`:
 | `array` | a key given once, which the item schema refuses | `invalid_union` | the item's, on the key: `Expected a number` for `zq.int()` |
 | `array` | a key given more than once, one of them refused | the item's, or `invalid_union` | the item's: at its index (`["ids", 1]`) for `zq.int()` or `z.string()`; on the key, without the index, for an enum, `zq.date()`, `zq.boolean()` or an object |
 
-A typed client already refuses most of these at compile time; the `400` is
-what a hand-written URL, a link, or another client gets.
+A client typed by the schema's input refuses most of these at compile
+time; the `400` is what a hand-written URL, a link, or another client gets.
 
-## OpenAPI: `zodConverter`
+## JSON Schema: `zodConverter`
 
-`@alxia/openapi` converts a schema through Standard JSON Schema, which Zod
-4.2 and later carries. That conversion fails on what JSON Schema cannot
-say — a `z.date()`, a `z.bigint()`, a `.transform()` — and when it fails,
-the whole schema is documented as `{}`, anything. `zodConverter` converts a
-Zod schema as it crosses the wire instead:
+> **Deprecated.** Nothing in alxia reads it any more: it served the
+> `convert` option of the retired `@alxia/openapi` document writer. It stays
+> exported, unchanged, for code that already calls it.
+
+alxia is OpenAPI spec first: the document is written by hand, and the
+routes' schemas come from it or are checked against it, so nothing in
+alxia converts a Zod schema for you. `zodConverter` is for your own use —
+writing the schemas of Zod you already have into a hand-written document,
+or handing them to any JSON Schema consumer. Zod's own conversion throws on
+what JSON Schema cannot say, a `z.date()`, a `z.bigint()`, a `.transform()`;
+`zodConverter` converts a Zod schema as it crosses the wire instead:
 
 ```ts
-import { alxia } from '@alxia/core';
-import { docs, openapi } from '@alxia/openapi';
 import { zodConverter } from '@alxia/zod';
 import { z } from 'zod';
 
-const app = alxia().get(
-	'/events/:id',
-	{ response: { 200: z.object({ id: z.string(), at: z.date() }) } },
-	({ params, reply }) => reply(200, { id: params.id, at: new Date() }),
-);
+const Event = z.object({ id: z.string(), at: z.date() });
 
-const info = { title: 'Events', version: '1.0.0' };
-
-const document = openapi(app, { info, convert: zodConverter }); // the document as an object
-app.use(docs(app, { info, convert: zodConverter }));             // or served, at /openapi.json and /docs
+zodConverter(Event, 'output');
+// {
+//   $schema: 'https://json-schema.org/draft/2020-12/schema',
+//   type: 'object',
+//   properties: { id: { type: 'string' }, at: { type: 'string', format: 'date-time' } },
+//   required: ['id', 'at'],
+//   additionalProperties: false,
+// }
 ```
 
-| In the schema | Without `zodConverter` | With it |
+| In the schema | Zod's own conversion | `zodConverter` |
 | --- | --- | --- |
-| `z.date()` | the whole schema is `{}` | `{ "type": "string", "format": "date-time" }` |
-| `z.bigint()` | the whole schema is `{}` | `{ "type": "integer" }` |
-| anything else JSON Schema cannot say: a `.transform()`'s output, a `z.map()` | the whole schema is `{}` | that one field is `{}`; the rest is documented |
-| a `params`, `query`, `headers` or `cookies` schema holding one of these | **no parameter** is documented for it | each parameter is documented |
-| a schema of another vendor | the default conversion | the default conversion: `zodConverter` returns `undefined` for it |
+| `z.date()` | throws `Date cannot be represented in JSON Schema` | `{ "type": "string", "format": "date-time" }` |
+| `z.bigint()` | throws | `{ "type": "integer" }` |
+| anything else JSON Schema cannot say: a `.transform()`'s output, a `z.map()` | throws | that one field is `{}`, anything; the rest is converted |
+| a schema of another vendor | — | `undefined`, for your own conversion |
 
-A `Date` is documented as a `date-time` string because that is what a
-client receives: a reply is sent as JSON, where a `Date` is its ISO text,
-and `@alxia/client` types it as a `string`.
+A `Date` is a `date-time` string because that is what a client receives: a
+reply is sent as JSON, where a `Date` is its ISO text.
 
-Each schema is documented from the side it is on. A request schema —
-`params`, `query`, `headers`, `cookies`, `body` — is documented by its
-input, what a client may send; a response by its output, what it gets. So
-`zq.int()` in a query documents as a number or numeric text:
+`side` picks the side of the schema. A request schema — `params`, `query`,
+`headers`, `cookies`, `body` — is converted by its `'input'`, what a client
+may send; a response by its `'output'`, what it gets. So `zq.int()` in a
+query converts as a number or numeric text:
 
-```json
-{
-	"name": "page",
-	"in": "query",
-	"required": false,
-	"schema": {
-		"anyOf": [
-			{ "type": "number" },
-			{ "type": "string", "pattern": "^\\s*[-+]?(\\d+\\.?\\d*|\\.\\d+)(e[-+]?\\d+)?\\s*$" }
-		]
-	}
-}
+```ts
+zodConverter(z.object({ page: zq.int().optional() }), 'input');
+// properties.page:
+// {
+//   anyOf: [
+//     { type: 'number' },
+//     { type: 'string', pattern: '^\\s*[-+]?(\\d+\\.?\\d*|\\.\\d+)(e[-+]?\\d+)?\\s*$' },
+//   ],
+// }
 ```
 
-`zq.json(schema)` documents as a string or anything: the shape inside the
-text is not described. Say it with `.describe()`, which the document
-carries as the parameter's description:
+`zq.json(schema)` converts as a string or anything: the shape inside the
+text is not described. Say it with `.describe()`, which the JSON Schema
+carries as its `description`:
 
 ```ts
 const query = z.object({
@@ -350,24 +358,40 @@ const query = z.object({
 });
 ```
 
-`zodConverter` targets JSON Schema 2020-12, the dialect of OpenAPI 3.1 and 3.2, and
-fits the `convert` option as it is: its type matches `@alxia/openapi`'s
-`Converter` without importing it, so this package has no dependency on
-`@alxia/openapi`.
+`zodConverter` targets JSON Schema 2020-12, the dialect of OpenAPI 3.1 and
+3.2, so what it returns fits under a document's `components.schemas` as it
+is, `$schema` included. A script that writes them once, for you to edit by
+hand from then on:
+
+```ts
+// scripts/schemas.ts — bun scripts/schemas.ts
+import { zodConverter } from '@alxia/zod';
+import { NewOrder, Order } from '../src/schemas';
+
+const components = {
+	schemas: {
+		Order: zodConverter(Order, 'output'),
+		NewOrder: zodConverter(NewOrder, 'input'),
+	},
+};
+await Bun.write('openapi/components.yaml', Bun.YAML.stringify(components, null, 2));
+```
+
+The routes are then generated from the document and checked against it:
+see [`@alxia/openapi`](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/spec-first.md).
 
 ## A realistic setup
 
-A list of orders a page filters by status, date and total, documented, and
-its tests through the typed client:
+A list of orders a page filters by status, date and total, and its tests
+through `app.request()`:
 
 ```ts
 // app.ts
-import { alxia } from '@alxia/core';
-import { docs } from '@alxia/openapi';
-import { zodConverter, zq } from '@alxia/zod';
+import { alxia, responds, validate } from '@alxia/core';
+import { zq } from '@alxia/zod';
 import { z } from 'zod';
 
-const Order = z.object({
+export const Order = z.object({
 	id: z.string(),
 	status: z.enum(['open', 'paid', 'shipped']),
 	total: z.number(),
@@ -381,15 +405,15 @@ const orders: z.output<typeof Order>[] = [
 
 export const app = alxia().get(
 	'/orders',
-	{
+	validate({
 		query: z.object({
 			page: zq.int().default(1),
 			status: zq.array(Order.shape.status).optional(),
 			since: zq.date().optional(),
 			total: zq.json(z.object({ min: z.number(), max: z.number() })).optional(),
 		}),
-		response: { 200: z.object({ page: z.number(), items: z.array(Order) }) },
-	},
+	}),
+	responds({ 200: z.object({ page: z.number(), items: z.array(Order) }) }),
 	({ query, reply }) =>
 		reply(200, {
 			page: query.page,
@@ -402,31 +426,25 @@ export const app = alxia().get(
 			),
 		}),
 );
-
-app.use(docs(app, { info: { title: 'Orders', version: '1.0.0' }, convert: zodConverter }));
-
-export type App = typeof app;
 ```
 
 ```ts
 // app.spec.ts
 import { describe, expect, test } from 'bun:test';
-import { client } from '@alxia/client';
-import { app } from './app';
-
-const api = client(app);
+import { zodConverter } from '@alxia/zod';
+import { app, Order } from './app';
 
 describe('GET /orders', () => {
-	test('the client sends values, the route reads them typed', async () => {
-		const result = await api.get('/orders', {
-			query: {
-				status: ['paid', 'open'],
-				since: new Date('2026-03-01T00:00:00Z'),
-				total: { min: 10, max: 50 },
-			},
-		});
+	test('values sent as text, read typed by the route', async () => {
+		const query = new URLSearchParams([
+			['status', 'paid'],
+			['status', 'open'],
+			['since', new Date('2026-03-01T00:00:00Z').toISOString()],
+			['total', JSON.stringify({ min: 10, max: 50 })],
+		]);
+		const result = await app.request(`/orders?${query}`);
 		expect(result.status).toBe(200);
-		expect(result.data).toMatchObject({ page: 1, items: [{ id: 'a1' }, { id: 'a2' }] });
+		expect(await result.json()).toMatchObject({ page: 1, items: [{ id: 'a1' }, { id: 'a2' }] });
 	});
 
 	test('one status is a list of one', async () => {
@@ -441,25 +459,15 @@ describe('GET /orders', () => {
 		expect(response.status).toBe(400);
 	});
 
-	test('the document says what crosses the wire', async () => {
-		const document = await (await app.request('/openapi.json')).json();
-		const operation = document.paths['/orders'].get;
-		const item =
-			operation.responses['200'].content['application/json'].schema.properties.items.items;
-		expect(item.properties.createdAt).toEqual({ type: 'string', format: 'date-time' });
-		expect(operation.parameters.map((p: { name: string }) => p.name)).toEqual([
-			'page',
-			'status',
-			'since',
-			'total',
-		]);
+	test('an order as JSON Schema says what crosses the wire', () => {
+		expect(zodConverter(Order, 'output')).toMatchObject({
+			properties: { createdAt: { type: 'string', format: 'date-time' } },
+		});
 	});
 });
 ```
 
-Without `convert: zodConverter`, the last test fails twice: the response is
-documented as `{}`, and the query, which holds a `zq.date()`, documents no
-parameter at all.
+Zod's own `z.toJSONSchema(Order)` throws on `createdAt` instead.
 
 When a request is still refused, [Troubleshooting](troubleshooting.md)
 starts from the issue message in the `400`.

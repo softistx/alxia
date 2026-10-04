@@ -36,8 +36,8 @@ function createI18n<
 	Ctx extends object = BaseContext,
 >(
 	options: I18nOptions<C, Fallback, Ctx>,
-): Alxia<RequiresOf<Ctx, 'resolve'> & Empty & LanguageContext<keyof C & string> & I18nContext<KeyOf<C[Fallback]>>, Empty, '', never> &
-	Requiring<RequiresOf<Ctx, 'resolve'>> & {
+): Middleware<RequiresOf<Ctx, 'resolve'>, Promise<Next<LanguageContext<keyof C & string> & I18nContext<KeyOf<C[Fallback]>>>>> &
+	MiddlewareMark & {
 		t: Translate<KeyOf<C[Fallback]>>;
 		language: () => keyof C & string;
 		supported: (keyof C & string)[];
@@ -65,9 +65,11 @@ when `resolve` is absent or not annotated. See
 
 `createI18n()` returns two things in one value:
 
-- **an app plugin**: pass it to `use`. It applies to the routes declared
-  **after** it, in the same app or [group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md),
-  and adds `t`, `language` and `languageSource` to their context;
+- **a middleware**: pass it to `app.use`. It runs on every request the app
+  takes, and applies to what is declared **after** it, in the same app or
+  [group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md):
+  the middlewares and the routes. It adds `t`, `language` and `languageSource`
+  to their context;
 - **`t()`, `language()` and `supported`**, to call where no context is at
   hand: a service, a model, a job. See [Outside a route](#outside-a-route).
 
@@ -86,13 +88,13 @@ does not grow `@nxgt/i18n`'s list; see [`@nxgt/i18n`'s own `translate`](#nxgti18
 | `cookie` | `string` | `'language'` | the cookie read, and written by `persist` |
 | `pathIndex` | `number` | `0` | the path segment the `path` source reads |
 | `persist` | `boolean \| { maxAge?, secure? }` | `false` | a language the query named is kept in the cookie |
-| `contentLanguage` | `boolean` | `true` | `Content-Language` on every response the plugin runs for |
-| `resolve` | `(ctx: BaseContext & Ctx) => string \| undefined` | none | decides after every source, before `fallback`; annotate `ctx` to read what an earlier plugin adds |
+| `contentLanguage` | `boolean` | `true` | `Content-Language` on every response the middleware runs for |
+| `resolve` | `(ctx: BaseContext & Ctx) => string \| undefined` | none | decides after every source, before `fallback`; annotate `ctx` to read what an earlier middleware adds |
 
 Every option but `resources` and `fallback` is `@alxia/language`'s, passed
 through as it is; its [guide](https://github.com/softistx/alxia/blob/develop/packages/language/docs/guide.md)
 details each one, how `Accept-Language` is negotiated, and the `Vary` the
-plugin adds. `supported` is not an option here: it is `resources`' keys.
+middleware adds. `supported` is not an option here: it is `resources`' keys.
 
 ### `resources`
 
@@ -182,15 +184,15 @@ export const app = alxia()
 	.get('/:lang/home', ({ t, reply }) => reply(200, t('home.title'))); // /fr/home → 'Bienvenue'
 ```
 
-The plugin reads the segment; it does not route on it, so the routes
+The middleware reads the segment; it does not route on it, so the routes
 declare it.
 
 ### Reading the app's context
 
 To speak the language a signed-in user saved, annotate `resolve`'s
-parameter with what an earlier plugin added. `createI18n()` infers it from
+parameter with what an earlier middleware added. `createI18n()` infers it from
 the annotation — the languages and the keys are still inferred from
-`resources` and `fallback` — and the plugin then requires it: an app that
+`resources` and `fallback` — and the middleware then requires it: an app that
 does not give `user` before it cannot use it.
 
 ```ts
@@ -209,18 +211,18 @@ const i18n = createI18n({
 });
 
 export const app = alxia()
-	.use(auth) // derives user: User | null
+	.plugin(auth) // an app: derives user: User | null
 	.use(i18n)
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 
 alxia().use(i18n);
-// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+// error: Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'
 ```
 
 This is `@alxia/language`'s check, carried through; its
 [guide](https://github.com/softistx/alxia/blob/develop/packages/language/docs/guide.md#reading-the-apps-context)
 details it. A `resolve` left unannotated reads `BaseContext` only, and the
-plugin requires nothing. Annotated `any`, the plugin is refused on every
+middleware requires nothing. Annotated `any`, it is refused on every
 app:
 [`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](troubleshooting.md#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated).
 
@@ -249,7 +251,11 @@ export const app = alxia()
 // GET /?lang=fr → {"title":"Bienvenue","language":"fr","languageSource":"query"}
 ```
 
-A route declared before `.use(i18n)` reads none of them:
+They are in the context of every route, and of every `derive`, declared
+after `.use(i18n)`. A standalone middleware (`defineMiddleware`) does not
+know the app it is used on: it calls `i18n.t()`, which follows the request
+([Outside a route](#outside-a-route)). A route declared before `.use(i18n)`
+reads none of them:
 
 ```text
 error TS2339: Property 't' does not exist on type 'Context<Empty, "/", Empty>'.
@@ -414,25 +420,28 @@ export const app = alxia()
 i18n.language(); // 'en': no request here
 ```
 
-The plugin reads the request's language in a route hook; from then on,
-everything the request runs knows it. Before that, `i18n.t()` and
-`i18n.language()` answer in the fallback:
+The middleware reads the request's language, then runs the rest of the
+chain inside it: everything after it knows the language, through every
+`await`, and so does the answer to an error, since `i18n` settles `next()`.
+Before it, `i18n.t()` and `i18n.language()` answer in the fallback:
 
 | Where | `i18n.t()` answers in |
 | --- | --- |
-| a route, `derive` or `wrap` declared after `.use(i18n)`, and what they call | the request's language |
-| an `onError` hook, for what a route after the plugin threw | the request's language |
-| an `onResponse` hook, for a request the plugin ran for | the request's language |
-| an `around` hook declared after `.use(i18n)`, once `next()` has resolved | the request's language |
-| an `onRequest` hook; an `around` hook declared before `.use(i18n)`; one declared after it, before `next()` | the fallback: the language is not read yet |
-| a route or route hook declared before `.use(i18n)`, or a `404` no route matched | the fallback: the plugin does not run for it |
+| a middleware, `derive` or route declared after `.use(i18n)`, before and after its `next()`, and what they call | the request's language |
+| a middleware after it that catches an error | the request's language |
+| a middleware after it, on a `404` or a `405` no route matched | the request's language |
+| the deprecated `onError` hook, for what the chain after `use(i18n)` threw | the request's language |
+| a middleware declared before `.use(i18n)`, in and out | the fallback: the language is not read yet |
+| a route declared before `.use(i18n)` | the fallback: the middleware does not run for it |
+| the deprecated `onRequest` and `onResponse` hooks, which run outside the chain | the fallback |
 | code outside any request: start-up, a timer, a queue consumer | the fallback: pass the language, see below |
 
-An `onError` hook translates an error's message with `i18n.t()`, or with
-`t` from its context:
+An error-handling middleware translates an error's message with `i18n.t()`.
+Declare it after `.use(i18n)` (and after the observers, `logger()` and
+`telemetry()`):
 
 ```ts
-import { alxia, HttpError } from '@alxia/core';
+import { alxia, defineMiddleware, HttpError } from '@alxia/core';
 import { createI18n } from '@alxia/i18n';
 import { resources as shared } from '@nxgt/i18n';
 
@@ -440,10 +449,16 @@ const i18n = createI18n({ resources: { en: shared.en, fr: shared.fr }, fallback:
 
 export const app = alxia()
 	.use(i18n)
-	.onError((error, { reply }) =>
-		error instanceof HttpError && error.status === 404
-			? reply(404, { error: i18n.t('errors.not-found') })
-			: undefined,
+	.use(
+		defineMiddleware(async ({ reply }, next) => {
+			try {
+				return await next();
+			} catch (error) {
+				if (error instanceof HttpError && error.status === 404)
+					return reply(404, { error: i18n.t('errors.not-found') });
+				throw error;
+			}
+		}),
 	)
 	.get('/users/:id', () => {
 		throw new HttpError(404, {});
@@ -500,14 +515,14 @@ Its limits are `@nxgt/i18n`'s:
 - **Its fallback is `'en'`, not yours.** Outside a request, or before the
   language is read, `getLanguage()` answers `'en'` even when your
   `fallback` is `'fr'`.
-- **It hears one plugin.** With two `createI18n()` on one app, it follows
+- **It hears one middleware.** With two `createI18n()` on one app, it follows
   the language the first one read — its fallback included, when the
   request named a language only the second supports.
 
 ## Caching
 
-A response in the request's language varies by what decided it. The plugin
-says so in `Vary` — `Accept-Language, Cookie` with the default `order` —
+A response in the request's language varies by what decided it. The
+middleware says so in `Vary` — `Accept-Language, Cookie` with the default `order` —
 and a cache in front of it needs the same headers:
 
 ```ts
@@ -576,7 +591,7 @@ export const i18n = createI18n({
 
 ```ts
 // src/app.ts
-import { alxia, HttpError } from '@alxia/core';
+import { alxia, defineMiddleware, HttpError } from '@alxia/core';
 import { i18n } from './i18n';
 
 const carts = new Map<string, string[]>([['c1', ['book', 'pen']]]);
@@ -586,10 +601,16 @@ const describeCart = (items: readonly string[]) => i18n.t('cart.items', { count:
 
 export const app = alxia()
 	.use(i18n)
-	.onError((error, { t, reply }) =>
-		error instanceof HttpError && error.status === 404
-			? reply(404, { error: t?.('errors.not-found') ?? 'Not found' })
-			: undefined,
+	.use(
+		defineMiddleware(async ({ reply }, next) => {
+			try {
+				return await next();
+			} catch (error) {
+				if (error instanceof HttpError && error.status === 404)
+					return reply(404, { error: i18n.t('errors.not-found') });
+				throw error;
+			}
+		}),
 	)
 	.get('/carts/:id', ({ params, reply }) => {
 		const items = carts.get(params.id);

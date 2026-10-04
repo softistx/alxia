@@ -16,7 +16,7 @@ deploying.
 - [The app's own context keys](#the-apps-own-context-keys)
 - [A CSP nonce](#a-csp-nonce)
 - [Escape hatches](#escape-hatches)
-- [Hooks around the pages](#hooks-around-the-pages)
+- [Middlewares around the pages](#middlewares-around-the-pages)
 - [Routes beside the pages](#routes-beside-the-pages)
 - [WebSockets](#websockets)
 - [The client's files](#the-clients-files)
@@ -217,7 +217,7 @@ The plugin loads `build/server/index.js` on the first request and hands
 every request to its default export, the alxia app, before Vite's own
 files. So the preview answers as `bun run start` does: the pages and their
 data, `/api`, `build/client` with the cache headers of
-[the client's files](#the-clients-files), and every hook of `beforeAll`
+[the client's files](#the-clients-files), and every middleware of `beforeAll`
 and `configure`. Requests, their bodies and every `Set-Cookie` pass
 through whole, and pages stream.
 
@@ -241,7 +241,7 @@ React Router prerenders the `prerender` paths of `react-router.config.ts`
 through the same preview server, during `react-router build`. A
 prerendered page is therefore rendered by the built server too: its loader
 reads `alxiaOf(context)` and `getLoadContext`'s keys, and `beforeAll`'s
-and `configure`'s hooks run around it.
+and `configure`'s middlewares run around it.
 
 ## Built for Bun
 
@@ -397,7 +397,7 @@ bunx alxia-react-router reveal
 
 ```text
 alxia-react-router: wrote app/server.ts, the server alxia() runs by default.
-Next: uncomment configure in app/server.ts to add the app's hooks and /api; bun run dev picks it up.
+Next: uncomment configure in app/server.ts to add the app's middlewares and /api; bun run dev picks it up.
 ```
 
 The file is the server the plugin runs without one, `createServer()`, so
@@ -456,7 +456,7 @@ React Router's own rendering entries, `app/entry.server.tsx` and
 ### By hand
 
 The example uses `@alxia/logger` and `@alxia/compress`
-(`bun add @alxia/logger @alxia/compress`); any plugin works the same way.
+(`bun add @alxia/logger @alxia/compress`); any middleware works the same way.
 
 ```ts
 // app/server.ts
@@ -489,7 +489,7 @@ Every option is optional:
 
 | option | what it does |
 | --- | --- |
-| `configure(app)` | the app the pages run behind: its plugins, hooks and `/api`. It returns the app, and what it builds is what the loaders read |
+| `configure(app)` | the app the pages run behind: its middlewares and `/api`. It returns the app, and what it builds is what the loaders read |
 | `beforeAll(app)` | runs first, on a new app. What it declares applies to the client's files too: a rate limit, a guard on everything, a logger that should see every asset. It returns the app, which `configure` then receives |
 | `getLoadContext(ctx, context)` | sets the app's own keys on React Router's provider, `ctx` typed by `configure`'s app |
 | `build`, `mode`, `client` | override what the plugin wires; see [Escape hatches](#escape-hatches) |
@@ -503,11 +503,16 @@ A request goes through four layers, in order:
 3. what `configure` declared;
 4. the pages: `GET`, `POST`, `PUT`, `PATCH` and `DELETE` at `/*`.
 
-Hooks apply to the routes declared after them, so a session or a guard in
-`configure` runs around every page and its data, but not around the
-JavaScript of the login page. Global hooks (`onRequest`, `@alxia/cors`,
-`@alxia/compress`, `@alxia/secure-headers`) apply everywhere, wherever
-they are declared.
+A middleware given to `use` runs on every route declared after it, and on a
+request no route matches. So a session or a guard in `configure` runs around
+every page and its data, and not around what is declared before it: the
+client's files, which sit between `beforeAll` and `configure`. What must see
+every request, the client's files included, goes in `beforeAll`: the logger,
+`@alxia/cors`, `@alxia/compress`, `@alxia/secure-headers`. A guard on the app
+answers a request no route matches too: an anonymous request to a missing path
+gets the 401, not the 404. Scope it with a path, `use('/app', guard)`
+(a guard that adds nothing to the context: `bearer` and `session` add `user`),
+to guard only some pages.
 
 ```ts
 // app/server.ts: a guard on everything, the assets included
@@ -524,13 +529,13 @@ export default createServer({
 ```
 
 `configure` and `beforeAll` must return the app; one that returns nothing
-is a compile error. A plugin that needs something an earlier one
+is a compile error. A middleware that needs something an earlier one
 derived is typed by the app it is given, as anywhere in alxia.
 
 ## Typing the loaders
 
 Every request through the catch-all sets `alxiaContext`, this package's
-key, on React Router's context provider, to what alxia's hooks built for
+key, on React Router's context provider, to what alxia's middlewares built for
 that request. `alxiaOf(context)` reads it.
 
 ### With `Register`: no type argument
@@ -575,7 +580,7 @@ shows. The checks it gives:
 
 ```ts
 const ctx = alxiaOf(context);
-ctx.tenant;     // error: no hook derives `tenant`
+ctx.tenant;     // error: no middleware derives `tenant`
 ctx.user.name;  // error: `user` may be null
 ```
 
@@ -606,19 +611,57 @@ export function loader({ context }: Route.LoaderArgs) {
 
 The type argument may also be an alxia app, the app *before* the
 catch-all, for a server of your own. Anything else is a compile error.
-With neither `Register` nor a type argument, `alxiaOf(context)` is
-`BaseContext`: the request, its URL, `reply` and the rest of what every
-hook reads.
+
+### With `@alxia/core`'s `Register`
+
+`@alxia/core` has a `Register` of its own, which names the chain that
+builds an app's context, for its route files
+([The app's type](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/types.md#register-and-appcontext)).
+`alxiaOf(context)` reads it when this package's `Register` names no
+server:
+
+```ts
+// app/context.ts
+import { alxia } from '@alxia/core';
+
+export const base = alxia().derive(({ request }) => ({ user: request.headers.get('x-user') }));
+
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+
+// app/server.ts
+const server = createServer({ configure: (app) => app.plugin(base) });
+export default server;
+```
+
+`alxiaOf(context).user` is then typed with no declaration in
+`@alxia/react-router`. Which one is read, in order:
+
+1. a type argument, `alxiaOf<typeof server>(context)`;
+2. this package's `Register`, `server: typeof server`: the whole app the
+   pages run behind, `base` and everything `configure` adds after it;
+3. `@alxia/core`'s `Register`, `context: typeof base`: only what `base`
+   builds;
+4. neither: `BaseContext`, the request, its URL, `reply` and the rest of
+   what every middleware reads.
+
+Declare this package's `Register` when `configure` adds to the context
+after the base, and the loaders read it.
 
 ### Why a global augmentation is right here
 
-alxia's core refuses global augmentation of its context: a plugin that
-added `user` to every route, declared before it or after, would type
-`user` on routes that run before the plugin. That is the lie "order is
-meaning" forbids. `Register` here does something else: it names the
-**one** server of the React Router build, at the point of its catch-all,
-which is exactly what every loader runs behind. One build has one server
-entry, so there is no second app for a module to be confused with.
+alxia's core refuses a global augmentation of a context key: a plugin
+that added `user` to every route, declared before it or after, would
+type `user` on routes that run before the plugin. That is the lie "order
+is meaning" forbids. Core's own `Register` names the base that builds
+the context instead, and what reads it requires it. `Register` here does
+something else: it names the **one** server of the React Router build,
+at the point of its catch-all, which is exactly what every loader runs
+behind. One build has one server entry, so there is no second app for a
+module to be confused with.
 
 If two React Router apps share one TypeScript program (one tsconfig over
 both folders of a monorepo), their two declarations conflict, and `tsc`
@@ -668,7 +711,7 @@ export function loader({ context }: Route.LoaderArgs) {
 
 `getLoadContext` runs before React Router, on every request, with
 `alxiaContext` already set. Its `ctx` is typed by `configure`'s app:
-reading something no hook derives is a compile error. Keep the keys in a
+reading something no middleware derives is a compile error. Keep the keys in a
 module of their own, such as `app/context.ts`, rather than in
 `app/server.ts`: a route imports them, and the server file then stays out
 of the client's module graph.
@@ -758,7 +801,7 @@ scripts included.
 ### How it stays loose
 
 `nonceOf` reads `nonce` from alxia's context if it is a string, and
-returns `undefined` otherwise: no hook set one, or the request did not come
+returns `undefined` otherwise: no middleware set one, or the request did not come
 through alxia at all. `ServerRouter` and React then render no `nonce`
 attribute. So:
 
@@ -845,7 +888,7 @@ export const base = alxia()
 /** What the loaders read: alxiaOf<Base>(context). */
 export type Base = typeof base;
 
-const app = base.use((app) =>
+const app = base.plugin((app) =>
 	reactRouter(app, {
 		build: () =>
 			import(new URL('./build/server/index.js', import.meta.url).href) as Promise<ServerBuild>,
@@ -867,7 +910,7 @@ bun run build && bun server.ts
 | `getLoadContext(ctx, context)` | as `createServer`'s |
 | `client` | the client build's folder, a path or a `file:` URL, served before the catch-all in `production` |
 
-`reactRouter()` goes through `use`, as `@alxia/graphql`'s `graphql(app, …)`
+`reactRouter()` goes through `app.plugin`, as `@alxia/graphql`'s `graphql(app, …)`
 does: that is how it knows the app's context type. A `HEAD` is handed to
 React Router as a `GET`, since React Router answers a `HEAD` of its own
 with no headers at all; the core then drops the body. In a monorepo where
@@ -875,14 +918,15 @@ this package is linked rather than installed, add
 `ssr: { external: ['@alxia/react-router'] }` to `vite.config.ts`: see
 [the troubleshooting entry](troubleshooting.md#alxiaof-this-request-has-no-alxia-context-).
 
-## Hooks around the pages
+## Middlewares around the pages
 
-Every hook declared before the catch-all runs around each page, as around
-any route:
+Every middleware declared before the catch-all runs around each page, as around
+any route, and `use` observers go first so they wrap everything:
 
 - **`@alxia/logger`** writes one entry per request and sets
   `x-request-id`. It times a streamed page by its first byte, since
-  `onResponse` runs when the headers leave.
+  the response is settled when its headers leave. Every request is logged,
+  404s and errors included.
 - **`@alxia/compress`** compresses documents and data, and flushes a
   streamed page as React writes it: the shell and its `<Suspense>`
   fallback still arrive first, in zstd, Brotli or gzip. See [the troubleshooting entry](troubleshooting.md#a-streamed-page-arrives-in-one-piece).
@@ -894,7 +938,8 @@ any route:
   [A CSP nonce](#a-csp-nonce).
 - **A guard** — `@alxia/jwt`'s `bearer`, `@alxia/janus`' session — in
   `configure` guards every page and its data alike; in `beforeAll`, the
-  client's files too.
+  client's files too. On the app, a guard also answers a request no route
+  matches with its 401.
 
 ## Routes beside the pages
 
@@ -912,7 +957,7 @@ export default createServer({
 });
 ```
 
-Each answers with its own schemas, replies and typed client. The core ranks
+Each answers with its own middlewares and replies. The core ranks
 paths as `Bun.serve` does, through `listen`, `app.fetch` and
 `app.request` alike: segment by segment, a literal beats a parameter,
 which beats the catch-all's wildcard. Two consequences:
@@ -923,10 +968,10 @@ which beats the catch-all's wildcard. Two consequences:
   every one-segment path, `/about` included, before React Router sees it.
   Put alxia's routes under a prefix of their own, `/api`.
 
-The catch-all adds nothing to the app's route table: `RoutesOf` and the
-typed client never show `/*`. Pages and single-fetch data are not
-something a typed client calls; what it does call, your `/api`, is typed
-as always.
+Pages and single-fetch data are not something a generated client calls:
+leave the catch-all out of `matchesSpec`'s check with `isReactRouterRoute`
+([OpenAPI](#openapi)); what a client does call, your `/api`, is what the
+OpenAPI document declares.
 
 What React Router answers comes back as it sent it: documents,
 single-fetch data (`/_.data`, `/login.data`), lazy route discovery
@@ -972,10 +1017,10 @@ export default createServer({
 });
 ```
 
-The upgrade runs the hooks declared before the route, and the route's
-validation, as any request does. A hook's reply refuses it: the client
+The upgrade runs the middlewares declared before the route, and the route's
+validation, as any request does. A middleware's reply refuses it: the client
 gets the 401 and its body, and no socket opens. `socket.data` holds the
-validated request and what each hook derived, typed. See
+validated request and what each middleware derived, typed. See
 [`@alxia/core`'s WebSockets](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/websockets.md)
 for the schemas and the rest of the socket.
 
@@ -995,7 +1040,7 @@ byte for byte, to a `Bun.serve` of the app on a loopback port of its
 own, started on the first upgrade and given
 `app.fetch` and `app.websocket`, as `listen` gives them. So in dev:
 
-- **The same hooks, refusals and handlers run** as from the build:
+- **The same middlewares, refusals and handlers run** as from the build:
   `open`, `message`, `close`, `drain`, the `message` and `send` schemas,
   `subscribe` and `publish`.
 - **An edit to `app/server.ts`, or to a module it imports, is used from
@@ -1045,25 +1090,49 @@ refused when the server starts: see
 
 ## OpenAPI
 
-`@alxia/openapi` documents every route of `app.routes`, and the catch-all
-and the client's files are routes. Leave them out with
+alxia is OpenAPI spec first: the document is written by hand, the API's
+routes are bound to the operations generated from it, and
+[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi)'s
+`matchesSpec` checks, in a test, that `app.routes` and the operations
+match both ways. The catch-all and the client's files are routes of
+`app.routes`, and no operation of the document. Leave them out with
 `isReactRouterRoute`, which is true for each route this package declared:
 
 ```ts
 // app/server.ts
-import { docs } from '@alxia/openapi';
-import { createServer, isReactRouterRoute } from '@alxia/react-router';
+import { createServer } from '@alxia/react-router';
+import { operations } from './generated/alxia';
 
 export default createServer({
 	configure: (app) =>
 		app
 			.get('/api/health', ({ reply }) => reply.ok({ ok: true }))
-			.use(docs(app, { info: { title: 'Shop', version: '1.0.0' }, exclude: isReactRouterRoute })),
+			.route(operations.listOrders, ({ reply }) => reply.ok([])),
 });
 ```
 
-Combine it with your own: `exclude: (route) => isReactRouterRoute(route) ||
-route.path === '/api/health'`.
+```ts
+// app/server.test.ts
+import { test } from 'bun:test';
+import { matchesSpec } from '@alxia/openapi';
+import { isReactRouterRoute } from '@alxia/react-router';
+import type { ServerBuild } from 'react-router';
+import { operations } from './generated/alxia';
+import server from './server';
+
+test('the API routes every operation of openapi.yaml, and nothing else', async () => {
+	const build: ServerBuild = await import(new URL('../build/server/index.js', import.meta.url).href);
+	const app = server.create({ build });
+	matchesSpec(app, operations, {
+		exclude: (route) => isReactRouterRoute(route) || route.path === '/api/health',
+	});
+});
+```
+
+When the app puts the operations under a prefix the document's paths
+leave out, `app.group('/api', (api) => api.route(…))`, give `matchesSpec`
+the same `prefix: '/api'`. See
+[`@alxia/openapi`'s checks](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md).
 
 ## Testing
 

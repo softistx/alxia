@@ -1,14 +1,12 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { client } from '@alxia/client';
-import { alxia } from '@alxia/core';
-import { openapi } from '@alxia/openapi';
+import { alxia, responds, validate } from '@alxia/core';
 import { z } from 'zod';
 import { zq } from './coerce';
 import { zodConverter } from './convert';
 
 const app = alxia().get(
 	'/search/:page',
-	{
+	validate({
 		params: z.object({ page: zq.int() }),
 		query: z.object({
 			tags: zq.array(z.string()).optional(),
@@ -16,16 +14,16 @@ const app = alxia().get(
 			since: zq.date().optional(),
 			filter: zq.json(z.object({ min: z.number() })).optional(),
 		}),
-		response: {
-			200: z.object({
-				page: z.number(),
-				tags: z.array(z.string()),
-				exact: z.boolean(),
-				since: z.date().nullable(),
-				min: z.number().nullable(),
-			}),
-		},
-	},
+	}),
+	responds({
+		200: z.object({
+			page: z.number(),
+			tags: z.array(z.string()),
+			exact: z.boolean(),
+			since: z.date().nullable(),
+			min: z.number().nullable(),
+		}),
+	}),
 	({ params, query, reply }) =>
 		reply(200, {
 			page: params.page,
@@ -37,18 +35,16 @@ const app = alxia().get(
 );
 
 describe('zq', () => {
-	test('the client sends values, the server reads them typed', async () => {
-		const result = await client(app).get('/search/:page', {
-			params: { page: 2 },
-			query: {
-				tags: 'one',
-				exact: true,
-				since: new Date('2026-01-01T00:00:00Z'),
-				filter: { min: 3 },
-			},
+	test('a query as a client sends it, read typed', async () => {
+		const query = new URLSearchParams({
+			tags: 'one',
+			exact: 'true',
+			since: new Date('2026-01-01T00:00:00Z').toISOString(),
+			filter: JSON.stringify({ min: 3 }),
 		});
+		const result = await app.request(`/search/2?${query}`);
 		expect(result.status).toBe(200);
-		expect(result.data).toEqual({
+		expect(await result.json()).toEqual({
 			page: 2,
 			tags: ['one'],
 			exact: true,
@@ -95,19 +91,18 @@ describe('zq', () => {
 	test('zq.json of an array is given as JSON text, since a query repeats a list', async () => {
 		const list = alxia().get(
 			'/ids',
-			{ query: z.object({ ids: zq.json(z.array(z.number())) }) },
+			validate({ query: z.object({ ids: zq.json(z.array(z.number())) }) }),
 			({ query, reply }) => reply(200, query.ids),
 		);
 		expectTypeOf<
 			z.input<ReturnType<typeof zq.json<z.ZodArray<z.ZodNumber>>>>
 		>().toEqualTypeOf<string>();
-		const result = await client(list).get('/ids', {
-			query: { ids: JSON.stringify([1, 2]) },
-		});
-		expect(result.data).toEqual([1, 2]);
+		const query = new URLSearchParams({ ids: JSON.stringify([1, 2]) });
+		const result = await list.request(`/ids?${query}`);
+		expect(await result.json()).toEqual([1, 2]);
 	});
 
-	test("the client's input is what it means to send", () => {
+	test("a coercion's input is what a client means to send", () => {
 		expectTypeOf<z.input<ReturnType<typeof zq.int>>>().toEqualTypeOf<
 			string | number
 		>();
@@ -121,13 +116,9 @@ describe('zq', () => {
 });
 
 describe('zodConverter', () => {
-	test('a Date is documented as a date-time string', () => {
-		const document = openapi(app, {
-			info: { title: 'Search', version: '1' },
-			convert: zodConverter,
-		});
-		const ok = document.paths['/search/{page}']?.get?.responses['200'];
-		expect(ok?.content?.['application/json']?.schema).toMatchObject({
+	test('a Date is a date-time string, as it crosses the wire', () => {
+		const Message = z.object({ since: z.date().nullable() });
+		expect(zodConverter(Message, 'output')).toMatchObject({
 			properties: {
 				since: {
 					anyOf: [{ type: 'string', format: 'date-time' }, { type: 'null' }],

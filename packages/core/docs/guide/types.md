@@ -1,132 +1,26 @@
 # The app's type
 
-This page covers what `typeof app` carries: the route table a client is
-typed from, the context a service can be typed with, and the helpers that
-read them.
+This page covers what `typeof app` carries: the context its routes read,
+which a service can be typed with, and the helpers that read it.
+
+alxia is **OpenAPI spec first**: the OpenAPI document is the contract
+between a server and its clients, and a client is generated from it with
+the generator of your choice — the examples use
+[`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen).
+A route adds nothing to the app's type: `typeof app` holds no route
+table, and no client is typed from it. What the types check is the
+server itself: what each handler reads, the replies `responds` declares,
+the paths and their parameters ([Routes](routes.md#what-the-types-refuse)).
 
 ```ts
-import { alxia, type RoutesOf } from '@alxia/core';
-import { z } from 'zod';
-
-const app = alxia().get(
-	'/users/:id',
-	{
-		params: z.object({ id: z.coerce.number() }),
-		response: { 200: z.object({ id: z.number(), name: z.string() }) },
-	},
-	({ params, reply }) => reply(200, { id: params.id, name: 'Ada' }),
-);
-
-export type App = typeof app;
-
-type GetUser = RoutesOf<App>['/users/:id']['GET'];
-type Input = GetUser['input'];   // { readonly params: { readonly id: string | number } }
-type Output = GetUser['output'];
-// | { status: 200; data: { id: number; name: string } }
-// | { status: 400; data: ValidationErrorBody }
-// | { status: 500; data: InternalErrorBody }
+class Alxia<Ctx extends object = Empty, Prefix extends string = '', Shortcuts extends AnyReply = never>;
 ```
 
-Export `typeof app` from the server, and import it **as a type** wherever
-it is read — a client bundle then holds none of the server's code:
-
-```ts
-import { client } from '@alxia/client';
-import type { App } from './server';
-
-const api = client<App>('http://localhost:3000');
-```
-
-## `RoutesOf<App>`
-
-```ts
-type RoutesOf<App> = /* routes by path, then by method */;
-interface RouteRecord<Input = unknown, Output = unknown> {
-	readonly input: Input;
-	readonly output: Output;
-}
-type RouteTable = {
-	readonly [path: string]: { readonly [method in Method]?: RouteRecord };
-};
-```
-
-The paths are the full paths — prefixes, groups and plugins applied — as
-declared, `/users/:id`. A socket is under `WS`, with a `SocketRecord`
-([WebSockets](websockets.md#in-the-apps-type)).
-
-### `input`: what a client sends
-
-| Part | In `input` when | Typed as |
-| --- | --- | --- |
-| `params` | the path has parameters | `{ [name]: string \| number }`, whatever the schema |
-| `query`, `headers`, `body` | the route has that schema | the schema's **input**; optional when it accepts `undefined` or `{}` |
-| `cookies` | the route has that schema | the schema's input, always optional: a browser sends its own |
-
-The input of a schema that coerces with `z.coerce` is `unknown`; `zq` in
-[`@alxia/zod`](https://www.npmjs.com/package/@alxia/zod) keeps it the value
-a client means to send.
-
-### `output`: every outcome a client may read
-
-A union of `Outcome<Status, Data>`, one per status the route may answer:
-
-```ts
-interface Outcome<Status extends number = number, Data = unknown> {
-	readonly status: Status;
-	readonly data: Data;
-}
-```
-
-| Outcome | When |
+| Parameter | What it holds |
 | --- | --- |
-| each declared `response` status, its data the schema's **output** | the route has `response` schemas |
-| each reply the handler can return | it has none |
-| a redirect the handler returns | always |
-| each reply a `derive`, `wrap` or `onError` before the route can return | always |
-| `400`, `ValidationErrorBody` | the route validates a part of its request, and no `onRefusal` hook answering `validation` is declared before it, or one that may return nothing |
-| each reply the general `onRefusal(hook)` before the route can return, in place of the 400 and the 413 | the route validates a part of its request, or has a `bodyLimit`, for each kind with no hook of its own or whose hook may return nothing; the default of each kind too when the general hook may return nothing |
-| each reply an `onRefusal('validation', …)` hook can return, in place of the 400 and the general hook's | the route validates a part of its request; the general hook's replies, or the 400, too when it may return nothing |
-| each reply an `onRefusal('body_limit', …)` hook can return, in place of the 413 and the general hook's | the route has a `bodyLimit`; the general hook's replies, or the 413, too when it may return nothing |
-| `413`, `ContentTooLargeBody` | the route has a `bodyLimit` of its own, or a `bodyLimit()` was called before it ([Routes](routes.md#body-size-bodylimit)), and no `onRefusal` hook answering `body_limit` is declared before it, or one that may return nothing |
-| `500`, `InternalErrorBody` | always |
-
-```ts
-const guarded = alxia()
-	.derive(({ request, reply }) =>
-		request.headers.get('authorization') === 'Bearer ada'
-			? { user: 'ada' }
-			: reply(401, { error: 'unauthenticated' as const }),
-	)
-	.get('/me', ({ user, reply }) => reply(200, { user }));
-
-type Me = RoutesOf<typeof guarded>['/me']['GET']['output'];
-type Unauthenticated = Extract<Me, { status: 401 }>['data']; // { error: 'unauthenticated' }
-```
-
-This is why the client is honest: checking `status` narrows `data`, and a
-status the server can answer is never missing from the union. The 404, 405
-and 426 the app answers outside every route (`RoutingErrorBody`) and a
-`Response` from a global hook are not in it.
-
-## `Jsonify<T>`
-
-What a value reads as once it has crossed the wire: `JSON.stringify`, then
-`JSON.parse`. Every `data` in `output` goes through it.
-
-| Server sends | Client reads |
-| --- | --- |
-| `Date`, anything with `toJSON()` | what `toJSON` returns: a `string` for a `Date` |
-| `Blob`, `ReadableStream`, `ArrayBuffer`, a typed array | `Blob` |
-| an async iterable of `T` | `AsyncIterable<Jsonify<T>>` |
-| `Map`, `Set` | `Record<string, never>` |
-| a function, a `bigint`, a `symbol` property | dropped |
-
-```ts
-import type { Jsonify } from '@alxia/core';
-
-type Wire = Jsonify<{ at: Date; tags: Set<string>; save(): void }>;
-// { at: string; tags: Record<string, never> }
-```
+| `Ctx` | what `decorate`, `derive` and plugins added to the context of the routes declared next |
+| `Prefix` | the prefix every route declared on the app is under |
+| `Shortcuts` | the replies the `derive`s and middlewares before the next route may answer with, and the `onRefusal` hooks (deprecated) in force |
 
 ## `ContextOf<App>`
 
@@ -150,22 +44,120 @@ function greet(ctx: Ctx): string {
 const app = base.get('/hello', (ctx) => ctx.reply(200, greet(ctx)));
 ```
 
-## Testing the types
+## `Register` and `AppContext`
 
-Bun's `expectTypeOf` checks the contract the same way the client will
-read it:
+`ContextOf<typeof base>` needs `base`. A file that should not import the
+app — a file of routes, a service three calls down — reads the context
+`Register` names instead. Augment it once, beside the chain that builds
+the context:
 
 ```ts
-import { expectTypeOf, test } from 'bun:test';
-import type { RoutesOf } from '@alxia/core';
+// src/context.ts
+import { alxia } from '@alxia/core';
 
-test('GET /users/:id answers 200, 400 or 500', () => {
-	type Route = RoutesOf<typeof app>['/users/:id']['GET'];
-	expectTypeOf<Route['output']['status']>().toEqualTypeOf<200 | 400 | 500>();
-	expectTypeOf<Extract<Route['output'], { status: 200 }>['data']>().toEqualTypeOf<{
-		id: number;
-		name: string;
-	}>();
+export const base = alxia()
+	.decorate({ greeting: 'Hello' })
+	.derive(({ request }) => ({ user: request.headers.get('x-user') ?? 'anonymous' }));
+
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+```
+
+```ts
+// src/greet.ts — no import of the app
+import type { AppContext } from '@alxia/core';
+
+export function greet({ greeting, user }: AppContext): string {
+	return `${greeting}, ${user}`;
+}
+```
+
+| Export | What it is |
+| --- | --- |
+| `Register` | the interface to augment, with `context: typeof base` |
+| `AppContext` | `ContextOf` of the registered app: `BaseContext` when nothing is registered |
+| `defineRoutes(prefix?)` | routes built on that context, requiring it of the app that mounts them ([Groups and plugins](groups-and-plugins.md#splitting-the-app-across-files)) |
+| `RegisteredBase` | the registered app, or `Alxia<Empty, '', never>` |
+| `RegisteredOf<R>` | the app a `Register`-shaped interface names: what a test reads without augmenting |
+| `InvalidRegister` | what a `context` that is not an alxia app reads as: an app whose only key is the message `Register.context must be typeof base, …`, so reading anything of it is a compile error |
+
+What it types, and what it does not:
+
+- **`AppContext`**, for a service, a resolver, a job's context.
+- **`defineRoutes`**: its routes read the context, and `plugin` checks that
+  the app mounting them gives it.
+- **`contextStorage()`** from `@alxia/context-storage`, with no type
+  argument: its `context()` reads `AppContext`, and an app that does not
+  give it cannot mount it.
+- **`alxiaOf(context)`** from `@alxia/react-router`, when that package's
+  own `Register` names no server.
+- **Not `defineMiddleware(fn)`**: a middleware may run before `base` gives
+  anything, so it reads `BaseContext`. One that needs the registered
+  context names it, `defineMiddleware<AppContext>()(fn)`, and a route or a
+  `use` whose context does not give it refuses it.
+
+**Register `base`, not the app.** The app mounts the route files, and their
+type reads `Register`: registered, the app would be typed by itself, and
+TypeScript gives it `any` with `TS7022`. For the same reason the chain you
+register cannot read `Register` either: no `defineMiddleware<AppContext>()`
+or `defineRoutes()` in `base` itself (`TS7022`), and a `contextStorage()`
+there reads `BaseContext` alone; give them to the app, after it.
+
+**One `Register` per program.** A second declaration with another
+`context` is `TS2717`. In a monorepo, each app has its own `tsconfig.json`;
+a package meant for several apps names what it reads with
+[`definePlugin<Requires>()`](writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
+instead.
+
+## `Jsonify<T>`
+
+What a value reads as once it has crossed the wire: `JSON.stringify`, then
+`JSON.parse`. A reply's body is sent so.
+
+| Server sends | A client reads |
+| --- | --- |
+| `Date`, anything with `toJSON()` | what `toJSON` returns: a `string` for a `Date` |
+| `Blob`, `ReadableStream`, `ArrayBuffer`, a typed array | `Blob` |
+| an async iterable of `T` | `AsyncIterable<Jsonify<T>>` |
+| `Map`, `Set` | `Record<string, never>` |
+| a function, a `bigint`, a `symbol` property | dropped |
+
+```ts
+import type { Jsonify } from '@alxia/core';
+
+type Wire = Jsonify<{ at: Date; tags: Set<string>; save(): void }>;
+// { at: string; tags: Record<string, never> }
+```
+
+## Testing
+
+Call the app in process with `app.request()` — or `app.fetch`, given a
+`Request` — and check what it answers; check what a handler reads with
+Bun's `expectTypeOf`, inside it:
+
+```ts
+import { expect, expectTypeOf, test } from 'bun:test';
+import { alxia, responds, validate } from '@alxia/core';
+import { z } from 'zod';
+
+const app = alxia().get(
+	'/users/:id',
+	validate({ params: z.object({ id: z.coerce.number() }) }),
+	responds({ 200: z.object({ id: z.number(), name: z.string() }) }),
+	({ params, reply }) => {
+		expectTypeOf(params.id).toEqualTypeOf<number>();
+		return reply(200, { id: params.id, name: 'Ada' });
+	},
+);
+
+test('GET /users/:id answers 200, or 400 for an id that is not a number', async () => {
+	const found = await app.request('/users/1');
+	expect(found.status).toBe(200);
+	expect(await found.json()).toEqual({ id: 1, name: 'Ada' });
+	expect((await app.request('/users/x')).status).toBe(400);
 });
 ```
 
@@ -173,17 +165,16 @@ test('GET /users/:id answers 200, 400 or 500', () => {
 
 | Types | Name |
 | --- | --- |
-| `RouteInput`, `RouteOutput`, `OutcomeOf`, `RouteEntryOf` | the pieces of one route's record |
-| `Context`, `BaseContext`, `RequestContext`, `ResponseSettings`, `ResponseCookies` | what handlers and hooks read ([Hooks](hooks.md#what-each-hook-reads)) |
-| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema` | what a route declares, and the checks on it ([Routes](routes.md#what-the-types-refuse)) |
+| `Context`, `BaseContext`, `RequestContext`, `ResponseSettings`, `ResponseCookies` | what handlers and middlewares read ([Hooks](hooks.md#what-each-hook-reads)); `BaseContext.route` is `string \| undefined`, `undefined` in a middleware of a request no route matches |
+| `RequestSchemas`, `Validated`, `ResponseSchemas`, `RouteOptions`, `RouteDetail`, `RouteSchema`, `ValidSchema` | what a route declares — `validate`'s and `responds`' arguments, its options — and the checks on it ([Routes](routes.md#what-the-types-refuse)) |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema interface |
 | `ValidationErrorBody`, `ValidationIssue`, `ValidationTarget`, `InternalErrorBody`, `RoutingErrorBody` | the bodies the framework answers |
-| `RoutePath`, `JoinPath`, `PathParams`, `PathParamName` | paths: `PathParams<'/users/:id/files/*'>` is `{ readonly id: string; readonly '*': string }` |
+| `ValidationError`, `Refusal`, `ValidationRefusal`, `BodyLimitRefusal`, `RequestPart` | what `validate` throws and the refusals `refusalOf(error)` reads ([Routes](routes.md#refusals-in-your-own-format)) |
+| `RoutePath`, `JoinPath`, `PathParams`, `PathParamName`, `PathAt`, `CheckedPath` | paths: `PathParams<'/users/:id/files/*'>` is `{ readonly id: string; readonly '*': string }` |
 | `StatusCode`, `InformationalStatus`, `SuccessStatus`, `RedirectStatus`, `ClientErrorStatus`, `ServerErrorStatus` | the statuses a route may declare |
 | `Method`, `Empty`, `MaybePromise`, `Simplify` | small helpers |
 
 ## See also
 
-- [`@alxia/client`](https://www.npmjs.com/package/@alxia/client): the
-  client this type is for.
-- [Routes](routes.md): what each schema part adds to `input`.
+- [Upgrading](../upgrading.md#no-more-client-spec-first): the route table and the typed client, removed in 0.4.
+- [Routes](routes.md): what each middleware adds to what the handler reads.

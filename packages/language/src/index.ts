@@ -1,4 +1,8 @@
-export { type LanguageOptions, language } from './language';
+export {
+	type LanguageMiddleware,
+	type LanguageOptions,
+	language,
+} from './language';
 export {
 	type Accepted,
 	match,

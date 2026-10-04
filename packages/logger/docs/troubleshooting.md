@@ -6,7 +6,7 @@ error of its own, and logging never breaks a request: a `write`, a `skip`
 or a `generateId` that throws, or an `async` `write` that rejects, has its
 error printed with `console.error` while the request is answered as it
 would have been. What goes wrong is
-where the plugin sits in the app, and what those options return.
+where the middleware sits in the app, and what those options return.
 
 **Types**
 
@@ -25,7 +25,8 @@ where the plugin sits in the app, and what those options return.
 - [`duration` is `0`, or shorter than the request took](#duration-is-0-or-shorter-than-the-request-took)
 - [A streamed request's entry comes long after the request](#a-streamed-requests-entry-comes-long-after-the-request)
 - [A WebSocket connection has no entry](#a-websocket-connection-has-no-entry)
-- [Requests outside the group are logged](#requests-outside-the-group-are-logged)
+- [`logger()` logs a 500, not the reply of my `try`/`catch` middleware](#logger-logs-a-500-not-the-reply-of-my-trycatch-middleware)
+- [Requests outside the group are not logged](#requests-outside-the-group-are-not-logged)
 - [A skipped path still shows up in the log](#a-skipped-path-still-shows-up-in-the-log)
 - [A field given to `log` is replaced](#a-field-given-to-log-is-replaced)
 
@@ -42,11 +43,10 @@ The same comes for `requestId`.
 **When:** a route reads `log` or `requestId`, but is declared before
 `use(logger())`.
 
-**Why:** both come from the plugin's `derive`, which reaches only the
-routes declared after it. At runtime too, `ctx.log` would be `undefined`
-there.
+**Why:** both are added by the middleware, which reaches only what is
+declared after it. At runtime too, `ctx.log` would be `undefined` there.
 
-**Fix:** use the plugin first:
+**Fix:** mount `logger()` first:
 
 ```ts
 const app = alxia()
@@ -63,18 +63,29 @@ const app = alxia()
 error TS18048: 'log' is possibly 'undefined'.
 ```
 
-**When:** an `onError` hook declared after the plugin calls `log.error(…)`.
+**When:** a deprecated `onError` hook, or a callback that runs outside the
+chain, calls `log.error(…)`.
 
-**Why:** an `onError` hook also runs for an error thrown before the
-plugin's `derive` had run, when there is no `log` yet.
+**Why:** an `onError` hook also runs for an error thrown before
+`logger()` had run, when there is no `log` yet. A middleware after
+`logger()` has no such doubt: `log` is typed there.
 
-**Fix:** call it optionally:
+**Fix:** catch in a middleware declared after `logger()`, with a `try`/`catch`
+around `next()`, and read `log` there:
 
 ```ts
-app.use(logger()).onError((error, { log }) => {
-	log?.error('request failed', { error: String(error) });
-	return undefined;
-});
+import { alxia, defineMiddleware } from '@alxia/core';
+
+app.use(logger()).use(
+	defineMiddleware(async ({ log }, next) => {
+		try {
+			return await next();
+		} catch (error) {
+			log.error('request failed', { error: String(error) });
+			throw error; // rethrow what is not yours
+		}
+	}),
+);
 ```
 
 ## Responses
@@ -90,7 +101,7 @@ default), and when it is 1 to 128 characters of letters, digits, `_`, `.`,
 dropped without a word so it cannot forge a log line. The header is also
 the one named by `header`, `x-request-id` by default.
 
-**Fix:** send an id that matches, in the header the plugin reads:
+**Fix:** send an id that matches, in the header the middleware reads:
 
 ```ts
 /^[\w.:@-]{1,128}$/.test('abc-123'); // true: kept
@@ -160,16 +171,16 @@ const app = alxia({
 **When:** a request's `duration` is `0`, or a download takes far longer
 than its `duration`.
 
-**Why:** `duration` runs from the plugin's `onRequest` hook to its
-`onResponse` hook. An `onRequest` hook declared before the plugin that
-answers on its own (a CORS preflight, a redirect) skips the plugin's, so
-the clock starts at the response: `0`. `onRequest` hooks before the plugin
-are not counted either. And for a body of known length, a file included,
+**Why:** `duration` runs from the moment `logger()` receives the request
+to the moment its response is settled. A middleware declared before it
+that answers on its own (a CORS preflight, a redirect) never calls
+`next()`, so `logger()` does not run: no entry. One declared before it
+that does call `next()` is not counted in the time. And for a body of known length, a file included,
 the clock stops when the response is handed to Bun, not when its last byte
 has been sent: only a streamed body, one with no `Content-Length`, is
 timed to its end.
 
-**Fix:** use the plugin first, so it times every other hook:
+**Fix:** mount `logger()` first, so it times every other middleware:
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -180,7 +191,7 @@ const app = alxia().use(logger()).use(cors());
 ```
 
 A large file sent to a slow client is the case that stays short: Bun sends
-it with `sendfile`, which the plugin does not wrap. Its `Content-Length`
+it with `sendfile`, which `logger()` does not wrap. Its `Content-Length`
 tells the client how long it is; the time to send it is the proxy's or the
 client's to measure.
 
@@ -208,24 +219,57 @@ app.use(logger({ skip: (_, url) => url.pathname === '/events' }));
 **When:** a `ws` route's connections never show up in the log, and the
 upgrade response has no `X-Request-Id`.
 
-**Why:** once a request is upgraded there is no response, so the
-`onResponse` hook that writes the entry does not run.
+**Why:** once a request is upgraded there is no response, so there is
+nothing for `logger()` to settle and no entry is written.
 
 **Fix:** log from the socket's handlers yourself, with `write`'s sink.
 
-### Requests outside the group are logged
+### `logger()` logs a 500, not the reply of my `try`/`catch` middleware
 
-**When:** `use(logger())` sits inside a `group`, and requests to routes
-outside the group, or to no route at all, are logged and get the header.
+**When:** a middleware wraps `next()` in a `try`/`catch` and answers errors
+in its own format (a 503, a problem document), and the log line for that
+request shows a 500.
 
-**Why:** the plugin's `onRequest` and `onResponse` are global hooks: they
-apply to the whole app, wherever they are declared. Only `log` and
-`requestId` are scoped to the routes after it.
+**Why:** `logger()` settles `next()`: it logs the response the error would be
+answered with, a 500 when no `onError` or `HttpError` says otherwise, then
+the error goes on to the middlewares around it. Declared **before**
+`logger()`, the catcher still catches the error, but the logger inside it
+saw the 500, not its reply. The same holds for `telemetry()` and
+`secureHeaders()`.
 
-**Fix:** to leave requests out of the log, name them in `skip`:
+**Fix:** declare the error-handling middleware after the observers, so they
+see its reply:
 
 ```ts
-app.group('/api', (api) => api.use(logger({ skip: (_, url) => !url.pathname.startsWith('/api/') })));
+import { alxia, defineMiddleware } from '@alxia/core';
+import { logger } from '@alxia/logger';
+
+const app = alxia()
+	.use(logger())
+	.use(
+		defineMiddleware(async (_ctx, next) => {
+			try {
+				return await next();
+			} catch (error) {
+				return new Response('try again', { status: 503 });
+			}
+		}),
+	);
+```
+
+### Requests outside the group are not logged
+
+**When:** `use(logger())` sits inside a `group`, and requests to routes
+outside the group, or to no route at all, get no entry and no header.
+
+**Why:** a group's middlewares stay inside the group: its routes, and the
+unmatched requests under its prefix. Nothing outside the prefix, and no route
+declared after the group, is logged by it.
+
+**Fix:** `use` it on the app, and leave requests out with `skip`:
+
+```ts
+app.use(logger({ skip: (_, url) => !url.pathname.startsWith('/api/') }));
 ```
 
 ### A skipped path still shows up in the log
@@ -251,7 +295,7 @@ app
 entry shows other values.
 
 **Why:** the fields are spread first, then `time`, `level`, `requestId` and
-`message` are set, so those four are always the plugin's.
+`message` are set, so those four are always the logger's.
 
 **Fix:** use another key:
 

@@ -4,7 +4,1058 @@ This page lists what the next releases change for an app built on
 `@alxia/core`: what changed, the code before and after, and whether it can
 break yours.
 
-## Next release: `@alxia/core` 0.3.1
+## Next release: `@alxia/core` 0.4.0
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [One middleware model](#one-middleware-model) | core | no: the forms of 0.3 still work, deprecated |
+| [Middlewares for every request: `use`](#middlewares-for-every-request-use) | core | no: new; `use` now runs on unmatched requests too |
+| [Middlewares replace the request hooks](#middlewares-replace-the-request-hooks) | core, logger, telemetry, compress, cors, secure-headers, rate-limit, cache, redis, context-storage, language, i18n, jwt, janus | yes, for an app that relies on a `use()`, `derive` or `decorate` not running on a 404, or on `ctx.route` being a `string` in a middleware: see the runtime changes |
+| [Plugins are apps: `app.plugin`](#plugins-are-apps-appplugin) | core | no: `plugin(middleware)` and `use(plugin)` still work, deprecated; a function given to `use` that returns no app now throws |
+| [How a middleware settles, and the details](#how-a-middleware-settles-and-the-details) | core | no: new behaviour of the new forms; a route mixing a list of hooks with middlewares now throws |
+| [alxia is OpenAPI spec first](#alxia-is-openapi-spec-first) | core, openapi | no: the document is the source, the routes run as before |
+| [No more client: spec first](#no-more-client-spec-first) | core, client, graphql, janus, secure-headers, context-storage, react-router | yes: `@alxia/client`, `RoutesOf` and the route table are gone, and `Alxia` takes three type parameters |
+| [`@alxia/openapi-routes` is now `@alxia/openapi`](#alxiaopenapi-routes-is-now-alxiaopenapi) | openapi, openapi-routes | no: change the import; `@alxia/openapi-routes` 0.3.0 re-exports it, deprecated |
+| [The old `@alxia/openapi` is retired](#the-old-alxiaopenapi-is-retired) | openapi | yes: `openapi()` and `docs()` are gone; write the document, generate the operations |
+| [The context registered once: `Register` and `defineRoutes`](#the-context-registered-once-register-and-defineroutes) | core, context-storage, react-router | no: new exports; `contextStorage()` now requires the context it reads of the app that uses it |
+
+### One middleware model
+
+**What changed.** A route takes middlewares after its path, or after its
+options: `app.<method>(path, options?, ...middlewares, handler)`. A
+middleware is `(ctx, next) => …`, made once with `defineMiddleware`. It
+returns `next(added)` to pass `added` on, typed, to the middlewares after
+it and to the handler; a reply, which ends the request; or a `Response`, sent as it is. `next()` resolves to the
+response of the rest of the route, so a middleware that awaits it runs
+around them. The request's schemas are middlewares too: `validate(…)` for
+the request, `responds(…)` for the replies. They run where they stand.
+`options` holds the route's configuration only: `bodyLimit` and `detail`.
+
+```ts
+import { alxia, defineMiddleware, responds, validate } from '@alxia/core';
+
+const auth = defineMiddleware(async (ctx, next) => {
+	const user = await session(ctx.request);
+	if (!user) return ctx.reply(401, { error: 'unauthorized' as const });
+	return next({ user }); // `user` is typed on everything after it
+});
+
+const app = alxia().post(
+	'/posts',
+	{ bodyLimit: 1024 * 1024 },
+	auth,
+	validate({ body: Post }),
+	responds({ 201: Post }),
+	({ user, body, reply }) => reply(201, create(user, body)),
+);
+```
+
+`ws(path, options?, ...middlewares, handlers)` takes the same; its options
+are `message`, `send` and `detail`. A route takes at most 8 middlewares.
+`app.route(operation, ...middlewares, handler)` takes the same middlewares,
+the operation's `schema` read as a `validate` and a `responds` just before
+the handler — or where `validate(operation)` and `responds(operation)`
+stand. `group`, `use`, `derive`, `decorate`, `bodyLimit`, `onStart`,
+`onStop` and `parser` are unchanged and not deprecated; `onRequest`,
+`onResponse`, `around`, `wrap`, `onError` and `onRefusal` are deprecated
+for middlewares ([Middlewares replace the request
+hooks](#middlewares-replace-the-request-hooks)).
+
+**Can it break your code.** No. The forms of 0.3 keep working, deprecated,
+for this minor at least: a list of hooks after the path, a schema before
+the handler, `defineHook`, `defineWrap`, `ws(path, schema, handlers)`
+with or without a list, and `route(operation, [hooks], handler)`. Each runs on the same chain as a middleware, and
+behaves as in 0.3: a schema before the handler becomes a `validate` and a
+`responds` placed just before it. The routes of one app may use either
+form; move each one over when you next touch it, with the steps below.
+
+New exports: `defineMiddleware`, `validate`, `responds`, and the types
+`Middleware`, `MiddlewareContext`, `MiddlewareResult`,
+`MiddlewareReturn`, `Next`, `NextFunction`, `RequestSchemas`, `Validated`,
+`ValidateRequires`, `RouteOptions`, `SocketOptions`, the types a route
+threads its middlewares with, and `OperationForms` with the types `route`
+threads an operation's schemas with (`OperationParts`, `OperationOptions`,
+`OperationResponds`, `OperationValidate`, `OperationApp`). `validate` and
+`responds` also take an operation.
+
+A request's body is read once: a second `validate` of the body on one
+route checks what the first read, where it used to fail with
+`TypeError: Body already used`.
+
+### Migrating to middlewares
+
+#### 1. `defineHook` becomes `defineMiddleware`
+
+A middleware takes `next` as its second argument, and always returns:
+`next(added)` where the hook returned what it added, `next()` where it
+returned nothing, and the same reply where it replied.
+
+```ts
+// before
+import { defineHook } from '@alxia/core';
+
+const auth = defineHook(async ({ request, reply }) => {
+	const user = await session(request);
+	return user ? { user } : reply(401, { error: 'unauthorized' as const });
+});
+
+const canView = defineHook<{ user: User; params: { id: string } }>()(
+	async ({ user, params, reply }) =>
+		(await mayView(user, params.id)) ? undefined : reply(403, { error: 'forbidden' as const }),
+);
+```
+
+```ts
+// after
+import { defineMiddleware } from '@alxia/core';
+
+const auth = defineMiddleware(async ({ request, reply }, next) => {
+	const user = await session(request);
+	return user ? next({ user }) : reply(401, { error: 'unauthorized' as const });
+});
+
+const canView = defineMiddleware<{ user: User; pathParams: { id: string } }>()(
+	async ({ user, pathParams, reply }, next) =>
+		(await mayView(user, pathParams.id)) ? next() : reply(403, { error: 'forbidden' as const }),
+);
+```
+
+Read the raw path parameters as `pathParams`. A middleware placed before
+any `validate` reads `params` as they arrived too, but after a
+`validate({ params })`, `params` is that schema's output; `pathParams` is
+always the path's strings. A middleware that calls `next()` and returns
+nothing answers with the rest's response; one that returns nothing without
+calling `next()` is a 500, with this error logged:
+
+```text
+TypeError: GET /posts/:id: a middleware returned nothing: return next(), a reply or a Response
+```
+
+#### 2. `defineWrap` becomes a middleware that awaits `next()`
+
+`next()` runs the middlewares after it and the handler, and resolves to
+their response. Return it, set a header on it first, or return a reply of
+your own.
+
+```ts
+// before
+import { defineWrap } from '@alxia/core';
+
+const exclusive = defineWrap<{ params: { id: string } }>()(
+	async ({ params, reply }, next) =>
+		(await locks.tryRun(params.id, next)) ?? reply(409, { error: 'busy' as const }),
+);
+```
+
+```ts
+// after
+import { defineMiddleware } from '@alxia/core';
+
+const exclusive = defineMiddleware<{ pathParams: { id: string } }>()(
+	async ({ pathParams, reply }, next) =>
+		(await locks.tryRun(pathParams.id, next)) ?? reply(409, { error: 'busy' as const }),
+);
+```
+
+Call `next()` once; a second call is a 500, with
+`GET /posts/:id: a middleware called next() twice` logged.
+
+#### 3. The list of hooks becomes middlewares after the path
+
+Drop the brackets. The middlewares run in the order given, after the hooks
+in force where the route is declared, as the list did.
+
+```ts
+// before
+app.delete('/posts/:id', [auth, canView, exclusive], handler);
+
+// after
+app.delete('/posts/:id', auth, canView, exclusive, handler);
+```
+
+What each one reads is checked where it stands: `canView` before `auth`
+does not compile, since no `user` is given yet.
+
+`route` drops them the same way. Its operation's schema then validates
+just before the handler, after the middlewares, as with the list; its
+`responds` stands first, so a middleware's reply whose status the
+operation declares is checked against its schema too:
+
+```ts
+// before
+app.route(operations.updatePet, [auth], handler);
+
+// after
+app.route(operations.updatePet, auth, handler);
+// or validate first, once: a bad body is a 400 before auth runs
+app.route(operations.updatePet, validate(operations.updatePet), auth, handler);
+```
+
+#### 4. The schema becomes `validate(…)` and `responds(…)`
+
+The request's parts — `params`, `query`, `headers`, `cookies`, `body` — go
+to `validate`; `response` goes to `responds`. `bodyLimit` and `detail` stay
+in the object, which becomes the route's options, before the middlewares.
+
+```ts
+// before
+app.patch(
+	'/posts/:id',
+	[auth, canView],
+	{ params: PostId, body: Update, response: { 200: Post }, bodyLimit: 64 * 1024, detail: { summary: 'Edit a post' } },
+	({ params, body, reply }) => reply(200, update(params.id, body)),
+);
+```
+
+```ts
+// after
+import { responds, validate } from '@alxia/core';
+
+app.patch(
+	'/posts/:id',
+	{ bodyLimit: 64 * 1024, detail: { summary: 'Edit a post' } },
+	auth,
+	canView,
+	validate({ params: PostId, body: Update }),
+	responds({ 200: Post }),
+	({ params, body, reply }) => reply(200, update(params.id, body)),
+);
+```
+
+A route with no options starts with its first middleware:
+`app.post('/posts', validate({ body: NewPost }), handler)`. A schema left
+in the options of a route with middlewares does not compile. The handler
+reads the same validated parts, and its `reply` is typed by `responds` as
+it was by `response`. A refused request is still answered by the
+`onRefusal` hook in force, deprecated, by default
+`400 { error: 'validation', issues }`; a middleware before the `validate`
+answers it in its own format instead
+([`ValidationError`](#validate-throws-a-validationerror)).
+`app.routes[i].schema` holds the route's options alone (`detail`,
+`bodyLimit`): the schemas of `validate` and `responds` stay in its chain,
+since the OpenAPI document, not the app, declares them. The same holds
+for `route(operation, …)`: its `schema` keeps the operation's `detail`
+(`operationId`, which `@alxia/openapi` reads), not its `params`, `body`
+or `response`. A tool that read those reads the operation itself.
+
+#### 5. A socket's schema becomes options and `validate`
+
+`message` and `send` are a socket route's options, with `detail`; the
+upgrade request's parts go to `validate`.
+
+```ts
+// before
+app.ws('/rooms/:room', [auth], { query: RoomQuery, message: Chat, send: Chat }, {
+	message: (socket, chat) => socket.publish(socket.data.params.room, chat),
+});
+```
+
+```ts
+// after
+import { validate } from '@alxia/core';
+
+app.ws('/rooms/:room', { message: Chat, send: Chat }, auth, validate({ query: RoomQuery }), {
+	message: (socket, chat) => socket.publish(socket.data.params.room, chat),
+});
+```
+
+The middlewares and `validate` run on the upgrade request, and
+`socket.data` reads what they added. A middleware that awaits `next()` on a
+socket route receives an empty `200` once the socket is open, and must
+return it as it is.
+
+#### 6. Put `validate` where it should answer first
+
+In 0.3 the schema always ran after the list. A middleware's position is now
+its place in the request, so choose it:
+
+```ts
+// auth first, as in 0.3: a stranger gets 401 before his body is read
+app.post('/posts', auth, validate({ body: Post }), handler);
+
+// validate first: an invalid body gets 400 before the user is looked up
+app.post('/posts', validate({ body: Post }), auth, handler);
+```
+
+The middlewares before `validate`, and the deprecated `onError` and
+`onRefusal` hooks, read the request as it arrived, its raw cookies included; what follows it
+reads the validated parts.
+
+**`responds` checks the replies made after it.** The handler's reply
+must have a status it declares, as with `response` in 0.3, and is sent as
+its schema's output. A middleware after it that replies with a declared
+status is checked too; one that replies with another status, such as an
+`auth`'s 401, is sent as it is. A reply made
+before it is not checked:
+
+```ts
+// auth's 401 is sent as it is; a 200 from the handler is checked
+app.get('/me', responds({ 200: User }), auth, handler);
+// declare the 401 to check auth's reply too
+app.get('/me', responds({ 200: User, 401: Unauthorized }), auth, handler);
+```
+
+### Middlewares for every request: `use`
+
+**What changed.** `use` takes middlewares made by `defineMiddleware`, up to
+8 in one call. They run on every request, in the order declared, and what
+they pass `next` is typed in the routes declared after them. A route runs
+the middlewares declared before it, then its own; a request no route
+matches runs all of them, wherever they were declared
+([Middlewares replace the request hooks](#middlewares-replace-the-request-hooks)).
+`use(path, ...middlewares)` runs them on the requests under `path` alone —
+`/admin`, `/admin/*`, `:name` segments — matched against the request's path
+when it arrives, with the syntax of a route's; those may add nothing to the
+context, a compile error (`Invalid middleware: …`) otherwise. To add to a
+subtree's context, `use` them in a group. `defineMiddleware` marks what it
+makes, and `use` reads the mark: any other function is a plugin, in the
+deprecated form of [`use(plugin)`](#plugins-are-apps-appplugin). `derive`
+stays, the shorthand for a middleware that only adds.
+
+```ts
+// before: a derive for every route after a point, a guard repeated on each route
+alxia()
+	.derive(({ request, reply }) => {
+		const id = request.headers.get('x-user');
+		return id ? { user: { id } } : reply(401, { error: 'unauthorized' as const });
+	})
+	.get('/admin/stats', admin, handler)
+	.get('/admin/users', admin, handler);
+
+// now: the middleware given to use, the guard given once for the subtree
+const auth = defineMiddleware(({ request, reply }, next) => {
+	const id = request.headers.get('x-user');
+	return id ? next({ user: { id } }) : reply(401, { error: 'unauthorized' as const });
+});
+alxia()
+	.use(auth)
+	.use('/admin', admin)
+	.get('/admin/stats', handler)
+	.get('/admin/users', handler);
+```
+
+`use('/users/admin', guard)` guards a `/users/:id` route requested as
+`/users/admin`, and a request under `/users/admin` that no route matches:
+the path is the request's, not the route's.
+
+**Can it break your code?** No, but a `use` now also runs on a request no
+route matches: read
+[Middlewares replace the request hooks](#middlewares-replace-the-request-hooks).
+Calls that never worked now throw where they are made, saying why: `use`
+given a plugin and more arguments, `use` given what is neither an app nor a
+function (a hook of `defineHook`), `use()` given nothing, and a plain
+`(ctx, next) => …` given to `use`, called once as a plugin, which returns
+no app: wrap it in `defineMiddleware`
+([Troubleshooting](troubleshooting.md#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-made-with-definemiddleware-and-given-to-use)).
+
+New exports: the types `MiddlewareMark`, `MadeByDefineMiddleware` (the
+mark as `use` requires it, named so that a plain `(ctx, next)` function
+reads `is not assignable to type 'MadeByDefineMiddleware'`), `UseForms`,
+`PluginForms` (deprecated), `ScopeMiddleware`, `PathMiddleware`,
+`AddingNothing`, `ScopePathAt` and `AppAfterUse`. A middleware the
+route's context does not give is reported on `use`'s middleware form
+last: TypeScript 7 prints the last overload alone, so the deprecated
+plugin forms come first, and the message names the missing key.
+
+### Middlewares replace the request hooks
+
+**What changed.** A middleware does what `onRequest`, `onResponse`,
+`around`, `onError`, `onRefusal` and `wrap` did, in one form, in the place
+of the chain you give it. The hooks keep working as in 0.3 and are
+deprecated; every package plugin is a middleware now.
+
+Routing is decided first, so `ctx.route` is known in every middleware. Then
+the request runs the chain, and an error nobody caught is answered:
+
+1. The deprecated `onRequest` and `around` hooks, outermost.
+2. The `use` middlewares, `derive`, `decorate` and the deprecated `wrap`,
+   in the order declared, as Koa and Hono run them: code before `await next()` runs on
+   the way in, code after it on the way out.
+3. The route's own middlewares, then the handler — or, for a request no
+   route matches, the 404, 405 or 426.
+4. What nobody caught reaches the route boundary, outermost: the deprecated
+   `onError` and `onRefusal` hooks, then an `HttpError`'s own status, then a
+   500.
+
+**What changed at run time.**
+
+- **`use()` runs on every request**, a 404, a 405, a 426 and an OPTIONS
+  request to a path with no OPTIONS route included. A middleware may answer
+  before the 404: a 401, a preflight's 204. The middlewares, `derive`s and
+  `decorate`s declared **after** a route do not run for that route; they do
+  run for a request no route matches. A deprecated `wrap` keeps the rule of
+  0.3: it never runs on a request no route matches.
+
+  ```ts
+  const app = alxia()
+  	.use(auth)                                      // runs for /a and /missing
+  	.get('/a', ({ reply }) => reply(200, 'a'))
+  	.use(timed)                                     // not for /a; for /missing
+  	.get('/b', ({ reply }) => reply(200, 'b'));
+  ```
+
+- **`use(path, …)` matches the request's path**, at run time, with the
+  syntax of a route's path (`:param`, `*`). It runs for a route whose request
+  path matches and for an unmatched request under that path.
+- **`ctx.route` is `string | undefined`** on `BaseContext`: `undefined` in a
+  middleware of an unmatched request. A route's own middlewares and its
+  handler read a `string`.
+
+  ```ts
+  const seen = defineMiddleware(({ route, request }, next) => {
+  	console.log(route ?? `no route for ${request.method} ${new URL(request.url).pathname}`);
+  	return next();
+  });
+  ```
+
+- **A group's middlewares stay with its routes**: they do not run on an
+  unmatched request, even one under the group's prefix. The middlewares of
+  an app given to `plugin(app)` are the mounting app's: they run on
+  unmatched requests too.
+- **Errors are rejections through `next()`**: a middleware's
+  `try { return await next() } catch (error) { … }` sees what the rest threw,
+  an `HttpError` included.
+
+#### `validate` throws a `ValidationError`
+
+A request `validate` refuses throws `ValidationError`, an `HttpError` of
+the 400: `.refusal` is `{ kind: 'validation', part, issues }` and `.body` the
+default 400 body. A body past its limit throws `ContentTooLargeError` (413).
+`refusalOf(error)` gives the `Refusal` of either, `undefined` for any other
+error. A middleware **before** the `validate` answers it in its own format;
+nobody does, and the response is the default 400 or 413, or the deprecated
+`onRefusal` hook's.
+
+```ts
+import { defineMiddleware, refusalOf } from '@alxia/core';
+
+const problems = defineMiddleware(async ({ reply }, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		const refusal = refusalOf(error);
+		if (refusal?.kind !== 'validation') throw error;
+		return reply(422, { detail: `the ${refusal.part} is invalid` });
+	}
+});
+```
+
+#### `settle(ctx, next())` for a middleware that must see every response
+
+An observer — a logger, a header on every response — must see the final
+response, an error's included. `settle` resolves to what `next()` resolved
+to or, when it rejected, to the answer the route boundary would give (the
+`onError` and `onRefusal` hooks, an `HttpError`, a 500), and keeps the error
+on `ctx.error`.
+
+```ts
+import { defineMiddleware, settle } from '@alxia/core';
+
+const poweredBy = defineMiddleware(async (ctx, next) => {
+	const response = await settle(ctx, next());
+	response.headers.set('x-powered-by', 'alxia');
+	return response; // a 404 and a 500 carry it too
+});
+```
+
+`next.behind(added?)` runs the rest behind a reply the middleware returns at
+once; the rest's response goes to nobody. It is what serves a stale cache
+entry while the route refreshes it.
+
+#### Each hook, as a middleware
+
+| 0.3 | 0.4 | Status |
+| --- | --- | --- |
+| `onRequest(fn)` | `use(defineMiddleware((ctx, next) => early(ctx) ?? next()))`, first | deprecated; still runs before routing, before every middleware |
+| `onResponse(fn)` | `use(defineMiddleware(async (ctx, next) => fn(await settle(ctx, next()))))`, first | deprecated; still runs after everything |
+| `around(fn)` | `use(defineMiddleware((ctx, next) => … next() …))`, first | deprecated; still outermost |
+| `onError(fn)` | a `try { return await next() } catch (error) { … }` middleware | deprecated; still answers at the route boundary, after every middleware |
+| `onRefusal(fn)` | the same, reading `refusalOf(error)` | deprecated |
+| `wrap(fn)` | `use(defineMiddleware(async (ctx, next) => … await next() …))` | deprecated: see below |
+| `derive(fn)` | `use(defineMiddleware((ctx, next) => next(added)))` | **not** deprecated: the shorthand for adding to the context |
+| `decorate`, `onStart`, `onStop`, `parser`, `bodyLimit` | unchanged | stay |
+| `app.plugin(middleware)` | `app.use(middleware)` | deprecated alias, same behaviour |
+| `app.plugin(otherApp)`, `definePlugin` | unchanged | stay: a plugin is an app |
+
+```ts
+// onRequest: answer early
+// before
+alxia().onRequest(({ request }) =>
+	request.method === 'OPTIONS' ? new Response(null, { status: 204 }) : undefined,
+);
+// after
+alxia().use(
+	defineMiddleware(({ request }, next) =>
+		request.method === 'OPTIONS' ? new Response(null, { status: 204 }) : next(),
+	),
+);
+```
+
+```ts
+// onResponse: edit every response, a 404 and a 500 included
+// before
+alxia().onResponse((response) => {
+	response.headers.set('x-powered-by', 'alxia');
+});
+// after
+alxia().use(
+	defineMiddleware(async (ctx, next) => {
+		const response = await settle(ctx, next());
+		response.headers.set('x-powered-by', 'alxia');
+		return response;
+	}),
+);
+```
+
+```ts
+// around: a span, a transaction, a timer around the whole request
+// before
+alxia().around(async (ctx, next) => {
+	const started = performance.now();
+	const response = await next();
+	console.log(ctx.url.pathname, response.status, performance.now() - started);
+	return response;
+});
+// after: settle, so a 500 is logged with its status
+alxia().use(
+	defineMiddleware(async (ctx, next) => {
+		const started = performance.now();
+		const response = await settle(ctx, next());
+		console.log(ctx.url.pathname, response.status, performance.now() - started);
+		return response;
+	}),
+);
+```
+
+```ts
+// onError: answer one kind of error
+// before
+alxia().onError((error, { reply }) =>
+	error instanceof PaymentError ? reply(402, { error: 'payment_required' as const }) : undefined,
+);
+// after: rethrow what is not yours
+alxia().use(
+	defineMiddleware(async ({ reply }, next) => {
+		try {
+			return await next();
+		} catch (error) {
+			if (!(error instanceof PaymentError)) throw error;
+			return reply(402, { error: 'payment_required' as const });
+		}
+	}),
+);
+```
+
+```ts
+// onRefusal: answer a refused request in your own format
+// before
+alxia().onRefusal((refusal, { reply }) => reply(422, { detail: `the ${refusal.kind} refusal` }));
+// after: the `problems` middleware above, given before the routes that validate
+alxia().use(problems);
+```
+
+```ts
+// wrap: around the rest of the route
+// before
+alxia().wrap(async ({ request, reply }, next) =>
+	busy(request) ? reply(409, { error: 'busy' as const }) : next(),
+);
+// after
+alxia().use(
+	defineMiddleware(({ request, reply }, next) =>
+		busy(request) ? reply(409, { error: 'busy' as const }) : next(),
+	),
+);
+```
+
+Two differences from `wrap`: a `wrap` never runs on a 404 (it keeps the rule of 0.3), a middleware does;
+and a `wrap`'s `next()` resolves a refusal to the 400, where a
+middleware's rejects with the `ValidationError`. `derive` needs no change:
+`derive(fn)` and `use(defineMiddleware((ctx, next) => next(added)))` are the
+same.
+
+#### The package plugins are middlewares
+
+The factories keep their names. Give them to `use`, before the routes:
+`app.use(logger())`. `app.plugin(logger())` still works, deprecated, as
+it did in 0.3: app-wide, on the routes declared before it too, before the
+app's chain — so an app that kept `.get(…).plugin(secureHeaders())` keeps
+its headers on every route. `use(logger())` given after routes does not
+run on them, and warns once in development, naming them.
+
+```ts
+// before
+alxia().plugin(logger()).plugin(secureHeaders()).plugin(cors()).plugin(bearer({ jwt }));
+
+// now
+alxia().use(logger()).use(secureHeaders()).use(cors()).use(bearer({ jwt }));
+```
+
+| Package | Now |
+| --- | --- |
+| `@alxia/logger` | `app.use(logger())`, first; every request is logged — 404s, 405s, an `onError` reply, a 500. New type `LoggerContext` |
+| `@alxia/telemetry` | `app.use(telemetry({ … }))`, first; one server span per request, an unmatched one included, named `METHOD route` once matched and `METHOD path` otherwise; no span for a socket upgrade. New type `TelemetryContext` |
+| `@alxia/compress` | `app.use(compress())`: compresses every response after it, 404s and errors included |
+| `@alxia/cors` | `app.use(cors())`, **first**: answers a preflight for any path itself, before the 404 or 405, and adds its headers to every other response, errors included |
+| `@alxia/secure-headers` | `app.use(secureHeaders())`, first; every response, errors included. New type `SecureHeaders`; `{ nonce: true }` gives `nonce` |
+| `@alxia/rate-limit` | `app.use(rateLimit({ … }))`: counts every request it runs on, an unmatched one too when it is on the app. New type `RateLimit<Requires>` |
+| `@alxia/cache` | `app.use(cache({ … }))`: a stale entry is served at once and refreshed behind it with `next.behind`. New type `CacheMiddleware<Requires>` |
+| `@alxia/redis` `idempotency` | `app.use(idempotency(client, options))`: skips a request no route matches, and keeps the response the route answers, an `onError` reply included |
+| `@alxia/context-storage` | `app.use(contextStorage<typeof base>())`: `getRequestContext()` works in every middleware after it, 404s included; `getContext()` only in a request that reached a route |
+| `@alxia/language` | `app.use(language({ … }))` |
+| `@alxia/i18n` | `app.use(createI18n({ … }))`: `t()` works in every middleware and hook after it, an error's answer included |
+| `@alxia/jwt` `bearer` | `app.use(bearer({ jwt }))`: refuses every request it runs on with a 401, an unmatched one included when it is on the app. New type `Bearer<Schema>` |
+| `@alxia/janus` | `session()`, `permission()` and `janusErrors()` are middlewares. `janusErrors()` is a try/catch: it answers the errors thrown **behind** it, so `app.use(janusErrors(), session(accounts))`. New types `JanusErrors`, `SessionMiddleware` |
+
+#### The order to give them
+
+- **Observers first**: `logger`, `telemetry`, `secureHeaders`, `cors` and
+  `compress` go first, so they wrap everything, a 404 included.
+- **An error-handling middleware after the observers**: a try/catch
+  middleware, or `janusErrors()`. An observer — these, `createI18n()`,
+  `contextStorage()` — settles `next()`: it reads the response the error
+  would be answered with, and the error goes on, so a try/catch catches it
+  wherever it stands. Given after the observers, they see its reply too.
+- **`janusErrors()` before `session()`**: it answers what is thrown behind
+  it. `use(janusErrors()).use(i18n).use(session())` answers a janus error
+  as janus says.
+- **A guard on the app answers a missing path too**: `bearer`, a required
+  `session` and `rateLimit` run on unmatched requests, so an anonymous request
+  to a path that does not exist gets the 401, not the 404. Scope the guard
+  with a `group`, `app.group('/api', (api) => api.use(bearer({ jwt })))`, to
+  guard some routes only. A path, `use('/api', guard)`, takes a middleware
+  that adds nothing to the context: not these.
+
+```ts
+import { alxia } from '@alxia/core';
+import { cors } from '@alxia/cors';
+import { logger } from '@alxia/logger';
+import { secureHeaders } from '@alxia/secure-headers';
+
+const app = alxia()
+	.use(logger(), secureHeaders(), cors())  // observers, first
+	.use(problems)                           // then what answers errors
+	.group('/api', (api) => api.use(auth).get('/me', ({ user, reply }) => reply(200, user)));
+```
+
+**Can it break your code?** Mostly no: the hooks and `plugin(middleware)`
+run as in 0.3. What a changed behaviour can break:
+
+- a `use()` — or a `derive`, `decorate` — that assumed a route, and now
+  also runs on a 404: read `ctx.route` as `string | undefined`, and
+  return `next()` for a request that is not yours;
+- a guard on the app that you relied on never answering a missing path;
+- a `wrap` moved to a middleware: its `next()` no longer resolves a refusal
+  to the 400, it rejects with the `ValidationError`;
+- an `onError` or `onRefusal` hook that you moved to a middleware: it
+  sees the error wherever it stands, but the observers before it see its
+  reply only when it is declared after them;
+- a group's middlewares now run on an unmatched request under the group's
+  prefix: a guarded group answers `/admin/missing` with its 401, and
+  `DELETE /admin/secret` too, rather than a 405 whose `Allow` lists its
+  methods;
+- a plugin with a prefix of its own — `alxia({ prefix: '/todos' })`,
+  `defineRoutes('/todos')` — keeps its middlewares, `derive` and
+  `decorate` under that prefix once mounted, as a group does: they no
+  longer run on the routes declared after `plugin`, nor on the requests
+  outside it, and add nothing to their context, in the types too. A plugin
+  without a prefix keeps giving them to the app;
+- a `use(path, …)` matches the request's path decoded, with empty segments
+  collapsed and without case: `use('/admin', guard)` now guards
+  `/%61dmin`, `//admin` and `/ADMIN` too, as the router, the static files
+  and React Router serve them. A route whose path differs from a guarded
+  one by its case alone is guarded too.
+
+### Plugins are apps: `app.plugin`
+
+**What changed.** A plugin is mounted by `app.plugin(…)`: an app — a
+sub-app, the routes of `defineRoutes`, a `definePlugin` — or a function
+`(app) => app` that adds to the app. The requirement checks of
+`definePlugin` and `defineRoutes` are on `plugin`, as is the prefix and
+the place behind the middlewares declared before it. `use` is for
+middlewares, the package plugins included: they are middlewares now
+([Middlewares replace the request hooks](#the-package-plugins-are-middlewares)).
+
+```ts
+// before
+alxia().use(cors()).use(auth).use(todos);
+
+// now: a middleware to use, an app to plugin
+alxia().use(cors()).use(auth).plugin(todos);
+```
+
+`plugin` throws where it is called when a function given to it returns
+anything but an app, and leaves a promise it returned handled; it throws
+too for more than one argument, and for a value that is neither an app nor
+a function
+([Troubleshooting](troubleshooting.md#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-made-with-definemiddleware-and-given-to-use)).
+
+**Can it break your code?** No, unless a plugin function returned no app.
+`use(plugin)` still mounts a plugin, and `plugin(middleware)` still
+installs a middleware, both deprecated. A function given to `use` that
+returns anything but an app now throws, where in 0.3 `use` returned what it
+returned: a middleware written without `defineMiddleware`,
+`(ctx, next) => …`, given to `use` was called once as a plugin and never
+guarded a request. Now it throws
+`use(): the plugin function returned a promise, not an app: …`; wrap it in
+`defineMiddleware`. Replace each `.use(app)` by `.plugin(app)` and each
+`.plugin(middleware)` by `.use(middleware)`. In the next minor, the plugin
+forms of `use` and the middleware form of `plugin` are removed
+([Roadmap](roadmap.md)).
+
+New exports: the types `PluginMethod` and `MountedIn`, the context of the
+routes after a plugin. `Mounted` and `RequiredIn` now come
+from `plugin-method.ts`, under the same names; `PluginForms`, the plugin
+forms of `use`, is deprecated.
+
+### How a middleware settles, and the details
+
+**What changed.** The middleware model above, in its details:
+
+- **A middleware that called `next()` and returns nothing answers with the
+  rest's response**, awaited or not, as Koa and Hono do. The 500
+  `a middleware returned nothing` is now only for a middleware that never
+  called `next()`.
+- **`next(); return reply(403)`**, a reply returned before the `next()` it
+  called settled: the rest runs anyway, so the reply is sent once it has,
+  `console.warn` logs
+  [`GET /…: a middleware returned before the next() it called settled: …`](troubleshooting.md#get--a-middleware-returned-before-the-next-it-called-settled-the-rest-of-the-route-ran-anyway-await-next-or-return-it),
+  and an error of the rest is logged with `console.error`, never an
+  unhandled rejection.
+- **On a socket route, once the upgrade happened**, what a middleware
+  returns after `next()` is ignored and what it throws is logged; the
+  socket stays open.
+- **`route(operation, …)`**: the implicit `validate` and `responds` both
+  stand just before the handler, after a `validate(operation)` placed
+  among the middlewares. The implicit `responds` checks the handler's
+  reply alone: an auth's 401 is its own. `responds(operation)`, new,
+  reads `schema.response` and, placed among the middlewares, checks the
+  replies made after it as before; the implicit one is then left out
+  ([Routes](guide/routes.md#middlewares-on-a-route-declared-as-data)).
+- **Each `validate` of the cookies reads the request's cookies**, not what
+  an earlier one gave back. A route with no middleware and no schema runs
+  no validation step. A schema in the route's arguments, the form of 0.3,
+  leaves the parts it has no schema for as they are: a body a `use`
+  middleware passed `next` reaches the handler.
+- **A list of hooks and middlewares, mixed, throws** where the route is
+  declared:
+  [`GET /: a list of hooks and middlewares are two forms, never mixed: …`](troubleshooting.md#get--a-list-of-hooks-and-middlewares-are-two-forms-never-mixed-give-the-hooks-as-middlewares-made-by-definemiddleware),
+  `route(operation, [hooks], auth, handler)` included, which in 0.3 took
+  `auth` for the handler and dropped the real one without a word.
+- **`validate` and `responds` are marked** with `Symbol.for('alxia.builtin')`
+  and carry `BuiltinMark<'validate' | 'responds'>` in their type, so two
+  copies of `@alxia/core` read each other's.
+- **The `Middleware` type no longer leaks `any`**: `MiddlewareResult`'s
+  brand is `Next`.
+- **A missing requirement is reported on the middleware forms**: the
+  overloads of the routes, `ws`, `route(operation)` and `use` are
+  ordered so that TypeScript names the key, `Property 'user' is missing in
+  type … but required in type '{ user: User; }'`, rather than the
+  deprecated list's `'~hooks'` message
+  ([Troubleshooting](troubleshooting.md#property-user-is-missing-in-type-routebase-but-required-in-type--user-user-)).
+
+**Can it break your code?** Only a route that mixed a list of hooks with
+middlewares, which never ran as written: give the hooks as middlewares.
+The rest is how the new forms behave.
+
+New export: the type `BuiltinMark`.
+
+### alxia is OpenAPI spec first
+
+**What changed.** The OpenAPI document is written by hand, and it is the
+source: of the client, generated from it with the generator you choose, and
+of the server's routes. Nothing in alxia writes a document from the app any
+more. The server side takes three pieces:
+
+| Piece | Package | What it does |
+| --- | --- | --- |
+| the operations | [`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen), with `alxia: true` | writes `src/generated/alxia.ts` from the document: each operation as `{ method, path, schema }`, with Zod schemas |
+| the routes | `@alxia/core`'s `route(operation, ...middlewares, handler)` | one route per operation; the operation's schemas check the request and every reply at run time |
+| the check | [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi)'s `matchesSpec` | reads `app.routes` and throws unless every operation has its route and every route its operation |
+
+```ts
+import { alxia } from '@alxia/core';
+import { operations } from './generated/alxia';
+
+export const app = alxia().route(operations.getTodo, ({ params, reply }) => {
+	const todo = todos.find(({ id }) => id === params.id); // todos: your own store
+	return todo ? reply.ok(todo) : reply.notFound({ error: 'not_found' as const });
+});
+```
+
+```ts
+// app.spec.ts
+import { test } from 'bun:test';
+import { matchesSpec } from '@alxia/openapi';
+import { app } from './app';
+import { operations } from './generated/alxia';
+
+test('routes every operation of openapi.yaml, and nothing else', () => {
+	matchesSpec(app, operations);
+});
+```
+
+A route's `detail` (`summary`, `description`, `operationId`, `tags`,
+`deprecated`) stays a route option, which nothing in alxia reads at run
+time; the generated operations carry it, and `matchesSpec` names an
+operation by its `operationId` when the operations are given as a list.
+`bun create @alxia` writes an API this way. The workflow, step by step:
+[`@alxia/openapi`: spec first](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/spec-first.md).
+
+**Can it break your code.** Not by itself: an app's routes run as before.
+What changes is in the two entries below, and in
+[No more client](#no-more-client-spec-first).
+
+### No more client: spec first
+
+**What changed.** alxia is OpenAPI spec first: the OpenAPI document is the
+contract between the server and its clients, and you bring the client
+generator — the examples use
+[`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen).
+So the server no longer builds a route table in its type for a client to
+read:
+
+- `@alxia/client` is retired: it is no longer released, and its last
+  version is to be deprecated on npm with:
+
+  ```sh
+  npm deprecate @alxia/client "Retired: alxia is OpenAPI spec first. Generate a client from your OpenAPI document, e.g. with @nxgt/openapi-codegen. See https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md"
+  ```
+- `Alxia` loses its `Routes` type parameter: it is
+  `Alxia<Ctx, Prefix, Shortcuts>`, and `typeof app` holds no route table.
+  The `~routes` field and `RoutesOf` are gone.
+- The types that only described a route to the client are gone:
+  `RouteEntryOf`, `RouteInput`, `RouteOutput`, `RouteRecord`, `RouteTable`,
+  `Outcome`, `OutcomeOf`, `SocketEntryOf`, `SocketRecord`,
+  `RefusalOutcome`, `KindOutcome`, `DefaultRefusalOutcome`,
+  `DefaultLimitOutcome`, `IsLimited`, `BehindShortcuts`, `ThreadReplies`
+  and `AppWithSocket`. `AppWithRoute<App>` takes one parameter: the app,
+  unchanged. `@alxia/graphql` no longer exports `GraphQLRoutes`.
+- The plugins typed by the app drop the `Routes` argument with it:
+  `session()` (`@alxia/janus`), `secureHeaders({ nonce: true })`,
+  `contextStorage()`, `graphql()`, `reactRouter()` and `FreshApp`.
+- `route(operation, ...middlewares, handler)` types a request part the
+  operation has no schema for as the middleware before it passed it to
+  `next`, as it runs: the request's own type, as before, when none did.
+
+What a handler reads is typed as before: what its middlewares add,
+`validate`'s outputs, `reply` typed by `responds`, the path's parameters
+checked against its schema, and `ContextOf`.
+
+**Can it break your code.** Yes, where it names what was removed:
+
+- code that imports `@alxia/client`, or `RoutesOf` or another removed type
+  from `@alxia/core`, no longer compiles;
+- code that writes `Alxia<A, B, C, D>` drops the second argument:
+  `Alxia<A, C, D>`. `Alxia<Ctx>` and `AnyAlxia` are unchanged.
+
+**How to migrate.** Write the OpenAPI document of the API by hand — it is
+the source; [the old `@alxia/openapi` is retired](#the-old-alxiaopenapi-is-retired)
+shows how to start from the one 0.3 made — and generate the client from it:
+
+```ts
+// before
+import { client } from '@alxia/client';
+import type { App } from './server';
+
+const api = client<App>('http://localhost:3000');
+const user = await api.get('/users/:id', { params: { id: 1 } });
+```
+
+```sh
+# after: a client generated from the document
+bun add -d @nxgt/openapi-codegen
+bunx nxgt-openapi generate -i openapi/openapi.yaml -o src/generated
+```
+
+A test that called the app through `client(app)` calls it in process with
+`app.request()` instead:
+
+```ts
+// before
+const result = await client(app).get('/users/:id', { params: { id: 1 } });
+expect(result.status).toBe(200);
+expect(result.data).toEqual({ id: 1, name: 'Ada' });
+
+// after
+const response = await app.request('/users/1');
+expect(response.status).toBe(200);
+expect(await response.json()).toEqual({ id: 1, name: 'Ada' });
+```
+
+A type test that read `RoutesOf<typeof app>[path][method]['output']`
+checks the handler instead, with `expectTypeOf` inside it
+([The app's type](guide/types.md#testing)).
+
+### `@alxia/openapi-routes` is now `@alxia/openapi`
+
+**What changed.** The package that checks an app's routes against the
+operations of its document, `@alxia/openapi-routes`, is published as
+`@alxia/openapi` from 0.4.0 on. Its API is the same: `implemented`,
+`matchesSpec`, the deprecated `exactly`, and the types `Operations`,
+`ImplementedOptions`, `MatchesSpecOptions` and `ExactlyOptions`, with the
+same messages.
+
+```sh
+bun remove @alxia/openapi-routes
+bun add -d @alxia/openapi
+```
+
+```ts
+// before
+import { matchesSpec } from '@alxia/openapi-routes';
+
+// after
+import { matchesSpec } from '@alxia/openapi';
+```
+
+**Can it break your code.** No. `@alxia/openapi-routes` 0.3.0 re-exports
+`@alxia/openapi`, deprecated, so an import of it keeps working until you
+change it. It is a minor, 0.3.0, because it peers on `@alxia/openapi`
+`^0.4.0`: `^0.2` never moves to it by itself, and it needs `@alxia/openapi`
+moved to 0.4 with it. See
+[`@alxia/openapi`'s checks](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md).
+
+### The old `@alxia/openapi` is retired
+
+**What changed.** `@alxia/openapi` 0.3.0 and earlier wrote an OpenAPI
+document from the app: `openapi(app, { info, convert, exclude })`, and
+`docs(app, …)`, which served it at `/openapi.json` with a reference page.
+That is code first, the opposite of spec first, so it is retired: 0.4.0 of
+`@alxia/openapi` is the former `@alxia/openapi-routes`, and `openapi`,
+`docs`, `toJsonSchema`, `Converter` and the rest of 0.3 are gone from it.
+
+**Can it break your code.** Yes, for an app that calls `openapi()` or
+`docs()`: with `@alxia/openapi` 0.4.0 its imports no longer resolve.
+
+**How to migrate.**
+
+1. **Write `openapi.yaml`.** Start from the document 0.3 made, exported
+   once *before* you upgrade, with `@alxia/openapi` 0.3 still installed;
+   from then on it is the source, edited by hand:
+
+   ```ts
+   // export-openapi.ts — bun export-openapi.ts, once, then delete it
+   import { openapi } from '@alxia/openapi'; // 0.3
+   import { zodConverter } from '@alxia/zod';
+   import { app } from './src/app';
+
+   const document = openapi(app, { info: { title: 'Todos', version: '1.0.0' }, convert: zodConverter });
+   await Bun.write('openapi.yaml', Bun.YAML.stringify(document, null, 2));
+   ```
+
+   Declare alxia's own 400 in it, `{ error: 'validation', issues }`
+   (`ValidationErrorBody`), on the routes that validate, and the
+   replies of your middlewares, such as a 401.
+
+2. **Generate the operations** with `@nxgt/openapi-codegen`'s `alxia`
+   option:
+
+   ```sh
+   bun add zod
+   bun add -d @alxia/openapi@latest @nxgt/openapi-codegen
+   ```
+
+   ```ts
+   // openapi-codegen.config.ts
+   import { defineConfig } from '@nxgt/openapi-codegen';
+
+   export default defineConfig({
+   	input: 'openapi.yaml',
+   	output: 'src/generated',
+   	alxia: true,
+   	validationErrors: false, // the 400 is alxia's, declared in openapi.yaml
+   });
+   ```
+
+   `bunx nxgt-openapi generate` writes `src/generated/`, and
+   `bunx nxgt-openapi generate --check` exits 1 when it is stale, for CI.
+
+3. **Bind each operation** with `route(operation, ...middlewares, handler)`,
+   in place of the route that declared its own path and schemas:
+
+   ```ts
+   // before
+   app.post('/todos', requireKey, validate({ body: NewTodo }), responds({ 201: Todo }), handler);
+
+   // after
+   app.route(operations.createTodo, requireKey, handler);
+   ```
+
+4. **Check the routes against the document** with `matchesSpec(app,
+   operations)` in a test, as in
+   [alxia is OpenAPI spec first](#alxia-is-openapi-spec-first).
+
+5. **Serve the document yourself**, if clients fetched it from the app:
+   it is a file now, served as any other, and a route `matchesSpec` is told
+   to leave out:
+
+   ```ts
+   app.file('/openapi.yaml', './openapi.yaml');
+
+   matchesSpec(app, operations, { exclude: (route) => route.path === '/openapi.yaml' });
+   ```
+
+   A reference page is any static viewer pointed at that URL; alxia serves
+   none.
+
+**For maintainers.** After the releases — `@alxia/openapi` 0.4.0 for the
+first, `@alxia/openapi-routes` 0.3.0 for the second — the owner deprecates
+the old versions on npm:
+
+```sh
+npm deprecate @alxia/openapi@"<=0.3.0" "Retired: alxia is OpenAPI spec first. @alxia/openapi 0.4.0 and later is the spec-first package that was @alxia/openapi-routes (implemented, matchesSpec): write the OpenAPI document, generate the operations with @nxgt/openapi-codegen, bind them with route(). See https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md"
+npm deprecate @alxia/openapi-routes@"<=0.3.0" "Moved to @alxia/openapi: bun add -d @alxia/openapi and change the import, nothing else. See https://github.com/softistx/alxia/blob/develop/packages/openapi-routes/README.md"
+```
+
+### The context registered once: `Register` and `defineRoutes`
+
+**What changed.** `@alxia/core` exports `Register`, an interface the app
+augments with the chain that builds its context, and what reads it:
+`AppContext`, that context, and `defineRoutes(prefix?)`, routes built on
+it that require it of the app mounting them. A file of routes no longer
+imports the app, nor takes it as a parameter.
+
+**Can it break your code.** No for core: nothing reads `Register` until
+an app augments it. `@alxia/context-storage`'s `contextStorage<typeof
+base>()` now requires `base`'s context of the app that uses it, and so
+does `contextStorage()`, typed by `Register`: mounting it on an app that does
+not give that context, which read `undefined` at runtime, is now a compile
+error. `@alxia/react-router`'s `alxiaOf(context)` reads core's `Register`
+when its own names no server; its own still wins.
+
+**How to migrate**, optionally, a file of routes at a time:
+
+```ts
+// before: src/routes/todos.ts takes the base
+import type { base } from '../context';
+
+export const todos = (app: typeof base) =>
+	app.get('/todos', ({ user, reply }) => reply(200, user.todos));
+
+// after: src/context.ts registers the base once…
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+
+// …and src/routes/todos.ts imports @alxia/core alone
+import { defineRoutes } from '@alxia/core';
+
+export const todos = defineRoutes('/todos')
+	.get('/', ({ user, reply }) => reply(200, user.todos));
+
+// src/app.ts
+export const app = base.plugin(todos);
+```
+
+Register `base`, never the app that mounts the routes: `TS7022`
+otherwise ([Troubleshooting](troubleshooting.md#app-implicitly-has-type-any-because-it-does-not-have-a-type-annotation-and-is-referenced-directly-or-indirectly-in-its-own-initializer)).
+A service typed `ContextOf<typeof base>` can take `AppContext` instead,
+and `contextStorage<typeof base>()` can drop its type argument.
+
+## 0.3.1
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
@@ -51,16 +1102,18 @@ New exports, so an app's type can be named in a declaration file:
 
 ## 0.3.0
 
-`@alxia/core` 0.3.0 ships with `@alxia/openapi` 0.3.0 and 0.2.0 of
+`@alxia/core` 0.3.0 ships with `@alxia/openapi` 0.3.0 — the document
+writer, [retired in 0.4](#the-old-alxiaopenapi-is-retired) — and 0.2.0 of
 `@alxia/logger`, `@alxia/telemetry`, `@alxia/secure-headers`,
-`@alxia/react-router` and `@alxia/openapi-routes`.
+`@alxia/react-router` and `@alxia/openapi-routes`, which is `@alxia/openapi`
+from 0.4.0 on.
 
 **Upgrade every `@alxia/*` package together.** Each one names `@alxia/core`
 as a peer by a `^0.2` range, which 0.3.0 is outside of; their next releases
 move the range.
 
 ```sh
-bun add @alxia/core@latest @alxia/client@latest @alxia/openapi@latest # and every other @alxia/* you use
+bun add @alxia/core@0.3 @alxia/openapi@0.3 # and every other @alxia/* you use; @alxia/openapi@latest is the 0.4 package, not the document writer
 ```
 
 | Change | Package | Can it break your code |
@@ -83,7 +1136,7 @@ bun add @alxia/core@latest @alxia/client@latest @alxia/openapi@latest # and ever
 naming what it reads with `defineHook<Requires>()(hook)`. The list runs
 after the hooks in force, in its order, then validation, then the handler.
 What a hook adds, the hooks after it and the handler read. Its replies join
-that route's type, so the client reads them; `@alxia/openapi` does not
+that route's type, so the client reads them; `@alxia/openapi` 0.3.0 did not
 document them. A list holds at most 8 hooks.
 
 ```ts
@@ -270,7 +1323,7 @@ error TS2769: No overload matches this call.
 A kind typed as a union, or as a generic parameter, is refused at compile
 time: write one call per kind
 ([Troubleshooting](troubleshooting.md#argument-of-type-validation--body_limit-is-not-assignable-to-parameter-of-type-never)).
-`@alxia/openapi` 0.3.0 documents each kind's statuses on the routes that
+`@alxia/openapi` 0.3.0, the document writer, documented each kind's statuses on the routes that
 kind may refuse. See [One hook per kind](guide/hooks.md#one-hook-per-kind).
 
 New exports: `RefusalKind`, `RefusalOfKind`, `RefusalHandlersByKind`,
@@ -293,8 +1346,10 @@ matchesSpec(app, operations);
 ```
 
 **Can it break your code.** No: `exactly` and `ExactlyOptions` still work,
-deprecated, and their messages still start with `exactly():`. See
-[`@alxia/openapi-routes`](https://github.com/softistx/alxia/blob/develop/packages/openapi-routes/docs/guide.md#matchesspec).
+deprecated, and their messages still start with `exactly():`. From 0.4.0
+on, both are imported from
+[`@alxia/openapi`](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md)
+([the move](#alxiaopenapi-routes-is-now-alxiaopenapi)).
 
 ### Streamed bodies timed to their last byte
 
@@ -370,6 +1425,19 @@ refused at startup. See
 [`@alxia/secure-headers`: a nonce per request](https://github.com/softistx/alxia/blob/develop/packages/secure-headers/docs/guide.md#a-nonce-per-request)
 and [`@alxia/react-router`: a CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#a-csp-nonce).
 
+### Other packages in 0.3.0
+
+These packages changed with 0.3.0, each with its own docs:
+
+- `@alxia/openapi` 0.3.0 — the document writer documented each `onRefusal` kind's statuses on the routes that kind may refuse; it is [retired in 0.4](#the-old-alxiaopenapi-is-retired).
+- `@alxia/logger` 0.2.0, `@alxia/telemetry` 0.2.0 — [above](#streamed-bodies-timed-to-their-last-byte).
+- `@alxia/secure-headers` 0.2.0, `@alxia/react-router` 0.2.0 — [above](#a-csp-nonce-per-request).
+- `@alxia/openapi-routes` 0.2.0 — [above](#matchesspec-the-new-name-of-exactly); `@alxia/openapi` from 0.4.0 on.
+
+Every other `@alxia/*` package, `@alxia/client` included, got a patch
+release whose only change is its peer range on `@alxia/core`; its own docs
+have nothing new.
+
 ## From 0.2.0 or earlier
 
 `@alxia/core` 0.2.1 already shipped this, so it is not part of the next release. If you are upgrading from 0.2.0 or earlier, it changes one thing an app may see: **a client
@@ -388,16 +1456,3 @@ app.onResponse((response, { request }) => {
 It cannot break code, but a log or an alert counting 500s sees fewer. An
 error the app throws after the client left is still logged and answered
 500. See [Replies: errors](guide/replies.md#errors).
-
-## Other packages
-
-These packages change with this release, each with its own docs:
-
-- `@alxia/openapi` 0.3.0 — each `onRefusal` kind's statuses on the routes that kind may refuse: [its docs](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/README.md).
-- `@alxia/logger` 0.2.0, `@alxia/telemetry` 0.2.0 — [above](#streamed-bodies-timed-to-their-last-byte).
-- `@alxia/secure-headers` 0.2.0, `@alxia/react-router` 0.2.0 — [above](#a-csp-nonce-per-request).
-- `@alxia/openapi-routes` 0.2.0 — [above](#matchesspec-the-new-name-of-exactly).
-
-Every other `@alxia/*` package, `@alxia/client` included, gets a patch
-release whose only change is its peer range on `@alxia/core`; its own docs
-have nothing new.

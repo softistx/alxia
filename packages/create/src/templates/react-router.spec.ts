@@ -11,8 +11,8 @@ const TEMPLATE = fileURLToPath(
 );
 const EXAMPLE = new URL('../../../../examples/react-router/', import.meta.url);
 const ALXIA = {
-	'@alxia/client': '^0.2.1',
 	'@alxia/core': '^0.3.0',
+	'@alxia/openapi': '^0.4.0',
 	'@alxia/react-router': '^0.2.0',
 };
 
@@ -69,7 +69,6 @@ describe("copyTemplate('react-router')", () => {
 			'@alxia/core': '^0.3.0',
 			'@alxia/react-router': '^0.2.0',
 		});
-		expect(manifest.dependencies?.['@alxia/client']).toBeUndefined();
 		expect(JSON.stringify(manifest)).not.toContain('workspace:');
 	});
 

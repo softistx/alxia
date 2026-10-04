@@ -1,5 +1,13 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { alxia, type BaseContext } from '@alxia/core';
+import { join } from 'node:path';
+import {
+	alxia,
+	type BaseContext,
+	defineMiddleware,
+	type Empty,
+	validate,
+} from '@alxia/core';
+import { $ } from 'bun';
 import { z } from 'zod';
 import {
 	ContextStorageError,
@@ -36,12 +44,16 @@ const app = base
 		reply(200, tryGetContext() === undefined ? 'none' : 'some'),
 	)
 	.use(requestContext)
-	.onResponse(() => {
-		seenOnResponse.push(getRequestContext().route);
-	})
+	.use(
+		defineMiddleware(async (_ctx, next) => {
+			const response = await next();
+			seenOnResponse.push(getRequestContext().route);
+			return response;
+		}),
+	)
 	.get(
 		'/greet/:id',
-		{ params: z.object({ id: z.coerce.number() }) },
+		validate({ params: z.object({ id: z.coerce.number() }) }),
 		async ({ reply }) =>
 			reply(200, {
 				text: await greet(),
@@ -73,7 +85,7 @@ describe('contextStorage', () => {
 		expect(answers).toEqual(users.map((user) => `hello ${user}`));
 	});
 
-	test('global hooks read the request context, a 404 included', async () => {
+	test('a middleware after it reads the request context, a 404 included', async () => {
 		seenOnResponse.length = 0;
 		await app.request('/greet/1');
 		await app.request('/nowhere');
@@ -96,9 +108,13 @@ describe('contextStorage', () => {
 		const seen: (string | undefined)[] = [];
 		const traced = alxia()
 			.use(contextStorage())
-			.onResponse(() => {
-				seen.push(tryGetRequestContext()?.url.pathname);
-			})
+			.use(
+				defineMiddleware(async (_ctx, next) => {
+					const response = await next();
+					seen.push(tryGetRequestContext()?.url.pathname);
+					return response;
+				}),
+			)
 			.get('/here', ({ reply }) => reply.ok('here'));
 		await traced.request('/here');
 		await traced.request('/nowhere');
@@ -118,4 +134,24 @@ describe('contextStorage', () => {
 		} as unknown as BaseContext;
 		expect(await runWithContext(fake, greet)).toBe('hi job');
 	});
+
+	test('typed by the app it names, which the app that mounts it must give', () => {
+		expectTypeOf(contextStorage().context).returns.toEqualTypeOf<
+			BaseContext & Empty
+		>();
+		// @ts-expect-error: an app that gives no `user` cannot use it
+		alxia().use(contextStorage<typeof base>());
+		expect(() => base.use(contextStorage<typeof base>())).not.toThrow();
+	});
+
+	test('with no type argument, typed by the app Register names', async () => {
+		// `test/register`, a program of its own, through the workspace's tsc:
+		// its refusal is a @ts-expect-error, so no output is each one failing.
+		const dir = join(import.meta.dir, '..', 'test', 'register');
+		const result = await $`${process.execPath} --bun tsc --noEmit -p ${dir}`
+			.cwd(import.meta.dir)
+			.nothrow()
+			.quiet();
+		expect(result.stdout.toString() + result.stderr.toString()).toBe('');
+	}, 30_000);
 });

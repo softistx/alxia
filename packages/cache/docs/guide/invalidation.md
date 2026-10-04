@@ -33,8 +33,8 @@ invalidateTag(tag: string): Promise<void>
 Forgets every response that carries `tag`, whatever its key. A response
 carries:
 
-- the tags of the plugin's `tags(ctx)`, computed for each response kept —
-  `cache<{ user: User }>(…)` lets it read what an earlier plugin added
+- the tags of the cache's `tags(ctx)`, computed for each response kept —
+  `cache<{ user: User }>(…)` lets it read what an earlier middleware added
   ([Reading the app's context](keys-and-vary.md#reading-the-apps-context));
 - the tags its route added with `ctx.cache.tag(…)`.
 
@@ -96,7 +96,7 @@ import { pathTag } from '@alxia/cache';
 pathTag('/api/products?page=2');   // 'alxia:path:/api/products?page=2'
 ```
 
-Tags starting `alxia:` are the plugin's: do not give one of yours that
+Tags starting `alxia:` are the cache's: do not give one of yours that
 prefix. A store of your own must remember each response's `tags`, or
 `invalidate` reaches nothing ([Writing a store](stores.md#writing-a-store)).
 

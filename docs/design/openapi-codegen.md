@@ -1,5 +1,9 @@
 # Typed routes from an OpenAPI document
 
+> **Since 0.4:** this note's `@alxia/openapi-routes` shipped, and is now
+> `@alxia/openapi`; the document writer it calls `@alxia/openapi` is
+> retired. alxia is spec first.
+
 Status: **approved** by the owner on 2026-10-02. Each slice below is one
 PR, built in the order given at the end.
 
@@ -9,6 +13,12 @@ direction, contract first. An OpenAPI document generates the routes' schemas,
 and the handler is the only thing left to write. Two things inspire it:
 `@nxgt/openapi-hono` in nxgt-http, and the owner's remark that "the options
 will go away once routes come from codegen-alxia".
+
+> **Since 0.4:** alxia is OpenAPI spec first. The app's route table
+> (`typeof app` carrying every route, read by the typed client) and the
+> client package are retired: a client is generated from the OpenAPI
+> document, with `@nxgt/openapi-codegen` in the examples. Below, "the route
+> table" and "the client" describe alxia as it was when this note was written.
 
 ## What nxgt-http already does
 
@@ -42,8 +52,8 @@ itself. A route takes `params`, `query`, `headers`, `body` and
 - types the context;
 - refuses at compile time a reply whose status is not declared, and at
   run time a reply that breaks its schema;
-- records the route in `RoutesOf<App>`, which `@alxia/client` and
-  `@alxia/openapi` read.
+- recorded the route in the app's route table, which the typed client and
+  `@alxia/openapi` read (the table is retired since 0.4).
 
 So nothing has to be validated or typed again. What remains is a route's
 options, built from the document with their concrete Zod types, plus a
@@ -116,7 +126,7 @@ const app = alxia()
 
 `route({ method, path, schema }, handler)` behaves exactly like
 `app[method](path, schema, handler)`, with the same types and the same
-`RoutesOf`. The handler is then the only argument the user writes, which is
+route table. The handler is then the only argument the user writes, which is
 how the options "go away". The method is about ten lines, a dispatch to
 `#method`, and does not depend on OpenAPI. It also serves a route declared as
 data by hand.
@@ -150,8 +160,8 @@ specs.
 3. **`route()` in core, or `operation(app, …)` in the package?** A function
    outside core breaks the `.get().post()` chain, which is the way alxia
    collects route types. So I recommend `route()` in core.
-4. **The client.** `@alxia/client` already types itself from `RoutesOf`,
-   so nothing changes there. openapi-httpyz's table client is not affected
+4. **The client.** The typed client of the time typed itself from the
+   route table, so nothing changed there. openapi-httpyz's table client is not affected
    either.
 
 ## Slices

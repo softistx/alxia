@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import { constants, gunzipSync } from 'node:zlib';
-import { alxia, type EventInput, eventStream } from '@alxia/core';
+import {
+	alxia,
+	type EventInput,
+	eventStream,
+	responds,
+	validate,
+} from '@alxia/core';
 import { z } from 'zod';
 import { compress } from './compress';
 
@@ -69,10 +75,10 @@ function appWith(log: string[], compressible?: (type: string) => boolean) {
 		.use(compress(compressible === undefined ? {} : { compressible }))
 		.get(
 			'/push',
-			{
+			validate({
 				query: z.object({ closeafter: z.enum(['state', 'no']).default('no') }),
-				response: { 200: Push },
-			},
+			}),
+			responds({ 200: Push }),
 			({ query, request, reply }) =>
 				reply(200, push(request.signal, log, query.closeafter === 'state')),
 		);

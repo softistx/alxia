@@ -7,7 +7,10 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **`idempotency` as a middleware.** `app.use(idempotency(client, { name }))` is
+  the form; `app.plugin(idempotency(…))` keeps working, deprecated. It skips a
+  request no route matches, and keeps what the route answers, an error's
+  answer included. `redis()` stays a plugin.
 
 ## Next
 

@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
-import { alxia, type RoutesOf } from '../app/alxia';
+import { alxia } from '../app/alxia';
 import { eventStream, isEventStreamSchema } from './event-stream';
 import { type EventInput, isNamedEventStreamSchema } from './named-events';
 
@@ -127,29 +127,6 @@ describe('eventStream({ name: schema })', () => {
 				})(),
 			),
 		);
-	});
-
-	test('the client reads a union of the events, discriminated by event, as they cross the wire', () => {
-		type Data = Extract<
-			RoutesOf<typeof app>['/push']['GET']['output'],
-			{ status: 200 }
-		>['data'];
-		type Event = Data extends AsyncIterable<infer Item> ? Item : never;
-		expectTypeOf<Event>().toEqualTypeOf<
-			| {
-					event: 'state';
-					data: {
-						'@type': 'StateChange';
-						changed: Record<string, Record<string, string>>;
-					};
-					id?: string;
-			  }
-			| {
-					event: 'ping';
-					data: { interval: number };
-					id?: string;
-			  }
-		>();
 	});
 
 	test('a named stream is told apart from an unnamed one', () => {

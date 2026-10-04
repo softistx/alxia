@@ -1,7 +1,17 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { alxia, type BaseContext, type Empty } from '@alxia/core';
+import {
+	alxia,
+	type BaseContext,
+	type Empty,
+	type Middleware,
+} from '@alxia/core';
 import { language } from './language';
 import { match, negotiate, parseAcceptLanguage } from './negotiate';
+
+/** What a middleware requires of the app that uses it: what its context reads beyond the base. */
+type Reads<M> =
+	M extends Middleware<infer Requires, infer _Result> ? Requires : never;
+const reads = <M>(_middleware: M) => undefined as unknown as Reads<M>;
 
 const app = alxia()
 	.use(
@@ -104,7 +114,7 @@ describe('language', () => {
 				user?.locale ?? undefined,
 			vary: ['Authorization'],
 		});
-		expectTypeOf(byUser['~requires']).toEqualTypeOf<{ user: User | null }>();
+		expectTypeOf(reads(byUser)).toEqualTypeOf<{ user: User | null }>();
 		const app = alxia()
 			.derive(({ request }) => ({
 				user:
@@ -128,17 +138,19 @@ describe('language', () => {
 
 	test('an unannotated resolver reads nothing more, and a plain one needs nothing', () => {
 		expectTypeOf(
-			language({
-				supported: ['en'],
-				fallback: 'en',
-				resolve: (ctx) => {
-					expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
-					return undefined;
-				},
-			})['~requires'],
+			reads(
+				language({
+					supported: ['en'],
+					fallback: 'en',
+					resolve: (ctx) => {
+						expectTypeOf(ctx).toEqualTypeOf<BaseContext>();
+						return undefined;
+					},
+				}),
+			),
 		).toEqualTypeOf<Empty>();
 		expectTypeOf(
-			language({ supported: ['en'], fallback: 'en' })['~requires'],
+			reads(language({ supported: ['en'], fallback: 'en' })),
 		).toEqualTypeOf<Empty>();
 	});
 
@@ -165,7 +177,7 @@ describe('language', () => {
 			fallback: 'en',
 			resolve: ({ url }: { url: string }) => url.slice(1),
 		});
-		expectTypeOf(wrong['~requires']).toEqualTypeOf<{ url: string }>();
+		expectTypeOf(reads(wrong)).toEqualTypeOf<{ url: string }>();
 		const _refused = () => {
 			// @ts-expect-error the plugin reads "url", which this app's context gives with another type
 			alxia().use(wrong);
@@ -179,7 +191,7 @@ describe('language', () => {
 			fallback: 'en',
 			resolve: (ctx: any) => ctx.user.locale,
 		});
-		expectTypeOf(loose['~requires']).toEqualTypeOf<{
+		expectTypeOf(reads(loose)).toEqualTypeOf<{
 			readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated";
 		}>();
 		const _refused = () => {
@@ -205,11 +217,11 @@ describe('language', () => {
 			fallback: 'en',
 			resolve: (ctx: object) => ('url' in ctx ? 'fr' : undefined),
 		});
-		expectTypeOf(byUnknown['~requires']).toEqualTypeOf<Empty>();
-		expectTypeOf(byObject['~requires']).toEqualTypeOf<Empty>();
+		expectTypeOf(reads(byUnknown)).toEqualTypeOf<Empty>();
+		expectTypeOf(reads(byObject)).toEqualTypeOf<Empty>();
 		for (const plugin of [byUnknown, byObject]) {
 			const served = alxia()
-				.use(plugin)
+				.plugin(plugin)
 				.get('/', ({ language: current, reply }) => reply(200, current));
 			expect(await (await served.request('/')).text()).toBe('fr');
 		}

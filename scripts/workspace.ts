@@ -1,7 +1,7 @@
 /**
  * Runs one script in every package, a package only once every sibling it
  * names — in any dependency field — has run it. `bun run --filter` started
- * dependents beside their dependencies on a clean checkout: `@alxia/client`
+ * dependents beside their dependencies on a clean checkout: a package
  * type-checked against an `@alxia/core` with no declarations yet.
  *
  * Packages of one wave run in parallel. Folders after the script run in

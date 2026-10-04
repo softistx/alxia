@@ -45,6 +45,11 @@ const app = alxia()
 	);
 ```
 
+The guard lives in a `group`: given to the app's own `use`, it would also run
+on a request no route matches, and answer it 401 or 404 before the 404 it
+should get. `janusErrors()` is given to `use` before `session()`, so it
+answers what `session()` and the guard throw.
+
 `object` is what `findRecord` answered, typed as such. Granting access is
 `@nxgt/janus`'s:
 
@@ -64,7 +69,7 @@ await access.grant({ type: 'record', id: 'r1' }, 'owners', user); // user: what 
 | `options.ctx` | `(ctx: BaseContext, object: O) => …` | the context a condition of the permission reads; **required exactly when the permission has one**, refused otherwise |
 
 Each callback reads the request's `BaseContext`, and, when its parameter is
-annotated, what an earlier plugin added: see
+annotated, what an earlier middleware added: see
 [Reading the app's context](#reading-the-apps-context).
 
 It runs once per request, before the route:
@@ -83,7 +88,7 @@ and answer it 401 or 404.
 
 ## Refusals
 
-Each refusal is in the type of the guarded routes, with the body
+Each guarded route may answer these refusals, with the body
 `PermissionRefusedBody`:
 
 | The request | Answered |
@@ -206,7 +211,7 @@ request throws a `TypeError` and answers 500
 `subject` names another — an API key's service account, a user read from a
 header set by a gateway. It reads the `BaseContext`, so the request, the
 URL and the path parameters, not the route's validated headers — and, when
-its parameter is annotated, what an earlier plugin added
+its parameter is annotated, what an earlier middleware added
 ([Reading the app's context](#reading-the-apps-context)). `null` is
 anonymous, a 401:
 
@@ -222,12 +227,12 @@ permission(access, 'view', 'record', byParam('id', findRecord), {
 ## Reading the app's context
 
 `load`, `subject` and `ctx` read `BaseContext` — the request, the URL, the
-path parameters. To read what an earlier plugin added — a tenant, a member,
+path parameters. To read what an earlier middleware added — a tenant, a member,
 a feature flag — annotate the callback's parameter. `permission()` infers
 what each one reads from its annotation, while `access`, `permission`,
 `type` and the object stay inferred as before, and the guard is a
-[`definePlugin`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
-plugin: an app that does not give it before the guard cannot use it.
+[middleware that requires an earlier one](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md#a-plugin-that-needs-an-earlier-one):
+an app that does not give it before the guard cannot `use` it.
 
 ```ts
 import { alxia, type BaseContext } from '@alxia/core';
@@ -250,20 +255,20 @@ const edit = permission(
 
 const app = alxia()
 	.use(janusErrors())
-	.use(tenancy) // derives tenant and member
+	.plugin(tenancy) // derives tenant and member
 	.group('/records/:id', (record) =>
 		record.use(edit).put('/', ({ object, reply }) => reply(200, { title: object.title })),
 	);
 
 alxia().use(edit);
-// error, one message per missing key: the plugin reads "tenant", which this app's context does not give: use the plugin that adds it first
-//   | the plugin reads "member", which this app's context does not give: use the plugin that adds it first
+// error, one message per missing key: Property 'tenant' is missing in type 'BaseContext & Empty' but required in type '{ tenant: Tenant; }'
+//   | Property 'member' is missing in type 'BaseContext & Empty' but required in type '{ member: { type: 'user'; id: string } | null; }'
 ```
 
 What the guard requires is the union of what the three annotations read.
 An annotation may be `BaseContext & { member: Member }` or `{ member: Member }`
 alone. An app whose `member` has a type that does not fit is refused too —
-`the plugin reads "member", which this app's context gives with another type`
+`Types of property 'member' are incompatible`
 — while a narrower one passes. A key `BaseContext` already has, annotated
 with a type it does not give — `({ pathParams }: { pathParams: string })` —
 is refused the same way.
@@ -318,7 +323,6 @@ function permission<
 	...options: OptionsArgs<C, T, P, O, SubjectCtx, CheckCtx>
 ): Alxia<
 	RequiresOf<LoadCtx & SubjectCtx & CheckCtx> & { object: O },
-	Empty,
 	'',
 	Reply<401, PermissionRefusedBody> | Reply<404, PermissionRefusedBody> | Reply<403, PermissionRefusedBody>
 > &

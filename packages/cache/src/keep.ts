@@ -25,6 +25,40 @@ export function keepable(
 }
 
 /**
+ * Response directives that let a shared cache keep the answer to a request
+ * carrying credentials (RFC 9111 §3.5).
+ */
+const SHARED = /\b(public|s-maxage|must-revalidate)\b/i;
+
+/** Which request credentials the cache's key tells apart: a response to a request carrying one is someone's own otherwise. */
+export interface KeyedBy {
+	/** `vary` names `authorization`: each token is a key of its own. */
+	readonly authorization: boolean;
+	/** The app gave a `key`, or `vary` names `cookie`. */
+	readonly cookie: boolean;
+}
+
+/**
+ * Whether the answer to `request` may be kept for others. A request carrying
+ * `Authorization` or `Cookie` is answered for whoever sent it: its response
+ * is kept only when it says it may be shared — `public`, `s-maxage` or
+ * `must-revalidate` — or when the key tells those senders apart (`keyedBy`).
+ */
+export function shareable(
+	request: Request,
+	response: Response,
+	keyedBy: KeyedBy,
+): boolean {
+	const { headers } = request;
+	const credentialed =
+		(headers.has('authorization') && !keyedBy.authorization) ||
+		(headers.has('cookie') && !keyedBy.cookie);
+	return (
+		!credentialed || SHARED.test(response.headers.get('cache-control') ?? '')
+	);
+}
+
+/**
  * The response as it is kept: its body read, `Content-Length` and `Date`
  * dropped, a weak `ETag` of its body when it has none, and `Vary` naming
  * each header in `vary`. `tags` is asked once the body is read.

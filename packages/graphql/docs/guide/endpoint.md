@@ -1,7 +1,7 @@
 # Mounting the endpoint
 
 This page covers `graphql(app, options)`: where the endpoint is served, what
-it answers, which hooks run before it, and how to test it.
+it answers, which middlewares run before it, and how to test it.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -15,7 +15,7 @@ const schema = createSchema({
 
 const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok'))
-	.use((app) => graphql(app, { schema })); // GET and POST /graphql
+	.plugin((app) => graphql(app, { schema })); // GET and POST /graphql
 
 app.listen(3000);
 ```
@@ -28,18 +28,18 @@ curl localhost:3000/graphql -H 'content-type: application/json' -d '{"query":"{ 
 ## `graphql`
 
 ```ts
-function graphql<Ctx, Routes, Prefix, Shortcuts, SchemaCtx, UserCtx = Empty, const Path = '/graphql'>(
-	app: Alxia<Ctx, Routes, Prefix, Shortcuts>,
+function graphql<Ctx, Prefix, Shortcuts, SchemaCtx, UserCtx = Empty, const Path = '/graphql'>(
+	app: Alxia<Ctx, Prefix, Shortcuts>,
 	options: GraphQLOptions<ServerContext<Ctx>, UserCtx, Path, SchemaCtx>,
-): Alxia<Ctx, Routes & GraphQLRoutes<JoinPath<Prefix, Path>, Shortcuts>, Prefix, Shortcuts>;
+): Alxia<Ctx, Prefix, Shortcuts>;
 ```
 
 `graphql` declares a `GET` and a `POST` route at `path` on `app`, and returns
-`app` with those two routes in its type. Hand it to `use` as a function, so
+`app`, its type unchanged. Hand it to `app.plugin` as a function, so
 it stays in the chain and sees the app as typed so far:
 
 ```ts
-const app = base.use((app) => graphql(app, { schema }));
+const app = base.plugin((app) => graphql(app, { schema }));
 ```
 
 Calling it directly does the same: `graphql(base, { schema })` declares the
@@ -62,17 +62,17 @@ routes on `base` and returns it.
 ## Where it is served
 
 `path` is joined to the app's prefix, and to the prefix of every app it is
-mounted into, in the routes' type as at runtime:
+mounted into:
 
 ```ts
-import { alxia, type RoutesOf } from '@alxia/core';
+import { alxia } from '@alxia/core';
 
 const api = alxia({ prefix: '/api' })
-	.use((app) => graphql(app, { schema, path: '/gql' })); // /api/gql
+	.plugin((app) => graphql(app, { schema, path: '/gql' })); // /api/gql
 
-const root = alxia({ prefix: '/v1' }).use(api);           // /v1/api/gql
+const root = alxia({ prefix: '/v1' }).plugin(api);           // /v1/api/gql
 
-type Paths = keyof RoutesOf<typeof root>;                  // '/v1/api/gql'
+root.routes.map((route) => `${route.method} ${route.path}`); // ['GET /v1/api/gql', 'POST /v1/api/gql']
 ```
 
 Two endpoints on one app need two paths: declaring the default path twice
@@ -81,13 +81,13 @@ own path:
 
 ```ts
 const app = alxia()
-	.use((app) => graphql(app, { schema }))
-	.use((app) => graphql(app, { schema: admin, path: '/admin/graphql' }));
+	.plugin((app) => graphql(app, { schema }))
+	.plugin((app) => graphql(app, { schema: admin, path: '/admin/graphql' }));
 ```
 
-## Behind the app's hooks
+## Behind the app's middlewares
 
-The endpoint is a route like any other: every route hook declared **before**
+The endpoint is a route like any other: every middleware declared **before**
 it runs first, and one that replies ends the request there. A guard before
 it guards it:
 
@@ -98,17 +98,34 @@ const app = alxia()
 			? { viewer: 'service' }
 			: reply(401, { error: 'unauthorized' as const }),
 	)
-	.use((app) => graphql(app, { schema })); // 401 without the token
+	.plugin((app) => graphql(app, { schema })); // 401 without the token
 ```
 
-A hook declared **after** `use` does not run for it: the endpoint answers
-without it. The order is core's, explained in
-[Hooks](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/hooks.md#route-hooks-and-global-hooks).
-Global hooks — `onRequest`, `onResponse`, `around`, and the plugins built on
-them, such as `@alxia/cors` or `@alxia/secure-headers` — apply wherever they
-are declared.
+A middleware declared **after** `app.plugin` does not run for the endpoint: it
+answers without it. Give the observers (`@alxia/logger`, `@alxia/cors`,
+`@alxia/secure-headers`, `@alxia/compress`) to `use` first, so they wrap the
+endpoint, and every other request, the 404s included:
 
-What the hooks added is in each resolver's context: that is the next page,
+```ts
+import { alxia } from '@alxia/core';
+import { cors } from '@alxia/cors';
+import { graphql } from '@alxia/graphql';
+import { logger } from '@alxia/logger';
+import { secureHeaders } from '@alxia/secure-headers';
+
+const app = alxia()
+	.use(logger())
+	.use(secureHeaders())
+	.use(cors({ origin: 'https://app.example.com' }))
+	.plugin((app) => graphql(app, { schema }));
+```
+
+A guard given to the app's `use` (`bearer`, a required session) also runs on
+a request no route matches: an anonymous request to a missing path is a 401,
+not a 404. The order is core's, explained in
+[Middlewares](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md).
+
+What the middlewares added is in each resolver's context: that is the next page,
 [The typed context](context.md).
 
 ## What it answers
@@ -123,7 +140,7 @@ IDE page ([GraphiQL and Apollo Sandbox](ide.md)).
 | `GET ?query=…` | the same, for a query; a mutation is a `405` |
 | `POST` a subscription with `Accept: text/event-stream` | `200`, a `text/event-stream` of results ([subscriptions](yoga.md#subscriptions)) |
 | `GET` from a browser (`Accept: text/html`), no `query` | the IDE page; with `ide: false`, a GraphQL answer (`Must provide query string.`) |
-| a hook replied first | that hook's reply, such as a `401` |
+| a middleware replied first | that middleware's reply, such as a `401` |
 
 ```text
 POST {"query":"{ nope }"}             → 200 {"errors":[{"message":"Cannot query field \"nope\" on type \"Query\".", … "extensions":{"code":"GRAPHQL_VALIDATION_FAILED"}}]}
@@ -131,15 +148,8 @@ GET  ?query=mutation { m }            → 405 {"errors":[{"message":"Can only pe
 POST {}                               → 200 {"errors":[{"message":"Must provide query string.","extensions":{"code":"BAD_REQUEST"}}]}
 ```
 
-The reply's type is `Reply<StatusCode, ReadableStream<Uint8Array> | undefined>`
-for both methods, plus the replies of the hooks before it: a typed client
-sees a body to read as GraphQL, and the guard's `401`.
-
-```ts
-type GraphQLRoutes<Path extends string, Shortcuts extends AnyReply> =
-	RouteEntryOf<'GET', Path, Empty, GraphQLReply, Shortcuts> &
-	RouteEntryOf<'POST', Path, Empty, GraphQLReply, Shortcuts>;
-```
+Both methods answer a body to read as GraphQL, whatever its status, and
+the replies of the middlewares before them — a guard's `401`, say.
 
 ## Testing it
 
@@ -158,7 +168,7 @@ const schema = createSchema({
 	resolvers: { Query: { hello: (_, { name }: { name: string }) => `hello ${name}` } },
 });
 
-const app = alxia().use((app) => graphql(app, { schema, logging: false }));
+const app = alxia().plugin((app) => graphql(app, { schema, logging: false }));
 
 const execute = (query: string, variables?: Record<string, unknown>) =>
 	app.request('/graphql', {

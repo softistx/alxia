@@ -1,4 +1,8 @@
-import { type BaseContext, definePlugin, type RequiresOf } from '@alxia/core';
+import {
+	type BaseContext,
+	defineMiddleware,
+	type RequiresOf,
+} from '@alxia/core';
 import type {
 	CheckableOf,
 	ModelConfig,
@@ -21,7 +25,7 @@ type LooseCan = (
 ) => Promise<boolean>;
 
 /**
- * A guard, as a plugin: the routes declared after it run only if the
+ * A guard, as a middleware: the routes declared after it run only if the
  * subject holds `permission` on an object of `type`. It loads the object
  * once, checks it with `access.can`, and hands it to them as `object`.
  *
@@ -34,10 +38,11 @@ type LooseCan = (
  *
  * Each refusal is typed on those routes. **A failure throws**: a store that
  * cannot answer is `STORE_FAILED`, never a 403 — `janusErrors()` answers
- * it 503. Scope it with `group`, so it guards only its routes:
+ * it 503. Scope it with `group`, so it guards only its routes — given to
+ * the app's `use`, it would refuse a request no route matches too:
  *
  * ```ts
- * app.use(session(accounts)).group('/records/:id', (records) =>
+ * app.use(janusErrors(), session(accounts)).group('/records/:id', (records) =>
  *   records.use(permission(access, 'view', 'record', byParam('id', findRecord)))
  *     .get('/', ({ object, reply }) => reply(200, object)));
  * ```
@@ -57,7 +62,7 @@ export function permission<
 	load: (ctx: BaseContext & LoadCtx) => Awaitable<O | null>,
 	...options: OptionsArgs<C, T, P, O, SubjectCtx, CheckCtx>
 ) {
-	// `use` has checked that the app gives what `load`, `subject` and `ctx` read.
+	// `app.use` has checked that the app gives what `load`, `subject` and `ctx` read.
 	const loadOf = load as (ctx: BaseContext) => Awaitable<O | null>;
 	const { subject, ctx: ctxOf } = (options[0] ?? {}) as {
 		readonly subject?: (
@@ -70,27 +75,25 @@ export function permission<
 		const body: PermissionRefusedBody = { error };
 		return body;
 	};
-	return definePlugin<
+	return defineMiddleware<
 		RequiresOf<
 			LoadCtx & SubjectCtx & CheckCtx,
 			AnnotatedAny<LoadCtx, SubjectCtx>
 		>
-	>()((app) =>
-		app.derive(async (ctx) => {
-			const who = subject === undefined ? userOf(ctx) : await subject(ctx);
-			if (who === null) return ctx.reply(401, refuse('unauthenticated'));
-			const object = await loadOf(ctx);
-			if (object === null) return ctx.reply(404, refuse('not_found'));
-			const allowed = await can(
-				who,
-				permission,
-				view(object, type),
-				ctxOf === undefined ? undefined : { ctx: await ctxOf(ctx, object) },
-			);
-			if (!allowed) return ctx.reply(403, refuse('forbidden'));
-			return { object };
-		}),
-	);
+	>()(async (ctx, next) => {
+		const who = subject === undefined ? userOf(ctx) : await subject(ctx);
+		if (who === null) return ctx.reply(401, refuse('unauthenticated'));
+		const object = await loadOf(ctx);
+		if (object === null) return ctx.reply(404, refuse('not_found'));
+		const allowed = await can(
+			who,
+			permission,
+			view(object, type),
+			ctxOf === undefined ? undefined : { ctx: await ctxOf(ctx, object) },
+		);
+		if (!allowed) return ctx.reply(403, refuse('forbidden'));
+		return next({ object });
+	});
 }
 
 /**

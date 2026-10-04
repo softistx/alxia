@@ -1,17 +1,16 @@
 # Server-sent events
 
 This page covers streaming events to a client: a handler replies with an
-async iterable, each value is one event, and the client reads the same
-values back as an async iterable. A stream may also name its events —
+async iterable, and each value is one event, sent as JSON. A stream may also name its events —
 `event: state`, `event: ping` — each with a schema of its own.
 
 ```ts
-import { alxia, eventStream } from '@alxia/core';
+import { alxia, eventStream, responds } from '@alxia/core';
 import { z } from 'zod';
 
 const Tick = z.object({ n: z.number() });
 
-const app = alxia().get('/ticks', { response: { 200: eventStream(Tick) } }, ({ reply }) =>
+const app = alxia().get('/ticks', responds({ 200: eventStream(Tick) }), ({ reply }) =>
 	reply(
 		200,
 		(async function* () {
@@ -39,13 +38,14 @@ curl -N localhost:3000/ticks
 function eventStream<Item extends StandardSchemaV1>(item: Item): EventStreamSchema<Item>;
 ```
 
-The response schema of a stream whose events are each checked by `item`.
+The response schema of a stream whose events are each checked by `item`,
+given to `responds` for the status that streams: `responds({ 200: eventStream(Tick) })`.
 The handler replies with an async iterable of what `item` accepts; each
 value is validated and sent as `item`'s **output**, so an unknown key the
 schema strips never leaves the server, as for any reply.
 
 `isEventStreamSchema(schema)` tells whether a schema is one
-`eventStream(schema)` made: what a plugin documenting the app — an OpenAPI generator — reads.
+`eventStream(schema)` made: what a tool reading `app.routes` checks a route's stream by.
 
 ## Named events
 
@@ -60,7 +60,7 @@ Given a schema per event name, the stream sends each event with its
 JMAP's push, for one, sends `state` and `ping`:
 
 ```ts
-import { alxia, eventStream } from '@alxia/core';
+import { alxia, eventStream, responds } from '@alxia/core';
 import { z } from 'zod';
 
 const StateChange = z.object({
@@ -71,7 +71,7 @@ const Ping = z.object({ interval: z.number().int() });
 
 const Push = eventStream({ state: StateChange, ping: Ping });
 
-const app = alxia().get('/push', { response: { 200: Push } }, ({ reply }) =>
+const app = alxia().get('/push', responds({ 200: Push }), ({ reply }) =>
 	reply(
 		200,
 		(async function* () {
@@ -118,8 +118,8 @@ data: {"@type":"StateChange","changed":{"a1":{"Email":"s42"}}}
   `Last-Event-ID` when it reconnects. **`retry`**, a whole number of
   milliseconds, tells an `EventSource` how long to wait before reconnecting.
   Both are left out unless given.
-- **The client** reads `{ event, data, id? }`, a union discriminated by
-  `event`: see [Reading it](#reading-it).
+- **A client** reads each under its `event:` name: see
+  [Reading it](#reading-it).
 
 ### What is refused
 
@@ -150,10 +150,8 @@ and the subscription. Returning ends the stream — what a client's
 ```ts
 app.get(
 	'/events',
-	{
-		query: z.object({ closeafter: z.enum(['state', 'no']).default('no') }),
-		response: { 200: Push },
-	},
+	validate({ query: z.object({ closeafter: z.enum(['state', 'no']).default('no') }) }),
+	responds({ 200: Push }),
 	({ query, request, reply }) =>
 		reply(
 			200,
@@ -194,8 +192,8 @@ Without the signal, a generator waiting on a promise is closed only when it
 next yields: its `finally` would wait for the next ping.
 
 `isNamedEventStreamSchema(schema)` tells whether a schema is a named
-stream, and `schema['~events']` holds its schemas by name: what an OpenAPI
-generator reads. `isEventStreamSchema` stays true of the unnamed form only.
+stream, and `schema['~events']` holds its schemas by name, for a tool reading
+`app.routes`. `isEventStreamSchema` stays true of the unnamed form only.
 
 ## What is sent
 
@@ -214,7 +212,7 @@ generator reads. `isEventStreamSchema` stays true of the unnamed form only.
 - When the generator returns, the stream ends.
 
 ```ts
-app.get('/orders/:id/status', { response: { 200: eventStream(Status) } }, ({ params, reply }) =>
+app.get('/orders/:id/status', responds({ 200: eventStream(Status) }), ({ params, reply }) =>
 	reply(
 		200,
 		(async function* () {
@@ -251,8 +249,8 @@ const Event = z.discriminatedUnion('type', [
 
 ## Without a schema
 
-Any async iterable a handler replies with is a stream, schema or not. The
-client then reads the values as their type:
+Any async iterable a handler replies with is a stream, schema or not, each
+value sent as JSON:
 
 ```ts
 app.get('/letters', ({ reply }) =>
@@ -263,45 +261,21 @@ app.get('/letters', ({ reply }) =>
 			yield 'b';
 		})(),
 	),
-); // the client reads AsyncIterable<string>
+); // data: "a", then data: "b"
 ```
 
 A `ReadableStream` is not an event stream: it is sent as bytes.
 
 ## Reading it
 
-With [`@alxia/client`](https://www.npmjs.com/package/@alxia/client), the
-200's `data` is an `AsyncIterable` of the events, typed by the schema's
-output:
-
-```ts
-const ticks = await api.get('/ticks');
-if (ticks.status === 200) {
-	for await (const tick of ticks.data) console.log(tick.n);
-}
-```
-
-On a named stream, each one is `{ event, data, id? }`, a union
-discriminated by `event`, its `data` typed by that name's schema:
-
-```ts
-const push = await api.get('/push');
-if (push.status === 200) {
-	for await (const item of push.data) {
-		if (item.event === 'state') console.log(item.data.changed, item.id);
-		else console.log('ping every', item.data.interval);
-	}
-}
-```
-
-Any `EventSource` reads it too: each `data` is the JSON of one event, and a
+Any `EventSource` reads it: each `data` is the JSON of one event, and a
 named event is dispatched under its name
 (`source.addEventListener('state', …)`).
 
 In a test, the body is the text of the events:
 
 ```ts
-const app = alxia().get('/ticks', { response: { 200: eventStream(Tick) } }, ({ reply }) =>
+const app = alxia().get('/ticks', responds({ 200: eventStream(Tick) }), ({ reply }) =>
 	reply(
 		200,
 		(async function* () {

@@ -1,6 +1,6 @@
 /**
  * Static files, served through the app's pipeline: every hook runs around
- * them, and the client types them like any route.
+ * them, as around any route.
  */
 import { extname, resolve, sep } from 'node:path';
 import type { BaseContext, MaybePromise } from '../app/types';
@@ -126,7 +126,7 @@ export function fileHandler(
 		const path =
 			typeof file === 'string'
 				? file
-				: ((isBunFile(blob) ? blob.name : undefined) ?? ctx.route);
+				: ((isBunFile(blob) ? blob.name : undefined) ?? ctx.route ?? '');
 		return send(ctx, { file: blob, path }, options, undefined, false);
 	};
 }

@@ -18,6 +18,12 @@ shape we intend to keep.
   unreadable. The options are expected to go away anyway once routes come
   from codegen-alxia.
 
+  > **Since `@alxia/core` 0.4.0** a route is
+  > `get(path, options?, ...middlewares, handler)`, its schemas the
+  > `validate(…)` and `responds(…)` middlewares, and its options `bodyLimit`
+  > and `detail` only; see [Routes as a chain of steps](route-steps.md).
+  > The examples below are written in the 0.4.0 form.
+
 ## Slice 1: shortcuts on `reply`
 
 Today a handler answers `reply(200, body)`, `reply(201, body)`,
@@ -32,7 +38,7 @@ app.get('/users/:id', ({ params, reply }) => {
 	return user ? reply.ok(user) : reply.notFound({ error: 'not_found' });
 });
 
-app.post('/users', { body: NewUser, response: { 201: User } }, ({ body, reply }) =>
+app.post('/users', validate({ body: NewUser }), responds({ 201: User }), ({ body, reply }) =>
 	reply.created(insert(body)),
 );
 
@@ -96,7 +102,7 @@ const accounts = janus({ … }); // the instance: named `accounts` in the docs, 
 
 app
 	.use(session(accounts))
-	.post('/sign-in', { body: Credentials }, async ({ body, auth, reply }) => {
+	.post('/sign-in', validate({ body: Credentials }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.patient.signIn(body, { device: auth.device });
 		return reply.ok({ id: auth.send(signedIn).id }); // session cookie, device cookie
 	})
@@ -140,8 +146,19 @@ Rejected: global augmentation (`declare module '@alxia/core' { interface
 Context { … } }`). It would type `user` on routes declared before the plugin
 that adds it, which is a lie the compiler would then repeat.
 
+Revisited at 0.4.0, and adopted in another shape: the app registers the
+chain that builds its context, never a key —
+`declare module '@alxia/core' { interface Register { context: typeof base } }`.
+Nothing reads it unchecked: `alxia()` and `defineMiddleware(fn)` still start
+from `BaseContext`; `defineRoutes()` carries the registered context as a
+requirement that `use` checks, as `definePlugin`'s; `AppContext`,
+`defineMiddleware<AppContext>()` and `contextStorage()` are opted into.
+The base is registered rather than the app because the app mounts the
+route files, whose type reads `Register`: TypeScript would type the app
+by itself, `TS7022`.
+
 The gap is a plugin that **needs** what an earlier one added: a permission
-check that reads `user`, a tenant scope that reads `session`. Today it is
+check that reads `user`, a tenant scope that reads `session`. At the time it was
 typed by hand, with `contextStorage<typeof base>()` and janus's
 `permission()` generics. The slice proposes one helper, a sketch to be
 probed:
@@ -151,8 +168,8 @@ const tenant = definePlugin<{ user: { tenantId: string } }>()((app) =>
 	app.derive(({ user }) => ({ tenant: tenants.get(user.tenantId) })),
 );
 
-base.use(session(accounts, { required: true })).use(tenant); // ok
-alxia().use(tenant); // compile error: the app gives no `user`
+base.use(session(accounts, { required: true })).plugin(tenant); // ok
+alxia().plugin(tenant); // compile error: the app gives no `user`
 ```
 
 It also adds a guide page, "Writing a plugin", covering an app plugin, a

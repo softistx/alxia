@@ -11,7 +11,6 @@ symptom, under [Traps](#traps).
 - [`'user' is possibly 'null'`](#user-is-possibly-null)
 - [`Type '"admin"' is not assignable to type '"user"'`](#type-admin-is-not-assignable-to-type-user)
 - [`Type 'SecondFactorRequired' is missing the following properties from type 'SessionOpened<User<…>>': token, session, user`](#type-secondfactorrequired-is-missing-the-following-properties-from-type-sessionopeneduser-token-session-user)
-- [`Property 'error' is missing in type '{ code: JanusErrorCode; … }'`](#property-error-is-missing-in-type--code-januserrorcode--)
 
 **Types: permissions**
 
@@ -21,8 +20,8 @@ symptom, under [Traps](#traps).
 - [`Type '() => { locked: boolean; }' is not assignable to type 'undefined'`](#type----locked-boolean--is-not-assignable-to-type-undefined)
 - [`Property 'doctorId' is missing in type '{ … }' but required in type '{ readonly doctorId: string | null; }'`](#property-doctorid-is-missing-in-type----but-required-in-type--readonly-doctorid-string--null-)
 - [`Property 'tenant' does not exist on type 'BaseContext'`](#property-tenant-does-not-exist-on-type-basecontext)
-- [`the plugin reads "tenant", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads-tenant-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
-- [`the plugin reads "tenant", which this app's context gives with another type`](#the-plugin-reads-tenant-which-this-apps-context-gives-with-another-type)
+- [`Property 'tenant' is missing in type 'BaseContext & Empty' but required in type '{ tenant: Tenant; }'`](#property-tenant-is-missing-in-type-basecontext--empty-but-required-in-type--tenant-tenant-)
+- [`Types of property 'tenant' are incompatible`](#types-of-property-tenant-are-incompatible)
 - [`the plugin's load reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-load-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
 **Runtime**
@@ -31,8 +30,11 @@ symptom, under [Traps](#traps).
 - [`TypeError: signIn: a device was given, but janus() has no devices — pass devices: { keys }`](#typeerror-signin-a-device-was-given-but-janus-has-no-devices--pass-devices--keys-)
 - [`Warning: janusErrors(): report failed: …`](#warning-januserrors-report-failed-)
 - [`500 {"error":"internal"}`, with a `JanusError` in the log](#500-errorinternal-with-a-januserror-in-the-log)
+- [`500 {"error":"internal"}` when the identity store is down, and `janusErrors()` is there](#500-errorinternal-when-the-identity-store-is-down-and-januserrors-is-there)
 - [`503 {"code":"STORE_FAILED"}`](#503-codestore_failed)
 - [`401 {"error":"unauthenticated"}` from the sign-in route](#401-errorunauthenticated-from-the-sign-in-route)
+- [`401 {"error":"unauthenticated"}` on a path that does not exist](#401-errorunauthenticated-on-a-path-that-does-not-exist)
+- [The error is never seen by a `try`/`catch` around `logger()` or `secureHeaders()`](#the-error-is-never-seen-by-a-trycatch-around-logger-or-secureheaders)
 - [`401 {"code":"CREDENTIALS_INVALID","retryAfter":900}` with the right password](#401-codecredentials_invalidretryafter900-with-the-right-password)
 
 **Traps**
@@ -57,7 +59,7 @@ error TS2339: Property 'user' does not exist on type 'Context<Empty, "/profile",
 **Why:** `session()` adds `user` and `session` to the routes declared
 **after** it. The route before it is not authenticated at all.
 
-**Fix:** declare the route after the plugin:
+**Fix:** declare the route after the middleware:
 
 ```ts
 alxia()
@@ -86,7 +88,7 @@ the route where it is and call the unbound `sendSession(ctx, accounts, …)`,
 ```ts
 alxia()
 	.use(session(accounts))
-	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
 	});
@@ -106,7 +108,7 @@ only at run time, an anonymous request may reach the route with
 `user: null`.
 
 **Fix:** answer the anonymous case, or require the session with a literal
-`true`, so the plugin answers it with a 401 and `user` is never `null`:
+`true`, so the middleware answers it with a 401 and `user` is never `null`:
 
 ```ts
 alxia().use(session(accounts, { required: true })).get('/me', ({ user, reply }) => reply(200, user.email));
@@ -148,30 +150,6 @@ challenge, and a challenge has no session to put in a cookie.
 const result = await accounts.signIn(body);
 if (result.status === 'secondFactor') return reply.ok({ challenge: result.challenge });
 return reply.ok({ id: auth.send(result).id });
-```
-
-### `Property 'error' is missing in type '{ code: JanusErrorCode; … }'`
-
-**When:** a client reads a 401 from a route behind
-`session(accounts, { required: true })` and `janusErrors()` as the session's
-body only.
-
-```text
-error TS2322: Type '{ error: "unauthenticated"; } | { code: JanusErrorCode; issues?: …; minLength?: number; attemptsLeft?: number; retryAfter?: number; }' is not assignable to type '{ error: "unauthenticated"; }'.
-  Property 'error' is missing in type '{ code: JanusErrorCode; … }' but required in type '{ error: "unauthenticated"; }'.
-```
-
-**Why:** two 401s are possible there: the session's own
-`{ error: 'unauthenticated' }`, and janus's `{ code }` — a refused code
-or password — through `janusErrors()`.
-
-**Fix:** narrow on the key ([Errors](guide/errors.md#on-the-client)):
-
-```ts
-if (me.status === 401) {
-	if ('error' in me.data) console.log('sign in first');
-	else console.log(me.data.code);
-}
 ```
 
 ## Types: permissions
@@ -271,7 +249,7 @@ byParam('id', (id) => db.records.findOne({ id }, { projection: { title: 1, docto
 error TS2339: Property 'tenant' does not exist on type 'BaseContext'.
 ```
 
-**When:** `load`, `subject` or `ctx` reads something a `derive` or a plugin
+**When:** `load`, `subject` or `ctx` reads something a `derive` or a middleware
 before the guard added — a tenant, a member — and its parameter is not
 annotated: `load: (ctx) => ctx.tenant.records.get(…)`.
 
@@ -281,7 +259,7 @@ added. `permission()` is built before it is used, so it cannot see the app
 it will be used on.
 
 **Fix:** annotate the parameter with what it reads. The guard infers it,
-and the app that uses it must then give it, before the guard:
+and the app that mounts it must then give it, before the guard:
 
 ```ts
 import type { BaseContext } from '@alxia/core';
@@ -290,51 +268,55 @@ const byTenant = permission(access, 'view', 'record', ({ tenant, pathParams }: B
 	tenant.records.get(pathParams['id'] ?? '') ?? null,
 );
 
-app.use(tenancy).use(byTenant); // tenancy derives tenant
+app.plugin(tenancy).use(byTenant); // tenancy derives tenant
 ```
 
 See [Reading the app's context](guide/permissions.md#reading-the-apps-context).
 
-### `the plugin reads "tenant", which this app's context does not give: use the plugin that adds it first`
+### `Property 'tenant' is missing in type 'BaseContext & Empty' but required in type '{ tenant: Tenant; }'`
 
 ```text
 error TS2769: No overload matches this call.
   …
-        Types of property ''~requires'' are incompatible.
-          Type '{ tenant: Tenant; }' is not assignable to type '"the plugin reads \"tenant\", which this app's context does not give: use the plugin that adds it first"'.
+          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ tenant: Tenant; }>'.
+            Property 'tenant' is missing in type 'BaseContext & Empty' but required in type '{ tenant: Tenant; }'.
 ```
 
 **When:** a callback of the guard is annotated to read `tenant`, and the
 guard is used on an app — or in a group — whose context has no `tenant` at
 that point: `alxia().use(byTenant)`, or `use(byTenant)` before
-`use(tenancy)`.
+`plugin(tenancy)`.
 
 **Why:** an annotated `load`, `subject` or `ctx` makes the guard require
-what it reads, and `use` checks the app's context against it, so the
+what it reads, and `app.use` checks the app's context against it, so the
 callback never runs without it.
 
-**Fix:** use the plugin that adds `tenant` first:
+**Fix:** mount what adds `tenant` first:
 
 ```ts
-app.use(tenancy).use(byTenant);
+app.plugin(tenancy).use(byTenant);
 ```
 
 More on this message in
-[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first).
 
-### `the plugin reads "tenant", which this app's context gives with another type`
+### `Types of property 'tenant' are incompatible`
 
 ```text
 error TS2769: No overload matches this call.
   …
-          Type '{ tenant: Tenant; }' is not assignable to type '"the plugin reads \"tenant\", which this app's context gives with another type"'.
+          Type 'BaseContext & Empty & { tenant: Tenant | null; }' is not assignable to type 'MiddlewareContext<{ tenant: Tenant; }>'.
+            Type 'BaseContext & Empty & { tenant: Tenant | null; }' is not assignable to type '{ tenant: Tenant; }'.
+              Types of property 'tenant' are incompatible.
+                Type 'Tenant | null' is not assignable to type 'Tenant'.
+                  Type 'null' is not assignable to type 'Tenant'.
 ```
 
 **When:** the app gives a `tenant`, but of a type that does not fit the one
 the callback's parameter is annotated with: a `Tenant | null` where `load`
 reads `Tenant`, or a tenant of another shape.
 
-**Why:** `use` checks each key the guard reads against the app's context;
+**Why:** `app.use` checks each key the guard reads against the app's context;
 a narrower type passes, a wider or different one does not.
 
 **Fix:** annotate the callback with the type the app gives, and handle it
@@ -354,8 +336,8 @@ More on this message in
 ```text
 error TS2769: No overload matches this call.
   …
-        Types of property ''~requires'' are incompatible.
-          Type '{ readonly '~any': "the plugin's load reads its context as any: annotate what it reads, or leave it unannotated"; }' is not assignable to type '"the plugin's load reads its context as any: annotate what it reads, or leave it unannotated"'.
+          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ readonly '~any': "the plugin's load reads its context as any: annotate what it reads, or leave it unannotated"; }>'.
+            Property ''~any'' is missing in type 'BaseContext & Empty' but required in type '{ readonly '~any': "the plugin's load reads its context as any: annotate what it reads, or leave it unannotated"; }'.
 ```
 
 The same message names `subject` or `ctx` when that callback is the one at
@@ -370,7 +352,7 @@ reads, so the guard would require nothing, and an app without a `tenant`
 would be accepted, and throw on every guarded request. The guard is
 refused instead.
 
-**Fix:** annotate what the callback reads, and use the plugin that adds it
+**Fix:** annotate what the callback reads, and mount what adds it
 first:
 
 ```ts
@@ -378,7 +360,7 @@ const byTenant = permission(access, 'view', 'record', ({ tenant, pathParams }: B
 	tenant.records.get(pathParams['id'] ?? '') ?? null,
 );
 
-app.use(tenancy).use(byTenant);
+app.plugin(tenancy).use(byTenant);
 ```
 
 Or leave it unannotated when it reads only the request, as `byParam`'s
@@ -450,19 +432,33 @@ one failing.
 **When:** a `janus()` refusal — `NotFoundError`, a refused password —
 thrown by a route is answered 500 instead of its own status.
 
-**Why:** the route is declared before `use(janusErrors())`, which answers
-only the routes after it.
+**Why:** `janusErrors()` is a try/catch middleware: it answers what is thrown
+**behind** it. The error was thrown by something declared before it, or by
+`session()` or a route while `janusErrors()` was given to `use` after them.
 
-**Fix:** use `janusErrors()` first:
+**Fix:** give `janusErrors()` to `use` first, before `session()`:
 
 ```ts
 const app = alxia()
-	.use(janusErrors())
-	.use(session(accounts))
-	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.use(janusErrors(), session(accounts))
+	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body); // a refusal is now its 401
 		return reply.ok({ id: auth.send(signedIn).id });
 	});
+```
+
+### `500 {"error":"internal"}` when the identity store is down, and `janusErrors()` is there
+
+**When:** the store behind `session()` is unreachable, and the answer is a 500
+instead of the 503 below, though the app uses `janusErrors()`.
+
+**Why:** `janusErrors()` was given to `use` **after** `session()`. The session
+is read before it, so the `STORE_FAILED` it throws is not behind it.
+
+**Fix:** put it before:
+
+```ts
+alxia().use(janusErrors(), session(accounts)); // not use(session(accounts), janusErrors())
 ```
 
 ### `503 {"code":"STORE_FAILED"}`
@@ -473,7 +469,7 @@ is unreachable.
 **Why:** intended. A store that cannot answer makes `authenticate` and
 `can` throw `STORE_FAILED`, and `janusErrors()` answers it 503 — never a
 401, which would send every signed-in user to the sign-in page, nor a 403.
-Routes declared before `session()` still answer.
+Routes declared before `session()` still answer. This holds when `janusErrors()` is before `session()`.
 
 **Fix:** the store. Pass `report` to `janusErrors()` to hear about it:
 
@@ -498,12 +494,51 @@ the session for the routes after it, or in a `group`
 alxia()
 	.use(janusErrors())
 	.use(session(accounts))                     // the sign-in routes
-	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
 	})
 	.use(session(accounts, { required: true })) // everything after
 	.get('/me', ({ user, reply }) => reply.ok({ name: user.name }));
+```
+
+### `401 {"error":"unauthenticated"}` on a path that does not exist
+
+**When:** an anonymous request to a missing path is answered 401, where it
+used to be a 404.
+
+**Why:** a required `session()` given to the app's `use` runs on every
+request, a request no route matches included, and answers before the 404.
+The same holds for `permission()` on the app.
+
+**Fix:** scope the guard with a `group`, or a path, so it guards only some routes:
+
+```ts
+alxia()
+	.use(janusErrors(), session(accounts))                      // open: runs on every request
+	.group('/account', (account) =>
+		account
+			.use(session(accounts, { required: true }))          // required: only /account/*
+			.get('/me', ({ user, reply }) => reply.ok({ name: user.name })),
+	);
+```
+
+### `logger()` or `secureHeaders()` never shows the reply of `janusErrors()`
+
+**When:** `janusErrors()` is declared before `logger()`, `secureHeaders()`
+or another observer: the janus error is answered as janus says, but the
+log line shows a 500, or the response lacks the security headers.
+
+**Why:** an observer settles `next()`: it reads the response the error
+would be answered with — a 500 — and the error goes on to `janusErrors()`
+outside it, which answers it. The observer inside saw the 500, not the
+reply.
+
+**Fix:** observers first, then the error-handling middleware, so that
+they see its reply:
+
+```ts
+alxia().use(logger()).use(janusErrors(), session(accounts));
 ```
 
 ### `401 {"code":"CREDENTIALS_INVALID","retryAfter":900}` with the right password

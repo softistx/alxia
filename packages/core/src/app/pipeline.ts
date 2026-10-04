@@ -2,9 +2,9 @@
  * The whole of a request: the global hooks around it, routing, then the
  * route's own run or the socket's upgrade.
  */
-import { handle } from './chain';
+import { handle, unmatched } from './boundary';
 import type { Definition, Runtime } from './definition';
-import { failed, routingError } from './send';
+import { failed } from './send';
 import { UPGRADED, upgradeSocket } from './socket';
 import type { RequestContext } from './types';
 
@@ -75,7 +75,7 @@ async function pipeline(
 /**
  * The route the request reached, run: the socket a `websocket` upgrade
  * asks for, a `GET` for a `HEAD` no route takes, or the 404, 405 or 426
- * when none answers.
+ * when none answers, behind the app's chain (`unmatched`).
  */
 async function route(
 	runtime: Runtime,
@@ -130,20 +130,20 @@ async function route(
 			head = true;
 		}
 	}
-	if (match === undefined) return routingError(404, 'not_found');
+	if (match === undefined) return unmatched(runtime, ctx, 404);
 	if ('allowed' in match) {
 		const allowed = match.allowed.filter((method) => method !== 'WS');
-		if (allowed.length === 0) return routingError(426, 'upgrade_required');
-		return routingError(405, 'method_not_allowed', allowed);
+		if (allowed.length === 0) return unmatched(runtime, ctx, 426);
+		return unmatched(runtime, ctx, 405, allowed);
 	}
 	const definition = match.value;
 	(ctx as { route: string | undefined }).route = definition.path;
-	if (definition.kind === 'ws') return routingError(426, 'upgrade_required');
+	if (definition.kind === 'ws') return unmatched(runtime, ctx, 426);
 	const response = await handle(
 		definition,
 		ctx,
 		match.params,
-		globals.parsers,
+		globals,
 		runtime.validateResponses,
 	);
 	return head

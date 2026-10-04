@@ -282,15 +282,19 @@ describe('read', () => {
 		const { manifests: found, lockPackages } = await read();
 		const packages: Tracked[] = tracked(found, lockPackages);
 		expect(packages.map(({ name, dirs }) => [name, dirs])).toEqual([
-			['@nxgt/i18n', ['packages/i18n']],
+			['@nxgt/i18n', ['packages/i18n', 'packages/janus']],
 			['@nxgt/janus', ['packages/janus']],
+			['@nxgt/openapi-codegen', ['packages/create']],
 			['@nxgt/redis', ['packages/redis']],
 			['@nxgt/redis-guard', ['packages/redis']],
 			['@nxgt/telemetry', ['packages/telemetry']],
 		]);
 		for (const one of packages) {
 			expect(one.locked.length).toBeGreaterThan(0);
-			expect(one.peers.length).toBe(1);
+			// The generator the api template pins is @alxia/create's tool, no peer.
+			expect(one.peers.length).toBe(
+				one.name === '@nxgt/openapi-codegen' ? 0 : 1,
+			);
 		}
 	});
 

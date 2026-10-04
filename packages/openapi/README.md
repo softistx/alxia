@@ -1,99 +1,222 @@
 # @alxia/openapi
 
-The OpenAPI 3.2 document of an [`@alxia/core`](https://www.npmjs.com/package/@alxia/core)
-app, made from the schemas its routes already declare. Nothing is written
-twice: the document cannot drift from the code.
+OpenAPI spec first for [`@alxia/core`](https://www.npmjs.com/package/@alxia/core).
+The OpenAPI document is the source:
+[`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen)'s
+`alxia` option generates each operation as `{ method, path, schema }`,
+`@alxia/core`'s `app.route(operation, ...middlewares, handler)` binds a
+handler to it, and this package's `implemented` and `matchesSpec` check
+that the app routes every operation of the document, and only those. A
+route the document declares and nobody wrote fails a test, not a client.
 
 ```sh
-bun add @alxia/openapi @alxia/core
-bun add -d typescript
+bun add -d @alxia/openapi typescript
+bun add -d --exact @nxgt/openapi-codegen
+bun add zod
 ```
 
-## Serving it
+`@alxia/core` and `typescript` are its peers; `@alxia/core` is the app's
+own dependency. `@nxgt/openapi-codegen` writes the operations, and the code
+it writes imports `zod` (4.5.4 or later) at runtime. For a check at startup
+rather than in a test, install `@alxia/openapi` without `-d`.
+
+`bun create @alxia my-api --template api` starts a project wired this way.
+
+## Spec first, end to end
+
+Write `openapi.yaml` — here with a `listTodos` and a `createTodo`
+operation — then point the generator at it:
 
 ```ts
-import { alxia } from '@alxia/core';
-import { docs } from '@alxia/openapi';
+// openapi-codegen.config.ts
+import { defineConfig } from '@nxgt/openapi-codegen';
 
-const app = alxia().get(...).post(...);
-app.use(docs(app, { info: { title: 'Users', version: '1.0.0' } }));
-// GET /openapi.json, and an API reference page at GET /docs
-```
-
-`path` and `ui` move them, under the app's prefix; `ui: false` serves the document alone.
-
-## Writing it
-
-```ts
-import { openapi } from '@alxia/openapi';
-
-await Bun.write('openapi.json', JSON.stringify(openapi(app, { info }), null, 2));
-```
-
-## How a route is documented
-
-- the path as OpenAPI writes it: `/users/:id` is `/users/{id}`, a `*` is `{path}`
-- `params`, `query` and `headers` as parameters, required as their schemas say
-- `body` as a JSON request body, what its schema **accepts**
-- a `QUERY` route (`app.query`) as its path's `query` operation, body included
-- each `response` as what its schema **gives back**, as it goes over the wire:
-  (with Zod, give it `zodConverter` from `@alxia/zod`: a `Date` is then a `date-time` string)
-- an event stream as `text/event-stream`, by the schema of one event, as its `itemSchema`;
-  a named one, `eventStream({ state, ping })`, as a `oneOf` with an object per name —
-  its `event` as a `const`, its `data`, its `id` and `retry`
-- `cookies` as cookie parameters
-- the 400 of a route that validates its request, the 413 of a route under a
-  `bodyLimit`, and the 500 of every route — beside the route's own 400, 413
-  or 500, when it declares one. Behind an
-  `onRefusal` hook given schemas, the refusal is each status those schemas
-  declare, under the hook's `contentType`, such as `application/problem+json`.
-  Behind a hook without schemas, it is a `4XX` whose body is not documented.
-  Behind a hook per kind, `onRefusal('validation', …)` or
-  `onRefusal('body_limit', …)`, each kind's statuses are documented on the
-  routes that kind may refuse: the validation hook's where the route
-  validates, the body-limit hook's where it has a `bodyLimit`
-- `detail`: `summary`, `description`, `tags`, `operationId`, `deprecated`. An
-  operation id is otherwise made from the method and path: `getUsersById`
-
-Schemas convert through [Standard JSON Schema](https://standardschema.dev),
-which Zod 4.2 and later, ArkType and Valibot carry: the package imports no
-validator. `convert` runs first — for a vendor that carries none, or to say
-more than it does; `@alxia/zod` exports one for Zod.
-
-## From an OpenAPI document
-
-The other direction: an OpenAPI document generates each route's method, path
-and schemas, as `@nxgt/openapi-codegen`'s `alxia` option writes them (not in
-a published release yet), and the handler is all you write.
-[`@alxia/openapi-routes`](https://www.npmjs.com/package/@alxia/openapi-routes)
-checks, in a test or at startup, that every operation has its route:
-
-```ts
-import { alxia } from '@alxia/core';
-import { implemented } from '@alxia/openapi-routes';
-import { operations as api } from './generated/alxia';
-
-// pets: your own store
-const app = alxia().route(api.getPet, ({ params, reply }) => {
-	const pet = pets.get(params.petId); // params.petId: a number, as the spec says
-	return pet ? reply.ok(pet) : reply.notFound({ title: 'No such pet' });
+export default defineConfig({
+	input: 'openapi.yaml',
+	output: 'src/generated',
+	alxia: true, // writes src/generated/alxia.ts
+	validationErrors: false, // alxia sends its own 400: declare it in the spec
 });
-implemented(app, api); // throws, naming each operation with no route
 ```
+
+```sh
+bunx nxgt-openapi generate # writes src/generated/, alxia.ts included
+```
+
+Bind each operation to its handler, with the middlewares it needs:
+
+```ts
+// src/app.ts
+import { alxia, defineMiddleware } from '@alxia/core';
+import { operations } from './generated/alxia';
+import type { Todo } from './generated/types';
+
+const requireKey = defineMiddleware(({ request, reply }, next) =>
+	request.headers.get('x-api-key') === Bun.env['API_KEY']
+		? next()
+		: reply(401, { error: 'unauthorized' as const }),
+);
+
+const todos: Todo[] = [];
+
+export const app = alxia()
+	.route(operations.listTodos, ({ reply }) => reply.ok(todos))
+	.route(operations.createTodo, requireKey, ({ body, reply }) => {
+		const todo = { id: todos.length + 1, title: body.title, done: false };
+		todos.push(todo);
+		return reply.created(todo);
+	});
+```
+
+And check the app against the same operations:
+
+```ts
+// src/app.spec.ts
+import { test } from 'bun:test';
+import { matchesSpec } from '@alxia/openapi';
+import { app } from './app';
+import { operations } from './generated/alxia';
+
+test('routes every operation of openapi.yaml, and nothing else', () => {
+	matchesSpec(app, operations);
+});
+```
+
+The [spec-first guide](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/spec-first.md)
+walks through every step: the document, alxia's own 400, middlewares,
+committing the generated files, and a client from the same document.
+
+## Every operation has a route
+
+```ts
+import { implemented } from '@alxia/openapi';
+
+implemented(app, operations); // routes the app serves beside the spec are fine
+```
+
+When some are missing, it throws, naming each by method, path and operation id:
+
+```text
+TypeError: implemented(): 2 operations have no route: GET /pets/:petId (getPet), QUERY /employees (searchEmployees)
+```
+
+## Only the operations
+
+```ts
+import { matchesSpec } from '@alxia/openapi';
+
+matchesSpec(app, operations, {
+	exclude: (route) => route.path === '/health',
+});
+```
+
+`matchesSpec` throws as `implemented` does, and also lists each route no
+operation declares, `exclude` aside:
+
+```text
+TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
+```
+
+## Under a prefix
+
+`app.routes` holds full paths. For `alxia({ prefix: '/api' })`, say so, and
+each operation is looked up under it:
+
+```ts
+implemented(app, operations, { prefix: '/api' });
+```
+
+## Routes with middlewares
+
+`app.route(operation, ...middlewares, handler)` validates the request and
+checks the handler's reply just before the handler, or where
+`validate(operation)` and `responds(operation)` stand. A middleware's own
+reply, such as an auth's 401, is sent as it is. The checks match such a
+route as any other, by method and path:
+
+```ts
+import { alxia, validate } from '@alxia/core';
+import { operations } from './generated/alxia';
+
+// requireKey, todos: as above
+export const app = alxia()
+	.route(operations.listTodos, ({ reply }) => reply.ok(todos))
+	.route(
+		operations.createTodo,
+		requireKey, // first: an anonymous client gets its 401 before the body is read
+		validate(operations.createTodo),
+		({ body, reply }) => reply.created({ id: todos.length + 1, title: body.title, done: false }),
+	);
+```
+
+Put the key check before `validate(...)`: auth first, so an anonymous client
+gets no body parsed, up to `bodyLimit`, and no validation issues back, which
+would reveal the schema.
+
+## How a route is matched
+
+- by method and path, as `app.routes` holds them: groups, plugins and the
+  prefix included
+- by the path's shape, the core's `shapeOf`: a `GET /pets/:id` serves the
+  `GET /pets/:petId` operation, as the router matches them alike
+- a `HEAD` operation is served by the `GET` route, as the core serves it
+- operations as an object, named by their keys (`operations` of `alxia.ts`),
+  or as a list, named by `schema.detail.operationId` when they have one
+- socket routes (`app.ws`) are not read: an OpenAPI operation is HTTP
+
+It reads `app.routes` and nothing else: it sends no request, and checks no
+schema.
+
+## Traps
+
+- `validationErrors` defaults to `true`, which declares in the client-facing
+  files a 400 alxia never sends: set `validationErrors: false` and declare
+  alxia's `{ error: 'validation', issues }` in the spec.
+- The generator does not turn `security` into a middleware: write one with
+  `defineMiddleware` and give it to `route(operation, auth, handler)`.
+- In `@nxgt/openapi-codegen` 0.6.0, a `cookie` parameter makes the generator
+  refuse the whole document: read the cookie in a middleware instead.
+
+## Coming from `@alxia/openapi` 0.3 or `@alxia/openapi-routes`
+
+**`@alxia/openapi` 0.1 to 0.3** was another package: it wrote a document
+from the app's routes (`openapi`, `docs`, `toJsonSchema`). It is retired,
+since the document now comes first, and 0.4 has none of its exports. Save
+the document it served, the app's `/openapi.json`, as the starting point
+of your own (the generator reads JSON as well as YAML), generate the
+operations from it, and bind the routes with `app.route()`.
+
+**`@alxia/openapi-routes`** is this package under its former name: the same
+functions, options and messages.
+
+```sh
+bun remove @alxia/openapi-routes
+bun add -d @alxia/openapi
+```
+
+```ts
+// before
+import { implemented, matchesSpec } from '@alxia/openapi-routes';
+// after
+import { implemented, matchesSpec } from '@alxia/openapi';
+```
+
+The core's side of the move is in its
+[upgrading notes](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md#no-more-client-spec-first).
 
 ## API
 
 | export | |
 | --- | --- |
-| `openapi(app, options)`, `OpenApiOptions` | the document. `info`, `servers`, `convert`, `exclude` |
-| `docs(app, options)`, `DocsOptions` | a plugin serving it, and a reference page. `path`, `ui` too |
-| `toJsonSchema(schema, side, convert?)` | one schema as JSON Schema 2020-12 |
-| `openApiPath(path)`, `operationId(method, path)` | the naming the document uses |
-| `OpenApiDocument`, `OpenApiInfo`, `Operation`, `MediaType`, `JsonSchema`, `Side`, `Converter` | its types: `convert` is a `Converter`, and a `MediaType` is one entry of a body's `content` |
+| `implemented(app, operations, options?)`, `ImplementedOptions` | throws a `TypeError` listing each operation with no route, or one with the core's reason for an operation path no route may be declared at. `prefix` |
+| `matchesSpec(app, operations, options?)`, `MatchesSpecOptions` | the same, and each route no operation declares. `prefix`, `exclude` |
+| `exactly`, `ExactlyOptions` | deprecated: `matchesSpec` and `MatchesSpecOptions` under their former names, with messages that start `exactly():` |
+| `Operations` | what both take: an object of core's `RouteOperation`, or a list of them |
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/openapi/docs): a page per area — the document and its options, how a route is documented, schemas and converters, and serving the document and its reference page.
-- [From an OpenAPI document](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/from-a-document.md): the contract first — the generated operations, `app.route()`, and the check that every operation has a route.
-- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/troubleshooting.md): an error message, or a document that says less than your routes, and what to do about it.
+- [Documentation index](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/README.md): every page, and when to read it.
+- [Spec first](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/spec-first.md): the whole workflow, from `openapi.yaml` to the generated operations, the routes, the check and a client.
+- [The checks](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md): `implemented` and `matchesSpec`, how a route is matched, the prefix, and the routes to exclude.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/troubleshooting.md): each message of the checks and the generator, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/roadmap.md): what is coming, and what is not planned.

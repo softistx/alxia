@@ -49,7 +49,7 @@ Everything else — `ttl`, `staleWhileRevalidate`, `key`, `vary`, `statuses`,
 
 - **A response** is one Redis string at `<name>:response:<key>`: an
   `@nxgt/redis` cache record holding the status, the headers, the body as
-  base64, and the plugin's `storedAt`, `ttl` and `stale`. Redis expires it
+  base64, and the cache's `storedAt`, `ttl` and `stale`. Redis expires it
   when `ttl + staleWhileRevalidate` has passed, rounded up to the second.
 - **A tag** is a Redis set at `<name>:tag:<tag>`, of the response keys it
   names. Besides your tags, every response carries `alxia:path:<path>` —
@@ -77,7 +77,7 @@ process sharing it misses on its next request:
 
 ```ts
 import { cache } from '@alxia/cache';
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { redisCacheStore } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 import { z } from 'zod';
@@ -90,7 +90,7 @@ const store = redisCacheStore(connection.client, { name: 'shop' });
 const products = cache({ ttl: 60, staleWhileRevalidate: 300, store, tags: () => ['products'] });
 
 const app = alxia()
-	.post('/products', { body: Product }, async ({ body, reply }) => {
+	.post('/products', validate({ body: Product }), async ({ body, reply }) => {
 		catalogue.set(body.id, body);
 		await products.invalidateTag('products');      // forgotten in every process
 		return reply(201, body);

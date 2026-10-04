@@ -6,7 +6,7 @@ the server log, or, for what prints nothing, what you see in your traces.
 **Types**
 
 - [`Property 'span' does not exist on type 'Context<…>'`](#property-span-does-not-exist-on-type-context)
-- [`Type 'Alxia<Empty, Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'`](#type-alxiaempty-empty--never-is-not-assignable-to-type-telemetrypluginoptions)
+- [`Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'`](#type-alxiaempty--never-is-not-assignable-to-type-telemetrypluginoptions)
 - [`Property 'service' is missing in type '…' but required in type '{ readonly service: string; readonly instance?: undefined; }'`](#property-service-is-missing-in-type--but-required-in-type--readonly-service-string-readonly-instance-undefined-)
 - [`Type 'Telemetry' is not assignable to type 'undefined'`](#type-telemetry-is-not-assignable-to-type-undefined)
 - [`Object literal may only specify known properties, and 'version' does not exist in type 'Hooks & { readonly instance: Telemetry; … }'`](#object-literal-may-only-specify-known-properties-and-version-does-not-exist-in-type-hooks---readonly-instance-telemetry--)
@@ -24,6 +24,7 @@ the server log, or, for what prints nothing, what you see in your traces.
 - [Logs carry a `traceId`, but its span is never exported](#logs-carry-a-traceid-but-its-span-is-never-exported)
 - [Spans stop arriving, and the app still answers](#spans-stop-arriving-and-the-app-still-answers)
 - [No span for a WebSocket connection](#no-span-for-a-websocket-connection)
+- [A request no route matched has no span, or a request has none at all](#a-request-no-route-matched-has-no-span-or-a-request-has-none-at-all)
 - [The response has no `traceparent` header](#the-response-has-no-traceparent-header)
 
 **Unexpected spans**
@@ -44,11 +45,11 @@ error TS2339: Property 'span' does not exist on type 'Context<Empty, "/before", 
 **When:** a route reads `span` or `telemetry`, and is declared before
 `use(telemetry(...))`.
 
-**Why:** the plugin gives `span` and `telemetry` to the routes declared
-after it. The request is still traced, since the span is opened by a global
-hook; the route only cannot reach it.
+**Why:** the middleware gives `span` and `telemetry` to what is declared
+after it. The request is still traced, since a `use()` on the app runs on
+every request; the route only cannot reach it.
 
-**Fix:** use the plugin first:
+**Fix:** `use` it first:
 
 ```ts
 const app = alxia()
@@ -59,20 +60,20 @@ const app = alxia()
 	});
 ```
 
-### `Type 'Alxia<Empty, Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'`
+### `Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'`
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(plugin: (app: Alxia<Empty, Empty, "", never>) => …): …', gave the following error.
-    Argument of type '(options: TelemetryPluginOptions) => …' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => …'.
+  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
+    Argument of type '(options: TelemetryPluginOptions) => Middleware<…>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
       Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'.
+        Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'.
 ```
 
 **When:** `app.use(telemetry)`, without calling it.
 
-**Why:** `telemetry` makes the plugin; it is not the plugin, and it needs a
-`service` or an `instance`.
+**Why:** `telemetry` makes the middleware; it is not the middleware, and it
+needs a `service` or an `instance`.
 
 **Fix:**
 
@@ -91,7 +92,7 @@ error TS2345: Argument of type '{ exporters: never[]; }' is not assignable to pa
 **When:** `telemetry({ exporters: [...] })`, with neither `service` nor
 `instance`.
 
-**Why:** the telemetry the plugin builds needs a service name: every signal
+**Why:** the telemetry it builds needs a service name: every signal
 groups by it, and there is no default.
 
 **Fix:** name the service, or hand over a telemetry you built:
@@ -110,7 +111,7 @@ error TS2345: Argument of type '{ service: string; instance: Telemetry; }' is no
 
 **When:** `telemetry({ service, instance })`.
 
-**Why:** `service` builds a telemetry, `instance` adopts one; the plugin
+**Why:** `service` builds a telemetry, `instance` adopts one; the middleware
 writes to exactly one.
 
 **Fix:** keep `instance`, whose service name was given to `createTelemetry`:
@@ -132,7 +133,7 @@ The same for `exporters`, `sampler`, `environment`, or any other
 
 **When:** `@nxgt/telemetry` options next to `instance`.
 
-**Why:** an adopted telemetry is already built; the plugin cannot change
+**Why:** an adopted telemetry is already built; the middleware cannot change
 its exporters or its resource.
 
 **Fix:** give them to `createTelemetry`:
@@ -156,8 +157,8 @@ error TS2322: Type '(ctx: RequestContext) => string | undefined' is not assignab
 
 **When:** `spanName: (ctx) => ctx.route`.
 
-**Why:** `spanName` runs before routing, where `ctx.route` is always
-`undefined`. The route already names the span once it matches.
+**Why:** `ctx.route` is `string | undefined`: it is `undefined` on a request
+no route matches. And the route already names the span once it matches.
 
 **Fix:** name what routing has not matched from the path, or leave
 `spanName` out:
@@ -205,7 +206,7 @@ is stopped, and the last spans and logs never reach the exporter — with
 
 **Why:** the telemetry batches signals, and ships a batch when it is full
 or a second after it started. A process that exits first loses it. The
-plugin never closes the telemetry, not even one it built from `service`.
+middleware never closes the telemetry, not even one it built from `service`.
 
 **Fix:** close it in `onStop`, await `app.stop()` on shutdown, and await
 `close()` in a script or a test before reading what was exported:
@@ -244,7 +245,7 @@ bun pm ls --all | grep @nxgt/telemetry@
 **When:** a log at start-up, in a job or a timer, or in a request `traced`
 said no to, while the logs in traced requests arrive.
 
-**Why:** the plugin was given an `instance`. It runs each traced request
+**Why:** the middleware was given an `instance`. It runs each traced request
 inside that telemetry, but does not install it, so a logger with no request
 around it finds none.
 
@@ -273,13 +274,13 @@ telemetry({ service: 'checkout', sampler: alwaysSample, exporters: [consoleExpor
 
 ### Spans stop arriving, and the app still answers
 
-**When:** after `close()` on the plugin's telemetry — often a test that
+**When:** after `close()` on the middleware's telemetry — often a test that
 closes it in one case and sends requests in the next.
 
-**Why:** a closed telemetry takes nothing more, and the plugin keeps
+**Why:** a closed telemetry takes nothing more, and the middleware keeps
 writing to it; the requests are answered as usual.
 
-**Fix:** build a plugin, with its own telemetry, per test:
+**Fix:** build a middleware, with its own telemetry, per test:
 
 ```ts
 const instance = createTelemetry('test', { exporters: [exporter] });
@@ -290,8 +291,8 @@ const app = alxia().use(telemetry({ instance }));
 
 **When:** a route declared with `app.ws`.
 
-**Why:** `@alxia/core` runs no `around` hook for a WebSocket upgrade, as
-there is no response to wrap, and the span is opened by one.
+**Why:** a WebSocket upgrade has no response to settle, and the span lasts
+as long as the response it wraps.
 
 **Fix:** open a span for the work a message does:
 
@@ -302,11 +303,30 @@ app.ws('/rooms/:room', {}, {
 });
 ```
 
+### A request no route matched has no span, or a request has none at all
+
+**When:** a 404 or a 405 is missing from your traces, or no request is.
+
+**Why:** the span is opened by `use(telemetry(...))`, which runs on every
+request the app takes, an unmatched one included. A request is missing when
+`telemetry()` sits inside a `group` (it sees the group's routes and the
+unmatched requests under its prefix, nothing else), when `traced` said no, or when another middleware
+declared before it answered without calling `next()` (a preflight, a 401):
+it is outside the span.
+
+**Fix:** `use` it on the app, first:
+
+```ts
+const app = alxia()
+	.use(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
+	.use(bearer({ jwt }));
+```
+
 ### The response has no `traceparent` header
 
 **When:** a caller looks for the trace of the request it made.
 
-**Why:** the plugin says `traceparent` back only with `traceResponse`, and
+**Why:** the middleware says `traceparent` back only with `traceResponse`, and
 only on a request `traced` let through.
 
 **Fix:**
@@ -338,7 +358,7 @@ await fetch('https://checkout.example.com/orders/o-1', {
 **When:** a `spanName` is set, and the matched requests are still named
 `GET /orders/:id`.
 
-**Why:** `spanName` is the name before routing. Once a route matches, the
+**Why:** `spanName` is the name the span opens with. Once a route matches, the
 span is renamed `"<METHOD> <route>"`, so a dashboard has one row per route.
 
 **Fix:** to add to a routed span, set an attribute rather than the name:
@@ -370,7 +390,9 @@ app.use(telemetry({ service: 'checkout', exporters, traced: (ctx) => ctx.url.pat
 
 ### A span has an exception, and its status is `ok`
 
-**When:** a route throws, and an `onError` hook answers with a `4xx`.
+**When:** a route throws, and the route boundary (an `HttpError`, a
+deprecated `onError` hook) answers with a `4xx`. An error-handling middleware
+that catches it leaves the span `ok` with no exception at all.
 
 **Why:** the error is recorded as the span's exception, but only a
 `5xx`, or a streamed body that fails midway, makes a span an error: a

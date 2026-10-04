@@ -43,8 +43,10 @@ app.listen(3000);
 
 ## The span
 
-- It is opened by an `around` hook: it holds the hooks, the handler,
-  everything they await and the `onResponse` hooks. A streamed body (a
+- It is opened by the middleware: it holds every middleware after it, the
+  handler, everything they await and the answer to an error. Give it to
+  `use` first, so it wraps everything, a request no route matches included.
+  A streamed body (a
   page rendered as it goes, an event stream) keeps it open until the body
   has been sent: one that fails midway makes it an error, a client that
   leaves adds an `http.response.aborted` event.
@@ -53,7 +55,8 @@ app.listen(3000);
   stranger.
 - It starts as `GET /orders/o-1` and is renamed `GET /orders/:id` once
   routing has matched, with `http.route`: one dashboard row per route, not
-  per order. A request no route matched keeps its path.
+  per order. A request no route matched (a 404, a 405) gets a span too, and
+  keeps its path.
 - A route's error is its exception. Only a 5xx, or a streamed body that
   fails midway, makes the span an error: a 401 a guard answered is the
   server working.
@@ -79,16 +82,18 @@ telemetry as `instance` — adopted, never closed. And:
 | option | default | |
 | --- | --- | --- |
 | `traced` | every request | `(ctx) => boolean`: a health check |
-| `spanName` | `"<METHOD> <path>"` | the name before routing |
+| `spanName` | `"<METHOD> <path>"` | the name the span opens with; a matched route renames it |
 | `traceResponse` | `false` | says `traceparent` back |
 
-A hook that throws costs its answer, never the request.
+A `traced` or `spanName` that throws costs its answer, never the request.
 
 ## API
 
 | export | |
 | --- | --- |
-| `telemetry(options)` | the plugin, with the telemetry it writes to as `.telemetry`; routes after it read `span` and `telemetry` |
+| `telemetry(options)` | the middleware, given to `app.use`, with the telemetry it writes to as `.telemetry`; what is after it reads `span` and `telemetry` |
+| `TelemetryContext` | what it adds to the context: `span` and `telemetry` |
+| `TelemetryMiddleware` | what `telemetry()` returns: a middleware adding `TelemetryContext`, with `.telemetry` |
 | `TelemetryPluginOptions` | its options: `service` and `@nxgt/telemetry`'s options, or an `instance`; `traced`, `spanName`, `traceResponse` |
 | `HTTP_METHOD`, `URL_PATH`, `URL_SCHEME`, `HTTP_ROUTE`, `HTTP_STATUS`, `SERVER_ADDRESS`, `SERVER_PORT`, `CLIENT_ADDRESS` | the attribute names a server span carries: `http.request.method`, `url.path`, `url.scheme`, `http.route`, `http.response.status_code`, `server.address`, `server.port`, `client.address` |
 

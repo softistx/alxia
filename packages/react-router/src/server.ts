@@ -17,7 +17,7 @@ import type { RouterContextProvider, ServerBuild } from 'react-router';
 import { declareClient, reactRouter } from './react-router';
 
 /** An app as `alxia()` makes it: what `beforeAll`, or `configure`, receives. */
-export type FreshApp = Alxia<Empty, Empty, '', never>;
+export type FreshApp = Alxia<Empty, '', never>;
 
 /**
  * What the Vite plugin hands the server, and a test passes to `create`:
@@ -43,7 +43,7 @@ export interface ServerOptions<Before extends AnyAlxia, App extends AnyAlxia> {
 	 */
 	readonly beforeAll?: (app: FreshApp) => Before;
 	/**
-	 * The app the pages run behind: its plugins, its hooks, its `/api`.
+	 * The app the pages run behind: its middlewares, its plugins, its `/api`.
 	 * Declared after the client's files and before the catch-all. Returns
 	 * the app: what it builds is what the loaders read through `alxiaOf`.
 	 */

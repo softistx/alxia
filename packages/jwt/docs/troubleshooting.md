@@ -42,6 +42,7 @@ Problems that show no message are under [Traps](#traps), by symptom.
 - [A token is still accepted long after it was issued](#a-token-is-still-accepted-long-after-it-was-issued)
 - [A token meant for another service is accepted](#a-token-meant-for-another-service-is-accepted)
 - [`user` has no `exp` or `iat`](#user-has-no-exp-or-iat)
+- [A missing path answers 401, not 404](#a-missing-path-answers-401-not-404)
 
 ## Types
 
@@ -198,7 +199,7 @@ app.use(bearer({ jwt })).get('/me', ({ user, reply }) => reply(200, user.sub ?? 
 error TS2339: Property 'user' does not exist on type 'Context<Empty, "/me", Empty>'.
 ```
 
-**Why:** the guard is a route hook: it applies to the routes declared after
+**Why:** the guard is a middleware: it applies to the routes declared after
 it, at runtime and in the types. A route before it is open, and has no
 `user`.
 
@@ -514,3 +515,32 @@ them.
 ```ts
 const Claims = z.object({ sub: z.string(), role: z.enum(['admin', 'user']), exp: z.number() });
 ```
+
+### A missing path answers 401, not 404
+
+**When:** an anonymous request to a path no route serves gets
+`401 {"error":"unauthorized","reason":"missing"}`, where it used to get a 404.
+
+**Why:** a guard given to `app.use` runs on every request, a request no route
+matches included, and refuses before the 404. A guard in a `group` runs for
+that group's routes only.
+
+**Fix:** that is the guard working: it does not tell an anonymous caller
+which paths exist. To guard some routes and leave the rest to answer
+normally, put the guard in a group:
+
+```ts
+const app = alxia()
+	.get('/health', ({ reply }) => reply(200, 'ok'))
+	.group('/api', (api) =>
+		api
+			.use(bearer({ jwt }))
+			.get('/me', ({ user, reply }) => reply(200, user)),
+	);
+// GET /nope        → 404
+// GET /api/me      → 401 without a token
+```
+
+A path-scoped `app.use('/api', bearer({ jwt }))` does not compile: a
+middleware given a path may add nothing to the context, and `bearer` adds
+`user`.

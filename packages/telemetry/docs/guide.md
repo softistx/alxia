@@ -35,9 +35,12 @@ exporter, and nothing else changes.
 ```ts
 function telemetry(
 	options: TelemetryPluginOptions,
-): Alxia<Empty & { span: SpanScope | undefined; telemetry: Telemetry }, Empty, '', never> & {
-	telemetry: Telemetry;
-};
+): Middleware<…> & { telemetry: Telemetry }; // give it to `app.use`, first
+
+interface TelemetryContext {
+	readonly span: SpanScope | undefined;
+	readonly telemetry: Telemetry;
+}
 
 type TelemetryPluginOptions =
 	| (Hooks & TelemetryOptions & { readonly service: string; readonly instance?: undefined })
@@ -51,18 +54,21 @@ interface Hooks {
 ```
 
 `SpanScope`, `Telemetry` and `TelemetryOptions` are `@nxgt/telemetry`'s;
-`RequestContext` is `@alxia/core`'s. `telemetry()` returns an app plugin:
-pass it to `use`, called. It adds a global `around` hook, which traces every
-request of the app, and a `derive`, which gives the routes declared
-**after** it `span` and `telemetry`. The telemetry it writes to is also on
-the plugin itself, as `.telemetry`, for the code that is not a route.
+`RequestContext` is `@alxia/core`'s. `telemetry()` returns a middleware:
+pass it to `app.use`, called. A `use()` on the app runs on every request,
+so it traces them all, a 404 included, and it adds `span` and `telemetry`
+to what is declared **after** it: the middlewares and the routes. The
+telemetry it writes to is also on the middleware itself, as `.telemetry`,
+for the code that is not a route. Give it to `use` first, with the other
+observers (`logger`, `secureHeaders`, `cors`, `compress`).
 
 ## The span
 
-One span per request, of kind `server`, opened by the `around` hook. It
-holds everything the request runs: the `onRequest` hooks, routing,
-validation, the route's hooks and handler, whatever they await, and the
-`onResponse` hooks. A log written with `createLogger` anywhere inside it,
+One span per request, of kind `server`, opened by the middleware. It
+holds everything the request runs after it: the middlewares, validation,
+the route's own middlewares and handler, whatever they await, and the
+answer to an error: `telemetry()` settles `next()`, so the span sees the
+response the client gets, an `onError` reply or a 500 included. A log written with `createLogger` anywhere inside it,
 and a span opened with `span()`, belong to it.
 
 ```ts
@@ -81,17 +87,18 @@ const app = alxia()
 	});
 ```
 
-Because the hook is global, a route declared before `use(telemetry(...))`
-is traced too; it only cannot read `span` and `telemetry` from its context.
-A WebSocket upgrade is not traced: `@alxia/core` runs no `around` hook for
-it, since there is no response to wrap.
+Because a `use()` on the app runs on every request, a route declared before
+`use(telemetry(...))` is traced too; it only cannot read `span` and
+`telemetry` from its context, and a request no route matches is traced as
+well. A middleware declared **before** `telemetry()` is outside the span.
+A WebSocket upgrade is not traced: there is no response to time.
 
 ### A streamed body
 
 A response whose body is a stream of unknown length (a React Router page
 rendered as it goes, an `eventStream` reply, a `ReadableStream` of your
 own) keeps the span open until that body has ended, so the span's
-duration is the time to the last byte. The plugin passes the body through
+duration is the time to the last byte. The middleware passes the body through
 a stream of its own, one chunk at a time:
 
 | The body | The span |
@@ -104,15 +111,15 @@ An endless event stream's span ends when its client leaves. A response
 with no body, or with a `Content-Length` header (`@alxia/core` sets it on
 every reply of a string, JSON, a buffer or a file), ends the span when it
 is handed over and is left as it is: Bun sends those bodies without
-JavaScript, a file with `sendfile`. A raw `Response` a hook builds, even
+JavaScript, a file with `sendfile`. A raw `Response` a handler or a middleware builds, even
 of a string or a `Bun.file`, has no such header until Bun sends it: it is
 treated as a stream, and timed to its end. An unsampled span is never
 exported, so its body is never wrapped.
 
-What decides is the `Content-Length` of the response the app finally
-sends, after every `onResponse` hook. `@alxia/compress` removes it from
-the body it compresses, so under compress a compressed JSON reply is a
-stream too, and its span lasts until it has been sent.
+What decides is the `Content-Length` of the response `telemetry()` sees on
+the way out. `@alxia/compress` removes it from the body it compresses, so
+with `use(compress())` declared before `use(telemetry(...))`, a compressed
+JSON reply is a stream too, and its span lasts until it has been sent.
 
 In a test, a streamed route's span ends only once its body has been read
 or cancelled: read it before `close()`, or the span is never exported.
@@ -127,12 +134,13 @@ await instance.close();
 
 | The request | The span's name |
 | --- | --- |
-| before routing | `spanName(ctx)`, by default `"<METHOD> <path>"`: `GET /orders/o-1` |
+| when it opens | `spanName(ctx)`, by default `"<METHOD> <path>"`: `GET /orders/o-1` |
 | routing matched a route | `"<METHOD> <route>"`: `GET /orders/:id`, and `http.route` is set |
-| no route matched (`404`, `405`) | stays what it was before routing |
+| no route matched (`404`, `405`) | stays `spanName(ctx)`, `"<METHOD> <path>"` by default |
 
 A route's name replaces any `spanName`: one dashboard row per route, not
-one per order. So `spanName` only names what routing did not match. A
+one per order. So `spanName` only names what routing did not match (an
+unmatched request still gets its span). A
 `HEAD` request answered by a `GET` route is named `HEAD /orders/:id`.
 
 ### Its status, and the route's error
@@ -140,31 +148,41 @@ one per order. So `spanName` only names what routing did not match. A
 | The response | The span's status | Its exception |
 | --- | --- | --- |
 | `2xx`, `3xx`, `4xx` replied | `ok` | none |
-| a `4xx` an `onError` hook made of a thrown error | `ok` | the error |
+| a `4xx` an error-handling middleware made of a thrown error | `ok` | none: the middleware caught it |
+| a `4xx` the route boundary made of a thrown error (a deprecated `onError` hook, an `HttpError`) | `ok` | the error |
 | `499`, the client hung up mid-request | `ok` | the `AbortError` |
 | a `5xx` from a throw | `error` | the error |
 | a `5xx` the route replied | `error` | none |
 | a streamed body that failed midway ([A streamed body](#a-streamed-body)) | `error` | the stream's error |
 
 A `401` a guard answered is the server working, so a 4xx never marks a
-span. The error the route failed with is still recorded, as `ctx.error`
-holds it:
+span. An error that reaches the route boundary is still recorded, as
+`ctx.error` holds it. One an error-handling middleware catches is not: the
+span sees only the 400 it answered. Here a middleware after `telemetry`
+turns a `RangeError` into a 400:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, defineMiddleware } from '@alxia/core';
 import { telemetry } from '@alxia/telemetry';
 import { consoleExporter } from '@nxgt/telemetry';
 
 const app = alxia()
 	.use(telemetry({ service: 'checkout', exporters: [consoleExporter()] }))
-	.onError((error, { reply }) =>
-		error instanceof RangeError ? reply(400, { error: 'out_of_range' as const }) : undefined,
+	.use(
+		defineMiddleware(async ({ reply }, next) => {
+			try {
+				return await next();
+			} catch (error) {
+				if (error instanceof RangeError) return reply(400, { error: 'out_of_range' as const });
+				throw error;
+			}
+		}),
 	)
 	.get('/range', () => {
 		throw new RangeError('out of range');
 	});
 
-await app.request('/range'); // 400; the span is ok, with `out of range` as its exception
+await app.request('/range'); // 400; the span is ok, with no exception: the middleware caught it
 ```
 
 ### What it records
@@ -198,17 +216,19 @@ outgoing request — and a log written inside the request carry its trace
 and span ids, not the request's path, method or the client's address. An
 attribute every log of a request should carry is yours to give, with
 `@nxgt/telemetry`'s `withAttributes`: it reaches what runs inside it, so
-an `around` hook declared after the plugin covers the whole request:
+a middleware declared after `telemetry()` covers the rest of the request:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, defineMiddleware } from '@alxia/core';
 import { telemetry } from '@alxia/telemetry';
 import { withAttributes } from '@nxgt/telemetry';
 
 const app = alxia()
 	.use(telemetry({ service: 'shop' }))
-	.around((ctx, next) =>
-		withAttributes({ 'tenant.id': ctx.request.headers.get('x-tenant') ?? 'none' }, next),
+	.use(
+		defineMiddleware((ctx, next) =>
+			withAttributes({ 'tenant.id': ctx.request.headers.get('x-tenant') ?? 'none' }, next),
+		),
 	);
 ```
 
@@ -267,9 +287,9 @@ response.headers.get('traceparent'); // '00-<trace id>-<span id>-01'
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `service` | `string` | required, without `instance` | the service name every signal groups by; the telemetry is built with `createTelemetry(service, options)` and installed |
-| `instance` | `Telemetry` | required, without `service` | a telemetry you built: used as it is, neither installed nor closed by the plugin |
+| `instance` | `Telemetry` | required, without `service` | a telemetry you built: used as it is, neither installed nor closed by the middleware |
 | `traced` | `(ctx: RequestContext) => boolean` | every request | whether a request gets a span |
-| `spanName` | `(ctx: RequestContext) => string` | `"<METHOD> <path>"` | the span's name before routing, kept when no route matches |
+| `spanName` | `(ctx: RequestContext) => string` | `"<METHOD> <path>"` | the span's name when it opens, kept when no route matches |
 | `traceResponse` | `boolean` | `false` | sets `traceparent` on the response |
 
 With `service`, every [`TelemetryOptions`](https://www.npmjs.com/package/@nxgt/telemetry)
@@ -288,7 +308,7 @@ of `@nxgt/telemetry` is accepted alongside:
 
 ### `service` or `instance`
 
-`service` is the short way, for an app whose telemetry is this plugin's:
+`service` is the short way, for an app whose telemetry is this middleware's:
 the telemetry is installed, so a logger used outside any request — at
 start-up, in a job — finds it too.
 
@@ -318,7 +338,7 @@ const shared = createTelemetry('checkout', { exporters: [consoleExporter()] }).i
 const app = alxia().use(telemetry({ instance: shared }));
 ```
 
-The plugin runs each traced request inside the instance, so the logs in it
+The middleware runs each traced request inside the instance, so the logs in it
 reach it either way. Outside a request, and in a request `traced` said no
 to, a logger only finds a telemetry that is installed: call `install()` on
 an instance the whole process writes to, as above.
@@ -346,8 +366,9 @@ telemetry({
 });
 ```
 
-It runs before routing, so `ctx.route` is always `undefined` there; once a
-route matches, the span is renamed after it whatever `spanName` said.
+It runs when the span opens, where `ctx.route` is already known, and is
+`undefined` on a request no route matches. Once a route has matched, the
+span is renamed after it whatever `spanName` said.
 
 A `traced` or `spanName` that throws costs its answer, never the request:
 the request is traced, or named `"<METHOD> <path>"`, and nothing is logged.
@@ -371,7 +392,7 @@ const app = alxia()
 | Field | Type | What it is |
 | --- | --- | --- |
 | `span` | `SpanScope \| undefined` | the server span: `attribute`, `attributes`, `event`, `fail`, `traceparent()`, a writable `name` and `status`; `undefined` when `traced` said no |
-| `telemetry` | `Telemetry` | the telemetry the plugin writes to, traced or not |
+| `telemetry` | `Telemetry` | the telemetry the middleware writes to, traced or not |
 
 Only the routes declared after `use(telemetry(...))`, in the same app or
 group, read them.
@@ -379,7 +400,7 @@ group, read them.
 ## Shutting down
 
 The telemetry batches what it receives; `close()` ships the backlog, and
-has to be awaited, or the last batch is lost. The plugin closes nothing,
+has to be awaited, or the last batch is lost. The middleware closes nothing,
 not even a telemetry it built: close it in `onStop`, which `app.stop()`
 runs, and stop the app when the process is asked to end.
 
@@ -484,7 +505,7 @@ test('a route gets one server span, named after it', async () => {
 ```
 
 An `instance` is not installed, so tests do not share one through the
-process. A plugin built with `service` installs its telemetry for the whole
+process. A middleware built with `service` installs its telemetry for the whole
 process; `uninstallTelemetry()` after each test takes it back out.
 
 To continue a trace in a test, send the header a caller would:

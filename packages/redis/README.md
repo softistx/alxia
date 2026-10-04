@@ -6,7 +6,7 @@ Redis for [alxia](https://www.npmjs.com/package/@alxia/core), on
 Bun's own Redis client, no driver, no dependency:
 
 - `redisStore`: a rate-limit store every process shares;
-- `idempotency`: routes that run once per `Idempotency-Key`;
+- `idempotency`: a middleware, so routes run once per `Idempotency-Key`;
 - `redisCacheStore`: an `@alxia/cache` store every process shares;
 - `redis`: the client, typed caches and a lock in the context.
 
@@ -68,7 +68,7 @@ the response: the route runs, and the error is logged.
 ## Idempotent routes
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { idempotency } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 import { z } from 'zod';
@@ -78,7 +78,7 @@ const Payment = z.object({ amount: z.number().int().positive() });
 
 const app = alxia()
 	.use(idempotency(connection.client, { name: 'payments', required: true }))
-	.post('/payments', { body: Payment }, ({ body, reply }) =>
+	.post('/payments', validate({ body: Payment }), ({ body, reply }) =>
 		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
 	);
 ```
@@ -95,12 +95,16 @@ the first response back — status, headers, body — with
 | no key, with `required` | `400 { error: 'idempotency_key_missing' }` |
 | the route answers a 5xx, or streams | answered, not kept: the key is free again |
 
-Every one is part of the guarded routes' types. Keys are scoped by the
+Only the routes after the middleware answer them; a request no route matches
+is not guarded: there is no route to scope its key by. What is kept is what the
+route answers, an error's answer included. Keys are scoped by the
 route and by `scope(ctx)` — the client's address by default, a user id
 when there is one — so two clients choosing the same key never see each
-other's response. A replay never repeats `Set-Cookie`. Every response
+other's response. A request with no scope — no address, no `scope` — runs
+unguarded, nothing stored or replayed, and the middleware warns once. A replay never repeats `Set-Cookie`. Every response
 below 500 is kept, a 4xx included: declare a rate limit or an auth check
-**before** `idempotency`, or its refusal is replayed.
+**before** `idempotency`, or its refusal is replayed (`app.use` in
+declaration order: the guard first, then `idempotency`).
 
 | option | default | |
 | --- | --- | --- |
@@ -111,7 +115,7 @@ below 500 is kept, a 4xx included: declare a rate limit or an auth check
 | `methods` | `POST`, `PATCH` | |
 | `header` | `Idempotency-Key` | |
 | `required` | `false` | |
-| `scope` | the client's address | `(ctx) => string` |
+| `scope` | the client's address | `(ctx) => string \| undefined`; `undefined` runs the request unguarded |
 
 ## Caches and locks in the context
 
@@ -128,7 +132,7 @@ const loadUser = async (id: string) => ({ id, name: 'Ada' });   // your database
 const touch = async (user: z.infer<typeof User>) => user;
 
 const app = alxia()
-	.use(redis(connection.client, { caches: { users } }))
+	.plugin(redis(connection.client, { caches: { users } }))
 	.get('/users/:id', async ({ caches, lock, params, reply }) => {
 		const user = await caches.users.remember(params.id, () => loadUser(params.id)); // typed by User
 		await lock(`user:${params.id}`, () => touch(user));
@@ -151,9 +155,10 @@ The package's specs run against `$REDIS_URL`, or a `redis-server` on
 | --- | --- |
 | `redisStore(client, { name })`, `RedisStoreOptions` | an `@alxia/rate-limit` store |
 | `redisCacheStore(client, { name })`, `RedisCacheStoreOptions` | an `@alxia/cache` store |
-| `idempotency(client, options)` | the plugin |
-| `redis(client, { caches? })`, `RedisContextOptions` | the plugin: `redis`, `caches`, `lock` in the context |
+| `idempotency(client, options)` | the middleware, given to `app.use` |
+| `redis(client, { caches? })`, `RedisContextOptions` | a plugin, given to `app.plugin`: `redis`, `caches`, `lock` in the context |
 | `IdempotencyOptions`, `IdempotencyErrorBody`, `RedisContext`, `BoundCaches` | its types |
+| `IdempotencyMiddleware` | what `idempotency()` returns: a middleware that adds nothing, and may answer a 400, a 409 or a 422 |
 | `AnyCache` | any cache definition: the constraint of a function generic over the caches it hands to `redis()` |
 
 ## Documentation

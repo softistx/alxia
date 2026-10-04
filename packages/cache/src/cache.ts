@@ -1,8 +1,15 @@
-import { type BaseContext, definePlugin, type Empty } from '@alxia/core';
+import {
+	type BaseContext,
+	defineMiddleware,
+	type Empty,
+	type Middleware,
+	type MiddlewareMark,
+	type Next,
+} from '@alxia/core';
 import { requestControls } from './control';
 import { type Loaded, refreshBehind, singleFlight } from './flight';
 import { storeGuard } from './guard';
-import { keepable, toCached } from './keep';
+import { type KeyedBy, keepable, shareable, toCached } from './keep';
 import { defaultKey, pathTag } from './keys';
 import { bypasses, freshness } from './lookup';
 import { respond } from './respond';
@@ -10,7 +17,7 @@ import { type CacheStore, MemoryCacheStore } from './store';
 
 /**
  * `Requires` is what `key` and `tags` read from the context beyond
- * `BaseContext` — a `user` an earlier plugin adds — and what the app that
+ * `BaseContext` — a `user` an earlier middleware adds — and what the app that
  * uses the cache must then give.
  */
 export interface CacheOptions<Requires extends object = Empty> {
@@ -42,7 +49,7 @@ export interface CacheOptions<Requires extends object = Empty> {
 
 /** What the routes behind the cache read. */
 export interface CacheControls {
-	/** Tags the response being built, beyond the plugin's `tags`. Tags starting `alxia:` are the plugin's own. */
+	/** Tags the response being built, beyond the middleware's `tags`. Tags starting `alxia:` are the cache's own. */
 	tag(...tags: string[]): void;
 	/** Keeps this response out of the cache. */
 	skip(): void;
@@ -61,11 +68,25 @@ export interface Cache {
 }
 
 /**
- * Responses kept and served again, as a plugin: a `GET` to a route declared
- * after it is answered from the store while fresh, and from the route
- * otherwise. Concurrent misses run the route once. Stale, it is served at
+ * What `cache()` makes: a middleware that requires `Requires` of the app
+ * and gives `cache`, with the hands to empty it.
+ */
+export type CacheMiddleware<Requires extends object = Empty> = Middleware<
+	Requires,
+	Promise<Response | Next<{ cache: CacheControls }>>
+> &
+	MiddlewareMark &
+	Cache;
+
+/**
+ * Responses kept and served again, as a middleware: a `GET` to a route
+ * declared after it is answered from the store while fresh, and from the
+ * route otherwise. Concurrent misses run the route once. Stale, it is served at
  * once and refreshed behind. A response that says `no-store` or `private`,
- * sets a cookie, or has another status is never kept.
+ * sets a cookie, or has another status is never kept; nor is the answer to a
+ * request carrying `Authorization` or `Cookie`, unless it says `public`,
+ * `s-maxage` or `must-revalidate`, or the key tells senders apart: `vary`
+ * naming the header, or, for a cookie, a `key` of the app's own.
  *
  * Every kept response gets a weak `ETag` from its body when it has none, so
  * a client whose copy is current gets a 304.
@@ -76,27 +97,15 @@ export interface Cache {
  * await products.invalidateTag('products');
  * ```
  *
- * A `key` or `tags` that reads what an earlier plugin added names it, and
+ * A `key` or `tags` that reads what an earlier middleware added names it, and
  * the app must then give it: `cache<{ user: User }>({ tags: ({ user }) => [user.id], … })`.
  */
 export function cache<Requires extends object = Empty>(
 	options: CacheOptions<Requires>,
-) {
-	const store = options.store ?? new MemoryCacheStore();
-	const ttl = options.ttl * 1000;
-	const stale = (options.staleWhileRevalidate ?? 0) * 1000;
-	const vary = (options.vary ?? []).map((name) => name.toLowerCase());
-	const statuses = new Set(options.statuses ?? [200]);
-	const debug = options.debugHeaders ?? true;
-	const honorNoCache = options.honorClientNoCache ?? false;
-	const keyOf =
-		options.key ??
-		((ctx: BaseContext & Requires) =>
-			defaultKey(
-				`${ctx.url.pathname}${ctx.url.search}`,
-				vary,
-				ctx.request.headers,
-			));
+): NoInfer<CacheMiddleware<Requires>> {
+	const { store, ttl, stale, vary, statuses, debug, honorNoCache, ...keys } =
+		settingsOf(options);
+	const { keyOf, keyedBy } = keys;
 	const controls = requestControls();
 	const attempt = storeGuard();
 	const flight = singleFlight();
@@ -109,7 +118,12 @@ export function cache<Requires extends object = Empty>(
 	): Promise<Loaded> => {
 		const response = await next();
 		const control = controls.get(ctx.request);
-		if (!keepable(response, control, statuses)) return { own: response };
+		if (
+			!keepable(response, control, statuses) ||
+			!shareable(ctx.request, response, keyedBy)
+		) {
+			return { own: response };
+		}
 		const cached = await toCached(response, {
 			ttl,
 			stale,
@@ -131,33 +145,60 @@ export function cache<Requires extends object = Empty>(
 
 	const label = (says: 'HIT' | 'STALE' | 'MISS') => (debug ? says : undefined);
 
-	const plugin = definePlugin<Requires>()((app) =>
-		app
-			.derive(({ request }) => {
-				const cacheControls: CacheControls = controls.open(request);
-				return { cache: cacheControls };
-			})
-			.wrap(async (ctx, next) => {
-				const { request } = ctx;
-				const key = bypasses(request, honorNoCache) ? undefined : keyOf(ctx);
-				if (key === undefined) return next();
+	const middleware = defineMiddleware<Requires>()(async (ctx, next) => {
+		const { request } = ctx;
+		const added: { cache: CacheControls } = { cache: controls.open(request) };
+		// A request no route matches is never kept: there is no route to answer it again.
+		const key =
+			ctx.route === undefined || bypasses(request, honorNoCache)
+				? undefined
+				: keyOf(ctx);
+		if (key === undefined) return next(added);
+		const found = await attempt(() => store.get(key), undefined);
+		const worth = found === undefined ? undefined : freshness(found);
+		if (found !== undefined && worth === 'fresh') {
+			return respond(request, found, label('HIT'));
+		}
+		if (found !== undefined && worth === 'stale') {
+			// Served at once; the route runs behind it, unless a refresh already does.
+			if (!flight.has(key)) {
+				refreshBehind(load(key, ctx, () => next.behind(added)));
+			}
+			return respond(request, found, label('STALE'));
+		}
+		const loaded = await load(key, ctx, () => next(added));
+		if (loaded instanceof Response) return loaded;
+		return respond(request, loaded, label('MISS'));
+	});
 
-				const found = await attempt(() => store.get(key), undefined);
-				const worth = found === undefined ? undefined : freshness(found);
-				if (found !== undefined && worth === 'fresh') {
-					return respond(request, found, label('HIT'));
-				}
-				if (found !== undefined && worth === 'stale') {
-					if (!flight.has(key)) refreshBehind(load(key, ctx, next));
-					return respond(request, found, label('STALE'));
-				}
-				const loaded = await load(key, ctx, next);
-				if (loaded instanceof Response) return loaded;
-				return respond(request, loaded, label('MISS'));
-			}),
-	);
+	return Object.assign(middleware, handlesOf(store));
+}
 
-	return Object.assign(plugin, handlesOf(store));
+/** The options with their defaults: milliseconds, lower-case header names, the key of a request and what it tells apart. */
+function settingsOf<Requires extends object>(options: CacheOptions<Requires>) {
+	const vary = (options.vary ?? []).map((name) => name.toLowerCase());
+	const keyedBy: KeyedBy = {
+		authorization: vary.includes('authorization'),
+		cookie: options.key !== undefined || vary.includes('cookie'),
+	};
+	return {
+		store: options.store ?? new MemoryCacheStore(),
+		ttl: options.ttl * 1000,
+		stale: (options.staleWhileRevalidate ?? 0) * 1000,
+		vary,
+		statuses: new Set(options.statuses ?? [200]),
+		debug: options.debugHeaders ?? true,
+		honorNoCache: options.honorClientNoCache ?? false,
+		keyOf:
+			options.key ??
+			((ctx: BaseContext & Requires) =>
+				defaultKey(
+					`${ctx.url.pathname}${ctx.url.search}`,
+					vary,
+					ctx.request.headers,
+				)),
+		keyedBy,
+	};
 }
 
 /** The hands to empty a cache: by the path a request asked, or by tag. */

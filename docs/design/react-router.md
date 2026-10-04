@@ -332,7 +332,7 @@ export const base = alxia()
 
 export type Base = typeof base;
 
-export default base.use((app) =>
+export default base.plugin((app) =>
 	reactRouter(app, {
 		build: () => import('virtual:react-router/server-build'),
 	}),
@@ -444,10 +444,11 @@ export default defineConfig({
   the global augmentation the [API ergonomics note](api-ergonomics.md#slice-3-extending-the-context-typed)
   rejected, and one app per process is not something a module can know.
   The type argument stays.
-- **The route table.** The catch-all adds nothing to `RoutesOf`: pages and
-  turbo-stream data are not something the typed client calls. Under
-  "the client is honest" that is the rule for global hooks' responses: what
-  a typed client never asks stays outside the contract.
+- **The route table.** The catch-all added nothing to the app's route table
+  (retired since 0.4, when alxia went spec first): pages and turbo-stream
+  data are not something a typed client calls. What a typed client never
+  asks stays outside the contract, and `isReactRouterRoute` keeps it out of
+  the OpenAPI document.
 
 ## Dependencies and layering
 
@@ -517,7 +518,7 @@ core ◄── react-router   (peers: react-router; vite, optional, for /vite on
      a `HEAD`, then drops everything.
    - (b) Pass `HEAD` through as React Router answers it.
 7. **The catch-all and the contract.**
-   - **(a, recommended) Outside `RoutesOf`, excluded from OpenAPI** through
+   - **(a, recommended) Outside the route table, excluded from OpenAPI** through
      `isReactRouterRoute`.
    - (b) Typed like `@alxia/graphql`'s routes: the client would show a
      `/*` nobody calls.

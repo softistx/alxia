@@ -16,7 +16,7 @@ const preflight = (origin: string, headers: Record<string, string> = {}) =>
 
 describe('cors', () => {
 	test('every origin by default: a star, a preflight answered', async () => {
-		const app = alxia().use(cors()).use(route);
+		const app = alxia().use(cors()).plugin(route);
 		const response = await app.request('/data', {
 			headers: { origin: 'https://a.example' },
 		});
@@ -48,7 +48,7 @@ describe('cors', () => {
 					maxAge: 600,
 				}),
 			)
-			.use(route);
+			.plugin(route);
 		const allowed = await app.request('/data', {
 			headers: { origin: 'https://x.b.example' },
 		});
@@ -78,7 +78,7 @@ describe('cors', () => {
 	test('credentials with every origin echo the origin, never a star', async () => {
 		const app = alxia()
 			.use(cors({ credentials: true }))
-			.use(route);
+			.plugin(route);
 		const response = await app.request('/data', {
 			headers: { origin: 'https://c.example' },
 		});
@@ -94,7 +94,7 @@ describe('cors', () => {
 					origin: (origin) => new URL(origin).hostname === 'a.example',
 				}),
 			)
-			.use(route);
+			.plugin(route);
 		const original = console.error;
 		console.error = () => {};
 		try {
@@ -107,5 +107,31 @@ describe('cors', () => {
 		} finally {
 			console.error = original;
 		}
+	});
+
+	test('a preflight to any path is answered, and a 404 carries the headers', async () => {
+		const app = alxia()
+			.use(cors({ origin: 'https://a.example' }))
+			.plugin(route);
+		const answered = await app.fetch(
+			new Request('http://localhost/elsewhere', {
+				method: 'OPTIONS',
+				headers: {
+					origin: 'https://a.example',
+					'access-control-request-method': 'PUT',
+				},
+			}),
+		);
+		expect(answered.status).toBe(204);
+		expect(answered.headers.get('access-control-allow-origin')).toBe(
+			'https://a.example',
+		);
+		const missing = await app.request('/missing', {
+			headers: { origin: 'https://a.example' },
+		});
+		expect(missing.status).toBe(404);
+		expect(missing.headers.get('access-control-allow-origin')).toBe(
+			'https://a.example',
+		);
 	});
 });

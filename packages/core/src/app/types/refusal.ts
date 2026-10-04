@@ -14,9 +14,7 @@ import type {
 	InferOutput,
 	StandardSchemaV1,
 } from '../../schema/standard-schema';
-import type { Jsonify } from '../../types/json';
 import type { ClientErrorStatus } from '../../types/status';
-import type { Outcome, OutcomeOf } from './route-table';
 
 /** The schema of each status an `onRefusal` hook may answer, client errors only. */
 export type RefusalResponses = {
@@ -104,30 +102,11 @@ export interface KindFallsBack<Kind extends RefusalKind>
 }
 
 /**
- * The default 400 in a route's type, marked: the `onRefusal` hook of an
- * app a plugin is used by replaces it on the plugin's routes, as it does
- * at runtime. The client reads it as `Outcome<400, ValidationErrorBody>`.
- */
-export interface DefaultRefusalOutcome
-	extends Outcome<400, ValidationErrorBody> {
-	readonly '~default': true;
-}
-
-/**
  * The mark of the default 400 among a hook's refusals: the hook may return
  * nothing, and the default answers then.
  */
 export interface FallsBack extends Refusing {
 	readonly '~fallback': true;
-}
-
-/**
- * The default 413 in a route's type, marked as the default 400 is: the
- * `onRefusal` hook of an app a plugin is used by replaces it.
- */
-export interface DefaultLimitOutcome
-	extends Outcome<413, Jsonify<ContentTooLargeBody>> {
-	readonly '~default': true;
 }
 
 /**
@@ -141,71 +120,11 @@ export interface BodyLimited {
 /** What `bodyLimit()` adds to the shortcuts of the routes after it. */
 export type BodyLimitShortcut = Reply<413, ContentTooLargeBody> & BodyLimited;
 
-/** Whether a route is under a `bodyLimit`: its own, or one in force before it. */
-export type IsLimited<Schema, Shortcuts> = Schema extends {
-	readonly bodyLimit: number;
-}
-	? true
-	: [Extract<Shortcuts, BodyLimited>] extends [never]
-		? false
-		: true;
-
 /** The replies of the general hook, `onRefusal(hook)`, among `Shortcuts`. */
 type GeneralRefusals<Shortcuts> = Exclude<
 	Extract<Shortcuts, Refusing>,
 	RefusingKind<RefusalKind>
 >;
-
-/** The default of a kind, marked: a using app's hooks replace it. */
-type MarkedDefault<Kind extends RefusalKind> = Kind extends 'validation'
-	? DefaultRefusalOutcome
-	: DefaultLimitOutcome;
-
-/** The default of a kind a hook falls back to: the hook in force is the route's own, so nothing replaces it. */
-type PlainDefault<Kind extends RefusalKind> = Kind extends 'validation'
-	? Outcome<400, ValidationErrorBody>
-	: Outcome<413, Jsonify<ContentTooLargeBody>>;
-
-/** The outcomes of the marked replies of a hook, and `Fallback` when it may return nothing. */
-type Answered<Marked, Fallback> =
-	| OutcomeOf<Exclude<Marked, FallsBack>>
-	| ([Extract<Marked, FallsBack>] extends [never] ? never : Fallback);
-
-/** What the general hook answers a refusal of `Kind` with, or, without one, the marked default. */
-type GeneralOutcome<Shortcuts, Kind extends RefusalKind> = [
-	GeneralRefusals<Shortcuts>,
-] extends [never]
-	? MarkedDefault<Kind>
-	: Answered<GeneralRefusals<Shortcuts>, PlainDefault<Kind>>;
-
-/**
- * The outcomes a refusal of `Kind` may get: the replies of the hook of
- * that kind, and, when it may return nothing or there is none, what the
- * general hook answers, or the default of the kind.
- */
-export type KindOutcome<Shortcuts, Kind extends RefusalKind> = [
-	Extract<Shortcuts, RefusingKind<Kind>>,
-] extends [never]
-	? GeneralOutcome<Shortcuts, Kind>
-	: Answered<
-			Extract<Shortcuts, RefusingKind<Kind>>,
-			GeneralOutcome<Shortcuts, Kind>
-		>;
-
-/**
- * The outcomes a refused request may get: those of a `validation` refusal
- * on a route that `Validates`, and of a `body_limit` one on a route that
- * is `Limited` — each the replies of the hook of its kind, of the general
- * hook, whose reply does not depend on the kind in its type, or the
- * default of the kind: the 400, the 413.
- */
-export type RefusalOutcome<
-	Shortcuts,
-	Validates extends boolean = true,
-	Limited extends boolean = false,
-> =
-	| (Validates extends true ? KindOutcome<Shortcuts, 'validation'> : never)
-	| (Limited extends true ? KindOutcome<Shortcuts, 'body_limit'> : never);
 
 /**
  * `Shortcuts`, then the shortcuts of a later scope: its general hook's
@@ -222,22 +141,3 @@ export type ThenShortcuts<Shortcuts, Later> = [GeneralRefusals<Later>] extends [
 			  >
 			| Later
 	: Exclude<Shortcuts, Refusing> | Later;
-
-/**
- * `Output`, a route of a plugin, behind the hooks of the app using it: its
- * default 400 and 413 replaced by the app's refusals, and the app's other
- * replies added. The app's `bodyLimit()` does not reach it: a plugin's
- * route keeps the limit it was declared with.
- */
-export type BehindShortcuts<Output, Shortcuts> =
-	| ([Extract<Shortcuts, Refusing>] extends [never]
-			? Output
-			:
-					| Exclude<Output, DefaultRefusalOutcome | DefaultLimitOutcome>
-					| ([Extract<Output, DefaultRefusalOutcome>] extends [never]
-							? never
-							: KindOutcome<Shortcuts, 'validation'>)
-					| ([Extract<Output, DefaultLimitOutcome>] extends [never]
-							? never
-							: KindOutcome<Shortcuts, 'body_limit'>))
-	| OutcomeOf<Exclude<Shortcuts, Refusing | BodyLimited>>;

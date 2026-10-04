@@ -1,13 +1,8 @@
-import { afterEach, describe, expect, expectTypeOf, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import { z } from 'zod';
-import type {
-	ContentTooLargeBody,
-	Refusal,
-	ValidationErrorBody,
-} from '../errors/errors';
+import type { Refusal } from '../errors/errors';
 import { problem } from '../reply/problem';
-import type { Jsonify } from '../types/json';
-import { type AnyAlxia, alxia, type RoutesOf } from './alxia';
+import { type AnyAlxia, alxia } from './alxia';
 
 const tooLarge = (limit: number) => ({ error: 'content_too_large', limit });
 
@@ -196,8 +191,6 @@ describe('without a bodyLimit', () => {
 		const response = await app.fetch(request);
 		expect(await response.json()).toBe(4096);
 		expect(seen).toBe(request);
-		type Statuses = RoutesOf<typeof app>['/notes']['POST']['output']['status'];
-		expectTypeOf<Statuses>().toEqualTypeOf<200 | 400 | 500>();
 	});
 });
 
@@ -248,48 +241,20 @@ describe('bodyLimit() for the routes after it', () => {
 			.post('/own', { body: z.string(), bodyLimit: 8 }, ({ reply }) =>
 				reply(200, 'ok'),
 			);
-		const host = alxia().bodyLimit(4).use(plugin);
+		const host = alxia().bodyLimit(4).plugin(plugin);
 		expect((await host.request('/free', post('xxxxx'))).status).toBe(200);
 		expect((await host.request('/own', post('xxxxxxxx'))).status).toBe(200);
 		expect((await host.request('/own', post('xxxxxxxxx'))).status).toBe(413);
 		expect(host.routes.map((route) => route.bodyLimit)).toEqual([undefined, 8]);
-		type Free = RoutesOf<typeof host>['/free']['POST']['output']['status'];
-		expectTypeOf<Free>().toEqualTypeOf<200 | 400 | 500>();
 	});
 
 	test("a plugin's own bodyLimit() applies to the app's routes after use", async () => {
 		const host = alxia()
-			.use(alxia().bodyLimit(4))
+			.plugin(alxia().bodyLimit(4))
 			.post('/after', { body: z.string() }, ({ reply }) => reply(200, 'ok'));
 		expect((await host.request('/after', post('xxxx'))).status).toBe(200);
 		expect((await host.request('/after', post('xxxxx'))).status).toBe(413);
 		expect(host.routes[0]?.bodyLimit).toBe(4);
-		expectTypeOf<
-			RoutesOf<typeof host>['/after']['POST']['output']['status']
-		>().toEqualTypeOf<200 | 400 | 413 | 500>();
-	});
-
-	test('the 413 is in the type of every route under a limit, and only those', () => {
-		type Routes = RoutesOf<typeof app>;
-		type Status<P extends keyof Routes> = Routes[P] extends {
-			POST: { output: { status: infer S } };
-		}
-			? S
-			: never;
-		expectTypeOf<Status<'/before'>>().toEqualTypeOf<200 | 400 | 500>();
-		expectTypeOf<Status<'/after'>>().toEqualTypeOf<200 | 400 | 413 | 500>();
-		expectTypeOf<Status<'/own'>>().toEqualTypeOf<200 | 400 | 413 | 500>();
-		expectTypeOf<Status<'/admin/tighter'>>().toEqualTypeOf<
-			200 | 400 | 413 | 500
-		>();
-		type Own = Extract<Routes['/own']['POST']['output'], { status: 413 }>;
-		expectTypeOf<Own['data']>().toEqualTypeOf<Jsonify<ContentTooLargeBody>>();
-		const raw = alxia().post('/raw', { bodyLimit: 1 }, ({ reply }) =>
-			reply(200, 'ok'),
-		);
-		expectTypeOf<
-			RoutesOf<typeof raw>['/raw']['POST']['output']['status']
-		>().toEqualTypeOf<200 | 413 | 500>();
 	});
 });
 
@@ -452,41 +417,6 @@ describe('a body_limit refusal through onRefusal', () => {
 		expect(response.status).toBe(413);
 		expect(await response.json()).toEqual(tooLarge(4));
 		expect(kinds).toEqual(['body_limit']);
-		type Statuses = RoutesOf<typeof app>['/api']['POST']['output']['status'];
-		expectTypeOf<Statuses>().toEqualTypeOf<200 | 400 | 413 | 422 | 500>();
-	});
-
-	test('every reply of the hook is in the type of every route it may refuse; the default 413 of a limited route alone', () => {
-		type Routes = RoutesOf<ReturnType<typeof jmapApp>>;
-		type Api = Routes['/api']['POST']['output'];
-		type Upload = Routes['/upload']['POST']['output'];
-		type Free = Routes['/free']['POST']['output'];
-		type Problem413 = {
-			type: 'urn:ietf:params:jmap:error:limit';
-			status: 413;
-			limit: 'maxSizeRequest';
-		};
-		expectTypeOf<Api['status']>().toEqualTypeOf<200 | 400 | 413 | 500>();
-		expectTypeOf<
-			Extract<Api, { status: 413 }>['data']
-		>().toEqualTypeOf<Problem413>();
-		// A raw route validates nothing: the hook's 400 lands too, since it answers any refusal.
-		expectTypeOf<Upload['status']>().toEqualTypeOf<200 | 400 | 413 | 500>();
-		// The hook's reply does not depend on the kind in its type, so its 413 is here too.
-		expectTypeOf<Free['status']>().toEqualTypeOf<200 | 400 | 413 | 500>();
-		type Free413 = Extract<Free, { status: 413 }>['data'];
-		// @ts-expect-error: a route without a limit gets the hook's 413, never the default one
-		expectTypeOf<Free413>().toEqualTypeOf<Jsonify<ContentTooLargeBody>>();
-		const plain = alxia().post('/a', { body: z.string() }, ({ reply }) =>
-			reply(200, 'ok'),
-		);
-		type Plain = RoutesOf<typeof plain>['/a']['POST']['output']['status'];
-		// @ts-expect-error: without a hook nor a limit, there is no 413
-		expectTypeOf<Plain>().toEqualTypeOf<200 | 400 | 413 | 500>();
-		type Default = Jsonify<ContentTooLargeBody>;
-		type Api413 = Extract<Api, { status: 413 }>['data'];
-		// @ts-expect-error: the default 413 is replaced by the hook's
-		expectTypeOf<Api413>().toEqualTypeOf<Default>();
 	});
 
 	test("the app's hook answers the 413 of a plugin's limited route without a hook", async () => {
@@ -495,17 +425,12 @@ describe('a body_limit refusal through onRefusal', () => {
 			{ body: z.string(), bodyLimit: 4 },
 			({ reply }) => reply(200, 'ok'),
 		);
-		const app = alxia().onRefusal(jmapLimit).use(plugin);
+		const app = alxia().onRefusal(jmapLimit).plugin(plugin);
 		const response = await app.request('/p', post('12345'));
 		expect(await response.json()).toEqual(JMAP_LIMIT);
-		type P = RoutesOf<typeof app>['/p']['POST']['output'];
-		expectTypeOf<P['status']>().toEqualTypeOf<200 | 400 | 413 | 500>();
-		expectTypeOf<
-			Extract<P, { status: 400 }>['data']
-		>().not.toEqualTypeOf<ValidationErrorBody>();
 	});
 
-	test("a plugin's own hook answers its 413 behind the app's hook, and is typed so", async () => {
+	test("a plugin's own hook answers its 413 behind the app's hook", async () => {
 		const plugin = alxia()
 			.onRefusal((refusal) =>
 				refusal.kind === 'body_limit'
@@ -515,18 +440,10 @@ describe('a body_limit refusal through onRefusal', () => {
 			.post('/p', { bodyLimit: 4 }, async ({ request, reply }) =>
 				reply(200, (await request.text()).length),
 			);
-		const app = alxia().onRefusal(jmapLimit).bodyLimit(4).use(plugin);
+		const app = alxia().onRefusal(jmapLimit).bodyLimit(4).plugin(plugin);
 		const response = await app.request('/p', post('12345678'));
 		expect(response.status).toBe(413);
 		expect(await response.json()).toEqual({ status: 413, detail: 'plugin' });
-		type P413 = Extract<
-			RoutesOf<typeof app>['/p']['POST']['output'],
-			{ status: 413 }
-		>['data'];
-		// The plugin's hook, and the default it falls back to when it returns nothing.
-		expectTypeOf<P413>().toEqualTypeOf<
-			{ status: 413; detail: 'plugin' } | Jsonify<ContentTooLargeBody>
-		>();
 	});
 
 	test('a hook that throws on a body_limit is a 500', async () => {

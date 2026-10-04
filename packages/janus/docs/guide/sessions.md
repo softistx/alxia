@@ -1,6 +1,6 @@
 # Sessions
 
-This page covers `session()`: the plugin that reads who a request belongs
+This page covers `session()`: the middleware that reads who a request belongs
 to, hands the routes after it a typed `user` and `session` and a bound
 `auth`, refuses an anonymous request when asked to, and sends a renewed
 session's cookie again.
@@ -27,7 +27,9 @@ const app = alxia()
 
 `session(accounts)` calls `accounts.authenticate(request)` once per request, for
 the routes declared **after** it. A route declared before it is not
-touched, and has no `user`, `session` or `auth`.
+touched, and has no `user`, `session` or `auth`. A request no route matches
+is not a route, so `session()` runs on it, wherever it is declared: with
+`required: true`, `GET /nothing` is a 401 before it is a 404.
 
 ## Where the session is read from
 
@@ -68,8 +70,9 @@ const app = alxia()
 	);
 ```
 
-With `required: true`, the 401 is in the type of every route after it, so a
-client generated from the app reads it:
+With `required: true`, every route after it answers this 401 to an
+anonymous request; declare it in the OpenAPI document a client is
+generated from:
 
 ```text
 401 {"error":"unauthenticated"}
@@ -143,7 +146,7 @@ A patient's session on `/staff/me` is a 401, as if they had sent none. A
 | `user` | the user, typed by its schema and narrowed by `type`, or `null` | the user, or `null` | the user |
 | `session` | `Session` or `null` | `Session` or `null` | `Session` |
 | `auth` | `RequestAuth`: `send`, `signOut`, `device` | the same | the same |
-| a 401 in the routes' type | no | yes | yes |
+| a 401 to an anonymous request | no | yes | yes |
 
 `Session` is `@nxgt/janus`'s: `id`, `userId`, `authenticatedAt`,
 `expiresAt`, `revokedAt`, `createdAt`. The token is never in it.
@@ -164,11 +167,11 @@ is signed in — [Signing in and out](sign-in-and-out.md) is its page.
 
 A sign-in route is called by someone who is not signed in yet, so it sits
 behind a `session()` that is **not** required: behind `required: true` it
-answers `401 {"error":"unauthenticated"}` before it runs. Use the plugin
+answers `401 {"error":"unauthenticated"}` before it runs. Use the middleware
 twice — once open, for the sign-in routes; once required, for the rest:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { janusErrors, session } from '@alxia/janus';
 import { createMemoryStores, janus, scryptHasher } from '@nxgt/janus';
 import { z } from 'zod';
@@ -185,7 +188,7 @@ const SignIn = z.object({ email: z.string(), password: z.string() });
 const app = alxia()
 	.use(janusErrors())
 	.use(session(accounts))                       // open: user may be null
-	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
 	})
@@ -202,10 +205,13 @@ The second `session()` replaces the first's `user`, `session` and `auth`
 for the routes after it, with its own types: `user` is never `null` under
 `/account`, and still may be on `/greeting`, outside the group. Without the
 `group`, `.use(session(accounts, { required: true }))` on the app itself works
-the same for every route declared after it.
+the same for every route declared after it, and for a request no route
+matches: an anonymous request to a missing path is then a 401, not a 404.
+Scope a required session with a `group` to guard only some routes: a path-scoped
+`use('/api', session(…))` does not compile, since `session` adds `user`.
 
-A route behind both plugins still looks the session up once: the plugins
-of one instance share a request's lookup, for the same `type`. A different
+A route behind both middlewares still looks the session up once: the
+middlewares of one instance share a request's lookup, for the same `type`. A different
 `type` is its own lookup.
 
 ## A renewed session is sent again
@@ -219,7 +225,7 @@ conditions:
   `Authorization: Bearer` is never handed a cookie; it keeps its token,
   which is still the same one;
 - **the route did not set a session cookie itself.** A route behind the
-  plugin that signs in, or signs out, keeps its own `Set-Cookie`: the
+  route that signs in, or signs out, keeps its own `Set-Cookie`: the
   session it replaced does not undo it.
 
 ```ts
@@ -260,11 +266,17 @@ writes it with `accounts.cookie.serialize`, so they are set in one place.
 A store that cannot answer makes `authenticate` throw `STORE_FAILED`.
 `session()` does not catch it: the request fails, and `janusErrors()`
 answers it **503** `{ "code": "STORE_FAILED" }` — never a 401 that would
-send every user to the sign-in page. Without `janusErrors()`, it is the
-app's 500. See [Errors](errors.md).
+send every user to the sign-in page. `janusErrors()` must be given to `use`
+**before** `session()`, or it is not behind it to see the error: the app's
+500 answers instead. See [Errors](errors.md).
+
+```ts
+const app = alxia().use(janusErrors(), session(accounts, { required: true }));
+```
 
 Routes declared before `session()` do not call the store, and keep
-answering.
+answering. A request no route matches does run it: `session()` on the app is
+given to every request.
 
 ## Testing it
 
@@ -303,7 +315,7 @@ function session<A extends Auth<{ readonly type: string }>, const T extends User
 	options: SessionOptions<T> & { readonly required: true },
 ): Alxia<
 	{ readonly user: UserOf<A, T>; readonly session: Session; readonly auth: RequestAuth },
-	Empty, '', Reply<401, UnauthenticatedBody>
+	'', Reply<401, UnauthenticatedBody>
 >;
 
 function session<A extends Auth<{ readonly type: string }>, const T extends UserOfAuth<A>['type']>(
@@ -311,7 +323,7 @@ function session<A extends Auth<{ readonly type: string }>, const T extends User
 	options?: SessionOptions<T> & { readonly required?: false },
 ): Alxia<
 	{ readonly user: UserOf<A, T> | null; readonly session: Session | null; readonly auth: RequestAuth },
-	Empty, '', never
+	'', never
 >;
 
 function session<A extends Auth<{ readonly type: string }>, const T extends UserOfAuth<A>['type']>(
@@ -319,7 +331,7 @@ function session<A extends Auth<{ readonly type: string }>, const T extends User
 	options?: SessionOptions<T>,
 ): Alxia<
 	{ readonly user: UserOf<A, T> | null; readonly session: Session | null; readonly auth: RequestAuth },
-	Empty, '', Reply<401, UnauthenticatedBody>
+	'', Reply<401, UnauthenticatedBody>
 >;
 
 interface SessionOptions<T extends string> {
@@ -346,5 +358,5 @@ type UserOfAuth<A> = A extends Auth<infer U> ? U : never;
 exported. `Alxia`, `Empty` and `Reply` are `@alxia/core`'s; `Session` and
 `SharedApi` are `@nxgt/janus`'s.
 
-Next: [Signing in and out](sign-in-and-out.md) sets the cookie this plugin
+Next: [Signing in and out](sign-in-and-out.md) sets the cookie this middleware
 reads.

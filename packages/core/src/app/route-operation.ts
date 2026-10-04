@@ -1,6 +1,9 @@
 import type { AnyReply } from '../reply/reply';
 import type { JoinPath, PathAt, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
+import type { OperationForms } from './operation-forms';
+import type { RouteApp } from './route-method';
+import { mixed } from './route-steps';
 import type {
 	AnyRouteHook,
 	Context,
@@ -8,12 +11,12 @@ import type {
 	HandlerResult,
 	MaybePromise,
 	Method,
-	RouteEntryOf,
 	RouteHookBase,
 	RouteSchema,
 	ThreadHooks,
 	ValidSchema,
 } from './types';
+import { builtinOf, responds, validate } from './validate';
 
 type IsUnion<T, All = T> = T extends unknown
 	? [All] extends [T]
@@ -73,49 +76,30 @@ export type CheckedOperation<
 		: { readonly path: OnePath<Prefix, Operation['path']> };
 
 /**
- * `app.route(operation, handler)`: a route declared as data — `{ method,
- * path, schema? }`, as an OpenAPI code generator writes it — and its
- * handler, the same route as `app[method](path, schema, handler)`,
- * with the three read from `operation`. With a list of hooks before the
- * handler, `app[method](path, hooks, schema, handler)`.
+ * `app.route(operation, ...middlewares, handler)`, see `OperationForms`;
+ * and the form of 0.3, deprecated: a list of hooks before the handler,
+ * first, so that a middleware the route's context does not give is
+ * reported on the middleware forms, naming the key it reads.
  */
 export interface OperationMethod<
 	Ctx extends object,
-	Routes extends object,
+	Prefix extends string,
+	Shortcuts extends AnyReply,
+> extends DeprecatedOperationForm<Ctx, Prefix, Shortcuts>,
+		OperationForms<RouteApp<Method, Ctx, Prefix, Shortcuts>> {}
+
+/** The form of `route` that 0.3 had, which the middleware form replaces. */
+export interface DeprecatedOperationForm<
+	Ctx extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
 	/**
-	 * A route declared as data — `{ method, path, schema? }`, as an OpenAPI
-	 * code generator writes it — and its handler: the same route as
-	 * `app[method](path, schema, handler)`.
+	 * @deprecated A list of hooks before the handler: give them as
+	 * middlewares, made by `defineMiddleware` —
+	 * `route(operation, ...middlewares, handler)`, see the upgrading guide.
 	 */
-	<
-		const Operation extends RouteOperation,
-		Result extends HandlerResult<OperationSchema<Operation>>,
-	>(
-		operation: CheckedOperation<Prefix, Operation>,
-		handler: (
-			ctx: Context<
-				Ctx,
-				JoinPath<Prefix, Operation['path']>,
-				OperationSchema<Operation>
-			>,
-		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes &
-			RouteEntryOf<
-				Operation['method'],
-				JoinPath<Prefix, Operation['path']>,
-				OperationSchema<Operation>,
-				Result,
-				Shortcuts
-			>,
-		Prefix,
-		Shortcuts
-	>;
-	/** A route declared as data, with a list of hooks before its handler. */
+	// biome-ignore lint/style/useShorthandFunctionType: one overload of `route`, deprecated on its own
 	<
 		const Operation extends RouteOperation,
 		const Hooks extends readonly [] | readonly AnyRouteHook[],
@@ -140,35 +124,60 @@ export interface OperationMethod<
 				OperationSchema<Operation>
 			>,
 		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes &
-			RouteEntryOf<
-				Operation['method'],
-				JoinPath<Prefix, Operation['path']>,
-				OperationSchema<Operation>,
-				Result,
-				| Shortcuts
-				| ThreadHooks<
-						RouteHookBase<Ctx, JoinPath<Prefix, Operation['path']>>,
-						Hooks
-				  >['replies']
-			>,
-		Prefix,
-		Shortcuts
-	>;
+	): Alxia<Ctx, Prefix, Shortcuts>;
 }
 
 /**
- * What `route(operation, ...rest)` passes `app[method]` after the path: the
- * list of hooks, if any, the operation's schema, then the handler.
+ * What `route(operation, ...rest)` passes `app[method]` after the path. The
+ * form of 0.3, a list of hooks first: the list, the operation's schema, the
+ * handler. Otherwise its options, the middlewares, then a `validate` of its
+ * request parts and a `responds` of its responses, just before the
+ * handler: the `responds` checks the handler's reply alone, never a
+ * middleware's — an auth's 401 is its own. A `validate(operation)` among
+ * the middlewares — a `validate` of each of its parts by the same schemas —
+ * stands where it is given, and so does a `responds(operation)`; the
+ * implicit one is then left out.
  */
 export function operationArgs(
 	operation: RouteOperation,
 	rest: readonly unknown[],
 ): unknown[] {
 	const schema = operation.schema ?? {};
-	return Array.isArray(rest[0])
-		? [rest[0], schema, rest[1]]
-		: [schema, rest[0]];
+	if (Array.isArray(rest[0])) {
+		if (rest.length > 2) throw mixed(`${operation.method} ${operation.path}`);
+		return [rest[0], schema, rest[1]];
+	}
+	const { params, query, headers, cookies, body, response, ...options } =
+		schema;
+	const parts = Object.fromEntries(
+		Object.entries({ params, query, headers, cookies, body }).filter(
+			([, part]) => part !== undefined,
+		),
+	);
+	const middlewares = rest.slice(0, -1);
+	const steps = middlewares.map(builtinOf);
+	// The operation's validate placed among them: one that validates each of
+	// its parts with the very schema the operation names for it.
+	const validated =
+		Object.keys(parts).length === 0 ||
+		steps.some(
+			(step) =>
+				step?.kind === 'validate' &&
+				Object.entries(parts).every(
+					([part, schema]) =>
+						step.schemas[part as keyof typeof step.schemas] === schema,
+				),
+		);
+	const responded =
+		response === undefined ||
+		steps.some(
+			(step) => step?.kind === 'responds' && step.responses === response,
+		);
+	return [
+		options,
+		...middlewares,
+		...(validated ? [] : [validate(parts as never)]),
+		...(responded ? [] : [responds(response as never)]),
+		...rest.slice(-1),
+	];
 }

@@ -18,6 +18,9 @@ app.use(compress());
 app.use(compress({ encodings: ['br', 'gzip'], threshold: 2048 }));
 ```
 
+`compress()` is a middleware: it compresses every response that comes back
+through it, a 404's and an error's included.
+
 Compressed: text, JSON, JavaScript, XML and SVG of at least `threshold`
 bytes (1 KiB), files included; a `ReadableStream` has no length, and is
 compressed whatever its size. Never: a `HEAD`, a 204, 206 or 304, a
@@ -59,12 +62,21 @@ app.use(compress()).get('/page', async ({ reply }) =>
 
 | export | |
 | --- | --- |
-| `compress(options?)` | the plugin |
+| `compress(options?)` | the middleware, for `app.use` |
 | `negotiate(accept, offered)` | the encoding an `Accept-Encoding` gets |
 | `CompressOptions`, `Encoding` | its types |
+| `CompressMiddleware` | what `compress()` returns: a middleware that adds nothing to the context |
+
+## Traps
+
+`use` it before the routes: a route declared before `app.use(compress())` is
+not compressed. Declare it after `logger()` and `secureHeaders()`, so they
+see the response as it leaves, and before a middleware that sets
+`Cache-Control: no-transform` on the way out (see
+[the guide](https://github.com/softistx/alxia/blob/develop/packages/compress/docs/guide.md#order-with-other-middlewares)).
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/compress/docs): what is compressed and what is not, streamed bodies, every option, the headers written, the order among other hooks, testing, and `negotiate`.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/compress/docs): what is compressed and what is not, streamed bodies, every option, the headers written, the order among other middlewares, testing, and `negotiate`.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/compress/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/compress/docs/roadmap.md): what is coming, and what is not planned.

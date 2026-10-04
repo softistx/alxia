@@ -1,13 +1,13 @@
 # Idempotency
 
-This page covers `idempotency`: a plugin that runs a `POST` or `PATCH`
+This page covers `idempotency`: a middleware, given to `app.use`, that runs a `POST` or `PATCH`
 once per `Idempotency-Key`, replays its response to every repeat, and
 refuses the repeats it cannot answer — across every process sharing a
 Redis.
 
 ```ts
-import { alxia } from '@alxia/core';
-import { idempotency } from '@alxia/redis';
+import { alxia, validate } from '@alxia/core';
+import { idempotency, type IdempotencyErrorBody } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 import { z } from 'zod';
 
@@ -16,7 +16,7 @@ const Payment = z.object({ amount: z.number().int().positive() });
 
 const app = alxia()
 	.use(idempotency(connection.client, { name: 'payments' }))
-	.post('/payments', { body: Payment }, ({ body, reply }) =>
+	.post('/payments', validate({ body: Payment }), ({ body, reply }) =>
 		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
 	);
 ```
@@ -28,12 +28,14 @@ curl -X POST localhost:3000/payments -H 'idempotency-key: 4f1c' -H 'content-type
 # 201 {"id":"9a…","amount":10}     Idempotent-Replayed: true — the route did not run
 ```
 
-Only the routes declared **after** `use(idempotency(…))` are guarded.
+Only the routes declared **after** `use(idempotency(…))` are guarded. A request
+no route matches is not: there is no route to scope its key by, so it passes
+to the 404.
 
 ## The signature
 
 ```ts
-function idempotency(client: RedisClient, options: IdempotencyOptions);  // a plugin
+function idempotency(client: RedisClient, options: IdempotencyOptions);  // a middleware
 
 interface IdempotencyOptions {
 	readonly name: string;
@@ -56,7 +58,7 @@ interface IdempotencyOptions {
 | `methods` | `readonly string[]` | `['POST', 'PATCH']` | the methods it guards; the others pass through |
 | `header` | `string` | `'idempotency-key'` | the request header the key is read from (any case) |
 | `required` | `boolean` | `false` | refuse a guarded request with no key, with a `400` |
-| `scope` | `(ctx: BaseContext) => string \| undefined` | `ctx.ip` | whose key it is; `undefined` scopes it to everyone |
+| `scope` | `(ctx: BaseContext) => string \| undefined` | `ctx.ip` | whose key it is; `undefined` leaves the request unguarded, with a warning |
 
 `name`, `ttl` and `lease` are checked when `idempotency(…)` is called, so a
 wrong one throws at startup:
@@ -84,8 +86,9 @@ guarded request a `500`, logging
 | no key, without `required` | the route runs, unguarded |
 | a method not in `methods` | the route runs, unguarded |
 
-Every refusal is typed as `IdempotencyErrorBody` and is part of each
-guarded route's type, so `@alxia/client` reads it:
+Every refusal's body is an `IdempotencyErrorBody`; declare the statuses in
+your OpenAPI document, and the client you generate from it (with
+`@nxgt/openapi-codegen`, say) reads them typed:
 
 ```ts
 interface IdempotencyErrorBody {
@@ -100,9 +103,8 @@ interface IdempotencyErrorBody {
 ```
 
 ```ts
-import { client } from '@alxia/client';
-import { alxia } from '@alxia/core';
-import { idempotency } from '@alxia/redis';
+import { alxia, validate } from '@alxia/core';
+import { idempotency, type IdempotencyErrorBody } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 import { z } from 'zod';
 
@@ -110,18 +112,19 @@ const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia()
 	.use(idempotency(connection.client, { name: 'payments', required: true }))
-	.post('/payments', { body: z.object({ amount: z.number() }) }, ({ body, reply }) =>
+	.post('/payments', validate({ body: z.object({ amount: z.number() }) }), ({ body, reply }) =>
 		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
 	);
 
-const api = client(app);
-const result = await api.post('/payments', {
-	body: { amount: 10 },
-	init: { headers: { 'idempotency-key': crypto.randomUUID() } },
+const result = await app.request('/payments', {
+	method: 'POST',
+	headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+	body: JSON.stringify({ amount: 10 }),
 });
-// result.status: 201 | 400 | 409 | 422 | 500
+// result.status: 201, or 400, 409, 422 from the guard, or 500
 if (result.status === 409) {
-	await Bun.sleep(result.data.retryAfter! * 1000);   // then send the same request again
+	const { retryAfter } = (await result.json()) as IdempotencyErrorBody;
+	await Bun.sleep(retryAfter! * 1000);   // then send the same request again
 }
 ```
 
@@ -150,7 +153,7 @@ gets the replay rather than the `409`:
 
 ```ts
 import { alxia } from '@alxia/core';
-import { idempotency } from '@alxia/redis';
+import { idempotency, type IdempotencyErrorBody } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
@@ -165,15 +168,22 @@ const app = alxia()
 Clients choose their keys, so two clients can choose the same one. The
 stored key is `<name>:<route>:<scope>:<key>`, where `scope(ctx)` is the
 client's address by default. When it is `undefined` — no address, as with
-`app.request()` in a test or a server that cannot see one — the scope is
-`anyone`, and every client shares the key space.
+`app.request()` in a test or a server that cannot see one, and no `scope`
+option, or one that returns `undefined` — the request runs unguarded:
+nothing is stored, nothing replayed, and each repeat runs the route again.
+Sharing one key space between every client would replay one client's
+response to another. The middleware warns once:
+
+```
+idempotency "payments": no client scope could be derived (ctx.ip is undefined and no scope option returned one), so these requests run unguarded, nothing stored or replayed. Pass a scope option, (ctx) => a user id, or an ip option to alxia().
+```
 
 Behind a proxy, the address is the proxy's unless the app's `ip` option
 reads the forwarded header. Where requests carry a user, scope by the user:
 
 ```ts
 import { alxia } from '@alxia/core';
-import { idempotency } from '@alxia/redis';
+import { idempotency, type IdempotencyErrorBody } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
@@ -197,9 +207,11 @@ is two keys.
 
 ## Order: what runs inside the guard
 
-The plugin wraps the routes declared after it, and every route hook
+The middleware wraps the routes declared after it, and every middleware
 declared after it too. Whatever those answer is kept like the route's
-answer. A rate limit or an authentication check declared **after**
+answer: so is what an `onError` hook, an `HttpError` or a validation
+refusal answers, because `idempotency` settles the rest of the request before
+it keeps it. A rate limit or an authentication check declared **after**
 `idempotency` has its `429` or `401` kept and replayed — even once the
 client is allowed through. Declare them **before**:
 
@@ -221,6 +233,10 @@ Measured: with the rate limit after `idempotency`, a key refused with a
 `429` answered `429` again, `Idempotent-Replayed: true`, after the window
 had passed; with it before, the same repeat ran the route and answered
 `201`.
+
+Declared on the app, a rate limit or a guard also runs on a request no route
+matches, and answers it before `idempotency` is reached; that is not a
+concern here, since `idempotency` skips that request anyway.
 
 A route that refuses a request it might accept later — a `401` before the
 client signs in again, a `409` on a state that changes — should answer it

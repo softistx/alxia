@@ -39,9 +39,10 @@
 		]
 	},
 	"devDependencies": {
-		"@alxia/client": "workspace:^",
 		"@alxia/core": "workspace:^",
+		"@alxia/openapi": "workspace:^",
 		"@alxia/react-router": "workspace:^",
+		"@nxgt/openapi-codegen": "0.6.0",
 		"@types/bun": "^1.4.2",
 		"zod": "^4.6.5"
 	}

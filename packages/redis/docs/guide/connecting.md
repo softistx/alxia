@@ -1,7 +1,7 @@
 # Connecting
 
 This page covers the one thing every export of `@alxia/redis` takes first:
-a Bun `RedisClient`, how to open it, when to make the plugins with it, and
+a Bun `RedisClient`, how to open it, when to build what takes it, and
 how to close it.
 
 ```ts
@@ -12,7 +12,7 @@ import { connectRedis } from '@nxgt/redis';
 const connection = await connectRedis(Bun.env['REDIS_URL'] ?? 'redis://127.0.0.1:6379');
 
 const app = alxia()
-	.use(redis(connection.client))
+	.plugin(redis(connection.client))
 	.get('/ping', async ({ redis, reply }) => reply(200, await redis.ping()));
 
 app.listen({ port: 3000 });
@@ -25,8 +25,8 @@ Every export takes Bun's own `RedisClient` as its first argument:
 ```ts
 redisStore(client: RedisClient, options: RedisStoreOptions): RateLimitStore
 redisCacheStore(client: RedisClient, options: RedisCacheStoreOptions): CacheStore
-idempotency(client: RedisClient, options: IdempotencyOptions)    // a plugin
-redis(client: RedisClient, options?: RedisContextOptions)        // a plugin
+idempotency(client: RedisClient, options: IdempotencyOptions)    // a middleware
+redis(client: RedisClient, options?: RedisContextOptions)        // a plugin, given to app.plugin
 ```
 
 Any `RedisClient` will do. `connectRedis` from
@@ -48,7 +48,7 @@ One client is enough for the whole app: the rate-limit store, the cache
 store, idempotency and `redis()` all send ordinary commands over it. None
 of them subscribes, so none needs a connection of its own.
 
-## Make the plugins after you connect
+## Build them after you connect
 
 Each export binds the client it is given when it is called. Open the
 connection first, then build the app:

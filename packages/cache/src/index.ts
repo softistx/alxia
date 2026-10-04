@@ -1,6 +1,7 @@
 export {
 	type Cache,
 	type CacheControls,
+	type CacheMiddleware,
 	type CacheOptions,
 	cache,
 } from './cache';

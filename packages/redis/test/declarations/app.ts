@@ -28,7 +28,7 @@ const users = defineCache({
 
 export function withRedis() {
 	return alxia()
-		.use(redis(client, { caches: { users } }))
+		.plugin(redis(client, { caches: { users } }))
 		.get('/users/:id', async ({ caches, lock, pathParams, reply }) => {
 			const id = pathParams['id'] ?? '';
 			const user = await lock(id, () =>
@@ -40,7 +40,7 @@ export function withRedis() {
 
 export function bare() {
 	return alxia()
-		.use(redis(client))
+		.plugin(redis(client))
 		.get('/', async ({ redis: connection, reply }) =>
 			reply(200, await connection.get('k')),
 		);
@@ -70,6 +70,10 @@ export function withCaches<const Caches extends Record<string, AnyCache>>(
 	caches: Caches,
 ) {
 	return alxia()
-		.use(redis(client, { caches }))
+		.plugin(redis(client, { caches }))
 		.get('/', ({ caches: bound, reply }) => reply(200, Object.keys(bound)));
+}
+
+export function guard() {
+	return idempotency(client, { name: 'refunds', wait: 1_000 });
 }

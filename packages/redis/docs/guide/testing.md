@@ -61,8 +61,9 @@ it, as below.
 ## Give each test a client address
 
 `app.request()` has no socket, so `ctx.ip` is `undefined`. A rate limit
-then counts nothing, and idempotency scopes every key to `anyone`. Pass the
-app an `ip` that answers, as above, or one per test to stand for two
+then counts nothing, and idempotency guards nothing: each request runs, and
+it warns once that no client scope could be derived. Pass the app an `ip`
+that answers, as above, or one per test to stand for two
 clients:
 
 ```ts
@@ -87,14 +88,13 @@ test('two processes share one count', async () => {
 });
 ```
 
-## Typed refusals
+## Refusals behind the middleware only
 
-The `409`, `422` and `400` of `idempotency` are part of each guarded route's
-type. `@alxia/client` and `expectTypeOf` pin them, with no Redis call:
+The `409`, `422` and `400` of `idempotency` are answered by the routes
+declared after it alone, never by a request no route matches. Send a key it refuses to both:
 
 ```ts
-import { expect, expectTypeOf, test } from 'bun:test';
-import { client } from '@alxia/client';
+import { expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { idempotency } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
@@ -106,13 +106,10 @@ const app = alxia()
 	.use(idempotency(connection.client, { name: 'payments' }))
 	.post('/payments', ({ reply }) => reply(201, 'ok'));
 
-test('only the routes after the plugin carry its refusals', () => {
-	const types = async () => {
-		const api = client(app);
-		expectTypeOf((await api.post('/payments')).status).toEqualTypeOf<201 | 400 | 409 | 422 | 500>();
-		expectTypeOf((await api.post('/open')).status).toEqualTypeOf<201 | 500>();
-	};
-	expect(types).toBeFunction();
+test('only the routes after the middleware refuse a bad key', async () => {
+	const init = { method: 'POST', headers: { 'idempotency-key': 'not a key' } };
+	expect((await app.request('/payments', init)).status).toBe(400);
+	expect((await app.request('/open', init)).status).toBe(201);
 });
 ```
 

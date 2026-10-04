@@ -1,6 +1,6 @@
 # Troubleshooting
 
-Each entry is headed by the text you see: the error the plugin throws at
+Each entry is headed by the text you see: the error `language()` throws at
 start-up, an error from `tsc`, or — for a trap that prints nothing — what
 the response does that you did not expect.
 
@@ -12,13 +12,13 @@ the response does that you did not expect.
 
 - [`Type '"de"' is not assignable to type '"en" | "fr"'`](#type-de-is-not-assignable-to-type-en--fr)
 - [`Property 'language' does not exist on type 'Context<Empty, "/", Empty>'`](#property-language-does-not-exist-on-type-contextempty--empty)
-- [`Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback`](#type-alxiaempty-empty--never-is-missing-the-following-properties-from-type-languageoptionsstring-basecontext-supported-fallback)
+- [`Type 'Alxia<Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback`](#type-alxiaempty--never-is-missing-the-following-properties-from-type-languageoptionsstring-basecontext-supported-fallback)
 - [`Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ en: string; fr: string; }'`](#element-implicitly-has-an-any-type-because-expression-of-type-string-cant-be-used-to-index-type--en-string-fr-string-)
 - [`Type 'string | null' is not assignable to type 'string | undefined'`](#type-string--null-is-not-assignable-to-type-string--undefined)
 - [`Type 'Promise<string>' is not assignable to type 'string'`](#type-promisestring-is-not-assignable-to-type-string)
 - [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
-- [`the plugin reads "user", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads-user-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
-- [`the plugin reads "user", which this app's context gives with another type`](#the-plugin-reads-user-which-this-apps-context-gives-with-another-type)
+- [`Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'`](#property-user-is-missing-in-type-basecontext--empty-but-required-in-type--user-user--null-)
+- [`Types of property 'user' are incompatible`](#types-of-property-user-are-incompatible)
 - [`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
 **Responses**
@@ -79,13 +79,12 @@ error TS2339: Property 'language' does not exist on type 'Context<Empty, "/", Em
 ```
 
 **When:** a route reads `language` but is declared before
-`.use(language(…))`, or in another app or group than the one that uses it.
+`.use(language(…))`, or in another app or group than the one that mounts it.
 
-**Why:** the plugin is a route hook: it applies to the routes declared
-after it, at runtime and in the types alike. A route before it never runs
-it.
+**Why:** the middleware applies to what is declared after it, at runtime
+and in the types alike. A route before it never runs it.
 
-**Fix:** use the plugin first:
+**Fix:** `use` it first:
 
 ```ts
 const app = alxia()
@@ -93,19 +92,20 @@ const app = alxia()
 	.get('/', ({ language: current, reply }) => reply(200, current));
 ```
 
-### `Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback`
+### `Type 'Alxia<Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback`
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(plugin: (app: Alxia<Empty, Empty, "", never>) => …): Alxia<…>', gave the following error.
-    Argument of type '<const L extends string, Ctx extends object = BaseContext>(options: LanguageOptions<L, Ctx>) => Alxia<RequiresOf<Ctx, "resolve"> & LanguageContext<L>, Empty, "", never> & Requiring<...>' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => …'.
+  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
+    Argument of type '<const L extends string, Ctx extends object = BaseContext>(options: LanguageOptions<L, Ctx>) => Middleware<…>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
       Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback
+        Type 'Alxia<Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback
 ```
 
 **When:** `app.use(language)`, without calling it.
 
-**Why:** `language` makes the plugin from its options; it is not the plugin.
+**Why:** `language` makes the middleware from its options; it is not the
+middleware.
 
 **Fix:**
 
@@ -183,7 +183,7 @@ database or a session store.
 **Why:** `resolve` is synchronous: it runs on every request, after the
 sources, and returns a tag or `undefined`.
 
-**Fix:** keep the preference where the plugin already reads it. When the
+**Fix:** keep the preference where the middleware already reads it. When the
 user saves it, write it to the cookie; every request after reads it from
 there, before `Accept-Language`:
 
@@ -202,7 +202,7 @@ const app = alxia()
 
 Do the same at sign-in, from the stored preference.
 
-Or load it before the plugin, in an async `derive` or the plugin that
+Or load it before the middleware, in an async `derive` or the middleware that
 signs the user in, and annotate `resolve` to read it — see
 [Reading the app's context](guide.md#reading-the-apps-context):
 
@@ -224,18 +224,18 @@ const app = alxia()
 error TS2339: Property 'user' does not exist on type 'BaseContext'.
 ```
 
-**When:** `resolve` reads something a `derive` or a plugin before
+**When:** `resolve` reads something a `derive` or a middleware before
 `language()` added — a user, a session — and its parameter is not
 annotated: `resolve: (ctx) => ctx.user.language`.
 
 **Why:** an unannotated `resolve` is typed with the request's `BaseContext`
-— `request`, `url`, `ip`, `pathParams`, `set` — not with what other hooks
+— `request`, `url`, `ip`, `pathParams`, `set` — not with what other middlewares
 added. `language()` is built before it is used, so it cannot see the app it
 will be used on.
 
 **Fix:** annotate the parameter with what it reads. `language()` infers it
-from the annotation, and the app that uses the plugin must then give it,
-before the plugin:
+from the annotation, and the app that uses the middleware must then give it,
+before it:
 
 ```ts
 import type { BaseContext } from '@alxia/core';
@@ -246,55 +246,59 @@ const byUser = language({
 	resolve: ({ user }: BaseContext & { user: User }) => user.language ?? undefined,
 });
 
-alxia().use(auth).use(byUser); // auth derives user
+alxia().plugin(auth).use(byUser); // auth derives user
 ```
 
 See [Reading the app's context](guide.md#reading-the-apps-context).
 
-### `the plugin reads "user", which this app's context does not give: use the plugin that adds it first`
+### `Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'`
 
 ```text
 error TS2769: No overload matches this call.
   …
-        Types of property ''~requires'' are incompatible.
-          Type '{ user: User; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"'.
+          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ user: User | null; }>'.
+            Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'.
 ```
 
-**When:** the plugin's `resolve` is annotated to read `user`, and it is
+**When:** the middleware's `resolve` is annotated to read `user`, and it is
 used on an app — or in a group — whose context has no `user` at that point:
-`alxia().use(byUser)`, or `use(byUser)` before `use(auth)`.
+`alxia().use(byUser)`, or `use(byUser)` before `plugin(auth)`.
 
-**Why:** an annotated `resolve` makes the plugin require what it reads, and
-`use` checks the app's context against it, so `resolve` never runs without
+**Why:** an annotated `resolve` makes the middleware require what it reads, and
+`app.use` checks the app's context against it, so `resolve` never runs without
 it.
 
-**Fix:** use the plugin that adds `user` first, with the type `resolve`
+**Fix:** mount what adds `user` first, with the type `resolve`
 reads:
 
 ```ts
-alxia().use(auth).use(byUser);
+alxia().plugin(auth).use(byUser);
 ```
 
 More on this message in
-[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first).
 
-### `the plugin reads "user", which this app's context gives with another type`
+### `Types of property 'user' are incompatible`
 
 ```text
 error TS2769: No overload matches this call.
   …
-          Type '{ user: User; }' is not assignable to type '"the plugin reads \"user\", which this app's context gives with another type"'.
+          Type 'BaseContext & Empty & { user: User | null; }' is not assignable to type 'MiddlewareContext<{ user: User; }>'.
+            Type 'BaseContext & Empty & { user: User | null; }' is not assignable to type '{ user: User; }'.
+              Types of property 'user' are incompatible.
+                Type 'User | null' is not assignable to type 'User'.
+                  Type 'null' is not assignable to type 'User'.
 ```
 
 **When:** the app gives a `user`, but of a type that does not fit the one
 `resolve`'s parameter is annotated with: a `User | null` where `resolve`
 reads `User`, or a user of another shape.
 
-**Why:** `use` checks each key the plugin reads against the app's context;
+**Why:** `app.use` checks each key the middleware reads against the app's context;
 a narrower type passes, a wider or different one does not.
 
 **Fix:** annotate `resolve` with the type the app gives — `User | null`,
-handled inside — or narrow it in the plugin before:
+handled inside — or narrow it in the middleware before:
 
 ```ts
 language({
@@ -312,20 +316,20 @@ More on this message in
 ```text
 error TS2769: No overload matches this call.
   …
-        Types of property ''~requires'' are incompatible.
-          Type '{ readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"; }' is not assignable to type '"the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"'.
+          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"; }>'.
+            Property ''~any'' is missing in type 'BaseContext & Empty' but required in type '{ readonly '~any': "the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated"; }'.
 ```
 
 **When:** `resolve`'s parameter is annotated `any` —
-`resolve: (ctx: any) => ctx.user.language` — and the plugin is used, on
+`resolve: (ctx: any) => ctx.user.language` — and the middleware is used, on
 any app, whatever its context gives.
 
 **Why:** an `any` parameter reads any key and says nothing of what it
-reads, so the plugin would require nothing, and an app without a `user`
-would be accepted, and throw on every request. The plugin is refused
+reads, so the middleware would require nothing, and an app without a `user`
+would be accepted, and throw on every request. It is refused
 instead.
 
-**Fix:** annotate what `resolve` reads, and use the plugin that adds it
+**Fix:** annotate what `resolve` reads, and mount what adds it
 first:
 
 ```ts
@@ -335,7 +339,7 @@ const byUser = language({
 	resolve: ({ user }: BaseContext & { user: User }) => user.language ?? undefined,
 });
 
-alxia().use(auth).use(byUser);
+alxia().plugin(auth).use(byUser);
 ```
 
 Or leave it unannotated when it reads only the request:
@@ -373,7 +377,7 @@ await app.request('/', { headers: { 'accept-language': 'fr-FR,fr;q=0.9,en;q=0.8'
 **When:** a language switcher links to `?lang=fr`; that page is in French,
 the next one, without the query, is not.
 
-**Why:** the query only decides the request that carries it. The plugin
+**Why:** the query only decides the request that carries it. The middleware
 keeps it for the next ones only when all of these hold:
 
 - `persist` is set — it is off by default;
@@ -400,22 +404,28 @@ language({
 **When:** behind a CDN, a reverse proxy, or `@alxia/cache`, the first
 visitor's language is served to everyone after.
 
-**Why:** the response depends on what the plugin read, and a cache keyed
-on the URL alone ignores it. The plugin says `Vary: Accept-Language,
+**Why:** the response depends on what the middleware read, and a cache keyed
+on the URL alone ignores it. It says `Vary: Accept-Language,
 Cookie` with the default `order`, and a reply's own `Vary` adds to it. Two
 things still leave a header out:
 
 - what `resolve` reads, unless the `vary` option names it;
-- an `onResponse` hook that sets `Vary` with `headers.set` instead of
-  `@alxia/core`'s `vary`, which replaces every name before it.
+- a middleware that sets `Vary` with
+  `headers.set` instead of `@alxia/core`'s `vary`, which replaces every
+  name before it.
 
 **Fix:** name what `resolve` reads, add to `Vary` rather than setting it,
 and give a cache the same headers:
 
 ```ts
-import { alxia, vary, withHeaders } from '@alxia/core';
+import { alxia, defineMiddleware, settle, vary, withHeaders } from '@alxia/core';
 
 alxia()
+	.use(
+		defineMiddleware(async (ctx, next) =>
+			withHeaders(await settle(ctx, next()), (headers) => vary(headers, 'Accept-Encoding')),
+		),
+	)
 	.use(
 		language({
 			supported: ['en', 'fr'],
@@ -423,8 +433,7 @@ alxia()
 			resolve: (ctx) => ctx.request.headers.get('x-preferred-language') ?? undefined,
 			vary: ['X-Preferred-Language'],
 		}),
-	)
-	.onResponse((response) => withHeaders(response, (headers) => vary(headers, 'Accept-Encoding')));
+	);
 // Vary: Accept-Language, Cookie, X-Preferred-Language, Accept-Encoding
 ```
 
@@ -437,9 +446,9 @@ cache({ ttl: 60, vary: ['accept-language', 'cookie', 'x-preferred-language'] });
 **When:** `order` lists `'path'`, and the routes are declared without the
 language segment: `.get('/products', …)`.
 
-**Why:** the plugin reads the segment at `pathIndex`; it does not remove
+**Why:** the middleware reads the segment at `pathIndex`; it does not remove
 it from the path or route on it. `/fr/products` matches no route, so the
-`404` is answered before the plugin runs.
+`404` is answered: the language was read, but no route answers in it.
 
 **Fix:** declare the segment in the routes:
 

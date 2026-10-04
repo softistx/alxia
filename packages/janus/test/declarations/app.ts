@@ -2,7 +2,7 @@
 // return types are inferred: a declaration build must be able to name each
 // one through `@alxia/janus`, `@alxia/core` and `@nxgt/janus` alone (TS2883
 // otherwise).
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import {
 	type Auth,
 	byParam,
@@ -56,7 +56,7 @@ export function signingIn() {
 		.use(janusErrors())
 		.post(
 			'/signin',
-			{ body: z.object({ email: z.string(), password: z.string() }) },
+			validate({ body: z.object({ email: z.string(), password: z.string() }) }),
 			async (ctx) => {
 				const signedIn = await auth.patient.signIn(ctx.body);
 				return ctx.reply(200, { id: sendSession(ctx, auth, signedIn).id });

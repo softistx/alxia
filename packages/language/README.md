@@ -39,12 +39,13 @@ matches whatever its case, by its base language (`fr-CA` for `fr`), or by a
 region of it (`pt` for `pt-BR`). `languageSource` says which source decided.
 
 Every response says `Content-Language`, and `Vary` by the headers it read.
-With `persist`, a language the query named is kept in the cookie.
+With `persist`, a language the query named is kept in the cookie. Given to
+`use` on the app, it runs on every request: a 404 says `Content-Language` too.
 
 ## Reading the app's context
 
-Annotate `resolve`'s parameter to decide by what an earlier plugin added —
-the language a signed-in user saved. The plugin then requires it: an app
+Annotate `resolve`'s parameter to decide by what an earlier middleware added —
+the language a signed-in user saved. The middleware then requires it: an app
 that does not give `user` before it cannot use it.
 
 ```ts
@@ -58,11 +59,11 @@ const byUser = language({
 	resolve: ({ user }: BaseContext & { user: { language: string } | null }) => user?.language,
 });
 
-alxia().use(auth).use(byUser); // auth derives user
+alxia().plugin(auth).use(byUser); // auth derives user
 alxia().use(byUser); // a compile error: this app gives no `user`
 ```
 
-A `resolve` annotated `any` would require nothing, so the plugin is refused
+A `resolve` annotated `any` would require nothing, so the middleware is refused
 on every app: annotate what it reads, or leave it unannotated.
 
 ## Options
@@ -76,21 +77,22 @@ on every app: annotate what it reads, or leave it unannotated.
 | `pathIndex` | 0 | |
 | `persist` | `false` | `true`, or `{ maxAge, secure }` |
 | `contentLanguage` | `true` | |
-| `resolve` | none | `(ctx) => string \| undefined`; annotate `ctx` to read what an earlier plugin adds |
+| `resolve` | none | `(ctx) => string \| undefined`; annotate `ctx` to read what an earlier middleware adds |
 | `vary` | none | the headers `resolve` reads, added to `Vary` |
 
 ## API
 
 | export | |
 | --- | --- |
-| `language(options)` | the plugin: `language`, `languageSource` |
+| `language(options)` | the middleware, given to `app.use`: it adds `language` and `languageSource` |
 | `LanguageOptions` | its options: `supported`, `fallback`, `order`, `query`, `cookie`, `pathIndex`, `persist`, `contentLanguage`, `resolve`, `vary` |
 | `negotiate(header, supported)` | the supported language `Accept-Language` prefers |
 | `parseAcceptLanguage(header)`, `match(tag, supported)` | its parts |
 | `LanguageContext`, `LanguageSource`, `Accepted` | its types |
+| `LanguageMiddleware<L, Requires>` | what `language()` returns: a middleware adding `LanguageContext<L>`, requiring of the app what `resolve` reads |
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/language/docs): every option with its default and an example, how the language is found and `Accept-Language` negotiated, reading what an earlier plugin added, the typed context, and the headers the plugin adds.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/language/docs): every option with its default and an example, how the language is found and `Accept-Language` negotiated, reading what an earlier middleware added, the typed context, and the headers the middleware adds.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md): an error, or a response in the wrong language, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/language/docs/roadmap.md): what is coming, and what is not planned.

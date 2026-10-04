@@ -7,7 +7,9 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **Compression as a middleware.** `app.use(compress())` compresses every
+  response that comes back through it, a 404's and an error's included;
+  `app.plugin(compress())` keeps working as a deprecated alias.
 
 ## Next
 
@@ -29,10 +31,10 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **Compression as a plugin.** `app.use(compress())` streams every response
+- **Compression as a plugin.** `app.plugin(compress())` streams every response
   worth it through zstd, Brotli, gzip or deflate, chosen from the client's
   `Accept-Encoding` and the server's order of preference, with the app's
-  routes and the client's types unchanged.
+  routes and type unchanged.
 - **Only what pays.** Text, JSON, JavaScript, XML and SVG of at least 1 KiB
   by default — files included — with the encodings, the threshold and the
   types compressed as options. An event stream (unless `compressible` lets

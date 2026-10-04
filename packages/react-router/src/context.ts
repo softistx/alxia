@@ -2,16 +2,16 @@
  * The key under which `reactRouter()` hands every loader, action and
  * middleware the request's alxia context, and the typed way to read it.
  */
-import type { Alxia, AnyAlxia, ContextOf, Empty } from '@alxia/core';
+import type { Alxia, AnyAlxia, ContextOf, RegisteredBase } from '@alxia/core';
 import { createContext, type RouterContextProvider } from 'react-router';
-import type { FreshApp, ReactRouterServer } from './server';
+import type { ReactRouterServer } from './server';
 
 /** The default of the key: no catch-all set it. */
 const MISSING: unique symbol = Symbol('alxia context missing');
 
 /**
  * The key `reactRouter()` sets on React Router's context provider, on every
- * request, to what alxia's hooks built for it. It lives in this package, so
+ * request, to what alxia's middlewares built for it. It lives in this package, so
  * it is one object whichever way the server was built or loaded: a key made
  * in the app's own `app/` folder is copied into React Router's build, and
  * the server that imports it separately sets a different one.
@@ -35,7 +35,10 @@ export const alxiaContext = createContext<unknown>(MISSING);
  * }
  * ```
  *
- * Unregistered, `alxiaOf(context)` reads `BaseContext`.
+ * Unregistered here, `alxiaOf(context)` reads the app `@alxia/core`'s own
+ * `Register` names as its `context`, and `BaseContext` when neither is
+ * declared. When both are, this one wins: the server's app is the whole
+ * app the pages run behind, the base's context and all `configure` adds.
  */
 // biome-ignore lint/suspicious/noEmptyInterface: an app augments it
 export interface Register {}
@@ -53,26 +56,35 @@ export type InvalidRegister = Alxia<
 	{
 		readonly 'Register.server must be typeof server, the default export of createServer()': never;
 	},
-	Empty,
 	'',
 	never
 >;
 
-/** The app `alxiaOf` reads for a `Register` interface: its server's, a fresh one, or `InvalidRegister`. */
-export type RegisteredOf<R> = R extends { readonly server: infer Server }
+/**
+ * The app `alxiaOf` reads for a `Register` interface: its server's, or
+ * `InvalidRegister`; with no server, `Core`, the app `@alxia/core`'s
+ * `Register` names (a fresh one when it names none).
+ */
+export type RegisteredOf<
+	R,
+	Core extends AnyAlxia = RegisteredBase,
+> = R extends {
+	readonly server: infer Server;
+}
 	? Server extends AnyAlxia | ReactRouterServer<AnyAlxia>
 		? AppOf<Server>
 		: InvalidRegister
-	: FreshApp;
+	: Core;
 
-/** What `alxiaOf` reads with no type argument: the registered server's app, or a fresh one. */
+/** What `alxiaOf` reads with no type argument: the registered server's app, else core's registered app, else a fresh one. */
 export type RegisteredApp = RegisteredOf<Register>;
 
 /**
- * What alxia's hooks built for this request, read in a loader, an action or
+ * What alxia's middlewares built for this request, read in a loader, an action or
  * a middleware, typed by the app: the server `Register` names, or the one
  * given as the type argument — `typeof server`, or an app *before* the
- * catch-all. With neither, `BaseContext`.
+ * catch-all. With neither, the app `@alxia/core`'s `Register` names, and
+ * `BaseContext` when nothing is registered.
  *
  * ```ts
  * export async function loader({ context }: Route.LoaderArgs) {
@@ -86,12 +98,17 @@ export type RegisteredApp = RegisteredOf<Register>;
  */
 export function alxiaOf<
 	App extends AnyAlxia | ReactRouterServer<AnyAlxia> = RegisteredApp,
->(context: Readonly<RouterContextProvider>): ContextOf<AppOf<App>> {
+>(
+	context: Readonly<RouterContextProvider>,
+): ContextOf<AppOf<App>> & {
+	/** The catch-all's route, which every request reaching React Router matched. */
+	readonly route: string;
+} {
 	const value = context.get(alxiaContext);
 	if (value === MISSING) {
 		throw new Error(
 			"alxiaOf(): this request has no alxia context. Serve the React Router app through alxia: add alxia() from @alxia/react-router/vite to vite.config.ts's plugins, or, with a server of your own, serve the build through reactRouter() from @alxia/react-router.",
 		);
 	}
-	return value as ContextOf<AppOf<App>>;
+	return value as ContextOf<AppOf<App>> & { readonly route: string };
 }

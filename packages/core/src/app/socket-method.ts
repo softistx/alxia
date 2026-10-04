@@ -6,19 +6,36 @@ import type { AnyReply } from '../reply/reply';
 import type { JoinPath, PathAt, RoutePath } from '../types/path';
 import type {
 	SocketContext,
-	SocketEntryOf,
 	SocketHandlers,
 	SocketMessage,
 	SocketSchema,
 	SocketSend,
 } from '../ws/types';
 import type { Alxia } from './alxia';
+import type { NotAFunction } from './route-forms';
+import type { RouteApp } from './route-method';
+import type { SocketForms } from './socket-forms';
+import type { SocketOptionsForms } from './socket-options';
 import type { AnyRouteHook, Empty, RouteHookBase, ThreadHooks } from './types';
 
-/** `app.ws(path, schema, handlers)`, or `app.ws(path, hooks, schema, handlers)`. */
+/**
+ * `app.ws(path, options?, ...middlewares, handlers)`, see `SocketForms`;
+ * and the forms of 0.3, deprecated: `app.ws(path, schema, handlers)`, or
+ * `app.ws(path, hooks, schema, handlers)`. In the order of `RouteMethod`'s
+ * forms: the middleware forms last, where a missing requirement is
+ * reported.
+ */
 export interface SocketMethod<
 	Ctx extends object,
-	Routes extends object,
+	Prefix extends string,
+	Shortcuts extends AnyReply,
+> extends SocketOptionsForms<RouteApp<'GET', Ctx, Prefix, Shortcuts>>,
+		DeprecatedSocketForms<Ctx, Prefix, Shortcuts>,
+		SocketForms<RouteApp<'GET', Ctx, Prefix, Shortcuts>> {}
+
+/** The forms of `ws` 0.3 had, which the middleware forms replace. */
+export interface DeprecatedSocketForms<
+	Ctx extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -34,26 +51,28 @@ export interface SocketMethod<
 	 *   message: (socket, chat) => socket.publish(socket.data.params.room, chat),
 	 * });
 	 * ```
+	 *
+	 * @deprecated A schema before the handlers: give `message` and `send` as
+	 * options, and the request's schemas to a `validate(…)` middleware —
+	 * see the upgrading guide.
 	 */
 	<const Path extends RoutePath, Schema extends SocketSchema = Empty>(
 		path: PathAt<Prefix, Path>,
-		schema: Schema,
+		schema: Schema & NotAFunction,
 		handlers: SocketHandlers<
 			SocketContext<Ctx, JoinPath<Prefix, Path>, Schema>,
 			SocketSend<Schema>,
 			SocketMessage<Schema>
 		>,
-	): Alxia<
-		Ctx,
-		Routes & SocketEntryOf<JoinPath<Prefix, Path>, Schema>,
-		Prefix,
-		Shortcuts
-	>;
+	): Alxia<Ctx, Prefix, Shortcuts>;
 	/**
 	 * A WebSocket route with hooks of its own, run on the upgrade request
 	 * after the hooks before it: what they add, `socket.data` reads. A
 	 * `defineWrap` in the list is skipped, as a socket's upgrade skips
 	 * every `wrap`.
+	 *
+	 * @deprecated A list of hooks after the path: give them as middlewares,
+	 * made by `defineMiddleware` — see the upgrading guide.
 	 */
 	<
 		const Path extends RoutePath,
@@ -65,7 +84,7 @@ export interface SocketMethod<
 			NoInfer<
 				ThreadHooks<RouteHookBase<Ctx, JoinPath<Prefix, Path>>, Hooks>['checks']
 			>,
-		schema: Schema,
+		schema: Schema & NotAFunction,
 		handlers: SocketHandlers<
 			SocketContext<
 				Ctx &
@@ -79,10 +98,5 @@ export interface SocketMethod<
 			SocketSend<Schema>,
 			SocketMessage<Schema>
 		>,
-	): Alxia<
-		Ctx,
-		Routes & SocketEntryOf<JoinPath<Prefix, Path>, Schema>,
-		Prefix,
-		Shortcuts
-	>;
+	): Alxia<Ctx, Prefix, Shortcuts>;
 }

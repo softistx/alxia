@@ -18,6 +18,7 @@ behaviour that prints nothing, or an error from `tsc`. A
 - [`Property 'user' does not exist on type 'BaseContext'.`](#property-user-does-not-exist-on-type-basecontext)
 - [`Property 'params' does not exist on type 'BaseContext & …'.`](#property-params-does-not-exist-on-type-basecontext--)
 - [`Object literal may only specify known properties, and 'db' does not exist in type 'BaseContext'.`](#object-literal-may-only-specify-known-properties-and-db-does-not-exist-in-type-basecontext)
+- [`Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: string; }'`](#property-user-is-missing-in-type-basecontext--empty-but-required-in-type--user-string-)
 
 ## Runtime
 
@@ -28,16 +29,18 @@ behaviour that prints nothing, or an error from `tsc`. A
 ```text
 error TS2769: No overload matches this call.
   …
-    Argument of type '<App = undefined>(...uncalled: readonly never[]) => ContextStoragePlugin<App>' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => ContextStoragePlugin<undefined>'.
+    Argument of type '<App = Alxia<Empty, "", never>>(...uncalled: readonly never[]) => ContextStorageMiddleware<App>' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
+      …
+          Type 'BaseContext & Empty' is not assignable to type 'never'.
 ```
 
-**When:** at startup, on `.use(contextStorage)`: the factory given to `use`
-without being called.
+**When:** at startup, on `.use(contextStorage)`: the factory given to
+`app.use` without being called.
 
-**Why:** `use` takes a function as a plugin and calls it with the app.
-Called that way, `contextStorage` would return a new, empty plugin app,
-and every route declared after it would land on an app nobody serves; it
-refuses the argument instead.
+**Why:** `app.use` calls a function it is given with the app, as a plugin.
+Called that way, `contextStorage` would be handed the app, and what
+follows would be declared on a plugin nobody serves; it refuses the
+argument instead.
 
 **Fix:** call it, once, and keep the result:
 
@@ -58,13 +61,17 @@ and `getRequestContext()` all throw it.
 - in a job, a queue consumer, or a callback run by a `setInterval` started
   at startup — including a function pushed onto a queue during a request
   and run later by such a timer;
-- in a WebSocket's `open`, `message` or `close`, since a socket's upgrade
-  runs outside the plugin's hook;
+- in a route declared **before** `use(requestContext)`, or outside the
+  `group` it is used in: the middleware never ran on that request;
+- in a middleware declared before it, or in the deprecated `onRequest` and
+  `onResponse` hooks, which run outside the chain;
+- in a WebSocket's `open`, `message` or `close`, since a socket's handlers
+  run outside the chain;
 - with two copies of `@alxia/context-storage` installed: each has its own
-  store, so a plugin from one is invisible to `getContext()` from the other.
+  store, so the middleware from one is invisible to `getContext()` from the other.
 
-**Why:** the context lives in an `AsyncLocalStorage` that the plugin opens
-for each request. A callback reads the store that was current where it was
+**Why:** the context lives in an `AsyncLocalStorage` that the middleware opens
+for each request it runs on. A callback reads the store that was current where it was
 **scheduled**; anything started outside a request has none.
 
 **Fix:** in code that runs in and out of requests, use `tryContext()` —
@@ -102,7 +109,7 @@ export function auditLater(action: string): void {
 }
 ```
 
-In a socket handler, read what the upgrade's hooks added from
+In a socket handler, read what the upgrade's middlewares added from
 `socket.data`. For two copies, `bun pm ls --all | grep context-storage`
 shows them; align the versions the app and its dependencies ask for.
 
@@ -110,38 +117,34 @@ shows them; align the versions the app and its dependencies ask for.
 
 `error.code` is `'NOT_ROUTED'`.
 
-**When:** in a request, but not inside a route declared after the plugin:
+**When:** in a request the middleware ran on, but that reached no route:
+a 404 or a 405, in a middleware after `use(requestContext)`, or in code
+that middleware calls.
 
-- in a route declared **before** `use(requestContext)`, or outside the
-  `group` it is used in;
-- in an `onRequest` hook, which runs before routing;
-- in an `onResponse` hook, for a `404`, or for a request a hook declared
-  before the plugin refused — a `derive` answering `401`;
-- in code those call.
+**Why:** `use(requestContext)` on the app runs on every request, and records
+the route's context only when a route matched: for an unmatched request
+there is a request and no route.
 
-**Why:** the plugin opens the store for every request, but records the
-route's context only for the routes declared after it: until then there is
-a request and no route.
-
-**Fix:** use the plugin before the routes whose code reads it:
+**Fix:** in a middleware, or in code that also runs for a 404, read the
+request instead, which holds wherever the middleware ran:
 
 ```ts
-const app = base
-	.use(requestContext) // before every route that reads it
-	.get('/orders', async ({ reply }) => reply(200, await listOrders()));
-```
-
-In a global hook, or in code that also runs for a 404, read the request
-instead, which holds wherever there is one:
-
-```ts
+import { defineMiddleware } from '@alxia/core';
 import { getRequestContext } from '@alxia/context-storage';
 
-app.onResponse((response) => {
-	const { request, route } = getRequestContext(); // route is undefined for a 404
-	console.log(request.method, route ?? 'unmatched', response.status);
-});
+app.use(requestContext).use(
+	defineMiddleware(async (_ctx, next) => {
+		const response = await next();
+		const { request, route } = getRequestContext(); // route is undefined for a 404
+		console.log(request.method, route ?? 'unmatched', response.status);
+		return response;
+	}),
+);
 ```
+
+A route declared before the middleware, or outside its `group`, throws
+`OUTSIDE_REQUEST` instead (see above): mount it before the routes whose
+code reads it.
 
 ### A header set from a timer never reaches the response
 
@@ -175,16 +178,16 @@ error TS7022: 'requestContext' implicitly has type 'any' because it does not hav
 
 Often with `TS2448: Block-scoped variable 'requestContext' used before its declaration.`
 
-**When:** the plugin is typed by the app that uses it:
+**When:** the middleware is typed by the app that mounts it:
 
 ```ts
 export const app = alxia().decorate({ db }).use(requestContext).get(/* … */);
 export const requestContext = contextStorage<typeof app>(); // circular
 ```
 
-**Why:** `app`'s type depends on the plugin, and the plugin's on `app`.
+**Why:** `app`'s type depends on the middleware, and the middleware's on `app`.
 
-**Fix:** type it by the app as it stands **before** the plugin:
+**Fix:** type it by the app as it stands **before** the middleware:
 
 ```ts
 export const base = alxia().decorate({ db });
@@ -200,18 +203,22 @@ error TS2339: Property 'user' does not exist on type 'BaseContext'.
 
 Also as `Property 'user' does not exist on type 'BaseContext & Empty & { readonly db: … }'.`
 
-**When:** reading from `context()` a value a hook adds, and either
+**When:** reading from `context()` a value a middleware adds, and either
 
-- the plugin was made without an app type, `contextStorage()`; or
-- it is typed by `base`, and the hook adding `user` comes after it:
+- the middleware was made without an app type, `contextStorage()`, and
+  `@alxia/core`'s `Register` names no base; or
+- it is `contextStorage()` given to the registered `base` itself, which
+  cannot read `Register` while `base` is being typed; or
+- it is typed by `base`, and the middleware adding `user` comes after it:
   `base.use(requestContext).derive(() => ({ user }))`.
 
 **Why:** `context()` returns `ContextOf<App>`: what a route declared next on
-`App` reads. With no `App`, that is `BaseContext`; a hook after `App` is
+`App` reads. With no `App`, that is `BaseContext`; a middleware after `App` is
 not in it. At runtime the value is there.
 
-**Fix:** declare every hook whose values services read in `base`, then type
-the plugin by it:
+**Fix:** declare every middleware whose values services read in `base`, then type
+it by `base` — or register `base` with `@alxia/core`'s `Register` and
+give `contextStorage()` to the app after `base`, never to `base` itself:
 
 ```ts
 const base = alxia()
@@ -232,9 +239,10 @@ The same for `query`, `body` and `headers`.
 
 **When:** reading a route's validated input from `requestContext.context()`.
 
-**Why:** those belong to one route's schema, not to the app, so the app's
-context does not have them. Hooks run before validation: a `derive` reads
-them as `undefined` even at runtime.
+**Why:** those belong to one route's `validate(…)`, not to the app, so the
+app's context does not have them. The app's middlewares run before a
+route's own, `validate` among them: a `derive` reads the request as it
+arrived, the body `undefined`, even at runtime.
 
 **Fix:** pass them from the handler, or, in code that only runs under one
 route, state them:
@@ -274,3 +282,33 @@ const ctx = {
 
 runWithContext(ctx as unknown as Ctx, () => listOrders());
 ```
+
+### `Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: string; }'`
+
+```text
+error TS2769: No overload matches this call.
+  …
+          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ user: string; }>'.
+            Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: string; }'.
+```
+
+**When:** an app uses the middleware typed by another app, `contextStorage<typeof
+base>()`, or by the registered one, `contextStorage()`, and does not give
+what that app's middlewares add:
+
+```ts
+const base = alxia().derive(({ request }) => ({ user: request.headers.get('x-user') ?? 'anonymous' }));
+const requestContext = contextStorage<typeof base>();
+
+alxia().use(requestContext);
+```
+
+**Why:** `context()` would return a `user` that no middleware of this app adds:
+at runtime it would be `undefined`.
+
+**Fix:** mount it on the app it is typed by, after `base`:
+
+```ts
+base.use(requestContext);
+```
+

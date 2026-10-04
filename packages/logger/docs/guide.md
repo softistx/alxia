@@ -30,7 +30,7 @@ took in `Server-Timing`:
 ## Options
 
 ```ts
-function logger(options?: LoggerOptions): Alxia<…> // an app plugin: give it to `use`
+function logger(options?: LoggerOptions): Middleware<…> // give it to `app.use`, first
 
 interface LoggerOptions {
 	readonly write?: (entry: LogEntry) => void;
@@ -74,7 +74,7 @@ app.use(logger({ write: ({ level, message, ...fields }) => sink[level](fields, m
 ```
 
 Logging never breaks a request. A `write` that throws, or returns a
-promise that rejects, loses that entry only: the plugin catches the error
+promise that rejects, loses that entry only: the middleware catches the error
 and prints it with `console.error`. The request is answered as it would have been, with its `X-Request-Id` and
 `Server-Timing`, and a `log.info`, `log.warn` or `log.error` in a route
 does not turn it into a 500:
@@ -177,7 +177,7 @@ its error is printed with `console.error`.
 
 ## The request's entry
 
-Once a request is answered, the plugin writes one `LogEntry`:
+Once a request is answered, the middleware writes one `LogEntry`:
 
 ```ts
 interface LogEntry {
@@ -201,8 +201,8 @@ interface LogEntry {
 | `level` | `info` below 400, `warn` from 400 to 499, `error` from 500; a streamed body that was `aborted` is at least `warn`, one that `errored` is `error` |
 | `message` | `<method> <path> <status>`, then the `outcome` when it is not `completed`: `GET /events 200 aborted` |
 | `path` | the URL's path, **without** its query string, so a token in the query never reaches the log |
-| `duration` | from the plugin's `onRequest` hook to its `onResponse` hook, rounded to two decimals; for a streamed body, to the end of that body |
-| `timeToHeaders` | a streamed body's only: from the plugin's `onRequest` hook to its `onResponse` hook, when the headers leave. The key is absent on any other entry |
+| `duration` | from the moment `logger()` receives the request to the moment its response is settled, rounded to two decimals: everything after it in the chain is counted. For a streamed body, to the end of that body |
+| `timeToHeaders` | a streamed body's only: from the request to the response, when the headers leave. The key is absent on any other entry |
 | `outcome` | a streamed body's only: `completed` when it was sent whole, `aborted` when the client left before its end, `errored` when the stream failed. The key is absent on any other entry |
 | `ip` | the app's `ctx.ip`; the key is absent when it is `undefined` |
 
@@ -216,7 +216,7 @@ to the response, and `outcome` says how it ended (the schema here is Zod's,
 `bun add zod`; any Standard Schema works):
 
 ```ts
-import { alxia, eventStream } from '@alxia/core';
+import { alxia, eventStream, responds } from '@alxia/core';
 import { logger } from '@alxia/logger';
 import { z } from 'zod';
 
@@ -224,7 +224,7 @@ const Tick = eventStream(z.object({ n: z.number() }));
 
 const app = alxia()
 	.use(logger())
-	.get('/ticks', { response: { 200: Tick } }, ({ reply }) =>
+	.get('/ticks', responds({ 200: Tick }), ({ reply }) =>
 		reply(
 			200,
 			(async function* () {
@@ -239,7 +239,7 @@ const app = alxia()
 // {"level":"warn","message":"GET /ticks 200 aborted","status":200,"duration":5004.1,"timeToHeaders":0.62,"outcome":"aborted",…}
 ```
 
-The plugin passes such a body through a stream of its own, one chunk at a
+The middleware passes such a body through a stream of its own, one chunk at a
 time, and writes the entry when it is read to its end, cancelled (the
 client left: Bun cancels the body, and the cancel goes on to the source,
 so an event stream's generator is released) or failed. An endless event
@@ -253,7 +253,7 @@ JavaScript, a file with `sendfile`, and wrapping them would cost that:
 their `duration` stops when the response is handed over, so a large file
 sent to a slow client takes longer than its `duration`.
 
-A raw `Response` a hook builds (`Response.json(…)`, `new Response(Bun.file(…))`)
+A raw `Response` a handler or a middleware builds (`Response.json(…)`, `new Response(Bun.file(…))`)
 has no `Content-Length` header until Bun sends it, so it is treated as a
 stream: logged once sent, with `timeToHeaders` and an `outcome`. Set the
 header, and it is logged at once and a file is sent with `sendfile`:
@@ -263,12 +263,12 @@ const file = Bun.file('report.pdf');
 return new Response(file, { headers: { 'content-length': String(file.size) } });
 ```
 
-What decides is the `Content-Length` of the response when the plugin's
-`onResponse` hook sees it. `@alxia/compress` removes it from the body it
+What decides is the `Content-Length` of the response when `logger()`
+sees it on the way out. `@alxia/compress` removes it from the body it
 compresses: with `use(compress())` declared **before** `use(logger())`,
 a compressed JSON reply is a stream by then, and is logged with
 `timeToHeaders` and `outcome: "completed"` once sent. Declared after it,
-as the plugin should be, compress runs later and the reply is logged at
+as `logger()` should be, compress runs later and the reply is logged at
 once.
 
 `Server-Timing` leaves with the headers, before the body: its `total` is
@@ -280,10 +280,13 @@ nothing else. A handler that replies despite the abort is logged with its
 own status.
 
 Every request is answered, so every request gets an entry: a 404 or a 405
-that matched no route, a 500 from a handler that threw, a response an
-earlier `onRequest` hook sent on its own. The error behind a 500 is not in
-the entry; the app prints it with `console.error`, and
-[`onError`](#in-onerror) can log it with the request's id.
+that matched no route, a 500 from a handler that threw, a 401 a guard
+declared after `logger()` sent on its own. `logger()` settles the rest of
+the chain, so the entry holds the response the client gets, whatever
+answered it: an `onError` reply, an `HttpError`'s status, a 500. The error
+behind a 500 is not in the entry; the app prints it with `console.error`,
+and [a middleware](#in-a-middleware-that-catches-errors) can log it with
+the request's id.
 
 `ip` is the connection's address unless the app reads it otherwise. Behind
 a proxy, that is the proxy; read the header it sets with the app's `ip`
@@ -302,8 +305,8 @@ no `ip`.
 
 ## `log` and `requestId`
 
-The routes declared after `use(logger())` read two more keys from their
-context:
+The routes declared after `use(logger())`, and every middleware after it,
+read two more keys from their context. `LoggerContext` is their type:
 
 ```ts
 interface RequestLog {
@@ -312,9 +315,10 @@ interface RequestLog {
 	error(message: string, fields?: Record<string, unknown>): void;
 }
 
-// in the context of every route after `use(logger())`:
-// requestId: string
-// log: RequestLog
+interface LoggerContext {
+	readonly requestId: string;
+	readonly log: RequestLog;
+}
 ```
 
 Each call writes one entry through `write`, with the fields spread in
@@ -345,56 +349,89 @@ app.use(logger()).post('/checkout', async ({ requestId, log, reply }) => {
 
 ### Declared before, or after
 
-`log` and `requestId` come from a `derive`, so they reach only the routes
-and route hooks declared after `use(logger())`. A route declared before it
-is a compile error, `Property 'log' does not exist`
+`log` and `requestId` are added to the context by the middleware, so they
+reach only what is declared after `use(logger())`: the routes, and the
+middlewares and `derive`s that follow. A route declared before it is a
+compile error, `Property 'log' does not exist`
 ([Troubleshooting](troubleshooting.md#property-log-does-not-exist-on-type-context)).
-In a `derive` of your own, after the plugin, they are there:
+In a middleware of your own, after `logger()`, they are there, once it
+names what it reads, `defineMiddleware<LoggerContext>()`:
 
 ```ts
+import { defineMiddleware } from '@alxia/core';
+import type { LoggerContext } from '@alxia/logger';
+
 app
 	.use(logger())
-	.derive(({ request, log }) => {
-		const user = request.headers.get('x-user');
-		if (user === null) log.warn('anonymous request');
-		return { user };
-	});
+	.use(
+		defineMiddleware<LoggerContext>()(({ request, log }, next) => {
+			const user = request.headers.get('x-user');
+			if (user === null) log.warn('anonymous request');
+			return next({ user });
+		}),
+	);
 ```
 
-### In `onError`
+### In a middleware that catches errors
 
-An `onError` hook declared after the plugin reads `log`, but typed as
-possibly `undefined`: the error may have come before the plugin's `derive`
-ran. Log the error with the request's id:
+An error is a rejection through `next()`. A middleware declared **after**
+`logger()` can catch it, log it with the request's id, and rethrow it so
+the app still answers as it would have:
 
 ```ts
+import { defineMiddleware } from '@alxia/core';
+import type { LoggerContext } from '@alxia/logger';
+
 app
 	.use(logger())
-	.onError((error, { log }) => {
-		log?.error('request failed', { error: String(error) });
-		return undefined; // the app still answers 500
-	})
+	.use(
+		defineMiddleware<LoggerContext>()(async ({ log }, next) => {
+			try {
+				return await next();
+			} catch (error) {
+				log.error('request failed', { error: String(error) });
+				throw error; // the app still answers 500
+			}
+		}),
+	)
 	.get('/boom', () => {
 		throw new Error('boom');
 	});
 ```
 
 The entry `request failed` comes first, then `GET /boom 500` at `error`
-level, both with the same `requestId`.
+level, both with the same `requestId`. A `try`/`catch` declared **before**
+`logger()` still catches the error, but `logger()` logs the response the
+error would be answered with, not the catcher's reply (see
+[Where it sits in the app](#where-it-sits-in-the-app)).
+
+The deprecated `onError` hook still works, and still reads `log` after the
+middleware, typed as possibly `undefined`: an error thrown before
+`logger()` ran has no `log` yet.
 
 ## Where it sits in the app
 
-`logger()` is an app plugin: it adds the `log` and `requestId` route keys,
-and two **global** hooks, an `onRequest` that gives the request its id and
-an `onResponse` that writes the entry and sets the headers. Global hooks
-apply to the whole app, wherever they are declared, so:
+`logger()` is a middleware. It gives the request its id, adds `log` and
+`requestId` to the context, runs the rest of the chain, settles its
+response, writes the entry and sets the headers. Middlewares run in the
+order they are declared, each wrapping the next, and a `use()` on the app
+runs on **every** request, so:
 
-- every request is logged and gets the header, including the routes
-  declared before `use(logger())` and those outside a `group` that uses it;
-- the order of global hooks is the order declared. Use the plugin first, so
-  its `duration` covers the `onRequest` hooks after it. Its `onResponse`
-  then runs before those declared after it (CORS, security headers); they
-  add headers but do not change the status it logs:
+- every request is logged and gets the header, a 404 or a 405 included,
+  and including the routes declared before `use(logger())`, which however
+  do not read `log`;
+- mount it first: its `duration` then covers every middleware after it.
+  Observers (`logger`, `telemetry`, `secureHeaders`, `cors`, `compress`)
+  go first, so they wrap everything, 404s included;
+- an error-handling middleware, a `try`/`catch` around `next()`, goes
+  **after** `logger()`: `logger()` settles `next()` and logs the response the
+  error would be answered with (the route's `onError`, `HttpError` or 500),
+  then the error goes on, so a `try`/`catch` catches it wherever it stands,
+  and is logged only when it stands after `logger()`;
+- a `use()` inside a `group` stays inside it: its routes, and a request no
+  route matches under the group's prefix, are logged by it; nothing outside
+  the prefix, nor a route declared after the group. To log everything, `use`
+  it on the app.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -413,7 +450,7 @@ const app = alxia()
 body, when that body has been sent ([A streamed body](#a-streamed-body)).
 
 A WebSocket upgrade gets no entry and no header: once upgraded, there is no
-response for the `onResponse` hook to read.
+response to settle.
 
 ## Testing
 
@@ -463,5 +500,5 @@ expect(entries.at(-1)).toMatchObject({ path: '/ticks', outcome: 'aborted' });
 - [Troubleshooting](troubleshooting.md): a missing header, a missing `log`,
   an id that was not kept.
 - [`@alxia/core`'s hooks](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/hooks.md):
-  the order a request runs through `onRequest`, `derive`, `onError` and
-  `onResponse`.
+  the order a request runs through the middlewares, `derive` and the
+  deprecated hooks.

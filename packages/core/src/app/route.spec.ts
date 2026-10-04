@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
-import { alxia, type RoutesOf } from './alxia';
+import { alxia } from './alxia';
 import type { RouteOperation } from './route-operation';
 
 // As an OpenAPI code generator writes them: data, importing only the schemas.
@@ -53,24 +53,8 @@ describe('route(operation, handler)', () => {
 		expect(await (await app.request('/health')).text()).toBe('ok');
 	});
 
-	test('in the route table, as the route method would put it', () => {
-		type Routes = RoutesOf<typeof app>;
-		expectTypeOf<
-			Routes['/pets/:petId']['GET']['input']['params']
-		>().toEqualTypeOf<{ readonly petId: string | number }>();
-		expectTypeOf<Routes['/pets']['QUERY']['input']['body']>().toEqualTypeOf<{
-			name: string;
-		}>();
-		expectTypeOf<keyof Routes>().toEqualTypeOf<
-			'/pets/:petId' | '/pets' | '/health'
-		>();
-	});
-
 	test('under a prefix, and with the mistakes of a route method', () => {
-		const api = alxia({ prefix: '/api' }).route(health, ({ reply }) =>
-			reply(200, 'ok'),
-		);
-		expectTypeOf<keyof RoutesOf<typeof api>>().toEqualTypeOf<'/api/health'>();
+		alxia({ prefix: '/api' }).route(health, ({ reply }) => reply(200, 'ok'));
 		const _mistakes = () => {
 			alxia().route(
 				{
@@ -79,7 +63,9 @@ describe('route(operation, handler)', () => {
 					// @ts-expect-error the params must read the path's own
 					schema: { params: z.object({ id: z.string() }) },
 				},
-				({ reply }) => reply(200, 'x'),
+				() => {
+					throw new Error('never declared');
+				},
 			);
 			alxia().route(getPet, ({ reply }) =>
 				// @ts-expect-error 201 is not declared
@@ -93,7 +79,6 @@ describe('route(operation, handler)', () => {
 		const grouped = alxia().group('/v1', (g) =>
 			g.route({ method: 'HEAD', path: '/ping' }, ({ reply }) => reply(204)),
 		);
-		expectTypeOf<keyof RoutesOf<typeof grouped>>().toEqualTypeOf<'/v1/ping'>();
 		const response = await grouped.request('/v1/ping', { method: 'HEAD' });
 		expect(response.status).toBe(204);
 	});

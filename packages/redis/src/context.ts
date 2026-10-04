@@ -16,7 +16,7 @@ import type { z } from 'zod';
  *
  * ```ts
  * function withCaches<const Caches extends Record<string, AnyCache>>(caches: Caches) {
- *   return alxia().use(redis(client, { caches }));
+ *   return alxia().plugin(redis(client, { caches }));
  * }
  * ```
  */
@@ -57,7 +57,7 @@ export interface RedisContext<Caches extends Record<string, AnyCache>> {
  *
  * ```ts
  * const users = defineCache({ name: 'user', key: (id: string) => id, ttl: 300, schema: User });
- * app.use(redis(connection.client, { caches: { users } }))
+ * app.plugin(redis(connection.client, { caches: { users } }))
  *    .get('/users/:id', async ({ caches, params, reply }) => reply.ok(await caches.users.remember(params.id, load)));
  * ```
  */

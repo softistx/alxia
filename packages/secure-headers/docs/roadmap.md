@@ -7,7 +7,11 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **Secure headers as a middleware.** `app.use(secureHeaders())`, declared
+  first, sets the headers on every response that comes back through it, a
+  404's, an error's and a 500's included; `NonceMiddleware` gives `nonce` to the
+  routes after it and `SecureHeaders` is the plain one.
+  `app.plugin(secureHeaders())` keeps working as a deprecated alias.
 
 ## Next
 
@@ -37,7 +41,7 @@ Nothing scheduled yet.
 ### 0.1.0
 
 - **Secure headers on every response.** `secureHeaders()` is a plugin for
-  `use` that sends `Content-Security-Policy`, `Strict-Transport-Security`,
+  `app.plugin` that sends `Content-Security-Policy`, `Strict-Transport-Security`,
   `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`,
   `Cross-Origin-Opener-Policy`, `Cross-Origin-Resource-Policy`,
   `Origin-Agent-Cluster`, `X-DNS-Prefetch-Control` and

@@ -54,7 +54,7 @@ readonly fetch: (request: Request, server?: Bun.Server<unknown>) => Promise<Resp
 request(path: string, init?: RequestInit): Promise<Response>;
 ```
 
-`app.fetch` is the whole app as a fetch handler — every hook, routing,
+`app.fetch` is the whole app as a fetch handler — every middleware, routing,
 validation — and is bound, so it can be passed around:
 
 ```ts
@@ -115,7 +115,7 @@ const app = alxia({
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `ip` | `(request: Request, server: Bun.Server<unknown> \| undefined) => string \| undefined` | the connection's address | what `ctx.ip` reads, in every hook and handler |
+| `ip` | `(request: Request, server: Bun.Server<unknown> \| undefined) => string \| undefined` | the connection's address | what `ctx.ip` reads, in every middleware and handler |
 
 ## The options of `alxia()`
 
@@ -160,7 +160,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 
 | Getter | Holds |
 | --- | --- |
-| `app.routes` | every HTTP route as the app runs it (`RouteDefinition`): method, full path, schema, handler — what `@alxia/openapi` documents |
+| `app.routes` | every HTTP route as the app runs it (`RouteDefinition`): method, full path, schema, handler — what `@alxia/openapi`'s `matchesSpec` checks against the document |
 | `app.sockets` | every socket route (`SocketDefinition`) |
 | `app.server` | the server `listen` started, until `stop` |
 

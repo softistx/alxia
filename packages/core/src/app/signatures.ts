@@ -51,12 +51,12 @@ export interface ListenOptions {
 }
 
 /** Any app, whatever it holds. */
-export type AnyAlxia = Alxia<any, any, any, any>;
+export type AnyAlxia = Alxia<any, any, any>;
 
 /**
  * A plugin written as a function: it receives the app and returns it, with
  * global hooks added. A plugin that adds to the context or declares routes
- * is an app of its own, given to `use`.
+ * is an app of its own; both are given to `app.plugin`.
  */
 export type Plugin = <App extends AnyAlxia>(app: App) => App;
 
@@ -67,7 +67,6 @@ export type Plugin = <App extends AnyAlxia>(app: App) => App;
  */
 export interface RefusalMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -81,8 +80,8 @@ export interface RefusalMethod<
 	 * and the `issues`, or `body_limit`, with the route's `limit` — and
 	 * returns a reply with a 4xx status, or nothing for that kind's default.
 	 * The last one declared before a route is the one in force; a group's
-	 * stays inside it. Its reply replaces the default 400 in the type of
-	 * every such route that validates, so the client reads it:
+	 * stays inside it. Its reply replaces the default 400 of every such
+	 * route that validates:
 	 *
 	 * ```ts
 	 * .onRefusal((refusal) => refusal.kind === 'validation'
@@ -91,7 +90,7 @@ export interface RefusalMethod<
 	 * ```
 	 *
 	 * Given schemas first, its `reply` is typed by them, its reply is
-	 * checked and sent as their output, and `@alxia/openapi` documents it:
+	 * checked and sent as their output:
 	 *
 	 * ```ts
 	 * .onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' },
@@ -110,16 +109,27 @@ export interface RefusalMethod<
 	 * .onRefusal('body_limit', { response: { 413: TooLarge } }, (refusal, { reply }) =>
 	 *   reply(413, { limit: refusal.limit }))
 	 * ```
+	 *
+	 * @deprecated A refusal is thrown now — a `ValidationError`, a
+	 * `ContentTooLargeError` — so a middleware before the `validate`
+	 * answers it: `try { return await next() } catch (error) { … }`,
+	 * reading `refusalOf(error)`. See the upgrading guide.
 	 */
 	<Result extends Reply<ClientErrorStatus, any> | undefined | void>(
 		hook: (refusal: Refusal, ctx: BaseContext & Ctx) => MaybePromise<Result>,
 	): Alxia<
 		Ctx,
-		Routes,
 		Prefix,
 		Exclude<Shortcuts, Refusing> | RefusalsOf<Extract<Result, AnyReply>, Result>
 	>;
-	/** The hook answering every kind of refusal, its replies typed by `schema`. */
+	/**
+	 * The hook answering every kind of refusal, its replies typed by `schema`.
+	 *
+	 * @deprecated A refusal is thrown now — a `ValidationError`, a
+	 * `ContentTooLargeError` — so a middleware before the `validate`
+	 * answers it: `try { return await next() } catch (error) { … }`,
+	 * reading `refusalOf(error)`. See the upgrading guide.
+	 */
 	<
 		Responses extends RefusalResponses,
 		Result extends DeclaredReply<Responses> | undefined | void,
@@ -132,12 +142,18 @@ export interface RefusalMethod<
 		) => MaybePromise<Result>,
 	): Alxia<
 		Ctx,
-		Routes,
 		Prefix,
 		| Exclude<Shortcuts, Refusing>
 		| RefusalsOf<DeclaredRefusal<Responses>, Result>
 	>;
-	/** The hook answering one `kind` of refusal, read narrowed. */
+	/**
+	 * The hook answering one `kind` of refusal, read narrowed.
+	 *
+	 * @deprecated A refusal is thrown now — a `ValidationError`, a
+	 * `ContentTooLargeError` — so a middleware before the `validate`
+	 * answers it: `try { return await next() } catch (error) { … }`,
+	 * reading `refusalOf(error)`. See the upgrading guide.
+	 */
 	<
 		Kind extends RefusalKind,
 		Result extends Reply<ClientErrorStatus, any> | undefined | void,
@@ -149,12 +165,18 @@ export interface RefusalMethod<
 		) => MaybePromise<Result>,
 	): Alxia<
 		Ctx,
-		Routes,
 		Prefix,
 		| Exclude<Shortcuts, RefusingKind<Kind>>
 		| KindRefusalsOf<Kind, Extract<Result, AnyReply>, Result>
 	>;
-	/** The hook answering one `kind` of refusal, its replies typed by `schema`. */
+	/**
+	 * The hook answering one `kind` of refusal, its replies typed by `schema`.
+	 *
+	 * @deprecated A refusal is thrown now — a `ValidationError`, a
+	 * `ContentTooLargeError` — so a middleware before the `validate`
+	 * answers it: `try { return await next() } catch (error) { … }`,
+	 * reading `refusalOf(error)`. See the upgrading guide.
+	 */
 	<
 		Kind extends RefusalKind,
 		Responses extends RefusalResponses,
@@ -169,22 +191,16 @@ export interface RefusalMethod<
 		) => MaybePromise<Result>,
 	): Alxia<
 		Ctx,
-		Routes,
 		Prefix,
 		| Exclude<Shortcuts, RefusingKind<Kind>>
 		| KindRefusalsOf<Kind, DeclaredRefusal<Responses>, Result>
 	>;
 }
 
-/** The route table of an app, as the client reads it. */
-export type RoutesOf<App> = App extends { readonly '~routes': infer Routes }
-	? Routes
-	: never;
-
 /**
- * What a route declared next on `App` reads: the context its hooks build —
- * `decorate`, `derive`, every plugin's — on top of the base context. A
- * GraphQL schema, a service, types its own context with it.
+ * What a route declared next on `App` reads: the context its hooks and
+ * middlewares build — `decorate`, `derive`, `use` — on top of the base
+ * context. A GraphQL schema, a service, types its own context with it.
  */
 export type ContextOf<App> = App extends { readonly '~context': infer Ctx }
 	? BaseContext & Ctx

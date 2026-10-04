@@ -1,7 +1,7 @@
 {
 	"name": "@alxia/zod",
 	"version": "0.1.0",
-	"description": "Zod 4 for alxia: query and path coercions a client can type, and the OpenAPI converter that documents a Date as it crosses the wire",
+	"description": "Zod 4 for alxia: query and path coercions typed by what a client sends, and a Zod schema as JSON Schema 2020-12, a Date as it crosses the wire",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -41,9 +41,7 @@
 		]
 	},
 	"devDependencies": {
-		"@alxia/client": "workspace:^",
 		"@alxia/core": "workspace:^",
-		"@alxia/openapi": "workspace:^",
 		"@types/bun": "^1.4.2",
 		"zod": "^4.2.0"
 	},

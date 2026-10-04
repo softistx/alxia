@@ -1,14 +1,13 @@
 {
 	"name": "@alxia/openapi-routes",
 	"version": "0.2.0",
-	"description": "Checks that an @alxia/core app routes every operation of an OpenAPI document, and only those",
+	"description": "Deprecated: moved to @alxia/openapi, which this release re-exports",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
 	"types": "./dist/index.d.ts",
 	"files": [
 		"dist",
-		"docs",
 		"README.md",
 		"package.json",
 		"LICENSE"
@@ -42,11 +41,12 @@
 	},
 	"devDependencies": {
 		"@alxia/core": "workspace:^",
-		"@types/bun": "^1.4.2",
-		"zod": "^4.2.0"
+		"@alxia/openapi": "workspace:^",
+		"@types/bun": "^1.4.2"
 	},
 	"peerDependencies": {
 		"@alxia/core": "workspace:^",
+		"@alxia/openapi": "workspace:^",
 		"typescript": "^6.0.3 || ^7.0.0"
 	}
 }

@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
 import { HttpError } from '../errors/errors';
-import { alxia, type RoutesOf } from './alxia';
+import { alxia } from './alxia';
 
 const User = z.object({ id: z.number(), name: z.string() });
 const NotFound = z.object({ error: z.literal('not_found') });
@@ -99,10 +99,7 @@ describe('QUERY', () => {
 		expect(refused.status).toBe(400);
 	});
 
-	test('it is in the route table, and in the Allow of a 405', async () => {
-		expectTypeOf<
-			RoutesOf<typeof app>['/users']['QUERY']['input']['body']
-		>().toEqualTypeOf<{ name: string }>();
+	test('it is in the Allow of a 405', async () => {
 		const response = await call('/users', { method: 'PUT' });
 		expect(response.status).toBe(405);
 		expect(response.headers.get('allow')).toContain('QUERY');
@@ -170,15 +167,6 @@ describe('hooks', () => {
 		expect(await response.json()).toEqual({ user: 'ada' });
 	});
 
-	test("a hook's reply is in the type of the routes after it", () => {
-		type Me = RoutesOf<typeof guarded>['/me']['GET']['output'];
-		type Public = RoutesOf<typeof guarded>['/public']['GET']['output'];
-		expectTypeOf<Extract<Me, { status: 401 }>['data']>().toEqualTypeOf<{
-			error: 'unauthenticated';
-		}>();
-		expectTypeOf<Extract<Public, { status: 401 }>>().toEqualTypeOf<never>();
-	});
-
 	test('an error becomes a 500 that leaks nothing', async () => {
 		const original = console.error;
 		console.error = () => {};
@@ -218,8 +206,8 @@ describe('plugins', () => {
 		reply(200, { id: params.id }),
 	);
 	const composed = alxia({ prefix: '/api' })
-		.use(auth)
-		.use(posts)
+		.plugin(auth)
+		.plugin(posts)
 		.get('/me', ({ user, reply }) => reply(200, user));
 
 	test("a plugin's routes are mounted under the app's prefix", async () => {
@@ -227,9 +215,6 @@ describe('plugins', () => {
 			new Request('http://localhost/api/posts/7'),
 		);
 		expect(await response.json()).toEqual({ id: '7' });
-		expectTypeOf<keyof RoutesOf<typeof composed>>().toEqualTypeOf<
-			'/api/posts/:id' | '/api/me'
-		>();
 	});
 
 	test("a plugin's hooks apply to the routes after it", async () => {
@@ -309,20 +294,6 @@ describe('listen', () => {
 });
 
 describe('types', () => {
-	test('the route table records inputs and outcomes', () => {
-		type Route = RoutesOf<typeof app>['/users/:id']['GET'];
-		expectTypeOf<Route['input']>().toEqualTypeOf<{
-			readonly params: { readonly id: string | number };
-			readonly query?: { upper?: 'yes' | 'no' | undefined };
-		}>();
-		expectTypeOf<
-			Extract<Route['output'], { status: 200 }>['data']
-		>().toEqualTypeOf<{ id: number; name: string }>();
-		expectTypeOf<Route['output']['status']>().toEqualTypeOf<
-			200 | 404 | 400 | 500
-		>();
-	});
-
 	test('mistakes in a route are compile errors', () => {
 		alxia().get(
 			'/users/:id',

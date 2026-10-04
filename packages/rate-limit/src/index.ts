@@ -1,4 +1,5 @@
 export {
+	type RateLimit,
 	type RateLimitedBody,
 	type RateLimitInfo,
 	type RateLimitOptions,

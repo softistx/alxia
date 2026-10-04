@@ -1,12 +1,13 @@
 import {
-	type Alxia,
-	definePlugin,
+	defineMiddleware,
 	type Empty,
-	type Plugin,
-	type Requiring,
+	type Middleware,
+	type MiddlewareMark,
+	type Next,
+	settle,
 	withHeaders,
 } from '@alxia/core';
-import { NONCE, type NonceContext, nonceStore, policyWithNonce } from './nonce';
+import { freshNonce, NONCE, type NonceContext, policyWithNonce } from './nonce';
 
 /** A header's value, or `false` to leave it out. An empty value is refused. */
 export type Setting = string | false;
@@ -44,11 +45,22 @@ interface NonceOption {
 }
 
 /**
- * What `secureHeaders({ nonce: true })` returns: an app plugin, whose routes
- * after it read `nonce`, and whose hook sets the header with the same one.
+ * What `secureHeaders()` returns: a middleware, for `app.use`, that sets
+ * the headers on every response after it.
  */
-export type NoncePlugin = Alxia<NonceContext, Empty, '', never> &
-	Requiring<Empty>;
+export type SecureHeaders = Middleware<Empty, Promise<Response>> &
+	MiddlewareMark;
+
+/**
+ * What `secureHeaders({ nonce: true })` returns: a middleware, for
+ * `app.use`, whose routes after it read `nonce`, and which sets the header
+ * with the same one.
+ */
+export type NonceMiddleware = Middleware<Empty, Promise<Next<NonceContext>>> &
+	MiddlewareMark;
+
+/** @deprecated Renamed `NonceMiddleware`: it is a middleware. */
+export type NoncePlugin = NonceMiddleware;
 
 const DEFAULTS = {
 	'content-security-policy':
@@ -82,9 +94,10 @@ const OPTION: Record<keyof typeof DEFAULTS, keyof SecureHeadersOptions> = {
 };
 
 /**
- * Secure headers on every response, as a plugin. A header a route set
- * itself is kept: a page that needs its own `Content-Security-Policy` —
- * `@alxia/openapi`'s reference page — sets it.
+ * Secure headers on every response, as a middleware: each response of the
+ * routes after it and of a request no route matches — a 404, an error —
+ * gets them. A header a route set itself is kept: a page that needs its
+ * own `Content-Security-Policy` — `@alxia/graphql`'s IDE — sets it.
  *
  * ```ts
  * app.use(secureHeaders({ contentSecurityPolicy: "default-src 'self'" }));
@@ -101,13 +114,13 @@ const OPTION: Record<keyof typeof DEFAULTS, keyof SecureHeadersOptions> = {
  */
 export function secureHeaders(
 	options: SecureHeadersOptions & { readonly nonce: true },
-): NoncePlugin;
+): NonceMiddleware;
 export function secureHeaders(
 	options?: SecureHeadersOptions & { readonly nonce?: false },
-): Plugin;
+): SecureHeaders;
 export function secureHeaders(
 	options: SecureHeadersOptions & NonceOption = {},
-): Plugin | NoncePlugin {
+): SecureHeaders | NonceMiddleware {
 	const headers = fixedHeaders(options);
 	const hide = options.hidePoweredBy ?? true;
 	const policy = headers.get('content-security-policy');
@@ -118,7 +131,9 @@ export function secureHeaders(
 			);
 		}
 		const set = setter(headers, hide);
-		return (app) => app.onResponse((response) => set(response));
+		return defineMiddleware(async (ctx, next) =>
+			set(await settle(ctx, next())),
+		);
 	}
 	if (policy === undefined) {
 		throw new TypeError(
@@ -127,14 +142,12 @@ export function secureHeaders(
 	}
 	headers.delete('content-security-policy');
 	const withNonce = policyWithNonce(policy);
-	const nonceOf = nonceStore();
 	const set = setter(headers, hide);
-	const plugin: NoncePlugin = definePlugin()((app) =>
-		app
-			.onResponse((response, ctx) => set(response, withNonce(nonceOf(ctx.url))))
-			.derive(({ url }): NonceContext => ({ nonce: nonceOf(url) })),
-	);
-	return plugin;
+	return defineMiddleware(async (ctx, next) => {
+		const added: NonceContext = { nonce: freshNonce() };
+		const response = await settle(ctx, next(added));
+		return set(response, withNonce(added.nonce)) as typeof response;
+	});
 }
 
 /** Each header the options leave in, by name, with its value. Throws on an empty one. */
@@ -157,7 +170,7 @@ function fixedHeaders(options: SecureHeadersOptions): Map<string, string> {
 	return headers;
 }
 
-/** The `onResponse` hook: every header the response lacks, then the policy given per request. */
+/** Every header the response lacks, then the policy given per request. */
 function setter(headers: ReadonlyMap<string, string>, hide: boolean) {
 	return (response: Response, policy?: string) =>
 		withHeaders(response, (current) => {

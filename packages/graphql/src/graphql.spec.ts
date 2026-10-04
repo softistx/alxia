@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { alxia, type RoutesOf } from '@alxia/core';
+import { alxia } from '@alxia/core';
 import { createSchema, type Plugin } from 'graphql-yoga';
 import { type GraphQLContext, graphql } from './graphql';
 import { SANDBOX_POLICY } from './sandbox';
@@ -60,7 +60,7 @@ const counting: Plugin = {
 	},
 };
 
-const app = base.use((app) =>
+const app = base.plugin((app) =>
 	graphql(app, { schema, plugins: [counting], logging: false }),
 );
 
@@ -153,25 +153,18 @@ describe('graphql', () => {
 					? { viewer: 'ok' as string | null, users }
 					: reply(401, { error: 'unauthorized' as const }),
 			)
-			.use((app) => graphql(app, { schema, logging: false }));
+			.plugin((app) => graphql(app, { schema, logging: false }));
 		expect((await post(guarded, '/api/graphql', '{ me }')).status).toBe(401);
 		const ok = await post(guarded, '/api/graphql', '{ me }', {
 			authorization: 'Bearer ok',
 		});
 		expect(await ok.json()).toEqual({ data: { me: 'ok' } });
 
-		const root = alxia({ prefix: '/v1' }).use(guarded);
+		const root = alxia({ prefix: '/v1' }).plugin(guarded);
 		const mounted = await post(root, '/v1/api/graphql', '{ me }', {
 			authorization: 'Bearer ok',
 		});
 		expect(await mounted.json()).toEqual({ data: { me: 'ok' } });
-
-		expectTypeOf<
-			keyof RoutesOf<typeof guarded>
-		>().toEqualTypeOf<'/api/graphql'>();
-		expectTypeOf<
-			RoutesOf<typeof guarded>['/api/graphql']['POST']['output']['status']
-		>().toExtend<number>();
 	});
 
 	test('GraphQLContext of something that is not an app says so, not never', () => {
@@ -184,7 +177,7 @@ describe('graphql', () => {
 
 	test('a schema whose context the app does not build is a compile error', () => {
 		const _never = () =>
-			alxia().use((app) =>
+			alxia().plugin((app) =>
 				// @ts-expect-error: the schema reads `viewer` and `users`, which no hook derives
 				graphql(app, { schema }),
 			);
@@ -195,9 +188,8 @@ describe('graphql', () => {
 		const custom = alxia()
 			.decorate({ users })
 			.derive(() => ({ viewer: null as string | null }))
-			.use((app) => graphql(app, { schema, path: '/gql', logging: false }));
+			.plugin((app) => graphql(app, { schema, path: '/gql', logging: false }));
 		expect((await post(custom, '/gql', '{ __typename }')).status).toBe(200);
-		expectTypeOf<keyof RoutesOf<typeof custom>>().toEqualTypeOf<'/gql'>();
 	});
 });
 
@@ -206,7 +198,7 @@ describe('ide', () => {
 		const sandboxed = alxia({ prefix: '/api' })
 			.decorate({ users })
 			.derive(() => ({ viewer: null as string | null }))
-			.use((app) =>
+			.plugin((app) =>
 				graphql(app, {
 					schema,
 					ide: 'apollo-sandbox',
@@ -240,7 +232,7 @@ describe('ide', () => {
 		const sandboxed = alxia()
 			.decorate({ users })
 			.derive(() => ({ viewer: null as string | null }))
-			.use((app) =>
+			.plugin((app) =>
 				graphql(app, { schema, ide: 'apollo-sandbox', logging: false }),
 			);
 		const page = await sandboxed.request('/graphql', {
@@ -254,7 +246,7 @@ describe('ide', () => {
 		const bare = alxia()
 			.decorate({ users })
 			.derive(() => ({ viewer: null as string | null }))
-			.use((app) => graphql(app, { schema, ide: false, logging: false }));
+			.plugin((app) => graphql(app, { schema, ide: false, logging: false }));
 		const page = await bare.request('/graphql', {
 			headers: { accept: 'text/html' },
 		});

@@ -36,6 +36,7 @@ goes wrong prints nothing at all, and is under [Traps](#traps), by symptom.
 - [Old data after a write](#old-data-after-a-write)
 - [A hard reload shows new data, a plain reload the old](#a-hard-reload-shows-new-data-a-plain-reload-the-old)
 - [Responses are kept for hours](#responses-are-kept-for-hours)
+- [A header is missing from a cached answer, or repeated in it](#a-header-is-missing-from-a-cached-answer-or-repeated-in-it)
 
 ## Types
 
@@ -66,10 +67,10 @@ declared before `use(cache(…))`.
 error TS2339: Property 'cache' does not exist on type 'Context<Empty, "/x", Empty>'.
 ```
 
-**Why:** the plugin is a route hook: it applies to, and adds `cache` to, the
+**Why:** the cache is a middleware: it applies to, and adds `cache` to, the
 routes declared after it. The route before it is not cached either.
 
-**Fix:** declare the route after the plugin:
+**Fix:** declare the route after the cache:
 
 ```ts
 alxia()
@@ -93,14 +94,14 @@ error TS2339: Property 'users' does not exist on type 'CacheControls'.
 At run time, without a typecheck, the route answers a 500 with
 `TypeError: undefined is not an object (evaluating 'cache.users.remember')`.
 
-**Why:** `ctx.cache` is this plugin's controls, `{ tag, skip }`, and
+**Why:** `ctx.cache` is this middleware's controls, `{ tag, skip }`, and
 nothing else.
 
-**Fix:** read the other plugin's name for it:
+**Fix:** read the other plugin's name for it (`redis()` is still a plugin, given to `app.plugin`):
 
 ```ts
 alxia()
-	.use(redis(connection.client, { caches: { users } }))
+	.plugin(redis(connection.client, { caches: { users } }))
 	.use(cache({ ttl: 60 }))
 	.get('/users/:id', async ({ caches, cache, params, reply }) => {
 		cache.tag(`user:${params.id}`);
@@ -111,7 +112,7 @@ alxia()
 ### `Property 'user' does not exist on type 'BaseContext & Empty'`
 
 **When:** a `key` or `tags` function reads something an earlier `derive`,
-`decorate` or plugin added to the context, and `cache` is not told about it.
+`decorate` or middleware added to the context, and `cache` is not told about it.
 
 ```text
 error TS2339: Property 'user' does not exist on type 'BaseContext & Empty'.
@@ -136,13 +137,13 @@ const auth = alxia().derive(({ request }) => ({
 	user: { tenantId: request.headers.get('x-tenant') ?? 'public' },
 }));
 
-alxia().use(auth).use(perTenant); // auth derives user
+alxia().plugin(auth).use(perTenant); // auth derives user
 ```
 
 On an app that does not give `user`, `use(perTenant)` is a compile error:
-[`the plugin reads "user", which this app's context does not give`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first),
-or [`… gives with another type`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-gives-with-another-type)
-when its `user` is not `{ tenantId: string }`.
+`Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: { tenantId: string; }; }'`,
+or `Types of property 'user' are incompatible` when its `user` is not
+`{ tenantId: string }`.
 See [Reading the app's context](guide/keys-and-vary.md#reading-the-apps-context).
 
 To tag by what only the route knows — the product it loaded — tag from the
@@ -233,7 +234,7 @@ error TS2322: Type '(_key: string) => CachedResponse | null' is not assignable t
     Type 'null' is not assignable to type 'CachedResponse | Promise<CachedResponse | undefined> | undefined'.
 ```
 
-**Why:** the plugin treats `undefined` as a miss; it would read `null` as a
+**Why:** the cache treats `undefined` as a miss; it would read `null` as a
 response.
 
 **Fix:** turn the client's `null` into `undefined`:
@@ -325,8 +326,9 @@ fails is what stale-while-revalidate is for. Fix the route; keep
 | Cause | Fix |
 | --- | --- |
 | the route is declared before `use(cache(…))` | declare it after |
-| the response sets a cookie — a session plugin that touches every response, say | move the routes that set it before the cache, or stop it setting a cookie on public pages |
+| the response sets a cookie — a session middleware that touches every response, say | move the routes that set it before the cache, or stop it setting a cookie on public pages |
 | the response says `Cache-Control: private` or `no-store` | intended: it is personal |
+| the request carries `Authorization` or `Cookie` | see [below](#no-x-cache-header-on-a-request-with-authorization-or-cookie) |
 | its status is not in `statuses` (`[200]`) | `statuses: [200, 404]` |
 | it is `text/event-stream` | intended: a stream is never kept |
 | the route called `cache.skip()` | intended |
@@ -335,6 +337,34 @@ fails is what stale-while-revalidate is for. Fix the route; keep
 | the method is not `GET` or `HEAD` | intended |
 | `honorClientNoCache: true`, and the request said `Cache-Control: no-cache` | see [below](#a-hard-reload-shows-new-data-a-plain-reload-the-old) |
 | `debugHeaders: false` | the cache works; it just does not say so |
+
+### No `X-Cache` header on a request with `Authorization` or `Cookie`
+
+**When:** the same route hits from curl with no credential, and a request
+with a bearer token or a browser's cookies gets no `X-Cache` and runs the
+route every time.
+
+**Why:** the answer to a request carrying `Authorization` or `Cookie` is
+taken for that sender's own (RFC 9111 §3.5), and never kept, unless the
+response says it may be shared or the key tells senders apart. Without it,
+the first caller's `/me` would be served to every later one.
+
+**Fix:** when the response really is the same for everyone, say so; when it
+is per user, key by the user:
+
+```ts
+// The same for every caller: kept, and served to all.
+app.get('/catalogue', ({ reply }) => reply(200, items, { headers: { 'cache-control': 'public, max-age=60' } }));
+
+// Per token: each Authorization value is a key of its own.
+cache({ ttl: 60, vary: ['authorization'] });
+
+// Per user, for a cookie session: a key of your own lifts the Cookie rule.
+cache<{ user: { id: string } }>({ ttl: 60, key: ({ user, url }) => `${user.id}:${url.pathname}${url.search}` });
+```
+
+A `key` does not lift the `Authorization` rule: name it in `vary`, or answer
+`public`, `s-maxage` or `must-revalidate`.
 
 ### `X-Cache: MISS` on every request
 
@@ -413,13 +443,18 @@ app.use(cache({ ttl: 60, vary: ['accept-encoding'] }))
 
 ### One visitor sees another visitor's page
 
-**When:** a route that answers by who is asking — a `Cookie`, an
-`Authorization` header — is behind the cache with the default key, and its
-response says nothing about it. curl, with no cookie, shows nothing wrong;
-a signed-in browser does.
+**When:** a route that answers by who is asking is behind the cache, its
+response says nothing about it, and the cache cannot tell: a `key` of your
+own that does not read the user, behind a cookie session; a credential the
+cache does not know — an `X-Api-Key` header, a token in the query; or a
+response that says `public`. curl, with no credential, shows nothing wrong;
+a signed-in client does.
 
-**Why:** the default key is the path and query only. The first visitor's
-response is kept, and served to everyone after.
+**Why:** the default key is the path and query only. A request carrying
+`Authorization` or `Cookie` is not kept by default
+([Personal responses](guide/keys-and-vary.md#personal-responses)), but a
+`key` of yours lifts the `Cookie` rule, and any other credential is not
+seen. The first visitor's response is kept, and served to everyone after.
 
 **Fix:** say the response is personal — it is then never kept, nor handed
 to a concurrent request:
@@ -488,4 +523,24 @@ not to refresh it.
 
 ```ts
 cache({ ttl: 60, staleWhileRevalidate: 300 });  // one minute fresh, five more stale
+```
+
+### A header is missing from a cached answer, or repeated in it
+
+**When:** a header another middleware sets (CORS, a request id, secure
+headers) is absent on a hit, or a hit replays a value from a long-gone
+request.
+
+**Why:** a middleware declared **after** the cache runs on a miss only, and
+what it adds to the response is kept and replayed. One declared **before**
+it runs on every answer, hit or not, on the way out, and its headers are
+not kept.
+
+**Fix:** declare what must be on every answer before the cache:
+
+```ts
+const app = alxia()
+	.use(cors())                         // every answer, a hit included
+	.use(cache({ ttl: 60 }))
+	.get('/products', ({ reply }) => reply(200, []));
 ```

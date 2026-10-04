@@ -41,8 +41,10 @@
 		]
 	},
 	"devDependencies": {
-		"@alxia/client": "workspace:^",
 		"@alxia/core": "workspace:^",
+		"@alxia/i18n": "workspace:^",
+		"@alxia/language": "workspace:^",
+		"@nxgt/i18n": "^2.0.0",
 		"@nxgt/janus": "^0.17.1",
 		"@types/bun": "^1.4.2",
 		"zod": "^4.6.5"

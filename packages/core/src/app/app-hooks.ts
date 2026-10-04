@@ -16,9 +16,14 @@ import type {
 export interface RequestHookMethod<App> {
 	/**
 	 * A global hook run on every request, before routing: a 404 included. A
-	 * `Response` it returns is sent as it is, and is no part of any route's
-	 * type: use it for what a typed client never asks — a CORS preflight, a
-	 * redirect to HTTPS. What a client must read belongs in `derive`.
+	 * `Response` it returns is sent as it is, and no route's schemas check
+	 * it: use it for what no operation of the API describes — a CORS
+	 * preflight, a redirect to HTTPS. What a client must read belongs in a
+	 * middleware, or in `derive`.
+	 *
+	 * @deprecated A middleware given to `use` first runs on every request
+	 * too, a 404 included: `use(defineMiddleware((ctx, next) => early ??
+	 * next()))`. See the upgrading guide.
 	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	(hook: RequestHook): App;
@@ -29,7 +34,11 @@ export interface ResponseHookMethod<App> {
 	/**
 	 * A global hook run on every response, in the order declared: headers,
 	 * compression, logging. A `Response` it returns replaces the one sent;
-	 * keep its status, which the client's types promise.
+	 * keep its status, which the API's document promises.
+	 *
+	 * @deprecated A middleware given to `use` first sees every response,
+	 * a 404 included: `const response = await settle(ctx, next())`, then
+	 * return it or another. See the upgrading guide.
 	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	(hook: ResponseHook): App;
@@ -51,6 +60,11 @@ export interface AroundMethod<App> {
 	 *   return response;
 	 * });
 	 * ```
+	 *
+	 * @deprecated A middleware given to `use` first runs around every
+	 * request, a 404 included, and what it awaits runs in its async
+	 * context: `use(defineMiddleware((ctx, next) => storage.run(store, next)))`.
+	 * See the upgrading guide.
 	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	(hook: AroundHook): App;

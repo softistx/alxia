@@ -3,20 +3,14 @@
  * path; `file`, one file at a path; `page`, one of Bun's HTML bundles.
  */
 import type { AnyReply } from '../reply/reply';
-import type {
-	FileOptions,
-	FileSource,
-	StaticOptions,
-	StaticReply,
-} from '../static/types';
-import type { JoinPath, PathAt, RoutePath, StaticPath } from '../types/path';
+import type { FileOptions, FileSource, StaticOptions } from '../static/types';
+import type { PathAt, RoutePath, StaticPath } from '../types/path';
 import type { Alxia } from './alxia';
-import type { BaseContext, Empty, MaybePromise, RouteEntryOf } from './types';
+import type { BaseContext, MaybePromise } from './types';
 
 /** `app.static(path, source, options?)`. */
 export interface StaticMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -41,25 +35,12 @@ export interface StaticMethod<
 		path: PathAt<Prefix, Path, StaticPath<Path>>,
 		source: FileSource,
 		options?: StaticOptions,
-	): Alxia<
-		Ctx,
-		Routes &
-			RouteEntryOf<
-				'GET',
-				JoinPath<Prefix, StaticPath<Path>>,
-				Empty,
-				StaticReply,
-				Shortcuts
-			>,
-		Prefix,
-		Shortcuts
-	>;
+	): Alxia<Ctx, Prefix, Shortcuts>;
 }
 
 /** `app.file(path, file, options?)`. */
 export interface FileMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -76,19 +57,7 @@ export interface FileMethod<
 			| Blob
 			| ((ctx: BaseContext & Ctx) => MaybePromise<Blob | null | undefined>),
 		options?: FileOptions,
-	): Alxia<
-		Ctx,
-		Routes &
-			RouteEntryOf<
-				'GET',
-				JoinPath<Prefix, Path>,
-				Empty,
-				StaticReply,
-				Shortcuts
-			>,
-		Prefix,
-		Shortcuts
-	>;
+	): Alxia<Ctx, Prefix, Shortcuts>;
 }
 
 /** `app.page(path, bundle)`. */

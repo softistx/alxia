@@ -3,5 +3,12 @@
 	"compilerOptions": {
 		"outDir": "dist"
 	},
-	"include": ["src", "test"]
+	"include": ["src", "test"],
+	"exclude": [
+		"node_modules",
+		"dist",
+		"test/register",
+		"test/messages",
+		"test/declarations/registered.ts"
+	]
 }

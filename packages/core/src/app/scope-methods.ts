@@ -15,7 +15,6 @@ import type {
 /** `app.decorate(values)`. */
 export interface DecorateMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -23,21 +22,19 @@ export interface DecorateMethod<
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	<const Values extends object>(
 		values: Values,
-	): Alxia<Ctx & Values, Routes, Prefix, Shortcuts>;
+	): Alxia<Ctx & Values, Prefix, Shortcuts>;
 }
 
 /** `app.derive(hook)`. */
 export interface DeriveMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
 	/**
 	 * A hook run on every request to a route declared after it, before the
 	 * request is validated. What it returns is added to the context; a reply
-	 * it returns ends the request, and is added to the type of every such
-	 * route, so the client reads it:
+	 * it returns ends the request:
 	 *
 	 * ```ts
 	 * .derive(async ({ request, reply }) => {
@@ -54,7 +51,6 @@ export interface DeriveMethod<
 			(Exclude<Result, AnyReply> extends infer Added extends object
 				? Added
 				: Empty),
-		Routes,
 		Prefix,
 		Shortcuts | Extract<Result, AnyReply>
 	>;
@@ -63,7 +59,6 @@ export interface DeriveMethod<
 /** `app.wrap(hook)`. */
 export interface WrapMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -78,6 +73,10 @@ export interface WrapMethod<
 	 * .wrap(async ({ request, reply }, next) =>
 	 *   (await locks.tryRun(request, next)) ?? reply(409, { error: 'busy' as const }))
 	 * ```
+	 *
+	 * @deprecated A middleware that awaits `next()`, given to `use`, does
+	 * the same; a refusal reaches it thrown, where a `wrap`'s `next()`
+	 * resolves to its 400. See the upgrading guide.
 	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	<Result extends AnyReply | Response>(
@@ -85,13 +84,12 @@ export interface WrapMethod<
 			ctx: BaseContext & Ctx,
 			next: () => Promise<Response>,
 		) => MaybePromise<Result>,
-	): Alxia<Ctx, Routes, Prefix, Shortcuts | Extract<Result, AnyReply>>;
+	): Alxia<Ctx, Prefix, Shortcuts | Extract<Result, AnyReply>>;
 }
 
 /** `app.bodyLimit(bytes)`. */
 export interface BodyLimitMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -110,13 +108,12 @@ export interface BodyLimitMethod<
 	 * ```
 	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
-	(bytes: number): Alxia<Ctx, Routes, Prefix, Shortcuts | BodyLimitShortcut>;
+	(bytes: number): Alxia<Ctx, Prefix, Shortcuts | BodyLimitShortcut>;
 }
 
 /** `app.onError(hook)`. */
 export interface ErrorMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -124,6 +121,10 @@ export interface ErrorMethod<
 	 * A hook that turns an error thrown by a route declared after it into a
 	 * reply. Returning nothing lets the next one try; past the last, an
 	 * `HttpError` is answered as it says and anything else as a 500.
+	 *
+	 * @deprecated A middleware given to `use` catches what the rest
+	 * throws: `try { return await next() } catch (error) { … }`, returning
+	 * a reply or throwing it on. See the upgrading guide.
 	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	<Result extends AnyReply | undefined | void>(
@@ -131,5 +132,5 @@ export interface ErrorMethod<
 			error: unknown,
 			ctx: BaseContext & Partial<Ctx>,
 		) => MaybePromise<Result>,
-	): Alxia<Ctx, Routes, Prefix, Shortcuts | Extract<Result, AnyReply>>;
+	): Alxia<Ctx, Prefix, Shortcuts | Extract<Result, AnyReply>>;
 }

@@ -1,4 +1,4 @@
-import { afterAll, describe, expect, expectTypeOf, test } from 'bun:test';
+import { afterAll, describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import type {
 	Refusal,
@@ -6,7 +6,7 @@ import type {
 	ValidationErrorBody,
 } from '../errors/errors';
 import { problem } from '../reply/problem';
-import { type AnyAlxia, alxia, type RoutesOf } from './alxia';
+import { type AnyAlxia, alxia } from './alxia';
 
 const Id = z.object({ id: z.coerce.number().int().positive() });
 const Name = z.object({ name: z.string().min(1) });
@@ -28,15 +28,6 @@ const jmapProblem = (refusal: Refusal) =>
 				status: 400,
 				detail: `the ${refusal.part} is invalid`,
 			});
-
-/** As the client reads it: the problem `jmapProblem` builds, its `detail` typed by the part. */
-type Jmap400 = {
-	type:
-		| 'urn:ietf:params:jmap:error:notJSON'
-		| 'urn:ietf:params:jmap:error:notRequest';
-	status: 400;
-	detail: `the ${RequestPart} is invalid`;
-};
 
 /** A JMAP-like app: problems for every route declared after the hook. */
 const jmap = alxia()
@@ -240,8 +231,8 @@ for (const [name, transport] of Object.entries(transports)) {
 			);
 			const app = alxia()
 				.onRefusal(() => problem({ status: 400, detail: 'app' }))
-				.use(plain)
-				.use(own)
+				.plugin(plain)
+				.plugin(own)
 				// The plugin's hook now applies to the routes after it, as its derives do.
 				.post('/after', { body: Name }, ({ reply }) => reply(200, 'ok'));
 			const call = transport(app);
@@ -321,98 +312,7 @@ describe('onRefusal on a socket route', () => {
 	});
 });
 
-describe('onRefusal, typed', () => {
-	type Output<
-		App,
-		Path extends keyof RoutesOf<App>,
-		M extends keyof RoutesOf<App>[Path],
-	> = RoutesOf<App>[Path][M] extends { readonly output: infer O } ? O : never;
-	type At<O, Status extends number> =
-		Extract<O, { status: Status }> extends { readonly data: infer Data }
-			? Data
-			: never;
-
-	test('the hook’s reply replaces the default 400 of the routes after it', () => {
-		type Api = Output<typeof jmap, '/api', 'POST'>;
-		expectTypeOf<At<Api, 400>>().toEqualTypeOf<Jmap400>();
-		// The hook answers 413 to a body_limit: its type does not say which kind, so the 413 is there too.
-		expectTypeOf<Api['status']>().toEqualTypeOf<200 | 400 | 413 | 500>();
-		type Download = Output<typeof jmap, '/download/:id', 'GET'>;
-		expectTypeOf<At<Download, 400>>().toEqualTypeOf<Jmap400>();
-		type Before = Output<typeof jmap, '/before', 'POST'>;
-		expectTypeOf<At<Before, 400>>().toEqualTypeOf<ValidationErrorBody>();
-		// A route that validates nothing is never refused.
-		type Health = Output<typeof jmap, '/health', 'GET'>;
-		expectTypeOf<Health['status']>().toEqualTypeOf<200 | 500>();
-	});
-
-	test('a hook that may return nothing keeps the default beside its reply; another status replaces 400', () => {
-		const app = alxia()
-			.onRefusal((refusal) =>
-				refusal.kind === 'validation' && refusal.part === 'body'
-					? problem({ status: 422, detail: 'body' })
-					: undefined,
-			)
-			.post('/a', { body: Name }, ({ reply }) => reply(200, 'ok'));
-		type A = Output<typeof app, '/a', 'POST'>;
-		expectTypeOf<A['status']>().toEqualTypeOf<200 | 400 | 422 | 500>();
-		expectTypeOf<At<A, 400>>().toEqualTypeOf<ValidationErrorBody>();
-		expectTypeOf<At<A, 422>>().toEqualTypeOf<{
-			status: 422;
-			detail: 'body';
-		}>();
-	});
-
-	test('declared schemas type the reply, as their output', () => {
-		const app = alxia()
-			.onRefusal(
-				{ response: { 400: z.object({ detail: z.string().default('x') }) } },
-				(_, { reply }) => reply(400, {}),
-			)
-			.post('/a', { body: Name }, ({ reply }) => reply(200, 'ok'));
-		type A = Output<typeof app, '/a', 'POST'>;
-		expectTypeOf<At<A, 400>>().toEqualTypeOf<{ detail: string }>();
-	});
-
-	test('group scoping and plugins, in the types as at runtime', () => {
-		const own = alxia()
-			.onRefusal(() => problem({ status: 400, detail: 'own' }))
-			.post('/own', { body: Name }, ({ reply }) => reply(200, 'ok'));
-		const plain = alxia().post('/plain', { body: Name }, ({ reply }) =>
-			reply(200, 'ok'),
-		);
-		const app = alxia()
-			.group('/v2', (v2) =>
-				v2
-					.onRefusal(() => problem({ status: 422, detail: 'v2' }))
-					.post('/a', { body: Name }, ({ reply }) => reply(200, 'ok')),
-			)
-			.post('/a', { body: Name }, ({ reply }) => reply(200, 'ok'))
-			.onRefusal(() => problem({ status: 400, detail: 'app' }))
-			.use(plain)
-			.use(own)
-			.post('/after', { body: Name }, ({ reply }) => reply(200, 'ok'));
-		type Status<Path extends keyof RoutesOf<typeof app>> = Output<
-			typeof app,
-			Path,
-			'POST' & keyof RoutesOf<typeof app>[Path]
-		>;
-		expectTypeOf<Status<'/v2/a'>['status']>().toEqualTypeOf<200 | 422 | 500>();
-		expectTypeOf<At<Status<'/a'>, 400>>().toEqualTypeOf<ValidationErrorBody>();
-		expectTypeOf<At<Status<'/plain'>, 400>>().toEqualTypeOf<{
-			status: 400;
-			detail: 'app';
-		}>();
-		expectTypeOf<At<Status<'/own'>, 400>>().toEqualTypeOf<{
-			status: 400;
-			detail: 'own';
-		}>();
-		expectTypeOf<At<Status<'/after'>, 400>>().toEqualTypeOf<{
-			status: 400;
-			detail: 'own';
-		}>();
-	});
-
+describe('onRefusal, its mistakes', () => {
 	test('mistakes are compile errors', () => {
 		// Never called: only compiled.
 		const _mistakes = () => {

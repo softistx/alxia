@@ -1,5 +1,10 @@
 export { base64url } from './base64url';
-export { type BearerOptions, bearer, type UnauthorizedBody } from './bearer';
+export {
+	type Bearer,
+	type BearerOptions,
+	bearer,
+	type UnauthorizedBody,
+} from './bearer';
 export {
 	type Algorithm,
 	createJwt,

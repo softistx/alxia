@@ -22,7 +22,7 @@ describe('PEER_RANGES', () => {
 			'react-router': reactRouter['react-router'] as string,
 			vite: reactRouter['vite'] as string,
 		});
-		for (const dir of ['client', 'react-router', 'zod']) {
+		for (const dir of ['react-router', 'zod']) {
 			expect((await peersOf(dir))['typescript']).toBe(PEER_RANGES.typescript);
 		}
 	});
@@ -36,8 +36,8 @@ describe('alxiaRanges', () => {
 
 	test("in the workspace, workspace:^ reads as ^ and the sibling's version, as bun publish writes it", async () => {
 		expect(await alxiaRanges()).toEqual({
-			'@alxia/client': `^${await versionOf('client')}`,
 			'@alxia/core': `^${await versionOf('core')}`,
+			'@alxia/openapi': `^${await versionOf('openapi')}`,
 			'@alxia/react-router': `^${await versionOf('react-router')}`,
 		});
 	});
@@ -50,15 +50,15 @@ describe('alxiaRanges', () => {
 			file,
 			JSON.stringify({
 				devDependencies: {
-					'@alxia/client': '^0.2.1',
 					'@alxia/core': '^0.3.0',
+					'@alxia/openapi': '^0.4.0',
 					'@alxia/react-router': '^0.2.0',
 				},
 			}),
 		);
 		expect(await alxiaRanges(new URL(`file://${file}`))).toEqual({
-			'@alxia/client': '^0.2.1',
 			'@alxia/core': '^0.3.0',
+			'@alxia/openapi': '^0.4.0',
 			'@alxia/react-router': '^0.2.0',
 		});
 	});
@@ -69,7 +69,7 @@ describe('alxiaRanges', () => {
 		const file = join(dir, 'package.json');
 		await Bun.write(file, JSON.stringify({ devDependencies: {} }));
 		await expect(alxiaRanges(new URL(`file://${file}`))).rejects.toThrow(
-			'@alxia/create: its package.json names no @alxia/client',
+			'@alxia/create: its package.json names no @alxia/core',
 		);
 	});
 });

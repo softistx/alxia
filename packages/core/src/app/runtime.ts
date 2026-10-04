@@ -8,10 +8,17 @@ import type { Globals, Runtime } from './definition';
 import { addPage } from './pages';
 import type { AlxiaOptions } from './signatures';
 
-/** A new app's runtime: no route, no global hook. */
-export function createRuntime(options: AlxiaOptions<string>): Runtime {
+/**
+ * A new app's runtime: no route, no global hook; `unmatched` reads the
+ * chain of its scope.
+ */
+export function createRuntime(
+	options: AlxiaOptions<string>,
+	unmatched: Runtime['unmatched'],
+): Runtime {
 	return {
 		router: new Router(),
+		unmatched,
 		globals: {
 			around: [],
 			onRequest: [],
@@ -19,6 +26,7 @@ export function createRuntime(options: AlxiaOptions<string>): Runtime {
 			onStart: [],
 			onStop: [],
 			parsers: [],
+			middlewares: [],
 			pages: new Map(),
 		},
 		validateResponses: options.validateResponses ?? true,
@@ -44,6 +52,7 @@ export function mergeGlobals(
 	runtime.globals.onStart.push(...globals.onStart);
 	runtime.globals.onStop.push(...globals.onStop);
 	runtime.globals.parsers.push(...globals.parsers);
+	runtime.globals.middlewares.push(...globals.middlewares);
 	for (const [path, bundle] of globals.pages) {
 		addPage(runtime, joinPath(prefix, path), bundle);
 	}

@@ -115,7 +115,7 @@ const tenant = definePlugin<{ user: string }>()((app) =>
 export function plugged() {
 	return alxia()
 		.derive(() => ({ user: 'u' }))
-		.use(tenant)
+		.plugin(tenant)
 		.get('/', ({ tenant: t, reply }) => reply(200, t));
 }
 
@@ -197,6 +197,8 @@ export function hooked() {
 export function methods() {
 	const app = alxia().derive(() => ({ user: 'u' }));
 	return {
+		get: app.get,
+		ws: app.ws,
 		static: app.static,
 		file: app.file,
 		page: app.page,

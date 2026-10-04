@@ -7,7 +7,15 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **Middlewares around the pages.** `beforeAll` and `configure` take
+  `use(logger())`, `use(secureHeaders())` and the other middlewares of
+  alxia 0.4, which run on the pages, the client's files declared after
+  them, and every request no route matches; the hooks they replace still
+  work, deprecated.
+- **Loaders typed by core's `Register`.** `alxiaOf(context)` reads the base
+  `@alxia/core`'s `Register` names when this package's names no server, so
+  an app that registers its context once types its loaders too. This
+  package's `Register` still wins when both are declared.
 
 ## Next
 
@@ -29,9 +37,9 @@ Nothing scheduled yet.
   only behind `future.v8_middleware`, and the line is in maintenance.
 - **Node or Cloudflare.** alxia is a Bun framework; React Router's own
   adapters serve those runtimes.
-- **The pages in the route table.** Documents and single-fetch data are not
-  something the typed client calls, so the catch-all stays out of
-  `RoutesOf`.
+- **The pages in the OpenAPI document.** Documents and single-fetch data
+  are not something a generated client calls, so `isReactRouterRoute`
+  leaves the catch-all out of `matchesSpec`'s check.
 - **A runtime dependency.** The package declares none: `@alxia/core` and
   `react-router` are peers.
 - **A `react-router-serve` of its own.** `bun build/server/index.js` is the
@@ -90,7 +98,8 @@ Nothing scheduled yet.
 - **`HEAD` with headers.** A `HEAD` is answered as its `GET`, less the
   body.
 - **OpenAPI.** `isReactRouterRoute` leaves the catch-all and the client's
-  files out of `@alxia/openapi`'s document.
+  files out of a check of `app.routes` against the document, such as
+  `@alxia/openapi`'s `matchesSpec`.
 - **Zero config, with Vite.** `@alxia/react-router/vite`'s `alxia()`,
   anywhere in `plugins`, is all an app from the official template needs.
   Without `app/server.ts` a default server serves the pages; with it,

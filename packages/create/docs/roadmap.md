@@ -7,7 +7,11 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **The `api` project split across files.** `src/context.ts` holds the
+  base the routes read and registers it with `@alxia/core`'s `Register`;
+  `src/routes/todos.ts` binds the operations with `defineRoutes()`,
+  reading that context with no import of the app; `src/app.ts` mounts
+  them, `base.plugin(todoRoutes)`.
 
 ## Next
 
@@ -23,12 +27,40 @@ Nothing scheduled yet.
   output, committed and copied: a new project needs nothing but the
   registry, and no change upstream can stop the command. It is generated
   again from the scaffold when React Router ships a new major.
+- **Generating the `api` project's code at install or build.**
+  `src/generated/` is committed: `bun install` runs no script, the
+  `Dockerfile` needs no generation step, a clone builds offline, and a
+  review shows what a change to `openapi.yaml` changed in the code.
+  `bun run verify`'s `generate --check` keeps the files equal to the spec.
+- **Generating the OpenAPI document from the app.** The document is
+  written first and the routes are bound to it; a spec read back from the
+  code would describe whatever the code does.
 - **A runtime dependency.** The prompts are Bun's `prompt()`, the registry
   is read with `fetch`, versions are compared with `Bun.semver`.
 
 ## Shipped
 
-### Next release
+### 0.1.6
+
+- **The `api` project is OpenAPI spec first.** `openapi.yaml` declares
+  its operations; `bun run generate` writes `src/generated/` from it with
+  `@nxgt/openapi-codegen`, committed, so the project and its image build
+  with no generation step and offline; `src/app.ts` binds each operation
+  with `route(operations.createTodo, requireKey, handler)`, which
+  validates the request and checks the handler's reply against the spec; the
+  spec asserts `matchesSpec` from `@alxia/openapi`, so no operation lacks
+  a route; and `bun run verify` starts with `generate --check`, which
+  fails when `src/generated/` drifts from `openapi.yaml`. New projects
+  install `@alxia/openapi` at the version this release was published
+  beside, and `@nxgt/openapi-codegen` pinned exactly, at the version the template ships.
+- **The `api` project is written in `@alxia/core`'s middleware model.**
+  `requireKey` is a `defineMiddleware` that answers 401 before the body
+  is read, given to the route among its middlewares.
+- **No client package in a new project.** The `api` template's spec calls
+  the app with `app.request()`; a typed client is generated from
+  `openapi.yaml`, with a generator such as `@nxgt/openapi-codegen`.
+
+### 0.1.5
 
 - **Both projects lint and format with Biome.** Each has a `biome.json`
   of its own (recommended rules, spaces and double quotes, imports
@@ -78,8 +110,8 @@ Nothing scheduled yet.
   template ships inside `@alxia/create`, with alxia's layer, and is copied
   as it is: no `create-react-router` runs, and no change in it can make the
   command refuse.
-- **alxia's packages resolve at creation too.** `@alxia/core`,
-  `@alxia/client` and `@alxia/react-router` move to the newest version
+- **alxia's packages resolve at creation too.** `@alxia/core`
+  and `@alxia/react-router` move to the newest version
   within the ranges `@alxia/create` was published with. Right after a
   release, while the registry does not serve that version yet, the newest
   of the same minor is written, so `bun install` no longer fails with

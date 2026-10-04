@@ -6,7 +6,7 @@ cookie that tells `janus()` a sign-in comes from a device it has seen
 before — and the unbound functions for code outside a route.
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { janusErrors, session } from '@alxia/janus';
 import { createMemoryStores, janus, scryptHasher } from '@nxgt/janus';
 import { z } from 'zod';
@@ -24,11 +24,11 @@ const SignIn = z.object({ email: z.string(), password: z.string() });
 const app = alxia()
 	.use(janusErrors()) // a refused sign-in answered 401, a login taken 409
 	.use(session(accounts)) // not required: the people signing in are anonymous
-	.post('/signup', { body: SignUp }, async ({ body, auth, reply }) => {
+	.post('/signup', validate({ body: SignUp }), async ({ body, auth, reply }) => {
 		const signedUp = await accounts.signUp(body);
 		return reply.created({ id: auth.send(signedUp).id });
 	})
-	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
 	})
@@ -60,12 +60,12 @@ It takes a `SessionOpened` — anything holding a `token`, a `session` and
 a `user`, what `signUp`, `signIn` and the other flows of `janus()` that open
 a session answer — so it works after a sign-in by code, by link, or after
 a second factor is confirmed too. With a `deviceToken`, it sets the device
-cookie as well, with the plugin's `device` options ([below](#devices)).
+cookie as well, with the middleware's `device` options ([below](#devices)).
 
 The cookie's attributes — `name` (`janus-session`), `domain`, `path`
 (`'/'`), `sameSite` (`'lax'`), `secure` (`true`) — are set once, in
 `janus({ cookie })`, and `session()` reads and renews the same cookie. A
-route that sends a session keeps its own `Set-Cookie`: the plugin never
+route that sends a session keeps its own `Set-Cookie`: the middleware never
 overwrites it with the session the request came in with.
 
 ### A user type
@@ -74,7 +74,7 @@ With several user types, the flow is the type's; `ctx.auth.send` is the
 same:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { janusErrors, session } from '@alxia/janus';
 import { createMemoryStores, janus, scryptHasher } from '@nxgt/janus';
 import { z } from 'zod';
@@ -93,7 +93,7 @@ const SignIn = z.object({ email: z.string(), password: z.string() });
 const app = alxia()
 	.use(janusErrors())
 	.use(session(accounts))
-	.post('/patients/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.post('/patients/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.patient.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
 	});
@@ -107,7 +107,7 @@ challenge, and `send` refuses the union at compile time
 Switch on `status` first:
 
 ```ts
-.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 	const result = await accounts.signIn(body);
 	if (result.status === 'secondFactor') {
 		return reply.ok({ status: result.status, challenge: result.challenge });
@@ -151,7 +151,7 @@ client keeps in a long-lived cookie and presents at its next sign-in.
 `ctx.auth.device` reads it, `ctx.auth.send` writes it back:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { janusErrors, session } from '@alxia/janus';
 import { createMemoryStores, janus, scryptHasher } from '@nxgt/janus';
 import { z } from 'zod';
@@ -169,7 +169,7 @@ const SignIn = z.object({ email: z.string(), password: z.string() });
 const app = alxia()
 	.use(janusErrors())
 	.use(session(accounts))
-	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body, { device: auth.device });
 		return reply.ok({
 			id: auth.send(signedIn).id,
@@ -203,7 +203,7 @@ const device = { name: 'shop-device', domain: 'example.com' };
 
 alxia()
 	.use(session(accounts, { device }))
-	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body, { device: auth.device });
 		return reply.ok({ id: auth.send(signedIn).id });
 	});
@@ -241,7 +241,7 @@ helper shared by several routes, a test, or a route declared **before**
 any `session()`, which then looks up no session at all:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { deviceOf, janusErrors, sendSession, session, signOut } from '@alxia/janus';
 import { createMemoryStores, janus, scryptHasher } from '@nxgt/janus';
 import { z } from 'zod';
@@ -258,7 +258,7 @@ const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
 	.use(janusErrors())
-	.post('/signin', { body: SignIn }, async (ctx) => {
+	.post('/signin', validate({ body: SignIn }), async (ctx) => {
 		const signedIn = await accounts.signIn(ctx.body, { device: deviceOf(ctx) });
 		return ctx.reply.ok({ id: sendSession(ctx, accounts, signedIn).id });
 	})

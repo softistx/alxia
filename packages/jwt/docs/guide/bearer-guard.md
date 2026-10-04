@@ -1,8 +1,8 @@
 # The bearer guard
 
-This page covers `bearer`: a plugin that makes every route declared after
-it require a valid token, reads the token's claims as a typed `user`, and
-answers a typed 401 otherwise.
+This page covers `bearer`: a middleware that makes every request it runs on
+require a valid token, reads the token's claims as a typed `user`, and
+answers a 401 otherwise.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -27,8 +27,14 @@ curl localhost:3000/me -H "authorization: Bearer $TOKEN"
 ```ts
 function bearer<Schema extends StandardSchemaV1 | undefined = undefined>(
 	options: BearerOptions<Schema>,
-): Alxia<{ user: User<Schema> }, Empty, '', Reply<401, UnauthorizedBody>>;
+): Bearer<Schema>;
+// a middleware that gives `user`, or answers the 401
 // User<Schema>: the schema's output, or JwtClaims without one
+
+type Bearer<Schema extends StandardSchemaV1 | undefined = undefined> = Middleware<
+	Empty,
+	Promise<Reply<401, UnauthorizedBody> | Next<{ user: User<Schema> }>>
+>;
 
 interface BearerOptions<Schema extends StandardSchemaV1 | undefined> {
 	readonly jwt: Jwt;
@@ -37,10 +43,17 @@ interface BearerOptions<Schema extends StandardSchemaV1 | undefined> {
 }
 ```
 
-`bearer` returns an app, given to `use`. Like any route hook, it applies to
-the routes declared **after** `use`, in the same app or
+`bearer` returns a middleware, given to `app.use`. It applies to the routes
+declared **after** `app.use`, in the same app or
 [group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md);
 a route declared before it is open, and cannot read `user`.
+
+Given to the app, it runs on **every** request, an unmatched one too: a request to a path no route serves is refused with the
+401 before its 404, so an anonymous caller learns nothing about which paths
+exist. Declared in a group, it stays with the group's routes, and an
+unmatched request under the group's prefix gets the 404. A path-scoped
+`use('/api', bearer(…))` does not compile: a middleware given a path may add
+nothing to the context, and `bearer` adds `user`.
 
 ### Options
 
@@ -116,15 +129,15 @@ interface UnauthorizedBody {
 
 The `verify` reasons are explained on [Signing and verifying](tokens.md#verify),
 and each one, with its fix, in [Troubleshooting](../troubleshooting.md#responses).
-The 401 is part of the type of every route after the guard, so a typed
-client reads it:
+Every route after the guard may answer this 401: declare it in your
+OpenAPI document, and the client you generate from it (with
+`@nxgt/openapi-codegen`, say) reads it typed. In the handler, `user` is
+the schema's output:
 
 ```ts
-import { client } from '@alxia/client';
-
-const result = await client(app).get('/me');
-if (result.status === 401) result.data.reason; // 'missing' | 'expired' | … | 'claims'
-if (result.status === 200) result.data.role;   // 'admin' | 'user'
+app.use(bearer({ jwt, schema: Claims })).get('/me', ({ user, reply }) =>
+	reply(200, { role: user.role }), // 'admin' | 'user'
+);
 ```
 
 With `claims`, each issue's `path` names the claim and its `target` where
@@ -139,7 +152,7 @@ startup ([Algorithms and keys](algorithms-and-keys.md#a-key-pair)).
 ## Roles after the guard
 
 The guard answers *who*; a `derive` after it answers *may they*. It reads
-the typed `user`, and its reply joins the type of the routes after it:
+the typed `user`, and its reply ends the request for the routes after it:
 
 ```ts
 const app = alxia()
@@ -149,7 +162,7 @@ const app = alxia()
 	.get('/admin/stats', ({ reply }) => reply(200, { users: 42 })); // 200, 401 or 403
 ```
 
-To guard only some routes, put the guard in a group: its hooks stay inside
+To guard only some routes, put the guard in a group: its middlewares stay inside
 ([Groups and plugins](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md)).
 
 ## A login that sets the cookie
@@ -159,7 +172,7 @@ The realistic case for a browser: the login route signs a token into an
 header, for a script.
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { bearer, createJwt } from '@alxia/jwt';
 import { z } from 'zod';
 
@@ -167,7 +180,7 @@ export const jwt = createJwt({ secret: Bun.env['JWT_SECRET']!, issuer: 'api', ex
 const Claims = z.object({ sub: z.string(), role: z.enum(['admin', 'user']) });
 
 export const app = alxia()
-	.post('/login', { body: z.object({ user: z.string(), password: z.string() }) }, async ({ body, set, reply }) => {
+	.post('/login', validate({ body: z.object({ user: z.string(), password: z.string() }) }), async ({ body, set, reply }) => {
 		const user = await findUser(body.user, body.password); // yours
 		if (user === undefined) return reply(401, { error: 'invalid_credentials' as const });
 		set.cookies.set('token', await jwt.sign({ sub: user.id, role: user.role }), {
@@ -199,17 +212,16 @@ no network:
 
 ```ts
 import { expect, test } from 'bun:test';
-import { client } from '@alxia/client';
 import { app, jwt } from './app';
 
 test('/me needs a token', async () => {
-	const missing = await client(app).get('/me');
+	const missing = await app.request('/me');
 	expect(missing.status).toBe(401);
-	if (missing.status === 401) expect(missing.data.reason).toBe('missing');
-	expect(missing.response.headers.get('www-authenticate')).toBe('Bearer');
+	expect((await missing.json()).reason).toBe('missing');
+	expect(missing.headers.get('www-authenticate')).toBe('Bearer');
 
 	const token = await jwt.sign({ sub: 'ada', role: 'admin' });
-	const me = await client(app).get('/me', { init: { headers: { authorization: `Bearer ${token}` } } });
+	const me = await app.request('/me', { headers: { authorization: `Bearer ${token}` } });
 	expect(me.status).toBe(200);
 });
 

@@ -4,9 +4,11 @@
  */
 import { joinPath } from '../router/paths';
 import { type AppState, mount, register } from './app-state';
+import { useMiddlewares } from './declare-hooks';
 import { refuseShadowedPages } from './pages';
 import { mergeGlobals } from './runtime';
 import type { AnyAlxia } from './signatures';
+import { builtinOf } from './validate';
 
 /** A group's build: given the group, it returns it with its routes declared. */
 type Build = (group: AnyAlxia) => AnyAlxia;
@@ -40,25 +42,96 @@ export function group(
 	refuseShadowedPages(state.runtime, before);
 	for (const route of built.routes) register(state, route);
 	for (const socket of built.sockets) mount(state, socket);
+	// A group with a prefix of its own guards what no route answers under it.
+	if (prefix !== state.prefix) state.scope.enclose(childState.scope, prefix);
 }
 
 /**
- * `app.use(plugin)`, an app: its routes under this app's prefix and behind
+ * `app.use(...args)` or `app.plugin(...args)`: middlewares made by
+ * `defineMiddleware` — given to `plugin`, the deprecated form of `use` —
+ * else a plugin, mounted. `stateOf` reads an app's state, and tells an
+ * app from anything else.
+ */
+export function compose(
+	state: AppState,
+	label: 'use()' | 'plugin()',
+	args: readonly unknown[],
+	app: AnyAlxia,
+	stateOf: (value: unknown) => AppState | undefined,
+): AnyAlxia {
+	if (useMiddlewares(state, args, label === 'use()')) return app;
+	const plugin = pluginOf(label, args);
+	const isApp = (value: unknown): value is AnyAlxia =>
+		stateOf(value) !== undefined;
+	const mounted = pluginApp(label, plugin, app, isApp);
+	if (mounted !== plugin) return mounted;
+	usePlugin(state, stateOf(plugin) as AppState);
+	return app;
+}
+
+/**
+ * The plugin `plugin` is given, or `use` in its deprecated plugin form —
+ * a function `defineMiddleware` made was read before, as a middleware —
+ * alone.
+ */
+export function pluginOf(label: string, args: readonly unknown[]): unknown {
+	if (args.length === 0) {
+		throw new TypeError(
+			`${label}: nothing is given: ${label === 'use()' ? 'middlewares' : 'a plugin, an app or a function'}`,
+		);
+	}
+	if (args.length !== 1) {
+		throw new TypeError(
+			`${label}: a plugin is given alone, to app.plugin(); middlewares are made with defineMiddleware() and given to use()`,
+		);
+	}
+	return args[0];
+}
+
+/**
+ * What `app.plugin(plugin)` mounts: an app, or what a function given the
+ * app returns, which must be an app. `isApp` tells one. A function that
+ * returns anything else — a middleware not made by `defineMiddleware`,
+ * called once with the app — throws, and its promise, if it returned one,
+ * is left handled: its guard would otherwise never run on any request.
+ */
+export function pluginApp(
+	label: string,
+	plugin: unknown,
+	app: AnyAlxia,
+	isApp: (value: unknown) => value is AnyAlxia,
+): AnyAlxia {
+	if (isApp(plugin)) return plugin;
+	if (typeof plugin !== 'function') {
+		throw new TypeError(
+			`${label}: the plugin is neither an app nor a function; a middleware is made with defineMiddleware() and given to use()`,
+		);
+	}
+	if (builtinOf(plugin) !== undefined) {
+		throw new TypeError(
+			`${label}: a middleware is given to use(), not taken for a plugin`,
+		);
+	}
+	const result: unknown = plugin(app);
+	if (isApp(result)) return result;
+	if (result instanceof Promise) result.catch(() => {});
+	throw new TypeError(
+		`${label}: the plugin function returned ${result instanceof Promise ? 'a promise' : typeof result}, not an app: a plugin returns the app it is given; a middleware is made with defineMiddleware() and given to use()`,
+	);
+}
+
+/**
+ * `app.plugin(plugin)`, an app: its routes under this app's prefix and behind
  * its hooks, its hooks for the routes declared after it, its global hooks.
  */
 export function usePlugin(state: AppState, plugin: AppState): void {
+	const { prefix, scope } = state;
 	for (const route of plugin.routes) {
-		register(
-			state,
-			state.scope.behind(route, joinPath(state.prefix, route.path)),
-		);
+		register(state, scope.behind(route, joinPath(prefix, route.path), prefix));
 	}
 	for (const socket of plugin.sockets) {
-		mount(
-			state,
-			state.scope.behind(socket, joinPath(state.prefix, socket.path)),
-		);
+		mount(state, scope.behind(socket, joinPath(prefix, socket.path), prefix));
 	}
-	state.scope.absorb(plugin.scope);
+	scope.absorb(plugin.scope, prefix, plugin.prefix);
 	mergeGlobals(state.runtime, plugin.runtime.globals, state.prefix);
 }

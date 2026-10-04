@@ -63,6 +63,34 @@ describe('secureHeaders', () => {
 		expect(response.headers.get('x-content-type-options')).toBe('nosniff');
 	});
 
+	test('an error answered by onError, and a 500, are covered too', async () => {
+		const original = console.error;
+		console.error = () => {};
+		try {
+			const app = alxia()
+				.use(secureHeaders())
+				.onError((error, { reply }) =>
+					error instanceof RangeError ? reply(409, 'taken') : undefined,
+				)
+				.get('/taken', () => {
+					throw new RangeError('taken');
+				})
+				.get('/boom', () => {
+					throw new Error('boom');
+				});
+			for (const [path, status] of [
+				['/taken', 409],
+				['/boom', 500],
+			] as const) {
+				const response = await app.request(path);
+				expect(response.status).toBe(status);
+				expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+			}
+		} finally {
+			console.error = original;
+		}
+	});
+
 	test('an empty value is refused, at once: false leaves a header out', () => {
 		expect(() => secureHeaders({ contentSecurityPolicy: '' })).toThrow(
 			'secureHeaders: contentSecurityPolicy is empty; give false to leave the content-security-policy header out',

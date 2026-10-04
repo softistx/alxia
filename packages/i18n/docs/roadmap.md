@@ -7,7 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **A middleware, not a plugin (0.4).** `app.use(createI18n({ ... }))` runs on every request, a 404 included; its `t()` works in every middleware after it and in the answer to an error. `app.plugin(i18n)` still works, deprecated.
 
 ## Next
 

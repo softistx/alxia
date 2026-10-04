@@ -1,7 +1,11 @@
 import { describe, expect, test } from 'bun:test';
-import { alxia, type Plugin } from '@alxia/core';
+import { alxia } from '@alxia/core';
 import { NONCE } from './nonce';
-import { type SecureHeadersOptions, secureHeaders } from './secure-headers';
+import {
+	type SecureHeaders,
+	type SecureHeadersOptions,
+	secureHeaders,
+} from './secure-headers';
 
 const PAGE_POLICY = "default-src 'self'; script-src 'self'; style-src 'self'";
 
@@ -149,7 +153,7 @@ describe('secureHeaders({ nonce: true })', () => {
 			.get('/', ({ nonce, reply }) => reply(200, String(nonce)));
 		// Options typed by the exported interface pick the plugin without a nonce.
 		const options: SecureHeadersOptions = { referrerPolicy: 'same-origin' };
-		const plain: Plugin = secureHeaders(options);
+		const plain: SecureHeaders = secureHeaders(options);
 		void plain;
 		const on = true as boolean;
 		const refused = () =>

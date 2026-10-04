@@ -9,7 +9,6 @@ nothing of its own; past the limit it answers a 429.
 - [`Property 'user' does not exist on type 'BaseContext & Empty'`](#property-user-does-not-exist-on-type-basecontext--empty)
 - [`Type '() => Promise<boolean>' is not assignable to type '(ctx: BaseContext & Empty) => boolean'`](#type---promiseboolean-is-not-assignable-to-type-ctx-basecontext--empty--boolean)
 - [`'rateLimit' is possibly 'undefined'`](#ratelimit-is-possibly-undefined)
-- [`This comparison appears to be unintentional because the types '200 | 500' and '429' have no overlap`](#this-comparison-appears-to-be-unintentional-because-the-types-200--500-and-429-have-no-overlap)
 
 **Startup**
 
@@ -25,19 +24,20 @@ nothing of its own; past the limit it answers a 429.
 - [Nothing is limited, and no `RateLimit-*` header is sent](#nothing-is-limited-and-no-ratelimit--header-is-sent)
 - [A client makes more than `limit` requests](#a-client-makes-more-than-limit-requests)
 - [A client is refused before `limit` requests](#a-client-is-refused-before-limit-requests)
+- [A missing path answers 429](#a-missing-path-answers-429)
 
 ## Types
 
 ### `Property 'user' does not exist on type 'BaseContext & Empty'`
 
-**When:** a `key` (or `skip`) reads something an earlier `derive` or plugin
+**When:** a `key` (or `skip`) reads something an earlier `derive` or middleware
 added to the context, and `rateLimit` is not told about it.
 
 ```text
 error TS2339: Property 'user' does not exist on type 'BaseContext & Empty'.
 ```
 
-**Why:** `key` and `skip` are typed with `BaseContext`, what every route hook
+**Why:** `key` and `skip` are typed with `BaseContext`, what every middleware
 reads — `request`, `url`, `ip`, `server`, `route`, `pathParams` — plus what
 you name as `rateLimit`'s type argument, and nothing else. `rateLimit` is
 built before it is used, so it cannot see the app it will be used on.
@@ -52,11 +52,11 @@ const perUser = rateLimit<{ user: { id: string } }>({
 	key: ({ user }) => user.id,
 });
 
-alxia().use(auth).use(perUser); // auth derives user
+alxia().plugin(auth).use(perUser); // auth derives user
 ```
 
 On an app that does not give `user`, `use(perUser)` is a compile error:
-[`the plugin reads "user", which this app's context does not give`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+`Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: { id: string; }; }'`.
 
 ### `Type '() => Promise<boolean>' is not assignable to type '(ctx: BaseContext & Empty) => boolean'`
 
@@ -104,29 +104,6 @@ app
 	.get('/quota', ({ rateLimit, reply }) => reply(200, { remaining: rateLimit?.remaining ?? null }));
 ```
 
-### `This comparison appears to be unintentional because the types '200 | 500' and '429' have no overlap`
-
-**When:** client code checks for a 429 on a route that cannot answer one.
-The left-hand union is that route's statuses.
-
-```text
-error TS2367: This comparison appears to be unintentional because the types '200 | 500' and '429' have no overlap.
-```
-
-**Why:** the limit applies to the routes declared after
-`use(rateLimit(…))`, in the types as at runtime. This route was declared
-before it, or outside the group that holds the limit, so it is never
-limited and its type has no 429.
-
-**Fix:** declare the route after the limit, if it should be limited — or
-drop the check, if it should not:
-
-```ts
-const app = alxia()
-	.use(rateLimit({ limit: 100, windowMs: 60_000 }))
-	.get('/search', ({ reply }) => reply(200, [])); // now 200 | 429 | 500
-```
-
 ## Startup
 
 ### `TypeError: rateLimit: … must be a whole number of 1 or more, not …`
@@ -161,13 +138,12 @@ app.use(rateLimit({ limit: Number(Bun.env.RATE_LIMIT ?? 100), windowMs: 60_000 }
 header are the seconds until a request would be allowed, at least 1. The
 refused request counted nothing.
 
-**Fix:** on the client, wait that long; the 429 is in the route's type, so
-`data` is typed:
+**Fix:** on the client, wait that long, then try again:
 
 ```ts
-const result = await api.get('/search');
-if (result.status === 429) {
-	await Bun.sleep(result.data.retryAfter * 1000);
+const response = await fetch('http://localhost:3000/search');
+if (response.status === 429) {
+	await Bun.sleep((await response.json()).retryAfter * 1000);
 }
 ```
 
@@ -197,13 +173,14 @@ const app = alxia({
 
 **When:** requests past `limit` still answer 200, without a rate-limit
 header, and `ctx.rateLimit` is `undefined` — typically in a test calling
-the app through `client(app)`, `app.fetch` or `app.request`.
+the app through `app.fetch` or `app.request`.
 
 **Why:** a request whose key is `undefined` is not counted. Without a server
 there is no connection, so the default `ip` is `undefined`, and so is the
 default key. A custom `key` returning `undefined`, or a `skip` returning
 `true`, does the same. (A route declared before the limit is not counted
-either, and has no 429 in its type.)
+either, and never answers a 429; nor is a request a group's limit does not
+run on.)
 
 **Fix:** in tests, read the address from a header you send:
 
@@ -212,7 +189,7 @@ const app = alxia({ ip: (request) => request.headers.get('x-ip') ?? undefined })
 	.use(rateLimit({ limit: 2, windowMs: 60_000 }))
 	.get('/limited', ({ reply }) => reply(200, 'ok'));
 
-await client(app).get('/limited', { init: { headers: { 'x-ip': '1.1.1.1' } } });
+await app.request('/limited', { headers: { 'x-ip': '1.1.1.1' } });
 ```
 
 ### A client makes more than `limit` requests
@@ -245,6 +222,9 @@ app.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis, { nam
   show the later one's numbers.
 - **Refused requests are counted.** The limit runs before the route
   validates the request, so a request answered 400 has spent one.
+- **Unmatched requests are counted.** On the app, the limit runs on a
+  request no route matches too, so a client probing missing paths spends
+  its allowance: see [A missing path answers 429](#a-missing-path-answers-429).
 
 **Fix:** give each limit its own `MemoryStore` — or none, and `rateLimit`
 creates one — and give all but one limit `headers: false`:
@@ -253,4 +233,26 @@ creates one — and give all but one limit `headers: false`:
 app
 	.use(rateLimit({ limit: 10, windowMs: 1_000 }))
 	.use(rateLimit({ limit: 1_000, windowMs: 60 * 60_000, headers: false }));
+```
+
+### A missing path answers 429
+
+**When:** a request to a path no route serves answers `429`, not `404`, once
+the client is past the limit.
+
+**Why:** a limit given to `app.use` runs on every request, a request no
+route matches included, and answers before the 404. Declared after a route,
+it still runs for unmatched requests: only the routes before it are spared.
+A limit inside a `group` does not.
+
+**Fix:** that is the limit working. To count only some routes, scope it:
+
+```ts
+const app = alxia()
+	.get('/health', ({ reply }) => reply(200, 'ok'))
+	.group('/api', (api) =>
+		api
+			.use(rateLimit({ limit: 100, windowMs: 60_000 })) // /api routes only
+			.get('/search', ({ reply }) => reply(200, [])),
+	);
 ```

@@ -1,13 +1,18 @@
-/** The shape of `@alxia/openapi`'s `Converter`, without importing it. */
 type Side = 'input' | 'output';
 type JsonSchema = Record<string, unknown>;
+
+/** What Standard JSON Schema's `input` and `output` take: Zod's `Options`. */
+interface JsonSchemaOptions {
+	readonly target: string;
+	readonly libraryOptions?: Record<string, unknown>;
+}
 
 interface ZodLike {
 	readonly '~standard': {
 		readonly vendor: string;
 		readonly jsonSchema?: {
-			readonly input: (options: Record<string, unknown>) => JsonSchema;
-			readonly output: (options: Record<string, unknown>) => JsonSchema;
+			readonly input: (options: JsonSchemaOptions) => JsonSchema;
+			readonly output: (options: JsonSchemaOptions) => JsonSchema;
 		};
 	};
 }
@@ -24,12 +29,19 @@ interface ZodContext {
  * `date-time` string, a `bigint` an integer, and anything JSON Schema cannot
  * say is documented as anything instead of failing the whole schema.
  *
- * A schema of another vendor is left to the default conversion. Give it to
- * `@alxia/openapi`:
+ * A schema of another vendor gives `undefined`, for the caller's own
+ * conversion. `side` is the schema's input, what a client sends, or its
+ * output, what a reply holds:
  *
  * ```ts
- * openapi(app, { info, convert: zodConverter });
+ * const schema = zodConverter(Todo, 'output'); // { type: 'object', … }
  * ```
+ *
+ * @deprecated Nothing in alxia reads it any more: it served the `convert`
+ * option of the retired `@alxia/openapi` document writer. alxia is OpenAPI
+ * spec first, so the schemas come from the document. Zod's own
+ * `z.toJSONSchema(schema)` does the same. It stays exported, unchanged, for
+ * code that already calls it.
  */
 export function zodConverter(
 	schema: ZodLike,

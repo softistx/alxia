@@ -2,8 +2,8 @@
 
 GraphQL for [alxia](https://www.npmjs.com/package/@alxia/core), served by
 [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server). The endpoint is a
-route like any other: behind the app's hooks, guarded by its guards, its
-resolvers reading the context those hooks built — typed, and checked.
+route like any other: behind the app's middlewares, guarded by its guards, its
+resolvers reading the context those middlewares built — typed, and checked.
 Yoga's plugin system is yours whole: Envelop's plugins and Yoga's own.
 
 ```sh
@@ -34,18 +34,18 @@ const schema = createSchema<GraphQLContext<typeof base>>({
 	},
 });
 
-const app = base.use((app) => graphql(app, { schema }));   // POST and GET /graphql
+const app = base.plugin((app) => graphql(app, { schema }));   // POST and GET /graphql
 app.listen(3000);
 ```
 
 `graphql(app, options)` adds `GET` and `POST` routes at `path` —
 `/graphql` by default, under the app's prefix — and returns the app. Given
-to `use` as a function, it stays in the chain and sees the app's type.
+to `app.plugin` as a function, it stays in the chain and sees the app's type.
 
 ## The context
 
 A resolver's context is Yoga's (`request`, `params`), the app's — every
-`decorate`, every `derive`, every plugin's: `user`, `db`, `log`,
+`decorate`, every `derive`, every middleware's: `user`, `db`, `log`,
 `requestId` — and `set`, through which it sets a header or a cookie:
 
 ```ts
@@ -108,7 +108,7 @@ graphql(app, {
 | `renderSandbox(endpoint, options?)`, `SANDBOX_POLICY` | the Sandbox page, and the policy it loads under |
 | `SandboxOptions` | its options: `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
 | `GraphQLContext<App, UserContext?>` | what a resolver reads |
-| `ServerContext<Ctx>`, `GraphQLOptions`, `GraphQLRoutes` | its types |
+| `ServerContext<Ctx>`, `GraphQLOptions` | its types |
 
 ## Documentation
 
