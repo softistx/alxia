@@ -12,7 +12,7 @@ break yours.
 
 A range request on an empty file is also answered as RFC 9110 says: a
 `200` for a suffix range, a `416` otherwise; see the
-[CHANGELOG](../CHANGELOG.md).
+[CHANGELOG](https://github.com/softistx/alxia/blob/develop/packages/core/CHANGELOG.md).
 
 ### The app's methods typed by interfaces
 
