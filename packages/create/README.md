@@ -162,11 +162,13 @@ or CI.
   packages within `^8.0.0`, Zod within `^4.2.0`; what no alxia package
   constrains goes to npm's `latest`. A newer major outside alxia's range is
   left out, and the output says so.
-- **Biome and `@nxgt/openapi-codegen`** are pinned exactly, and written
-  exactly: the newest patch of the template's minor, `2.5.15` writing
-  `2.5.16` but never `2.6.0`, whose new rules the template was not checked
-  against, and `0.6.0` writing `0.6.1` once it is out, never `0.7.0`, which may write
-  `src/generated/` differently.
+- **Biome** is pinned exactly, and written exactly: the newest patch of the
+  template's minor, `2.5.15` writing `2.5.16` but never `2.6.0`, whose new
+  rules the template was not checked against.
+- **`@nxgt/openapi-codegen`** is pinned exactly and kept at the template's
+  version, `0.6.0`, never moved to a newer patch: `bun run verify` runs
+  `generate --check` over the committed `src/generated/`, which a release
+  that writes the files differently would fail in a fresh project.
 
 The registry is the one `BUN_CONFIG_REGISTRY` or `npm_config_registry`
 names, else npmjs.org; when it does not answer, the template's own

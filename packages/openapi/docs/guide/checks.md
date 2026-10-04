@@ -129,7 +129,9 @@ route declared from an operation the middlewares of any route. The
 operation's schema is two of them: a `responds` of its responses, first, and
 a `validate` of its request just before the handler, so an `auth` placed
 before it answers 401 before the body is read. `validate(operation)`,
-given the same operation, validates where it stands instead, once:
+given the same operation, validates where it stands instead, once. Put it
+after the auth: an anonymous client then gets no body parsed, and no
+validation issues back, which would reveal the schema:
 
 ```ts
 import { alxia, defineMiddleware, validate } from '@alxia/core';
@@ -142,7 +144,7 @@ const auth = defineMiddleware(({ request, reply }, next) =>
 
 export const app = alxia()
 	.route(api.renamePet, auth, ({ params, body, reply }) => reply.ok(rename(params.petId, body.name)))
-	.route(api.adoptPet, validate(api.adoptPet), auth, ({ params, reply }) => reply.created(adopt(params.petId)));
+	.route(api.adoptPet, auth, validate(api.adoptPet), ({ params, reply }) => reply.created(adopt(params.petId)));
 
 matchesSpec(app, api); // the routes are matched as any others: by method and path
 ```

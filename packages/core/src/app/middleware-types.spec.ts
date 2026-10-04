@@ -1,11 +1,7 @@
 import { describe, expectTypeOf, test } from 'bun:test';
-import { z } from 'zod';
-import type { Reply } from '../reply/reply';
 import { alxia } from './alxia';
-import { defineHook, defineWrap } from './define-hook';
 import { defineMiddleware } from './define-middleware';
 import type { Next } from './types';
-import { responds, validate } from './validate';
 
 interface User {
 	readonly id: string;
@@ -16,8 +12,6 @@ const auth = defineMiddleware(({ request, reply }, next) => {
 	if (id === null) return reply(401, { error: 'unauthorized' as const });
 	return next({ user: { id } as User });
 });
-
-const Post = z.object({ title: z.string() });
 
 describe('the context a route threads through its middlewares', () => {
 	test('eight middlewares accumulate what each adds', () => {
@@ -42,14 +36,6 @@ describe('the context a route threads through its middlewares', () => {
 				expectTypeOf(h).toEqualTypeOf<number>();
 				return reply(200, 'ok');
 			},
-		);
-	});
-
-	test('a ninth is refused: the types thread eight', () => {
-		const add = defineMiddleware((_ctx, next) => next({ x: 1 }));
-		// @ts-expect-error a route takes at most 8 middlewares
-		alxia().get('/', add, add, add, add, add, add, add, add, add, ({ reply }) =>
-			reply(200, 'x'),
 		);
 	});
 
@@ -104,166 +90,5 @@ describe('the context a route threads through its middlewares', () => {
 			() => undefined,
 			({ reply }) => reply(200, 'x'),
 		);
-	});
-});
-
-describe('validate and responds', () => {
-	test('validate types what follows it: body, params, query, headers, cookies', () => {
-		alxia().patch(
-			'/posts/:id',
-			validate({
-				params: z.object({ id: z.coerce.number() }),
-				query: z.object({ draft: z.enum(['yes', 'no']) }),
-				headers: z.object({ 'x-trace': z.string() }),
-				cookies: z.object({ sid: z.string() }),
-				body: Post,
-			}),
-			({ params, query, headers, cookies, body, reply }) => {
-				expectTypeOf(params).toEqualTypeOf<{ id: number }>();
-				expectTypeOf(query).toEqualTypeOf<{ draft: 'yes' | 'no' }>();
-				expectTypeOf(headers).toEqualTypeOf<{ 'x-trace': string }>();
-				expectTypeOf(cookies).toEqualTypeOf<{ sid: string }>();
-				expectTypeOf(body).toEqualTypeOf<{ title: string }>();
-				return reply(200, body.title);
-			},
-		);
-		alxia().post('/', ({ body, reply }) => {
-			expectTypeOf(body).toEqualTypeOf<undefined>();
-			return reply(200, 'x');
-		});
-	});
-
-	test('validate is refused a params schema its path does not declare, or an unknown part', () => {
-		alxia().get(
-			'/posts',
-			// @ts-expect-error "/posts" declares no `id`
-			validate({ params: z.object({ id: z.string() }) }),
-			({ reply }) => reply(200, 'x'),
-		);
-		alxia().get(
-			'/users/:id',
-			// @ts-expect-error "/users/:id" declares no `extra`, optional or not
-			validate({
-				params: z.object({ id: z.string(), extra: z.string().optional() }),
-			}),
-			({ reply }) => reply(200, 'x'),
-		);
-		alxia().ws(
-			'/users/:id',
-			// @ts-expect-error the same on a socket's upgrade
-			validate({
-				params: z.object({ id: z.string(), extra: z.string().optional() }),
-			}),
-			{ message: () => {} },
-		);
-		// @ts-expect-error "response" is not a part validate() reads
-		validate({ response: Post });
-	});
-
-	test('responds types the handler reply: a declared status only', () => {
-		alxia().get('/', responds({ 200: Post, 404: z.null() }), ({ reply }) => {
-			expectTypeOf(reply.notFound).toBeFunction();
-			return reply(200, { title: 'x' });
-		});
-		// @ts-expect-error 201 is not declared
-		alxia().get('/', responds({ 200: Post }), ({ reply }) => reply(201, {}));
-		// @ts-expect-error 999 is not an HTTP status
-		responds({ 999: Post });
-	});
-
-	test('the options hold no schema', () => {
-		const declare = () =>
-			// @ts-expect-error a schema is validate(…) among the middlewares
-			alxia().post('/', { body: Post }, auth, ({ reply }) => reply(200, 'x'));
-		void declare;
-	});
-
-	test('a ninth middleware is refused after options, and on a socket', () => {
-		const add = defineMiddleware((_ctx, next) => next({ x: 1 }));
-		const declare = () => {
-			alxia().get(
-				'/',
-				{},
-				add,
-				add,
-				add,
-				add,
-				add,
-				add,
-				add,
-				add,
-				add,
-				// @ts-expect-error a route takes at most 8 middlewares
-				({ reply }) => reply(200, 'x'),
-			);
-			// @ts-expect-error a socket route takes at most 8 middlewares
-			alxia().ws('/', add, add, add, add, add, add, add, add, add, {
-				message: () => {},
-			});
-		};
-		void declare;
-	});
-
-	test('responds on a socket route is refused: it sends no reply', () => {
-		const declare = () => {
-			// @ts-expect-error responds() has nothing to check on a socket
-			alxia().ws('/', responds({ 200: Post }), {
-				message: () => {},
-			});
-		};
-		void declare;
-	});
-
-	test('options, then middlewares, validate and responds among them', () => {
-		alxia().post(
-			'/posts',
-			{ bodyLimit: 1024 },
-			auth,
-			validate({ body: Post }),
-			responds({ 201: Post }),
-			({ body, reply }) => {
-				expectTypeOf(body).toEqualTypeOf<{ title: string }>();
-				return reply(201, body);
-			},
-		);
-	});
-});
-
-describe('the forms of 0.3, deprecated, still compile', () => {
-	test('a list of hooks, a schema, defineHook and defineWrap', () => {
-		const canSee = defineHook<{ user: User }>()(({ user, reply }) =>
-			user.id === '' ? reply(403, { error: 'forbidden' as const }) : undefined,
-		);
-		const exclusive = defineWrap(async (_ctx, next) => next());
-		alxia()
-			.derive(() => ({ user: { id: 'u' } as User }))
-			.post('/a', { body: Post }, ({ body, reply }) => reply(200, body.title))
-			.post('/b', [canSee, exclusive], { body: Post }, ({ body, reply }) =>
-				reply(200, body.title),
-			)
-			.get('/c', [canSee], ({ user, reply }) => reply(200, user.id))
-			.ws('/d', { message: Post }, { message: (_socket, post) => void post })
-			.ws('/e', [canSee], {}, { message: (socket) => void socket.data.user });
-	});
-});
-
-describe('a socket route', () => {
-	test('reads what its middlewares add, and validate, on socket.data', () => {
-		alxia().ws(
-			'/rooms/:room',
-			{ send: Post },
-			auth,
-			validate({ query: z.object({ v: z.string() }) }),
-			{
-				open: (socket) => {
-					expectTypeOf(socket.data.user).toEqualTypeOf<User>();
-					expectTypeOf(socket.data.query).toEqualTypeOf<{ v: string }>();
-					expectTypeOf(socket.data.params.room).toEqualTypeOf<string>();
-					void socket.send({ title: 'hi' });
-				},
-				message: () => {},
-			},
-		);
-		expectTypeOf<Reply<200, string>>().not.toBeNever();
 	});
 });

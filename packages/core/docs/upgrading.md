@@ -12,7 +12,7 @@ break yours.
 | [Middlewares for the routes after them: `use`](#middlewares-for-the-routes-after-them-use) | core | no: `use` still takes a plugin as before |
 | [alxia is OpenAPI spec first](#alxia-is-openapi-spec-first) | core, openapi | no: the document is the source, the routes run as before |
 | [No more client: spec first](#no-more-client-spec-first) | core, client, graphql, janus, secure-headers, context-storage, react-router | yes: `@alxia/client`, `RoutesOf` and the route table are gone, and `Alxia` takes three type parameters |
-| [`@alxia/openapi-routes` is now `@alxia/openapi`](#alxiaopenapi-routes-is-now-alxiaopenapi) | openapi, openapi-routes | no: change the import; `@alxia/openapi-routes` 0.2.1 re-exports it, deprecated |
+| [`@alxia/openapi-routes` is now `@alxia/openapi`](#alxiaopenapi-routes-is-now-alxiaopenapi) | openapi, openapi-routes | no: change the import; `@alxia/openapi-routes` 0.3.0 re-exports it, deprecated |
 | [The old `@alxia/openapi` is retired](#the-old-alxiaopenapi-is-retired) | openapi | yes: `openapi()` and `docs()` are gone; write the document, generate the operations |
 | [The context registered once: `Register` and `defineRoutes`](#the-context-registered-once-register-and-defineroutes) | core, context-storage, react-router | no: new exports; `contextStorage()` now requires the context it reads of the app that uses it |
 
@@ -478,9 +478,11 @@ import { matchesSpec } from '@alxia/openapi-routes';
 import { matchesSpec } from '@alxia/openapi';
 ```
 
-**Can it break your code.** No. `@alxia/openapi-routes` 0.2.1 re-exports
+**Can it break your code.** No. `@alxia/openapi-routes` 0.3.0 re-exports
 `@alxia/openapi`, deprecated, so an import of it keeps working until you
-change it. See
+change it. It is a minor, 0.3.0, because it peers on `@alxia/openapi`
+`^0.4.0`: `^0.2` never moves to it by itself, and it needs `@alxia/openapi`
+moved to 0.4 with it. See
 [`@alxia/openapi`'s checks](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md).
 
 ### The old `@alxia/openapi` is retired
@@ -567,12 +569,12 @@ That is code first, the opposite of spec first, so it is retired: 0.4.0 of
    none.
 
 **For maintainers.** After the releases — `@alxia/openapi` 0.4.0 for the
-first, `@alxia/openapi-routes` 0.2.1 for the second — the owner deprecates
+first, `@alxia/openapi-routes` 0.3.0 for the second — the owner deprecates
 the old versions on npm:
 
 ```sh
 npm deprecate @alxia/openapi@"<=0.3.0" "Retired: alxia is OpenAPI spec first. @alxia/openapi 0.4.0 and later is the spec-first package that was @alxia/openapi-routes (implemented, matchesSpec): write the OpenAPI document, generate the operations with @nxgt/openapi-codegen, bind them with route(). See https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md"
-npm deprecate @alxia/openapi-routes@"<=0.2.1" "Moved to @alxia/openapi: bun add -d @alxia/openapi and change the import, nothing else. See https://github.com/softistx/alxia/blob/develop/packages/openapi-routes/README.md"
+npm deprecate @alxia/openapi-routes@"<=0.3.0" "Moved to @alxia/openapi: bun add -d @alxia/openapi and change the import, nothing else. See https://github.com/softistx/alxia/blob/develop/packages/openapi-routes/README.md"
 ```
 
 ### The context registered once: `Register` and `defineRoutes`
