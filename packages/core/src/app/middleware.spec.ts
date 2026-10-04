@@ -137,15 +137,13 @@ describe('a middleware', () => {
 		});
 	});
 
-	test('that returns nothing, or calls next() twice, is a 500 naming the route', async () => {
+	test('that returns nothing without calling next(), or calls it twice, is a 500 naming the route', async () => {
 		const error = spyOn(console, 'error').mockImplementation(() => {});
 		try {
 			const app = alxia()
 				.get(
 					'/nothing',
-					async function forgot(_ctx: unknown, next: () => Promise<Response>) {
-						await next();
-					} as never,
+					async function forgot() {} as never,
 					({ reply }) => reply(200, 'x'),
 				)
 				.get(

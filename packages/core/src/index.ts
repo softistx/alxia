@@ -91,6 +91,7 @@ export type {
 	BaseContext,
 	BodyLimited,
 	BodyLimitShortcut,
+	BuiltinMark,
 	Context,
 	DeclaredRefusal,
 	DeclaredReply,

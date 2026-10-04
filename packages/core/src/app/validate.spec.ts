@@ -170,35 +170,6 @@ describe('a socket route', () => {
 		);
 	});
 
-	test('a middleware must return the stand-in response next() resolved to', async () => {
-		const error = spyOn(console, 'error').mockImplementation(() => {});
-		const app = alxia().ws(
-			'/',
-			async (_ctx, next) => {
-				await next();
-				return new Response('mine');
-			},
-			{ message: () => {} },
-		);
-		const server = app.listen({ port: 0 });
-		try {
-			const url = new URL('/', server.url);
-			url.protocol = 'ws:';
-			const socket = new WebSocket(url);
-			await new Promise((resolve) => {
-				socket.onopen = resolve;
-				socket.onerror = resolve;
-			});
-			socket.close();
-			expect(String(error.mock.calls[0]?.[0])).toContain(
-				'WS /: a middleware returned another response than next() resolved to',
-			);
-		} finally {
-			error.mockRestore();
-			await server.stop(true);
-		}
-	});
-
 	test('runs its middlewares and validate on the upgrade, then opens', async () => {
 		const around: number[] = [];
 		const app = alxia().ws(

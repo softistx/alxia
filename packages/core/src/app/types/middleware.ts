@@ -66,6 +66,16 @@ export interface MiddlewareMark {
 }
 
 /**
+ * What `validate` and `responds` mark their middleware with: a step the
+ * chain runs itself, which `use` refuses. Never set as such: at runtime
+ * the mark is `Symbol.for('alxia.builtin')` on the function, shared by
+ * every copy of `@alxia/core`, as `defineMiddleware`'s is.
+ */
+export interface BuiltinMark<Kind extends 'validate' | 'responds'> {
+	readonly '~builtin': Kind;
+}
+
+/**
  * What a route's first middleware reads: the base context, what the hooks
  * before the route added, and the request as it arrived — the path
  * parameters and query as strings, the headers, and no body until a

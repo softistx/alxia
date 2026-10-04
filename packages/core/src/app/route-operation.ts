@@ -15,6 +15,7 @@ import type {
 	ThreadHooks,
 	ValidSchema,
 } from './types';
+import { mixed } from './route-steps';
 import { builtinOf, responds, validate } from './validate';
 
 type IsUnion<T, All = T> = T extends unknown
@@ -127,17 +128,23 @@ export interface DeprecatedOperationForm<
 /**
  * What `route(operation, ...rest)` passes `app[method]` after the path. The
  * form of 0.3, a list of hooks first: the list, the operation's schema, the
- * handler. Otherwise its options, a `responds` of its responses first, the
- * middlewares, then a `validate` of its request parts just before the
- * handler — unless a `validate` of each of those parts, by the same
- * schemas, `validate(operation)`, stands among the middlewares.
+ * handler. Otherwise its options, the middlewares, then a `validate` of its
+ * request parts and a `responds` of its responses, just before the
+ * handler: the `responds` checks the handler's reply alone, never a
+ * middleware's — an auth's 401 is its own. A `validate(operation)` among
+ * the middlewares — a `validate` of each of its parts by the same schemas —
+ * stands where it is given, and so does a `responds(operation)`; the
+ * implicit one is then left out.
  */
 export function operationArgs(
 	operation: RouteOperation,
 	rest: readonly unknown[],
 ): unknown[] {
 	const schema = operation.schema ?? {};
-	if (Array.isArray(rest[0])) return [rest[0], schema, rest[1]];
+	if (Array.isArray(rest[0])) {
+		if (rest.length > 2) throw mixed(`${operation.method} ${operation.path}`);
+		return [rest[0], schema, rest[1]];
+	}
 	const { params, query, headers, cookies, body, response, ...options } =
 		schema;
 	const parts = Object.fromEntries(
@@ -146,25 +153,29 @@ export function operationArgs(
 		),
 	);
 	const middlewares = rest.slice(0, -1);
+	const steps = middlewares.map(builtinOf);
 	// The operation's validate placed among them: one that validates each of
 	// its parts with the very schema the operation names for it.
-	const placed = middlewares.some((middleware) => {
-		const step = builtinOf(middleware);
-		return (
-			step?.kind === 'validate' &&
-			Object.entries(parts).every(
-				([part, schema]) =>
-					step.schemas[part as keyof typeof step.schemas] === schema,
-			)
+	const validated =
+		Object.keys(parts).length === 0 ||
+		steps.some(
+			(step) =>
+				step?.kind === 'validate' &&
+				Object.entries(parts).every(
+					([part, schema]) =>
+						step.schemas[part as keyof typeof step.schemas] === schema,
+				),
 		);
-	});
+	const responded =
+		response === undefined ||
+		steps.some(
+			(step) => step?.kind === 'responds' && step.responses === response,
+		);
 	return [
 		options,
-		...(response === undefined ? [] : [responds(response as never)]),
 		...middlewares,
-		...(placed || Object.keys(parts).length === 0
-			? []
-			: [validate(parts as never)]),
+		...(validated ? [] : [validate(parts as never)]),
+		...(responded ? [] : [responds(response as never)]),
 		...rest.slice(-1),
 	];
 }

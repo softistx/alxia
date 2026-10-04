@@ -49,6 +49,9 @@ export async function chain<Last>(
 		Object.assign(current, added);
 		if (current !== ctx) Object.assign(ctx, added);
 	};
+	// The route's own context keeps the request's cookies: what every
+	// `validate` of them checks, a second one included.
+	const route = ctx;
 	const answer = (
 		result: AnyReply | Response | Last,
 		responses: ResponseSchemas | undefined,
@@ -86,8 +89,8 @@ export async function chain<Last>(
 				return answer(result as AnyReply | Response | Last, responses);
 			}
 			case 'validate': {
-				const raw = hook.raw === true;
-				const validated = await validateStep(run, hook.schemas, raw, ctx);
+				const { schemas } = hook;
+				const validated = await validateStep(run, schemas, ctx, route.cookies);
 				if ('refused' in validated) return validated.refused;
 				return step(next, validated.ctx, responses);
 			}

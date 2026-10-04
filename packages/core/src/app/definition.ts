@@ -35,9 +35,9 @@ export type MiddlewareHook = (
 /**
  * A step of a route's chain, in the order declared: a hook in force where
  * it was declared or in its list, a middleware, its validation, the check
- * of its replies. `raw` is the validation of a route declared without
- * middlewares, the form of 0.3: every part it has no schema for is set to
- * the request's, the body to `undefined`.
+ * of its replies. `raw` is the validation of a route declared with a
+ * schema and no middleware, the form of 0.3, which `app.routes` declares
+ * by that schema rather than by its own.
  */
 export type ChainHook =
 	| { readonly kind: 'derive'; readonly run: DeriveHook }

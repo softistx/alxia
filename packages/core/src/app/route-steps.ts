@@ -32,7 +32,8 @@ export function routeArgs<Last>(
 	what: string,
 ): RouteArgs<Last> {
 	const args = [...rest];
-	const list = Array.isArray(args[0]) ? (args.shift() as unknown[]) : [];
+	const listed = Array.isArray(args[0]);
+	const list = listed ? (args.shift() as unknown[]) : [];
 	const last = args.pop();
 	// A `validate(…)` or `responds(…)` last is a forgotten handler, not one.
 	if (!isLast(last) || builtinOf(last) !== undefined) {
@@ -42,7 +43,15 @@ export function routeArgs<Last>(
 		args[0] !== null && typeof args[0] === 'object'
 			? (args.shift() as Record<string, unknown>)
 			: {};
+	if (listed && args.length > 0) throw mixed(label);
 	return { list, config, middlewares: args, last };
+}
+
+/** A list of hooks, the form of 0.3, given with middlewares: one would be dropped. */
+export function mixed(label: string): TypeError {
+	return new TypeError(
+		`${label}: a list of hooks and middlewares are two forms, never mixed: give the hooks as middlewares, made by defineMiddleware()`,
+	);
 }
 
 /** A route's chain, from its arguments, and the schema it declares by them. */
@@ -71,8 +80,9 @@ export function routeChain(
 		);
 	}
 	// The form of 0.3: the schema validates the request just before the
-	// handler, as then, and a route with no middleware reads it as then.
-	if (middlewares.length === 0) {
+	// handler, as then. A route with no middleware and no schema runs none:
+	// what a middleware of `use` passed `next` reaches its handler.
+	if (middlewares.length === 0 && Object.keys(parts).length > 0) {
 		steps.push({ kind: 'validate', schemas: parts, raw: true });
 	}
 	if (response !== undefined)

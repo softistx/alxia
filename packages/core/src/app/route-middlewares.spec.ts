@@ -85,20 +85,21 @@ describe('route(operation, ...middlewares, handler)', () => {
 		expect(validations).toEqual(['Rex']);
 	});
 
-	test("checks every reply the operation declares, a middleware's included", async () => {
+	test("checks the handler's reply by the operation's responses, not a middleware's", async () => {
 		const error = spyOn(console, 'error').mockImplementation(() => {});
 		try {
-			const lying = defineMiddleware(({ reply }) =>
+			// A 401 the operation declares otherwise: an auth's own, sent as it is.
+			const own = defineMiddleware(({ reply }) =>
 				reply(401, { error: 'nope' } as never),
 			);
 			const app = alxia()
-				.route(updatePet, lying, ({ reply }) =>
-					reply(200, { id: 1, name: 'x' }),
-				)
+				.route(updatePet, own, ({ reply }) => reply(200, { id: 1, name: 'x' }))
 				.route({ ...updatePet, path: '/cats/:petId' } as const, ({ reply }) =>
 					reply(200, { id: 'x' } as never),
 				);
-			expect((await patch(app, { name: 'Rex' })).status).toBe(500);
+			const refused = await patch(app, { name: 'Rex' });
+			expect(refused.status).toBe(401);
+			expect(await refused.json()).toEqual({ error: 'nope' });
 			const cat = await app.request('/cats/1', {
 				method: 'PATCH',
 				headers: { 'content-type': 'application/json' },
