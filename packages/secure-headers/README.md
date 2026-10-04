@@ -108,10 +108,11 @@ value is refused at startup. `nonce` is off by default.
 ## Traps
 
 `use` it first: a route declared before `app.use(secureHeaders())` gets no
-header, and `ctx.nonce` exists only on routes declared after it. A
-`try`/`catch` middleware declared before it never sees an error: it settles
-`next()`, so the route's own error reply, or a 500, already carries the
-headers. Declare error-handling middleware after it.
+header, and `ctx.nonce` exists only on routes declared after it. It
+settles `next()` without swallowing the error: a `try`/`catch` middleware
+catches it wherever it stands, but only one declared after
+`secureHeaders()` has the headers on its reply. Declare error-handling
+middleware after it.
 
 ```ts
 const app = alxia().use(secureHeaders()).use(errorHandler).get(...);
