@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.3.0
+
+### Minor Changes
+
+- [#112](https://github.com/softistx/alxia/pull/112) [`c808d83`](https://github.com/softistx/alxia/commit/c808d836381bbcfb6a05b921483bfb088a1eb909) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `alxia()` now builds the server for Bun, with nothing to configure. In Vite's `ssr` environment, under `react-router dev` and `react-router build`, it adds the `bun` export condition to `resolve.conditions` and `resolve.externalConditions`, so a package that exports a `bun` variant is bundled, and loaded in dev, as that variant; adds `bun` and `bun:*` to `resolve.builtins`, so Bun's own modules stay imports of `build/server/index.js` whichever runtime runs Vite; and sets `build.target` to `esnext`. What the app sets is kept: its own conditions and builtins are merged with these, and a `build.target` it set, at the top level or on the environment, wins. An app that sets `ssr.target: 'webworker'` itself gets none of this. The guide has a Built for Bun section, and Deploying a multi-stage `Dockerfile` on `oven/bun:1`.
+
 ## 0.2.0
 
 ### Minor Changes
