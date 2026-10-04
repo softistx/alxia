@@ -35,6 +35,14 @@ number on it. Every release, with each change it made, is in
   retired. An app is tested in process with `app.request()`. What a handler
   reads, `reply` typed by `responds` and the path checks are typed as
   before ([Upgrading](upgrading.md#no-more-client-spec-first)).
+- **Routes from the OpenAPI document.** The document, written by hand, is
+  the source: `@nxgt/openapi-codegen`'s `alxia` option writes its
+  operations, `route(operation, ...middlewares, handler)` binds each, its
+  schemas check the request and every reply, and `@alxia/openapi`'s
+  `matchesSpec` checks the routes against the document. `@alxia/openapi`
+  is the package that was `@alxia/openapi-routes`; the one that generated
+  a document from an app is retired
+  ([Upgrading](upgrading.md#the-old-alxiaopenapi-is-retired)).
 
 ## Next
 
@@ -42,10 +50,10 @@ number on it. Every release, with each change it made, is in
   marked deprecated, pointing at the upgrading guide, once the owner runs
   the command the [upgrading guide](upgrading.md#no-more-client-spec-first)
   gives.
-- **Routes from the OpenAPI document.** `@alxia/openapi` becomes spec first:
-  the operations of a document, declared with `route(operation,
-  ...middlewares, handler)` and checked by `matchesSpec`; the package that
-  generated a document from an app is retired.
+- **The old packages deprecated on npm.** `@alxia/openapi` 0.3.0 and
+  earlier, and `@alxia/openapi-routes`, marked deprecated with the commands
+  the [upgrading guide](upgrading.md#the-old-alxiaopenapi-is-retired) gives,
+  once the owner runs them after the releases.
 
 ## Later
 
@@ -111,7 +119,7 @@ number on it. Every release, with each change it made, is in
 - **A hook per refusal kind.** `onRefusal('validation', hook)` and
   `onRefusal('body_limit', hook)`, each with schemas of its own if given,
   answer one kind each and read it narrowed. A route's types, the client
-  and `@alxia/openapi` see each kind's replies apart: the 413 of a
+  and the document writer of the time saw each kind's replies apart: the 413 of a
   `body_limit` hook is no part of a route without a limit. A kind with no
   hook, or whose hook returns nothing, falls back to `onRefusal(hook)`,
   then to the default.
@@ -128,8 +136,8 @@ number on it. Every release, with each change it made, is in
   `400 { error: 'validation', issues }`, for the routes declared after it.
   The hook reads the part that failed and every issue, and may answer 400
   or another 4xx. Its reply takes the 400's place in each route's type, so
-  the client reads it. Given schemas, `@alxia/openapi` documents it under
-  its content type. A group's hook stays in the group, and the default is
+  the client reads it. Given schemas, its replies are checked by them and
+  sent under its content type. A group's hook stays in the group, and the default is
   unchanged.
 - **RFC 9457 problems.** `problem({ type, status, detail, … })` is a reply
   sent as `application/problem+json`, with its extension members typed:
@@ -142,8 +150,7 @@ number on it. Every release, with each change it made, is in
   before it can write a frame the handler never yielded.
 - **A body size per route.** `bodyLimit` on a route, or `bodyLimit(bytes)`
   for the app or a group, caps its request body below the server's
-  `maxRequestBodySize`. A body over the limit is refused with a typed 413,
-  which `@alxia/openapi` documents. A `Content-Length` over the limit is
+  `maxRequestBodySize`. A body over the limit is refused with a typed 413. A `Content-Length` over the limit is
   refused unread, and a chunked upload is cut off as soon as it passes the
   limit, never buffered whole. This holds for JSON, forms, text, custom
   parsers and a handler reading the raw stream. The refusal reaches

@@ -1,16 +1,13 @@
-# @alxia/openapi-routes documentation
+# @alxia/openapi documentation
 
 The [package README](../README.md) is the short version. This folder is
-the long one: where to call the checks, how an operation is matched to a
-route, and what to do with each message they throw.
+the long one: the spec-first workflow end to end, how the checks match an
+operation to a route, and what to do with each message the checks and the
+generator print.
 
 | Page | Read it when |
 | --- | --- |
-| [Guide](guide.md) | calling `implemented` or `matchesSpec` in a test or at startup, checking an app with a prefix or routes with middlewares, or choosing what `matchesSpec` leaves out |
-| [Troubleshooting](troubleshooting.md) | a check threw and you have its message, or it passes when you expected it to fail |
-| [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |
-
-The whole flow, from an OpenAPI document to the generated operations, the
-routes and these checks, is
-[From an OpenAPI document](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/from-a-document.md), in
-`@alxia/openapi`'s docs.
+| [Spec first](guide/spec-first.md) | starting an API from its OpenAPI document: configuring `@nxgt/openapi-codegen`, declaring alxia's 400, binding the generated operations with middlewares, committing the generated files, checking them in CI, and generating a client from the same document |
+| [The checks](guide/checks.md) | calling `implemented` or `matchesSpec` in a test or at startup, checking an app with a prefix or routes with middlewares, or choosing what `matchesSpec` leaves out |
+| [Troubleshooting](troubleshooting.md) | a check threw, the generator refused the document or left an operation out, or an import from an older version no longer compiles |
+| [Roadmap](roadmap.md) | wondering what is coming, what is not planned, and what this package was called before |

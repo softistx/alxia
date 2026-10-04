@@ -4,11 +4,14 @@ A type-safe HTTP framework for Bun. Modular to the bone: the core has **no
 dependency**, and everything else — Zod, OpenAPI, CORS, JWT, compression —
 is a package you add, or don't.
 
-OpenAPI spec first: the document is the contract, and a typed client is
-generated from it by the generator of your choice — the examples will use
-[`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen). The
-server's types check each handler: what its middlewares add, its replies
-against its `responds`, its path.
+OpenAPI spec first: the document is the contract. The routes are bound to
+the operations generated from it, and a typed client is generated from it
+by the generator of your choice — the `api` template uses
+[`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen),
+and [`@alxia/openapi`](packages/openapi) checks that the app routes every
+operation of the document, and no other. The server's types check each
+handler: what its middlewares add, its replies against its `responds`, its
+path.
 
 ## Getting started
 
@@ -16,8 +19,8 @@ against its `responds`, its path.
 bun create @alxia my-app
 ```
 
-It asks for a template — `api`, an alxia app with Zod, a middleware and a
-spec, or `react-router`, React Router's official template served by
+It asks for a template — `api`, a spec-first alxia app: an `openapi.yaml`,
+the operations generated from it, its routes, a middleware and a spec — or `react-router`, React Router's official template served by
 alxia — writes the project, installs it, and prints `cd my-app` and
 `bun dev` ([`@alxia/create`](packages/create)).
 
@@ -26,11 +29,10 @@ alxia — writes the project, installs it, and prints `cd my-app` and
 | Package | |
 | --- | --- |
 | [`@alxia/core`](packages/core) | routes on `Bun.serve`, validated with any Standard Schema; replies typed by status; hooks, groups and plugins; cookies, server-sent events and WebSockets, typed; static files and Bun's HTML bundles |
-| [`@alxia/zod`](packages/zod) | Zod 4: query and path coercions (`zq.int()`, `zq.array()`…), and the OpenAPI converter |
+| [`@alxia/zod`](packages/zod) | Zod 4: query and path coercions (`zq.int()`, `zq.array()`…), and a Zod schema as JSON Schema |
 | [`@alxia/graphql`](packages/graphql) | GraphQL with Yoga and its plugins: behind the app's hooks, resolvers reading its typed context, subscriptions over SSE, GraphiQL or Apollo Sandbox |
 | [`@alxia/react-router`](packages/react-router) | a React Router app served by alxia, under Bun: server rendering behind the app's hooks, loaders reading its typed context, `/api` routes beside the pages; one Vite plugin, no server file needed, for the dev server and a runnable build |
-| [`@alxia/openapi`](packages/openapi) | the OpenAPI 3.2 document of an app, from its schemas, and a reference page |
-| [`@alxia/openapi-routes`](packages/openapi-routes) | the other direction: a test that every operation of an OpenAPI document has its route, and no other |
+| [`@alxia/openapi`](packages/openapi) | OpenAPI spec first: the routes bound to the operations `@nxgt/openapi-codegen` generates from the document, and a test that every operation has its route, and no other (`matchesSpec`). Formerly `@alxia/openapi-routes`, now deprecated |
 | [`@alxia/cors`](packages/cors) | CORS: preflights before routing, headers on every response |
 | [`@alxia/secure-headers`](packages/secure-headers) | HSTS, CSP, nosniff and the rest |
 | [`@alxia/rate-limit`](packages/rate-limit) | a rate limit: a 429 past it, with its headers; pluggable stores |

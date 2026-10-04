@@ -1,8 +1,8 @@
 # @alxia/openapi
 
 From 0.4.0, `@alxia/openapi` is the spec-first package that was
-`@alxia/openapi-routes`, whose releases follow, up to 0.2.0, under that
-name. The `@alxia/openapi` of 0.1.0 to 0.3.0, which wrote an OpenAPI
+`@alxia/openapi-routes`: its releases up to 0.2.0, below, were published
+under that name. The `@alxia/openapi` of 0.1.0 to 0.3.0, which wrote an OpenAPI
 document from an app's route schemas, is retired; its changelog is
 [in the repository's history](https://github.com/softistx/alxia/blob/3f80253/packages/openapi/CHANGELOG.md).
 

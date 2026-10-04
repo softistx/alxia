@@ -1,10 +1,12 @@
 # Guide
 
-How `bun create @alxia` asks, what each template writes, and how it
-chooses the versions it writes.
+How `bun create @alxia` asks, what each template writes, how the `api`
+project grows from its OpenAPI document, and how the command chooses the
+versions it writes.
 
 - [Running it](#running-it)
 - [The `api` template](#the-api-template)
+  - [Adding an operation](#adding-an-operation)
 - [The `react-router` template](#the-react-router-template)
 - [Lint and format](#lint-and-format)
 - [Docker](#docker)
@@ -71,87 +73,330 @@ repository ([Lint and format](#lint-and-format)).
 
 ```
 my-api/
+├── openapi.yaml               the contract: every operation, its parameters, body and replies
+├── openapi-codegen.config.ts  how `bun run generate` reads it
 ├── src/
-│   ├── app.ts        the app, and its type
-│   ├── app.spec.ts   bun test: app.request(), no port
-│   └── server.ts     app.listen(PORT), stopped on SIGTERM
+│   ├── generated/             what `bun run generate` writes: committed, never edited
+│   ├── app.ts                 the app: one route per operation, and its type
+│   ├── app.spec.ts            bun test: app.request(), no port, and matchesSpec
+│   └── server.ts              app.listen(PORT), stopped on SIGTERM
 ├── package.json
 ├── tsconfig.json
-├── biome.json        Biome: lint, format, imports sorted
-├── .vscode/          Biome's extension recommended, format on save
-├── Dockerfile        bun run build, then dist/ alone, on oven/bun:1-alpine
+├── biome.json                 Biome: lint, format, imports sorted
+├── .vscode/                   Biome's extension recommended, format on save
+├── Dockerfile                 bun run build, then dist/ alone, on oven/bun:1-alpine
 ├── .dockerignore
-├── .env.example      PORT and API_KEY, for a .env Bun loads
+├── .env.example               PORT and API_KEY, for a .env Bun loads
 ├── .gitignore
 └── README.md
 ```
 
-`src/app.ts` is one route, `POST /todos`, with what a real one needs: a
-body validated by a Zod schema, a declared reply, and a middleware of its own.
+The project is OpenAPI spec first: `openapi.yaml` is written first, the
+code is generated from it, and the app binds a handler to each generated
+operation. A client in another project is generated from the same file.
+
+### `openapi.yaml`
+
+Three operations, each with an `operationId`, which names it everywhere
+after:
+
+| operation | `operationId` | replies |
+| --- | --- | --- |
+| `GET /todos` | `listTodos` | 200, the todos |
+| `POST /todos` | `createTodo` | 201, the todo; 400; 401 without the `x-api-key` header (`security: apiKey`) |
+| `GET /todos/{id}` | `getTodo` | 200; 400, an `id` that is not a whole number of 1 or more; 404 |
+
+```yaml
+# openapi.yaml, in part
+  /todos/{id}:
+    get:
+      operationId: getTodo
+      summary: One todo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: The todo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Todo" }
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          description: No todo has this id
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotFound" }
+```
+
+The 400 is declared once, as `components.responses.ValidationError`, and
+is the body alxia itself sends when a request breaks the operation's
+schemas, `@alxia/core`'s `ValidationErrorBody`:
+
+```json
+{ "error": "validation", "issues": [{ "target": "body", "path": ["title"], "code": "too_small", "message": "…" }] }
+```
+
+Declared in the spec, it is in every generated client's types, and the
+app checks its own refusals against it like any other reply.
+
+### `openapi-codegen.config.ts`
 
 ```ts
-import { alxia, defineMiddleware, responds, validate } from "@alxia/core";
-import { z } from "zod";
+import { defineConfig } from "@nxgt/openapi-codegen";
 
-const Todo = z.object({ id: z.number(), title: z.string(), done: z.boolean() });
-const NewTodo = z.object({ title: z.string().min(1) });
+export default defineConfig({
+  input: "openapi.yaml",
+  output: "src/generated",
+  alxia: true,
+  validationErrors: false,
+});
+```
+
+| option | value | effect |
+| --- | --- | --- |
+| `input` | `"openapi.yaml"` | the spec |
+| `output` | `"src/generated"` | where the files go |
+| `alxia` | `true` | adds `alxia.ts`: each operation as the data `app.route()` takes |
+| `validationErrors` | `false` | declares no 400 of the generator's own (below) |
+
+`validationErrors` is `true` by default, and then declares another
+server's 400 body, `{ status, message, timestamp, issues }`, in the
+files a client reads (`types.ts`, `zod.ts`, `operations.ts`,
+`paths.ts`). alxia never sends that body. Turned off, the generated files
+declare only the spec's own 400, which is the one alxia sends.
+
+### `src/generated/`
+
+`bun run generate` runs `nxgt-openapi generate`, the bin of
+[`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen):
+
+```
+openapi.yaml → src/generated: 5 written, 0 unchanged
+```
+
+| file | holds |
+| --- | --- |
+| `alxia.ts` | one `as const` constant per operation, `{ method, path, schema }`, with the path in alxia's form (`/todos/:id`), the request's Zod schemas, a schema per response status and the `operationId`; and `operations`, all of them by `operationId` |
+| `zod.ts` | a Zod schema per component schema: `zTodo`, `zNewTodo`, … |
+| `types.ts` | a TypeScript type per component schema: `Todo`, `NewTodo`, … |
+| `operations.ts`, `paths.ts` | the operations and paths as types, for a typed client |
+
+```ts
+// src/generated/alxia.ts, in part
+export const createTodo = {
+  method: "POST",
+  path: "/todos",
+  schema: {
+    body: zNewTodo,
+    response: { 201: zTodo, 400: zValidationError, 401: zUnauthorized },
+    detail: { operationId: "createTodo", summary: "Add a todo" },
+  },
+} as const;
+```
+
+**The folder is committed.** Nothing is generated at install or at build:
+
+- `bun install` runs no script, and `bun dev`, `bun test` and
+  `bun run build` read the files as they are;
+- the `Dockerfile` is the same as without a spec: its build stage runs
+  `bun run build`, and `openapi.yaml` is not read;
+- a clone builds offline, and a review shows what a change to
+  `openapi.yaml` changed in the code.
+
+The cost is that the files can drift from the spec: `openapi.yaml` edited
+and `bun run generate` forgotten. `bun run verify` runs
+`bun run generate --check` first, which writes nothing, lists each stale
+file and exits 1
+([troubleshooting](troubleshooting.md#openapiyaml--srcgenerated-out-of-date-run-nxgt-openapi-generate)).
+
+`biome.json` skips `src/generated/`, `"!!**/src/generated"` in its
+`files.includes`, as it skips `dist/`: the generator writes its own
+style, and `bun run check` would otherwise rewrite the files and make
+`generate --check` fail.
+
+`@nxgt/openapi-codegen` is a devDependency pinned exactly, since another
+release may write the files differently. The command moves it to the
+newest patch of the template's minor ([Versions](#versions)). Moving it to
+another minor is a change to review:
+
+```sh
+bun add --dev --exact @nxgt/openapi-codegen@latest
+bun run generate
+git diff src/generated
+```
+
+What the generator does not write, in 0.6.0, and how the app does it
+instead:
+
+- **`security`**: no middleware is generated from it. Authentication is
+  a middleware the app writes, `requireKey` here, given to the routes
+  that need it.
+- **A cookie parameter**: the generator refuses the whole spec
+  ([troubleshooting](troubleshooting.md#cookie-parameter-session-is-not-supported-unsupported_parameter)).
+  Read the cookie in a middleware, or validate it with `validate({ cookies })`
+  by hand.
+- **Named server-sent events** (an `itemSchema` with `event` names): the
+  operation is left out of `alxia.ts` with a warning; declare that route
+  by hand with `@alxia/core`'s `eventStream`.
+
+### `src/app.ts`
+
+```ts
+import { alxia, defineMiddleware } from "@alxia/core";
+import { operations } from "./generated/alxia";
+import type { Todo } from "./generated/types";
 
 /** Set API_KEY in the environment: this default is for development. */
 export const apiKey = Bun.env["API_KEY"] ?? "dev-key";
 
 // A middleware of the routes it is given to: it answers 401 without the key,
-// before the body is read.
+// before the body is read. openapi.yaml declares that 401.
 const requireKey = defineMiddleware(({ request, reply }, next) =>
   request.headers.get("x-api-key") === apiKey
     ? next()
     : reply(401, { error: "unauthorized" as const }),
 );
 
-const todos: z.infer<typeof Todo>[] = [];
+const todos: Todo[] = [];
 
 export const app = alxia()
   .decorate({ todos })
-  .post(
-    "/todos",
-    requireKey,
-    validate({ body: NewTodo }),
-    responds({ 201: Todo }),
-    ({ body, todos, reply }) => {
-      const todo = { id: todos.length + 1, title: body.title, done: false };
-      todos.push(todo);
-      return reply.created(todo);
-    },
-  );
+  .route(operations.listTodos, ({ todos, reply }) => reply.ok(todos))
+  .route(operations.createTodo, requireKey, ({ body, todos, reply }) => {
+    const todo = { id: todos.length + 1, title: body.title, done: false };
+    todos.push(todo);
+    return reply.created(todo);
+  })
+  .route(operations.getTodo, ({ params, todos, reply }) => {
+    const todo = todos.find(({ id }) => id === params.id);
+    return todo
+      ? reply.ok(todo)
+      : reply.notFound({ error: "not_found" as const });
+  });
 
 export type App = typeof app;
 ```
 
-- The middlewares run in the order given. `requireKey` stands before
-  `validate`, so it runs before the body is read: a request without the key
-  is a 401 whatever its body
-  ([A route's middlewares](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md#a-routes-middlewares)).
-- `validate({ body: NewTodo })` answers an empty `title` with a 400 naming
-  `title`, before the handler runs; the handler reads `body` typed by it.
-- `responds({ 201: Todo })` types the handler's `reply` and checks what it
-  sends.
-- `todos` lives in memory: replace the array with your database, given to
-  the routes the same way, by `decorate`.
-
-`src/app.spec.ts` calls the app in process, no port, with `app.request()`
-and a JSON body:
-
 ```ts
-const response = await app.request("/todos", {
-  method: "POST",
-  headers: { "content-type": "application/json", "x-api-key": apiKey },
-  body: JSON.stringify({ title: "Write a route" }),
-});
-expect(response.status).toBe(201);
+route(operation, ...middlewares, handler)
 ```
 
-alxia is OpenAPI spec first: a typed client for other programs is generated
-from the API's OpenAPI document, with the generator of your choice, such as
-`@nxgt/openapi-codegen`, rather than read from the app's type.
+- **The operation gives the method, the path and the schemas.** The
+  handler is all the route writes; its `params`, `body` and `reply` are
+  typed by the spec: `params.id` is a number, as `openapi.yaml` declares
+  it, and `reply` takes only the statuses the operation declares.
+- **The middlewares run in the order given.** `requireKey` comes first,
+  so a request without the key is a 401 before its body is read, whatever
+  the body
+  ([A route's middlewares](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md#a-routes-middlewares)).
+- **The request is validated just before the handler**: an empty
+  `title` is a 400 naming `title`, `/todos/first` a 400 naming `id`, and
+  the handler never runs. To validate before a middleware instead, place
+  `validate(operations.createTodo)` among the middlewares.
+- **Every reply is checked against the spec's responses**, a middleware's
+  too: `requireKey`'s 401 is checked against `Unauthorized`. A reply the
+  spec refuses is not sent; the client gets a 500
+  ([troubleshooting](troubleshooting.md#responsevalidationerror-post-todos-the-401-reply-does-not-match-its-schema)).
+- **`todos` lives in memory**: replace the array with your database,
+  given to the routes the same way, by `decorate`.
+
+### `src/app.spec.ts`
+
+```ts
+import { expect, test } from "bun:test";
+import { matchesSpec } from "@alxia/openapi";
+import { apiKey, app } from "./app";
+import { operations } from "./generated/alxia";
+
+test("routes every operation of openapi.yaml, and nothing else", () => {
+  matchesSpec(app, operations);
+});
+
+test("creates a todo from JSON", async () => {
+  const response = await app.request("/todos", {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-api-key": apiKey },
+    body: JSON.stringify({ title: "Write a route" }),
+  });
+  expect(response.status).toBe(201);
+});
+```
+
+`matchesSpec(app, operations)`, from
+[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi), throws
+when an operation has no route, or a route has no operation, naming each.
+The spec also checks the 400, the 401 before the body and the 404, each
+with `app.request()`, in process, with no port.
+
+### Adding an operation
+
+A route starts in `openapi.yaml`. To add `DELETE /todos/{id}`:
+
+1. Declare it, with an `operationId`:
+
+   ```yaml
+   # openapi.yaml, under /todos/{id}, beside get
+       delete:
+         operationId: deleteTodo
+         security:
+           - apiKey: []
+         parameters:
+           - name: id
+             in: path
+             required: true
+             schema: { type: integer, minimum: 1 }
+         responses:
+           "204":
+             description: The todo, removed
+           "400":
+             $ref: "#/components/responses/ValidationError"
+           "401":
+             description: No x-api-key header, or not the key
+             content:
+               application/json:
+                 schema: { $ref: "#/components/schemas/Unauthorized" }
+           "404":
+             description: No todo has this id
+             content:
+               application/json:
+                 schema: { $ref: "#/components/schemas/NotFound" }
+   ```
+
+2. Generate:
+
+   ```sh
+   bun run generate
+   ```
+
+   `src/generated/alxia.ts` now exports `operations.deleteTodo`. Until
+   the app routes it, `bun test` fails:
+
+   ```
+   TypeError: matchesSpec(): 1 operation has no route: DELETE /todos/:id (deleteTodo)
+   ```
+
+3. Bind it in `src/app.ts`, after the `getTodo` route:
+
+   ```ts
+     .route(operations.deleteTodo, requireKey, ({ params, todos, reply }) => {
+       const index = todos.findIndex(({ id }) => id === params.id);
+       if (index === -1) return reply.notFound({ error: "not_found" as const });
+       todos.splice(index, 1);
+       return reply.noContent();
+     });
+   ```
+
+4. Check, and commit `openapi.yaml` with `src/generated/`:
+
+   ```sh
+   bun run verify
+   ```
+
+### The rest
 
 The scripts:
 
@@ -159,13 +404,14 @@ The scripts:
 | --- | --- |
 | `bun dev` | `bun --watch src/server.ts`: restarted on every change, on `PORT` or 3000 |
 | `bun test` | the spec |
+| `bun run generate` | `nxgt-openapi generate`: `src/generated/` from `openapi.yaml`. `bun run generate --check` writes nothing and exits 1 when a file is stale |
 | `bun run typecheck` | `tsc --noEmit` |
 | `bun run build` | `bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked`: one file, its dependencies bundled |
 | `bun start` | `bun dist/server.js`: the build, after `bun run build` |
 | `bun run check` | `biome check --write`: lint, format, sort imports, fixing what it can |
 | `bun run lint`, `bun run format` | `biome lint`, `biome format --write` |
 | `bun run check:ci` | `biome ci`: read-only, for CI |
-| `bun run verify` | `check:ci`, `typecheck`, then `test` |
+| `bun run verify` | `generate --check`, `check:ci`, `typecheck`, then `test` |
 
 `start` runs what `build` wrote, as production and the image do:
 
@@ -190,7 +436,8 @@ keeps out of git and `.dockerignore` out of the image.
 `noUnusedLocals` and the rest. Hence `Bun.env["API_KEY"]` and not
 `Bun.env.API_KEY`, and Biome's `useLiteralKeys`, which would ask for the
 second, is off in `biome.json`. Loosen what you would rather not keep:
-alxia's types compile under each one, and under none.
+alxia's types, and the generated files, compile under each one, and under
+none.
 
 ## The `react-router` template
 
@@ -306,7 +553,8 @@ configuration of its own, extending nothing:
 ```
 
 That is the `react-router` project's, written here compact. The `api`
-project's skips `dist/` instead of `build/` and `.react-router/`, has no
+project's skips `dist/` and `src/generated/` instead of `build/` and
+`.react-router/`, has no
 CSS settings and no overrides, and turns `complexity.useLiteralKeys` off
 in place of `noEmptyPattern` ([the `api` template](#the-api-template)).
 
@@ -318,8 +566,8 @@ in place of `noEmptyPattern` ([the `api` template](#the-api-template)).
 - **`$schema` is the installed Biome's own schema**, so an editor checks
   the file against the version `bun install` put in `node_modules`,
   whichever the command wrote.
-- **What is generated is skipped.** `files.includes` leaves `dist/`, or
-  `build/` and `.react-router/`, out, and `vcs.useIgnoreFile` every path
+- **What is generated is skipped.** `files.includes` leaves `dist/` and
+  `src/generated/`, or `build/` and `.react-router/`, out, and `vcs.useIgnoreFile` every path
   `.gitignore` names, the project in a git repository or not (with no
   `.gitignore` and no git repository, Biome refuses to run:
   [troubleshooting](troubleshooting.md#-biome-couldnt-find-an-ignore-file-in-the-following-folder-)).
@@ -348,7 +596,7 @@ bunx biome migrate --write
 | `bun run lint` | `biome lint` |
 | `bun run format` | `biome format --write` |
 | `bun run check:ci` | `biome ci`: changes nothing, and fails on any error |
-| `bun run verify` | `check:ci`, `typecheck`, then `test` (`api`) or `build` (`react-router`) |
+| `bun run verify` | `api`: `generate --check`, `check:ci`, `typecheck`, then `test`; `react-router`: `check:ci`, `typecheck`, then `build` |
 
 The read-only one is `check:ci`, not `ci`: `bun ci` is Bun's
 `bun install --frozen-lockfile`, and a script named `ci` would only run
@@ -398,6 +646,9 @@ Bun's `--no-install` (not create-alxia's option of the same name), so that a pac
 startup rather than being fetched from npm, written out so that Bun
 is the container's process. `src/server.ts` stops the app on `SIGTERM`:
 as process 1, Bun would otherwise ignore it, and `docker stop` would wait.
+Nothing is generated in the image: `src/generated/` is committed, and
+`COPY . .` brings it with the rest, so the build stage runs no
+`bun run generate` and needs no `openapi.yaml`.
 
 ```dockerfile
 FROM oven/bun:1 AS build
@@ -460,12 +711,12 @@ template pins exactly:
 
 | dependency | moved to the newest within |
 | --- | --- |
-| `@alxia/core`, `@alxia/react-router` | the ranges this `@alxia/create` was published with, such as `^0.3.1`; while the registry does not serve that version yet, the newest of its minor, `~0.3.0` |
+| `@alxia/core`, `@alxia/openapi`, `@alxia/react-router` | the ranges this `@alxia/create` was published with, such as `^0.3.1`; while the registry does not serve that version yet, the newest of its minor, `~0.3.0` |
 | `typescript` | `^6.0.3 \|\| ^7.0.0`, every alxia package's peer range |
 | `zod` | `^4.2.0`, `@alxia/zod`'s |
 | `vite` | `^7.0.0 \|\| ^8.0.0`, `@alxia/react-router`'s |
 | `react-router`, `@react-router/*` | `^8.0.0`, `@alxia/react-router`'s; the `@react-router/*` packages take `react-router`'s version, which `@react-router/node` pins exactly |
-| `@biomejs/biome` | its own minor, from the exact version the template pins (`~2.5.15`): written exactly, `2.5.16`, never `^` |
+| `@biomejs/biome`, `@nxgt/openapi-codegen` | its own minor, from the exact version the template pins (`~2.5.15`, `~0.6.0`): written exactly, `2.5.16`, never `^`. A minor of Biome may add a recommended rule; one of `@nxgt/openapi-codegen` may write `src/generated/` differently |
 | anything else: `react`, `isbot`, Tailwind, `@types/*` | no alxia range: npm's `latest` |
 
 The command prints each move, and each newer major it left out:

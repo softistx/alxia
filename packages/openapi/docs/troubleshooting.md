@@ -1,7 +1,7 @@
 # Troubleshooting
 
 Each entry is headed by the text you see: a `TypeError` one of the checks
-threw, or an error from `tsc`. The counts, methods and paths in a message
+threw, a line `nxgt-openapi generate` printed, or an error from `tsc`. The counts, methods and paths in a message
 are the app's own, written `…` below. A check that passes when you expected
 it to fail prints nothing; those are under [Traps](#traps), by symptom.
 A message that starts `exactly():` comes from `exactly`, the deprecated
@@ -14,12 +14,19 @@ name of `matchesSpec`: read the same entry.
 - [`TypeError: implemented(): the prefix "…" must start with "/" and not end with one`](#typeerror-implemented-the-prefix--must-start-with--and-not-end-with-one)
 - [`TypeError: implemented(): "…": ":…" is not a parameter name`](#typeerror-implemented---is-not-a-parameter-name)
 
+**Generator** (`@nxgt/openapi-codegen` 0.6.0)
+
+- [``cookie parameter `…` is not supported [unsupported_parameter]``](#cookie-parameter--is-not-supported-unsupported_parameter)
+- [`alxia.ts leaves it out. Its … reply streams events alxia cannot send … [ignored]`](#alxiats-leaves-it-out-its--reply-streams-events-alxia-cannot-send--ignored)
+- [A client refuses alxia's 400, or types it `{ status, message, timestamp, issues }`](#a-client-refuses-alxias-400-or-types-it--status-message-timestamp-issues-)
+
 **Types**
 
 - [`Type '"TRACE"' is not assignable to type 'Method'`](#type-trace-is-not-assignable-to-type-method)
 - [``Type '"pets"' is not assignable to type '`/${string}`'``](#type-pets-is-not-assignable-to-type-string)
 - [`Argument of type '{ method: string; path: string; }[]' is not assignable to parameter of type 'Operations'`](#argument-of-type--method-string-path-string--is-not-assignable-to-parameter-of-type-operations)
 - [`Property 'routes' is missing in type '…' but required in type '{ readonly routes: readonly RouteDefinition[]; }'`](#property-routes-is-missing-in-type--but-required-in-type--readonly-routes-readonly-routedefinition-)
+- [`Module '"@alxia/openapi"' has no exported member 'docs'`](#module-alxiaopenapi-has-no-exported-member-docs)
 
 **Traps**
 
@@ -76,17 +83,16 @@ TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1
 named by method and full path.
 
 **Why:** the route is not in the spec — an admin route, a health check, the
-routes `docs()` from `@alxia/openapi` adds (`GET /openapi.json`,
-`GET /docs`), an `app.static('/assets', …)` mount (`GET /assets/*`) — or the spec's
-operation was renamed or removed and the route was not.
+pages of a React Router app, an `app.static('/assets', …)` mount
+(`GET /assets/*`) — or the spec's operation was renamed or removed and the
+route was not.
 
 **Fix:** add the operation to the document and generate again, remove the
 route, or leave it out on purpose with `exclude`:
 
 ```ts
 matchesSpec(app, api, {
-	exclude: (route) =>
-		['/openapi.json', '/docs', '/health'].includes(route.path),
+	exclude: (route) => route.path === '/health' || route.path.startsWith('/assets/'),
 });
 ```
 
@@ -144,6 +150,80 @@ the path as the core's entry for it says: a `:time` parameter for
 ([`":" may only start a segment`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#--may-only-start-a-segment-as-a-parameter)),
 `/caf%C3%A9` for `/café`
 ([`is not encoded as a request's URL carries it`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#-is-not-encoded-as-a-requests-url-carries-it-declare-)).
+
+## Generator
+
+These come from `bunx nxgt-openapi generate`, with `alxia: true`, before
+any check runs. Its guide lists every
+[diagnostic](https://github.com/softistx/nxgt-http/blob/develop/packages/openapi-codegen/docs/guide/diagnostics.md).
+
+### ``cookie parameter `…` is not supported [unsupported_parameter]``
+
+```text
+error openapi.yaml#/paths/~1me/get/parameters/0/in: cookie parameter `session` is not supported [unsupported_parameter]
+```
+
+**When:** an operation declares a parameter `in: cookie`. 0.6.0 refuses
+the whole document, with `alxia` on or off, writes no file, and exits 1.
+
+**Why:** the generator does not read cookie parameters yet.
+
+**Fix:** remove the parameter from the spec, and read the cookie on the
+server in a middleware, or validate it with `validate({ cookies })`:
+
+```ts
+import { defineMiddleware } from '@alxia/core';
+
+const session = defineMiddleware(({ cookies, reply }, next) => {
+	const id = cookies['session'];
+	return id === undefined ? reply(401, { error: 'unauthorized' as const }) : next({ sessionId: id });
+});
+
+app.route(operations.getMe, session, ({ sessionId, reply }) => reply.ok(findUser(sessionId)));
+```
+
+### `alxia.ts leaves it out. Its … reply streams events alxia cannot send … [ignored]`
+
+```text
+warning openapi.yaml#/paths/~1feed/get: watchFeed: alxia.ts leaves it out. Its 200 reply streams events alxia cannot send: its eventStream sends unnamed events, each its data as JSON [ignored]
+```
+
+**When:** a reply is `text/event-stream` whose `itemSchema` declares named
+events, or data that is not JSON.
+
+**Why:** the generated `eventStream(schema)` describes unnamed events, each
+its data as JSON, so 0.6.0 leaves the operation out of `alxia.ts` rather
+than type it wrongly. It is not in `operations`, so `implemented` does not
+list it either.
+
+**Fix:** declare the route by hand, with `eventStream` from `@alxia/core`,
+which takes a schema per event name
+([server-sent events](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/server-sent-events.md)).
+Other `ignored` warnings — a `TRACE`, a binary body, a binary, JSON Lines
+or form reply — mean the same: declare the route by hand if you serve it.
+
+### A client refuses alxia's 400, or types it `{ status, message, timestamp, issues }`
+
+**Symptom:** a client generated from the document fails to decode a 400,
+or its type says the body is `ValidationErrorBody`, with `status`,
+`message` and `timestamp`.
+
+**Why:** `validationErrors` defaults to `true`, which declares
+`@nxgt/openapi-hono`'s 400 in `types.ts`, `zod.ts`, `operations.ts` and
+`paths.ts`. alxia answers `{ error: 'validation', issues }` instead.
+
+**Fix:** set `validationErrors: false`, declare alxia's 400 in the spec
+([Spec first](guide/spec-first.md#declare-alxias-own-400)), and generate
+again:
+
+```ts
+export default defineConfig({
+	input: 'openapi.yaml',
+	output: 'src/generated',
+	alxia: true,
+	validationErrors: false,
+});
+```
 
 ## Types
 
@@ -212,6 +292,28 @@ app given in the wrong order, `implemented(operations, app)`.
 
 **Fix:** the app first: `implemented(app, operations)`.
 
+### `Module '"@alxia/openapi"' has no exported member 'docs'`
+
+```text
+error TS2305: Module '"@alxia/openapi"' has no exported member 'docs'.
+```
+
+Also for `openapi`, `toJsonSchema`, `Converter`, `openApiPath` and the other
+exports of `@alxia/openapi` 0.3 or earlier.
+
+**When:** code written for `@alxia/openapi` 0.1 to 0.3, after installing
+0.4 or later.
+
+**Why:** that package wrote a document from the app, and is retired: alxia
+is spec first, and the name now belongs to the package that checks an app
+against its document.
+
+**Fix:** write the document, generate the operations from it, and check
+the app with `matchesSpec`, as
+[Coming from `@alxia/openapi` 0.3](https://github.com/softistx/alxia/blob/develop/packages/openapi/README.md#coming-from-alxiaopenapi-03-or-alxiaopenapi-routes)
+says: the document the old package served, saved as a file, is a good
+start for your own.
+
 ## Traps
 
 ### Every operation is listed, though the app serves them
@@ -241,7 +343,8 @@ hand-written operation, write its path `/pets/:petId`.
 
 **Why:** the operation is not in `operations`. `@nxgt/openapi-codegen`
 leaves out what alxia cannot route or validate yet — a `TRACE`, a binary
-body, JSON Lines — with an `ignored` warning. The check only knows the
+body, JSON Lines, named events — with an `ignored` warning
+([one of them](#alxiats-leaves-it-out-its--reply-streams-events-alxia-cannot-send--ignored)). The check only knows the
 operations it is given.
 
 **Fix:** read the generator's warnings, and declare such a route by hand

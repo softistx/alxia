@@ -95,8 +95,8 @@ const app = alxia().query(
 // QUERY /users/search, {"name":""}                                    → 400
 ```
 
-It is in the `Allow` of a 405 on its path, like any route. `@alxia/openapi` documents it as the path's
-`query` operation, and `@alxia/cors` allows it by default. A cache does not:
+It is in the `Allow` of a 405 on its path, like any route. The OpenAPI document declares it as the path's
+`query` operation (OpenAPI 3.2), and `@alxia/cors` allows it by default. A cache does not:
 `@alxia/cache` keys `GET` and `HEAD` only, as a `QUERY`'s key would have to
 include its body.
 
@@ -389,11 +389,11 @@ const app = alxia().get(
 );
 ```
 
-Both declare their schemas on the route, `app.routes[i].schema`, so
-[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
-them: `validate`'s schemas are what a client sends, its 400 and
-`responds`' statuses what it may read, in the document a client is
-generated from. Where
+Both declare their schemas on the route, `app.routes[i].schema`: at run
+time `validate`'s check what a client sends, and `responds`' what it may
+read — what the OpenAPI document a client is generated from declares, its
+400 included. A route bound to a generated operation, `route(operation, …)`,
+takes both from the document. Where
 each stands changes which answer comes first, a 401 or a 400
 ([Middleware](middleware.md#where-validate-stands)).
 
@@ -402,7 +402,7 @@ each stands changes which answer comes first, a 401 or a 400
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `bodyLimit` | `number` | the `bodyLimit()` in force, or none | the most bytes the body may hold, a 413 past it ([Body size](#body-size-bodylimit)) |
-| `detail` | `RouteDetail` | none | nothing at runtime: what `@alxia/openapi` says of the route — `summary`, `description`, `operationId`, `tags`, `deprecated` |
+| `detail` | `RouteDetail` | none | nothing at runtime: `summary`, `description`, `operationId`, `tags`, `deprecated`, in `app.routes`. A generated operation carries the document's, and `@alxia/openapi`'s `matchesSpec` names an operation by its `operationId` when the operations are a list |
 
 ```ts
 interface RouteOptions {
@@ -546,9 +546,7 @@ Past the limit the request is answered with a 413:
 ```
 
 Its body is the exported `ContentTooLargeBody`. Every route under a limit
-may answer it, and
-[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
-it there. A route with no limit never answers it, and reads its body as it
+may answer it: declare it there in the OpenAPI document. A route with no limit never answers it, and reads its body as it
 always has.
 
 What the read throws is a `ContentTooLargeError`, an `HttpError` with the

@@ -173,9 +173,8 @@ response.headers.get('x-frame-options');         // null                   — f
 `set.headers` in a handler or a `derive` works the same way, since it ends
 up on the response before the plugin reads it.
 
-That is how `@alxia/openapi`'s reference page and `@alxia/graphql`'s IDE
-load under the strict default: each sets the `Content-Security-Policy` it
-needs, and `secureHeaders` keeps it.
+That is how `@alxia/graphql`'s IDE loads under the strict default: it sets
+the `Content-Security-Policy` it needs, and `secureHeaders` keeps it.
 
 ## A nonce per request
 

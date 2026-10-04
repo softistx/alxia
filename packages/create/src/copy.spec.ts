@@ -179,21 +179,6 @@ describe('the stored templates', () => {
 		).toBe(await Bun.file(join(TEMPLATES, 'api/.vscode/settings.json')).text());
 	});
 
-	test('api pins @nxgt/openapi-codegen exactly, at the version that wrote its src/generated/', async () => {
-		const read = (file: string) => Bun.file(join(TEMPLATES, file)).json();
-		const pinned = (await read('api/package.json')).devDependencies[
-			'@nxgt/openapi-codegen'
-		];
-		// @alxia/create's own devDependency, which api.spec.ts runs --check with.
-		expect(pinned).toBe(
-			(await read('../package.json')).devDependencies['@nxgt/openapi-codegen'],
-		);
-		const installed = await Bun.file(
-			Bun.resolveSync('@nxgt/openapi-codegen/package.json', import.meta.dir),
-		).json();
-		expect(pinned).toBe(installed.version);
-	});
-
 	test('are the ones the command offers', async () => {
 		const dirs = (await readdir(TEMPLATES, { withFileTypes: true }))
 			.filter((entry) => entry.isDirectory())

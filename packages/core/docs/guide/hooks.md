@@ -265,8 +265,8 @@ const app = alxia()
   context of the hooks after it in the list and of the handler, typed
   there; a reply ends the request; `undefined` does nothing.
 - **Its replies end that route's request** — not the routes after it, as a
-  `derive`'s would. `@alxia/openapi` documents a route's schemas, and a
-  hook in the list, like a `derive`, declares none.
+  `derive`'s would. A hook in the list, like a `derive`, declares no
+  schema: what it answers is checked by a `responds` after it alone.
 - **A `defineWrap`** runs the hooks after it in the list, validation and
   the handler inside `next()`, as `wrap` does. A socket's upgrade skips it.
 - **A thrown error** goes to the `onError` hooks in force; a refused
@@ -484,10 +484,11 @@ that answers 422 makes the route answer 422 and no 400. A
 `reply` is typed by those schemas, as a `responds` types a handler's. Its reply is checked by
 the schema of its status and sent as that schema's output, and a reply the
 schema refuses is a 500, as a handler's is ([`validateResponses`](replies.md#validateresponses)).
-`contentType` is set on the reply unless it sets its own.
-[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
-each declared status under that content type. Without schemas it documents
-a `4XX` whose body it does not know.
+`contentType` is set on the reply unless it sets its own. Declare the same
+statuses, under that content type, in the OpenAPI document, on the routes
+the hook may refuse: the document is the contract, and the hook's schemas
+check that its replies keep it. Without schemas, its replies are sent as
+they are.
 
 ```ts
 const Problem = z.object({ type: z.string(), status: z.literal(400), detail: z.string() });
@@ -526,9 +527,8 @@ const app = alxia()
 ```
 
 Here `/jmap` may answer the `Invalid` 400 and the `TooLarge` 413, and
-`/download/:blobId`, which has no limit, the `Invalid` 400 alone.
-[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
-each kind's statuses on the routes that kind may refuse.
+`/download/:blobId`, which has no limit, the `Invalid` 400 alone: what the
+OpenAPI document declares on each of them.
 
 - **One kind, as a literal.** A kind typed as a union, `RefusalKind`, or
   as a generic parameter is a compile error: the hook is registered for the

@@ -156,6 +156,22 @@ describe('the api template', () => {
 		expect(result.exitCode).toBe(0);
 	});
 
+	test('api pins @nxgt/openapi-codegen exactly, at the version that wrote its src/generated/', async () => {
+		const read = (file: string) =>
+			Bun.file(join(import.meta.dir, '..', '..', file)).json();
+		const pinned = (await read('templates/api/package.json')).devDependencies[
+			'@nxgt/openapi-codegen'
+		];
+		// @alxia/create's own devDependency, which api.spec.ts runs --check with.
+		expect(pinned).toBe(
+			(await read('package.json')).devDependencies['@nxgt/openapi-codegen'],
+		);
+		const installed = await Bun.file(
+			Bun.resolveSync('@nxgt/openapi-codegen/package.json', import.meta.dir),
+		).json();
+		expect(pinned).toBe(installed.version);
+	});
+
 	test('its .env.example names each variable the app reads', async () => {
 		const { files } = await copyTemplate('api', 'my-api', await alxiaRanges());
 		const example = (await files['.env.example']?.text()) ?? '';

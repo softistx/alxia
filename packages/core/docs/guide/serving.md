@@ -160,7 +160,7 @@ for (const signal of ['SIGINT', 'SIGTERM'] as const) {
 
 | Getter | Holds |
 | --- | --- |
-| `app.routes` | every HTTP route as the app runs it (`RouteDefinition`): method, full path, schema, handler — what `@alxia/openapi` documents |
+| `app.routes` | every HTTP route as the app runs it (`RouteDefinition`): method, full path, schema, handler — what `@alxia/openapi`'s `matchesSpec` checks against the document |
 | `app.sockets` | every socket route (`SocketDefinition`) |
 | `app.server` | the server `listen` started, until `stop` |
 

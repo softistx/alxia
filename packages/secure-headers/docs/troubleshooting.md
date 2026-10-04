@@ -479,8 +479,7 @@ until it reads `max-age=0` from the host over HTTPS.
 **Why:** the plugin never overwrites a header the response already has.
 A route set it on its reply or on `set.headers`, an `onResponse` hook
 declared before `secureHeaders` set it, or one declared after overwrote it.
-`@alxia/openapi`'s reference page and `@alxia/graphql`'s IDE set their own
-`Content-Security-Policy` on purpose.
+`@alxia/graphql`'s IDE sets its own `Content-Security-Policy` on purpose.
 
 **Fix:** find what sets it on that route, and change it there:
 

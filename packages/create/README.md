@@ -1,7 +1,8 @@
 # @alxia/create
 
 Start an [alxia](https://github.com/softistx/alxia) app in one command: an
-API with Zod, or React Router's official template served by alxia.
+API with Zod, written OpenAPI spec first, or React Router's official
+template served by alxia.
 
 ```sh
 bun create @alxia my-app
@@ -28,14 +29,18 @@ bun create @alxia my-site --template react-router
 
 | template | what it writes |
 | --- | --- |
-| `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a middleware made with `defineMiddleware` that answers 401 without an API key, then `validate` and `responds`; a `bun test` spec calling it with `app.request()`; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, Biome (`biome.json`, `lint`, `format`, `check`, `check:ci`, `verify`), a `Dockerfile` running on `oven/bun:1-alpine`, `.dockerignore`, `.gitignore`, `.env.example`, `.vscode/` and a README |
+| `api` | an `@alxia/core` app with Zod, OpenAPI spec first: `openapi.yaml` declares `GET /todos`, `POST /todos` and `GET /todos/{id}`; `bun run generate` writes `src/generated/` from it with [`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen) (`openapi-codegen.config.ts`), committed, so nothing is generated at install or build; `src/app.ts` binds each operation with `route(operation, …middlewares, handler)`, as `route(operations.createTodo, requireKey, handler)`, where `requireKey`, made with `defineMiddleware`, answers 401 without an API key, and the operation's schemas validate the request and check every reply; a `bun test` spec calling the app with `app.request()` and asserting `matchesSpec` from [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi): every operation has its route, and no route is outside the spec; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, Biome (`biome.json`, `lint`, `format`, `check`, `check:ci`), `verify`, starting with `generate --check`, a `Dockerfile` running on `oven/bun:1-alpine`, `.dockerignore`, `.gitignore`, `.env.example`, `.vscode/` and a README. `@alxia/openapi` and `@nxgt/openapi-codegen` are devDependencies |
 | `react-router` | React Router's official template, as `create-react-router` writes it, shipped in this package and copied, with [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun, a `Dockerfile` running on `oven/bun:1-alpine` in place of React Router's Node one, and Biome as the `api` project has it, the scaffold formatted by it once. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
 
-The heart of the `api` project, its route and middleware (the whole file, with
-its imports and schemas, is in the [guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#the-api-template)):
+The heart of the `api` project, its middleware and a route bound to an
+operation of `openapi.yaml` (the whole file, and how to add an operation,
+are in the [guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#the-api-template)):
 
 ```ts
 // src/app.ts, in part
+import { alxia, defineMiddleware } from "@alxia/core";
+import { operations } from "./generated/alxia";
+
 const requireKey = defineMiddleware(({ request, reply }, next) =>
   request.headers.get("x-api-key") === apiKey
     ? next()
@@ -44,12 +49,18 @@ const requireKey = defineMiddleware(({ request, reply }, next) =>
 
 export const app = alxia()
   .decorate({ todos })
-  .post("/todos", requireKey, validate({ body: NewTodo }), responds({ 201: Todo }), ({ body, todos, reply }) => {
+  .route(operations.createTodo, requireKey, ({ body, todos, reply }) => {
     const todo = { id: todos.length + 1, title: body.title, done: false };
     todos.push(todo);
     return reply.created(todo);
   });
 ```
+
+`operations.createTodo` is `POST /todos` as `openapi.yaml` declares it:
+the body is validated just before the handler, which reads it typed, and
+every reply, `requireKey`'s 401 included, is checked against the spec's
+responses. To change the API, edit `openapi.yaml` and run
+`bun run generate`; never edit `src/generated/`.
 
 ## Lint and format
 
@@ -66,7 +77,8 @@ passes `bun run check:ci` with no finding.
 | `bun run lint` | `biome lint` |
 | `bun run format` | `biome format --write` |
 | `bun run check:ci` | `biome ci`: what CI runs, read-only |
-| `bun run verify` | `check:ci`, `typecheck`, then `test` (`api`) or `build` (`react-router`) |
+| `bun run verify` | `api`: `generate --check`, `check:ci`, `typecheck`, then `test`; `react-router`: `check:ci`, `typecheck`, then `build` |
+| `bun run generate` | `api` only: `nxgt-openapi generate`, `src/generated/` from `openapi.yaml`; with `--check`, writes nothing and exits 1 when a file is stale |
 
 ```sh
 cd my-api
@@ -87,7 +99,8 @@ builds in a stage of its own, and the image holds the build output alone,
 no `node_modules`:
 
 - `api`: `bun run build` bundles `src/server.ts` and its dependencies into
-  `dist/server.js`; the image holds `dist/` and runs `bun --no-install dist/server.js`.
+  `dist/server.js`, `src/generated/` included as it is committed, so the
+  build generates nothing; the image holds `dist/` and runs `bun --no-install dist/server.js`.
 - `react-router`: `bun run build`, every dependency bundled into
   `build/server/index.js` by `@alxia/react-router`'s plugin; the image
   holds `build/` and runs `bun --no-install build/server/index.js`.
@@ -127,8 +140,8 @@ or CI.
 
 ## Versions
 
-- **alxia's packages** — `@alxia/core` and
-  `@alxia/react-router` — are moved to the newest version on the registry
+- **alxia's packages** — `@alxia/core`, `@alxia/openapi` (`api`) and
+  `@alxia/react-router` (`react-router`) — are moved to the newest version on the registry
   within the ranges this release of `@alxia/create` was published with:
   `^0.3.1` writes `^0.3.4` once 0.3.4 is out, never `^0.4.0`. Just after a
   release, while the registry does not serve that version yet, the newest of
@@ -141,9 +154,11 @@ or CI.
   packages within `^8.0.0`, Zod within `^4.2.0`; what no alxia package
   constrains goes to npm's `latest`. A newer major outside alxia's range is
   left out, and the output says so.
-- **Biome** is pinned exactly, and written exactly: the newest patch of
-  the template's minor, `2.5.15` writing `2.5.16` but never `2.6.0`, whose
-  new rules the template was not checked against.
+- **Biome and `@nxgt/openapi-codegen`** are pinned exactly, and written
+  exactly: the newest patch of the template's minor, `2.5.15` writing
+  `2.5.16` but never `2.6.0`, whose new rules the template was not checked
+  against, and `0.6.0` writing `0.6.1` once it is out, never `0.7.0`, which may write
+  `src/generated/` differently.
 
 The registry is the one `BUN_CONFIG_REGISTRY` or `npm_config_registry`
 names, else npmjs.org; when it does not answer, the template's own
@@ -167,6 +182,6 @@ the project it writes installs with `bun install`.
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md): each template file by file, what the `react-router` template adds to React Router's, Biome's settings, each `Dockerfile`, how versions are chosen, and running it in CI.
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md): each template file by file, adding an operation to the `api` project, what the `react-router` template adds to React Router's, Biome's settings, each `Dockerfile`, how versions are chosen, and running it in CI.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md): each message the command prints, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/create/docs/roadmap.md): what is coming, and what is not planned.

@@ -1,13 +1,13 @@
-# Guide
+# The checks
 
 This page covers `implemented` and `matchesSpec`: what they take, how they
 match an operation to a route, where to call them, and how to check an app
 that has a prefix, routes with middlewares, or routes the document does not
-declare.
+declare. Where the operations come from is [Spec first](spec-first.md).
 
 ```ts
 import { alxia } from '@alxia/core';
-import { implemented, matchesSpec } from '@alxia/openapi-routes';
+import { implemented, matchesSpec } from '@alxia/openapi';
 import { operations as api } from './generated/alxia';
 
 // pets, search: your own store and query
@@ -59,9 +59,9 @@ no request and start no server.
 ...middlewares, handler)` reads: `{ method, path, schema? }`. So `operations` is what the
 routes were declared from:
 
-- the `operations` object of a generated `alxia.ts`, keyed by operation id.
-  A message names each operation by its key. The generator's `alxia` option
-  is not in a published release of `@nxgt/openapi-codegen` yet;
+- the `operations` object of a generated `alxia.ts`, keyed by operation id
+  ([Spec first](spec-first.md#2-generate-the-operations)). A message names
+  each operation by its key;
 - a list of operations, written by hand or picked from that object. A
   message names each one by its `schema.detail.operationId`, which the
   generator always writes, or by method and path alone when it has none.
@@ -86,12 +86,13 @@ TypeError: implemented(): 2 operations have no route: GET /pets/:petId (getPet),
 
 It lists each operation the app does not serve, in the order of
 `operations`. Routes the document does not declare are fine: a health
-check, the document's own route, an admin page.
+check, a page, an admin route.
 
 ## `matchesSpec`
 
-Called `exactly` until 0.2.0: `exactly` and `ExactlyOptions` still
-work, deprecated, and their messages still start with `exactly():`.
+Called `exactly` until 0.2.0 of `@alxia/openapi-routes`: `exactly` and
+`ExactlyOptions` still work, deprecated, and their messages still start
+with `exactly():`.
 
 ```text
 TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
@@ -106,16 +107,17 @@ route as `app.routes` holds it — method, full path, schema — and returns
 `true` for a route the document does not have to declare:
 
 ```ts
-import { docs } from '@alxia/openapi';
+import { isReactRouterRoute } from '@alxia/react-router';
 
-const served = app.use(docs(app, { info: { title: 'Pets', version: '1.0.0' } }));
-
-matchesSpec(served, api, {
-	// docs serves the document and its page; /health is for the load balancer
-	exclude: (route) =>
-		['/openapi.json', '/docs', '/health'].includes(route.path),
+matchesSpec(app, api, {
+	// the pages a React Router app serves beside the API, and the load balancer's check
+	exclude: (route) => isReactRouterRoute(route) || route.path === '/health',
 });
 ```
+
+`isReactRouterRoute`, from `@alxia/react-router`, is one such predicate:
+`true` for the routes `reactRouter()` declared, its catch-all and the
+client build's files. Any function of the route works.
 
 `exclude` is not consulted for the first half: an operation with no route
 is always listed.
@@ -131,7 +133,7 @@ given the same operation, validates where it stands instead, once:
 
 ```ts
 import { alxia, defineMiddleware, validate } from '@alxia/core';
-import { matchesSpec } from '@alxia/openapi-routes';
+import { matchesSpec } from '@alxia/openapi';
 import { operations as api } from './generated/alxia';
 
 const auth = defineMiddleware(({ request, reply }, next) =>
@@ -209,7 +211,7 @@ before a client meets a 404.
 ```ts
 // app.spec.ts
 import { test } from 'bun:test';
-import { implemented } from '@alxia/openapi-routes';
+import { implemented } from '@alxia/openapi';
 import { app } from './app';
 import { operations } from './generated/alxia';
 
@@ -235,8 +237,9 @@ not in `app.routes` yet.
 
 - **An operation the generator left out.** `@nxgt/openapi-codegen` skips an
   operation alxia cannot route or validate yet — a `TRACE`, a binary body,
-  JSON Lines — with an `ignored` warning, and it is not in `operations`.
-  Read the generator's warnings: the check only knows the operations it is
-  given.
+  JSON Lines, named server-sent events — with an `ignored` warning, and it
+  is not in `operations`. Read the generator's warnings: the check only
+  knows the operations it is given
+  ([what the generator leaves out](spec-first.md#what-the-generator-leaves-out-060)).
 - **A route that answers 404 on purpose.** A route is served if it is
   declared; what its handler does is the specs' to check.
