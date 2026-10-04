@@ -5,7 +5,7 @@ dependency**, and everything else — Zod, OpenAPI, CORS, JWT, compression —
 is a package you add, or don't.
 
 OpenAPI spec first: the document is the contract, and a typed client is
-generated from it by the generator of your choice — the examples use
+generated from it by the generator of your choice — the examples will use
 [`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen). The
 server's types check each handler: what its middlewares add, its replies
 against its `responds`, its path.

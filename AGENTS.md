@@ -82,7 +82,8 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   the assertion really fails when wrong.
 - **The spec is the contract.** alxia is OpenAPI spec first: the document
   is the source, and a client is generated from it by the developer's own
-  generator (the examples use `@nxgt/openapi-codegen`). The server's types
+  generator (`@nxgt/openapi-codegen` in the examples, the `api` template
+  first, as the next step of the move to spec first). The server's types
   check a handler — what its middlewares add, its `reply` against its
   `responds`, its path — and accumulate no route table for a client:
   `Alxia<Ctx, Prefix, Shortcuts>`, and a route returns the app unchanged in
