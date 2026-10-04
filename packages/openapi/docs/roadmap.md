@@ -16,7 +16,7 @@ number on it. Every release, with each change it made, is in
   `implemented`, `matchesSpec` and `exactly`, options and messages: change
   the import. The docs cover the whole workflow, from the document to the
   generated operations, routes with middlewares, the check and a client.
-  Shipped as 0.4.0.
+  Ships as 0.4.0.
 
 ## Next
 

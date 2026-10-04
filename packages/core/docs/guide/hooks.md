@@ -493,7 +493,7 @@ they are.
 ```ts
 const Problem = z.object({ type: z.string(), status: z.literal(400), detail: z.string() });
 
-const documented = alxia()
+const problems = alxia()
 	.onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' }, (refusal, { reply }) =>
 		reply(400, { type: 'urn:ietf:params:jmap:error:notRequest', status: 400, detail: refusal.kind }),
 	)
