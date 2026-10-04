@@ -1,5 +1,0 @@
----
-"@alxia/core": minor
----
-
-`use` takes middlewares: `app.use(auth)` runs a `defineMiddleware` on every route declared after it in the app or group, before the route's own, and types what it passes `next` on those routes, not on the ones before; up to 8 in one call, each reading what the ones before it added. `app.use(path, ...middlewares)` runs them on the requests under `path` alone — `/admin` and under, `/admin/*` under only, `:name` any one segment; those may add nothing to the context, and one that passes `next` an object is a compile error, `Invalid middleware: …`: a group's `use` adds to its subtree's context instead. They run on a socket's upgrade too, and the app's on every request no route matches (see the change that makes them wrap the router). `defineMiddleware` now marks the function it returns, which `use` reads to tell a middleware from a plugin: any other function is still a plugin. `derive` stays, the shorthand for a middleware that only adds. New types: `MiddlewareMark`, `UseForms`, `PluginForms`, `ScopeMiddleware`, `PathMiddleware`, `AddingNothing`, `ScopePathAt`, `AppAfterUse`. A path given to `use` ending in `/` is refused.

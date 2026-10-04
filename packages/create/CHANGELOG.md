@@ -1,5 +1,19 @@
 # @alxia/create
 
+## 0.1.6
+
+### Patch Changes
+
+- [#134](https://github.com/softistx/alxia/pull/134) [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects no longer install `@alxia/client`, which is retired: the `api` template's spec calls the app with `app.request()`. alxia is OpenAPI spec first, so a typed client is generated from the API's OpenAPI document, with a generator such as `@nxgt/openapi-codegen`.
+
+- [#134](https://github.com/softistx/alxia/pull/134) [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects get the `@alxia/core` minor with the middleware model, and the API template is written in it: `requireKey` is a `defineMiddleware` that answers 401 before the body is read, then `validate({ body })` and `responds({ 201 })` stand among the route's middlewares, in place of a list of hooks and a schema. Its spec checks that a request without the key is refused before its body is.
+
+- [#134](https://github.com/softistx/alxia/pull/134) [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `api` template mounts its routes with `base.plugin(todoRoutes)`, `@alxia/core`'s new method for plugins, and its docs say that `route(operation)` checks the handler's reply against the spec, an auth middleware's 401 being sent as it is.
+
+- [#134](https://github.com/softistx/alxia/pull/134) [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `api` project is split across files: `src/context.ts` holds the base the routes read and registers it with `@alxia/core`'s `Register`, `src/routes/todos.ts` binds the operations with `defineRoutes()` and imports no app, and `src/app.ts` is `base.plugin(todoRoutes)`.
+
+- [#134](https://github.com/softistx/alxia/pull/134) [`c503098`](https://github.com/softistx/alxia/commit/c503098a652439d816a56f2d731b61015d8237bd) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `api` template is OpenAPI spec first. `openapi.yaml` describes its operations, `GET /todos`, `POST /todos` and `GET /todos/{id}`; `bun run generate` runs `@nxgt/openapi-codegen` with its `alxia` option into `src/generated/`, which is committed, so the project and its image build with no generation step; `src/routes/todos.ts` binds each route with `route(operations.createTodo, requireKey, handler)`; and `src/app.spec.ts` asserts `matchesSpec` from `@alxia/openapi`. `bun run verify` starts with `bun run generate --check`, which fails when `src/generated/` is not what `openapi.yaml` gives. New projects install `@alxia/openapi` at the version this release was published beside, and `@nxgt/openapi-codegen` pinned exactly and kept at that version, so `bun run verify` passes in a fresh project whatever a later generator release writes. Biome is pinned exactly too, moved to the newest patch of its minor.
+
 ## 0.1.5
 
 ### Patch Changes
