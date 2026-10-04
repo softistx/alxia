@@ -620,13 +620,14 @@ after the base, and the loaders read it.
 ### Why a global augmentation is right here
 
 alxia's core refuses a global augmentation of a context key: a plugin
-that added `user` to every route, declared before it or after, would type
-`user` on routes that run before the plugin. That is the lie "order is
-meaning" forbids. Core's own `Register` names the base that builds the
-context instead, and what reads it requires it. `Register` here does something else: it names the
-**one** server of the React Router build, at the point of its catch-all,
-which is exactly what every loader runs behind. One build has one server
-entry, so there is no second app for a module to be confused with.
+that added `user` to every route, declared before it or after, would
+type `user` on routes that run before the plugin. That is the lie "order
+is meaning" forbids. Core's own `Register` names the base that builds
+the context instead, and what reads it requires it. `Register` here does
+something else: it names the **one** server of the React Router build,
+at the point of its catch-all, which is exactly what every loader runs
+behind. One build has one server entry, so there is no second app for a
+module to be confused with.
 
 If two React Router apps share one TypeScript program (one tsconfig over
 both folders of a monorepo), their two declarations conflict, and `tsc`

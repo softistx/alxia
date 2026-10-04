@@ -358,6 +358,11 @@ error TS2769: No overload matches this call.
 The first overload's error, about a function plugin, is noise: the
 message on the last line is the one that matters.
 
+Returned from a `group` or a plugin function, `group(() => todos)` or
+`use(() => todos)`, the error is a `TS2322: Type 'AppWithRoute<…>' is not
+assignable to type '… & { readonly '~requires': "the plugin reads …" }'`
+on the returned app, with the same message.
+
 For routes made by `defineRoutes()`, the last line reads
 `Property ''~requires'' is missing in type 'Alxia<…>' but required in type '{ readonly '~requires': "the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"; }'`.
 
