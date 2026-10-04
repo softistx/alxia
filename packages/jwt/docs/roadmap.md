@@ -7,7 +7,10 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **`bearer` as a middleware.** `app.use(bearer({ jwt }))` is the form;
+  `app.plugin(bearer(…))` keeps working, deprecated. Given to the app, the guard
+  also refuses a request no route matches, before its 404, and `Bearer<Schema>`
+  names what `bearer()` returns.
 
 ## Next
 

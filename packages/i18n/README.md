@@ -23,7 +23,7 @@ const fr = { ...shared.fr, cart: { items: '{count, plural, =0 {Aucun article} on
 export const i18n = createI18n({ resources: { en, fr }, fallback: 'en' });
 
 const app = alxia()
-	.plugin(i18n)
+	.use(i18n)
 	.get('/cart', ({ t, reply }) => reply(200, t('cart.items', { count: 3 }))); // '3 articles' in French
 
 app.listen(3000);
@@ -40,7 +40,7 @@ app.listen(3000);
 ## Reading the app's context
 
 Annotate `resolve`'s parameter to speak the language a signed-in user saved.
-The plugin then requires what it reads: an app that does not give `user`
+The middleware then requires what it reads: an app that does not give `user`
 before it cannot use it.
 
 ```ts
@@ -61,12 +61,12 @@ const byUser = createI18n({
 	resolve: ({ user }: BaseContext & { user: { language: string } | null }) => user?.language,
 });
 
-alxia().plugin(auth).plugin(byUser); // auth derives user
-alxia().plugin(byUser); // a compile error: this app gives no `user`
+alxia().plugin(auth).use(byUser); // auth derives user
+alxia().use(byUser); // a compile error: this app gives no `user`
 ```
 
-Unannotated, `resolve` reads the request alone and the plugin requires
-nothing; annotated `any`, the plugin is refused on every app.
+Unannotated, `resolve` reads the request alone and the middleware requires
+nothing; annotated `any`, it is refused on every app.
 
 ## Anywhere
 
@@ -76,9 +76,9 @@ export const describeCart = (count: number) => i18n.t('cart.items', { count });
 ```
 
 `i18n.t()` translates in the language of the request it runs in — through
-every `await`, an `onError` hook included — and in the fallback outside
-one, or before the language is read: in an `onRequest` hook, or a route
-declared before the plugin
+every `await`, in every middleware after `use(i18n)`, and in the answer to
+an error — and in the fallback outside one, or before the language is
+read: in a middleware declared before it, or a route declared before it
 ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/troubleshooting.md#i18nt-answers-in-the-fallback-before-the-language-is-read)).
 `i18n.language()` says which.
 
@@ -98,13 +98,13 @@ A response in the request's language varies by what decided it: give
 
 | export | |
 | --- | --- |
-| `createI18n({ resources, fallback, …languageOptions })` | the plugin — routes after it read `t` and `language` — with `t()`, `language()` and `supported` |
+| `createI18n({ resources, fallback, …languageOptions })` | the middleware, given to `app.use` — what is after it reads `t` and `language` — with `t()`, `language()` and `supported` |
 | `I18nOptions` | its options: `resources`, `fallback`, and every `@alxia/language` option but `supported`; `resolve` may be annotated to read the app's context |
 | `KeyOf<Catalogue>` | a catalogue's dotted keys, nine levels deep; a deeper section gives `section.${string}` |
 | `Translate<Key>`, `Catalogues`, `I18nContext<Key>` | its types |
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/i18n/docs): the catalogues and every option, reading what an earlier plugin added, what the routes read, ICU messages and typed keys, `t()` outside a route, and `@nxgt/i18n`'s own `translate`.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/i18n/docs): the catalogues and every option, reading what an earlier middleware added, what the routes read, ICU messages and typed keys, `t()` outside a route, and `@nxgt/i18n`'s own `translate`.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/troubleshooting.md): an error, a key shown instead of a message, or a response in the wrong language, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/roadmap.md): what is coming, and what is not planned.

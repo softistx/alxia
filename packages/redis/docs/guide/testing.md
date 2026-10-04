@@ -16,7 +16,7 @@ let app: ReturnType<typeof makeApp>;
 
 const makeApp = (client: RedisConnection['client']) =>
 	alxia({ ip: () => '1.2.3.4' })
-		.plugin(idempotency(client, { name: 'payments' }))
+		.use(idempotency(client, { name: 'payments' }))
 		.post('/payments', ({ reply }) => reply(201, { id: crypto.randomUUID() }));
 
 beforeAll(async () => {
@@ -78,7 +78,7 @@ test('two processes share one count', async () => {
 	await connection.client.send('FLUSHDB', []);
 	const make = () =>
 		alxia({ ip: () => '1.2.3.4' })
-			.plugin(rateLimit({ limit: 2, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
+			.use(rateLimit({ limit: 2, windowMs: 60_000, store: redisStore(connection.client, { name: 'api' }) }))
 			.get('/', ({ reply }) => reply(200, 'ok'));
 	const [one, two] = [make(), make()];             // two apps stand for two processes
 	expect((await one.request('/')).status).toBe(200);
@@ -87,10 +87,10 @@ test('two processes share one count', async () => {
 });
 ```
 
-## Refusals behind the plugin only
+## Refusals behind the middleware only
 
 The `409`, `422` and `400` of `idempotency` are answered by the routes
-declared after it alone. Send a key it refuses to both:
+declared after it alone, never by a request no route matches. Send a key it refuses to both:
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -102,10 +102,10 @@ const connection = await connectRedis(Bun.env['REDIS_URL'] ?? 'redis://127.0.0.1
 
 const app = alxia()
 	.post('/open', ({ reply }) => reply(201, 'ok'))
-	.plugin(idempotency(connection.client, { name: 'payments' }))
+	.use(idempotency(connection.client, { name: 'payments' }))
 	.post('/payments', ({ reply }) => reply(201, 'ok'));
 
-test('only the routes after the plugin refuse a bad key', async () => {
+test('only the routes after the middleware refuse a bad key', async () => {
 	const init = { method: 'POST', headers: { 'idempotency-key': 'not a key' } };
 	expect((await app.request('/payments', init)).status).toBe(400);
 	expect((await app.request('/open', init)).status).toBe(201);

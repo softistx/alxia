@@ -17,12 +17,12 @@ import { alxia } from '@alxia/core';
 import { contextStorage } from '@alxia/context-storage';
 import { session } from '@alxia/janus';
 
-const base = alxia().decorate({ db }).plugin(session(auth, { required: true }));
+const base = alxia().decorate({ db }).use(session(auth, { required: true }));
 
 export const requestContext = contextStorage<typeof base>();
 
 const app = base
-	.plugin(requestContext)
+	.use(requestContext)
 	.get('/orders', async ({ reply }) => reply(200, await listOrders()));
 ```
 
@@ -53,11 +53,11 @@ declare module '@alxia/core' {
 }
 
 export const requestContext = contextStorage(); // context(): AppContext
-base.plugin(requestContext);                       // ok
-alxia().plugin(requestContext);                    // compile error: the plugin reads "db" | "user", which this app's context does not give
+base.use(requestContext);                       // ok
+alxia().use(requestContext);                    // compile error: the middleware reads "db" | "user", which this app's context does not give
 ```
 
-Requiring that context of the app is new in 0.4.0: a plugin used on an app
+Requiring that context of the app is new in 0.4.0: a middleware used on an app
 that does not give it, which read `undefined` at runtime, is now a compile
 error ([Upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md#the-context-registered-once-register-and-defineroutes)).
 
@@ -65,32 +65,36 @@ error ([Upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/
 
 | | |
 | --- | --- |
-| `requestContext.context()` | the route's context, typed by the app the plugin was given: the request, `set`, `reply`, and what every hook before it added. Throws outside |
+| `requestContext.context()` | the route's context, typed by the app the middleware was given: the request, `set`, `reply`, and what every middleware before it added. Throws outside |
 | `requestContext.tryContext()` | the same, or `undefined`: code that runs in and out of requests |
 | `getContext<Ctx>()`, `tryGetContext<Ctx>()` | untyped, as `hono/context-storage`'s: `Ctx` is yours to state |
-| `getRequestContext()`, `tryGetRequestContext()` | the request as global hooks see it — in a 404, an `onResponse` — with the `route` it reached and its `error`; the `try` form returns `undefined` outside a request |
+| `getRequestContext()`, `tryGetRequestContext()` | the request as a middleware after it sees it — in a 404 too — with the `route` it reached (`undefined` when none) and its `error`; the `try` form returns `undefined` outside a request |
 | `runWithContext(ctx, work)` | runs `work` with a context: a job, a queue consumer, a test of a service |
 
-Outside a request, `getContext()` throws a `ContextStorageError` coded
-`OUTSIDE_REQUEST`; in a request that reached no route declared after the
-plugin, `NOT_ROUTED`. Declare it before the routes whose code reads it.
+Give it to `use` before the routes whose code reads it, and before the
+middlewares that read the context: it runs on every request the app takes,
+a 404 included. `getRequestContext()` works in every middleware after it;
+`getContext()` only in a request that reached a route. Outside a request,
+or where the middleware did not run (a route declared before it),
+`getContext()` throws a `ContextStorageError` coded `OUTSIDE_REQUEST`; in
+a request that reached no route, `NOT_ROUTED`.
 
-Pass the plugin to `app.plugin` called: `plugin(contextStorage)`, uncalled, is refused by
+Pass it to `app.use` called: `use(contextStorage)`, uncalled, is refused by
 `tsc` (`TS2769`) and throws a `TypeError` at startup
-([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/troubleshooting.md#typeerror-contextstorage-is-a-factory-plugincontextstorage-not-plugincontextstorage)).
+([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)).
 
 ## API
 
 | export | |
 | --- | --- |
-| `contextStorage<App>()` | the plugin, with `context()` and `tryContext()` typed by `App` — by default the app `@alxia/core`'s `Register` names, `BaseContext` when none — and required of the app that mounts it |
+| `contextStorage<App>()` | the middleware, given to `app.use`, with `context()` and `tryContext()` typed by `App` — by default the app `@alxia/core`'s `Register` names, `BaseContext` when none — and required of the app that mounts it |
 | `StoredContext<App>` | what `context()` returns: `ContextOf<App>`, or `BaseContext` when `App` is no app |
-| `ContextStoragePlugin<App>` | its type |
+| `ContextStoragePlugin<App>` | its type: a middleware with `context()` and `tryContext()` |
 | `getContext`, `tryGetContext`, `getRequestContext`, `tryGetRequestContext`, `runWithContext` | the store, untyped |
 | `ContextStorageError`, `ContextStorageErrorCode` | why there is no context |
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/context-storage/docs): what the plugin stores and when, reading it from a service or a logger, its typing, where it sits among hooks, what a timer or a detached callback sees, and jobs and tests with `runWithContext`.
-- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/troubleshooting.md): a `ContextStorageError`, the `TypeError` of `plugin(contextStorage)`, or a `tsc` error, and what to do about it.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/context-storage/docs): what the middleware stores and when, reading it from a service or a logger, its typing, where it sits among the other middlewares, what a timer or a detached callback sees, and jobs and tests with `runWithContext`.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/troubleshooting.md): a `ContextStorageError`, the `TypeError` of `use(contextStorage)`, or a `tsc` error, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/roadmap.md): what is coming, and what is not planned.

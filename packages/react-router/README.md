@@ -4,9 +4,9 @@
 [React Router](https://reactrouter.com) framework app, server rendered,
 under Bun. One Vite plugin and no server file: the pages are served by
 alxia in `react-router dev` and from the build. When you want more,
-`app/server.ts` adds the app's hooks — logger, compression, sessions,
+`app/server.ts` adds the app's middlewares — logger, compression, sessions,
 guards — and an `/api` beside the pages, and each loader reads what those
-hooks built, typed.
+middlewares built, typed.
 
 ## Quick start
 
@@ -68,7 +68,7 @@ With the `bunfig.toml` in place, the template's `dev`, `build` and
 
 After a build, `bunx --bun vite preview` serves that built server through
 Vite's preview server, as `bun run start` would: the pages, `/api`, the
-client's files and the app's hooks. So does React Router's prerendering.
+client's files and the app's middlewares. So does React Router's prerendering.
 
 `@alxia/core` and `react-router` 8 are peers, and `vite` 7 or 8 is an
 optional peer, for `/vite`. The package declares no dependency.
@@ -91,8 +91,8 @@ commented, and the `Register` declaration. It refuses to overwrite a file
 already there; `--force` overwrites it. Run it from the app's root, once
 `@alxia/react-router` is installed.
 
-The examples use `@alxia/logger` (`bun add @alxia/logger`); any plugin
-works the same way. The plugin picks the file up in dev and in the build:
+The examples use `@alxia/logger` (`bun add @alxia/logger`); any middleware
+works the same way (`use` the observers first). The Vite plugin picks the file up in dev and in the build:
 
 ```ts
 // app/server.ts
@@ -102,7 +102,7 @@ import { createServer } from '@alxia/react-router';
 const server = createServer({
 	configure: (app) =>
 		app
-			.plugin(logger())
+			.use(logger())
 			.get('/api/health', ({ reply }) => reply.ok({ ok: true }))
 			.derive(({ request }) => {
 				const name = request.headers.get('x-user');
@@ -145,7 +145,7 @@ export function loader({ context }: Route.LoaderArgs) {
 How `alxiaOf(context)` is typed:
 
 - with the `Register` declaration above, by that server: reading something
-  no hook derives is a compile error;
+  no middleware derives is a compile error;
 - without it, `alxiaOf<typeof server>(context)` names the server;
 - with neither, by the base `@alxia/core`'s own `Register` names
   (`context: typeof base`), when the app has one;
@@ -167,7 +167,7 @@ Router puts it on every script it renders, so `script-src` needs no
 ```ts
 // app/server.ts
 configure: (app) =>
-	app.plugin(
+	app.use(
 		secureHeaders({
 			nonce: true,
 			contentSecurityPolicy:
@@ -198,7 +198,7 @@ bunx react-router reveal entry.server
          [readyOption]() {
 ```
 
-`nonceOf` returns `undefined` when no hook set a nonce, so the entry works
+`nonceOf` returns `undefined` when no middleware set a nonce, so the entry works
 with or without secure-headers: neither package depends on the other. Any
 `derive` that returns a string `nonce` works the same.
 [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#a-csp-nonce)
@@ -225,7 +225,7 @@ export default createServer({
 
 In dev, the plugin hands each upgrade Vite does not claim (its HMR, its
 `server.proxy`) to the app, run by `Bun.serve` as `listen` runs it: the
-hooks before the route, a refusal's status, `socket.data`, `publish`. An
+middlewares before the route, a refusal's status, `socket.data`, `publish`. An
 edit to the server is used from the next connection.
 [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#websockets)
 
@@ -238,7 +238,7 @@ import { createServer } from '@alxia/react-router';
 import { greetingContext } from './context'; // createContext<string>('unset'), in app/context.ts
 
 export default createServer({
-	beforeAll: (app) => app.plugin(logger()), // runs before the client's files too
+	beforeAll: (app) => app.use(logger()), // runs before the client's files too
 	configure: (app) => app.get('/api/health', ({ reply }) => reply.ok({ ok: true })),
 	getLoadContext: (_ctx, context) => context.set(greetingContext, 'hello'),
 	listen: { idleTimeout: 30 }, // its port and hostname, if given, win over PORT and HOST
@@ -253,7 +253,7 @@ client })` itself. [More](https://github.com/softistx/alxia/blob/develop/package
 
 ## The client's files
 
-In a build, `build/client` is served before `configure`'s hooks:
+In a build, `build/client` is served before `configure`'s middlewares:
 
 | path | `Cache-Control` |
 | --- | --- |
@@ -403,14 +403,14 @@ has the commented file, and what to copy for a package left external.
 | `ReactRouterServer<App>` | what it returns: `create(wiring)` makes the app, `start(app)` listens |
 | `ServerWiring` | what `create` takes: `build`, `mode`, `client` |
 | `FreshApp` | the app `beforeAll`, or `configure` without it, receives |
-| `alxiaOf<App>(context)` | what alxia's hooks built, in a loader, an action or a middleware. Typed by the registered server, by the type argument (a server or an app), or as `BaseContext` |
+| `alxiaOf<App>(context)` | what alxia's middlewares built, in a loader, an action or a middleware. Typed by the registered server, by the type argument (a server or an app), or as `BaseContext` |
 | `Register` | the interface to augment with `server: typeof server` |
 | `RegisteredApp` | the app `alxiaOf` reads with no type argument: the registered server's, else the one `@alxia/core`'s `Register` names, else a fresh app |
 | `RegisteredOf<R, Core?>` | the app a `Register`-shaped interface names: its server's, `InvalidRegister`, or with no server `Core`, by default core's `RegisteredBase` |
 | `InvalidRegister` | what a `Register` naming neither a server nor an app reads as: every key of the app's own a compile error |
 | `AppOf<Server>` | the app a server makes |
 | `alxiaContext` | the React Router context key `alxiaOf` reads, set on every request |
-| `nonceOf(context)` | the request's CSP nonce, for `entry.server.tsx`: the context's `nonce` when a hook set one, such as `secureHeaders({ nonce: true })`, else `undefined` |
+| `nonceOf(context)` | the request's CSP nonce, for `entry.server.tsx`: the context's `nonce` when a middleware set one, such as `secureHeaders({ nonce: true })`, else `undefined` |
 | `reactRouter(app, options)` | the catch-all and the client's files, for a server of your own. `build`, `mode`, `getLoadContext`, `client` |
 | `ReactRouterOptions<Ctx>` | its options |
 | `isReactRouterRoute(route)` | whether this package declared a route, for `matchesSpec`'s `exclude` |

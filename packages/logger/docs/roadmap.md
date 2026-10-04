@@ -7,7 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **A middleware, not a plugin (0.4).** `app.use(logger())` logs every request, a 404, a 405 or a 500 included, and times everything after it. `app.plugin(logger())` still works, deprecated.
 
 ## Next
 
@@ -50,6 +50,6 @@ Nothing scheduled yet.
   an `async` `write` that rejects, is reported on `console.error`, and the request is answered as it would be.
 - **`Server-Timing`.** The response says how long it took, for the
   browser's developer tools, unless turned off.
-- **A log bound to the request.** The routes after the plugin read a typed
+- **A log bound to the request.** The routes after it read a typed
   `requestId` and a `log` whose `info`, `warn` and `error` entries carry the
   request's id.

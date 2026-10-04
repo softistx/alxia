@@ -9,7 +9,7 @@ import { alxia } from '@alxia/core';
 import { compress } from '@alxia/compress';
 
 const app = alxia()
-	.plugin(compress())
+	.use(compress())
 	.get('/report', ({ reply }) => reply(200, { rows: Array.from({ length: 500 }, (_, i) => ({ i })) }));
 
 app.listen(3000);
@@ -30,14 +30,17 @@ interface CompressOptions {
 	readonly compressible?: (type: string) => boolean;
 }
 
-function compress(options?: CompressOptions): Plugin;
+function compress(options?: CompressOptions): Middleware<Empty, Promise<Response>>;
 
 function negotiate(accept: string | null, offered: readonly Encoding[]): Encoding | undefined;
 ```
 
-`compress` returns a function `Plugin` from `@alxia/core`: it adds one
-`onResponse` hook and leaves the app's type unchanged, so routes and replies
-are the same with or without it.
+`compress` returns a middleware from `@alxia/core`, for `app.use`. It waits
+for the rest of the chain, then answers the response compressed, and adds
+nothing to the context: routes and replies are the same with or without it.
+It sees every response that comes back through it: the routes declared
+after it, and a request no route matches (a 404, a 405), an error's reply
+included. A route declared before it is not compressed.
 
 ## Options
 
@@ -54,7 +57,7 @@ equally, the first in `encodings` wins. Leave out what you do not want to
 spend CPU on:
 
 ```ts
-app.plugin(compress({ encodings: ['br', 'gzip'] }));
+app.use(compress({ encodings: ['br', 'gzip'] }));
 ```
 
 | `Accept-Encoding` | `encodings` | Sent |
@@ -77,18 +80,18 @@ about its speed. None of the codecs' levels is an option. For the smallest
 static assets, let the build write `.br` and `.gz` copies at the highest
 level and serve them with `static`'s
 [`precompressed`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/static-files.md#options)
-option; the plugin leaves them alone. An empty list never compresses.
+option; the middleware leaves them alone. An empty list never compresses.
 
 ### `threshold`
 
 Read from the response's `Content-Length`. A JSON or string reply has one
-when the hook runs, and so does a binary one — a `Blob`, a `Bun.file(…)`,
+when the middleware sees it, and so does a binary one — a `Blob`, a `Bun.file(…)`,
 what `static` and `file` serve, an `ArrayBuffer` or a typed array. A
 `ReadableStream` does not: its size is unknown until it ends, and **a body
 with no `Content-Length` is compressed whatever its size**:
 
 ```ts
-app.plugin(compress({ threshold: 2048 }));
+app.use(compress({ threshold: 2048 }));
 // reply(200, 'x'.repeat(1500))          → sent as it is: 1500 < 2048
 // reply(200, { text: 'alxia '.repeat(1000) }) → compressed: 6011 bytes
 // static('/s', '.') for a 117-byte file → sent as it is: 117 < 2048
@@ -116,7 +119,7 @@ test and extend it:
 ```ts
 const defaults = /^(text\/(?!event-stream)|application\/(.+\+)?(json|javascript|xml)|image\/svg\+xml)/i;
 
-app.plugin(
+app.use(
 	compress({
 		compressible: (type) => defaults.test(type) || type.startsWith('application/wasm'),
 	}),
@@ -144,7 +147,7 @@ Whatever `compressible` says, a response is sent as it is when:
 
 ## Streamed bodies
 
-A body with no `Content-Length` when the hook runs — a `ReadableStream`, a
+A body with no `Content-Length` when the middleware sees it — a `ReadableStream`, a
 page rendered by `renderToReadableStream`, an event stream that
 `compressible` lets in — is flushed as it comes. After the chunks the
 source yields in one turn of the event loop, the codec is flushed
@@ -160,7 +163,7 @@ import { compress } from '@alxia/compress';
 
 const encoder = new TextEncoder();
 const app = alxia()
-	.plugin(compress())
+	.use(compress())
 	.get('/page', ({ reply }) =>
 		reply(
 			200,
@@ -248,33 +251,44 @@ app.get('/doc', ({ request, reply }) => {
 });
 ```
 
-## Order with other hooks
+## Order with other middlewares
 
-`compress()` is an `onResponse` hook, and `onResponse` hooks run in the
-order they are declared. It reads the headers as the hooks before it left
-them, and the hooks after it see the compressed response.
+Middlewares nest: the first `use` is the outermost. On the way out, a
+middleware sees the response the ones after it returned. So `compress()`
+reads the headers as the middlewares **after** it left them, and the ones
+**before** it see the compressed response.
 
 ```ts
-import { alxia, withHeaders } from '@alxia/core';
+import { alxia, defineMiddleware, settle, withHeaders } from '@alxia/core';
 import { compress } from '@alxia/compress';
 
+// after compress(): its Cache-Control is read when compress() decides
+const noTransformRaw = defineMiddleware(async (ctx, next) => {
+	const response = await settle(ctx, next());
+	return new URL(ctx.request.url).pathname.startsWith('/raw/')
+		? withHeaders(response, (headers) => headers.set('cache-control', 'no-transform'))
+		: response;
+});
+
+// before compress(): sees Content-Encoding, and no Content-Length on a compressed body
+const log = defineMiddleware(async (ctx, next) => {
+	const response = await settle(ctx, next());
+	console.log(ctx.request.method, ctx.request.url, response.status, response.headers.get('content-encoding') ?? 'identity');
+	return response;
+});
+
 const app = alxia()
-	// before: compress() reads this Cache-Control
-	.onResponse((response, { request }) =>
-		new URL(request.url).pathname.startsWith('/raw/')
-			? withHeaders(response, (headers) => headers.set('cache-control', 'no-transform'))
-			: undefined,
-	)
-	.plugin(compress())
-	// after: sees Content-Encoding, and no Content-Length on a compressed body
-	.onResponse((response, { request }) => {
-		console.log(request.method, request.url, response.status, response.headers.get('content-encoding') ?? 'identity');
-	});
+	.use(log)
+	.use(compress())
+	.use(noTransformRaw);
 ```
 
-Declare `compress()` after every hook that sets `Content-Type`,
-`Cache-Control` or `Content-Encoding`, and before every hook that logs or
-measures what is sent.
+Declare `compress()` before every middleware that sets `Content-Type`,
+`Cache-Control` or `Content-Encoding` on the way out, and after every one
+that logs or measures what is sent (`logger()`, `secureHeaders()`, `cors()`).
+`settle(ctx, next())` makes a middleware see the final response, a 404's
+or an error's included; see
+[Middlewares](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md).
 
 ## A realistic app
 
@@ -289,7 +303,7 @@ import { z } from 'zod';
 const Tick = z.object({ at: z.number() });
 
 const app = alxia()
-	.plugin(compress({ encodings: ['zstd', 'br', 'gzip'] }))
+	.use(compress({ encodings: ['zstd', 'br', 'gzip'] }))
 	.get('/api/products', ({ reply }) => reply(200, products))  // JSON: compressed over 1 KiB
 	.get('/api/ticks', responds({ 200: eventStream(Tick) }), ({ reply }) =>
 		reply(
@@ -326,7 +340,7 @@ import { compress } from '@alxia/compress';
 
 const big = 'alxia '.repeat(1000);
 const app = alxia()
-	.plugin(compress())
+	.use(compress())
 	.get('/big', ({ reply }) => reply(200, { text: big }));
 
 const get = (encoding: string) => app.request('/big', { headers: { 'accept-encoding': encoding } });
@@ -349,7 +363,7 @@ test('identity only: sent as it is', async () => {
 
 ## `negotiate(accept, offered)`
 
-The choice `compress()` makes, exported for a handler or a plugin that
+The choice `compress()` makes, exported for a handler or a middleware that
 encodes on its own — a file it caches per encoding, a proxy:
 
 ```ts

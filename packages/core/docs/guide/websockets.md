@@ -63,7 +63,7 @@ interface SocketOptions {
 <const Path extends RoutePath, const Options extends SocketOptions, R1 extends MiddlewareReturn>(
 	path: Path, // a literal the app would refuse does not compile: `Invalid path: …`
 	options: Options, // no schema of the request: that is validate(…)
-	m1: (ctx: /* the hooks' context, and the upgrade request as it arrived */, next: NextFunction) => R1,
+	m1: (ctx: /* the middlewares' context, and the upgrade request as it arrived */, next: NextFunction) => R1,
 	handlers: SocketHandlers</* socket.data: the context after m1 */, SocketSend<Options>, SocketMessage<Options>>,
 ): Alxia</* … the app, unchanged in type */>;
 ```
@@ -73,7 +73,7 @@ The options hold no schema of the request — `params`, `query`, `headers`,
 
 | Middleware | On the upgrade |
 | --- | --- |
-| `validate({ params, query, headers, cookies })` | checks the upgrade request as a route's: a refused one is answered with the 400 with every issue, or the reply of the `onRefusal` hook in force ([Hooks](hooks.md#onrefusal)), and no socket. A `params` key the path lacks, optional or not, does not compile, as on a route |
+| `validate({ params, query, headers, cookies })` | checks the upgrade request as a route's: a refused one throws a `ValidationError`, answered with the 400 with every issue, or by a middleware before the `validate` that catches it ([Routes](routes.md#refusals-in-your-own-format)), and no socket. A `params` key the path lacks, optional or not, does not compile, as on a route |
 | a middleware returning `next(added)` | `added` is in `socket.data`, typed |
 | a middleware returning a reply or a `Response` | the upgrade is refused with it: an unauthenticated client never gets a socket |
 | a middleware that awaits `next()` | receives a stand-in response once the socket is open; what it returns after is ignored ([below](#the-upgrade)) |
@@ -85,9 +85,9 @@ declared:
 
 ## The upgrade
 
-The upgrade request runs the route hooks declared before the socket —
-`decorate`, `derive` — then its middlewares, in order, `validate` where it
-stands, then opens. A middleware or a `derive` that replies 401 refuses the
+The upgrade request runs the `use` middlewares, `decorate`s and `derive`s
+declared before the socket, then its own middlewares, in order, `validate`
+where it stands, then opens. A middleware or a `derive` that replies 401 refuses the
 socket with that 401; a `validate` placed after it is never reached.
 
 ```ts
@@ -108,10 +108,11 @@ const app = alxia().ws('/live', auth, validate({ query: z.object({ channel: z.st
 ```
 
 A middleware that awaits `next()` runs around the rest of the upgrade. When
-the request is refused after it — a `validate`'s 400 — `next()` resolves to
-that response. When the socket opens, there is no response: `next()`
+the request is refused after it — a `validate`'s 400 — `next()` rejects with
+the `ValidationError`, as on a route; a reply a later middleware returns
+resolves it. When the socket opens, there is no response: `next()`
 resolves to a **stand-in**, an empty `200`. The socket is open by then:
-what the middleware returns after it is ignored, as a `wrap` is skipped,
+what the middleware returns after it is ignored,
 and what it throws is logged with `console.error`, the socket kept open.
 So a middleware of `use` that wraps every response —
 `new Response(response.body, { headers })` — leaves the socket routes after
@@ -121,16 +122,16 @@ it as they are. A header set on the stand-in is lost: set it with
 ```ts
 const watched = defineMiddleware(async ({ route }, next) => {
 	const response = await next();
-	console.log(route, response.status); // 400 for a refused upgrade, 200 once the socket is open
+	console.log(route, response.status); // a reply's status for a refused upgrade, 200 once the socket is open
 	return response;                     // ignored once the socket is open
 });
 ```
 
-- `wrap` hooks and `around` hooks are skipped: there is no response to wrap.
-- `onRequest` hooks run; `onResponse` hooks do not run for an upgrade that
-  succeeds.
-- `set.headers` and `set.cookies` a hook or a middleware sets are sent with
-  the `101`.
+- The deprecated `wrap` and `around` hooks are skipped: there is no
+  response to wrap. A telemetry span is not opened for an upgrade.
+- The deprecated `onRequest` hooks run; `onResponse` hooks do not run for
+  an upgrade that succeeds.
+- `set.headers` and `set.cookies` a middleware sets are sent with the `101`.
 
 ## The handlers
 

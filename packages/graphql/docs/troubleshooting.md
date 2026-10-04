@@ -34,6 +34,8 @@ symptom.
 **Traps**
 
 - [The endpoint answers without a guard declared after it](#the-endpoint-answers-without-a-guard-declared-after-it)
+- [The logger, CORS or secure headers miss the endpoint](#the-logger-cors-or-secure-headers-miss-the-endpoint)
+- [An anonymous request to a missing path is a 401](#an-anonymous-request-to-a-missing-path-is-a-401)
 - [A WebSocket client cannot connect: `Expected 101 status code`](#a-websocket-client-cannot-connect-expected-101-status-code)
 - [The IDE page is blank](#the-ide-page-is-blank)
 - [GraphiQL is served in production](#graphiql-is-served-in-production)
@@ -75,15 +77,15 @@ error TS2322: Type 'GraphQLSchemaWithContext<…>' is not assignable to type 'Gr
 ```
 
 **Why:** the schema was typed with `GraphQLContext<typeof base>`, and its
-resolvers read what `base`'s hooks add, but `graphql` was given an app that
-does not run those hooks: another app, or the endpoint declared before the
+resolvers read what `base`'s middlewares add, but `graphql` was given an app that
+does not run those middlewares: another app, or the endpoint declared before the
 `derive` or the guard.
 
 **Fix:** mount the endpoint on the app the schema was typed from, after its
-hooks ([The typed context](guide/context.md)):
+middlewares ([The typed context](guide/context.md)):
 
 ```ts
-const base = alxia().plugin(bearer({ jwt }));                       // adds user
+const base = alxia().use(bearer({ jwt }));                       // adds user
 const schema = createSchema<GraphQLContext<typeof base>>({ … });
 const app = base.plugin((app) => graphql(app, { schema }));         // not alxia().plugin(…)
 ```
@@ -121,7 +123,7 @@ createSchema<GraphQLContext<typeof base>>({ … });   // not GraphQLContext<type
 ### `Property 'viewer' does not exist on type 'YogaInitialContext'`
 
 **When:** a resolver of a schema created with `createSchema({ … })`, no type
-argument, reads what the app's hooks add.
+argument, reads what the app's middlewares add.
 
 **Why:** an untyped schema's context is Yoga's alone. The field is there at
 runtime; its type is not.
@@ -247,15 +249,16 @@ throw createGraphQLError('Admins only', {
 fails and the console reports a CORS error.
 
 **Why:** Yoga's CORS is off, and the app answers no `OPTIONS` without a
-CORS plugin.
+CORS middleware.
 
-**Fix:** `@alxia/cors`, for the whole app ([CORS](guide/yoga.md#cors)):
+**Fix:** `@alxia/cors`, given to `use` first, for the whole app: it answers a
+preflight itself, before the router's 404 or 405 ([CORS](guide/yoga.md#cors)):
 
 ```ts
 import { cors } from '@alxia/cors';
 
 const app = alxia()
-	.plugin(cors({ origin: 'https://app.example.com', credentials: true }))
+	.use(cors({ origin: 'https://app.example.com', credentials: true }))
 	.plugin((app) => graphql(app, { schema }));
 ```
 
@@ -329,18 +332,53 @@ await app.request(`/graphql?query=${encodeURIComponent('{ me }')}`, {
 ### The endpoint answers without a guard declared after it
 
 **When:** `.plugin((app) => graphql(app, { schema }))` comes before
-`.plugin(bearer(…))` or a guarding `derive`: the endpoint answers anonymous
+`.use(bearer(…))` or a guarding `derive`: the endpoint answers anonymous
 requests, and its resolvers read no `user`.
 
-**Why:** a route hook applies to the routes declared after it. The endpoint
-is a route, declared where `graphql` is called. A schema typed from the
+**Why:** a middleware applies to the routes declared after it. The endpoint
+is a route, declared where `graphql` is called, so a middleware given to `use`
+after it never runs for it. A schema typed from the
 guarded app is refused (`missing user`); an untyped one is not.
 
 **Fix:** declare the guard first:
 
 ```ts
-const base = alxia().plugin(bearer({ jwt }));
+const base = alxia().use(bearer({ jwt }));
 const app = base.plugin((app) => graphql(app, { schema }));
+```
+
+### The logger, CORS or secure headers miss the endpoint
+
+**When:** `use(logger())`, `use(cors(…))` or `use(secureHeaders())` comes
+after `.plugin((app) => graphql(app, { schema }))`: the endpoint is not
+logged, its responses carry no CORS or security headers.
+
+**Why:** a `use` middleware runs on the routes declared after it, and on a
+request no route matches. The endpoint is declared before it.
+
+**Fix:** give the observers to `use` first:
+
+```ts
+const app = alxia()
+	.use(logger())
+	.use(cors({ origin: 'https://app.example.com' }))
+	.plugin((app) => graphql(app, { schema }));
+```
+
+### An anonymous request to a missing path is a 401
+
+**When:** `use(bearer(…))` is on the app, and `GET /nope` answers
+`401` rather than `404`.
+
+**Why:** a guard given to the app's `use` runs on every request, a request
+no route matches included, and answers before the 404.
+
+**Fix:** scope the guard to what it guards, with a path or a `group`:
+
+```ts
+const app = alxia()
+	.use('/graphql', bearer({ jwt }))
+	.plugin((app) => graphql(app, { schema }));
 ```
 
 ### A WebSocket client cannot connect: `Expected 101 status code`
@@ -367,7 +405,7 @@ graphql(app, { schema, graphiql: { subscriptionsProtocol: 'SSE' } });
 console reports scripts refused by the `Content-Security-Policy`.
 
 **Why:** the endpoint sends the IDE with a policy that lets it load its
-scripts from `unpkg.com` or Apollo's CDN. A hook of the app that sets its
+scripts from `unpkg.com` or Apollo's CDN. A middleware of the app that sets its
 own `Content-Security-Policy` on every response replaces it.
 `@alxia/secure-headers` does not: it keeps a policy a response already has.
 
@@ -375,12 +413,14 @@ own `Content-Security-Policy` on every response replaces it.
 ([With `@alxia/secure-headers`](guide/ide.md#with-alxiasecure-headers)):
 
 ```ts
-app.onResponse((response) =>
-	withHeaders(response, (headers) => {
+const defaultPolicy = defineMiddleware(async (ctx, next) =>
+	withHeaders(await settle(ctx, next()), (headers) => {
 		if (!headers.has('content-security-policy'))
 			headers.set('content-security-policy', "default-src 'self'");
 	}),
 );
+
+app.use(defaultPolicy); // before the endpoint, so it wraps it
 ```
 
 ### GraphiQL is served in production

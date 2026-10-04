@@ -19,6 +19,8 @@ Firefox and Safari say the same thing in other words.
 **Responses**
 
 - [`405 {"error":"method_not_allowed"}` on an `OPTIONS` request](#405-errormethod_not_allowed-on-an-options-request)
+- [A route's responses carry no CORS header, though the others do](#a-routes-responses-carry-no-cors-header-though-the-others-do)
+- [`401` on every request to a path that does not exist](#401-on-every-request-to-a-path-that-does-not-exist)
 - [`Access-Control-Allow-Origin: https://example.com.evil.net`](#access-control-allow-origin-httpsexamplecomevilnet)
 - [A refused origin's request still ran the route](#a-refused-origins-request-still-ran-the-route)
 
@@ -60,23 +62,30 @@ cors({ origin: ['https://app.example.com', 'http://localhost:5173'] });
 body, an `Authorization` header — and the preflight is answered with an
 error status.
 
-**Why:** one of two things answered the preflight instead of `cors()`:
+**Why:** one of three things answered the preflight instead of `cors()`:
 
 - the app does not use `cors()`, and routing answers the `OPTIONS` with a
   `405` — see [the next section](#405-errormethod_not_allowed-on-an-options-request);
-- an `onRequest` hook added **before** `cors()` returned a response — a
-  `401` for a missing token, a `429` — and `onRequest` hooks run in the
-  order they were added. A browser never sends credentials on a preflight,
-  so an authentication hook refuses every one.
+- `cors()` is declared in a `group`: a group's middlewares do not run on a
+  request no route matches, and a preflight is one, so the app answers the
+  `405`;
+- a middleware declared **before** `cors()` returned a response — a `401`
+  for a missing token, a `429` — and middlewares run in the order they are
+  declared. A browser never sends credentials on a preflight, so an
+  authentication guard refuses every one.
 
-**Fix:** use `cors()` before any hook that can answer early:
+**Fix:** use `cors()` first, on the app, before any middleware that can
+answer early:
 
 ```ts
+import { alxia, defineMiddleware } from '@alxia/core';
+import { cors } from '@alxia/cors';
+
 const app = alxia()
-	.plugin(cors({ origin: 'https://app.example.com' }))   // first
-	.onRequest(({ request }) =>
-		request.headers.has('authorization') ? undefined : new Response(null, { status: 401 }),
-	)
+	.use(cors({ origin: 'https://app.example.com' }))   // first
+	.use(defineMiddleware((ctx, next) =>
+		ctx.request.headers.has('authorization') ? next() : new Response(null, { status: 401 }),
+	))
 	.get('/data', ({ reply }) => reply(200, { ok: true }));
 ```
 
@@ -116,7 +125,7 @@ cors({ origin: ['https://app.example.com'], credentials: true });
 not in it.
 
 **Why:** with a list, the preflight allows those headers and no other.
-Without `allowedHeaders`, the plugin allows whatever the preflight asks
+Without `allowedHeaders`, the middleware allows whatever the preflight asks
 for, and this cannot happen.
 
 **Fix:** add the header, or drop `allowedHeaders` to allow what is asked:
@@ -164,7 +173,8 @@ cors({ origin: 'https://app.example.com', exposedHeaders: ['x-total', 'etag'] })
 **When:** an `OPTIONS` request to a path that has routes for other
 methods.
 
-**Why:** either the app does not use `cors()`, or the request is not a
+**Why:** either the app does not use `cors()` (or uses it in a `group`, which
+does not run on a request no route matches), or the request is not a
 preflight: `cors()` only answers an `OPTIONS` that carries
 `Access-Control-Request-Method`, as a browser's does. A plain `OPTIONS` —
 from `curl`, or a test that forgets the header — goes to routing like any
@@ -200,6 +210,42 @@ pass too.
 cors({ origin: /^https:\/\/([a-z0-9-]+\.)?example\.com$/ });
 ```
 
+### A route's responses carry no CORS header, though the others do
+
+**When:** one route's replies lack `Access-Control-Allow-Origin`, while a
+`404` or another route's replies have it.
+
+**Why:** a route declared **before** `app.use(cors())` does not run it; a
+request no route matches runs every top-level middleware wherever it is
+declared, which is why its `404` is covered. Likewise `cors()` used inside a
+`group` covers only that group's routes.
+
+**Fix:** declare `cors()` first, on the app:
+
+```ts
+const app = alxia()
+	.use(cors({ origin: 'https://app.example.com' }))
+	.get('/items', ({ reply }) => reply(200, []));
+```
+
+### `401` on every request to a path that does not exist
+
+**When:** an anonymous request to a missing path is answered `401` where you
+expected a `404`, with the CORS headers on it.
+
+**Why:** a guard declared on the app with `use` (an authentication
+middleware, `bearer`, a required session) runs on a request no route matches
+too, before its `404`.
+
+**Fix:** scope the guard to the routes it protects:
+
+```ts
+const app = alxia()
+	.use(cors({ origin: 'https://app.example.com' }))
+	.use('/api', authenticated)
+	.get('/api/data', ({ reply }) => reply(200, { ok: true }));
+```
+
 ### A refused origin's request still ran the route
 
 **When:** a `GET`, or a `POST` with a form or plain-text body, from an
@@ -226,7 +272,7 @@ app.derive(({ request, reply }) =>
 **When:** an `origin` function throws — typically `new URL(origin)` on the
 `Origin: null` that a sandboxed iframe or a page opened from a file sends.
 
-**Why:** the function runs in the plugin's hooks. On a preflight, the throw
+**Why:** the function runs in the middleware. On a preflight, the throw
 becomes a `500 {"error":"internal"}` without CORS headers. On any other
 request, the route has already answered: the error is logged and the
 response is sent as the route made it, without CORS headers, so the browser
@@ -253,34 +299,35 @@ error TS2322: Type 'false' is not assignable to type 'CorsOrigin | undefined'.
 **When:** `cors({ origin: false })`, to turn CORS off.
 
 **Why:** `origin` is `true`, a string, a `RegExp`, a list or a function;
-there is no off switch inside the plugin.
+there is no off switch inside the middleware.
 
-**Fix:** do not mount the plugin where CORS should be off:
+**Fix:** do not use the middleware where CORS should be off:
 
 ```ts
 const origins = process.env['CORS_ORIGINS']?.split(',');
 
-const app = alxia().plugin((app) => (origins ? cors({ origin: origins })(app) : app));
+const base = alxia();
+const app = origins ? base.use(cors({ origin: origins })) : base;
 ```
 
 ### `Type 'Alxia<…>' has no properties in common with type 'CorsOptions'`
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '(options?: CorsOptions | undefined) => Plugin' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
+  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
+    Argument of type '(options?: CorsOptions | undefined) => NoInfer<Middleware<Empty, Promise<Response>> & MiddlewareMark>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
       Types of parameters 'options' and 'app' are incompatible.
         Type 'Alxia<Empty, "", never>' has no properties in common with type 'CorsOptions'.
 ```
 
-**When:** `app.plugin(cors)`, without calling it.
+**When:** `app.use(cors)`, without calling it.
 
-**Why:** `cors` makes the plugin; it is not the plugin.
+**Why:** `cors` makes the middleware; it is not the middleware.
 
 **Fix:** call it, with no options for the defaults:
 
 ```ts
-alxia().plugin(cors());
+alxia().use(cors());
 ```
 
 ### `Type 'string' is not assignable to type 'readonly string[]'`
@@ -292,7 +339,7 @@ error TS2322: Type 'string' is not assignable to type 'readonly string[]'.
 **When:** `methods`, `allowedHeaders` or `exposedHeaders` is given as a
 string, such as `methods: 'GET, POST'`.
 
-**Why:** each is a list; the plugin joins it.
+**Why:** each is a list; the middleware joins it.
 
 **Fix:**
 

@@ -20,7 +20,7 @@ class Alxia<Ctx extends object = Empty, Prefix extends string = '', Shortcuts ex
 | --- | --- |
 | `Ctx` | what `decorate`, `derive` and plugins added to the context of the routes declared next |
 | `Prefix` | the prefix every route declared on the app is under |
-| `Shortcuts` | the replies the hooks before the next route may answer with, and the `onRefusal` hooks in force |
+| `Shortcuts` | the replies the `derive`s and middlewares before the next route may answer with, and the `onRefusal` hooks (deprecated) in force |
 
 ## `ContextOf<App>`
 
@@ -165,10 +165,11 @@ test('GET /users/:id answers 200, or 400 for an id that is not a number', async 
 
 | Types | Name |
 | --- | --- |
-| `Context`, `BaseContext`, `RequestContext`, `ResponseSettings`, `ResponseCookies` | what handlers and hooks read ([Hooks](hooks.md#what-each-hook-reads)) |
+| `Context`, `BaseContext`, `RequestContext`, `ResponseSettings`, `ResponseCookies` | what handlers and middlewares read ([Hooks](hooks.md#what-each-hook-reads)); `BaseContext.route` is `string \| undefined`, `undefined` in a middleware of a request no route matches |
 | `RequestSchemas`, `Validated`, `ResponseSchemas`, `RouteOptions`, `RouteDetail`, `RouteSchema`, `ValidSchema` | what a route declares — `validate`'s and `responds`' arguments, its options — and the checks on it ([Routes](routes.md#what-the-types-refuse)) |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema interface |
 | `ValidationErrorBody`, `ValidationIssue`, `ValidationTarget`, `InternalErrorBody`, `RoutingErrorBody` | the bodies the framework answers |
+| `ValidationError`, `Refusal`, `ValidationRefusal`, `BodyLimitRefusal`, `RequestPart` | what `validate` throws and the refusals `refusalOf(error)` reads ([Routes](routes.md#refusals-in-your-own-format)) |
 | `RoutePath`, `JoinPath`, `PathParams`, `PathParamName`, `PathAt`, `CheckedPath` | paths: `PathParams<'/users/:id/files/*'>` is `{ readonly id: string; readonly '*': string }` |
 | `StatusCode`, `InformationalStatus`, `SuccessStatus`, `RedirectStatus`, `ClientErrorStatus`, `ServerErrorStatus` | the statuses a route may declare |
 | `Method`, `Empty`, `MaybePromise`, `Simplify` | small helpers |

@@ -15,7 +15,7 @@ bun add -d typescript
 import { logger } from '@alxia/logger';
 
 const app = alxia()
-	.plugin(logger())
+	.use(logger())
 	.get('/orders/:id', ({ log, requestId, reply }) => {
 		log.info('order read', { id: requestId });
 		return reply(200, ...);
@@ -38,8 +38,9 @@ to the last byte, with `timeToHeaders` and an `outcome`: `completed`,
 {"time":"…","level":"warn","requestId":"…","message":"GET /events 200 aborted","method":"GET","path":"/events","status":200,"duration":5012.3,"timeToHeaders":0.84,"outcome":"aborted","ip":"127.0.0.1"}
 ```
 
-The routes after the plugin read `requestId`, and `log`, whose entries
-carry it.
+The routes after it read `requestId`, and `log`, whose entries carry it.
+Give it to `use` first: its timing then holds everything after it, and
+every request is logged, a 404 or a 405 that matched no route included.
 
 ## Options
 
@@ -56,11 +57,11 @@ carry it.
 
 | export | |
 | --- | --- |
-| `logger(options?)` | the plugin: an app that derives `requestId` and `log` |
-| `LogEntry`, `RequestLog`, `LoggerOptions` | its types |
+| `logger(options?)` | the middleware: give it to `app.use`; it adds `requestId` and `log` to the context |
+| `LogEntry`, `RequestLog`, `LoggerOptions`, `LoggerContext` | its types; `LoggerContext` is what it adds (`requestId`, `log`) |
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/logger/docs): every option and default, the entry's fields, `log` and `requestId`, where the plugin sits among other hooks, and testing.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/logger/docs): every option and default, the entry's fields, `log` and `requestId`, where the middleware sits among the others, and testing.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/logger/docs/troubleshooting.md): an error message or a missing header, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/logger/docs/roadmap.md): what is coming, and what is not planned.

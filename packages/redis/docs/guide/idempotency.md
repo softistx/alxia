@@ -1,6 +1,6 @@
 # Idempotency
 
-This page covers `idempotency`: a plugin that runs a `POST` or `PATCH`
+This page covers `idempotency`: a middleware, given to `app.use`, that runs a `POST` or `PATCH`
 once per `Idempotency-Key`, replays its response to every repeat, and
 refuses the repeats it cannot answer — across every process sharing a
 Redis.
@@ -15,7 +15,7 @@ const connection = await connectRedis(Bun.env['REDIS_URL']!);
 const Payment = z.object({ amount: z.number().int().positive() });
 
 const app = alxia()
-	.plugin(idempotency(connection.client, { name: 'payments' }))
+	.use(idempotency(connection.client, { name: 'payments' }))
 	.post('/payments', validate({ body: Payment }), ({ body, reply }) =>
 		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
 	);
@@ -28,12 +28,14 @@ curl -X POST localhost:3000/payments -H 'idempotency-key: 4f1c' -H 'content-type
 # 201 {"id":"9a…","amount":10}     Idempotent-Replayed: true — the route did not run
 ```
 
-Only the routes declared **after** `plugin(idempotency(…))` are guarded.
+Only the routes declared **after** `use(idempotency(…))` are guarded. A request
+no route matches is not: there is no route to scope its key by, so it passes
+to the 404.
 
 ## The signature
 
 ```ts
-function idempotency(client: RedisClient, options: IdempotencyOptions);  // a plugin
+function idempotency(client: RedisClient, options: IdempotencyOptions);  // a middleware
 
 interface IdempotencyOptions {
 	readonly name: string;
@@ -109,7 +111,7 @@ import { z } from 'zod';
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia()
-	.plugin(idempotency(connection.client, { name: 'payments', required: true }))
+	.use(idempotency(connection.client, { name: 'payments', required: true }))
 	.post('/payments', validate({ body: z.object({ amount: z.number() }) }), ({ body, reply }) =>
 		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
 	);
@@ -157,7 +159,7 @@ import { connectRedis } from '@nxgt/redis';
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia()
-	.plugin(idempotency(connection.client, { name: 'orders', wait: 2_000 }))   // keep it under your HTTP timeout
+	.use(idempotency(connection.client, { name: 'orders', wait: 2_000 }))   // keep it under your HTTP timeout
 	.post('/orders', async ({ reply }) => reply(201, { id: crypto.randomUUID() }));
 ```
 
@@ -180,7 +182,7 @@ import { connectRedis } from '@nxgt/redis';
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia({ ip: (request) => request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() })
-	.plugin(
+	.use(
 		idempotency(connection.client, {
 			name: 'payments',
 			scope: ({ request }) => request.headers.get('x-user-id') ?? undefined,
@@ -198,9 +200,11 @@ is two keys.
 
 ## Order: what runs inside the guard
 
-The plugin wraps the routes declared after it, and every route hook
+The middleware wraps the routes declared after it, and every middleware
 declared after it too. Whatever those answer is kept like the route's
-answer. A rate limit or an authentication check declared **after**
+answer: so is what an `onError` hook, an `HttpError` or a validation
+refusal answers, because `idempotency` settles the rest of the request before
+it keeps it. A rate limit or an authentication check declared **after**
 `idempotency` has its `429` or `401` kept and replayed — even once the
 client is allowed through. Declare them **before**:
 
@@ -213,8 +217,8 @@ import { connectRedis } from '@nxgt/redis';
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia()
-	.plugin(rateLimit({ limit: 10, windowMs: 60_000, store: redisStore(connection.client, { name: 'pay' }) }))  // its 429 is never kept
-	.plugin(idempotency(connection.client, { name: 'payments' }))
+	.use(rateLimit({ limit: 10, windowMs: 60_000, store: redisStore(connection.client, { name: 'pay' }) }))  // its 429 is never kept
+	.use(idempotency(connection.client, { name: 'payments' }))
 	.post('/payments', ({ reply }) => reply(201, { ok: true }));
 ```
 
@@ -222,6 +226,10 @@ Measured: with the rate limit after `idempotency`, a key refused with a
 `429` answered `429` again, `Idempotent-Replayed: true`, after the window
 had passed; with it before, the same repeat ran the route and answered
 `201`.
+
+Declared on the app, a rate limit or a guard also runs on a request no route
+matches, and answers it before `idempotency` is reached; that is not a
+concern here, since `idempotency` skips that request anyway.
 
 A route that refuses a request it might accept later — a `401` before the
 client signs in again, a `409` on a state that changes — should answer it

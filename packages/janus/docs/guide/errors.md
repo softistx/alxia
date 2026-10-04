@@ -1,6 +1,6 @@
 # Errors
 
-This page covers `janusErrors()`: the plugin that answers every refusal
+This page covers `janusErrors()`: the middleware that answers every refusal
 `@nxgt/janus` throws — a wrong password, a login taken, a store down —
 with its status and a body a client can act on, typed on the routes after
 it; and `bodyOf` and `statusOf`, the two functions it is made of.
@@ -21,15 +21,15 @@ const accounts = janus({
 const SignUp = z.object({ email: z.string(), name: z.string(), password: z.string() });
 
 const app = alxia()
-	.plugin(janusErrors())
-	.plugin(session(accounts))
+	.use(janusErrors())
+	.use(session(accounts))
 	.post('/signup', validate({ body: SignUp }), async ({ body, auth, reply }) => {
 		const signedUp = await accounts.signUp(body); // throws a JanusError when it refuses
 		return reply.created({ id: auth.send(signedUp).id });
 	});
 ```
 
-A route needs no `try`: `signUp` throws, and the plugin answers.
+A route needs no `try`: `signUp` throws, and the middleware answers.
 
 ```text
 400 {"code":"PASSWORD_TOO_SHORT","minLength":12}
@@ -42,12 +42,33 @@ A route needs no `try`: `signUp` throws, and the plugin answers.
 
 ## Where to put it
 
-`janusErrors()` is an `onError` hook: it answers the errors of the routes
-declared **after** it. Put it first. A `JanusError` thrown by a route
-declared before it is the app's 500 `{"error":"internal"}`.
+`janusErrors()` is a try/catch middleware: it answers a `JanusError` thrown
+**behind** it, by `session()`, by `permission()` or by a route. Give it to
+`use` before `session()`:
 
-It answers only a `JanusError`. Anything else goes on to the app's next
-`onError`, or its 500.
+```ts
+const app = alxia().use(janusErrors(), session(accounts));
+```
+
+Declared after `session()`, it never sees what `session()` throws: a store
+down while the session is read (`STORE_FAILED`) is the app's 500
+`{"error":"internal"}`, not the 503. The same goes for a route declared
+before it: a `JanusError` it throws is not behind `janusErrors()`.
+
+It answers only a `JanusError`. Anything else goes on, thrown, to the
+middlewares before it, then the app's `onError`, or its 500.
+
+An observer that settles `next()` (`logger()`, `secureHeaders()`,
+`telemetry()`) answers an error itself, so it must be outside: give the
+observers to `use` first, then `janusErrors()`.
+
+```ts
+import { logger } from '@alxia/logger';
+
+const app = alxia()
+	.use(logger())                          // sees the 503 janusErrors() answers
+	.use(janusErrors(), session(accounts));
+```
 
 ## Statuses
 
@@ -95,16 +116,17 @@ bodyOf(new NotFoundError('user')); // { code: 'NOT_FOUND' }
 `CREDENTIALS_INVALID` is one code for an unknown login, a wrong password and
 a login throttled for too many attempts: a client cannot tell a login exists
 from it. `retryAfter` is set only once `janus()`'s throttle trips — ten
-passwords in fifteen minutes by default — and the plugin then adds the
+passwords in fifteen minutes by default — and the middleware then adds the
 `Retry-After` header.
 
 ## Reporting the 5xx
 
 ```ts
-const app = alxia().plugin(
+const app = alxia().use(
 	janusErrors({
 		report: (error, ctx) => console.error(`${ctx.route}: ${error.code}`, error.cause),
 	}),
+	session(accounts),
 );
 ```
 
@@ -124,7 +146,7 @@ The 4xx are not reported: they are the client's.
 
 ## On the wire
 
-Every route after the plugin may answer these refusals: declare them in
+Every route after the middleware may answer these refusals: declare them in
 your OpenAPI document, and the client you generate from it (with
 `@nxgt/openapi-codegen`, say) reads them typed. A 401 from a route behind
 `session(accounts, { required: true })` is either the session's
@@ -136,8 +158,7 @@ import { alxia } from '@alxia/core';
 import { janusErrors, session } from '@alxia/janus';
 
 const app = alxia()
-	.plugin(janusErrors())
-	.plugin(session(accounts, { required: true }))
+	.use(janusErrors(), session(accounts, { required: true }))
 	.get('/me', ({ user, reply }) => reply(200, { name: user.name }));
 
 const me = await app.request('/me');
@@ -152,7 +173,10 @@ if (me.status === 503) console.log(body.code);         // 'STORE_FAILED' and the
 ## Signatures
 
 ```ts
-function janusErrors(options?: JanusErrorsOptions): Alxia<Empty, '', Reply<JanusErrorStatus, JanusErrorBody>>;
+function janusErrors(options?: JanusErrorsOptions): JanusErrors;
+
+// a middleware: answers the JanusErrors thrown behind it
+type JanusErrors = Middleware<object, Promise<Next | Reply<JanusErrorStatus, JanusErrorBody>>> & MiddlewareMark;
 
 interface JanusErrorsOptions {
 	readonly report?: (error: JanusError, ctx: BaseContext) => unknown;
@@ -172,7 +196,7 @@ function statusOf(code: JanusErrorCode): JanusErrorStatus; // @nxgt/janus's
 ```
 
 `JanusError`, `JanusErrorCode` and `JanusErrorStatus` are `@nxgt/janus`'s;
-`Alxia`, `Empty`, `Reply` and `BaseContext` are `@alxia/core`'s.
+`Middleware`, `MiddlewareMark`, `Next`, `Reply` and `BaseContext` are `@alxia/core`'s.
 
 The permission guard's own refusals — `{ error: 'forbidden' }` and the
 like — are not `JanusError`s; see [Permissions](permissions.md#refusals).

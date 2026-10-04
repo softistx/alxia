@@ -1,6 +1,6 @@
 # Sessions
 
-This page covers `session()`: the plugin that reads who a request belongs
+This page covers `session()`: the middleware that reads who a request belongs
 to, hands the routes after it a typed `user` and `session` and a bound
 `auth`, refuses an anonymous request when asked to, and sends a renewed
 session's cookie again.
@@ -19,15 +19,17 @@ const accounts = janus({
 });
 
 const app = alxia()
-	.plugin(janusErrors())
+	.use(janusErrors())
 	.get('/health', ({ reply }) => reply(200, 'ok'))       // before it: open
-	.plugin(session(accounts, { required: true }))
+	.use(session(accounts, { required: true }))
 	.get('/me', ({ user, reply }) => reply(200, { name: user.name })); // user: never null
 ```
 
 `session(accounts)` calls `accounts.authenticate(request)` once per request, for
 the routes declared **after** it. A route declared before it is not
-touched, and has no `user`, `session` or `auth`.
+touched, and has no `user`, `session` or `auth`. A request no route matches
+is not a route, so `session()` runs on it, wherever it is declared: with
+`required: true`, `GET /nothing` is a 401 before it is a 404.
 
 ## Where the session is read from
 
@@ -62,7 +64,7 @@ the route decides:
 
 ```ts
 const app = alxia()
-	.plugin(session(accounts))
+	.use(session(accounts))
 	.get('/greeting', ({ user, reply }) =>
 		reply(200, user === null ? 'Hello, stranger' : `Hello, ${user.name}`),
 	);
@@ -86,7 +88,7 @@ request 401 and `false` lets it through with `user: null`:
 const strict = Bun.env['STRICT'] === '1';
 
 const app = alxia()
-	.plugin(session(accounts, { required: strict }))
+	.use(session(accounts, { required: strict }))
 	.get('/me', ({ user, reply }) => reply(200, user === null ? 'anonymous' : user.name));
 
 // STRICT=1: 401 {"error":"unauthenticated"}; otherwise: 200 "anonymous"
@@ -122,13 +124,13 @@ const accounts = janus({
 });
 
 const app = alxia()
-	.plugin(janusErrors())
+	.use(janusErrors())
 	.group('/staff', (staff) =>
 		staff
-			.plugin(session(accounts, { type: 'staff', required: true }))
+			.use(session(accounts, { type: 'staff', required: true }))
 			.get('/me', ({ user, reply }) => reply(200, { username: user.username })), // a staff user
 	)
-	.plugin(session(accounts))
+	.use(session(accounts))
 	.get('/whoami', ({ user, reply }) =>
 		reply(200, user === null ? 'anonymous' : user.type), // 'patient' | 'staff'
 	);
@@ -165,7 +167,7 @@ is signed in — [Signing in and out](sign-in-and-out.md) is its page.
 
 A sign-in route is called by someone who is not signed in yet, so it sits
 behind a `session()` that is **not** required: behind `required: true` it
-answers `401 {"error":"unauthenticated"}` before it runs. Use the plugin
+answers `401 {"error":"unauthenticated"}` before it runs. Use the middleware
 twice — once open, for the sign-in routes; once required, for the rest:
 
 ```ts
@@ -184,8 +186,8 @@ const accounts = janus({
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.plugin(janusErrors())
-	.plugin(session(accounts))                       // open: user may be null
+	.use(janusErrors())
+	.use(session(accounts))                       // open: user may be null
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
@@ -193,7 +195,7 @@ const app = alxia()
 	.post('/signout', async ({ auth, reply }) => reply.ok(await auth.signOut()))
 	.group('/account', (account) =>
 		account
-			.plugin(session(accounts, { required: true })) // required: user never null
+			.use(session(accounts, { required: true })) // required: user never null
 			.get('/me', ({ user, reply }) => reply.ok({ name: user.name })),
 	)
 	.get('/greeting', ({ user, reply }) => reply.ok(user === null ? 'Hello, stranger' : `Hello, ${user.name}`));
@@ -202,11 +204,14 @@ const app = alxia()
 The second `session()` replaces the first's `user`, `session` and `auth`
 for the routes after it, with its own types: `user` is never `null` under
 `/account`, and still may be on `/greeting`, outside the group. Without the
-`group`, `.plugin(session(accounts, { required: true }))` on the app itself works
-the same for every route declared after it.
+`group`, `.use(session(accounts, { required: true }))` on the app itself works
+the same for every route declared after it, and for a request no route
+matches: an anonymous request to a missing path is then a 401, not a 404.
+Scope a required session with a `group`, or a path (`use('/api', …)`), to
+guard only some routes.
 
-A route behind both plugins still looks the session up once: the plugins
-of one instance share a request's lookup, for the same `type`. A different
+A route behind both middlewares still looks the session up once: the
+middlewares of one instance share a request's lookup, for the same `type`. A different
 `type` is its own lookup.
 
 ## A renewed session is sent again
@@ -220,7 +225,7 @@ conditions:
   `Authorization: Bearer` is never handed a cookie; it keeps its token,
   which is still the same one;
 - **the route did not set a session cookie itself.** A route behind the
-  plugin that signs in, or signs out, keeps its own `Set-Cookie`: the
+  route that signs in, or signs out, keeps its own `Set-Cookie`: the
   session it replaced does not undo it.
 
 ```ts
@@ -239,7 +244,7 @@ const accounts = janus({
 	clock,
 });
 const app = alxia()
-	.plugin(session(accounts, { required: true }))
+	.use(session(accounts, { required: true }))
 	.get('/me', ({ user, reply }) => reply(200, user.email));
 
 const { token } = await accounts.signUp({ email: 'ada@example.com', password: 'correct horse' });
@@ -261,11 +266,17 @@ writes it with `accounts.cookie.serialize`, so they are set in one place.
 A store that cannot answer makes `authenticate` throw `STORE_FAILED`.
 `session()` does not catch it: the request fails, and `janusErrors()`
 answers it **503** `{ "code": "STORE_FAILED" }` — never a 401 that would
-send every user to the sign-in page. Without `janusErrors()`, it is the
-app's 500. See [Errors](errors.md).
+send every user to the sign-in page. `janusErrors()` must be given to `use`
+**before** `session()`, or it is not behind it to see the error: the app's
+500 answers instead. See [Errors](errors.md).
+
+```ts
+const app = alxia().use(janusErrors(), session(accounts, { required: true }));
+```
 
 Routes declared before `session()` do not call the store, and keep
-answering.
+answering. A request no route matches does run it: `session()` on the app is
+given to every request.
 
 ## Testing it
 
@@ -285,7 +296,7 @@ const accounts = janus({
 	hasher: scryptHasher({ cost: 10 }), // fast in tests
 });
 const app = alxia()
-	.plugin(session(accounts, { required: true }))
+	.use(session(accounts, { required: true }))
 	.get('/me', ({ user, reply }) => reply(200, { email: user.email }));
 
 test('the session reads the user, and anonymous is a 401', async () => {
@@ -347,5 +358,5 @@ type UserOfAuth<A> = A extends Auth<infer U> ? U : never;
 exported. `Alxia`, `Empty` and `Reply` are `@alxia/core`'s; `Session` and
 `SharedApi` are `@nxgt/janus`'s.
 
-Next: [Signing in and out](sign-in-and-out.md) sets the cookie this plugin
+Next: [Signing in and out](sign-in-and-out.md) sets the cookie this middleware
 reads.

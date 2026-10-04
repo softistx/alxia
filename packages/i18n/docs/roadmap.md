@@ -7,7 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **A middleware, not a plugin (0.4).** `app.use(createI18n({ ... }))` runs on every request, a 404 included; its `t()` works in every middleware after it and in the answer to an error. `app.plugin(i18n)` still works, deprecated.
 
 ## Next
 
@@ -27,7 +27,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **Translations as one plugin.** `alxia().plugin(createI18n({ resources, fallback }))`
+- **Translations as one plugin.** `alxia().use(createI18n({ resources, fallback }))`
   gives the routes after it `t`, bound to the request's language, and
   `language`, typed as one of the catalogues' languages.
 - **The request's language, found by `@alxia/language`.** The query, a

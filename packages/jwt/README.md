@@ -2,7 +2,7 @@
 
 JSON Web Tokens for [alxia](https://www.npmjs.com/package/@alxia/core), on
 Web Crypto, with no dependency: HS256/384/512 with a secret, ES256/384,
-RS256/384/512 and EdDSA with a key pair, and a typed bearer guard.
+RS256/384/512 and EdDSA with a key pair, and a typed bearer guard, a middleware.
 
 ```sh
 bun add @alxia/jwt @alxia/core
@@ -36,14 +36,16 @@ import { z } from 'zod';
 
 const app = alxia()
 	.post('/login', ...)                                    // open
-	.plugin(bearer({ jwt, schema: z.object({ sub: z.string(), role: z.enum(['admin', 'user']) }) }))
+	.use(bearer({ jwt, schema: z.object({ sub: z.string(), role: z.enum(['admin', 'user']) }) }))
 	.get('/me', ({ user, reply }) => reply(200, user));    // user: { sub: string; role: ... }
 ```
 
-Every route after the guard needs a valid token — `Authorization: Bearer`,
+Every request the guard runs on needs a valid token — `Authorization: Bearer`,
 or the cookie named by `cookie` — and reads its claims, checked by `schema`
 (any Standard Schema), as `user`. Otherwise a 401 with `WWW-Authenticate:
-Bearer` and `{ error: 'unauthorized', reason }`.
+Bearer` and `{ error: 'unauthorized', reason }`. Given to `app.use`, it also
+refuses a request no route matches, before its 404: an anonymous request to a
+missing path gets the 401. Put the guard in a `group` to guard only some routes.
 
 ## API
 
@@ -51,10 +53,10 @@ Bearer` and `{ error: 'unauthorized', reason }`.
 | --- | --- |
 | `createJwt(options)` | `sign(claims, { expiresIn? })`, `verify(token)` |
 | `JwtOptions` | its options: `algorithm` with `secret`, or with `privateKey` and `publicKey`; `issuer`, `audience`, `expiresIn`, `clockTolerance` |
-| `bearer({ jwt, schema?, cookie? })` | the guard: an app that derives `user` |
+| `bearer({ jwt, schema?, cookie? })` | the guard: a middleware that gives `user`, or answers the 401 |
 | `BearerOptions` | its options: `jwt`, `schema`, `cookie` |
 | `base64url(bytes)` | bytes as base64url |
-| `Jwt`, `JwtClaims`, `VerifyResult`, `UnauthorizedBody`, `Algorithm`, `HmacAlgorithm`, `KeyAlgorithm` | its types |
+| `Bearer`, `Jwt`, `JwtClaims`, `VerifyResult`, `UnauthorizedBody`, `Algorithm`, `HmacAlgorithm`, `KeyAlgorithm` | its types |
 
 ## Documentation
 

@@ -36,14 +36,14 @@ error TS2322: Type '"identity"' is not assignable to type 'Encoding'.
 
 The same message comes for `'brotli'`, `'x-gzip'` or `'compress'`.
 
-**Why:** `encodings` lists what the plugin can produce, by the token that
+**Why:** `encodings` lists what the middleware can produce, by the token that
 goes in `Content-Encoding`. `identity` is not an encoding to offer — it is
 what a client gets when none is chosen — and Brotli's token is `br`.
 
 **Fix:** use the tokens, and leave `identity` out:
 
 ```ts
-app.plugin(compress({ encodings: ['br', 'gzip'] }));
+app.use(compress({ encodings: ['br', 'gzip'] }));
 ```
 
 ### `Type 'RegExp' is not assignable to type '(type: string) => boolean'`
@@ -60,28 +60,28 @@ error TS2322: Type 'RegExp' is not assignable to type '(type: string) => boolean
 **Fix:** wrap the expression:
 
 ```ts
-app.plugin(compress({ compressible: (type) => /json|text\//.test(type) }));
+app.use(compress({ compressible: (type) => /json|text\//.test(type) }));
 ```
 
 ### `Type 'Alxia<…>' has no properties in common with type 'CompressOptions'`
 
-**When:** passing `compress` to `app.plugin` without calling it.
+**When:** passing `compress` to `app.use` without calling it.
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '(options?: CompressOptions) => Plugin' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
+  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
+    Argument of type '(options?: CompressOptions | undefined) => NoInfer<Middleware<Empty, Promise<Response>> & MiddlewareMark>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
       Types of parameters 'options' and 'app' are incompatible.
         Type 'Alxia<Empty, "", never>' has no properties in common with type 'CompressOptions'.
 ```
 
-**Why:** `compress` builds the plugin from its options; the plugin is what
-it returns.
+**Why:** `compress` builds the middleware from its options; the middleware
+is what it returns.
 
 **Fix:**
 
 ```ts
-app.plugin(compress());
+app.use(compress());
 ```
 
 ## Responses
@@ -100,9 +100,9 @@ app.plugin(compress());
 | the response already has a `Content-Encoding` | a precompressed file from `static(…, { precompressed })` |
 | its `Cache-Control` holds `no-transform` | |
 | its `Content-Length` is under `threshold` (1024 by default) | a short JSON error, a small string, a small file from `static` or `file` |
-| `compress()` is not on this app | it was given to `app.plugin` on another app, or not at all |
+| `compress()` does not run for this route | it was given to `use` on another app, not at all, or after the route: a route declared before `app.use(compress())` is not compressed |
 
-**Fix:** ask for an encoding to check the plugin works:
+**Fix:** ask for an encoding to check the middleware works:
 
 ```sh
 curl -s -D - -o /dev/null -H 'accept-encoding: gzip' localhost:3000/report
@@ -115,7 +115,7 @@ then lower `threshold` or widen `compressible` if the response is one you
 want compressed:
 
 ```ts
-app.plugin(compress({ threshold: 256 }));
+app.use(compress({ threshold: 256 }));
 ```
 
 ### `Content-Encoding: gzip` on a tiny body, larger than the original
@@ -125,7 +125,7 @@ its compressed size is larger than the original (a 2-byte stream becomes
 22 bytes of gzip).
 
 **Why:** `threshold` is read from `Content-Length`. A stream has none when
-the hook runs, so its size is unknown and it is compressed whatever it is.
+the middleware sees it, so its size is unknown and it is compressed whatever it is.
 A string, JSON or binary body — a file included — has one, and is measured.
 
 **Fix:** for a stream that is always small, mark it, or send it as a
@@ -137,21 +137,29 @@ app.get('/ping', ({ reply }) => reply(200, smallStream, { headers: { 'content-ty
 
 ### `Cache-Control: no-transform` and `Content-Encoding` on the same response
 
-**When:** a hook sets `Cache-Control: no-transform`, and the response is
+**When:** a middleware sets `Cache-Control: no-transform`, and the response is
 compressed anyway.
 
-**Why:** `onResponse` hooks run in the order declared, and the hook that
-sets the header runs after `compress()`, which has already decided. Every
-hook after it also sees the compressed body: one that reads or measures
-the body reads the encoded bytes.
+**Why:** middlewares nest, and the first one declared is the outermost. A
+middleware declared **before** `compress()` sets its header on the way out,
+after `compress()` has already decided. Every middleware before it also sees
+the compressed body: one that reads or measures the body reads the encoded
+bytes.
 
-**Fix:** declare the hooks that set `Cache-Control`, `Content-Type` or
-`Content-Encoding` before `compress()`, and those that log after it:
+**Fix:** declare the middlewares that set `Cache-Control`, `Content-Type` or
+`Content-Encoding` after `compress()`, and those that log before it:
 
 ```ts
+import { alxia, defineMiddleware, settle, withHeaders } from '@alxia/core';
+import { compress } from '@alxia/compress';
+
+const noTransform = defineMiddleware(async (ctx, next) =>
+	withHeaders(await settle(ctx, next()), (headers) => headers.set('cache-control', 'no-transform')),
+);
+
 const app = alxia()
-	.onResponse((response) => withHeaders(response, (headers) => headers.set('cache-control', 'no-transform')))
-	.plugin(compress());
+	.use(compress())
+	.use(noTransform);
 ```
 
 A `Cache-Control` set by the handler itself (`reply(200, body, { headers })`
@@ -163,18 +171,18 @@ or `set.headers`) is always seen.
 that `compressible` lets in, reach the client only when later chunks push
 them out, or when the stream ends.
 
-**Why:** not the plugin. A body with no `Content-Length` is flushed after
+**Why:** not the middleware. A body with no `Content-Length` is flushed after
 the chunks of each turn of the event loop, in every encoding: see
 [Streamed bodies](guide.md#streamed-bodies). An earlier `@alxia/compress`
 held a stream in the codec until a block filled, and the default
 `compressible` left event streams out for that reason; it still leaves
 them out, now because events are small. What holds a stream back now is
-outside the plugin:
+outside the middleware:
 
 | Cause | How to see it |
 | --- | --- |
 | a proxy in front of the server buffers the response | the delay is gone with `curl -N` against the server itself; nginx honours the `X-Accel-Buffering: no` that alxia sets on an event stream, not on a page |
-| an `onResponse` hook after `compress()` reads the body, as `await response.text()` does, and answers a new one | the hook's response has a `Content-Length` |
+| a middleware before `compress()` reads the body, as `await response.text()` does, and answers a new one | the middleware's response has a `Content-Length` |
 | the response has a `Content-Length` | a body with one is compressed whole; a stream handed to `reply` has none |
 | the renderer waits for everything before it writes | React Router's default entry waits for `allReady` when the user agent looks like a bot, as Bun's default user agent does: send a browser's |
 
@@ -230,7 +238,7 @@ app.get('/report', async ({ reply }) =>
 a comparison with `If-None-Match` never matches.
 
 **Why:** a strong ETag promises the same bytes, and the compressed bytes
-differ from the uncompressed ones, so the plugin weakens it. The client
+differ from the uncompressed ones, so the middleware weakens it. The client
 then sends `If-None-Match: W/"…"`.
 
 **Fix:** compare the tag weakly, ignoring the `W/` prefix:
@@ -262,9 +270,9 @@ bytes` when fetched without `Accept-Encoding`, and none when it comes back
 compressed.
 
 **Why:** a byte range of the encoded body is not a range of the file, so
-the plugin removes the header rather than advertise ranges of a body that
+the middleware removes the header rather than advertise ranges of a body that
 is not the one sent. A request that carries `Range` is answered 206 with
-the slice, uncompressed: the plugin never compresses a 206.
+the slice, uncompressed: the middleware never compresses a 206.
 
 **Fix:** nothing to fix: a client that seeks sends `Range` and gets the
 slice. To keep `Accept-Ranges` on every response for a file type, keep it
@@ -274,7 +282,7 @@ out of compression:
 // The default test, as the guide's `compressible` section spells it.
 const defaults = /^(text\/(?!event-stream)|application\/(.+\+)?(json|javascript|xml)|image\/svg\+xml)/i;
 
-app.plugin(compress({ compressible: (type) => defaults.test(type) && !type.startsWith('text/csv') }));
+app.use(compress({ compressible: (type) => defaults.test(type) && !type.startsWith('text/csv') }));
 ```
 
 ### `Vary: Accept-Encoding` on a response that is not compressed
@@ -288,4 +296,4 @@ this copy was compressed or not. It is added to every response whose type
 is compressible.
 
 **Fix:** nothing to fix. A response whose type is not compressible gets no
-`Vary` from the plugin.
+`Vary` from the middleware.

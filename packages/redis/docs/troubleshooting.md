@@ -277,7 +277,7 @@ with a fraction or below 0.
 TypeError: run on "payments": wait is a whole number of milliseconds, 0 or more
 ```
 
-**Why:** `wait` is checked when it is used, not when the plugin is made.
+**Why:** `wait` is checked when it is used, not when the middleware is made.
 
 **Fix:**
 
@@ -567,7 +567,8 @@ rateLimit({ limit: 5, windowMs: 60_000, store: redisStore(connection.client, { n
 ### A `401` or a `429` is replayed, with `Idempotent-Replayed: true`, after the client fixed it
 
 **When:** a request under a key was refused with a `4xx` — by the route, or
-by a rate limit or an authentication check declared after `idempotency` —
+by a rate limit or an authentication check declared after `idempotency`,
+or by an error handler —
 and the client, once allowed, retries with the same key and body.
 
 **Why:** every response below `500` is kept and replayed for `ttl`, not
@@ -580,8 +581,8 @@ the request was sent with a valid token.
 
 ```ts
 alxia()
-	.plugin(rateLimit({ limit: 10, windowMs: 60_000, store: redisStore(connection.client, { name: 'pay' }) }))
-	.plugin(idempotency(connection.client, { name: 'payments' }))
+	.use(rateLimit({ limit: 10, windowMs: 60_000, store: redisStore(connection.client, { name: 'pay' }) }))
+	.use(idempotency(connection.client, { name: 'payments' }))
 	.post('/payments', ({ reply }) => reply(201, { ok: true }));
 ```
 

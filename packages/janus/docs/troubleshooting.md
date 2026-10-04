@@ -30,8 +30,11 @@ symptom, under [Traps](#traps).
 - [`TypeError: signIn: a device was given, but janus() has no devices — pass devices: { keys }`](#typeerror-signin-a-device-was-given-but-janus-has-no-devices--pass-devices--keys-)
 - [`Warning: janusErrors(): report failed: …`](#warning-januserrors-report-failed-)
 - [`500 {"error":"internal"}`, with a `JanusError` in the log](#500-errorinternal-with-a-januserror-in-the-log)
+- [`500 {"error":"internal"}` when the identity store is down, and `janusErrors()` is there](#500-errorinternal-when-the-identity-store-is-down-and-januserrors-is-there)
 - [`503 {"code":"STORE_FAILED"}`](#503-codestore_failed)
 - [`401 {"error":"unauthenticated"}` from the sign-in route](#401-errorunauthenticated-from-the-sign-in-route)
+- [`401 {"error":"unauthenticated"}` on a path that does not exist](#401-errorunauthenticated-on-a-path-that-does-not-exist)
+- [The error is never seen by a `try`/`catch` around `logger()` or `secureHeaders()`](#the-error-is-never-seen-by-a-trycatch-around-logger-or-secureheaders)
 - [`401 {"code":"CREDENTIALS_INVALID","retryAfter":900}` with the right password](#401-codecredentials_invalidretryafter900-with-the-right-password)
 
 **Traps**
@@ -47,7 +50,7 @@ symptom, under [Traps](#traps).
 ### `Property 'user' does not exist on type 'Context<…>'`
 
 **When:** a route reads `user` or `session`, and is declared before
-`plugin(session(accounts))`.
+`use(session(accounts))`.
 
 ```text
 error TS2339: Property 'user' does not exist on type 'Context<Empty, "/profile", Empty>'.
@@ -56,11 +59,11 @@ error TS2339: Property 'user' does not exist on type 'Context<Empty, "/profile",
 **Why:** `session()` adds `user` and `session` to the routes declared
 **after** it. The route before it is not authenticated at all.
 
-**Fix:** declare the route after the plugin:
+**Fix:** declare the route after the middleware:
 
 ```ts
 alxia()
-	.plugin(session(accounts, { required: true }))
+	.use(session(accounts, { required: true }))
 	.get('/profile', ({ user, reply }) => reply(200, { name: user.name }));
 ```
 
@@ -68,7 +71,7 @@ alxia()
 
 **When:** a sign-in or sign-out route calls `ctx.auth.send`,
 `ctx.auth.signOut` or reads `ctx.auth.device`, and is declared before
-`plugin(session(accounts))`.
+`use(session(accounts))`.
 
 ```text
 error TS2339: Property 'auth' does not exist on type 'Context<Empty, "/signin", Empty>'.
@@ -84,7 +87,7 @@ the route where it is and call the unbound `sendSession(ctx, accounts, …)`,
 
 ```ts
 alxia()
-	.plugin(session(accounts))
+	.use(session(accounts))
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
@@ -105,10 +108,10 @@ only at run time, an anonymous request may reach the route with
 `user: null`.
 
 **Fix:** answer the anonymous case, or require the session with a literal
-`true`, so the plugin answers it with a 401 and `user` is never `null`:
+`true`, so the middleware answers it with a 401 and `user` is never `null`:
 
 ```ts
-alxia().plugin(session(accounts, { required: true })).get('/me', ({ user, reply }) => reply(200, user.email));
+alxia().use(session(accounts, { required: true })).get('/me', ({ user, reply }) => reply(200, user.email));
 ```
 
 ### `Type '"admin"' is not assignable to type '"user"'`
@@ -167,7 +170,7 @@ app or group it is used in.
 ```ts
 app.group('/records/:id', (record) =>
 	record
-		.plugin(permission(access, 'view', 'record', byParam('id', findRecord)))
+		.use(permission(access, 'view', 'record', byParam('id', findRecord)))
 		.get('/', ({ object, reply }) => reply(200, object)),
 );
 ```
@@ -246,7 +249,7 @@ byParam('id', (id) => db.records.findOne({ id }, { projection: { title: 1, docto
 error TS2339: Property 'tenant' does not exist on type 'BaseContext'.
 ```
 
-**When:** `load`, `subject` or `ctx` reads something a `derive` or a plugin
+**When:** `load`, `subject` or `ctx` reads something a `derive` or a middleware
 before the guard added — a tenant, a member — and its parameter is not
 annotated: `load: (ctx) => ctx.tenant.records.get(…)`.
 
@@ -265,7 +268,7 @@ const byTenant = permission(access, 'view', 'record', ({ tenant, pathParams }: B
 	tenant.records.get(pathParams['id'] ?? '') ?? null,
 );
 
-app.plugin(tenancy).plugin(byTenant); // tenancy derives tenant
+app.use(tenancy).use(byTenant); // tenancy derives tenant
 ```
 
 See [Reading the app's context](guide/permissions.md#reading-the-apps-context).
@@ -281,17 +284,17 @@ error TS2769: No overload matches this call.
 
 **When:** a callback of the guard is annotated to read `tenant`, and the
 guard is used on an app — or in a group — whose context has no `tenant` at
-that point: `alxia().plugin(byTenant)`, or `plugin(byTenant)` before
-`plugin(tenancy)`.
+that point: `alxia().use(byTenant)`, or `use(byTenant)` before
+`use(tenancy)`.
 
 **Why:** an annotated `load`, `subject` or `ctx` makes the guard require
-what it reads, and `app.plugin` checks the app's context against it, so the
+what it reads, and `app.use` checks the app's context against it, so the
 callback never runs without it.
 
-**Fix:** mount the plugin that adds `tenant` first:
+**Fix:** add the middleware that adds `tenant` first:
 
 ```ts
-app.plugin(tenancy).plugin(byTenant);
+app.use(tenancy).use(byTenant);
 ```
 
 More on this message in
@@ -309,7 +312,7 @@ error TS2769: No overload matches this call.
 the callback's parameter is annotated with: a `Tenant | null` where `load`
 reads `Tenant`, or a tenant of another shape.
 
-**Why:** `app.plugin` checks each key the guard reads against the app's context;
+**Why:** `app.use` checks each key the guard reads against the app's context;
 a narrower type passes, a wider or different one does not.
 
 **Fix:** annotate the callback with the type the app gives, and handle it
@@ -345,7 +348,7 @@ reads, so the guard would require nothing, and an app without a `tenant`
 would be accepted, and throw on every guarded request. The guard is
 refused instead.
 
-**Fix:** annotate what the callback reads, and mount the plugin that adds it
+**Fix:** annotate what the callback reads, and give `use` the middleware that adds it
 first:
 
 ```ts
@@ -353,7 +356,7 @@ const byTenant = permission(access, 'view', 'record', ({ tenant, pathParams }: B
 	tenant.records.get(pathParams['id'] ?? '') ?? null,
 );
 
-app.plugin(tenancy).plugin(byTenant);
+app.use(tenancy).use(byTenant);
 ```
 
 Or leave it unannotated when it reads only the request, as `byParam`'s
@@ -377,9 +380,9 @@ treat everyone as anonymous.
 
 ```ts
 app
-	.plugin(session(accounts))
+	.use(session(accounts))
 	.group('/records/:id', (record) =>
-		record.plugin(permission(access, 'view', 'record', byParam('id', findRecord))).get('/', ({ object, reply }) => reply(200, object)),
+		record.use(permission(access, 'view', 'record', byParam('id', findRecord))).get('/', ({ object, reply }) => reply(200, object)),
 	);
 ```
 
@@ -425,19 +428,33 @@ one failing.
 **When:** a `janus()` refusal — `NotFoundError`, a refused password —
 thrown by a route is answered 500 instead of its own status.
 
-**Why:** the route is declared before `plugin(janusErrors())`, which answers
-only the routes after it.
+**Why:** `janusErrors()` is a try/catch middleware: it answers what is thrown
+**behind** it. The error was thrown by something declared before it, or by
+`session()` or a route while `janusErrors()` was given to `use` after them.
 
-**Fix:** use `janusErrors()` first:
+**Fix:** give `janusErrors()` to `use` first, before `session()`:
 
 ```ts
 const app = alxia()
-	.plugin(janusErrors())
-	.plugin(session(accounts))
+	.use(janusErrors(), session(accounts))
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body); // a refusal is now its 401
 		return reply.ok({ id: auth.send(signedIn).id });
 	});
+```
+
+### `500 {"error":"internal"}` when the identity store is down, and `janusErrors()` is there
+
+**When:** the store behind `session()` is unreachable, and the answer is a 500
+instead of the 503 below, though the app uses `janusErrors()`.
+
+**Why:** `janusErrors()` was given to `use` **after** `session()`. The session
+is read before it, so the `STORE_FAILED` it throws is not behind it.
+
+**Fix:** put it before:
+
+```ts
+alxia().use(janusErrors(), session(accounts)); // not use(session(accounts), janusErrors())
 ```
 
 ### `503 {"code":"STORE_FAILED"}`
@@ -448,7 +465,7 @@ is unreachable.
 **Why:** intended. A store that cannot answer makes `authenticate` and
 `can` throw `STORE_FAILED`, and `janusErrors()` answers it 503 — never a
 401, which would send every signed-in user to the sign-in page, nor a 403.
-Routes declared before `session()` still answer.
+Routes declared before `session()` still answer. This holds when `janusErrors()` is before `session()`.
 
 **Fix:** the store. Pass `report` to `janusErrors()` to hear about it:
 
@@ -471,14 +488,50 @@ the session for the routes after it, or in a `group`
 
 ```ts
 alxia()
-	.plugin(janusErrors())
-	.plugin(session(accounts))                     // the sign-in routes
+	.use(janusErrors())
+	.use(session(accounts))                     // the sign-in routes
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
 	})
-	.plugin(session(accounts, { required: true })) // everything after
+	.use(session(accounts, { required: true })) // everything after
 	.get('/me', ({ user, reply }) => reply.ok({ name: user.name }));
+```
+
+### `401 {"error":"unauthenticated"}` on a path that does not exist
+
+**When:** an anonymous request to a missing path is answered 401, where it
+used to be a 404.
+
+**Why:** a required `session()` given to the app's `use` runs on every
+request, a request no route matches included, and answers before the 404.
+The same holds for `permission()` on the app.
+
+**Fix:** scope the guard with a `group`, or a path, so it guards only some routes:
+
+```ts
+alxia()
+	.use(janusErrors(), session(accounts))                      // open: runs on every request
+	.group('/account', (account) =>
+		account
+			.use(session(accounts, { required: true }))          // required: only /account/*
+			.get('/me', ({ user, reply }) => reply.ok({ name: user.name })),
+	);
+```
+
+### The error is never seen by a `try`/`catch` around `logger()` or `secureHeaders()`
+
+**When:** a middleware that catches errors is declared before `logger()`,
+`secureHeaders()` or another observer, and never runs its `catch`.
+
+**Why:** an observer settles `next()`: it answers the error with the route's
+`onError`, `HttpError` or 500 before an outer `try` could see it. `janusErrors()`
+declared before the observers is such a middleware.
+
+**Fix:** observers first, then the error-handling middleware:
+
+```ts
+alxia().use(logger()).use(janusErrors(), session(accounts));
 ```
 
 ### `401 {"code":"CREDENTIALS_INVALID","retryAfter":900}` with the right password
@@ -559,7 +612,7 @@ compiles.
 
 ```ts
 app.group('/records/:recordId', (record) =>
-	record.plugin(permission(access, 'view', 'record', byParam('recordId', findRecord))).get('/', ({ object, reply }) => reply(200, object)),
+	record.use(permission(access, 'view', 'record', byParam('recordId', findRecord))).get('/', ({ object, reply }) => reply(200, object)),
 );
 ```
 

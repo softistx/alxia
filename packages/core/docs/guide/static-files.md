@@ -13,8 +13,8 @@ const app = alxia()
 app.listen(3000);
 ```
 
-`static` and `file` are `GET` routes like any other: every hook runs around
-them — headers, compression, logging, a `derive` that guards them — and
+`static` and `file` are `GET` routes like any other: every middleware runs around
+them — headers, compression, logging, a `use` that guards them — and
 they are in `app.routes`: `@alxia/openapi`'s `matchesSpec` sees them, so
 leave them out with its `exclude` unless the document declares them.
 `page` is the exception, below.
@@ -202,7 +202,7 @@ under `development`. Because Bun serves it itself:
 
 - it works through **`listen` only** — `app.fetch` and `app.request`
   answer it 404;
-- the app's hooks do **not** run around it;
+- the app's middlewares do **not** run around it;
 - it is not in `app.routes`, so `matchesSpec` does not see it, and a client
   generated from the document does not call it.
 

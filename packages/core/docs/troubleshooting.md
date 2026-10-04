@@ -103,10 +103,14 @@ a trap that prints nothing is headed by its symptom.
 - [`500 {"error":"internal"}`](#500-errorinternal)
 - [A plugin's route reads a body past the app's `bodyLimit()`](#a-plugins-route-reads-a-body-past-the-apps-bodylimit)
 
-**Hooks**
+**Middlewares**
 
 - [`set.cookies.get()` returns null in a hook](#setcookiesget-returns-null-in-a-hook)
 - [A `use(path)` guard did not run on a request under its path](#a-usepath-guard-did-not-run-on-a-request-under-its-path)
+- [A path that does not exist answers `401`, not `404`](#a-path-that-does-not-exist-answers-401-not-404)
+- [A middleware's `try`/`catch` never sees the error](#a-middlewares-trycatch-never-sees-the-error)
+- [`Type 'string | undefined' is not assignable to type 'string'` on `ctx.route`](#type-string--undefined-is-not-assignable-to-type-string-on-ctxroute)
+- [A `use()` did not run for a route](#a-use-did-not-run-for-a-route)
 
 **Routing**
 
@@ -301,8 +305,8 @@ as it is, and anything else as JSON:
 app.get('/health', ({ reply }) => reply(200, 'ok'));
 ```
 
-A `Response` is only for global hooks (`onRequest`, `onResponse`,
-`around`), outside the typed contract.
+A `Response` is only for a middleware, which may return one sent as it is,
+outside the typed contract.
 
 ### `Property 'user' does not exist on type 'Context<…>'`
 
@@ -321,10 +325,10 @@ A route declared by its method, `get(path, …middlewares, handler)`, reports
 the same mistake as
 [`Property 'user' does not exist on type 'RouteBase<…>'`](#property-user-does-not-exist-on-type-routebase).
 
-**Why:** a route hook applies only to the routes declared after it. This is
+**Why:** a `derive`, a `decorate` or a `use` applies only to the routes declared after it. This is
 true at runtime too: in JavaScript, `ctx.user` would be `undefined`.
 
-**Fix:** declare the hook first ([Hooks](../README.md#hooks)):
+**Fix:** declare the `derive` first ([Hooks](../README.md#context-and-hooks)):
 
 ```ts
 const app = alxia()
@@ -332,7 +336,7 @@ const app = alxia()
 	.get('/me', ({ user, reply }) => reply(200, user));
 ```
 
-The same applies to `plugin(app)`. Its route hooks reach the routes
+The same applies to `plugin(app)`. Its `derive`s and middlewares reach the routes
 declared after `plugin`, not before it.
 
 ### `the plugin reads "…", which this app's context does not give: add the plugin or middleware that gives it first`
@@ -1930,7 +1934,7 @@ from a plugin function:
 ```ts
 const auth = defineMiddleware(async ({ request, reply }, next) => { … });
 app.use(auth);
-app.plugin((app) => app.onResponse(addHeader)); // onResponse returns the app
+app.plugin((app) => app.onStop(close)); // onStop returns the app
 ```
 
 The types say so first: a plain `(ctx, next) => …` given to `use` does not
@@ -2047,8 +2051,10 @@ await fetch('/users', {
 A client generated from the OpenAPI document sets the `content-type` for
 you.
 
-To answer it in another format, such as an RFC 9457 problem, declare
-[`onRefusal`](guide/hooks.md#onrefusal) before the routes.
+To answer it in another format, such as an RFC 9457 problem, give a
+middleware before the routes that catches the `ValidationError` and reads
+`refusalOf(error)` ([Routes](guide/routes.md#refusals-in-your-own-format)).
+The `onRefusal` hook does the same and is deprecated for it.
 
 ### A route still answers `{"error":"validation"}` after `onRefusal`
 
@@ -2057,7 +2063,7 @@ routes still gets the default 400.
 
 **Why**, by what you find:
 
-- The route is declared **before** the hook. A route hook applies to the
+- The route is declared **before** the hook. A hook applies to the
   routes declared after it, never before: move the hook up the chain.
 - The hook is declared inside a `group`. A group's hooks stay inside it:
   declare the hook on the app, before the group.
@@ -2112,21 +2118,28 @@ app
 	});
 ```
 
-To answer in another format, such as an RFC 9457 problem, return it from
-an [`onRefusal`](guide/hooks.md#onrefusal) hook declared before the route,
+To answer in another format, such as an RFC 9457 problem, return it from a
+middleware given before the route that catches the `ContentTooLargeError`,
 for the refusal of kind `body_limit`. The `onError` hooks never see it:
 
 ```ts
-import { problem, validate } from '@alxia/core';
+import { defineMiddleware, problem, refusalOf, validate } from '@alxia/core';
+
+const limits = defineMiddleware(async (_ctx, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		if (refusalOf(error)?.kind !== 'body_limit') throw error;
+		return problem({ type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: 'maxSizeRequest' });
+	}
+});
 
 app
-	.onRefusal((refusal) =>
-		refusal.kind === 'body_limit'
-			? problem({ type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: 'maxSizeRequest' })
-			: undefined,
-	)
+	.use(limits)
 	.post('/api', { bodyLimit: 10_000_000 }, validate({ body: z.unknown() }), handler);
 ```
+
+The deprecated `onRefusal` hook answers it too.
 
 A 413 with no JSON body comes from Bun itself. The body passed `listen`'s
 `maxRequestBodySize`, which applies to every route, before any route's
@@ -2219,26 +2232,34 @@ body never says why, by design.
 
 **Why:** the app prints the error with `console.error`, then answers 500.
 The next section lists the messages it prints. An error thrown in a route
-first goes through that route's `onError` hooks. An `HttpError` is answered
-with its own status and body.
+rejects `next()` through the middlewares, which may answer it; one nobody
+catches reaches the route's deprecated `onError` hooks. An `HttpError` is
+answered with its own status and body.
 
 A request that fails because its client hung up (its `request.signal`
 aborted, and the error is the `AbortError` a body read then throws) is
 not an error of the app: nothing is printed, no `onError` hook runs, and
-an `onResponse` hook, a logger's, sees a `499` with no body. Any other
+a middleware that settles `next()`, a logger's, sees a `499` with no body. Any other
 error is printed and answered 500, a bug thrown after the client left
 included. A handler that ignores the abort and replies gets its own
 status.
 
 **Fix:** read the server log for the real error. To answer a known failure
 with a status of your own, return a declared reply, or turn the error into
-one with `onError`:
+one in a middleware that catches it:
 
 ```ts
+const notFound = defineMiddleware(async ({ reply }, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		if (!(error instanceof NotFoundError)) throw error;
+		return reply(404, { error: 'not_found' as const });
+	}
+});
+
 app
-	.onError((error, { reply }) =>
-		error instanceof NotFoundError ? reply(404, { error: 'not_found' as const }) : undefined,
-	)
+	.use(notFound)
 	.get('/users/:id', handler);
 ```
 
@@ -2268,15 +2289,15 @@ A `bodyLimit()` the plugin calls instead also applies to the app's routes
 declared after `plugin`, as its hooks do. Call the app's own after `plugin`
 to keep it.
 
-## Hooks
+## Middlewares
 
-A trap that prints nothing: a hook reads a value that is never there.
+Traps that print nothing: a middleware runs where you did not expect, or does not run where you did.
 
 ### `set.cookies.get()` returns null in a hook
 
-**When:** a `derive`, `wrap`, `onError`, `onRefusal` or guard reads a
-cookie the request sent through `set.cookies` — a session id — and always
-gets `null`, so every request looks signed out:
+**When:** a `derive` or a middleware reads a cookie the request sent
+through `set.cookies` — a session id — and always gets `null`, so every
+request looks signed out:
 
 ```ts
 .derive(({ set }) => ({ user: sessions.get(set.cookies.get('sid') ?? '') })) // always null
@@ -2286,15 +2307,15 @@ gets `null`, so every request looks signed out:
 and `get` reads back only what this response set with `set.cookies.set`;
 it never holds the `Cookie` header the request sent.
 
-**Fix:** read the request's cookies from `ctx.cookies`, which every hook
-has:
+**Fix:** read the request's cookies from `ctx.cookies`, which every
+middleware has:
 
 ```ts
 .derive(({ cookies }) => ({ user: sessions.get(cookies['sid'] ?? '') }))
 ```
 
 A `validate({ cookies })` validates them for the middlewares after it and
-the handler; a hook reads them as they arrived
+the handler; a middleware before it reads them as they arrived
 ([Hooks](guide/hooks.md#reading-the-requests-cookies)).
 
 ### A `use(path)` guard did not run on a request under its path
@@ -2303,17 +2324,138 @@ the handler; a hook reads them as they arrived
 `/admin/x` is answered without the guard:
 
 ```ts
-app.use('/admin', guard).get('/:section', handler); // GET /admin: no guard
+app.get('/admin/stats', handler).use('/admin', guard); // GET /admin/stats: no guard
 ```
 
-**Why:** the path is matched once, against the path each route is
-declared at, not against the request's URL. `/:section` is not under
-`/admin`, though it serves `GET /admin`; a wildcard route, `/files/*`, is
-not under `/files/:id/secret` either.
+**Why:** the path is matched against the request's path, with the syntax of a
+route's, so it covers a route declared as `/:section`, a wildcard route and
+a request no route matches, whichever way the route is declared. What it
+does not do is reach back: a `use` is part of the chain of the routes declared
+after it, so a route declared before it never runs it. And a path is read
+segment by segment: `'/admin'` covers `/admin` and `/admin/x`, not
+`/administrators`; `'/admin/*'` covers what is under `/admin`, not `/admin`
+itself.
 
-**Fix:** declare the guarded routes at paths under the guard's, or put
-them in a group and `use` the guard there, or give the guard to the
-route itself: `app.get('/:section', guard, handler)`.
+**Fix:** declare the guard before the routes it covers, and pick the path
+that names them:
+
+```ts
+app.use('/admin', guard).get('/admin/stats', handler); // guarded
+```
+
+### A path that does not exist answers `401`, not `404`
+
+**When:** `GET /nowhere` with no credentials answers
+`401 {"error":"unauthorized"}`, or `429`, where you expected the 404, and
+`GET /nowhere` with credentials answers 404:
+
+```ts
+const app = alxia()
+	.use(bearer({ jwt }))                         // a guard on the app
+	.get('/users', ({ reply }) => reply(200, []));
+```
+
+**Why:** a middleware given to `use` runs on **every** request, the ones no
+route matches included, before the router's 404 or 405. A guard on the
+app — `bearer`, a required `session`, `rateLimit` — answers an anonymous
+request to a missing path before the router does.
+
+**Fix:** if only some routes should be guarded, guard them in a group, which
+runs on its own routes alone:
+
+```ts
+const app = alxia()
+	.get('/health', ({ reply }) => reply(200, 'ok'))
+	.group('/api', (api) =>
+		api.use(bearer({ jwt })).get('/users', ({ reply }) => reply(200, [])),
+	);
+// GET /nowhere → 404; GET /api/users without a token → 401
+```
+
+`use('/api', guard)` also scopes a guard to a path, but only a middleware
+that adds nothing to the context: `bearer` and `session` add, so they take a
+group ([`Invalid middleware: …`](#-is-not-assignable-to-type-invalid-middleware-a-middleware-given-a-path-may-add-nothing-to-the-context-)).
+
+### A middleware's `try`/`catch` never sees the error
+
+**When:** a middleware catches what `next()` throws, and the error never
+reaches it: the response is the 500 or the `onError` reply, and the `catch`
+does not run:
+
+```ts
+const app = alxia()
+	.use(errors)    // try { return await next() } catch { … }
+	.use(logger())  // an observer, after it
+	.get('/boom', () => { throw new Error('boom'); });
+```
+
+**Why:** `logger()`, `telemetry()`, `secureHeaders()` and `cors()` settle
+`next()`: they answer an error with the route's `onError` hooks, its
+`HttpError` or a 500 so that they can see and decorate the response. The
+error is already an answer when it reaches a middleware outside them.
+
+**Fix:** give the observers first and the middleware that answers errors
+after them, so it is inside:
+
+```ts
+const app = alxia()
+	.use(logger())  // observers, first
+	.use(errors)    // sees the error before the observer settles it
+	.get('/boom', () => { throw new Error('boom'); });
+```
+
+The same holds for `janusErrors()`: it answers what is thrown **behind**
+it, so `app.use(janusErrors(), session(accounts))`.
+
+### `Type 'string | undefined' is not assignable to type 'string'` on `ctx.route`
+
+```text
+error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+```
+
+**When:** a middleware given to `use` reads `ctx.route`, the route's path as
+declared, and passes it where a `string` is expected — or logs
+`undefined`.
+
+**Why:** a `use` middleware also runs on a request no route matches — a 404,
+a 405, a preflight — where there is no route: `BaseContext.route` is
+`string | undefined`. A route's own middlewares and its handler read a
+`string`.
+
+**Fix:** handle the missing route, or leave the request to the router:
+
+```ts
+const timed = defineMiddleware(async ({ route, request }, next) => {
+	const response = await next();
+	console.log(route ?? `no route for ${request.method}`, response.status);
+	return response;
+});
+```
+
+### A `use()` did not run for a route
+
+**When:** a middleware given to `use` does nothing for a route, and runs for
+a request to a path that does not exist:
+
+```ts
+const app = alxia()
+	.get('/early', handler)
+	.use(audit); // GET /early: not audited; GET /missing: audited
+```
+
+**Why:** a route runs the middlewares declared **before** it. A `use` after
+a route is not part of that route's chain; it runs for a request no route
+matches, where every top-level `use` runs, wherever declared. A group's
+`use` stays with the group's routes.
+
+**Fix:** declare the middleware before the routes it should cover, first
+when it is an observer:
+
+```ts
+const app = alxia()
+	.use(audit)
+	.get('/early', handler);
+```
 
 ## Routing
 
@@ -2569,10 +2711,10 @@ TypeError: Body already used
 **When:** a route with a `validate({ body })` answers
 `500 {"error":"internal"}`, and the server log prints this. Something
 before the `validate` — a middleware placed before it, a `derive`, a
-`wrap`, a plugin's hook — read the body itself, with `request.json()`,
+`wrap` — read the body itself, with `request.json()`,
 `request.text()` or `request.formData()`.
 
-**Why:** route hooks, and the middlewares before a `validate`, run before
+**Why:** `derive`s, and the middlewares before a `validate`, run before
 it. A request's body can be read once: the hook used it up, and the
 `validate`, which reads it next, fails. Two `validate`s of the body are
 not this: the second checks the body the first read.

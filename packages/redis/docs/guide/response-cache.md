@@ -15,7 +15,7 @@ const connection = await connectRedis(Bun.env['REDIS_URL']!);
 const products = cache({ ttl: 60, store: redisCacheStore(connection.client, { name: 'shop' }), tags: () => ['products'] });
 
 const app = alxia()
-	.plugin(products)
+	.use(products)
 	.get('/products', ({ reply }) => reply(200, [{ id: '1', name: 'Kettle' }]));
 ```
 
@@ -49,7 +49,7 @@ Everything else — `ttl`, `staleWhileRevalidate`, `key`, `vary`, `statuses`,
 
 - **A response** is one Redis string at `<name>:response:<key>`: an
   `@nxgt/redis` cache record holding the status, the headers, the body as
-  base64, and the plugin's `storedAt`, `ttl` and `stale`. Redis expires it
+  base64, and the cache's `storedAt`, `ttl` and `stale`. Redis expires it
   when `ttl + staleWhileRevalidate` has passed, rounded up to the second.
 - **A tag** is a Redis set at `<name>:tag:<tag>`, of the response keys it
   names. Besides your tags, every response carries `alxia:path:<path>` —
@@ -95,7 +95,7 @@ const app = alxia()
 		await products.invalidateTag('products');      // forgotten in every process
 		return reply(201, body);
 	})
-	.plugin(products)
+	.use(products)
 	.get('/products', ({ reply }) => reply(200, [...catalogue.values()]));
 ```
 

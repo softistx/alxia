@@ -7,7 +7,10 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **A middleware, not a plugin.** `app.use(cache({ ttl }))` is the form;
+  `app.plugin(cache(…))` keeps working, deprecated. Stale responses are
+  served at once with the refresh run behind them, and `CacheMiddleware<Requires>`
+  names what `cache()` returns.
 
 ## Next
 

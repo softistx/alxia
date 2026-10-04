@@ -42,7 +42,7 @@ curl localhost:3000/health   # {"ok":true}
 ```
 
 Every method returns the app, typed with what it added, so declare the app
-in **one chain**: what a hook adds is typed in the routes after it
+in **one chain**: what a `derive` or a middleware adds is typed in the routes after it
 ([The app's type](types.md)). A client is generated from the API's OpenAPI
 document, not from the app's type: alxia is spec first.
 
@@ -132,8 +132,8 @@ the app's own `fetch`: no port, no server.
 | --- | --- |
 | validate the query, headers, cookies, or a form | [Routes and validation](routes.md) |
 | set a header or a cookie, redirect, stream, send a file | [Replies](replies.md) |
-| guard some routes — an auth, a permission check — with a middleware of your own | [Middleware](middleware.md) |
-| authenticate, add a database to the context, catch errors | [Hooks](hooks.md) |
+| guard some routes — an auth, a permission check — log every request, or catch errors, with a middleware of your own | [Middleware](middleware.md) |
+| add a database or the signed-in user to the context | [Hooks](hooks.md) |
 | split the app into files or reusable plugins | [Groups and plugins](groups-and-plugins.md) |
 | serve a directory, a favicon, a single-page app | [Static files](static-files.md) |
 | push events or open a socket | [Server-sent events](server-sent-events.md), [WebSockets](websockets.md) |

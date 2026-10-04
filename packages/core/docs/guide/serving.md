@@ -54,7 +54,7 @@ readonly fetch: (request: Request, server?: Bun.Server<unknown>) => Promise<Resp
 request(path: string, init?: RequestInit): Promise<Response>;
 ```
 
-`app.fetch` is the whole app as a fetch handler — every hook, routing,
+`app.fetch` is the whole app as a fetch handler — every middleware, routing,
 validation — and is bound, so it can be passed around:
 
 ```ts
@@ -115,7 +115,7 @@ const app = alxia({
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `ip` | `(request: Request, server: Bun.Server<unknown> \| undefined) => string \| undefined` | the connection's address | what `ctx.ip` reads, in every hook and handler |
+| `ip` | `(request: Request, server: Bun.Server<unknown> \| undefined) => string \| undefined` | the connection's address | what `ctx.ip` reads, in every middleware and handler |
 
 ## The options of `alxia()`
 

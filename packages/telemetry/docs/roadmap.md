@@ -7,7 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **A middleware, not a plugin (0.4).** `app.use(telemetry({ ... }))` opens a span for every request, a 404 or a 405 included, around everything after it, and sees the response the client gets. `app.plugin(telemetry(...))` still works, deprecated.
 
 ## Next
 
@@ -38,7 +38,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **One server span per request.** `alxia().plugin(telemetry({ service, exporters }))`
+- **One server span per request.** `alxia().use(telemetry({ service, exporters }))`
   opens a span around everything a request runs — hooks, handler, what
   they await — and every log written with `@nxgt/telemetry`'s
   `createLogger` inside it carries its trace id.

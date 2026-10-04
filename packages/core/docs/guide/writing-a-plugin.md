@@ -5,26 +5,30 @@ This page covers the three ways to write a plugin, and when to use each:
 | Write | When the plugin | Example |
 | --- | --- | --- |
 | [an app](#an-app-plugin) | adds context, routes or typed replies | an `auth` that derives `user` |
-| [a `Plugin` function](#a-plugin-function) | adds global hooks only, the app's type unchanged | a header on every response |
+| [a `Plugin` function](#a-plugin-function) | adds lifecycle hooks or a parser only, the app's type unchanged | closing a pool when the app stops |
 | [`definePlugin<Requires>()`](#a-plugin-that-needs-an-earlier-one) | reads what an earlier plugin added | a tenant scope that reads `user` |
 
 Whichever you write, a plugin uses the core's public API only, and the app
 mounts it with `app.plugin(…)`. The mechanics of `plugin` itself —
-prefixes, the order of `onError`, global hooks — are in
+prefixes, what a mounted app's middlewares do — are in
 [Groups and plugins](groups-and-plugins.md#plugins). A middleware, which
 runs on requests, is no plugin: it is made by `defineMiddleware` and given
-to `use` ([Middleware](middleware.md#use-for-every-route-after-it)).
+to `use` ([Middleware](middleware.md#use-for-every-route-after-it)), as the
+packages' own are: `app.use(logger())`. A plugin for several apps that
+wraps requests is usually a middleware factory, [below](#a-middleware-that-reads-the-context).
 
 ## An app plugin
 
 An app is a plugin. What it declares is mounted on the app that mounts it,
 and its types come with it:
 
-- its route hooks (`derive`, `decorate`, `wrap`, `onError`, `onRefusal`) apply to the
-  routes declared after `plugin`, and what they add is typed on them;
-- its routes are mounted under the app's prefix, behind the hooks declared
-  before `plugin`;
-- its hooks' replies — a 401, a 429 — may answer every route after it.
+- its `derive`s, `decorate`s and middlewares apply to the routes declared
+  after `plugin`, and what they add is typed on them. They become the
+  app's, so they run on a request no route matches too;
+- its routes are mounted under the app's prefix, behind the middlewares
+  declared before `plugin`;
+- its replies — a 401, a 429 — may answer every route after it, and a
+  missing path too.
 
 ```ts
 // auth.ts
@@ -68,29 +72,45 @@ app.plugin(requireRole('admin')).get('/stats', handler);
 type Plugin = <App extends AnyAlxia>(app: App) => App;
 ```
 
-A function given the app, which returns it with global hooks added:
-`onRequest`, `onResponse`, `around`, `onStart`, `onStop`, `parser`. The
-app's type is unchanged, so it fits anywhere in the chain.
+A function given the app, which returns it with lifecycle hooks or a parser
+added: `onStart`, `onStop`, `parser`. The app's type is unchanged, so it
+fits anywhere in the chain.
 
 ```ts
-import { alxia, type Plugin, withHeaders } from '@alxia/core';
+import { alxia, type Plugin } from '@alxia/core';
 
-export const poweredBy =
-	(name: string): Plugin =>
+export const closing =
+	(pool: { end(): Promise<void> }): Plugin =>
 	(app) =>
-		app.onResponse((response) =>
-			withHeaders(response, (headers) => headers.set('x-powered-by', name)),
-		);
+		app.onStop(() => pool.end());
 
 const app = alxia()
 	.get('/', ({ reply }) => reply(200, 'hi'))
-	.plugin(poweredBy('alxia')); // global: it applies to `/` too
+	.plugin(closing(pool)); // closed when the app stops
 ```
 
 A `Plugin` returns the app it is given: `plugin` throws on `undefined`, a
-promise or anything else that is not an app. Add only global hooks here. A `derive` added by a `Plugin` would run, but
+promise or anything else that is not an app. Add only what the app's type
+does not carry here. A `derive` added by a `Plugin` would run, but
 `Plugin` returns the app's type unchanged, so no route could read what it
-added. To add context or replies, write an app plugin.
+added: to add context or replies, write an app plugin. To run code around
+every request — a header on every response, a timer — write a middleware, not
+a function plugin:
+
+```ts
+import { alxia, defineMiddleware, settle } from '@alxia/core';
+
+export const poweredBy = (name: string) =>
+	defineMiddleware(async (ctx, next) => {
+		const response = await settle(ctx, next());
+		response.headers.set('x-powered-by', name);
+		return response; // a 404 and a 500 carry it too
+	});
+
+const app = alxia()
+	.use(poweredBy('alxia')) // first: it wraps everything after it
+	.get('/', ({ reply }) => reply(200, 'hi'));
+```
 
 ## A plugin that needs an earlier one
 
@@ -165,47 +185,50 @@ export const tenantOf = (tenants: Map<string, Tenant>) =>
 	);
 ```
 
-When the plugin calls back into code the app writes, let the app name the
-requirement. `@alxia/rate-limit`'s `key` works this way:
+### A middleware that reads the context
+
+<a id="a-middleware-that-reads-the-context"></a>
+
+When the plugin runs on every request and calls back into code the app
+writes, it is a middleware factory, and the app names the requirement.
+`@alxia/rate-limit`'s `key` works this way:
 
 ```ts
-import { type BaseContext, definePlugin, type Empty } from '@alxia/core';
+import { type BaseContext, defineMiddleware, type Empty, settle } from '@alxia/core';
 
 export const audit = <Requires extends object = Empty>(
 	who: (ctx: BaseContext & Requires) => string,
 ) =>
-	definePlugin<Requires>()((app) =>
-		app.wrap(async (ctx, next) => {
-			const response = await next();
-			console.log(who(ctx), ctx.route, response.status);
-			return response;
-		}),
-	);
+	defineMiddleware<Requires>()(async (ctx, next) => {
+		const response = await settle(ctx, next());
+		console.log(who(ctx), ctx.route, response.status);
+		return response;
+	});
 
-app.plugin(auth).plugin(audit<{ user: User }>(({ user }) => user.id));
+app.use(auth).use(audit<{ user: User }>(({ user }) => user.id));
 ```
 
-Or infer it from the callback's annotation, so the app writes no type
-argument: `RequiresOf<Ctx>` is what the annotation adds to `BaseContext`.
-`@alxia/language`'s `resolve` and `@alxia/janus`'s `load` work this way:
+`use` checks it: given before `auth`, the middleware reads a `user` the app
+does not give yet, and does not compile. Or infer it from the callback's
+annotation, so the app writes no type argument: `RequiresOf<Ctx>` is what the
+annotation adds to `BaseContext`. `@alxia/language`'s `resolve` and
+`@alxia/janus`'s `load` work this way:
 
 ```ts
-import { type BaseContext, definePlugin, type RequiresOf } from '@alxia/core';
+import { type BaseContext, defineMiddleware, type RequiresOf, settle } from '@alxia/core';
 
 export const audit = <Ctx extends object = BaseContext>(
 	who: (ctx: BaseContext & Ctx) => string,
 ) =>
-	definePlugin<RequiresOf<Ctx, 'who'>>()((app) =>
-		app.wrap(async (ctx, next) => {
-			const response = await next();
-			// `plugin` has checked that the app gives what `who` reads.
-			console.log((who as (ctx: BaseContext) => string)(ctx), ctx.route, response.status);
-			return response;
-		}),
-	);
+	defineMiddleware<RequiresOf<Ctx, 'who'>>()(async (ctx, next) => {
+		const response = await settle(ctx, next());
+		// `use` has checked that the app gives what `who` reads.
+		console.log((who as (ctx: BaseContext) => string)(ctx), ctx.route, response.status);
+		return response;
+	});
 
-app.plugin(auth).plugin(audit(({ user }: BaseContext & { user: User }) => user.id));
-app.plugin(audit((ctx) => ctx.ip ?? 'unknown')); // unannotated: requires nothing
+app.use(auth).use(audit(({ user }: BaseContext & { user: User }) => user.id));
+app.use(audit((ctx) => ctx.ip ?? 'unknown')); // unannotated: requires nothing
 ```
 
 | `Ctx`, the annotation | `RequiresOf<Ctx>` |
@@ -271,11 +294,11 @@ That is sound where the key was not, because nothing reads it unchecked:
   before it.
 - **What reads it requires it.** `defineRoutes()` carries the registered
   context as a requirement, like `definePlugin`'s, so `plugin` refuses it
-  on an app that does not give it yet; so does `plugin` for
-  `contextStorage()`, and `use` for `defineMiddleware<AppContext>()`.
+  on an app that does not give it yet; so does `use` for
+  `contextStorage()` and for `defineMiddleware<AppContext>()`.
 - **It names a real chain.** The type is `typeof base`, what `decorate`,
-  `derive`, `use` and `plugin` built, not a key written by hand that no hook has to
-  match.
+  `derive`, `use` and `plugin` built, not a key written by hand that no
+  middleware has to match.
 
 A plugin published for several apps should not read `Register`: each app
 registers its own base, and the plugin cannot know it. Name what it reads
@@ -285,5 +308,5 @@ with `definePlugin<Requires>()`, as above.
 
 - [Groups and plugins](groups-and-plugins.md): what `plugin` mounts, and the
   helpers `withHeaders`, `vary` and `check`.
-- [Hooks](hooks.md): what each hook does, and its order.
+- [Hooks](hooks.md): `derive`, `decorate`, and the deprecated request hooks.
 - [The app's type](types.md): `ContextOf`.

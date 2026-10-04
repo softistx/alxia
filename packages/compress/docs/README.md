@@ -7,6 +7,6 @@ errors you may meet.
 
 | Page | Read it when |
 | --- | --- |
-| [Guide](guide.md) | choosing encodings, a threshold or the types compressed, streaming a page or events compressed, placing the plugin among other hooks, testing it, or negotiating an encoding yourself |
+| [Guide](guide.md) | choosing encodings, a threshold or the types compressed, streaming a page or events compressed, placing the middleware among others, testing it, or negotiating an encoding yourself |
 | [Troubleshooting](troubleshooting.md) | something went wrong and you have the message, or a response is not encoded as you expected |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |

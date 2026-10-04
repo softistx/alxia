@@ -1,7 +1,7 @@
 # Keys and Vary
 
 This page covers what makes two requests "the same" to the cache: the
-default key, `vary`, a `key` of your own, reading what an earlier plugin
+default key, `vary`, a `key` of your own, reading what an earlier middleware
 added, and keeping personal responses out.
 
 ```ts
@@ -9,7 +9,7 @@ import { alxia } from '@alxia/core';
 import { cache } from '@alxia/cache';
 
 const app = alxia()
-	.plugin(cache({ ttl: 60, vary: ['accept-language'] }))
+	.use(cache({ ttl: 60, vary: ['accept-language'] }))
 	.get('/hello', ({ request, reply }) =>
 		reply(200, request.headers.get('accept-language')?.startsWith('fr') ? 'Bonjour' : 'Hello'),
 	);
@@ -85,7 +85,7 @@ key?: (ctx: BaseContext & Requires) => string | undefined;
 
 `key` replaces the default key whole. It is synchronous and reads the
 `BaseContext` — `request`, `url`, `ip`, `server`, `route`, `pathParams` —
-and `Requires`, empty by default. To key by what an earlier plugin added,
+and `Requires`, empty by default. To key by what an earlier middleware added,
 see [Reading the app's context](#reading-the-apps-context).
 
 Keyed by the language the route actually answers in, two visitors who both
@@ -103,7 +103,7 @@ function language(header: string | null): string {
 }
 
 const app = alxia()
-	.plugin(
+	.use(
 		cache({
 			ttl: 60,
 			vary: ['accept-language'],                   // still says `Vary: accept-language`
@@ -143,10 +143,10 @@ not by key.
 
 ## Reading the app's context
 
-To key or tag by what an earlier plugin added, such as a signed-in `user`
+To key or tag by what an earlier middleware added, such as a signed-in `user`
 and its tenant, name it as `cache`'s type argument. `key` and `tags` then
-read it, and the cache is a [`definePlugin`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
-plugin: an app that does not give `user` before it cannot use it.
+read it, and the app that uses the cache must give it first: an app that
+does not give `user` before it cannot use it.
 
 ```ts
 const perTenant = cache<{ user: { tenantId: string } }>({
@@ -156,17 +156,17 @@ const perTenant = cache<{ user: { tenantId: string } }>({
 });
 
 const auth = alxia().derive(({ request }) => ({
-	user: { tenantId: request.headers.get('x-tenant') ?? 'public' }, // your session plugin
+	user: { tenantId: request.headers.get('x-tenant') ?? 'public' }, // your session middleware
 }));
 
 const app = alxia()
-	.plugin(auth)
-	.plugin(perTenant)
+	.use(auth)
+	.use(perTenant)
 	.get('/dashboard', ({ user, reply }) => reply(200, { tenant: user.tenantId }));
 
 await perTenant.invalidateTag('tenant:acme'); // one tenant's pages, every path
 
-alxia().plugin(perTenant);
+alxia().use(perTenant);
 // error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
@@ -189,7 +189,7 @@ or sets a cookie. Three ways, from the cheapest:
 // 1. Declare them before the cache: it never sees them, and no lookup is made.
 alxia()
 	.get('/me', ({ reply }) => reply(200, { name: 'Grace' }))
-	.plugin(cache({ ttl: 60 }))
+	.use(cache({ ttl: 60 }))
 	.get('/products', ({ reply }) => reply(200, []));
 
 // 2. No key for a request that carries a session: it is neither looked up nor kept.

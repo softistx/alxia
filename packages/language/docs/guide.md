@@ -12,7 +12,7 @@ import { language } from '@alxia/language';
 const greetings = { en: 'Hello', fr: 'Bonjour', 'pt-BR': 'Olá' };
 
 const app = alxia()
-	.plugin(language({ supported: ['en', 'fr', 'pt-BR'], fallback: 'en' }))
+	.use(language({ supported: ['en', 'fr', 'pt-BR'], fallback: 'en' }))
 	.get('/', ({ language: current, reply }) => reply(200, greetings[current]));
 
 app.listen(3000);
@@ -54,11 +54,13 @@ type `resolve`'s parameter is annotated with. `RequiresOf<Ctx>`,
 see
 [Reading the app's context](#reading-the-apps-context).
 
-`language()` returns an app plugin: pass it to `app.plugin`, called. It is a
-`derive`, so it applies to the routes declared **after** it — in the same
-app, or inside the [group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md)
-it is used in — and adds `language` and `languageSource` to their context.
-A route declared before it neither runs it nor reads them.
+`language()` returns a middleware: pass it to `app.use`, called. A `use()` on
+the app runs on every request, in declaration order, a request no route
+matches included, and adds `language` and `languageSource` to what is
+declared **after** it: the middlewares and the routes. Inside a
+[group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md)
+it applies to the group's routes only. A route declared before it neither
+runs it nor reads them.
 
 It throws once, when it is created, if `fallback` is not one of
 `supported`:
@@ -82,7 +84,7 @@ for when they cannot.
 | `cookie` | `string` | `'language'` | the cookie read, and written by `persist` |
 | `pathIndex` | `number` | `0` | the path segment read by the `path` source: `/fr/products` is 0 |
 | `persist` | `boolean \| { maxAge?, secure? }` | `false` | a language the query named is written to the cookie |
-| `contentLanguage` | `boolean` | `true` | `Content-Language` on every response the plugin runs for |
+| `contentLanguage` | `boolean` | `true` | `Content-Language` on every response the middleware runs for |
 | `resolve` | `(ctx: BaseContext & Ctx) => string \| undefined` | none | decides after every source, before `fallback`; its annotated parameter types what it reads |
 | `vary` | `readonly string[]` | none | the request headers `resolve` reads, added to `Vary` |
 
@@ -105,7 +107,7 @@ language({ supported, fallback: 'en' });
 ```
 
 `fallback` must be one of them; the types refuse another (`fallback: 'de'`
-is a compile error), and so does the plugin, at start-up.
+is a compile error), and so does `language()`, at start-up.
 
 ### `order`
 
@@ -141,16 +143,16 @@ language({ supported: ['en', 'fr'], fallback: 'en', order: ['path'], pathIndex: 
 // /shop/fr/products → 'fr'
 ```
 
-The plugin reads the segment; it does not route on it or remove it. The
+The middleware reads the segment; it does not route on it or remove it. The
 routes still declare it, as a parameter:
 
 ```ts
 const app = alxia()
-	.plugin(language({ supported: ['en', 'fr'], fallback: 'en', order: ['path', 'header'] }))
+	.use(language({ supported: ['en', 'fr'], fallback: 'en', order: ['path', 'header'] }))
 	.get('/:lang/products', ({ language: current, reply }) => reply(200, current));
 
 await app.request('/fr/products'); // 'fr'
-await app.request('/products');    // 404: no route matches; the plugin never runs
+await app.request('/products');    // 404: no route matches (it still says Content-Language)
 ```
 
 A segment is matched like any other tag, so `/fr-ca/products` is `fr` too.
@@ -184,8 +186,8 @@ the cookie or the header sets nothing. For the cookie to be read back,
 
 ### `contentLanguage`
 
-On by default: every response of a route behind the plugin says
-`Content-Language: <language>`. A route that sets its own wins over it:
+On by default: every response of a request the middleware runs on says
+`Content-Language: <language>`, a 404 included when it is used on the app. A route that sets its own wins over it:
 
 ```ts
 .get('/legal', ({ reply }) => reply(200, legalText, { headers: { 'content-language': 'fr' } }));
@@ -214,27 +216,27 @@ language({
 ```
 
 `vary` names the request headers `resolve` reads, so a shared cache keeps
-one response per value; the plugin cannot see what a function reads.
+one response per value; the middleware cannot see what a function reads.
 
 It receives the request's `BaseContext` — `request`, `url`, `ip`,
 `pathParams`, `set` — and, when its parameter is annotated, what an earlier
-plugin added: see [Reading the app's context](#reading-the-apps-context). It
+middleware added: see [Reading the app's context](#reading-the-apps-context). It
 returns a tag, or `undefined` for none. The tag is matched against
 `supported` like any other: a tag it does not support is ignored, and
 `fallback` decides. It is synchronous: a preference kept in a database is
 either written to the cookie when the user saves it — see
 [the realistic setup](#a-realistic-setup) — or loaded by an async `derive`
-or plugin before `language()`, which `resolve` then reads — see
+or middleware before `language()`, which `resolve` then reads — see
 [Reading the app's context](#reading-the-apps-context).
 
 ### Reading the app's context
 
-To decide by what an earlier plugin added, such as a signed-in `user` and
+To decide by what an earlier middleware added, such as a signed-in `user` and
 the language they saved, annotate `resolve`'s parameter. `language()` infers
 what it reads from that annotation — `supported` still types `language` —
-and the plugin is a
+and the middleware requires it, as a
 [`definePlugin`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
-plugin: an app that does not give `user` before it cannot use it.
+plugin does: an app that does not give `user` before it cannot use it.
 
 ```ts
 import { alxia, type BaseContext } from '@alxia/core';
@@ -254,26 +256,26 @@ const byUser = language({
 });
 
 const app = alxia()
-	.plugin(auth) // derives user: User | null
-	.plugin(byUser)
+	.plugin(auth) // an app: derives user: User | null
+	.use(byUser)
 	.get('/', ({ language: current, reply }) => reply(200, current)); // 'en' | 'fr'
 
-alxia().plugin(byUser);
+alxia().use(byUser);
 // error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
 The annotation may be `BaseContext & { user: User }` or `{ user: User }`
-alone; either way the plugin requires `{ user: User }`. An app whose `user`
+alone; either way the middleware requires `{ user: User }`. An app whose `user`
 has a type that does not fit it is refused too —
 `the plugin reads "user", which this app's context gives with another type` —
-while a narrower one passes: an app deriving `user: User` may use a plugin
+while a narrower one passes: an app deriving `user: User` may use a middleware
 that reads `User | null`. Annotating a key `BaseContext` already has with
 a type it does not give — `({ url }: { url: string })` — is refused the
 same way.
-A `resolve` left unannotated reads `BaseContext` only, and the plugin
+A `resolve` left unannotated reads `BaseContext` only, and the middleware
 requires nothing.
 Annotated `unknown` or `object`, it requires nothing either. Annotated
-`any`, it would read anything and require nothing, so the plugin is
+`any`, it would read anything and require nothing, so the middleware is
 refused on every app instead:
 [`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](troubleshooting.md#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated).
 
@@ -387,11 +389,11 @@ function negotiate<const L extends string>(header: string | null | undefined, su
 
 The three are exported for code outside a request — a background job
 choosing an email's language from a saved header, a WebSocket upgrade —
-and return the same answers the plugin would.
+and return the same answers the middleware would.
 
 ## The typed context
 
-The routes behind the plugin read:
+What the routes and middlewares after it read:
 
 ```ts
 interface LanguageContext<L extends string> {
@@ -414,7 +416,7 @@ type Language = (typeof supported)[number];
 const titles: Record<Language, string> = { en: 'Products', fr: 'Produits' };
 
 const app = alxia()
-	.plugin(language({ supported, fallback: 'en' }))
+	.use(language({ supported, fallback: 'en' }))
 	.get('/products', ({ language: current, languageSource, reply }) =>
 		reply(200, { title: titles[current], decidedBy: languageSource }),
 	);
@@ -448,7 +450,7 @@ so a shared cache keeps one copy per language rather than serving the first
 one to everyone. The query and the path are part of the URL, and need no
 `Vary`. What `resolve` reads is added only when the `vary` option names it.
 
-The plugin adds to `ctx.set.headers`, and a reply's own `Vary` adds to it
+The middleware adds to `ctx.set.headers`, and a reply's own `Vary` adds to it
 rather than replacing it:
 
 ```ts
@@ -462,8 +464,11 @@ the cache the same headers, so it keys by them:
 `cache({ ttl: 60, vary: ['accept-language', 'cookie'] })`. A response that
 sets a cookie — a `persist` from the query — is not cached.
 
-A request that matches no route — a `404`, a `405` — never reaches the
-plugin, so it carries none of these headers.
+A request that matches no route — a `404`, a `405` — runs the app's
+`use()` middlewares, so with `language()` on the app it carries these
+headers too. Inside a `group`, the middleware runs for the group's routes
+only: an unmatched request, even one under the group's prefix, carries
+none of them.
 
 ## A realistic setup
 
@@ -485,7 +490,7 @@ const messages: Record<Language, { welcome: string }> = {
 };
 
 export const app = alxia()
-	.plugin(
+	.use(
 		language({
 			supported,
 			fallback: 'en',
@@ -501,7 +506,7 @@ export const app = alxia()
 	});
 ```
 
-The saved choice is the `language` cookie, which the plugin reads on every
+The saved choice is the `language` cookie, which the middleware reads on every
 request after, before the browser's languages. `secure` is off outside
 production, so the cookie survives a plain-`http` development server.
 
@@ -546,6 +551,6 @@ describe('language', () => {
 ```
 
 [`@alxia/i18n`](https://www.npmjs.com/package/@alxia/i18n) builds on this
-plugin — its options pass through — and adds `t()` bound to the request's
+middleware — its options pass through — and adds `t()` bound to the request's
 language. When something does not behave as described here,
 [Troubleshooting](troubleshooting.md) starts from the symptom.

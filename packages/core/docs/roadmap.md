@@ -22,18 +22,34 @@ number on it. Every release, with each change it made, is in
   answers with the rest's response. The 0.3 forms — a list of hooks, a
   schema before the handler, `defineHook`, `defineWrap` — keep working,
   deprecated.
-- **Middlewares for every route after a point.** `app.use(auth)` runs a
-  `defineMiddleware` on every route declared after it, before the route's
-  own, and types what it adds there; `app.use('/admin', requireAdmin)`
-  guards the routes under a path, matched when each is declared, and adds
-  nothing; a group's `use` adds to its subtree's context. `derive` stays,
-  the shorthand for a middleware that only adds
-  ([Upgrading](upgrading.md#middlewares-for-the-routes-after-them-use)).
-- **Plugins on a method of their own.** `app.plugin(plugin)` mounts an app
-  — a sub-app, `defineRoutes`, `definePlugin` — or calls a function given
-  the app, and checks what the plugin reads of the context; a function that
-  returns anything but an app throws. `use(plugin)` still runs, deprecated
-  ([Upgrading](upgrading.md#plugins-move-to-appplugin)).
+- **Middlewares for every request.** `app.use(auth)` runs a
+  `defineMiddleware` on every request, in the order declared, and types what
+  it adds in the routes after it; a request no route matches — a 404, a 405, a
+  preflight — runs them all, so a guard answers a missing path and an
+  observer sees every response. `app.use('/admin', requireAdmin)` guards the
+  requests under a path, matched against the request's path, and adds
+  nothing; a group's `use` adds to its subtree's context and stays with its
+  routes. `derive` stays, the shorthand for a middleware that only adds
+  ([Upgrading](upgrading.md#middlewares-for-every-request-use)).
+- **Middlewares replace the request hooks.** `onRequest`, `onResponse`,
+  `around`, `wrap`, `onError` and `onRefusal` are deprecated, and still run
+  as in 0.3, for a middleware: code before and after `await next()`; a
+  try/catch around it for an error; `settle(ctx, next())` for a middleware
+  that must see the final response, an error's included; `ctx.route`, which
+  is `undefined` on a request no route matches. `validate` throws a
+  `ValidationError` and a body past its limit a `ContentTooLargeError`, and
+  `refusalOf(error)` reads either, so a middleware before the `validate`
+  answers a refusal in its own format. `next.behind` runs the rest behind a
+  reply sent at once. The packages' plugins — `logger`, `telemetry`,
+  `compress`, `cors`, `secureHeaders`, `rateLimit`, `cache`, `bearer`,
+  `session`, `janusErrors` and the others — are middlewares given to `use`
+  ([Upgrading](upgrading.md#middlewares-replace-the-request-hooks)).
+- **Plugins are apps.** `app.plugin(plugin)` mounts an app — a sub-app,
+  `defineRoutes`, `definePlugin` — or calls a function given the app, and
+  checks what the plugin reads of the context; a function that returns
+  anything but an app throws. `use(plugin)` and `plugin(middleware)` still
+  run, deprecated
+  ([Upgrading](upgrading.md#plugins-are-apps-appplugin)).
 - **Spec first, no client typed from the app.** The OpenAPI document is the
   contract, and a client is generated from it with the generator you
   choose — the examples use `@nxgt/openapi-codegen`. `Alxia` takes
@@ -62,9 +78,9 @@ number on it. Every release, with each change it made, is in
 ## Next
 
 - **`use` takes any `(ctx, next)` function.** In the next minor, the
-  `use(plugin)` forms are removed, and `use` reads every function it is
-  given as a middleware, with no `defineMiddleware` mark needed: a plugin
-  is given to `app.plugin(…)` alone.
+  `use(plugin)` forms and `plugin(middleware)` are removed, and `use` reads
+  every function it is given as a middleware, with no `defineMiddleware`
+  mark needed: a plugin is given to `app.plugin(…)` alone.
 - **The retired client deprecated on npm.** Its last published version
   marked deprecated, pointing at the upgrading guide, once the owner runs
   the command the [upgrading guide](upgrading.md#no-more-client-spec-first)
@@ -80,15 +96,10 @@ number on it. Every release, with each change it made, is in
   a list of hooks after the path or after an operation, a schema before the
   handler, `defineHook` and `defineWrap` are gone, leaving one way to
   declare a route.
-- **`derive` written as a `use` middleware.** Once `use` has carried a
-  release, `derive`, `decorate` and `wrap` may be deprecated in favour of
-  the middleware that does the same, leaving one way to add to the
-  context.
-- **The plugin guards as middlewares too.** `bearer`, `permission`,
-  `rateLimit`, `cache` and `idempotency` are app plugins: given to `plugin`,
-  they guard every route declared after them, in a group for some. A
-  middleware form of each, named on the one route that needs it, would sit
-  beside the plugin.
+- **The deprecated request hooks removed.** `onRequest`, `onResponse`,
+  `around`, `wrap`, `onError` and `onRefusal`, and `plugin(middleware)`, are
+  gone once a release has carried the middlewares, leaving one way to run
+  code around a request. `derive` and `decorate` stay.
 - **Comments on a stream.** A handler yielding a comment line of its own
   (`: …`), beside the keep-alive the stream already sends while idle.
 
@@ -103,15 +114,14 @@ number on it. Every release, with each change it made, is in
   library can do — Zod's query coercions, its OpenAPI conversion — lives in a
   package of its own, such as `@alxia/zod`.
 - **CORS, security headers, compression, rate limiting, authentication or
-  logging in the core.** Each is a plugin package to take or leave
+  logging in the core.** Each is a middleware package to take or leave
   (`@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress`,
   `@alxia/rate-limit`, `@alxia/jwt`, `@alxia/logger`), built on the core's
   public API only, so an app ships only what it uses.
 - **A raw `Response` from a handler.** A handler answers with `reply`, so
   `responds` checks every status a route sends; a `Response` would be
-  outside that contract. A route middleware or a `wrap` may return one, sent
-  as it is, and so may a global hook (`onRequest`, `onResponse`), for what a
-  client generated from the OpenAPI document never asks.
+  outside that contract. A middleware may return one, sent as it is, for
+  what a client generated from the OpenAPI document never asks.
 
 ## Shipped
 

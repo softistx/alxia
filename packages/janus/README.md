@@ -32,22 +32,27 @@ const accounts = janus({
 const SignIn = z.object({ email: z.string(), password: z.string() });
 
 const app = alxia()
-	.plugin(janusErrors())                                   // janus's refusals, typed
-	.plugin(session(accounts))                               // not required: anonymous may sign in
+	.use(janusErrors(), session(accounts))                // errors first, then the session: anonymous may sign in
 	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });  // the token in the cookie
 	})
 	.post('/signout', async ({ auth, reply }) => reply.ok(await auth.signOut()))
-	.plugin(session(accounts, { required: true }))           // every route after it
+	.use(session(accounts, { required: true }))           // the routes after it, and any unmatched request
 	.get('/me', ({ user, reply }) => reply.ok(user));     // user typed by the schema
 ```
+
+`janusErrors()` and `session()` are middlewares. `janusErrors()` answers
+what is thrown behind it, so give it to `use` **before** `session()`.
 
 ## `session(accounts, options?)`
 
 The routes after it read `user`, `session` and `auth`. With
 `required: true`, an anonymous request is a 401
-`{ error: 'unauthenticated' }` and `user` is never `null`; without, it is
+`{ error: 'unauthenticated' }` and `user` is never `null`. On the app, a
+required session also runs on a request no route matches: an anonymous
+request to a missing path gets the 401, not the 404. Put it in a `group` to
+guard only some routes; without, it is
 `null` for an anonymous request. A `boolean` known only at run time types
 both: the 401, and a `user` that may be `null`. `type` narrows to one user
 type of a multi-type `janus()`; `device` names the device cookie.
@@ -77,11 +82,15 @@ behind `required: true`, an anonymous request — anyone signing in — is a
 
 ## `janusErrors(options?)`
 
-Every `JanusError` a route after it throws is answered with janus's status
+A try/catch middleware: every `JanusError` thrown behind it — by
+`session()`, `permission()` or a route — is answered with janus's status
 and a body holding its `code` and only what a client can act on — the
 issues, a minimum length, attempts left, seconds to wait (with
 `Retry-After`). Never a login, a reason or a cause. `report(error, ctx)` is
-called for the 5xx.
+called for the 5xx. Anything else goes on, thrown, to the middlewares before
+it. Declared after `session()`, it would not see the session's
+`STORE_FAILED`: it goes first, and after the observers (`logger()`,
+`secureHeaders()`), which settle `next()`.
 
 | status | codes |
 | --- | --- |
@@ -129,11 +138,11 @@ const records = new Map([['r1', { id: 'r1', title: 'Blood test' }]]);
 const findRecord = (id: string) => records.get(id) ?? null;
 
 const app = alxia()
-	.plugin(janusErrors())
-	.plugin(session(accounts))
+	.use(janusErrors())
+	.use(session(accounts))
 	.group('/records/:id', (record) =>
 		record
-			.plugin(permission(access, 'view', 'record', byParam('id', findRecord)))
+			.use(permission(access, 'view', 'record', byParam('id', findRecord)))
 			.get('/', ({ object, reply }) => reply(200, object)), // object: what findRecord found
 	);
 ```
@@ -145,7 +154,7 @@ types exactly then.
 ### Reading the app's context
 
 Annotate `load`, `subject` or `ctx`'s parameter to read what an earlier
-plugin added. The guard then requires it: an app that does not give it
+middleware added. The guard then requires it: an app that does not give it
 before the guard cannot use it.
 
 ```ts
@@ -159,8 +168,8 @@ const byTenant = permission(
 		tenant.records.get(pathParams['id'] ?? '') ?? null,
 );
 
-alxia().plugin(tenancy).plugin(session(accounts)).plugin(byTenant); // tenancy derives tenant
-alxia().plugin(session(accounts)).plugin(byTenant); // a compile error: this app gives no `tenant`
+alxia().use(tenancy).use(session(accounts)).use(byTenant); // tenancy derives tenant
+alxia().use(session(accounts)).use(byTenant); // a compile error: this app gives no `tenant`
 ```
 
 A callback annotated `any` would require nothing, so the guard is refused
@@ -170,13 +179,14 @@ on every app: annotate what it reads, or leave it unannotated.
 
 | export | |
 | --- | --- |
-| `session(accounts, options?)` | the plugin: `user`, `session`, `auth` |
+| `session(accounts, options?)` | the middleware: `user`, `session`, `auth` |
 | `SessionOptions` | its options: `type`, `required`, `device` |
 | `RequestAuth`, `SessionOpened` | the type of `ctx.auth`: `send`, `signOut`, `device`; and what `send` takes: `token`, `session` and `user` from `@nxgt/janus`'s `SignedIn`, and `deviceToken?` |
 | `sendSession`, `signOut`, `deviceOf`, `sendDevice` | the cookies, outside a route |
 | `DEVICE_COOKIE` | the device cookie's name, `janus-device`: the one `@nxgt/janus-hono` uses, so a device one remembers the other does too |
 | `SendSessionOptions`, `DeviceCookieOptions` | their options: `device`; `name`, `domain`, `path`, `sameSite`, `secure`, `maxAge` |
-| `janusErrors(options?)` | the plugin: janus's refusals answered |
+| `janusErrors(options?)` | the middleware: janus's refusals answered; `use` it before `session()` |
+| `JanusErrors`, `SessionMiddleware` | the types of what `janusErrors()` and `session()` make |
 | `JanusErrorsOptions` | its options: `report`, called with every error answered 5xx |
 | `permission(…)`, `byParam(…)` | the guard |
 | `PermissionOptions`, `OptionsArgs` | its options: `subject`, `ctx`; and the rest of its arguments, the options required exactly when the permission has a condition; both take what `subject` and `ctx` read beyond `BaseContext` as their last two, defaulted, parameters |
@@ -186,6 +196,6 @@ on every app: annotate what it reads, or leave it unannotated.
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/janus/docs): a page per area — sessions, signing in and out with `ctx.auth` and the device cookie, janus's errors and their statuses, and the permission guard, reading what an earlier plugin added included.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/janus/docs): a page per area — sessions, signing in and out with `ctx.auth` and the device cookie, janus's errors and their statuses, and the permission guard, reading what an earlier middleware added included.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/janus/docs/troubleshooting.md): an error message, or a request anonymous, refused or a 404 when it should not be, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/janus/docs/roadmap.md): what is coming, and what is not planned.
