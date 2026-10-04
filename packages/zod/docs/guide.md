@@ -7,13 +7,13 @@ as it really crosses the wire.
 
 ```ts
 import { client } from '@alxia/client';
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { zq } from '@alxia/zod';
 import { z } from 'zod';
 
 const app = alxia().get(
 	'/items/:id',
-	{ params: z.object({ id: zq.int() }) },
+	validate({ params: z.object({ id: zq.int() }) }),
 	({ params, reply }) => reply(200, { id: params.id, next: params.id + 1 }),
 );
 
@@ -81,11 +81,11 @@ numbers, booleans and arrays, so `z.number()` is right there.
 ```ts
 app.get(
 	'/reports',
-	{
+	validate({
 		query: z.object({ year: zq.int(), draft: zq.boolean().optional() }),
 		headers: z.object({ 'x-page-size': zq.int().default(20) }),
 		cookies: z.object({ beta: zq.boolean().default(false) }),
-	},
+	}),
 	({ query, headers, cookies, reply }) =>
 		reply(200, { year: query.year, size: headers['x-page-size'], beta: cookies.beta }),
 );
@@ -239,7 +239,7 @@ never reach the schema:
 ```ts
 const app = alxia().get(
 	'/ids',
-	{ query: z.object({ ids: zq.json(z.array(z.number())) }) },
+	validate({ query: z.object({ ids: zq.json(z.array(z.number())) }) }),
 	({ query, reply }) => reply(200, query.ids), // number[]
 );
 
@@ -289,14 +289,14 @@ the whole schema is documented as `{}`, anything. `zodConverter` converts a
 Zod schema as it crosses the wire instead:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, responds } from '@alxia/core';
 import { docs, openapi } from '@alxia/openapi';
 import { zodConverter } from '@alxia/zod';
 import { z } from 'zod';
 
 const app = alxia().get(
 	'/events/:id',
-	{ response: { 200: z.object({ id: z.string(), at: z.date() }) } },
+	responds({ 200: z.object({ id: z.string(), at: z.date() }) }),
 	({ params, reply }) => reply(200, { id: params.id, at: new Date() }),
 );
 
@@ -362,7 +362,7 @@ its tests through the typed client:
 
 ```ts
 // app.ts
-import { alxia } from '@alxia/core';
+import { alxia, responds, validate } from '@alxia/core';
 import { docs } from '@alxia/openapi';
 import { zodConverter, zq } from '@alxia/zod';
 import { z } from 'zod';
@@ -381,15 +381,15 @@ const orders: z.output<typeof Order>[] = [
 
 export const app = alxia().get(
 	'/orders',
-	{
+	validate({
 		query: z.object({
 			page: zq.int().default(1),
 			status: zq.array(Order.shape.status).optional(),
 			since: zq.date().optional(),
 			total: zq.json(z.object({ min: z.number(), max: z.number() })).optional(),
 		}),
-		response: { 200: z.object({ page: z.number(), items: z.array(Order) }) },
-	},
+	}),
+	responds({ 200: z.object({ page: z.number(), items: z.array(Order) }) }),
 	({ query, reply }) =>
 		reply(200, {
 			page: query.page,

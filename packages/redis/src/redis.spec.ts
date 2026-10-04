@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, expectTypeOf, test } from 'bun:test';
 import { client as httpClient } from '@alxia/client';
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { rateLimit } from '@alxia/rate-limit';
 import { defineCache } from '@nxgt/redis';
 import { z } from 'zod';
@@ -70,7 +70,7 @@ const makeApp = () =>
 		.use(idempotency(db.client, { name: 'payments' }))
 		.post(
 			'/payments',
-			{ body: z.object({ amount: z.number() }) },
+			validate({ body: z.object({ amount: z.number() }) }),
 			async ({ body, reply, set }) => {
 				runs++;
 				set.cookies.set('seen', 'yes');

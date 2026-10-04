@@ -168,7 +168,7 @@ answers `401 {"error":"unauthenticated"}` before it runs. Use the plugin
 twice — once open, for the sign-in routes; once required, for the rest:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { janusErrors, session } from '@alxia/janus';
 import { createMemoryStores, janus, scryptHasher } from '@nxgt/janus';
 import { z } from 'zod';
@@ -185,7 +185,7 @@ const SignIn = z.object({ email: z.string(), password: z.string() });
 const app = alxia()
 	.use(janusErrors())
 	.use(session(accounts))                       // open: user may be null
-	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
 	})

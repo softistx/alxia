@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { client } from '@alxia/client';
-import { alxia } from '@alxia/core';
+import { alxia, responds, validate } from '@alxia/core';
 import { openapi } from '@alxia/openapi';
 import { z } from 'zod';
 import { zq } from './coerce';
@@ -8,7 +8,7 @@ import { zodConverter } from './convert';
 
 const app = alxia().get(
 	'/search/:page',
-	{
+	validate({
 		params: z.object({ page: zq.int() }),
 		query: z.object({
 			tags: zq.array(z.string()).optional(),
@@ -16,16 +16,16 @@ const app = alxia().get(
 			since: zq.date().optional(),
 			filter: zq.json(z.object({ min: z.number() })).optional(),
 		}),
-		response: {
-			200: z.object({
-				page: z.number(),
-				tags: z.array(z.string()),
-				exact: z.boolean(),
-				since: z.date().nullable(),
-				min: z.number().nullable(),
-			}),
-		},
-	},
+	}),
+	responds({
+		200: z.object({
+			page: z.number(),
+			tags: z.array(z.string()),
+			exact: z.boolean(),
+			since: z.date().nullable(),
+			min: z.number().nullable(),
+		}),
+	}),
 	({ params, query, reply }) =>
 		reply(200, {
 			page: params.page,
@@ -95,7 +95,7 @@ describe('zq', () => {
 	test('zq.json of an array is given as JSON text, since a query repeats a list', async () => {
 		const list = alxia().get(
 			'/ids',
-			{ query: z.object({ ids: zq.json(z.array(z.number())) }) },
+			validate({ query: z.object({ ids: zq.json(z.array(z.number())) }) }),
 			({ query, reply }) => reply(200, query.ids),
 		);
 		expectTypeOf<

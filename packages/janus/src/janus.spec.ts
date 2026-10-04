@@ -1,6 +1,12 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { client } from '@alxia/client';
-import { alxia, type BaseContext, type Empty, type Jsonify } from '@alxia/core';
+import {
+	alxia,
+	type BaseContext,
+	type Empty,
+	type Jsonify,
+	validate,
+} from '@alxia/core';
 import {
 	createMemoryStores,
 	fixedClock,
@@ -79,13 +85,13 @@ function setup() {
 		.use(janusErrors())
 		.post(
 			'/signup',
-			{
+			validate({
 				body: z.object({
 					email: z.string(),
 					name: z.string(),
 					password: z.string(),
 				}),
-			},
+			}),
 			async (ctx) => {
 				const signedIn = await auth.patient.signUp(ctx.body);
 				return ctx.reply(201, { id: sendSession(ctx, auth, signedIn).id });
@@ -93,7 +99,7 @@ function setup() {
 		)
 		.post(
 			'/signin',
-			{ body: z.object({ email: z.string(), password: z.string() }) },
+			validate({ body: z.object({ email: z.string(), password: z.string() }) }),
 			async (ctx) => {
 				const signedIn = await auth.patient.signIn(ctx.body);
 				return ctx.reply(200, { id: sendSession(ctx, auth, signedIn).id });
@@ -176,7 +182,9 @@ describe('session', () => {
 			.use(session(auth, { type: 'patient', device: { name: 'my-device' } }))
 			.post(
 				'/signin',
-				{ body: z.object({ email: z.string(), password: z.string() }) },
+				validate({
+					body: z.object({ email: z.string(), password: z.string() }),
+				}),
 				async ({ body, auth: current, reply }) => {
 					expectTypeOf(current.device).toEqualTypeOf<string | null>();
 					const signedIn = await auth.patient.signIn(body);
@@ -313,7 +321,9 @@ describe('session', () => {
 			.use(session(accounts, { device: { name: 'my-device' } }))
 			.post(
 				'/signin',
-				{ body: z.object({ email: z.string(), password: z.string() }) },
+				validate({
+					body: z.object({ email: z.string(), password: z.string() }),
+				}),
 				async ({ body, auth, reply }) => {
 					const signedIn = await accounts.signIn(body, { device: auth.device });
 					return reply.ok({ id: auth.send(signedIn).id });

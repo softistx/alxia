@@ -86,7 +86,7 @@ the route where it is and call the unbound `sendSession(ctx, accounts, …)`,
 ```ts
 alxia()
 	.use(session(accounts))
-	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
 	});
@@ -459,7 +459,7 @@ only the routes after it.
 const app = alxia()
 	.use(janusErrors())
 	.use(session(accounts))
-	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body); // a refusal is now its 401
 		return reply.ok({ id: auth.send(signedIn).id });
 	});
@@ -498,7 +498,7 @@ the session for the routes after it, or in a `group`
 alxia()
 	.use(janusErrors())
 	.use(session(accounts))                     // the sign-in routes
-	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });
 	})

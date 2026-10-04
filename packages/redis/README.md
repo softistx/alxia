@@ -68,7 +68,7 @@ the response: the route runs, and the error is logged.
 ## Idempotent routes
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { idempotency } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 import { z } from 'zod';
@@ -78,7 +78,7 @@ const Payment = z.object({ amount: z.number().int().positive() });
 
 const app = alxia()
 	.use(idempotency(connection.client, { name: 'payments', required: true }))
-	.post('/payments', { body: Payment }, ({ body, reply }) =>
+	.post('/payments', validate({ body: Payment }), ({ body, reply }) =>
 		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
 	);
 ```

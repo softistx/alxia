@@ -28,23 +28,23 @@ bun create @alxia my-site --template react-router
 
 | template | what it writes |
 | --- | --- |
-| `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a hook made with `defineHook` that answers 401 without an API key; a `bun test` spec calling it with `app.request()` and through `@alxia/client`, typed; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, Biome (`biome.json`, `lint`, `format`, `check`, `check:ci`, `verify`), a `Dockerfile` running on `oven/bun:1-alpine`, `.dockerignore`, `.gitignore`, `.env.example`, `.vscode/` and a README |
+| `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a middleware made with `defineMiddleware` that answers 401 without an API key, then `validate` and `responds`; a `bun test` spec calling it with `app.request()` and through `@alxia/client`, typed; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, Biome (`biome.json`, `lint`, `format`, `check`, `check:ci`, `verify`), a `Dockerfile` running on `oven/bun:1-alpine`, `.dockerignore`, `.gitignore`, `.env.example`, `.vscode/` and a README |
 | `react-router` | React Router's official template, as `create-react-router` writes it, shipped in this package and copied, with [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun, a `Dockerfile` running on `oven/bun:1-alpine` in place of React Router's Node one, and Biome as the `api` project has it, the scaffold formatted by it once. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
 
-The heart of the `api` project, its route and hook (the whole file, with
+The heart of the `api` project, its route and middleware (the whole file, with
 its imports and schemas, is in the [guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#the-api-template)):
 
 ```ts
 // src/app.ts, in part
-const requireKey = defineHook(({ request, reply }) =>
+const requireKey = defineMiddleware(({ request, reply }, next) =>
   request.headers.get("x-api-key") === apiKey
-    ? undefined
+    ? next()
     : reply(401, { error: "unauthorized" as const }),
 );
 
 export const app = alxia()
   .decorate({ todos })
-  .post("/todos", [requireKey], { body: NewTodo, response: { 201: Todo } }, ({ body, todos, reply }) => {
+  .post("/todos", requireKey, validate({ body: NewTodo }), responds({ 201: Todo }), ({ body, todos, reply }) => {
     const todo = { id: todos.length + 1, title: body.title, done: false };
     todos.push(todo);
     return reply.created(todo);

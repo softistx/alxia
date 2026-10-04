@@ -52,7 +52,7 @@ Not one package declares a dependency: what one needs at runtime — `zod`,
 
 ```ts
 // server.ts
-import { alxia } from '@alxia/core';
+import { alxia, responds, validate } from '@alxia/core';
 import { cors } from '@alxia/cors';
 import { logger } from '@alxia/logger';
 import { zq } from '@alxia/zod';
@@ -63,10 +63,8 @@ const app = alxia()
 	.use(cors())
 	.get(
 		'/users/:id',
-		{
-			params: z.object({ id: zq.int() }),
-			response: { 200: z.object({ id: z.number(), name: z.string() }), 404: z.object({ error: z.literal('not_found') }) },
-		},
+		validate({ params: z.object({ id: zq.int() }) }),
+		responds({ 200: z.object({ id: z.number(), name: z.string() }), 404: z.object({ error: z.literal('not_found') }) }),
 		({ params, reply }) => (params.id === 1 ? reply(200, { id: 1, name: 'Ada' }) : reply(404, { error: 'not_found' })),
 	);
 

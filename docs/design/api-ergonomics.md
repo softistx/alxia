@@ -39,7 +39,7 @@ app.get('/users/:id', ({ params, reply }) => {
 	return user ? reply.ok(user) : reply.notFound({ error: 'not_found' });
 });
 
-app.post('/users', { body: NewUser, response: { 201: User } }, ({ body, reply }) =>
+app.post('/users', validate({ body: NewUser }), responds({ 201: User }), ({ body, reply }) =>
 	reply.created(insert(body)),
 );
 
@@ -103,7 +103,7 @@ const accounts = janus({ … }); // the instance: named `accounts` in the docs, 
 
 app
 	.use(session(accounts))
-	.post('/sign-in', { body: Credentials }, async ({ body, auth, reply }) => {
+	.post('/sign-in', validate({ body: Credentials }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.patient.signIn(body, { device: auth.device });
 		return reply.ok({ id: auth.send(signedIn).id }); // session cookie, device cookie
 	})

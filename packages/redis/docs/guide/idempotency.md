@@ -6,7 +6,7 @@ refuses the repeats it cannot answer — across every process sharing a
 Redis.
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { idempotency } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 import { z } from 'zod';
@@ -16,7 +16,7 @@ const Payment = z.object({ amount: z.number().int().positive() });
 
 const app = alxia()
 	.use(idempotency(connection.client, { name: 'payments' }))
-	.post('/payments', { body: Payment }, ({ body, reply }) =>
+	.post('/payments', validate({ body: Payment }), ({ body, reply }) =>
 		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
 	);
 ```
@@ -101,7 +101,7 @@ interface IdempotencyErrorBody {
 
 ```ts
 import { client } from '@alxia/client';
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { idempotency } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 import { z } from 'zod';
@@ -110,7 +110,7 @@ const connection = await connectRedis(Bun.env['REDIS_URL']!);
 
 const app = alxia()
 	.use(idempotency(connection.client, { name: 'payments', required: true }))
-	.post('/payments', { body: z.object({ amount: z.number() }) }, ({ body, reply }) =>
+	.post('/payments', validate({ body: z.object({ amount: z.number() }) }), ({ body, reply }) =>
 		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
 	);
 

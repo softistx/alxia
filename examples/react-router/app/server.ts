@@ -3,6 +3,7 @@
 // data. This example's routes read what it derives (`user`, `log`), so
 // here it is required.
 import { compress } from "@alxia/compress";
+import { responds, validate } from "@alxia/core";
 import { logger } from "@alxia/logger";
 import { createServer } from "@alxia/react-router";
 import { secureHeaders } from "@alxia/secure-headers";
@@ -42,11 +43,12 @@ const server = createServer({
       // A tiny session: the user, from the cookie the sign-in sets. Every
       // hook reads the request's cookies as `cookies`.
       .derive(({ cookies }) => ({ user: userOf(cookies) }))
-      // alxia's own JSON route, validated by its schema. Under /api, a
-      // prefix no page uses.
+      // alxia's own JSON route: its body validated, its reply checked. Under
+      // /api, a prefix no page uses.
       .post(
         "/api/todos",
-        { body: NewTodo, response: { 201: Todo } },
+        validate({ body: NewTodo }),
+        responds({ 201: Todo }),
         ({ body, user, reply }) =>
           reply.created(addTodo(body.title, user?.name ?? "api")),
       ),

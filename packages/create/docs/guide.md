@@ -87,10 +87,10 @@ my-api/
 ```
 
 `src/app.ts` is one route, `POST /todos`, with what a real one needs: a
-body validated by a Zod schema, a declared reply, and a hook of its own.
+body validated by a Zod schema, a declared reply, and a middleware of its own.
 
 ```ts
-import { alxia, defineHook } from "@alxia/core";
+import { alxia, defineMiddleware, responds, validate } from "@alxia/core";
 import { z } from "zod";
 
 const Todo = z.object({ id: z.number(), title: z.string(), done: z.boolean() });
@@ -99,9 +99,12 @@ const NewTodo = z.object({ title: z.string().min(1) });
 /** Set API_KEY in the environment: this default is for development. */
 export const apiKey = Bun.env["API_KEY"] ?? "dev-key";
 
-const requireKey = defineHook(({ request, reply }) =>
+// A middleware of the routes it is given to: it answers 401 without the key,
+// before the body is read, and that 401 joins the type of each, so the
+// client reads it.
+const requireKey = defineMiddleware(({ request, reply }, next) =>
   request.headers.get("x-api-key") === apiKey
-    ? undefined
+    ? next()
     : reply(401, { error: "unauthorized" as const }),
 );
 
@@ -111,8 +114,9 @@ export const app = alxia()
   .decorate({ todos })
   .post(
     "/todos",
-    [requireKey],
-    { body: NewTodo, response: { 201: Todo } },
+    requireKey,
+    validate({ body: NewTodo }),
+    responds({ 201: Todo }),
     ({ body, todos, reply }) => {
       const todo = { id: todos.length + 1, title: body.title, done: false };
       todos.push(todo);
@@ -123,10 +127,14 @@ export const app = alxia()
 export type App = typeof app;
 ```
 
-- `requireKey` runs before the body is read: a request without the key is a
-  401 whatever its body, and that 401 joins the route's type
-  ([Hooks on one route](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/hooks.md#hooks-on-one-route)).
-- An empty `title` is a 400 naming `title`, before the handler runs.
+- The middlewares run in the order given. `requireKey` stands before
+  `validate`, so it runs before the body is read: a request without the key
+  is a 401 whatever its body, and that 401 joins the route's type
+  ([A route's middlewares](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md#a-routes-middlewares)).
+- `validate({ body: NewTodo })` answers an empty `title` with a 400 naming
+  `title`, before the handler runs; the handler reads `body` typed by it.
+- `responds({ 201: Todo })` types the handler's `reply` and checks what it
+  sends.
 - `todos` lives in memory: replace the array with your database, given to
   the routes the same way, by `decorate`.
 

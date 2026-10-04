@@ -28,6 +28,15 @@ test("refuses an empty title with a 400 naming it", async () => {
   expect((await response.json()).issues[0].path).toEqual(["title"]);
 });
 
+test("asks for the key before it reads the body", async () => {
+  const response = await app.request("/todos", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ title: "" }),
+  });
+  expect(response.status).toBe(401); // requireKey stands before validate
+});
+
 test("the typed client reads each status the route answers", async () => {
   // Given the app itself, the client calls its fetch in process.
   const api = client(app, { headers: { "x-api-key": apiKey } });

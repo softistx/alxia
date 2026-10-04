@@ -3,7 +3,7 @@
 Checks that an [`@alxia/core`](https://www.npmjs.com/package/@alxia/core)
 app routes every operation of an OpenAPI document, and, if you ask, only
 those. Each operation is the `{ method, path, schema }` that
-`app.route(operation, handler)` takes, as
+`app.route(operation, ...middlewares, handler)` takes, as
 [`@nxgt/openapi-codegen`](https://github.com/softistx/nxgt-http/tree/develop/packages/openapi-codegen)'s
 `alxia` option writes them into `alxia.ts` (that option is not in a
 published release yet; a list of operations written by hand works today).
@@ -63,6 +63,25 @@ each operation is looked up under it:
 implemented(app, operations, { prefix: '/api' });
 ```
 
+## Routes with middlewares
+
+A route declared with `app.route(operation, ...middlewares, handler)` takes
+the middlewares of any route; the operation's schema validates just before
+the handler, or where `validate(operation)` stands. The checks match it as
+any other route:
+
+```ts
+import { alxia, validate } from '@alxia/core';
+import { matchesSpec } from '@alxia/openapi-routes';
+import { operations } from './generated/alxia';
+
+const app = alxia()
+	.route(operations.renamePet, auth, ({ params, body, reply }) => reply.ok(rename(params.petId, body.name)))
+	.route(operations.adoptPet, validate(operations.adoptPet), auth, ({ params, reply }) => reply.created(adopt(params.petId)));
+
+matchesSpec(app, operations);
+```
+
 ## How a route is matched
 
 - by method and path, as `app.routes` holds them: groups, plugins and the
@@ -88,7 +107,7 @@ schema.
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/openapi-routes/docs/guide.md): where to call the checks, the prefix, what counts as a route, and the routes to exclude.
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/openapi-routes/docs/guide.md): where to call the checks, the prefix, routes with middlewares, what counts as a route, and the routes to exclude.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/openapi-routes/docs/troubleshooting.md): each message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/openapi-routes/docs/roadmap.md): what is coming, and what is not planned.
 - [From an OpenAPI document](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/from-a-document.md), in `@alxia/openapi`'s docs: the whole flow, from the spec to the generated operations, the routes and these checks.

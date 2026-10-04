@@ -3,8 +3,10 @@
 An [alxia](https://github.com/softistx/alxia) app with
 [Zod](https://zod.dev), made with `bun create @alxia`.
 
-- `src/app.ts`: the app. `POST /todos` validates its body with Zod, and
-  its own hook, `requireKey`, answers 401 without the `x-api-key` header.
+- `src/app.ts`: the app. `POST /todos` runs its middlewares in order:
+  `requireKey`, made with `defineMiddleware`, answers 401 without the
+  `x-api-key` header; `validate({ body })` checks the body with Zod;
+  `responds({ 201 })` checks the reply.
 - `src/server.ts`: listens on `PORT`, 3000 by default.
 - `src/app.spec.ts`: `app.request()` and `@alxia/client`, no port.
 - `biome.json`: Biome's lint and format settings ([Lint and format](#lint-and-format)).

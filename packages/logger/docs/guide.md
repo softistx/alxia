@@ -216,7 +216,7 @@ to the response, and `outcome` says how it ended (the schema here is Zod's,
 `bun add zod`; any Standard Schema works):
 
 ```ts
-import { alxia, eventStream } from '@alxia/core';
+import { alxia, eventStream, responds } from '@alxia/core';
 import { logger } from '@alxia/logger';
 import { z } from 'zod';
 
@@ -224,7 +224,7 @@ const Tick = eventStream(z.object({ n: z.number() }));
 
 const app = alxia()
 	.use(logger())
-	.get('/ticks', { response: { 200: Tick } }, ({ reply }) =>
+	.get('/ticks', responds({ 200: Tick }), ({ reply }) =>
 		reply(
 			200,
 			(async function* () {

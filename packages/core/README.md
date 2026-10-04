@@ -256,11 +256,15 @@ app.query(
 );
 ```
 
-`route(operation, handler)` declares the same route from data —
-`{ method, path, schema? }`, written once and shared, or generated from an
-OpenAPI document — with the same types and the same compile errors. A
-variable holding an operation needs `as const`, to keep its method and path
-literal. `route` keeps its `schema`, and its list of hooks, as in 0.3:
+`route(operation, ...middlewares, handler)` declares the same route from
+data — `{ method, path, schema? }`, written once and shared, or generated
+from an OpenAPI document — with the same types and the same compile
+errors. A variable holding an operation needs `as const`, to keep its
+method and path literal. The operation's `schema` is a `responds` of its
+responses, first, and a `validate` of its request just before the handler,
+so a middleware such as `auth` answers before the body is read; a
+`validate(operation)` among the middlewares validates where it stands
+instead, once:
 
 ```ts
 const getUser = {
@@ -269,7 +273,21 @@ const getUser = {
 	schema: { params: z.object({ id: z.coerce.number().int() }), response: { 200: User } },
 } as const;
 
-app.route(getUser, async ({ params, reply }) => reply.ok(await findUser(params.id)));
+const renameUser = {
+	method: 'PATCH',
+	path: '/users/:id',
+	schema: {
+		params: z.object({ id: z.coerce.number().int() }),
+		body: z.object({ name: z.string().min(1) }),
+		response: { 200: User },
+	},
+} as const;
+
+app
+	.route(getUser, async ({ params, reply }) => reply.ok(await findUser(params.id)))
+	// auth answers 401 before the body is read; the handler reads it validated
+	.route(renameUser, auth, async ({ params, body, reply }) => reply.ok(await rename(params.id, body.name)));
+// validate(renameUser), auth: a bad body is a 400 before auth runs, and is validated once
 ```
 
 ### Body size
@@ -600,7 +618,7 @@ covers all three kinds.
 | `FreeShortcuts`, `TypedShortcuts`, `SHORTCUTS`, `Shortcuts` | `reply`'s shortcuts without and with schemas, and the status of each |
 | `Plugin`, `AnyAlxia` | a function plugin, any app |
 | `defineMiddleware(fn)`, `defineMiddleware<Requires>()(fn)` | a middleware, `(ctx, next) => …`, typed and returned as it is: `next(added)` adds `added` to the context after it, a reply ends the request and joins the route's type, a `Response` is sent as it is; `Requires` is what it reads beyond `BaseContext`, which the route must give where it is placed |
-| `validate(schemas)`, `RequestSchemas`, `Validated<Schemas>`, `ValidateRequires<Schemas>` | the middleware that validates `params`, `query`, `headers`, `cookies` and `body`, each with any Standard Schema; what it takes, what it passes on, the path parameters its `params` schema must read |
+| `validate(schemas)`, `validate(operation)`, `RequestSchemas`, `Validated<Schemas>`, `ValidateRequires<Schemas>` | the middleware that validates `params`, `query`, `headers`, `cookies` and `body`, each with any Standard Schema — or the request parts of an operation's `schema`, which its `route` then validates nowhere else; what it takes, what it passes on, the path parameters its `params` schema must read |
 | `responds(responses)` | the middleware that types the handler's `reply` by the statuses it declares, and checks the replies after it of those statuses against their schemas |
 | `Middleware<Requires, Result>`, `MiddlewareContext<Requires>`, `MiddlewareResult`, `MiddlewareReturn`, `Next<Added, Schema>`, `NextFunction` | a middleware, what it reads (`BaseContext & Requires`), what it may return, and `next`: called once at most, it resolves to the rest of the route's `Response`, branded by what was added |
 | `RouteOptions`, `SocketOptions` | a route's options, `bodyLimit` and `detail`; a socket's, `message`, `send` and `detail` |
@@ -623,7 +641,8 @@ covers all three kinds.
 | `RequestContext`, `BaseContext`, `Context`, `ResponseSettings`, `HandlerResult` | what every hook reads (`BaseContext.cookies`: the request's), what a handler reads, what a route sets on its response, what a handler may return |
 | `ResponseCookies` | `set.cookies`: Bun's `CookieMap` of the cookies the response sets, whose `get` and `has` read those, never the request's |
 | `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod` (its forms: `path, options?, ...middlewares, handler`, and the deprecated schema and list of hooks), `RefusalMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, what OpenAPI says of it, the checks its schema's type cannot express, a route method, the type of `onRefusal` (its four forms), a route and a socket as the app runs them |
-| `RouteOperation`, `OperationSchema`, `OperationMethod`, `CheckedOperation` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), the type of `route` (with a list of hooks or without; unchanged), and the check it makes of the operation |
+| `RouteOperation`, `OperationSchema`, `OperationMethod`, `CheckedOperation` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), the type of `route` — `OperationForms`, and its list of hooks of 0.3, deprecated — and the check it makes of the operation |
+| `OperationForms`, `OperationApp`, `OperationParts`, `OperationOptions`, `OperationResponds`, `OperationValidate` | `route(operation, ...middlewares, handler)`, up to 8 middlewares; the app it reads; the operation's request parts, its options (`bodyLimit`, `detail`), and the implicit `responds` and `validate` it threads. Exported so an app's type can be named in a declaration file |
 | `StaticMethod`, `FileMethod`, `PageMethod`, `DecorateMethod`, `DeriveMethod`, `WrapMethod`, `BodyLimitMethod`, `ErrorMethod`, `RequestHookMethod`, `ResponseHookMethod`, `AroundMethod`, `StartHookMethod`, `StopHookMethod`, `ParserMethod`, `GroupMethod`, `UseMethod`, `RequestMethod`, `ListenMethod` | the types of the app's other methods, each holding its overloads and their documentation: `static`, `file`, `page`; the route hooks `decorate`, `derive`, `wrap`, `bodyLimit`, `onError`; the global hooks `onRequest`, `onResponse`, `around`, `onStart`, `onStop`, `parser`; `group` and `use`; `request` and `listen`. Exported so an app's type can be named in a declaration file |
 | `SocketMethod`, `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage`, `SocketRecord`, `SocketEntryOf` | sockets: the type of `ws` (`path, options?, ...middlewares, handlers`, and the deprecated forms), what a deprecated socket schema validates, what its handlers read, send and receive, the entry one socket adds to `RoutesOf` |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema types |

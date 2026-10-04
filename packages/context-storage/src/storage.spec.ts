@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { alxia, type BaseContext } from '@alxia/core';
+import { alxia, type BaseContext, validate } from '@alxia/core';
 import { z } from 'zod';
 import {
 	ContextStorageError,
@@ -41,7 +41,7 @@ const app = base
 	})
 	.get(
 		'/greet/:id',
-		{ params: z.object({ id: z.coerce.number() }) },
+		validate({ params: z.object({ id: z.coerce.number() }) }),
 		async ({ reply }) =>
 			reply(200, {
 				text: await greet(),
