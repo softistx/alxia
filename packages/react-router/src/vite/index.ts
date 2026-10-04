@@ -85,8 +85,6 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 			// environment as the app and the plugins left it, built for Bun.
 			// An app that chose `ssr.target: 'webworker'` keeps Vite's own.
 			if (name !== 'ssr' || env.isSsrTargetWebworker === true) return;
-			// Built, the server is self-contained; in dev, Vite's SSR runner
-			// loads the packages from node_modules.
 			return ssrEnvironment(options, env.command);
 		},
 		configResolved(resolved) {

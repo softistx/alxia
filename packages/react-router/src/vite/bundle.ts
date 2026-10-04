@@ -34,7 +34,8 @@ export function bundledEnvironment(
 
 /**
  * Everything the plugin adds to the `ssr` environment: built for Bun under
- * either command, and self-contained under `build` alone.
+ * either command, and self-contained under `build` alone. In dev, Vite's
+ * SSR runner loads the packages from `node_modules`.
  */
 export function ssrEnvironment(
 	options: EnvironmentOptions,
