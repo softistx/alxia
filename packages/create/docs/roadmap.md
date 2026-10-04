@@ -52,7 +52,7 @@ Nothing scheduled yet.
   a route; and `bun run verify` starts with `generate --check`, which
   fails when `src/generated/` drifts from `openapi.yaml`. New projects
   install `@alxia/openapi` at the version this release was published
-  beside, and `@nxgt/openapi-codegen` pinned exactly, within its minor.
+  beside, and `@nxgt/openapi-codegen` pinned exactly, at the version the template ships.
 - **The `api` project is written in `@alxia/core`'s middleware model.**
   `requireKey` is a `defineMiddleware` that answers 401 before the body
   is read, given to the route among its middlewares.

@@ -221,9 +221,10 @@ style, and `bun run check` would otherwise rewrite the files and make
 `generate --check` fail.
 
 `@nxgt/openapi-codegen` is a devDependency pinned exactly, since another
-release may write the files differently. The command moves it to the
-newest patch of the template's minor ([Versions](#versions)). Moving it to
-another minor is a change to review:
+release may write the files differently. The command keeps the version
+the template ships, never moving it to a newer patch ([Versions](#versions)),
+so `bun run verify` passes in a fresh project whatever a later release
+writes. Moving it is a change to review:
 
 ```sh
 bun add --dev --exact @nxgt/openapi-codegen@latest
@@ -767,7 +768,8 @@ template pins exactly:
 | `zod` | `^4.2.0`, `@alxia/zod`'s |
 | `vite` | `^7.0.0 \|\| ^8.0.0`, `@alxia/react-router`'s |
 | `react-router`, `@react-router/*` | `^8.0.0`, `@alxia/react-router`'s; the `@react-router/*` packages take `react-router`'s version, which `@react-router/node` pins exactly |
-| `@biomejs/biome`, `@nxgt/openapi-codegen` | its own minor, from the exact version the template pins (`~2.5.15`, `~0.6.0`): written exactly, `2.5.16`, never `^`. A minor of Biome may add a recommended rule; one of `@nxgt/openapi-codegen` may write `src/generated/` differently |
+| `@biomejs/biome` | its own minor, from the exact version the template pins (`~2.5.15`): written exactly, `2.5.16`, never `^`. A minor of Biome may add a recommended rule |
+| `@nxgt/openapi-codegen` | none: the template's exact version, `0.6.0`, is kept. Any release may write `src/generated/` differently, and `bun run verify` checks it with `generate --check` |
 | anything else: `react`, `isbot`, Tailwind, `@types/*` | no alxia range: npm's `latest` |
 
 The command prints each move, and each newer major it left out:

@@ -446,7 +446,7 @@ right after `bun add --dev --exact @nxgt/openapi-codegen@…`, with no
 change to `openapi.yaml`.
 
 **When:** the generator moved to another minor, `0.6.x` to `0.7.0`. A new
-project never hits it: the command keeps the template's minor
+project never hits it: the command keeps the template's version
 ([Versions](guide.md#versions)).
 
 **Why:** the generated files are the output of one release of the

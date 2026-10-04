@@ -130,7 +130,7 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
 ```
 core ◄── openapi, graphql, cors, secure-headers, compress, rate-limit, jwt, logger,
          telemetry, janus, context-storage, cache, language
-         openapi-routes ◄── openapi   (deprecated: a re-export)
+         openapi ◄── openapi-routes   (deprecated: a re-export)
          i18n ◄── language
          redis ◄── rate-limit, cache (optional peers: the stores' contracts)
          react-router   (peers: react-router; vite, optional, for /vite; dev: openapi, compress for its specs)

@@ -116,6 +116,16 @@ export function isExact(range: string): boolean {
 }
 
 /**
+ * Tools whose exact pin the template keeps as it is, even from the newest
+ * patch of its minor: a project's `bun run verify` runs `generate --check`
+ * over the committed `src/generated/`, so a generator patch that writes the
+ * files differently would fail a fresh project on files it never touched.
+ */
+export const KEPT_EXACT: ReadonlySet<string> = new Set([
+	'@nxgt/openapi-codegen',
+]);
+
+/**
  * `range`'s own minor, from its first version: `~0.3.0` for `^0.3.1`, or
  * undefined for a range that names no version.
  */
@@ -146,7 +156,8 @@ export function newestOfMinor(
  * `built[name]` for a package it names — alxia's, at the ranges this
  * `@alxia/create` was published with — else within the range alxia's peers
  * hold it to, else npm's `latest`. A dependency the template pins exactly
- * (`isExact`) is rewritten exactly, to the newest of its own minor. A
+ * (`isExact`) is rewritten exactly, to the newest of its own minor, except
+ * a `KEPT_EXACT` one, which keeps the template's version. A
  * package of `built` with no release in
  * its range, as when npm has not yet propagated a version published minutes
  * ago, takes the newest of the range's own minor, named in `behind`: `^` it
@@ -188,6 +199,7 @@ export async function bumpDependencies(
 		const deps = field && manifest[field];
 		const current = deps?.[name];
 		if (!deps || current === undefined) continue;
+		if (KEPT_EXACT.has(name) && isExact(current)) continue;
 		const meta = fetched.get(name);
 		if (!meta?.versions) {
 			failed.push(name);

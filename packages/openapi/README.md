@@ -142,11 +142,15 @@ export const app = alxia()
 	.route(operations.listTodos, ({ reply }) => reply.ok(todos))
 	.route(
 		operations.createTodo,
-		validate(operations.createTodo), // a bad body gets its 400 before the key is asked for
-		requireKey,
+		requireKey, // first: an anonymous client gets its 401 before the body is read
+		validate(operations.createTodo),
 		({ body, reply }) => reply.created({ id: todos.length + 1, title: body.title, done: false }),
 	);
 ```
+
+Put the key check before `validate(...)`: auth first, so an anonymous client
+gets no body parsed, up to `bodyLimit`, and no validation issues back, which
+would reveal the schema.
 
 ## How a route is matched
 

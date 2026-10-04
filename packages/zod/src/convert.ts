@@ -36,6 +36,12 @@ interface ZodContext {
  * ```ts
  * const schema = zodConverter(Todo, 'output'); // { type: 'object', … }
  * ```
+ *
+ * @deprecated Nothing in alxia reads it any more: it served the `convert`
+ * option of the retired `@alxia/openapi` document writer. alxia is OpenAPI
+ * spec first, so the schemas come from the document. Zod's own
+ * `z.toJSONSchema(schema)` does the same. It stays exported, unchanged, for
+ * code that already calls it.
  */
 export function zodConverter(
 	schema: ZodLike,

@@ -48,6 +48,11 @@ await app.request(`/search/2?exact=true&since=${new Date().toISOString()}`);
 
 ## JSON Schema: `zodConverter`
 
+> **Deprecated.** Nothing in alxia reads `zodConverter` any more: it served
+> the `convert` option of the retired `@alxia/openapi` document writer. It
+> stays exported, unchanged. Zod's own `z.toJSONSchema` does the same, but
+> throws where `zodConverter` documents a value as anything.
+
 A Zod schema as JSON Schema 2020-12, for your own use: writing it into a
 hand-written OpenAPI document, or handing it to any JSON Schema consumer.
 
@@ -72,7 +77,7 @@ schema of another vendor gives `undefined`.
 | export | |
 | --- | --- |
 | `zq` | `number`, `int`, `boolean`, `date`, `array`, `json` |
-| `zodConverter(schema, side)` | a Zod schema as JSON Schema 2020-12, its `'input'` or its `'output'`; `undefined` for another vendor |
+| `zodConverter(schema, side)` | deprecated: a Zod schema as JSON Schema 2020-12, its `'input'` or its `'output'`; `undefined` for another vendor |
 
 ## Documentation
 
