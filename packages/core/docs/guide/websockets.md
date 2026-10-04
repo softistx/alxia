@@ -1,28 +1,28 @@
 # WebSockets
 
-This page covers socket routes: the upgrade request validated like a
-route's, each message checked both ways, and the client typed from the
-same schemas.
+This page covers socket routes: the upgrade request run through the route's
+middlewares and validated like a route's, each message checked both ways,
+and the client typed from the same schemas.
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, defineMiddleware } from '@alxia/core';
 import { z } from 'zod';
 
 const Chat = z.object({ text: z.string().min(1) });
 const Said = z.object({ from: z.string(), text: z.string() });
 
-const app = alxia()
-	.derive(({ url }) => ({ user: url.searchParams.get('user') ?? 'anonymous' }))
-	.ws('/rooms/:room', { message: Chat, send: Said }, {
-		open(socket) {
-			socket.subscribe(socket.data.params.room);
-		},
-		async message(socket, chat) {
-			const said = { from: socket.data.user, text: chat.text };
-			await socket.send(said);                               // to this socket
-			await socket.publish(socket.data.params.room, said);   // to the others in the room
-		},
-	});
+const who = defineMiddleware(({ url }, next) => next({ user: url.searchParams.get('user') ?? 'anonymous' }));
+
+const app = alxia().ws('/rooms/:room', { message: Chat, send: Said }, who, {
+	open(socket) {
+		socket.subscribe(socket.data.params.room);
+	},
+	async message(socket, chat) {
+		const said = { from: socket.data.user, text: chat.text };
+		await socket.send(said);                               // to this socket
+		await socket.publish(socket.data.params.room, said);   // to the others in the room
+	},
+});
 
 app.listen(3000);
 ```
@@ -32,61 +32,102 @@ Sockets need **a server**: `listen`, or a `Bun.serve` of your own given
 — `app.request`, a test without a server — a socket route answers
 `426 upgrade_required`.
 
-## `ws(path, schema, handlers)`, `ws(path, hooks, schema, handlers)`
+## `ws(path, options?, ...middlewares, handlers)`
 
 ```ts
-ws<const Path extends RoutePath, Schema extends SocketSchema = Empty>(
-	path: Path, // a literal the app would refuse does not compile: `Invalid path: …`
-	schema: Schema,
-	handlers: SocketHandlers<SocketContext<Ctx, Path, Schema>, SocketSend<Schema>, SocketMessage<Schema>>,
-): Alxia<…>
-ws<const Path extends RoutePath, const Hooks extends readonly AnyRouteHook[], Schema extends SocketSchema = Empty>(
-	path: Path,
-	hooks: Hooks, // each checked as a route's list is: at most 8
-	schema: Schema,
-	handlers: SocketHandlers<SocketContext<Ctx & /* what the hooks add */, Path, Schema>, SocketSend<Schema>, SocketMessage<Schema>>,
-): Alxia<…>
+ws(path, handlers);
+ws(path, ...middlewares, handlers);           // up to 8, run on the upgrade request
+ws(path, options, ...middlewares, handlers);  // options: message, send, detail
 ```
 
-The schema is required; `{}` validates nothing. With a list of hooks
-after the path — `ws(path, [canJoin, loadRoom], schema, handlers)` — the
-socket runs hooks of its own on the upgrade ([below](#the-upgrade)).
+The last argument is the handlers. Before them, the middlewares the upgrade
+request runs, in the order given: made by `defineMiddleware`, written
+inline, or a `validate` that checks the upgrade request
+([Middleware](middleware.md#a-routes-middlewares)). An object right after
+the path is the socket's options:
 
-| Part | Checks | Refused |
-| --- | --- | --- |
-| `params`, `query`, `headers`, `cookies` | the upgrade request, as a route's | the 400 with every issue, or the reply of the `onRefusal` hook in force ([Hooks](hooks.md#onrefusal)), and no socket |
-| `message` | each message the client sends, parsed as JSON | answered on the socket with a `ValidationErrorBody`; the socket stays open, the handler is not called |
-| `send` | each message the server sends | the message is not sent: `send` rejects with a `ResponseValidationError`, which, in a handler, closes the socket with `1011` |
-| `detail` | nothing at runtime: what OpenAPI says of it | — |
+| Option | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `message` | any Standard Schema | none: the raw message | each message the client sends, parsed as JSON; a refused one is answered on the socket with a `ValidationErrorBody`, the socket kept open and the handler not called |
+| `send` | any Standard Schema | none: anything is sent | each message the server sends: checked, then sent as its output. A refused one is not sent: `send` rejects with a `ResponseValidationError`, which, in a handler, closes the socket with `1011` |
+| `detail` | `RouteDetail` | none | nothing at runtime: what OpenAPI says of it |
+
+```ts
+interface SocketOptions {
+	readonly message?: StandardSchemaV1;
+	readonly send?: StandardSchemaV1;
+	readonly detail?: RouteDetail;
+}
+
+// SocketForms and SocketOptionsForms: one overload per count of middlewares, 0 to 8. With one:
+<const Path extends RoutePath, const Options extends SocketOptions, R1 extends MiddlewareReturn>(
+	path: Path, // a literal the app would refuse does not compile: `Invalid path: …`
+	options: Options, // no schema of the request: that is validate(…)
+	m1: (ctx: /* the hooks' context, and the upgrade request as it arrived */, next: NextFunction) => R1,
+	handlers: SocketHandlers</* socket.data: the context after m1 */, SocketSend<Options>, SocketMessage<Options>>,
+): Alxia</* … the socket added under WS */>;
+```
+
+The options hold no schema of the request — `params`, `query`, `headers`,
+`cookies`: give them to a `validate` among the middlewares.
+
+| Middleware | On the upgrade |
+| --- | --- |
+| `validate({ params, query, headers, cookies })` | checks the upgrade request as a route's: a refused one is answered with the 400 with every issue, or the reply of the `onRefusal` hook in force ([Hooks](hooks.md#onrefusal)), and no socket. A `params` key the path lacks, optional or not, does not compile, as on a route |
+| a middleware returning `next(added)` | `added` is in `socket.data`, typed |
+| a middleware returning a reply or a `Response` | the upgrade is refused with it: an unauthenticated client never gets a socket |
+| a middleware that awaits `next()` | receives a stand-in response once the socket is open ([below](#the-upgrade)) |
+| `responds(…)` | refused: a socket sends no reply. `send` checks its messages |
+
+`responds` on a socket does not compile, and throws where the socket is
+declared:
+`` WS /x: responds() checks replies, and a socket route sends none: check its messages with the `send` option ``.
 
 ## The upgrade
 
 The upgrade request runs the route hooks declared before the socket —
-`decorate`, `derive` — then the hooks of its own list, in order, then
-validation, like a route. A `defineHook` in the list runs, and what it
-adds is in `socket.data`; a `defineWrap` in it is skipped, as every `wrap`
-is on an upgrade: there is no response to wrap
-([Hooks on one route](hooks.md#hooks-on-one-route)). A `derive` that
-replies 401 refuses the socket with that 401: an unauthenticated client
-never gets one.
+`decorate`, `derive` — then its middlewares, in order, `validate` where it
+stands, then opens. A middleware or a `derive` that replies 401 refuses the
+socket with that 401; a `validate` placed after it is never reached.
 
 ```ts
-const app = alxia()
-	.derive(({ url, reply }) =>
-		url.searchParams.get('token') === 'secret'
-			? { user: 'ada' }
-			: reply(401, { error: 'unauthenticated' as const }),
-	)
-	.ws('/live', { query: z.object({ channel: z.string() }) }, {
-		open: (socket) => socket.subscribe(socket.data.query.channel),
-		message: () => {},
-	});
+import { alxia, defineMiddleware, validate } from '@alxia/core';
+import { z } from 'zod';
+
+const auth = defineMiddleware(({ url, reply }, next) =>
+	url.searchParams.get('token') === 'secret'
+		? next({ user: 'ada' })
+		: reply(401, { error: 'unauthenticated' as const }),
+);
+
+const app = alxia().ws('/live', auth, validate({ query: z.object({ channel: z.string() }) }), {
+	open: (socket) => socket.subscribe(socket.data.query.channel), // socket.data.user: 'ada'
+	message: () => {},
+});
+// no token → 401; a token and no channel → 400; both → the socket opens
+```
+
+A middleware that awaits `next()` runs around the rest of the upgrade. When
+the request is refused after it — a `validate`'s 400 — `next()` resolves to
+that response. When the socket opens, there is no response: `next()`
+resolves to a **stand-in**, an empty `200`, which the middleware must
+return as it is. A header set on it is lost — set it with `set.headers`,
+sent with the `101` — and returning another response throws
+`WS /x: a middleware returned another response than next() resolved to, once the socket was open: return it as it is`.
+
+```ts
+const watched = defineMiddleware(async ({ route }, next) => {
+	const response = await next();
+	console.log(route, response.status); // 400 for a refused upgrade, 200 once the socket is open
+	return response;                     // as it is
+});
 ```
 
 - `wrap` hooks and `around` hooks are skipped: there is no response to wrap.
 - `onRequest` hooks run; `onResponse` hooks do not run for an upgrade that
   succeeds.
-- `set.headers` and `set.cookies` a hook sets are sent with the `101`.
+- `set.headers` and `set.cookies` a hook or a middleware sets are sent with
+  the `101`.
 
 ## The handlers
 
@@ -109,7 +150,7 @@ An error a handler throws is logged, and the socket is closed with
 
 ```ts
 interface Socket<Data, Send> {
-	readonly data: Data;                                  // the upgrade request, validated, and what hooks added
+	readonly data: Data;                                  // the upgrade request, what validate gave back, what middlewares added
 	send(message: Send): Promise<void>;                   // as JSON, checked by `send`
 	publish(topic: string, message: Send): Promise<void>; // to every subscriber but this socket
 	subscribe(topic: string): void;
@@ -120,9 +161,10 @@ interface Socket<Data, Send> {
 }
 ```
 
-`socket.data` holds `params`, `query`, `headers` and `cookies` as the
-schema gave them back, the `request`, `url`, `ip` and `route`, and
-whatever each `derive` and `decorate` added: `socket.data.user` above.
+`socket.data` holds `params`, `query`, `headers` and `cookies` — as a
+`validate` gave them back, or as they arrived — the `request`, `url`, `ip`
+and `route`, and whatever each `derive`, `decorate` and middleware added:
+`socket.data.user` above.
 
 `send` and `publish` validate the message with `send` and send its output,
 so stripped keys never leave the server. `validateResponses: false`
@@ -139,7 +181,7 @@ same socket:
 ```
 
 A message that is not JSON has the code `invalid_json`. The client's type
-of what it receives includes this body when the route has a `message`
+of what it receives includes this body when the socket has a `message`
 schema.
 
 ## Reading it
@@ -201,6 +243,23 @@ type Room = RoutesOf<typeof app>['/rooms/:room']['WS'];
 `SocketRecord`, `SocketEntryOf`, `SocketSchema`, `SocketContext`,
 `SocketSend` and `SocketMessage` name these pieces ([The app's
 type](types.md)).
+
+## The forms of 0.3, deprecated
+
+`ws(path, schema, handlers)`, with the request's schemas beside `message`
+and `send`, and `ws(path, [hooks], schema, handlers)` still run as they
+did in 0.3, and will be removed in a later minor:
+
+```ts
+// deprecated
+app.ws('/live', [canJoin], { query: Channel, message: Chat, send: Chat }, handlers);
+// now
+app.ws('/live', { message: Chat, send: Chat }, canJoin, validate({ query: Channel }), handlers);
+```
+
+In the list, a `defineWrap` was skipped on the upgrade; a middleware that
+awaits `next()` runs, and gets the stand-in. Each change is on
+[Upgrading](../upgrading.md).
 
 ## See also
 

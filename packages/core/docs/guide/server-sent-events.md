@@ -6,12 +6,12 @@ values back as an async iterable. A stream may also name its events —
 `event: state`, `event: ping` — each with a schema of its own.
 
 ```ts
-import { alxia, eventStream } from '@alxia/core';
+import { alxia, eventStream, responds } from '@alxia/core';
 import { z } from 'zod';
 
 const Tick = z.object({ n: z.number() });
 
-const app = alxia().get('/ticks', { response: { 200: eventStream(Tick) } }, ({ reply }) =>
+const app = alxia().get('/ticks', responds({ 200: eventStream(Tick) }), ({ reply }) =>
 	reply(
 		200,
 		(async function* () {
@@ -39,7 +39,8 @@ curl -N localhost:3000/ticks
 function eventStream<Item extends StandardSchemaV1>(item: Item): EventStreamSchema<Item>;
 ```
 
-The response schema of a stream whose events are each checked by `item`.
+The response schema of a stream whose events are each checked by `item`,
+given to `responds` for the status that streams: `responds({ 200: eventStream(Tick) })`.
 The handler replies with an async iterable of what `item` accepts; each
 value is validated and sent as `item`'s **output**, so an unknown key the
 schema strips never leaves the server, as for any reply.
@@ -60,7 +61,7 @@ Given a schema per event name, the stream sends each event with its
 JMAP's push, for one, sends `state` and `ping`:
 
 ```ts
-import { alxia, eventStream } from '@alxia/core';
+import { alxia, eventStream, responds } from '@alxia/core';
 import { z } from 'zod';
 
 const StateChange = z.object({
@@ -71,7 +72,7 @@ const Ping = z.object({ interval: z.number().int() });
 
 const Push = eventStream({ state: StateChange, ping: Ping });
 
-const app = alxia().get('/push', { response: { 200: Push } }, ({ reply }) =>
+const app = alxia().get('/push', responds({ 200: Push }), ({ reply }) =>
 	reply(
 		200,
 		(async function* () {
@@ -150,10 +151,8 @@ and the subscription. Returning ends the stream — what a client's
 ```ts
 app.get(
 	'/events',
-	{
-		query: z.object({ closeafter: z.enum(['state', 'no']).default('no') }),
-		response: { 200: Push },
-	},
+	validate({ query: z.object({ closeafter: z.enum(['state', 'no']).default('no') }) }),
+	responds({ 200: Push }),
 	({ query, request, reply }) =>
 		reply(
 			200,
@@ -214,7 +213,7 @@ generator reads. `isEventStreamSchema` stays true of the unnamed form only.
 - When the generator returns, the stream ends.
 
 ```ts
-app.get('/orders/:id/status', { response: { 200: eventStream(Status) } }, ({ params, reply }) =>
+app.get('/orders/:id/status', responds({ 200: eventStream(Status) }), ({ params, reply }) =>
 	reply(
 		200,
 		(async function* () {
@@ -301,7 +300,7 @@ named event is dispatched under its name
 In a test, the body is the text of the events:
 
 ```ts
-const app = alxia().get('/ticks', { response: { 200: eventStream(Tick) } }, ({ reply }) =>
+const app = alxia().get('/ticks', responds({ 200: eventStream(Tick) }), ({ reply }) =>
 	reply(
 		200,
 		(async function* () {

@@ -1,167 +1,136 @@
 /**
- * A route's own run, once the router has found it: its context, its hooks
- * in the order declared, the request validated, the handler, and the
- * `onError` hooks when any of it throws.
+ * A route's own run, once the router has found it: its context, then one
+ * loop over its chain — its hooks, its middlewares, its validation, in the
+ * order declared — then its handler, and the `onError` hooks when any of
+ * it throws.
  */
-import {
-	ContentTooLargeError,
-	HttpError,
-	type RequestPart,
-	type ValidationIssue,
-} from '../errors/errors';
-import { Reply } from '../reply/reply';
-import {
-	type BodyParser,
-	readBody,
-	readHeaders,
-	readQuery,
-} from '../request/read';
-import { check } from '../schema/standard-schema';
+import { ContentTooLargeError, HttpError } from '../errors/errors';
+import { type AnyReply, Reply } from '../reply/reply';
+import type { BodyParser } from '../request/read';
+import type { StatusCode } from '../types/status';
+import { middleware, wrapped } from './chain-middleware';
 import { routeContext } from './context';
 import type { RouteDefinition, SocketDefinition } from './definition';
 import { refuse } from './refusal';
-import { clientGone, failed, internalError, send, sendDeclared } from './send';
-import type { BaseContext, RequestContext, ResponseSettings } from './types';
+import {
+	checkReply,
+	clientGone,
+	failed,
+	internalError,
+	isRedirect,
+	send,
+} from './send';
+import type { BaseContext, RequestContext, ResponseSchemas } from './types';
+import { type ChainRun, validateStep } from './validation';
+
+type Ctx = Record<string, unknown> & BaseContext;
 
 /**
- * Runs the hooks of a route in order — a `derive` adds to the context or
- * ends the request, a `wrap` runs the rest inside it — then validates the
- * request, then `last`, given the context its handler reads. A socket's
- * upgrade skips the `wrap` hooks: it has no response to wrap.
+ * Runs the chain of a route, `step(index)` by `step(index)`: a `derive`
+ * adds to the context or ends the request, a `wrap` or a middleware runs
+ * the rest inside it, a `validate` checks the request, a `responds` checks
+ * every reply after it; past the last, `last` — the handler — reads the
+ * context they built. Each reply is checked by the `responds` in force
+ * where it is made, then sent. A socket's upgrade skips the `wrap` hooks
+ * and the `responds`: it has no response to wrap or check.
  */
 export async function chain<Last>(
-	definition: RouteDefinition | SocketDefinition,
-	request: RequestContext,
-	rawParams: Record<string, string>,
-	set: ResponseSettings,
-	ctx: Record<string, unknown> & BaseContext,
-	parsers: readonly BodyParser[],
-	validateResponses: boolean,
-	last: (
-		ctx: Record<string, unknown> & BaseContext,
-	) => Promise<Response | Last>,
+	run: ChainRun,
+	ctx: Ctx,
+	last: (ctx: Ctx) => Promise<AnyReply | Response | Last>,
 ): Promise<Response | Last> {
-	const hooks = definition.derive;
+	const { definition } = run;
+	const steps = definition.derive;
 	const socket = !('method' in definition);
-	const signal = request.request.signal;
-	const step = async (index: number): Promise<Response | Last> => {
-		const hook = hooks[index];
-		if (hook === undefined) {
-			const validated = await validate(
-				definition,
-				request,
-				rawParams,
-				set,
-				ctx,
-				parsers,
-				validateResponses,
-			);
-			return 'refused' in validated ? validated.refused : last(validated.ctx);
-		}
-		if (hook.kind === 'wrap') {
-			if (socket) return step(index + 1);
-			let wrapped = hook.run(ctx, () => step(index + 1) as Promise<Response>);
-			if (wrapped instanceof Promise) wrapped = await wrapped;
-			return wrapped instanceof Reply ? send(wrapped, set, signal) : wrapped;
-		}
-		let added = hook.run(ctx);
-		if (added instanceof Promise) added = await added;
-		if (added instanceof Reply) return send(added, set, signal);
-		if (added !== null && typeof added === 'object') {
-			Object.assign(ctx, added);
-		}
-		return step(index + 1);
+	// What a step adds goes on the context it runs with and on the route's
+	// own, which `onError` reads: after a `validate` of the cookies, the
+	// steps run with a copy holding the validated ones.
+	const merge = (current: Ctx, added: object) => {
+		Object.assign(current, added);
+		if (current !== ctx) Object.assign(ctx, added);
 	};
-	return step(0);
-}
-
-/** The request checked by the route's schemas: the response that refuses it, or nothing. */
-async function validate(
-	definition: RouteDefinition | SocketDefinition,
-	request: RequestContext,
-	rawParams: Record<string, string>,
-	set: ResponseSettings,
-	ctx: Record<string, unknown> & BaseContext,
-	parsers: readonly BodyParser[],
-	validateResponses: boolean,
-): Promise<
-	| { readonly refused: Response }
-	| { readonly ctx: Record<string, unknown> & BaseContext }
-> {
-	const { schema } = definition;
-	const issues: ValidationIssue[] = [];
-	let part: RequestPart | undefined;
-	const parts = [
-		['params', schema.params, () => rawParams],
-		['query', schema.query, () => readQuery(request.url)],
-		['headers', schema.headers, () => readHeaders(request.request.headers)],
-	] as const;
-	for (const [target, partSchema, read] of parts) {
-		const raw = read();
-		if (partSchema === undefined) {
-			ctx[target] = raw;
-			continue;
-		}
-		const checked = await check(partSchema, raw, target);
-		if (checked.ok) ctx[target] = checked.value;
-		else {
-			part ??= target;
-			issues.push(...checked.issues);
-		}
-	}
-	// The request's cookies stay on `ctx`, where every hook reads them as
-	// they arrived — an `onError` or an `onRefusal` included; the handler
-	// alone reads the validated ones, on a copy of the context.
-	let cookies: { value: unknown } | undefined;
-	if (schema.cookies !== undefined) {
-		const checked = await check(schema.cookies, ctx.cookies, 'cookies');
-		if (checked.ok) cookies = { value: checked.value };
-		else {
-			part ??= 'cookies';
-			issues.push(...checked.issues);
-		}
-	}
-	ctx['body'] = undefined;
-	const bodySchema = 'body' in schema ? schema.body : undefined;
-	if (bodySchema !== undefined) {
-		const body = await readBody(ctx.request, parsers);
-		if (!body.ok) {
-			part ??= 'body';
-			issues.push(body.issue);
-		} else {
-			const checked = await check(bodySchema, body.value, 'body');
-			if (checked.ok) ctx['body'] = checked.value;
-			else {
-				part ??= 'body';
-				issues.push(...checked.issues);
+	const answer = (
+		result: AnyReply | Response | Last,
+		responses: ResponseSchemas | undefined,
+		handler = false,
+	) => sent(run, result, responses, handler);
+	const step = async (
+		index: number,
+		ctx: Ctx,
+		responses: ResponseSchemas | undefined,
+	): Promise<Response | Last> => {
+		const hook = steps[index];
+		if (hook === undefined) return answer(await last(ctx), responses, true);
+		const next = index + 1;
+		const rest = () => step(next, ctx, responses);
+		switch (hook.kind) {
+			case 'derive': {
+				let added = hook.run(ctx);
+				if (added instanceof Promise) added = await added;
+				if (added instanceof Reply) return answer(added, responses);
+				if (added !== null && typeof added === 'object') {
+					merge(ctx, added);
+				}
+				return step(next, ctx, responses);
 			}
+			case 'wrap':
+				if (socket) return rest();
+				// A wrap or a middleware returns the rest's response, or its own.
+				return answer(
+					(await wrapped(hook.run, ctx, rest)) as Response | Last,
+					responses,
+				);
+			case 'middleware': {
+				let result = middleware(hook.run, ctx, merge, rest, run.definition);
+				if (result instanceof Promise) result = await result;
+				return answer(result as AnyReply | Response | Last, responses);
+			}
+			case 'validate': {
+				const raw = hook.raw === true;
+				const validated = await validateStep(run, hook.schemas, raw, ctx);
+				if ('refused' in validated) return validated.refused;
+				return step(next, validated.ctx, responses);
+			}
+			case 'responds':
+				return step(next, ctx, socket ? undefined : hook.responses);
 		}
-	}
-	if (part === undefined) {
-		return { ctx: cookies === undefined ? ctx : handlerContext(ctx, cookies) };
-	}
-	return {
-		refused: await refuse(
-			definition,
-			{ kind: 'validation', part, issues },
-			set,
-			ctx,
-			validateResponses,
-		),
 	};
+	return step(0, ctx, undefined);
 }
 
-/** The context a handler reads: `ctx`, its cookies the validated ones. */
-function handlerContext(
-	ctx: Record<string, unknown> & BaseContext,
-	cookies: { value: unknown },
-): Record<string, unknown> & BaseContext {
-	const copy: Record<string, unknown> = { ...ctx };
-	copy['cookies'] = cookies.value;
-	return copy as Record<string, unknown> & BaseContext;
+/**
+ * A step's result as the chain returns it: a reply sent, once checked by
+ * the `responds` in force. Synchronous but for a reply it checks. The
+ * handler's reply must have a status `responds` declares; a middleware's
+ * is checked when its status is declared, and sent as it is otherwise, as
+ * its type says.
+ */
+function sent<Last>(
+	run: ChainRun,
+	result: AnyReply | Response | Last,
+	responses: ResponseSchemas | undefined,
+	handler: boolean,
+): Response | Last | Promise<Response> {
+	if (!(result instanceof Reply)) return result;
+	const { definition, set } = run;
+	const signal = run.request.request.signal;
+	if (
+		responses === undefined ||
+		isRedirect(result) ||
+		(!handler && responses[result.status as StatusCode] === undefined)
+	) {
+		return send(result, set, signal);
+	}
+	return checkReply(
+		'method' in definition ? definition.method : 'WS',
+		definition.path,
+		responses,
+		result,
+		run.validateResponses,
+	).then((checked) => send(checked, set, signal));
 }
 
-/** A route's request, from its hooks to its handler's reply, sent. */
+/** A route's request, from its chain to its handler's reply, sent. */
 export async function handle(
 	route: RouteDefinition,
 	request: RequestContext,
@@ -170,33 +139,26 @@ export async function handle(
 	validateResponses: boolean,
 ): Promise<Response> {
 	const { ctx, set } = routeContext(route, request, rawParams);
+	const run: ChainRun = {
+		definition: route,
+		request,
+		rawParams,
+		set,
+		parsers,
+		validateResponses,
+	};
 	try {
-		return await chain(
-			route,
-			request,
-			rawParams,
-			set,
-			ctx,
-			parsers,
-			validateResponses,
-			async (validated) => {
-				let reply = route.handler(validated as never);
-				if (reply instanceof Promise) reply = await reply;
-				if (!(reply instanceof Reply)) {
-					throw new TypeError(
-						`${route.method} ${route.path}: the handler returned no reply. ` +
-							'Return ctx.reply(status, body).',
-					);
-				}
-				return sendDeclared(
-					route,
-					reply,
-					set,
-					request.request.signal,
-					validateResponses,
+		return await chain<never>(run, ctx, async (validated) => {
+			let reply = route.handler(validated as never);
+			if (reply instanceof Promise) reply = await reply;
+			if (!(reply instanceof Reply)) {
+				throw new TypeError(
+					`${route.method} ${route.path}: the handler returned no reply. ` +
+						'Return ctx.reply(status, body).',
 				);
-			},
-		);
+			}
+			return reply;
+		});
 	} catch (error) {
 		(request as { error: unknown }).error = error;
 		return fail(route, error, ctx, validateResponses);

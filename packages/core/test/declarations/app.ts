@@ -197,6 +197,8 @@ export function hooked() {
 export function methods() {
 	const app = alxia().derive(() => ({ user: 'u' }));
 	return {
+		get: app.get,
+		ws: app.ws,
 		static: app.static,
 		file: app.file,
 		page: app.page,

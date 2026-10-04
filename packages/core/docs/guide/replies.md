@@ -5,17 +5,15 @@ schemas, how a body is encoded, headers and cookies, redirects, and how a
 thrown error becomes a response.
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, responds, validate } from '@alxia/core';
 import { z } from 'zod';
 
 const User = z.object({ id: z.number(), name: z.string() });
 
 const app = alxia().get(
 	'/users/:id',
-	{
-		params: z.object({ id: z.coerce.number() }),
-		response: { 200: User, 404: z.object({ error: z.literal('not_found') }) },
-	},
+	validate({ params: z.object({ id: z.coerce.number() }) }),
+	responds({ 200: User, 404: z.object({ error: z.literal('not_found') }) }),
 	({ params, reply }) =>
 		params.id === 1 ? reply(200, { id: 1, name: 'Ada' }) : reply(404, { error: 'not_found' }),
 );
@@ -41,15 +39,15 @@ type.
 
 ### With response schemas
 
-`response` maps each status the route may answer to the schema of its
-body. `reply` then takes only a declared status, with a body the schema
-**accepts** (its input):
+`responds(schemas)`, among the route's middlewares, maps each status the
+route may answer to the schema of its body. `reply` then takes only a
+declared status, with a body the schema **accepts** (its input):
 
 ```ts
-app.get('/users', { response: { 200: User } }, ({ reply }) =>
+app.get('/users', responds({ 200: User }), ({ reply }) =>
 	reply(201, { id: 1, name: 'x' }), // compile error: 201 is not declared
 );
-app.get('/users', { response: { 200: User } }, ({ reply }) =>
+app.get('/users', responds({ 200: User }), ({ reply }) =>
 	reply(200, { id: '1', name: 'x' }), // compile error: the body does not match
 );
 ```
@@ -60,7 +58,7 @@ database row — never leaves the server:
 
 ```ts
 const row = { id: 1, name: 'Ada', password: 'secret' };
-app.get('/me', { response: { 200: User } }, ({ reply }) => reply(200, row));
+app.get('/me', responds({ 200: User }), ({ reply }) => reply(200, row));
 // → {"id":1,"name":"Ada"}
 ```
 
@@ -85,7 +83,7 @@ be left out: `reply(204)`.
 
 ### Without response schemas
 
-Any status, any body. The body's type is still kept, so a client reads it:
+A route without `responds`: any status, any body. The body's type is still kept, so a client reads it:
 
 ```ts
 app.get('/health', ({ reply }) => reply(200, { ok: true as const }));
@@ -114,25 +112,26 @@ and the OpenAPI document cannot tell them apart:
 ```ts
 app.get(
 	'/users/:id',
-	{ params: z.object({ id: z.coerce.number() }), response: { 200: User, 404: NotFound } },
+	validate({ params: z.object({ id: z.coerce.number() }) }),
+	responds({ 200: User, 404: NotFound }),
 	({ params, reply }) => {
 		const user = users.get(params.id);
 		return user ? reply.ok(user) : reply.notFound({ error: 'not_found' });
 	},
 );
 
-app.delete('/users/:id', { response: { 204: z.undefined() } }, ({ reply }) => reply.noContent());
+app.delete('/users/:id', responds({ 204: z.undefined() }), ({ reply }) => reply.noContent());
 app.get('/', ({ reply }) => reply.html(200, '<h1>Welcome</h1>'));
 ```
 
 The body may be left out where `reply(status)` may: always without
 schemas, and where the status's schema takes `undefined` with them. With
-`response` schemas, a route has a shortcut only for a status it declares —
+`responds`, a route has a shortcut only for a status it declares —
 `noContent` only when its 204 takes `undefined` — and its body is checked
 the same way:
 
 ```ts
-// response: { 200: User }
+// responds({ 200: User })
 ({ reply }) => reply.notFound({ error: 'not_found' }); // Property 'notFound' does not exist
 ({ reply }) => reply.html(200, '<p>…</p>');            // 200's schema takes no string
 ```
@@ -186,7 +185,7 @@ response's) apply to the reply the request ends with, whatever its status: the h
 hook's, an `onError`'s, or the 400 of a refused request.
 
 ```ts
-app.post('/login', { body: z.object({ user: z.string() }) }, ({ body, set, reply }) => {
+app.post('/login', validate({ body: z.object({ user: z.string() }) }), ({ body, set, reply }) => {
 	set.cookies.set('session', createSession(body.user), {
 		httpOnly: true,
 		secure: true,
@@ -212,9 +211,9 @@ error is sent without them.
 `set.cookies` holds only the response's: it starts empty, and
 `set.cookies.get` reads back what this response set. To read the request's
 cookies, read `ctx.cookies` — in a handler or any route hook (`derive`,
-`wrap`, `onError`, `onRefusal`) — or declare them in the route's schema to
-validate them for its handler
-([Routes](routes.md#the-schema), [Hooks](hooks.md#reading-the-requests-cookies)).
+`wrap`, `onError`, `onRefusal`) — or give the route
+`validate({ cookies })` to validate them for what follows it
+([Routes](routes.md#validate-and-responds), [Hooks](hooks.md#reading-the-requests-cookies)).
 
 ## Redirects
 
@@ -230,7 +229,7 @@ type RedirectFunction = <const Status extends RedirectStatus = 302>(
 ) => Reply<Status, undefined>;
 ```
 
-`redirect` needs no response schema, even on a route that declares others:
+`redirect` needs no response schema, even on a route whose `responds` declares others:
 the redirect is added to the route's outcomes.
 
 ## Errors
@@ -316,7 +315,7 @@ interface ProblemDetails<Status extends ClientErrorStatus | ServerErrorStatus> {
 }
 ```
 
-On a route with `response` schemas, a problem is a reply like any other:
+On a route with `responds`, a problem is a reply like any other:
 its status must be declared and its body accepted by that status's schema.
 [`onRefusal`](hooks.md#onrefusal) answers a refused request with one, and
 a hook per kind declares a schema for each: `onRefusal('validation', { response: { 400: Invalid } }, hook)`

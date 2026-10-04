@@ -4,7 +4,256 @@ This page lists what the next releases change for an app built on
 `@alxia/core`: what changed, the code before and after, and whether it can
 break yours.
 
-## Next release: `@alxia/core` 0.3.1
+## Next release: `@alxia/core` 0.4.0
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [One middleware model](#one-middleware-model) | core | no: the forms of 0.3 still work, deprecated |
+
+### One middleware model
+
+**What changed.** A route takes middlewares after its path, or after its
+options: `app.<method>(path, options?, ...middlewares, handler)`. A
+middleware is `(ctx, next) => …`, made once with `defineMiddleware`. It
+returns `next(added)` to pass `added` on, typed, to the middlewares after
+it and to the handler; a reply, which ends the request and joins the
+route's type; or a `Response`, sent as it is. `next()` resolves to the
+response of the rest of the route, so a middleware that awaits it runs
+around them. The request's schemas are middlewares too: `validate(…)` for
+the request, `responds(…)` for the replies. They run where they stand.
+`options` holds the route's configuration only: `bodyLimit` and `detail`.
+
+```ts
+import { alxia, defineMiddleware, responds, validate } from '@alxia/core';
+
+const auth = defineMiddleware(async (ctx, next) => {
+	const user = await session(ctx.request);
+	if (!user) return ctx.reply(401, { error: 'unauthorized' as const });
+	return next({ user }); // `user` is typed on everything after it
+});
+
+const app = alxia().post(
+	'/posts',
+	{ bodyLimit: 1024 * 1024 },
+	auth,
+	validate({ body: Post }),
+	responds({ 201: Post }),
+	({ user, body, reply }) => reply(201, create(user, body)),
+);
+```
+
+`ws(path, options?, ...middlewares, handlers)` takes the same; its options
+are `message`, `send` and `detail`. A route takes at most 8 middlewares.
+`app.route(operation, [hooks]?, handler)`, `group`, `use`, and the hooks on
+the app — `derive`, `decorate`, `wrap`, `onError`, `onRefusal`,
+`bodyLimit`, `onRequest`, `onResponse`, `around` — are unchanged, and not
+deprecated.
+
+**Can it break your code.** No. The forms of 0.3 keep working, deprecated,
+for this minor at least: a list of hooks after the path, a schema before
+the handler, `defineHook`, `defineWrap`, and `ws(path, schema, handlers)`
+with or without a list. Each runs on the same chain as a middleware, and
+behaves as in 0.3: a schema before the handler becomes a `validate` and a
+`responds` placed just before it. The routes of one app may use either
+form; move each one over when you next touch it, with the steps below.
+
+New exports: `defineMiddleware`, `validate`, `responds`, and the types
+`Middleware`, `MiddlewareContext`, `MiddlewareResult`,
+`MiddlewareReturn`, `Next`, `NextFunction`, `RequestSchemas`, `Validated`,
+`ValidateRequires`, `RouteOptions`, `SocketOptions`, and the types a route
+threads its middlewares with.
+
+### Migrating to middlewares
+
+#### 1. `defineHook` becomes `defineMiddleware`
+
+A middleware takes `next` as its second argument, and always returns:
+`next(added)` where the hook returned what it added, `next()` where it
+returned nothing, and the same reply where it replied.
+
+```ts
+// before
+import { defineHook } from '@alxia/core';
+
+const auth = defineHook(async ({ request, reply }) => {
+	const user = await session(request);
+	return user ? { user } : reply(401, { error: 'unauthorized' as const });
+});
+
+const canView = defineHook<{ user: User; params: { id: string } }>()(
+	async ({ user, params, reply }) =>
+		(await mayView(user, params.id)) ? undefined : reply(403, { error: 'forbidden' as const }),
+);
+```
+
+```ts
+// after
+import { defineMiddleware } from '@alxia/core';
+
+const auth = defineMiddleware(async ({ request, reply }, next) => {
+	const user = await session(request);
+	return user ? next({ user }) : reply(401, { error: 'unauthorized' as const });
+});
+
+const canView = defineMiddleware<{ user: User; pathParams: { id: string } }>()(
+	async ({ user, pathParams, reply }, next) =>
+		(await mayView(user, pathParams.id)) ? next() : reply(403, { error: 'forbidden' as const }),
+);
+```
+
+Read the raw path parameters as `pathParams`. A middleware placed before
+any `validate` reads `params` as they arrived too, but after a
+`validate({ params })`, `params` is that schema's output; `pathParams` is
+always the path's strings. A middleware that returns nothing is a 500,
+with this error logged:
+
+```text
+TypeError: GET /posts/:id: a middleware returned nothing: return next(), a reply or a Response
+```
+
+#### 2. `defineWrap` becomes a middleware that awaits `next()`
+
+`next()` runs the middlewares after it and the handler, and resolves to
+their response. Return it, set a header on it first, or return a reply of
+your own.
+
+```ts
+// before
+import { defineWrap } from '@alxia/core';
+
+const exclusive = defineWrap<{ params: { id: string } }>()(
+	async ({ params, reply }, next) =>
+		(await locks.tryRun(params.id, next)) ?? reply(409, { error: 'busy' as const }),
+);
+```
+
+```ts
+// after
+import { defineMiddleware } from '@alxia/core';
+
+const exclusive = defineMiddleware<{ pathParams: { id: string } }>()(
+	async ({ pathParams, reply }, next) =>
+		(await locks.tryRun(pathParams.id, next)) ?? reply(409, { error: 'busy' as const }),
+);
+```
+
+Call `next()` once; a second call is a 500, with
+`GET /posts/:id: a middleware called next() twice` logged.
+
+#### 3. The list of hooks becomes middlewares after the path
+
+Drop the brackets. The middlewares run in the order given, after the hooks
+in force where the route is declared, as the list did.
+
+```ts
+// before
+app.delete('/posts/:id', [auth, canView, exclusive], handler);
+
+// after
+app.delete('/posts/:id', auth, canView, exclusive, handler);
+```
+
+What each one reads is checked where it stands: `canView` before `auth`
+does not compile, since no `user` is given yet.
+
+#### 4. The schema becomes `validate(…)` and `responds(…)`
+
+The request's parts — `params`, `query`, `headers`, `cookies`, `body` — go
+to `validate`; `response` goes to `responds`. `bodyLimit` and `detail` stay
+in the object, which becomes the route's options, before the middlewares.
+
+```ts
+// before
+app.patch(
+	'/posts/:id',
+	[auth, canView],
+	{ params: PostId, body: Update, response: { 200: Post }, bodyLimit: 64 * 1024, detail: { summary: 'Edit a post' } },
+	({ params, body, reply }) => reply(200, update(params.id, body)),
+);
+```
+
+```ts
+// after
+import { responds, validate } from '@alxia/core';
+
+app.patch(
+	'/posts/:id',
+	{ bodyLimit: 64 * 1024, detail: { summary: 'Edit a post' } },
+	auth,
+	canView,
+	validate({ params: PostId, body: Update }),
+	responds({ 200: Post }),
+	({ params, body, reply }) => reply(200, update(params.id, body)),
+);
+```
+
+A route with no options starts with its first middleware:
+`app.post('/posts', validate({ body: NewPost }), handler)`. A schema left
+in the options of a route with middlewares does not compile. The handler
+reads the same validated parts, and its `reply` is typed by `responds` as
+it was by `response`. A refused request is still answered by the
+`onRefusal` hook in force, by default `400 { error: 'validation', issues }`.
+`@alxia/openapi` and `@alxia/client` read the schemas of `validate` and
+`responds` as they read the route's schema.
+
+#### 5. A socket's schema becomes options and `validate`
+
+`message` and `send` are a socket route's options, with `detail`; the
+upgrade request's parts go to `validate`.
+
+```ts
+// before
+app.ws('/rooms/:room', [auth], { query: RoomQuery, message: Chat, send: Chat }, {
+	message: (socket, chat) => socket.publish(socket.data.params.room, chat),
+});
+```
+
+```ts
+// after
+import { validate } from '@alxia/core';
+
+app.ws('/rooms/:room', { message: Chat, send: Chat }, auth, validate({ query: RoomQuery }), {
+	message: (socket, chat) => socket.publish(socket.data.params.room, chat),
+});
+```
+
+The middlewares and `validate` run on the upgrade request, and
+`socket.data` reads what they added. A middleware that awaits `next()` on a
+socket route receives an empty `200` once the socket is open, and must
+return it as it is.
+
+#### 6. Put `validate` where it should answer first
+
+In 0.3 the schema always ran after the list. A middleware's position is now
+its place in the request, so choose it:
+
+```ts
+// auth first, as in 0.3: a stranger gets 401 before his body is read
+app.post('/posts', auth, validate({ body: Post }), handler);
+
+// validate first: an invalid body gets 400 before the user is looked up
+app.post('/posts', validate({ body: Post }), auth, handler);
+```
+
+The middlewares before `validate`, and the `onError` and `onRefusal` hooks,
+read the request as it arrived, its raw cookies included; what follows it
+reads the validated parts.
+
+**`responds` checks the replies made after it.** The handler's reply
+must have a status it declares, as with `response` in 0.3, and is sent as
+its schema's output. A middleware after it that replies with a declared
+status is checked too; one that replies with another status, such as an
+`auth`'s 401, is sent as it is, as the route's type says. A reply made
+before it is not checked:
+
+```ts
+// auth's 401 is sent as it is; a 200 from the handler is checked
+app.get('/me', responds({ 200: User }), auth, handler);
+// declare the 401 to check auth's reply too
+app.get('/me', responds({ 200: User, 401: Unauthorized }), auth, handler);
+```
+
+## 0.3.1
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
@@ -370,6 +619,19 @@ refused at startup. See
 [`@alxia/secure-headers`: a nonce per request](https://github.com/softistx/alxia/blob/develop/packages/secure-headers/docs/guide.md#a-nonce-per-request)
 and [`@alxia/react-router`: a CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#a-csp-nonce).
 
+### Other packages in 0.3.0
+
+These packages changed with 0.3.0, each with its own docs:
+
+- `@alxia/openapi` 0.3.0 — each `onRefusal` kind's statuses on the routes that kind may refuse: [its docs](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/README.md).
+- `@alxia/logger` 0.2.0, `@alxia/telemetry` 0.2.0 — [above](#streamed-bodies-timed-to-their-last-byte).
+- `@alxia/secure-headers` 0.2.0, `@alxia/react-router` 0.2.0 — [above](#a-csp-nonce-per-request).
+- `@alxia/openapi-routes` 0.2.0 — [above](#matchesspec-the-new-name-of-exactly).
+
+Every other `@alxia/*` package, `@alxia/client` included, got a patch
+release whose only change is its peer range on `@alxia/core`; its own docs
+have nothing new.
+
 ## From 0.2.0 or earlier
 
 `@alxia/core` 0.2.1 already shipped this, so it is not part of the next release. If you are upgrading from 0.2.0 or earlier, it changes one thing an app may see: **a client
@@ -388,16 +650,3 @@ app.onResponse((response, { request }) => {
 It cannot break code, but a log or an alert counting 500s sees fewer. An
 error the app throws after the client left is still logged and answered
 500. See [Replies: errors](guide/replies.md#errors).
-
-## Other packages
-
-These packages change with this release, each with its own docs:
-
-- `@alxia/openapi` 0.3.0 — each `onRefusal` kind's statuses on the routes that kind may refuse: [its docs](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/README.md).
-- `@alxia/logger` 0.2.0, `@alxia/telemetry` 0.2.0 — [above](#streamed-bodies-timed-to-their-last-byte).
-- `@alxia/secure-headers` 0.2.0, `@alxia/react-router` 0.2.0 — [above](#a-csp-nonce-per-request).
-- `@alxia/openapi-routes` 0.2.0 — [above](#matchesspec-the-new-name-of-exactly).
-
-Every other `@alxia/*` package, `@alxia/client` included, gets a patch
-release whose only change is its peer range on `@alxia/core`; its own docs
-have nothing new.

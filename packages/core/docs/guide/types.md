@@ -5,15 +5,13 @@ typed from, the context a service can be typed with, and the helpers that
 read them.
 
 ```ts
-import { alxia, type RoutesOf } from '@alxia/core';
+import { alxia, responds, type RoutesOf, validate } from '@alxia/core';
 import { z } from 'zod';
 
 const app = alxia().get(
 	'/users/:id',
-	{
-		params: z.object({ id: z.coerce.number() }),
-		response: { 200: z.object({ id: z.number(), name: z.string() }) },
-	},
+	validate({ params: z.object({ id: z.coerce.number() }) }),
+	responds({ 200: z.object({ id: z.number(), name: z.string() }) }),
 	({ params, reply }) => reply(200, { id: params.id, name: 'Ada' }),
 );
 
@@ -59,8 +57,8 @@ declared, `/users/:id`. A socket is under `WS`, with a `SocketRecord`
 | Part | In `input` when | Typed as |
 | --- | --- | --- |
 | `params` | the path has parameters | `{ [name]: string \| number }`, whatever the schema |
-| `query`, `headers`, `body` | the route has that schema | the schema's **input**; optional when it accepts `undefined` or `{}` |
-| `cookies` | the route has that schema | the schema's input, always optional: a browser sends its own |
+| `query`, `headers`, `body` | a `validate` of the route reads that part | the schema's **input**; optional when it accepts `undefined` or `{}` |
+| `cookies` | a `validate` of the route reads them | the schema's input, always optional: a browser sends its own |
 
 The input of a schema that coerces with `z.coerce` is `unknown`; `zq` in
 [`@alxia/zod`](https://www.npmjs.com/package/@alxia/zod) keeps it the value
@@ -79,7 +77,7 @@ interface Outcome<Status extends number = number, Data = unknown> {
 
 | Outcome | When |
 | --- | --- |
-| each declared `response` status, its data the schema's **output** | the route has `response` schemas |
+| each status its `responds` declares, its data the schema's **output** | the route has a `responds` |
 | each reply the handler can return | it has none |
 | a redirect the handler returns | always |
 | each reply a `derive`, `wrap` or `onError` before the route can return | always |
@@ -175,7 +173,7 @@ test('GET /users/:id answers 200, 400 or 500', () => {
 | --- | --- |
 | `RouteInput`, `RouteOutput`, `OutcomeOf`, `RouteEntryOf` | the pieces of one route's record |
 | `Context`, `BaseContext`, `RequestContext`, `ResponseSettings`, `ResponseCookies` | what handlers and hooks read ([Hooks](hooks.md#what-each-hook-reads)) |
-| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema` | what a route declares, and the checks on it ([Routes](routes.md#what-the-types-refuse)) |
+| `RequestSchemas`, `Validated`, `ResponseSchemas`, `RouteOptions`, `RouteDetail`, `RouteSchema`, `ValidSchema` | what a route declares — `validate`'s and `responds`' arguments, its options — and the checks on it ([Routes](routes.md#what-the-types-refuse)) |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema interface |
 | `ValidationErrorBody`, `ValidationIssue`, `ValidationTarget`, `InternalErrorBody`, `RoutingErrorBody` | the bodies the framework answers |
 | `RoutePath`, `JoinPath`, `PathParams`, `PathParamName` | paths: `PathParams<'/users/:id/files/*'>` is `{ readonly id: string; readonly '*': string }` |

@@ -18,6 +18,13 @@ shape we intend to keep.
   unreadable. The options are expected to go away anyway once routes come
   from codegen-alxia.
 
+  > **Since `@alxia/core` 0.4.0** a route is
+  > `get(path, options?, ...middlewares, handler)`, its schemas the
+  > `validate(…)` and `responds(…)` middlewares, and its options `bodyLimit`
+  > and `detail` only; see [Routes as a chain of steps](route-steps.md).
+  > The examples below keep the form of the time, a schema before the
+  > handler, which 0.4.0 still accepts, deprecated.
+
 ## Slice 1: shortcuts on `reply`
 
 Today a handler answers `reply(200, body)`, `reply(201, body)`,

@@ -12,6 +12,22 @@ export type {
 	ResponseSettings,
 } from './context';
 export type {
+	AddedOf,
+	HandlerContext,
+	Merge,
+	Middleware,
+	MiddlewareBase,
+	MiddlewareContext,
+	MiddlewareResult,
+	MiddlewareReturn,
+	Next,
+	NextFunction,
+	SchemaOf,
+	ThreadContext,
+	ThreadReplies,
+	ThreadSchema,
+} from './middleware';
+export type {
 	BehindShortcuts,
 	BodyLimited,
 	BodyLimitShortcut,

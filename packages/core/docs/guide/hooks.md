@@ -2,7 +2,8 @@
 
 This page covers the code that runs around routes: route hooks, which
 apply to the routes declared after them and can end a request with a typed
-reply, and global hooks, which apply to the whole app.
+reply, and global hooks, which apply to the whole app. What runs for one
+route alone is a middleware ([Middleware](middleware.md#a-routes-middlewares)).
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -24,8 +25,9 @@ const app = alxia()
 | | Applies to | Declared with |
 | --- | --- | --- |
 | route hooks | the routes declared **after** them, in the same app or [group](groups-and-plugins.md#groups) | `decorate`, `derive`, `wrap`, `onError`, `onRefusal` |
-| hooks on one route | that route alone, after the route hooks in force | a list after its path: `defineHook`, `defineWrap` ([below](#hooks-on-one-route)) |
+| middlewares | the routes they are given to, after the route hooks in force | `defineMiddleware`, `validate`, `responds`, after the path ([Middleware](middleware.md#a-routes-middlewares)) |
 | global hooks | every request to the app, wherever they are declared | `around`, `onRequest`, `onResponse`, `onStart`, `onStop`, `parser` |
+| hooks on one route — **deprecated** | that route alone, after the route hooks in force | a list after its path: `defineHook`, `defineWrap` ([below](#hooks-on-one-route)) |
 
 The order of the chain is the order of the request, at runtime and in the
 types alike: a route declared before a `derive` neither runs it nor reads
@@ -38,22 +40,23 @@ around (first declared outermost)
 └─ onRequest hooks           ← a Response here is sent as it is
    └─ routing                ← 404, 405, 426
       └─ route hooks, in order: derive / decorate / wrap
-         └─ the route's own list, in order: defineHook / defineWrap
-            └─ validation    ← 400, or the onRefusal hook's reply
-               └─ handler
+         └─ the route's middlewares, in order, validate and responds where they stand
+            ├─ validate      ← 400, or the onRefusal hook's reply
+            └─ handler       ← its reply checked by the responds before it
          onError hooks       ← for what any of the above threw
    onResponse hooks          ← every response, 404s included
 ```
 
 A body read past its route's `bodyLimit` is a `body_limit` refusal,
 answered by [`onRefusal`](#onrefusal) or with a 413, wherever it is read: a
-route hook, validation or the handler ([Routes](routes.md#body-size-bodylimit)). A global hook reads it
+route hook, a middleware, a `validate` or the handler ([Routes](routes.md#body-size-bodylimit)). A global hook reads it
 unbounded, and the route's limit is then skipped.
 
-Route hooks run **before validation**: they read `pathParams`, the path
-parameters as they arrived, not `params`. A hook in a route's own list
-reads them as `params`, typed by its path but still strings
-([Before validation](#before-validation)).
+Route hooks run **before the route's middlewares**, so before any
+`validate`: they read `pathParams`, the path parameters as they arrived,
+not `params`. A middleware before a `validate` reads them as `params` too,
+typed by its path but still strings
+([What a middleware reads](middleware.md#what-a-middleware-reads)).
 
 ## `decorate`
 
@@ -101,12 +104,16 @@ const app = alxia()
 
 Write the error literal `as const`: the client then reads
 `{ error: 'unauthenticated' }`, not `{ error: string }`. A hook's reply is
-sent as it is: the route's `response` schemas do not check it.
+sent as it is: it is made before the route's middlewares, so a `responds`
+among them does not check it.
+
+For some routes rather than every route after it, the same hook is a
+middleware: `defineMiddleware(({ request, reply }, next) => … next({ user }))`.
 
 ### Reading the request's cookies
 
-Every route hook — `derive`, `wrap`, `onError`, `onRefusal`, a guard —
-reads the request's cookies as `ctx.cookies`, a
+Every route hook — `derive`, `wrap`, `onError`, `onRefusal` — and every
+middleware before a `validate` reads the request's cookies as `ctx.cookies`, a
 `Readonly<Record<string, string>>` parsed from the `Cookie` header on first
 read. A route with no hook or handler that reads it never parses the header.
 
@@ -119,32 +126,33 @@ const app = alxia()
 // GET /me with "Cookie: sid=…" → the session's user; without it → {"user":null}
 ```
 
-A route with a `cookies` schema gives its **handler** the validated values
-instead, typed by the schema's output. Its hooks still read the cookies as
-they arrived — strings — even an `onError` or `onRefusal` that runs after
-validation, so the type each one reads is the one it gets:
+A `validate({ cookies })` gives what follows it — the middlewares after it
+and the **handler** — the validated values instead, typed by the schema's
+output. The hooks still read the cookies as they arrived — strings — even
+an `onError` or `onRefusal` that runs after the `validate`, and so do the
+middlewares before it, so the type each one reads is the one it gets:
 
 ```ts
 app
 	.onError((error, { cookies }) => console.error(error, cookies['sid'])) // a string
-	.get('/visits', { cookies: z.object({ visits: z.coerce.number() }) },
+	.get('/visits', validate({ cookies: z.object({ visits: z.coerce.number() }) }),
 		({ cookies, reply }) => reply(200, cookies.visits));                 // a number
 ```
 
 Two consequences of that split:
 
-- On a route with a `cookies` schema, the handler's context is a copy of
-  the hooks' whose `cookies` is the schema's output. `getContext()` from
+- After a `validate({ cookies })`, the context is a copy of the hooks'
+  whose `cookies` is the schema's output. `getContext()` from
   `@alxia/context-storage` holds the hooks' one, with the cookies as
   strings.
-- A handler's context on a route whose `cookies` schema outputs anything
+- A handler's context after a `cookies` schema that outputs anything
   but strings — `{ visits: number }` — is no longer a `BaseContext`, whose
   `cookies` are strings. Pass a helper typed `(ctx: BaseContext) => …` the
   fields it reads, or type it `Omit<BaseContext, 'cookies'>`.
 
-A `derive` that returns `cookies` replaces the map for the hooks and the
-handler after it; a route's `cookies` schema then validates the map it
-returned, not the `Cookie` header.
+A `derive` that returns `cookies` replaces the map for the hooks, the
+middlewares and the handler after it; a `validate({ cookies })` then
+validates the map it returned, not the `Cookie` header.
 
 `set.cookies` is the other side: the cookies the **response** sets, empty
 when the request starts. `set.cookies.get('sid')` reads back what this
@@ -160,7 +168,8 @@ wrap<Result extends AnyReply | Response>(
 ```
 
 A route hook around the rest of the route: `next()` runs the hooks declared
-after it, validation and the handler, and resolves to the `Response`. The
+after it, the route's middlewares and the handler, and resolves to the
+`Response`. The
 hook returns that response, another one, or a reply of its own — which,
 like a `derive`'s, is added to the type of the routes after it.
 
@@ -175,15 +184,43 @@ const app = alxia()
 	.get('/items/:id', ({ params, reply }) => reply(200, { id: params.id }));
 ```
 
-- A 400 from validation reaches the hook as a response, like any other.
+- A 400 from a `validate` reaches the hook as a response, like any other.
 - An error thrown after it reaches it first, as a rejection of `next()`;
   rethrown, it goes on to `onError`.
 - A socket's upgrade skips `wrap`: there is no response to wrap.
 
 Use it for what must hold across the handler: an idempotency key, a
-database transaction, a lock, a cookie set from the response.
+database transaction, a lock, a cookie set from the response. For one route,
+a middleware that awaits `next()` does the same
+([Middleware](middleware.md#a-routes-middlewares)).
 
 ## Hooks on one route
+
+**Deprecated.** A list of hooks after the path, and the `defineHook` and
+`defineWrap` that make them, still run as they did in 0.3, and will be
+removed in a later minor. Give the route [middlewares](middleware.md#a-routes-middlewares)
+instead: a `defineHook` becomes a `defineMiddleware` that returns
+`next(added)` — `next()` where the hook returned nothing — and a
+`defineWrap` one that awaits `next()`:
+
+```ts
+// deprecated
+const canView = defineHook<{ user: User; params: { id: string } }>()(
+	async ({ user, params, reply }) =>
+		(await mayView(user, params.id)) ? undefined : reply(403, { error: 'forbidden' as const }),
+);
+app.patch('/posts/:id', [canView], { params: PostId, body: Update, response: { 200: Post } }, handler);
+
+// now
+const canView = defineMiddleware<{ user: User; pathParams: { id: string } }>()(
+	async ({ user, pathParams, reply }, next) =>
+		(await mayView(user, pathParams.id)) ? next() : reply(403, { error: 'forbidden' as const }),
+);
+app.patch('/posts/:id', canView, validate({ params: PostId, body: Update }), responds({ 200: Post }), handler);
+```
+
+Each change is on [Upgrading](../upgrading.md). The rest of this section
+describes the list as it runs.
 
 A route takes hooks of its own in a list, after its path and before its
 schema: `app.patch(path, [canView, loadBookmark, canEdit], schema, handler)`, or
@@ -286,21 +323,23 @@ naming the key ([Troubleshooting](../troubleshooting.md#the-hook-reads--which-th
 Name the requirement before the hook — `defineHook<{ user: User }>()(…)`,
 not `defineHook<{ user: User }>(…)`, which does not compile.
 
-### The list or a group's `derive`?
+### A middleware or a group's `derive`?
 
-Both run the same hooks the same way; they differ in where the hook is
-written and how far it reaches.
+The deprecated list's place is now a route's middlewares. They and a
+group's `derive` differ in where the check is written and how far it
+reaches.
 
-| | `[hook]` on the route | `group(g => g.derive(hook).…)` |
+| | a middleware on the route | `group(g => g.derive(hook).…)` |
 | --- | --- | --- |
 | applies to | one route | every route of the group, declared after it |
-| written | once with `defineHook`, then named on each route | inline, where its context is already typed |
+| written | once with `defineMiddleware`, then named on each route | inline, where its context is already typed |
 | reads | what it names in `Requires`, checked on each route | the group's context, typed as it is written |
 | best for | a check that differs route by route: `canView` here, `canEdit` there, on routes of one path | a guard that every route in a prefix shares: an admin area, an API version |
 
-When three routes of the same group take the same list, a `derive` in a
-group of their own says it once. When the routes of one path each check
-something else, the list keeps each check beside the route it guards.
+When three routes of the same group take the same middleware, a `derive`
+in a group of their own says it once. When the routes of one path each
+check something else, a middleware keeps each check beside the route it
+guards.
 
 ### The type cost
 
@@ -359,11 +398,13 @@ onRefusal<Kind extends RefusalKind, Responses extends RefusalResponses, Result e
 ```
 
 Answers a request that a route declared after it refuses before its
-handler runs. There are two kinds of refusal, each with its default:
+handler runs. A `validate` among a route's middlewares is refused through
+it, wherever it stands, as a schema of 0.3 was. There are two kinds of
+refusal, each with its default:
 
 | `kind` | When | Default |
 | --- | --- | --- |
-| `validation` | the route's schemas refuse the request | `400 { "error": "validation", "issues": […] }` ([The 400](routes.md#the-400)) |
+| `validation` | a `validate` refuses the request — or a deprecated schema before the handler | `400 { "error": "validation", "issues": […] }` ([The 400](routes.md#the-400)) |
 | `body_limit` | the body is larger than the route's [`bodyLimit`](routes.md#body-size-bodylimit) | `413 { "error": "content_too_large", "limit": … }` |
 
 The hook reads the refusal and the context. It returns a reply with a 4xx
@@ -390,7 +431,7 @@ An API whose errors are RFC 9457 problems, as JMAP's are, answers them
 with [`problem`](replies.md#problem-details-problem):
 
 ```ts
-import { alxia, problem, type Refusal } from '@alxia/core';
+import { alxia, problem, type Refusal, validate } from '@alxia/core';
 import { z } from 'zod';
 
 const jmapProblem = (refusal: Refusal) =>
@@ -406,10 +447,10 @@ const jmapProblem = (refusal: Refusal) =>
 
 const app = alxia()
 	.onRefusal(jmapProblem)
-	.post('/jmap', { body: z.object({ using: z.array(z.string()) }), bodyLimit: 10_000_000 }, ({ reply }) =>
+	.post('/jmap', { bodyLimit: 10_000_000 }, validate({ body: z.object({ using: z.array(z.string()) }) }), ({ reply }) =>
 		reply(200, { methodResponses: [] }),
 	)
-	.get('/download/:blobId', { params: z.object({ blobId: z.string().min(1) }) }, ({ reply }) =>
+	.get('/download/:blobId', validate({ params: z.object({ blobId: z.string().min(1) }) }), ({ reply }) =>
 		reply(200, 'blob'),
 	);
 ```
@@ -429,7 +470,7 @@ one take the hook of the app using it, and the plugin's hook then applies to
 the routes declared after `use`, as its `derive`s do.
 
 **Typed.** The hook's reply replaces the default 400 in the type of every
-route after it that validates part of its request, so
+route after it that validates part of its request with a `validate`, so
 [`@alxia/client`](https://www.npmjs.com/package/@alxia/client) reads the
 problem. A route under a `bodyLimit` may be refused too, and its type
 gains the hook's replies in place of the default 413. A route that neither
@@ -444,7 +485,7 @@ every route it may refuse: the JMAP hook above puts its 413 in the type of
 [hook per kind](#one-hook-per-kind) says which, and keeps it out.
 
 **With schemas.** Given `{ response, contentType? }` first, the hook's
-`reply` is typed by those schemas, as a route's is. Its reply is checked by
+`reply` is typed by those schemas, as a `responds` types a handler's. Its reply is checked by
 the schema of its status and sent as that schema's output, and a reply the
 schema refuses is a 500, as a handler's is ([`validateResponses`](replies.md#validateresponses)).
 `contentType` is set on the reply unless it sets its own.
@@ -459,7 +500,7 @@ const documented = alxia()
 	.onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' }, (refusal, { reply }) =>
 		reply(400, { type: 'urn:ietf:params:jmap:error:notRequest', status: 400, detail: refusal.kind }),
 	)
-	.post('/jmap', { body: z.object({ using: z.array(z.string()) }) }, ({ reply }) => reply(200, 'ok'));
+	.post('/jmap', validate({ body: z.object({ using: z.array(z.string()) }) }), ({ reply }) => reply(200, 'ok'));
 ```
 
 ### One hook per kind
@@ -480,10 +521,10 @@ const app = alxia()
 	.onRefusal('body_limit', { response: { 413: TooLarge }, contentType: 'application/problem+json' }, (refusal, { reply }) =>
 		reply(413, { type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: refusal.limit }),
 	)
-	.post('/jmap', { body: z.object({ using: z.array(z.string()) }), bodyLimit: 10_000_000 }, ({ reply }) =>
+	.post('/jmap', { bodyLimit: 10_000_000 }, validate({ body: z.object({ using: z.array(z.string()) }) }), ({ reply }) =>
 		reply(200, { methodResponses: [] }),
 	)
-	.get('/download/:blobId', { params: z.object({ blobId: z.string().min(1) }) }, ({ reply }) =>
+	.get('/download/:blobId', validate({ params: z.object({ blobId: z.string().min(1) }) }), ({ reply }) =>
 		reply(200, 'blob'),
 	);
 ```
@@ -641,17 +682,24 @@ interface BaseContext extends RequestContext {   // derive, wrap, onError, onRef
 `ResponseCookies` is Bun's `CookieMap`, documented as the response's: its
 `get` and `has` read what this response set.
 
-A hook in a route's list reads `HookContext<Requires>`: `BaseContext`, the
-raw `params` and `query`, and what it names. A handler reads
-`BaseContext`, what every hook before it added, and the validated
-`params`, `query`, `headers`, `cookies` and `body`: a `cookies` schema's
-output replaces the request's map for the handler alone. `ContextOf<App>`
+A middleware made by `defineMiddleware<Requires>()` reads
+`MiddlewareContext<Requires>`, `BaseContext & Requires`; one written
+inline reads the route's context where it stands: `BaseContext`, what the
+hooks and the middlewares before it added, and the request's `params`,
+`query`, `headers` and `cookies` as they arrived, or as a `validate` before
+it gave them back ([What a middleware reads](middleware.md#what-a-middleware-reads)).
+A handler reads the same after the last middleware: a `cookies` schema's
+output replaces the request's map for what follows the `validate` alone,
+never for the hooks. A hook in a deprecated list reads
+`HookContext<Requires>`: `BaseContext`, the raw `params` and `query`, and
+what it names. `ContextOf<App>`
 names that context outside the chain ([The app's type](types.md#contextofapp)).
 
 ## See also
 
-- [Middleware: which way to use](middleware.md): every way to run code
-  around routes, side by side, and the order a request runs them in.
+- [Middleware: which way to use](middleware.md): middlewares, route hooks,
+  global hooks and plugins side by side, and the order a request runs them
+  in.
 - [Groups and plugins](groups-and-plugins.md): scoping a hook to some
   routes, and sharing hooks across apps.
 - [Replies](replies.md): `reply`, `set`, and errors.

@@ -4,8 +4,8 @@ This page takes an empty Bun project to a running, validated, tested app,
 and points at the page that goes deeper at each step.
 
 To skip ahead, `bun create @alxia my-app --template api` writes an app of
-the shape this page ends with — a route validated by Zod, behind a hook of
-its own, and a spec calling it in process and through the typed client —
+the shape this page ends with — a route validated by Zod, behind an API-key
+check of its own, and a spec calling it in process and through the typed client —
 and installs it
 ([`@alxia/create`](https://www.npmjs.com/package/@alxia/create)). By hand:
 
@@ -51,7 +51,7 @@ in **one chain** and export its type. `App` is what
 ## A route that validates
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, responds, validate } from '@alxia/core';
 import { z } from 'zod';
 
 const User = z.object({ id: z.number(), name: z.string() });
@@ -63,10 +63,8 @@ export const app = alxia()
 	.decorate({ users })
 	.get(
 		'/users/:id',
-		{
-			params: z.object({ id: z.coerce.number().int() }),
-			response: { 200: User, 404: NotFound },
-		},
+		validate({ params: z.object({ id: z.coerce.number().int() }) }),
+		responds({ 200: User, 404: NotFound }),
 		({ params, users, reply }) => {
 			const user = users.get(params.id); // params.id: number
 			return user ? reply(200, user) : reply(404, { error: 'not_found' });
@@ -74,19 +72,24 @@ export const app = alxia()
 	)
 	.post(
 		'/users',
-		{ body: z.object({ name: z.string().min(1) }), response: { 201: User } },
+		validate({ body: z.object({ name: z.string().min(1) }) }),
+		responds({ 201: User }),
 		({ body, reply }) => reply(201, { id: 2, name: body.name }),
 	);
 
 export type App = typeof app;
 ```
 
-What this buys:
+`validate` and `responds` are middlewares: given among the route's
+arguments, between the path and the handler, they run in the order given,
+with any middleware of your own — an `auth` placed before `validate`
+answers a stranger 401 before his body is read
+([Middleware](middleware.md#where-validate-stands)). What this buys:
 
 - `GET /users/abc` is a **400** naming the refused value, before the handler
   runs ([Routes](routes.md#the-400)).
-- The handler can only `reply` with 200 or 404, each with a body its schema
-  accepts; anything else is a compile error ([Replies](replies.md)).
+- `responds` types the handler's `reply`: only 200 or 404, each with a body
+  its schema accepts; anything else is a compile error ([Replies](replies.md)).
 - The 200 is sent as the schema's **output**: `password` is not in `User`,
   so it never leaves the server.
 - `decorate` puts `users` in the context of every route declared after it
@@ -131,8 +134,9 @@ itself, calls the same `fetch` with typed arguments.
 
 | You want to | Read |
 | --- | --- |
-| validate the query, headers, cookies, or a form | [Routes and schemas](routes.md) |
+| validate the query, headers, cookies, or a form | [Routes and validation](routes.md) |
 | set a header or a cookie, redirect, stream, send a file | [Replies](replies.md) |
+| guard some routes — an auth, a permission check — with a middleware of your own | [Middleware](middleware.md) |
 | authenticate, add a database to the context, catch errors | [Hooks](hooks.md) |
 | split the app into files or reusable plugins | [Groups and plugins](groups-and-plugins.md) |
 | serve a directory, a favicon, a single-page app | [Static files](static-files.md) |

@@ -7,14 +7,42 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **One middleware model.** A route takes its middlewares after its path or
+  its options — `app.post(path, { bodyLimit }, auth, validate({ body: Post }), responds({ 201: Post }), handler)` —
+  each a `(ctx, next) => …` written once with `defineMiddleware`. What a
+  middleware passes to `next(added)` the ones after it and the handler read,
+  typed; awaiting `next()` wraps the rest of the route; a reply it returns
+  joins the route's type. `validate` stands where it is given, so an `auth`
+  before it answers 401 before the body is read, and `responds` checks the
+  replies made after it. `ws` takes the same. The 0.3 forms — a list of
+  hooks, a schema before the handler, `defineHook`, `defineWrap` — keep
+  working, deprecated.
 
 ## Next
 
-Nothing scheduled yet.
+- **Middlewares from the plugin packages.** The packages that give a route
+  hook today — `@alxia/jwt`, `@alxia/janus`, `@alxia/rate-limit`,
+  `@alxia/cache`, `@alxia/redis` (its idempotency hook), `@alxia/secure-headers`,
+  `@alxia/logger`, `@alxia/telemetry`, `@alxia/context-storage`,
+  `@alxia/graphql`, `@alxia/react-router` — give middlewares made by
+  `defineMiddleware`, placed among a route's own.
+- **No route table in the app's type.** The `Routes` type parameter,
+  `~routes` and `RoutesOf` leave the app, and `@alxia/client` is retired: an
+  app is tested in process with `app.request`.
+- **Routes from the OpenAPI document.** `@alxia/openapi` becomes spec first,
+  `route(operation, ...middlewares)` declaring each operation of a document
+  with the same middlewares as any route; the package that generated a
+  document from an app is retired.
 
 ## Later
 
+- **The 0.3 route forms removed.** In the minor after the middleware model:
+  a list of hooks after the path, a schema before the handler, `defineHook`
+  and `defineWrap` are gone, leaving one way to declare a route.
+- **A context declared once.** A `Register` interface the app augments —
+  `declare module '@alxia/core' { interface Register { context: … } }` — with
+  `defineRoutes` and `AppContext`, so a module of routes reads the app's
+  context typed without importing the app.
 - **Comments on a stream.** A handler yielding a comment line of its own
   (`: …`), beside the keep-alive the stream already sends while idle.
 
@@ -35,8 +63,9 @@ Nothing scheduled yet.
   public API only, so an app ships only what it uses.
 - **A raw `Response` from a handler.** A handler answers with `reply`, so the
   client's type holds every status a route can send; a `Response` would be
-  outside that contract. A global hook (`onRequest`, `onResponse`) can still
-  return one, for what a typed client never asks.
+  outside that contract. A route middleware or a `wrap` may return one, sent
+  as it is, and so may a global hook (`onRequest`, `onResponse`), for what a
+  typed client never asks.
 
 ## Shipped
 

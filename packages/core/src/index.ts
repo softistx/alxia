@@ -9,6 +9,7 @@ export type {
 } from './app/app-hooks';
 export type { GroupMethod, UseMethod } from './app/compose-methods';
 export { defineHook, defineWrap } from './app/define-hook';
+export { defineMiddleware } from './app/define-middleware';
 export { definePlugin } from './app/define-plugin';
 export type {
 	AroundHook,
@@ -22,13 +23,23 @@ export type {
 	StartHook,
 	StopHook,
 } from './app/definition';
-export type { RouteMethod } from './app/route-method';
+export type {
+	AppWithRoute,
+	RouteOptions,
+} from './app/route-forms';
+export type {
+	DeprecatedForms,
+	RouteApp,
+	RouteMethod,
+} from './app/route-method';
+export type { MiddlewareForms } from './app/route-middlewares';
 export type {
 	CheckedOperation,
 	OperationMethod,
 	OperationSchema,
 	RouteOperation,
 } from './app/route-operation';
+export type { OptionsForms } from './app/route-options';
 export type {
 	BodyLimitMethod,
 	DecorateMethod,
@@ -46,7 +57,16 @@ export type {
 	RefusalMethod,
 	RoutesOf,
 } from './app/signatures';
-export type { SocketMethod } from './app/socket-method';
+export type {
+	AppWithSocket,
+	SocketForms,
+	SocketOptions,
+} from './app/socket-forms';
+export type {
+	DeprecatedSocketForms,
+	SocketMethod,
+} from './app/socket-method';
+export type { SocketOptionsForms } from './app/socket-options';
 export type {
 	FileMethod,
 	PageMethod,
@@ -76,6 +96,12 @@ export type {
 	MaxRouteHooks,
 	MaybePromise,
 	Method,
+	Middleware,
+	MiddlewareContext,
+	MiddlewareResult,
+	MiddlewareReturn,
+	Next,
+	NextFunction,
 	NoHookYet,
 	OneKind,
 	Outcome,
@@ -112,6 +138,13 @@ export type {
 	TypedShortcuts,
 	ValidSchema,
 } from './app/types';
+export {
+	type RequestSchemas,
+	responds,
+	type Validated,
+	type ValidateRequires,
+	validate,
+} from './app/validate';
 export {
 	type BodyLimitRefusal,
 	type ContentTooLargeBody,

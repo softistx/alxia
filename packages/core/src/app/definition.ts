@@ -15,6 +15,7 @@ import type {
 	ResponseSchemas,
 	RouteSchema,
 } from './types';
+import type { RequestSchemas } from './validate';
 
 /** A hook that runs before validation, and may add to the context or end the request. */
 export type DeriveHook = (ctx: Record<string, unknown>) => unknown;
@@ -23,10 +24,31 @@ export type WrapHook = (
 	ctx: Record<string, unknown>,
 	next: () => Promise<Response>,
 ) => MaybePromise<Response | AnyReply>;
-/** A route hook, in the order declared. */
+/**
+ * A middleware: it returns what `next(added)` resolves to, a reply, or a
+ * `Response`.
+ */
+export type MiddlewareHook = (
+	ctx: Record<string, unknown>,
+	next: (added?: object) => Promise<Response>,
+) => unknown;
+/**
+ * A step of a route's chain, in the order declared: a hook in force where
+ * it was declared or in its list, a middleware, its validation, the check
+ * of its replies. `raw` is the validation of a route declared without
+ * middlewares, the form of 0.3: every part it has no schema for is set to
+ * the request's, the body to `undefined`.
+ */
 export type ChainHook =
 	| { readonly kind: 'derive'; readonly run: DeriveHook }
-	| { readonly kind: 'wrap'; readonly run: WrapHook };
+	| { readonly kind: 'wrap'; readonly run: WrapHook }
+	| { readonly kind: 'middleware'; readonly run: MiddlewareHook }
+	| {
+			readonly kind: 'validate';
+			readonly schemas: RequestSchemas;
+			readonly raw?: boolean;
+	  }
+	| { readonly kind: 'responds'; readonly responses: ResponseSchemas };
 /** A hook that turns an error into a reply, or lets the next one try. */
 export type ErrorHook = (
 	error: unknown,
@@ -81,6 +103,11 @@ export type StopHook = () => MaybePromise<void>;
 export interface RouteDefinition {
 	readonly method: Method;
 	readonly path: string;
+	/**
+	 * What it validates and answers: its schema, or the schemas of its
+	 * `validate` and `responds` middlewares and its options. What
+	 * `@alxia/openapi` documents; the chain runs `derive`.
+	 */
 	readonly schema: RouteSchema;
 	/**
 	 * The most bytes its request body may hold: its schema's `bodyLimit`,
@@ -89,6 +116,10 @@ export interface RouteDefinition {
 	 */
 	readonly bodyLimit?: number;
 	readonly handler: (ctx: never) => MaybePromise<AnyReply>;
+	/**
+	 * Its chain, run before its handler: the hooks in force where it was
+	 * declared, then its own list, middlewares and validation.
+	 */
 	readonly derive: readonly ChainHook[];
 	readonly onError: readonly ErrorHook[];
 	/** The `onRefusal` hook declared last before it; none, and a refused request is the default 400. */
