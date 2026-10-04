@@ -16,9 +16,9 @@
       "name": "react-router-example",
       "dependencies": {
         "@alxia/compress": "^0.1.2",
-        "@alxia/core": "^0.3.0",
+        "@alxia/core": "^0.3.1",
         "@alxia/logger": "^0.2.0",
-        "@alxia/react-router": "^0.2.0",
+        "@alxia/react-router": "^0.3.0",
         "@alxia/secure-headers": "^0.2.0",
         "@react-router/node": "^8.4.0",
         "@react-router/serve": "^8.4.0",
@@ -120,7 +120,7 @@
     },
     "packages/create": {
       "name": "@alxia/create",
-      "version": "0.1.1",
+      "version": "0.1.2",
       "bin": {
         "create-alxia": "./dist/index.js",
       },

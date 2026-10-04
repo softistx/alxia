@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.1.2
+
+### Patch Changes
+
+- [#113](https://github.com/softistx/alxia/pull/113) [`a74d045`](https://github.com/softistx/alxia/commit/a74d0455d5e8a4d97fe63d73dc45b1f763ba9a8b) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `api` template is now plain files that the command copies, as the `react-router` one is, and it gains the base files a project needs to ship: a `Dockerfile` on `oven/bun:1` that installs the production dependencies with `--frozen-lockfile` and runs `src/server.ts` as the image's non-root `bun` user, a `.dockerignore`, and a `.env.example` naming `PORT` and `API_KEY`. Its `start` script now runs `bun src/server.ts`, since Bun runs the TypeScript as it is; `bun run build` still bundles `dist/server.js` for a host with no `node_modules`. Its README has a section each for developing, testing, building and Docker.
+
 ## 0.1.1
 
 ### Patch Changes
