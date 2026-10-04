@@ -10,8 +10,25 @@ hooks built, typed.
 
 ## Quick start
 
-Start from the official template, `bunx create-react-router@latest`, and
-make four changes.
+### A new app
+
+```sh
+bun create @alxia my-app --template react-router
+cd my-app
+bun dev
+```
+
+[`@alxia/create`](https://www.npmjs.com/package/@alxia/create) writes React
+Router's official template with everything below already done: this
+package and `@alxia/core` installed, `alxia()` in `vite.config.ts`, the
+`bunfig.toml`, `start` on Bun, Biome, and a `Dockerfile` that builds on
+`oven/bun` and runs `build/` alone on Alpine. Its dependencies are
+moved to the newest releases alxia accepts.
+
+### An existing React Router app
+
+Start from the official template, `bunx create-react-router@latest`, or your
+own app, and make four changes.
 
 **1. Install** alxia and this package:
 
