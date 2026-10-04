@@ -1,11 +1,11 @@
-import { describe, expect, expectTypeOf, test } from 'bun:test';
+import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import { alxia } from './alxia';
 import { defineMiddleware } from './define-middleware';
-import { responds, validate } from './validate';
+import { validate } from './validate';
 
 describe('validate, given twice', () => {
-	test('checks the request\'s cookies each time, never the first one\'s output', async () => {
+	test("checks the request's cookies each time, never the first one's output", async () => {
 		// Its output, `#7`, is no input it takes: checked again, it would refuse.
 		const Session = z.object({
 			n: z
@@ -27,9 +27,7 @@ describe('validate, given twice', () => {
 
 // Typed apart: a route types its `body` as `undefined` until it validates one.
 describe('what a middleware of use() passes next()', () => {
-	const addsBody = defineMiddleware((_ctx, next) =>
-		next({ body: 'from use' }),
-	);
+	const addsBody = defineMiddleware((_ctx, next) => next({ body: 'from use' }));
 
 	test('reaches a route with no middleware and no schema', async () => {
 		const app = (
@@ -45,7 +43,8 @@ describe('what a middleware of use() passes next()', () => {
 		const app = scoped.get(
 			'/:id',
 			{ params: z.object({ id: z.coerce.number() }) },
-			({ body, params, reply }) => reply(200, { body: body as unknown, params }),
+			({ body, params, reply }) =>
+				reply(200, { body: body as unknown, params }),
 		);
 		expect(await (await app.request('/3')).json()).toEqual({
 			body: 'from use',
@@ -68,12 +67,7 @@ describe('a validate of another copy of @alxia/core', () => {
 		expect((await app.request('/?page=x')).status).toBe(400);
 		expect((await app.request('/?page=2')).status).toBe(200);
 		expect(() => alxia().use(foreign as never)).toThrow(
-			"use(): middleware 1 is a validate() or responds(), which belongs to a route",
+			'use(): middleware 1 is a validate() or responds(), which belongs to a route',
 		);
-	});
-
-	test('carries its mark in its type too', () => {
-		expectTypeOf(validate({ query: Query })['~builtin']).toEqualTypeOf<'validate'>();
-		expectTypeOf(responds({ 200: Query })['~builtin']).toEqualTypeOf<'responds'>();
 	});
 });

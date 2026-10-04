@@ -291,6 +291,10 @@ time; the `400` is what a hand-written URL, a link, or another client gets.
 
 ## JSON Schema: `zodConverter`
 
+> **Deprecated.** Nothing in alxia reads it any more: it served the
+> `convert` option of the retired `@alxia/openapi` document writer. It stays
+> exported, unchanged, for code that already calls it.
+
 alxia is OpenAPI spec first: the document is written by hand, and the
 routes' schemas come from it or are checked against it, so nothing in
 alxia converts a Zod schema for you. `zodConverter` is for your own use —

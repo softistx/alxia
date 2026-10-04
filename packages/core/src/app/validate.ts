@@ -196,10 +196,9 @@ type ResponsesIn<Given> = Given extends RouteOperation
  * runs just before its handler, so that the replies of the middlewares
  * after it are checked too.
  */
-export function responds<
-	const Given extends ResponseSchemas | RouteOperation,
->(
-	responses: Given & (Given extends RouteOperation ? unknown : KnownStatuses<Given>),
+export function responds<const Given extends ResponseSchemas | RouteOperation>(
+	responses: Given &
+		(Given extends RouteOperation ? unknown : KnownStatuses<Given>),
 ): NoInfer<
 	Middleware<Empty, Next<Empty, { readonly response: ResponsesIn<Given> }>> &
 		BuiltinMark<'responds'>

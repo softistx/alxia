@@ -32,13 +32,19 @@ context of the request that called it, and never another's.
 ## The signature
 
 ```ts
-// `uncalled` takes nothing: it makes `use(contextStorage)` a compile error
-function contextStorage<App = undefined>(...uncalled: readonly never[]): ContextStoragePlugin<App>;
+// `uncalled` takes nothing: it makes `use(contextStorage)` a compile error.
+// `App` defaults to the app `Register` names in `@alxia/core` (`RegisteredBase`)
+function contextStorage<App = RegisteredBase>(...uncalled: readonly never[]): ContextStoragePlugin<App>;
 
-type ContextStoragePlugin<App> = Alxia<Empty, '', never> & {
-	context(): ContextOf<App> extends never ? BaseContext : ContextOf<App>;
-	tryContext(): (ContextOf<App> extends never ? BaseContext : ContextOf<App>) | undefined;
-};
+// It requires `App`'s context of the app that uses it (`Requiring`)
+type ContextStoragePlugin<App> = Alxia<Empty, '', never> &
+	Requiring<RequiresOf<StoredContext<App>, 'context'>> & {
+		context(): StoredContext<App>;
+		tryContext(): StoredContext<App> | undefined;
+	};
+
+// What `context()` returns: `App`'s context, or `BaseContext` when `App` is no app
+type StoredContext<App> = [ContextOf<App>] extends [never] ? BaseContext : Mounted<ContextOf<App>>;
 
 function getContext<Ctx extends object = Empty>(): BaseContext & Ctx;
 function tryGetContext<Ctx extends object = Empty>(): (BaseContext & Ctx) | undefined;
@@ -55,8 +61,10 @@ type ContextStorageErrorCode = 'OUTSIDE_REQUEST' | 'NOT_ROUTED';
 ```
 
 `contextStorage()` returns an app plugin: pass it to `use`, called — `use(contextStorage)` fails `tsc` with `TS2769` and throws a `TypeError` at startup ([troubleshooting](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)). It adds
-nothing to the app's type. `BaseContext`, `RequestContext` and `ContextOf`
-come from `@alxia/core`.
+nothing to the app's type, but it requires `StoredContext<App>` of the app
+that uses it: `use` on an app that does not give that context is a compile
+error. `BaseContext`, `RequestContext`, `ContextOf`, `RegisteredBase`,
+`Requiring` and `Mounted` come from `@alxia/core`.
 
 | Export | Returns | Where it would have nothing |
 | --- | --- | --- |

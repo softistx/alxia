@@ -58,9 +58,9 @@ describe('the implicit responds of route(operation)', () => {
 	});
 
 	test('responds(operation) refuses an operation that declares no response', () => {
-		expect(() =>
-			responds({ method: 'GET', path: '/health' } as never),
-		).toThrow('responds(): the operation GET /health declares no response');
+		expect(() => responds({ method: 'GET', path: '/health' } as never)).toThrow(
+			'responds(): the operation GET /health declares no response',
+		);
 	});
 });
 
@@ -85,11 +85,13 @@ describe('the forms of 0.3 and the middleware forms', () => {
 
 	test('route(operation, [hooks], middleware, handler) is refused, not cut short', () => {
 		expect(() =>
-			alxia().route(getPet, [hook] as never, mw as never, (({
-				reply,
-			}: {
-				reply: (status: 200, body: unknown) => never;
-			}) => reply(200, { id: 1, name: 'x' })) as never),
+			alxia().route(
+				getPet,
+				[hook] as never,
+				mw as never,
+				(({ reply }: { reply: (status: 200, body: unknown) => never }) =>
+					reply(200, { id: 1, name: 'x' })) as never,
+			),
 		).toThrow(
 			'GET /pets/:petId: a list of hooks and middlewares are two forms, never mixed',
 		);

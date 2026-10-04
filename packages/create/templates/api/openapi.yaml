@@ -1,4 +1,4 @@
-# The API's contract: the routes of src/app.ts are bound to the operations
+# The API's contract: the routes of src/routes/todos.ts are bound to the operations
 # generated from it. Edit it first, then run `bun run generate`.
 openapi: 3.1.0
 info:

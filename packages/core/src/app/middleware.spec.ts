@@ -141,10 +141,8 @@ describe('a middleware', () => {
 		const error = spyOn(console, 'error').mockImplementation(() => {});
 		try {
 			const app = alxia()
-				.get(
-					'/nothing',
-					async function forgot() {} as never,
-					({ reply }) => reply(200, 'x'),
+				.get('/nothing', async function forgot() {} as never, ({ reply }) =>
+					reply(200, 'x'),
 				)
 				.get(
 					'/twice',

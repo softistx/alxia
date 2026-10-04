@@ -3,6 +3,7 @@ import type { JoinPath, PathAt, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
 import type { OperationForms } from './operation-forms';
 import type { RouteApp } from './route-method';
+import { mixed } from './route-steps';
 import type {
 	AnyRouteHook,
 	Context,
@@ -15,7 +16,6 @@ import type {
 	ThreadHooks,
 	ValidSchema,
 } from './types';
-import { mixed } from './route-steps';
 import { builtinOf, responds, validate } from './validate';
 
 type IsUnion<T, All = T> = T extends unknown
