@@ -37,29 +37,28 @@ export async function upgradeSocket(
 	const { ctx, set } = routeContext(definition, request, rawParams);
 	const server = request.server;
 	try {
-		return await chain<typeof UPGRADED>(
+		const run = {
 			definition,
 			request,
 			rawParams,
 			set,
-			ctx,
 			parsers,
 			validateResponses,
-			async (validated) => {
-				if (server === undefined) {
-					return routingError(426, 'upgrade_required');
+		};
+		return await chain<typeof UPGRADED>(run, ctx, async (validated) => {
+			if (server === undefined) {
+				return routingError(426, 'upgrade_required');
+			}
+			const headers = new Headers(set.headers);
+			if ((set as { touched?: () => boolean }).touched?.()) {
+				for (const cookie of set.cookies.toSetCookieHeaders()) {
+					headers.append('set-cookie', cookie);
 				}
-				const headers = new Headers(set.headers);
-				if ((set as { touched?: () => boolean }).touched?.()) {
-					for (const cookie of set.cookies.toSetCookieHeaders()) {
-						headers.append('set-cookie', cookie);
-					}
-				}
-				const data: SocketData = { definition, ctx: validated };
-				const upgraded = server.upgrade(request.request, { headers, data });
-				return upgraded ? UPGRADED : routingError(426, 'upgrade_required');
-			},
-		);
+			}
+			const data: SocketData = { definition, ctx: validated };
+			const upgraded = server.upgrade(request.request, { headers, data });
+			return upgraded ? UPGRADED : routingError(426, 'upgrade_required');
+		});
 	} catch (error) {
 		return fail(definition, error, ctx);
 	}

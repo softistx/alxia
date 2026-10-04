@@ -9,6 +9,7 @@ export type {
 } from './app/app-hooks';
 export type { GroupMethod, UseMethod } from './app/compose-methods';
 export { defineHook, defineWrap } from './app/define-hook';
+export { defineMiddleware } from './app/define-middleware';
 export { definePlugin } from './app/define-plugin';
 export type {
 	AroundHook,
@@ -22,13 +23,29 @@ export type {
 	StartHook,
 	StopHook,
 } from './app/definition';
-export type { RouteMethod } from './app/route-method';
+export type {
+	AppTypes,
+	AppWithRoute,
+	OptionsOnly,
+	RouteBase,
+	RouteHandler,
+	RouteOptions,
+	RouteResult,
+	RouteStep,
+} from './app/route-forms';
+export type {
+	AppOf,
+	DeprecatedForms,
+	RouteMethod,
+} from './app/route-method';
+export type { MiddlewareForms } from './app/route-middlewares';
 export type {
 	CheckedOperation,
 	OperationMethod,
 	OperationSchema,
 	RouteOperation,
 } from './app/route-operation';
+export type { OptionsForms } from './app/route-options';
 export type {
 	BodyLimitMethod,
 	DecorateMethod,
@@ -46,7 +63,19 @@ export type {
 	RefusalMethod,
 	RoutesOf,
 } from './app/signatures';
-export type { SocketMethod } from './app/socket-method';
+export type {
+	AppWithSocket,
+	SocketDataAfter,
+	SocketForms,
+	SocketHandlersAfter,
+	SocketOptions,
+	SocketOptionsOnly,
+} from './app/socket-forms';
+export type {
+	DeprecatedSocketForms,
+	SocketMethod,
+} from './app/socket-method';
+export type { SocketOptionsForms } from './app/socket-options';
 export type {
 	FileMethod,
 	PageMethod,
@@ -54,6 +83,7 @@ export type {
 } from './app/static-methods';
 export type {
 	AddedBy,
+	AddedOf,
 	AnyRouteHook,
 	BaseContext,
 	BehindShortcuts,
@@ -66,6 +96,7 @@ export type {
 	DefaultRefusalOutcome,
 	Empty,
 	FallsBack,
+	HandlerContext,
 	HandlerResult,
 	HookContext,
 	HookProvided,
@@ -75,7 +106,15 @@ export type {
 	KindRefusalsOf,
 	MaxRouteHooks,
 	MaybePromise,
+	Merge,
 	Method,
+	Middleware,
+	MiddlewareBase,
+	MiddlewareContext,
+	MiddlewareResult,
+	MiddlewareReturn,
+	Next,
+	NextFunction,
 	NoHookYet,
 	OneKind,
 	Outcome,
@@ -106,12 +145,23 @@ export type {
 	RouteSchema,
 	RouteTable,
 	RouteWrap,
+	SchemaOf,
 	ThenShortcuts,
+	ThreadContext,
 	ThreadHooks,
+	ThreadReplies,
+	ThreadSchema,
 	TypedReplyFunction,
 	TypedShortcuts,
 	ValidSchema,
 } from './app/types';
+export {
+	type RequestSchemas,
+	responds,
+	type Validated,
+	type ValidateRequires,
+	validate,
+} from './app/validate';
 export {
 	type BodyLimitRefusal,
 	type ContentTooLargeBody,

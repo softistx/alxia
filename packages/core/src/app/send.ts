@@ -13,7 +13,6 @@ import { type AnyReply, Reply, toResponse } from '../reply/reply';
 import { check, type StandardSchemaV1 } from '../schema/standard-schema';
 import { isAsyncIterable } from '../sse/async-iterable';
 import { isNamedEventStreamSchema, toFrames } from '../sse/named-events';
-import type { RouteDefinition } from './definition';
 import type { ResponseSchemas, ResponseSettings } from './types';
 
 const internal: InternalErrorBody = { error: 'internal' };
@@ -81,32 +80,6 @@ export function send(
 }
 
 /**
- * A handler's reply, checked against the schema its route declares for its
- * status and sent as that schema's output. A status the route does not
- * declare, or a body its schema refuses, throws a `ResponseValidationError`.
- */
-export async function sendDeclared(
-	route: RouteDefinition,
-	reply: AnyReply,
-	set: ResponseSettings,
-	signal: AbortSignal,
-	validateResponses: boolean,
-): Promise<Response> {
-	const responses = route.schema.response;
-	if (responses === undefined || isRedirect(reply)) {
-		return send(reply, set, signal);
-	}
-	const checked = await checkReply(
-		route.method,
-		route.path,
-		responses,
-		reply,
-		validateResponses,
-	);
-	return send(checked, set, signal);
-}
-
-/**
  * `reply` checked against the schema `responses` declares for its status,
  * as that schema's output: what a handler's reply and an `onRefusal`
  * hook's go through. A status with no schema, or a body its schema
@@ -166,6 +139,7 @@ function framed(schema: StandardSchemaV1, reply: AnyReply): AnyReply {
 	);
 }
 
-function isRedirect(reply: AnyReply): boolean {
+/** Whether `reply` is a redirect, which no `responds` checks: a 3xx with no body. */
+export function isRedirect(reply: AnyReply): boolean {
 	return reply.status >= 300 && reply.status < 400 && reply.body === undefined;
 }

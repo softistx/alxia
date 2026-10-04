@@ -5,7 +5,7 @@
  */
 import { createReply, Reply } from '../reply/reply';
 import { limitBody } from '../request/limit';
-import { readCookies, readQuery } from '../request/read';
+import { readCookies, readHeaders, readQuery } from '../request/read';
 import type { RedirectStatus } from '../types/status';
 import type { RouteDefinition, SocketDefinition } from './definition';
 import type {
@@ -45,6 +45,9 @@ export function routeContext(
 	// The query as it arrived, read on first use: what a route's own hooks
 	// read before validation replaces it with the schema's output.
 	let query: Readonly<Record<string, string | readonly string[]>> | undefined;
+	// The headers as an object, read on first use: what a middleware reads
+	// as `headers` until a `validate` sets its schema's output.
+	let headers: Readonly<Record<string, string>> | undefined;
 	const limit = 'bodyLimit' in definition ? definition.bodyLimit : undefined;
 	const ctx: Record<string, unknown> & BaseContext = {
 		...request,
@@ -62,6 +65,13 @@ export function routeContext(
 		},
 		set query(value: Readonly<Record<string, string | readonly string[]>>) {
 			query = value;
+		},
+		get headers() {
+			headers ??= readHeaders(request.request.headers);
+			return headers;
+		},
+		set headers(value: Readonly<Record<string, string>>) {
+			headers = value;
 		},
 		get cookies() {
 			received ??= readCookies(request.request.headers);
