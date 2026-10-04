@@ -2,7 +2,9 @@
 // types are inferred: a declaration build must name each one through
 // `@alxia/core` alone (TS2883 otherwise). This file is in no typecheck of
 // the package, whose specs read `Register` unregistered: only the
-// declaration build of the installed tarball compiles it.
+// declaration build of the installed tarball compiles it, in one program
+// with the other fixtures here: they compile with `Register` augmented too,
+// so a fixture that needs it unregistered belongs in a package of its own.
 import {
 	type AppContext,
 	alxia,

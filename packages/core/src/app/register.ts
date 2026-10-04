@@ -4,7 +4,7 @@
  */
 import type { Alxia } from './alxia';
 import type { AnyAlxia, ContextOf } from './signatures';
-import type { Empty, Requiring } from './types';
+import type { Empty, RequiringContext } from './types';
 
 /**
  * Names the chain that builds the app's context — its `decorate`, its
@@ -75,4 +75,4 @@ export type AppContext = ContextOf<RegisteredBase>;
  * declared on it, up to the `use` that mounts it.
  */
 export type RoutesContext = RegisteredBase['~context'] &
-	Requiring<RegisteredBase['~context']>;
+	RequiringContext<RegisteredBase['~context']>;

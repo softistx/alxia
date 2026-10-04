@@ -125,6 +125,7 @@ export type {
 	RequestContext,
 	RequiresOf,
 	Requiring,
+	RequiringContext,
 	ResponseCookies,
 	ResponseSchemas,
 	ResponseSettings,

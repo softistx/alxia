@@ -71,8 +71,9 @@ export const app = base.use(todos); // GET /todos, POST /todos
   context, and it carries that context as its requirement through every
   route, `derive` and `use` declared on it.
 - **`use` checks the requirement.** Mounting the routes on an app that
-  does not give the context — `alxia().use(todos)`, or `base` before the
-  `derive` that adds `user` — is the compile error of
+  does not give the context — `alxia().use(todos)`, `alxia().use(() =>
+  todos)`, `alxia().group(() => todos)`, or `base` before the `derive`
+  that adds `user` — is the compile error of
   [a plugin that needs an earlier one](writing-a-plugin.md#a-plugin-that-needs-an-earlier-one).
 - **Spec first, the same way.** `defineRoutes().route(operations.listTodos,
   handler)`: an operation's path is already whole, so give no prefix.

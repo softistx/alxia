@@ -9,6 +9,16 @@ export interface Requiring<Requires> {
 }
 
 /**
+ * Carries, inside an app's context, what that app requires of the one that
+ * mounts it: what `defineRoutes` starts from. A function of it, never set,
+ * so that a route reading `'~requires'` gets nothing it could use.
+ */
+export interface RequiringContext<Requires> {
+	/** Never set: what the app that mounts this one must give. */
+	readonly '~requires': (provided: Requires) => void;
+}
+
+/**
  * `unknown` when the context `Ctx` gives what `Requires` reads; otherwise a
  * `'~requires'` whose type is the message: one per key the context gives
  * not at all, or with another type, or one for the whole requirement when

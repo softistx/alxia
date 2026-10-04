@@ -677,7 +677,7 @@ import { base } from './context';
 import { todos } from './routes/todos';
 
 export const app = base.use(todos);
-alxia().use(todos); // compile error: the plugin reads "user", which this app's context does not give
+alxia().use(todos); // compile error: the plugin reads "db" | "user", which this app's context does not give
 ```
 
 `defineRoutes(prefix?)` is `alxia({ prefix })` typed with the registered
@@ -735,7 +735,7 @@ covers all three kinds.
 | `Register`, `AppContext` | the interface an app augments with `context: typeof base`, and that base's context: `BaseContext` when nothing is registered |
 | `defineRoutes(prefix?)` | an app plugin built on the registered context, requiring it of the app that `use`s it: a file of routes with no import of the app |
 | `RegisteredOf<R>`, `RegisteredBase`, `InvalidRegister`, `RoutesContext` | the app a `Register`-shaped interface names (a fresh app when it names none), the one `Register` names, what a `context` that is not an app reads as (every key of the app's own a compile error), and the context `defineRoutes` starts from, its requirement in it |
-| `RequiredIn<PluginCtx>`, `Mounted<PluginCtx>` | what a `defineRoutes` plugin's context requires of the app that mounts it, and what it adds to it. Exported so an app's type can be named in a declaration file |
+| `RequiringContext<Requires>`, `RequiredIn<PluginCtx>`, `Mounted<PluginCtx>` | the requirement a `defineRoutes` plugin carries in its context (a function type, never set, so a route reading it gets nothing usable), what it requires of the app that mounts it — checked by `use(plugin)`, `use((app) => plugin)` and a `group` returning it — and what it adds to it. Exported so an app's type can be named in a declaration file |
 | `definePlugin<Requires>()(build)` | an app plugin built on an app whose context has `Requires`; `use` refuses it on an app that does not give them |
 | `Requiring<Requires>`, `ProvidedBy<Ctx, Requires>` | the marker on a `definePlugin` plugin, and the check `use` makes of it |
 | `RequiresOf<Ctx, Callback?>` | what a callback annotated `Ctx` reads beyond `BaseContext` — `{ user: User }` for `BaseContext & { user: User }`, `Empty` for nothing more: the `Requires` of a plugin that infers it from a callback it is given. A callback annotated `any` is refused on every app, with a message naming `Callback` |

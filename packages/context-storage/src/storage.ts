@@ -5,6 +5,7 @@ import {
 	type BaseContext,
 	type ContextOf,
 	type Empty,
+	type Mounted,
 	type RegisteredBase,
 	type RequestContext,
 	type RequiresOf,
@@ -106,7 +107,7 @@ export type ContextStoragePlugin<App> = Alxia<Empty, '', never> &
 /** What `context()` reads: the context of `App`, or the base context when `App` is no app. */
 export type StoredContext<App> = [ContextOf<App>] extends [never]
 	? BaseContext
-	: ContextOf<App>;
+	: Mounted<ContextOf<App>>;
 
 /**
  * The request's context, anywhere it runs, as a plugin: from the routes

@@ -54,8 +54,12 @@ declare module '@alxia/core' {
 
 export const requestContext = contextStorage(); // context(): AppContext
 base.use(requestContext);                       // ok
-alxia().use(requestContext);                    // compile error: the plugin reads "db", which this app's context does not give
+alxia().use(requestContext);                    // compile error: the plugin reads "db" | "user", which this app's context does not give
 ```
+
+Requiring that context of the app is new in 0.4.0: a plugin used on an app
+that does not give it, which read `undefined` at runtime, is now a compile
+error ([Upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md#the-context-registered-once-register-and-defineroutes)).
 
 ## Reading it
 

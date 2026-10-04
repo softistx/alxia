@@ -23,6 +23,21 @@ export const todos = defineRoutes('/todos')
 // @ts-expect-error: an app with no `user` cannot mount the routes
 alxia().use(todos);
 
+// @ts-expect-error: nor return them from a plugin function
+alxia().use(() => todos);
+
+// @ts-expect-error: nor from a group
+alxia().group(() => todos);
+
+// @ts-expect-error: nor from a group under a path
+alxia().group('/g', () => todos);
+
+defineRoutes().get('/', (ctx) => {
+	// @ts-expect-error: the requirement it carries is nothing to read
+	void ctx['~requires'].user;
+	return ctx.reply(200, 'x');
+});
+
 // @ts-expect-error: nor run the middleware that reads it
 alxia().get('/', owner, ({ reply }) => reply(200, 'x'));
 

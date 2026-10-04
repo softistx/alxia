@@ -7,7 +7,12 @@ import type { AnyReply } from '../reply/reply';
 import type { JoinPath, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
 import type { AnyAlxia } from './signatures';
-import type { Empty, ProvidedBy, Requiring, ThenShortcuts } from './types';
+import type {
+	Empty,
+	ProvidedBy,
+	RequiringContext,
+	ThenShortcuts,
+} from './types';
 import type { UseForms } from './use-forms';
 
 /** `app.group(prefix, build)` or `app.group(build)`. */
@@ -24,13 +29,17 @@ export interface GroupMethod<
 	 * app.group('/admin', (admin) => admin.derive(requireAdmin).get('/stats', ...));
 	 * ```
 	 */
-	<const Path extends RoutePath>(
+	<const Path extends RoutePath, Built extends AnyAlxia>(
 		prefix: Path,
-		build: (group: Alxia<Ctx, JoinPath<Prefix, Path>, Shortcuts>) => AnyAlxia,
+		build: (
+			group: Alxia<Ctx, JoinPath<Prefix, Path>, Shortcuts>,
+		) => Built & ProvidedBy<Ctx, RequiredIn<Built['~context']>>,
 	): Alxia<Ctx, Prefix, Shortcuts>;
 	/** Routes declared in a scope, under this app's prefix. */
-	(
-		build: (group: Alxia<Ctx, Prefix, Shortcuts>) => AnyAlxia,
+	<Built extends AnyAlxia>(
+		build: (
+			group: Alxia<Ctx, Prefix, Shortcuts>,
+		) => Built & ProvidedBy<Ctx, RequiredIn<Built['~context']>>,
 	): Alxia<Ctx, Prefix, Shortcuts>;
 }
 
@@ -58,7 +67,11 @@ export interface PluginForms<
 	 * A plugin written as a function, given this app, that returns it: a
 	 * `Plugin`.
 	 */
-	<Result extends AnyAlxia>(plugin: (app: App) => Result): Result;
+	<Result extends AnyAlxia>(
+		plugin: (
+			app: App,
+		) => Result & ProvidedBy<Ctx, RequiredIn<Result['~context']>>,
+	): Result;
 	/**
 	 * A plugin. An app: its routes, under this app's prefix and behind this
 	 * app's hooks, and its hooks, which then apply to the routes declared on
@@ -91,13 +104,13 @@ export interface PluginForms<
  */
 export type RequiredIn<PluginCtx> = 0 extends 1 & PluginCtx
 	? Empty
-	: PluginCtx extends Requiring<infer Requires>
+	: PluginCtx extends RequiringContext<infer Requires>
 		? Requires
 		: Empty;
 
 /** What a plugin's context adds to the app that mounts it: all of it but the requirement. */
 export type Mounted<PluginCtx> = 0 extends 1 & PluginCtx
 	? PluginCtx
-	: PluginCtx extends Requiring<unknown>
+	: PluginCtx extends { readonly '~requires': unknown }
 		? Omit<PluginCtx, '~requires'>
 		: PluginCtx;

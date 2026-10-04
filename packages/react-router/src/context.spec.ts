@@ -1,7 +1,9 @@
 import { describe, expect, test } from 'bun:test';
+import { join } from 'node:path';
 import { alxia, type BaseContext, type ContextOf } from '@alxia/core';
 // By its published name, as the fixture's build imports it: see react-router.spec.ts.
 import { alxiaOf, createServer, type RegisteredOf } from '@alxia/react-router';
+import { $ } from 'bun';
 import { RouterContextProvider } from 'react-router';
 import { configure } from '../fixture/base';
 
@@ -67,4 +69,15 @@ describe('alxiaOf and Register', () => {
 			'add alxia() from @alxia/react-router/vite',
 		);
 	});
+
+	test("unregistered here, alxiaOf reads core's Register", async () => {
+		// `test/register`, a program of its own, through the workspace's tsc:
+		// its refusal is a @ts-expect-error, so no output is each one failing.
+		const dir = join(import.meta.dir, '..', 'test', 'register');
+		const result = await $`${process.execPath} --bun tsc --noEmit -p ${dir}`
+			.cwd(import.meta.dir)
+			.nothrow()
+			.quiet();
+		expect(result.stdout.toString() + result.stderr.toString()).toBe('');
+	}, 30_000);
 });

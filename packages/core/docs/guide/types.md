@@ -103,7 +103,8 @@ What it types, and what it does not:
 type reads `Register`: registered, the app would be typed by itself, and
 TypeScript gives it `any` with `TS7022`. For the same reason the chain you
 register cannot read `Register` either: no `defineMiddleware<AppContext>()`
-and no `contextStorage()` in `base` itself; give them to the app, after it.
+or `defineRoutes()` in `base` itself (`TS7022`), and a `contextStorage()`
+there reads `BaseContext` alone; give them to the app, after it.
 
 **One `Register` per program.** A second declaration with another
 `context` is `TS2717`. In a monorepo, each app has its own `tsconfig.json`;

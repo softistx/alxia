@@ -359,7 +359,8 @@ route(operation, ...middlewares, handler)
 ```ts
 import { expect, test } from "bun:test";
 import { matchesSpec } from "@alxia/openapi";
-import { apiKey, app } from "./app";
+import { app } from "./app";
+import { apiKey } from "./context";
 import { operations } from "./generated/alxia";
 
 test("routes every operation of openapi.yaml, and nothing else", () => {

@@ -52,7 +52,7 @@ a trap that prints nothing is headed by its symptom.
 - [`Generic type 'Alxia<Ctx, Prefix, Shortcuts>' requires between 0 and 3 type arguments`](#generic-type-alxiactx-prefix-shortcuts-requires-between-0-and-3-type-arguments)
 - [`'app' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer`](#app-implicitly-has-type-any-because-it-does-not-have-a-type-annotation-and-is-referenced-directly-or-indirectly-in-its-own-initializer), with `Register`
 - [`Property '…' does not exist on type 'BaseContext & { readonly 'Register.context must be typeof base, …': never; }'`](#property--does-not-exist-on-type-basecontext---readonly-registercontext-must-be-typeof-base--never-)
-- [`Subsequent property declarations must have the same type. Property 'context' must be of type '…'`](#subsequent-property-declarations-must-have-the-same-type-property-context-must-be-of-type-)
+- [`Subsequent property declarations must have the same type.  Property 'context' must be of type '…'`](#subsequent-property-declarations-must-have-the-same-type-property-context-must-be-of-type-)
 - [`Property 'user' does not exist on type 'MiddlewareContext<Empty>'`](#property-user-does-not-exist-on-type-middlewarecontextempty), with `Register`
 
 **Building the app**
@@ -1364,14 +1364,15 @@ declare module '@alxia/core' {
 ```
 
 ```text
-app.ts(6,14): error TS7022: 'app' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
-app.ts(12,3): error TS2502: 'context' is referenced directly or indirectly in its own type annotation.
+app.ts(1,14): error TS7022: 'app' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+app.ts(5,3): error TS2502: 'context' is referenced directly or indirectly in its own type annotation.
 todos.ts(3,14): error TS7022: 'todos' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
 ```
 
 The same happens when the registered chain itself reads `Register`: a
-`defineMiddleware<AppContext>()`, a `defineRoutes()` or a
-`contextStorage()` given to `base`.
+`defineMiddleware<AppContext>()` or a `defineRoutes()` given to `base`.
+(A `contextStorage()` given to `base` compiles, but its `context()` reads
+`BaseContext`: give it to the app after `base`.)
 
 **Why:** `todos`' type reads `Register`, which is `typeof app`, whose type
 is what `use(todos)` returns: each needs the other first, so TypeScript
@@ -1421,7 +1422,7 @@ declare module '@alxia/core' {
 }
 ```
 
-### `Subsequent property declarations must have the same type. Property 'context' must be of type '…'`
+### `Subsequent property declarations must have the same type.  Property 'context' must be of type '…'`
 
 **When:** two files of one TypeScript program declare `Register`'s
 `context`, with different apps.

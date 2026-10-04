@@ -158,7 +158,7 @@ route files, whose type reads `Register`: TypeScript would type the app
 by itself, `TS7022`.
 
 The gap is a plugin that **needs** what an earlier one added: a permission
-check that reads `user`, a tenant scope that reads `session`. Today it is
+check that reads `user`, a tenant scope that reads `session`. At the time it was
 typed by hand, with `contextStorage<typeof base>()` and janus's
 `permission()` generics. The slice proposes one helper, a sketch to be
 probed:

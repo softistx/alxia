@@ -203,7 +203,10 @@ Also as `Property 'user' does not exist on type 'BaseContext & Empty & { readonl
 
 **When:** reading from `context()` a value a hook adds, and either
 
-- the plugin was made without an app type, `contextStorage()`; or
+- the plugin was made without an app type, `contextStorage()`, and
+  `@alxia/core`'s `Register` names no base; or
+- it is `contextStorage()` given to the registered `base` itself, which
+  cannot read `Register` while `base` is being typed; or
 - it is typed by `base`, and the hook adding `user` comes after it:
   `base.use(requestContext).derive(() => ({ user }))`.
 
@@ -212,7 +215,8 @@ Also as `Property 'user' does not exist on type 'BaseContext & Empty & { readonl
 not in it. At runtime the value is there.
 
 **Fix:** declare every hook whose values services read in `base`, then type
-the plugin by it:
+the plugin by it — or register `base` with `@alxia/core`'s `Register` and
+give `contextStorage()` to the app after `base`, never to `base` itself:
 
 ```ts
 const base = alxia()

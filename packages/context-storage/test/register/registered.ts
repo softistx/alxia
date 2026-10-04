@@ -2,7 +2,7 @@
 // names. A program of its own: the package's typecheck reads `Register`
 // unregistered.
 import { contextStorage } from '@alxia/context-storage';
-import { alxia } from '@alxia/core';
+import { alxia, defineRoutes } from '@alxia/core';
 
 const base = alxia().derive(() => ({ user: { id: 'ada' } }));
 
@@ -22,3 +22,7 @@ export const app = base.use(requestContext);
 
 // @ts-expect-error: an app that gives no `user` cannot use it
 alxia().use(requestContext);
+
+// Typed by a defineRoutes app, it reads that context, and the base gives it.
+const routes = defineRoutes().get('/', ({ reply }) => reply(200, 'x'));
+export const byRoutes = base.use(contextStorage<typeof routes>());
