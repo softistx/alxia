@@ -39,6 +39,11 @@ export function scopePath(prefix: string, pattern: string): ScopePath {
 	return parse(joinPath(prefix, pattern));
 }
 
+/** A group's or a plugin's `prefix`, a valid one: the requests under it. */
+export function prefixPath(prefix: string): ScopePath {
+	return parse(prefix === '' ? '/' : prefix);
+}
+
 /** `path` under `prefix`: what an absorbed plugin's scoped middleware matches. */
 export function rebase(path: ScopePath, prefix: string): ScopePath {
 	if (prefix === '') return path;
@@ -67,7 +72,9 @@ export function reach(
 		if (segment === '*') return 'maybe';
 		if (segment.startsWith(':')) {
 			if (!scoped.startsWith(':')) uncertain = true;
-		} else if (!scoped.startsWith(':') && scoped !== segment) return 'never';
+		} else if (!scoped.startsWith(':') && scoped !== segment.toLowerCase()) {
+			return 'never';
+		}
 	}
 	if (path.under) {
 		const after = segments[path.segments.length];
@@ -80,35 +87,91 @@ export function reach(
 /**
  * Whether a request's `pathname` is under `path`: what a scoped
  * middleware a route may or may not serve checks, and what a request no
- * route matches checks of every one. A trailing `/` is read as none, as
- * the router forgives it. Reads the string in place: no request pays an
- * allocation for it.
+ * route matches checks of every one. The path is read as the router, the
+ * static files and React Router read it, and fails closed: each segment
+ * decoded (an encoded `/` splits it), empty segments collapsed (`//`, a
+ * trailing `/`), compared without case. A segment that does not decode, or
+ * a `.` or `..` left in it, runs the middleware. A path with neither `%`
+ * nor `/.` — almost every request — is read in place, allocating nothing.
  */
 export function matches(path: ScopePath, pathname: string): boolean {
-	let length = pathname.length;
-	if (length > 1 && pathname.charCodeAt(length - 1) === SLASH) length -= 1;
-	// Where the next segment starts: "/" has none.
-	let at = 1;
+	if (pathname.includes('%') || pathname.includes('/.')) {
+		return matchesDecoded(path, pathname);
+	}
+	const length = pathname.length;
+	let at = 0;
 	for (const scoped of path.segments) {
+		at = skipSlashes(pathname, at);
 		if (at >= length) return false;
 		let end = pathname.indexOf('/', at);
-		if (end === -1 || end > length) end = length;
-		if (end === at) return false;
-		if (
-			!scoped.startsWith(':') &&
-			(end - at !== scoped.length || !pathname.startsWith(scoped, at))
-		) {
+		if (end === -1) end = length;
+		if (!scoped.startsWith(':') && !sameSegment(scoped, pathname, at, end)) {
 			return false;
 		}
-		at = end + 1;
+		at = end;
 	}
-	return path.under ? at < length : true;
+	return path.under ? skipSlashes(pathname, at) < length : true;
 }
 
+/** `matches`, for a path to decode first: a segment at a time. */
+function matchesDecoded(path: ScopePath, pathname: string): boolean {
+	const segments: string[] = [];
+	for (const raw of pathname.split('/')) {
+		let decoded: string;
+		try {
+			decoded = decodeURIComponent(raw);
+		} catch {
+			return true;
+		}
+		for (const part of decoded.split('/')) {
+			if (part === '') continue;
+			if (part === '.' || part === '..') return true;
+			segments.push(part.toLowerCase());
+		}
+	}
+	for (const [index, scoped] of path.segments.entries()) {
+		const segment = segments[index];
+		if (segment === undefined) return false;
+		if (!scoped.startsWith(':') && segment !== scoped) return false;
+	}
+	return path.under ? segments.length > path.segments.length : true;
+}
+
+/** Where the next segment starts: past every `/` at `at`. */
+function skipSlashes(pathname: string, at: number): number {
+	let index = at;
+	while (index < pathname.length && pathname.charCodeAt(index) === SLASH) {
+		index += 1;
+	}
+	return index;
+}
+
+/** Whether `pathname` holds `scoped`, lower case, from `at` to `end`, in any case. */
+function sameSegment(
+	scoped: string,
+	pathname: string,
+	at: number,
+	end: number,
+): boolean {
+	if (end - at !== scoped.length) return false;
+	for (let index = 0; index < scoped.length; index++) {
+		let code = pathname.charCodeAt(at + index);
+		if (code >= UPPER_A && code <= UPPER_Z) code += LOWER;
+		if (code !== scoped.charCodeAt(index)) return false;
+	}
+	return true;
+}
+
+const UPPER_A = 65;
+const UPPER_Z = 90;
+const LOWER = 32;
 const SLASH = 47;
 
+/** Its segments, those not a parameter in lower case: `matches` reads none in case. */
 function parse(full: string): ScopePath {
-	const segments = split(full);
+	const segments = split(full).map((segment) =>
+		segment.startsWith(':') ? segment : segment.toLowerCase(),
+	);
 	const under = segments.at(-1) === '*';
 	return { segments: under ? segments.slice(0, -1) : segments, under };
 }

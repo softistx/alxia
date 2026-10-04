@@ -415,10 +415,10 @@ const app = alxia().get(
 );
 ```
 
-Both declare their schemas on the route, `app.routes[i].schema`: at run
-time `validate`'s check what a client sends, and `responds`' what it may
-read — what the OpenAPI document a client is generated from declares, its
-400 included. A route bound to a generated operation, `route(operation, …)`,
+At run time `validate`'s schemas check what a client sends, and
+`responds`' what it may read — what the OpenAPI document a client is
+generated from declares, its 400 included. The document declares them, not
+the app: `app.routes[i].schema` holds the route's options alone. A route bound to a generated operation, `route(operation, …)`,
 takes both from the document. Where
 each stands changes which answer comes first, a 401 or a 400
 ([Middleware](middleware.md#where-validate-stands)).

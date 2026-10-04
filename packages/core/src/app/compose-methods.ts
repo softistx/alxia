@@ -6,7 +6,7 @@
 import type { AnyReply } from '../reply/reply';
 import type { JoinPath, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
-import type { Mounted, RequiredIn } from './plugin-method';
+import type { MountedIn, RequiredIn } from './plugin-method';
 import type { AnyAlxia } from './signatures';
 import type { Empty, ProvidedBy, ThenShortcuts } from './types';
 import type { UseForms } from './use-forms';
@@ -52,8 +52,8 @@ export interface UseMethod<
 	Ctx extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
-> extends PluginForms<App, Ctx, Prefix, Shortcuts>,
-		UseForms<Ctx, Prefix, Shortcuts> {}
+> extends UseForms<Ctx, Prefix, Shortcuts>,
+		PluginForms<App, Ctx, Prefix, Shortcuts> {}
 
 /** `app.use(plugin)`, deprecated: `app.plugin(plugin)`, see `PluginMethod`. */
 export interface PluginForms<
@@ -88,7 +88,7 @@ export interface PluginForms<
 		} & ProvidedBy<Ctx, PluginRequires> &
 			ProvidedBy<Ctx, RequiredIn<PluginCtx>>,
 	): Alxia<
-		Ctx & Mounted<PluginCtx>,
+		MountedIn<Ctx, PluginCtx, PluginPrefix>,
 		Prefix,
 		ThenShortcuts<Shortcuts, PluginShortcuts>
 	>;

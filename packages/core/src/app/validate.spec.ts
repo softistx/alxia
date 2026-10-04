@@ -15,7 +15,6 @@ const auth = defineMiddleware(({ request, reply }, next) => {
 	return next({ user: { id } satisfies User });
 });
 
-const Post = z.object({ title: z.string().min(1) });
 const Strict = z.object({ id: z.string() });
 
 describe('validate', () => {
@@ -56,22 +55,6 @@ describe('validate', () => {
 			);
 		await app.request('/', { headers: { cookie: 'n=1', 'x-user': 'ada' } });
 		expect(seen).toEqual([{ id: 'ada' }]);
-	});
-
-	test('declares its schemas on the route, for what documents it', () => {
-		const app = alxia().post(
-			'/posts',
-			{ detail: { summary: 'A post' } },
-			auth,
-			validate({ body: Post }),
-			responds({ 201: Post }),
-			({ body, reply }) => reply(201, body),
-		);
-		expect(app.routes[0]?.schema).toEqual({
-			detail: { summary: 'A post' },
-			body: Post,
-			response: { 201: Post },
-		});
 	});
 });
 

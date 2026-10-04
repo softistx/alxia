@@ -231,8 +231,9 @@ it was by `response`. A refused request is still answered by the
 `400 { error: 'validation', issues }`; a middleware before the `validate`
 answers it in its own format instead
 ([`ValidationError`](#validate-throws-a-validationerror)).
-A tool that reads `app.routes` finds the schemas of `validate` and
-`responds` on the route, as it found the route's schema.
+`app.routes[i].schema` holds the route's options alone (`detail`,
+`bodyLimit`): the schemas of `validate` and `responds` stay in its chain,
+since the OpenAPI document, not the app, declares them.
 
 #### 5. A socket's schema becomes options and `validate`
 

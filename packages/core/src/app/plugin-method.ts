@@ -62,7 +62,7 @@ export interface PluginMethod<
 		} & ProvidedBy<Ctx, PluginRequires> &
 			ProvidedBy<Ctx, RequiredIn<PluginCtx>>,
 	): Alxia<
-		Ctx & Mounted<PluginCtx>,
+		MountedIn<Ctx, PluginCtx, PluginPrefix>,
 		Prefix,
 		ThenShortcuts<Shortcuts, PluginShortcuts>
 	>;
@@ -92,3 +92,14 @@ export type Mounted<PluginCtx> = 0 extends 1 & PluginCtx
 	: PluginCtx extends { readonly '~requires': unknown }
 		? Omit<PluginCtx, '~requires'>
 		: PluginCtx;
+
+/**
+ * The context of the routes declared after a plugin: what it adds, when
+ * it has no prefix of its own. A plugin with one keeps its chain to its
+ * routes, as a group does, and adds nothing to the app's.
+ */
+export type MountedIn<
+	Ctx extends object,
+	PluginCtx,
+	PluginPrefix extends string,
+> = PluginPrefix extends '' ? Ctx & Mounted<PluginCtx> : Ctx;

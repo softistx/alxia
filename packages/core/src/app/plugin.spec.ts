@@ -109,7 +109,7 @@ describe('app.plugin, given what is no plugin', () => {
 });
 
 describe('app.plugin(middleware), deprecated', () => {
-	test('is use(middleware): typed for the routes after it, run on a request no route matches', async () => {
+	test('runs app-wide, as 0.3: on the routes before it, after it, and a request no route matches', async () => {
 		const seen: string[] = [];
 		const stamp = defineMiddleware(({ url }, next) => {
 			seen.push(url.pathname);
@@ -122,7 +122,7 @@ describe('app.plugin(middleware), deprecated', () => {
 		expect(await (await app.request('/after')).text()).toBe('ok');
 		expect((await app.request('/before')).status).toBe(200);
 		expect((await app.request('/missing')).status).toBe(404);
-		expect(seen).toEqual(['/after', '/missing']);
+		expect(seen).toEqual(['/after', '/before', '/missing']);
 	});
 
 	test('takes no path, and refuses a function not made by defineMiddleware beside one', () => {

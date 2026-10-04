@@ -76,6 +76,13 @@ export interface MiddlewareMark {
 }
 
 /**
+ * `MiddlewareMark`, as `use` and a route require it: named to be read in
+ * the compile error a plain `(ctx, next)` function gets — wrap it in
+ * `defineMiddleware(fn)`.
+ */
+export interface MadeByDefineMiddleware extends MiddlewareMark {}
+
+/**
  * What `validate` and `responds` mark their middleware with: a step the
  * chain runs itself, which `use` refuses. Never set as such: at runtime
  * the mark is `Symbol.for('alxia.builtin')` on the function, shared by

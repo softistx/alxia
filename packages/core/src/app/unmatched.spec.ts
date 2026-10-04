@@ -96,15 +96,22 @@ describe('a request no route matches', () => {
 		expect(seen).toEqual(['eu ada']);
 	});
 
-	test('a group’s middlewares stay with its routes', async () => {
+	test('a group’s middlewares run under its prefix alone', async () => {
 		const log: string[] = [];
-		const app = alxia().group('/admin', (admin) =>
-			admin.use(logs(log, 'admin')).get('/stats', ({ reply }) => reply(200, 1)),
-		);
+		const app = alxia()
+			.group('/admin', (admin) =>
+				admin
+					.use(logs(log, 'admin'))
+					.get('/stats', ({ reply }) => reply(200, 1)),
+			)
+			.get('/after', ({ reply }) => reply(200, 2));
 		expect((await app.request('/admin/missing')).status).toBe(404);
-		expect(log).toEqual([]);
+		expect(log).toEqual(['admin -']);
+		expect((await app.request('/missing')).status).toBe(404);
+		expect((await app.request('/after')).status).toBe(200);
+		expect(log).toEqual(['admin -']);
 		expect((await app.request('/admin/stats')).status).toBe(200);
-		expect(log).toEqual(['admin /admin/stats']);
+		expect(log).toEqual(['admin -', 'admin /admin/stats']);
 	});
 
 	test('a plugin’s middlewares are the app’s: they run on it too', async () => {

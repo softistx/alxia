@@ -51,7 +51,6 @@ describe('the implicit responds of route(operation)', () => {
 			expect(
 				(await app.request('/pets/1', { headers: { 'x-user': 'a' } })).status,
 			).toBe(200);
-			expect(app.routes[0]?.schema.response).toEqual(getPet.schema.response);
 		} finally {
 			error.mockRestore();
 		}

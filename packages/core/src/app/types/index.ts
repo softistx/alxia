@@ -15,6 +15,7 @@ export type {
 	AddedOf,
 	BuiltinMark,
 	HandlerContext,
+	MadeByDefineMiddleware,
 	Merge,
 	Middleware,
 	MiddlewareBase,

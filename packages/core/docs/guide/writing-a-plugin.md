@@ -205,7 +205,7 @@ export const audit = <Requires extends object = Empty>(
 		return response;
 	});
 
-app.use(auth).use(audit<{ user: User }>(({ user }) => user.id));
+app.plugin(auth).use(audit<{ user: User }>(({ user }) => user.id));
 ```
 
 `use` checks it: given before `auth`, the middleware reads a `user` the app
@@ -227,7 +227,7 @@ export const audit = <Ctx extends object = BaseContext>(
 		return response;
 	});
 
-app.use(auth).use(audit(({ user }: BaseContext & { user: User }) => user.id));
+app.plugin(auth).use(audit(({ user }: BaseContext & { user: User }) => user.id));
 app.use(audit((ctx) => ctx.ip ?? 'unknown')); // unannotated: requires nothing
 ```
 

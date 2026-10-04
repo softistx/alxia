@@ -87,7 +87,7 @@ export function routeChain(
 	}
 	if (response !== undefined)
 		steps.push({ kind: 'responds', responses: response });
-	return { derive: steps, schema: declared(config, steps) };
+	return { derive: steps, schema: config as RouteSchema };
 }
 
 /** A middleware as a step of the chain: `validate` and `responds` are the chain's own. */
@@ -111,27 +111,4 @@ function requestParts(
 		if (config[part] !== undefined) parts[part] = config[part];
 	}
 	return parts as RequestSchemas;
-}
-
-/**
- * What the route declares, for a tool that reads `app.routes`: its options or schema,
- * with the schemas of its `validate` and `responds` middlewares merged in.
- */
-function declared(
-	config: Readonly<Record<string, unknown>>,
-	steps: readonly ChainHook[],
-): RouteSchema {
-	let schema: Record<string, unknown> | undefined;
-	for (const step of steps) {
-		if (step.kind === 'validate' && step.raw !== true) {
-			schema = Object.assign(schema ?? { ...config }, step.schemas);
-		} else if (
-			step.kind === 'responds' &&
-			step.responses !== config['response']
-		) {
-			schema ??= { ...config };
-			schema['response'] = { ...(schema['response'] ?? {}), ...step.responses };
-		}
-	}
-	return (schema ?? config) as RouteSchema;
 }

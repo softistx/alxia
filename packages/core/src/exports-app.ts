@@ -110,6 +110,7 @@ export type {
 	HookProvided,
 	KindFallsBack,
 	KindRefusalsOf,
+	MadeByDefineMiddleware,
 	MaxRouteHooks,
 	MaybePromise,
 	Method,

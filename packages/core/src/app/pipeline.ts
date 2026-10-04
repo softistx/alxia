@@ -143,7 +143,7 @@ async function route(
 		definition,
 		ctx,
 		match.params,
-		globals.parsers,
+		globals,
 		runtime.validateResponses,
 	);
 	return head
