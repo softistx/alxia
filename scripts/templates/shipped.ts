@@ -24,11 +24,13 @@ const SHIPPED: Readonly<Record<TemplateName, readonly string[]>> = {
 		'openapi-codegen.config.ts',
 		'package.json',
 		'src/app.ts',
+		'src/context.ts',
 		'src/generated/alxia.ts',
 		'src/generated/operations.ts',
 		'src/generated/paths.ts',
 		'src/generated/types.ts',
 		'src/generated/zod.ts',
+		'src/routes/todos.ts',
 	],
 	'react-router': [
 		'gitignore',

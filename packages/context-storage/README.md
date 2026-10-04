@@ -41,6 +41,26 @@ The context holds through every `await`, timer and promise of the
 request, and never leaks into another's: twenty concurrent requests read
 twenty contexts.
 
+With `@alxia/core`'s `Register` naming `base`, `contextStorage()` needs no
+type argument: it reads the registered context, `AppContext`. Either way
+the app that uses it must give that context, a compile error otherwise:
+
+```ts
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+
+export const requestContext = contextStorage(); // context(): AppContext
+base.use(requestContext);                       // ok
+alxia().use(requestContext);                    // compile error: the plugin reads "db" | "user", which this app's context does not give
+```
+
+Requiring that context of the app is new in 0.4.0: a plugin used on an app
+that does not give it, which read `undefined` at runtime, is now a compile
+error ([Upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md#the-context-registered-once-register-and-defineroutes)).
+
 ## Reading it
 
 | | |
@@ -63,7 +83,8 @@ Pass the plugin to `use` called: `use(contextStorage)`, uncalled, is refused by
 
 | export | |
 | --- | --- |
-| `contextStorage<App>()` | the plugin, with `context()` and `tryContext()` typed by `App` |
+| `contextStorage<App>()` | the plugin, with `context()` and `tryContext()` typed by `App` — by default the app `@alxia/core`'s `Register` names, `BaseContext` when none — and required of the app that uses it |
+| `StoredContext<App>` | what `context()` returns: `ContextOf<App>`, or `BaseContext` when `App` is no app |
 | `ContextStoragePlugin<App>` | its type |
 | `getContext`, `tryGetContext`, `getRequestContext`, `tryGetRequestContext`, `runWithContext` | the store, untyped |
 | `ContextStorageError`, `ContextStorageErrorCode` | why there is no context |

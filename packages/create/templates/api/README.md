@@ -12,11 +12,18 @@ operations generated from it, and a client is generated from the same file.
   (`openapi-codegen.config.ts`). `alxia.ts` holds each operation as the
   data `app.route()` takes. Never edit it: change `openapi.yaml`, then
   generate.
-- `src/app.ts`: the app. `route(operations.createTodo, requireKey, handler)`
-  runs its middlewares in order: `requireKey`, made with
-  `defineMiddleware`, answers 401 without the `x-api-key` header; the
-  operation's body is validated just before the handler, and every reply
-  checked against the operation's responses.
+- `src/context.ts`: the base, what every route reads (the todos), and
+  its `Register` declaration: a route file reads that context with no
+  import of the app. Register the base, never the app, which mounts the
+  route files and would be typed by itself.
+- `src/routes/todos.ts`: the routes, `defineRoutes()`, each bound to an
+  operation. `route(operations.createTodo, requireKey, handler)` runs its
+  middlewares in order: `requireKey`, made with `defineMiddleware`,
+  answers 401 without the `x-api-key` header; the operation's body is
+  validated just before the handler, and every reply checked against the
+  operation's responses.
+- `src/app.ts`: the app, `base.use(todoRoutes)`. Mounting the routes on
+  an app that does not give the base's context is a compile error.
 - `src/server.ts`: listens on `PORT`, 3000 by default.
 - `src/app.spec.ts`: `app.request()`, no port, and `matchesSpec` from
   [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi): every
@@ -30,7 +37,7 @@ A new route starts in `openapi.yaml`:
 1. Add the operation, with an `operationId`: `deleteTodo`, say.
 2. `bun run generate`: `src/generated/alxia.ts` now exports
    `operations.deleteTodo`.
-3. Bind it in `src/app.ts`, with the middlewares it needs:
+3. Bind it in `src/routes/todos.ts`, with the middlewares it needs:
    `.route(operations.deleteTodo, requireKey, ({ params, reply }) => …)`.
    The handler's `params`, `body` and `reply` are typed by the spec.
 4. `bun test`: `matchesSpec` fails while an operation has no route.

@@ -9,12 +9,14 @@ export type {
 } from './app/app-hooks';
 export type {
 	GroupMethod,
+	Mounted,
 	PluginForms,
+	RequiredIn,
 	UseMethod,
 } from './app/compose-methods';
 export { defineHook, defineWrap } from './app/define-hook';
 export { defineMiddleware } from './app/define-middleware';
-export { definePlugin } from './app/define-plugin';
+export { definePlugin, defineRoutes } from './app/define-plugin';
 export type {
 	AroundHook,
 	RefusalHandler,
@@ -35,6 +37,7 @@ export type {
 	OperationResponds,
 	OperationValidate,
 } from './app/operation-types';
+export type * from './app/register';
 export type {
 	AppWithRoute,
 	RouteOptions,
@@ -122,6 +125,7 @@ export type {
 	RequestContext,
 	RequiresOf,
 	Requiring,
+	RequiringContext,
 	ResponseCookies,
 	ResponseSchemas,
 	ResponseSettings,

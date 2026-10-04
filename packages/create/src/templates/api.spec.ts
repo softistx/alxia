@@ -176,7 +176,9 @@ describe('the api template', () => {
 		const { files } = await copyTemplate('api', 'my-api', await alxiaRanges());
 		const example = (await files['.env.example']?.text()) ?? '';
 		const source = [
+			(await files['src/context.ts']?.text()) ?? '',
 			(await files['src/app.ts']?.text()) ?? '',
+			(await files['src/routes/todos.ts']?.text()) ?? '',
 			(await files['src/server.ts']?.text()) ?? '',
 		].join('\n');
 		const read = [...source.matchAll(/Bun\.env\["(\w+)"\]/g)].map(

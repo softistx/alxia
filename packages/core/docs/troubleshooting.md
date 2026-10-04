@@ -50,6 +50,10 @@ a trap that prints nothing is headed by its symptom.
 - [`Property 'part' does not exist on type 'Refusal'`](#property-part-does-not-exist-on-type-refusal)
 - [`Module '"@alxia/core"' has no exported member 'RoutesOf'`](#module-alxiacore-has-no-exported-member-routesof)
 - [`Generic type 'Alxia<Ctx, Prefix, Shortcuts>' requires between 0 and 3 type arguments`](#generic-type-alxiactx-prefix-shortcuts-requires-between-0-and-3-type-arguments)
+- [`'app' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer`](#app-implicitly-has-type-any-because-it-does-not-have-a-type-annotation-and-is-referenced-directly-or-indirectly-in-its-own-initializer), with `Register`
+- [`Property '…' does not exist on type 'BaseContext & { readonly 'Register.context must be typeof base, …': never; }'`](#property--does-not-exist-on-type-basecontext---readonly-registercontext-must-be-typeof-base--never-)
+- [`Subsequent property declarations must have the same type.  Property 'context' must be of type '…'`](#subsequent-property-declarations-must-have-the-same-type-property-context-must-be-of-type-)
+- [`Property 'user' does not exist on type 'MiddlewareContext<Empty>'`](#property-user-does-not-exist-on-type-middlewarecontextempty), with `Register`
 
 **Building the app**
 
@@ -330,8 +334,9 @@ declared after `use`, not before it.
 
 ### `the plugin reads "…", which this app's context does not give: use the plugin that adds it first`
 
-**When:** an app uses a plugin made by `definePlugin<Requires>()`, and
-nothing declared before that `use` adds a key the plugin requires.
+**When:** an app uses a plugin made by `definePlugin<Requires>()`, or
+routes made by `defineRoutes()` (which require the registered context),
+and nothing declared before that `use` adds a key the plugin requires.
 
 ```ts
 const tenant = definePlugin<{ user: { tenantId: string } }>()((app) =>
@@ -352,6 +357,14 @@ error TS2769: No overload matches this call.
 
 The first overload's error, about a function plugin, is noise: the
 message on the last line is the one that matters.
+
+Returned from a `group` or a plugin function, `group(() => todos)` or
+`use(() => todos)`, the error is a `TS2322: Type 'AppWithRoute<…>' is not
+assignable to type '… & { readonly '~requires': "the plugin reads …" }'`
+on the returned app, with the same message.
+
+For routes made by `defineRoutes()`, the last line reads
+`Property ''~requires'' is missing in type 'Alxia<…>' but required in type '{ readonly '~requires': "the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"; }'`.
 
 **Why:** the plugin's hooks read `user`, and on this app no plugin or
 `derive` before it adds one, so at runtime `user` would be `undefined`. The
@@ -1339,6 +1352,118 @@ type Fresh = Alxia<Empty, '', never>;
 ```
 
 See [No more client: spec first](upgrading.md#no-more-client-spec-first).
+
+### `'app' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer`
+
+**When:** `Register` names the app that mounts the route files, rather
+than the base that builds the context:
+
+```ts
+export const app = alxia().derive(auth).use(todos); // todos = defineRoutes(…)
+
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof app;
+	}
+}
+```
+
+```text
+app.ts(1,14): error TS7022: 'app' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+app.ts(5,3): error TS2502: 'context' is referenced directly or indirectly in its own type annotation.
+todos.ts(3,14): error TS7022: 'todos' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer.
+```
+
+The same happens when the registered chain itself reads `Register`: a
+`defineMiddleware<AppContext>()` or a `defineRoutes()` given to `base`.
+(A `contextStorage()` given to `base` compiles, but its `context()` reads
+`BaseContext`: give it to the app after `base`.)
+
+**Why:** `todos`' type reads `Register`, which is `typeof app`, whose type
+is what `use(todos)` returns: each needs the other first, so TypeScript
+gives both `any`.
+
+**Fix:** register the chain that builds the context, and mount the routes
+on the app after it:
+
+```ts
+// src/context.ts
+export const base = alxia().derive(auth);
+
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+
+// src/app.ts
+export const app = base.use(todos);
+```
+
+Give `base` nothing that reads `Register`; give those to `app`.
+
+### `Property '…' does not exist on type 'BaseContext & { readonly 'Register.context must be typeof base, …': never; }'`
+
+**When:** every read of `AppContext`, and of a `defineRoutes` route's
+context, fails with it.
+
+```text
+error TS2339: Property 'user' does not exist on type 'BaseContext & { readonly 'Register.context must be typeof base, the alxia() chain that decorates and derives the context': never; }'.
+```
+
+**Why:** `Register`'s `context` is not an alxia app: its context
+(`ContextOf<typeof base>`), the module (`typeof import('./context')`), or
+a type written by hand. What it names is read as `InvalidRegister`, whose
+only key is this message, so the mistake shows on the first read rather
+than as an `any`.
+
+**Fix:** name the app, `typeof base`:
+
+```ts
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+```
+
+### `Subsequent property declarations must have the same type.  Property 'context' must be of type '…'`
+
+**When:** two files of one TypeScript program declare `Register`'s
+`context`, with different apps.
+
+```text
+error TS2717: Subsequent property declarations must have the same type.  Property 'context' must be of type 'Alxia<Empty & { user: string; }, "", never>', but here has type 'Alxia<Empty & { tenant: string; }, "", never>'.
+```
+
+**Why:** a program has one `Register`, and it names one context.
+
+**Fix:** keep one declaration, beside the base. Two apps in one
+repository each get their own `tsconfig.json`, so each is its own program;
+a package shared by both names what it reads with
+`definePlugin<Requires>()`, not `Register`.
+
+### `Property 'user' does not exist on type 'MiddlewareContext<Empty>'`
+
+**When:** with `Register` augmented, a `defineMiddleware(fn)` reads a key
+of the registered context.
+
+```ts
+const owner = defineMiddleware(({ user }, next) => next({ owner: user.id }));
+```
+
+**Why:** a middleware may be given to a route before `base` adds
+anything, so with no type argument it reads `BaseContext` alone,
+registered or not.
+
+**Fix:** name the registered context as what it requires; a route or a
+`use` whose context does not give it then refuses the middleware:
+
+```ts
+import { type AppContext, defineMiddleware } from '@alxia/core';
+
+const owner = defineMiddleware<AppContext>()(({ user }, next) => next({ owner: user.id }));
+```
 
 ## Building the app
 

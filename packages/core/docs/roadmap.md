@@ -43,6 +43,14 @@ number on it. Every release, with each change it made, is in
   is the package that was `@alxia/openapi-routes`; the one that generated
   a document from an app is retired
   ([Upgrading](upgrading.md#the-old-alxiaopenapi-is-retired)).
+- **A context declared once.** `declare module '@alxia/core' { interface
+  Register { context: typeof base } }`, beside the chain that builds the
+  context, and a file of routes reads it with no import of the app:
+  `defineRoutes('/todos').get('/', ({ user, reply }) => …)`, mounted with
+  `base.use(todos)`, which `use` refuses on an app that does not give that
+  context. `AppContext` types a service with it, `contextStorage()` reads
+  it, and so does `@alxia/react-router`'s `alxiaOf` when no server is
+  registered ([The app's type](guide/types.md#register-and-appcontext)).
 
 ## Next
 
@@ -70,10 +78,6 @@ number on it. Every release, with each change it made, is in
   they guard every route declared after them, in a group for some. A
   middleware form of each, named on the one route that needs it, would sit
   beside the plugin.
-- **A context declared once.** A `Register` interface the app augments —
-  `declare module '@alxia/core' { interface Register { context: … } }` — with
-  `defineRoutes` and `AppContext`, so a module of routes reads the app's
-  context typed without importing the app.
 - **Comments on a stream.** A handler yielding a comment line of its own
   (`: …`), beside the keep-alive the stream already sends while idle.
 

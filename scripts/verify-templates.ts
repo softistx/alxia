@@ -57,7 +57,9 @@ const CHECKS: readonly Check[] = [
 			'openapi.yaml',
 			'openapi-codegen.config.ts',
 			'src/app.ts',
+			'src/context.ts',
 			'src/generated/alxia.ts',
+			'src/routes/todos.ts',
 		],
 		// verify: generate --check, check:ci, typecheck, then test.
 		scripts: ['verify', 'build'],

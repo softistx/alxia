@@ -42,7 +42,12 @@ export type {
 	RefusingKind,
 	ThenShortcuts,
 } from './refusal';
-export type { ProvidedBy, RequiresOf, Requiring } from './requires';
+export type {
+	ProvidedBy,
+	RequiresOf,
+	Requiring,
+	RequiringContext,
+} from './requires';
 export type {
 	AddedBy,
 	AnyRouteHook,

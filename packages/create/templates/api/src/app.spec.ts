@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { matchesSpec } from "@alxia/openapi";
-import { apiKey, app } from "./app";
+import { app } from "./app";
+import { apiKey } from "./context";
 import { operations } from "./generated/alxia";
 
 const json = { "content-type": "application/json", "x-api-key": apiKey };

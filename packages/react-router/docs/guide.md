@@ -577,19 +577,57 @@ export function loader({ context }: Route.LoaderArgs) {
 
 The type argument may also be an alxia app, the app *before* the
 catch-all, for a server of your own. Anything else is a compile error.
-With neither `Register` nor a type argument, `alxiaOf(context)` is
-`BaseContext`: the request, its URL, `reply` and the rest of what every
-hook reads.
+
+### With `@alxia/core`'s `Register`
+
+`@alxia/core` has a `Register` of its own, which names the chain that
+builds an app's context, for its route files
+([The app's type](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/types.md#register-and-appcontext)).
+`alxiaOf(context)` reads it when this package's `Register` names no
+server:
+
+```ts
+// app/context.ts
+import { alxia } from '@alxia/core';
+
+export const base = alxia().derive(({ request }) => ({ user: request.headers.get('x-user') }));
+
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+
+// app/server.ts
+const server = createServer({ configure: (app) => app.use(base) });
+export default server;
+```
+
+`alxiaOf(context).user` is then typed with no declaration in
+`@alxia/react-router`. Which one is read, in order:
+
+1. a type argument, `alxiaOf<typeof server>(context)`;
+2. this package's `Register`, `server: typeof server`: the whole app the
+   pages run behind, `base` and everything `configure` adds after it;
+3. `@alxia/core`'s `Register`, `context: typeof base`: only what `base`
+   builds;
+4. neither: `BaseContext`, the request, its URL, `reply` and the rest of
+   what every hook reads.
+
+Declare this package's `Register` when `configure` adds to the context
+after the base, and the loaders read it.
 
 ### Why a global augmentation is right here
 
-alxia's core refuses global augmentation of its context: a plugin that
-added `user` to every route, declared before it or after, would type
-`user` on routes that run before the plugin. That is the lie "order is
-meaning" forbids. `Register` here does something else: it names the
-**one** server of the React Router build, at the point of its catch-all,
-which is exactly what every loader runs behind. One build has one server
-entry, so there is no second app for a module to be confused with.
+alxia's core refuses a global augmentation of a context key: a plugin
+that added `user` to every route, declared before it or after, would
+type `user` on routes that run before the plugin. That is the lie "order
+is meaning" forbids. Core's own `Register` names the base that builds
+the context instead, and what reads it requires it. `Register` here does
+something else: it names the **one** server of the React Router build,
+at the point of its catch-all, which is exactly what every loader runs
+behind. One build has one server entry, so there is no second app for a
+module to be confused with.
 
 If two React Router apps share one TypeScript program (one tsconfig over
 both folders of a monorepo), their two declarations conflict, and `tsc`

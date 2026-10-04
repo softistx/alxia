@@ -473,7 +473,7 @@ With several, `2 operations have no route: …`; a route outside the spec
 reads `1 route has no operation: …`, after a `;` when both happen.
 
 **When:** `bun test`, in `src/app.spec.ts`, after an operation was added
-to `openapi.yaml` and `bun run generate` run, before `src/app.ts` routes
+to `openapi.yaml` and `bun run generate` run, before `src/routes/todos.ts` routes
 it. The path is in alxia's form, `/todos/:id`, and the `operationId` is
 in parentheses.
 
@@ -481,7 +481,7 @@ in parentheses.
 of `src/generated/alxia.ts` has a route of its method and path, and every
 route has an operation.
 
-**Fix:** bind the operation in `src/app.ts`
+**Fix:** bind the operation in `src/routes/todos.ts`
 ([Adding an operation](guide.md#adding-an-operation)):
 
 ```ts

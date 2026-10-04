@@ -14,6 +14,7 @@ break yours.
 | [No more client: spec first](#no-more-client-spec-first) | core, client, graphql, janus, secure-headers, context-storage, react-router | yes: `@alxia/client`, `RoutesOf` and the route table are gone, and `Alxia` takes three type parameters |
 | [`@alxia/openapi-routes` is now `@alxia/openapi`](#alxiaopenapi-routes-is-now-alxiaopenapi) | openapi, openapi-routes | no: change the import; `@alxia/openapi-routes` 0.2.1 re-exports it, deprecated |
 | [The old `@alxia/openapi` is retired](#the-old-alxiaopenapi-is-retired) | openapi | yes: `openapi()` and `docs()` are gone; write the document, generate the operations |
+| [The context registered once: `Register` and `defineRoutes`](#the-context-registered-once-register-and-defineroutes) | core, context-storage, react-router | no: new exports; `contextStorage()` now requires the context it reads of the app that uses it |
 
 ### One middleware model
 
@@ -573,6 +574,53 @@ the old versions on npm:
 npm deprecate @alxia/openapi@"<=0.3.0" "Retired: alxia is OpenAPI spec first. @alxia/openapi 0.4.0 and later is the spec-first package that was @alxia/openapi-routes (implemented, matchesSpec): write the OpenAPI document, generate the operations with @nxgt/openapi-codegen, bind them with route(). See https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md"
 npm deprecate @alxia/openapi-routes@"<=0.2.1" "Moved to @alxia/openapi: bun add -d @alxia/openapi and change the import, nothing else. See https://github.com/softistx/alxia/blob/develop/packages/openapi-routes/README.md"
 ```
+
+### The context registered once: `Register` and `defineRoutes`
+
+**What changed.** `@alxia/core` exports `Register`, an interface the app
+augments with the chain that builds its context, and what reads it:
+`AppContext`, that context, and `defineRoutes(prefix?)`, routes built on
+it that require it of the app mounting them. A file of routes no longer
+imports the app, nor takes it as a parameter.
+
+**Can it break your code.** No for core: nothing reads `Register` until
+an app augments it. `@alxia/context-storage`'s `contextStorage<typeof
+base>()` now requires `base`'s context of the app that uses it, and so
+does `contextStorage()`, typed by `Register`: using it on an app that does
+not give that context, which read `undefined` at runtime, is now a compile
+error. `@alxia/react-router`'s `alxiaOf(context)` reads core's `Register`
+when its own names no server; its own still wins.
+
+**How to migrate**, optionally, a file of routes at a time:
+
+```ts
+// before: src/routes/todos.ts takes the base
+import type { base } from '../context';
+
+export const todos = (app: typeof base) =>
+	app.get('/todos', ({ user, reply }) => reply(200, user.todos));
+
+// after: src/context.ts registers the base once…
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+
+// …and src/routes/todos.ts imports @alxia/core alone
+import { defineRoutes } from '@alxia/core';
+
+export const todos = defineRoutes('/todos')
+	.get('/', ({ user, reply }) => reply(200, user.todos));
+
+// src/app.ts
+export const app = base.use(todos);
+```
+
+Register `base`, never the app that mounts the routes: `TS7022`
+otherwise ([Troubleshooting](troubleshooting.md#app-implicitly-has-type-any-because-it-does-not-have-a-type-annotation-and-is-referenced-directly-or-indirectly-in-its-own-initializer)).
+A service typed `ContextOf<typeof base>` can take `AppContext` instead,
+and `contextStorage<typeof base>()` can drop its type argument.
 
 ## 0.3.1
 

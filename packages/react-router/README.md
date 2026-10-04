@@ -147,7 +147,12 @@ How `alxiaOf(context)` is typed:
 - with the `Register` declaration above, by that server: reading something
   no hook derives is a compile error;
 - without it, `alxiaOf<typeof server>(context)` names the server;
-- with neither, `alxiaOf(context)` is `BaseContext`.
+- with neither, by the base `@alxia/core`'s own `Register` names
+  (`context: typeof base`), when the app has one;
+- with none of them, `alxiaOf(context)` is `BaseContext`.
+
+This package's `Register` wins over core's: the server's app is the base
+and all `configure` adds after it.
 
 [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#typing-the-loaders)
 
@@ -400,8 +405,8 @@ has the commented file, and what to copy for a package left external.
 | `FreshApp` | the app `beforeAll`, or `configure` without it, receives |
 | `alxiaOf<App>(context)` | what alxia's hooks built, in a loader, an action or a middleware. Typed by the registered server, by the type argument (a server or an app), or as `BaseContext` |
 | `Register` | the interface to augment with `server: typeof server` |
-| `RegisteredApp` | the app `alxiaOf` reads with no type argument |
-| `RegisteredOf<R>` | the app a `Register`-shaped interface names: its server's, a fresh app, or `InvalidRegister` |
+| `RegisteredApp` | the app `alxiaOf` reads with no type argument: the registered server's, else the one `@alxia/core`'s `Register` names, else a fresh app |
+| `RegisteredOf<R, Core?>` | the app a `Register`-shaped interface names: its server's, `InvalidRegister`, or with no server `Core`, by default core's `RegisteredBase` |
 | `InvalidRegister` | what a `Register` naming neither a server nor an app reads as: every key of the app's own a compile error |
 | `AppOf<Server>` | the app a server makes |
 | `alxiaContext` | the React Router context key `alxiaOf` reads, set on every request |

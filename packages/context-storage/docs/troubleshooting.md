@@ -18,6 +18,7 @@ behaviour that prints nothing, or an error from `tsc`. A
 - [`Property 'user' does not exist on type 'BaseContext'.`](#property-user-does-not-exist-on-type-basecontext)
 - [`Property 'params' does not exist on type 'BaseContext & …'.`](#property-params-does-not-exist-on-type-basecontext--)
 - [`Object literal may only specify known properties, and 'db' does not exist in type 'BaseContext'.`](#object-literal-may-only-specify-known-properties-and-db-does-not-exist-in-type-basecontext)
+- [`the plugin reads "…", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
 
 ## Runtime
 
@@ -202,7 +203,10 @@ Also as `Property 'user' does not exist on type 'BaseContext & Empty & { readonl
 
 **When:** reading from `context()` a value a hook adds, and either
 
-- the plugin was made without an app type, `contextStorage()`; or
+- the plugin was made without an app type, `contextStorage()`, and
+  `@alxia/core`'s `Register` names no base; or
+- it is `contextStorage()` given to the registered `base` itself, which
+  cannot read `Register` while `base` is being typed; or
 - it is typed by `base`, and the hook adding `user` comes after it:
   `base.use(requestContext).derive(() => ({ user }))`.
 
@@ -211,7 +215,8 @@ Also as `Property 'user' does not exist on type 'BaseContext & Empty & { readonl
 not in it. At runtime the value is there.
 
 **Fix:** declare every hook whose values services read in `base`, then type
-the plugin by it:
+the plugin by it — or register `base` with `@alxia/core`'s `Register` and
+give `contextStorage()` to the app after `base`, never to `base` itself:
 
 ```ts
 const base = alxia()
@@ -275,3 +280,33 @@ const ctx = {
 
 runWithContext(ctx as unknown as Ctx, () => listOrders());
 ```
+
+### `the plugin reads "…", which this app's context does not give: use the plugin that adds it first`
+
+```text
+error TS2769: No overload matches this call.
+  …
+        Types of property ''~requires'' are incompatible.
+          Type '{ user: string; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"'.
+```
+
+**When:** an app uses a plugin typed by another app, `contextStorage<typeof
+base>()`, or by the registered one, `contextStorage()`, and does not give
+what that app's hooks add:
+
+```ts
+const base = alxia().derive(({ request }) => ({ user: request.headers.get('x-user') ?? 'anonymous' }));
+const requestContext = contextStorage<typeof base>();
+
+alxia().use(requestContext);
+```
+
+**Why:** `context()` would return a `user` that no hook of this app adds:
+at runtime it would be `undefined`.
+
+**Fix:** use the plugin on the app it is typed by, after `base`:
+
+```ts
+base.use(requestContext);
+```
+

@@ -7,7 +7,10 @@ only number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **Typed by `Register`.** With `@alxia/core`'s `Register` naming the
+  base, `contextStorage()` needs no type argument: `context()` reads the
+  registered context. Typed either way, the plugin requires that context
+  of the app that uses it, a compile error otherwise.
 
 ## Next
 

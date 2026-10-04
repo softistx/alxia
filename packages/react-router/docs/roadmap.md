@@ -7,7 +7,10 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **Loaders typed by core's `Register`.** `alxiaOf(context)` reads the base
+  `@alxia/core`'s `Register` names when this package's names no server, so
+  an app that registers its context once types its loaders too. This
+  package's `Register` still wins when both are declared.
 
 ## Next
 
