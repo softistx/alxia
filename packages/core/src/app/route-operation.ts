@@ -85,6 +85,11 @@ export interface OperationMethod<
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
+	/**
+	 * A route declared as data — `{ method, path, schema? }`, as an OpenAPI
+	 * code generator writes it — and its handler: the same route as
+	 * `app[method](path, schema, handler)`.
+	 */
 	<
 		const Operation extends RouteOperation,
 		Result extends HandlerResult<OperationSchema<Operation>>,
@@ -110,6 +115,7 @@ export interface OperationMethod<
 		Prefix,
 		Shortcuts
 	>;
+	/** A route declared as data, with a list of hooks before its handler. */
 	<
 		const Operation extends RouteOperation,
 		const Hooks extends readonly [] | readonly AnyRouteHook[],

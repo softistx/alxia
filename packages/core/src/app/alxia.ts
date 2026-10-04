@@ -211,8 +211,9 @@ export class Alxia<
 	}
 
 	/**
-	 * A method that declares on this app's state, then returns the app; typed
-	 * by its interface, whose overloads the implementation does not repeat.
+	 * A method that declares on this app's state, then returns the app. The
+	 * `never` is deliberate: its interface types it, whose generic overloads
+	 * the implementation does not repeat, so the specs check that they agree.
 	 */
 	#do<Args extends unknown[]>(
 		run: (state: AppState, ...args: Args) => void,
