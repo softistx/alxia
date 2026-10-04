@@ -895,9 +895,9 @@ which beats the catch-all's wildcard. Two consequences:
   Put alxia's routes under a prefix of their own, `/api`.
 
 Pages and single-fetch data are not something a generated client calls:
-leave the catch-all out of the OpenAPI document with `isReactRouterRoute`
-([OpenAPI](#openapi)); what a client does call, your `/api`, is documented
-as always.
+leave the catch-all out of `matchesSpec`'s check with `isReactRouterRoute`
+([OpenAPI](#openapi)); what a client does call, your `/api`, is what the
+OpenAPI document declares.
 
 What React Router answers comes back as it sent it: documents,
 single-fetch data (`/_.data`, `/login.data`), lazy route discovery
@@ -1016,25 +1016,49 @@ refused when the server starts: see
 
 ## OpenAPI
 
-`@alxia/openapi` documents every route of `app.routes`, and the catch-all
-and the client's files are routes. Leave them out with
+alxia is OpenAPI spec first: the document is written by hand, the API's
+routes are bound to the operations generated from it, and
+[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi)'s
+`matchesSpec` checks, in a test, that `app.routes` and the operations
+match both ways. The catch-all and the client's files are routes of
+`app.routes`, and no operation of the document. Leave them out with
 `isReactRouterRoute`, which is true for each route this package declared:
 
 ```ts
 // app/server.ts
-import { docs } from '@alxia/openapi';
-import { createServer, isReactRouterRoute } from '@alxia/react-router';
+import { createServer } from '@alxia/react-router';
+import { operations } from './generated/alxia';
 
 export default createServer({
 	configure: (app) =>
 		app
 			.get('/api/health', ({ reply }) => reply.ok({ ok: true }))
-			.use(docs(app, { info: { title: 'Shop', version: '1.0.0' }, exclude: isReactRouterRoute })),
+			.route(operations.listOrders, ({ reply }) => reply.ok([])),
 });
 ```
 
-Combine it with your own: `exclude: (route) => isReactRouterRoute(route) ||
-route.path === '/api/health'`.
+```ts
+// app/server.test.ts
+import { test } from 'bun:test';
+import { matchesSpec } from '@alxia/openapi';
+import { isReactRouterRoute } from '@alxia/react-router';
+import type { ServerBuild } from 'react-router';
+import { operations } from './generated/alxia';
+import server from './server';
+
+test('the API routes every operation of openapi.yaml, and nothing else', async () => {
+	const build: ServerBuild = await import(new URL('../build/server/index.js', import.meta.url).href);
+	const app = server.create({ build });
+	matchesSpec(app, operations, {
+		exclude: (route) => isReactRouterRoute(route) || route.path === '/api/health',
+	});
+});
+```
+
+When the app puts the operations under a prefix the document's paths
+leave out, `app.group('/api', (api) => api.route(…))`, give `matchesSpec`
+the same `prefix: '/api'`. See
+[`@alxia/openapi`'s checks](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md).
 
 ## Testing
 

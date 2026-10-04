@@ -90,7 +90,7 @@ export interface RefusalMethod<
 	 * ```
 	 *
 	 * Given schemas first, its `reply` is typed by them, its reply is
-	 * checked and sent as their output, and `@alxia/openapi` documents it:
+	 * checked and sent as their output:
 	 *
 	 * ```ts
 	 * .onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' },

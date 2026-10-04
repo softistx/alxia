@@ -258,24 +258,32 @@ In a build, `build/client` is served before `configure`'s hooks:
 A missing asset gets alxia's JSON 404, not a page. In dev, Vite serves
 these files.
 
-## Leaving the pages out of OpenAPI
+## Leaving the pages out of `matchesSpec`
 
-The examples use `@alxia/openapi` (`bun add @alxia/openapi`):
+An API under `/api`, spec first, is checked against its OpenAPI document
+by [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi)'s
+`matchesSpec` (`bun add -d @alxia/openapi`), which reads `app.routes`. The
+catch-all and the client's files are routes too, and no operation of the
+document:
 
 ```ts
-// app/server.ts
-import { docs } from '@alxia/openapi';
-import { createServer, isReactRouterRoute } from '@alxia/react-router';
+// app/server.test.ts
+import { test } from 'bun:test';
+import { matchesSpec } from '@alxia/openapi';
+import { isReactRouterRoute } from '@alxia/react-router';
+import type { ServerBuild } from 'react-router';
+import { operations } from './generated/alxia';
+import server from './server';
 
-export default createServer({
-	configure: (app) =>
-		app.use(docs(app, { info: { title: 'Shop', version: '1.0.0' }, exclude: isReactRouterRoute })),
+test('the API routes every operation of openapi.yaml, and nothing else', async () => {
+	const build: ServerBuild = await import(new URL('../build/server/index.js', import.meta.url).href);
+	const app = server.create({ build });
+	matchesSpec(app, operations, { exclude: isReactRouterRoute });
 });
 ```
 
-`isReactRouterRoute` names the catch-all and the client files, so
-`@alxia/openapi` can leave them out of the document a client is generated
-from.
+`isReactRouterRoute` is true for each route this package declared, so
+`matchesSpec` checks your own routes alone.
 
 ## Built for Bun
 
@@ -400,7 +408,7 @@ has the commented file, and what to copy for a package left external.
 | `nonceOf(context)` | the request's CSP nonce, for `entry.server.tsx`: the context's `nonce` when a hook set one, such as `secureHeaders({ nonce: true })`, else `undefined` |
 | `reactRouter(app, options)` | the catch-all and the client's files, for a server of your own. `build`, `mode`, `getLoadContext`, `client` |
 | `ReactRouterOptions<Ctx>` | its options |
-| `isReactRouterRoute(route)` | whether this package declared a route, for OpenAPI's `exclude` |
+| `isReactRouterRoute(route)` | whether this package declared a route, for `matchesSpec`'s `exclude` |
 
 From `@alxia/react-router/vite`:
 

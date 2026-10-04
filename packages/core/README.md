@@ -7,10 +7,16 @@ reads and what it answers with any [Standard Schema](https://standardschema.dev)
 and the types follow: the handler reads validated values, and can only answer
 what it declared.
 
-alxia is **OpenAPI spec first**: the OpenAPI document is the contract, and a
-client is generated from it with the generator you choose — the examples use
-[`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen)
-([upgrading from a typed client](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md#no-more-client-spec-first)).
+alxia is **OpenAPI spec first**: the OpenAPI document, written by hand, is
+the contract. A client is generated from it with the generator you choose,
+and so are the server's routes — the examples use
+[`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen),
+whose `alxia` option writes each operation for `route()`. The operation's
+schemas check every request and reply at run time, and
+[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi)'s
+`matchesSpec` checks, in a test, that the app routes the document's
+operations and nothing else
+([upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md#alxia-is-openapi-spec-first)).
 
 ## Getting started
 
@@ -140,7 +146,7 @@ const app = alxia().post(
 | Piece | Does |
 | --- | --- |
 | `app.<method>(path, options?, ...middlewares, handler)` | up to 8 middlewares, each reading what the ones before it added; the handler last |
-| `options` | `bodyLimit` (bytes, a 413 past it) and `detail` (what OpenAPI says of the route); a schema there does not compile, and throws where the route is declared |
+| `options` | `bodyLimit` (bytes, a 413 past it) and `detail` (`summary`, `operationId`, `tags`…: read by nothing at run time; a generated operation carries it); a schema there does not compile, and throws where the route is declared |
 | `defineMiddleware(fn)` | types `fn`, marks it as a middleware, and returns it |
 | `app.use(...middlewares)` | up to 8 `defineMiddleware`s for every route declared after it, before the route's own, what each adds typed after it |
 | `app.use(path, ...middlewares)` | the same for the routes under `path` alone; they may add nothing |
@@ -152,7 +158,7 @@ Position is meaning: `auth, validate(…)` answers a stranger 401 before his
 body is read; `validate(…), auth` answers a bad body 400 first. A reply
 made before a `responds` is never checked; `auth`'s 401 after it is checked
 only if `responds` declares a 401. Both declare their schemas on the route,
-so `@alxia/openapi` documents them.
+in `app.routes`.
 
 The forms of 0.3 still run, as 0.3 ran them, and are deprecated: a list of
 hooks after the path, a schema before the handler, `defineHook` and
@@ -268,11 +274,11 @@ const app = alxia()
 
 Its reply replaces the 400 of every route after it that validates. Given schemas first —
 `onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' }, hook)`
-— its `reply` is typed by them, its body checked and sent as their output,
-and `@alxia/openapi` documents it.
+— its `reply` is typed by them, and its body checked and sent as their
+output.
 
 Given a kind first, a hook answers that kind alone, reads its refusal
-narrowed, and types and documents that kind's replies apart. A kind with no
+narrowed, and types and checks that kind's replies apart. A kind with no
 hook of its own, or whose hook returns nothing, falls back to the general
 hook, then to the default:
 
@@ -365,7 +371,7 @@ Without one, the bytes are counted as they arrive, and reading stops once
 they pass the limit, so a chunked upload is never buffered whole. The
 limit applies to JSON, forms, text, an app's own parsers, and a handler
 reading `request.body` as a stream. Either way the answer is a 413, which
-the route's OpenAPI document includes:
+the route's operation in the OpenAPI document declares:
 
 ```json
 { "error": "content_too_large", "limit": 65536 }
@@ -693,7 +699,7 @@ covers all three kinds.
 | `ContextOf<App>` | what a route declared next on `App` reads: to type a GraphQL schema, a service |
 | `RequestContext`, `BaseContext`, `Context`, `ResponseSettings`, `HandlerResult` | what every hook reads (`BaseContext.cookies`: the request's), what a handler reads, what a route sets on its response, what a handler may return |
 | `ResponseCookies` | `set.cookies`: Bun's `CookieMap` of the cookies the response sets, whose `get` and `has` read those, never the request's |
-| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod` (its forms: `path, options?, ...middlewares, handler`, and the deprecated schema and list of hooks), `RefusalMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, what OpenAPI says of it, the checks its schema's type cannot express, a route method, the type of `onRefusal` (its four forms), a route and a socket as the app runs them |
+| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod` (its forms: `path, options?, ...middlewares, handler`, and the deprecated schema and list of hooks), `RefusalMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, its `detail` (`summary`, `operationId`, …), the checks its schema's type cannot express, a route method, the type of `onRefusal` (its four forms), a route and a socket as the app runs them |
 | `RouteOperation`, `OperationSchema`, `OperationMethod`, `CheckedOperation` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), the type of `route` — `OperationForms`, and its list of hooks of 0.3, deprecated — and the check it makes of the operation |
 | `OperationForms`, `OperationApp`, `OperationParts`, `OperationOptions`, `OperationResponds`, `OperationValidate` | `route(operation, ...middlewares, handler)`, up to 8 middlewares; the app it reads; the operation's request parts, its options (`bodyLimit`, `detail`), and the implicit `responds` and `validate` it threads. Exported so an app's type can be named in a declaration file |
 | `StaticMethod`, `FileMethod`, `PageMethod`, `DecorateMethod`, `DeriveMethod`, `WrapMethod`, `BodyLimitMethod`, `ErrorMethod`, `RequestHookMethod`, `ResponseHookMethod`, `AroundMethod`, `StartHookMethod`, `StopHookMethod`, `ParserMethod`, `GroupMethod`, `UseMethod`, `RequestMethod`, `ListenMethod` | the types of the app's other methods, each holding its overloads and their documentation: `static`, `file`, `page`; the route hooks `decorate`, `derive`, `wrap`, `bodyLimit`, `onError`; the global hooks `onRequest`, `onResponse`, `around`, `onStart`, `onStop`, `parser`; `group` and `use`; `request` and `listen`. Exported so an app's type can be named in a declaration file |
@@ -704,7 +710,7 @@ covers all three kinds.
 | `Refusal`, `ValidationRefusal`, `BodyLimitRefusal`, `RequestPart` | what an `onRefusal` hook reads: the refusal by `kind` — `validation`, with the `part` that failed first and its `issues`, or `body_limit`, with the route's `limit` |
 | `RefusalKind`, `RefusalOfKind<Kind>` | the kinds `onRefusal(kind, hook)` takes, `'validation' \| 'body_limit'`, and the refusal a hook of one kind reads |
 | `RefusalSchema`, `RefusalResponses` | what an `onRefusal` hook may declare: the schema of each 4xx it answers, and its `contentType` |
-| `RefusalHook`, `RefusalHandler`, `RefusalHandlersByKind` | an `onRefusal` hook, the general one in force for a route — `RouteDefinition['refusal']` — and those of each kind, tried before it — `RouteDefinition['refusalByKind']` — what `@alxia/openapi` documents |
+| `RefusalHook`, `RefusalHandler`, `RefusalHandlersByKind` | an `onRefusal` hook, the general one in force for a route — `RouteDefinition['refusal']` — and those of each kind, tried before it — `RouteDefinition['refusalByKind']` |
 | `RefusingKind`, `KindFallsBack`, `KindRefusalsOf`, `OneKind` | how an app's type carries an `onRefusal(kind, hook)`: the mark of its replies, of the general hook or default it falls back to, the replies it may answer, and the check that its kind is one literal, not a union. Exported so an app's type can be named in a declaration file |
 | `Refusing`, `FallsBack`, `RefusalsOf`, `DeclaredRefusal`, `ThenShortcuts`, `BodyLimited`, `BodyLimitShortcut` | how an app's type carries its `onRefusal` hook and its `bodyLimit()`: the mark of the hook's replies, of the default it falls back to, how a later scope's hooks replace them, the mark of a `bodyLimit()` in force and the shortcut it adds, the replies a hook may answer (`RefusalsOf`) and, for a hook declaring schemas, those replies as its schemas give them back (`DeclaredRefusal`). Exported so an app's type can be named in a declaration file |
 | `problem(details, init?)`, `ProblemDetails` | a reply whose body is an RFC 9457 problem — `type`, `title`, `status`, `detail`, `instance` and typed extension members — sent with its `status` as `application/problem+json` |

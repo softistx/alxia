@@ -31,10 +31,10 @@ you notice. A `400` from validation reads like this, and the heading is its
 
 - [`Expected 1 arguments, but got 0.`](#expected-1-arguments-but-got-0)
 
-**The OpenAPI document**
+**JSON Schema**
 
-- [A route documents no query parameter](#a-route-documents-no-query-parameter)
-- [A response is documented as `{}`](#a-response-is-documented-as-)
+- [`Date cannot be represented in JSON Schema`](#date-cannot-be-represented-in-json-schema)
+- [`zodConverter` returns `undefined`](#zodconverter-returns-undefined)
 
 ## A `400` from validation
 
@@ -222,43 +222,34 @@ zq.array(z.string());
 zq.json(z.object({ min: z.number() }));
 ```
 
-## The OpenAPI document
+## JSON Schema
 
-### A route documents no query parameter
+### `Date cannot be represented in JSON Schema`
 
-**When:** a route's `query`, `params`, `headers` or `cookies` schema holds a
-`zq.date()`, a `z.date()`, a `z.bigint()` or a `.transform()`, and the
-document is made without `convert: zodConverter`. Its `parameters` list
-leaves that location out entirely, or the path parameter reads a bare
-`{ "type": "string" }`.
+**When:** converting a Zod schema that holds a `z.date()`, a `zq.date()`
+or a `z.bigint()` with Zod's own conversion — `z.toJSONSchema(schema)`, or
+its Standard JSON Schema `'~standard'.jsonSchema` — to write it into an
+OpenAPI document or hand it to a JSON Schema tool.
 
-**Why:** the default conversion asks Zod for JSON Schema, which Zod refuses
-for a whole object when one field cannot be expressed. `@alxia/openapi`
-then documents the schema as `{}`, with no property to make a parameter of.
+Also as `BigInt cannot be represented in JSON Schema` and `Transforms
+cannot be represented in JSON Schema`.
 
-**Fix:** give the converter to `openapi` and to `docs` alike:
+**Why:** Zod refuses what JSON Schema cannot say, and one such field fails
+the whole object.
+
+**Fix:** convert it with `zodConverter`, which says it as it crosses the
+wire — a `Date` as a `date-time` string, a `bigint` as an integer:
 
 ```ts
-import { docs, openapi } from '@alxia/openapi';
 import { zodConverter } from '@alxia/zod';
 
-const document = openapi(app, { info, convert: zodConverter });
-app.use(docs(app, { info, convert: zodConverter }));
+const schema = zodConverter(Event, 'output'); // a response: its output
+const query = zodConverter(Search, 'input'); // a request part: its input
 ```
 
-### A response is documented as `{}`
-
-**When:** a response or body schema holds a `z.date()` or a `z.bigint()`,
-anywhere inside it, and the document is made without `zodConverter`.
-
-**Why:** the same as [above](#a-route-documents-no-query-parameter): one
-field JSON Schema cannot say fails the whole schema.
-
-**Fix:** use `convert: zodConverter`. A `Date` is then a `date-time` string,
-which is what the client receives, and a `bigint` an integer. A field that
-still has no JSON Schema — a `.transform()`'s output, a `z.map()` — is
-documented as `{}` on its own, and the rest of the schema is kept. Document
-its output with an explicit schema when it matters:
+A field that still has no JSON Schema — a `.transform()`'s output, a
+`z.map()` — is `{}` on its own, and the rest of the schema is kept. Say its
+output with an explicit schema when it matters:
 
 ```ts
 const Item = z.object({
@@ -266,7 +257,18 @@ const Item = z.object({
 });
 ```
 
-If every Zod schema is `{}` even with the converter, check that the app's
-`zod` is 4.2 or later, the version that carries JSON Schema conversion: for
-an older one, `zodConverter` leaves the schema to the default, which cannot
-convert it either.
+### `zodConverter` returns `undefined`
+
+**When:** `zodConverter(schema, side)` gives `undefined` instead of a JSON
+Schema.
+
+**Why:** the schema is not Zod's — its `'~standard'.vendor` is another
+library's — or the app's `zod` is older than 4.2, the version that carries
+JSON Schema conversion.
+
+**Fix:** convert another vendor's schema with that library's own tool, and
+upgrade `zod`:
+
+```sh
+bun add zod@latest
+```

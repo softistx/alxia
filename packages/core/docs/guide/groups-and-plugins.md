@@ -227,7 +227,7 @@ const tenant = alxia().derive(async ({ request, reply }) => {
 });
 ```
 
-A tool that reads `app.routes` — `@alxia/openapi-routes` is one — looks a
+A tool that reads `app.routes` — `@alxia/openapi`'s `matchesSpec` is one — looks a
 path up as the core declares and matches it:
 
 ```ts

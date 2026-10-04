@@ -9,6 +9,7 @@ import { packageName } from './target';
 
 const ALXIA = {
 	'@alxia/core': '^0.3.0',
+	'@alxia/openapi': '^0.4.0',
 	'@alxia/react-router': '^0.2.0',
 };
 

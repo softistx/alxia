@@ -23,12 +23,40 @@ Nothing scheduled yet.
   output, committed and copied: a new project needs nothing but the
   registry, and no change upstream can stop the command. It is generated
   again from the scaffold when React Router ships a new major.
+- **Generating the `api` project's code at install or build.**
+  `src/generated/` is committed: `bun install` runs no script, the
+  `Dockerfile` needs no generation step, a clone builds offline, and a
+  review shows what a change to `openapi.yaml` changed in the code.
+  `bun run verify`'s `generate --check` keeps the files equal to the spec.
+- **Generating the OpenAPI document from the app.** The document is
+  written first and the routes are bound to it; a spec read back from the
+  code would describe whatever the code does.
 - **A runtime dependency.** The prompts are Bun's `prompt()`, the registry
   is read with `fetch`, versions are compared with `Bun.semver`.
 
 ## Shipped
 
-### Next release
+### 0.1.6
+
+- **The `api` project is OpenAPI spec first.** `openapi.yaml` declares
+  its operations; `bun run generate` writes `src/generated/` from it with
+  `@nxgt/openapi-codegen`, committed, so the project and its image build
+  with no generation step and offline; `src/app.ts` binds each operation
+  with `route(operations.createTodo, requireKey, handler)`, which
+  validates the request and checks every reply against the spec; the
+  spec asserts `matchesSpec` from `@alxia/openapi`, so no operation lacks
+  a route; and `bun run verify` starts with `generate --check`, which
+  fails when `src/generated/` drifts from `openapi.yaml`. New projects
+  install `@alxia/openapi` at the version this release was published
+  beside, and `@nxgt/openapi-codegen` pinned exactly, within its minor.
+- **The `api` project is written in `@alxia/core`'s middleware model.**
+  `requireKey` is a `defineMiddleware` that answers 401 before the body
+  is read, given to the route among its middlewares.
+- **No client package in a new project.** The `api` template's spec calls
+  the app with `app.request()`; a typed client is generated from
+  `openapi.yaml`, with a generator such as `@nxgt/openapi-codegen`.
+
+### 0.1.5
 
 - **Both projects lint and format with Biome.** Each has a `biome.json`
   of its own (recommended rules, spaces and double quotes, imports
@@ -40,11 +68,6 @@ Nothing scheduled yet.
   normalised, replaces the template's own, as a whole word, in every text
   file, as the README's
   `docker build -t` and `docker run`.
-- **No client package in a new project.** The `api` template's spec calls
-  the app with `app.request()`, and the project installs `@alxia/core`
-  alone of alxia's packages. alxia is OpenAPI spec first: a typed client
-  is generated from the API's OpenAPI document, with a generator such as
-  `@nxgt/openapi-codegen`.
 
 ### 0.1.4
 

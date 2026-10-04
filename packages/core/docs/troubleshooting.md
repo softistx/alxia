@@ -1349,7 +1349,7 @@ whole segment`, `is a dot segment` and `declares ":…" twice` — are refused
 by the type first when the path is a literal, with the same message after
 `Invalid path:`
 ([the compile error](#argument-of-type--is-not-assignable-to-parameter-of-type-invalid-path-)). The eight about a path's syntax are also thrown
-by `shapeOf(path)`, and so by a tool that calls it: `@alxia/openapi-routes`'
+by `shapeOf(path)`, and so by a tool that calls it: `@alxia/openapi`'s
 `implemented` and `matchesSpec` throw them for an operation path no route may
 be declared at, after their own name (`implemented(): …`; `exactly(): …` from the
 deprecated `exactly`).

@@ -10,7 +10,10 @@ break yours.
 | --- | --- | --- |
 | [One middleware model](#one-middleware-model) | core | no: the forms of 0.3 still work, deprecated |
 | [Middlewares for the routes after them: `use`](#middlewares-for-the-routes-after-them-use) | core | no: `use` still takes a plugin as before |
+| [alxia is OpenAPI spec first](#alxia-is-openapi-spec-first) | core, openapi | no: the document is the source, the routes run as before |
 | [No more client: spec first](#no-more-client-spec-first) | core, client, graphql, janus, secure-headers, context-storage, react-router | yes: `@alxia/client`, `RoutesOf` and the route table are gone, and `Alxia` takes three type parameters |
+| [`@alxia/openapi-routes` is now `@alxia/openapi`](#alxiaopenapi-routes-is-now-alxiaopenapi) | openapi, openapi-routes | no: change the import; `@alxia/openapi-routes` 0.2.1 re-exports it, deprecated |
+| [The old `@alxia/openapi` is retired](#the-old-alxiaopenapi-is-retired) | openapi | yes: `openapi()` and `docs()` are gone; write the document, generate the operations |
 
 ### One middleware model
 
@@ -218,8 +221,8 @@ in the options of a route with middlewares does not compile. The handler
 reads the same validated parts, and its `reply` is typed by `responds` as
 it was by `response`. A refused request is still answered by the
 `onRefusal` hook in force, by default `400 { error: 'validation', issues }`.
-`@alxia/openapi` reads the schemas of `validate` and `responds` as it read
-the route's schema.
+A tool that reads `app.routes` finds the schemas of `validate` and
+`responds` on the route, as it found the route's schema.
 
 #### 5. A socket's schema becomes options and `validate`
 
@@ -325,6 +328,52 @@ New exports: the types `MiddlewareMark`, `UseForms`, `PluginForms`,
 `ScopeMiddleware`, `PathMiddleware`, `AddingNothing`, `ScopePathAt` and
 `AppAfterUse`.
 
+### alxia is OpenAPI spec first
+
+**What changed.** The OpenAPI document is written by hand, and it is the
+source: of the client, generated from it with the generator you choose, and
+of the server's routes. Nothing in alxia writes a document from the app any
+more. The server side takes three pieces:
+
+| Piece | Package | What it does |
+| --- | --- | --- |
+| the operations | [`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen), with `alxia: true` | writes `src/generated/alxia.ts` from the document: each operation as `{ method, path, schema }`, with Zod schemas |
+| the routes | `@alxia/core`'s `route(operation, ...middlewares, handler)` | one route per operation; the operation's schemas check the request and every reply at run time |
+| the check | [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi)'s `matchesSpec` | reads `app.routes` and throws unless every operation has its route and every route its operation |
+
+```ts
+import { alxia } from '@alxia/core';
+import { operations } from './generated/alxia';
+
+export const app = alxia().route(operations.getTodo, ({ params, reply }) => {
+	const todo = todos.find(({ id }) => id === params.id); // todos: your own store
+	return todo ? reply.ok(todo) : reply.notFound({ error: 'not_found' as const });
+});
+```
+
+```ts
+// app.spec.ts
+import { test } from 'bun:test';
+import { matchesSpec } from '@alxia/openapi';
+import { app } from './app';
+import { operations } from './generated/alxia';
+
+test('routes every operation of openapi.yaml, and nothing else', () => {
+	matchesSpec(app, operations);
+});
+```
+
+A route's `detail` (`summary`, `description`, `operationId`, `tags`,
+`deprecated`) stays a route option, which nothing in alxia reads at run
+time; the generated operations carry it, and `matchesSpec` names an
+operation by its `operationId` when the operations are given as a list.
+`bun create @alxia` writes an API this way. The workflow, step by step:
+[`@alxia/openapi`: spec first](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/spec-first.md).
+
+**Can it break your code.** Not by itself: an app's routes run as before.
+What changes is in the two entries below, and in
+[No more client](#no-more-client-spec-first).
+
 ### No more client: spec first
 
 **What changed.** alxia is OpenAPI spec first: the OpenAPI document is the
@@ -368,8 +417,9 @@ checked against its schema, and `ContextOf`.
 - code that writes `Alxia<A, B, C, D>` drops the second argument:
   `Alxia<A, C, D>`. `Alxia<Ctx>` and `AnyAlxia` are unchanged.
 
-**How to migrate.** Keep an OpenAPI document for the API — written by
-hand, or generated with `@alxia/openapi` — and generate the client from it:
+**How to migrate.** Write the OpenAPI document of the API by hand — it is
+the source; [the old `@alxia/openapi` is retired](#the-old-alxiaopenapi-is-retired)
+shows how to start from the one 0.3 made — and generate the client from it:
 
 ```ts
 // before
@@ -404,6 +454,125 @@ expect(await response.json()).toEqual({ id: 1, name: 'Ada' });
 A type test that read `RoutesOf<typeof app>[path][method]['output']`
 checks the handler instead, with `expectTypeOf` inside it
 ([The app's type](guide/types.md#testing)).
+
+### `@alxia/openapi-routes` is now `@alxia/openapi`
+
+**What changed.** The package that checks an app's routes against the
+operations of its document, `@alxia/openapi-routes`, is published as
+`@alxia/openapi` from 0.4.0 on. Its API is the same: `implemented`,
+`matchesSpec`, the deprecated `exactly`, and the types `Operations`,
+`ImplementedOptions`, `MatchesSpecOptions` and `ExactlyOptions`, with the
+same messages.
+
+```sh
+bun remove @alxia/openapi-routes
+bun add -d @alxia/openapi
+```
+
+```ts
+// before
+import { matchesSpec } from '@alxia/openapi-routes';
+
+// after
+import { matchesSpec } from '@alxia/openapi';
+```
+
+**Can it break your code.** No. `@alxia/openapi-routes` 0.2.1 re-exports
+`@alxia/openapi`, deprecated, so an import of it keeps working until you
+change it. See
+[`@alxia/openapi`'s checks](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md).
+
+### The old `@alxia/openapi` is retired
+
+**What changed.** `@alxia/openapi` 0.3.0 and earlier wrote an OpenAPI
+document from the app: `openapi(app, { info, convert, exclude })`, and
+`docs(app, …)`, which served it at `/openapi.json` with a reference page.
+That is code first, the opposite of spec first, so it is retired: 0.4.0 of
+`@alxia/openapi` is the former `@alxia/openapi-routes`, and `openapi`,
+`docs`, `toJsonSchema`, `Converter` and the rest of 0.3 are gone from it.
+
+**Can it break your code.** Yes, for an app that calls `openapi()` or
+`docs()`: with `@alxia/openapi` 0.4.0 its imports no longer resolve.
+
+**How to migrate.**
+
+1. **Write `openapi.yaml`.** Start from the document 0.3 made, exported
+   once *before* you upgrade, with `@alxia/openapi` 0.3 still installed;
+   from then on it is the source, edited by hand:
+
+   ```ts
+   // export-openapi.ts — bun export-openapi.ts, once, then delete it
+   import { openapi } from '@alxia/openapi'; // 0.3
+   import { zodConverter } from '@alxia/zod';
+   import { app } from './src/app';
+
+   const document = openapi(app, { info: { title: 'Todos', version: '1.0.0' }, convert: zodConverter });
+   await Bun.write('openapi.yaml', Bun.YAML.stringify(document, null, 2));
+   ```
+
+   Declare alxia's own 400 in it, `{ error: 'validation', issues }`
+   (`ValidationErrorBody`), on the routes that validate, and the
+   replies of your middlewares, such as a 401.
+
+2. **Generate the operations** with `@nxgt/openapi-codegen`'s `alxia`
+   option:
+
+   ```sh
+   bun add zod
+   bun add -d @alxia/openapi@latest @nxgt/openapi-codegen
+   ```
+
+   ```ts
+   // openapi-codegen.config.ts
+   import { defineConfig } from '@nxgt/openapi-codegen';
+
+   export default defineConfig({
+   	input: 'openapi.yaml',
+   	output: 'src/generated',
+   	alxia: true,
+   	validationErrors: false, // the 400 is alxia's, declared in openapi.yaml
+   });
+   ```
+
+   `bunx nxgt-openapi generate` writes `src/generated/`, and
+   `bunx nxgt-openapi generate --check` exits 1 when it is stale, for CI.
+
+3. **Bind each operation** with `route(operation, ...middlewares, handler)`,
+   in place of the route that declared its own path and schemas:
+
+   ```ts
+   // before
+   app.post('/todos', requireKey, validate({ body: NewTodo }), responds({ 201: Todo }), handler);
+
+   // after
+   app.route(operations.createTodo, requireKey, handler);
+   ```
+
+4. **Check the routes against the document** with `matchesSpec(app,
+   operations)` in a test, as in
+   [alxia is OpenAPI spec first](#alxia-is-openapi-spec-first).
+
+5. **Serve the document yourself**, if clients fetched it from the app:
+   it is a file now, served as any other, and a route `matchesSpec` is told
+   to leave out:
+
+   ```ts
+   app.file('/openapi.yaml', './openapi.yaml');
+
+   matchesSpec(app, operations, { exclude: (route) => route.path === '/openapi.yaml' });
+   ```
+
+   A reference page is any static viewer pointed at that URL; alxia serves
+   none.
+
+**For maintainers.** After the releases — `@alxia/openapi` 0.4.0 for the
+first, `@alxia/openapi-routes` 0.2.1 for the second — the owner deprecates
+the old versions on npm:
+
+```sh
+npm deprecate @alxia/openapi@"<=0.3.0" "Retired: alxia is OpenAPI spec first. @alxia/openapi 0.4.0 and later is the spec-first package that was @alxia/openapi-routes (implemented, matchesSpec): write the OpenAPI document, generate the operations with @nxgt/openapi-codegen, bind them with route(). See https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md"
+npm deprecate @alxia/openapi-routes@"<=0.2.1" "Moved to @alxia/openapi: bun add -d @alxia/openapi and change the import, nothing else. See https://github.com/softistx/alxia/blob/develop/packages/openapi-routes/README.md"
+```
 
 ## 0.3.1
 
@@ -452,16 +621,18 @@ New exports, so an app's type can be named in a declaration file:
 
 ## 0.3.0
 
-`@alxia/core` 0.3.0 ships with `@alxia/openapi` 0.3.0 and 0.2.0 of
+`@alxia/core` 0.3.0 ships with `@alxia/openapi` 0.3.0 — the document
+writer, [retired in 0.4](#the-old-alxiaopenapi-is-retired) — and 0.2.0 of
 `@alxia/logger`, `@alxia/telemetry`, `@alxia/secure-headers`,
-`@alxia/react-router` and `@alxia/openapi-routes`.
+`@alxia/react-router` and `@alxia/openapi-routes`, which is `@alxia/openapi`
+from 0.4.0 on.
 
 **Upgrade every `@alxia/*` package together.** Each one names `@alxia/core`
 as a peer by a `^0.2` range, which 0.3.0 is outside of; their next releases
 move the range.
 
 ```sh
-bun add @alxia/core@latest @alxia/openapi@latest # and every other @alxia/* you use (`@alxia/client` is retired since 0.4)
+bun add @alxia/core@0.3 @alxia/openapi@0.3 # and every other @alxia/* you use; @alxia/openapi@latest is the 0.4 package, not the document writer
 ```
 
 | Change | Package | Can it break your code |
@@ -484,7 +655,7 @@ bun add @alxia/core@latest @alxia/openapi@latest # and every other @alxia/* you 
 naming what it reads with `defineHook<Requires>()(hook)`. The list runs
 after the hooks in force, in its order, then validation, then the handler.
 What a hook adds, the hooks after it and the handler read. Its replies join
-that route's type, so the client reads them; `@alxia/openapi` does not
+that route's type, so the client reads them; `@alxia/openapi` 0.3.0 did not
 document them. A list holds at most 8 hooks.
 
 ```ts
@@ -671,7 +842,7 @@ error TS2769: No overload matches this call.
 A kind typed as a union, or as a generic parameter, is refused at compile
 time: write one call per kind
 ([Troubleshooting](troubleshooting.md#argument-of-type-validation--body_limit-is-not-assignable-to-parameter-of-type-never)).
-`@alxia/openapi` 0.3.0 documents each kind's statuses on the routes that
+`@alxia/openapi` 0.3.0, the document writer, documented each kind's statuses on the routes that
 kind may refuse. See [One hook per kind](guide/hooks.md#one-hook-per-kind).
 
 New exports: `RefusalKind`, `RefusalOfKind`, `RefusalHandlersByKind`,
@@ -694,8 +865,10 @@ matchesSpec(app, operations);
 ```
 
 **Can it break your code.** No: `exactly` and `ExactlyOptions` still work,
-deprecated, and their messages still start with `exactly():`. See
-[`@alxia/openapi-routes`](https://github.com/softistx/alxia/blob/develop/packages/openapi-routes/docs/guide.md#matchesspec).
+deprecated, and their messages still start with `exactly():`. From 0.4.0
+on, both are imported from
+[`@alxia/openapi`](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md)
+([the move](#alxiaopenapi-routes-is-now-alxiaopenapi)).
 
 ### Streamed bodies timed to their last byte
 
@@ -775,10 +948,10 @@ and [`@alxia/react-router`: a CSP nonce](https://github.com/softistx/alxia/blob/
 
 These packages changed with 0.3.0, each with its own docs:
 
-- `@alxia/openapi` 0.3.0 — each `onRefusal` kind's statuses on the routes that kind may refuse: [its docs](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/README.md).
+- `@alxia/openapi` 0.3.0 — the document writer documented each `onRefusal` kind's statuses on the routes that kind may refuse; it is [retired in 0.4](#the-old-alxiaopenapi-is-retired).
 - `@alxia/logger` 0.2.0, `@alxia/telemetry` 0.2.0 — [above](#streamed-bodies-timed-to-their-last-byte).
 - `@alxia/secure-headers` 0.2.0, `@alxia/react-router` 0.2.0 — [above](#a-csp-nonce-per-request).
-- `@alxia/openapi-routes` 0.2.0 — [above](#matchesspec-the-new-name-of-exactly).
+- `@alxia/openapi-routes` 0.2.0 — [above](#matchesspec-the-new-name-of-exactly); `@alxia/openapi` from 0.4.0 on.
 
 Every other `@alxia/*` package, `@alxia/client` included, got a patch
 release whose only change is its peer range on `@alxia/core`; its own docs

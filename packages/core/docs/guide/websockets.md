@@ -50,7 +50,7 @@ the path is the socket's options:
 | --- | --- | --- | --- |
 | `message` | any Standard Schema | none: the raw message | each message the client sends, parsed as JSON; a refused one is answered on the socket with a `ValidationErrorBody`, the socket kept open and the handler not called |
 | `send` | any Standard Schema | none: anything is sent | each message the server sends: checked, then sent as its output. A refused one is not sent: `send` rejects with a `ResponseValidationError`, which, in a handler, closes the socket with `1011` |
-| `detail` | `RouteDetail` | none | nothing at runtime: what OpenAPI says of it |
+| `detail` | `RouteDetail` | none | nothing at runtime: `summary`, `operationId`, `tags`…, on the socket's definition |
 
 ```ts
 interface SocketOptions {

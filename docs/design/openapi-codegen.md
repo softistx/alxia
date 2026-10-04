@@ -1,5 +1,9 @@
 # Typed routes from an OpenAPI document
 
+> **Since 0.4:** this note's `@alxia/openapi-routes` shipped, and is now
+> `@alxia/openapi`; the document writer it calls `@alxia/openapi` is
+> retired. alxia is spec first.
+
 Status: **approved** by the owner on 2026-10-02. Each slice below is one
 PR, built in the order given at the end.
 

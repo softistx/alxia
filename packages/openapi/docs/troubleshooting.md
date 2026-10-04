@@ -1,314 +1,351 @@
 # Troubleshooting
 
-Each entry is headed by the text you see: a TypeError thrown when the app
-is built, or a TypeScript error. `@alxia/openapi` itself throws nothing at
-runtime — a schema it cannot convert is documented as `{}` — so most
-problems show no message at all. Those are under [Traps](#traps), by
-symptom.
+Each entry is headed by the text you see: a `TypeError` one of the checks
+threw, a line `nxgt-openapi generate` printed, or an error from `tsc`. The counts, methods and paths in a message
+are the app's own, written `…` below. A check that passes when you expected
+it to fail prints nothing; those are under [Traps](#traps), by symptom.
+A message that starts `exactly():` comes from `exactly`, the deprecated
+name of `matchesSpec`: read the same entry.
+
+**Thrown**
+
+- [`TypeError: implemented(): … operations have no route: …`](#typeerror-implemented--operations-have-no-route-)
+- [`TypeError: matchesSpec(): … routes have no operation: …`](#typeerror-matchesspec--routes-have-no-operation-)
+- [`TypeError: implemented(): the prefix "…" must start with "/" and not end with one`](#typeerror-implemented-the-prefix--must-start-with--and-not-end-with-one)
+- [`TypeError: implemented(): "…": ":…" is not a parameter name`](#typeerror-implemented---is-not-a-parameter-name)
+
+**Generator** (`@nxgt/openapi-codegen` 0.6.0)
+
+- [``cookie parameter `…` is not supported [unsupported_parameter]``](#cookie-parameter--is-not-supported-unsupported_parameter)
+- [`alxia.ts leaves it out. Its … reply streams events alxia cannot send … [ignored]`](#alxiats-leaves-it-out-its--reply-streams-events-alxia-cannot-send--ignored)
+- [A client refuses alxia's 400, or types it `{ status, message, timestamp, issues }`](#a-client-refuses-alxias-400-or-types-it--status-message-timestamp-issues-)
 
 **Types**
 
-- [``Type '"openapi.json"' is not assignable to type '`/${string}`'``](#type-openapijson-is-not-assignable-to-type-string)
-- [``Type '"docs"' is not assignable to type 'false | `/${string}`'``](#type-docs-is-not-assignable-to-type-false--string)
-- [`Property 'version' is missing in type '{ title: string; }' but required in type 'OpenApiInfo'`](#property-version-is-missing-in-type--title-string--but-required-in-type-openapiinfo)
-- [`'title' does not exist in type 'OpenApiOptions'`](#title-does-not-exist-in-type-openapioptions)
-- [`Type 'null' is not assignable to type 'JsonSchema | undefined'`](#type-null-is-not-assignable-to-type-jsonschema--undefined)
-- [`Object is possibly 'undefined'` on `document.paths[…]`](#object-is-possibly-undefined-on-documentpaths)
-- [`Property 'GET' does not exist on type 'Partial<Record<"get" | "post" | …, Operation>>'`](#property-get-does-not-exist-on-type-partialrecordget--post---operation)
-
-**Building the app**
-
-- [`TypeError: GET /docs is declared twice`](#typeerror-get-docs-is-declared-twice)
+- [`Type '"TRACE"' is not assignable to type 'Method'`](#type-trace-is-not-assignable-to-type-method)
+- [``Type '"pets"' is not assignable to type '`/${string}`'``](#type-pets-is-not-assignable-to-type-string)
+- [`Argument of type '{ method: string; path: string; }[]' is not assignable to parameter of type 'Operations'`](#argument-of-type--method-string-path-string--is-not-assignable-to-parameter-of-type-operations)
+- [`Property 'routes' is missing in type '…' but required in type '{ readonly routes: readonly RouteDefinition[]; }'`](#property-routes-is-missing-in-type--but-required-in-type--readonly-routes-readonly-routedefinition-)
+- [`Module '"@alxia/openapi"' has no exported member 'docs'`](#module-alxiaopenapi-has-no-exported-member-docs)
 
 **Traps**
 
-- [Every schema in the document is `{}`](#every-schema-in-the-document-is-)
-- [A reply with a `Date` is documented as `{}`](#a-reply-with-a-date-is-documented-as-)
-- [A route has no parameters](#a-route-has-no-parameters)
-- [`GET /openapi.json` answers 401](#get-openapijson-answers-401)
-- [A route is missing from the served document](#a-route-is-missing-from-the-served-document)
-- [The reference page at `/docs` stays blank](#the-reference-page-at-docs-stays-blank)
-- [A form or text body is documented as JSON](#a-form-or-text-body-is-documented-as-json)
-- [WebSocket routes are not in the document](#websocket-routes-are-not-in-the-document)
+- [Every operation is listed, though the app serves them](#every-operation-is-listed-though-the-app-serves-them)
+- [An operation of the spec is never listed](#an-operation-of-the-spec-is-never-listed)
+
+## Thrown
+
+### `TypeError: implemented(): … operations have no route: …`
+
+Also as `1 operation has no route: …`, and as the first half of a
+`matchesSpec()` message, or an `exactly()` one from the deprecated `exactly`.
+
+```text
+TypeError: implemented(): 2 operations have no route: GET /pets/:petId (getPet), QUERY /employees (searchEmployees)
+```
+
+**When:** an operation of `operations` has no route of its method and path
+on the app. Each is named by method, the full path looked up, and its
+operation id, its key in the object, or `schema.detail.operationId` in a
+list.
+
+**Why:** nobody declared it yet, it is declared under another method, or it
+is declared after the check ran.
+
+**Fix:** declare each one from its operation:
+
+```ts
+// pets, search: your own store and query
+const app = alxia()
+	.route(api.getPet, ({ params, reply }) => {
+		const pet = pets.get(params.petId);
+		return pet ? reply.ok(pet) : reply.notFound({ title: 'No such pet' });
+	})
+	.route(api.searchEmployees, ({ body, reply }) => reply.ok(search(body)));
+
+implemented(app, api);
+```
+
+Call the check after the last `route`, `use` and `group`. If every
+operation is listed, see
+[Every operation is listed](#every-operation-is-listed-though-the-app-serves-them).
+
+### `TypeError: matchesSpec(): … routes have no operation: …`
+
+Also as `1 route has no operation: …`, after a `;` when operations are
+missing too, and as `exactly(): …` from the deprecated `exactly`:
+
+```text
+TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
+```
+
+**When:** `matchesSpec` found a route on the app that no operation declares,
+named by method and full path.
+
+**Why:** the route is not in the spec — an admin route, a health check, the
+pages of a React Router app, an `app.static('/assets', …)` mount
+(`GET /assets/*`) — or the spec's operation was renamed or removed and the
+route was not.
+
+**Fix:** add the operation to the document and generate again, remove the
+route, or leave it out on purpose with `exclude`:
+
+```ts
+matchesSpec(app, api, {
+	exclude: (route) => route.path === '/health' || route.path.startsWith('/assets/'),
+});
+```
+
+If only the routes that need no operation are listed, `implemented` may be
+the check you want.
+
+### `TypeError: implemented(): the prefix "…" must start with "/" and not end with one`
+
+Also as `matchesSpec(): the prefix "…" …`, and `exactly(): the prefix "…" …` from the deprecated `exactly`.
+
+```text
+TypeError: implemented(): the prefix "/api/" must start with "/" and not end with one
+```
+
+**When:** `prefix` ends with `/`, or is `/` alone; leave it out for an app
+with no prefix. One without a leading `/` does not
+[compile](#type-pets-is-not-assignable-to-type-string).
+
+**Why:** the prefix is the app's, which the core refuses written that way
+(`The prefix "…" must start with "/" and not end with one`); looked up as
+given, it would name `/api//pets/:petId`, and every operation would be
+reported missing.
+
+**Fix:** write it as the app's: `{ prefix: '/api' }`.
+
+### `TypeError: implemented(): "…": ":…" is not a parameter name`
+
+Also as `matchesSpec(): …` and `exactly(): …`, and with any other
+message the core throws for a route path:
+`The route path "…" must start with "/"`, `"…": "*" may only end a path`,
+`"…" declares ":…" twice`, `"…": ":" may only start a segment, as a
+parameter`, `"…": "*" may only be a whole segment, as a wildcard`,
+`"…": "…" is a dot segment, which a request's URL never keeps`,
+`"…" is not encoded as a request's URL carries it: declare "…"`.
+
+```text
+TypeError: implemented(): "/pets/:pet-id": ":pet-id" is not a parameter name
+```
+
+**When:** an operation's path is one no route may be declared at: a
+parameter that is not an identifier, a `*` before the last segment, a name
+given twice, a `:` or a `*` inside a segment (`/at/10:45`), a dot segment,
+a literal not percent-encoded as a URL carries it (`/café`).
+
+**Why:** an operation is matched by its shape, which the core's `shapeOf`
+reads as the router does, and it refuses such a path as `app.route` would.
+No route could serve it, so the check throws, naming the path and the
+core's reason, rather than list it.
+
+**Fix:** rename the parameter in the operation, as the route that serves it
+must: `/pets/:petId`. A generator writing `operations` from a document turns
+`{pet-id}` into a name the core accepts. For the other messages, write
+the path as the core's entry for it says: a `:time` parameter for
+`/at/10:45`
+([`":" may only start a segment`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#--may-only-start-a-segment-as-a-parameter)),
+`/caf%C3%A9` for `/café`
+([`is not encoded as a request's URL carries it`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#-is-not-encoded-as-a-requests-url-carries-it-declare-)).
+
+## Generator
+
+These come from `bunx nxgt-openapi generate`, with `alxia: true`, before
+any check runs. Its guide lists every
+[diagnostic](https://github.com/softistx/nxgt-http/blob/develop/packages/openapi-codegen/docs/guide/diagnostics.md).
+
+### ``cookie parameter `…` is not supported [unsupported_parameter]``
+
+```text
+error openapi.yaml#/paths/~1me/get/parameters/0/in: cookie parameter `session` is not supported [unsupported_parameter]
+```
+
+**When:** an operation declares a parameter `in: cookie`. 0.6.0 refuses
+the whole document, with `alxia` on or off, writes no file, and exits 1.
+
+**Why:** the generator does not read cookie parameters yet.
+
+**Fix:** remove the parameter from the spec, and read the cookie on the
+server in a middleware, or validate it with `validate({ cookies })`:
+
+```ts
+import { defineMiddleware } from '@alxia/core';
+
+const session = defineMiddleware(({ cookies, reply }, next) => {
+	const id = cookies['session'];
+	return id === undefined ? reply(401, { error: 'unauthorized' as const }) : next({ sessionId: id });
+});
+
+app.route(operations.getMe, session, ({ sessionId, reply }) => reply.ok(findUser(sessionId)));
+```
+
+### `alxia.ts leaves it out. Its … reply streams events alxia cannot send … [ignored]`
+
+```text
+warning openapi.yaml#/paths/~1feed/get: watchFeed: alxia.ts leaves it out. Its 200 reply streams events alxia cannot send: its eventStream sends unnamed events, each its data as JSON [ignored]
+```
+
+**When:** a reply is `text/event-stream` whose `itemSchema` declares named
+events, or data that is not JSON.
+
+**Why:** the generated `eventStream(schema)` describes unnamed events, each
+its data as JSON, so 0.6.0 leaves the operation out of `alxia.ts` rather
+than type it wrongly. It is not in `operations`, so `implemented` does not
+list it either.
+
+**Fix:** declare the route by hand, with `eventStream` from `@alxia/core`,
+which takes a schema per event name
+([server-sent events](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/server-sent-events.md)).
+Other `ignored` warnings — a `TRACE`, a binary body, a binary, JSON Lines
+or form reply — mean the same: declare the route by hand if you serve it.
+
+### A client refuses alxia's 400, or types it `{ status, message, timestamp, issues }`
+
+**Symptom:** a client generated from the document fails to decode a 400,
+or its type says the body is `ValidationErrorBody`, with `status`,
+`message` and `timestamp`.
+
+**Why:** `validationErrors` defaults to `true`, which declares
+`@nxgt/openapi-hono`'s 400 in `types.ts`, `zod.ts`, `operations.ts` and
+`paths.ts`. alxia answers `{ error: 'validation', issues }` instead.
+
+**Fix:** set `validationErrors: false`, declare alxia's 400 in the spec
+([Spec first](guide/spec-first.md#declare-alxias-own-400)), and generate
+again:
+
+```ts
+export default defineConfig({
+	input: 'openapi.yaml',
+	output: 'src/generated',
+	alxia: true,
+	validationErrors: false,
+});
+```
 
 ## Types
 
-These are what `tsc` prints.
-
-### ``Type '"openapi.json"' is not assignable to type '`/${string}`'``
-
-**When:** `docs` is given a `path` that does not start with `/`.
+### `Type '"TRACE"' is not assignable to type 'Method'`
 
 ```text
-error TS2322: Type '"openapi.json"' is not assignable to type '`/${string}`'.
+error TS2322: Type '"TRACE"' is not assignable to type 'Method'.
 ```
 
-**Why:** `path` is where the document is served, an absolute route path.
+**When:** an operation has a method alxia cannot route.
 
-**Fix:**
+**Why:** each operation is a `RouteOperation`, whose `method` is one the
+core serves: `GET`, `POST`, `PUT`, `PATCH`, `DELETE`, `OPTIONS`, `HEAD` or
+`QUERY`. The generator leaves a `TRACE` out of `alxia.ts` for that reason.
 
-```ts
-app.use(docs(app, { info, path: '/openapi.json' }));
-```
+**Fix:** remove the operation from the list; no app can serve it.
 
-### ``Type '"docs"' is not assignable to type 'false | `/${string}`'``
-
-**When:** `docs` is given a `ui` that does not start with `/`, or
-`ui: true`.
+### ``Type '"pets"' is not assignable to type '`/${string}`'``
 
 ```text
-error TS2322: Type '"docs"' is not assignable to type 'false | `/${string}`'.
-error TS2322: Type 'true' is not assignable to type 'false | `/${string}`'.
+error TS2322: Type '"pets"' is not assignable to type '`/${string}`'.
 ```
 
-**Why:** `ui` is the path of the reference page, or `false` for none. The
-page is served by default, so there is no `true`.
+Also as ``Type '"api"' is not assignable to type '`/${string}`'`` for a
+`prefix`.
 
-**Fix:** a path, or leave `ui` out for `/docs`
-([Serving](guide/serving.md#options)):
+**When:** an operation's `path`, or `prefix`, does not start with `/`.
 
-```ts
-app.use(docs(app, { info, ui: '/reference' }));
-app.use(docs(app, { info })); // the page at /docs
-```
+**Fix:** write it as the route would: `{ method: 'GET', path: '/pets' }`,
+and the prefix as the app's: `{ prefix: '/api' }`.
 
-### `Property 'version' is missing in type '{ title: string; }' but required in type 'OpenApiInfo'`
-
-**When:** `openapi` or `docs` is given an `info` without `version`.
+### `Argument of type '{ method: string; path: string; }[]' is not assignable to parameter of type 'Operations'`
 
 ```text
-error TS2741: Property 'version' is missing in type '{ title: string; }' but required in type 'OpenApiInfo'.
+error TS2345: Argument of type '{ method: string; path: string; }[]' is not assignable to parameter of type 'Operations'.
+  Type '{ method: string; path: string; }[]' is not assignable to type '{ readonly [name: string]: RouteOperation; }'.
+    Index signature for type 'string' is missing in type '{ method: string; path: string; }[]'.
 ```
 
-**Why:** OpenAPI requires both `info.title` and `info.version`. The
-version is that of your API, a string — `version: 1` is a TS2322.
+**When:** a list of operations written by hand, in a variable of its own,
+without `as const`.
 
-**Fix:**
+**Why:** TypeScript widens each `method` to `string` and each `path` to
+`string`, and a `RouteOperation` needs a `Method` and a path starting with
+`/`.
+
+**Fix:** keep the literals:
 
 ```ts
-openapi(app, { info: { title: 'Users', version: '1.0.0' } });
+import type { RouteOperation } from '@alxia/core';
+
+const ops = [{ method: 'GET', path: '/pets' }] as const;
+// or: const ops: RouteOperation[] = [{ method: 'GET', path: '/pets' }];
+implemented(app, ops);
 ```
 
-### `'title' does not exist in type 'OpenApiOptions'`
-
-**When:** the title and version are given at the top level of the
-options.
+### `Property 'routes' is missing in type '…' but required in type '{ readonly routes: readonly RouteDefinition[]; }'`
 
 ```text
-error TS2353: Object literal may only specify known properties, and 'title' does not exist in type 'OpenApiOptions'.
+error TS2345: Argument of type '{ readonly getPet: …; }' is not assignable to parameter of type '{ readonly routes: readonly RouteDefinition[]; }'.
+  Property 'routes' is missing in type '{ readonly getPet: …; }' but required in type '{ readonly routes: readonly RouteDefinition[]; }'.
 ```
 
-**Why:** they belong under `info`, as in the document.
+**When:** the first argument is not an app: often the operations and the
+app given in the wrong order, `implemented(operations, app)`.
 
-**Fix:**
+**Fix:** the app first: `implemented(app, operations)`.
 
-```ts
-openapi(app, { info: { title: 'Users', version: '1.0.0' } });
-```
-
-### `Type 'null' is not assignable to type 'JsonSchema | undefined'`
-
-**When:** a `convert` function returns `null` for the schemas it does not
-handle.
+### `Module '"@alxia/openapi"' has no exported member 'docs'`
 
 ```text
-error TS2322: Type 'null' is not assignable to type 'JsonSchema | undefined'.
+error TS2305: Module '"@alxia/openapi"' has no exported member 'docs'.
 ```
 
-**Why:** `undefined` is what lets the default conversion run. A `null`
-would not, so the type refuses it.
+Also for `openapi`, `toJsonSchema`, `Converter`, `openApiPath` and the other
+exports of `@alxia/openapi` 0.3 or earlier.
 
-**Fix:** return `undefined` ([Writing a `Converter`](guide/converters.md#writing-a-converter)):
+**When:** code written for `@alxia/openapi` 0.1 to 0.3, after installing
+0.4 or later.
 
-```ts
-const convert: Converter = (schema) => known.get(schema); // undefined when unknown
-```
+**Why:** that package wrote a document from the app, and is retired: alxia
+is spec first, and the name now belongs to the package that checks an app
+against its document.
 
-### `Object is possibly 'undefined'` on `document.paths[…]`
-
-**When:** reading an operation with `noUncheckedIndexedAccess` on, as in
-`document.paths['/users'].get.operationId`.
-
-```text
-error TS2532: Object is possibly 'undefined'.
-```
-
-**Why:** `paths` is a `Record<string, …>`: TypeScript cannot know a given
-path is in it. Each method under a path is optional too, and so are the
-replies under `responses`.
-
-**Fix:** read every step with `?.`, and let the test fail on `undefined`:
-
-```ts
-expect(document.paths['/users']?.get?.operationId).toBe('getUsers');
-```
-
-### `Property 'GET' does not exist on type 'Partial<Record<"get" | "post" | …, Operation>>'`
-
-**When:** reading an operation by its uppercase method.
-
-```text
-error TS2551: Property 'GET' does not exist on type 'Partial<Record<"get" | "post" | "put" | "patch" | "delete" | "options" | "head" | "query", Operation>>'. Did you mean 'get'?
-```
-
-**Why:** OpenAPI writes methods lowercase; routes declare them uppercase.
-
-**Fix:**
-
-```ts
-document.paths['/users']?.get;
-document.paths[openApiPath(route.path)]?.[route.method.toLowerCase() as 'get'];
-```
-
-## Building the app
-
-### `TypeError: GET /docs is declared twice`
-
-Or `TypeError: GET /openapi.json is declared twice`.
-
-**When:** `app.use(docs(...))`, when the app already has a `GET /docs` or
-`GET /openapi.json` route, when `docs` is used twice on the same app, or
-when `path` and `ui` are the same path.
-
-**Why:** `docs` declares two `GET` routes, `path` and `ui`, and an app
-refuses a method and path declared twice.
-
-**Fix:** move the plugin's routes, or turn the page off:
-
-```ts
-app.use(docs(app, { info, path: '/api-docs/openapi.json', ui: '/api-docs' }));
-app.use(docs(app, { info, ui: false })); // only GET /openapi.json
-```
+**Fix:** write the document, generate the operations from it, and check
+the app with `matchesSpec`, as
+[Coming from `@alxia/openapi` 0.3](https://github.com/softistx/alxia/blob/develop/packages/openapi/README.md#coming-from-alxiaopenapi-03-or-alxiaopenapi-routes)
+says: the document the old package served, saved as a file, is a good
+start for your own.
 
 ## Traps
 
-These print nothing: the document is made, and says less than your
-routes do.
+### Every operation is listed, though the app serves them
 
-### Every schema in the document is `{}`
+**Symptom:** the message lists every operation, with paths that look right.
 
-**When:** the document is made from schemas of a validator that carries
-no Standard JSON Schema — Zod before 4.2, a library that only implements
-Standard Schema's `validate`, or a schema written by hand.
+**Why:** the app has a prefix, `alxia({ prefix: '/api' })`, so it serves
+`GET /api/pets/:petId`, and the operation's `/pets/:petId` is not there.
 
-**Why:** the package imports no validator. It asks each schema for its
-JSON Schema through `~standard.jsonSchema`, and documents a schema that
-has none as `{}`, anything.
+Or the operations were written by hand with OpenAPI's braces,
+`/pets/{petId}`, which no route matches: the router's paths read
+`/pets/:petId`.
 
-**Fix:** upgrade Zod to 4.2 or later, or pass a `convert` that knows
-your schemas ([Schemas and converters](guide/converters.md#writing-a-converter)):
-
-```sh
-bun add zod@^4.2
-```
+**Fix:** give the prefix, written as the app's, a leading `/` and no
+trailing one:
 
 ```ts
-openapi(app, { info, convert: (schema) => known.get(schema) });
+implemented(app, api, { prefix: '/api' });
 ```
 
-### A reply with a `Date` is documented as `{}`
+The message then names the full paths, `GET /api/pets/:petId`. For a
+hand-written operation, write its path `/pets/:petId`.
 
-**When:** a Zod schema holds a `z.date()` or a `z.bigint()`, or a reply's
-schema ends in a `.transform(...)`, and no converter is given.
+### An operation of the spec is never listed
 
-**Why:** Zod's conversion throws on what JSON Schema cannot describe, and
-a schema whose conversion throws is documented as `{}` — the whole
-schema, not only the field.
+**Symptom:** a route the spec declares is missing, and the check passes.
 
-**Fix:** give `openapi` or `docs` the converter of `@alxia/zod`, which
-documents a `Date` as a `date-time` string and a `bigint` as an integer
-([Zod and `Date`](guide/converters.md#zod-and-date-zodconverter)):
+**Why:** the operation is not in `operations`. `@nxgt/openapi-codegen`
+leaves out what alxia cannot route or validate yet — a `TRACE`, a binary
+body, JSON Lines, named events — with an `ignored` warning
+([one of them](#alxiats-leaves-it-out-its--reply-streams-events-alxia-cannot-send--ignored)). The check only knows the
+operations it is given.
 
-```ts
-import { zodConverter } from '@alxia/zod';
-
-openapi(app, { info, convert: zodConverter });
-```
-
-### A route has no parameters
-
-**When:** a route's `query`, `headers` or `cookies` schema is not a plain
-object — a union of objects, a schema that converts to `{}` — and its
-parameters are missing from the operation.
-
-**Why:** parameters are read from the converted schema's `properties`.
-A union has none at its top level, and nothing is guessed. Path
-parameters are not affected: they come from the path.
-
-**Fix:** declare the parameters as one object, with the optional ones
-optional:
-
-```ts
-query: z.object({ email: z.string().optional(), phone: z.string().optional() }),
-```
-
-### `GET /openapi.json` answers 401
-
-**When:** `docs` is used after a hook that guards routes — a `derive`
-that answers 401, a bearer-token plugin.
-
-**Why:** the plugin's routes are routes of your app, and run every hook
-declared before `use`.
-
-**Fix:** use `docs` before the guard. The guarded routes are still
-documented, since the document is made at its first request:
-
-```ts
-app.use(docs(app, { info }));
-app.use(guard).get('/me', handler);
-```
-
-### A route is missing from the served document
-
-**When:** the route was added after `/openapi.json` was first requested —
-often in a test that fetches the document, then declares more routes on
-the same app.
-
-**Why:** `docs` makes the document at its first request, and serves that
-same document afterwards.
-
-**Fix:** declare every route before the first request; in a test, build a
-fresh app per case.
-
-```ts
-const app = alxia().get('/a', handlerA).get('/b', handlerB);
-app.use(docs(app, { info }));
-await app.fetch(new Request('http://localhost/openapi.json')); // lists /a and /b
-```
-
-### The reference page at `/docs` stays blank
-
-**When:** the browser cannot reach `cdn.jsdelivr.net` — an offline or
-filtered network, a proxy that replaces the page's
-`Content-Security-Policy` with a stricter one.
-
-**Why:** the page loads [Scalar](https://scalar.com) from
-`https://cdn.jsdelivr.net/npm/@scalar/api-reference`; it bundles nothing.
-
-**Fix:** serve the document alone, and open it with a reference viewer
-you host:
-
-```ts
-app.use(docs(app, { info, ui: false }));
-```
-
-### A form or text body is documented as JSON
-
-**When:** a route's `body` is sent as a form or as text.
-
-**Why:** the request body is always documented as `application/json`.
-
-**Fix:** none in the document today; say it in `detail.description`:
-
-```ts
-detail: { description: 'Accepts application/x-www-form-urlencoded.' },
-```
-
-### WebSocket routes are not in the document
-
-**When:** an app declares `app.ws(...)` routes.
-
-**Why:** the document is made from `app.routes`, the HTTP routes;
-OpenAPI 3.2 has no way to describe a WebSocket.
-
-**Fix:** none: document them elsewhere.
+**Fix:** read the generator's warnings, and declare such a route by hand
+with a route method.

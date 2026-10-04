@@ -28,22 +28,22 @@ const app = alxia()
 
 ## Which way
 
-| Way | For | Applies to | Runs | Can end the request | Typed, and documented |
+| Way | For | Applies to | Runs | Can end the request | Typed, and in `app.routes` |
 | --- | --- | --- | --- | --- | --- |
-| [A route's middlewares](#a-routes-middlewares), `app.post(path, auth, canEdit, …, handler)` | authenticating, a check, a load, a timer or a lock that some routes need, written once with `defineMiddleware` | the routes it is given to | after the scope's hooks, in the order given | yes, with a reply or any `Response` | what it passes `next`, in that route's context. Not in OpenAPI |
-| [`use(...middlewares)`](#use-for-every-route-after-it) | the same middlewares, for every route after a point: authenticating, a timer | the routes declared after it, in this app or group | after the hooks declared before it, before the route's own middlewares | yes, with a reply or any `Response` | what it passes `next`, in the context of those routes. Not in OpenAPI |
-| [`use(path, ...middlewares)`](#use-with-a-path) | a guard for a subtree: `/admin` | the routes declared after it under `path`, matched when each is declared | as above | yes, with a reply or any `Response` | nothing: it may add nothing to the context. Not in OpenAPI |
-| [`validate(schemas)`](#validate-and-responds) | validating `params`, `query`, `headers`, `cookies` or `body` | the route it is given to | where it stands among the middlewares | yes, a 400 or the `onRefusal` hook's reply | the validated parts, in the context after it; its schemas and the 400, in OpenAPI |
-| [`responds(responses)`](#validate-and-responds) | declaring what a route answers, and checking it | the route it is given to | on the handler's reply, and on a reply made after it with a status it declares | a reply it refuses becomes a 500 | the handler's `reply` typed by its statuses; its statuses, in OpenAPI |
-| A route's options, `{ bodyLimit, detail }` | capping one route's body; what OpenAPI says of it | one route | whenever the body is read | yes, a 413 | the 413, in OpenAPI |
+| [A route's middlewares](#a-routes-middlewares), `app.post(path, auth, canEdit, …, handler)` | authenticating, a check, a load, a timer or a lock that some routes need, written once with `defineMiddleware` | the routes it is given to | after the scope's hooks, in the order given | yes, with a reply or any `Response` | what it passes `next`, in that route's context; its replies carry no schema |
+| [`use(...middlewares)`](#use-for-every-route-after-it) | the same middlewares, for every route after a point: authenticating, a timer | the routes declared after it, in this app or group | after the hooks declared before it, before the route's own middlewares | yes, with a reply or any `Response` | what it passes `next`, in the context of those routes; its replies carry no schema |
+| [`use(path, ...middlewares)`](#use-with-a-path) | a guard for a subtree: `/admin` | the routes declared after it under `path`, matched when each is declared | as above | yes, with a reply or any `Response` | nothing: it may add nothing to the context |
+| [`validate(schemas)`](#validate-and-responds) | validating `params`, `query`, `headers`, `cookies` or `body` | the route it is given to | where it stands among the middlewares | yes, a 400 or the `onRefusal` hook's reply | the validated parts, in the context after it; its schemas, in `app.routes` |
+| [`responds(responses)`](#validate-and-responds) | declaring what a route answers, and checking it | the route it is given to | on the handler's reply, and on a reply made after it with a status it declares | a reply it refuses becomes a 500 | the handler's `reply` typed by its statuses; its schemas, in `app.routes` |
+| A route's options, `{ bodyLimit, detail }` | capping one route's body; `detail`, which nothing reads at run time | one route | whenever the body is read | yes, a 413 | both, in `app.routes` |
 | [`decorate(values)`](#decorate) | a database, a logger, a config | the routes declared after it | before the route's middlewares | no | its values, in the context |
-| [`derive(hook)`](#derive) | the shorthand for a `use` middleware that only adds: loading what every route after a point reads | the routes declared after it | before the route's middlewares | yes, with a reply | what it adds, in the context. Not in OpenAPI |
-| [`wrap(hook)`](#wrap) | a transaction, a lock, an idempotency key, a header from the response, for every route after a point | the routes declared after it | around the route's middlewares and the handler | yes, with a reply, or any `Response` | nothing. Not in OpenAPI |
-| [`bodyLimit(bytes)`](#bodylimit) | capping request bodies | the routes declared after it | whenever the body is read | yes, a 413 | the 413, in OpenAPI |
-| [`onRefusal(hook)`](#onrefusal) | answering a 400 or a 413 in your own format | the routes declared after it | when a `validate` or the body limit refuses | yes, with a 4xx reply | a `4XX` with no body in OpenAPI |
-| `onRefusal(schema, hook)` | the same, documented | the routes declared after it | as above | yes, with a 4xx reply | its `reply`, by its schemas; its replies, in OpenAPI |
-| `onRefusal(kind, [schema,] hook)` | one kind of refusal, `'validation'` or `'body_limit'` | the routes declared after it that may be refused that way | as above | yes, with a 4xx reply | its replies, on the routes that kind may refuse, in OpenAPI when given schemas |
-| [`onError(hook)`](#onerror) | turning a thrown error into a reply | the routes declared after it | after something threw | yes, with a reply | nothing. Not in OpenAPI |
+| [`derive(hook)`](#derive) | the shorthand for a `use` middleware that only adds: loading what every route after a point reads | the routes declared after it | before the route's middlewares | yes, with a reply | what it adds, in the context |
+| [`wrap(hook)`](#wrap) | a transaction, a lock, an idempotency key, a header from the response, for every route after a point | the routes declared after it | around the route's middlewares and the handler | yes, with a reply, or any `Response` | nothing |
+| [`bodyLimit(bytes)`](#bodylimit) | capping request bodies | the routes declared after it | whenever the body is read | yes, a 413 | the limit, in `app.routes` |
+| [`onRefusal(hook)`](#onrefusal) | answering a 400 or a 413 in your own format | the routes declared after it | when a `validate` or the body limit refuses | yes, with a 4xx reply | the hook, in `app.routes`; its replies carry no schema |
+| `onRefusal(schema, hook)` | the same, with schemas for its replies | the routes declared after it | as above | yes, with a 4xx reply | its `reply`, by its schemas; the hook, in `app.routes` |
+| `onRefusal(kind, [schema,] hook)` | one kind of refusal, `'validation'` or `'body_limit'` | the routes declared after it that may be refused that way | as above | yes, with a 4xx reply | its replies, on the routes that kind may refuse; the hook, in `app.routes` |
+| [`onError(hook)`](#onerror) | turning a thrown error into a reply | the routes declared after it | after something threw | yes, with a reply | nothing |
 | [`onRequest(hook)`](#onrequest-onresponse-and-around) | a CORS preflight, a redirect to HTTPS | the whole app | before routing | yes, with a raw `Response` | no |
 | `onResponse(hook)` | a header on every response, compression | the whole app | after everything else, 404s included | it replaces the response; keep its status | no |
 | `around(hook)` | a request id in `AsyncLocalStorage`, a timer, a span | the whole app | outermost | yes, with a raw `Response` | no |
@@ -52,13 +52,16 @@ const app = alxia()
 | `use(plugin)`, a `Plugin` function | global hooks shared across apps | the whole app | — | its hooks can | no |
 | [A route's own hooks](#a-routes-own-hooks), `[canView]` — **deprecated** | what a middleware does now | one route | after the scope's hooks, before its schema | yes | as a middleware's |
 
-"Typed" is what the handler and the middlewares after it read;
-[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
-what the table says. The OpenAPI document is the contract a client is
-generated from: alxia is spec first, and a route adds nothing to the app's
-type for a client to read. A reply made by a middleware or a hook carries
-no schema, so the OpenAPI document cannot describe it: only `validate`,
-`responds`, `bodyLimit` and `onRefusal` with schemas reach it.
+"Typed" is what the handler and the middlewares after it read. alxia is
+spec first: the OpenAPI document, written by hand, is the contract a client
+is generated from, and a route adds nothing to the app's type for a client
+to read. The document declares every reply a route may send, a
+middleware's 401 and a refusal's 400 included, and a `responds` of those
+schemas — written on the route, or made by `route(operation, …)` from a
+generated operation — checks each reply made after it with a status it
+declares. What is in `app.routes` is what a tool reading it sees:
+[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi)'s
+`matchesSpec` checks the routes against the document's operations.
 
 ### Which to reach for
 

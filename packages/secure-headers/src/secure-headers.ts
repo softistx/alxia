@@ -83,7 +83,7 @@ const OPTION: Record<keyof typeof DEFAULTS, keyof SecureHeadersOptions> = {
 /**
  * Secure headers on every response, as a plugin. A header a route set
  * itself is kept: a page that needs its own `Content-Security-Policy` —
- * `@alxia/openapi`'s reference page — sets it.
+ * `@alxia/graphql`'s IDE — sets it.
  *
  * ```ts
  * app.use(secureHeaders({ contentSecurityPolicy: "default-src 'self'" }));

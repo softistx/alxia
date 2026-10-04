@@ -104,7 +104,7 @@ function requestParts(
 }
 
 /**
- * What the route declares, for `@alxia/openapi`: its options or schema,
+ * What the route declares, for a tool that reads `app.routes`: its options or schema,
  * with the schemas of its `validate` and `responds` middlewares merged in.
  */
 function declared(

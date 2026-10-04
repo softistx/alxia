@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { compress } from '@alxia/compress';
 import { alxia, type BaseContext } from '@alxia/core';
-import { openapi } from '@alxia/openapi';
+import { matchesSpec } from '@alxia/openapi';
 // The package by its published name, `dist/`, not `./index`: the fixture's
 // build imports it so, and the catch-all must set the very `alxiaContext`
 // its loaders read.
@@ -217,7 +217,7 @@ describe('beside the app', () => {
 		expect(app.routes.map((route) => route.path)).toContain('/assets/*');
 	});
 
-	test('isReactRouterRoute names the catch-all and the client files, for OpenAPI to leave out', () => {
+	test('isReactRouterRoute names the catch-all and the client files, for matchesSpec to leave out', () => {
 		const app = served();
 		const ours = app.routes
 			.filter(isReactRouterRoute)
@@ -231,11 +231,13 @@ describe('beside the app', () => {
 			'PATCH /*',
 			'DELETE /*',
 		]);
-		const document = openapi(app, {
-			info: { title: 'fixture', version: '1' },
-			exclude: isReactRouterRoute,
-		});
-		expect(Object.keys(document.paths ?? {})).toEqual(['/api/health']);
+		const health = { method: 'GET', path: '/api/health' } as const;
+		expect(() =>
+			matchesSpec(app, [health], { exclude: isReactRouterRoute }),
+		).not.toThrow();
+		expect(() => matchesSpec(app, [health])).toThrow(
+			'7 routes have no operation',
+		);
 	});
 });
 

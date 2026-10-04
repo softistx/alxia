@@ -4,7 +4,6 @@
 "@alxia/i18n": patch
 "@alxia/jwt": patch
 "@alxia/language": patch
-"@alxia/openapi": patch
 "@alxia/rate-limit": patch
 "@alxia/redis": patch
 "@alxia/telemetry": patch

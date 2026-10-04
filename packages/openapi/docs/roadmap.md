@@ -7,78 +7,65 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **The spec-first `@alxia/openapi`.** The OpenAPI document is the source:
+  `@nxgt/openapi-codegen`'s `alxia` option generates the operations,
+  `@alxia/core`'s `app.route(operation, ...middlewares, handler)` binds
+  them, and `implemented` and `matchesSpec` check the app against them.
+  The package that was `@alxia/openapi-routes` now carries this name;
+  `@alxia/openapi-routes` stays a while as a deprecated re-export. Same
+  `implemented`, `matchesSpec` and `exactly`, options and messages: change
+  the import. The docs cover the whole workflow, from the document to the
+  generated operations, routes with middlewares, the check and a client.
+  Ships as 0.4.0.
 
 ## Next
 
-Nothing scheduled yet.
+- **A client from the document, in this package.** Today you bring your own
+  generator, `@nxgt/openapi-codegen`'s `paths.ts` with openapi-fetch for
+  one ([Spec first](guide/spec-first.md#5-a-client-from-the-same-document)).
+  A client generated here, from the same document, is the direction; it is
+  not designed yet.
 
 ## Later
 
-- **The default 400 beside a hook that may fall back to it.** An
-  `onRefusal` hook that returns nothing for some refusals lets the default
-  `ValidationError` 400 answer them — or, for a hook of one kind, the
-  general hook — and the document does not show it beside the hook's
-  schemas yet. The client's type already does.
+Nothing scheduled yet.
 
 ## Not planned
 
-- **Knowing a validator by name.** `@alxia/openapi` reads every schema
-  through Standard Schema and Standard JSON Schema, and names no library:
-  what only one validator needs lives beside it, as Zod's converter lives
-  in `@alxia/zod`. A validator is supported by carrying Standard JSON
-  Schema, or by a `convert` function.
-- **A runtime dependency.** The package installs nothing beside itself and
-  its `@alxia/core` and `typescript` peers: no validator, no JSON Schema library, and no
-  reference page bundled in it — the page served at `/docs` loads its
-  viewer from a CDN in the browser.
+- **Generating the document from the app.** That was `@alxia/openapi` 0.1
+  to 0.3, now retired: with the document written first, a second document
+  derived from the routes would be a second source of truth.
+- **Checking the schemas.** The checks read each route's method and path.
+  A route declared with `app.route(operation, ...middlewares, handler)`
+  takes its schemas from the operation itself, so they cannot differ; a
+  route written by hand is the app's to keep in step.
+- **Registering the routes.** `app.route(operation, ...middlewares,
+  handler)` is in `@alxia/core`, where it keeps the chain that types the
+  app.
+- **A runtime dependency.** `@alxia/openapi` declares no dependency, only
+  `@alxia/core`, whose types it reads, and `typescript` as peers.
 
 ## Shipped
 
-### Next release
+Before 0.4.0, the name `@alxia/openapi` (0.1.0 to 0.3.0) belonged to a
+different package, which wrote a document from the app's routes; it is
+retired. The releases below are this package's, under its former name,
+`@alxia/openapi-routes`.
 
-- **Refusals by kind.** Behind `onRefusal('validation', …)` and
-  `onRefusal('body_limit', …)`, a route documents each kind's statuses
-  only where that kind may refuse it: the validation hook's on a route that
-  validates, the body-limit hook's on one under a `bodyLimit`. A kind with
-  no hook of its own documents the general hook's, or its default.
-- **Refusals as the app answers them.** A route behind an `onRefusal`
-  hook documents what the hook declares — an RFC 9457 problem under
-  `application/problem+json`, for one — in place of the `ValidationError`
-  400; a hook without schemas, a `4XX`.
-- **Named server-sent events.** A stream of named events,
-  `eventStream({ state, ping })`, is documented as `text/event-stream`
-  with one object per event name in its `itemSchema`: the name as a
-  `const`, the data by its schema, the `id` and `retry` fields.
-- **The 413 of a body limit.** A route under a `bodyLimit`, its own or
-  inherited from `bodyLimit()`, documents a `413` with the
-  `ContentTooLargeError` body, its description naming the limit — or,
-  behind an `onRefusal` hook given schemas, the hook's `413`.
+### `@alxia/openapi-routes` 0.2.0
 
-### 0.1.0
+- **One name for the check both ways.** `matchesSpec(app, operations)`,
+  the new name of `exactly`, which stays as a deprecated alias.
 
-- **An OpenAPI 3.2 document from the routes you already wrote.**
-  `openapi(app, options)` documents every HTTP route of an `@alxia/core`
-  app from its schemas — paths, parameters, request body, each reply, a
-  `QUERY` route as its path's `query` operation — so
-  the document cannot drift from the code. `info`, `servers` and an
-  `exclude` filter shape it.
-- **Each side of a schema where it belongs.** Parameters and bodies are
-  documented by what their schema accepts, replies by what it gives back;
-  an event stream is `text/event-stream` by the schema of one event, as its `itemSchema`, a
-  string reply is `text/plain`.
-- **The errors every route can answer.** A `400` with the validation error
-  body on every route that validates its request, and a `500` on every
-  route, as shared components — beside a route's own `400` or `500`.
-- **Any validator.** Schemas convert through Standard JSON Schema, which
-  Zod 4.2 and later, ArkType and Valibot carry; a `convert` function runs
-  first, for a validator that carries none or to say more than it does.
-  `toJsonSchema` converts a single schema the same way.
-- **Names a client generator can use.** Paths as OpenAPI writes them
-  (`/users/{id}`), operation ids from the method and path (`getUsersById`)
-  unless `detail.operationId` sets one, and `detail`'s summary,
-  description, tags and deprecation copied onto each operation.
-- **The document served, with a page to read it.** The `docs` plugin
-  serves the document at `/openapi.json` and an API reference page at
-  `/docs`, both movable and the page optional, under any prefix or group,
-  and leaves its own routes out of the document.
+### `@alxia/openapi-routes` 0.1.0
+
+- **Every operation has a route.** `implemented(app, operations)` throws,
+  listing each operation of the document that the app does not serve, by
+  method, path and operation id.
+- **Only the operations.** `exactly(app, operations)` also lists each route
+  the document does not declare; `exclude` leaves out the ones it should
+  not, such as a health check.
+- **The generated shape.** Both take the `operations` object
+  `@nxgt/openapi-codegen`'s `alxia` option writes, or a list of operations,
+  typed as `@alxia/core`'s `RouteOperation`; `prefix` looks them up under
+  the app's prefix.

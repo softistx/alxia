@@ -1,8 +1,8 @@
 # Troubleshooting
 
 Each entry is headed by the text you see: what `create-alxia` printed, what
-Bun or the shell printed before it ran, or — for a trap that prints
-nothing — the symptom.
+Bun or the shell printed before it ran, what a new project's own commands
+print, or — for a trap that prints nothing — the symptom.
 
 **Before it runs**
 
@@ -32,6 +32,7 @@ nothing — the symptom.
 - [`zod: no release within ^4.2.0; kept ^4.2.0`](#zod-no-release-within-420-kept-420)
 - [`@alxia/core: the registry has no release within ^0.3.1 yet; wrote ^0.3.0, the newest of ~0.3.0`](#alxiacore-the-registry-has-no-release-within-031-yet-wrote-030-the-newest-of-030)
 - [`create-alxia: bun install failed; the files are written.`](#create-alxia-bun-install-failed-the-files-are-written)
+- [`warn: incorrect peer dependency "typescript@7.0.2"`](#warn-incorrect-peer-dependency-typescript702)
 
 **After**
 
@@ -40,6 +41,14 @@ nothing — the symptom.
 - [`error: Cannot find package '…' from '/app/dist/server.js'`](#error-cannot-find-package--from-appdistserverjs)
 - [`error: … is linked against glibc (DT_NEEDED libm.so.6), but this Bun build uses musl.`](#error--is-linked-against-glibc-dt_needed-libmso6-but-this-bun-build-uses-musl)
 - [The project's `@alxia/*` are older than npm's latest](#the-projects-alxia-are-older-than-npms-latest)
+
+**The `api` project's spec**
+
+- [`openapi.yaml → src/generated: out of date, run nxgt-openapi generate`](#openapiyaml--srcgenerated-out-of-date-run-nxgt-openapi-generate)
+- [`src/generated/` changes after moving `@nxgt/openapi-codegen`](#srcgenerated-changes-after-moving-nxgtopenapi-codegen)
+- [`TypeError: matchesSpec(): 1 operation has no route: DELETE /todos/:id (deleteTodo)`](#typeerror-matchesspec-1-operation-has-no-route-delete-todosid-deletetodo)
+- [`ResponseValidationError: POST /todos: the 401 reply does not match its schema`](#responsevalidationerror-post-todos-the-401-reply-does-not-match-its-schema)
+- [``cookie parameter `session` is not supported [unsupported_parameter]``](#cookie-parameter-session-is-not-supported-unsupported_parameter)
 
 **Biome**
 
@@ -246,6 +255,23 @@ the next steps.
 **Fix:** what its output says, then `cd my-app && bun install`. The
 project is complete; only `node_modules` is missing.
 
+### `warn: incorrect peer dependency "typescript@7.0.2"`
+
+**When:** `bun install` in a new `api` project, the one `bun create @alxia`
+runs included, prints it once and finishes.
+
+**Why:** the project gets the newest TypeScript alxia's packages accept,
+`^6.0.3 || ^7.0.0`, and `@nxgt/openapi-codegen` 0.6.0, the generator the
+template pins, declares `typescript` `^6.0.3` alone. The generator never
+loads TypeScript, so nothing fails: `bun run generate`, `typecheck`, `test`
+and `build` all pass.
+
+**Fix:** none is needed. To silence it, hold the project to TypeScript 6:
+
+```sh
+bun add -d typescript@^6.0.3
+```
+
 ## After
 
 ### `error: lockfile had changes, but lockfile is frozen`
@@ -374,10 +400,162 @@ new `@alxia/create`.
 
 **Fix:** `bunx @alxia/create@latest` for the newest `@alxia/create`, and in
 an existing project
-`bun add @alxia/core@latest` (`api`) or
+`bun add @alxia/core@latest && bun add --dev @alxia/openapi@latest` (`api`) or
 `bun add @alxia/core@latest @alxia/react-router@latest` (`react-router`), reading
 [`@alxia/core`'s upgrading page](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md)
 for what a minor changed.
+
+## The `api` project's spec
+
+### `openapi.yaml → src/generated: out of date, run nxgt-openapi generate`
+
+`bun run verify` stops at its first step, with the stale files listed
+below the line:
+
+```
+openapi.yaml → src/generated: out of date, run nxgt-openapi generate
+  src/generated/types.ts
+  src/generated/operations.ts
+  src/generated/paths.ts
+  src/generated/alxia.ts
+```
+
+**When:** `bun run generate --check`, alone or as `verify`'s first step,
+after `openapi.yaml` changed and `bun run generate` was not run, or after
+a file of `src/generated/` was edited by hand. It writes nothing and exits 1.
+
+**Why:** `src/generated/` is committed, so that nothing is generated at
+install or build ([the `api` template](guide.md#srcgenerated)); the check
+is what keeps it equal to `openapi.yaml`.
+
+**Fix:** generate, then commit the files with the spec:
+
+```sh
+bun run generate
+git add openapi.yaml src/generated
+```
+
+A change made by hand in `src/generated/` is lost: make it in
+`openapi.yaml`.
+
+### `src/generated/` changes after moving `@nxgt/openapi-codegen`
+
+**Symptom:** `bun run verify` fails with
+`openapi.yaml → src/generated: out of date, run nxgt-openapi generate`
+right after `bun add --dev --exact @nxgt/openapi-codegen@…`, with no
+change to `openapi.yaml`.
+
+**When:** the generator moved to another minor, `0.6.x` to `0.7.0`. A new
+project never hits it: the command keeps the template's minor
+([Versions](guide.md#versions)).
+
+**Why:** the generated files are the output of one release of the
+generator, and another minor may write them differently: an option's
+default, a new file, another form for a schema. That is why the template
+pins it exactly.
+
+**Fix:** generate again, then read what changed before committing it:
+
+```sh
+bun run generate
+git diff src/generated
+bun run verify
+```
+
+The diff is what the new release writes differently; `bun run verify`
+tells whether the app still compiles and passes against it. To stay
+where you were, pin the previous version again:
+`bun add --dev --exact @nxgt/openapi-codegen@0.6.0`.
+
+### `TypeError: matchesSpec(): 1 operation has no route: DELETE /todos/:id (deleteTodo)`
+
+With several, `2 operations have no route: …`; a route outside the spec
+reads `1 route has no operation: …`, after a `;` when both happen.
+
+**When:** `bun test`, in `src/app.spec.ts`, after an operation was added
+to `openapi.yaml` and `bun run generate` run, before `src/app.ts` routes
+it. The path is in alxia's form, `/todos/:id`, and the `operationId` is
+in parentheses.
+
+**Why:** `matchesSpec(app, operations)` checks both ways: every operation
+of `src/generated/alxia.ts` has a route of its method and path, and every
+route has an operation.
+
+**Fix:** bind the operation in `src/app.ts`
+([Adding an operation](guide.md#adding-an-operation)):
+
+```ts
+  .route(operations.deleteTodo, requireKey, ({ params, todos, reply }) => {
+    const index = todos.findIndex(({ id }) => id === params.id);
+    if (index === -1) return reply.notFound({ error: "not_found" as const });
+    todos.splice(index, 1);
+    return reply.noContent();
+  });
+```
+
+For a route deliberately outside the spec, a health check say, see
+[`@alxia/openapi`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/troubleshooting.md#typeerror-matchesspec--routes-have-no-operation-).
+
+### `ResponseValidationError: POST /todos: the 401 reply does not match its schema`
+
+The client gets `500 {"error":"internal"}`, and the server prints the
+error, with the field that broke the schema after the colon:
+
+```text
+ResponseValidationError: POST /todos: the 401 reply does not match its schema: error: Invalid input: expected "unauthorized"
+```
+
+The method, path and status are the route's and the reply's.
+
+**When:** a reply's body does not match what `openapi.yaml` declares for
+its status: a handler's, or a middleware's such as `requireKey`'s, since
+every reply with a declared status is checked. The types refuse most of
+these, so it comes from data the types do not see (a database row,
+`JSON.parse`, `any`, a cast), or from `openapi.yaml` changed and
+generated while the code still sends the old shape.
+
+**Why:** a route bound with `route(operation, …)` checks every reply
+against the operation's responses, so a client generated from the same
+spec never reads a body it was not told about. A body the spec refuses is
+not sent.
+
+**Fix:** send what the spec declares, or change the spec, generate, and
+send that:
+
+```ts
+reply(401, { error: "unauthorized" as const }) // Unauthorized: { error: "unauthorized" }
+```
+
+The other forms of the error, and how to turn the check off, are in
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#responsevalidationerror--the-200-reply-does-not-match-its-schema).
+
+### ``cookie parameter `session` is not supported [unsupported_parameter]``
+
+```text
+error openapi.yaml#/paths/~1todos/get/parameters/0/in: cookie parameter `session` is not supported [unsupported_parameter]
+```
+
+**When:** `bun run generate`, once `openapi.yaml` declares a parameter
+`in: cookie`. It writes nothing and exits 1.
+
+**Why:** `@nxgt/openapi-codegen` 0.6.0 does not generate cookie
+parameters, and refuses the whole spec rather than leave one out.
+
+**Fix:** take the parameter out of `openapi.yaml`, and read the cookie in
+the app: in a middleware, or with a `validate({ cookies })` placed among
+the route's middlewares:
+
+```ts
+import { alxia, validate } from "@alxia/core";
+import { z } from "zod";
+import { operations } from "./generated/alxia";
+
+export const app = alxia().route(
+  operations.listTodos,
+  validate({ cookies: z.object({ session: z.string() }) }),
+  ({ cookies, reply }) => reply.ok(todosOf(cookies.session)),
+);
+```
 
 ## Biome
 

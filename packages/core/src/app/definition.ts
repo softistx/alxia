@@ -105,8 +105,8 @@ export interface RouteDefinition {
 	readonly path: string;
 	/**
 	 * What it validates and answers: its schema, or the schemas of its
-	 * `validate` and `responds` middlewares and its options. What
-	 * `@alxia/openapi` documents; the chain runs `derive`.
+	 * `validate` and `responds` middlewares and its options, for a tool
+	 * that reads `app.routes`; the chain runs `derive`.
 	 */
 	readonly schema: RouteSchema;
 	/**

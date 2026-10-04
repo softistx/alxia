@@ -7,7 +7,9 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **`zodConverter` takes a Zod schema as it is.** `zodConverter(Todo, 'output')`
+  compiles, for any use of the JSON Schema it gives: a hand-written OpenAPI
+  document, a JSON Schema validator, a form builder.
 
 ## Next
 
@@ -19,12 +21,11 @@ Nothing scheduled yet.
 
 ## Not planned
 
-- **Zod inside `@alxia/core` or `@alxia/openapi`.** Both read any Standard
-  Schema and name no validator, so an app can use Zod, Valibot, ArkType or
+- **Zod inside `@alxia/core`.** It reads any Standard
+  Schema and names no validator, so an app can use Zod, Valibot, ArkType or
   its own; what only Zod can do lives in this package.
 - **A runtime dependency.** `@alxia/zod` declares no dependency, only
-  peers: the app's own `zod` is the one used, and the converter fits
-  `@alxia/openapi` without importing it.
+  peers: the app's own `zod` is the one used.
 
 ## Shipped
 
@@ -48,8 +49,7 @@ Nothing scheduled yet.
   JSON, validates it with the schema, and lets the client send the object.
   An array is sent as its JSON text, since a query sends a list as repeated
   keys.
-- **OpenAPI that matches the wire.** `zodConverter`, given to
-  `@alxia/openapi`'s `openapi` or `docs`, documents a `Date` as a
-  `date-time` string and a `bigint` as an integer, and documents the rest
-  of a schema when one field has no JSON Schema, instead of losing all of
-  it.
+- **JSON Schema that matches the wire.** `zodConverter` gives a Zod
+  schema as JSON Schema 2020-12, a `Date` as a `date-time` string and a
+  `bigint` as an integer, and keeps the rest of a schema when one field has
+  no JSON Schema, instead of losing all of it.

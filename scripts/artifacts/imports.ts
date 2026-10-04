@@ -84,7 +84,7 @@ export function undeclaredImports(
  *
  * The install below holds every package of this repository side by side, so
  * a package that imports a sibling it lists only as a devDependency — the
- * zod spec uses `@alxia/openapi` that way — still loads there. A
+ * react-router spec uses `@alxia/openapi` that way — still loads there. A
  * consumer who installs that package alone gets "Cannot find package". Only
  * reading the imports catches it; loading cannot.
  */

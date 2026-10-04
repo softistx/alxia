@@ -55,11 +55,12 @@ const declared = new WeakSet<RouteDefinition['handler']>();
 
 /**
  * Whether `reactRouter()` declared this route: the catch-all, or one of the
- * client build's files. For `@alxia/openapi`'s `exclude`, so the document
- * lists the app's API and not its pages.
+ * client build's files. For `@alxia/openapi`'s `matchesSpec`, whose
+ * `exclude` leaves them out, so the app's routes are checked against the
+ * operations of its OpenAPI document and its pages are not.
  *
  * ```ts
- * app.use(docs(app, { info, exclude: isReactRouterRoute }));
+ * matchesSpec(app, operations, { exclude: isReactRouterRoute });
  * ```
  */
 export function isReactRouterRoute(route: RouteDefinition): boolean {

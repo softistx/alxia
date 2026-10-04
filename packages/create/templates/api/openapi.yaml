@@ -1,0 +1,116 @@
+# The API's contract: the routes of src/app.ts are bound to the operations
+# generated from it. Edit it first, then run `bun run generate`.
+openapi: 3.1.0
+info:
+  title: my-api
+  version: 0.1.0
+paths:
+  /todos:
+    get:
+      operationId: listTodos
+      summary: Every todo
+      responses:
+        "200":
+          description: The todos, oldest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Todo" }
+    post:
+      operationId: createTodo
+      summary: Add a todo
+      security:
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NewTodo" }
+      responses:
+        "201":
+          description: The todo, created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Todo" }
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "401":
+          description: No x-api-key header, or not the key
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Unauthorized" }
+  /todos/{id}:
+    get:
+      operationId: getTodo
+      summary: One todo
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        "200":
+          description: The todo
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Todo" }
+        "400":
+          $ref: "#/components/responses/ValidationError"
+        "404":
+          description: No todo has this id
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NotFound" }
+components:
+  securitySchemes:
+    apiKey: { type: apiKey, in: header, name: x-api-key }
+  responses:
+    ValidationError:
+      description: alxia's own 400, for a request the schemas refuse
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/ValidationError" }
+  schemas:
+    Todo:
+      type: object
+      required: [id, title, done]
+      properties:
+        id: { type: integer }
+        title: { type: string }
+        done: { type: boolean }
+    NewTodo:
+      type: object
+      required: [title]
+      properties:
+        title: { type: string, minLength: 1 }
+    Unauthorized:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, enum: [unauthorized] }
+    NotFound:
+      type: object
+      required: [error]
+      properties:
+        error: { type: string, enum: [not_found] }
+    ValidationError:
+      type: object
+      required: [error, issues]
+      properties:
+        error: { type: string, enum: [validation] }
+        issues:
+          type: array
+          items:
+            type: object
+            required: [target, path, code, message]
+            properties:
+              target:
+                type: string
+                enum: [params, query, headers, cookies, body]
+              path:
+                type: array
+                items:
+                  anyOf: [{ type: string }, { type: integer }]
+              code: { type: string }
+              message: { type: string }

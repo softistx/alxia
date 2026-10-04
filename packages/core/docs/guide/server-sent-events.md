@@ -45,7 +45,7 @@ value is validated and sent as `item`'s **output**, so an unknown key the
 schema strips never leaves the server, as for any reply.
 
 `isEventStreamSchema(schema)` tells whether a schema is one
-`eventStream(schema)` made: what a plugin documenting the app — an OpenAPI generator — reads.
+`eventStream(schema)` made: what a tool reading `app.routes` checks a route's stream by.
 
 ## Named events
 
@@ -192,8 +192,8 @@ Without the signal, a generator waiting on a promise is closed only when it
 next yields: its `finally` would wait for the next ping.
 
 `isNamedEventStreamSchema(schema)` tells whether a schema is a named
-stream, and `schema['~events']` holds its schemas by name: what an OpenAPI
-generator reads. `isEventStreamSchema` stays true of the unnamed form only.
+stream, and `schema['~events']` holds its schemas by name, for a tool reading
+`app.routes`. `isEventStreamSchema` stays true of the unnamed form only.
 
 ## What is sent
 

@@ -37,6 +37,7 @@ describe('the api template', () => {
 			await alxiaRanges(),
 		);
 		expect(manifest['scripts']).toEqual({
+			generate: 'nxgt-openapi generate',
 			dev: 'bun --watch src/server.ts',
 			build:
 				'bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked',
@@ -47,14 +48,17 @@ describe('the api template', () => {
 			format: 'biome format --write',
 			check: 'biome check --write',
 			'check:ci': 'biome ci',
-			verify: 'bun run check:ci && bun run typecheck && bun run test',
+			verify:
+				'bun run generate --check && bun run check:ci && bun run typecheck && bun run test',
 		});
 		expect(Object.keys(manifest.dependencies ?? {})).toEqual([
 			'@alxia/core',
 			'zod',
 		]);
 		expect(Object.keys(manifest.devDependencies ?? {})).toEqual([
+			'@alxia/openapi',
 			'@biomejs/biome',
+			'@nxgt/openapi-codegen',
 			'@types/bun',
 			'typescript',
 		]);
@@ -140,6 +144,34 @@ describe('the api template', () => {
 		expect(result.exitCode).toBe(0);
 	});
 
+	test('its src/generated/ is what its @nxgt/openapi-codegen writes from openapi.yaml', async () => {
+		// The version this repository installs, the one the template pins.
+		const result = await $`${process.execPath} run generate --check`
+			.cwd(dir)
+			.nothrow()
+			.quiet();
+		expect(`${result.stdout}${result.stderr}`).toContain(
+			'src/generated: up to date',
+		);
+		expect(result.exitCode).toBe(0);
+	});
+
+	test('api pins @nxgt/openapi-codegen exactly, at the version that wrote its src/generated/', async () => {
+		const read = (file: string) =>
+			Bun.file(join(import.meta.dir, '..', '..', file)).json();
+		const pinned = (await read('templates/api/package.json')).devDependencies[
+			'@nxgt/openapi-codegen'
+		];
+		// @alxia/create's own devDependency, which api.spec.ts runs --check with.
+		expect(pinned).toBe(
+			(await read('package.json')).devDependencies['@nxgt/openapi-codegen'],
+		);
+		const installed = await Bun.file(
+			Bun.resolveSync('@nxgt/openapi-codegen/package.json', import.meta.dir),
+		).json();
+		expect(pinned).toBe(installed.version);
+	});
+
 	test('its .env.example names each variable the app reads', async () => {
 		const { files } = await copyTemplate('api', 'my-api', await alxiaRanges());
 		const example = (await files['.env.example']?.text()) ?? '';
@@ -170,7 +202,7 @@ describe('the api template', () => {
 	test('its spec passes', async () => {
 		const result = await $`${process.execPath} test`.cwd(dir).nothrow().quiet();
 		const output = result.stderr.toString();
-		expect(output).toContain(' 4 pass');
+		expect(output).toContain(' 6 pass');
 		expect(output).toContain(' 0 fail');
 		expect(result.exitCode).toBe(0);
 	}, 30_000);
