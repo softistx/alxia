@@ -232,9 +232,10 @@ The same for `query`, `body` and `headers`.
 
 **When:** reading a route's validated input from `requestContext.context()`.
 
-**Why:** those belong to one route's schema, not to the app, so the app's
-context does not have them. Hooks run before validation: a `derive` reads
-them as `undefined` even at runtime.
+**Why:** those belong to one route's `validate(…)`, not to the app, so the
+app's context does not have them. Hooks run before a route's middlewares,
+`validate` among them: a `derive` reads the request as it arrived, the
+body `undefined`, even at runtime.
 
 **Fix:** pass them from the handler, or, in code that only runs under one
 route, state them:

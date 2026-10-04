@@ -7,11 +7,17 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **Routes with middlewares.** `app.route(operation, ...middlewares,
+  handler)`, in `@alxia/core`'s next minor: the operation's schema
+  validates just before the handler, or where `validate(operation)` stands,
+  and the checks match such a route as any other.
 
 ## Next
 
-Nothing scheduled yet.
+- **The spec-first `@alxia/openapi`.** This package becomes
+  `@alxia/openapi`: the operations of a document, declared and checked in
+  one place; `@alxia/openapi-routes` stays a while as a deprecated
+  re-export.
 
 ## Later
 
@@ -20,10 +26,10 @@ Nothing scheduled yet.
 ## Not planned
 
 - **Checking the schemas.** The checks read each route's method and path.
-  A route declared with `app.route(operation, handler)` takes its schemas
+  A route declared with `app.route(operation, ...middlewares, handler)` takes its schemas
   from the operation itself, so they cannot differ; a route written by hand
   is the app's to keep in step.
-- **Registering the routes.** `app.route(operation, handler)` is in
+- **Registering the routes.** `app.route(operation, ...middlewares, handler)` is in
   `@alxia/core`, where it keeps the chain that types the app.
 - **A runtime dependency.** `@alxia/openapi-routes` declares no dependency,
   only `@alxia/core`, whose types it reads, and `typescript` as peers.

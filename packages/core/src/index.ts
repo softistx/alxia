@@ -23,6 +23,14 @@ export type {
 	StartHook,
 	StopHook,
 } from './app/definition';
+export type { OperationForms } from './app/operation-forms';
+export type {
+	OperationApp,
+	OperationOptions,
+	OperationParts,
+	OperationResponds,
+	OperationValidate,
+} from './app/operation-types';
 export type {
 	AppWithRoute,
 	RouteOptions,

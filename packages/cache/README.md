@@ -16,7 +16,7 @@ bun add -d typescript
 
 ```ts
 import { cache } from '@alxia/cache';
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { z } from 'zod'; // any Standard Schema validates a body; zod is one
 
 const Product = z.object({ id: z.string(), name: z.string() });
@@ -25,7 +25,7 @@ const catalogue = new Map<string, z.infer<typeof Product>>();
 const products = cache({ ttl: 60, staleWhileRevalidate: 300, statuses: [200, 404], tags: () => ['products'] });
 
 const app = alxia()
-	.post('/products', { body: Product }, async ({ body, reply }) => {
+	.post('/products', validate({ body: Product }), async ({ body, reply }) => {
 		catalogue.set(body.id, body);
 		await products.invalidateTag('products');           // the next GET runs the route
 		return reply(201, body);

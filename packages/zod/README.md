@@ -20,10 +20,11 @@ reads the same text, and types the client's side as the value it means to
 send:
 
 ```ts
+import { validate } from '@alxia/core';
 import { zq } from '@alxia/zod';
 import { z } from 'zod';
 
-app.get('/search/:page', {
+app.get('/search/:page', validate({
 	params: z.object({ page: zq.int() }),
 	query: z.object({
 		tags: zq.array(z.string()).optional(),  // ?tags=a and ?tags=a&tags=b
@@ -31,7 +32,7 @@ app.get('/search/:page', {
 		since: zq.date().optional(),            // ISO 8601
 		filter: zq.json(Filter).optional(),     // ?filter={"min":3}
 	}),
-}, ...);
+}), ...);
 
 await api.get('/search/:page', { params: { page: 2 }, query: { exact: true, since: new Date() } });
 ```

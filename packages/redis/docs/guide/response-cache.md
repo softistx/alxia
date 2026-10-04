@@ -77,7 +77,7 @@ process sharing it misses on its next request:
 
 ```ts
 import { cache } from '@alxia/cache';
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { redisCacheStore } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 import { z } from 'zod';
@@ -90,7 +90,7 @@ const store = redisCacheStore(connection.client, { name: 'shop' });
 const products = cache({ ttl: 60, staleWhileRevalidate: 300, store, tags: () => ['products'] });
 
 const app = alxia()
-	.post('/products', { body: Product }, async ({ body, reply }) => {
+	.post('/products', validate({ body: Product }), async ({ body, reply }) => {
 		catalogue.set(body.id, body);
 		await products.invalidateTag('products');      // forgotten in every process
 		return reply(201, body);

@@ -6,7 +6,7 @@ with its status and a body a client can act on, typed on the routes after
 it; and `bodyOf` and `statusOf`, the two functions it is made of.
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { janusErrors, session } from '@alxia/janus';
 import { createMemoryStores, janus, scryptHasher } from '@nxgt/janus';
 import { z } from 'zod';
@@ -23,7 +23,7 @@ const SignUp = z.object({ email: z.string(), name: z.string(), password: z.strin
 const app = alxia()
 	.use(janusErrors())
 	.use(session(accounts))
-	.post('/signup', { body: SignUp }, async ({ body, auth, reply }) => {
+	.post('/signup', validate({ body: SignUp }), async ({ body, auth, reply }) => {
 		const signedUp = await accounts.signUp(body); // throws a JanusError when it refuses
 		return reply.created({ id: auth.send(signedUp).id });
 	});

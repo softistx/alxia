@@ -2,7 +2,8 @@
 
 This page covers `implemented` and `matchesSpec`: what they take, how they
 match an operation to a route, where to call them, and how to check an app
-that has a prefix or routes the document does not declare.
+that has a prefix, routes with middlewares, or routes the document does not
+declare.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -55,7 +56,7 @@ app holds, groups and plugins included, with their full paths. They send
 no request and start no server.
 
 `RouteOperation` is `@alxia/core`'s, the type `app.route(operation,
-handler)` reads: `{ method, path, schema? }`. So `operations` is what the
+...middlewares, handler)` reads: `{ method, path, schema? }`. So `operations` is what the
 routes were declared from:
 
 - the `operations` object of a generated `alxia.ts`, keyed by operation id.
@@ -119,6 +120,36 @@ matchesSpec(served, api, {
 `exclude` is not consulted for the first half: an operation with no route
 is always listed.
 
+## Routes with middlewares
+
+`app.route(operation, ...middlewares, handler)`, in `@alxia/core`, gives a
+route declared from an operation the middlewares of any route. The
+operation's schema is two of them: a `responds` of its responses, first, and
+a `validate` of its request just before the handler, so an `auth` placed
+before it answers 401 before the body is read. `validate(operation)`,
+given the same operation, validates where it stands instead, once:
+
+```ts
+import { alxia, defineMiddleware, validate } from '@alxia/core';
+import { matchesSpec } from '@alxia/openapi-routes';
+import { operations as api } from './generated/alxia';
+
+const auth = defineMiddleware(({ request, reply }, next) =>
+	request.headers.has('authorization') ? next() : reply(401, { error: 'unauthorized' as const }),
+);
+
+export const app = alxia()
+	.route(api.renamePet, auth, ({ params, body, reply }) => reply.ok(rename(params.petId, body.name)))
+	.route(api.adoptPet, validate(api.adoptPet), auth, ({ params, reply }) => reply.created(adopt(params.petId)));
+
+matchesSpec(app, api); // the routes are matched as any others: by method and path
+```
+
+The checks read `app.routes`, so middlewares change nothing for them. A
+reply a middleware sends with a status the operation declares, such as
+`auth`'s 401 when the document declares one, is checked against that
+status's schema; one with a status it does not declare is sent as it is.
+
 ## How a route is matched
 
 An operation is served by a route of the same method and path:
@@ -141,7 +172,7 @@ An operation is served by a route of the same method and path:
   and an OpenAPI operation is HTTP: `matchesSpec` never lists them.
 
 Only the method and the path are compared. A route declared with
-`app.route(operation, handler)` reads its schemas from the operation, so
+`app.route(operation, ...middlewares, handler)` reads its schemas from the operation, so
 they cannot differ from the spec's; one written by hand is the app's to
 keep in step.
 

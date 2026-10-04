@@ -171,7 +171,7 @@ describe('the api template', () => {
 	test('its spec passes', async () => {
 		const result = await $`${process.execPath} test`.cwd(dir).nothrow().quiet();
 		const output = result.stderr.toString();
-		expect(output).toContain(' 3 pass');
+		expect(output).toContain(' 4 pass');
 		expect(output).toContain(' 0 fail');
 		expect(result.exitCode).toBe(0);
 	}, 30_000);

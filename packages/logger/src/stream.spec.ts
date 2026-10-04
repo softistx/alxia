@@ -1,5 +1,5 @@
 import { afterAll, describe, expect, test } from 'bun:test';
-import { alxia, eventStream } from '@alxia/core';
+import { alxia, eventStream, responds } from '@alxia/core';
 import { z } from 'zod';
 import { type LogEntry, logger } from './logger';
 
@@ -57,9 +57,7 @@ describe('a streamed body', () => {
 		.use(logger({ write: (entry) => entries.push(entry) }))
 		.get('/slow', ({ reply }) => reply(200, slow()))
 		.get('/failing', ({ reply }) => reply(200, failing()))
-		.get('/ticks', { response: { 200: Tick } }, ({ reply }) =>
-			reply(200, ticks()),
-		)
+		.get('/ticks', responds({ 200: Tick }), ({ reply }) => reply(200, ticks()))
 		.get('/text', ({ reply }) => reply(200, 'hello'));
 	const server = app.listen({ port: 0 });
 	const base = `http://127.0.0.1:${server.port}`;
@@ -172,7 +170,7 @@ describe('a streamed body without a server', () => {
 		released.length = 0;
 		const app = alxia()
 			.use(logger({ write: (entry) => entries.push(entry) }))
-			.get('/ticks', { response: { 200: Tick } }, ({ reply }) =>
+			.get('/ticks', responds({ 200: Tick }), ({ reply }) =>
 				reply(200, ticks()),
 			)
 			.get('/slow', ({ reply }) => reply(200, slow()));

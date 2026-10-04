@@ -30,11 +30,12 @@ a trap that prints nothing is headed by its symptom.
 - [`a route's hooks are a list written in the call, [first, second]: a list of unknown length cannot be checked`](#a-routes-hooks-are-a-list-written-in-the-call-first-second-a-list-of-unknown-length-cannot-be-checked)
 - [`a route takes at most 8 hooks in its list: derive the rest in a group around it`](#a-route-takes-at-most-8-hooks-in-its-list-derive-the-rest-in-a-group-around-it)
 - [`Type '…' is not assignable to type 'MaybePromise<unique symbol>'`](#type--is-not-assignable-to-type-maybepromiseunique-symbol), and `Type 'Promise<Next<…>>' is not assignable to type 'unique symbol'`
+- [`Types of property 'body' are incompatible. Type 'undefined' is not assignable to type '…'`](#types-of-property-body-are-incompatible-type-undefined-is-not-assignable-to-type-), on `route(operation, …)`
 - [`Property 'user' does not exist on type 'RouteBase<…>'`](#property-user-does-not-exist-on-type-routebase)
 - [`Property 'user' is missing in type 'RouteBase<…>' but required in type '{ user: User; }'`](#property-user-is-missing-in-type-routebase-but-required-in-type--user-user-)
 - [`Property 'id' is missing in type 'Readonly<Record<string, string>> & PathParams<"…">'`](#property-id-is-missing-in-type-readonlyrecordstring-string--pathparams)
 - [`Type '…' is not assignable to type 'never'` in a route's options](#type--is-not-assignable-to-type-never-in-a-routes-options)
-- [`Type 'Middleware<…>' has no properties in common with type 'OptionsOnly<RouteOptions>'`](#type-middleware-has-no-properties-in-common-with-type-optionsonlyrouteoptions), and `Expected 2-11 arguments, but got 12`
+- [`Type 'Middleware<…>' has no properties in common with type 'OptionsOnly<RouteOptions>'`](#type-middleware-has-no-properties-in-common-with-type-optionsonlyrouteoptions), `Expected 2-11 arguments, but got 12` and, on `route()`, `Expected 2-10 arguments, but got 11`
 - [`Type 'string' is not assignable to type 'MiddlewareReturn'`](#type-string-is-not-assignable-to-type-middlewarereturn)
 - [`'response' does not exist in type 'RequestSchemas'`](#response-does-not-exist-in-type-requestschemas)
 - [`route() needs the path as a literal: declare the operation as const`](#route-needs-the-path-as-a-literal-declare-the-operation-as-const)
@@ -287,9 +288,12 @@ A `Response` is only for global hooks (`onRequest`, `onResponse`,
 
 ### `Property 'user' does not exist on type 'Context<…>'`
 
-**When:** a route declared by `route()`, or with the deprecated schema
-before the handler, reads what a `derive` or `decorate` adds, but the route
-is declared before that hook.
+**When:** a route declared with the deprecated schema before the handler
+reads what a `derive` or `decorate` adds, but the route is declared before
+that hook. A route declared by `route(operation, …)` gets the same error
+naming another type:
+`Property 'user' does not exist on type 'Omit<BaseContext & Empty & { readonly params: PathParams<"/me">; … }, "params" | … | "body"> & { …; }'`;
+the fix is the same.
 
 ```text
 error TS2339: Property 'user' does not exist on type 'Context<Empty, "/me", Empty>'.
@@ -736,6 +740,25 @@ function's result could not be inferred beside `Requires`.
 defineMiddleware<{ user: User }>()(({ user }, next) => next({ id: user.id }));
 ```
 
+### `Types of property 'body' are incompatible. Type 'undefined' is not assignable to type '…'`
+
+**When:** a middleware given to `route(operation, m, handler)` reads `body`,
+or the validated `params`, of the operation. The operation's `validate`
+stands just before the handler, so a middleware before it reads the
+request as it arrived: `body` is `undefined`, `params` strings. TypeScript
+reports it under `Overload 1 of 10`, then a `'~hooks'` message from the
+deprecated list form, which is not the cause.
+
+```ts
+app.route(op, ({ body }, next) => next({ title: body.title }), handler); // body: undefined here
+```
+
+**Fix:** place the operation's validation before the middleware:
+
+```ts
+app.route(op, validate(op), ({ body }, next) => next({ title: body.title }), handler);
+```
+
 ### `Property 'user' does not exist on type 'RouteBase<…>'`
 
 **When:** a middleware written in the route reads a key that only a
@@ -887,10 +910,13 @@ app.post('/posts', { bodyLimit: 1024 * 1024 }, auth, validate({ body: Post }), r
 
 ### `Type 'Middleware<…>' has no properties in common with type 'OptionsOnly<RouteOptions>'`
 ### `Expected 2-11 arguments, but got 12`
+### `Expected 2-10 arguments, but got 11`
 
 **When:** a route is given nine middlewares or more. Without options,
 TypeScript reports the first, `TS2559`, on the first middleware; with
-options, it counts the arguments, `TS2554`.
+options, it counts the arguments, `TS2554`. `route(operation, …)` counts
+them too, `Expected 2-10 arguments`, and may add
+`TS2590: Expression produces a union type that is too complex to represent`.
 
 ```ts
 app.get('/', m1, m2, m3, m4, m5, m6, m7, m8, m9, handler);
@@ -2134,7 +2160,8 @@ before the `validate` — a middleware placed before it, a `derive`, a
 
 **Why:** route hooks, and the middlewares before a `validate`, run before
 it. A request's body can be read once: the hook used it up, and the
-`validate`, which reads it next, fails.
+`validate`, which reads it next, fails. Two `validate`s of the body are
+not this: the second checks the body the first read.
 
 **Fix:** let the `validate` read the body, and do a check that needs it in
 a middleware placed after it, or in the handler: both read `body`, the

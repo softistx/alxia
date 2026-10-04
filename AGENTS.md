@@ -8,7 +8,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 
 | package | what it is | peers |
 | --- | --- | --- |
-| `@alxia/core` | the framework: routes, hooks, groups, plugins, cookies, SSE, WebSockets | — |
+| `@alxia/core` | the framework: routes and their middlewares (`defineMiddleware`, `validate`, `responds`), hooks, groups, plugins, cookies, SSE, WebSockets | — |
 | `@alxia/client` | the client of an app, typed from `typeof app` alone | core |
 | `@alxia/openapi` | the OpenAPI 3.2 document of an app, from its route schemas | core |
 | `@alxia/openapi-routes` | `implemented` and `matchesSpec`: every operation of an OpenAPI document has a route, read from `app.routes` | core |
@@ -87,8 +87,16 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   `Response`. A global hook's `Response` is outside the contract: use it
   only for what a typed client never asks.
 - **Order is meaning.** A route hook applies to the routes declared after
-  it, at runtime and in the types alike; a group's stay inside it. Global
+  it, at runtime and in the types alike; a group's stay inside it. A
+  route's middlewares run in the order given, `validate` and `responds`
+  among them, and what one passes `next` is typed only after it. Global
   hooks apply everywhere. Keep the two in step.
+- **One route model.** A route, a socket's upgrade and `route(operation)`
+  take the same `...middlewares`. The forms of 0.3 (a list of hooks, a
+  schema before the handler, `defineHook`, `defineWrap`) are deprecated
+  adapters in `@alxia/core`, kept until they are removed: no other package,
+  template or example writes them, but the specs of `@alxia/client` and
+  `@alxia/openapi`, which are retired.
 - **What leaves the server is the schema's output.** A reply, an event, a
   socket message is validated and sent as its schema gives it back.
 

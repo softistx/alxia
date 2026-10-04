@@ -109,10 +109,16 @@ include its body.
 are plain data — `{ method, path, schema? }` — instead of arguments: an
 operation written once and shared between modules, or one a code generator
 writes from an OpenAPI document.
-`route` keeps the form of 0.3, unchanged in this release: the operation's
-`schema` validates the request just before the handler, and
-`route(operation, [hooks], handler)` gives it a list of hooks of its own
-([Hooks on one route](hooks.md#hooks-on-one-route)).
+`route(operation, ...middlewares, handler)` takes the middlewares of any
+route, up to 8, and reads the operation's `schema` as two of them: a
+`responds` of its `response`, first, which checks every reply with a status
+it declares, a middleware's included; and a `validate` of its request
+parts, just before the handler, so a middleware placed before it reads the
+request as it arrived and an `auth` answers 401 before the body is read.
+Given `validate(operation)` among the middlewares, the route validates
+there instead, once ([Middlewares on a route declared as data](#middlewares-on-a-route-declared-as-data)).
+`route(operation, [hooks], handler)`, a list of hooks, is the form of 0.3,
+deprecated ([Hooks on one route](hooks.md#hooks-on-one-route)).
 
 ```ts
 // operations.ts: data, importing only the schemas
@@ -146,10 +152,10 @@ const app = alxia({ prefix: '/api' })
 // GET /api/pets/1 → 200, GET /api/pets/x → 400, GET /api/health → "ok"
 ```
 
-It is exactly the route `app[method](path, validate(…), responds(…), handler)`
+It is exactly the route `app[method](path, options, responds(…), validate(…), handler)`
 declares from the same schemas: the same context, the same entry in
 `RoutesOf` (`'/api/pets/:petId'` above, the prefix applied), and the same
-compile errors — a params schema that does not
+checks, at compile time — a params schema that does not
 read the path, an unknown schema key, a status the operation does not declare.
 `method` is any `Method`, `QUERY` included; an operation without `schema` is
 a route without one.
@@ -175,16 +181,73 @@ type OperationSchema<Operation> = Operation extends { readonly schema: infer Sch
 	? Schema
 	: Empty;
 
-// app.route: OperationMethod<Ctx, Routes, Prefix, Shortcuts>
-<const Operation extends RouteOperation, Result extends HandlerResult<OperationSchema<Operation>>>(
-	operation: Operation & {
-		readonly schema?: ValidSchema<JoinPath<Prefix, Operation['path']>, OperationSchema<Operation>>;
-	},
-	handler: (
-		ctx: Context<Ctx, JoinPath<Prefix, Operation['path']>, OperationSchema<Operation>>,
-	) => MaybePromise<Result>,
+// app.route: OperationMethod, whose forms are OperationForms<App>, one per count of middlewares
+<const Op extends RouteOperation, R1 extends MiddlewareReturn, Result>(
+	operation: CheckedOperation<Prefix, Op>, // one method, a literal path, a schema that reads it
+	m1: Middleware</* the route's context before the operation's validate */, R1>,
+	handler: (ctx: /* … what m1 added, the validated parts, reply typed by the responses */) => MaybePromise<Result>,
 ) => Alxia</* … the route added … */>;
 ```
+
+### Middlewares on a route declared as data
+
+The operation's `validate` stands just before the handler unless you place
+it: `validate(operation)` validates the operation's request parts where it
+stands, and the route runs no other. A `validate` counts as the
+operation's when it checks each of those parts by the very schema the
+operation names, so `validate(renamePet)` on a route declared from a copy,
+`{ ...renamePet, path }`, counts too. A `validate` of other schemas is one
+more middleware: the route still validates the operation's parts before the
+handler, and the body, read once, is checked by both.
+
+Two things the types of `route` say differently from the runtime, both
+rare. A middleware placed after `validate(operation)` that passes
+`next({ body })` (or `params`, `query`, `headers`) is typed, in the
+handler, by the operation's schema, though the handler receives what the
+middleware passed. And on a route whose operation has no schema for a
+part, a middleware that passes that part to `next` sees it typed, in the
+handler, as the request's own: `query` raw, `body` `undefined`. Give such
+a value another name — `next({ page })` — and both are typed as they run.
+
+```ts
+import { alxia, defineMiddleware, validate } from '@alxia/core';
+import { z } from 'zod';
+
+const Pet = z.object({ id: z.number(), name: z.string() });
+export const renamePet = {
+	method: 'PATCH',
+	path: '/pets/:petId',
+	schema: {
+		params: z.object({ petId: z.coerce.number().int() }),
+		body: z.object({ name: z.string().min(1) }),
+		response: { 200: Pet, 401: z.object({ error: z.literal('unauthorized') }) },
+	},
+} as const;
+
+export const renameDraft = { ...renamePet, path: '/drafts/:petId' } as const;
+
+const auth = defineMiddleware(({ request, reply }, next) => {
+	const user = request.headers.get('x-user');
+	return user === null ? reply(401, { error: 'unauthorized' as const }) : next({ user });
+});
+
+const app = alxia()
+	// auth first: a stranger gets 401 before his body is read
+	.route(renamePet, auth, ({ user, params, body, reply }) =>
+		reply(200, { id: params.petId, name: `${body.name} (by ${user})` }),
+	)
+	// validate first: a bad body gets 400 before anyone is asked
+	.route(renameDraft, validate(renameDraft), auth, ({ params, body, reply }) =>
+		reply(200, { id: params.petId, name: body.name }),
+	);
+```
+
+The operation's `responds` stands first, so it checks `auth`'s 401 too,
+against the schema the operation declares for it: a reply a middleware
+makes with a declared status is sent as its schema's output, or refused
+with a 500. A status the operation does not declare is sent as it is.
+Before the operation's `validate`, a middleware reads `params` as strings
+and `body` as `undefined`, as on any route.
 
 ## Paths
 

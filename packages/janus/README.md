@@ -17,7 +17,7 @@ the same cookie, the same rules, the same bodies.
 ## Usage
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { janusErrors, session } from '@alxia/janus';
 import { createMemoryStores, janus, scryptHasher } from '@nxgt/janus';
 import { z } from 'zod';
@@ -34,7 +34,7 @@ const SignIn = z.object({ email: z.string(), password: z.string() });
 const app = alxia()
 	.use(janusErrors())                                   // janus's refusals, typed
 	.use(session(accounts))                               // not required: anonymous may sign in
-	.post('/signin', { body: SignIn }, async ({ body, auth, reply }) => {
+	.post('/signin', validate({ body: SignIn }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.signIn(body);
 		return reply.ok({ id: auth.send(signedIn).id });  // the token in the cookie
 	})

@@ -88,7 +88,7 @@ the name you give it in `caches`:
 A realistic case, a profile read through the cache and forgotten on write:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { redis } from '@alxia/redis';
 import { connectRedis, defineCache } from '@nxgt/redis';
 import { z } from 'zod';
@@ -105,7 +105,7 @@ const app = alxia()
 		const profile = await caches.profiles.remember(params.id, async () => table.get(params.id) ?? { id: params.id, name: '?' });
 		return reply.ok(profile);                         // plan is filled in: 'free'
 	})
-	.put('/profiles/:id', { body: Profile.omit({ id: true }) }, async ({ caches, params, body, reply }) => {
+	.put('/profiles/:id', validate({ body: Profile.omit({ id: true }) }), async ({ caches, params, body, reply }) => {
 		table.set(params.id, { id: params.id, ...body });
 		await caches.profiles.delete(params.id);          // the next read loads it again
 		return reply(204, undefined);

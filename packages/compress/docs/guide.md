@@ -282,7 +282,7 @@ An API, a built front end whose bundler already wrote `.br` and `.gz`
 copies, and an event stream — compressed where it pays, and nowhere else:
 
 ```ts
-import { alxia, eventStream } from '@alxia/core';
+import { alxia, eventStream, responds } from '@alxia/core';
 import { compress } from '@alxia/compress';
 import { z } from 'zod';
 
@@ -291,7 +291,7 @@ const Tick = z.object({ at: z.number() });
 const app = alxia()
 	.use(compress({ encodings: ['zstd', 'br', 'gzip'] }))
 	.get('/api/products', ({ reply }) => reply(200, products))  // JSON: compressed over 1 KiB
-	.get('/api/ticks', { response: { 200: eventStream(Tick) } }, ({ reply }) =>
+	.get('/api/ticks', responds({ 200: eventStream(Tick) }), ({ reply }) =>
 		reply(
 			200,
 			(async function* () {

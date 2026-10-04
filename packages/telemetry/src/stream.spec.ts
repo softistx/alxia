@@ -1,5 +1,5 @@
 import { afterAll, afterEach, describe, expect, test } from 'bun:test';
-import { alxia, eventStream } from '@alxia/core';
+import { alxia, eventStream, responds } from '@alxia/core';
 import {
 	createTelemetry,
 	type Exporter,
@@ -74,9 +74,7 @@ describe('the span of a streamed body', () => {
 		.use(telemetry({ instance }))
 		.get('/slow', ({ reply }) => reply(200, slow()))
 		.get('/failing', ({ reply }) => reply(200, failing()))
-		.get('/ticks', { response: { 200: Tick } }, ({ reply }) =>
-			reply(200, ticks()),
-		)
+		.get('/ticks', responds({ 200: Tick }), ({ reply }) => reply(200, ticks()))
 		.get('/text', ({ reply }) => reply(200, 'hello'));
 	const server = app.listen({ port: 0 });
 	const base = `http://127.0.0.1:${server.port}`;
@@ -164,7 +162,7 @@ describe('a streamed body without a server', () => {
 		});
 		const app = alxia()
 			.use(telemetry({ instance }))
-			.get('/ticks', { response: { 200: Tick } }, ({ reply }) =>
+			.get('/ticks', responds({ 200: Tick }), ({ reply }) =>
 				reply(200, ticks()),
 			);
 		const response = await app.request('/ticks');

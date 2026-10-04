@@ -22,8 +22,7 @@ shape we intend to keep.
   > `get(path, options?, ...middlewares, handler)`, its schemas the
   > `validate(…)` and `responds(…)` middlewares, and its options `bodyLimit`
   > and `detail` only; see [Routes as a chain of steps](route-steps.md).
-  > The examples below keep the form of the time, a schema before the
-  > handler, which 0.4.0 still accepts, deprecated.
+  > The examples below are written in the 0.4.0 form.
 
 ## Slice 1: shortcuts on `reply`
 
@@ -39,7 +38,7 @@ app.get('/users/:id', ({ params, reply }) => {
 	return user ? reply.ok(user) : reply.notFound({ error: 'not_found' });
 });
 
-app.post('/users', { body: NewUser, response: { 201: User } }, ({ body, reply }) =>
+app.post('/users', validate({ body: NewUser }), responds({ 201: User }), ({ body, reply }) =>
 	reply.created(insert(body)),
 );
 
@@ -103,7 +102,7 @@ const accounts = janus({ … }); // the instance: named `accounts` in the docs, 
 
 app
 	.use(session(accounts))
-	.post('/sign-in', { body: Credentials }, async ({ body, auth, reply }) => {
+	.post('/sign-in', validate({ body: Credentials }), async ({ body, auth, reply }) => {
 		const signedIn = await accounts.patient.signIn(body, { device: auth.device });
 		return reply.ok({ id: auth.send(signedIn).id }); // session cookie, device cookie
 	})

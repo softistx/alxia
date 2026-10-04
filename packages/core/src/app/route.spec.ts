@@ -79,7 +79,9 @@ describe('route(operation, handler)', () => {
 					// @ts-expect-error the params must read the path's own
 					schema: { params: z.object({ id: z.string() }) },
 				},
-				({ reply }) => reply(200, 'x'),
+				() => {
+					throw new Error('never declared');
+				},
 			);
 			alxia().route(getPet, ({ reply }) =>
 				// @ts-expect-error 201 is not declared

@@ -8,6 +8,7 @@ import type {
 	StandardSchemaV1,
 } from '../schema/standard-schema';
 import type { StatusCode } from '../types/status';
+import type { RouteOperation } from './route-operation';
 import type {
 	Empty,
 	Middleware,
@@ -46,16 +47,26 @@ export type ValidateRequires<Schemas> = Schemas extends {
 		}
 	: Empty;
 
-type KnownParts<Schemas> = [
-	Exclude<keyof Schemas, keyof RequestSchemas>,
-] extends [never]
+/**
+ * What `validate` was given: request schemas, or an operation, whose
+ * request parts it reads from its `schema`.
+ */
+type PartsOf<Given> = Given extends RouteOperation
+	? Given extends { readonly schema: infer Schema extends object }
+		? Pick<Schema, keyof Schema & keyof RequestSchemas>
+		: Empty
+	: Given;
+
+type KnownParts<Schemas> = Schemas extends RouteOperation
 	? unknown
-	: {
-			readonly [Key in Exclude<
-				keyof Schemas,
-				keyof RequestSchemas
-			>]: `"${Key & string}" is not a part validate() reads: params, query, headers, cookies or body`;
-		};
+	: [Exclude<keyof Schemas, keyof RequestSchemas>] extends [never]
+		? unknown
+		: {
+				readonly [Key in Exclude<
+					keyof Schemas,
+					keyof RequestSchemas
+				>]: `"${Key & string}" is not a part validate() reads: params, query, headers, cookies or body`;
+			};
 
 type KnownStatuses<Responses> = [Exclude<keyof Responses, StatusCode>] extends [
 	never,
@@ -104,13 +115,43 @@ export function builtinOf(middleware: unknown): BuiltinStep | undefined {
  * The middlewares and hooks before it, `onError` and `onRefusal` included,
  * read the request as it arrived; the request's cookies stay so for those
  * hooks, and the validated ones are what follows it reads.
+ *
+ * Given an operation, `{ method, path, schema }`, it validates the request
+ * parts of its `schema`: on `app.route(operation, …)`, where it stands
+ * replaces the validation the route would run just before its handler.
  */
-export function validate<const Schemas extends RequestSchemas>(
+export function validate<const Schemas extends RequestSchemas | RouteOperation>(
 	schemas: Schemas & KnownParts<Schemas>,
 ): NoInfer<
-	Middleware<ValidateRequires<Schemas>, Next<Validated<Schemas>, Schemas>>
+	Middleware<
+		ValidateRequires<PartsOf<Schemas>>,
+		Next<Validated<PartsOf<Schemas>>, PartsOf<Schemas>>
+	>
 > {
-	return builtin({ kind: 'validate', schemas }, 'validate');
+	if (isOperation(schemas)) {
+		const parts = Object.fromEntries(
+			PARTS.flatMap((part) => {
+				const schema = schemas.schema?.[part];
+				return schema === undefined ? [] : [[part, schema]];
+			}),
+		);
+		return builtin({ kind: 'validate', schemas: parts }, 'validate');
+	}
+	return builtin(
+		{ kind: 'validate', schemas: schemas as RequestSchemas },
+		'validate',
+	);
+}
+
+const PARTS = ['params', 'query', 'headers', 'cookies', 'body'] as const;
+
+function isOperation(given: unknown): given is RouteOperation {
+	return (
+		given !== null &&
+		typeof given === 'object' &&
+		typeof (given as { method?: unknown }).method === 'string' &&
+		typeof (given as { path?: unknown }).path === 'string'
+	);
 }
 
 /**

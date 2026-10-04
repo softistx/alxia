@@ -348,7 +348,7 @@ Keep a reference to the store to forget a key — the failed logins of an
 address that has just logged in:
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { MemoryStore, rateLimit } from '@alxia/rate-limit';
 import { z } from 'zod';
 
@@ -361,7 +361,7 @@ export const app = alxia()
 			.use(rateLimit({ limit: 5, windowMs: 15 * 60_000, store: attempts }))
 			.post(
 				'/login',
-				{ body: z.object({ name: z.string(), password: z.string() }) },
+				validate({ body: z.object({ name: z.string(), password: z.string() }) }),
 				async ({ body, ip, reply }) => {
 					if (passwords.get(body.name) !== body.password) {
 						return reply(401, { error: 'invalid_credentials' as const });

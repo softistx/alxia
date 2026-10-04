@@ -2,7 +2,7 @@
 // values whose types are inferred: a declaration build must be able to name
 // each one through `@alxia/zod`, `@alxia/core` and `zod` alone (TS2883
 // otherwise).
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { zq } from '@alxia/zod';
 import { z } from 'zod';
 
@@ -16,7 +16,7 @@ export const Query = z.object({
 });
 
 export function listed() {
-	return alxia().get('/items', { query: Query }, ({ query, reply }) =>
+	return alxia().get('/items', validate({ query: Query }), ({ query, reply }) =>
 		reply(200, { page: query.page, tags: query.tags }),
 	);
 }

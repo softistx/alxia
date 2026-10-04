@@ -44,15 +44,17 @@ const app = alxia().post(
 
 `ws(path, options?, ...middlewares, handlers)` takes the same; its options
 are `message`, `send` and `detail`. A route takes at most 8 middlewares.
-`app.route(operation, [hooks]?, handler)`, `group`, `use`, and the hooks on
-the app — `derive`, `decorate`, `wrap`, `onError`, `onRefusal`,
-`bodyLimit`, `onRequest`, `onResponse`, `around` — are unchanged, and not
-deprecated.
+`app.route(operation, ...middlewares, handler)` takes the same middlewares,
+the operation's `schema` read as a `responds` first and a `validate` just
+before the handler — or where `validate(operation)` stands. `group`, `use`,
+and the hooks on the app — `derive`, `decorate`, `wrap`, `onError`,
+`onRefusal`, `bodyLimit`, `onRequest`, `onResponse`, `around` — are
+unchanged, and not deprecated.
 
 **Can it break your code.** No. The forms of 0.3 keep working, deprecated,
 for this minor at least: a list of hooks after the path, a schema before
-the handler, `defineHook`, `defineWrap`, and `ws(path, schema, handlers)`
-with or without a list. Each runs on the same chain as a middleware, and
+the handler, `defineHook`, `defineWrap`, `ws(path, schema, handlers)`
+with or without a list, and `route(operation, [hooks], handler)`. Each runs on the same chain as a middleware, and
 behaves as in 0.3: a schema before the handler becomes a `validate` and a
 `responds` placed just before it. The routes of one app may use either
 form; move each one over when you next touch it, with the steps below.
@@ -60,8 +62,15 @@ form; move each one over when you next touch it, with the steps below.
 New exports: `defineMiddleware`, `validate`, `responds`, and the types
 `Middleware`, `MiddlewareContext`, `MiddlewareResult`,
 `MiddlewareReturn`, `Next`, `NextFunction`, `RequestSchemas`, `Validated`,
-`ValidateRequires`, `RouteOptions`, `SocketOptions`, and the types a route
-threads its middlewares with.
+`ValidateRequires`, `RouteOptions`, `SocketOptions`, the types a route
+threads its middlewares with, and `OperationForms` with the types `route`
+threads an operation's schemas with (`OperationParts`, `OperationOptions`,
+`OperationResponds`, `OperationValidate`, `OperationApp`). `validate` also
+takes an operation.
+
+A request's body is read once: a second `validate` of the body on one
+route checks what the first read, where it used to fail with
+`TypeError: Body already used`.
 
 ### Migrating to middlewares
 
@@ -155,6 +164,21 @@ app.delete('/posts/:id', auth, canView, exclusive, handler);
 
 What each one reads is checked where it stands: `canView` before `auth`
 does not compile, since no `user` is given yet.
+
+`route` drops them the same way. Its operation's schema then validates
+just before the handler, after the middlewares, as with the list; its
+`responds` stands first, so a middleware's reply whose status the
+operation declares is checked against its schema too:
+
+```ts
+// before
+app.route(operations.updatePet, [auth], handler);
+
+// after
+app.route(operations.updatePet, auth, handler);
+// or validate first, once: a bad body is a 400 before auth runs
+app.route(operations.updatePet, validate(operations.updatePet), auth, handler);
+```
 
 #### 4. The schema becomes `validate(…)` and `responds(…)`
 

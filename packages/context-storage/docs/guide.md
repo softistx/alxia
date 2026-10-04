@@ -234,13 +234,13 @@ Three rules follow from typing by an app:
   `base.use(requestContext)` is missing from its type. Put the hooks whose
   values services read in `base`, or state the type with `getContext<Ctx>()`.
 - **A route's own `params`, `query`, `body` and `headers` are not in it**:
-  they belong to one route's schema, not to the app. Read them in the
-  handler and pass them down, or state them:
+  they belong to one route's `validate(…)`, not to the app. Read them in
+  the handler and pass them down, or state them:
 
 ```ts
 import { getContext } from '@alxia/context-storage';
 
-// in code that only ever runs under GET /orders/:id, with a params schema
+// in code that only ever runs under GET /orders/:id, after its validate({ params })
 const { params } = getContext<{ params: { id: number } }>();
 ```
 

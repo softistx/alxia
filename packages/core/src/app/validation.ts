@@ -25,6 +25,8 @@ export interface ChainRun {
 	readonly set: ResponseSettings;
 	readonly parsers: readonly BodyParser[];
 	readonly validateResponses: boolean;
+	/** The body, read once by the first `validate` that reads it. */
+	body?: ReturnType<typeof readBody>;
 }
 
 /**
@@ -98,7 +100,10 @@ async function validateBody(
 	schema: StandardSchemaV1,
 	ctx: Ctx,
 ): Promise<readonly ValidationIssue[] | undefined> {
-	const body = await readBody(ctx.request, run.parsers);
+	// A second `validate` of the body checks what the first read: the
+	// request's stream is read once.
+	run.body ??= readBody(ctx.request, run.parsers);
+	const body = await run.body;
 	if (!body.ok) return [body.issue];
 	const checked = await check(schema, body.value, 'body');
 	if (!checked.ok) return checked.issues;

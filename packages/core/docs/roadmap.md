@@ -14,31 +14,34 @@ number on it. Every release, with each change it made, is in
   typed; awaiting `next()` wraps the rest of the route; a reply it returns
   joins the route's type. `validate` stands where it is given, so an `auth`
   before it answers 401 before the body is read, and `responds` checks the
-  replies made after it. `ws` takes the same. The 0.3 forms — a list of
-  hooks, a schema before the handler, `defineHook`, `defineWrap` — keep
-  working, deprecated.
+  replies made after it. `ws` takes the same, and so does
+  `route(operation, ...middlewares, handler)`: the operation's schema is a
+  `responds` first and a `validate` just before the handler, or where
+  `validate(operation)` is placed. The 0.3 forms — a list of hooks, a
+  schema before the handler, `defineHook`, `defineWrap` — keep working,
+  deprecated.
 
 ## Next
 
-- **Middlewares from the plugin packages.** The packages that give a route
-  hook today — `@alxia/jwt`, `@alxia/janus`, `@alxia/rate-limit`,
-  `@alxia/cache`, `@alxia/redis` (its idempotency hook), `@alxia/secure-headers`,
-  `@alxia/logger`, `@alxia/telemetry`, `@alxia/context-storage`,
-  `@alxia/graphql`, `@alxia/react-router` — give middlewares made by
-  `defineMiddleware`, placed among a route's own.
 - **No route table in the app's type.** The `Routes` type parameter,
   `~routes` and `RoutesOf` leave the app, and `@alxia/client` is retired: an
   app is tested in process with `app.request`.
-- **Routes from the OpenAPI document.** `@alxia/openapi` becomes spec first,
-  `route(operation, ...middlewares)` declaring each operation of a document
-  with the same middlewares as any route; the package that generated a
-  document from an app is retired.
+- **Routes from the OpenAPI document.** `@alxia/openapi` becomes spec first:
+  the operations of a document, declared with `route(operation,
+  ...middlewares, handler)` and checked by `matchesSpec`; the package that
+  generated a document from an app is retired.
 
 ## Later
 
 - **The 0.3 route forms removed.** In the minor after the middleware model:
-  a list of hooks after the path, a schema before the handler, `defineHook`
-  and `defineWrap` are gone, leaving one way to declare a route.
+  a list of hooks after the path or after an operation, a schema before the
+  handler, `defineHook` and `defineWrap` are gone, leaving one way to
+  declare a route.
+- **The plugin guards as middlewares too.** `bearer`, `permission`,
+  `rateLimit`, `cache` and `idempotency` are app plugins: given to `use`,
+  they guard every route declared after them, in a group for some. A
+  middleware form of each, named on the one route that needs it, would sit
+  beside the plugin.
 - **A context declared once.** A `Register` interface the app augments —
   `declare module '@alxia/core' { interface Register { context: … } }` — with
   `defineRoutes` and `AppContext`, so a module of routes reads the app's
