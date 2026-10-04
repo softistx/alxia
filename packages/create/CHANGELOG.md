@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.1.3
+
+### Patch Changes
+
+- [#115](https://github.com/softistx/alxia/pull/115) [`5da0f5e`](https://github.com/softistx/alxia/commit/5da0f5e1e5c715c12aa1d789c370b73d229b5147) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Every template's `Dockerfile` builds, and the image holds the build output alone, no `node_modules`. The `api` template's builds `dist/server.js` (now `--minify --sourcemap=linked`) and runs it; its `start` runs `bun dist/server.js` after `bun run build`, where it ran `src/server.ts`. The `react-router` template's copies `build/` alone, which `@alxia/react-router`'s plugin now bundles whole. New projects get that `@alxia/react-router`.
+
 ## 0.1.2
 
 ### Patch Changes

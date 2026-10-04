@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.4.0
+
+### Minor Changes
+
+- [#115](https://github.com/softistx/alxia/pull/115) [`5da0f5e`](https://github.com/softistx/alxia/commit/5da0f5e1e5c715c12aa1d789c370b73d229b5147) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `react-router build` now bundles every package into `build/server/index.js`, React, React Router and alxia included: the `ssr` environment gets `resolve.noExternal: true` in the build, never in dev. `build/` runs on Bun with no `node_modules`, so a Docker image's final stage copies it alone. What the app sets wins: `ssr.external: ['sharp']` keeps those packages external, and `ssr.external: true` keeps every package external, as before.
+
 ## 0.3.0
 
 ### Minor Changes
