@@ -11,4 +11,10 @@ describe('parseRange', () => {
 		expect(parseRange('bytes=0-1,3-4', 10)).toBeUndefined();
 		expect(parseRange('items=0-1', 10)).toBeUndefined();
 	});
+
+	test('no range of an empty file is satisfiable', () => {
+		expect(parseRange('bytes=-5', 0)).toBe('unsatisfiable');
+		expect(parseRange('bytes=0-', 0)).toBe('unsatisfiable');
+		expect(parseRange('bytes=0-0', 0)).toBe('unsatisfiable');
+	});
 });

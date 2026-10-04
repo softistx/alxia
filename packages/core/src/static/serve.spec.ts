@@ -21,6 +21,7 @@ beforeAll(async () => {
 	await writeFile(join(root, 'index.html'), '<h1>app</h1>');
 	await writeFile(join(root, 'about.html'), '<h1>about</h1>');
 	await writeFile(join(root, 'big.txt'), big);
+	await writeFile(join(root, 'empty.txt'), '');
 	await writeFile(join(root, 'app.js'), 'console.log(1)');
 	await writeFile(join(root, 'app.js.gz'), gzipSync('console.log(1)'));
 	await writeFile(join(root, 'module.wasm'), new Uint8Array([0, 97, 115, 109]));
@@ -112,6 +113,18 @@ describe('app.static', () => {
 			headers: { range: 'bytes=0-9', 'if-range': 'W/"old"' },
 		});
 		expect(stale.status).toBe(200);
+	});
+
+	test('a range of an empty file is a 416, a suffix included', async () => {
+		const app = make();
+		for (const range of ['bytes=-5', 'bytes=0-']) {
+			const response = await app.request('/files/empty.txt', {
+				headers: { range },
+			});
+			expect(response.status).toBe(416);
+			expect(response.headers.get('content-range')).toBe('bytes */0');
+		}
+		expect((await app.request('/files/empty.txt')).status).toBe(200);
 	});
 
 	test('a precompressed file, to a client that accepts it', async () => {

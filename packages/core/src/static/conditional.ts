@@ -60,7 +60,8 @@ export function parseRange(
 	if (from === '' && to === '') return undefined;
 	if (from === '') {
 		const suffix = Number(to);
-		if (suffix === 0) return 'unsatisfiable';
+		// An empty file has no byte to serve, whatever the suffix (RFC 9110 §14.1.2).
+		if (suffix === 0 || size === 0) return 'unsatisfiable';
 		return { start: Math.max(0, size - suffix), end: size - 1 };
 	}
 	const start = Number(from);
