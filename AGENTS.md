@@ -25,7 +25,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/telemetry` | a server span per request, on `@nxgt/telemetry` | core, @nxgt/telemetry |
 | `@alxia/redis` | rate-limit and response-cache stores, idempotency, caches and locks, on `@nxgt/redis` and `@nxgt/redis-guard` | core, @nxgt/redis, @nxgt/redis-guard, zod; rate-limit and cache (optional) |
 | `@alxia/janus` | sessions, refusals and permissions, on `@nxgt/janus` | core, @nxgt/janus |
-| `@alxia/create` | `bun create @alxia [dir] [--template api\|react-router]`: the `create-alxia` bin, no module. `api` is written from strings in `src/templates/api.ts`; `react-router` runs React Router's own `create-react-router`, then edits what it wrote as `examples/react-router` was edited (`src/templates/react-router.ts`), refusing a scaffold it does not recognise. alxia's packages at the versions it was published with, the rest at the registry's newest within alxia's peer ranges | — (dev: core, client, react-router, whose versions it writes) |
+| `@alxia/create` | `bun create @alxia [dir] [--template api\|react-router]`: the `create-alxia` bin, no module. `api` is written from strings in `src/templates/api.ts`; `react-router` copies `templates/react-router/`, React Router's official scaffold committed as generated plus `examples/react-router`'s alxia layer (`.gitignore` and `bunfig.toml`, which `bun publish` drops, stored as `gitignore` and `_bunfig.toml`). No scaffold runs at creation. Every dependency is moved to the registry's newest at creation: alxia's within the ranges it was published with (the newest of the same minor while npm has not propagated the exact version yet), the rest within alxia's peer ranges | — (dev: core, client, react-router, whose versions it writes) |
 
 Its skeleton is `softistx/nxgt-http`'s: the Bun workspace, the root
 `build.ts`, Biome, changesets, `scripts/publish.ts` and `verify:artifacts`.
@@ -133,6 +133,7 @@ below records what is kept twice.
 | `bodyOf`, the permission guard's option types, the device cookie, in `janus/src/` and `@nxgt/janus-hono` | the same refusals and cookies whichever server answers; importing them would depend on Hono. Change both together. One divergence, on purpose: alxia's guard infers what `load`, `subject` and `ctx` read beyond `BaseContext` from their annotated parameters (`SubjectCtx` and `CheckCtx` on `PermissionOptions` and `OptionsArgs`, defaulted to `BaseContext`), and `use()` refuses an app that does not give it, and refuses the guard on every app when one is annotated `any`. Hono's callbacks take its `Context`, whose variables a middleware cannot require of the app, and `app.use()` checks nothing, so the Hono types have no such parameters. Every other part of the types stays in step |
 | The body watcher, `logger/src/body.ts` and `telemetry/src/body.ts`, with `body.spec.ts` beside each | both time a streamed body to its end (`settled`, `watched`), and neither depends on the other; the core exports no such helper, and exporting one would be a minor of `@alxia/core`, which moves every package's peer range. The two `body.ts` are byte for byte the same but for their first line, and the two specs are the same. Change both together |
 | `PEER_RANGES` in `create/src/versions.ts` and the peer ranges of `@alxia/core` (`typescript`), `@alxia/zod` (`zod`) and `@alxia/react-router` (`react-router`, `vite`) | the published `@alxia/create` cannot read its siblings' manifests, and holds a project's dependencies to these ranges. `versions.spec.ts` compares them: widening one of those peers fails there until `PEER_RANGES` is widened too, with a changeset for `@alxia/create` |
+| React Router's official scaffold, in `create/templates/react-router/` and `examples/react-router` | both are `create-react-router`'s output committed as generated, plus the same alxia layer; the template is copied as it is, so a new project needs no network for its files and nothing to recognise. `create/src/templates/react-router.spec.ts` holds the template's `vite.config.ts` and `_bunfig.toml` byte for byte to the example's `vite.config.ts` and `bunfig.toml`. When React Router ships a new major, once `@alxia/react-router`'s peer accepts it, regenerate the template with `bun scripts/regenerate-react-router-template.ts` (`bunx create-react-router@latest` with `--yes --no-install --no-git-init --no-agent-skills --no-motion`, then the layer), regenerate the example the same way, read both diffs, and add a patch changeset for `@alxia/create` |
 | `scripts/check-nxgt-versions.ts`, its spec and `.github/workflows/nxgt-versions.yml`, here and in nxgt-data (itself from nxgt-janus) | each repository releases on its own, and this one's check reads no `examples/`. What differs here: the manifests come from `readManifests()` (`packages/*` alone), `latest` from `latestOnRegistry()`, each line names the peer range and whether it admits `latest`, and the issue asks for a changeset; `folderOf` and `manifestOf` are nxgt-data's alone. A fix to the check or the workflow belongs in every copy |
 | `scripts/verify-artifacts.ts` and `scripts/artifacts/`, here and in nxgt-http, nxgt-data, nxgt-janus and nxgt-core | the skeleton is nxgt-http's, and each repository releases on its own. `emit.ts`, the declaration-emit stage, started here (#87); softistx/nxgt-http#98, softistx/nxgt-data#146, softistx/nxgt-janus#186 and softistx/nxgt-core#173 port it in, so the copies are in step once they land, with the same `emit.spec.ts`, the injectable tsc run and Bun's types, which this copy took back from them. The `#!` skip in `imports.ts` (#79) is in nxgt-data's copy (softistx/nxgt-data#146) and nxgt-http's (softistx/nxgt-http#97); nxgt-janus and nxgt-core have no `imports.ts`. A check added to one copy belongs in the others |
 
@@ -193,8 +194,9 @@ installed tarball with `--help`.
   template: the project installs this checkout's packages, then its
   `typecheck`, `test` (the `api` template) and `build` run, and its
   `bun run start` answers (`POST /todos` 201, `GET /` 200). It also runs
-  `bunx @alxia/create --help`. It needs the network: `create-react-router`
-  and every non-alxia dependency come from npm, at the newest versions
+  `bunx @alxia/create --help`, and checks `@alxia/create`'s tarball holds the
+  `react-router` template's `gitignore` and `_bunfig.toml`. It needs the
+  network: every non-alxia dependency comes from npm, at the newest versions
   `@alxia/create` resolves. 18 seconds measured locally; kept out of `bun run test`.
 
 The last three resolve without a lockfile, so an upstream release can turn
@@ -241,7 +243,10 @@ publish` turns from `workspace:^` into `^<version>`, so those must be on
 the registry first. They are fixed when it is published: a release of
 `@alxia/core` alone leaves new projects on the previous range, so a minor
 of `core`, `client` or `react-router` that new projects should get comes
-with a patch changeset for `@alxia/create`.
+with a patch changeset for `@alxia/create`. npm can take minutes to serve a
+version just published while `@alxia/create` is already visible: it then
+writes the newest release of the same minor, whose `^` range still takes
+the new one.
 Merging to `develop` opens a "Version packages" PR; merging that publishes
 with `bun publish`, in dependency order. Registry configuration lives in
 `bunfig.toml`, never in `.npmrc`; publishing reads `$NPM_TOKEN`. Every

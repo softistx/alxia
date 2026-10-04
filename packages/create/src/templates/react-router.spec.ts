@@ -1,156 +1,107 @@
-import { afterAll, describe, expect, test } from 'bun:test';
-import { mkdtemp, rm } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import {
-	SCAFFOLD_MANIFEST,
-	SCAFFOLD_VITE_CONFIG,
-	writeScaffold,
-} from '../../test/scaffold';
-import {
-	addAlxia,
-	addPlugin,
-	alxiaLayer,
-	BUNFIG,
-	ScaffoldChanged,
-	scaffoldCommand,
-} from './react-router';
+import { describe, expect, test } from 'bun:test';
+import { fileURLToPath } from 'node:url';
+import { PEER_RANGES } from '../versions';
+import { RENAMED, reactRouterTemplate } from './react-router';
 
+const TEMPLATE = fileURLToPath(
+	new URL('../../templates/react-router', import.meta.url),
+);
+const EXAMPLE = new URL('../../../../examples/react-router/', import.meta.url);
 const ALXIA = {
 	'@alxia/client': '^0.2.1',
 	'@alxia/core': '^0.3.0',
 	'@alxia/react-router': '^0.2.0',
 };
 
-const dirs: string[] = [];
-afterAll(async () => {
-	for (const dir of dirs) await rm(dir, { recursive: true, force: true });
-});
-async function scaffolded(edit?: Parameters<typeof writeScaffold>[1]) {
-	const dir = await mkdtemp(join(tmpdir(), 'alxia-create-rr-'));
-	dirs.push(dir);
-	await writeScaffold(dir, edit);
-	return dir;
-}
+const stored = (file: string) => Bun.file(`${TEMPLATE}/${file}`);
 
-describe('scaffoldCommand', () => {
-	test('the newest create-react-router of the major @alxia/react-router accepts, asking nothing, installing nothing', () => {
-		expect(scaffoldCommand('my-app')).toEqual([
-			'create-react-router@8',
-			'my-app',
-			'--yes',
-			'--no-install',
-			'--no-git-init',
-			'--no-agent-skills',
-			'--no-motion',
-		]);
-	});
-});
+describe('the stored template', () => {
+	// The template and the example are the same official scaffold with the
+	// same alxia layer: these two files keep them in step.
+	for (const [file, storedAs] of [
+		['vite.config.ts', 'vite.config.ts'],
+		['bunfig.toml', '_bunfig.toml'],
+	] as const) {
+		test(`its ${file} is examples/react-router's`, async () => {
+			expect(await stored(storedAs).text()).toBe(
+				await Bun.file(new URL(file, EXAMPLE)).text(),
+			);
+		});
+	}
 
-describe('addPlugin', () => {
-	test('adds alxia() after reactRouter(), and its import first, as examples/react-router has it', async () => {
-		expect(addPlugin(SCAFFOLD_VITE_CONFIG)).toBe(
-			await Bun.file(
-				new URL(
-					'../../../../examples/react-router/vite.config.ts',
-					import.meta.url,
-				),
-			).text(),
+	test('holds no lockfile, no generated types, nothing bun publish would drop', async () => {
+		const paths = await Array.fromAsync(
+			new Bun.Glob('**').scan({ cwd: TEMPLATE, dot: true }),
 		);
+		expect(paths).toEqual(expect.arrayContaining(Object.keys(RENAMED)));
+		for (const path of paths) {
+			expect(path).not.toMatch(
+				/(^|\/)(\.gitignore|bunfig\.toml|\.npmrc|bun\.lockb?|package-lock\.json)$|(^|\/)(\.react-router|node_modules|build)\//,
+			);
+		}
 	});
 
-	test('refuses a config with no reactRouter() in its plugins, or with alxia already', () => {
-		expect(() => addPlugin('export default {};\n')).toThrow(ScaffoldChanged);
-		expect(() =>
-			addPlugin(
-				SCAFFOLD_VITE_CONFIG.replace(
-					'reactRouter()]',
-					'reactRouter(), reactRouter()]',
+	test('its React Router is the major @alxia/react-router accepts', async () => {
+		const { dependencies, devDependencies } =
+			await stored('package.json').json();
+		for (const version of [
+			dependencies['react-router'],
+			devDependencies['@react-router/dev'],
+		]) {
+			expect(
+				Bun.semver.satisfies(
+					version.replace(/^\^/, ''),
+					PEER_RANGES['react-router'],
 				),
-			),
-		).toThrow(ScaffoldChanged);
-		expect(() => addPlugin(addPlugin(SCAFFOLD_VITE_CONFIG))).toThrow(
-			'it already imports @alxia/react-router/vite',
-		);
+			).toBe(true);
+		}
 	});
 });
 
-describe('addAlxia', () => {
-	test('adds @alxia/core and @alxia/react-router, sorted, and starts the build on Bun', () => {
-		const manifest = addAlxia(structuredClone(SCAFFOLD_MANIFEST), ALXIA);
+describe('reactRouterTemplate', () => {
+	test("names the manifest, gives alxia's packages their ranges, and starts the build on Bun", async () => {
+		const { manifest } = await reactRouterTemplate(TEMPLATE, 'web', ALXIA);
+		expect(manifest['name']).toBe('web');
 		expect(manifest['scripts']).toEqual({
-			...SCAFFOLD_MANIFEST.scripts,
+			build: 'react-router build',
+			dev: 'react-router dev',
 			start: 'bun build/server/index.js',
+			typecheck: 'react-router typegen && tsc',
 		});
-		expect(Object.keys(manifest.dependencies ?? {})).toEqual([
-			'@alxia/core',
-			'@alxia/react-router',
-			'@react-router/node',
-			'@react-router/serve',
-			'isbot',
-			'react',
-			'react-dom',
-			'react-router',
-		]);
-		expect(manifest.dependencies?.['@alxia/core']).toBe('^0.3.0');
-		expect(manifest.dependencies?.['@alxia/react-router']).toBe('^0.2.0');
-		expect(manifest.devDependencies).toEqual(SCAFFOLD_MANIFEST.devDependencies);
-	});
-
-	test('refuses a manifest without react-router, or without a start', () => {
-		const { 'react-router': _, ...dependencies } =
-			SCAFFOLD_MANIFEST.dependencies;
-		expect(() =>
-			addAlxia({ ...SCAFFOLD_MANIFEST, dependencies }, ALXIA),
-		).toThrow('react-router in its dependencies');
-		const { start: __, ...scripts } = SCAFFOLD_MANIFEST.scripts;
-		expect(() => addAlxia({ ...SCAFFOLD_MANIFEST, scripts }, ALXIA)).toThrow(
-			ScaffoldChanged,
-		);
-	});
-
-	test("refuses a manifest whose scripts are not React Router's", () => {
-		const manifest = structuredClone(SCAFFOLD_MANIFEST);
-		manifest.scripts.dev = 'vite';
-		expect(() => addAlxia(manifest, ALXIA)).toThrow(
-			"create-react-router's package.json is not what this @alxia/create expects",
-		);
-	});
-});
-
-describe('alxiaLayer', () => {
-	test('reads the scaffold and returns the edits, writing nothing', async () => {
-		const dir = await scaffolded();
-		const { manifest, files } = await alxiaLayer(dir, ALXIA);
-		expect(manifest.dependencies?.['@alxia/react-router']).toBe('^0.2.0');
-		expect(files).toEqual({
-			'vite.config.ts': addPlugin(SCAFFOLD_VITE_CONFIG),
-			'bunfig.toml': BUNFIG,
+		expect(manifest.dependencies).toMatchObject({
+			'@alxia/core': '^0.3.0',
+			'@alxia/react-router': '^0.2.0',
 		});
-		expect(await Bun.file(join(dir, 'vite.config.ts')).text()).toBe(
-			SCAFFOLD_VITE_CONFIG,
-		);
+		expect(manifest.dependencies?.['@alxia/client']).toBeUndefined();
+		expect(JSON.stringify(manifest)).not.toContain('workspace:');
 	});
 
-	test("the bunfig.toml is examples/react-router's", async () => {
-		expect(BUNFIG).toBe(
-			await Bun.file(
-				new URL(
-					'../../../../examples/react-router/bunfig.toml',
-					import.meta.url,
-				),
-			).text(),
+	test('every other file as stored, gitignore as .gitignore and _bunfig.toml as bunfig.toml', async () => {
+		const { files } = await reactRouterTemplate(TEMPLATE, 'web', ALXIA);
+		const paths = Object.keys(files);
+		expect(paths).not.toContain('gitignore');
+		expect(paths).not.toContain('_bunfig.toml');
+		expect(paths).not.toContain('package.json');
+		expect(paths).toEqual(
+			expect.arrayContaining([
+				'.gitignore',
+				'.dockerignore',
+				'Dockerfile',
+				'README.md',
+				'app/root.tsx',
+				'app/routes.ts',
+				'bunfig.toml',
+				'public/favicon.ico',
+				'react-router.config.ts',
+				'tsconfig.json',
+				'vite.config.ts',
+			]),
 		);
-	});
-
-	test('refuses a scaffold with no vite.config.ts, or one with a bunfig.toml', async () => {
-		const missing = await scaffolded();
-		await rm(join(missing, 'vite.config.ts'));
-		await expect(alxiaLayer(missing, ALXIA)).rejects.toThrow(
-			"create-react-router's vite.config.ts is not what this @alxia/create expects: it is missing",
+		for (const [from, to] of Object.entries(RENAMED)) {
+			expect(await files[to]?.text()).toBe(await stored(from).text());
+		}
+		expect(await files['public/favicon.ico']?.bytes()).toEqual(
+			await stored('public/favicon.ico').bytes(),
 		);
-		const bunfig = await scaffolded();
-		await Bun.write(join(bunfig, 'bunfig.toml'), '');
-		await expect(alxiaLayer(bunfig, ALXIA)).rejects.toThrow(ScaffoldChanged);
 	});
 });

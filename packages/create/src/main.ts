@@ -8,7 +8,6 @@ import { relative, resolve } from 'node:path';
 import { isTemplate, NAME, parseArgs, TEMPLATES, type Template } from './args';
 import type { Io } from './io';
 import { clean, refusal } from './target';
-import { ScaffoldChanged } from './templates/react-router';
 import { alxiaRanges } from './versions';
 import { write } from './write';
 
@@ -80,7 +79,7 @@ export async function main(
 			// The directory was empty or absent: what is in it now is ours.
 			await clean(target, existed);
 			io.err(
-				`${NAME}: ${error instanceof ScaffoldChanged ? '' : 'failed: '}${error instanceof Error ? error.message : String(error)}`,
+				`${NAME}: failed: ${error instanceof Error ? error.message : String(error)}`,
 			);
 			return false;
 		});

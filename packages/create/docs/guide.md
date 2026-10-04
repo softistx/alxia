@@ -138,16 +138,12 @@ compile under each one, and under none.
 
 ## The `react-router` template
 
-It is React Router's template, not a copy of it: the command runs
-
-```sh
-bunx create-react-router@8 my-site --yes --no-install --no-git-init --no-agent-skills --no-motion
-```
-
-— the newest `create-react-router` of the React Router major
-`@alxia/react-router` accepts — and then makes the same small change
+It is React Router's official template, shipped inside this package and
+copied: what `create-react-router` wrote, committed as it wrote it, with the
+same small change
 [`examples/react-router`](https://github.com/softistx/alxia/tree/develop/examples/react-router)
-made to it, in code:
+made to it. Nothing is downloaded but the dependencies, and nothing runs
+before `bun install`. The change, against React Router's files:
 
 ```diff
  // package.json
@@ -156,7 +152,7 @@ made to it, in code:
 +    "start": "bun build/server/index.js",
    },
    "dependencies": {
-+    "@alxia/core": "^0.3.0",
++    "@alxia/core": "^0.3.1",
 +    "@alxia/react-router": "^0.2.0",
 ```
 
@@ -177,12 +173,17 @@ made to it, in code:
 bun = true
 ```
 
-Every other file is React Router's, as it wrote it. Each edit checks first
-that the file is the one it expects — `reactRouter()` once in `plugins`,
-the `dev`, `build` and `start` scripts, no `bunfig.toml` yet — and when
-React Router's template has changed, the command stops, removes what was
-written, and says which file
-([Troubleshooting](troubleshooting.md#create-alxia-create-react-routers--is-not-what-this-alxiacreate-expects-)).
+Every other file is React Router's: `app/`, `public/`, `tsconfig.json`,
+`react-router.config.ts`, its `README.md`, `.gitignore`, `Dockerfile` and
+`.dockerignore`. `package.json` takes the directory's name, and its
+versions are moved to the newest the registry has ([Versions](#versions)):
+the template's own are where they start.
+
+The template follows React Router's majors, not its every release: it is
+written again from `create-react-router` when React Router ships one that
+`@alxia/react-router` accepts, in a new `@alxia/create`. Between two, the
+files are what `create-react-router` wrote when the template was last
+generated (React Router 8.4.0 in this release), and the versions are the newest of that major.
 
 There is no `app/server.ts`: the plugin's default server serves the pages
 in `bun dev` and from the build. To put alxia's hooks or `/api` routes in
@@ -200,14 +201,14 @@ says.
 
 ## Versions
 
-A template is written with the versions it was written with, and React
-Router's lags behind its own releases. So before installing, the command
+A template ships the versions it was generated with, and React Router's
+lags behind its own releases. So before installing, the command
 asks the registry for every dependency's versions, and writes `^` the
 newest one alxia accepts:
 
 | dependency | moved to the newest within |
 | --- | --- |
-| `@alxia/core`, `@alxia/client`, `@alxia/react-router` | not moved: the versions this `@alxia/create` was published with |
+| `@alxia/core`, `@alxia/client`, `@alxia/react-router` | the ranges this `@alxia/create` was published with, such as `^0.3.1`; while the registry does not serve that version yet, the newest of its minor, `~0.3.0` |
 | `typescript` | `^6.0.3 \|\| ^7.0.0`, every alxia package's peer range |
 | `zod` | `^4.2.0`, `@alxia/zod`'s |
 | `vite` | `^7.0.0 \|\| ^8.0.0`, `@alxia/react-router`'s |
@@ -235,9 +236,19 @@ The registry is the one `BUN_CONFIG_REGISTRY` names, else
 that does not arrive keeps the template's version, and the command warns
 and goes on.
 
-alxia's own packages are not moved, so a project is always written with a
-set released together. `bunx @alxia/create@latest` takes the newest set;
-`bun update` moves an existing project's within its ranges.
+alxia's own packages stay within the ranges they were published with, so
+a project is always written with a set released together, and its patches
+since. `bunx @alxia/create@latest` takes the newest set; `bun update` moves
+an existing project's within its ranges.
+
+Right after a release, npm can take a few minutes to serve a version
+while the `@alxia/create` published beside it is already there. The
+command then writes the newest release of the same minor, whose `^` range
+takes the new version once it arrives, and says so:
+
+```
+  @alxia/core: the registry has no release within ^0.3.1 yet; wrote ^0.3.0, the newest of ~0.3.0
+```
 
 ## In a script or CI
 
