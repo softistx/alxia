@@ -155,7 +155,8 @@ into a directory the user cannot write to, `ENOSPC` with the disk full.
 
 **Fix:** what the message names, then run the command again: what was
 written is removed — the target directory is emptied when it was there,
-removed when it was not.
+removed when it was not. A parent directory the command created for it, as
+`a/b` for `a/b/my-site`, stays.
 
 ### `create-alxia: warning: the registry did not answer for …; kept the versions the template ships.`
 
@@ -170,7 +171,10 @@ that is React Router's, whose TypeScript may be older than alxia accepts.
 
 **Fix:** once the registry answers, run the command again in an empty
 directory, or move the packages named within alxia's ranges by hand:
-`bun add -d typescript@^7 vite@^8`. Behind a proxy, check `BUN_CONFIG_REGISTRY` or
+`bun add -d typescript@^7 vite@^8`. The message can name an `@alxia/*`
+package too, on a mirror that does not hold alxia's: the range kept is the
+one this `@alxia/create` was published with, which that mirror cannot
+install either, so let it proxy npmjs.org. Behind a proxy, check `BUN_CONFIG_REGISTRY` or
 `npm_config_registry`, which the command reads.
 
 ### `typescript: kept to ^6.0.3 || ^7.0.0, where the newest is 7.0.2; npm's latest, 8.0.0, is outside it`
@@ -190,6 +194,8 @@ once the major is tested, and the next `@alxia/create` takes it.
 **When:** a notice: the registry answered for the package, but none of its
 releases is in the range alxia's packages accept — a registry mirror that
 holds only some versions, most often. The template's own version is kept.
+An `@alxia/*` package prints it too when the registry holds none of the
+range's minor, not even an older patch.
 
 **Fix:** check what the registry holds (`bun pm view zod versions`), let
 the mirror fetch the missing ones, or write a version within the range by
@@ -248,6 +254,7 @@ new `@alxia/create`.
 
 **Fix:** `bunx @alxia/create@latest` for the newest `@alxia/create`, and in
 an existing project
-`bun add @alxia/core@latest @alxia/client@latest`, reading
+`bun add @alxia/core@latest @alxia/client@latest` (`api`) or
+`bun add @alxia/core@latest @alxia/react-router@latest` (`react-router`), reading
 [`@alxia/core`'s upgrading page](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md)
 for what a minor changed.

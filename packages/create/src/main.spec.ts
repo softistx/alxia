@@ -12,6 +12,7 @@ import { join } from 'node:path';
 import { fakeRegistry } from '../test/registry';
 import { type Io, main, packageName, USAGE } from './main';
 import { alxiaRanges } from './versions';
+import { write } from './write';
 
 const ALXIA = await alxiaRanges();
 /** The version each `@alxia/*` range starts at: `0.3.1` for `^0.3.1`. */
@@ -253,24 +254,29 @@ describe('create-alxia', () => {
 	});
 
 	test('an @alxia/* version npm has not propagated yet: the newest of its minor, still within its range', async () => {
-		const [major, minor] = ALXIA['@alxia/core'].slice(1).split('.');
+		// Fixed ranges, not this checkout's: at x.y.0 nothing older shares the minor.
+		const published = {
+			'@alxia/client': '^0.2.1',
+			'@alxia/core': '^0.3.1',
+			'@alxia/react-router': '^0.2.0',
+		};
 		registry.stop();
-		// The registry has the minor's .0, and the newest of the minor before,
-		// but not the version this @alxia/create was published beside.
 		registry = fakeRegistry({
 			...VERSIONS,
-			'@alxia/core': [`${major}.${Number(minor) - 1}.9`, `${major}.${minor}.0`],
+			'@alxia/client': ['0.2.1'],
+			// 0.3.1 published a minute ago, not on this registry yet.
+			'@alxia/core': ['0.2.9', '0.3.0'],
 		});
-		const { io, out } = fake();
-		expect(
-			await main(['my-api', '--template', 'api', '--no-install'], root, io),
-		).toBe(0);
-		const written = (await json(join(root, 'my-api', 'package.json')))
-			.dependencies['@alxia/core'];
-		expect(written).toBe(`^${major}.${minor}.0`);
+		const { io, out, err } = fake();
+		const target = join(root, 'my-api');
+		expect(await write(target, 'api', published, io)).toBe(true);
+		const manifest = await json(join(target, 'package.json'));
+		expect(manifest.dependencies['@alxia/core']).toBe('^0.3.0');
+		expect(manifest.devDependencies['@alxia/client']).toBe('^0.2.1');
 		expect(out).toContain(
-			`  @alxia/core: the registry has no release within ${ALXIA['@alxia/core']} yet; wrote ^${major}.${minor}.0, the newest of ~${major}.${minor}.0`,
+			'  @alxia/core: the registry has no release within ^0.3.1 yet; wrote ^0.3.0, the newest of ~0.3.0',
 		);
+		expect(err).toEqual([]);
 	});
 
 	test('a registry that does not answer: the template versions kept, with a warning', async () => {

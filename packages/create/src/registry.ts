@@ -114,6 +114,23 @@ export function sameMinor(range: string): string | undefined {
 }
 
 /**
+ * For a `built` range with no release on the registry: the newest of its
+ * own minor whose `^` still takes the version the range starts at, or
+ * undefined. Below 0.1, `^0.0.2` does not take 0.0.3: no fallback there.
+ */
+export function newestOfMinor(
+	versions: readonly string[],
+	range: string,
+): string | undefined {
+	const minor = sameMinor(range);
+	const start = /\d+\.\d+\.\d+/.exec(range)?.[0];
+	const version = minor && newestWithin(versions, minor);
+	return version && start && Bun.semver.satisfies(start, `^${version}`)
+		? version
+		: undefined;
+}
+
+/**
  * Rewrites every dependency of `manifest` to `^` its newest version: within
  * `built[name]` for a package it names — alxia's, at the ranges this
  * `@alxia/create` was published with — else within the range alxia's peers
@@ -172,12 +189,11 @@ export async function bumpDependencies(
 			name.startsWith('@react-router/') && follow && versions.includes(follow)
 				? follow
 				: choose(versions, range, latest);
-		const minor = pinned === undefined ? undefined : sameMinor(pinned);
-		if (version === undefined && minor) {
-			version = newestWithin(versions, minor);
+		if (version === undefined && pinned !== undefined) {
+			version = newestOfMinor(versions, pinned);
 			if (version !== undefined) {
 				behind.push(
-					`${name}: the registry has no release within ${range} yet; wrote ^${version}, the newest of ${minor}`,
+					`${name}: the registry has no release within ${range} yet; wrote ^${version}, the newest of ${sameMinor(pinned)}`,
 				);
 			}
 		}

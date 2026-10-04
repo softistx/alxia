@@ -38,7 +38,8 @@ export async function reactRouterTemplate(
 	const manifest: Manifest = { ...stored, name, dependencies };
 	const files: Record<string, Blob> = {};
 	for await (const path of new Bun.Glob('**').scan({ cwd: dir, dot: true })) {
-		if (path === 'package.json') continue;
+		// A Finder file in a local checkout is not the template's.
+		if (path === 'package.json' || path.endsWith('.DS_Store')) continue;
 		files[RENAMED[path] ?? path] = Bun.file(join(dir, path));
 	}
 	return { manifest, files };

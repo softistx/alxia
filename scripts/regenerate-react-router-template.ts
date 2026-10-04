@@ -45,8 +45,15 @@ type Manifest = {
 
 /** The manifest with alxia's packages in, sorted, and `start` on Bun. */
 export function addAlxia(manifest: Manifest): Manifest {
-	if (manifest.scripts['start'] === undefined) {
-		throw new Error('package.json: expected a start script');
+	if (
+		manifest.scripts['dev'] !== 'react-router dev' ||
+		manifest.scripts['build'] !== 'react-router build' ||
+		manifest.scripts['start'] === undefined ||
+		manifest.dependencies['react-router'] === undefined
+	) {
+		throw new Error(
+			'package.json: expected react-router in its dependencies, and the scripts dev: react-router dev, build: react-router build and a start',
+		);
 	}
 	const dependencies = Object.fromEntries(
 		Object.entries({

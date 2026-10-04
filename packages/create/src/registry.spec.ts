@@ -4,6 +4,7 @@ import {
 	allowedRange,
 	bumpDependencies,
 	type Manifest,
+	newestOfMinor,
 	newestWithin,
 	registryUrl,
 	sameMinor,
@@ -53,6 +54,16 @@ describe('sameMinor', () => {
 		expect(sameMinor('^0.3.1')).toBe('~0.3.0');
 		expect(sameMinor('^1.4.2')).toBe('~1.4.0');
 		expect(sameMinor('*')).toBeUndefined();
+	});
+});
+
+describe('newestOfMinor', () => {
+	test("the newest of the range's minor, only when its ^ takes the range's start", () => {
+		expect(newestOfMinor(['0.2.9', '0.3.0'], '^0.3.1')).toBe('0.3.0');
+		expect(newestOfMinor(['1.3.0', '1.4.0', '1.4.1'], '^1.4.2')).toBe('1.4.1');
+		expect(newestOfMinor(['0.2.9'], '^0.3.0')).toBeUndefined();
+		// ^0.0.2 does not take 0.0.3.
+		expect(newestOfMinor(['0.0.2'], '^0.0.3')).toBeUndefined();
 	});
 });
 
