@@ -136,7 +136,7 @@ const app = alxia()
 	.get('/tenant', ({ tenant, reply }) => reply(200, tenant)); // tenant: Tenant | null
 
 alxia().use(tenant);
-// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+// error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
 The order matters, as everywhere in alxia. `alxia().use(tenant).use(auth)`
@@ -149,7 +149,7 @@ optional session, gets the second message:
 the plugin reads "user", which this app's context gives with another type
 ```
 
-[Troubleshooting](../troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
+[Troubleshooting](../troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
 shows both errors in full.
 
 A plugin that takes options is a function around `definePlugin`:

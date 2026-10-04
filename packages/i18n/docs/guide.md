@@ -214,7 +214,7 @@ export const app = alxia()
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 
 alxia().use(i18n);
-// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+// error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
 This is `@alxia/language`'s check, carried through; its

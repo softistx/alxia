@@ -140,7 +140,7 @@ alxia().use(auth).use(perTenant); // auth derives user
 ```
 
 On an app that does not give `user`, `use(perTenant)` is a compile error:
-[`the plugin reads "user", which this app's context does not give`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first),
+[`the plugin reads "user", which this app's context does not give`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first),
 or [`… gives with another type`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-gives-with-another-type)
 when its `user` is not `{ tenantId: string }`.
 See [Reading the app's context](guide/keys-and-vary.md#reading-the-apps-context).

@@ -77,14 +77,16 @@ export type CheckedOperation<
 
 /**
  * `app.route(operation, ...middlewares, handler)`, see `OperationForms`;
- * and the form of 0.3, deprecated: a list of hooks before the handler.
+ * and the form of 0.3, deprecated: a list of hooks before the handler,
+ * first, so that a middleware the route's context does not give is
+ * reported on the middleware forms, naming the key it reads.
  */
 export interface OperationMethod<
 	Ctx extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
-> extends OperationForms<RouteApp<Method, Ctx, Prefix, Shortcuts>>,
-		DeprecatedOperationForm<Ctx, Prefix, Shortcuts> {}
+> extends DeprecatedOperationForm<Ctx, Prefix, Shortcuts>,
+		OperationForms<RouteApp<Method, Ctx, Prefix, Shortcuts>> {}
 
 /** The form of `route` that 0.3 had, which the middleware form replaces. */
 export interface DeprecatedOperationForm<

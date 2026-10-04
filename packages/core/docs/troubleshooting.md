@@ -14,7 +14,7 @@ a trap that prints nothing is headed by its symptom.
 - [`Type 'string' is not assignable to type 'number'` on a `reply`](#type-string-is-not-assignable-to-type-number-on-a-reply)
 - [`Type 'Response' is not assignable to type 'MaybePromise<AnyReply>'`](#type-response-is-not-assignable-to-type-maybepromiseanyreply)
 - [`Property 'user' does not exist on type 'Context<…>'`](#property-user-does-not-exist-on-type-context)
-- [`the plugin reads "…", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
+- [`the plugin reads "…", which this app's context does not give: add the plugin or middleware that gives it first`](#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
 - [`the plugin reads "…", which this app's context gives with another type`](#the-plugin-reads--which-this-apps-context-gives-with-another-type)
 - [`this app's context does not give what the plugin reads`](#this-apps-context-does-not-give-what-the-plugin-reads)
 - [`the plugin's … reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins--reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
@@ -332,7 +332,7 @@ const app = alxia()
 The same applies to `use(plugin)`. Its route hooks reach the routes
 declared after `use`, not before it.
 
-### `the plugin reads "…", which this app's context does not give: use the plugin that adds it first`
+### `the plugin reads "…", which this app's context does not give: add the plugin or middleware that gives it first`
 
 **When:** an app uses a plugin made by `definePlugin<Requires>()`, or
 routes made by `defineRoutes()` (which require the registered context),
@@ -352,7 +352,7 @@ error TS2769: No overload matches this call.
   Overload 2 of 2, '(plugin: Alxia<…> & { readonly '~requires'?: { user: { tenantId: string; }; }; } & { ...; }): Alxia<…>', gave the following error.
     …
         Types of property ''~requires'' are incompatible.
-          Type '{ user: { tenantId: string; }; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"'.
+          Type '{ user: { tenantId: string; }; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: add the plugin or middleware that gives it first"'.
 ```
 
 The first overload's error, about a function plugin, is noise: the
@@ -364,7 +364,7 @@ assignable to type '… & { readonly '~requires': "the plugin reads …" }'`
 on the returned app, with the same message.
 
 For routes made by `defineRoutes()`, the last line reads
-`Property ''~requires'' is missing in type 'Alxia<…>' but required in type '{ readonly '~requires': "the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"; }'`.
+`Property ''~requires'' is missing in type 'Alxia<…>' but required in type '{ readonly '~requires': "the plugin reads \"user\", which this app's context does not give: add the plugin or middleware that gives it first"; }'`.
 
 **Why:** the plugin's hooks read `user`, and on this app no plugin or
 `derive` before it adds one, so at runtime `user` would be `undefined`. The

@@ -18,7 +18,7 @@ nothing — what the response does that you did not expect.
 - [`Cannot invoke an object which is possibly 'undefined'`](#cannot-invoke-an-object-which-is-possibly-undefined)
 - [`t()` accepts any key, typos included](#t-accepts-any-key-typos-included)
 - [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
-- [`the plugin reads "user", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads-user-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
+- [`the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first`](#the-plugin-reads-user-which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
 - [`the plugin reads "user", which this app's context gives with another type`](#the-plugin-reads-user-which-this-apps-context-gives-with-another-type)
 - [`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
@@ -267,13 +267,13 @@ alxia().use(auth).use(i18n); // auth derives user
 
 See [Reading the app's context](guide.md#reading-the-apps-context).
 
-### `the plugin reads "user", which this app's context does not give: use the plugin that adds it first`
+### `the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first`
 
 ```text
 error TS2769: No overload matches this call.
   …
         Types of property ''~requires'' are incompatible.
-          Type '{ user: User | null; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"'.
+          Type '{ user: User | null; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: add the plugin or middleware that gives it first"'.
 ```
 
 **When:** `resolve` is annotated to read `user` —
@@ -294,7 +294,7 @@ alxia().use(auth).use(i18n);
 ```
 
 More on this message in
-[`@alxia/language`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#the-plugin-reads-user-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+[`@alxia/language`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#the-plugin-reads-user-which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first).
 
 ### `the plugin reads "user", which this app's context gives with another type`
 
@@ -341,7 +341,7 @@ instead.
 
 **Fix:** annotate what `resolve` reads —
 `({ user }: BaseContext & { user: User | null }) => user?.language ?? undefined` —
-and use the plugin that adds it first; or leave it unannotated when it
+and add the plugin or middleware that gives it first; or leave it unannotated when it
 reads only the request.
 
 More on this message in

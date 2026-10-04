@@ -42,7 +42,7 @@ export type ProvidedBy<Ctx, Requires> = [AnyMessage<Requires>] extends [never]
 						? (BaseContext & Ctx)[Key] extends Requires[Key]
 							? never
 							: `the plugin reads "${Key & (string | number)}", which this app's context gives with another type`
-						: `the plugin reads "${Key & (string | number)}", which this app's context does not give: use the plugin that adds it first`;
+						: `the plugin reads "${Key & (string | number)}", which this app's context does not give: add the plugin or middleware that gives it first`;
 				}[keyof Requires] extends infer Message
 			? {
 					readonly '~requires': [Message] extends [never]

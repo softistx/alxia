@@ -55,7 +55,7 @@ alxia().use(auth).use(perUser); // auth derives user
 ```
 
 On an app that does not give `user`, `use(perUser)` is a compile error:
-[`the plugin reads "user", which this app's context does not give`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+[`the plugin reads "user", which this app's context does not give`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first).
 
 ### `Type '() => Promise<boolean>' is not assignable to type '(ctx: BaseContext & Empty) => boolean'`
 

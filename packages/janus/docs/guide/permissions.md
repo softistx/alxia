@@ -256,8 +256,8 @@ const app = alxia()
 	);
 
 alxia().use(edit);
-// error, one message per missing key: the plugin reads "tenant", which this app's context does not give: use the plugin that adds it first
-//   | the plugin reads "member", which this app's context does not give: use the plugin that adds it first
+// error, one message per missing key: the plugin reads "tenant", which this app's context does not give: add the plugin or middleware that gives it first
+//   | the plugin reads "member", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
 What the guard requires is the union of what the three annotations read.

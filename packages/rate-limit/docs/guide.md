@@ -130,7 +130,7 @@ const app = alxia()
 	.get('/search', handler);
 
 alxia().use(perUser);
-// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+// error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
 ### `headers`

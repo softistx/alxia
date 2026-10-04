@@ -20,7 +20,7 @@ symptom, under [Traps](#traps).
 - [`Type '() => { locked: boolean; }' is not assignable to type 'undefined'`](#type----locked-boolean--is-not-assignable-to-type-undefined)
 - [`Property 'doctorId' is missing in type '{ … }' but required in type '{ readonly doctorId: string | null; }'`](#property-doctorid-is-missing-in-type----but-required-in-type--readonly-doctorid-string--null-)
 - [`Property 'tenant' does not exist on type 'BaseContext'`](#property-tenant-does-not-exist-on-type-basecontext)
-- [`the plugin reads "tenant", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads-tenant-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
+- [`the plugin reads "tenant", which this app's context does not give: add the plugin or middleware that gives it first`](#the-plugin-reads-tenant-which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
 - [`the plugin reads "tenant", which this app's context gives with another type`](#the-plugin-reads-tenant-which-this-apps-context-gives-with-another-type)
 - [`the plugin's load reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-load-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
@@ -270,13 +270,13 @@ app.use(tenancy).use(byTenant); // tenancy derives tenant
 
 See [Reading the app's context](guide/permissions.md#reading-the-apps-context).
 
-### `the plugin reads "tenant", which this app's context does not give: use the plugin that adds it first`
+### `the plugin reads "tenant", which this app's context does not give: add the plugin or middleware that gives it first`
 
 ```text
 error TS2769: No overload matches this call.
   …
         Types of property ''~requires'' are incompatible.
-          Type '{ tenant: Tenant; }' is not assignable to type '"the plugin reads \"tenant\", which this app's context does not give: use the plugin that adds it first"'.
+          Type '{ tenant: Tenant; }' is not assignable to type '"the plugin reads \"tenant\", which this app's context does not give: add the plugin or middleware that gives it first"'.
 ```
 
 **When:** a callback of the guard is annotated to read `tenant`, and the
@@ -295,7 +295,7 @@ app.use(tenancy).use(byTenant);
 ```
 
 More on this message in
-[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first).
 
 ### `the plugin reads "tenant", which this app's context gives with another type`
 

@@ -259,7 +259,7 @@ const app = alxia()
 	.get('/', ({ language: current, reply }) => reply(200, current)); // 'en' | 'fr'
 
 alxia().use(byUser);
-// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+// error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
 The annotation may be `BaseContext & { user: User }` or `{ user: User }`

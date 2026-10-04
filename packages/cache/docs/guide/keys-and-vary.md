@@ -167,7 +167,7 @@ const app = alxia()
 await perTenant.invalidateTag('tenant:acme'); // one tenant's pages, every path
 
 alxia().use(perTenant);
-// error: the plugin reads "user", which this app's context does not give: use the plugin that adds it first
+// error: the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first
 ```
 
 The rule of [a key of your own](#a-key-of-your-own) still holds: the route

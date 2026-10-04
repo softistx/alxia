@@ -17,7 +17,7 @@ the response does that you did not expect.
 - [`Type 'string | null' is not assignable to type 'string | undefined'`](#type-string--null-is-not-assignable-to-type-string--undefined)
 - [`Type 'Promise<string>' is not assignable to type 'string'`](#type-promisestring-is-not-assignable-to-type-string)
 - [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
-- [`the plugin reads "user", which this app's context does not give: use the plugin that adds it first`](#the-plugin-reads-user-which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first)
+- [`the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first`](#the-plugin-reads-user-which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
 - [`the plugin reads "user", which this app's context gives with another type`](#the-plugin-reads-user-which-this-apps-context-gives-with-another-type)
 - [`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
@@ -251,13 +251,13 @@ alxia().use(auth).use(byUser); // auth derives user
 
 See [Reading the app's context](guide.md#reading-the-apps-context).
 
-### `the plugin reads "user", which this app's context does not give: use the plugin that adds it first`
+### `the plugin reads "user", which this app's context does not give: add the plugin or middleware that gives it first`
 
 ```text
 error TS2769: No overload matches this call.
   …
         Types of property ''~requires'' are incompatible.
-          Type '{ user: User; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: use the plugin that adds it first"'.
+          Type '{ user: User; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: add the plugin or middleware that gives it first"'.
 ```
 
 **When:** the plugin's `resolve` is annotated to read `user`, and it is
@@ -276,7 +276,7 @@ alxia().use(auth).use(byUser);
 ```
 
 More on this message in
-[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-use-the-plugin-that-adds-it-first).
+[`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first).
 
 ### `the plugin reads "user", which this app's context gives with another type`
 
