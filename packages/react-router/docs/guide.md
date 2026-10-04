@@ -261,6 +261,8 @@ What the plugin leaves alone:
 - **`ssr.target` stays `node`.** Bun runs Node's modules, and `node`
   keeps `node:*` external and resolves packages as a server does;
   `webworker` would bundle every dependency with the browser's conditions.
+  An app that sets `ssr.target: 'webworker'` itself gets none of the
+  above: that environment keeps Vite's own defaults.
 - **No polyfill is added.** Vite adds none to a server build, and the
   plugin adds none.
 - **The client build** is a browser's, as before: none of this reaches

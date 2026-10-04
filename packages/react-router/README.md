@@ -307,7 +307,8 @@ export default createServer({
 
 What the app sets wins: its own conditions and builtins are kept, `bun` is
 added beside them, and a `build.target` it set is left as it is.
-`ssr.target` stays `node`, and no polyfill is added. The
+`ssr.target` stays `node`, and no polyfill is added; an app that sets
+`ssr.target: 'webworker'` itself gets none of this, only Vite's defaults. The
 [guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#built-for-bun)
 has each option and why.
 
