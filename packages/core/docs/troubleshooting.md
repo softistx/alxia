@@ -1232,8 +1232,10 @@ export or the hook's return type, e.g. `Reply<400 | 413, ProblemDetails>`, with 
 **When:** code written for 0.3 imports `RoutesOf`, or another type that
 described a route to a client — `RouteEntryOf`, `RouteRecord`,
 `RouteTable`, `RouteInput`, `RouteOutput`, `Outcome`, `OutcomeOf`,
-`SocketRecord`, `SocketEntryOf`, `RefusalOutcome`, `KindOutcome` — from
-`@alxia/core` 0.4 or later:
+`SocketRecord`, `SocketEntryOf`, `RefusalOutcome`, `KindOutcome`,
+`DefaultRefusalOutcome`, `DefaultLimitOutcome`, `IsLimited`,
+`BehindShortcuts`, `AppWithSocket`, or `@alxia/graphql`'s `GraphQLRoutes`
+— from `@alxia/core` 0.4 or later:
 
 ```text
 error TS2305: Module '"@alxia/core"' has no exported member 'RoutesOf'.
@@ -2214,7 +2216,7 @@ not this: the second checks the body the first read.
 a middleware placed after it, or in the handler: both read `body`, the
 schema's output. Before it, decide on what can be read without the body,
 such as `pathParams`, `cookies` and the headers
-([What a middleware reads](guide/middleware.md#hooks-run-before-validation)):
+([What a middleware reads](guide/middleware.md#what-a-middleware-reads)):
 
 ```ts
 import { alxia, defineMiddleware, validate } from '@alxia/core';

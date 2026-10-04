@@ -2,7 +2,8 @@
 
 [Zod 4](https://zod.dev) for [alxia](https://www.npmjs.com/package/@alxia/core).
 `@alxia/core` validates with any Standard Schema and imports no validator;
-this package adds what only Zod can: coercions a client can type, and the
+this package adds what only Zod can: coercions of the text a request
+carries, typed by what a client means to send, and the
 OpenAPI conversion of what Zod alone knows how to say.
 
 ```sh
@@ -15,9 +16,9 @@ bun add -d typescript
 ## Coercions: `zq`
 
 Path parameters, the query string, headers and cookies arrive as text.
-`z.coerce.number()` reads them, but types the client's side `unknown`. `zq`
-reads the same text, and types the client's side as the value it means to
-send:
+`z.coerce.number()` reads them, but its input is `unknown`. `zq` reads the
+same text, and its input is the value a client means to send, so the
+OpenAPI document, and a client generated from it, say so:
 
 ```ts
 import { validate } from '@alxia/core';
@@ -34,7 +35,7 @@ app.get('/search/:page', validate({
 	}),
 }), ...);
 
-await api.get('/search/:page', { params: { page: 2 }, query: { exact: true, since: new Date() } });
+await app.request(`/search/2?exact=true&since=${new Date().toISOString()}`);
 ```
 
 | | the server reads | the client sends |

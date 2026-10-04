@@ -20,8 +20,8 @@ const app = alxia()
 	.use(rateLimit({ limit: 100, windowMs: 60_000 }))
 	.get('/search', ({ rateLimit, reply }) => ...);      // limited; rateLimit.remaining
 
-const result = await api.get('/search');
-if (result.status === 429) result.data.retryAfter;      // seconds
+const response = await app.request('/search');
+if (response.status === 429) (await response.json()).retryAfter; // seconds
 ```
 
 Past the limit, a 429 with `Retry-After` and

@@ -499,8 +499,6 @@ export const app = alxia()
 		set.cookies.set('language', chosen, { path: '/', sameSite: 'lax', maxAge: 365 * 24 * 60 * 60 });
 		return reply(200, { language: chosen });
 	});
-
-export type App = typeof app;
 ```
 
 The saved choice is the `language` cookie, which the plugin reads on every

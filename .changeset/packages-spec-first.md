@@ -1,6 +1,6 @@
 ---
 "@alxia/context-storage": patch
-"@alxia/graphql": patch
+"@alxia/graphql": minor
 "@alxia/janus": patch
 "@alxia/react-router": patch
 "@alxia/secure-headers": patch

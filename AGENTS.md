@@ -99,7 +99,7 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   schema before the handler, `defineHook`, `defineWrap`) are deprecated
   adapters in `@alxia/core`, kept until they are removed: no other package,
   template or example writes them, but the specs of `@alxia/openapi`,
-  which is retired.
+  which is to be retired.
 - **What leaves the server is the schema's output.** A reply, an event, a
   socket message is validated and sent as its schema gives it back.
 

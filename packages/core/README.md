@@ -75,8 +75,6 @@ const app = alxia()
 	);
 
 app.listen(3000);
-
-export type App = typeof app;
 ```
 
 A route is a path, its middlewares, then its handler. They run in the order

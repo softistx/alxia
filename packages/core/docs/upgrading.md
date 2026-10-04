@@ -9,7 +9,7 @@ break yours.
 | Change | Package | Can it break your code |
 | --- | --- | --- |
 | [One middleware model](#one-middleware-model) | core | no: the forms of 0.3 still work, deprecated |
-| [No more client: spec first](#no-more-client-spec-first) | core, client | yes: `@alxia/client`, `RoutesOf` and the route table are gone, and `Alxia` takes three type parameters |
+| [No more client: spec first](#no-more-client-spec-first) | core, client, graphql, janus, secure-headers, context-storage, react-router | yes: `@alxia/client`, `RoutesOf` and the route table are gone, and `Alxia` takes three type parameters |
 
 ### One middleware model
 
@@ -301,7 +301,13 @@ read:
   `RefusalOutcome`, `KindOutcome`, `DefaultRefusalOutcome`,
   `DefaultLimitOutcome`, `IsLimited`, `BehindShortcuts`, `ThreadReplies`
   and `AppWithSocket`. `AppWithRoute<App>` takes one parameter: the app,
-  unchanged.
+  unchanged. `@alxia/graphql` no longer exports `GraphQLRoutes`.
+- The plugins typed by the app drop the `Routes` argument with it:
+  `session()` (`@alxia/janus`), `secureHeaders({ nonce: true })`,
+  `contextStorage()`, `graphql()`, `reactRouter()` and `FreshApp`.
+- `route(operation, ...middlewares, handler)` types a request part the
+  operation has no schema for as the middleware before it passed it to
+  `next`, as it runs: the request's own type, as before, when none did.
 
 What a handler reads is typed as before: what its middlewares add,
 `validate`'s outputs, `reply` typed by `responds`, the path's parameters
@@ -407,7 +413,7 @@ as a peer by a `^0.2` range, which 0.3.0 is outside of; their next releases
 move the range.
 
 ```sh
-bun add @alxia/core@latest @alxia/client@latest @alxia/openapi@latest # and every other @alxia/* you use
+bun add @alxia/core@latest @alxia/openapi@latest # and every other @alxia/* you use (`@alxia/client` is retired since 0.4)
 ```
 
 | Change | Package | Can it break your code |

@@ -300,8 +300,6 @@ export const app = alxia()
 		}),
 	)
 	.get('/items', ({ reply }) => reply(200, ['a', 'b'], { headers: { 'x-total': '2' } }));
-
-export type App = typeof app;
 ```
 
 And its tests, without a server — `app.fetch` takes a `Request` with any
