@@ -60,7 +60,7 @@ class ContextStorageError extends Error {
 type ContextStorageErrorCode = 'OUTSIDE_REQUEST' | 'NOT_ROUTED';
 ```
 
-`contextStorage()` returns an app plugin: pass it to `app.plugin`, called — `plugin(contextStorage)` fails `tsc` with `TS2769` and throws a `TypeError` at startup ([troubleshooting](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)). It adds
+`contextStorage()` returns an app plugin: pass it to `app.plugin`, called — `plugin(contextStorage)` fails `tsc` with `TS2769` and throws a `TypeError` at startup ([troubleshooting](troubleshooting.md#typeerror-contextstorage-is-a-factory-plugincontextstorage-not-plugincontextstorage)). It adds
 nothing to the app's type, but it requires `StoredContext<App>` of the app
 that mounts it: `app.plugin` on an app that does not give that context is a compile
 error. `BaseContext`, `RequestContext`, `ContextOf`, `RegisteredBase`,
@@ -313,7 +313,7 @@ The plugin is an app like any other: `requestContext.get('/x', handler)` is the
 route method, and the context is read with `context()` and `tryContext()`.
 Declare routes on the app rather than on the plugin, and pass
 `contextStorage()` to `app.plugin` called — the uncalled form is
-[refused](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage).
+[refused](troubleshooting.md#typeerror-contextstorage-is-a-factory-plugincontextstorage-not-plugincontextstorage).
 
 ## What `AsyncLocalStorage` carries
 

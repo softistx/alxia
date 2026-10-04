@@ -77,7 +77,7 @@ plugin, `NOT_ROUTED`. Declare it before the routes whose code reads it.
 
 Pass the plugin to `app.plugin` called: `plugin(contextStorage)`, uncalled, is refused by
 `tsc` (`TS2769`) and throws a `TypeError` at startup
-([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)).
+([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/troubleshooting.md#typeerror-contextstorage-is-a-factory-plugincontextstorage-not-plugincontextstorage)).
 
 ## API
 

@@ -33,9 +33,10 @@ export async function wrapped(
  *   Koa and Hono answer `await next()` with no return.
  * - A reply of its own returned before the `next()` it called settled —
  *   `next(); return reply(403)`: the rest runs anyway, so the reply is
- *   sent once it has, with a warning. An error of the rest the middleware
- *   did not read — it returned or threw without awaiting `next()` — is
- *   logged, never left unhandled.
+ *   sent once it has, with a warning, and an error the rest throws then
+ *   is logged. An error of the rest that settled before the middleware
+ *   did is taken as read — a `try { await next() } catch` is the usual
+ *   way — and never left unhandled either.
  * - What `rest` resolves to that is not a response — a socket's upgrade —
  *   reaches the middleware as a stand-in response. The socket is open by
  *   then: what the middleware returns after it, or throws, is ignored, as
@@ -81,25 +82,23 @@ export function middleware(
 		if (result === undefined) {
 			return pending.then((downstream) => parked?.value ?? downstream);
 		}
-		const status = Bun.peek.status(pending);
-		if (status === 'fulfilled') return own(hook, definition, result, parked);
-		// Returned before the `next()` it called settled, or after it failed:
-		// the rest's error is logged.
-		if (status === 'pending') {
-			console.warn(
-				`${labelOf(definition)}: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`,
-			);
+		if (Bun.peek.status(pending) !== 'pending') {
+			return own(hook, definition, result, parked);
 		}
+		console.warn(
+			`${labelOf(definition)}: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`,
+		);
 		const after = () => own(hook, definition, result, parked);
 		return pending.then(after, (error: unknown) => {
 			console.error(error);
 			return after();
 		});
 	};
-	// A middleware that throws once it called `next()`: the rest's error,
-	// if any, is logged, and the middleware's goes on to `onError`.
+	// A middleware that throws while the `next()` it called still runs:
+	// the rest's error, if any, is logged, the middleware's goes on to
+	// `onError`.
 	const thrown = (error: unknown): never => {
-		if (pending !== undefined && Bun.peek.status(pending) !== 'fulfilled') {
+		if (pending !== undefined && Bun.peek.status(pending) === 'pending') {
 			pending.catch(console.error);
 		}
 		throw error;

@@ -2493,7 +2493,9 @@ a 403. alxia sends the middleware's reply once the rest has run, so that
 nothing the handler sets on the response leaks into it, and logs an error
 the rest throws with `console.error` rather than leave it an unhandled
 rejection. Not every such middleware is caught: one whose rest settles
-before it returns is taken for one that awaited it.
+before it returns is taken for one that awaited it, and an error of that
+rest for one it read, as `try { return await next() } catch { … }` does —
+not logged, and never an unhandled rejection either.
 
 **Fix:** decide before calling `next()`, and return or await it:
 

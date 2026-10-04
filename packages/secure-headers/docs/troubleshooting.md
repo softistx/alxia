@@ -18,7 +18,7 @@ or a header in the wrong place.
 **Runtime**
 
 - [`TypeError: secureHeaders: … is empty; give false to leave the … header out`](#typeerror-secureheaders--is-empty-give-false-to-leave-the--header-out)
-- [`TypeError: alxia().plugin(secureHeaders).get is not a function`](#typeerror-alxiausesecureheadersget-is-not-a-function)
+- [`TypeError: plugin(): the plugin function returned function, not an app: …`](#typeerror-plugin-the-plugin-function-returned-function-not-an-app-)
 - [`TypeError: secureHeaders: nonce is on, but the content-security-policy has no script-src to add it to: …`](#typeerror-secureheaders-nonce-is-on-but-the-content-security-policy-has-no-script-src-to-add-it-to-)
 - [`TypeError: secureHeaders: nonce is on, but contentSecurityPolicy is false: …`](#typeerror-secureheaders-nonce-is-on-but-contentsecuritypolicy-is-false-)
 - [`TypeError: secureHeaders: contentSecurityPolicy names NONCE, but nonce is off: give nonce: true`](#typeerror-secureheaders-contentsecuritypolicy-names-nonce-but-nonce-is-off-give-nonce-true)
@@ -229,14 +229,15 @@ Only `false` leaves a header out.
 app.plugin(secureHeaders({ xFrameOptions: false }));
 ```
 
-### `TypeError: alxia().plugin(secureHeaders).get is not a function`
+### `TypeError: plugin(): the plugin function returned function, not an app: …`
 
-**When:** the same mistake as above in JavaScript, or past a cast: the
-chain breaks on the next method after `plugin(secureHeaders)`.
+**When:** the same mistake as above in JavaScript, or past a cast:
+`alxia().plugin(secureHeaders)`, the factory given uncalled. It throws at
+startup.
 
-**Why:** `app.plugin` calls the function with the app. Uncalled, `secureHeaders`
-reads the app as its options and returns a plugin, not the app, so the
-next `.get` is called on a function.
+**Why:** `app.plugin` calls a function with the app, and expects the app
+back. Uncalled, `secureHeaders` reads the app as its options and returns
+a plugin, a function, not the app.
 
 **Fix:**
 
