@@ -40,7 +40,7 @@ Nothing scheduled yet.
 
 ## Shipped
 
-### Next release
+### 0.3.0
 
 - **Hooks on one route.** A route takes a list of hooks after its path —
   `app.patch('/bookmarks/:id', [canView, loadBookmark, canEdit], schema, handler)` — run

@@ -22,6 +22,19 @@ export interface SocketMethod<
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
+	/**
+	 * A WebSocket route. The upgrade request runs the hooks before it and is
+	 * validated as a route's; each message is then checked by `message`, and
+	 * each one sent by `send`. Open through `listen`, or a `Bun.serve` given
+	 * `fetch` and `websocket`: a socket needs a server.
+	 *
+	 * ```ts
+	 * app.ws('/rooms/:room', { message: Chat, send: Chat }, {
+	 *   open: (socket) => socket.subscribe(socket.data.params.room),
+	 *   message: (socket, chat) => socket.publish(socket.data.params.room, chat),
+	 * });
+	 * ```
+	 */
 	<const Path extends RoutePath, Schema extends SocketSchema = Empty>(
 		path: PathAt<Prefix, Path>,
 		schema: Schema,

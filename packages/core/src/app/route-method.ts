@@ -1,10 +1,12 @@
 /**
  * The type of a route method — `get`, `post`, … — in its four forms: with
- * or without a schema, and with or without a list of hooks after the path.
+ * or without a schema, and with or without a list of hooks after the path;
+ * and how a call's arguments are read.
  */
 import type { AnyReply } from '../reply/reply';
 import type { JoinPath, PathAt, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
+import type { RouteDefinition } from './definition';
 import type {
 	AnyRouteHook,
 	Context,
@@ -136,4 +138,37 @@ export interface RouteMethod<
 		Prefix,
 		Shortcuts
 	>;
+}
+
+/** The arguments of a route method's call, after its path, read. */
+export interface RouteArgs {
+	readonly list: readonly unknown[];
+	readonly schema: RouteSchema;
+	readonly handler: RouteDefinition['handler'];
+}
+
+/**
+ * Reads `(path, [hooks], schema?, handler)` or `(path, schema?, handler)`
+ * after the path; a call without a handler throws.
+ */
+export function routeArgs(
+	method: Method,
+	path: string,
+	rest: readonly unknown[],
+): RouteArgs {
+	const [list, schemaOrHandler, maybeHandler] = (
+		Array.isArray(rest[0]) ? rest : [[], ...rest]
+	) as [
+		readonly unknown[],
+		RouteSchema | RouteDefinition['handler'],
+		RouteDefinition['handler'] | undefined,
+	];
+	const [schema, handler] =
+		typeof schemaOrHandler === 'function'
+			? [{}, schemaOrHandler]
+			: [schemaOrHandler, maybeHandler];
+	if (typeof handler !== 'function') {
+		throw new TypeError(`${method} ${path}: the handler is missing`);
+	}
+	return { list, schema, handler };
 }

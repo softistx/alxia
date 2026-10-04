@@ -73,7 +73,9 @@ export type CheckedOperation<
 		: { readonly path: OnePath<Prefix, Operation['path']> };
 
 /**
- * `app.route(operation, handler)`: `app[method](path, schema, handler)`,
+ * `app.route(operation, handler)`: a route declared as data — `{ method,
+ * path, schema? }`, as an OpenAPI code generator writes it — and its
+ * handler, the same route as `app[method](path, schema, handler)`,
  * with the three read from `operation`. With a list of hooks before the
  * handler, `app[method](path, hooks, schema, handler)`.
  */
@@ -83,6 +85,11 @@ export interface OperationMethod<
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
+	/**
+	 * A route declared as data — `{ method, path, schema? }`, as an OpenAPI
+	 * code generator writes it — and its handler: the same route as
+	 * `app[method](path, schema, handler)`.
+	 */
 	<
 		const Operation extends RouteOperation,
 		Result extends HandlerResult<OperationSchema<Operation>>,
@@ -108,6 +115,7 @@ export interface OperationMethod<
 		Prefix,
 		Shortcuts
 	>;
+	/** A route declared as data, with a list of hooks before its handler. */
 	<
 		const Operation extends RouteOperation,
 		const Hooks extends readonly [] | readonly AnyRouteHook[],
@@ -149,4 +157,18 @@ export interface OperationMethod<
 		Prefix,
 		Shortcuts
 	>;
+}
+
+/**
+ * What `route(operation, ...rest)` passes `app[method]` after the path: the
+ * list of hooks, if any, the operation's schema, then the handler.
+ */
+export function operationArgs(
+	operation: RouteOperation,
+	rest: readonly unknown[],
+): unknown[] {
+	const schema = operation.schema ?? {};
+	return Array.isArray(rest[0])
+		? [rest[0], schema, rest[1]]
+		: [schema, rest[0]];
 }
