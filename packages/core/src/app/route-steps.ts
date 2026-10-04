@@ -34,7 +34,10 @@ export function routeArgs<Last>(
 	const args = [...rest];
 	const list = Array.isArray(args[0]) ? (args.shift() as unknown[]) : [];
 	const last = args.pop();
-	if (!isLast(last)) throw new TypeError(`${label}: the ${what} is missing`);
+	// A `validate(…)` or `responds(…)` last is a forgotten handler, not one.
+	if (!isLast(last) || builtinOf(last) !== undefined) {
+		throw new TypeError(`${label}: the ${what} is missing`);
+	}
 	const config =
 		args[0] !== null && typeof args[0] === 'object'
 			? (args.shift() as Record<string, unknown>)
