@@ -115,16 +115,26 @@ describe('app.static', () => {
 		expect(stale.status).toBe(200);
 	});
 
-	test('a range of an empty file is a 416, a suffix included', async () => {
+	test('an empty file: a suffix range is served whole, any other is a 416', async () => {
 		const app = make();
-		for (const range of ['bytes=-5', 'bytes=0-']) {
+		const suffix = await app.request('/files/empty.txt', {
+			headers: { range: 'bytes=-5' },
+		});
+		expect(suffix.status).toBe(200);
+		expect(suffix.headers.get('content-range')).toBeNull();
+		expect(await suffix.text()).toBe('');
+		for (const method of ['GET', 'HEAD']) {
 			const response = await app.request('/files/empty.txt', {
-				headers: { range },
+				method,
+				headers: { range: 'bytes=0-' },
 			});
 			expect(response.status).toBe(416);
 			expect(response.headers.get('content-range')).toBe('bytes */0');
 		}
-		expect((await app.request('/files/empty.txt')).status).toBe(200);
+		const stale = await app.request('/files/empty.txt', {
+			headers: { range: 'bytes=0-', 'if-range': 'W/"old"' },
+		});
+		expect(stale.status).toBe(200);
 	});
 
 	test('a precompressed file, to a client that accepts it', async () => {

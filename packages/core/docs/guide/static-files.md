@@ -148,7 +148,7 @@ that does not exist is a 404.
 | 200 | the file | the file |
 | 304 | `If-None-Match` matches the `ETag`, or, without it, `If-Modified-Since` is not older than the file | none |
 | 206 | a single `Range` the file satisfies; with `If-Range`, only when it names the current copy | the slice, with `Content-Range` |
-| 416 | a `Range` past the end, or any `Range` of an empty file | `{ "error": "range_not_satisfiable" }`, `Content-Range: bytes */<size>` |
+| 416 | a `Range` past the end; on an empty file, any range but a suffix (`bytes=-5`, served whole as a 200) | `{ "error": "range_not_satisfiable" }`, `Content-Range: bytes */<size>` |
 | 404 | no file, a dotfile, a path that leaves the source | `{ "error": "not_found" }` |
 
 - `HEAD` answers the same headers without the body, as for every `GET`
@@ -174,6 +174,7 @@ parseRange('bytes=0-9', 100);   // { start: 0, end: 9 }
 parseRange('bytes=-20', 100);   // { start: 80, end: 99 }
 parseRange('bytes=100-', 100);  // 'unsatisfiable'
 parseRange('bytes=0-1,3-4', 100); // undefined: serve the whole file
+parseRange('bytes=-5', 0);      // undefined: an empty file is served whole
 ```
 
 In the types, a file route answers `StaticReply`: a `Blob` with 200 or

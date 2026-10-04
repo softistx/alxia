@@ -45,7 +45,9 @@ export function ifRange(
 /**
  * One byte range of `size`: its first and last byte, `unsatisfiable`, or
  * `undefined` — a header this server ignores, several ranges included —
- * which serves the whole file.
+ * which serves the whole file. A range returned always has
+ * `0 <= start <= end < size`, so an empty file never yields one: a suffix
+ * range of it is ignored, any other range is `unsatisfiable`.
  */
 export function parseRange(
 	header: string,
@@ -60,8 +62,10 @@ export function parseRange(
 	if (from === '' && to === '') return undefined;
 	if (from === '') {
 		const suffix = Number(to);
-		// An empty file has no byte to serve, whatever the suffix (RFC 9110 §14.1.2).
-		if (suffix === 0 || size === 0) return 'unsatisfiable';
+		if (suffix === 0) return 'unsatisfiable';
+		// Satisfiable on an empty file (RFC 9110 §14.1.1), but no 206 can
+		// describe zero bytes: ignored, so the empty file is served whole.
+		if (size === 0) return undefined;
 		return { start: Math.max(0, size - suffix), end: size - 1 };
 	}
 	const start = Number(from);

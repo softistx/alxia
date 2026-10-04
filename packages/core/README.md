@@ -245,7 +245,7 @@ file, options?)` serves one file. Both answer:
 
 - **304** to a client whose copy is current: a weak `ETag` and
   `Last-Modified`;
-- **206** to a `Range` — a video seeking — and **416** to one past the end or of an empty file;
+- **206** to a `Range` — a video seeking — and **416** to one past the end;
   `If-Range` honored;
 - **404** `{ error: 'not_found' }` to no file, a dotfile, or a path that
   leaves the source — `..`, an encoded slash, a backslash;
