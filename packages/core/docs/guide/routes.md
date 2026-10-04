@@ -1,20 +1,20 @@
-# Routes and schemas
+# Routes and validation
 
-This page covers declaring a route: its path, what its schema validates,
-how each part of the request is read, and what the app answers when a
-request matches nothing or is refused.
+This page covers declaring a route: its path, its options and middlewares,
+what `validate` and `responds` check, how each part of the request is read,
+and what the app answers when a request matches nothing or is refused.
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, responds, validate } from '@alxia/core';
 import { z } from 'zod';
 
 const app = alxia().get(
 	'/users/:id/posts',
-	{
+	validate({
 		params: z.object({ id: z.coerce.number().int() }),
 		query: z.object({ tag: z.string().optional() }),
-		response: { 200: z.array(z.object({ id: z.number(), title: z.string() })) },
-	},
+	}),
+	responds({ 200: z.array(z.object({ id: z.number(), title: z.string() })) }),
 	({ params, query, reply }) => reply(200, findPosts(params.id, query.tag)),
 );
 ```
@@ -22,54 +22,60 @@ const app = alxia().get(
 ## The route methods
 
 ```ts
-app.get(path, schema, handler);
-app.get(path, handler); // no schema: nothing validated, any reply
-app.get(path, [canView, loadPet], schema, handler); // hooks of this route alone, then the schema
-app.get(path, [canView], handler);
+app.get(path, handler);                              // nothing validated, any reply
+app.get(path, ...middlewares, handler);              // up to 8, run in the order given
+app.get(path, options, ...middlewares, handler);     // options: bodyLimit, detail
+app.get(path, auth, validate(schemas), responds(responses), handler);
 ```
 
-The list after the path holds hooks made by `defineHook` and `defineWrap`:
-they run after the hooks in force, in order, then the request is
-validated, then the handler. What each adds, the hooks after it and the
-handler read; its replies join this route's type. They read the request as
-it arrived — `params.id` is a string even when the `params` schema makes it
-a number — and never the body ([Hooks on one route](hooks.md#hooks-on-one-route)).
+The last argument is the handler, which returns the route's reply. Before
+it, the route's middlewares: functions made by `defineMiddleware`, written
+inline, or made by `validate` and `responds`. Each reads what the ones
+before it passed `next`; they run after the hooks in force, in the order
+given ([Middleware](middleware.md#a-routes-middlewares)). An object right
+after the path is the route's options.
 
 `get`, `post`, `put`, `patch`, `delete`, `options`, `head` and `query` take
 the same arguments. `ws` declares a socket ([WebSockets](websockets.md)); `static`,
 `file` and `page` serve files ([Static files](static-files.md)).
 
 ```ts
-interface RouteMethod<M, Ctx, Routes, Prefix, Shortcuts> {
-	<const Path extends RoutePath, Schema extends RouteSchema, Result extends HandlerResult<Schema>>(
-		path: Path, // a literal the app would refuse does not compile: `Invalid path: …`
-		schema: Schema & ValidSchema<JoinPath<Prefix, Path>, Schema>,
-		handler: (ctx: Context<Ctx, JoinPath<Prefix, Path>, Schema>) => MaybePromise<Result>,
-	): Alxia</* … the route added … */>;
-	<const Path extends RoutePath, Result extends AnyReply>(
-		path: Path, // checked as above
-		handler: (ctx: Context<Ctx, JoinPath<Prefix, Path>, Empty>) => MaybePromise<Result>,
-	): Alxia</* … */>;
-	// each of the two above with a list of hooks after the path, at most 8:
-	// each checked against what the route gives before it, what they add read
-	// by the handler, their replies in the route's outputs
-	<const Path extends RoutePath, const Hooks extends readonly AnyRouteHook[], Schema extends RouteSchema, Result extends HandlerResult<Schema>>(
-		path: Path,
-		hooks: Hooks /* & each hook's check */,
-		schema: Schema & ValidSchema<JoinPath<Prefix, Path>, Schema>,
-		handler: (ctx: Context<Ctx & /* what the hooks add */, JoinPath<Prefix, Path>, Schema>) => MaybePromise<Result>,
-	): Alxia</* … the route added, with the hooks' replies … */>;
-	<const Path extends RoutePath, const Hooks extends readonly AnyRouteHook[], Result extends AnyReply>(
-		path: Path,
-		hooks: Hooks,
-		handler: (ctx: Context<Ctx & /* what the hooks add */, JoinPath<Prefix, Path>, Empty>) => MaybePromise<Result>,
-	): Alxia</* … */>;
-}
+interface RouteMethod<M, Ctx, Routes, Prefix, Shortcuts>
+	extends MiddlewareForms<RouteApp<M, Ctx, Routes, Prefix, Shortcuts>>,
+		OptionsForms<RouteApp<M, Ctx, Routes, Prefix, Shortcuts>>,
+		DeprecatedForms<M, Ctx, Routes, Prefix, Shortcuts> {}
+
+// MiddlewareForms: one overload per count of middlewares, 0 to 8. With two:
+<const Path extends RoutePath, R1 extends MiddlewareReturn, R2 extends MiddlewareReturn, Result extends …>(
+	path: Path, // a literal the app would refuse does not compile: `Invalid path: …`
+	m1: (ctx: /* the hooks' context, and the request as it arrived */, next: NextFunction) => R1,
+	m2: (ctx: /* the same, and what m1 passed `next` */, next: NextFunction) => R2,
+	handler: (ctx: /* the same, and what m2 passed `next`; `reply` typed by a `responds` */) => MaybePromise<Result>,
+): Alxia</* … the route added: validate's input and 400, responds' statuses, the middlewares' replies */>;
+
+// OptionsForms: the same, with the options after the path
+<const Path extends RoutePath, const Options extends RouteOptions, R1 extends MiddlewareReturn, Result extends …>(
+	path: Path,
+	options: Options, // no schema: a key of one does not compile
+	m1: (ctx: …, next: NextFunction) => R1,
+	handler: (ctx: …) => MaybePromise<Result>,
+): Alxia</* … the route added, with the 413 of a bodyLimit */>;
 ```
+
+A route method checks its arguments when the route is declared, and a
+mistake throws a `TypeError` at startup:
+
+| Declared | Thrown |
+| --- | --- |
+| no handler last | `GET /a: the handler is missing` |
+| something other than a function among the middlewares | `GET /a: middleware 1 is not a function: make it with defineMiddleware(), validate() or responds()` |
+| a schema in the options beside middlewares, past the types | `GET /a: the options hold no schema: give validate(…) and responds(…) among the middlewares` |
 
 A handler must return a reply. One that returns anything else is answered
 with a 500, and the server logs
 `GET /path: the handler returned no reply. Return ctx.reply(status, body).`
+What a middleware may return, and the errors of one that returns anything
+else, are on [Middleware](middleware.md#a-routes-middlewares).
 
 ### `QUERY`
 
@@ -81,10 +87,8 @@ like a `POST`'s, and a refused one is the same [400](#the-400).
 ```ts
 const app = alxia().query(
 	'/users/search',
-	{
-		body: z.object({ name: z.string().min(1), roles: z.array(z.string()).default([]) }),
-		response: { 200: z.array(z.object({ id: z.number(), name: z.string() })) },
-	},
+	validate({ body: z.object({ name: z.string().min(1), roles: z.array(z.string()).default([]) }) }),
+	responds({ 200: z.array(z.object({ id: z.number(), name: z.string() })) }),
 	({ body, reply }) => reply.ok(searchUsers(body.name, body.roles)),
 );
 // QUERY /users/search, content-type: application/json, {"name":"A"} → 200
@@ -105,8 +109,10 @@ include its body.
 are plain data — `{ method, path, schema? }` — instead of arguments: an
 operation written once and shared between modules, or one a code generator
 writes from an OpenAPI document.
-`route(operation, [hooks], handler)` gives it a list of hooks of its own,
-as `app[method](path, [hooks], schema, handler)` does.
+`route` keeps the form of 0.3, unchanged in this release: the operation's
+`schema` validates the request just before the handler, and
+`route(operation, [hooks], handler)` gives it a list of hooks of its own
+([Hooks on one route](hooks.md#hooks-on-one-route)).
 
 ```ts
 // operations.ts: data, importing only the schemas
@@ -140,9 +146,10 @@ const app = alxia({ prefix: '/api' })
 // GET /api/pets/1 → 200, GET /api/pets/x → 400, GET /api/health → "ok"
 ```
 
-It is exactly the route `app[method](path, schema, handler)` declares: the
-same context, the same entry in `RoutesOf` (`'/api/pets/:petId'` above, the
-prefix applied), and the same compile errors — a params schema that does not
+It is exactly the route `app[method](path, validate(…), responds(…), handler)`
+declares from the same schemas: the same context, the same entry in
+`RoutesOf` (`'/api/pets/:petId'` above, the prefix applied), and the same
+compile errors — a params schema that does not
 read the path, an unknown schema key, a status the operation does not declare.
 `method` is any `Method`, `QUERY` included; an operation without `schema` is
 a route without one.
@@ -206,7 +213,6 @@ Paths are checked when the route is declared, and a mistake throws a
 | `'/café'` | `"/café" is not encoded as a request's URL carries it: declare "/caf%C3%A9"` |
 | `'/users/:userId'` after `'/users/:id'` | `"/users/:userId" has the shape of "/users/:id" with other parameter names. Use the same names: the two would match the same requests.` |
 | the same method and path twice | `GET /a is declared twice` |
-| a method with no handler | `GET /a: the handler is missing` |
 
 A path written as a literal is refused by its type first: the call does
 not compile, and the message is the `TypeError` above after
@@ -274,40 +280,80 @@ app
 // GET /api/users → "api", through fetch and listen alike
 ```
 
-## The schema
+<a id="the-schema"></a>
 
-Every part is optional, and each one is any Standard Schema.
+## `validate` and `responds`
 
-| Part | Validates | What the handler reads without it |
-| --- | --- | --- |
-| `params` | the path parameters, which arrive as strings | `{ readonly id: string }`, from the path |
-| `query` | the query string | `Readonly<Record<string, string \| readonly string[]>>` |
-| `headers` | the request headers, names lowercased | `Readonly<Record<string, string>>` |
-| `cookies` | the `Cookie` header, by name | `Readonly<Record<string, string>>` |
-| `body` | the body, parsed by its `content-type` | `undefined`: read `ctx.request` yourself |
-| `response` | the body of each status the route may answer | any status, any body ([Replies](replies.md)) |
-| `bodyLimit` | not a schema: the most bytes the body may hold, a 413 past it ([Body size](#body-size-bodylimit)) | no limit beyond `listen`'s `maxRequestBodySize` |
-| `detail` | nothing at runtime: what [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) says of the route | — |
-
-The handler reads each part as its schema's **output**: a schema that
-coerces turns `"7"` into `7`, a default fills a missing key.
+Two middlewares the core runs itself, placed among the route's others:
 
 ```ts
-app.get(
+validate(schemas: { params?, query?, headers?, cookies?, body? }): Middleware; // each any Standard Schema
+responds(responses: { [status: number]: StandardSchemaV1 }): Middleware;
+```
+
+`validate` reads each part it is given a schema for, and passes the
+schema's **output** on, typed, to the middlewares after it and the handler:
+a schema that coerces turns `"7"` into `7`, a default fills a missing key.
+
+| Part | Validates | What is read without it, or before it |
+| --- | --- | --- |
+| `params` | the path parameters, which arrive as strings; a key the path lacks, optional or not, does not compile ([below](#what-the-types-refuse)) | `{ readonly id: string }`, from the path; `pathParams` holds them, after a `validate` too |
+| `query` | the query string | `Readonly<Record<string, string \| readonly string[]>>` |
+| `headers` | the request headers, names lowercased | `Readonly<Record<string, string>>` |
+| `cookies` | the `Cookie` header, by name | `Readonly<Record<string, string>>`; the hooks, `onError` and `onRefusal` always read these |
+| `body` | the body, parsed by its `content-type` | `undefined`: read `ctx.request` yourself |
+
+`responds` declares the body of each status the route may answer. The
+handler's `reply` is then typed by it — a declared status only, with a body
+its schema takes — and its reply is checked by that schema and sent as its
+output: an unknown key the schema strips never leaves the server
+([Replies](replies.md#with-response-schemas)). A middleware placed after it
+that replies with a declared status is checked the same way; one with
+another status, or placed before it, is sent as it is
+([Where `validate` stands](middleware.md#where-validate-stands)).
+
+```ts
+import { alxia, responds, validate } from '@alxia/core';
+import { z } from 'zod';
+
+const app = alxia().get(
 	'/search',
-	{
+	{ detail: { summary: 'Search', tags: ['search'] } },
+	validate({
 		query: z.object({ q: z.string(), page: z.coerce.number().int().default(1) }),
 		headers: z.object({ 'accept-language': z.string().optional() }),
 		cookies: z.object({ session: z.string() }),
-		detail: { summary: 'Search', tags: ['search'] },
-	},
+	}),
+	responds({ 200: z.object({ q: z.string(), page: z.number(), language: z.string() }) }),
 	({ query, headers, reply }) =>
 		reply(200, { q: query.q, page: query.page, language: headers['accept-language'] ?? 'en' }),
 );
 ```
 
-`detail` takes `summary`, `description`, `operationId`, `tags` and
-`deprecated`.
+Both declare their schemas on the route, `app.routes[i].schema`, so
+[`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
+them, and the route's type reads them: `validate`'s input is what the
+client sends, its 400 and `responds`' statuses are what it may read. Where
+each stands changes which answer comes first, a 401 or a 400
+([Middleware](middleware.md#where-validate-stands)).
+
+### The options
+
+| Option | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `bodyLimit` | `number` | the `bodyLimit()` in force, or none | the most bytes the body may hold, a 413 past it ([Body size](#body-size-bodylimit)) |
+| `detail` | `RouteDetail` | none | nothing at runtime: what `@alxia/openapi` says of the route — `summary`, `description`, `operationId`, `tags`, `deprecated` |
+
+```ts
+interface RouteOptions {
+	readonly bodyLimit?: number;
+	readonly detail?: RouteDetail;
+}
+```
+
+The options hold no schema. `{ body: Post }` there beside a middleware does
+not compile, and throws where the route is declared when the types are
+passed by: give `validate({ body: Post })` among the middlewares.
 
 ### Query strings
 
@@ -318,7 +364,7 @@ A key given once is a string; given more than once, an array. So
 ```ts
 const Tags = z.union([z.string().transform((tag) => [tag]), z.array(z.string())]);
 
-app.get('/posts', { query: z.object({ tag: Tags.optional() }) }, ({ query, reply }) =>
+app.get('/posts', validate({ query: z.object({ tag: Tags.optional() }) }), ({ query, reply }) =>
 	reply(200, query.tag ?? []), // string[]
 );
 ```
@@ -329,7 +375,7 @@ value it means to send — `{ page: 2 }` rather than `unknown`.
 
 ### Bodies
 
-The body is read only when the route has a `body` schema, by its
+The body is read only by a `validate` given a `body` schema, by its
 `content-type`:
 
 | `content-type` | Read as |
@@ -343,7 +389,7 @@ The body is read only when the route has a `body` schema, by its
 ```ts
 app.post(
 	'/avatar',
-	{ body: z.object({ name: z.string(), file: z.instanceof(File) }) },
+	validate({ body: z.object({ name: z.string(), file: z.instanceof(File) }) }),
 	async ({ body, reply }) => {
 		await Bun.write(`uploads/${body.name}`, body.file);
 		return reply(204);
@@ -360,7 +406,7 @@ app, wherever it is declared.
 ```ts
 const app = alxia()
 	.parser('application/csv', async (request) => (await request.text()).split(','))
-	.post('/csv', { body: z.array(z.string()) }, ({ body, reply }) => reply(200, body.length));
+	.post('/csv', validate({ body: z.array(z.string()) }), ({ body, reply }) => reply(200, body.length));
 // POST /csv, content-type: application/csv, body "a,b,c" → 3
 ```
 
@@ -375,24 +421,24 @@ cap its own body below that limit:
 
 | Where | Applies to |
 | --- | --- |
-| `bodyLimit` in a route's schema | that route, whatever `bodyLimit()` was called before it |
+| `bodyLimit` in a route's options | that route, whatever `bodyLimit()` was called before it |
 | `app.bodyLimit(bytes)` | every route declared after it on the app, a group's included |
 | `group.bodyLimit(bytes)` inside a group | the group's routes declared after it, never the app's |
 | a plugin's routes, given to `use` | their own limit only: the app's `bodyLimit()` never reaches them. A `bodyLimit()` the plugin calls applies to the app's routes declared after `use`, as its hooks do |
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, validate } from '@alxia/core';
 import { z } from 'zod';
 
 const Note = z.object({ text: z.string() });
 
 const app = alxia()
 	.bodyLimit(64 * 1024) // the app's default: 64 KiB
-	.post('/notes', { body: Note }, ({ body, reply }) => reply(201, body))
+	.post('/notes', validate({ body: Note }), ({ body, reply }) => reply(201, body))
 	.group('/import', (bulk) =>
 		bulk
 			.bodyLimit(4 * 1024 * 1024) // this group only: 4 MiB
-			.post('/notes', { body: z.array(Note) }, ({ body, reply }) => reply(200, body.length)),
+			.post('/notes', validate({ body: z.array(Note) }), ({ body, reply }) => reply(200, body.length)),
 	)
 	.post(
 		'/upload',
@@ -420,7 +466,7 @@ How a body is held to it, without reading it whole:
 
 The count covers every reader of the body. That means the built-in JSON,
 form and text parsers, a [`parser`](#body-parsers) of the app's, a route
-hook (`derive`, `wrap`), and a handler that reads `ctx.request.body` as a stream, as `/upload` does
+hook (`derive`, `wrap`), a middleware, and a handler that reads `ctx.request.body` as a stream, as `/upload` does
 above. That handler sees a stream like any other, and the stream fails once
 the count passes the limit. Measured on a 25 MiB limit through `listen`,
 with 256 MiB offered: the handler read 25 MiB, the client had sent about
@@ -452,7 +498,7 @@ the [`onRefusal`](hooks.md#onrefusal) hook in force reads
 an RFC 9457 problem. The `onError` hooks never see it.
 
 ```ts
-import { alxia, problem } from '@alxia/core';
+import { alxia, problem, validate } from '@alxia/core';
 import { z } from 'zod';
 
 const api = alxia()
@@ -461,7 +507,7 @@ const api = alxia()
 			? problem({ type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: 'maxSizeRequest' })
 			: undefined,
 	)
-	.post('/api', { body: z.unknown(), bodyLimit: 10_000_000 }, ({ reply }) => reply(200, 'ok'));
+	.post('/api', { bodyLimit: 10_000_000 }, validate({ body: z.unknown() }), ({ reply }) => reply(200, 'ok'));
 // a body past 10 MB → 413, application/problem+json:
 // { "type": "urn:ietf:params:jmap:error:limit", "status": 413, "limit": "maxSizeRequest" }
 ```
@@ -477,8 +523,9 @@ response stream fails instead of answering a 413.
 
 ## The 400
 
-A request any part refuses is answered with a 400 before the handler runs,
-naming every issue in every part at once. `GET /users/abc?upper=maybe`, to a
+A request a `validate` refuses is answered with a 400 where the `validate`
+stands, before anything after it runs, naming every issue in every part it
+checks at once. `GET /users/abc?upper=maybe`, to a
 route with a numeric `id` and `upper: z.enum(['yes', 'no']).optional()`:
 
 ```json
@@ -506,7 +553,8 @@ interface ValidationIssue {
 
 Two codes are the framework's: `invalid_json` (the body is not JSON) and
 `unreadable_body` (a parser threw). The 400 is in the type of every route
-that validates part of its request, so a client reads it.
+with a `validate`, so a client reads it. The middlewares before the
+`validate` see it as the response of `next()`.
 
 The 400 is the default. [`onRefusal`](hooks.md#onrefusal) answers a refused
 request in your own format for the routes declared after it, such as an RFC
@@ -515,28 +563,44 @@ request in your own format for the routes declared after it, such as an RFC
 
 ## What the types refuse
 
-The schema argument is checked against the path and against
-`RouteSchema`. Each of these is a compile error; the comment is what
-TypeScript reports:
+`validate`'s schemas are checked against the path and against
+`RequestSchemas`, `responds`' against the statuses, and each middleware
+against what the route gives it where it stands. Each of these is a compile
+error; the comment is what TypeScript reports:
 
 ```ts
-// the params schema must accept the parameters of "/users/:id", which arrive as strings
-app.get('/users/:id', { params: z.object({ name: z.string() }) }, ({ reply }) => reply(200));
+// No overload matches this call. … Argument of type 'Middleware<{ readonly pathParams: { readonly name: string; }; }, …>' is not assignable to parameter of type …
+app.get('/users/:id', validate({ params: z.object({ name: z.string() }) }), ({ reply }) => reply(200));
 
-// the same, for a schema that does not coerce: the path gives "7", not 7
-app.get('/users/:id', { params: z.object({ id: z.number() }) }, ({ reply }) => reply(200));
+// the same, 'pathParams: { readonly id: number; }', for a schema that does not coerce: the path gives "7", not 7
+app.get('/users/:id', validate({ params: z.object({ id: z.number() }) }), ({ reply }) => reply(200));
 
-// 'quey' does not exist in type 'RouteSchema'. Did you mean to write 'query'?
-app.get('/users', { quey: z.object({}) }, ({ reply }) => reply(200));
+// the same, 'pathParams: { readonly id: string; }', for a path with no parameter
+app.get('/users', validate({ params: z.object({ id: z.string() }) }), ({ reply }) => reply(200));
+
+// the same, 'pathParams: { readonly id: string; readonly extra: string | undefined; }', for a key the path lacks, optional or not
+app.get('/users/:id', validate({ params: z.object({ id: z.string(), extra: z.string().optional() }) }), ({ reply }) => reply(200));
+
+// 'quey' does not exist in type 'RequestSchemas'. Did you mean to write 'query'?
+app.get('/users', validate({ quey: z.object({}) }), ({ reply }) => reply(200));
 
 // '999' does not exist in type 'ResponseSchemas'
-app.get('/users', { response: { 999: z.string() } }, ({ reply }) => reply(200, ''));
+app.get('/users', responds({ 999: z.string() }), ({ reply }) => reply(200, ''));
+
+// No overload matches this call: a schema in the options — Type 'ZodString' is not assignable to type 'never'
+app.post('/users', { body: z.string() }, auth, ({ reply }) => reply(200));
+
+// Property 'user' does not exist: no middleware before this one added it
+app.get('/me', ({ user }, next) => next({ id: user.id }), auth, ({ reply }) => reply(200));
 ```
 
-A params schema with an optional key the path does not declare —
-`/users/:id` with `{ id, extra? }` — is refused with
-`the params schema reads "extra", which "/users/:id" does not declare`. What
-`reply` refuses is on [Replies](replies.md#with-response-schemas).
+A ninth middleware does not compile either: the types thread eight. With
+the params, the message TypeScript prints is that of the last overload it
+tried; the argument it names is the `validate(…)` whose `pathParams` the
+path does not give. A `params` schema reads the path's parameters and no
+other: every key it declares, an optional one included, must be a
+parameter of the path, as a string. What `reply` refuses is on
+[Replies](replies.md#with-response-schemas).
 
 ## Answered outside every route
 
@@ -555,7 +619,7 @@ The core calls `~standard.validate` and nothing else. A schema written by
 hand types the route like a Zod one:
 
 ```ts
-import { alxia, type StandardSchemaV1 } from '@alxia/core';
+import { alxia, type StandardSchemaV1, validate } from '@alxia/core';
 
 const Page: StandardSchemaV1<unknown, { page: number }> = {
 	'~standard': {
@@ -570,7 +634,7 @@ const Page: StandardSchemaV1<unknown, { page: number }> = {
 	},
 };
 
-const app = alxia().get('/items', { query: Page }, ({ query, reply }) =>
+const app = alxia().get('/items', validate({ query: Page }), ({ query, reply }) =>
 	reply(200, query.page), // number
 );
 ```
@@ -578,9 +642,42 @@ const app = alxia().get('/items', { query: Page }, ({ query, reply }) =>
 `InferInput<Schema>` is what a schema accepts — what a client sends, what a
 handler passes to `reply` — and `InferOutput<Schema>` what it gives back.
 
+## The forms of 0.3, deprecated
+
+A schema before the handler, and a list of hooks after the path, still
+compile and run as they did in 0.3, and will be removed in a later minor:
+
+```ts
+app.get(path, schema, handler);                  // deprecated: validate(…) and responds(…), options for bodyLimit and detail
+app.get(path, [canView, loadPet], schema, handler); // deprecated: middlewares, made by defineMiddleware
+app.get(path, [canView], handler);
+```
+
+A schema there validates the request just before the handler, after the
+list, with `responds` checking the handler's reply: at runtime it becomes
+`validate(…)` and `responds(…)` placed last, so the route answers exactly as
+it did. Its `bodyLimit` and `detail` move to the options:
+
+```ts
+// deprecated
+app.post('/upload', { body: Upload, response: { 201: Stored }, bodyLimit: 25 * 1024 * 1024 }, handler);
+// now
+app.post('/upload', { bodyLimit: 25 * 1024 * 1024 }, validate({ body: Upload }), responds({ 201: Stored }), handler);
+```
+
+A schema there is checked against the path as `validate`'s is, an optional
+key the path does not declare included. After a list of hooks, TypeScript
+names the key — `/users/:id` with `{ id, extra? }` is refused with
+`the params schema reads "extra", which "/users/:id" does not declare`.
+Each change is on [Upgrading](../upgrading.md); the list's hooks on
+[Hooks on one route](hooks.md#hooks-on-one-route).
+
 ## See also
 
 - [Replies](replies.md): what a handler returns.
-- [Hooks](hooks.md): what runs before validation, and what it adds to the
-  context.
+- [Middleware: which way to use](middleware.md): where `validate` and
+  `responds` stand among the route's middlewares, and the order a request
+  runs them in.
+- [Hooks](hooks.md): what runs before the route's middlewares, and what it
+  adds to the context.
 - [The app's type](types.md): what a client reads of each route.

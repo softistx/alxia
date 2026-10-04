@@ -3,9 +3,9 @@
 An HTTP framework for [Bun](https://bun.sh), type-safe from the request to
 the client that calls it, with **no dependency**. Each route declares what it
 reads and what it answers with any [Standard Schema](https://standardschema.dev)
-— Zod, Valibot, ArkType, or one written by hand — and the types follow: the
-handler reads validated values, can only answer what it declared, and the
-app's type is the contract [`@alxia/client`](https://www.npmjs.com/package/@alxia/client)
+— Zod, Valibot, ArkType, or one written by hand — among its middlewares,
+and the types follow: the handler reads validated values, can only answer
+what it declared, and the app's type is the contract [`@alxia/client`](https://www.npmjs.com/package/@alxia/client)
 calls.
 
 ## Getting started
@@ -14,8 +14,8 @@ calls.
 bun create @alxia my-app
 ```
 
-writes a new app — an API with Zod, a route hook, a spec and the typed
-client, or React Router's official template served by alxia — installs it,
+writes a new app — an API with Zod, an API-key check on its route, a spec
+and the typed client, or React Router's official template served by alxia — installs it,
 and prints `cd my-app` and `bun dev`
 ([`@alxia/create`](https://www.npmjs.com/package/@alxia/create)). Into an
 existing project:
@@ -40,19 +40,23 @@ Everything else is a package of its own, to take or leave:
 ## A first app
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, defineMiddleware, responds, validate } from '@alxia/core';
 import { zq } from '@alxia/zod';
 import { z } from 'zod';
 
 const User = z.object({ id: z.number(), name: z.string() });
+const NotFound = z.object({ error: z.literal('not_found') });
+
+const auth = defineMiddleware(async ({ request, reply }, next) => {
+	const user = await session(request);
+	return user ? next({ user }) : reply(401, { error: 'unauthorized' as const });
+});
 
 const app = alxia()
 	.get(
 		'/users/:id',
-		{
-			params: z.object({ id: zq.int() }),
-			response: { 200: User, 404: z.object({ error: z.literal('not_found') }) },
-		},
+		validate({ params: z.object({ id: zq.int() }) }),
+		responds({ 200: User, 404: NotFound }),
 		async ({ params, reply }) => {
 			const user = await findUser(params.id); // params.id: number
 			return user ? reply(200, user) : reply(404, { error: 'not_found' });
@@ -60,8 +64,10 @@ const app = alxia()
 	)
 	.post(
 		'/users',
-		{ body: z.object({ name: z.string().min(1) }), response: { 201: User } },
-		async ({ body, reply }) => reply(201, await createUser(body.name)),
+		auth,
+		validate({ body: z.object({ name: z.string().min(1) }) }),
+		responds({ 201: User }),
+		async ({ user, body, reply }) => reply(201, await createUser(user, body.name)),
 	);
 
 app.listen(3000);
@@ -69,46 +75,124 @@ app.listen(3000);
 export type App = typeof app;
 ```
 
-`listen` hands the routes to `Bun.serve`'s own router. `app.fetch` is the
-same app as a fetch handler; `app.request('/users/1')` calls it in process.
+A route is a path, its middlewares, then its handler. They run in the order
+given: `POST /users` answers a stranger 401 before it reads his body, then
+400 for a bad body, then 201. `listen` hands the routes to `Bun.serve`'s own
+router. `app.fetch` is the same app as a fetch handler;
+`app.request('/users/1')` calls it in process.
 
 ## What the types refuse
 
 Each of these is a compile error, not a runtime surprise:
 
 ```ts
-app.get('/users/:id', { params: z.object({ name: z.string() }) }, ...); // not the path's parameters
-app.get('/users', { quey: z.object({}) }, ...);                          // a typo
-({ reply }) => reply(201, user);                                         // a status not declared
-({ reply }) => reply(200, { id: '1' });                                  // a body its schema refuses
+app.get('/users/:id', validate({ params: z.object({ name: z.string() }) }), ...); // not the path's parameters
+app.get('/users', validate({ quey: z.object({}) }), ...);                          // a typo
+app.get('/me', ({ user }, next) => ..., auth, ...);                                // `user` before the middleware that adds it
+app.post('/users', { body: User }, auth, ...);                                     // a schema in the options
+({ reply }) => reply(201, user);                                                   // behind responds({ 200: User }): a status not declared
+({ reply }) => reply(200, { id: '1' });                                            // a body its schema refuses
 ```
+
+## Middlewares
+
+A middleware is `(ctx, next) => …`, written once with `defineMiddleware` and
+given to every route that needs it. It returns `next(added)` — `added` is
+typed in the context of everything after it — a reply, which ends the
+request and joins the route's type, or a `Response`, sent as it is. Awaited,
+`next()` resolves to the response of the rest of the route, so a middleware
+can run around it. `validate` and `responds` are middlewares too, and stand
+where they are given:
+
+```ts
+import { alxia, defineMiddleware, responds, validate } from '@alxia/core';
+import { z } from 'zod';
+
+const Post = z.object({ title: z.string().min(1) });
+
+const auth = defineMiddleware(async ({ request, reply }, next) => {
+	const user = await session(request);
+	if (!user) return reply(401, { error: 'unauthorized' as const });
+	return next({ user }); // `user`, typed, in everything after
+});
+
+const timed = defineMiddleware(async (_ctx, next) => {
+	const started = performance.now();
+	const response = await next(); // the rest of the route, as a Response
+	response.headers.set('server-timing', `app;dur=${performance.now() - started}`);
+	return response;
+});
+
+const app = alxia().post(
+	'/posts',
+	{ bodyLimit: 1024 * 1024, detail: { summary: 'Create a post' } }, // options: never a schema
+	timed,
+	auth,                     // a 401 before the body is read
+	validate({ body: Post }), // a 400, or the onRefusal hook's reply
+	responds({ 201: Post }),  // types the handler's `reply`, checks it
+	({ user, body, reply }) => reply(201, createPost(user, body)),
+);
+// POST /posts answers 201, 400, 401, 413 or 500, and the client reads each
+```
+
+| Piece | Does |
+| --- | --- |
+| `app.<method>(path, options?, ...middlewares, handler)` | up to 8 middlewares, each reading what the ones before it added; the handler last |
+| `options` | `bodyLimit` (bytes, a 413 past it) and `detail` (what OpenAPI says of the route); a schema there does not compile, and throws where the route is declared |
+| `defineMiddleware(fn)` | types `fn`, and returns it |
+| `defineMiddleware<{ user: User; pathParams: { id: string } }>()(fn)` | a middleware that reads more than the base context; a route that does not give it, where the middleware is placed, does not compile |
+| `validate({ params, query, headers, cookies, body })` | any Standard Schema per part; what follows reads their output. Before it, a middleware reads the request as it arrived: `params` as strings, `query` raw, `body` `undefined` |
+| `responds({ 200: Post, 404: NotFound })` | the handler's `reply` typed by the statuses, and its reply checked and sent as its schema's output: a body it refuses is a 500. A middleware after it that replies with a declared status is checked too; any other status it sends as it is |
+
+Position is meaning: `auth, validate(…)` answers a stranger 401 before his
+body is read; `validate(…), auth` answers a bad body 400 first. A reply
+made before a `responds` is never checked; `auth`'s 401 after it is checked
+only if `responds` declares a 401. Both declare their schemas on the route,
+so `@alxia/openapi` documents them.
+
+The forms of 0.3 still run, as 0.3 ran them, and are deprecated: a list of
+hooks after the path, a schema before the handler, `defineHook` and
+`defineWrap`.
+
+```ts
+// deprecated
+app.patch('/posts/:id', [canView], { params: PostId, body: Update, response: { 200: Post } }, handler);
+// now
+app.patch('/posts/:id', canView, validate({ params: PostId, body: Update }), responds({ 200: Post }), handler);
+```
+
+[Upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md)
+has each one, before and after.
 
 ## Requests
 
-| part | read from | without a schema |
+`validate(…)` reads each part it is given a schema for; what follows it
+reads the schema's output. Before it, or without one:
+
+| part | read from | before a `validate` |
 | --- | --- | --- |
-| `params` | the path, as strings | `{ id: string }`, from the path |
+| `params` | the path, as strings | `{ id: string }`, from the path; `pathParams` is the same, after a `validate` too |
 | `query` | the query string: a key given once is a string, more than once an array | `Record<string, string \| string[]>` |
 | `headers` | the headers, names lowercased | `Record<string, string>` |
-| `cookies` | the `Cookie` header; every route hook reads it too, unvalidated | `Record<string, string>` |
+| `cookies` | the `Cookie` header; the hooks, `onError` and `onRefusal` included, always read it unvalidated | `Record<string, string>` |
 | `body` | by `content-type`: a parser the app added, JSON, a form, text, or the bytes | `undefined`: read `ctx.request` |
 
-A request any schema refuses is answered with a 400 that names every issue,
-whatever part it is in:
+A request a `validate` refuses is answered with a 400 that names every
+issue, whatever part it is in:
 
 ```json
 { "error": "validation", "issues": [{ "target": "params", "path": ["id"], "code": "invalid_type", "message": "…" }] }
 ```
 
 `onRefusal(hook)` answers it in your format instead, for the routes declared
-after it: the hook reads the refusal's `kind` — for a `validation`, the
+after it, as it answers a deprecated schema's: the hook reads the refusal's `kind` — for a `validation`, the
 `part` that failed and the `issues` — and returns a reply with a 4xx
 status, or nothing, for the default.
 `problem(details)` builds an RFC 9457 problem, sent as
 `application/problem+json`, its extension members typed:
 
 ```ts
-import { alxia, problem } from '@alxia/core';
+import { alxia, problem, validate } from '@alxia/core';
 import { z } from 'zod';
 
 const JmapRequest = z.object({ using: z.array(z.string()), methodCalls: z.array(z.unknown()) });
@@ -125,7 +209,7 @@ const app = alxia()
 					detail: `the ${refusal.part} is invalid`,
 				}),
 	)
-	.post('/jmap', { body: JmapRequest }, ({ reply }) => reply(200, { methodResponses: [] }));
+	.post('/jmap', validate({ body: JmapRequest }), ({ reply }) => reply(200, { methodResponses: [] }));
 ```
 
 Its reply replaces the 400 in the type of every route after it that
@@ -150,7 +234,9 @@ alxia()
 	.onRefusal('body_limit', { response: { 413: TooLarge } }, (refusal, { reply }) =>
 		reply(413, { limit: refusal.limit }),
 	)
-	.post('/notes', { body: z.object({ text: z.string() }), bodyLimit: 64 * 1024 }, ({ reply }) => reply(201, 'ok'));
+	.post('/notes', { bodyLimit: 64 * 1024 }, validate({ body: z.object({ text: z.string() }) }), ({ reply }) =>
+		reply(201, 'ok'),
+	);
 // POST /notes answers 201, 413 { limit: number }, 422 { detail: string } or 500
 ```
 
@@ -164,7 +250,8 @@ validated like a `POST`'s, a 400 when refused.
 ```ts
 app.query(
 	'/users/search',
-	{ body: z.object({ name: z.string().min(1) }), response: { 200: z.array(User) } },
+	validate({ body: z.object({ name: z.string().min(1) }) }),
+	responds({ 200: z.array(User) }),
 	async ({ body, reply }) => reply.ok(await searchUsers(body.name)),
 );
 ```
@@ -173,7 +260,7 @@ app.query(
 `{ method, path, schema? }`, written once and shared, or generated from an
 OpenAPI document — with the same types and the same compile errors. A
 variable holding an operation needs `as const`, to keep its method and path
-literal:
+literal. `route` keeps its `schema`, and its list of hooks, as in 0.3:
 
 ```ts
 const getUser = {
@@ -188,14 +275,14 @@ app.route(getUser, async ({ params, reply }) => reply.ok(await findUser(params.i
 ### Body size
 
 `bodyLimit`, in bytes, caps a route's request body below the server's
-`maxRequestBodySize`. Set it on a route, or call `bodyLimit(bytes)` for
+`maxRequestBodySize`. Set it in a route's options, or call `bodyLimit(bytes)` for
 every route declared after the call: on the app, for every later route; in a
 group, for the group's routes alone. A route's own limit wins.
 
 ```ts
 const app = alxia()
 	.bodyLimit(64 * 1024)
-	.post('/notes', { body: z.object({ text: z.string() }) }, ({ body, reply }) => reply.created(body))
+	.post('/notes', validate({ body: z.object({ text: z.string() }) }), ({ body, reply }) => reply.created(body))
 	.post('/upload', { bodyLimit: 25 * 1024 * 1024 }, async ({ request, reply }) => {
 		await Bun.write('upload.bin', new Response(request.body));
 		return reply.noContent();
@@ -220,12 +307,12 @@ body as before.
 
 ## Replies
 
-A handler returns `reply(status, body, init?)`. With `response` schemas,
+A handler returns `reply(status, body, init?)`. Behind a `responds(…)`,
 only a declared status, with a body its schema accepts. Without, any status
 and any body — the client still reads the type of the body. Shortcuts —
 `reply.ok(body)`, `reply.created(body)`, `reply.noContent()`,
 `reply.notFound(body)`, `reply.html(status, html)`, … — are the same
-replies; with schemas, a route has one only for a status it declares.
+replies; behind a `responds`, a route has one only for a status it declares.
 
 The body sent is the **output** of the schema: an unknown key it strips — a
 password hash — never leaves the server. A reply its schema refuses is a
@@ -305,9 +392,9 @@ app's hooks.
 ## Server-sent events
 
 ```ts
-import { eventStream } from '@alxia/core';
+import { eventStream, responds } from '@alxia/core';
 
-app.get('/ticks', { response: { 200: eventStream(Tick) } }, ({ reply }) =>
+app.get('/ticks', responds({ 200: eventStream(Tick) }), ({ reply }) =>
 	reply(200, (async function* () {
 		for (let n = 0; ; n++) { yield { n }; await Bun.sleep(1000); }
 	})()),
@@ -324,7 +411,7 @@ line, plus `id:` and `retry:` when given:
 ```ts
 const Push = eventStream({ state: StateChange, ping: Ping });
 
-app.get('/push', { response: { 200: Push } }, ({ reply }) =>
+app.get('/push', responds({ 200: Push }), ({ reply }) =>
 	reply(200, (async function* () {
 		yield Push.event('ping', { interval: 30 });
 		yield Push.event('state', change, { id: 's42' });
@@ -342,23 +429,28 @@ stream before it is written.
 ## WebSockets
 
 ```ts
-app.ws('/rooms/:room', { message: Chat, send: Chat }, {
+app.ws('/rooms/:room', { message: Chat, send: Chat }, auth, validate({ query: z.object({ v: z.literal('1') }) }), {
 	open: (socket) => socket.subscribe(socket.data.params.room),
-	message: (socket, chat) => socket.publish(socket.data.params.room, chat),
+	message: (socket, chat) => socket.publish(socket.data.params.room, chat), // socket.data.user: auth's
 });
 ```
 
-The upgrade request runs the hooks before the route and is validated as a
-route's — a 401 or a 400 never becomes a socket. Each message is parsed as
-JSON and checked by `message` (a refused one is answered with its issues,
-the socket kept open); each one sent is checked by `send`. `socket.data`
-holds the validated request and what each hook added. Sockets need a
+`ws(path, options?, ...middlewares, handlers)`: the upgrade request runs the
+hooks before the route, then its middlewares — a 401 or a 400 never becomes
+a socket. The options are `message`, `send` and `detail`. Each message is
+parsed as JSON and checked by `message` (a refused one is answered with its
+issues, the socket kept open); each one sent is checked by `send`.
+`socket.data` holds what the middlewares added and `validate` gave back. A
+middleware that awaits `next()` gets an empty `200` stand-in once the socket
+is open: return it as it is (a header set on it is lost). `responds` has no
+reply to check on a socket, and is refused there. Sockets need a
 server: `listen`, or `Bun.serve({ fetch: app.fetch, websocket: app.websocket })`.
 
 ## Hooks
 
-Route hooks apply to the routes declared **after** them: the chain reads in
-the order the request runs.
+A middleware belongs to the routes it is given to. A route hook belongs to
+the chain: it applies to every route declared **after** it, the chain read
+in the order the request runs, and runs before the route's own middlewares.
 
 ```ts
 const app = alxia()
@@ -375,8 +467,8 @@ A reply a hook returns ends the request, and is added to the type of every
 route after it: the client of `/me` reads the 401.
 
 `wrap(hook)` is a route hook around the rest: `next()` runs the hooks
-declared after it, validation and the handler, and resolves to the
-response, which the hook returns — or a reply of its own, typed like a
+declared after it, the route's middlewares and the handler, and resolves to
+the response, which the hook returns — or a reply of its own, typed like a
 `derive`'s. An idempotency key, a transaction, a cookie set after the route:
 
 ```ts
@@ -384,44 +476,17 @@ response, which the hook returns — or a reply of its own, typed like a
 	busy(request) ? reply(409, { error: 'busy' as const }) : next())
 ```
 
-### Hooks on one route
+`derive`, `decorate` and `wrap` are the shape of a middleware for every
+route after them; none of them is deprecated. A route's own list of hooks,
+`app.get(path, [canView], …)` made with `defineHook` or `defineWrap`, is:
+give the same checks as middlewares.
 
-A route takes hooks of its own, in a list after its path. Each is made once
-with `defineHook` — or `defineWrap`, for one around the rest — and names
-what it reads; the list runs after the hooks in force, in order, before
-validation:
-
-```ts
-import { alxia, defineHook } from '@alxia/core';
-
-const canView = defineHook<{ user: User; params: { id: string } }>()(
-	async ({ user, params, reply }) =>
-		(await mayView(user, params.id)) ? undefined : reply(403, { error: 'forbidden' as const }),
-);
-const loadBookmark = defineHook<{ params: { id: string } }>()(async ({ params }) => ({
-	bookmark: await bookmarks.find(params.id),
-}));
-
-const app = alxia()
-	.derive(authenticate) // adds `user`, or answers 401
-	.patch('/bookmarks/:id', [canView, loadBookmark], { body: UpdateBookmark },
-		async ({ bookmark, body, reply }) => reply.ok(await bookmarks.update(bookmark, body)));
-```
-
-What a hook adds, the hooks after it and the handler read; its replies join
-that route's type alone, so the client of `PATCH /bookmarks/:id` reads the
-403. A route whose context does not give what a hook names — no `user`
-derived before it, no `:id` in its path — does not compile. The hooks read
-`params`, `query` and `cookies` as they arrived, strings, and never
-`body`: the request is validated after them, so a refusing hook answers
-before a 400, and a check that needs the body belongs in the handler.
-`route()` and `ws` take the list too. A route takes at most 8.
-
-Hooks run before validation: `pathParams` holds the path's parameters as
-they arrived, and `cookies` the request's cookies, parsed on first read. A
-route's `cookies` schema validates them for its handler alone. `set.cookies`
-is the response's — its `get` reads what the response set, so it is `null`
-in a hook for a cookie the request sent:
+The hooks, and the middlewares before a `validate`, read the request as it
+arrived: `pathParams` holds the path's parameters as strings, and `cookies`
+the request's cookies, parsed on first read. A `validate({ cookies })` gives
+what follows it the validated ones. `set.cookies` is the response's — its
+`get` reads what the response set, so it is `null` in a hook for a cookie
+the request sent:
 
 ```ts
 .derive(({ cookies }) => ({ user: sessions.get(cookies['sid'] ?? '') ?? null }))
@@ -430,13 +495,14 @@ in a hook for a cookie the request sent:
 `onError` turns a thrown error into a reply the same way; an `HttpError`
 is answered as it says, and anything else is a 500 that leaks nothing, but
 for a client that hung up mid-request, a 499 nobody reads. `onRefusal`
-answers a request the route's schemas refuse, or whose body passes its
+answers a request a route's `validate` refuses, or whose body passes its
 `bodyLimit` ([Requests](#requests)); the last one declared before a route
 is the one it uses, and a hook of one kind, `onRefusal('validation', hook)`,
 falls back to it.
 
-Which one to reach for, where each applies and the order a request runs
-them in: [Middleware: which way to use](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md).
+Which one to reach for — a middleware, a route hook, a global hook, a
+plugin — where each applies and the order a request runs them in:
+[Middleware: which way to use](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md).
 
 Global hooks apply to the whole app, wherever they are declared:
 
@@ -530,14 +596,18 @@ covers all three kinds.
 | `Reply`, `HttpError`, `ResponseValidationError` | what a handler returns or throws |
 | `ContentTooLargeError`, `ContentTooLargeBody` | what reading a body past its route's `bodyLimit` throws — answered as a `body_limit` refusal — and the body of its default 413: `{ error: 'content_too_large', limit }` |
 | `ReplyInit` | a reply's options: `headers` |
-| `AnyReply`, `FreeReplyFunction`, `TypedReplyFunction`, `DeclaredReply`, `RedirectFunction` | any reply, `reply` without and with schemas, every reply a route with schemas may return, `redirect` |
+| `AnyReply`, `FreeReplyFunction`, `TypedReplyFunction`, `DeclaredReply`, `RedirectFunction` | any reply, `reply` without and behind a `responds`, every reply a route with schemas may return, `redirect` |
 | `FreeShortcuts`, `TypedShortcuts`, `SHORTCUTS`, `Shortcuts` | `reply`'s shortcuts without and with schemas, and the status of each |
 | `Plugin`, `AnyAlxia` | a function plugin, any app |
-| `defineHook(hook)`, `defineHook<Requires>()(hook)` | a hook for a route's list, `app.get(path, [hook], schema?, handler)`: what it returns is added to the context after it, a reply ends the request and joins the route's type; `Requires` is what it reads beyond `HookContext`, which the route must give |
-| `defineWrap(hook)`, `defineWrap<Requires>()(hook)` | a hook around the rest of a route, for its list: `next()` runs the hooks after it, validation and the handler; a socket's upgrade skips it |
-| `RouteHook<Requires, Result>`, `RouteWrap<Requires, Result>`, `AnyRouteHook` | what `defineHook` and `defineWrap` make, and any of them |
-| `HookContext<Requires>`, `RawRequestParts` | what a hook of a route's list reads: `BaseContext`, the `params` and `query` as they arrived, and `Requires` |
-| `ThreadHooks<Base, Hooks>`, `RouteHookBase<Ctx, Path>`, `HookProvided<Given, Requires>`, `AddedBy<Hook>`, `RepliesBy<Hook>`, `MaxRouteHooks`, `NoHookYet` | how a route's type threads its list: the check of each hook against what the route and the hooks before it give, what each adds and replies, the bound of 8. Exported so an app's type can be named in a declaration file |
+| `defineMiddleware(fn)`, `defineMiddleware<Requires>()(fn)` | a middleware, `(ctx, next) => …`, typed and returned as it is: `next(added)` adds `added` to the context after it, a reply ends the request and joins the route's type, a `Response` is sent as it is; `Requires` is what it reads beyond `BaseContext`, which the route must give where it is placed |
+| `validate(schemas)`, `RequestSchemas`, `Validated<Schemas>`, `ValidateRequires<Schemas>` | the middleware that validates `params`, `query`, `headers`, `cookies` and `body`, each with any Standard Schema; what it takes, what it passes on, the path parameters its `params` schema must read |
+| `responds(responses)` | the middleware that types the handler's `reply` by the statuses it declares, and checks the replies after it of those statuses against their schemas |
+| `Middleware<Requires, Result>`, `MiddlewareContext<Requires>`, `MiddlewareResult`, `MiddlewareReturn`, `Next<Added, Schema>`, `NextFunction` | a middleware, what it reads (`BaseContext & Requires`), what it may return, and `next`: called once at most, it resolves to the rest of the route's `Response`, branded by what was added |
+| `RouteOptions`, `SocketOptions` | a route's options, `bodyLimit` and `detail`; a socket's, `message`, `send` and `detail` |
+| `RouteMethod`'s `MiddlewareForms`, `OptionsForms` and `DeprecatedForms`; `SocketMethod`'s `SocketForms`, `SocketOptionsForms` and `DeprecatedSocketForms`; `RouteApp`, `AppWithRoute`, `AppWithSocket` | the forms of a route method and of `ws`: with and without options, and those of 0.3; the app's types and the method, as those forms read them; the app a call returns, its route or socket added. Exported so an app's type can be named in a declaration file |
+| `defineHook(hook)`, `defineHook<Requires>()(hook)`, `defineWrap(hook)`, `defineWrap<Requires>()(hook)` | deprecated: a hook for a route's list, `app.get(path, [hook], schema?, handler)`, and one around the rest of it. Still run as in 0.3; write a `defineMiddleware` instead |
+| `RouteHook<Requires, Result>`, `RouteWrap<Requires, Result>`, `AnyRouteHook`, `HookContext<Requires>`, `RawRequestParts` | what `defineHook` and `defineWrap` make, and what such a hook reads: `BaseContext`, the `params` and `query` as they arrived, and `Requires` |
+| `ThreadHooks<Base, Hooks>`, `RouteHookBase<Ctx, Path>`, `HookProvided<Given, Requires>`, `AddedBy<Hook>`, `RepliesBy<Hook>`, `MaxRouteHooks`, `NoHookYet` | how a route's type threads a deprecated list of hooks, bounded at 8. Exported so an app's type can be named in a declaration file |
 | `definePlugin<Requires>()(build)` | an app plugin built on an app whose context has `Requires`; `use` refuses it on an app that does not give them |
 | `Requiring<Requires>`, `ProvidedBy<Ctx, Requires>` | the marker on a `definePlugin` plugin, and the check `use` makes of it |
 | `RequiresOf<Ctx, Callback?>` | what a callback annotated `Ctx` reads beyond `BaseContext` — `{ user: User }` for `BaseContext & { user: User }`, `Empty` for nothing more: the `Requires` of a plugin that infers it from a callback it is given. A callback annotated `any` is refused on every app, with a message naming `Callback` |
@@ -552,10 +622,10 @@ covers all three kinds.
 | `ContextOf<App>` | what a route declared next on `App` reads: to type a GraphQL schema, a service |
 | `RequestContext`, `BaseContext`, `Context`, `ResponseSettings`, `HandlerResult` | what every hook reads (`BaseContext.cookies`: the request's), what a handler reads, what a route sets on its response, what a handler may return |
 | `ResponseCookies` | `set.cookies`: Bun's `CookieMap` of the cookies the response sets, whose `get` and `has` read those, never the request's |
-| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod` (its four forms: with or without a schema, with or without a list of hooks), `RefusalMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, what OpenAPI says of it, the checks its schema's type cannot express, a route method, the type of `onRefusal` (its four forms), a route and a socket as the app runs them |
-| `RouteOperation`, `OperationSchema`, `OperationMethod`, `CheckedOperation` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), the type of `route` (with a list of hooks or without), and the check it makes of the operation |
+| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod` (its forms: `path, options?, ...middlewares, handler`, and the deprecated schema and list of hooks), `RefusalMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, what OpenAPI says of it, the checks its schema's type cannot express, a route method, the type of `onRefusal` (its four forms), a route and a socket as the app runs them |
+| `RouteOperation`, `OperationSchema`, `OperationMethod`, `CheckedOperation` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), the type of `route` (with a list of hooks or without; unchanged), and the check it makes of the operation |
 | `StaticMethod`, `FileMethod`, `PageMethod`, `DecorateMethod`, `DeriveMethod`, `WrapMethod`, `BodyLimitMethod`, `ErrorMethod`, `RequestHookMethod`, `ResponseHookMethod`, `AroundMethod`, `StartHookMethod`, `StopHookMethod`, `ParserMethod`, `GroupMethod`, `UseMethod`, `RequestMethod`, `ListenMethod` | the types of the app's other methods, each holding its overloads and their documentation: `static`, `file`, `page`; the route hooks `decorate`, `derive`, `wrap`, `bodyLimit`, `onError`; the global hooks `onRequest`, `onResponse`, `around`, `onStart`, `onStop`, `parser`; `group` and `use`; `request` and `listen`. Exported so an app's type can be named in a declaration file |
-| `SocketMethod`, `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage`, `SocketRecord`, `SocketEntryOf` | sockets: the type of `ws` (with a list of hooks or without), what a socket route validates, what its handlers read, send and receive, the entry one socket adds to `RoutesOf` |
+| `SocketMethod`, `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage`, `SocketRecord`, `SocketEntryOf` | sockets: the type of `ws` (`path, options?, ...middlewares, handlers`, and the deprecated forms), what a deprecated socket schema validates, what its handlers read, send and receive, the entry one socket adds to `RoutesOf` |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema types |
 | `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426 |
 | `ValidationIssue`, `ValidationTarget` | one issue of a 400, and where the refused value was read from |
@@ -573,8 +643,8 @@ covers all three kinds.
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/core/docs): a page per area — routes and schemas, replies, hooks, groups and plugins, writing a plugin, static files, server-sent events, WebSockets, serving, and the app's type.
-- [Middleware: which way to use](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md): every way to run code around routes, side by side, and the order a request runs them in.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/core/docs): a page per area — routes and validation, replies, hooks, groups and plugins, writing a plugin, static files, server-sent events, WebSockets, serving, and the app's type.
+- [Middleware: which way to use](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md): middlewares, route hooks, global hooks and plugins side by side, and the order a request runs them in.
 - [Upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md): what the next release changes, and what can break.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/core/docs/roadmap.md): what is coming, and what is not planned.
