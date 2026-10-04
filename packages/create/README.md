@@ -141,10 +141,13 @@ or CI.
   packages within `^8.0.0`, Zod within `^4.2.0`; what no alxia package
   constrains goes to npm's `latest`. A newer major outside alxia's range is
   left out, and the output says so.
-- **Biome** is pinned exactly, and written exactly: the newest release of
-  the template's major, `2.5.15` writing `2.6.0` but never `3.0.0`. The registry is the one
-  `BUN_CONFIG_REGISTRY` or `npm_config_registry` names, else npmjs.org;
-  when it does not answer, the template's own versions stay, with a warning.
+- **Biome** is pinned exactly, and written exactly: the newest patch of
+  the template's minor, `2.5.15` writing `2.5.16` but never `2.6.0`, whose
+  new rules the template was not checked against.
+
+The registry is the one `BUN_CONFIG_REGISTRY` or `npm_config_registry`
+names, else npmjs.org; when it does not answer, the template's own
+versions stay, with a warning.
 
 ## Other package managers
 

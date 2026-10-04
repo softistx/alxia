@@ -139,18 +139,18 @@ describe('bumpDependencies', () => {
 		expect(bumped.held).toEqual([]);
 	});
 
-	test('an exact pin stays exact, moved to the newest of its own major', async () => {
+	test('an exact pin stays exact, moved to the newest of its own minor', async () => {
 		const { url } = registry();
 		const manifest: Manifest = {
 			devDependencies: { '@biomejs/biome': '2.5.15' },
 		};
 		const bumped = await bumpDependencies(manifest, { url });
 		expect(manifest).toEqual({
-			devDependencies: { '@biomejs/biome': '2.6.0' },
+			devDependencies: { '@biomejs/biome': '2.5.16' },
 		});
-		expect(bumped.moved).toEqual(['@biomejs/biome 2.5.15 -> 2.6.0']);
+		expect(bumped.moved).toEqual(['@biomejs/biome 2.5.15 -> 2.5.16']);
 		expect(bumped.held).toEqual([
-			"@biomejs/biome: kept to ^2.5.15, where the newest is 2.6.0; npm's latest, 3.0.0, is outside it",
+			"@biomejs/biome: kept to ~2.5.15, where the newest is 2.5.16; npm's latest, 3.0.0, is outside it",
 		]);
 	});
 

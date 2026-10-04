@@ -25,10 +25,12 @@ import { $ } from 'bun';
 import { pack } from './artifacts/install';
 import { readPackages } from './artifacts/packages';
 import { staleBuilds } from './artifacts/stale';
-import type { Tarball } from './artifacts/tarball';
+import { biomeClean } from './templates/biome';
 import { dockerRuns, dockerServed } from './templates/docker';
 import { startRegistry } from './templates/registry';
+import { report } from './templates/report';
 import { pageAndAsset, served } from './templates/serve';
+import { templateShipped } from './templates/shipped';
 
 interface Check {
 	readonly template: 'api' | 'react-router';
@@ -78,58 +80,6 @@ const CHECKS: readonly Check[] = [
 	},
 ];
 
-/** Prints `ok` or `FAIL` and the check's name; whether it passed. */
-function report(passed: boolean, what: string): boolean {
-	console.log(`${passed ? 'ok  ' : 'FAIL'} ${what}`);
-	return passed;
-}
-
-/**
- * `bun publish` leaves every `.gitignore` and `bunfig.toml` out of a
- * tarball, so the templates ship them as `gitignore` and `_bunfig.toml`,
- * renamed when they are copied; `biome.json` is `_biome.json`, which this
- * repository's Biome would refuse as a nested root. `.vscode/` ships as it is.
- */
-const SHIPPED: Readonly<Record<Check['template'], readonly string[]>> = {
-	api: [
-		'gitignore',
-		'_biome.json',
-		'.dockerignore',
-		'.env.example',
-		'.vscode/extensions.json',
-		'.vscode/settings.json',
-		'Dockerfile',
-		'package.json',
-		'src/app.ts',
-	],
-	'react-router': [
-		'gitignore',
-		'_bunfig.toml',
-		'_biome.json',
-		'.dockerignore',
-		'.vscode/extensions.json',
-		'.vscode/settings.json',
-		'Dockerfile',
-		'package.json',
-		'vite.config.ts',
-	],
-};
-
-function templateShipped(tarballs: readonly Tarball[]): boolean {
-	const create = tarballs.find(
-		({ manifest }) => manifest['name'] === '@alxia/create',
-	);
-	const entries = create?.entries ?? [];
-	return Object.entries(SHIPPED).every(([template, files]) =>
-		report(
-			files.every((file) =>
-				entries.includes(`package/templates/${template}/${file}`),
-			),
-			`@alxia/create's tarball holds templates/${template}: ${files.join(', ')}`,
-		),
-	);
-}
-
 /** `bun create @alxia` is `bunx @alxia/create`: the same bin, run alone. */
 async function helpRuns(workdir: string, env: Record<string, string>) {
 	const help = await $`bunx @alxia/create --help`
@@ -142,31 +92,6 @@ async function helpRuns(workdir: string, env: Record<string, string>) {
 		help.stdout.toString().startsWith('Usage: bun create @alxia');
 	if (!usage) console.error(help.stdout.toString(), help.stderr.toString());
 	return report(usage, 'bunx @alxia/create --help');
-}
-
-/**
- * `bun run check:ci` on the project, after its scripts wrote `dist/`,
- * `build/` and `.react-router/`, which its `biome.json` skips: no error,
- * warning or info. `biome ci` exits 0 on a warning; this does not.
- */
-async function biomeClean(
-	template: string,
-	dir: string,
-	env: Record<string, string>,
-): Promise<boolean> {
-	console.log(`\n=== ${template}: bun run check:ci\n`);
-	const run = await $`bun run check:ci --colors=off`
-		.cwd(dir)
-		.env(env)
-		.nothrow()
-		.quiet();
-	const output = `${run.stdout}${run.stderr}`;
-	console.log(output);
-	const diagnostics = output.match(/Found \d+ (error|warning|info)s?/g) ?? [];
-	return report(
-		run.exitCode === 0 && diagnostics.length === 0,
-		`${template}: bun run check:ci exited ${run.exitCode}${diagnostics.length > 0 ? `, ${diagnostics.join(', ')}` : ', no diagnostic'}`,
-	);
 }
 
 /** Creates `check`'s template in `workdir`, then runs its scripts and its server. */

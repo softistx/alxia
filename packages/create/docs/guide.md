@@ -308,7 +308,9 @@ in place of `noEmptyPattern` ([the `api` template](#the-api-template)).
   whichever the command wrote.
 - **What is generated is skipped.** `files.includes` leaves `dist/`, or
   `build/` and `.react-router/`, out, and `vcs.useIgnoreFile` every path
-  `.gitignore` names, the project in a git repository or not.
+  `.gitignore` names, the project in a git repository or not (without
+both a `.gitignore` and a repository, Biome refuses to run:
+[troubleshooting](troubleshooting.md#-biome-couldnt-find-an-ignore-file-in-the-following-folder-)).
 - **Two rules are off in the `react-router` project, for the scaffold's
   own code.** `noEmptyPattern`: `meta({}: Route.MetaArgs)` is React
   Router's idiom for a route module's function that reads none of its
@@ -319,7 +321,8 @@ in place of `noEmptyPattern` ([the `api` template](#the-api-template)).
 
 `@biomejs/biome` is a devDependency pinned exactly, as Biome recommends,
 since a release may format differently. The command moves it to the
-newest release of the same major and keeps it exact
+newest patch of the same minor and keeps it exact: a minor may add a
+recommended rule the template was not checked against
 ([Versions](#versions)). To move it later:
 
 ```sh
@@ -450,7 +453,7 @@ template pins exactly:
 | `zod` | `^4.2.0`, `@alxia/zod`'s |
 | `vite` | `^7.0.0 \|\| ^8.0.0`, `@alxia/react-router`'s |
 | `react-router`, `@react-router/*` | `^8.0.0`, `@alxia/react-router`'s; the `@react-router/*` packages take `react-router`'s version, which `@react-router/node` pins exactly |
-| `@biomejs/biome` | its own major, from the exact version the template pins: written exactly, `2.6.0`, never `^` |
+| `@biomejs/biome` | its own minor, from the exact version the template pins (`~2.5.15`): written exactly, `2.5.16`, never `^` |
 | anything else: `react`, `isbot`, Tailwind, `@types/*` | no alxia range: npm's `latest` |
 
 The command prints each move, and each newer major it left out:

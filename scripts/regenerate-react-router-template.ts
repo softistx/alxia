@@ -9,7 +9,7 @@
  * `examples/react-router`'s `bunfig.toml`, and its `Dockerfile` in place of
  * the scaffold's, which builds and runs the app on Node; and its
  * `README.md`'s commands on Bun, the package manager alxia uses (`toBun`).
- * Then Biome, as the `api` template has it (`addBiome`): `@biomejs/biome`
+ * Then Biome, as the `api` template has it (`templates/biome.ts`): `@biomejs/biome`
  * pinned at the workspace's version, the `lint`, `format`, `check`,
  * `check:ci` and `verify` scripts, `BIOME_CONFIG` as `biome.json`, the
  * `api` template's `.vscode/`, a Lint and format section in the README
@@ -34,6 +34,12 @@ import { mkdtemp, rename, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { $ } from 'bun';
+import {
+	addBiome,
+	addLintSection,
+	BIOME_CONFIG,
+	biomeVersion,
+} from './templates/biome';
 
 const ROOT = join(import.meta.dir, '..');
 const TEMPLATE = join(ROOT, 'packages/create/templates/react-router');
@@ -79,6 +85,7 @@ export function toBun(readme: string): string {
 type Manifest = {
 	scripts: Record<string, string>;
 	dependencies: Record<string, string>;
+	devDependencies?: Record<string, string>;
 	[key: string]: unknown;
 };
 
@@ -108,111 +115,6 @@ export function addAlxia(manifest: Manifest): Manifest {
 	};
 }
 
-/**
- * The project's Biome: Biome's defaults but for spaces, the scaffold's own
- * style, so formatting it once changes three files; Tailwind's directives
- * in CSS, which `app.css` uses; nothing generated; and two rules off for
- * the scaffold's code: `meta({}: Route.MetaArgs)`, React Router's own
- * idiom, is an empty pattern, and the welcome page's logos have no
- * `<title>`.
- */
-export const BIOME_CONFIG = {
-	$schema: './node_modules/@biomejs/biome/configuration_schema.json',
-	vcs: { enabled: true, clientKind: 'git', useIgnoreFile: true },
-	files: { includes: ['**', '!!**/build', '!!**/.react-router'] },
-	formatter: { enabled: true, indentStyle: 'space' },
-	css: { parser: { tailwindDirectives: true } },
-	linter: {
-		enabled: true,
-		rules: {
-			preset: 'recommended',
-			correctness: { noEmptyPattern: 'off' },
-		},
-	},
-	assist: {
-		enabled: true,
-		actions: { source: { organizeImports: 'on' } },
-	},
-	overrides: [
-		{
-			includes: ['**/app/welcome/**'],
-			linter: { rules: { a11y: { noSvgWithoutTitle: 'off' } } },
-		},
-	],
-};
-
-/** The scripts Biome adds, the `api` template's but for `verify`'s last step. */
-export const BIOME_SCRIPTS = {
-	lint: 'biome lint',
-	format: 'biome format --write',
-	check: 'biome check --write',
-	'check:ci': 'biome ci',
-	verify: 'bun run check:ci && bun run typecheck && bun run build',
-};
-
-/** The manifest with Biome's scripts, and `@biomejs/biome` pinned at `version`. */
-export function addBiome(manifest: Manifest, version: string): Manifest {
-	const devDependencies = (manifest['devDependencies'] ?? {}) as Record<
-		string,
-		string
-	>;
-	return {
-		...manifest,
-		scripts: { ...manifest.scripts, ...BIOME_SCRIPTS },
-		devDependencies: Object.fromEntries(
-			Object.entries({ ...devDependencies, '@biomejs/biome': version }).sort(
-				([a], [b]) => (a < b ? -1 : 1),
-			),
-		),
-	};
-}
-
-/** The README's section on Biome, the `api` template's but for `verify`. */
-export const LINT_SECTION = `## Lint and format
-
-[Biome](https://biomejs.dev) lints and formats the project, as \`biome.json\`
-sets it: Biome's recommended rules, spaces, double quotes, imports
-sorted. What the build and \`react-router typegen\` write, \`build/\` and
-\`.react-router/\`, is skipped.
-
-\`\`\`bash
-bun run check      # lint, format and sort imports, fixing what it can
-bun run lint       # lint only
-bun run format     # format only, in place
-bun run check:ci   # what CI runs: changes nothing, fails on any finding
-bun run verify     # check:ci, then typecheck, then build
-\`\`\`
-
-\`bun run check:ci\`, not \`bun ci\`: \`bun ci\` is Bun's frozen-lockfile
-install. In VS Code, \`.vscode/\` recommends Biome's extension and formats
-on save with it.
-
-\`@biomejs/biome\` is pinned exactly, since a release of Biome may format
-differently. To move it:
-
-\`\`\`bash
-bun add --dev --exact @biomejs/biome@latest
-bunx biome migrate --write
-\`\`\`
-
-`;
-
-/** The README with `LINT_SECTION` before its Styling section. */
-export function addLintSection(readme: string): string {
-	if (!readme.includes('\n## Styling\n')) {
-		throw new Error('README.md: expected a ## Styling section');
-	}
-	return readme.replace('\n## Styling\n', `\n${LINT_SECTION}## Styling\n`);
-}
-
-/** The version of Biome this workspace installed, which formats the template. */
-async function biomeVersion(): Promise<string> {
-	const { version } = await Bun.file(
-		join(ROOT, 'node_modules/@biomejs/biome/package.json'),
-	).json();
-	return version;
-}
-
 async function main(): Promise<void> {
 	const work = await mkdtemp(join(tmpdir(), 'alxia-rr-template-'));
 	try {
@@ -224,7 +126,7 @@ async function main(): Promise<void> {
 		);
 		const manifest = addBiome(
 			addAlxia(await Bun.file(join(out, 'package.json')).json()),
-			await biomeVersion(),
+			await biomeVersion(ROOT),
 		);
 		const config = addPlugin(
 			await Bun.file(join(out, 'vite.config.ts')).text(),

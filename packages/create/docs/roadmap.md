@@ -37,7 +37,8 @@ Nothing scheduled yet.
   `.vscode/` recommending Biome's extension. A new project passes
   `bun run check:ci` with no finding.
 - **The project's name in its README.** The name given to the command,
-  normalised, replaces the template's own in every file, as the README's
+  normalised, replaces the template's own, as a whole word, in every text
+  file, as the README's
   `docker build -t` and `docker run`.
 
 ### 0.1.4

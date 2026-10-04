@@ -107,7 +107,9 @@ function choose(
 /**
  * Whether `range` is one exact version, as `2.5.15`: how a template pins a
  * tool whose patch releases may change its output, as Biome asks to be
- * pinned. Such a dependency stays exact, and within its own major.
+ * pinned. Such a dependency stays exact, and within its own minor: a
+ * minor of Biome may add a recommended rule the template was not checked
+ * against.
  */
 export function isExact(range: string): boolean {
 	return /^\d+\.\d+\.\d+$/.test(range);
@@ -144,7 +146,8 @@ export function newestOfMinor(
  * `built[name]` for a package it names — alxia's, at the ranges this
  * `@alxia/create` was published with — else within the range alxia's peers
  * hold it to, else npm's `latest`. A dependency the template pins exactly
- * (`isExact`) is rewritten exactly, to the newest of its own major. A package of `built` with no release in
+ * (`isExact`) is rewritten exactly, to the newest of its own minor. A
+ * package of `built` with no release in
  * its range, as when npm has not yet propagated a version published minutes
  * ago, takes the newest of the range's own minor, named in `behind`: `^` it
  * is still within the range. React Router's own packages take the version
@@ -194,7 +197,7 @@ export async function bumpDependencies(
 		const pinned = built[name];
 		const exact = isExact(current);
 		const range =
-			pinned ?? allowedRange(name) ?? (exact ? `^${current}` : undefined);
+			pinned ?? allowedRange(name) ?? (exact ? `~${current}` : undefined);
 		const latest = meta['dist-tags']?.['latest'];
 		const follow = chosen.get('react-router');
 		let version =

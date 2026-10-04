@@ -24,7 +24,7 @@ const VERSIONS = {
 	zod: ['4.2.0', '4.6.5'],
 	typescript: ['6.0.3', '7.0.2'],
 	'@types/bun': ['1.4.2'],
-	'@biomejs/biome': ['2.5.15', '2.5.16', '3.0.0'],
+	'@biomejs/biome': ['2.5.15', '2.5.16', '2.6.0', '3.0.0'],
 	'react-router': ['8.4.0'],
 	'@react-router/node': ['8.4.0'],
 	'@react-router/serve': ['8.4.0'],
@@ -142,7 +142,7 @@ describe('create-alxia', () => {
 			'src',
 			'tsconfig.json',
 		]);
-		// Pinned exactly, as Biome asks, and held to the template's major.
+		// Pinned exactly, as Biome asks, and held to the template's minor.
 		expect(
 			(await json(join(dir, 'package.json'))).devDependencies['@biomejs/biome'],
 		).toBe('2.5.16');

@@ -428,7 +428,8 @@ settings alone, delete the project's `biome.json` and its
 ### `× Biome couldn't find an ignore file in the following folder: …`
 
 **When:** `bun run check:ci`, `check`, `lint` or `format` in a project
-whose `.gitignore` was deleted or renamed.
+with no `.gitignore`, deleted or renamed, and outside any git repository.
+Inside one, Biome reads git's ignore rules and runs.
 
 **Why:** `biome.json` sets `vcs.useIgnoreFile`, which skips what
 `.gitignore` names, and Biome refuses to run without the file it was told

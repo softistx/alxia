@@ -89,7 +89,7 @@ sorted. What the build and `react-router typegen` write, `build/` and
 bun run check      # lint, format and sort imports, fixing what it can
 bun run lint       # lint only
 bun run format     # format only, in place
-bun run check:ci   # what CI runs: changes nothing, fails on any finding
+bun run check:ci   # what CI runs: changes nothing, fails on an error
 bun run verify     # check:ci, then typecheck, then build
 ```
 
