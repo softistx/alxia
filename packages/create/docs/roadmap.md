@@ -30,12 +30,16 @@ Nothing scheduled yet.
 
 ### Next release
 
+- **Every `Dockerfile` builds, and the image holds the build alone.** The
+  `api` template's builds `dist/server.js`, bundled, minified and source
+  mapped, and runs it with no `node_modules` and no `src/`; `start` runs
+  `dist/server.js` after `bun run build`. The `react-router` template's
+  copies `build/` alone, which `@alxia/react-router`'s plugin now bundles
+  whole. Each image is about 50 MB (api) and 150 MB (react-router)
+  smaller.
 - **The `api` template is files, copied, with a `Dockerfile`.** It ships
   under `templates/api/` and is copied as `react-router`'s is. New in it:
-  a `Dockerfile` on `oven/bun:1` that installs the production
-  dependencies and runs `src/server.ts` as the non-root `bun` user,
-  `.dockerignore`, `.env.example`, and `start` running the source with no
-  build first.
+  a `Dockerfile` on `oven/bun:1`, `.dockerignore` and `.env.example`.
 
 ### 0.1.1
 

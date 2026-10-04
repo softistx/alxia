@@ -128,6 +128,27 @@ describe('the stored templates', () => {
 				expect(dockerfile).toContain('\nUSER bun\n');
 			});
 
+			test('its Dockerfile builds, and its final stage holds the build output, no node_modules', async () => {
+				const dockerfile = await Bun.file(
+					join(TEMPLATES, name, 'Dockerfile'),
+				).text();
+				const stages = dockerfile.split(/^(?=FROM )/m).slice(1);
+				expect(stages.length).toBeGreaterThanOrEqual(2);
+				const final = stages.at(-1) ?? '';
+				const building = stages.slice(0, -1);
+				expect(
+					building.some((stage) => /^RUN bun run build$/m.test(stage)),
+				).toBe(true);
+				// What the image holds is copied from the build stage alone.
+				const copies = final.match(/^COPY .+$/gm) ?? [];
+				expect(copies.length).toBeGreaterThan(0);
+				for (const copy of copies) {
+					expect(copy).toStartWith('COPY --from=build ');
+					expect(copy).not.toContain('node_modules');
+				}
+				expect(final).not.toMatch(/^RUN bun install/m);
+			});
+
 			test("names alxia's packages as workspace:^, which the copy replaces", async () => {
 				const stored = await Bun.file(
 					join(TEMPLATES, name, 'package.json'),

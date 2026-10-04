@@ -39,21 +39,30 @@ bun run typecheck
 
 ## Build
 
-Bun runs the TypeScript as it is: `bun start` serves `src/server.ts`, with
-no build step. `bun run build` bundles the server and its dependencies into
-one file, for a host with Bun and no `node_modules`:
+`bun run build` bundles the server and its dependencies into one file,
+`dist/server.js`, minified, with its source map beside it, and `bun start`
+runs it: what production and the image run.
 
 ```sh
-bun run build    # dist/server.js
-bun dist/server.js
+bun run build    # dist/server.js and dist/server.js.map
+bun start        # bun dist/server.js
 ```
+
+`dist/` needs Bun and nothing else, no `node_modules`. Bun reads the
+source map, so a stack trace names the lines of `src/`. `bun dev` and
+`bun test` run the TypeScript as it is, with no build.
+
+A dependency that cannot be bundled, a native addon, is left out with
+`--external <name>` in the `build` script, and must then be installed
+beside `dist/`.
 
 ## Docker
 
-The `Dockerfile` installs the production dependencies on `oven/bun:1` and
-runs `src/server.ts` as the image's non-root `bun` user. It installs with
-`--frozen-lockfile`, from the `bun.lock` that `bun install` wrote: commit
-it.
+The `Dockerfile` builds in a stage of its own, on `oven/bun:1`: it
+installs every dependency with `--frozen-lockfile`, from the `bun.lock`
+that `bun install` wrote (commit it), and runs `bun run build`. The image
+holds `dist/` alone, no `node_modules` and no `src/`, and runs
+`bun dist/server.js` as its non-root `bun` user.
 
 ```sh
 docker build -t my-api .

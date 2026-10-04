@@ -14,7 +14,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/openapi-routes` | `implemented` and `matchesSpec`: every operation of an OpenAPI document has a route, read from `app.routes` | core |
 | `@alxia/zod` | Zod coercions (`zq`) and the OpenAPI converter | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's hooks and typed context, Yoga's plugins | core, graphql-yoga, graphql |
-| `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its hooks, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js` built for Bun (the `ssr` environment gains the `bun` condition, `bun` and `bun:*` as builtins, `esnext`, all merged with the app's own); the `alxia-react-router reveal` bin writes the default server out | core, react-router; vite (optional, `/vite`) |
+| `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its hooks, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js` built for Bun (the `ssr` environment gains the `bun` condition, `bun` and `bun:*` as builtins, `esnext`, all merged with the app's own) and self-contained under `react-router build` (`resolve.noExternal: true`, unless the app set `ssr.external: true`; a list it sets stays external), so `build/` runs with no `node_modules`; the `alxia-react-router reveal` bin writes the default server out | core, react-router; vite (optional, `/vite`) |
 | `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | function plugins: global hooks; `secureHeaders({ nonce: true })` is an app plugin, adding a typed `nonce` | core |
 | `@alxia/rate-limit`, `@alxia/jwt`, `@alxia/logger` | app plugins: typed context, typed replies, routes | core |
 | `@alxia/env` | environment variables through any Standard Schema | — |
@@ -25,7 +25,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/telemetry` | a server span per request, on `@nxgt/telemetry` | core, @nxgt/telemetry |
 | `@alxia/redis` | rate-limit and response-cache stores, idempotency, caches and locks, on `@nxgt/redis` and `@nxgt/redis-guard` | core, @nxgt/redis, @nxgt/redis-guard, zod; rate-limit and cache (optional) |
 | `@alxia/janus` | sessions, refusals and permissions, on `@nxgt/janus` | core, @nxgt/janus |
-| `@alxia/create` | `bun create @alxia [dir] [--template api\|react-router]`: the `create-alxia` bin, no module. Each template is files under `templates/<name>/`, copied by one `copyTemplate` (`src/copy.ts`) that rewrites only `package.json` (`workspace:^` on `@alxia/*` replaced by the ranges it was published with) and renames `gitignore` and `_bunfig.toml`, which `bun publish` drops, to `.gitignore` and `bunfig.toml`. `api` is alxia's own, with a Bun `Dockerfile` that runs `src/server.ts` with no build stage, `.dockerignore` and `.env.example`; `react-router` is React Router's official scaffold committed as generated plus `examples/react-router`'s alxia layer, its Bun `Dockerfile` included. No scaffold runs at creation. Every dependency is moved to the registry's newest at creation: alxia's within the ranges it was published with (the newest of the same minor while npm has not propagated the exact version yet), the rest within alxia's peer ranges | — (dev: core, client, react-router, whose versions it writes) |
+| `@alxia/create` | `bun create @alxia [dir] [--template api\|react-router]`: the `create-alxia` bin, no module. Each template is files under `templates/<name>/`, copied by one `copyTemplate` (`src/copy.ts`) that rewrites only `package.json` (`workspace:^` on `@alxia/*` replaced by the ranges it was published with) and renames `gitignore` and `_bunfig.toml`, which `bun publish` drops, to `.gitignore` and `bunfig.toml`. `api` is alxia's own, with a Bun `Dockerfile` that builds `dist/server.js` and holds `dist/` alone (`start` runs `bun dist/server.js`), `.dockerignore` and `.env.example`; `react-router` is React Router's official scaffold committed as generated plus `examples/react-router`'s alxia layer, its Bun `Dockerfile` included. No scaffold runs at creation. Every dependency is moved to the registry's newest at creation: alxia's within the ranges it was published with (the newest of the same minor while npm has not propagated the exact version yet), the rest within alxia's peer ranges | — (dev: core, client, react-router, whose versions it writes) |
 
 Its skeleton is `softistx/nxgt-http`'s: the Bun workspace, the root
 `build.ts`, Biome, changesets, `scripts/publish.ts` and `verify:artifacts`.
@@ -54,7 +54,7 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
 
 | example | what it shows |
 | --- | --- |
-| `examples/react-router` | React Router's official template (`bunx create-react-router@latest`, committed as generated), then `@alxia/react-router` added in four changes (`bun add`, `alxia()` in `vite.config.ts`, `start: bun build/server/index.js`, a `bunfig.toml`), the template's Node `Dockerfile` replaced by a multi-stage one on `oven/bun:1`, then an optional `app/server.ts`. That file holds `createServer()` with logger, compress and secure-headers with a nonce per request and a policy the pages pass, a cookie session deriving `user`, `POST /api/todos` validated by Zod, `getLoadContext` and the `Register` declaration. On top of the template: `app/entry.server.tsx` as `react-router reveal` writes it, plus `nonceOf(loadContext)` in three lines; the home loader reading `alxiaOf(context).user`, a sign-in action, a todo form with a 400, and a page streamed behind `<Await>`. `app/server.spec.ts` builds it, runs `bun build/server/index.js` on a free port, starts `react-router dev` on a free port to check the nonce on every script there and in the build, and builds a copy without `app/server.ts` to check the default server. |
+| `examples/react-router` | React Router's official template (`bunx create-react-router@latest`, committed as generated), then `@alxia/react-router` added in four changes (`bun add`, `alxia()` in `vite.config.ts`, `start: bun build/server/index.js`, a `bunfig.toml`), the template's Node `Dockerfile` replaced by a multi-stage one on `oven/bun:1` whose image holds `build/` alone, then an optional `app/server.ts`. That file holds `createServer()` with logger, compress and secure-headers with a nonce per request and a policy the pages pass, a cookie session deriving `user`, `POST /api/todos` validated by Zod, `getLoadContext` and the `Register` declaration. On top of the template: `app/entry.server.tsx` as `react-router reveal` writes it, plus `nonceOf(loadContext)` in three lines; the home loader reading `alxiaOf(context).user`, a sign-in action, a todo form with a 400, and a page streamed behind `<Await>`. `app/server.spec.ts` builds it, runs `bun build/server/index.js` on a free port, starts `react-router dev` on a free port to check the nonce on every script there and in the build, and builds a copy without `app/server.ts` to check the default server. |
 
 ## Principles
 
@@ -193,11 +193,13 @@ installed tarball with `--help`.
   and runs `bun create @alxia` against it, with an empty Bun cache, for each
   template: the project installs this checkout's packages, then its
   `typecheck`, `test` (the `api` template) and `build` run, and its
-  `bun run start` answers (`POST /todos` 201, `GET /` 200). It also runs
+  `bun run start` answers (`POST /todos` 201, `GET /` 200 and one
+  `/assets/*.js` it names 200). It also runs
   `bunx @alxia/create --help`, and checks `@alxia/create`'s tarball holds
   each template's files, `gitignore` and `_bunfig.toml` included. Then it
   builds each project's `Dockerfile` and expects the same answer from the
-  container (`scripts/templates/docker.ts`): `bun.lock` is pointed at the
+  container (`scripts/templates/docker.ts`, which logs the image's size):
+  `bun.lock` is pointed at the
   registry as `host.docker.internal`, mapped by `--add-host` on Linux. With
   no Docker daemon it skips that step locally and fails on CI (`CI` set). It
   needs the network: every non-alxia dependency comes from npm, at the
@@ -264,6 +266,10 @@ package is public and MIT, with its own copy of `LICENSE`.
 - Commit messages: `<type>: <Capitalized summary>`, with `feat`, `fix`,
   `update`, `chore`, `docs`, `typo`, `ci`, `test` (specs and fixtures
   alone, no change a consumer sees).
+- Dockerfiles build, and the final image holds the build output, not
+  `node_modules`: a build stage runs `bun run build`, and the last stage
+  copies its output alone. `create/src/copy.spec.ts` checks every
+  template's.
 - Bun is the package manager in every command, doc, template, Dockerfile
   and script: `bun install`, `bun run`, `bunx`, `bun create`, `oven/bun`,
   unless an exception is stated. The one documented exception: `npm create

@@ -8,6 +8,7 @@ import { relative } from 'node:path';
 // copy of this package's own.
 import type { Plugin, ResolvedConfig } from 'vite';
 import { bunEnvironment } from './bun';
+import { bundledEnvironment } from './bundle';
 import {
 	clientPath,
 	contextOf,
@@ -55,6 +56,10 @@ const RESOLVED_DEFAULT = `\0${DEFAULT}`;
  * - **Built for Bun**: the `ssr` environment resolves packages with the
  *   `bun` export condition, leaves `bun` and `bun:*` external, and targets
  *   `esnext` unless the app set a target. What the app set is kept.
+ * - **Self-contained**: `react-router build` bundles every package into
+ *   `build/server/index.js` (`ssr.noExternal: true`), so `build/` runs with
+ *   no `node_modules`. `ssr.external` keeps the packages it names external,
+ *   and `ssr.external: true` all of them.
  *
  * The server is `app/server.ts`'s default export, `createServer()` from
  * `@alxia/react-router`, or without that file `createServer()` as it is.
@@ -81,7 +86,13 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 			// environment as the app and the plugins left it, built for Bun.
 			// An app that chose `ssr.target: 'webworker'` keeps Vite's own.
 			if (name !== 'ssr' || env.isSsrTargetWebworker === true) return;
-			return bunEnvironment(options);
+			const added = bunEnvironment(options);
+			// Built, the server is self-contained; in dev, Vite's SSR runner
+			// loads the packages from node_modules.
+			const bundled =
+				env.command === 'build' ? bundledEnvironment(options) : undefined;
+			if (bundled === undefined) return added;
+			return { ...added, resolve: { ...added.resolve, ...bundled.resolve } };
 		},
 		configResolved(resolved) {
 			config = resolved;

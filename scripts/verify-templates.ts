@@ -67,7 +67,16 @@ const CHECKS: readonly Check[] = [
 			'app/root.tsx',
 		],
 		scripts: ['typecheck', 'build'],
-		request: (base) => fetch(`${base}/`),
+		// The page, and one of the client build's scripts it names: a client
+		// navigation loads, from build/ alone in the image.
+		request: async (base) => {
+			const page = await fetch(`${base}/`);
+			const html = await page.clone().text();
+			const asset = html.match(/\/assets\/[\w.-]+\.js/)?.[0];
+			if (asset === undefined) return new Response(null, { status: 404 });
+			const served = await fetch(`${base}${asset}`);
+			return served.ok ? page : served;
+		},
 		expected: 200,
 	},
 ];
