@@ -432,8 +432,9 @@ with no `.gitignore`, deleted or renamed, and outside any git repository.
 Inside one, Biome reads git's ignore rules and runs.
 
 **Why:** `biome.json` sets `vcs.useIgnoreFile`, which skips what
-`.gitignore` names, and Biome refuses to run without the file it was told
-to read.
+`.gitignore` names. Inside a git repository Biome falls back on git's
+own ignore rules; with no `.gitignore` and no repository, it refuses to
+run rather than skip nothing.
 
 **Fix:** put a `.gitignore` back, even an empty one, or set
 `"useIgnoreFile": false` in `biome.json`'s `vcs`: `files.includes` still

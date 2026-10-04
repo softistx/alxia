@@ -8,7 +8,10 @@ import { report } from './report';
  * renamed when they are copied; `biome.json` is `_biome.json`, which this
  * repository's Biome would refuse as a nested root. `.vscode/` ships as it is.
  */
-const SHIPPED: Readonly<Record<string, readonly string[]>> = {
+/** The templates `@alxia/create` ships. */
+export type TemplateName = 'api' | 'react-router';
+
+const SHIPPED: Readonly<Record<TemplateName, readonly string[]>> = {
 	api: [
 		'gitignore',
 		'_biome.json',

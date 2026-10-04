@@ -30,10 +30,10 @@ import { dockerRuns, dockerServed } from './templates/docker';
 import { startRegistry } from './templates/registry';
 import { report } from './templates/report';
 import { pageAndAsset, served } from './templates/serve';
-import { templateShipped } from './templates/shipped';
+import { type TemplateName, templateShipped } from './templates/shipped';
 
 interface Check {
-	readonly template: 'api' | 'react-router';
+	readonly template: TemplateName;
 	/** Files the project must hold, as a template copied them. */
 	readonly files: readonly string[];
 	readonly scripts: readonly string[];

@@ -308,9 +308,9 @@ in place of `noEmptyPattern` ([the `api` template](#the-api-template)).
   whichever the command wrote.
 - **What is generated is skipped.** `files.includes` leaves `dist/`, or
   `build/` and `.react-router/`, out, and `vcs.useIgnoreFile` every path
-  `.gitignore` names, the project in a git repository or not (without
-both a `.gitignore` and a repository, Biome refuses to run:
-[troubleshooting](troubleshooting.md#-biome-couldnt-find-an-ignore-file-in-the-following-folder-)).
+  `.gitignore` names, the project in a git repository or not (with no
+  `.gitignore` and no git repository, Biome refuses to run:
+  [troubleshooting](troubleshooting.md#-biome-couldnt-find-an-ignore-file-in-the-following-folder-)).
 - **Two rules are off in the `react-router` project, for the scaffold's
   own code.** `noEmptyPattern`: `meta({}: Route.MetaArgs)` is React
   Router's idiom for a route module's function that reads none of its
