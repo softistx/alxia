@@ -9,6 +9,7 @@ break yours.
 | Change | Package | Can it break your code |
 | --- | --- | --- |
 | [One middleware model](#one-middleware-model) | core | no: the forms of 0.3 still work, deprecated |
+| [No more client: spec first](#no-more-client-spec-first) | core, client | yes: `@alxia/client`, `RoutesOf` and the route table are gone, and `Alxia` takes three type parameters |
 
 ### One middleware model
 
@@ -16,8 +17,7 @@ break yours.
 options: `app.<method>(path, options?, ...middlewares, handler)`. A
 middleware is `(ctx, next) => …`, made once with `defineMiddleware`. It
 returns `next(added)` to pass `added` on, typed, to the middlewares after
-it and to the handler; a reply, which ends the request and joins the
-route's type; or a `Response`, sent as it is. `next()` resolves to the
+it and to the handler; a reply, which ends the request; or a `Response`, sent as it is. `next()` resolves to the
 response of the rest of the route, so a middleware that awaits it runs
 around them. The request's schemas are middlewares too: `validate(…)` for
 the request, `responds(…)` for the replies. They run where they stand.
@@ -217,8 +217,8 @@ in the options of a route with middlewares does not compile. The handler
 reads the same validated parts, and its `reply` is typed by `responds` as
 it was by `response`. A refused request is still answered by the
 `onRefusal` hook in force, by default `400 { error: 'validation', issues }`.
-`@alxia/openapi` and `@alxia/client` read the schemas of `validate` and
-`responds` as they read the route's schema.
+`@alxia/openapi` reads the schemas of `validate` and `responds` as it read
+the route's schema.
 
 #### 5. A socket's schema becomes options and `validate`
 
@@ -267,7 +267,7 @@ reads the validated parts.
 must have a status it declares, as with `response` in 0.3, and is sent as
 its schema's output. A middleware after it that replies with a declared
 status is checked too; one that replies with another status, such as an
-`auth`'s 401, is sent as it is, as the route's type says. A reply made
+`auth`'s 401, is sent as it is. A reply made
 before it is not checked:
 
 ```ts
@@ -276,6 +276,80 @@ app.get('/me', responds({ 200: User }), auth, handler);
 // declare the 401 to check auth's reply too
 app.get('/me', responds({ 200: User, 401: Unauthorized }), auth, handler);
 ```
+
+### No more client: spec first
+
+**What changed.** alxia is OpenAPI spec first: the OpenAPI document is the
+contract between the server and its clients, and you bring the client
+generator — the examples use
+[`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen).
+So the server no longer builds a route table in its type for a client to
+read:
+
+- `@alxia/client` is retired: it is no longer released, and its last
+  version is to be deprecated on npm with:
+
+  ```sh
+  npm deprecate @alxia/client "Retired: alxia is OpenAPI spec first. Generate a client from your OpenAPI document, e.g. with @nxgt/openapi-codegen. See https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md"
+  ```
+- `Alxia` loses its `Routes` type parameter: it is
+  `Alxia<Ctx, Prefix, Shortcuts>`, and `typeof app` holds no route table.
+  The `~routes` field and `RoutesOf` are gone.
+- The types that only described a route to the client are gone:
+  `RouteEntryOf`, `RouteInput`, `RouteOutput`, `RouteRecord`, `RouteTable`,
+  `Outcome`, `OutcomeOf`, `SocketEntryOf`, `SocketRecord`,
+  `RefusalOutcome`, `KindOutcome`, `DefaultRefusalOutcome`,
+  `DefaultLimitOutcome`, `IsLimited`, `BehindShortcuts`, `ThreadReplies`
+  and `AppWithSocket`. `AppWithRoute<App>` takes one parameter: the app,
+  unchanged.
+
+What a handler reads is typed as before: what its middlewares add,
+`validate`'s outputs, `reply` typed by `responds`, the path's parameters
+checked against its schema, and `ContextOf`.
+
+**Can it break your code.** Yes, where it names what was removed:
+
+- code that imports `@alxia/client`, or `RoutesOf` or another removed type
+  from `@alxia/core`, no longer compiles;
+- code that writes `Alxia<A, B, C, D>` drops the second argument:
+  `Alxia<A, C, D>`. `Alxia<Ctx>` and `AnyAlxia` are unchanged.
+
+**How to migrate.** Keep an OpenAPI document for the API — written by
+hand, or generated with `@alxia/openapi` — and generate the client from it:
+
+```ts
+// before
+import { client } from '@alxia/client';
+import type { App } from './server';
+
+const api = client<App>('http://localhost:3000');
+const user = await api.get('/users/:id', { params: { id: 1 } });
+```
+
+```sh
+# after: a client generated from the document
+bun add -d @nxgt/openapi-codegen
+bunx nxgt-openapi generate -i openapi/openapi.yaml -o src/generated
+```
+
+A test that called the app through `client(app)` calls it in process with
+`app.request()` instead:
+
+```ts
+// before
+const result = await client(app).get('/users/:id', { params: { id: 1 } });
+expect(result.status).toBe(200);
+expect(result.data).toEqual({ id: 1, name: 'Ada' });
+
+// after
+const response = await app.request('/users/1');
+expect(response.status).toBe(200);
+expect(await response.json()).toEqual({ id: 1, name: 'Ada' });
+```
+
+A type test that read `RoutesOf<typeof app>[path][method]['output']`
+checks the handler instead, with `expectTypeOf` inside it
+([The app's type](guide/types.md#testing)).
 
 ## 0.3.1
 

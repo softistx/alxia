@@ -6,32 +6,11 @@ import type { AnyReply } from '../reply/reply';
 import type { JoinPath, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
 import type { AnyAlxia } from './signatures';
-import type {
-	BehindShortcuts,
-	Empty,
-	ProvidedBy,
-	RouteRecord,
-	ThenShortcuts,
-} from './types';
-
-/** The routes of a plugin, under the prefix of the app it is used by. */
-type Prefixed<Prefix extends string, Routes, Shortcuts> = {
-	readonly [Path in keyof Routes as Path extends string
-		? JoinPath<Prefix, Path>
-		: never]: {
-		readonly [M in keyof Routes[Path]]: Routes[Path][M] extends RouteRecord<
-			infer Input,
-			infer Output
-		>
-			? RouteRecord<Input, BehindShortcuts<Output, Shortcuts>>
-			: Routes[Path][M];
-	};
-};
+import type { Empty, ProvidedBy, ThenShortcuts } from './types';
 
 /** `app.group(prefix, build)` or `app.group(build)`. */
 export interface GroupMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -43,34 +22,20 @@ export interface GroupMethod<
 	 * app.group('/admin', (admin) => admin.derive(requireAdmin).get('/stats', ...));
 	 * ```
 	 */
-	<
-		const Path extends RoutePath,
-		GroupRoutes extends object,
-		GroupCtx extends object,
-		GroupShortcuts extends AnyReply,
-	>(
+	<const Path extends RoutePath>(
 		prefix: Path,
-		build: (
-			group: Alxia<Ctx, Empty, JoinPath<Prefix, Path>, Shortcuts>,
-		) => Alxia<GroupCtx, GroupRoutes, JoinPath<Prefix, Path>, GroupShortcuts>,
-	): Alxia<Ctx, Routes & GroupRoutes, Prefix, Shortcuts>;
+		build: (group: Alxia<Ctx, JoinPath<Prefix, Path>, Shortcuts>) => AnyAlxia,
+	): Alxia<Ctx, Prefix, Shortcuts>;
 	/** Routes declared in a scope, under this app's prefix. */
-	<
-		GroupRoutes extends object,
-		GroupCtx extends object,
-		GroupShortcuts extends AnyReply,
-	>(
-		build: (
-			group: Alxia<Ctx, Empty, Prefix, Shortcuts>,
-		) => Alxia<GroupCtx, GroupRoutes, Prefix, GroupShortcuts>,
-	): Alxia<Ctx, Routes & GroupRoutes, Prefix, Shortcuts>;
+	(
+		build: (group: Alxia<Ctx, Prefix, Shortcuts>) => AnyAlxia,
+	): Alxia<Ctx, Prefix, Shortcuts>;
 }
 
 /** `app.use(plugin)`: an app, or a function given this app. */
 export interface UseMethod<
 	App,
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -90,18 +55,12 @@ export interface UseMethod<
 	 */
 	<
 		PluginCtx extends object,
-		PluginRoutes extends object,
 		PluginPrefix extends string,
 		PluginShortcuts extends AnyReply,
 		PluginRequires = Empty,
 	>(
-		plugin: Alxia<PluginCtx, PluginRoutes, PluginPrefix, PluginShortcuts> & {
+		plugin: Alxia<PluginCtx, PluginPrefix, PluginShortcuts> & {
 			readonly '~requires'?: PluginRequires;
 		} & ProvidedBy<Ctx, PluginRequires>,
-	): Alxia<
-		Ctx & PluginCtx,
-		Routes & Prefixed<Prefix, PluginRoutes, Shortcuts>,
-		Prefix,
-		ThenShortcuts<Shortcuts, PluginShortcuts>
-	>;
+	): Alxia<Ctx & PluginCtx, Prefix, ThenShortcuts<Shortcuts, PluginShortcuts>>;
 }

@@ -74,9 +74,9 @@ export interface RoutingErrorBody {
 /**
  * An error a handler or a hook throws to answer with `status` and `body`.
  *
- * Prefer returning `reply(status, body)`: a reply is part of the route's
- * type, and the client sees it. A thrown `HttpError` is not, so the client
- * reads it as a status the route never declared.
+ * Prefer returning `reply(status, body)`: a reply is checked against the
+ * route's `responds`, at compile time and at runtime. A thrown `HttpError`
+ * is not: it answers a status the route may never have declared.
  */
 export class HttpError<
 	Status extends number = number,

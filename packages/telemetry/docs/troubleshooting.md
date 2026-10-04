@@ -6,7 +6,7 @@ the server log, or, for what prints nothing, what you see in your traces.
 **Types**
 
 - [`Property 'span' does not exist on type 'Context<…>'`](#property-span-does-not-exist-on-type-context)
-- [`Type 'Alxia<Empty, Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'`](#type-alxiaempty-empty--never-is-not-assignable-to-type-telemetrypluginoptions)
+- [`Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'`](#type-alxiaempty--never-is-not-assignable-to-type-telemetrypluginoptions)
 - [`Property 'service' is missing in type '…' but required in type '{ readonly service: string; readonly instance?: undefined; }'`](#property-service-is-missing-in-type--but-required-in-type--readonly-service-string-readonly-instance-undefined-)
 - [`Type 'Telemetry' is not assignable to type 'undefined'`](#type-telemetry-is-not-assignable-to-type-undefined)
 - [`Object literal may only specify known properties, and 'version' does not exist in type 'Hooks & { readonly instance: Telemetry; … }'`](#object-literal-may-only-specify-known-properties-and-version-does-not-exist-in-type-hooks---readonly-instance-telemetry--)
@@ -59,14 +59,14 @@ const app = alxia()
 	});
 ```
 
-### `Type 'Alxia<Empty, Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'`
+### `Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'`
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(plugin: (app: Alxia<Empty, Empty, "", never>) => …): …', gave the following error.
-    Argument of type '(options: TelemetryPluginOptions) => …' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => …'.
+  Overload 1 of 2, '(plugin: (app: Alxia<Empty, "", never>) => …): …', gave the following error.
+    Argument of type '(options: TelemetryPluginOptions) => …' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => …'.
       Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'.
+        Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'.
 ```
 
 **When:** `app.use(telemetry)`, without calling it.

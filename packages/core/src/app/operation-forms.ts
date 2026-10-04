@@ -3,23 +3,31 @@
  * handler)`, the operation's schemas as an implicit `responds` first and an
  * implicit `validate` just before the handler.
  */
-import type { JoinPath } from '../types/path';
 import type {
 	OperationApp,
-	OperationOptions,
 	OperationResponds,
 	OperationValidate,
 } from './operation-types';
 import type {
 	AppTypes,
 	AppWithRoute,
+	RouteBase,
 	RouteHandler,
 	RouteMiddleware,
 	RouteResult,
 } from './route-forms';
 import type { CheckedOperation, RouteOperation } from './route-operation';
-import type { MiddlewareReturn } from './types';
+import type { MiddlewareReturn, ThreadContext } from './types';
 
+/** The context the implicit `validate` reads: the implicit `responds`'s, then the middlewares'. */
+type BeforeValidate<
+	App extends AppTypes,
+	Op extends RouteOperation,
+	Results extends readonly unknown[],
+> = ThreadContext<
+	RouteBase<OperationApp<App, Op>, Op['path']>,
+	[OperationResponds<Op>, ...Results]
+>;
 /** The results the route threads: the implicit `responds`, the middlewares', the implicit `validate`. */
 type Steps<
 	App extends AppTypes,
@@ -28,7 +36,7 @@ type Steps<
 > = [
 	OperationResponds<Op>,
 	...Results,
-	OperationValidate<Op, JoinPath<App['prefix'], Op['path']>>,
+	OperationValidate<Op, BeforeValidate<App, Op, Results>>,
 ];
 /** Middleware `n`, after the ones that returned `Before`. */
 type Mw<
@@ -46,19 +54,6 @@ type Handler<
 > = RouteHandler<
 	OperationApp<App, Op>,
 	Op['path'],
-	Steps<App, Op, Results>,
-	Result
->;
-/** The app with the route added. */
-type WithRoute<
-	App extends AppTypes,
-	Op extends RouteOperation,
-	Results extends readonly unknown[],
-	Result,
-> = AppWithRoute<
-	OperationApp<App, Op>,
-	Op['path'],
-	OperationOptions<Op>,
 	Steps<App, Op, Results>,
 	Result
 >;
@@ -83,7 +78,7 @@ export interface OperationForms<App extends AppTypes> {
 	>(
 		operation: CheckedOperation<App['prefix'], Op>,
 		handler: Handler<App, Op, [], Result>,
-	): WithRoute<App, Op, [], Result>;
+	): AppWithRoute<App>;
 	<
 		const Op extends RouteOperation,
 		R1 extends R,
@@ -92,7 +87,7 @@ export interface OperationForms<App extends AppTypes> {
 		operation: CheckedOperation<App['prefix'], Op>,
 		m1: Mw<App, Op, [], R1>,
 		handler: Handler<App, Op, [R1], Result>,
-	): WithRoute<App, Op, [R1], Result>;
+	): AppWithRoute<App>;
 	<
 		const Op extends RouteOperation,
 		R1 extends R,
@@ -103,7 +98,7 @@ export interface OperationForms<App extends AppTypes> {
 		m1: Mw<App, Op, [], R1>,
 		m2: Mw<App, Op, [R1], R2>,
 		handler: Handler<App, Op, [R1, R2], Result>,
-	): WithRoute<App, Op, [R1, R2], Result>;
+	): AppWithRoute<App>;
 	<
 		const Op extends RouteOperation,
 		R1 extends R,
@@ -116,7 +111,7 @@ export interface OperationForms<App extends AppTypes> {
 		m2: Mw<App, Op, [R1], R2>,
 		m3: Mw<App, Op, [R1, R2], R3>,
 		handler: Handler<App, Op, [R1, R2, R3], Result>,
-	): WithRoute<App, Op, [R1, R2, R3], Result>;
+	): AppWithRoute<App>;
 	<
 		const Op extends RouteOperation,
 		R1 extends R,
@@ -131,7 +126,7 @@ export interface OperationForms<App extends AppTypes> {
 		m3: Mw<App, Op, [R1, R2], R3>,
 		m4: Mw<App, Op, [R1, R2, R3], R4>,
 		handler: Handler<App, Op, [R1, R2, R3, R4], Result>,
-	): WithRoute<App, Op, [R1, R2, R3, R4], Result>;
+	): AppWithRoute<App>;
 	<
 		const Op extends RouteOperation,
 		R1 extends R,
@@ -148,7 +143,7 @@ export interface OperationForms<App extends AppTypes> {
 		m4: Mw<App, Op, [R1, R2, R3], R4>,
 		m5: Mw<App, Op, [R1, R2, R3, R4], R5>,
 		handler: Handler<App, Op, [R1, R2, R3, R4, R5], Result>,
-	): WithRoute<App, Op, [R1, R2, R3, R4, R5], Result>;
+	): AppWithRoute<App>;
 	<
 		const Op extends RouteOperation,
 		R1 extends R,
@@ -167,7 +162,7 @@ export interface OperationForms<App extends AppTypes> {
 		m5: Mw<App, Op, [R1, R2, R3, R4], R5>,
 		m6: Mw<App, Op, [R1, R2, R3, R4, R5], R6>,
 		handler: Handler<App, Op, [R1, R2, R3, R4, R5, R6], Result>,
-	): WithRoute<App, Op, [R1, R2, R3, R4, R5, R6], Result>;
+	): AppWithRoute<App>;
 	<
 		const Op extends RouteOperation,
 		R1 extends R,
@@ -188,7 +183,7 @@ export interface OperationForms<App extends AppTypes> {
 		m6: Mw<App, Op, [R1, R2, R3, R4, R5], R6>,
 		m7: Mw<App, Op, [R1, R2, R3, R4, R5, R6], R7>,
 		handler: Handler<App, Op, [R1, R2, R3, R4, R5, R6, R7], Result>,
-	): WithRoute<App, Op, [R1, R2, R3, R4, R5, R6, R7], Result>;
+	): AppWithRoute<App>;
 	<
 		const Op extends RouteOperation,
 		R1 extends R,
@@ -213,5 +208,5 @@ export interface OperationForms<App extends AppTypes> {
 		m7: Mw<App, Op, [R1, R2, R3, R4, R5, R6], R7>,
 		m8: Mw<App, Op, [R1, R2, R3, R4, R5, R6, R7], R8>,
 		handler: Handler<App, Op, [R1, R2, R3, R4, R5, R6, R7, R8], Result>,
-	): WithRoute<App, Op, [R1, R2, R3, R4, R5, R6, R7, R8], Result>;
+	): AppWithRoute<App>;
 }

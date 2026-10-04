@@ -7,15 +7,12 @@ import type {
 	Empty,
 	MaybePromise,
 	RouteDetail,
-	RouteInput,
 } from '../app/types';
-import type { ValidationErrorBody } from '../errors/errors';
 import type {
 	InferInput,
 	InferOutput,
 	StandardSchemaV1,
 } from '../schema/standard-schema';
-import type { Jsonify } from '../types/json';
 import type { PathParams } from '../types/path';
 
 export interface SocketSchema {
@@ -108,31 +105,5 @@ export interface SocketHandlers<Data, Send, Message> {
 	): MaybePromise<void>;
 	drain?(socket: Socket<Data, Send>): void;
 }
-
-/** A socket route, as the client knows it. */
-export interface SocketRecord<
-	Input = unknown,
-	Send = unknown,
-	Receive = unknown,
-> {
-	readonly input: Input;
-	/** What the client sends. */
-	readonly send: Send;
-	/** What the client receives. */
-	readonly receive: Receive;
-}
-
-export type SocketEntryOf<Path extends string, Schema> = {
-	readonly [P in Path]: {
-		readonly WS: SocketRecord<
-			RouteInput<Path, Omit<Schema, 'body'>>,
-			InputAt<Schema, 'message', unknown>,
-			| Jsonify<OutputAt<Schema, 'send', unknown>>
-			| ([SchemaAt<Schema, 'message'>] extends [never]
-					? never
-					: ValidationErrorBody)
-		>;
-	};
-};
 
 export type { Empty };

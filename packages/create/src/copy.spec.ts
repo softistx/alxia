@@ -8,7 +8,6 @@ import { copyTemplate, TEMPLATES, withName } from './copy';
 import { packageName } from './target';
 
 const ALXIA = {
-	'@alxia/client': '^0.2.1',
 	'@alxia/core': '^0.3.0',
 	'@alxia/react-router': '^0.2.0',
 };
@@ -29,7 +28,7 @@ describe('copyTemplate', () => {
 				name: 'stored',
 				dependencies: { '@alxia/core': 'workspace:^', zod: '^4.2.0' },
 				devDependencies: {
-					'@alxia/client': 'workspace:^',
+					'@alxia/react-router': 'workspace:^',
 					typescript: '^6.0.3',
 				},
 			}),
@@ -45,7 +44,10 @@ describe('copyTemplate', () => {
 		expect(manifest).toEqual({
 			name: 'mine',
 			dependencies: { '@alxia/core': '^0.3.0', zod: '^4.2.0' },
-			devDependencies: { '@alxia/client': '^0.2.1', typescript: '^6.0.3' },
+			devDependencies: {
+				'@alxia/react-router': '^0.2.0',
+				typescript: '^6.0.3',
+			},
 		});
 	});
 

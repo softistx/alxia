@@ -1,12 +1,5 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { client } from '@alxia/client';
-import {
-	alxia,
-	type BaseContext,
-	type Empty,
-	type Jsonify,
-	validate,
-} from '@alxia/core';
+import { alxia, type BaseContext, type Empty, validate } from '@alxia/core';
 import {
 	createMemoryStores,
 	fixedClock,
@@ -22,7 +15,7 @@ import {
 	when,
 } from '@nxgt/janus/permissions';
 import { z } from 'zod';
-import { type JanusErrorBody, janusErrors } from './errors';
+import { janusErrors } from './errors';
 import { byParam, permission } from './permission';
 import { sendSession, signOut } from './send';
 import { type SessionOptions, session } from './session';
@@ -161,16 +154,11 @@ describe('session', () => {
 		expect(bearer.status).toBe(200);
 	});
 
-	test('anonymous is a 401, typed; routes before the session are open', async () => {
+	test('anonymous is a 401; routes before the session are open', async () => {
 		const { app } = setup();
-		const anonymous = await client(app).get('/me');
+		const anonymous = await app.request('/me');
 		expect(anonymous.status).toBe(401);
-		if (anonymous.status === 401) {
-			// The session's own 401, or janus's — a refused code — through janusErrors().
-			expectTypeOf(anonymous.data).toEqualTypeOf<
-				{ error: 'unauthenticated' } | Jsonify<JanusErrorBody>
-			>();
-		}
+		expect(await anonymous.json()).toEqual({ error: 'unauthenticated' });
 		expect((await app.request('/whoami')).status).toBe(200);
 	});
 
@@ -236,12 +224,7 @@ describe('session', () => {
 					void anonymous;
 					return reply(200, { signedIn: user !== null });
 				});
-			const anonymous = await client(app).get('/me');
-			if (anonymous.status === 401) {
-				expectTypeOf(anonymous.data).toEqualTypeOf<{
-					error: 'unauthenticated';
-				}>();
-			}
+			const anonymous = await app.request('/me');
 			expect(anonymous.status).toBe(required ? 401 : 200);
 		}
 		// A wrapper forwarding the options as they are typed compiles too.

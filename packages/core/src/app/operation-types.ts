@@ -3,10 +3,9 @@
  * `responds`, first, and its `validate`, just before the handler.
  */
 import type { InferOutput, StandardSchemaV1 } from '../schema/standard-schema';
-import type { PathParams } from '../types/path';
 import type { AppTypes } from './route-forms';
 import type { OperationSchema, RouteOperation } from './route-operation';
-import type { Empty, Next, RawRequestParts } from './types';
+import type { Empty, MiddlewareBase, Next } from './types';
 import type { RequestSchemas } from './validate';
 
 /** The request parts an operation's schema validates. */
@@ -29,37 +28,35 @@ export type OperationResponds<Operation> =
 		? Next<Empty, { readonly response: Responses }>
 		: Next;
 
-/** The output of the operation's schema for `Part`, or `Raw` when it has none. */
-type PartOutput<Operation, Part extends keyof RequestSchemas, Raw> =
+/** The output of the operation's schema for `Part`, or `Before`'s when it has none. */
+type PartOutput<Operation, Part extends keyof RequestSchemas, Before> =
 	OperationSchema<Operation> extends {
 		readonly [Key in Part]: infer Schema extends StandardSchemaV1;
 	}
 		? InferOutput<Schema>
-		: Raw;
+		: Part extends keyof Before
+			? Before[Part]
+			: undefined;
 
 /**
- * The implicit `validate` of an operation, just before its handler. What it
- * adds names every part, the request's own for a part it has no schema
- * for: keys known before the operation is, which the route threads cheaply.
+ * The implicit `validate` of an operation, just before its handler, after
+ * the middlewares that built `Before`. What it adds names every part: the
+ * output of the operation's schema, or, for a part it has none for, the
+ * part as `Before` holds it — the request's own, or what a middleware
+ * passed on. Keys known before the operation is: the route threads them
+ * cheaply, where keys read off the operation made TypeScript give up with
+ * TS2590 once a route had two middlewares.
  */
 export type OperationValidate<
 	Operation extends RouteOperation,
-	Path extends string = Operation['path'],
+	Before = MiddlewareBase<Empty, Operation['path']>,
 > = Next<
 	{
-		readonly params: PartOutput<Operation, 'params', PathParams<Path>>;
-		readonly query: PartOutput<Operation, 'query', RawRequestParts['query']>;
-		readonly headers: PartOutput<
-			Operation,
-			'headers',
-			Readonly<Record<string, string>>
-		>;
-		readonly cookies: PartOutput<
-			Operation,
-			'cookies',
-			Readonly<Record<string, string>>
-		>;
-		readonly body: PartOutput<Operation, 'body', undefined>;
+		readonly params: PartOutput<Operation, 'params', Before>;
+		readonly query: PartOutput<Operation, 'query', Before>;
+		readonly headers: PartOutput<Operation, 'headers', Before>;
+		readonly cookies: PartOutput<Operation, 'cookies', Before>;
+		readonly body: PartOutput<Operation, 'body', Before>;
 	},
 	OperationParts<Operation>
 >;
@@ -71,7 +68,6 @@ export interface OperationApp<
 > extends AppTypes {
 	readonly method: Operation['method'];
 	readonly ctx: App['ctx'];
-	readonly routes: App['routes'];
 	readonly prefix: App['prefix'];
 	readonly shortcuts: App['shortcuts'];
 }

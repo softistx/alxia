@@ -3,9 +3,8 @@
  * send }, ...middlewares, handlers)`.
  */
 import type { PathAt, RoutePath } from '../types/path';
-import type { AppTypes, RouteMiddleware } from './route-forms';
+import type { AppTypes, AppWithRoute, RouteMiddleware } from './route-forms';
 import type {
-	AppWithSocket,
 	SocketHandlersAfter,
 	SocketOptions,
 	SocketOptionsOnly,
@@ -18,7 +17,7 @@ export interface SocketOptionsForms<App extends AppTypes> {
 		path: PathAt<App['prefix'], Path>,
 		options: SocketOptionsOnly<Options>,
 		handlers: SocketHandlersAfter<App, Path, [], Options>,
-	): AppWithSocket<App, Path, Options, []>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		const Options extends SocketOptions,
@@ -28,7 +27,7 @@ export interface SocketOptionsForms<App extends AppTypes> {
 		options: SocketOptionsOnly<Options>,
 		m1: RouteMiddleware<App, Path, [], R1>,
 		handlers: SocketHandlersAfter<App, Path, [R1], Options>,
-	): AppWithSocket<App, Path, Options, [R1]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		const Options extends SocketOptions,
@@ -40,7 +39,7 @@ export interface SocketOptionsForms<App extends AppTypes> {
 		m1: RouteMiddleware<App, Path, [], R1>,
 		m2: RouteMiddleware<App, Path, [R1], R2>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2], Options>,
-	): AppWithSocket<App, Path, Options, [R1, R2]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		const Options extends SocketOptions,
@@ -54,7 +53,7 @@ export interface SocketOptionsForms<App extends AppTypes> {
 		m2: RouteMiddleware<App, Path, [R1], R2>,
 		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3], Options>,
-	): AppWithSocket<App, Path, Options, [R1, R2, R3]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		const Options extends SocketOptions,
@@ -70,7 +69,7 @@ export interface SocketOptionsForms<App extends AppTypes> {
 		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
 		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3, R4], Options>,
-	): AppWithSocket<App, Path, Options, [R1, R2, R3, R4]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		const Options extends SocketOptions,
@@ -88,7 +87,7 @@ export interface SocketOptionsForms<App extends AppTypes> {
 		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
 		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3, R4, R5], Options>,
-	): AppWithSocket<App, Path, Options, [R1, R2, R3, R4, R5]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		const Options extends SocketOptions,
@@ -108,7 +107,7 @@ export interface SocketOptionsForms<App extends AppTypes> {
 		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
 		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3, R4, R5, R6], Options>,
-	): AppWithSocket<App, Path, Options, [R1, R2, R3, R4, R5, R6]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		const Options extends SocketOptions,
@@ -135,7 +134,7 @@ export interface SocketOptionsForms<App extends AppTypes> {
 			[R1, R2, R3, R4, R5, R6, R7],
 			Options
 		>,
-	): AppWithSocket<App, Path, Options, [R1, R2, R3, R4, R5, R6, R7]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		const Options extends SocketOptions,
@@ -164,5 +163,5 @@ export interface SocketOptionsForms<App extends AppTypes> {
 			[R1, R2, R3, R4, R5, R6, R7, R8],
 			Options
 		>,
-	): AppWithSocket<App, Path, Options, [R1, R2, R3, R4, R5, R6, R7, R8]>;
+	): AppWithRoute<App>;
 }

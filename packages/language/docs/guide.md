@@ -28,7 +28,7 @@ client that names no language it supports gets `Hello`. `current` is typed
 ```ts
 function language<const L extends string, Ctx extends object = BaseContext>(
 	options: LanguageOptions<L, Ctx>,
-): Alxia<RequiresOf<Ctx> & LanguageContext<L>, Empty, '', never> &
+): Alxia<RequiresOf<Ctx> & LanguageContext<L>, '', never> &
 	Requiring<RequiresOf<Ctx>>;
 
 interface LanguageOptions<L extends string, Ctx extends object = BaseContext> {

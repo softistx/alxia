@@ -41,7 +41,6 @@
 		]
 	},
 	"devDependencies": {
-		"@alxia/client": "workspace:^",
 		"@alxia/core": "workspace:^",
 		"@nxgt/janus": "^0.17.1",
 		"@types/bun": "^1.4.2",

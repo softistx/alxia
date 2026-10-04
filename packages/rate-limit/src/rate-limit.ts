@@ -43,8 +43,7 @@ export interface RateLimitInfo {
 
 /**
  * A rate limit, as a plugin: every route declared after it counts its
- * requests, and answers a 429 past the limit. The 429 is part of each such
- * route's type, so the client reads it.
+ * requests, and answers a 429 past the limit.
  *
  * ```ts
  * app.use(rateLimit({ limit: 100, windowMs: 60_000 })).get(...);

@@ -1,12 +1,16 @@
 # @alxia/core
 
 An HTTP framework for [Bun](https://bun.sh), type-safe from the request to
-the client that calls it, with **no dependency**. Each route declares what it
+the reply, with **no dependency**. Each route declares what it
 reads and what it answers with any [Standard Schema](https://standardschema.dev)
 — Zod, Valibot, ArkType, or one written by hand — among its middlewares,
-and the types follow: the handler reads validated values, can only answer
-what it declared, and the app's type is the contract [`@alxia/client`](https://www.npmjs.com/package/@alxia/client)
-calls.
+and the types follow: the handler reads validated values, and can only answer
+what it declared.
+
+alxia is **OpenAPI spec first**: the OpenAPI document is the contract, and a
+client is generated from it with the generator you choose — the examples use
+[`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen)
+([upgrading from a typed client](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md#no-more-client-spec-first)).
 
 ## Getting started
 
@@ -14,8 +18,8 @@ calls.
 bun create @alxia my-app
 ```
 
-writes a new app — an API with Zod, an API-key check on its route, a spec
-and the typed client, or React Router's official template served by alxia — installs it,
+writes a new app — an API with Zod, an API-key check on its route and a spec
+calling it in process, or React Router's official template served by alxia — installs it,
 and prints `cd my-app` and `bun dev`
 ([`@alxia/create`](https://www.npmjs.com/package/@alxia/create)). Into an
 existing project:
@@ -99,7 +103,7 @@ app.post('/users', { body: User }, auth, ...);                                  
 A middleware is `(ctx, next) => …`, written once with `defineMiddleware` and
 given to every route that needs it. It returns `next(added)` — `added` is
 typed in the context of everything after it — a reply, which ends the
-request and joins the route's type, or a `Response`, sent as it is. Awaited,
+request, or a `Response`, sent as it is. Awaited,
 `next()` resolves to the response of the rest of the route, so a middleware
 can run around it. `validate` and `responds` are middlewares too, and stand
 where they are given:
@@ -132,7 +136,7 @@ const app = alxia().post(
 	responds({ 201: Post }),  // types the handler's `reply`, checks it
 	({ user, body, reply }) => reply(201, createPost(user, body)),
 );
-// POST /posts answers 201, 400, 401, 413 or 500, and the client reads each
+// POST /posts answers 201, 400, 401, 413 or 500
 ```
 
 | Piece | Does |
@@ -212,8 +216,7 @@ const app = alxia()
 	.post('/jmap', validate({ body: JmapRequest }), ({ reply }) => reply(200, { methodResponses: [] }));
 ```
 
-Its reply replaces the 400 in the type of every route after it that
-validates, so the client reads the problem. Given schemas first —
+Its reply replaces the 400 of every route after it that validates. Given schemas first —
 `onRefusal({ response: { 400: Problem }, contentType: 'application/problem+json' }, hook)`
 — its `reply` is typed by them, its body checked and sent as their output,
 and `@alxia/openapi` documents it.
@@ -312,7 +315,7 @@ Without one, the bytes are counted as they arrive, and reading stops once
 they pass the limit, so a chunked upload is never buffered whole. The
 limit applies to JSON, forms, text, an app's own parsers, and a handler
 reading `request.body` as a stream. Either way the answer is a 413, which
-the route's type and its OpenAPI document include:
+the route's OpenAPI document includes:
 
 ```json
 { "error": "content_too_large", "limit": 65536 }
@@ -327,7 +330,7 @@ body as before.
 
 A handler returns `reply(status, body, init?)`. Behind a `responds(…)`,
 only a declared status, with a body its schema accepts. Without, any status
-and any body — the client still reads the type of the body. Shortcuts —
+and any body. Shortcuts —
 `reply.ok(body)`, `reply.created(body)`, `reply.noContent()`,
 `reply.notFound(body)`, `reply.html(status, html)`, … — are the same
 replies; behind a `responds`, a route has one only for a status it declares.
@@ -344,7 +347,7 @@ else is JSON. `redirect(location, status?)` needs no schema.
 ## Static files
 
 Served through the app's pipeline: every hook runs around them — headers,
-compression, telemetry — and the client types them like any route.
+compression, telemetry — like any route.
 
 ```ts
 const app = alxia()
@@ -421,7 +424,7 @@ app.get('/ticks', responds({ 200: eventStream(Tick) }), ({ reply }) =>
 
 Each value is checked by the event's schema and sent as one `data:` line of
 JSON; a comment keeps an idle stream open, and the generator is closed when
-the client leaves. The client reads `data` as an `AsyncIterable` of events.
+the client leaves.
 
 Name the events, each with its schema, and each is sent with its `event:`
 line, plus `id:` and `retry:` when given:
@@ -439,8 +442,7 @@ app.get('/push', responds({ 200: Push }), ({ reply }) =>
 // data: {"interval":30}
 ```
 
-`Push.event(name, data, fields?)` types each by its name's schema. The
-client reads `{ event, data, id? }`, a union discriminated by `event`. A
+`Push.event(name, data, fields?)` types each by its name's schema. A
 line break in an `id`, or a `retry` that is not a whole number, ends the
 stream before it is written.
 
@@ -481,8 +483,8 @@ const app = alxia()
 	.get('/me', ({ user, reply }) => reply(200, user)); // ctx.user is typed
 ```
 
-A reply a hook returns ends the request, and is added to the type of every
-route after it: the client of `/me` reads the 401.
+A reply a hook returns ends the request: `/me` answers the 401 to a
+stranger.
 
 `wrap(hook)` is a route hook around the rest: `next()` runs the hooks
 declared after it, the route's middlewares and the handler, and resolves to
@@ -607,7 +609,7 @@ covers all three kinds.
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream(schema)` made |
 | `eventStream({ name: schema })`, `NamedEventStreamSchema`, `EventSchemas` | the response schema of a stream of named events, its `event(name, data, fields?)` builder, its schemas by name under `~events` |
-| `EventInput<Of>`, `EventOutput<Of>`, `EventFields` | what a handler yields on a named stream, what the client reads of it, and an event's `id` and `retry` |
+| `EventInput<Of>`, `EventOutput<Of>`, `EventFields` | what a handler yields on a named stream, what is sent of it, and an event's `id` and `retry` |
 | `isNamedEventStreamSchema(schema)` | whether a schema is one `eventStream({ … })` made |
 | `FileSource`, `StaticOptions`, `FileOptions`, `StaticReply`, `parseRange` | static files |
 | `Precompressed`, `FileNotFoundBody`, `RangeNotSatisfiableBody` | a coding stored beside a file, the bodies of the 404 and 416 |
@@ -617,12 +619,12 @@ covers all three kinds.
 | `AnyReply`, `FreeReplyFunction`, `TypedReplyFunction`, `DeclaredReply`, `RedirectFunction` | any reply, `reply` without and behind a `responds`, every reply a route with schemas may return, `redirect` |
 | `FreeShortcuts`, `TypedShortcuts`, `SHORTCUTS`, `Shortcuts` | `reply`'s shortcuts without and with schemas, and the status of each |
 | `Plugin`, `AnyAlxia` | a function plugin, any app |
-| `defineMiddleware(fn)`, `defineMiddleware<Requires>()(fn)` | a middleware, `(ctx, next) => …`, typed and returned as it is: `next(added)` adds `added` to the context after it, a reply ends the request and joins the route's type, a `Response` is sent as it is; `Requires` is what it reads beyond `BaseContext`, which the route must give where it is placed |
+| `defineMiddleware(fn)`, `defineMiddleware<Requires>()(fn)` | a middleware, `(ctx, next) => …`, typed and returned as it is: `next(added)` adds `added` to the context after it, a reply ends the request, a `Response` is sent as it is; `Requires` is what it reads beyond `BaseContext`, which the route must give where it is placed |
 | `validate(schemas)`, `validate(operation)`, `RequestSchemas`, `Validated<Schemas>`, `ValidateRequires<Schemas>` | the middleware that validates `params`, `query`, `headers`, `cookies` and `body`, each with any Standard Schema — or the request parts of an operation's `schema`, which its `route` then validates nowhere else; what it takes, what it passes on, the path parameters its `params` schema must read |
 | `responds(responses)` | the middleware that types the handler's `reply` by the statuses it declares, and checks the replies after it of those statuses against their schemas |
 | `Middleware<Requires, Result>`, `MiddlewareContext<Requires>`, `MiddlewareResult`, `MiddlewareReturn`, `Next<Added, Schema>`, `NextFunction` | a middleware, what it reads (`BaseContext & Requires`), what it may return, and `next`: called once at most, it resolves to the rest of the route's `Response`, branded by what was added |
 | `RouteOptions`, `SocketOptions` | a route's options, `bodyLimit` and `detail`; a socket's, `message`, `send` and `detail` |
-| `RouteMethod`'s `MiddlewareForms`, `OptionsForms` and `DeprecatedForms`; `SocketMethod`'s `SocketForms`, `SocketOptionsForms` and `DeprecatedSocketForms`; `RouteApp`, `AppWithRoute`, `AppWithSocket` | the forms of a route method and of `ws`: with and without options, and those of 0.3; the app's types and the method, as those forms read them; the app a call returns, its route or socket added. Exported so an app's type can be named in a declaration file |
+| `RouteMethod`'s `MiddlewareForms`, `OptionsForms` and `DeprecatedForms`; `SocketMethod`'s `SocketForms`, `SocketOptionsForms` and `DeprecatedSocketForms`; `RouteApp`, `AppWithRoute` | the forms of a route method and of `ws`: with and without options, and those of 0.3; the app's types and the method, as those forms read them; the app a call returns, unchanged in type. Exported so an app's type can be named in a declaration file |
 | `defineHook(hook)`, `defineHook<Requires>()(hook)`, `defineWrap(hook)`, `defineWrap<Requires>()(hook)` | deprecated: a hook for a route's list, `app.get(path, [hook], schema?, handler)`, and one around the rest of it. Still run as in 0.3; write a `defineMiddleware` instead |
 | `RouteHook<Requires, Result>`, `RouteWrap<Requires, Result>`, `AnyRouteHook`, `HookContext<Requires>`, `RawRequestParts` | what `defineHook` and `defineWrap` make, and what such a hook reads: `BaseContext`, the `params` and `query` as they arrived, and `Requires` |
 | `ThreadHooks<Base, Hooks>`, `RouteHookBase<Ctx, Path>`, `HookProvided<Given, Requires>`, `AddedBy<Hook>`, `RepliesBy<Hook>`, `MaxRouteHooks`, `NoHookYet` | how a route's type threads a deprecated list of hooks, bounded at 8. Exported so an app's type can be named in a declaration file |
@@ -635,8 +637,7 @@ covers all three kinds.
 | `shapeOf(path)` | the path with its parameter names erased, as the router compares them: `shapeOf('/pets/:id') === shapeOf('/pets/:petId')`; throws a `TypeError` for a path no route may be declared at |
 | `withHeaders`, `vary`, `check` | for plugins: edit a response's headers (copied when immutable; an error of the edit leaves the body unread), add to `Vary`, run a schema |
 | `Checked` | what `check` returns: the value, or its issues |
-| `RoutesOf<App>`, `Jsonify<T>` | the route table the client reads, and what a value is on the wire |
-| `RouteTable`, `RouteRecord`, `RouteEntryOf`, `RouteInput`, `RouteOutput`, `Outcome`, `OutcomeOf` | a route as the client knows it: the entry one route adds to `RoutesOf`, what it sends, every outcome it may read |
+| `Jsonify<T>` | what a value is on the wire |
 | `ContextOf<App>` | what a route declared next on `App` reads: to type a GraphQL schema, a service |
 | `RequestContext`, `BaseContext`, `Context`, `ResponseSettings`, `HandlerResult` | what every hook reads (`BaseContext.cookies`: the request's), what a handler reads, what a route sets on its response, what a handler may return |
 | `ResponseCookies` | `set.cookies`: Bun's `CookieMap` of the cookies the response sets, whose `get` and `has` read those, never the request's |
@@ -644,7 +645,7 @@ covers all three kinds.
 | `RouteOperation`, `OperationSchema`, `OperationMethod`, `CheckedOperation` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), the type of `route` — `OperationForms`, and its list of hooks of 0.3, deprecated — and the check it makes of the operation |
 | `OperationForms`, `OperationApp`, `OperationParts`, `OperationOptions`, `OperationResponds`, `OperationValidate` | `route(operation, ...middlewares, handler)`, up to 8 middlewares; the app it reads; the operation's request parts, its options (`bodyLimit`, `detail`), and the implicit `responds` and `validate` it threads. Exported so an app's type can be named in a declaration file |
 | `StaticMethod`, `FileMethod`, `PageMethod`, `DecorateMethod`, `DeriveMethod`, `WrapMethod`, `BodyLimitMethod`, `ErrorMethod`, `RequestHookMethod`, `ResponseHookMethod`, `AroundMethod`, `StartHookMethod`, `StopHookMethod`, `ParserMethod`, `GroupMethod`, `UseMethod`, `RequestMethod`, `ListenMethod` | the types of the app's other methods, each holding its overloads and their documentation: `static`, `file`, `page`; the route hooks `decorate`, `derive`, `wrap`, `bodyLimit`, `onError`; the global hooks `onRequest`, `onResponse`, `around`, `onStart`, `onStop`, `parser`; `group` and `use`; `request` and `listen`. Exported so an app's type can be named in a declaration file |
-| `SocketMethod`, `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage`, `SocketRecord`, `SocketEntryOf` | sockets: the type of `ws` (`path, options?, ...middlewares, handlers`, and the deprecated forms), what a deprecated socket schema validates, what its handlers read, send and receive, the entry one socket adds to `RoutesOf` |
+| `SocketMethod`, `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage` | sockets: the type of `ws` (`path, options?, ...middlewares, handlers`, and the deprecated forms), what a deprecated socket schema validates, what its handlers read, send and receive |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema types |
 | `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426 |
 | `ValidationIssue`, `ValidationTarget` | one issue of a 400, and where the refused value was read from |
@@ -652,8 +653,8 @@ covers all three kinds.
 | `RefusalKind`, `RefusalOfKind<Kind>` | the kinds `onRefusal(kind, hook)` takes, `'validation' \| 'body_limit'`, and the refusal a hook of one kind reads |
 | `RefusalSchema`, `RefusalResponses` | what an `onRefusal` hook may declare: the schema of each 4xx it answers, and its `contentType` |
 | `RefusalHook`, `RefusalHandler`, `RefusalHandlersByKind` | an `onRefusal` hook, the general one in force for a route — `RouteDefinition['refusal']` — and those of each kind, tried before it — `RouteDefinition['refusalByKind']` — what `@alxia/openapi` documents |
-| `RefusingKind`, `KindFallsBack`, `KindRefusalsOf`, `KindOutcome`, `OneKind` | how an app's type carries an `onRefusal(kind, hook)`: the mark of its replies, of the general hook or default it falls back to, the replies it may answer, the outcomes a refusal of one kind may get, and the check that its kind is one literal, not a union. Exported so an app's type can be named in a declaration file |
-| `Refusing`, `FallsBack`, `DefaultRefusalOutcome`, `DefaultLimitOutcome`, `RefusalOutcome`, `RefusalsOf`, `DeclaredRefusal`, `ThenShortcuts`, `BehindShortcuts`, `BodyLimited`, `BodyLimitShortcut`, `IsLimited` | how an app's type carries its `onRefusal` hook and its `bodyLimit()`: the mark of the hook's replies, of the default it falls back to, the default 400 and 413 a plugin's route keeps, how a later scope's and a using app's hooks replace them, the mark of a `bodyLimit()` in force and the shortcut it adds, whether a route is under a limit, the outcomes a refused request may get (`RefusalOutcome`), the replies a hook may answer (`RefusalsOf`) and, for a hook declaring schemas, those replies as its schemas give them back (`DeclaredRefusal`). Exported so an app's type can be named in a declaration file |
+| `RefusingKind`, `KindFallsBack`, `KindRefusalsOf`, `OneKind` | how an app's type carries an `onRefusal(kind, hook)`: the mark of its replies, of the general hook or default it falls back to, the replies it may answer, and the check that its kind is one literal, not a union. Exported so an app's type can be named in a declaration file |
+| `Refusing`, `FallsBack`, `RefusalsOf`, `DeclaredRefusal`, `ThenShortcuts`, `BodyLimited`, `BodyLimitShortcut` | how an app's type carries its `onRefusal` hook and its `bodyLimit()`: the mark of the hook's replies, of the default it falls back to, how a later scope's hooks replace them, the mark of a `bodyLimit()` in force and the shortcut it adds, the replies a hook may answer (`RefusalsOf`) and, for a hook declaring schemas, those replies as its schemas give them back (`DeclaredRefusal`). Exported so an app's type can be named in a declaration file |
 | `problem(details, init?)`, `ProblemDetails` | a reply whose body is an RFC 9457 problem — `type`, `title`, `status`, `detail`, `instance` and typed extension members — sent with its `status` as `application/problem+json` |
 | `RoutePath`, `JoinPath`, `PathParams`, `PathParamName` | paths: an absolute path, a prefix joined to a path, the parameters a path declares |
 | `PathAt<Prefix, Path, Route?>`, `CheckedPath<Path>`, `StaticPath<Path>` | the check a route method makes on a literal path: `Path`, or `Invalid path: …` with the `TypeError` the app would throw; the same for a path alone; the route `static(path)` declares. A wrapper forwarding a path generic in `P` types its parameter `PathAt<'', P>` |

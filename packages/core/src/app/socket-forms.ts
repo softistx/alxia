@@ -3,16 +3,11 @@
  * handlers)`, up to 8 middlewares run on the upgrade request.
  */
 import type { StandardSchemaV1 } from '../schema/standard-schema';
-import type { JoinPath, PathAt, RoutePath } from '../types/path';
-import type {
-	SocketEntryOf,
-	SocketHandlers,
-	SocketMessage,
-	SocketSend,
-} from '../ws/types';
-import type { Alxia } from './alxia';
+import type { PathAt, RoutePath } from '../types/path';
+import type { SocketHandlers, SocketMessage, SocketSend } from '../ws/types';
 import type {
 	AppTypes,
+	AppWithRoute,
 	NotAFunction,
 	RouteBase,
 	RouteMiddleware,
@@ -74,23 +69,6 @@ export type SocketHandlersAfter<
 				SocketMessage<Options>
 			>;
 
-/** `App` with the socket route at `Path` added to its table. */
-export type AppWithSocket<
-	App extends AppTypes,
-	Path extends string,
-	Options,
-	Results extends readonly unknown[],
-> = Alxia<
-	App['ctx'],
-	App['routes'] &
-		SocketEntryOf<
-			JoinPath<App['prefix'], Path>,
-			Options & ThreadSchema<Results>
-		>,
-	App['prefix'],
-	App['shortcuts']
->;
-
 /**
  * `app.ws(path, options?, ...middlewares, handlers)`: a WebSocket route
  * whose upgrade request runs the hooks before it, then its middlewares —
@@ -110,12 +88,12 @@ export interface SocketForms<App extends AppTypes> {
 	<const Path extends RoutePath>(
 		path: PathAt<App['prefix'], Path>,
 		handlers: SocketHandlersAfter<App, Path, [], Empty>,
-	): AppWithSocket<App, Path, Empty, []>;
+	): AppWithRoute<App>;
 	<const Path extends RoutePath, R1 extends MiddlewareReturn>(
 		path: PathAt<App['prefix'], Path>,
 		m1: RouteMiddleware<App, Path, [], R1>,
 		handlers: SocketHandlersAfter<App, Path, [R1], Empty>,
-	): AppWithSocket<App, Path, Empty, [R1]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -125,7 +103,7 @@ export interface SocketForms<App extends AppTypes> {
 		m1: RouteMiddleware<App, Path, [], R1>,
 		m2: RouteMiddleware<App, Path, [R1], R2>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2], Empty>,
-	): AppWithSocket<App, Path, Empty, [R1, R2]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -137,7 +115,7 @@ export interface SocketForms<App extends AppTypes> {
 		m2: RouteMiddleware<App, Path, [R1], R2>,
 		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3], Empty>,
-	): AppWithSocket<App, Path, Empty, [R1, R2, R3]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -151,7 +129,7 @@ export interface SocketForms<App extends AppTypes> {
 		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
 		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3, R4], Empty>,
-	): AppWithSocket<App, Path, Empty, [R1, R2, R3, R4]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -167,7 +145,7 @@ export interface SocketForms<App extends AppTypes> {
 		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
 		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3, R4, R5], Empty>,
-	): AppWithSocket<App, Path, Empty, [R1, R2, R3, R4, R5]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -185,7 +163,7 @@ export interface SocketForms<App extends AppTypes> {
 		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
 		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
 		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3, R4, R5, R6], Empty>,
-	): AppWithSocket<App, Path, Empty, [R1, R2, R3, R4, R5, R6]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -210,7 +188,7 @@ export interface SocketForms<App extends AppTypes> {
 			[R1, R2, R3, R4, R5, R6, R7],
 			Empty
 		>,
-	): AppWithSocket<App, Path, Empty, [R1, R2, R3, R4, R5, R6, R7]>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -237,5 +215,5 @@ export interface SocketForms<App extends AppTypes> {
 			[R1, R2, R3, R4, R5, R6, R7, R8],
 			Empty
 		>,
-	): AppWithSocket<App, Path, Empty, [R1, R2, R3, R4, R5, R6, R7, R8]>;
+	): AppWithRoute<App>;
 }

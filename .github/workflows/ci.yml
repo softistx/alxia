@@ -50,7 +50,7 @@ jobs:
       - name: Lint code
         run: bunx biome ci
       # Build FIRST. Every package's `exports` points at `./dist/*`, so on a
-      # clean checkout `@alxia/core` resolves to nothing for the client and
+      # clean checkout `@alxia/core` resolves to nothing for its dependents and
       # typecheck reports phantom TS2307s. A developer's tree always has a
       # stale `dist/` lying around, which hides this locally — it only ever
       # shows up in CI. `bun run build` goes through scripts/workspace.ts,

@@ -22,7 +22,7 @@ Writes a new alxia app in dir, which must be empty or not exist yet. Asks
 for what is not given.
 
 Options:
-  -t, --template <name>  api           an alxia app with Zod, a spec and the typed client
+  -t, --template <name>  api           an alxia app with Zod, a middleware and a spec
                          react-router  React Router's official template, served by alxia
   --no-install           write the files, skip bun install
   -h, --help             show this help`;

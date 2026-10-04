@@ -1,8 +1,7 @@
 # Server-sent events
 
 This page covers streaming events to a client: a handler replies with an
-async iterable, each value is one event, and the client reads the same
-values back as an async iterable. A stream may also name its events —
+async iterable, and each value is one event, sent as JSON. A stream may also name its events —
 `event: state`, `event: ping` — each with a schema of its own.
 
 ```ts
@@ -119,8 +118,8 @@ data: {"@type":"StateChange","changed":{"a1":{"Email":"s42"}}}
   `Last-Event-ID` when it reconnects. **`retry`**, a whole number of
   milliseconds, tells an `EventSource` how long to wait before reconnecting.
   Both are left out unless given.
-- **The client** reads `{ event, data, id? }`, a union discriminated by
-  `event`: see [Reading it](#reading-it).
+- **A client** reads each under its `event:` name: see
+  [Reading it](#reading-it).
 
 ### What is refused
 
@@ -250,8 +249,8 @@ const Event = z.discriminatedUnion('type', [
 
 ## Without a schema
 
-Any async iterable a handler replies with is a stream, schema or not. The
-client then reads the values as their type:
+Any async iterable a handler replies with is a stream, schema or not, each
+value sent as JSON:
 
 ```ts
 app.get('/letters', ({ reply }) =>
@@ -262,38 +261,14 @@ app.get('/letters', ({ reply }) =>
 			yield 'b';
 		})(),
 	),
-); // the client reads AsyncIterable<string>
+); // data: "a", then data: "b"
 ```
 
 A `ReadableStream` is not an event stream: it is sent as bytes.
 
 ## Reading it
 
-With [`@alxia/client`](https://www.npmjs.com/package/@alxia/client), the
-200's `data` is an `AsyncIterable` of the events, typed by the schema's
-output:
-
-```ts
-const ticks = await api.get('/ticks');
-if (ticks.status === 200) {
-	for await (const tick of ticks.data) console.log(tick.n);
-}
-```
-
-On a named stream, each one is `{ event, data, id? }`, a union
-discriminated by `event`, its `data` typed by that name's schema:
-
-```ts
-const push = await api.get('/push');
-if (push.status === 200) {
-	for await (const item of push.data) {
-		if (item.event === 'state') console.log(item.data.changed, item.id);
-		else console.log('ping every', item.data.interval);
-	}
-}
-```
-
-Any `EventSource` reads it too: each `data` is the JSON of one event, and a
+Any `EventSource` reads it: each `data` is the JSON of one event, and a
 named event is dispatched under its name
 (`source.addEventListener('state', …)`).
 

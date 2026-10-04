@@ -16,7 +16,6 @@ import type {
 	HandlerResult,
 	MaybePromise,
 	Method,
-	RouteEntryOf,
 	RouteHookBase,
 	RouteSchema,
 	ThreadHooks,
@@ -32,18 +31,15 @@ import type {
 export interface RouteMethod<
 	M extends Method,
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
-> extends MiddlewareForms<RouteApp<M, Ctx, Routes, Prefix, Shortcuts>>,
-		OptionsForms<RouteApp<M, Ctx, Routes, Prefix, Shortcuts>>,
-		DeprecatedForms<M, Ctx, Routes, Prefix, Shortcuts> {}
+> extends MiddlewareForms<RouteApp<M, Ctx, Prefix, Shortcuts>>,
+		OptionsForms<RouteApp<M, Ctx, Prefix, Shortcuts>>,
+		DeprecatedForms<Ctx, Prefix, Shortcuts> {}
 
 /** The forms of a route method that 0.3 had, which the middleware forms replace. */
 export interface DeprecatedForms<
-	M extends Method,
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -62,12 +58,7 @@ export interface DeprecatedForms<
 		handler: (
 			ctx: Context<Ctx, JoinPath<Prefix, Path>, Schema>,
 		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes & RouteEntryOf<M, JoinPath<Prefix, Path>, Schema, Result, Shortcuts>,
-		Prefix,
-		Shortcuts
-	>;
+	): Alxia<Ctx, Prefix, Shortcuts>;
 	/**
 	 * @deprecated A list of hooks after the path: give them as middlewares,
 	 * made by `defineMiddleware` — see the upgrading guide.
@@ -95,23 +86,7 @@ export interface DeprecatedForms<
 				Schema
 			>,
 		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes &
-			RouteEntryOf<
-				M,
-				JoinPath<Prefix, Path>,
-				Schema,
-				Result,
-				| Shortcuts
-				| ThreadHooks<
-						RouteHookBase<Ctx, JoinPath<Prefix, Path>>,
-						Hooks
-				  >['replies']
-			>,
-		Prefix,
-		Shortcuts
-	>;
+	): Alxia<Ctx, Prefix, Shortcuts>;
 	/**
 	 * @deprecated A list of hooks after the path: give them as middlewares,
 	 * made by `defineMiddleware` — see the upgrading guide.
@@ -137,36 +112,18 @@ export interface DeprecatedForms<
 				Empty
 			>,
 		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes &
-			RouteEntryOf<
-				M,
-				JoinPath<Prefix, Path>,
-				Empty,
-				Result,
-				| Shortcuts
-				| ThreadHooks<
-						RouteHookBase<Ctx, JoinPath<Prefix, Path>>,
-						Hooks
-				  >['replies']
-			>,
-		Prefix,
-		Shortcuts
-	>;
+	): Alxia<Ctx, Prefix, Shortcuts>;
 }
 
 /** The types of an app and a method, as the middleware forms read them. */
 export interface RouteApp<
 	M extends Method,
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > extends AppTypes {
 	readonly method: M;
 	readonly ctx: Ctx;
-	readonly routes: Routes;
 	readonly prefix: Prefix;
 	readonly shortcuts: Shortcuts;
 }

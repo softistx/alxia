@@ -83,18 +83,17 @@ be left out: `reply(204)`.
 
 ### Without response schemas
 
-A route without `responds`: any status, any body. The body's type is still kept, so a client reads it:
+A route without `responds`: any status, any body:
 
 ```ts
 app.get('/health', ({ reply }) => reply(200, { ok: true as const }));
-// the client reads { status: 200, data: { ok: true } }
 ```
 
 ### Shortcuts
 
 `reply` has one method per common status. Each one is the same reply as
-`reply(status, body, init)`, checked and typed the same way, so the client
-and the OpenAPI document cannot tell them apart:
+`reply(status, body, init)`, checked and typed the same way, so the OpenAPI
+document cannot tell them apart:
 
 | Shortcut | Is |
 | --- | --- |
@@ -139,8 +138,8 @@ the same way:
 There is no `reply.json` and no `reply.text`: a string is already sent as
 `text/plain` and an object as JSON ([How a body is sent](#how-a-body-is-sent)).
 A hook's `reply` has the shortcuts too: `return reply.unauthorized({ error:
-'unauthenticated' as const })` in a `derive` ends the request, and is added
-to the type of every route after it, like `reply(401, …)`.
+'unauthenticated' as const })` in a `derive` ends the request, like
+`reply(401, …)`.
 
 ### `validateResponses`
 
@@ -234,8 +233,8 @@ the redirect is added to the route's outcomes.
 
 ## Errors
 
-Prefer returning a reply: it is part of the route's type, and the client
-reads it. When code deep in a call throws, the error goes, in order:
+Prefer returning a reply: its status is checked against `responds`, and
+documented. When code deep in a call throws, the error goes, in order:
 
 1. to the route's `onError` hooks, declared before it, in the order
    declared. The first to return a reply answers ([Hooks](hooks.md#onerror));
@@ -279,12 +278,11 @@ its route's `bodyLimit` ([Routes](routes.md#body-size-bodylimit)). The route
 answers it as a refusal, through [`onRefusal`](hooks.md#onrefusal), before
 any `onError` hook. Test for it with `instanceof`, not by `name`.
 
-An `onError` reply is added to the type of the routes after it. A thrown
-`HttpError` is not: the client reads it as a status the route never
-declared.
+A thrown `HttpError` is answered as a status the route may never have
+declared: a client generated from the OpenAPI document does not expect it.
 
-Every route's type includes `500 { error: 'internal' }`
-(`InternalErrorBody`), so a client always handles it.
+Every route may answer `500 { error: 'internal' }` (`InternalErrorBody`),
+so a client always handles it.
 
 ## Problem details: `problem`
 
@@ -302,7 +300,7 @@ const app = alxia().post('/upload', ({ request }) =>
 		? problem({ type: 'urn:ietf:params:jmap:error:limit', status: 413, limit: 'maxSizeRequest' })
 		: problem({ type: 'about:blank', status: 501, title: 'Not Implemented' }),
 );
-// the client reads 413 { type: 'urn:ietf:params:jmap:error:limit'; status: 413; limit: 'maxSizeRequest' }
+// answers 413 { type: 'urn:ietf:params:jmap:error:limit'; status: 413; limit: 'maxSizeRequest' }
 ```
 
 ```ts
@@ -320,7 +318,7 @@ its status must be declared and its body accepted by that status's schema.
 [`onRefusal`](hooks.md#onrefusal) answers a refused request with one, and
 a hook per kind declares a schema for each: `onRefusal('validation', { response: { 400: Invalid } }, hook)`
 and `onRefusal('body_limit', { response: { 413: TooLarge } }, hook)`
-([One hook per kind](hooks.md#one-hook-per-kind)). `@alxia/client` reads `application/problem+json` as JSON.
+([One hook per kind](hooks.md#one-hook-per-kind)). A client reads `application/problem+json` as JSON.
 
 ## Types
 

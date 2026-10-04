@@ -1,8 +1,8 @@
 # WebSockets
 
 This page covers socket routes: the upgrade request run through the route's
-middlewares and validated like a route's, each message checked both ways,
-and the client typed from the same schemas.
+middlewares and validated like a route's, and each message checked both
+ways.
 
 ```ts
 import { alxia, defineMiddleware } from '@alxia/core';
@@ -65,7 +65,7 @@ interface SocketOptions {
 	options: Options, // no schema of the request: that is validate(…)
 	m1: (ctx: /* the hooks' context, and the upgrade request as it arrived */, next: NextFunction) => R1,
 	handlers: SocketHandlers</* socket.data: the context after m1 */, SocketSend<Options>, SocketMessage<Options>>,
-): Alxia</* … the socket added under WS */>;
+): Alxia</* … the app, unchanged in type */>;
 ```
 
 The options hold no schema of the request — `params`, `query`, `headers`,
@@ -180,23 +180,12 @@ same socket:
 { "error": "validation", "issues": [{ "target": "message", "path": ["text"], "code": "too_small", "message": "…" }] }
 ```
 
-A message that is not JSON has the code `invalid_json`. The client's type
-of what it receives includes this body when the socket has a `message`
-schema.
+A message that is not JSON has the code `invalid_json`. A client of a
+socket with a `message` schema may receive this body.
 
 ## Reading it
 
-With [`@alxia/client`](https://www.npmjs.com/package/@alxia/client), the
-socket is typed by the route: what the client sends by `message`, what it
-receives by `send`.
-
-```ts
-const socket = api.ws('/rooms/:room', { params: { room: 'lobby' } });
-socket.send({ text: 'hi' });
-socket.on((said) => console.log(said));
-```
-
-Without it, any `WebSocket` works: send JSON text, parse what comes back.
+Any `WebSocket` works: send JSON text, parse what comes back.
 
 ```ts
 import { expect, test } from 'bun:test';
@@ -231,18 +220,9 @@ test('a message is checked, then answered', async () => {
 
 ## In the app's type
 
-A socket is recorded under the method `WS`:
-
-```ts
-type Room = RoutesOf<typeof app>['/rooms/:room']['WS'];
-// Room['input']   — { readonly params: { readonly room: string | number } }
-// Room['send']    — what the client sends: the input of `message`
-// Room['receive'] — what it receives: the output of `send`, or a ValidationErrorBody
-```
-
-`SocketRecord`, `SocketEntryOf`, `SocketSchema`, `SocketContext`,
-`SocketSend` and `SocketMessage` name these pieces ([The app's
-type](types.md)).
+A socket route adds nothing to the app's type, as a route does not.
+`SocketSchema`, `SocketContext`, `SocketSend` and `SocketMessage` name what
+its handlers read, send and receive ([The app's type](types.md)).
 
 ## The forms of 0.3, deprecated
 

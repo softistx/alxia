@@ -165,7 +165,7 @@ const app = alxia()
 A stream of named events documents each name as an object of its own: the
 event's name as a `const`, its data by its schema. As for an unnamed
 stream, `data` is described as the JSON it carries, parsed — what
-`@alxia/client` reads — not as the string on the `data:` line:
+a client reads — not as the string on the `data:` line:
 
 ```ts
 const push = alxia().get(

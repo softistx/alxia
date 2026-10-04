@@ -178,7 +178,6 @@ describe('create-alxia', () => {
 			name: 'my-api',
 			dependencies: { '@alxia/core': ALXIA['@alxia/core'], zod: '^4.6.5' },
 			devDependencies: {
-				'@alxia/client': ALXIA['@alxia/client'],
 				'@types/bun': '^1.4.2',
 				typescript: '^7.0.2',
 			},
@@ -266,14 +265,12 @@ describe('create-alxia', () => {
 	test('an @alxia/* version npm has not propagated yet: the newest of its minor, still within its range', async () => {
 		// Fixed ranges, not this checkout's: at x.y.0 nothing older shares the minor.
 		const published = {
-			'@alxia/client': '^0.2.1',
 			'@alxia/core': '^0.3.1',
 			'@alxia/react-router': '^0.2.0',
 		};
 		registry.stop();
 		registry = fakeRegistry({
 			...VERSIONS,
-			'@alxia/client': ['0.2.1'],
 			// 0.3.1 published a minute ago, not on this registry yet.
 			'@alxia/core': ['0.2.9', '0.3.0'],
 		});
@@ -282,7 +279,6 @@ describe('create-alxia', () => {
 		expect(await write(target, 'api', published, io)).toBe(true);
 		const manifest = await json(join(target, 'package.json'));
 		expect(manifest.dependencies['@alxia/core']).toBe('^0.3.0');
-		expect(manifest.devDependencies['@alxia/client']).toBe('^0.2.1');
 		expect(out).toContain(
 			'  @alxia/core: the registry has no release within ^0.3.1 yet; wrote ^0.3.0, the newest of ~0.3.0',
 		);
@@ -295,7 +291,7 @@ describe('create-alxia', () => {
 			await main(['my-api', '--template', 'api', '--no-install'], root, io),
 		).toBe(0);
 		expect(err[0]).toBe(
-			'create-alxia: warning: the registry did not answer for @alxia/core, zod, @alxia/client, @biomejs/biome, @types/bun, typescript; kept the versions the template ships.',
+			'create-alxia: warning: the registry did not answer for @alxia/core, zod, @biomejs/biome, @types/bun, typescript; kept the versions the template ships.',
 		);
 		expect(
 			(await json(join(root, 'my-api', 'package.json'))).devDependencies

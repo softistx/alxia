@@ -37,8 +37,10 @@ Nothing scheduled yet.
 - **Options that can work, or a startup error.** A `limit` or `windowMs`
   that is not a whole number of 1 or more throws when `rateLimit()` is
   called.
-- **A typed 429.** The 429 is part of each limited route's type, so
-  `@alxia/client` reads it, and a route declared before the limit has none.
+- **A 429 only behind the limit.** A route declared before the limit is
+  never counted and never answers a 429. (Its place in a typed client left
+  with the client: alxia is OpenAPI spec first, so the 429 is declared in
+  the document a client is generated from.)
 - **What the route reads.** `ctx.rateLimit` gives the limit, what is left,
   and when the allowance is whole again.
 - **Standard headers.** The IETF draft's `RateLimit-Limit`, `-Remaining`,

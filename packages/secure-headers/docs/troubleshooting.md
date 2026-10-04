@@ -11,7 +11,7 @@ or a header in the wrong place.
 - [`Type 'true' is not assignable to type 'Setting | undefined'`](#type-true-is-not-assignable-to-type-setting--undefined)
 - [`No overload matches this call` … `is not assignable to type 'SecureHeadersOptions' with 'exactOptionalPropertyTypes: true'`](#no-overload-matches-this-call--is-not-assignable-to-type-secureheadersoptions-with-exactoptionalpropertytypes-true)
 - [`No overload matches this call` … `Object literal may only specify known properties, and '…' does not exist in type 'SecureHeadersOptions & …'`](#no-overload-matches-this-call--object-literal-may-only-specify-known-properties-and--does-not-exist-in-type-secureheadersoptions--)
-- [`No overload matches this call` … `Property 'nonce' is missing in type 'Alxia<Empty, Empty, "", never>'`](#no-overload-matches-this-call--property-nonce-is-missing-in-type-alxiaempty-empty--never)
+- [`No overload matches this call` … `Property 'nonce' is missing in type 'Alxia<Empty, "", never>'`](#no-overload-matches-this-call--property-nonce-is-missing-in-type-alxiaempty--never)
 - [`Property 'nonce' does not exist on type 'Context<…>'`](#property-nonce-does-not-exist-on-type-context)
 - [`No overload matches this call` … `Type 'boolean' is not assignable to type 'true'`](#no-overload-matches-this-call--type-boolean-is-not-assignable-to-type-true)
 
@@ -137,17 +137,17 @@ const app = alxia()
 	);
 ```
 
-### `No overload matches this call` … `Property 'nonce' is missing in type 'Alxia<Empty, Empty, "", never>'`
+### `No overload matches this call` … `Property 'nonce' is missing in type 'Alxia<Empty, "", never>'`
 
 **When:** `secureHeaders` is given to `use` without being called.
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(plugin: (app: Alxia<Empty, Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '{ (options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin; (options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): Plugin; }' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => AnyAlxia'.
+  Overload 1 of 2, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
+    Argument of type '{ (options: SecureHeadersOptions & { readonly nonce: true; }): NoncePlugin; (options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): Plugin; }' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
       Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, Empty, "", never>' is not assignable to type 'SecureHeadersOptions & { readonly nonce: true; }'.
-          Property 'nonce' is missing in type 'Alxia<Empty, Empty, "", never>' but required in type '{ readonly nonce: true; }'.
+        Type 'Alxia<Empty, "", never>' is not assignable to type 'SecureHeadersOptions & { readonly nonce: true; }'.
+          Property 'nonce' is missing in type 'Alxia<Empty, "", never>' but required in type '{ readonly nonce: true; }'.
 ```
 
 **Why:** `secureHeaders` makes the plugin from its options; the plugin is

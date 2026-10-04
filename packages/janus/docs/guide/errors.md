@@ -122,15 +122,16 @@ or rejects is a process warning, and the 503 is sent all the same:
 
 The 4xx are not reported: they are the client's.
 
-## On the client
+## On the wire
 
-The refusals are in the type of every route after the plugin, so
-`@alxia/client` reads them. A 401 from a route behind
+Every route after the plugin may answer these refusals: declare them in
+your OpenAPI document, and the client you generate from it (with
+`@nxgt/openapi-codegen`, say) reads them typed. A 401 from a route behind
 `session(accounts, { required: true })` is either the session's
-`{ error: 'unauthenticated' }` or janus's `{ code }`; narrow on the key:
+`{ error: 'unauthenticated' }` or janus's `{ code }`; a caller narrows on
+the key:
 
 ```ts
-import { client } from '@alxia/client';
 import { alxia } from '@alxia/core';
 import { janusErrors, session } from '@alxia/janus';
 
@@ -139,18 +140,19 @@ const app = alxia()
 	.use(session(accounts, { required: true }))
 	.get('/me', ({ user, reply }) => reply(200, { name: user.name }));
 
-const me = await client(app).get('/me');
+const me = await app.request('/me');
+const body = await me.json();
 if (me.status === 401) {
-	if ('error' in me.data) console.log('sign in first');   // the session's own 401
-	else console.log(me.data.code);                           // a JanusErrorCode
+	if ('error' in body) console.log('sign in first');   // the session's own 401
+	else console.log(body.code);                          // a JanusErrorCode
 }
-if (me.status === 503) console.log(me.data.code);          // 'STORE_FAILED' and the like: try again later
+if (me.status === 503) console.log(body.code);         // 'STORE_FAILED' and the like: try again later
 ```
 
 ## Signatures
 
 ```ts
-function janusErrors(options?: JanusErrorsOptions): Alxia<Empty, Empty, '', Reply<JanusErrorStatus, JanusErrorBody>>;
+function janusErrors(options?: JanusErrorsOptions): Alxia<Empty, '', Reply<JanusErrorStatus, JanusErrorBody>>;
 
 interface JanusErrorsOptions {
 	readonly report?: (error: JanusError, ctx: BaseContext) => unknown;

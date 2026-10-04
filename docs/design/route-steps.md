@@ -6,6 +6,12 @@ replies and its response schemas in OpenAPI, and the owner did not want a
 response middleware. This note keeps the probe and the reasoning for a later
 look at making the options form friendlier.
 
+> **Since 0.4:** alxia is OpenAPI spec first. The app's route table
+> (`typeof app` carrying every route, read by the typed client) and the
+> client package are retired: a client is generated from the OpenAPI
+> document, with `@nxgt/openapi-codegen` in the examples. Below, "the route
+> table" and "the client" describe alxia as it was when this note was written.
+
 **Update: the first slice is implemented** on the integration branch, for
 `@alxia/core` 0.4.0, with a step for the response after all: `responds`.
 Core has `defineMiddleware`, `validate`, `responds`, the forms
@@ -23,7 +29,7 @@ differently from the proposal below:
   types the handler's `reply` and checks and strips it, where it is made
   — a status it does not declare is a 500; a reply of a middleware after
   it is checked when its status is declared, and sent as it is otherwise,
-  as the route's type says; a reply made before it is not checked. Its schemas reach `RoutesOf` and
+  as the route's type says; a reply made before it is not checked. Its schemas reach the route table and
   `@alxia/openapi`, which settles decision 2 below.
 - **The options object stays, for configuration only:** `bodyLimit` and
   `detail` (`message`, `send` and `detail` on a socket). A schema in it,
@@ -59,8 +65,8 @@ app.post(
 ```
 
 - **The options object is the route's contract.** Core validates with it, and
-  types the context and the replies from it. `RoutesOf` records it, and
-  `@alxia/client` and `@alxia/openapi` read it.
+  types the context and the replies from it. The route table records it, and
+  the typed client and `@alxia/openapi` read it.
 - **Middleware is not per route.** `derive` and `decorate` apply to every
   route declared after them, and one route has to be put in a `group` to get
   its own.
@@ -110,11 +116,11 @@ app.get('/health', ({ reply }) => reply.ok('up'));        // no step, no schema
   error.
 - **`validate` carries its schemas.** Core reads the chain when the route is
   declared and rebuilds the request part of today's `RouteSchema`, so the
-  request side of `RoutesOf`, `@alxia/client` and `@alxia/openapi` stays as
+  request side of the route table, the typed client and `@alxia/openapi` stays as
   it is. This is the difference from Hono, where a validator is an opaque
   function.
 - **The replies are typed by the handler.** What the steps and the handler
-  return with `reply(status, body)` is what `RoutesOf` records. The client
+  return with `reply(status, body)` is what the route table records. The client
   reads each status with the type of its body, as it already does for a
   route without `response`.
 - **Steps run in the order they are written.** With `auth` before

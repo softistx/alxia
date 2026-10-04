@@ -28,14 +28,14 @@ curl localhost:3000/graphql -H 'content-type: application/json' -d '{"query":"{ 
 ## `graphql`
 
 ```ts
-function graphql<Ctx, Routes, Prefix, Shortcuts, SchemaCtx, UserCtx = Empty, const Path = '/graphql'>(
-	app: Alxia<Ctx, Routes, Prefix, Shortcuts>,
+function graphql<Ctx, Prefix, Shortcuts, SchemaCtx, UserCtx = Empty, const Path = '/graphql'>(
+	app: Alxia<Ctx, Prefix, Shortcuts>,
 	options: GraphQLOptions<ServerContext<Ctx>, UserCtx, Path, SchemaCtx>,
-): Alxia<Ctx, Routes & GraphQLRoutes<JoinPath<Prefix, Path>, Shortcuts>, Prefix, Shortcuts>;
+): Alxia<Ctx, Prefix, Shortcuts>;
 ```
 
 `graphql` declares a `GET` and a `POST` route at `path` on `app`, and returns
-`app` with those two routes in its type. Hand it to `use` as a function, so
+`app`, its type unchanged. Hand it to `use` as a function, so
 it stays in the chain and sees the app as typed so far:
 
 ```ts
@@ -62,17 +62,17 @@ routes on `base` and returns it.
 ## Where it is served
 
 `path` is joined to the app's prefix, and to the prefix of every app it is
-mounted into, in the routes' type as at runtime:
+mounted into:
 
 ```ts
-import { alxia, type RoutesOf } from '@alxia/core';
+import { alxia } from '@alxia/core';
 
 const api = alxia({ prefix: '/api' })
 	.use((app) => graphql(app, { schema, path: '/gql' })); // /api/gql
 
 const root = alxia({ prefix: '/v1' }).use(api);           // /v1/api/gql
 
-type Paths = keyof RoutesOf<typeof root>;                  // '/v1/api/gql'
+root.routes.map((route) => `${route.method} ${route.path}`); // ['GET /v1/api/gql', 'POST /v1/api/gql']
 ```
 
 Two endpoints on one app need two paths: declaring the default path twice
@@ -131,15 +131,8 @@ GET  ?query=mutation { m }            → 405 {"errors":[{"message":"Can only pe
 POST {}                               → 200 {"errors":[{"message":"Must provide query string.","extensions":{"code":"BAD_REQUEST"}}]}
 ```
 
-The reply's type is `Reply<StatusCode, ReadableStream<Uint8Array> | undefined>`
-for both methods, plus the replies of the hooks before it: a typed client
-sees a body to read as GraphQL, and the guard's `401`.
-
-```ts
-type GraphQLRoutes<Path extends string, Shortcuts extends AnyReply> =
-	RouteEntryOf<'GET', Path, Empty, GraphQLReply, Shortcuts> &
-	RouteEntryOf<'POST', Path, Empty, GraphQLReply, Shortcuts>;
-```
+Both methods answer a body to read as GraphQL, whatever its status, and
+the replies of the hooks before them — a guard's `401`, say.
 
 ## Testing it
 

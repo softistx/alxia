@@ -134,8 +134,7 @@ and [`alxia.ts`](https://github.com/softistx/nxgt-http/blob/develop/packages/ope
 
 `app.route(operation, handler)` declares the route an operation describes,
 exactly as `app[method](path, schema, handler)` would: the same context,
-the same compile errors, the same entry in the app's types, which
-`@alxia/client` reads.
+and the same compile errors.
 
 ```ts
 // src/app.ts

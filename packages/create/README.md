@@ -28,7 +28,7 @@ bun create @alxia my-site --template react-router
 
 | template | what it writes |
 | --- | --- |
-| `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a middleware made with `defineMiddleware` that answers 401 without an API key, then `validate` and `responds`; a `bun test` spec calling it with `app.request()` and through `@alxia/client`, typed; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, Biome (`biome.json`, `lint`, `format`, `check`, `check:ci`, `verify`), a `Dockerfile` running on `oven/bun:1-alpine`, `.dockerignore`, `.gitignore`, `.env.example`, `.vscode/` and a README |
+| `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a middleware made with `defineMiddleware` that answers 401 without an API key, then `validate` and `responds`; a `bun test` spec calling it with `app.request()`; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, Biome (`biome.json`, `lint`, `format`, `check`, `check:ci`, `verify`), a `Dockerfile` running on `oven/bun:1-alpine`, `.dockerignore`, `.gitignore`, `.env.example`, `.vscode/` and a README |
 | `react-router` | React Router's official template, as `create-react-router` writes it, shipped in this package and copied, with [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun, a `Dockerfile` running on `oven/bun:1-alpine` in place of React Router's Node one, and Biome as the `api` project has it, the scaffold formatted by it once. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
 
 The heart of the `api` project, its route and middleware (the whole file, with
@@ -127,7 +127,7 @@ or CI.
 
 ## Versions
 
-- **alxia's packages** — `@alxia/core`, `@alxia/client`,
+- **alxia's packages** — `@alxia/core` and
   `@alxia/react-router` — are moved to the newest version on the registry
   within the ranges this release of `@alxia/create` was published with:
   `^0.3.1` writes `^0.3.4` once 0.3.4 is out, never `^0.4.0`. Just after a

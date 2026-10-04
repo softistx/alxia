@@ -3,11 +3,7 @@ import type {
 	AnyReply,
 	BaseContext,
 	Empty,
-	JoinPath,
-	Reply,
-	RouteEntryOf,
 	RoutePath,
-	StatusCode,
 } from '@alxia/core';
 import type {
 	GraphQLSchemaWithContext,
@@ -104,15 +100,6 @@ type ProvidesContext<Provided, Required> = Provided extends Required
 				string}`;
 		};
 
-/** What the endpoint answers, as alxia's client sees it: a body to read as GraphQL. */
-type GraphQLReply = Reply<StatusCode, ReadableStream<Uint8Array> | undefined>;
-
-export type GraphQLRoutes<
-	Path extends string,
-	Shortcuts extends AnyReply,
-> = RouteEntryOf<'GET', Path, Empty, GraphQLReply, Shortcuts> &
-	RouteEntryOf<'POST', Path, Empty, GraphQLReply, Shortcuts>;
-
 /**
  * A GraphQL endpoint on `app`, served by [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server):
  * `GET` and `POST` at `path`, behind every hook declared on `app` before it.
@@ -129,25 +116,19 @@ export type GraphQLRoutes<
  */
 export function graphql<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 	SchemaCtx,
 	UserCtx extends YogaContext = Empty,
 	const Path extends RoutePath = '/graphql',
 >(
-	app: Alxia<Ctx, Routes, Prefix, Shortcuts>,
+	app: Alxia<Ctx, Prefix, Shortcuts>,
 	options: GraphQLOptions<ServerContext<Ctx>, UserCtx, Path, SchemaCtx> &
 		ProvidesContext<
 			YogaInitialContext & ServerContext<Ctx> & UserCtx,
 			SchemaCtx
 		>,
-): Alxia<
-	Ctx,
-	Routes & GraphQLRoutes<JoinPath<Prefix, Path>, Shortcuts>,
-	Prefix,
-	Shortcuts
-> {
+): Alxia<Ctx, Prefix, Shortcuts> {
 	const {
 		path = '/graphql' as Path,
 		cors = false,

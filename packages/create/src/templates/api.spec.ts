@@ -6,8 +6,8 @@ import { $ } from 'bun';
 import { copyTemplate } from '../copy';
 import { alxiaRanges } from '../versions';
 
-// Inside the package, so the project resolves @alxia/core, @alxia/client and
-// zod to this workspace's: the template typechecks and passes its own spec
+// Inside the package, so the project resolves @alxia/core and zod
+// to this workspace's: the template typechecks and passes its own spec
 // against them with no install. scripts/verify-templates.ts does the same
 // from the packed tarballs, installed.
 const dir = join(import.meta.dir, '..', '..', '.fixture-api');
@@ -54,7 +54,6 @@ describe('the api template', () => {
 			'zod',
 		]);
 		expect(Object.keys(manifest.devDependencies ?? {})).toEqual([
-			'@alxia/client',
 			'@biomejs/biome',
 			'@types/bun',
 			'typescript',

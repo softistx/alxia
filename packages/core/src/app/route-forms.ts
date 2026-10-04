@@ -14,9 +14,7 @@ import type {
 	MiddlewareBase,
 	NextFunction,
 	RouteDetail,
-	RouteEntryOf,
 	ThreadContext,
-	ThreadReplies,
 	ThreadSchema,
 } from './types';
 
@@ -62,7 +60,6 @@ export interface NotAFunction {
 export interface AppTypes {
 	readonly method: Method;
 	readonly ctx: object;
-	readonly routes: object;
 	readonly prefix: string;
 	readonly shortcuts: AnyReply;
 }
@@ -105,23 +102,13 @@ export type RouteResult<Results extends readonly unknown[]> = HandlerResult<
 	ThreadSchema<Results>
 >;
 
-/** `App` with the route at `Path` added to its table. */
-export type AppWithRoute<
-	App extends AppTypes,
-	Path extends string,
-	Options,
-	Results extends readonly unknown[],
-	Result,
-> = Alxia<
+/**
+ * What a route method returns: `App` itself, its context, prefix and
+ * shortcuts unchanged. A route adds nothing to the app's type: the
+ * OpenAPI document is the contract a client is generated from.
+ */
+export type AppWithRoute<App extends AppTypes> = Alxia<
 	App['ctx'],
-	App['routes'] &
-		RouteEntryOf<
-			App['method'],
-			JoinPath<App['prefix'], Path>,
-			Options & ThreadSchema<Results>,
-			Result,
-			App['shortcuts'] | ThreadReplies<Results>
-		>,
 	App['prefix'],
 	App['shortcuts']
 >;

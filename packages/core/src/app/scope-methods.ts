@@ -15,7 +15,6 @@ import type {
 /** `app.decorate(values)`. */
 export interface DecorateMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -23,21 +22,19 @@ export interface DecorateMethod<
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	<const Values extends object>(
 		values: Values,
-	): Alxia<Ctx & Values, Routes, Prefix, Shortcuts>;
+	): Alxia<Ctx & Values, Prefix, Shortcuts>;
 }
 
 /** `app.derive(hook)`. */
 export interface DeriveMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
 	/**
 	 * A hook run on every request to a route declared after it, before the
 	 * request is validated. What it returns is added to the context; a reply
-	 * it returns ends the request, and is added to the type of every such
-	 * route, so the client reads it:
+	 * it returns ends the request:
 	 *
 	 * ```ts
 	 * .derive(async ({ request, reply }) => {
@@ -54,7 +51,6 @@ export interface DeriveMethod<
 			(Exclude<Result, AnyReply> extends infer Added extends object
 				? Added
 				: Empty),
-		Routes,
 		Prefix,
 		Shortcuts | Extract<Result, AnyReply>
 	>;
@@ -63,7 +59,6 @@ export interface DeriveMethod<
 /** `app.wrap(hook)`. */
 export interface WrapMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -85,13 +80,12 @@ export interface WrapMethod<
 			ctx: BaseContext & Ctx,
 			next: () => Promise<Response>,
 		) => MaybePromise<Result>,
-	): Alxia<Ctx, Routes, Prefix, Shortcuts | Extract<Result, AnyReply>>;
+	): Alxia<Ctx, Prefix, Shortcuts | Extract<Result, AnyReply>>;
 }
 
 /** `app.bodyLimit(bytes)`. */
 export interface BodyLimitMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -110,13 +104,12 @@ export interface BodyLimitMethod<
 	 * ```
 	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
-	(bytes: number): Alxia<Ctx, Routes, Prefix, Shortcuts | BodyLimitShortcut>;
+	(bytes: number): Alxia<Ctx, Prefix, Shortcuts | BodyLimitShortcut>;
 }
 
 /** `app.onError(hook)`. */
 export interface ErrorMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -131,5 +124,5 @@ export interface ErrorMethod<
 			error: unknown,
 			ctx: BaseContext & Partial<Ctx>,
 		) => MaybePromise<Result>,
-	): Alxia<Ctx, Routes, Prefix, Shortcuts | Extract<Result, AnyReply>>;
+	): Alxia<Ctx, Prefix, Shortcuts | Extract<Result, AnyReply>>;
 }

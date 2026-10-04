@@ -1,8 +1,8 @@
 # @alxia/rate-limit
 
-Rate limiting for [alxia](https://www.npmjs.com/package/@alxia/core), typed:
-the 429 is part of every route behind the limit, so
-[`@alxia/client`](https://www.npmjs.com/package/@alxia/client) reads it. No
+Rate limiting for [alxia](https://www.npmjs.com/package/@alxia/core): every
+route behind the limit answers a 429 with `Retry-After` once a key has
+spent its allowance, and reads what is left as a typed `ctx.rateLimit`. No
 dependency.
 
 ```sh
@@ -70,6 +70,6 @@ nothing.
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/rate-limit/docs): the options and their defaults, which requests are counted, the headers, the 429 on the client, stores, and testing.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/rate-limit/docs): the options and their defaults, which requests are counted, the headers, the 429 on the wire, stores, and testing.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/roadmap.md): what is coming, and what is not planned.

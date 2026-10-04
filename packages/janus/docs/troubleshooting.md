@@ -11,7 +11,6 @@ symptom, under [Traps](#traps).
 - [`'user' is possibly 'null'`](#user-is-possibly-null)
 - [`Type '"admin"' is not assignable to type '"user"'`](#type-admin-is-not-assignable-to-type-user)
 - [`Type 'SecondFactorRequired' is missing the following properties from type 'SessionOpened<User<…>>': token, session, user`](#type-secondfactorrequired-is-missing-the-following-properties-from-type-sessionopeneduser-token-session-user)
-- [`Property 'error' is missing in type '{ code: JanusErrorCode; … }'`](#property-error-is-missing-in-type--code-januserrorcode--)
 
 **Types: permissions**
 
@@ -148,30 +147,6 @@ challenge, and a challenge has no session to put in a cookie.
 const result = await accounts.signIn(body);
 if (result.status === 'secondFactor') return reply.ok({ challenge: result.challenge });
 return reply.ok({ id: auth.send(result).id });
-```
-
-### `Property 'error' is missing in type '{ code: JanusErrorCode; … }'`
-
-**When:** a client reads a 401 from a route behind
-`session(accounts, { required: true })` and `janusErrors()` as the session's
-body only.
-
-```text
-error TS2322: Type '{ error: "unauthenticated"; } | { code: JanusErrorCode; issues?: …; minLength?: number; attemptsLeft?: number; retryAfter?: number; }' is not assignable to type '{ error: "unauthenticated"; }'.
-  Property 'error' is missing in type '{ code: JanusErrorCode; … }' but required in type '{ error: "unauthenticated"; }'.
-```
-
-**Why:** two 401s are possible there: the session's own
-`{ error: 'unauthenticated' }`, and janus's `{ code }` — a refused code
-or password — through `janusErrors()`.
-
-**Fix:** narrow on the key ([Errors](guide/errors.md#on-the-client)):
-
-```ts
-if (me.status === 401) {
-	if ('error' in me.data) console.log('sign in first');
-	else console.log(me.data.code);
-}
 ```
 
 ## Types: permissions

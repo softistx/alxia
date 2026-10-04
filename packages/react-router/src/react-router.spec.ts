@@ -1,6 +1,6 @@
 import { beforeAll, describe, expect, test } from 'bun:test';
 import { compress } from '@alxia/compress';
-import { alxia, type BaseContext, type RoutesOf } from '@alxia/core';
+import { alxia, type BaseContext } from '@alxia/core';
 import { openapi } from '@alxia/openapi';
 // The package by its published name, `dist/`, not `./index`: the fixture's
 // build imports it so, and the catch-all must set the very `alxiaContext`
@@ -380,14 +380,6 @@ describe('the context', () => {
 			);
 		};
 		expect(typed).toBeFunction();
-	});
-
-	test('the catch-all adds nothing to the route table', () => {
-		type Routes = RoutesOf<ReturnType<typeof served>>;
-		const paths: (keyof Routes)[] = ['/api/health'];
-		// @ts-expect-error: pages are not something the typed client calls
-		const page: keyof Routes = '/*';
-		expect([paths, page]).toHaveLength(2);
 	});
 });
 

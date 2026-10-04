@@ -7,7 +7,7 @@ Redis.
 
 ```ts
 import { alxia, validate } from '@alxia/core';
-import { idempotency } from '@alxia/redis';
+import { idempotency, type IdempotencyErrorBody } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 import { z } from 'zod';
 
@@ -84,8 +84,9 @@ guarded request a `500`, logging
 | no key, without `required` | the route runs, unguarded |
 | a method not in `methods` | the route runs, unguarded |
 
-Every refusal is typed as `IdempotencyErrorBody` and is part of each
-guarded route's type, so `@alxia/client` reads it:
+Every refusal's body is an `IdempotencyErrorBody`; declare the statuses in
+your OpenAPI document, and the client you generate from it (with
+`@nxgt/openapi-codegen`, say) reads them typed:
 
 ```ts
 interface IdempotencyErrorBody {
@@ -100,9 +101,8 @@ interface IdempotencyErrorBody {
 ```
 
 ```ts
-import { client } from '@alxia/client';
 import { alxia, validate } from '@alxia/core';
-import { idempotency } from '@alxia/redis';
+import { idempotency, type IdempotencyErrorBody } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 import { z } from 'zod';
 
@@ -114,14 +114,15 @@ const app = alxia()
 		reply(201, { id: crypto.randomUUID(), amount: body.amount }),
 	);
 
-const api = client(app);
-const result = await api.post('/payments', {
-	body: { amount: 10 },
-	init: { headers: { 'idempotency-key': crypto.randomUUID() } },
+const result = await app.request('/payments', {
+	method: 'POST',
+	headers: { 'content-type': 'application/json', 'idempotency-key': crypto.randomUUID() },
+	body: JSON.stringify({ amount: 10 }),
 });
-// result.status: 201 | 400 | 409 | 422 | 500
+// result.status: 201, or 400, 409, 422 from the guard, or 500
 if (result.status === 409) {
-	await Bun.sleep(result.data.retryAfter! * 1000);   // then send the same request again
+	const { retryAfter } = (await result.json()) as IdempotencyErrorBody;
+	await Bun.sleep(retryAfter! * 1000);   // then send the same request again
 }
 ```
 
@@ -150,7 +151,7 @@ gets the replay rather than the `409`:
 
 ```ts
 import { alxia } from '@alxia/core';
-import { idempotency } from '@alxia/redis';
+import { idempotency, type IdempotencyErrorBody } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
@@ -173,7 +174,7 @@ reads the forwarded header. Where requests carry a user, scope by the user:
 
 ```ts
 import { alxia } from '@alxia/core';
-import { idempotency } from '@alxia/redis';
+import { idempotency, type IdempotencyErrorBody } from '@alxia/redis';
 import { connectRedis } from '@nxgt/redis';
 
 const connection = await connectRedis(Bun.env['REDIS_URL']!);

@@ -6,7 +6,6 @@ import type { AnyReply } from '../reply/reply';
 import type { JoinPath, PathAt, RoutePath } from '../types/path';
 import type {
 	SocketContext,
-	SocketEntryOf,
 	SocketHandlers,
 	SocketMessage,
 	SocketSchema,
@@ -26,17 +25,15 @@ import type { AnyRouteHook, Empty, RouteHookBase, ThreadHooks } from './types';
  */
 export interface SocketMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
-> extends SocketForms<RouteApp<'GET', Ctx, Routes, Prefix, Shortcuts>>,
-		SocketOptionsForms<RouteApp<'GET', Ctx, Routes, Prefix, Shortcuts>>,
-		DeprecatedSocketForms<Ctx, Routes, Prefix, Shortcuts> {}
+> extends SocketForms<RouteApp<'GET', Ctx, Prefix, Shortcuts>>,
+		SocketOptionsForms<RouteApp<'GET', Ctx, Prefix, Shortcuts>>,
+		DeprecatedSocketForms<Ctx, Prefix, Shortcuts> {}
 
 /** The forms of `ws` 0.3 had, which the middleware forms replace. */
 export interface DeprecatedSocketForms<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -65,12 +62,7 @@ export interface DeprecatedSocketForms<
 			SocketSend<Schema>,
 			SocketMessage<Schema>
 		>,
-	): Alxia<
-		Ctx,
-		Routes & SocketEntryOf<JoinPath<Prefix, Path>, Schema>,
-		Prefix,
-		Shortcuts
-	>;
+	): Alxia<Ctx, Prefix, Shortcuts>;
 	/**
 	 * A WebSocket route with hooks of its own, run on the upgrade request
 	 * after the hooks before it: what they add, `socket.data` reads. A
@@ -104,10 +96,5 @@ export interface DeprecatedSocketForms<
 			SocketSend<Schema>,
 			SocketMessage<Schema>
 		>,
-	): Alxia<
-		Ctx,
-		Routes & SocketEntryOf<JoinPath<Prefix, Path>, Schema>,
-		Prefix,
-		Shortcuts
-	>;
+	): Alxia<Ctx, Prefix, Shortcuts>;
 }

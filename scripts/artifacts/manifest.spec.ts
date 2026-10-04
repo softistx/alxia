@@ -8,7 +8,7 @@ import {
 describe('manifestShapeProblems', () => {
 	const httpyz = { name: '@alxia/core', version: '0.4.0' };
 	const binding = (peerDependencies: Record<string, string>) => ({
-		name: '@alxia/client',
+		name: '@alxia/jwt',
 		version: '0.3.0',
 		peerDependencies,
 	});

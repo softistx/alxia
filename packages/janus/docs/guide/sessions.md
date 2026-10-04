@@ -68,8 +68,9 @@ const app = alxia()
 	);
 ```
 
-With `required: true`, the 401 is in the type of every route after it, so a
-client generated from the app reads it:
+With `required: true`, every route after it answers this 401 to an
+anonymous request; declare it in the OpenAPI document a client is
+generated from:
 
 ```text
 401 {"error":"unauthenticated"}
@@ -143,7 +144,7 @@ A patient's session on `/staff/me` is a 401, as if they had sent none. A
 | `user` | the user, typed by its schema and narrowed by `type`, or `null` | the user, or `null` | the user |
 | `session` | `Session` or `null` | `Session` or `null` | `Session` |
 | `auth` | `RequestAuth`: `send`, `signOut`, `device` | the same | the same |
-| a 401 in the routes' type | no | yes | yes |
+| a 401 to an anonymous request | no | yes | yes |
 
 `Session` is `@nxgt/janus`'s: `id`, `userId`, `authenticatedAt`,
 `expiresAt`, `revokedAt`, `createdAt`. The token is never in it.
@@ -303,7 +304,7 @@ function session<A extends Auth<{ readonly type: string }>, const T extends User
 	options: SessionOptions<T> & { readonly required: true },
 ): Alxia<
 	{ readonly user: UserOf<A, T>; readonly session: Session; readonly auth: RequestAuth },
-	Empty, '', Reply<401, UnauthenticatedBody>
+	'', Reply<401, UnauthenticatedBody>
 >;
 
 function session<A extends Auth<{ readonly type: string }>, const T extends UserOfAuth<A>['type']>(
@@ -311,7 +312,7 @@ function session<A extends Auth<{ readonly type: string }>, const T extends User
 	options?: SessionOptions<T> & { readonly required?: false },
 ): Alxia<
 	{ readonly user: UserOf<A, T> | null; readonly session: Session | null; readonly auth: RequestAuth },
-	Empty, '', never
+	'', never
 >;
 
 function session<A extends Auth<{ readonly type: string }>, const T extends UserOfAuth<A>['type']>(
@@ -319,7 +320,7 @@ function session<A extends Auth<{ readonly type: string }>, const T extends User
 	options?: SessionOptions<T>,
 ): Alxia<
 	{ readonly user: UserOf<A, T> | null; readonly session: Session | null; readonly auth: RequestAuth },
-	Empty, '', Reply<401, UnauthenticatedBody>
+	'', Reply<401, UnauthenticatedBody>
 >;
 
 interface SessionOptions<T extends string> {

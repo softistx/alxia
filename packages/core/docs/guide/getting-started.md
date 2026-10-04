@@ -5,7 +5,7 @@ and points at the page that goes deeper at each step.
 
 To skip ahead, `bun create @alxia my-app --template api` writes an app of
 the shape this page ends with — a route validated by Zod, behind an API-key
-check of its own, and a spec calling it in process and through the typed client —
+check of its own, and a spec calling it in process with `app.request()` —
 and installs it
 ([`@alxia/create`](https://www.npmjs.com/package/@alxia/create)). By hand:
 
@@ -26,8 +26,6 @@ Valibot, ArkType or a schema written by hand work the same
 import { alxia } from '@alxia/core';
 
 export const app = alxia().get('/health', ({ reply }) => reply(200, { ok: true }));
-
-export type App = typeof app;
 ```
 
 ```ts
@@ -44,9 +42,9 @@ curl localhost:3000/health   # {"ok":true}
 ```
 
 Every method returns the app, typed with what it added, so declare the app
-in **one chain** and export its type. `App` is what
-[`@alxia/client`](https://www.npmjs.com/package/@alxia/client) reads
-([The app's type](types.md)).
+in **one chain**: what a hook adds is typed in the routes after it
+([The app's type](types.md)). A client is generated from the API's OpenAPI
+document, not from the app's type: alxia is spec first.
 
 ## A route that validates
 
@@ -76,8 +74,6 @@ export const app = alxia()
 		responds({ 201: User }),
 		({ body, reply }) => reply(201, { id: 2, name: body.name }),
 	);
-
-export type App = typeof app;
 ```
 
 `validate` and `responds` are middlewares: given among the route's
@@ -127,8 +123,8 @@ test('creates a user from JSON', async () => {
 ```
 
 A body is read by its `content-type`: without `application/json`, the JSON
-above would be read as bytes and refused. `@alxia/client`, given the app
-itself, calls the same `fetch` with typed arguments.
+above would be read as bytes and refused. `app.request(path, init)` calls
+the app's own `fetch`: no port, no server.
 
 ## Where to go next
 
@@ -142,4 +138,4 @@ itself, calls the same `fetch` with typed arguments.
 | serve a directory, a favicon, a single-page app | [Static files](static-files.md) |
 | push events or open a socket | [Server-sent events](server-sent-events.md), [WebSockets](websockets.md) |
 | choose a port, TLS, run behind a proxy, stop cleanly | [Serving](serving.md) |
-| type a client, a service, or a test from the app | [The app's type](types.md) |
+| type a service or a test from the app | [The app's type](types.md) |

@@ -1,6 +1,6 @@
 import { describe, expect, expectTypeOf, spyOn, test } from 'bun:test';
 import { z } from 'zod';
-import { type AnyAlxia, alxia, type RoutesOf } from './alxia';
+import { type AnyAlxia, alxia } from './alxia';
 import { defineMiddleware } from './define-middleware';
 import { validate } from './validate';
 
@@ -110,7 +110,7 @@ describe('route(operation, ...middlewares, handler)', () => {
 		}
 	});
 
-	test('declares the operation on the route, as the route table and OpenAPI read it', () => {
+	test('declares the operation on the route, as OpenAPI reads it', () => {
 		const app = alxia().route(updatePet, auth, ({ reply }) =>
 			reply(200, { id: 1, name: 'x' }),
 		);
@@ -120,8 +120,6 @@ describe('route(operation, ...middlewares, handler)', () => {
 			params: updatePet.schema.params,
 			body: updatePet.schema.body,
 		});
-		type Route = RoutesOf<typeof app>['/pets/:petId']['PATCH'];
-		expectTypeOf<Route['input']['body']>().toEqualTypeOf<{ name: string }>();
 	});
 
 	test('the mistakes a route method refuses', () => {
@@ -174,24 +172,24 @@ describe('validate counted as the operation’s', () => {
 		expect(reads).toEqual(['Rex', 'Rex']); // the other validate, then the operation's
 	});
 
-	test('what the types say of a part a middleware passes on', () => {
+	test('a part a middleware passes on, which the operation has no schema for', async () => {
 		const op = {
 			method: 'GET',
 			path: '/pets',
 			schema: { response: { 200: z.object({ page: z.number() }) } },
 		} as const;
-		alxia().route(
+		const app = alxia().route(
 			op,
-			(_ctx, next) => next({ query: { page: 3 }, page: 3 }),
-			({ query, page, reply }) => {
-				// the operation has no query schema: typed as the request's own
-				expectTypeOf(query).toEqualTypeOf<
-					Readonly<Record<string, string | readonly string[]>>
-				>();
-				expectTypeOf(page).toEqualTypeOf<number>(); // another name: typed as it runs
-				return reply(200, { page });
+			(_ctx, next) => next({ query: { page: 3 } }),
+			({ query, reply }) => {
+				// typed as the middleware passed it, as it runs
+				expectTypeOf(query).toEqualTypeOf<{ page: number }>();
+				return reply(200, { page: query.page });
 			},
 		);
+		expect(await (await app.request('/pets?page=1')).json()).toEqual({
+			page: 3,
+		});
 	});
 
 	test("an operation's params a route's path does not give is refused", () => {

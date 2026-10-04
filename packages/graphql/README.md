@@ -108,7 +108,7 @@ graphql(app, {
 | `renderSandbox(endpoint, options?)`, `SANDBOX_POLICY` | the Sandbox page, and the policy it loads under |
 | `SandboxOptions` | its options: `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
 | `GraphQLContext<App, UserContext?>` | what a resolver reads |
-| `ServerContext<Ctx>`, `GraphQLOptions`, `GraphQLRoutes` | its types |
+| `ServerContext<Ctx>`, `GraphQLOptions` | its types |
 
 ## Documentation
 

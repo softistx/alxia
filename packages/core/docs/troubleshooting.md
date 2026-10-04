@@ -46,6 +46,8 @@ a trap that prints nothing is headed by its symptom.
 - [`The inferred type of '…' cannot be named without a reference to '…' from '…/@alxia/core/dist/…'`](#the-inferred-type-of--cannot-be-named-without-a-reference-to--from-alxiacoredist)
 - [`Argument of type '"validation" | "body_limit"' is not assignable to parameter of type 'never'`](#argument-of-type-validation--body_limit-is-not-assignable-to-parameter-of-type-never)
 - [`Property 'part' does not exist on type 'Refusal'`](#property-part-does-not-exist-on-type-refusal)
+- [`Module '"@alxia/core"' has no exported member 'RoutesOf'`](#module-alxiacore-has-no-exported-member-routesof)
+- [`Generic type 'Alxia<Ctx, Prefix, Shortcuts>' requires between 0 and 3 type arguments`](#generic-type-alxiactx-prefix-shortcuts-requires-between-0-and-3-type-arguments)
 
 **Building the app**
 
@@ -242,7 +244,8 @@ error TS2345: Argument of type '201' is not assignable to parameter of type '200
 ```
 
 **Why:** with `responds`, the handler's `reply` takes only the declared
-statuses, so the client's type lists every status it can read.
+statuses, so the route answers only what it declares, as its OpenAPI
+document says.
 
 **Fix:** declare the status, then reply with it:
 
@@ -273,8 +276,8 @@ reply(200, { id: Number(row.id), name: row.name });
 **When:** a handler returns a `Response`, for example `new Response('ok')`
 or `Response.json(data)`.
 
-**Why:** a handler returns a `Reply`. A raw `Response` has no type the
-client could read.
+**Why:** a handler returns a `Reply`. A raw `Response` escapes the check
+`responds` makes of a reply, and the OpenAPI document cannot describe it.
 
 **Fix:** return `reply`. A string goes as `text/plain`, a `Blob` or a stream
 as it is, and anything else as JSON:
@@ -468,7 +471,7 @@ const withTenant = <C extends { user: { tenantId: string } }>(app: Alxia<C>) =>
 ```text
 error TS2769: No overload matches this call.
   …
-      Type 'Alxia<{ user: { tenantId: string; }; } & { tenant: …; }, Empty, "", never> & Requiring<{ user: { tenantId: string; }; }>' is not assignable to type 'ProvidedBy<C, { user: { tenantId: string; }; }>'.
+      Type 'Alxia<{ user: { tenantId: string; }; } & { tenant: …; }, "", never> & Requiring<{ user: { tenantId: string; }; }>' is not assignable to type 'ProvidedBy<C, { user: { tenantId: string; }; }>'.
 ```
 
 **Why:** the check is a conditional type, and TypeScript does not decide a
@@ -915,8 +918,7 @@ app.post('/posts', { bodyLimit: 1024 * 1024 }, auth, validate({ body: Post }), r
 **When:** a route is given nine middlewares or more. Without options,
 TypeScript reports the first, `TS2559`, on the first middleware; with
 options, it counts the arguments, `TS2554`. `route(operation, …)` counts
-them too, `Expected 2-10 arguments`, and may add
-`TS2590: Expression produces a union type that is too complex to represent`.
+them too, `Expected 2-10 arguments`.
 
 ```ts
 app.get('/', m1, m2, m3, m4, m5, m6, m7, m8, m9, handler);
@@ -1018,8 +1020,8 @@ error TS2345: Argument of type '{ readonly method: "GET" | "POST"; readonly path
 
 **Why:** TypeScript widens the properties of an object in a variable:
 `'GET'` and `'/pets/:petId'` both become `string`. A route under a method it
-cannot name would be typed under every method while being served under one,
-so the client would offer calls that answer 404. A route with a path it
+cannot name would be typed under every method while being served under
+one. A route with a path it
 cannot name has no parameters to read. An operation written inline in the
 call is not widened.
 
@@ -1224,6 +1226,50 @@ an app with an `onRefusal` hook could not be named.
 **Fix:** upgrade to `@alxia/core` 0.2.1 or later. A type core still fails
 to export is a bug: report it with the code. Until then, annotate the
 export or the hook's return type, e.g. `Reply<400 | 413, ProblemDetails>`, with `Reply` and `ProblemDetails` from `@alxia/core`.
+
+### `Module '"@alxia/core"' has no exported member 'RoutesOf'`
+
+**When:** code written for 0.3 imports `RoutesOf`, or another type that
+described a route to a client — `RouteEntryOf`, `RouteRecord`,
+`RouteTable`, `RouteInput`, `RouteOutput`, `Outcome`, `OutcomeOf`,
+`SocketRecord`, `SocketEntryOf`, `RefusalOutcome`, `KindOutcome` — from
+`@alxia/core` 0.4 or later:
+
+```text
+error TS2305: Module '"@alxia/core"' has no exported member 'RoutesOf'.
+```
+
+**Why:** alxia is OpenAPI spec first. A route adds nothing to the app's
+type, and the route table, its types and the typed client are gone: a
+client is generated from the OpenAPI document.
+
+**Fix:** generate the client from the document, for example with
+`@nxgt/openapi-codegen`; check a route in a test with `app.request()`, and
+what its handler reads with `expectTypeOf` inside it. See
+[No more client: spec first](upgrading.md#no-more-client-spec-first).
+
+### `Generic type 'Alxia<Ctx, Prefix, Shortcuts>' requires between 0 and 3 type arguments`
+
+**When:** code written for 0.3 names an app with four type arguments:
+
+```ts
+type Fresh = Alxia<Empty, Empty, '', never>;
+```
+
+```text
+error TS2707: Generic type 'Alxia<Ctx, Prefix, Shortcuts>' requires between 0 and 3 type arguments.
+```
+
+**Why:** the second parameter, `Routes`, is gone: `Alxia` is
+`Alxia<Ctx, Prefix, Shortcuts>`.
+
+**Fix:** drop the second argument:
+
+```ts
+type Fresh = Alxia<Empty, '', never>;
+```
+
+See [No more client: spec first](upgrading.md#no-more-client-spec-first).
 
 ## Building the app
 
@@ -1673,8 +1719,8 @@ await fetch('/users', {
 });
 ```
 
-[`@alxia/client`](https://www.npmjs.com/package/@alxia/client) sets the
-`content-type` for you.
+A client generated from the OpenAPI document sets the `content-type` for
+you.
 
 To answer it in another format, such as an RFC 9457 problem, declare
 [`onRefusal`](guide/hooks.md#onrefusal) before the routes.
@@ -1872,7 +1918,8 @@ app
 ```
 
 Prefer a declared `reply` to `throw new HttpError(…)`: a thrown status is
-not in the route's type, so a typed client does not expect it.
+not declared, so a client generated from the OpenAPI document does not
+expect it.
 
 ### A plugin's route reads a body past the app's `bodyLimit()`
 
@@ -1881,7 +1928,7 @@ app plugin, and a route of that plugin accepts a larger body.
 
 **Why:** an app's `bodyLimit()` reaches the routes declared on it and in
 its groups, never a plugin's. A plugin's route keeps the limit it was
-declared with, and its type with it. A plugin route with no `onRefusal` of
+declared with. A plugin route with no `onRefusal` of
 its own is still answered by the app's hook. A function plugin that declares its routes on the app is
 bounded like any of them.
 

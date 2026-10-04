@@ -36,7 +36,7 @@ function createI18n<
 	Ctx extends object = BaseContext,
 >(
 	options: I18nOptions<C, Fallback, Ctx>,
-): Alxia<RequiresOf<Ctx, 'resolve'> & Empty & LanguageContext<keyof C & string> & I18nContext<KeyOf<C[Fallback]>>, Empty, '', never> &
+): Alxia<RequiresOf<Ctx, 'resolve'> & Empty & LanguageContext<keyof C & string> & I18nContext<KeyOf<C[Fallback]>>, '', never> &
 	Requiring<RequiresOf<Ctx, 'resolve'>> & {
 		t: Translate<KeyOf<C[Fallback]>>;
 		language: () => keyof C & string;

@@ -1,5 +1,4 @@
-import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { client } from '@alxia/client';
+import { describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { rateLimit } from './rate-limit';
 import { MemoryStore } from './store';
@@ -13,31 +12,26 @@ const app = alxia({ ip: (request) => request.headers.get('x-ip') ?? undefined })
 
 describe('rateLimit', () => {
 	test('counts by key, answers 429 past the limit, with its headers', async () => {
-		const api = client(app);
-		const init = { init: { headers: { 'x-ip': '1.1.1.1' } } };
-		const first = await api.get('/limited', init);
-		expect(first.data).toBe(1);
-		expect(first.response.headers.get('ratelimit-remaining')).toBe('1');
-		await api.get('/limited', init);
-		const third = await api.get('/limited', init);
+		const from = (ip: string) =>
+			app.request('/limited', { headers: { 'x-ip': ip } });
+		const first = await from('1.1.1.1');
+		expect(await first.json()).toBe(1);
+		expect(first.headers.get('ratelimit-remaining')).toBe('1');
+		await from('1.1.1.1');
+		const third = await from('1.1.1.1');
 		expect(third.status).toBe(429);
-		if (third.status === 429) {
-			expectTypeOf(third.data).toEqualTypeOf<{
-				error: 'rate_limited';
-				retryAfter: number;
-			}>();
-			expect(third.data.error).toBe('rate_limited');
-		}
-		expect(third.response.headers.get('retry-after')).not.toBeNull();
-		const other = await api.get('/limited', {
-			init: { headers: { 'x-ip': '2.2.2.2' } },
-		});
-		expect(other.status).toBe(200);
+		expect(await third.json()).toMatchObject({ error: 'rate_limited' });
+		expect(third.headers.get('retry-after')).not.toBeNull();
+		expect((await from('2.2.2.2')).status).toBe(200);
 	});
 
-	test('routes before it are not limited, nor typed with a 429', async () => {
-		const result = await client(app).get('/free');
-		expectTypeOf(result.status).toEqualTypeOf<200 | 500>();
+	test('routes before it are not limited', async () => {
+		for (let i = 0; i < 3; i++) {
+			const free = await app.request('/free', {
+				headers: { 'x-ip': '3.3.3.3' },
+			});
+			expect(free.status).toBe(200);
+		}
 	});
 
 	test('the memory store decides, forgets a key, and a window', async () => {

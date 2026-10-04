@@ -51,7 +51,7 @@ export interface ListenOptions {
 }
 
 /** Any app, whatever it holds. */
-export type AnyAlxia = Alxia<any, any, any, any>;
+export type AnyAlxia = Alxia<any, any, any>;
 
 /**
  * A plugin written as a function: it receives the app and returns it, with
@@ -67,7 +67,6 @@ export type Plugin = <App extends AnyAlxia>(app: App) => App;
  */
 export interface RefusalMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -81,8 +80,8 @@ export interface RefusalMethod<
 	 * and the `issues`, or `body_limit`, with the route's `limit` — and
 	 * returns a reply with a 4xx status, or nothing for that kind's default.
 	 * The last one declared before a route is the one in force; a group's
-	 * stays inside it. Its reply replaces the default 400 in the type of
-	 * every such route that validates, so the client reads it:
+	 * stays inside it. Its reply replaces the default 400 of every such
+	 * route that validates:
 	 *
 	 * ```ts
 	 * .onRefusal((refusal) => refusal.kind === 'validation'
@@ -115,7 +114,6 @@ export interface RefusalMethod<
 		hook: (refusal: Refusal, ctx: BaseContext & Ctx) => MaybePromise<Result>,
 	): Alxia<
 		Ctx,
-		Routes,
 		Prefix,
 		Exclude<Shortcuts, Refusing> | RefusalsOf<Extract<Result, AnyReply>, Result>
 	>;
@@ -132,7 +130,6 @@ export interface RefusalMethod<
 		) => MaybePromise<Result>,
 	): Alxia<
 		Ctx,
-		Routes,
 		Prefix,
 		| Exclude<Shortcuts, Refusing>
 		| RefusalsOf<DeclaredRefusal<Responses>, Result>
@@ -149,7 +146,6 @@ export interface RefusalMethod<
 		) => MaybePromise<Result>,
 	): Alxia<
 		Ctx,
-		Routes,
 		Prefix,
 		| Exclude<Shortcuts, RefusingKind<Kind>>
 		| KindRefusalsOf<Kind, Extract<Result, AnyReply>, Result>
@@ -169,17 +165,11 @@ export interface RefusalMethod<
 		) => MaybePromise<Result>,
 	): Alxia<
 		Ctx,
-		Routes,
 		Prefix,
 		| Exclude<Shortcuts, RefusingKind<Kind>>
 		| KindRefusalsOf<Kind, DeclaredRefusal<Responses>, Result>
 	>;
 }
-
-/** The route table of an app, as the client reads it. */
-export type RoutesOf<App> = App extends { readonly '~routes': infer Routes }
-	? Routes
-	: never;
 
 /**
  * What a route declared next on `App` reads: the context its hooks build —

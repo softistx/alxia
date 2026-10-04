@@ -8,8 +8,7 @@ const NewTodo = z.object({ title: z.string().min(1) });
 export const apiKey = Bun.env["API_KEY"] ?? "dev-key";
 
 // A middleware of the routes it is given to: it answers 401 without the key,
-// before the body is read, and that 401 joins the type of each, so the
-// client reads it.
+// before the body is read.
 const requireKey = defineMiddleware(({ request, reply }, next) =>
   request.headers.get("x-api-key") === apiKey
     ? next()

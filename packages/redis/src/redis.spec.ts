@@ -1,5 +1,4 @@
 import { beforeAll, describe, expect, expectTypeOf, test } from 'bun:test';
-import { client as httpClient } from '@alxia/client';
 import { alxia, validate } from '@alxia/core';
 import { rateLimit } from '@alxia/rate-limit';
 import { defineCache } from '@nxgt/redis';
@@ -12,7 +11,7 @@ import { redisStore } from './store';
 const db = useRedis();
 
 describe('redisStore', () => {
-	test('two apps sharing a Redis share a count, typed 429 and all', async () => {
+	test('two apps sharing a Redis share a count, 429 and all', async () => {
 		const make = () =>
 			alxia({ ip: () => '1.2.3.4' })
 				.use(
@@ -26,10 +25,10 @@ describe('redisStore', () => {
 		const [one, two] = [make(), make()];
 		expect((await one.request('/')).status).toBe(200);
 		expect((await two.request('/')).status).toBe(200);
-		const third = await httpClient(one).get('/');
+		const third = await one.request('/');
 		expect(third.status).toBe(429);
-		if (third.status === 429) expect(third.data.retryAfter).toBeGreaterThan(0);
-		expect(third.response.headers.get('ratelimit-remaining')).toBe('0');
+		expect((await third.json()).retryAfter).toBeGreaterThan(0);
+		expect(third.headers.get('ratelimit-remaining')).toBe('0');
 	});
 
 	test('reset forgets a key', async () => {
@@ -134,17 +133,6 @@ describe('idempotency', () => {
 		} finally {
 			console.error = original;
 		}
-	});
-
-	test('its refusals are in the types of the routes after it only', () => {
-		const _types = async () => {
-			const api = httpClient(app);
-			const result = await api.post('/payments', { body: { amount: 1 } });
-			expectTypeOf(result.status).toEqualTypeOf<201 | 400 | 409 | 422 | 500>();
-			const open = await api.post('/open');
-			expectTypeOf(open.status).toEqualTypeOf<201 | 500>();
-		};
-		expect(_types).toBeFunction();
 	});
 });
 

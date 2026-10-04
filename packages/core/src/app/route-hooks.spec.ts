@@ -2,10 +2,10 @@ import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
 import { problem } from '../reply/problem';
 import type { Reply } from '../reply/reply';
-import { alxia, type RoutesOf } from './alxia';
+import { alxia } from './alxia';
 import { defineHook, defineWrap } from './define-hook';
 import { definePlugin } from './define-plugin';
-import type { AnyRouteHook, Outcome, RouteHook, RouteWrap } from './types';
+import type { AnyRouteHook, RouteHook, RouteWrap } from './types';
 
 interface User {
 	readonly id: string;
@@ -200,10 +200,6 @@ describe('hooks given to a route', () => {
 		expect(
 			(await app.request('/', { headers: { 'x-busy': '1' } })).status,
 		).toBe(409);
-		type Out = RoutesOf<typeof app>['/']['GET']['output'];
-		expectTypeOf<Extract<Out, { status: 409 }>>().toEqualTypeOf<
-			Outcome<409, { error: 'busy' }>
-		>();
 	});
 
 	test('a thrown error reaches the onError hooks in force', async () => {
@@ -232,8 +228,6 @@ describe('hooks given to a route', () => {
 			.get('/public', ({ reply }) => reply(200, 'hello'));
 		expect((await app.request('/private')).status).toBe(403);
 		expect(await (await app.request('/public')).text()).toBe('hello');
-		type Public = RoutesOf<typeof app>['/public']['GET']['output'];
-		expectTypeOf<Extract<Public, { status: 403 }>>().toBeNever();
 	});
 
 	test('anything not made by defineHook or defineWrap is refused where the route is declared', () => {
@@ -253,19 +247,6 @@ describe('hooks given to a route', () => {
 });
 
 describe('the types of a route with hooks', () => {
-	test("a hook's replies are in the route's outputs, beside the scope's", () => {
-		type Out = RoutesOf<typeof bookmarks>['/bookmarks/:id']['PATCH']['output'];
-		expectTypeOf<Out['status']>().toEqualTypeOf<
-			200 | 400 | 401 | 403 | 409 | 500
-		>();
-		expectTypeOf<Extract<Out, { status: 403 }>>().toEqualTypeOf<
-			Outcome<403, { error: 'forbidden' }>
-		>();
-		expectTypeOf<Extract<Out, { status: 409 }>>().toEqualTypeOf<
-			Outcome<409, { error: 'locked' }>
-		>();
-	});
-
 	test('a hook made once is typed by what it reads and returns', () => {
 		expectTypeOf(canEdit).toEqualTypeOf<
 			RouteHook<
@@ -421,8 +402,6 @@ describe('hooks given to a route, with the rest of the app', () => {
 			).status,
 		).toBe(403);
 		expect((await app.request('/api/bookmarks/ada-1')).status).toBe(401);
-		type Out = RoutesOf<typeof app>['/api/bookmarks/:id']['GET']['output'];
-		expectTypeOf<Out['status']>().toEqualTypeOf<200 | 401 | 403 | 500>();
 	});
 
 	test('in a plugin, behind the hooks of the app using it', async () => {
@@ -444,8 +423,6 @@ describe('hooks given to a route, with the rest of the app', () => {
 				})
 			).status,
 		).toBe(403);
-		type Out = RoutesOf<typeof app>['/v1/bookmarks/:id']['GET']['output'];
-		expectTypeOf<Out['status']>().toEqualTypeOf<200 | 401 | 403 | 500>();
 	});
 
 	test('a refusal after the hooks is answered by the onRefusal hook of its kind, under the bodyLimit', async () => {
@@ -475,10 +452,6 @@ describe('hooks given to a route, with the rest of the app', () => {
 		expect((await post('ada-1', JSON.stringify({ title: 'Bun' }))).status).toBe(
 			204,
 		);
-		type Out = RoutesOf<typeof app>['/bookmarks/:id']['POST']['output'];
-		expectTypeOf<Out['status']>().toEqualTypeOf<
-			204 | 401 | 403 | 413 | 422 | 500
-		>();
 	});
 
 	test('route() takes the list before the handler', async () => {
@@ -501,8 +474,6 @@ describe('hooks given to a route, with the rest of the app', () => {
 			(await app.request('/bookmarks/bob-2', { headers: { 'x-user': 'ada' } }))
 				.status,
 		).toBe(403);
-		type Out = RoutesOf<typeof app>['/bookmarks/:id']['GET']['output'];
-		expectTypeOf<Out['status']>().toEqualTypeOf<200 | 401 | 403 | 500>();
 	});
 
 	test('a socket route runs its hooks on the upgrade, skipping a wrap, and its handlers read what they add', async () => {

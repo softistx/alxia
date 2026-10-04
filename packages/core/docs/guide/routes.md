@@ -40,10 +40,10 @@ the same arguments. `ws` declares a socket ([WebSockets](websockets.md)); `stati
 `file` and `page` serve files ([Static files](static-files.md)).
 
 ```ts
-interface RouteMethod<M, Ctx, Routes, Prefix, Shortcuts>
-	extends MiddlewareForms<RouteApp<M, Ctx, Routes, Prefix, Shortcuts>>,
-		OptionsForms<RouteApp<M, Ctx, Routes, Prefix, Shortcuts>>,
-		DeprecatedForms<M, Ctx, Routes, Prefix, Shortcuts> {}
+interface RouteMethod<M, Ctx, Prefix, Shortcuts>
+	extends MiddlewareForms<RouteApp<M, Ctx, Prefix, Shortcuts>>,
+		OptionsForms<RouteApp<M, Ctx, Prefix, Shortcuts>>,
+		DeprecatedForms<Ctx, Prefix, Shortcuts> {}
 
 // MiddlewareForms: one overload per count of middlewares, 0 to 8. With two:
 <const Path extends RoutePath, R1 extends MiddlewareReturn, R2 extends MiddlewareReturn, Result extends …>(
@@ -51,7 +51,7 @@ interface RouteMethod<M, Ctx, Routes, Prefix, Shortcuts>
 	m1: (ctx: /* the hooks' context, and the request as it arrived */, next: NextFunction) => R1,
 	m2: (ctx: /* the same, and what m1 passed `next` */, next: NextFunction) => R2,
 	handler: (ctx: /* the same, and what m2 passed `next`; `reply` typed by a `responds` */) => MaybePromise<Result>,
-): Alxia</* … the route added: validate's input and 400, responds' statuses, the middlewares' replies */>;
+): Alxia</* … the app, unchanged in type: a route adds nothing to it */>;
 
 // OptionsForms: the same, with the options after the path
 <const Path extends RoutePath, const Options extends RouteOptions, R1 extends MiddlewareReturn, Result extends …>(
@@ -59,7 +59,7 @@ interface RouteMethod<M, Ctx, Routes, Prefix, Shortcuts>
 	options: Options, // no schema: a key of one does not compile
 	m1: (ctx: …, next: NextFunction) => R1,
 	handler: (ctx: …) => MaybePromise<Result>,
-): Alxia</* … the route added, with the 413 of a bodyLimit */>;
+): Alxia</* … the app, unchanged in type */>;
 ```
 
 A route method checks its arguments when the route is declared, and a
@@ -95,10 +95,7 @@ const app = alxia().query(
 // QUERY /users/search, {"name":""}                                    → 400
 ```
 
-It is in the app's type like any route — `RoutesOf<App>['/users/search']['QUERY']`,
-called as `api.query(path, { body })` by
-[`@alxia/client`](https://www.npmjs.com/package/@alxia/client) — and in the
-`Allow` of a 405 on its path. `@alxia/openapi` documents it as the path's
+It is in the `Allow` of a 405 on its path, like any route. `@alxia/openapi` documents it as the path's
 `query` operation, and `@alxia/cors` allows it by default. A cache does not:
 `@alxia/cache` keys `GET` and `HEAD` only, as a `QUERY`'s key would have to
 include its body.
@@ -153,9 +150,9 @@ const app = alxia({ prefix: '/api' })
 ```
 
 It is exactly the route `app[method](path, options, responds(…), validate(…), handler)`
-declares from the same schemas: the same context, the same entry in
-`RoutesOf` (`'/api/pets/:petId'` above, the prefix applied), and the same
-checks, at compile time — a params schema that does not
+declares from the same schemas, at its path under the prefix
+(`'/api/pets/:petId'` above): the same context, and the same checks, at
+compile time — a params schema that does not
 read the path, an unknown schema key, a status the operation does not declare.
 `method` is any `Method`, `QUERY` included; an operation without `schema` is
 a route without one.
@@ -186,7 +183,7 @@ type OperationSchema<Operation> = Operation extends { readonly schema: infer Sch
 	operation: CheckedOperation<Prefix, Op>, // one method, a literal path, a schema that reads it
 	m1: Middleware</* the route's context before the operation's validate */, R1>,
 	handler: (ctx: /* … what m1 added, the validated parts, reply typed by the responses */) => MaybePromise<Result>,
-) => Alxia</* … the route added … */>;
+) => Alxia</* … the app, unchanged in type */>;
 ```
 
 ### Middlewares on a route declared as data
@@ -200,14 +197,13 @@ operation names, so `validate(renamePet)` on a route declared from a copy,
 more middleware: the route still validates the operation's parts before the
 handler, and the body, read once, is checked by both.
 
-Two things the types of `route` say differently from the runtime, both
-rare. A middleware placed after `validate(operation)` that passes
-`next({ body })` (or `params`, `query`, `headers`) is typed, in the
-handler, by the operation's schema, though the handler receives what the
-middleware passed. And on a route whose operation has no schema for a
-part, a middleware that passes that part to `next` sees it typed, in the
-handler, as the request's own: `query` raw, `body` `undefined`. Give such
-a value another name — `next({ page })` — and both are typed as they run.
+One thing the types of `route` say differently from the runtime, and it
+is rare: a middleware placed after `validate(operation)` that passes
+`next({ body })` (or `params`, `query`, `headers`, `cookies`) is typed, in
+the handler, by the operation's schema, though the handler receives what
+the middleware passed. Give such a value another name — `next({ draft })`
+— and both are typed as they run. A part the operation has no schema for
+is typed as the middleware passed it, as it runs.
 
 ```ts
 import { alxia, defineMiddleware, validate } from '@alxia/core';
@@ -395,8 +391,9 @@ const app = alxia().get(
 
 Both declare their schemas on the route, `app.routes[i].schema`, so
 [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
-them, and the route's type reads them: `validate`'s input is what the
-client sends, its 400 and `responds`' statuses are what it may read. Where
+them: `validate`'s schemas are what a client sends, its 400 and
+`responds`' statuses what it may read, in the document a client is
+generated from. Where
 each stands changes which answer comes first, a 401 or a 400
 ([Middleware](middleware.md#where-validate-stands)).
 
@@ -433,8 +430,8 @@ app.get('/posts', validate({ query: z.object({ tag: Tags.optional() }) }), ({ qu
 ```
 
 `zq` in [`@alxia/zod`](https://www.npmjs.com/package/@alxia/zod) has
-ready-made coercions for this, and keeps the client's side typed as the
-value it means to send — `{ page: 2 }` rather than `unknown`.
+ready-made coercions for this, whose input is the value a client means to
+send — `{ page: 2 }` rather than `unknown`.
 
 ### Bodies
 
@@ -548,11 +545,11 @@ Past the limit the request is answered with a 413:
 { "error": "content_too_large", "limit": 65536 }
 ```
 
-Its body is the exported `ContentTooLargeBody`. The 413 is in the type of
-every route under a limit, so a typed client reads it, and
+Its body is the exported `ContentTooLargeBody`. Every route under a limit
+may answer it, and
 [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
-it. A route with no limit has no default 413 in its type, and reads its
-body as it always has.
+it there. A route with no limit never answers it, and reads its body as it
+always has.
 
 What the read throws is a `ContentTooLargeError`, an `HttpError` with the
 route's `limit`. The route answers it as a refusal, as it answers a 400:
@@ -575,10 +572,9 @@ const api = alxia()
 // { "type": "urn:ietf:params:jmap:error:limit", "status": 413, "limit": "maxSizeRequest" }
 ```
 
-The hook's replies then take the default 413's place in the type of every
-route under a limit. A hook that returns nothing for a `body_limit` sends
-the default 413, which stays in the type beside them
-([Hooks](hooks.md#onrefusal)).
+The hook's replies then take the default 413's place on every route under
+a limit. A hook that returns nothing for a `body_limit` sends the default
+413 ([Hooks](hooks.md#onrefusal)).
 
 A handler that streams its own response while it reads the body may have
 sent its headers before the count passes the limit. In that case its
@@ -615,14 +611,14 @@ interface ValidationIssue {
 ```
 
 Two codes are the framework's: `invalid_json` (the body is not JSON) and
-`unreadable_body` (a parser threw). The 400 is in the type of every route
-with a `validate`, so a client reads it. The middlewares before the
+`unreadable_body` (a parser threw). Every route with a `validate` may
+answer the 400, and its OpenAPI document says so. The middlewares before the
 `validate` see it as the response of `next()`.
 
 The 400 is the default. [`onRefusal`](hooks.md#onrefusal) answers a refused
 request in your own format for the routes declared after it, such as an RFC
 9457 problem sent as `application/problem+json`. Its reply then takes the
-400's place in those routes' types.
+400's place on those routes.
 
 ## What the types refuse
 
@@ -743,4 +739,4 @@ Each change is on [Upgrading](../upgrading.md); the list's hooks on
   runs them in.
 - [Hooks](hooks.md): what runs before the route's middlewares, and what it
   adds to the context.
-- [The app's type](types.md): what a client reads of each route.
+- [The app's type](types.md): `ContextOf`, and testing a route.

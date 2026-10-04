@@ -4,14 +4,20 @@ A type-safe HTTP framework for Bun. Modular to the bone: the core has **no
 dependency**, and everything else — Zod, OpenAPI, CORS, JWT, compression —
 is a package you add, or don't.
 
+OpenAPI spec first: the document is the contract, and a typed client is
+generated from it by the generator of your choice — the examples use
+[`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen). The
+server's types check each handler: what its middlewares add, its replies
+against its `responds`, its path.
+
 ## Getting started
 
 ```sh
 bun create @alxia my-app
 ```
 
-It asks for a template — `api`, an alxia app with Zod, a spec and the typed
-client, or `react-router`, React Router's official template served by
+It asks for a template — `api`, an alxia app with Zod, a middleware and a
+spec, or `react-router`, React Router's official template served by
 alxia — writes the project, installs it, and prints `cd my-app` and
 `bun dev` ([`@alxia/create`](packages/create)).
 
@@ -20,15 +26,14 @@ alxia — writes the project, installs it, and prints `cd my-app` and
 | Package | |
 | --- | --- |
 | [`@alxia/core`](packages/core) | routes on `Bun.serve`, validated with any Standard Schema; replies typed by status; hooks, groups and plugins; cookies, server-sent events and WebSockets, typed; static files and Bun's HTML bundles |
-| [`@alxia/client`](packages/client) | the typed client of an app, from `typeof app`: no spec, no codegen. Results are a union by status; events and sockets typed too |
-| [`@alxia/zod`](packages/zod) | Zod 4: coercions a client can type (`zq.int()`, `zq.array()`…), and the OpenAPI converter |
+| [`@alxia/zod`](packages/zod) | Zod 4: query and path coercions (`zq.int()`, `zq.array()`…), and the OpenAPI converter |
 | [`@alxia/graphql`](packages/graphql) | GraphQL with Yoga and its plugins: behind the app's hooks, resolvers reading its typed context, subscriptions over SSE, GraphiQL or Apollo Sandbox |
 | [`@alxia/react-router`](packages/react-router) | a React Router app served by alxia, under Bun: server rendering behind the app's hooks, loaders reading its typed context, `/api` routes beside the pages; one Vite plugin, no server file needed, for the dev server and a runnable build |
 | [`@alxia/openapi`](packages/openapi) | the OpenAPI 3.2 document of an app, from its schemas, and a reference page |
 | [`@alxia/openapi-routes`](packages/openapi-routes) | the other direction: a test that every operation of an OpenAPI document has its route, and no other |
 | [`@alxia/cors`](packages/cors) | CORS: preflights before routing, headers on every response |
 | [`@alxia/secure-headers`](packages/secure-headers) | HSTS, CSP, nosniff and the rest |
-| [`@alxia/rate-limit`](packages/rate-limit) | a rate limit whose 429 is in the client's types; pluggable stores |
+| [`@alxia/rate-limit`](packages/rate-limit) | a rate limit: a 429 past it, with its headers; pluggable stores |
 | [`@alxia/cache`](packages/cache) | HTTP response caching: TTL, stale-while-revalidate, one load per miss, tags, ETags; in memory or Redis |
 | [`@alxia/language`](packages/language) | the request's language, typed: query, cookie, path, `Accept-Language` |
 | [`@alxia/compress`](packages/compress) | zstd, Brotli, gzip, deflate: negotiated and streamed |
@@ -69,14 +74,10 @@ const app = alxia()
 	);
 
 app.listen(3000);
-export type App = typeof app;
 
-// anywhere else
-import { client } from '@alxia/client';
-import type { App } from './server';
-
-const result = await client<App>('http://localhost:3000').get('/users/:id', { params: { id: 1 } });
-if (result.status === 200) result.data.name; // string
+// a test, in process
+const found = await app.request('/users/1');
+found.status; // 200
 ```
 
 ## Examples

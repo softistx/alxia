@@ -6,7 +6,6 @@ means to send, and `zodConverter`, which documents a Zod schema in OpenAPI
 as it really crosses the wire.
 
 ```ts
-import { client } from '@alxia/client';
 import { alxia, validate } from '@alxia/core';
 import { zq } from '@alxia/zod';
 import { z } from 'zod';
@@ -17,12 +16,13 @@ const app = alxia().get(
 	({ params, reply }) => reply(200, { id: params.id, next: params.id + 1 }),
 );
 
-const result = await client(app).get('/items/:id', { params: { id: 41 } });
-result.data; // { id: 41, next: 42 }
+const result = await app.request('/items/41');
+await result.json(); // { id: 41, next: 42 }
 ```
 
 The path arrives as the text `'41'`; the handler reads the number `41`, and
-the client is typed to send a number, not a string it would have to format.
+the schema's input, `number | string`, says a client may send the number
+itself, not a string it would have to format.
 
 ## The signature
 
@@ -64,9 +64,9 @@ there as on any schema.
 
 Path parameters, the query string, headers and cookies are text. Zod's own
 `z.coerce.number()` reads that text, but its input is `unknown`, so a typed
-client accepts anything for the key. `z.number()` types the client right,
-but refuses the text the server receives. A `zq` coercion does both: the
-client is typed with the value, the server accepts the value or its text.
+client accepts anything for the key. `z.number()` has the right input,
+but refuses the text the server receives. A `zq` coercion does both: its
+input is the value, the server accepts the value or its text.
 
 | | `z.number()` | `z.coerce.number()` | `zq.number()` |
 | --- | --- | --- | --- |
@@ -91,8 +91,7 @@ app.get(
 );
 ```
 
-When the client sends a value, it turns it into text the coercion reads
-back: a number or a boolean with `String`, a `Date` with `toISOString()`, an
+A client sends a value as text the coercion reads back: a number or a boolean with `String`, a `Date` with `toISOString()`, an
 object as JSON, and each item of an array under the same key.
 
 ### `zq.number()`
@@ -222,8 +221,8 @@ Range.parse('{"min":1,"max":5}'); // { min: 1, max: 5 }
 Range.parse({ min: 1, max: 5 });   // { min: 1, max: 5 }, already parsed
 ```
 
-The client is typed with the schema's input and sends an object as its JSON,
-so it writes `query: { range: { min: 1, max: 5 } }`. Text that is not JSON
+A client typed by the schema's input sends an object as its JSON text,
+`?range={"min":1,"max":5}`. Text that is not JSON
 is refused with `Expected JSON`; JSON that does not match the schema is
 refused with the schema's own issue, at the path inside it:
 
@@ -231,7 +230,7 @@ refused with the schema's own issue, at the path inside it:
 ?range={"min":"x","max":5}   →  path ["range", "min"]: Invalid input: expected number, received string
 ```
 
-An array is the exception: the client is typed to send it as its JSON
+An array is the exception: its input is its JSON
 text, a `string`, not as the array. A query sends a list as one value per
 key, `?ids=1&ids=2`, which is not JSON, so an array given as itself could
 never reach the schema:
@@ -243,7 +242,7 @@ const app = alxia().get(
 	({ query, reply }) => reply(200, query.ids), // number[]
 );
 
-await client(app).get('/ids', { query: { ids: JSON.stringify([1, 2]) } }); // ?ids=[1,2]
+await app.request(`/ids?${new URLSearchParams({ ids: JSON.stringify([1, 2]) })}`); // ?ids=[1,2]
 ```
 
 For a list a key repeats, use [`zq.array(item)`](#zqarrayitem) instead.
@@ -277,8 +276,8 @@ problem. From `GET /items/x`:
 | `array` | a key given once, which the item schema refuses | `invalid_union` | the item's, on the key: `Expected a number` for `zq.int()` |
 | `array` | a key given more than once, one of them refused | the item's, or `invalid_union` | the item's: at its index (`["ids", 1]`) for `zq.int()` or `z.string()`; on the key, without the index, for an enum, `zq.date()`, `zq.boolean()` or an object |
 
-A typed client already refuses most of these at compile time; the `400` is
-what a hand-written URL, a link, or another client gets.
+A client typed by the schema's input refuses most of these at compile
+time; the `400` is what a hand-written URL, a link, or another client gets.
 
 ## OpenAPI: `zodConverter`
 
@@ -316,7 +315,7 @@ app.use(docs(app, { info, convert: zodConverter }));             // or served, a
 
 A `Date` is documented as a `date-time` string because that is what a
 client receives: a reply is sent as JSON, where a `Date` is its ISO text,
-and `@alxia/client` types it as a `string`.
+and a client generated from the document types it as a `string`.
 
 Each schema is documented from the side it is on. A request schema —
 `params`, `query`, `headers`, `cookies`, `body` — is documented by its
@@ -358,7 +357,7 @@ fits the `convert` option as it is: its type matches `@alxia/openapi`'s
 ## A realistic setup
 
 A list of orders a page filters by status, date and total, documented, and
-its tests through the typed client:
+its tests through `app.request()`:
 
 ```ts
 // app.ts
@@ -404,29 +403,24 @@ export const app = alxia().get(
 );
 
 app.use(docs(app, { info: { title: 'Orders', version: '1.0.0' }, convert: zodConverter }));
-
-export type App = typeof app;
 ```
 
 ```ts
 // app.spec.ts
 import { describe, expect, test } from 'bun:test';
-import { client } from '@alxia/client';
 import { app } from './app';
 
-const api = client(app);
-
 describe('GET /orders', () => {
-	test('the client sends values, the route reads them typed', async () => {
-		const result = await api.get('/orders', {
-			query: {
-				status: ['paid', 'open'],
-				since: new Date('2026-03-01T00:00:00Z'),
-				total: { min: 10, max: 50 },
-			},
-		});
+	test('values sent as text, read typed by the route', async () => {
+		const query = new URLSearchParams([
+			['status', 'paid'],
+			['status', 'open'],
+			['since', new Date('2026-03-01T00:00:00Z').toISOString()],
+			['total', JSON.stringify({ min: 10, max: 50 })],
+		]);
+		const result = await app.request(`/orders?${query}`);
 		expect(result.status).toBe(200);
-		expect(result.data).toMatchObject({ page: 1, items: [{ id: 'a1' }, { id: 'a2' }] });
+		expect(await result.json()).toMatchObject({ page: 1, items: [{ id: 'a1' }, { id: 'a2' }] });
 	});
 
 	test('one status is a list of one', async () => {

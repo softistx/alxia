@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { type Alxia, alxia, type ContextOf, type RoutesOf } from './alxia';
+import { type Alxia, alxia, type ContextOf } from './alxia';
 import { definePlugin } from './define-plugin';
 import type { BaseContext, Empty, ProvidedBy, RequiresOf } from './types';
 
@@ -48,7 +48,6 @@ describe('definePlugin', () => {
 		});
 		expect(await response.text()).toBe('ada');
 		expect((await app.request('/api/me')).status).toBe(401);
-		expectTypeOf<keyof RoutesOf<typeof app>>().toEqualTypeOf<'/api/me'>();
 	});
 
 	test('it can be used in a group, and by several apps', async () => {

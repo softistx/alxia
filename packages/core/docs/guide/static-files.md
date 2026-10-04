@@ -14,8 +14,8 @@ app.listen(3000);
 ```
 
 `static` and `file` are `GET` routes like any other: every hook runs around
-them — headers, compression, logging, a `derive` that guards them — and the
-client types them. `page` is the exception, below.
+them — headers, compression, logging, a `derive` that guards them — and
+`@alxia/openapi` documents them. `page` is the exception, below.
 
 ## `static(path, source, options?)`
 
@@ -201,7 +201,7 @@ under `development`. Because Bun serves it itself:
 - it works through **`listen` only** — `app.fetch` and `app.request`
   answer it 404;
 - the app's hooks do **not** run around it;
-- it is not in the app's type, so a client does not call it.
+- it is in no OpenAPI document, so a client does not call it.
 
 A page of a plugin app is mounted under the prefix of the app that uses it.
 A path served twice — or two paths of the same shape, `/u/:id` and

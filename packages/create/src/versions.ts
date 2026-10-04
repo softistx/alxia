@@ -7,13 +7,9 @@
 import { dirname } from 'node:path';
 
 /** The `@alxia/*` packages a template depends on. */
-export type AlxiaPackage =
-	| '@alxia/client'
-	| '@alxia/core'
-	| '@alxia/react-router';
+export type AlxiaPackage = '@alxia/core' | '@alxia/react-router';
 
 const ALXIA_PACKAGES: readonly AlxiaPackage[] = [
-	'@alxia/client',
 	'@alxia/core',
 	'@alxia/react-router',
 ];

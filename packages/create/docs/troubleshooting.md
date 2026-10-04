@@ -227,7 +227,7 @@ hand after the project is created.
 
 **When:** a notice, not an error, right after an alxia release: the
 registry lists `@alxia/create`'s new version but not yet the
-`@alxia/core` (or `@alxia/client`, `@alxia/react-router`) published beside
+`@alxia/core` (or `@alxia/react-router`) published beside
 it. npm can take a few minutes to serve a version everywhere.
 
 **Why:** a project written with `^0.3.1` would fail its `bun install` with
@@ -374,7 +374,7 @@ new `@alxia/create`.
 
 **Fix:** `bunx @alxia/create@latest` for the newest `@alxia/create`, and in
 an existing project
-`bun add @alxia/core@latest @alxia/client@latest` (`api`) or
+`bun add @alxia/core@latest` (`api`) or
 `bun add @alxia/core@latest @alxia/react-router@latest` (`react-router`), reading
 [`@alxia/core`'s upgrading page](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md)
 for what a minor changed.

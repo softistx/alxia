@@ -25,14 +25,10 @@ you notice. A `400` from validation reads like this, and the heading is its
 **Wrong values, no error**
 
 - [`?draft=false` reads `true`](#draftfalse-reads-true)
-- [The client accepts anything for a key](#the-client-accepts-anything-for-a-key)
+- [A typed client accepts anything for a key](#a-typed-client-accepts-anything-for-a-key)
 
 **Types**
 
-- [`Type 'string' is not assignable to type 'string[]'`](#type-string-is-not-assignable-to-type-string)
-- [`Type 'number[]' is not assignable to type 'string'`](#type-number-is-not-assignable-to-type-string)
-- [`Type 'number' is not assignable to type 'string | Date | undefined'`](#type-number-is-not-assignable-to-type-string--date--undefined)
-- [`Type '"yes"' is not assignable to type 'boolean | "1" | "true" | "0" | "false" | undefined'`](#type-yes-is-not-assignable-to-type-boolean--1--true--0--false--undefined)
 - [`Expected 1 arguments, but got 0.`](#expected-1-arguments-but-got-0)
 
 **The OpenAPI document**
@@ -53,11 +49,12 @@ item of a `zq.array(zq.int())` is: `?ids=x` reports it on the key, path
 an optional sign, decimal point and exponent — and nothing else. An empty
 value is refused rather than read as `0`.
 
-**Fix:** send a number; a typed client already refuses anything else. When
-the key is optional, leave it out rather than sending it empty:
+**Fix:** send a number. When the key is optional, leave it out rather than
+sending it empty:
 
 ```ts
-await api.get('/items', { query: { page: input.value === '' ? undefined : Number(input.value) } });
+const query = new URLSearchParams(input.value === '' ? {} : { page: input.value });
+await fetch(`/items?${query}`);
 ```
 
 If the key is not a number at all — a slug, an id with letters — it is a
@@ -83,11 +80,11 @@ key read by `zq.json(z.array(z.number()))`: `?ids=1&ids=2`, path
 `["ids", 0]`.
 
 **Why:** everything in a URL, a header or a cookie is text, and
-`z.number()` refuses text. The typed client is happy, since its input is a
-`number`, so the error only shows at run time. A repeated key is a list of
-texts, `'1'` and `'2'`, not JSON, so `zq.json` hands them to the schema
-as they are; the typed client is refused this at compile time, see
-[`Type 'number[]' is not assignable to type 'string'`](#type-number-is-not-assignable-to-type-string).
+`z.number()` refuses text. A client typed by the schema's input is happy,
+since that input is a `number`, so the error only shows at run time. A
+repeated key is a list of texts, `'1'` and `'2'`, not JSON, so `zq.json`
+hands them to the schema as they are: send the array as its JSON text,
+`?ids=[1,2]`.
 
 **Fix:** use the coercion, and `zq.array` for a list:
 
@@ -124,8 +121,7 @@ refused item, whether the key was given once or more.
 **Why:** the four texts are the only ones read; anything else is refused,
 not guessed.
 
-**Fix:** send one of the four — a typed client sends `true` or `false` as
-`'true'` or `'false'`. For a checkbox in a form, read its presence instead:
+**Fix:** send one of the four — a boolean as `'true'` or `'false'`. For a checkbox in a form, read its presence instead:
 
 ```ts
 const form = z.object({ draft: z.literal('on').optional().transform((value) => value === 'on') });
@@ -143,11 +139,11 @@ refused item, whether the key was given once or more.
 depends on a time zone the server does not know — so it is refused rather
 than read in the server's zone. A timestamp and loose text are refused too.
 
-**Fix:** send a `Date`; the client sends it as its `toISOString()`. A
-`datetime-local` value becomes one in the browser, in the user's zone:
+**Fix:** send a `Date` as its `toISOString()`. A `datetime-local` value
+becomes one in the browser, in the user's zone:
 
 ```ts
-await api.get('/orders', { query: { since: new Date(input.value) } });
+await fetch(`/orders?${new URLSearchParams({ since: new Date(input.value).toISOString() })}`);
 ```
 
 A date alone, `?since=2026-01-01`, is accepted, and reads midnight UTC.
@@ -191,14 +187,14 @@ string is truthy, `'false'` and `'0'` included.
 const query = z.object({ draft: zq.boolean().default(false) }); // 'false' and '0' read false
 ```
 
-### The client accepts anything for a key
+### A typed client accepts anything for a key
 
 **When:** a key is a `z.coerce.number()`, `z.coerce.boolean()` or
-`z.coerce.date()`. The typed client accepts `{ page: 'two' }` or
-`{ page: {} }` without a complaint, and the server refuses it at run time.
+`z.coerce.date()`. A client typed by the schema's input accepts
+`{ page: 'two' }` or `{ page: {} }` without a complaint, and the server
+refuses it at run time.
 
-**Why:** a `z.coerce` schema's input is `unknown`, and the client is typed
-with the schema's input.
+**Why:** a `z.coerce` schema's input is `unknown`.
 
 **Fix:** use the `zq` coercion, whose input is the value or its text:
 
@@ -207,83 +203,6 @@ const params = z.object({ page: zq.int() }); // the client sends number | string
 ```
 
 ## Types
-
-### `Type 'string' is not assignable to type 'string[]'`
-
-```text
-error TS2322: Type 'string' is not assignable to type 'string[]'.
-```
-
-**When:** the client sends one value for a key that is a `z.array(...)`:
-`query: { tag: 'a' }`.
-
-**Why:** `z.array`'s input is an array. Sending `['a']` compiles, and the
-URL is then `?tag=a`, which `z.array` refuses at run time — see
-[`expected array, received string`](#invalid-input-expected-array-received-string).
-
-**Fix:** make it a `zq.array`, whose input is one value or several:
-
-```ts
-const query = z.object({ tag: zq.array(z.string()).optional() });
-
-await api.get('/posts', { query: { tag: 'a' } });
-```
-
-### `Type 'number' is not assignable to type 'string | Date | undefined'`
-
-```text
-error TS2322: Type 'number' is not assignable to type 'string | Date | undefined'.
-```
-
-**When:** the client sends a timestamp for a `zq.date()`:
-`query: { since: Date.now() }`.
-
-**Why:** `zq.date()` reads a `Date` or ISO 8601 text, not a number.
-
-**Fix:**
-
-```ts
-await api.get('/orders', { query: { since: new Date(Date.now() - 86_400_000) } });
-```
-
-### `Type 'number[]' is not assignable to type 'string'`
-
-```text
-error TS2322: Type 'number[]' is not assignable to type 'string'.
-```
-
-**When:** the client sends an array for a `zq.json(z.array(...))`:
-`query: { ids: [1, 2] }`.
-
-**Why:** a query sends an array as one value per key, `?ids=1&ids=2`,
-which is not JSON, so `zq.json` could never read it; its input for an array
-schema is the JSON text. An object is still given as itself.
-
-**Fix:** send the JSON text, or make the key a `zq.array` the client sends
-as an array:
-
-```ts
-await api.get('/ids', { query: { ids: JSON.stringify([1, 2]) } }); // zq.json(z.array(z.number()))
-await api.get('/ids', { query: { ids: [1, 2] } });                 // zq.array(zq.int())
-```
-
-### `Type '"yes"' is not assignable to type 'boolean | "1" | "true" | "0" | "false" | undefined'`
-
-```text
-error TS2322: Type '"yes"' is not assignable to type 'boolean | "1" | "true" | "0" | "false" | undefined'.
-```
-
-**When:** the client sends text other than the four a `zq.boolean()`
-reads.
-
-**Why:** the server would refuse it with
-[`Expected true, false, 1 or 0`](#expected-true-false-1-or-0); the type says so first.
-
-**Fix:** send a boolean:
-
-```ts
-await api.get('/orders', { query: { exact: input.value === 'yes' } });
-```
 
 ### `Expected 1 arguments, but got 0.`
 

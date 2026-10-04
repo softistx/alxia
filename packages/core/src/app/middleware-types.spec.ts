@@ -1,7 +1,7 @@
 import { describe, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
 import type { Reply } from '../reply/reply';
-import { alxia, type RoutesOf } from './alxia';
+import { alxia } from './alxia';
 import { defineHook, defineWrap } from './define-hook';
 import { defineMiddleware } from './define-middleware';
 import type { Next } from './types';
@@ -92,13 +92,7 @@ describe('the context a route threads through its middlewares', () => {
 			expectTypeOf(response.headers).toEqualTypeOf<Headers>();
 			return response;
 		});
-		const app = alxia().get('/', timed, raw, closed, ({ reply }) =>
-			reply(200, 'ok'),
-		);
-		type Output = RoutesOf<typeof app>['/']['GET']['output'];
-		expectTypeOf<
-			Extract<Output, { status: 503 }>['data']['error']
-		>().toEqualTypeOf<'closed'>();
+		alxia().get('/', timed, raw, closed, ({ reply }) => reply(200, 'ok'));
 	});
 
 	test('a middleware returning anything else is refused', () => {
@@ -220,22 +214,18 @@ describe('validate and responds', () => {
 		void declare;
 	});
 
-	test('the route table reads the middlewares: their replies, the 400, the 413', () => {
-		const app = alxia().post(
+	test('options, then middlewares, validate and responds among them', () => {
+		alxia().post(
 			'/posts',
 			{ bodyLimit: 1024 },
 			auth,
 			validate({ body: Post }),
 			responds({ 201: Post }),
-			({ body, reply }) => reply(201, body),
+			({ body, reply }) => {
+				expectTypeOf(body).toEqualTypeOf<{ title: string }>();
+				return reply(201, body);
+			},
 		);
-		type Route = RoutesOf<typeof app>['/posts']['POST'];
-		expectTypeOf<Route['input']>().toEqualTypeOf<{
-			readonly body: { title: string };
-		}>();
-		expectTypeOf<Route['output']['status']>().toEqualTypeOf<
-			201 | 400 | 401 | 413 | 500
-		>();
 	});
 });
 

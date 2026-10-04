@@ -82,7 +82,7 @@ keep the limit they were declared with ([Routes](routes.md#body-size-bodylimit))
 ### An app as a plugin
 
 ```ts
-use(plugin: Alxia<PluginCtx, PluginRoutes, PluginPrefix, PluginShortcuts>): Alxia<…>
+use(plugin: Alxia<PluginCtx, PluginPrefix, PluginShortcuts>): Alxia<…>
 ```
 
 - Its **routes** are mounted under this app's prefix and behind this app's
@@ -121,7 +121,7 @@ export const rateLimit = (limit: number) =>
 const app = alxia()
 	.get('/health', ({ reply }) => reply(200, 'ok'))  // not limited
 	.use(rateLimit(100))
-	.get('/search', ({ reply }) => reply(200, []));     // may answer 429, and its client knows
+	.get('/search', ({ reply }) => reply(200, []));     // may answer 429
 ```
 
 ### A function plugin
@@ -221,4 +221,4 @@ of any shape.
 - [Writing a plugin](writing-a-plugin.md): choosing between an app, a
   `Plugin` function and `definePlugin`, with an example of each.
 - [Hooks](hooks.md): what each hook does.
-- [The app's type](types.md): what `use` and `group` add to `RoutesOf`.
+- [The app's type](types.md): what `use` adds to the context, `ContextOf`.
