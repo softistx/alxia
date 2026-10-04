@@ -136,6 +136,10 @@ describe('the stored templates', () => {
 				expect(stages.length).toBeGreaterThanOrEqual(2);
 				const final = stages.at(-1) ?? '';
 				const building = stages.slice(0, -1);
+				// Built on Debian's glibc, run on Alpine: the output is pure JS.
+				for (const stage of building)
+					expect(stage).toStartWith('FROM oven/bun:1 AS ');
+				expect(final).toStartWith('FROM oven/bun:1-alpine\n');
 				expect(
 					building.some((stage) => /^RUN bun run build$/m.test(stage)),
 				).toBe(true);

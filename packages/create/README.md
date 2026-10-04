@@ -28,8 +28,8 @@ bun create @alxia my-site --template react-router
 
 | template | what it writes |
 | --- | --- |
-| `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a hook made with `defineHook` that answers 401 without an API key; a `bun test` spec calling it with `app.request()` and through `@alxia/client`, typed; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, a `Dockerfile` on `oven/bun:1`, `.dockerignore`, `.gitignore`, `.env.example` and a README |
-| `react-router` | React Router's official template, as `create-react-router` writes it, shipped in this package and copied, with [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun, and a `Dockerfile` on `oven/bun:1` in place of React Router's Node one. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
+| `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a hook made with `defineHook` that answers 401 without an API key; a `bun test` spec calling it with `app.request()` and through `@alxia/client`, typed; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, a `Dockerfile` running on `oven/bun:1-alpine`, `.dockerignore`, `.gitignore`, `.env.example` and a README |
+| `react-router` | React Router's official template, as `create-react-router` writes it, shipped in this package and copied, with [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun, and a `Dockerfile` running on `oven/bun:1-alpine` in place of React Router's Node one. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
 
 The heart of the `api` project, its route and hook (the whole file, with
 its imports and schemas, is in the [guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#the-api-template)):
@@ -53,8 +53,9 @@ export const app = alxia()
 
 ## Docker
 
-Both projects build into an image as they are written, on `oven/bun:1`,
-the image running the app as the non-root `bun` user. Each `Dockerfile`
+Both projects build into an image as they are written: built on
+`oven/bun:1`, run on `oven/bun:1-alpine` as the non-root `bun` user, an
+image of about 130 MB. Each `Dockerfile`
 builds in a stage of its own, and the image holds the build output alone,
 no `node_modules`:
 

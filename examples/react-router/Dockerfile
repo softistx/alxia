@@ -16,8 +16,10 @@ RUN bun run build
 # command, and --no-install: with no node_modules, Bun would otherwise
 # fetch a package the build left out from the registry at startup,
 # where this fails.
-# The server listens on PORT (3000) and HOST (0.0.0.0).
-FROM oven/bun:1
+# The server listens on PORT (3000) and HOST (0.0.0.0). On Alpine, about
+# 200 MB lighter: build/ is JavaScript, which runs the same on musl. A
+# native addon built for glibc alone needs oven/bun:1 here.
+FROM oven/bun:1-alpine
 WORKDIR /app
 ENV NODE_ENV=production
 COPY --from=build /app/build ./build

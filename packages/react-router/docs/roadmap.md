@@ -59,7 +59,8 @@ Nothing scheduled yet.
   configure. A package's `bun` variant is the one bundled, and what the
   app sets is kept.
 - **A Docker image on Bun.** The guide's Deploying has the multi-stage
-  `Dockerfile` on `oven/bun:1` that `@alxia/create`'s template and the
+  `Dockerfile`, built on `oven/bun:1` and run on `oven/bun:1-alpine`,
+  that `@alxia/create`'s template and the
   example ship, running `bun build/server/index.js` as a non-root user,
   from `build/` alone.
 - **A per-request CSP nonce.** `nonceOf(loadContext)` reads the nonce that

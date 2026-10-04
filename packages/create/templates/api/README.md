@@ -60,13 +60,16 @@ beside `dist/`.
 
 ## Docker
 
-The `Dockerfile` builds in a stage of its own, on `oven/bun:1`: it
+The `Dockerfile` builds in a stage of its own, on `oven/bun:1`, and runs
+on `oven/bun:1-alpine`. The build stage
 installs every dependency with `--frozen-lockfile`, from the `bun.lock`
 that `bun install` wrote (commit it), and runs `bun run build`. The image
 holds `dist/` alone, no `node_modules` and no `src/`, and runs
 `bun --no-install dist/server.js` as its non-root `bun` user: a package
 missing from the bundle fails at startup instead of being fetched from
-npm.
+npm. `src/server.ts` stops the app on `SIGTERM`, so `docker stop` is
+immediate. A native addon built for glibc alone does not load on
+Alpine: put the final stage back on `oven/bun:1`.
 
 ```sh
 docker build -t my-api .
