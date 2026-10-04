@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
-import { addAlxia, addPlugin } from './regenerate-react-router-template';
+import { addAlxia, addPlugin, toBun } from './regenerate-react-router-template';
 
 const ROOT = join(import.meta.dir, '..');
 
@@ -68,5 +68,69 @@ describe('addAlxia', () => {
 		expect(() => addAlxia({ ...SCAFFOLD_MANIFEST, scripts })).toThrow(
 			'package.json: expected',
 		);
+	});
+});
+
+/** The lines of `create-react-router@8.4.0`'s README that name npm. */
+const SCAFFOLD_README = `\`\`\`bash
+npm install
+\`\`\`
+
+\`\`\`bash
+npm run dev
+\`\`\`
+
+\`\`\`bash
+npm run build
+\`\`\`
+
+If you're familiar with deploying Node applications, the built-in app server is production-ready.
+
+Make sure to deploy the output of \`npm run build\`
+
+\`\`\`
+├── package.json
+├── package-lock.json (or pnpm-lock.yaml, or bun.lockb)
+├── build/
+\`\`\`
+`;
+
+describe('toBun', () => {
+	test("gives the scaffold's README Bun's commands and lockfile", () => {
+		expect(toBun(SCAFFOLD_README)).toBe(`\`\`\`bash
+bun install
+\`\`\`
+
+\`\`\`bash
+bun dev
+\`\`\`
+
+\`\`\`bash
+bun run build
+\`\`\`
+
+The build is production-ready: \`bun run start\` runs \`build/server/index.js\` on Bun.
+
+Make sure to deploy the output of \`bun run build\`
+
+\`\`\`
+├── package.json
+├── bun.lock
+├── build/
+\`\`\`
+`);
+	});
+
+	test('npx becomes bunx', () => {
+		expect(toBun('npx react-router typegen\n')).toBe(
+			'bunx react-router typegen\n',
+		);
+	});
+
+	test('refuses a command of another package manager it does not know', () => {
+		expect(() => toBun('Then:\n\n    yarn add tailwindcss\n')).toThrow(
+			'README.md: a yarn command toBun does not know is left:     yarn add tailwindcss',
+		);
+		expect(() => toBun('Run `pnpm dlx shadcn`.\n')).toThrow('a pnpm command');
 	});
 });

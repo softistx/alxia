@@ -29,7 +29,7 @@ bun create @alxia my-site --template react-router
 | template | what it writes |
 | --- | --- |
 | `api` | an `@alxia/core` app with Zod: `POST /todos` validates its body, behind `requireKey`, a hook made with `defineHook` that answers 401 without an API key; a `bun test` spec calling it with `app.request()` and through `@alxia/client`, typed; `bun dev` restarting on change, `typecheck`, `build`, a strict `tsconfig.json`, `.gitignore` and a README |
-| `react-router` | React Router's official template, as `create-react-router` writes it, shipped in this package and copied, with [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
+| `react-router` | React Router's official template, as `create-react-router` writes it, shipped in this package and copied, with [`@alxia/react-router`](https://www.npmjs.com/package/@alxia/react-router) added as its README says: `alxia()` in `vite.config.ts`'s plugins, `start` running `bun build/server/index.js`, a `bunfig.toml` starting React Router's CLI on Bun, and a `Dockerfile` on `oven/bun:1` in place of React Router's Node one. No server file: the default one serves the pages; `bunx alxia-react-router reveal` writes it out to customise |
 
 The heart of the `api` project, its route and hook (the whole file, with
 its imports and schemas, is in the [guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#the-api-template)):
@@ -50,6 +50,23 @@ export const app = alxia()
 		return reply.created(todo);
 	});
 ```
+
+## Docker
+
+The `react-router` project builds into an image as it is written: its
+`Dockerfile` installs, builds and runs on `oven/bun:1`, and the image runs
+`bun build/server/index.js` as the non-root `bun` user.
+
+```sh
+cd my-site
+docker build -t my-site .
+docker run -p 3000:3000 my-site
+```
+
+Commit the `bun.lock` that `bun install` wrote: the image installs from it
+with `--frozen-lockfile`. The
+[guide](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#docker)
+has the stages.
 
 ## Options
 

@@ -3,13 +3,14 @@
 `@alxia/react-router` serves a React Router **framework-mode** app with
 server rendering from an alxia app, under Bun. This page walks an app
 author through it: the setup, what happens in dev, in a build and under
-`vite preview`,
+`vite preview`, what the build sets for Bun,
 customising the server, typing the loaders, the app's own context keys,
 a CSP nonce, the escape hatches, WebSockets, the client's files, OpenAPI, testing and
 deploying.
 
 - [Setup](#setup)
 - [How it works](#how-it-works)
+- [Built for Bun](#built-for-bun)
 - [Customising the server](#customising-the-server)
 - [Typing the loaders](#typing-the-loaders)
 - [The app's own context keys](#the-apps-own-context-keys)
@@ -208,6 +209,86 @@ through the same preview server, during `react-router build`. A
 prerendered page is therefore rendered by the built server too: its loader
 reads `alxiaOf(context)` and `getLoadContext`'s keys, and `beforeAll`'s
 and `configure`'s hooks run around it.
+
+## Built for Bun
+
+`build/server/index.js` runs on Bun, and the plugin builds it for Bun,
+with nothing to configure. It adds to Vite's `ssr` environment, under
+`react-router dev` and `react-router build` alike:
+
+| option | what the plugin adds | why |
+| --- | --- | --- |
+| `resolve.conditions` | `bun` | a package bundled into the server whose `exports` has a `bun` condition is bundled as its Bun variant |
+| `resolve.externalConditions` | `bun` | a dependency left external is loaded as its Bun variant in dev too, as Bun loads it from the build |
+| `resolve.builtins` | `bun`, and `bun:*` (`bun:sqlite`, `bun:ffi`, …) | Bun's own modules stay imports of the build, whichever runtime runs Vite. Vite knows `bun:*`, and bare `bun` only when it runs on Bun |
+| `build.target` | `esnext` | the newest syntax is left as written: Bun runs it, and Vite's default targets browsers |
+
+A package written for Bun, then, gives the build the variant Bun would
+load, and Bun's own modules are used as they are:
+
+```json
+// node_modules/some-package/package.json
+{ "exports": { "bun": "./bun.js", "default": "./node.js" } }
+```
+
+```ts
+// app/server.ts
+import { createServer } from '@alxia/react-router';
+import { Database } from 'bun:sqlite';
+
+const db = new Database(':memory:');
+
+export default createServer({
+	configure: (app) =>
+		app.get('/api/count', ({ reply }) =>
+			reply.ok(db.query('select sqlite_version() as version').get()),
+		),
+});
+```
+
+```js
+// build/server/index.js, in part
+import { Database } from "bun:sqlite";
+```
+
+Which variant wins is still the package's own order: `exports` is read
+top to bottom, and the first condition the build has wins. A package that
+lists `node` before `bun` gives its Node variant, as Bun itself would load
+it.
+
+What the plugin leaves alone:
+
+- **`ssr.target` stays `node`.** Bun runs Node's modules, and `node`
+  keeps `node:*` external and resolves packages as a server does;
+  `webworker` would bundle every dependency with the browser's conditions.
+- **No polyfill is added.** Vite adds none to a server build, and the
+  plugin adds none.
+- **The client build** is a browser's, as before: none of this reaches
+  it. A Bun module imported by code that reaches the client fails the
+  build ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#-is-not-exported-by-__vite-browser-external-imported-by-)).
+
+What the app sets wins. The plugin adds to the `ssr` environment once
+every plugin's `config` has run, and Vite merges what it adds by
+concatenating arrays, so conditions and builtins of the app's own are
+kept, and `bun` is added only when they lack it. A `build.target`, at the
+top level or on the environment, is kept as it is:
+
+```ts
+// vite.config.ts
+export default defineConfig({
+	// Kept: the build resolves `worker`, then `bun`, and targets es2022.
+	environments: {
+		ssr: {
+			resolve: { conditions: ['worker'] },
+			build: { target: 'es2022' },
+		},
+	},
+	plugins: [reactRouter(), alxia()],
+});
+```
+
+`ssr.resolve.conditions` at the top level is the same option, and is kept
+the same way.
 
 ## Customising the server
 
@@ -931,12 +1012,67 @@ is `POST /?index`, not `POST /`.
 
 Run `bun run build`, then `bun build/server/index.js` beside the project's
 production `node_modules`: the build imports `react`, `react-router` and
-alxia from them, as any React Router server build does. The template's
-`Dockerfile` no longer works once `start` runs Bun: it is based on a Node
-image with no Bun, and copies a `package-lock.json` a Bun app does not
-have. Base it on an `oven/bun` image instead, install with
-`bun install --production`, and make its command
-`bun build/server/index.js`.
+alxia from them, as any React Router server build does.
+
+### Docker
+
+The `react-router` template of
+[`@alxia/create`](https://github.com/softistx/alxia/tree/develop/packages/create)
+and the [example](https://github.com/softistx/alxia/tree/develop/examples/react-router)
+ship this `Dockerfile`, on Bun's official image. For an app started from
+`create-react-router`, it replaces the template's, which builds and runs
+on Node:
+
+```dockerfile
+# Bun builds the app and runs it: build/server/index.js is alxia's server,
+# which runs on Bun. Pinned to Bun 1, the major alxia supports.
+
+# The production dependencies alone, for the final image.
+FROM oven/bun:1 AS production-dependencies
+WORKDIR /app
+COPY package.json bun.lock* bunfig.toml* ./
+RUN bun install --frozen-lockfile --production
+
+# Every dependency, then react-router build: build/client and
+# build/server/index.js.
+FROM oven/bun:1 AS build
+WORKDIR /app
+COPY package.json bun.lock* bunfig.toml* ./
+RUN bun install --frozen-lockfile
+COPY . .
+RUN bun run build
+
+# The build and the production dependencies, run as Bun's own non-root
+# user. The server listens on PORT (3000) and HOST (0.0.0.0).
+FROM oven/bun:1
+WORKDIR /app
+ENV NODE_ENV=production
+COPY package.json ./
+COPY --from=production-dependencies /app/node_modules ./node_modules
+COPY --from=build /app/build ./build
+USER bun
+EXPOSE 3000
+CMD ["bun", "build/server/index.js"]
+```
+
+```sh
+docker build -t my-app .
+docker run -p 3000:3000 my-app
+```
+
+Keep the template's `.dockerignore` beside it: `node_modules`, `build` and
+`.react-router` stay out of the context, so the image installs and builds
+its own. The `bunfig.toml` goes in, and `bun run build` runs React
+Router's CLI on Bun, as it does outside Docker. The image's command is
+`start`'s, run directly, so the platform's `SIGTERM` reaches the server.
+
+- **Commit `bun.lock`.** The installs are `--frozen-lockfile`: the image
+  gets the versions you tested, and a `package.json` changed without a
+  `bun install` fails the build
+  ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#error-lockfile-had-changes-but-lockfile-is-frozen)).
+- **The server runs as `bun`**, a user with no write access to `/app`.
+  Write files to a volume the user owns
+  ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#eacces-permission-denied-open-app)).
 
 `PORT` and `HOST` set where the server listens. The platform's `SIGTERM`
 stops it once the requests in flight are answered, and runs the app's

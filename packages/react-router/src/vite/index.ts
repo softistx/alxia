@@ -7,6 +7,7 @@ import { relative } from 'node:path';
 // Types only: the plugin runs on whichever Vite the app has, never on a
 // copy of this package's own.
 import type { Plugin, ResolvedConfig } from 'vite';
+import { bunEnvironment } from './bun';
 import {
 	clientPath,
 	contextOf,
@@ -51,6 +52,9 @@ const RESOLVED_DEFAULT = `\0${DEFAULT}`;
  *   `PORT` (3000) and `HOST` (`0.0.0.0`); importing it starts nothing.
  * - **`vite preview`**: every request goes to that built server, as it
  *   would answer it; so does React Router's prerendering.
+ * - **Built for Bun**: the `ssr` environment resolves packages with the
+ *   `bun` export condition, leaves `bun` and `bun:*` external, and targets
+ *   `esnext` unless the app set a target. What the app set is kept.
  *
  * The server is `app/server.ts`'s default export, `createServer()` from
  * `@alxia/react-router`, or without that file `createServer()` as it is.
@@ -71,6 +75,12 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 			const meta = this.meta as { readonly rolldownVersion?: string };
 			const bundler = serverBuildOptions(meta.rolldownVersion !== undefined);
 			return { environments: { ssr: { build: bundler as never } } };
+		},
+		configEnvironment(name, options) {
+			// After every config hook, React Router's included: the server
+			// environment as the app and the plugins left it, built for Bun.
+			if (name === 'ssr') return bunEnvironment(options);
+			return undefined;
 		},
 		configResolved(resolved) {
 			config = resolved;

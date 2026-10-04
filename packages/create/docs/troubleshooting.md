@@ -35,7 +35,7 @@ nothing — the symptom.
 
 **After**
 
-- [The `react-router` project's `docker build` fails](#the-react-router-projects-docker-build-fails)
+- [`error: lockfile had changes, but lockfile is frozen`](#error-lockfile-had-changes-but-lockfile-is-frozen)
 - [The project's `@alxia/*` are older than npm's latest](#the-projects-alxia-are-older-than-npms-latest)
 
 ## Before it runs
@@ -226,20 +226,20 @@ project is complete; only `node_modules` is missing.
 
 ## After
 
-### The `react-router` project's `docker build` fails
+### `error: lockfile had changes, but lockfile is frozen`
 
-**Symptom:** `COPY ./package.json package-lock.json /app/` finds no
-`package-lock.json`, or the image starts and `bun: not found`.
+**When:** `docker build` in a `react-router` project stops at
+`RUN bun install --frozen-lockfile`.
 
-**Why:** React Router's `Dockerfile` is kept as its template writes it: on
-Node, installed with npm. Once `start` runs `bun build/server/index.js`,
-it no longer fits.
+**Why:** the project's `Dockerfile` installs exactly what `bun.lock`
+records, and `package.json` now asks for something it does not: a
+dependency added or changed by hand, without `bun install`, or a project
+written with `--no-install`, whose `bun.lock` does not exist yet and was
+made by a later `bun install` that was not committed.
 
-**Fix:** base it on an `oven/bun` image, install with
-`bun install --production`, and make its command
-`bun build/server/index.js`, as
-[`@alxia/react-router`'s guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#deploying)
-says.
+**Fix:** run `bun install`, commit `bun.lock`, and build again. The other
+traps of the image, a write refused to the `bun` user among them, are in
+[`@alxia/react-router`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#eacces-permission-denied-open-app).
 
 ### The project's `@alxia/*` are older than npm's latest
 

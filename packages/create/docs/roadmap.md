@@ -15,12 +15,7 @@ Nothing scheduled yet.
 
 ## Later
 
-- **A Dockerfile on Bun for the `react-router` template.** React Router's
-  template ships one based on Node, which no longer runs the app once
-  `start` runs Bun; the
-  [`@alxia/react-router` guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#deploying)
-  says what to change. The template keeps React Router's files as its
-  scaffold wrote them, so this waits for a decision to edit more of them.
+Nothing scheduled yet.
 
 ## Not planned
 
@@ -35,6 +30,14 @@ Nothing scheduled yet.
 
 ### Next release
 
+- **The `react-router` template's `Dockerfile` runs on Bun.** It replaces
+  React Router's Node one: multi-stage on `oven/bun:1`, the production
+  dependencies apart, `bun run build`, then `bun build/server/index.js` as
+  the image's non-root `bun` user. `docker build` works in a new project
+  as it is.
+- **The `react-router` project's README runs Bun.** React Router's own
+  README, with `bun install`, `bun dev` and `bun run build` where it wrote
+  npm's commands.
 - **The `react-router` template is files, copied.** React Router's official
   template ships inside `@alxia/create`, with alxia's layer, and is copied
   as it is: no `create-react-router` runs, and no change in it can make the

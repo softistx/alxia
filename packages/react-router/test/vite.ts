@@ -54,10 +54,13 @@ export async function eventually(check: () => Promise<boolean>, ms = 5_000) {
 	throw new Error(`not within ${ms} ms`);
 }
 
-/** `react-router build` on a copy of the fixture, with the plugin. */
-export async function build(root: string): Promise<void> {
+/** `react-router build` on a copy of the fixture, with the plugin, or with `config` beside it. */
+export async function build(
+	root: string,
+	config = 'vite.alxia.config.ts',
+): Promise<void> {
 	const result =
-		await $`${process.execPath} --bun react-router build --config vite.alxia.config.ts`
+		await $`${process.execPath} --bun react-router build --config ${config}`
 			.cwd(root)
 			// `bun test` sets NODE_ENV=test, which Vite would build as development.
 			.env({ ...process.env, NODE_ENV: 'production' })

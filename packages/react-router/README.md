@@ -277,6 +277,80 @@ The catch-all adds nothing to the app's route table, so the typed client
 never shows it. `isReactRouterRoute` names the catch-all and the client
 files, so `@alxia/openapi` can leave them out.
 
+## Built for Bun
+
+The server build runs on Bun, so the plugin builds it for Bun, with
+nothing to configure. In Vite's `ssr` environment, in dev and in the
+build, it adds:
+
+- the `bun` export condition, to `resolve.conditions` and
+  `resolve.externalConditions`: a package that exports a `bun` variant is
+  bundled, and loaded in dev, as that variant;
+- `bun` and `bun:*` to `resolve.builtins`: Bun's own modules stay imports
+  of `build/server/index.js`;
+- `build.target: 'esnext'`, where Vite's default targets browsers.
+
+```ts
+// app/server.ts: Bun's modules, bundled as they are
+import { createServer } from '@alxia/react-router';
+import { Database } from 'bun:sqlite';
+
+const db = new Database(':memory:');
+
+export default createServer({
+	configure: (app) =>
+		app.get('/api/sqlite', ({ reply }) =>
+			reply.ok(db.query('select sqlite_version() as version').get()),
+		),
+});
+```
+
+What the app sets wins: its own conditions and builtins are kept, `bun` is
+added beside them, and a `build.target` it set is left as it is.
+`ssr.target` stays `node`, and no polyfill is added. The
+[guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#built-for-bun)
+has each option and why.
+
+## Docker
+
+A multi-stage `Dockerfile` on Bun's official image, as `@alxia/create`'s
+`react-router` template ships it. For an app from `create-react-router`,
+it replaces the template's, which runs on Node:
+
+```dockerfile
+FROM oven/bun:1 AS production-dependencies
+WORKDIR /app
+COPY package.json bun.lock* bunfig.toml* ./
+RUN bun install --frozen-lockfile --production
+
+FROM oven/bun:1 AS build
+WORKDIR /app
+COPY package.json bun.lock* bunfig.toml* ./
+RUN bun install --frozen-lockfile
+COPY . .
+RUN bun run build
+
+FROM oven/bun:1
+WORKDIR /app
+ENV NODE_ENV=production
+COPY package.json ./
+COPY --from=production-dependencies /app/node_modules ./node_modules
+COPY --from=build /app/build ./build
+USER bun
+EXPOSE 3000
+CMD ["bun", "build/server/index.js"]
+```
+
+```sh
+docker build -t my-app .
+docker run -p 3000:3000 my-app
+```
+
+Keep the template's `.dockerignore`, and commit `bun.lock`. The server
+runs as the non-root `bun` user, on `PORT` (3000). The
+[guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#docker)
+has the commented file.
+
 ## Traps
 
 - **A context key made in `app/` reaches the loaders only through the
@@ -322,7 +396,7 @@ From `@alxia/react-router/vite`:
 
 | export | |
 | --- | --- |
-| `alxia(options?)` | the Vite plugin, for `react-router dev`, `react-router build` and `vite preview`. `entry` is the server file: `app/server.ts` by default, or the default server when there is none |
+| `alxia(options?)` | the Vite plugin, for `react-router dev`, `react-router build` and `vite preview`, building the server for Bun. `entry` is the server file: `app/server.ts` by default, or the default server when there is none |
 | `AlxiaOptions` | its options |
 
 The `alxia-react-router` bin, run with `bunx`:
@@ -333,7 +407,7 @@ The `alxia-react-router` bin, run with `bunx`:
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev, the build and `vite preview` work, customising the server, typing the loaders, the app's own keys, a CSP nonce, escape hatches, WebSockets, the client's files, OpenAPI, testing and deploying.
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev, the build and `vite preview` work, what the build sets for Bun, customising the server, typing the loaders, the app's own keys, a CSP nonce, escape hatches, WebSockets, the client's files, OpenAPI, testing and deploying, with Docker.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these three lines, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.
