@@ -563,7 +563,7 @@ files are what `create-react-router` wrote when the template was last
 generated (React Router 8.4.0 in this release), and the versions are the newest of that major.
 
 There is no `app/server.ts`: the plugin's default server serves the pages
-in `bun dev` and from the build. To put alxia's hooks or `/api` routes in
+in `bun dev` and from the build. To put alxia's middlewares or `/api` routes in
 front of the pages, write it out and edit it:
 
 ```sh

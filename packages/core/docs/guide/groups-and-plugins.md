@@ -171,7 +171,7 @@ the deprecated `onRequest`, `onResponse` and `around`.
 
 A plugin is either an **app** or a **function**, mounted by
 `app.plugin(…)`. Middlewares go to `use`
-([Middleware: `use`](middleware.md#use-for-every-route-after-it)), the
+([Middleware: `use`](middleware.md#use-for-every-request-after-it)), the
 packages' included: `app.use(logger())`.
 
 | | Adds | Type of the app after it |

@@ -325,9 +325,9 @@ import { reactRouter } from '@alxia/react-router';
 import { session } from './session'; // an app plugin that derives `user`
 
 export const base = alxia()
-	.plugin(logger())
-	.plugin(compress())
-	.plugin(session)
+	.use(logger())
+	.use(compress())
+	.use(session)
 	.get('/api/health', ({ reply }) => reply.ok({ ok: true }));
 
 export type Base = typeof base;

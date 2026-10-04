@@ -13,7 +13,7 @@ mounts it with `app.plugin(…)`. The mechanics of `plugin` itself —
 prefixes, what a mounted app's middlewares do — are in
 [Groups and plugins](groups-and-plugins.md#plugins). A middleware, which
 runs on requests, is no plugin: it is made by `defineMiddleware` and given
-to `use` ([Middleware](middleware.md#use-for-every-route-after-it)), as the
+to `use` ([Middleware](middleware.md#use-for-every-request-after-it)), as the
 packages' own are: `app.use(logger())`. A plugin for several apps that
 wraps requests is usually a middleware factory, [below](#a-middleware-that-reads-the-context).
 

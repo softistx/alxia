@@ -7,7 +7,7 @@ behaviour that prints nothing, or an error from `tsc`. A
 
 **Runtime**
 
-- [`TypeError: contextStorage is a factory: use(contextStorage()), not use(contextStorage)`](#typeerror-contextstorage-is-a-factory-typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)
+- [`TypeError: contextStorage is a factory: use(contextStorage()), not use(contextStorage)`](#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)
 - [`ContextStorageError: getContext(): called outside a request — use tryGetContext(), or runWithContext() in a job or a test`](#contextstorageerror-getcontext-called-outside-a-request--use-trygetcontext-or-runwithcontext-in-a-job-or-a-test)
 - [`ContextStorageError: getContext(): this request reached no route declared after contextStorage() — use it earlier, or getRequestContext()`](#contextstorageerror-getcontext-this-request-reached-no-route-declared-after-contextstorage--use-it-earlier-or-getrequestcontext)
 - [A header set from a timer never reaches the response](#a-header-set-from-a-timer-never-reaches-the-response)
@@ -36,9 +36,9 @@ error TS2769: No overload matches this call.
 `app.use` without being called.
 
 **Why:** `app.use` calls a function it is given with the app, as a plugin.
-Called that way, `contextStorage` would return a new, empty middleware,
-and everything declared after it would run on an app nobody serves; it
-refuses the argument instead.
+Called that way, `contextStorage` would be handed the app, and what
+follows would be declared on a plugin nobody serves; it refuses the
+argument instead.
 
 **Fix:** call it, once, and keep the result:
 
