@@ -17,6 +17,7 @@ import type {
 	SocketSchema,
 	SocketSend,
 } from '../ws/types';
+import { routeHooks } from './define-hook';
 import type {
 	AroundHook,
 	DeriveHook,
@@ -47,6 +48,7 @@ import type {
 } from './signatures';
 import { type SocketData, websocketHandler } from './socket';
 import type {
+	AnyRouteHook,
 	BaseContext,
 	BehindShortcuts,
 	BodyLimitShortcut,
@@ -57,9 +59,11 @@ import type {
 	ProvidedBy,
 	RefusalSchema,
 	RouteEntryOf,
+	RouteHookBase,
 	RouteRecord,
 	RouteSchema,
 	ThenShortcuts,
+	ThreadHooks,
 } from './types';
 
 /** The routes of a plugin, under the prefix of the app it is used by. */
@@ -181,13 +185,21 @@ export class Alxia<
 	 */
 	readonly route: OperationMethod<Ctx, Routes, Prefix, Shortcuts> = ((
 		operation: RouteOperation,
-		handler: RouteDefinition['handler'],
+		hooksOrHandler: readonly unknown[] | RouteDefinition['handler'],
+		maybeHandler?: RouteDefinition['handler'],
 	) =>
-		this.#method(operation.method)(
-			operation.path,
-			operation.schema ?? {},
-			handler,
-		)) as never;
+		Array.isArray(hooksOrHandler)
+			? this.#method(operation.method)(
+					operation.path,
+					hooksOrHandler,
+					operation.schema ?? {},
+					maybeHandler,
+				)
+			: this.#method(operation.method)(
+					operation.path,
+					operation.schema ?? {},
+					hooksOrHandler as RouteDefinition['handler'],
+				)) as never;
 
 	/**
 	 * A `QUERY` route: a safe, idempotent read whose criteria travel in the
@@ -314,14 +326,59 @@ export class Alxia<
 		Routes & SocketEntryOf<JoinPath<Prefix, Path>, Schema>,
 		Prefix,
 		Shortcuts
-	> {
+	>;
+	/**
+	 * A WebSocket route with hooks of its own, run on the upgrade request
+	 * after the hooks before it: what they add, `socket.data` reads. A
+	 * `defineWrap` in the list is skipped, as a socket's upgrade skips
+	 * every `wrap`.
+	 */
+	ws<
+		const Path extends RoutePath,
+		const Hooks extends readonly [] | readonly AnyRouteHook[],
+		Schema extends SocketSchema = Empty,
+	>(
+		path: PathAt<Prefix, Path>,
+		hooks: Hooks &
+			NoInfer<
+				ThreadHooks<RouteHookBase<Ctx, JoinPath<Prefix, Path>>, Hooks>['checks']
+			>,
+		schema: Schema,
+		handlers: SocketHandlers<
+			SocketContext<
+				Ctx &
+					ThreadHooks<
+						RouteHookBase<Ctx, JoinPath<Prefix, Path>>,
+						Hooks
+					>['added'],
+				JoinPath<Prefix, Path>,
+				Schema
+			>,
+			SocketSend<Schema>,
+			SocketMessage<Schema>
+		>,
+	): Alxia<
+		Ctx,
+		Routes & SocketEntryOf<JoinPath<Prefix, Path>, Schema>,
+		Prefix,
+		Shortcuts
+	>;
+	ws(
+		path: string,
+		...rest:
+			| [SocketSchema, SocketHandlers<never, never, never>]
+			| [readonly unknown[], SocketSchema, SocketHandlers<never, never, never>]
+	): AnyAlxia {
+		const [list, schema, handlers] =
+			rest.length === 3 ? rest : ([[], ...rest] as const);
+		const full = joinPath(this.#prefix, path);
 		this.#mount({
-			path: joinPath(this.#prefix, path),
+			path: full,
 			schema,
-			handlers: handlers as SocketDefinition['handlers'],
-			...this.#scope.hooks(),
+			handlers,
+			...this.#scope.hooks(routeHooks(list, `WS ${full}`)),
 		});
-		return this as never;
+		return this;
 	}
 
 	/** Values every route after this reads from its context: a database, a logger. */
@@ -705,11 +762,13 @@ export class Alxia<
 	}
 
 	#method(method: Method) {
-		return (
-			path: string,
-			schemaOrHandler: RouteSchema | RouteDefinition['handler'],
-			maybeHandler?: RouteDefinition['handler'],
-		) => {
+		return (path: string, ...rest: unknown[]) => {
+			// `(path, [hooks], schema?, handler)` or `(path, schema?, handler)`.
+			const list = Array.isArray(rest[0]) ? (rest.shift() as unknown[]) : [];
+			const [schemaOrHandler, maybeHandler] = rest as [
+				RouteSchema | RouteDefinition['handler'],
+				RouteDefinition['handler'] | undefined,
+			];
 			const [schema, handler] =
 				typeof schemaOrHandler === 'function'
 					? [{}, schemaOrHandler]
@@ -718,14 +777,15 @@ export class Alxia<
 				throw new TypeError(`${method} ${path}: the handler is missing`);
 			}
 			const full = joinPath(this.#prefix, path);
-			const bodyLimit = this.#scope.bodyLimitOf(schema, `${method} ${full}`);
+			const label = `${method} ${full}`;
+			const bodyLimit = this.#scope.bodyLimitOf(schema, label);
 			this.#register({
 				method,
 				path: full,
 				schema,
 				...(bodyLimit === undefined ? {} : { bodyLimit }),
 				handler,
-				...this.#scope.hooks(),
+				...this.#scope.hooks(routeHooks(list, label)),
 			});
 			return this;
 		};

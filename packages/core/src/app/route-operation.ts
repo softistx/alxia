@@ -2,13 +2,16 @@ import type { AnyReply } from '../reply/reply';
 import type { JoinPath, PathAt, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
 import type {
+	AnyRouteHook,
 	Context,
 	Empty,
 	HandlerResult,
 	MaybePromise,
 	Method,
 	RouteEntryOf,
+	RouteHookBase,
 	RouteSchema,
+	ThreadHooks,
 	ValidSchema,
 } from './types';
 
@@ -54,17 +57,12 @@ export type OperationSchema<Operation> = Operation extends {
 	? Schema
 	: Empty;
 
-/** `app.route(operation, handler)`: `app[method](path, schema, handler)`, with the three read from `operation`. */
-export type OperationMethod<
-	Ctx extends object,
-	Routes extends object,
+/** What `route()` checks of an operation: one method, a literal path at `Prefix`, a schema that reads the path. */
+export type CheckedOperation<
 	Prefix extends string,
-	Shortcuts extends AnyReply,
-> = <
-	const Operation extends RouteOperation,
-	Result extends HandlerResult<OperationSchema<Operation>>,
->(
-	operation: OnePath<Prefix, Operation['path']> extends Operation['path']
+	Operation extends RouteOperation,
+> =
+	OnePath<Prefix, Operation['path']> extends Operation['path']
 		? Operation & {
 				readonly method: OneMethod<Operation['method']>;
 				readonly schema?: ValidSchema<
@@ -72,24 +70,83 @@ export type OperationMethod<
 					OperationSchema<Operation>
 				>;
 			}
-		: { readonly path: OnePath<Prefix, Operation['path']> },
-	handler: (
-		ctx: Context<
-			Ctx,
-			JoinPath<Prefix, Operation['path']>,
-			OperationSchema<Operation>
-		>,
-	) => MaybePromise<Result>,
-) => Alxia<
-	Ctx,
-	Routes &
-		RouteEntryOf<
-			Operation['method'],
-			JoinPath<Prefix, Operation['path']>,
-			OperationSchema<Operation>,
-			Result,
-			Shortcuts
-		>,
-	Prefix,
-	Shortcuts
->;
+		: { readonly path: OnePath<Prefix, Operation['path']> };
+
+/**
+ * `app.route(operation, handler)`: `app[method](path, schema, handler)`,
+ * with the three read from `operation`. With a list of hooks before the
+ * handler, `app[method](path, hooks, schema, handler)`.
+ */
+export interface OperationMethod<
+	Ctx extends object,
+	Routes extends object,
+	Prefix extends string,
+	Shortcuts extends AnyReply,
+> {
+	<
+		const Operation extends RouteOperation,
+		Result extends HandlerResult<OperationSchema<Operation>>,
+	>(
+		operation: CheckedOperation<Prefix, Operation>,
+		handler: (
+			ctx: Context<
+				Ctx,
+				JoinPath<Prefix, Operation['path']>,
+				OperationSchema<Operation>
+			>,
+		) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes &
+			RouteEntryOf<
+				Operation['method'],
+				JoinPath<Prefix, Operation['path']>,
+				OperationSchema<Operation>,
+				Result,
+				Shortcuts
+			>,
+		Prefix,
+		Shortcuts
+	>;
+	<
+		const Operation extends RouteOperation,
+		const Hooks extends readonly [] | readonly AnyRouteHook[],
+		Result extends HandlerResult<OperationSchema<Operation>>,
+	>(
+		operation: CheckedOperation<Prefix, Operation>,
+		hooks: Hooks &
+			NoInfer<
+				ThreadHooks<
+					RouteHookBase<Ctx, JoinPath<Prefix, Operation['path']>>,
+					Hooks
+				>['checks']
+			>,
+		handler: (
+			ctx: Context<
+				Ctx &
+					ThreadHooks<
+						RouteHookBase<Ctx, JoinPath<Prefix, Operation['path']>>,
+						Hooks
+					>['added'],
+				JoinPath<Prefix, Operation['path']>,
+				OperationSchema<Operation>
+			>,
+		) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes &
+			RouteEntryOf<
+				Operation['method'],
+				JoinPath<Prefix, Operation['path']>,
+				OperationSchema<Operation>,
+				Result,
+				| Shortcuts
+				| ThreadHooks<
+						RouteHookBase<Ctx, JoinPath<Prefix, Operation['path']>>,
+						Hooks
+				  >['replies']
+			>,
+		Prefix,
+		Shortcuts
+	>;
+}

@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import {
 	alxia,
+	defineHook,
 	type InternalErrorBody,
 	problem,
 	type RequestPart,
@@ -114,6 +115,40 @@ describe('client', () => {
 		if (result.status === 400) {
 			expect(result.data.issues[0]?.target).toBe('body');
 		} else throw new Error(`expected a 400, got ${result.status}`);
+	});
+
+	test('the replies of the hooks given to a route are typed, before its 400', async () => {
+		const canEdit = defineHook<{ params: { id: string } }>()(
+			({ params, reply }) =>
+				params.id === '1'
+					? { owner: 'ada' }
+					: reply(403, { error: 'forbidden' as const }),
+		);
+		const hooked = client(
+			alxia().patch(
+				'/notes/:id',
+				[canEdit],
+				{
+					body: z.object({ text: z.string().min(1) }),
+					response: { 200: z.string() },
+				},
+				({ owner, body, reply }) => reply(200, `${owner}: ${body.text}`),
+			),
+		);
+		const refused = await hooked.patch('/notes/:id', {
+			params: { id: 2 },
+			body: { text: '' },
+		});
+		expectTypeOf(refused.status).toEqualTypeOf<200 | 400 | 403 | 500>();
+		if (refused.status === 403) {
+			expectTypeOf(refused.data).toEqualTypeOf<{ error: 'forbidden' }>();
+			expect(refused.data).toEqual({ error: 'forbidden' });
+		} else throw new Error(`expected a 403, got ${refused.status}`);
+		const edited = await hooked.patch('/notes/:id', {
+			params: { id: 1 },
+			body: { text: 'hi' },
+		});
+		expect(edited.data).toBe('ada: hi');
 	});
 
 	test('the problem an onRefusal hook answers is typed, in place of the 400', async () => {

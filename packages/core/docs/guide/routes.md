@@ -24,7 +24,16 @@ const app = alxia().get(
 ```ts
 app.get(path, schema, handler);
 app.get(path, handler); // no schema: nothing validated, any reply
+app.get(path, [canView, loadPet], schema, handler); // hooks of this route alone, then the schema
+app.get(path, [canView], handler);
 ```
+
+The list after the path holds hooks made by `defineHook` and `defineWrap`:
+they run after the hooks in force, in order, then the request is
+validated, then the handler. What each adds, the hooks after it and the
+handler read; its replies join this route's type. They read the request as
+it arrived — `params.id` is a string even when the `params` schema makes it
+a number — and never the body ([Hooks on one route](hooks.md#hooks-on-one-route)).
 
 `get`, `post`, `put`, `patch`, `delete`, `options`, `head` and `query` take
 the same arguments. `ws` declares a socket ([WebSockets](websockets.md)); `static`,
@@ -40,6 +49,20 @@ interface RouteMethod<M, Ctx, Routes, Prefix, Shortcuts> {
 	<const Path extends RoutePath, Result extends AnyReply>(
 		path: Path, // checked as above
 		handler: (ctx: Context<Ctx, JoinPath<Prefix, Path>, Empty>) => MaybePromise<Result>,
+	): Alxia</* … */>;
+	// each of the two above with a list of hooks after the path, at most 8:
+	// each checked against what the route gives before it, what they add read
+	// by the handler, their replies in the route's outputs
+	<const Path extends RoutePath, const Hooks extends readonly AnyRouteHook[], Schema extends RouteSchema, Result extends HandlerResult<Schema>>(
+		path: Path,
+		hooks: Hooks /* & each hook's check */,
+		schema: Schema & ValidSchema<JoinPath<Prefix, Path>, Schema>,
+		handler: (ctx: Context<Ctx & /* what the hooks add */, JoinPath<Prefix, Path>, Schema>) => MaybePromise<Result>,
+	): Alxia</* … the route added, with the hooks' replies … */>;
+	<const Path extends RoutePath, const Hooks extends readonly AnyRouteHook[], Result extends AnyReply>(
+		path: Path,
+		hooks: Hooks,
+		handler: (ctx: Context<Ctx & /* what the hooks add */, JoinPath<Prefix, Path>, Empty>) => MaybePromise<Result>,
 	): Alxia</* … */>;
 }
 ```
@@ -82,6 +105,8 @@ include its body.
 are plain data — `{ method, path, schema? }` — instead of arguments: an
 operation written once and shared between modules, or one a code generator
 writes from an OpenAPI document.
+`route(operation, [hooks], handler)` gives it a list of hooks of its own,
+as `app[method](path, [hooks], schema, handler)` does.
 
 ```ts
 // operations.ts: data, importing only the schemas

@@ -19,6 +19,12 @@ a trap that prints nothing is headed by its symptom.
 - [`this app's context does not give what the plugin reads`](#this-apps-context-does-not-give-what-the-plugin-reads)
 - [`the plugin's … reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins--reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 - [`… is not assignable to type 'ProvidedBy<C, …>'`](#-is-not-assignable-to-type-providedbyc-)
+- [`the hook reads "…", which this route's context does not give: derive it before this route, or earlier in its list`](#the-hook-reads--which-this-routes-context-does-not-give-derive-it-before-this-route-or-earlier-in-its-list)
+- [`the hook reads "…", which this route's context gives with another type`](#the-hook-reads--which-this-routes-context-gives-with-another-type)
+- [`the hook reads the path parameter "…", which this route's path does not declare`](#the-hook-reads-the-path-parameter--which-this-routes-path-does-not-declare)
+- [`this route's context does not give what the hook reads`](#this-routes-context-does-not-give-what-the-hook-reads)
+- [`a route takes at most 8 hooks in its list: derive the rest in a group around it`](#a-route-takes-at-most-8-hooks-in-its-list-derive-the-rest-in-a-group-around-it)
+- [`Type '…' is not assignable to type 'MaybePromise<unique symbol>'`](#type--is-not-assignable-to-type-maybepromiseunique-symbol)
 - [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
 - [`Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`](#type-reply500--is-not-assignable-to-type-maybepromisevoid--replyclienterrorstatus-any--undefined)
 - [`'500' does not exist in type 'RefusalResponses'`](#500-does-not-exist-in-type-refusalresponses)
@@ -39,6 +45,7 @@ a trap that prints nothing is headed by its symptom.
 - [`"…" declares ":…" twice`](#-declares--twice)
 - [`"…" has the shape of "…" with other parameter names`](#-has-the-shape-of--with-other-parameter-names)
 - [`GET /… is declared twice`](#get--is-declared-twice)
+- [`GET /…: hook 1 of the list is not a hook: make it with defineHook() or defineWrap()`](#get--hook-1-of-the-list-is-not-a-hook-make-it-with-definehook-or-definewrap)
 - [`GET /…: the handler is missing`](#get--the-handler-is-missing)
 - [`group(): build is missing`](#group-build-is-missing)
 - [`onRefusal(): the hook is missing`](#onrefusal-the-hook-is-missing)
@@ -405,6 +412,124 @@ conditional type on a type parameter, even when its bound would pass.
 
 **Fix:** type the app with a concrete context, or as `AnyAlxia` and give
 the function's return type yourself. `AnyAlxia` is not checked.
+
+### `the hook reads "…", which this route's context does not give: derive it before this route, or earlier in its list`
+
+**When:** a route's list holds a hook made by `defineHook<Requires>()` (or
+`defineWrap<Requires>()`), and neither the hooks in force where the route
+is declared nor the hooks before it in the list add a key it requires.
+
+```ts
+const canView = defineHook<{ user: User; params: { id: string } }>()(({ user, params, reply }) =>
+	params.id.startsWith(user.id) ? undefined : reply(403, { error: 'forbidden' as const }));
+
+alxia().patch('/bookmarks/:id', [canView], { body: Update }, handler);
+```
+
+```text
+error TS2322: Type 'RouteHook<{ user: User; params: { id: string; }; }, …>' is not assignable to type 'RouteHook<…> & { readonly '~requires': "the hook reads \"user\", which this route's context does not give: derive it before this route, or earlier in its list"; }'.
+  …
+    Types of property ''~requires'' are incompatible.
+      Type '{ user: User; params: { id: string; }; }' is not assignable to type '"the hook reads \"user\", which this route's context does not give: derive it before this route, or earlier in its list"'.
+```
+
+Without a schema, `get(path, [hook], handler)`, TypeScript prints it as
+`No overload matches this call`, after an `Overload 1 of 4` error saying
+the list `has no properties in common with type 'RouteSchema'`: that one is
+noise, the message of the hooks' overload is the one that matters.
+
+**Why:** the hook reads `user`, which nothing before it on this route adds,
+so at runtime it would be `undefined`. Each hook is checked against the
+context the route has built when it runs: the scope's, then the list's up
+to it. A hook that reads what a hook **after** it in the list adds is
+refused the same way.
+
+**Fix:** derive the key before the route, or put the hook that adds it
+earlier in the list:
+
+```ts
+alxia()
+	.derive(authenticate)                                         // adds user
+	.patch('/bookmarks/:id', [canView], { body: Update }, handler);
+
+app.get('/bookmarks/:id', [loadBookmark, canEdit], handler);   // not [canEdit, loadBookmark]
+```
+
+### `the hook reads "…", which this route's context gives with another type`
+
+**When:** the route's context has the key a hook in its list requires, but
+of a type that does not satisfy it: a `user: string` where the hook reads
+`user: User`.
+
+**Why:** the hook would read a value of the wrong shape.
+
+**Fix:** make the `derive` that adds the key return the type the hook
+names, or name the type the route gives in the hook's `Requires`.
+
+### `the hook reads the path parameter "…", which this route's path does not declare`
+
+**When:** a hook names `params: { id: string }` in its `Requires`, and is
+given to a route whose path has no `:id`.
+
+```ts
+app.get('/bookmarks', [canView], handler); // canView reads params.id
+```
+
+**Why:** the hook reads `params.id`, which a request to `/bookmarks` never
+has.
+
+**Fix:** give it to a route whose path declares the parameter, under its
+name: `/bookmarks/:id`. A route under a group or a prefix is checked by its
+whole path, the prefix's parameters included.
+
+### `this route's context does not give what the hook reads`
+
+**When:** a hook's `Requires` is not satisfied, and no key can be named: a
+union, or a symbol key.
+
+**Fix:** name the requirement as an object type with string keys.
+
+### `a route takes at most 8 hooks in its list: derive the rest in a group around it`
+
+**When:** a route's list holds nine hooks or more.
+
+```text
+Property ''~hooks'' is missing in type '[RouteHook<…>, …]' but required in type '{ readonly '~hooks': "a route takes at most 8 hooks in its list: derive the rest in a group around it"; }'.
+```
+
+**Why:** the types thread the list one hook at a time, and the bound keeps
+that recursion cheap and finite.
+
+**Fix:** move the hooks every route of a set shares into a `derive` in a
+group around them, and keep in the list what differs route by route:
+
+```ts
+app.group((g) => g.derive(authenticate).derive(loadTenant)
+	.patch('/bookmarks/:id', [canView, canEdit], { body: Update }, handler));
+```
+
+### `Type '…' is not assignable to type 'MaybePromise<unique symbol>'`
+
+**When:** `defineHook<Requires>(hook)`, the requirement and the hook in one
+call:
+
+```ts
+defineHook<{ user: User }>(({ user }) => ({ id: user.id }));
+```
+
+```text
+error TS2345: Argument of type '({ user }: HookContext<{ user: User; }>) => { id: string; }' is not assignable to parameter of type 'DeriveFn<{ user: User; }, unique symbol>'.
+  Type '{ id: string; }' is not assignable to type 'MaybePromise<unique symbol>'.
+```
+
+**Why:** TypeScript infers no type argument once one is given, so the
+hook's result could not be inferred beside `Requires`.
+
+**Fix:** name the requirement first, then give the hook:
+
+```ts
+defineHook<{ user: User }>()(({ user }) => ({ id: user.id }));
+```
 
 ### `route() needs the path as a literal: declare the operation as const`
 
@@ -840,6 +965,15 @@ and once through `use(plugin)` or a `group`, or as `static` beside a
 
 **Fix:** keep one. `HEAD` runs the `GET` route, so you do not need to
 declare it.
+
+### `GET /…: hook 1 of the list is not a hook: make it with defineHook() or defineWrap()`
+
+**When:** a route's list holds something `defineHook` or `defineWrap` did
+not make: a bare function, an object cast to a hook.
+
+**Fix:** wrap it: `[defineHook(({ request }) => …)]`. A function given to
+`defineHook` or `defineWrap` that is not one throws
+`defineHook(): the hook is not a function`.
 
 ### `GET /…: the handler is missing`
 

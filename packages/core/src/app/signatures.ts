@@ -8,6 +8,7 @@ import type { JoinPath, PathAt, RoutePath } from '../types/path';
 import type { ClientErrorStatus } from '../types/status';
 import type { Alxia } from './alxia';
 import type {
+	AnyRouteHook,
 	BaseContext,
 	Context,
 	DeclaredRefusal,
@@ -24,7 +25,9 @@ import type {
 	Refusing,
 	RefusingKind,
 	RouteEntryOf,
+	RouteHookBase,
 	RouteSchema,
+	ThreadHooks,
 	TypedReplyFunction,
 	ValidSchema,
 } from './types';
@@ -58,7 +61,11 @@ export interface ListenOptions {
 	readonly tls?: Bun.TLSOptions;
 }
 
-/** A route method: `app.get(path, schema, handler)` or `app.get(path, handler)`. */
+/**
+ * A route method: `app.get(path, schema, handler)` or `app.get(path,
+ * handler)`, each with a list of hooks after the path, if any:
+ * `app.get(path, [canView], schema, handler)`.
+ */
 export interface RouteMethod<
 	M extends Method,
 	Ctx extends object,
@@ -90,6 +97,84 @@ export interface RouteMethod<
 	): Alxia<
 		Ctx,
 		Routes & RouteEntryOf<M, JoinPath<Prefix, Path>, Empty, Result, Shortcuts>,
+		Prefix,
+		Shortcuts
+	>;
+	<
+		const Path extends RoutePath,
+		const Hooks extends readonly [] | readonly AnyRouteHook[],
+		Schema extends RouteSchema,
+		Result extends HandlerResult<Schema>,
+	>(
+		path: PathAt<Prefix, Path>,
+		hooks: Hooks &
+			NoInfer<
+				ThreadHooks<RouteHookBase<Ctx, JoinPath<Prefix, Path>>, Hooks>['checks']
+			>,
+		schema: Schema & ValidSchema<JoinPath<Prefix, Path>, Schema>,
+		handler: (
+			ctx: Context<
+				Ctx &
+					ThreadHooks<
+						RouteHookBase<Ctx, JoinPath<Prefix, Path>>,
+						Hooks
+					>['added'],
+				JoinPath<Prefix, Path>,
+				Schema
+			>,
+		) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes &
+			RouteEntryOf<
+				M,
+				JoinPath<Prefix, Path>,
+				Schema,
+				Result,
+				| Shortcuts
+				| ThreadHooks<
+						RouteHookBase<Ctx, JoinPath<Prefix, Path>>,
+						Hooks
+				  >['replies']
+			>,
+		Prefix,
+		Shortcuts
+	>;
+	<
+		const Path extends RoutePath,
+		const Hooks extends readonly [] | readonly AnyRouteHook[],
+		Result extends AnyReply,
+	>(
+		path: PathAt<Prefix, Path>,
+		hooks: Hooks &
+			NoInfer<
+				ThreadHooks<RouteHookBase<Ctx, JoinPath<Prefix, Path>>, Hooks>['checks']
+			>,
+		handler: (
+			ctx: Context<
+				Ctx &
+					ThreadHooks<
+						RouteHookBase<Ctx, JoinPath<Prefix, Path>>,
+						Hooks
+					>['added'],
+				JoinPath<Prefix, Path>,
+				Empty
+			>,
+		) => MaybePromise<Result>,
+	): Alxia<
+		Ctx,
+		Routes &
+			RouteEntryOf<
+				M,
+				JoinPath<Prefix, Path>,
+				Empty,
+				Result,
+				| Shortcuts
+				| ThreadHooks<
+						RouteHookBase<Ctx, JoinPath<Prefix, Path>>,
+						Hooks
+				  >['replies']
+			>,
 		Prefix,
 		Shortcuts
 	>;

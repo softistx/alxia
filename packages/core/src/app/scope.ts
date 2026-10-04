@@ -65,10 +65,10 @@ export class Scope {
 		return copy;
 	}
 
-	/** The hooks of a route declared now. */
-	hooks(): ScopedHooks {
+	/** The hooks of a route declared now: those in force, then its own list's. */
+	hooks(own: readonly ChainHook[] = []): ScopedHooks {
 		return {
-			derive: [...this.#derive],
+			derive: [...this.#derive, ...own],
 			onError: [...this.#onError],
 			refusal: this.#refusals.refusal,
 			...byKind(this.#refusals.refusalByKind),

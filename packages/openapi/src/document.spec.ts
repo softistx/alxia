@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { alxia, eventStream, problem } from '@alxia/core';
+import { alxia, defineHook, eventStream, problem } from '@alxia/core';
 import { z } from 'zod';
 import { openApiPath, openapi, operationId } from './document';
 import { docs } from './plugin';
@@ -158,6 +158,41 @@ describe('openapi', () => {
 			'500',
 			'default',
 		]);
+	});
+
+	test('a route given hooks is documented by its schemas, as one behind a derive', () => {
+		const deny = defineHook(({ reply }) =>
+			reply(403, { error: 'forbidden' as const }),
+		);
+		const hooked = openapi(
+			alxia()
+				.post(
+					'/a/:id',
+					[deny],
+					{
+						params: z.object({ id: z.string() }),
+						body: User,
+						response: { 201: User },
+					},
+					({ reply, body }) => reply(201, body),
+				)
+				.post(
+					'/b/:id',
+					{
+						params: z.object({ id: z.string() }),
+						body: User,
+						response: { 201: User },
+					},
+					({ reply, body }) => reply(201, body),
+				),
+			{ info: { title: 'Hooks', version: '1.0.0' } },
+		);
+		expect(hooked.paths['/a/{id}']?.post?.responses).toEqual(
+			hooked.paths['/b/{id}']?.post?.responses ?? {},
+		);
+		expect(hooked.paths['/a/{id}']?.post?.parameters).toEqual(
+			hooked.paths['/b/{id}']?.post?.parameters ?? [],
+		);
 	});
 
 	test('a route’s own 400 and 500 are kept', () => {

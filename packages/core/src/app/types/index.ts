@@ -34,6 +34,20 @@ export type {
 } from './refusal';
 export type { ProvidedBy, RequiresOf, Requiring } from './requires';
 export type {
+	AddedBy,
+	AnyRouteHook,
+	HookContext,
+	HookProvided,
+	MaxRouteHooks,
+	NoHookYet,
+	RawRequestParts,
+	RepliesBy,
+	RouteHook,
+	RouteHookBase,
+	RouteWrap,
+	ThreadHooks,
+} from './route-hooks';
+export type {
 	Outcome,
 	OutcomeOf,
 	RouteEntryOf,

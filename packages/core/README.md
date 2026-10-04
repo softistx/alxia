@@ -372,6 +372,39 @@ response, which the hook returns — or a reply of its own, typed like a
 	busy(request) ? reply(409, { error: 'busy' as const }) : next())
 ```
 
+### Hooks on one route
+
+A route takes hooks of its own, in a list after its path. Each is made once
+with `defineHook` — or `defineWrap`, for one around the rest — and names
+what it reads; the list runs after the hooks in force, in order, before
+validation:
+
+```ts
+import { alxia, defineHook } from '@alxia/core';
+
+const canView = defineHook<{ user: User; params: { id: string } }>()(
+	async ({ user, params, reply }) =>
+		(await mayView(user, params.id)) ? undefined : reply(403, { error: 'forbidden' as const }),
+);
+const loadBookmark = defineHook<{ params: { id: string } }>()(async ({ params }) => ({
+	bookmark: await bookmarks.find(params.id),
+}));
+
+app
+	.derive(authenticate) // adds `user`, or answers 401
+	.patch('/bookmarks/:id', [canView, loadBookmark], { body: UpdateBookmark },
+		async ({ bookmark, body, reply }) => reply.ok(await bookmarks.update(bookmark, body)));
+```
+
+What a hook adds, the hooks after it and the handler read; its replies join
+that route's type alone, so the client of `PATCH /bookmarks/:id` reads the
+403. A route whose context does not give what a hook names — no `user`
+derived before it, no `:id` in its path — does not compile. The hooks read
+`params`, `query` and `cookies` as they arrived, strings, and never
+`body`: the request is validated after them, so a refusing hook answers
+before a 400, and a check that needs the body belongs in the handler.
+`route()` and `ws` take the list too. A route takes at most 8.
+
 Hooks run before validation: `pathParams` holds the path's parameters as
 they arrived, and `cookies` the request's cookies, parsed on first read. A
 route's `cookies` schema validates them for its handler alone. `set.cookies`
@@ -485,6 +518,11 @@ covers all three kinds.
 | `AnyReply`, `FreeReplyFunction`, `TypedReplyFunction`, `DeclaredReply`, `RedirectFunction` | any reply, `reply` without and with schemas, every reply a route with schemas may return, `redirect` |
 | `FreeShortcuts`, `TypedShortcuts`, `SHORTCUTS`, `Shortcuts` | `reply`'s shortcuts without and with schemas, and the status of each |
 | `Plugin`, `AnyAlxia` | a function plugin, any app |
+| `defineHook(hook)`, `defineHook<Requires>()(hook)` | a hook for a route's list, `app.get(path, [hook], schema?, handler)`: what it returns is added to the context after it, a reply ends the request and joins the route's type; `Requires` is what it reads beyond `HookContext`, which the route must give |
+| `defineWrap(hook)`, `defineWrap<Requires>()(hook)` | a hook around the rest of a route, for its list: `next()` runs the hooks after it, validation and the handler; a socket's upgrade skips it |
+| `RouteHook<Requires, Result>`, `RouteWrap<Requires, Result>`, `AnyRouteHook` | what `defineHook` and `defineWrap` make, and any of them |
+| `HookContext<Requires>`, `RawRequestParts` | what a hook of a route's list reads: `BaseContext`, the `params` and `query` as they arrived, and `Requires` |
+| `ThreadHooks<Base, Hooks>`, `RouteHookBase<Ctx, Path>`, `HookProvided<Given, Requires>`, `AddedBy<Hook>`, `RepliesBy<Hook>`, `MaxRouteHooks`, `NoHookYet` | how a route's type threads its list: the check of each hook against what the route and the hooks before it give, what each adds and replies, the bound of 8. Exported so an app's type can be named in a declaration file |
 | `definePlugin<Requires>()(build)` | an app plugin built on an app whose context has `Requires`; `use` refuses it on an app that does not give them |
 | `Requiring<Requires>`, `ProvidedBy<Ctx, Requires>` | the marker on a `definePlugin` plugin, and the check `use` makes of it |
 | `RequiresOf<Ctx, Callback?>` | what a callback annotated `Ctx` reads beyond `BaseContext` — `{ user: User }` for `BaseContext & { user: User }`, `Empty` for nothing more: the `Requires` of a plugin that infers it from a callback it is given. A callback annotated `any` is refused on every app, with a message naming `Callback` |
@@ -499,8 +537,8 @@ covers all three kinds.
 | `ContextOf<App>` | what a route declared next on `App` reads: to type a GraphQL schema, a service |
 | `RequestContext`, `BaseContext`, `Context`, `ResponseSettings`, `HandlerResult` | what every hook reads (`BaseContext.cookies`: the request's), what a handler reads, what a route sets on its response, what a handler may return |
 | `ResponseCookies` | `set.cookies`: Bun's `CookieMap` of the cookies the response sets, whose `get` and `has` read those, never the request's |
-| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod`, `RefusalMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, what OpenAPI says of it, the checks its schema's type cannot express, a route method, the type of `onRefusal` (its four forms), a route and a socket as the app runs them |
-| `RouteOperation`, `OperationSchema`, `OperationMethod` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), and the type of `route` |
+| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod` (its four forms: with or without a schema, with or without a list of hooks), `RefusalMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, what OpenAPI says of it, the checks its schema's type cannot express, a route method, the type of `onRefusal` (its four forms), a route and a socket as the app runs them |
+| `RouteOperation`, `OperationSchema`, `OperationMethod`, `CheckedOperation` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), the type of `route` (with a list of hooks or without), and the check it makes of the operation |
 | `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage`, `SocketRecord`, `SocketEntryOf` | sockets: what a socket route validates, what its handlers read, send and receive, the entry one socket adds to `RoutesOf` |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema types |
 | `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426 |

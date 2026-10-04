@@ -24,6 +24,7 @@ const app = alxia()
 | | Applies to | Declared with |
 | --- | --- | --- |
 | route hooks | the routes declared **after** them, in the same app or [group](groups-and-plugins.md#groups) | `decorate`, `derive`, `wrap`, `onError`, `onRefusal` |
+| hooks on one route | that route alone, after the route hooks in force | a list after its path: `defineHook`, `defineWrap` ([below](#hooks-on-one-route)) |
 | global hooks | every request to the app, wherever they are declared | `around`, `onRequest`, `onResponse`, `onStart`, `onStop`, `parser` |
 
 The order of the chain is the order of the request, at runtime and in the
@@ -37,8 +38,9 @@ around (first declared outermost)
 └─ onRequest hooks           ← a Response here is sent as it is
    └─ routing                ← 404, 405, 426
       └─ route hooks, in order: derive / decorate / wrap
-         └─ validation       ← 400, or the onRefusal hook's reply
-            └─ handler
+         └─ the route's own list, in order: defineHook / defineWrap
+            └─ validation    ← 400, or the onRefusal hook's reply
+               └─ handler
          onError hooks       ← for what any of the above threw
    onResponse hooks          ← every response, 404s included
 ```
@@ -49,7 +51,9 @@ route hook, validation or the handler ([Routes](routes.md#body-size-bodylimit)).
 unbounded, and the route's limit is then skipped.
 
 Route hooks run **before validation**: they read `pathParams`, the path
-parameters as they arrived, not `params`.
+parameters as they arrived, not `params`. A hook in a route's own list
+reads them as `params`, typed by its path but still strings
+([Hooks on one route](#before-validation)).
 
 ## `decorate`
 
@@ -178,6 +182,127 @@ const app = alxia()
 
 Use it for what must hold across the handler: an idempotency key, a
 database transaction, a lock, a cookie set from the response.
+
+## Hooks on one route
+
+A route takes hooks of its own in a list, after its path and before its
+schema: `app.patch(path, [canView, canEdit], schema, handler)`, or
+`app.get(path, [canView], handler)` without a schema. Each is made by
+`defineHook` (a `derive` of that route alone) or `defineWrap` (a `wrap` of
+that route alone):
+
+```ts
+import { alxia, defineHook } from '@alxia/core';
+import { z } from 'zod';
+
+interface User { readonly id: string }
+
+const canView = defineHook<{ user: User; params: { id: string } }>()(
+	async ({ user, params, reply }) =>
+		(await mayView(user, params.id)) ? undefined : reply(403, { error: 'forbidden' as const }),
+);
+const loadBookmark = defineHook<{ params: { id: string } }>()(async ({ params }) => ({
+	bookmark: await bookmarks.find(params.id),
+}));
+const canEdit = defineHook<{ bookmark: Bookmark }>()(({ bookmark, reply }) =>
+	bookmark.locked ? reply(409, { error: 'locked' as const }) : undefined,
+);
+
+const app = alxia()
+	.derive(authenticate) // adds `user`, or answers 401
+	.get('/bookmarks/:id', [canView, loadBookmark], ({ bookmark, reply }) => reply.ok(bookmark))
+	.patch('/bookmarks/:id', [canView, loadBookmark, canEdit], { body: z.object({ title: z.string() }) },
+		async ({ bookmark, body, reply }) => reply.ok(await bookmarks.update(bookmark, body)));
+// PATCH /bookmarks/:id answers 200, 400, 401, 403, 409 or 500, and its client reads each
+```
+
+### What a hook in the list does
+
+- **It runs after the hooks in force, in the order of the list**, then the
+  request is validated, then the handler runs. The same chain as `derive`
+  and `wrap` runs it: a route's list is appended to the hooks declared
+  before the route.
+- **What it returns** is treated as a `derive`'s: an object is added to the
+  context of the hooks after it in the list and of the handler, typed
+  there; a reply ends the request; `undefined` does nothing.
+- **Its replies join that route's type** — not the routes after it, as a
+  `derive`'s would. The client reads them; `@alxia/openapi` documents a
+  route's schemas, and a hook in the list, like a `derive`, declares none.
+- **A `defineWrap`** runs the hooks after it in the list, validation and
+  the handler inside `next()`, as `wrap` does. A socket's upgrade skips it.
+- **A thrown error** goes to the `onError` hooks in force; a refused
+  request — a 400, a 413 — to the `onRefusal` hook in force, of its kind
+  or general.
+
+### Before validation
+
+The hooks of the list run **before the request is validated**, as every
+route hook does, and that ordering is the point: a hook that refuses with a
+403 answers a request whose body its schema would refuse with a 400, so
+the 403 is what the client gets.
+
+So a hook reads the request as it arrived:
+
+| | a hook in the list reads | the handler reads |
+| --- | --- | --- |
+| `params` | the path's parameters, strings: `params.id` is a `string` even when the `params` schema makes it a number | the `params` schema's output |
+| `query` | the query string, as `Record<string, string \| readonly string[]>` | the `query` schema's output |
+| `cookies` | the request's cookies, strings | the `cookies` schema's output |
+| `body` | nothing: the body is not read yet | the `body` schema's output |
+
+A check that needs the validated body, or a parameter as the schema makes
+it, belongs in the handler, which returns the reply itself:
+
+```ts
+.patch('/bookmarks/:id', [canView], { body: UpdateBookmark }, ({ body, reply }) =>
+	body.title.length > 200 ? reply(422, { error: 'title_too_long' as const }) : …)
+```
+
+### What a hook reads: `defineHook<Requires>()`
+
+`defineHook(hook)` makes a hook that reads `HookContext`: the base context
+(`request`, `url`, `cookies`, `set`, `reply`, …) and the raw `params` and
+`query`. A hook that reads more names it first, and is given the hook
+next:
+
+```ts
+defineHook(({ request }) => ({ agent: request.headers.get('user-agent') }));
+defineHook<{ user: User }>()(({ user }) => ({ tenant: user.tenantId }));
+defineHook<{ params: { id: string } }>()(({ params }) => ({ id: params.id })); // the path must declare :id
+```
+
+`Requires` is checked where the hook is given, against the context the
+route builds up to that point: the hooks in force, then the hooks before it
+in the list. A route that does not give a key, gives it with another type,
+or whose path has no such parameter does not compile, with a message
+naming the key ([Troubleshooting](../troubleshooting.md#the-hook-reads--which-this-routes-context-does-not-give-derive-it-before-this-route-or-earlier-in-its-list)).
+`defineWrap<Requires>()(hook)` does the same for a wrap.
+
+Name the requirement before the hook — `defineHook<{ user: User }>()(…)`,
+not `defineHook<{ user: User }>(…)`, which does not compile.
+
+### The list or a group's `derive`?
+
+Both run the same hooks the same way; they differ in where the hook is
+written and how far it reaches.
+
+| | `[hook]` on the route | `group(g => g.derive(hook).…)` |
+| --- | --- | --- |
+| applies to | one route | every route of the group, declared after it |
+| written | once with `defineHook`, then named on each route | inline, where its context is already typed |
+| reads | what it names in `Requires`, checked on each route | the group's context, typed as it is written |
+| best for | a check that differs route by route: `canView` here, `canEdit` there, on routes of one path | a guard that every route in a prefix shares: an admin area, an API version |
+
+When three routes of the same group take the same list, a `derive` in a
+group of their own says it once. When the routes of one path each check
+something else, the list keeps each check beside the route it guards.
+
+### The type cost
+
+A route's list is threaded through a tuple, one step per hook, so the list
+is bounded at 8 hooks (`MaxRouteHooks`); a ninth is a compile error. A
+route without a list costs the compiler nothing more than before the list
+existed; one with eight hooks costs about a sixth more than one without.
 
 ## `onError`
 
@@ -511,7 +636,8 @@ interface BaseContext extends RequestContext {   // derive, wrap, onError, onRef
 `ResponseCookies` is Bun's `CookieMap`, documented as the response's: its
 `get` and `has` read what this response set.
 
-A handler reads `BaseContext`, what every hook before it added, and the
+A hook in a route's list reads `HookContext<Requires>`: `BaseContext`, the
+raw `params` and `query`, and what it names. A handler reads `BaseContext`, what every hook before it added, and the
 validated `params`, `query`, `headers`, `cookies` and `body`: a `cookies`
 schema's output replaces the request's map for the handler alone. `ContextOf<App>`
 names that context outside the chain ([The app's type](types.md#contextofapp)).
