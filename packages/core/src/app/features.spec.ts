@@ -121,7 +121,7 @@ describe('global hooks', () => {
 				});
 		const app = alxia()
 			.get('/a', ({ reply }) => reply(200, 'a'))
-			.use(poweredBy('alxia'));
+			.plugin(poweredBy('alxia'));
 		expect((await app.request('/a')).headers.get('x-powered-by')).toBe('alxia');
 	});
 

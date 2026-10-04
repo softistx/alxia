@@ -43,7 +43,7 @@ function appWith(
 	traceResponse = false,
 ) {
 	return alxia()
-		.use(
+		.plugin(
 			telemetry({
 				instance,
 				traced: (ctx) => ctx.url.pathname !== '/health',
@@ -84,7 +84,7 @@ describe('telemetry', () => {
 	test('the request’s attributes are the server span’s own, not its children’s', async () => {
 		const { instance, spans, logs } = collecting();
 		await alxia()
-			.use(telemetry({ instance }))
+			.plugin(telemetry({ instance }))
 			.get('/orders/:id', async ({ reply }) => {
 				await span('db.find', { kind: 'client' }, () => log.info('found'));
 				return reply(200, 'ok');

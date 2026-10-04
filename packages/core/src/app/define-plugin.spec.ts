@@ -26,8 +26,8 @@ const session = alxia().derive(({ request, reply }) => {
 describe('definePlugin', () => {
 	test('its hooks read what the plugin before it added', async () => {
 		const app = alxia()
-			.use(session)
-			.use(tenant)
+			.plugin(session)
+			.plugin(tenant)
 			.get('/tenant', ({ tenant, user, reply }) =>
 				reply(200, { tenant: tenant?.name ?? null, user: user.id }),
 			);
@@ -42,7 +42,7 @@ describe('definePlugin', () => {
 		const routes = definePlugin<{ user: User }>()((app) =>
 			app.get('/me', ({ user, reply }) => reply(200, user.id)),
 		);
-		const app = alxia({ prefix: '/api' }).use(session).use(routes);
+		const app = alxia({ prefix: '/api' }).plugin(session).plugin(routes);
 		const response = await app.request('/api/me', {
 			headers: { 'x-user': 'ada' },
 		});
@@ -52,15 +52,15 @@ describe('definePlugin', () => {
 
 	test('it can be used in a group, and by several apps', async () => {
 		const first = alxia()
-			.use(session)
+			.plugin(session)
 			.group('/t', (group) =>
 				group
-					.use(tenant)
+					.plugin(tenant)
 					.get('/', ({ tenant, reply }) => reply(200, tenant?.name ?? '')),
 			);
 		const second = alxia()
-			.use(session)
-			.use(tenant)
+			.plugin(session)
+			.plugin(tenant)
 			.get('/', ({ tenant, reply }) => reply(200, tenant?.name ?? ''));
 		const headers = { 'x-user': 'ada' };
 		expect(await (await first.request('/t', { headers })).text()).toBe('Acme');
@@ -74,7 +74,7 @@ describe('definePlugin', () => {
 			}),
 		);
 		const app = alxia()
-			.use(stamp)
+			.plugin(stamp)
 			.get('/', ({ reply }) => reply(200, 'ok'));
 		expect((await app.request('/')).headers.get('x-stamp')).toBe('1');
 	});
@@ -85,7 +85,7 @@ describe('definePlugin', () => {
 			// @ts-expect-error `session` is neither required nor added
 			return app.derive(({ session }) => ({ copy: session }));
 		});
-		const app = alxia().use(session).use(tenant);
+		const app = alxia().plugin(session).plugin(tenant);
 		expectTypeOf<ContextOf<typeof app>['tenant']>().toEqualTypeOf<{
 			name: string;
 		} | null>();
@@ -94,19 +94,19 @@ describe('definePlugin', () => {
 	test('an app that does not give what it reads cannot use it', () => {
 		const _refused = () => {
 			// @ts-expect-error the plugin reads "user", which this app's context does not give
-			alxia().use(tenant);
+			alxia().plugin(tenant);
 			const maybe = alxia().derive(() => ({ user: null as User | null }));
 			// @ts-expect-error the plugin reads "user", which this app's context gives with another type
-			maybe.use(tenant);
+			maybe.plugin(tenant);
 			const both = definePlugin<{ user: User; session: string }>()(
 				(app) => app,
 			);
 			// @ts-expect-error one message per key: "user" of another type, "session" not given
-			maybe.use(both);
+			maybe.plugin(both);
 			// @ts-expect-error inside a group, the same check
-			alxia().group('/t', (group) => group.use(tenant));
+			alxia().group('/t', (group) => group.plugin(tenant));
 			// @ts-expect-error through a function plugin, the same check
-			alxia().use((app) => app.use(tenant));
+			alxia().plugin((app) => app.plugin(tenant));
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -115,12 +115,12 @@ describe('definePlugin', () => {
 		const greeting = definePlugin<{ user?: { id: string } }>()((app) =>
 			app.derive(({ user }) => ({ greeting: `hi ${user?.id ?? 'guest'}` })),
 		);
-		alxia().use(greeting);
-		alxia().use(session).use(greeting);
+		alxia().plugin(greeting);
+		alxia().plugin(session).plugin(greeting);
 		const _refused = () => {
 			const numeric = alxia().derive(() => ({ user: 1 }));
 			// @ts-expect-error the plugin reads "user", which this app's context gives with another type
-			numeric.use(greeting);
+			numeric.plugin(greeting);
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -133,10 +133,10 @@ describe('definePlugin', () => {
 				app: Alxia<C>,
 			) =>
 				// @ts-expect-error a generic context cannot be checked
-				app.use(tenant);
+				app.plugin(tenant);
 			// What is chained onto the plugin after `definePlugin` returns is a
 			// plain app, unchecked: finish the plugin inside `build`.
-			alxia().use(tenant.get('/x', ({ reply }) => reply(200, 'x')));
+			alxia().plugin(tenant.get('/x', ({ reply }) => reply(200, 'x')));
 			return generic;
 		};
 		expect(_limits).toBeFunction();
@@ -190,18 +190,18 @@ describe('RequiresOf', () => {
 	test('an annotated callback makes the plugin require what it reads', async () => {
 		const byUser = audit(({ user }: BaseContext & { user: User }) => user.id);
 		const app = alxia()
-			.use(session)
-			.use(byUser)
+			.plugin(session)
+			.plugin(byUser)
 			.get('/', ({ actor, reply }) => reply(200, actor));
 		expect(
 			await (await app.request('/', { headers: { 'x-user': 'ada' } })).text(),
 		).toBe('ada');
 		const _refused = () => {
 			// @ts-expect-error the plugin reads "user", which this app's context does not give
-			alxia().use(byUser);
+			alxia().plugin(byUser);
 			const byUrl = audit(({ url }: { url: string }) => url);
 			// @ts-expect-error the plugin reads "url", which this app's context gives with another type
-			alxia().use(byUrl);
+			alxia().plugin(byUrl);
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -228,11 +228,11 @@ describe('RequiresOf', () => {
 		const loose = audit((ctx: any) => String(ctx.user));
 		const _refused = () => {
 			// @ts-expect-error the plugin's callback reads its context as any
-			alxia().use(loose);
+			alxia().plugin(loose);
 			// @ts-expect-error the plugin's callback reads its context as any, whatever the app gives
-			alxia().use(session).use(loose);
+			alxia().plugin(session).plugin(loose);
 			// @ts-expect-error the plugin's callback reads its context as any, through an index signature
-			alxia().use(byRecord);
+			alxia().plugin(byRecord);
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -243,9 +243,9 @@ describe('RequiresOf', () => {
 		expectTypeOf(byUnknown['~requires']).toEqualTypeOf<Empty>();
 		expectTypeOf(byObject['~requires']).toEqualTypeOf<Empty>();
 		const app = alxia()
-			.use(byUnknown)
+			.plugin(byUnknown)
 			.get('/unknown', ({ actor, reply }) => reply(200, actor))
-			.use(byObject)
+			.plugin(byObject)
 			.get('/object', ({ actor, reply }) => reply(200, actor));
 		expect(await (await app.request('/unknown')).text()).toBe('object');
 		expect(await (await app.request('/object')).text()).toBe('true');
@@ -255,7 +255,7 @@ describe('RequiresOf', () => {
 		const byRecord = audit((ctx: Record<string, unknown>) => typeof ctx['url']);
 		const _refused = () => {
 			// @ts-expect-error a string index of unknown is a key no app's context gives
-			alxia().use(byRecord);
+			alxia().plugin(byRecord);
 		};
 		expect(_refused).toBeFunction();
 	});
@@ -263,7 +263,7 @@ describe('RequiresOf', () => {
 	test('an unannotated callback requires nothing', async () => {
 		const byPath = audit((ctx) => ctx.url.pathname);
 		const app = alxia()
-			.use(byPath)
+			.plugin(byPath)
 			.get('/here', ({ actor, reply }) => reply(200, actor));
 		expect(await (await app.request('/here')).text()).toBe('/here');
 	});

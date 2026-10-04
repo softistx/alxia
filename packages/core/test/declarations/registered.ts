@@ -35,7 +35,7 @@ export function todos() {
 }
 
 export function served() {
-	return base.use(todos());
+	return base.plugin(todos());
 }
 
 export function context(ctx: AppContext) {

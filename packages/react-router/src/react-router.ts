@@ -76,7 +76,7 @@ export function isReactRouterRoute(route: RouteDefinition): boolean {
  * files are served when `client` is given.
  *
  * ```ts
- * const app = base.use((app) =>
+ * const app = base.plugin((app) =>
  *   reactRouter(app, { build: () => import('./build/server/index.js'), client: 'build/client' }),
  * );
  * ```

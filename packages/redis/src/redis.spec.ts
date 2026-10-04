@@ -14,7 +14,7 @@ describe('redisStore', () => {
 	test('two apps sharing a Redis share a count, 429 and all', async () => {
 		const make = () =>
 			alxia({ ip: () => '1.2.3.4' })
-				.use(
+				.plugin(
 					rateLimit({
 						limit: 2,
 						windowMs: 60_000,
@@ -66,7 +66,7 @@ let runs = 0;
 const makeApp = () =>
 	alxia({ ip: () => '1.2.3.4' })
 		.post('/open', ({ reply }) => reply(201, ++runs))
-		.use(idempotency(db.client, { name: 'payments' }))
+		.plugin(idempotency(db.client, { name: 'payments' }))
 		.post(
 			'/payments',
 			validate({ body: z.object({ amount: z.number() }) }),
@@ -148,7 +148,7 @@ describe('redis', () => {
 	test('caches and a lock in the context, typed', async () => {
 		let loads = 0;
 		const app = alxia()
-			.use(redis(db.client, { caches: { users } }))
+			.plugin(redis(db.client, { caches: { users } }))
 			.get('/users/:id', async ({ caches, lock, params, reply }) => {
 				const user = await caches.users.remember(params.id, () => {
 					loads++;
@@ -183,7 +183,7 @@ describe('redisCacheStore', () => {
 			return {
 				products,
 				app: alxia()
-					.use(products)
+					.plugin(products)
 					.get('/products', ({ reply }) => reply(200, { runs: ++runs })),
 			};
 		};
@@ -208,7 +208,7 @@ describe('redisCacheStore', () => {
 			store: redisCacheStore(db.client, { name: 'pages' }),
 		});
 		const app = alxia()
-			.use(
+			.plugin(
 				redis(db.client, {
 					caches: {
 						greetings: defineCache({
@@ -220,7 +220,7 @@ describe('redisCacheStore', () => {
 					},
 				}),
 			)
-			.use(pages)
+			.plugin(pages)
 			.get('/hello', ({ cache: controls, caches, request, reply }) => {
 				expectTypeOf(controls.tag).toBeFunction();
 				expectTypeOf(caches.greetings.remember).toBeFunction();

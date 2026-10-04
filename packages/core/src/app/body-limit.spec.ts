@@ -241,7 +241,7 @@ describe('bodyLimit() for the routes after it', () => {
 			.post('/own', { body: z.string(), bodyLimit: 8 }, ({ reply }) =>
 				reply(200, 'ok'),
 			);
-		const host = alxia().bodyLimit(4).use(plugin);
+		const host = alxia().bodyLimit(4).plugin(plugin);
 		expect((await host.request('/free', post('xxxxx'))).status).toBe(200);
 		expect((await host.request('/own', post('xxxxxxxx'))).status).toBe(200);
 		expect((await host.request('/own', post('xxxxxxxxx'))).status).toBe(413);
@@ -250,7 +250,7 @@ describe('bodyLimit() for the routes after it', () => {
 
 	test("a plugin's own bodyLimit() applies to the app's routes after use", async () => {
 		const host = alxia()
-			.use(alxia().bodyLimit(4))
+			.plugin(alxia().bodyLimit(4))
 			.post('/after', { body: z.string() }, ({ reply }) => reply(200, 'ok'));
 		expect((await host.request('/after', post('xxxx'))).status).toBe(200);
 		expect((await host.request('/after', post('xxxxx'))).status).toBe(413);
@@ -425,7 +425,7 @@ describe('a body_limit refusal through onRefusal', () => {
 			{ body: z.string(), bodyLimit: 4 },
 			({ reply }) => reply(200, 'ok'),
 		);
-		const app = alxia().onRefusal(jmapLimit).use(plugin);
+		const app = alxia().onRefusal(jmapLimit).plugin(plugin);
 		const response = await app.request('/p', post('12345'));
 		expect(await response.json()).toEqual(JMAP_LIMIT);
 	});
@@ -440,7 +440,7 @@ describe('a body_limit refusal through onRefusal', () => {
 			.post('/p', { bodyLimit: 4 }, async ({ request, reply }) =>
 				reply(200, (await request.text()).length),
 			);
-		const app = alxia().onRefusal(jmapLimit).bodyLimit(4).use(plugin);
+		const app = alxia().onRefusal(jmapLimit).bodyLimit(4).plugin(plugin);
 		const response = await app.request('/p', post('12345678'));
 		expect(response.status).toBe(413);
 		expect(await response.json()).toEqual({ status: 413, detail: 'plugin' });

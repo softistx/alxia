@@ -1,7 +1,7 @@
 import { describe, expectTypeOf, test } from 'bun:test';
 import { alxia } from './alxia';
 import { defineMiddleware } from './define-middleware';
-import type { Next } from './types';
+import type { AddedOf, Empty, Middleware, Next } from './types';
 
 interface User {
 	readonly id: string;
@@ -90,5 +90,20 @@ describe('the context a route threads through its middlewares', () => {
 			() => undefined,
 			({ reply }) => reply(200, 'x'),
 		);
+	});
+
+	test('a middleware typed by the exported Middleware adds nothing, and leaves the context typed', () => {
+		const plain: Middleware = (_ctx, next) => next();
+		alxia().get('/', plain, (ctx) => {
+			expectTypeOf(ctx).not.toBeAny();
+			expectTypeOf<AddedOf<ReturnType<Middleware>>>().toEqualTypeOf<Empty>();
+			return ctx.reply(200, 'x');
+		});
+		// The requirement of a route of `use` stays checked behind it.
+		const needsUser = defineMiddleware<{ user: User }>()((_ctx, next) =>
+			next(),
+		);
+		// @ts-expect-error no middleware before needsUser adds a `user`
+		alxia().get('/', plain, needsUser, ({ reply }) => reply(200, 'x'));
 	});
 });

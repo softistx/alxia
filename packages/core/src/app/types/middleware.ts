@@ -39,7 +39,7 @@ export interface NextFunction {
 }
 
 /** What a middleware may return: `next(…)`'s response, a reply, or a `Response` of its own. */
-export type MiddlewareResult = Next<any, any> | AnyReply | Response;
+export type MiddlewareResult = Next | AnyReply | Response;
 
 /** What a middleware's function returns: its result, or a promise of it. */
 export type MiddlewareReturn = MaybePromise<MiddlewareResult>;

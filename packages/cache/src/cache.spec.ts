@@ -8,7 +8,7 @@ function setup(options: Partial<Parameters<typeof cache>[0]> = {}) {
 	const products = cache({ ttl: 60, tags: () => ['products'], ...options });
 	const app = alxia()
 		.get('/live', ({ reply }) => reply(200, ++runs))
-		.use(products)
+		.plugin(products)
 		.get('/products', async ({ reply, cache: controls }) => {
 			expectTypeOf(controls.tag).toBeFunction();
 			await Bun.sleep(20);
@@ -59,7 +59,7 @@ describe('cache', () => {
 	test('concurrent misses of a response not kept: each request runs the route', async () => {
 		let runs = 0;
 		const app = alxia()
-			.use(cache({ ttl: 60 }))
+			.plugin(cache({ ttl: 60 }))
 			.get('/me', async ({ request, reply }) => {
 				runs++;
 				await Bun.sleep(20);
@@ -81,7 +81,7 @@ describe('cache', () => {
 	test('a leading run that throws: each waiting request runs the route', async () => {
 		let runs = 0;
 		const app = alxia()
-			.use(cache({ ttl: 60 }))
+			.plugin(cache({ ttl: 60 }))
 			.get('/flaky', async ({ reply }) => {
 				const run = ++runs;
 				await Bun.sleep(20);
@@ -116,7 +116,7 @@ describe('cache', () => {
 	test('stale: a refresh that is not kept leaves the stale copy', async () => {
 		let runs = 0;
 		const app = alxia()
-			.use(cache({ ttl: 0.02, staleWhileRevalidate: 60 }))
+			.plugin(cache({ ttl: 0.02, staleWhileRevalidate: 60 }))
 			.get('/page', ({ reply }) =>
 				++runs === 1
 					? reply(200, 'first')
@@ -232,8 +232,8 @@ describe('cache', () => {
 			tags: ({ user }) => [`tenant:${user.tenant}`],
 		});
 		const app = alxia()
-			.use(session)
-			.use(perTenant)
+			.plugin(session)
+			.plugin(perTenant)
 			.get('/home', ({ user, reply }) =>
 				reply(200, `${user.tenant} ${++runs}`),
 			);
@@ -248,11 +248,11 @@ describe('cache', () => {
 
 		const _refused = () => {
 			// @ts-expect-error the plugin reads "user", which this app's context does not give
-			alxia().use(perTenant);
+			alxia().plugin(perTenant);
 			alxia()
 				.derive(() => ({ user: { tenant: 1 } }))
 				// @ts-expect-error the plugin reads "user", which this app's context gives with another type
-				.use(perTenant);
+				.plugin(perTenant);
 		};
 		expect(_refused).toBeFunction();
 	});

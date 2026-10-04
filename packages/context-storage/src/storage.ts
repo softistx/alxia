@@ -137,10 +137,10 @@ export function contextStorage<App = RegisteredBase>(
 	...uncalled: readonly never[]
 ): ContextStoragePlugin<App> {
 	if (uncalled.length > 0) {
-		// `use(contextStorage)`: the app is handed to the factory, and what
+		// `plugin(contextStorage)`: the app is handed to the factory, and what
 		// follows would be declared on a plugin nobody serves.
 		throw new TypeError(
-			'contextStorage is a factory: use(contextStorage()), not use(contextStorage)',
+			'contextStorage is a factory: plugin(contextStorage()), not plugin(contextStorage)',
 		);
 	}
 	const plugin = alxia()

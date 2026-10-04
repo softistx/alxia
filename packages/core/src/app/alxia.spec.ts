@@ -206,8 +206,8 @@ describe('plugins', () => {
 		reply(200, { id: params.id }),
 	);
 	const composed = alxia({ prefix: '/api' })
-		.use(auth)
-		.use(posts)
+		.plugin(auth)
+		.plugin(posts)
 		.get('/me', ({ user, reply }) => reply(200, user));
 
 	test("a plugin's routes are mounted under the app's prefix", async () => {

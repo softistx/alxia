@@ -35,7 +35,7 @@ describe('Shortcuts', () => {
 		);
 		const app = alxia()
 			.onRefusal((_refusal, { reply }) => reply(400, { error: 'app' as const }))
-			.use(plugin);
+			.plugin(plugin);
 		expectTypeOf<ShortcutsOf<typeof app>>().toEqualTypeOf<
 			Reply<400, { readonly error: 'plugin' }> & Refusing
 		>();

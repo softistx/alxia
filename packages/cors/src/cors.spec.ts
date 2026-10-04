@@ -16,7 +16,7 @@ const preflight = (origin: string, headers: Record<string, string> = {}) =>
 
 describe('cors', () => {
 	test('every origin by default: a star, a preflight answered', async () => {
-		const app = alxia().use(cors()).use(route);
+		const app = alxia().plugin(cors()).plugin(route);
 		const response = await app.request('/data', {
 			headers: { origin: 'https://a.example' },
 		});
@@ -40,7 +40,7 @@ describe('cors', () => {
 
 	test('a list of origins: the allowed one echoed, another refused', async () => {
 		const app = alxia()
-			.use(
+			.plugin(
 				cors({
 					origin: ['https://a.example', /\.b\.example$/],
 					credentials: true,
@@ -48,7 +48,7 @@ describe('cors', () => {
 					maxAge: 600,
 				}),
 			)
-			.use(route);
+			.plugin(route);
 		const allowed = await app.request('/data', {
 			headers: { origin: 'https://x.b.example' },
 		});
@@ -77,8 +77,8 @@ describe('cors', () => {
 
 	test('credentials with every origin echo the origin, never a star', async () => {
 		const app = alxia()
-			.use(cors({ credentials: true }))
-			.use(route);
+			.plugin(cors({ credentials: true }))
+			.plugin(route);
 		const response = await app.request('/data', {
 			headers: { origin: 'https://c.example' },
 		});
@@ -89,12 +89,12 @@ describe('cors', () => {
 
 	test('an origin function that throws: the response sent whole, without the headers', async () => {
 		const app = alxia()
-			.use(
+			.plugin(
 				cors({
 					origin: (origin) => new URL(origin).hostname === 'a.example',
 				}),
 			)
-			.use(route);
+			.plugin(route);
 		const original = console.error;
 		console.error = () => {};
 		try {

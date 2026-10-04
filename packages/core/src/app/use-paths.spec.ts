@@ -104,7 +104,7 @@ describe('app.use(path, ...middlewares)', () => {
 			.use('/admin', logs(log, 'plugin'))
 			.get('/admin/x', ({ reply }) => reply(200, 'ok'));
 		const app = alxia({ prefix: '/api' })
-			.use(plugin)
+			.plugin(plugin)
 			.get('/admin/y', ({ reply }) => reply(200, 'ok'))
 			.get('/open', ({ reply }) => reply(200, 'ok'));
 		for (const path of ['/api/admin/x', '/api/admin/y', '/api/open']) {
@@ -118,7 +118,7 @@ describe('app.use(path, ...middlewares)', () => {
 		const plugin = alxia()
 			.get('/admin/x', ({ reply }) => reply(200, 'ok'))
 			.get('/open', ({ reply }) => reply(200, 'ok'));
-		const app = alxia().use('/admin', logs(log, 'parent')).use(plugin);
+		const app = alxia().use('/admin', logs(log, 'parent')).plugin(plugin);
 		await app.request('/admin/x');
 		await app.request('/open');
 		expect(log).toEqual(['parent']);

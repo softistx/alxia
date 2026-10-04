@@ -111,7 +111,7 @@ type ProvidesContext<Provided, Required> = Provided extends Required
  * ```ts
  * const app = alxia()
  *   .use(bearer({ jwt }))
- *   .use((app) => graphql(app, { schema, plugins: [useDepthLimit()] }));
+ *   .plugin((app) => graphql(app, { schema, plugins: [useDepthLimit()] }));
  * ```
  */
 export function graphql<

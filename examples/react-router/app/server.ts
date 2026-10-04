@@ -14,9 +14,9 @@ import { addTodo, NewTodo, Todo } from "./todos.server";
 const server = createServer({
   configure: (app) =>
     app
-      .use(logger())
-      .use(compress())
-      .use(
+      .plugin(logger())
+      .plugin(compress())
+      .plugin(
         secureHeaders({
           // A fresh nonce per request, added to script-src: entry.server
           // reads it with nonceOf(loadContext), and React Router puts it on

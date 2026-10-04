@@ -80,7 +80,7 @@ describe('the types of app.use(...middlewares)', () => {
 
 	test('a plugin is still a plugin', () => {
 		const plugin = definePlugin()((app) => app.decorate({ db: 1 as const }));
-		const app = alxia().use(plugin).use(auth);
+		const app = alxia().plugin(plugin).use(auth);
 		expectTypeOf<ContextOf<typeof app>['db']>().toEqualTypeOf<1>();
 		expectTypeOf<ContextOf<typeof app>['user']>().toEqualTypeOf<User>();
 	});

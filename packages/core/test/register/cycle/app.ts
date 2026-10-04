@@ -5,7 +5,7 @@ import { todos } from './todos';
 
 export const app = alxia()
 	.derive(() => ({ user: { id: 'ada' } }))
-	.use(todos);
+	.plugin(todos);
 
 declare module '@alxia/core' {
 	interface Register {

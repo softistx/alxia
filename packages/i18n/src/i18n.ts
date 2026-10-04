@@ -149,7 +149,7 @@ export function createI18n<
 	const plugin = definePlugin<RequiresOf<Ctx, 'resolve'>>()((app) =>
 		app
 			.around((_ctx, next) => current.run({}, () => requests.run({}, next)))
-			.use(detected)
+			.plugin(detected)
 			.derive(({ language: lang }): I18nContext<Key> => {
 				const own = current.getStore();
 				if (own !== undefined) own.language = lang;
