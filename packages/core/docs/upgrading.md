@@ -16,12 +16,59 @@ bun add @alxia/core@latest @alxia/client@latest @alxia/openapi@latest # and ever
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
+| [Hooks on one route](#hooks-on-one-route) | core | no |
 | [The request's cookies on every hook](#the-requests-cookies-on-every-hook) | core | yes, in three narrow cases |
 | [Route paths checked by the types](#route-paths-checked-by-the-types) | core | yes: a path the app refused at startup, and a wrapper generic in its path |
 | [`onRefusal(kind, …)`](#onrefusalkind-) | core, openapi | no; one compile error reads differently |
 | [`matchesSpec`, the new name of `exactly`](#matchesspec-the-new-name-of-exactly) | openapi-routes | no; `exactly` is deprecated |
 | [Streamed bodies timed to their last byte](#streamed-bodies-timed-to-their-last-byte) | logger, telemetry | dashboards and tests that read a streamed request's entry or span |
 | [A CSP nonce per request](#a-csp-nonce-per-request) | secure-headers, react-router | no; opt-in |
+
+## Hooks on one route
+
+**What changed.** Every route method takes a list of hooks after its path:
+`app.<method>(path, [hooks], [schema,] handler)`,
+`route(operation, [hooks], handler)` and `ws(path, [hooks], schema, handlers)`.
+`static`, `file` and `page` take no list. A hook is made once with
+`defineHook` (a `derive` of that route alone) or `defineWrap` (a `wrap`),
+naming what it reads with `defineHook<Requires>()(hook)`. The list runs
+after the hooks in force, in its order, then validation, then the handler.
+What a hook adds, the hooks after it and the handler read. Its replies join
+that route's type, so the client reads them; `@alxia/openapi` does not
+document them. A list holds at most 8 hooks.
+
+```ts
+// before: a group of one route, to keep a check off the routes after it
+app.group((note) =>
+	note
+		.derive(({ pathParams, reply }) => (notes.has(pathParams['id'] ?? '') ? undefined : reply(404, { error: 'not_found' as const })))
+		.patch('/notes/:id', { body: UpdateNote }, handler),
+);
+```
+
+```ts
+// after: the check, named once, listed on the routes that need it
+import { defineHook } from '@alxia/core';
+
+const exists = defineHook<{ params: { id: string } }>()(({ params, reply }) =>
+	notes.has(params.id) ? undefined : reply(404, { error: 'not_found' as const }),
+);
+
+app.patch('/notes/:id', [exists], { body: UpdateNote }, handler);
+```
+
+Every route hook now reads `params` and `query` as they arrived before
+validation replaces them for the handler. A hook of a route's list has them
+in its type, typed by the route's path. A `derive` or `wrap` on the chain
+has them at runtime only, and still reads `pathParams` in its type.
+
+**Can it break your code.** No: a route without a list is declared and
+typed as before, and costs the compiler nothing more. New exports:
+`defineHook`, `defineWrap`, `RouteHook`, `RouteWrap`, `AnyRouteHook`,
+`HookContext`, `RawRequestParts`, `MaxRouteHooks` and the types a route's
+type threads its list with. See
+[Hooks: hooks on one route](guide/hooks.md#hooks-on-one-route) and
+[Middleware: a route's own hooks](guide/middleware.md#a-routes-own-hooks).
 
 ## The request's cookies on every hook
 

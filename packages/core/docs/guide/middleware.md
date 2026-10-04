@@ -31,7 +31,7 @@ const app = alxia()
 | [`decorate(values)`](#decorate) | a database, a logger, a config | the routes declared after it | before validation | no | its values, in the context; nothing for the client |
 | [`derive(hook)`](#derive) | authenticating, loading what routes read | the routes declared after it | before validation | yes, with a reply | what it adds, in the context; its replies, for the client. Not in OpenAPI |
 | [`wrap(hook)`](#wrap) | a transaction, a lock, an idempotency key, a header from the response | the routes declared after it | around validation and the handler | yes, with a reply, or any `Response` | its replies, for the client. Not in OpenAPI. A raw `Response`, nowhere |
-| [Per-route hooks](#per-route-hooks) | a check that belongs to one route | one route | before validation, after the scope's hooks | yes, with a reply | its replies, for the client |
+| [A route's own hooks](#a-routes-own-hooks), `app.patch(path, [canView, canEdit], …)` | a check that belongs to one route, written once with `defineHook` or `defineWrap` | one route | after the scope's hooks, in the order listed, before validation | yes, with a reply; a `defineWrap`, any `Response` | what it adds, in that route's context; its replies, for that route's client. Not in OpenAPI |
 | [`bodyLimit(bytes)`](#bodylimit), or a route's `bodyLimit` | capping a request body | the routes declared after it, or one route | whenever the body is read | yes, a 413 | the 413, for the client and in OpenAPI |
 | [`onRefusal(hook)`](#onrefusal) | answering a 400 or a 413 in your own format | the routes declared after it | when validation or the body limit refuses | yes, with a 4xx reply | its replies, for the client; a `4XX` with no body in OpenAPI |
 | `onRefusal(schema, hook)` | the same, documented | the routes declared after it | as above | yes, with a 4xx reply | its replies, for the client and in OpenAPI |
@@ -55,9 +55,11 @@ schemas reach it.
 
 Two rules decide the rest:
 
-- **Order is meaning.** A route hook — every row down to `onError` — applies
-  to the routes declared after it, at runtime and in the types alike. A
-  route declared before a `derive` neither runs it nor reads what it adds.
+- **Order is meaning.** A hook declared on the chain — `decorate`, `derive`,
+  `wrap`, `bodyLimit`, `onRefusal`, `onError` — applies to the routes
+  declared after it, at runtime and in the types alike. A route declared
+  before a `derive` neither runs it nor reads what it adds. A route's own
+  list applies to that route alone.
 - **Global hooks are global.** `onRequest`, `onResponse` and `around` apply
   to every request wherever they are declared, inside a group or a plugin
   included. What they answer is in no route's type: use them only for what
@@ -75,8 +77,8 @@ Two rules decide the rest:
    or `decorate` runs and adds to the context; a `wrap` calls `next()` to run
    the rest. A reply from any of them ends the request, and the `wrap`s
    around it see it as the response.
-5. **The route's own hooks**, in the order listed.
-   <!-- route-hooks: confirm against #feat/core-route-hooks -->
+5. **The route's own list**, `[canView, canEdit]`, in its order: a
+   `defineHook` runs as a `derive` does, a `defineWrap` as a `wrap`.
 6. **Validation**: `params`, `query`, `headers`, `cookies`, then `body`.
    A refusal is answered here, inside the `wrap`s: the `onRefusal` hooks of
    its kind, then the general one, then the default 400.
@@ -94,7 +96,7 @@ Two rules decide the rest:
 
 ```
 around ─┐
-        onRequest ─ routing ─ scope hooks ─ route's hooks ─ validation ─ handler
+        onRequest ─ routing ─ scope hooks ─ route's list ─ validation ─ handler
                                   └─ wrap ─────────────────────────────────┘   ← unwinds here
                               onError / onRefusal(body_limit)                   ← what was thrown
         onResponse
@@ -109,15 +111,16 @@ a hook, validation or the handler — so it reaches `onRefusal`, not
 ## Hooks run before validation
 
 Every route hook runs before the route's schemas, so it reads the request
-as it arrived:
+as it arrived: strings, never the body. Every hook has `params` and `query`
+at runtime, but only a hook of a route's list has them in its type:
 
-| A hook reads | Not |
-| --- | --- |
-| `pathParams['id']`, a string | `params`, which only the handler reads |
-| `url.searchParams.get('page')`, a string | `query` |
-| `cookies['sid']`, a string | a `cookies` schema's output |
-| `request.headers.get('x-tenant')` | `headers` |
-| nothing of the body | `body` |
+| | A hook of a route's list (`defineHook`) | A `derive` or `wrap` on the chain | The handler |
+| --- | --- | --- | --- |
+| `params` | the path's parameters, strings, typed by the route's path | there at runtime, not in its type: read `pathParams` | the `params` schema's output |
+| `pathParams` | the same strings | the same strings | the same strings |
+| `query` | the query string, `Record<string, string \| readonly string[]>` | there at runtime, not in its type: read `url.searchParams` | the `query` schema's output |
+| `cookies` | the request's cookies, strings | the same | the `cookies` schema's output |
+| `body` | never: naming it in `defineHook<…>` does not compile | never | the `body` schema's output |
 
 ```ts
 import { alxia, type BaseContext } from '@alxia/core';
@@ -231,72 +234,65 @@ const app = alxia()
 
 See [Hooks: `wrap`](hooks.md#wrap).
 
-### Per-route hooks
+### A route's own hooks
 
-<!-- route-hooks: confirm against #feat/core-route-hooks -->
-
-Hooks given to one route, as an array before its schema. They run after the
-scope's hooks and before validation, read what those added, and may end the
-request with a reply, which is in that route's type alone:
+A list of hooks after the route's path, before its schema, each made once
+with `defineHook` and named on every route that needs it. They run after
+the scope's hooks, in the order listed, and before validation. What one
+adds, the hooks after it and the handler read. Its replies join that
+route's type alone. `defineHook<Requires>()` names what the hook reads, and
+a route that does not give it does not compile:
 
 ```ts
-import { alxia, type BaseContext } from '@alxia/core';
+import { alxia, defineHook } from '@alxia/core';
 import { z } from 'zod';
 
 interface User {
 	readonly id: string;
-	readonly role: 'viewer' | 'editor';
 }
 interface Note {
 	readonly id: string;
 	readonly owner: string;
+	readonly shared: boolean;
 	title: string;
 }
 
 const sessions = new Map<string, User>();
 const notes = new Map<string, Note>();
 
-type Authed = BaseContext & { user: User };
+const canView = defineHook<{ user: User; params: { id: string } }>()(({ user, params, reply }) => {
+	const note = notes.get(params.id);
+	return note && (note.shared || note.owner === user.id) ? { note } : reply(404, { error: 'not_found' as const });
+});
 
-const canView = ({ pathParams, reply }: Authed) =>
-	notes.has(pathParams['id'] ?? '') ? undefined : reply(404, { error: 'not_found' as const });
-
-const canEdit = ({ user, pathParams, reply }: Authed) =>
-	user.role === 'editor' && notes.get(pathParams['id'] ?? '')?.owner === user.id
-		? undefined
-		: reply(403, { error: 'forbidden' as const });
+const canEdit = defineHook<{ user: User; note: Note }>()(({ user, note, reply }) =>
+	note.owner === user.id ? undefined : reply(403, { error: 'forbidden' as const }),
+);
 
 const app = alxia({ prefix: '/notes' })
 	.derive(({ cookies, reply }) => {
 		const user = sessions.get(cookies['sid'] ?? '');
 		return user ? { user } : reply(401, { error: 'unauthenticated' as const });
 	})
-	.patch('/:id', [canView, canEdit], { body: z.object({ title: z.string().min(1) }) }, ({ pathParams, body, reply }) => {
-		const note = notes.get(pathParams['id'] ?? '');
-		if (note === undefined) return reply(404, { error: 'not_found' as const });
+	.get('/:id', [canView], ({ note, reply }) => reply(200, note))
+	.patch('/:id', [canView, canEdit], { body: z.object({ title: z.string().min(1) }) }, ({ note, body, reply }) => {
 		note.title = body.title;
 		return reply(200, note);
 	});
-// PATCH /notes/:id → 401 without a session, 404 for no such note, 403 for someone else's,
-// 400 for a bad body, 200 otherwise: in that order, and all in the route's type
+// PATCH /notes/:id → 401 without a session, 404 for a note it may not see, 403 for someone else's,
+// 400 for a bad body, 200 otherwise: in that order, and each in the route's type
 ```
 
 The `derive` is the scope's: every route after it is authenticated.
-`canView` and `canEdit` are this route's: another route after it is not
-checked by them. Both run before validation, so they read `pathParams`, and
-a 403 comes before a 400.
+`canView` and `canEdit` belong to the routes that list them: `GET` checks
+only that the note may be seen. Both run before validation, so a 403 comes
+before a 400, and `canView` reads `params.id` as the string it arrived as.
 
-Until per-route hooks are in your release, a group of one route does the
-same, with the hooks as `derive`s:
-
-```ts
-app.group((note) =>
-	note
-		.derive(canView)
-		.derive(canEdit)
-		.patch('/:id', { body: z.object({ title: z.string().min(1) }) }, ({ body, reply }) => reply(200, body)),
-);
-```
+`route(operation, [hooks], handler)` and `ws(path, [hooks], schema, handlers)`
+take a list too; `static`, `file` and `page` do not. A list holds at most 8
+hooks. `defineWrap`, what `Requires` may name, and when a group's `derive`
+says it better are on
+[Hooks: hooks on one route](hooks.md#hooks-on-one-route).
 
 ### `bodyLimit`
 
