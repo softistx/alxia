@@ -48,13 +48,15 @@ type WrapFn<Requires, Result> = (
  */
 export function defineHook<Requires extends object = Empty, Result = NoHookYet>(
 	hook?: DeriveFn<Requires, Result>,
-): [Result] extends [NoHookYet]
-	? [NoHookYet] extends [Result]
-		? <Returned>(
-				hook: DeriveFn<Requires, Returned>,
-			) => RouteHook<Requires, Returned>
-		: RouteHook<Requires, Result>
-	: RouteHook<Requires, Result> {
+): 0 extends 1 & Result
+	? RouteHook<Requires, Result>
+	: [Result] extends [NoHookYet]
+		? [NoHookYet] extends [Result]
+			? <Returned>(
+					hook: DeriveFn<Requires, Returned>,
+				) => RouteHook<Requires, Returned>
+			: RouteHook<Requires, Result>
+		: RouteHook<Requires, Result> {
 	if (hook === undefined) {
 		return ((run: unknown) => tag('derive', run)) as never;
 	}
@@ -80,13 +82,15 @@ export function defineWrap<
 	Result extends AnyReply | Response | NoHookYet = NoHookYet,
 >(
 	hook?: WrapFn<Requires, Result>,
-): [Result] extends [NoHookYet]
-	? [NoHookYet] extends [Result]
-		? <Returned extends AnyReply | Response>(
-				hook: WrapFn<Requires, Returned>,
-			) => RouteWrap<Requires, Returned>
-		: RouteWrap<Requires, Result>
-	: RouteWrap<Requires, Result> {
+): 0 extends 1 & Result
+	? RouteWrap<Requires, Result>
+	: [Result] extends [NoHookYet]
+		? [NoHookYet] extends [Result]
+			? <Returned extends AnyReply | Response>(
+					hook: WrapFn<Requires, Returned>,
+				) => RouteWrap<Requires, Returned>
+			: RouteWrap<Requires, Result>
+		: RouteWrap<Requires, Result> {
 	if (hook === undefined) {
 		return ((run: unknown) => tag('wrap', run)) as never;
 	}

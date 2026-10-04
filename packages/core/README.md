@@ -390,7 +390,7 @@ const loadBookmark = defineHook<{ params: { id: string } }>()(async ({ params })
 	bookmark: await bookmarks.find(params.id),
 }));
 
-app
+const app = alxia()
 	.derive(authenticate) // adds `user`, or answers 401
 	.patch('/bookmarks/:id', [canView, loadBookmark], { body: UpdateBookmark },
 		async ({ bookmark, body, reply }) => reply.ok(await bookmarks.update(bookmark, body)));
@@ -539,7 +539,7 @@ covers all three kinds.
 | `ResponseCookies` | `set.cookies`: Bun's `CookieMap` of the cookies the response sets, whose `get` and `has` read those, never the request's |
 | `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod` (its four forms: with or without a schema, with or without a list of hooks), `RefusalMethod`, `RouteDefinition`, `SocketDefinition` | a route: what it validates, what OpenAPI says of it, the checks its schema's type cannot express, a route method, the type of `onRefusal` (its four forms), a route and a socket as the app runs them |
 | `RouteOperation`, `OperationSchema`, `OperationMethod`, `CheckedOperation` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), the type of `route` (with a list of hooks or without), and the check it makes of the operation |
-| `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage`, `SocketRecord`, `SocketEntryOf` | sockets: what a socket route validates, what its handlers read, send and receive, the entry one socket adds to `RoutesOf` |
+| `SocketMethod`, `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage`, `SocketRecord`, `SocketEntryOf` | sockets: the type of `ws` (with a list of hooks or without), what a socket route validates, what its handlers read, send and receive, the entry one socket adds to `RoutesOf` |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema types |
 | `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426 |
 | `ValidationIssue`, `ValidationTarget` | one issue of a 400, and where the refused value was read from |

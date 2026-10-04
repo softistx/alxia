@@ -43,7 +43,7 @@ Nothing scheduled yet.
 ### Next release
 
 - **Hooks on one route.** A route takes a list of hooks after its path —
-  `app.patch('/bookmarks/:id', [canView, canEdit], schema, handler)` — run
+  `app.patch('/bookmarks/:id', [canView, loadBookmark, canEdit], schema, handler)` — run
   after the hooks in force, in order, before validation. Each is written
   once with `defineHook` or `defineWrap` and names what it reads, a `user`
   or a path parameter: a route that does not give it does not compile.

@@ -22,7 +22,12 @@ a trap that prints nothing is headed by its symptom.
 - [`the hook reads "…", which this route's context does not give: derive it before this route, or earlier in its list`](#the-hook-reads--which-this-routes-context-does-not-give-derive-it-before-this-route-or-earlier-in-its-list)
 - [`the hook reads "…", which this route's context gives with another type`](#the-hook-reads--which-this-routes-context-gives-with-another-type)
 - [`the hook reads the path parameter "…", which this route's path does not declare`](#the-hook-reads-the-path-parameter--which-this-routes-path-does-not-declare)
+- [`the hook reads the path parameter "…" as another type than the string it arrives as`](#the-hook-reads-the-path-parameter--as-another-type-than-the-string-it-arrives-as)
+- [`the hook reads the query parameter "…" as another type than the string | readonly string[] it arrives as`](#the-hook-reads-the-query-parameter--as-another-type-than-the-string--readonly-string-it-arrives-as)
+- [`the hook reads the cookie "…" as another type than the string it arrives as`](#the-hook-reads-the-cookie--as-another-type-than-the-string-it-arrives-as)
+- [`the hook reads "body", which no hook reads: the body is validated after the hooks, so read it in the handler`](#the-hook-reads-body-which-no-hook-reads-the-body-is-validated-after-the-hooks-so-read-it-in-the-handler)
 - [`this route's context does not give what the hook reads`](#this-routes-context-does-not-give-what-the-hook-reads)
+- [`a route's hooks are a list written in the call, [canView, canEdit]: a list of unknown length cannot be checked`](#a-routes-hooks-are-a-list-written-in-the-call-canview-canedit-a-list-of-unknown-length-cannot-be-checked)
 - [`a route takes at most 8 hooks in its list: derive the rest in a group around it`](#a-route-takes-at-most-8-hooks-in-its-list-derive-the-rest-in-a-group-around-it)
 - [`Type '…' is not assignable to type 'MaybePromise<unique symbol>'`](#type--is-not-assignable-to-type-maybepromiseunique-symbol)
 - [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
@@ -46,6 +51,7 @@ a trap that prints nothing is headed by its symptom.
 - [`"…" has the shape of "…" with other parameter names`](#-has-the-shape-of--with-other-parameter-names)
 - [`GET /… is declared twice`](#get--is-declared-twice)
 - [`GET /…: hook 1 of the list is not a hook: make it with defineHook() or defineWrap()`](#get--hook-1-of-the-list-is-not-a-hook-make-it-with-definehook-or-definewrap)
+- [`defineHook(): the hook is not a function`](#definehook-the-hook-is-not-a-function)
 - [`GET /…: the handler is missing`](#get--the-handler-is-missing)
 - [`group(): build is missing`](#group-build-is-missing)
 - [`onRefusal(): the hook is missing`](#onrefusal-the-hook-is-missing)
@@ -482,12 +488,88 @@ has.
 name: `/bookmarks/:id`. A route under a group or a prefix is checked by its
 whole path, the prefix's parameters included.
 
+### `the hook reads the path parameter "…" as another type than the string it arrives as`
+
+**When:** a hook names a path parameter with a type a string is not, in
+`params` or `pathParams`: `defineHook<{ params: { id: number } }>()`.
+
+**Why:** a hook runs before the `params` schema, so `params.id` is the
+string the path carried, whatever the schema makes of it for the handler.
+
+**Fix:** name it `string` and convert it in the hook, or read the
+schema's output in the handler:
+
+```ts
+defineHook<{ params: { id: string } }>()(({ params }) => ({ id: Number(params.id) }));
+```
+
+### `the hook reads the query parameter "…" as another type than the string | readonly string[] it arrives as`
+
+**When:** a hook names a query parameter as anything narrower than
+`string | readonly string[]`, optional or not: `{ query: { page?: number } }`,
+or `{ query: { page?: string } }`.
+
+**Why:** the query a hook reads is the query string as it arrived, and a
+repeated key — `?page=1&page=2` — arrives as a list. A `query` schema's
+output is the handler's alone.
+
+**Fix:** name it as it arrives and narrow it in the hook, or read it in the
+handler:
+
+```ts
+defineHook<{ query: { page?: string | readonly string[] } }>()(({ query }) => ({
+	page: Number(Array.isArray(query.page) ? query.page[0] : (query.page ?? 1)),
+}));
+```
+
+### `the hook reads the cookie "…" as another type than the string it arrives as`
+
+**When:** a hook names a cookie as anything a string is not:
+`{ cookies: { visits?: number } }`.
+
+**Why:** a hook reads the cookies the `Cookie` header sent, strings; a
+`cookies` schema's output is the handler's alone.
+
+**Fix:** name it `string` (`{ cookies: { visits?: string } }`) and convert
+it in the hook.
+
+### `the hook reads "body", which no hook reads: the body is validated after the hooks, so read it in the handler`
+
+**When:** a hook names `body` in its `Requires`.
+
+**Why:** the hooks of a route's list run before the request is validated,
+and the body is read then: no hook ever has one.
+
+**Fix:** do the check in the handler, which reads the validated body and
+returns the reply itself ([Hooks](guide/hooks.md#before-validation)).
+
 ### `this route's context does not give what the hook reads`
 
 **When:** a hook's `Requires` is not satisfied, and no key can be named: a
 union, or a symbol key.
 
 **Fix:** name the requirement as an object type with string keys.
+
+### `a route's hooks are a list written in the call, [canView, canEdit]: a list of unknown length cannot be checked`
+
+**When:** a route is given its hooks as an array typed `AnyRouteHook[]` —
+built elsewhere, or annotated — rather than written in the call.
+
+```ts
+const guards: AnyRouteHook[] = [canView];
+app.get('/bookmarks/:id', guards, handler);
+```
+
+**Why:** each hook is checked against what the hooks before it added, which
+takes knowing each one's place: a list of unknown length has none.
+
+**Fix:** write the list in the call, `[canView]`, or keep it as a tuple:
+`const guards = [canView, canEdit] as const`.
+
+The message can also follow an error of a route **without** a list — a
+schema the route refuses, `get('/a/:id', { params: … }, handler)` — as the
+last overload TypeScript tried: the error of the overload with the schema,
+`Overload 1 of 4`, is the one that matters there.
 
 ### `a route takes at most 8 hooks in its list: derive the rest in a group around it`
 
@@ -505,7 +587,7 @@ group around them, and keep in the list what differs route by route:
 
 ```ts
 app.group((g) => g.derive(authenticate).derive(loadTenant)
-	.patch('/bookmarks/:id', [canView, canEdit], { body: Update }, handler));
+	.patch('/bookmarks/:id', [canView, loadBookmark, canEdit], { body: Update }, handler));
 ```
 
 ### `Type '…' is not assignable to type 'MaybePromise<unique symbol>'`
@@ -971,9 +1053,17 @@ declare it.
 **When:** a route's list holds something `defineHook` or `defineWrap` did
 not make: a bare function, an object cast to a hook.
 
-**Fix:** wrap it: `[defineHook(({ request }) => …)]`. A function given to
-`defineHook` or `defineWrap` that is not one throws
-`defineHook(): the hook is not a function`.
+**Fix:** wrap it: `[defineHook(({ request }) => …)]`.
+
+### `defineHook(): the hook is not a function`
+
+**When:** `defineHook(value)` or `defineWrap(value)` is given something that
+is not a function — `defineWrap()` reports `defineWrap(): …`. Calling
+either with nothing at all is not this error: `defineHook<Requires>()`
+returns the function that takes the hook.
+
+**Fix:** give it the hook, `defineHook(({ request }) => …)`, or name the
+requirement and give the hook next, `defineHook<{ user: User }>()((ctx) => …)`.
 
 ### `GET /…: the handler is missing`
 

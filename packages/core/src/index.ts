@@ -9,6 +9,7 @@ export {
 	type RefusalMethod,
 	type RouteMethod,
 	type RoutesOf,
+	type SocketMethod,
 } from './app/alxia';
 export { defineHook, defineWrap } from './app/define-hook';
 export { definePlugin } from './app/define-plugin';

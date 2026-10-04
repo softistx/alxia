@@ -89,37 +89,59 @@ export type RepliesBy<Hook> = Hook extends { readonly '~result': infer Result }
 export type RouteHookBase<Ctx, Path extends string> = BaseContext &
 	Ctx & {
 		readonly params: PathParams<Path>;
+		readonly pathParams: PathParams<Path>;
 		readonly query: RawRequestParts['query'];
 	};
 
 /**
  * `unknown` when `Given` gives what `Requires` reads, else a `'~requires'`
- * whose type is the message, one per key. Written inline, not behind an
- * alias, so that an error prints them.
+ * whose type is the message, one per key. `params`, `query` and `cookies`
+ * are checked name by name against what arrives — a string, or for the
+ * query a string or a list of them — an optional name included, which a
+ * plain assignability check would let any type through. Written inline,
+ * not behind an alias, so that an error prints them.
  */
-export type HookProvided<Given, Requires> = Given extends {
-	readonly request: Request;
-} & Requires
-	? unknown
-	: {
-				[Key in keyof Requires]-?: Key extends 'params'
-					? {
-							[Name in keyof Requires[Key]]-?: Name extends keyof PathParamsOf<Given>
-								? never
-								: `the hook reads the path parameter "${Name & string}", which this route's path does not declare`;
-						}[keyof Requires[Key]]
+export type HookProvided<Given, Requires> = {
+	[Key in keyof Requires]-?: Key extends 'params' | 'pathParams'
+		? {
+				[Name in keyof Requires[Key]]-?: Name extends keyof PathParamsOf<Given>
+					? string extends NonNullable<Requires[Key][Name]>
+						? never
+						: `the hook reads the path parameter "${Name & string}" as another type than the string it arrives as`
+					: `the hook reads the path parameter "${Name & string}", which this route's path does not declare`;
+			}[keyof Requires[Key]]
+		: Key extends 'query'
+			? {
+					[Name in keyof Requires[Key]]-?: [
+						string | readonly string[],
+					] extends [NonNullable<Requires[Key][Name]>]
+						? never
+						: `the hook reads the query parameter "${Name & string}" as another type than the string | readonly string[] it arrives as`;
+				}[keyof Requires[Key]]
+			: Key extends 'cookies'
+				? {
+						[Name in keyof Requires[Key]]-?: string extends NonNullable<
+							Requires[Key][Name]
+						>
+							? never
+							: `the hook reads the cookie "${Name & string}" as another type than the string it arrives as`;
+					}[keyof Requires[Key]]
+				: Key extends 'body'
+					? `the hook reads "body", which no hook reads: the body is validated after the hooks, so read it in the handler`
 					: Key extends keyof Given
 						? Given[Key] extends Requires[Key]
 							? never
 							: `the hook reads "${Key & (string | number)}", which this route's context gives with another type`
 						: `the hook reads "${Key & (string | number)}", which this route's context does not give: derive it before this route, or earlier in its list`;
-			}[keyof Requires] extends infer Message
-		? {
-				readonly '~requires': [Message] extends [never]
-					? "this route's context does not give what the hook reads"
-					: Message;
-			}
-		: never;
+}[keyof Requires] extends infer Message
+	? [Message] extends [never]
+		? Given extends { readonly request: Request } & Requires
+			? unknown
+			: {
+					readonly '~requires': "this route's context does not give what the hook reads";
+				}
+		: { readonly '~requires': Message }
+	: never;
 
 type PathParamsOf<Given> = Given extends { readonly params: infer P }
 	? P
@@ -135,15 +157,23 @@ type PathParamsOf<Given> = Given extends { readonly params: infer P }
 export type ThreadHooks<
 	Base,
 	Hooks extends readonly unknown[],
-> = Hooks['length'] extends 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | MaxRouteHooks
-	? Thread<Base, Hooks, Empty, never, []>
-	: {
+> = number extends Hooks['length']
+	? {
 			readonly checks: {
-				readonly '~hooks': `a route takes at most 8 hooks in its list: derive the rest in a group around it`;
+				readonly '~hooks': "a route's hooks are a list written in the call, [canView, canEdit]: a list of unknown length cannot be checked";
 			};
 			readonly added: Empty;
 			readonly replies: never;
-		};
+		}
+	: Hooks['length'] extends 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | MaxRouteHooks
+		? Thread<Base, Hooks, Empty, never, []>
+		: {
+				readonly checks: {
+					readonly '~hooks': `a route takes at most 8 hooks in its list: derive the rest in a group around it`;
+				};
+				readonly added: Empty;
+				readonly replies: never;
+			};
 
 type Thread<
 	Base,
@@ -165,7 +195,7 @@ type Thread<
 			]
 		>
 	: {
-			readonly checks: Checks;
+			readonly checks: Readonly<Checks>;
 			readonly added: Added;
 			readonly replies: Replies;
 		};

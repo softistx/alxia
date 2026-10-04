@@ -9,14 +9,7 @@ import type {
 	StaticReply,
 } from '../static/types';
 import type { JoinPath, PathAt, RoutePath, StaticPath } from '../types/path';
-import type {
-	SocketContext,
-	SocketEntryOf,
-	SocketHandlers,
-	SocketMessage,
-	SocketSchema,
-	SocketSend,
-} from '../ws/types';
+import type { SocketHandlers, SocketSchema } from '../ws/types';
 import { routeHooks } from './define-hook';
 import type {
 	AroundHook,
@@ -47,8 +40,8 @@ import type {
 	RouteMethod,
 } from './signatures';
 import { type SocketData, websocketHandler } from './socket';
+import type { SocketMethod } from './socket-method';
 import type {
-	AnyRouteHook,
 	BaseContext,
 	BehindShortcuts,
 	BodyLimitShortcut,
@@ -59,11 +52,9 @@ import type {
 	ProvidedBy,
 	RefusalSchema,
 	RouteEntryOf,
-	RouteHookBase,
 	RouteRecord,
 	RouteSchema,
 	ThenShortcuts,
-	ThreadHooks,
 } from './types';
 
 /** The routes of a plugin, under the prefix of the app it is used by. */
@@ -313,62 +304,12 @@ export class Alxia<
 	 * });
 	 * ```
 	 */
-	ws<const Path extends RoutePath, Schema extends SocketSchema = Empty>(
-		path: PathAt<Prefix, Path>,
-		schema: Schema,
-		handlers: SocketHandlers<
-			SocketContext<Ctx, JoinPath<Prefix, Path>, Schema>,
-			SocketSend<Schema>,
-			SocketMessage<Schema>
-		>,
-	): Alxia<
-		Ctx,
-		Routes & SocketEntryOf<JoinPath<Prefix, Path>, Schema>,
-		Prefix,
-		Shortcuts
-	>;
-	/**
-	 * A WebSocket route with hooks of its own, run on the upgrade request
-	 * after the hooks before it: what they add, `socket.data` reads. A
-	 * `defineWrap` in the list is skipped, as a socket's upgrade skips
-	 * every `wrap`.
-	 */
-	ws<
-		const Path extends RoutePath,
-		const Hooks extends readonly [] | readonly AnyRouteHook[],
-		Schema extends SocketSchema = Empty,
-	>(
-		path: PathAt<Prefix, Path>,
-		hooks: Hooks &
-			NoInfer<
-				ThreadHooks<RouteHookBase<Ctx, JoinPath<Prefix, Path>>, Hooks>['checks']
-			>,
-		schema: Schema,
-		handlers: SocketHandlers<
-			SocketContext<
-				Ctx &
-					ThreadHooks<
-						RouteHookBase<Ctx, JoinPath<Prefix, Path>>,
-						Hooks
-					>['added'],
-				JoinPath<Prefix, Path>,
-				Schema
-			>,
-			SocketSend<Schema>,
-			SocketMessage<Schema>
-		>,
-	): Alxia<
-		Ctx,
-		Routes & SocketEntryOf<JoinPath<Prefix, Path>, Schema>,
-		Prefix,
-		Shortcuts
-	>;
-	ws(
+	readonly ws = ((
 		path: string,
 		...rest:
 			| [SocketSchema, SocketHandlers<never, never, never>]
 			| [readonly unknown[], SocketSchema, SocketHandlers<never, never, never>]
-	): AnyAlxia {
+	): AnyAlxia => {
 		const [list, schema, handlers] =
 			rest.length === 3 ? rest : ([[], ...rest] as const);
 		const full = joinPath(this.#prefix, path);
@@ -379,7 +320,7 @@ export class Alxia<
 			...this.#scope.hooks(routeHooks(list, `WS ${full}`)),
 		});
 		return this;
-	}
+	}) as SocketMethod<Ctx, Routes, Prefix, Shortcuts>;
 
 	/** Values every route after this reads from its context: a database, a logger. */
 	decorate<const Values extends object>(
@@ -836,4 +777,5 @@ export type {
 	Plugin,
 	RefusalMethod,
 	RouteMethod,
+	SocketMethod,
 };

@@ -53,7 +53,7 @@ unbounded, and the route's limit is then skipped.
 Route hooks run **before validation**: they read `pathParams`, the path
 parameters as they arrived, not `params`. A hook in a route's own list
 reads them as `params`, typed by its path but still strings
-([Hooks on one route](#before-validation)).
+([Before validation](#before-validation)).
 
 ## `decorate`
 
@@ -186,7 +186,7 @@ database transaction, a lock, a cookie set from the response.
 ## Hooks on one route
 
 A route takes hooks of its own in a list, after its path and before its
-schema: `app.patch(path, [canView, canEdit], schema, handler)`, or
+schema: `app.patch(path, [canView, loadBookmark, canEdit], schema, handler)`, or
 `app.get(path, [canView], handler)` without a schema. Each is made by
 `defineHook` (a `derive` of that route alone) or `defineWrap` (a `wrap` of
 that route alone):
@@ -245,7 +245,7 @@ So a hook reads the request as it arrived:
 
 | | a hook in the list reads | the handler reads |
 | --- | --- | --- |
-| `params` | the path's parameters, strings: `params.id` is a `string` even when the `params` schema makes it a number | the `params` schema's output |
+| `params`, `pathParams` | the path's parameters, strings, typed by the route's path: `params.id` is a `string` even when the `params` schema makes it a number. `pathParams` is the same object, as every route hook reads it | the `params` schema's output; `pathParams` as they arrived |
 | `query` | the query string, as `Record<string, string \| readonly string[]>` | the `query` schema's output |
 | `cookies` | the request's cookies, strings | the `cookies` schema's output |
 | `body` | nothing: the body is not read yet | the `body` schema's output |
@@ -270,6 +270,11 @@ defineHook(({ request }) => ({ agent: request.headers.get('user-agent') }));
 defineHook<{ user: User }>()(({ user }) => ({ tenant: user.tenantId }));
 defineHook<{ params: { id: string } }>()(({ params }) => ({ id: params.id })); // the path must declare :id
 ```
+
+`params`, `pathParams`, `query` and `cookies` in `Requires` are checked
+name by name against what arrives: a path parameter or a cookie is a
+`string`, a query parameter a `string | readonly string[]`, optional or
+not. A `body` is refused: no hook reads one.
 
 `Requires` is checked where the hook is given, against the context the
 route builds up to that point: the hooks in force, then the hooks before it
@@ -637,8 +642,8 @@ interface BaseContext extends RequestContext {   // derive, wrap, onError, onRef
 `get` and `has` read what this response set.
 
 A hook in a route's list reads `HookContext<Requires>`: `BaseContext`, the
-raw `params` and `query`, and what it names. A handler reads `BaseContext`, what every hook before it added, and the
-validated `params`, `query`, `headers`, `cookies` and `body`: a `cookies`
+raw `params` and `query`, and what it names. A handler reads
+`BaseContext`, what every hook before it added, and the validated `params`, `query`, `headers`, `cookies` and `body`: a `cookies`
 schema's output replaces the request's map for the handler alone. `ContextOf<App>`
 names that context outside the chain ([The app's type](types.md#contextofapp)).
 

@@ -5,7 +5,7 @@ import type { Reply } from '../reply/reply';
 import { alxia, type RoutesOf } from './alxia';
 import { defineHook, defineWrap } from './define-hook';
 import { definePlugin } from './define-plugin';
-import type { Outcome, RouteHook, RouteWrap } from './types';
+import type { AnyRouteHook, Outcome, RouteHook, RouteWrap } from './types';
 
 interface User {
 	readonly id: string;
@@ -314,6 +314,68 @@ describe('the types of a route with hooks', () => {
 			.derive(() => ({ user: 1 }))
 			// @ts-expect-error `user` is given with another type
 			.get('/:id', [canView], ({ reply }) => reply(200, 'x'));
+	});
+
+	test('params, pathParams, query and cookies are named as the strings they arrive as', () => {
+		const byId = defineHook<{ pathParams: { id: string } }>()(
+			({ pathParams }) => {
+				expectTypeOf(pathParams.id).toEqualTypeOf<string>();
+				return { id: pathParams.id };
+			},
+		);
+		const page = defineHook<{ query: { page?: string | readonly string[] } }>()(
+			() => {},
+		);
+		const sid = defineHook<{ cookies: { sid?: string } }>()(() => {});
+		// The probes: each compiles where it arrives as named.
+		alxia().get('/:id', [byId, page, sid], ({ id, reply }) => reply(200, id));
+		// @ts-expect-error the path declares no `id`
+		alxia().get('/all', [byId], ({ reply }) => reply(200, 'x'));
+		const numberId = defineHook<{ params: { id: number } }>()(() => {});
+		// @ts-expect-error a path parameter arrives as a string, never a number
+		alxia().get('/:id', [numberId], ({ reply }) => reply(200, 'x'));
+		const numberPage = defineHook<{ query: { page?: number } }>()(() => {});
+		// @ts-expect-error a query parameter arrives as a string or a list of them
+		alxia().get('/', [numberPage], ({ reply }) => reply(200, 'x'));
+		const onePage = defineHook<{ query: { page?: string } }>()(() => {});
+		// @ts-expect-error a repeated query parameter arrives as a list
+		alxia().get('/', [onePage], ({ reply }) => reply(200, 'x'));
+		const numberSid = defineHook<{ cookies: { sid?: number } }>()(() => {});
+		// @ts-expect-error a cookie arrives as a string
+		alxia().get('/', [numberSid], ({ reply }) => reply(200, 'x'));
+		const readsBody = defineHook<{ body: { title: string } }>()(() => {});
+		// @ts-expect-error a hook runs before the body is read: it never reads one
+		alxia().post('/', [readsBody], { body: Update }, ({ reply }) => reply(204));
+	});
+
+	test('route() and ws check the list as the route methods do', () => {
+		const op = { method: 'GET', path: '/b/:id' } as const;
+		const handlers = { message: () => {} };
+		// The probes.
+		alxia()
+			.use(session)
+			.route(op, [canView], ({ reply }) => reply(200, 'x'));
+		alxia().use(session).ws('/b/:id', [canView], {}, handlers);
+		// @ts-expect-error no hook before gives `user`
+		alxia().route(op, [canView], ({ reply }) => reply(200, 'x'));
+		// @ts-expect-error no hook before gives `user`
+		alxia().ws('/b/:id', [canView], {}, handlers);
+	});
+
+	test('a list is written in the call, so each of its hooks is checked', () => {
+		const list: AnyRouteHook[] = [canView];
+		const app = alxia().use(session);
+		// The probe: a tuple kept `as const` is checked like one written inline.
+		const tuple = [canView, loadBookmark] as const;
+		app.get('/t/:id', tuple, ({ bookmark, reply }) => reply(200, bookmark.id));
+		// @ts-expect-error a list of unknown length
+		app.get('/:id', list, ({ reply }) => reply(200, 'x'));
+	});
+
+	test('a hook returning any is a hook, not the function that takes one', () => {
+		const untyped = defineHook(() => JSON.parse('{}'));
+		expectTypeOf(untyped).toEqualTypeOf<RouteHook<Record<never, never>, any>>();
+		alxia().get('/', [untyped], ({ reply }) => reply(200, 'x'));
 	});
 
 	test('a list of at most 8 hooks', () => {
