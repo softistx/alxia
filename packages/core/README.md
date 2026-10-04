@@ -8,6 +8,18 @@ handler reads validated values, can only answer what it declared, and the
 app's type is the contract [`@alxia/client`](https://www.npmjs.com/package/@alxia/client)
 calls.
 
+## Getting started
+
+```sh
+bun create @alxia my-app
+```
+
+writes a new app — an API with Zod, a route hook, a spec and the typed
+client, or React Router's official template served by alxia — installs it,
+and prints `cd my-app` and `bun dev`
+([`@alxia/create`](https://www.npmjs.com/package/@alxia/create)). Into an
+existing project:
+
 ```sh
 bun add @alxia/core
 bun add -d typescript

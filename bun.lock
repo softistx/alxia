@@ -15,11 +15,11 @@
     "examples/react-router": {
       "name": "react-router-example",
       "dependencies": {
-        "@alxia/compress": "^0.1.1",
-        "@alxia/core": "^0.2.1",
-        "@alxia/logger": "^0.1.1",
-        "@alxia/react-router": "^0.1.1",
-        "@alxia/secure-headers": "^0.1.1",
+        "@alxia/compress": "^0.1.2",
+        "@alxia/core": "^0.3.0",
+        "@alxia/logger": "^0.2.0",
+        "@alxia/react-router": "^0.2.0",
+        "@alxia/secure-headers": "^0.2.0",
         "@react-router/node": "^8.4.0",
         "@react-router/serve": "^8.4.0",
         "isbot": "^5.2.2",
@@ -116,6 +116,20 @@
       "peerDependencies": {
         "@alxia/core": "workspace:^",
         "typescript": "^6.0.3 || ^7.0.0",
+      },
+    },
+    "packages/create": {
+      "name": "@alxia/create",
+      "version": "0.0.0",
+      "bin": {
+        "create-alxia": "./dist/index.js",
+      },
+      "devDependencies": {
+        "@alxia/client": "workspace:^",
+        "@alxia/core": "workspace:^",
+        "@alxia/react-router": "workspace:^",
+        "@types/bun": "^1.4.2",
+        "zod": "^4.6.5",
       },
     },
     "packages/env": {
@@ -375,6 +389,8 @@
     "@alxia/core": ["@alxia/core@workspace:packages/core"],
 
     "@alxia/cors": ["@alxia/cors@workspace:packages/cors"],
+
+    "@alxia/create": ["@alxia/create@workspace:packages/create"],
 
     "@alxia/env": ["@alxia/env@workspace:packages/env"],
 

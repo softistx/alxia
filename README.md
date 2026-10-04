@@ -4,6 +4,19 @@ A type-safe HTTP framework for Bun. Modular to the bone: the core has **no
 dependency**, and everything else — Zod, OpenAPI, CORS, JWT, compression —
 is a package you add, or don't.
 
+## Getting started
+
+```sh
+bun create @alxia my-app
+```
+
+It asks for a template — `api`, an alxia app with Zod, a spec and the typed
+client, or `react-router`, React Router's official template served by
+alxia — writes the project, installs it, and prints `cd my-app` and
+`bun dev` ([`@alxia/create`](packages/create)).
+
+## Packages
+
 | Package | |
 | --- | --- |
 | [`@alxia/core`](packages/core) | routes on `Bun.serve`, validated with any Standard Schema; replies typed by status; hooks, groups and plugins; cookies, server-sent events and WebSockets, typed; static files and Bun's HTML bundles |
@@ -23,6 +36,7 @@ is a package you add, or don't.
 | [`@alxia/logger`](packages/logger) | a request id, structured logs, `Server-Timing` |
 | [`@alxia/env`](packages/env) | environment variables, validated and typed at startup |
 | [`@alxia/context-storage`](packages/context-storage) | the request's context anywhere it runs, typed by the app: `hono/context-storage` for alxia |
+| [`@alxia/create`](packages/create) | `bun create @alxia`: a new app from a template, `api` or React Router's own, its dependencies at the newest versions alxia accepts |
 
 Adapters to the [nxgt](https://github.com/softistx) suite:
 

@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import {
 	appendChangesetsOutput,
 	changesetsGitTagEvent,
+	inDependencyOrder,
 	readPackages,
 } from './publish';
 
@@ -57,6 +58,21 @@ describe('readPackages', () => {
 		for (const pkg of pkgs) {
 			expect(pkg.name).toStartWith('@alxia/');
 			expect(pkg.dir).toContain('/packages/');
+		}
+	});
+});
+
+describe('inDependencyOrder', () => {
+	test('publishes @alxia/create after every package its projects install', async () => {
+		const order = inDependencyOrder(await readPackages()).map((p) => p.name);
+		const create = order.indexOf('@alxia/create');
+		expect(create).toBeGreaterThan(-1);
+		for (const name of [
+			'@alxia/core',
+			'@alxia/client',
+			'@alxia/react-router',
+		]) {
+			expect(order.indexOf(name)).toBeLessThan(create);
 		}
 	});
 });
