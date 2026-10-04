@@ -95,7 +95,7 @@ the first response back — status, headers, body — with
 | no key, with `required` | `400 { error: 'idempotency_key_missing' }` |
 | the route answers a 5xx, or streams | answered, not kept: the key is free again |
 
-Every one is part of the guarded routes' types. Keys are scoped by the
+Only the routes after the plugin answer them. Keys are scoped by the
 route and by `scope(ctx)` — the client's address by default, a user id
 when there is one — so two clients choosing the same key never see each
 other's response. A replay never repeats `Set-Cookie`. Every response

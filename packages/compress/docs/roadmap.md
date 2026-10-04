@@ -32,7 +32,7 @@ Nothing scheduled yet.
 - **Compression as a plugin.** `app.use(compress())` streams every response
   worth it through zstd, Brotli, gzip or deflate, chosen from the client's
   `Accept-Encoding` and the server's order of preference, with the app's
-  routes and the client's types unchanged.
+  routes and type unchanged.
 - **Only what pays.** Text, JSON, JavaScript, XML and SVG of at least 1 KiB
   by default — files included — with the encodings, the threshold and the
   types compressed as options. An event stream (unless `compressible` lets

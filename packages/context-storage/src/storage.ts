@@ -88,7 +88,7 @@ export function runWithContext<T>(ctx: BaseContext, work: () => T): T {
 }
 
 /** The plugin, and its context typed by the app it follows. */
-export type ContextStoragePlugin<App> = Alxia<Empty, Empty, '', never> & {
+export type ContextStoragePlugin<App> = Alxia<Empty, '', never> & {
 	/** `getContext()`, typed by `App`. */
 	context(): ContextOf<App> extends never ? BaseContext : ContextOf<App>;
 	/** `tryGetContext()`, typed by `App`. */

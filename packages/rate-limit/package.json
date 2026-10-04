@@ -1,7 +1,7 @@
 {
 	"name": "@alxia/rate-limit",
 	"version": "0.1.2",
-	"description": "Rate limiting for alxia, typed: the 429 is part of every route behind it, and the client reads it",
+	"description": "Rate limiting for alxia: a 429 with Retry-After past the limit, the remaining allowance typed in the context, pluggable stores",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -41,7 +41,6 @@
 		]
 	},
 	"devDependencies": {
-		"@alxia/client": "workspace:^",
 		"@alxia/core": "workspace:^",
 		"@types/bun": "^1.4.2",
 		"zod": "^4.2.0"

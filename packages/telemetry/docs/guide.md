@@ -35,7 +35,7 @@ exporter, and nothing else changes.
 ```ts
 function telemetry(
 	options: TelemetryPluginOptions,
-): Alxia<Empty & { span: SpanScope | undefined; telemetry: Telemetry }, Empty, '', never> & {
+): Alxia<Empty & { span: SpanScope | undefined; telemetry: Telemetry }, '', never> & {
 	telemetry: Telemetry;
 };
 

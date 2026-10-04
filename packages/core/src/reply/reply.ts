@@ -11,9 +11,9 @@ export interface ReplyInit {
 }
 
 /**
- * What a handler returns: a status and the body sent with it. Its type is the
- * route's contract — the client reads the union of every `Reply` a handler
- * may return.
+ * What a handler returns: a status and the body sent with it. Its type is
+ * checked against the route's `responds`, when it has one: a status it
+ * does not declare, or a body its schema refuses, is a compile error.
  *
  * Built by `ctx.reply(status, body)`, which checks the body against the
  * schema the route declares for that status.
@@ -76,8 +76,8 @@ export type FreeShortcuts = {
 };
 
 /**
- * `reply` without schemas: any status, any body. The body's type is kept, so
- * the client still reads it. Its shortcuts — `reply.ok(body)`,
+ * `reply` without schemas: any status, any body. The body's type is kept in
+ * the reply's. Its shortcuts — `reply.ok(body)`,
  * `reply.notFound(body)`, `reply.noContent()` — are the same replies.
  */
 export type FreeReplyFunction = (<

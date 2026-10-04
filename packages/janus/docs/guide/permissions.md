@@ -83,7 +83,7 @@ and answer it 401 or 404.
 
 ## Refusals
 
-Each refusal is in the type of the guarded routes, with the body
+Each guarded route may answer these refusals, with the body
 `PermissionRefusedBody`:
 
 | The request | Answered |
@@ -318,7 +318,6 @@ function permission<
 	...options: OptionsArgs<C, T, P, O, SubjectCtx, CheckCtx>
 ): Alxia<
 	RequiresOf<LoadCtx & SubjectCtx & CheckCtx> & { object: O },
-	Empty,
 	'',
 	Reply<401, PermissionRefusedBody> | Reply<404, PermissionRefusedBody> | Reply<403, PermissionRefusedBody>
 > &

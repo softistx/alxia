@@ -47,8 +47,7 @@ interface NonceOption {
  * What `secureHeaders({ nonce: true })` returns: an app plugin, whose routes
  * after it read `nonce`, and whose hook sets the header with the same one.
  */
-export type NoncePlugin = Alxia<NonceContext, Empty, '', never> &
-	Requiring<Empty>;
+export type NoncePlugin = Alxia<NonceContext, '', never> & Requiring<Empty>;
 
 const DEFAULTS = {
 	'content-security-policy':

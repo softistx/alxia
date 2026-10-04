@@ -67,11 +67,7 @@ describe('inDependencyOrder', () => {
 		const order = inDependencyOrder(await readPackages()).map((p) => p.name);
 		const create = order.indexOf('@alxia/create');
 		expect(create).toBeGreaterThan(-1);
-		for (const name of [
-			'@alxia/core',
-			'@alxia/client',
-			'@alxia/react-router',
-		]) {
+		for (const name of ['@alxia/core', '@alxia/react-router']) {
 			expect(order.indexOf(name)).toBeLessThan(create);
 		}
 	});

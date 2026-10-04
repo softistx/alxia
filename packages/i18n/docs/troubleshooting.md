@@ -13,7 +13,7 @@ nothing — what the response does that you did not expect.
 - [`Type '"de"' is not assignable to type '"en" | "fr"'`](#type-de-is-not-assignable-to-type-en--fr)
 - [`Argument of type '"cart.itmes"' is not assignable to parameter of type '"cart.items"'`](#argument-of-type-cartitmes-is-not-assignable-to-parameter-of-type-cartitems)
 - [`Property 't' does not exist on type 'Context<Empty, "/", Empty>'`](#property-t-does-not-exist-on-type-contextempty--empty)
-- [`Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`](#type-alxiaempty-empty--never-is-missing-the-following-properties-from-type-i18noptionsreadonlyrecordstring-readonlyrecordstring-unknown-string-basecontext-resources-fallback)
+- [`Type 'Alxia<Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`](#type-alxiaempty--never-is-missing-the-following-properties-from-type-i18noptionsreadonlyrecordstring-readonlyrecordstring-unknown-string-basecontext-resources-fallback)
 - [`Object literal may only specify known properties, and 'supported' does not exist in type 'I18nOptions<…>'`](#object-literal-may-only-specify-known-properties-and-supported-does-not-exist-in-type-i18noptions)
 - [`Cannot invoke an object which is possibly 'undefined'`](#cannot-invoke-an-object-which-is-possibly-undefined)
 - [`t()` accepts any key, typos included](#t-accepts-any-key-typos-included)
@@ -147,14 +147,14 @@ const app = alxia()
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 ```
 
-### `Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`
+### `Type 'Alxia<Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(plugin: (app: Alxia<Empty, Empty, "", never>) => Alxia<Empty & LanguageContext<string> & I18nContext<string>, Empty & Prefixed<...>, "", never> & Requiring<...> & { ...; }): Alxia<...> & ... 1 more ... & { ...; }', gave the following error.
-    Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => …' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => …'.
+  Overload 1 of 2, '(plugin: (app: Alxia<Empty, "", never>) => Alxia<Empty & LanguageContext<string> & I18nContext<string>, "", never> & Requiring<...> & { ...; }): Alxia<...> & ... 1 more ... & { ...; }', gave the following error.
+    Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => …' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => …'.
       Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback
+        Type 'Alxia<Empty, "", never>' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback
 ```
 
 **When:** `app.use(createI18n)`, without calling it.

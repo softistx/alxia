@@ -39,7 +39,6 @@
 		]
 	},
 	"devDependencies": {
-		"@alxia/client": "workspace:^",
 		"@alxia/core": "workspace:^",
 		"@alxia/react-router": "workspace:^",
 		"@types/bun": "^1.4.2",

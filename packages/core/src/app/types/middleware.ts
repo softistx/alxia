@@ -112,12 +112,6 @@ export type ThreadSchema<Results extends readonly unknown[]> =
 		? SchemaOf<Result> & ThreadSchema<Rest>
 		: Empty;
 
-/** The replies the middlewares whose results are `Results` may end the request with. */
-export type ThreadReplies<Results extends readonly unknown[]> = Extract<
-	Awaited<Results[number]>,
-	AnyReply
->;
-
 /**
  * What a route's handler reads after its middlewares: their context, and
  * `reply` typed by the statuses a `responds` before it declares.

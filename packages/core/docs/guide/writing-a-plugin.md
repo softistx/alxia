@@ -21,8 +21,7 @@ and its types come with it:
   routes declared after `use`, and what they add is typed on them;
 - its routes are mounted under the app's prefix, behind the hooks declared
   before `use`;
-- its hooks' replies — a 401, a 429 — are in the type of every route after
-  it, so the client reads them.
+- its hooks' replies — a 401, a 429 — may answer every route after it.
 
 ```ts
 // auth.ts
@@ -256,4 +255,4 @@ hook declared before it added.
 - [Groups and plugins](groups-and-plugins.md): what `use` mounts, and the
   helpers `withHeaders`, `vary` and `check`.
 - [Hooks](hooks.md): what each hook does, and its order.
-- [The app's type](types.md): `ContextOf` and `RoutesOf`.
+- [The app's type](types.md): `ContextOf`.

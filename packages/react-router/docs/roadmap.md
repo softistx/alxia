@@ -29,9 +29,9 @@ Nothing scheduled yet.
   only behind `future.v8_middleware`, and the line is in maintenance.
 - **Node or Cloudflare.** alxia is a Bun framework; React Router's own
   adapters serve those runtimes.
-- **The pages in the route table.** Documents and single-fetch data are not
-  something the typed client calls, so the catch-all stays out of
-  `RoutesOf`.
+- **The pages in the OpenAPI document.** Documents and single-fetch data
+  are not something a generated client calls, so `isReactRouterRoute`
+  leaves the catch-all out.
 - **A runtime dependency.** The package declares none: `@alxia/core` and
   `react-router` are peers.
 - **A `react-router-serve` of its own.** `bun build/server/index.js` is the

@@ -273,9 +273,9 @@ export default createServer({
 });
 ```
 
-The catch-all adds nothing to the app's route table, so the typed client
-never shows it. `isReactRouterRoute` names the catch-all and the client
-files, so `@alxia/openapi` can leave them out.
+`isReactRouterRoute` names the catch-all and the client files, so
+`@alxia/openapi` can leave them out of the document a client is generated
+from.
 
 ## Built for Bun
 

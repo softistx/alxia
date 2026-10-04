@@ -36,8 +36,8 @@ function negotiate(accept: string | null, offered: readonly Encoding[]): Encodin
 ```
 
 `compress` returns a function `Plugin` from `@alxia/core`: it adds one
-`onResponse` hook and leaves the app's type unchanged, so routes, replies
-and the client's types are the same with or without it.
+`onResponse` hook and leaves the app's type unchanged, so routes and replies
+are the same with or without it.
 
 ## Options
 

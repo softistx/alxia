@@ -50,5 +50,4 @@ Nothing scheduled yet.
   refused claim's issue names where the token was read, `headers` or
   `cookies`.
   Otherwise it answers a `401` with `WWW-Authenticate: Bearer` and a body
-  naming the reason, which is part of each guarded route's type, so a
-  typed client reads it.
+  naming the reason.

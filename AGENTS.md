@@ -9,7 +9,6 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | package | what it is | peers |
 | --- | --- | --- |
 | `@alxia/core` | the framework: routes and their middlewares (`defineMiddleware`, `validate`, `responds`), hooks, groups, plugins, cookies, SSE, WebSockets | — |
-| `@alxia/client` | the client of an app, typed from `typeof app` alone | core |
 | `@alxia/openapi` | the OpenAPI 3.2 document of an app, from its route schemas | core |
 | `@alxia/openapi-routes` | `implemented` and `matchesSpec`: every operation of an OpenAPI document has a route, read from `app.routes` | core |
 | `@alxia/zod` | Zod coercions (`zq`) and the OpenAPI converter | zod |
@@ -25,7 +24,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/telemetry` | a server span per request, on `@nxgt/telemetry` | core, @nxgt/telemetry |
 | `@alxia/redis` | rate-limit and response-cache stores, idempotency, caches and locks, on `@nxgt/redis` and `@nxgt/redis-guard` | core, @nxgt/redis, @nxgt/redis-guard, zod; rate-limit and cache (optional) |
 | `@alxia/janus` | sessions, refusals and permissions, on `@nxgt/janus` | core, @nxgt/janus |
-| `@alxia/create` | `bun create @alxia [dir] [--template api\|react-router]`: the `create-alxia` bin, no module. Each template is files under `templates/<name>/`, copied by one `copyTemplate` (`src/copy.ts`) that rewrites `package.json` (`workspace:^` on `@alxia/*` replaced by the ranges it was published with), replaces the stored manifest's `name` (`my-api`, `my-app`), as a whole word, by the project's in every other text file (the README's `docker` commands), and renames `gitignore` and `_bunfig.toml`, which `bun publish` drops, to `.gitignore` and `bunfig.toml`, and `_biome.json`, which this repository's Biome would refuse as a nested root, to `biome.json`. Both ship Biome: a standalone `biome.json` (spaces, double quotes, recommended rules), `@biomejs/biome` pinned exactly at the workspace's version, the scripts `lint`, `format`, `check`, `check:ci` (`biome ci`; `bun ci` is Bun's install) and `verify`, and `.vscode/`; a new project passes `bun run check:ci` with no finding. `api` is alxia's own, with a Bun `Dockerfile` that builds `dist/server.js` and holds `dist/` alone (`start` runs `bun dist/server.js`), `.dockerignore` and `.env.example`; `react-router` is React Router's official scaffold committed as generated plus `examples/react-router`'s alxia layer, its Bun `Dockerfile` included. No scaffold runs at creation. Every dependency is moved to the registry's newest at creation: alxia's within the ranges it was published with (the newest of the same minor while npm has not propagated the exact version yet), the rest within alxia's peer ranges; one the template pins exactly, `@biomejs/biome`, stays exact, within its own minor | — (dev: core, client, react-router, whose versions it writes) |
+| `@alxia/create` | `bun create @alxia [dir] [--template api\|react-router]`: the `create-alxia` bin, no module. Each template is files under `templates/<name>/`, copied by one `copyTemplate` (`src/copy.ts`) that rewrites `package.json` (`workspace:^` on `@alxia/*` replaced by the ranges it was published with), replaces the stored manifest's `name` (`my-api`, `my-app`), as a whole word, by the project's in every other text file (the README's `docker` commands), and renames `gitignore` and `_bunfig.toml`, which `bun publish` drops, to `.gitignore` and `bunfig.toml`, and `_biome.json`, which this repository's Biome would refuse as a nested root, to `biome.json`. Both ship Biome: a standalone `biome.json` (spaces, double quotes, recommended rules), `@biomejs/biome` pinned exactly at the workspace's version, the scripts `lint`, `format`, `check`, `check:ci` (`biome ci`; `bun ci` is Bun's install) and `verify`, and `.vscode/`; a new project passes `bun run check:ci` with no finding. `api` is alxia's own, with a Bun `Dockerfile` that builds `dist/server.js` and holds `dist/` alone (`start` runs `bun dist/server.js`), `.dockerignore` and `.env.example`; `react-router` is React Router's official scaffold committed as generated plus `examples/react-router`'s alxia layer, its Bun `Dockerfile` included. No scaffold runs at creation. Every dependency is moved to the registry's newest at creation: alxia's within the ranges it was published with (the newest of the same minor while npm has not propagated the exact version yet), the rest within alxia's peer ranges; one the template pins exactly, `@biomejs/biome`, stays exact, within its own minor | — (dev: core, react-router, whose versions it writes) |
 
 Its skeleton is `softistx/nxgt-http`'s: the Bun workspace, the root
 `build.ts`, Biome, changesets, `scripts/publish.ts` and `verify:artifacts`.
@@ -81,11 +80,16 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   route, an undeclared status, a body its schema refuses. Each has a
   `@ts-expect-error` in a spec; a new check gets one too, and a probe that
   the assertion really fails when wrong.
-- **The client is honest.** Every status a route may answer is in its type:
-  its declared replies, the replies of the hooks before it, its 400 when it
-  validates, the 500 of every route. A handler cannot return a raw
-  `Response`. A global hook's `Response` is outside the contract: use it
-  only for what a typed client never asks.
+- **The spec is the contract.** alxia is OpenAPI spec first: the document
+  is the source, and a client is generated from it by the developer's own
+  generator (`@nxgt/openapi-codegen` in the examples, the `api` template
+  first, as the next step of the move to spec first). The server's types
+  check a handler — what its middlewares add, its `reply` against its
+  `responds`, its path — and accumulate no route table for a client:
+  `Alxia<Ctx, Prefix, Shortcuts>`, and a route returns the app unchanged in
+  type. A handler cannot return a raw `Response`. A global hook's
+  `Response` is outside the contract: use it only for what no operation
+  describes.
 - **Order is meaning.** A route hook applies to the routes declared after
   it, at runtime and in the types alike; a group's stay inside it. A
   route's middlewares run in the order given, `validate` and `responds`
@@ -95,22 +99,22 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   take the same `...middlewares`. The forms of 0.3 (a list of hooks, a
   schema before the handler, `defineHook`, `defineWrap`) are deprecated
   adapters in `@alxia/core`, kept until they are removed: no other package,
-  template or example writes them, but the specs of `@alxia/client` and
-  `@alxia/openapi`, which are retired.
+  template or example writes them, but the specs of `@alxia/openapi`,
+  which is to be retired.
 - **What leaves the server is the schema's output.** A reply, an event, a
   socket message is validated and sent as its schema gives it back.
 
 ## Layering
 
 ```
-core ◄── client, openapi, openapi-routes, graphql, cors, secure-headers, compress, rate-limit, jwt, logger,
+core ◄── openapi, openapi-routes, graphql, cors, secure-headers, compress, rate-limit, jwt, logger,
          telemetry, janus, context-storage, cache, language
          i18n ◄── language
          redis ◄── rate-limit, cache (optional peers: the stores' contracts)
          react-router   (peers: react-router; vite, optional, for /vite; dev: openapi, compress for its specs)
-zod             (peer: zod; dev: core, client, openapi for its specs)
+zod             (peer: zod; dev: core, openapi for its specs)
 env             (standalone)
-create          (no peer; dev: core, client, react-router: the versions its projects install)
+create          (no peer; dev: core, react-router: the versions its projects install)
 ```
 
 A package that uses a sibling declares it by `workspace:^`, as a peer and a
@@ -259,7 +263,7 @@ versions of its devDependencies into the projects it makes, which `bun
 publish` turns from `workspace:^` into `^<version>`, so those must be on
 the registry first. They are fixed when it is published: a release of
 `@alxia/core` alone leaves new projects on the previous range, so a minor
-of `core`, `client` or `react-router` that new projects should get comes
+of `core` or `react-router` that new projects should get comes
 with a patch changeset for `@alxia/create`. npm can take minutes to serve a
 version just published while `@alxia/create` is already visible: it then
 writes the newest release of the same minor, whose `^` range still takes

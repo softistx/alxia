@@ -1,10 +1,4 @@
-import {
-	type Alxia,
-	alxia,
-	type Empty,
-	type Reply,
-	withHeaders,
-} from '@alxia/core';
+import { type Alxia, alxia, type Reply, withHeaders } from '@alxia/core';
 import type { Session } from '@nxgt/janus';
 import { type DeviceCookieOptions, deviceOf } from './device';
 import { authenticateOnce, type Found } from './lookup';
@@ -60,7 +54,6 @@ export function session<
 		readonly session: Session;
 		readonly auth: RequestAuth;
 	},
-	Empty,
 	'',
 	Reply<401, UnauthenticatedBody>
 >;
@@ -76,7 +69,6 @@ export function session<
 		readonly session: Session | null;
 		readonly auth: RequestAuth;
 	},
-	Empty,
 	'',
 	never
 >;
@@ -92,7 +84,6 @@ export function session<
 		readonly session: Session | null;
 		readonly auth: RequestAuth;
 	},
-	Empty,
 	'',
 	Reply<401, UnauthenticatedBody>
 >;

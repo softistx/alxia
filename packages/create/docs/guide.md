@@ -73,7 +73,7 @@ repository ([Lint and format](#lint-and-format)).
 my-api/
 ├── src/
 │   ├── app.ts        the app, and its type
-│   ├── app.spec.ts   bun test: app.request() and @alxia/client
+│   ├── app.spec.ts   bun test: app.request(), no port
 │   └── server.ts     app.listen(PORT), stopped on SIGTERM
 ├── package.json
 ├── tsconfig.json
@@ -100,8 +100,7 @@ const NewTodo = z.object({ title: z.string().min(1) });
 export const apiKey = Bun.env["API_KEY"] ?? "dev-key";
 
 // A middleware of the routes it is given to: it answers 401 without the key,
-// before the body is read, and that 401 joins the type of each, so the
-// client reads it.
+// before the body is read.
 const requireKey = defineMiddleware(({ request, reply }, next) =>
   request.headers.get("x-api-key") === apiKey
     ? next()
@@ -129,7 +128,7 @@ export type App = typeof app;
 
 - The middlewares run in the order given. `requireKey` stands before
   `validate`, so it runs before the body is read: a request without the key
-  is a 401 whatever its body, and that 401 joins the route's type
+  is a 401 whatever its body
   ([A route's middlewares](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md#a-routes-middlewares)).
 - `validate({ body: NewTodo })` answers an empty `title` with a 400 naming
   `title`, before the handler runs; the handler reads `body` typed by it.
@@ -138,16 +137,21 @@ export type App = typeof app;
 - `todos` lives in memory: replace the array with your database, given to
   the routes the same way, by `decorate`.
 
-`src/app.spec.ts` calls the app in process, no port: `app.request()` with a
-JSON body, then `@alxia/client` given the app itself, whose result is typed
-by status:
+`src/app.spec.ts` calls the app in process, no port, with `app.request()`
+and a JSON body:
 
 ```ts
-const api = client(app, { headers: { "x-api-key": apiKey } });
-const created = await api.post("/todos", { body: { title: "Call it typed" } });
-if (created.status !== 201) throw new Error(`got ${created.status}`);
-expect(created.data.title).toBe("Call it typed"); // data is the Todo schema's type
+const response = await app.request("/todos", {
+  method: "POST",
+  headers: { "content-type": "application/json", "x-api-key": apiKey },
+  body: JSON.stringify({ title: "Write a route" }),
+});
+expect(response.status).toBe(201);
 ```
+
+alxia is OpenAPI spec first: a typed client for other programs is generated
+from the API's OpenAPI document, with the generator of your choice, such as
+`@nxgt/openapi-codegen`, rather than read from the app's type.
 
 The scripts:
 
@@ -456,7 +460,7 @@ template pins exactly:
 
 | dependency | moved to the newest within |
 | --- | --- |
-| `@alxia/core`, `@alxia/client`, `@alxia/react-router` | the ranges this `@alxia/create` was published with, such as `^0.3.1`; while the registry does not serve that version yet, the newest of its minor, `~0.3.0` |
+| `@alxia/core`, `@alxia/react-router` | the ranges this `@alxia/create` was published with, such as `^0.3.1`; while the registry does not serve that version yet, the newest of its minor, `~0.3.0` |
 | `typescript` | `^6.0.3 \|\| ^7.0.0`, every alxia package's peer range |
 | `zod` | `^4.2.0`, `@alxia/zod`'s |
 | `vite` | `^7.0.0 \|\| ^8.0.0`, `@alxia/react-router`'s |

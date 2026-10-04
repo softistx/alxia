@@ -883,7 +883,7 @@ export default createServer({
 });
 ```
 
-Each answers with its own schemas, replies and typed client. The core ranks
+Each answers with its own middlewares and replies. The core ranks
 paths as `Bun.serve` does, through `listen`, `app.fetch` and
 `app.request` alike: segment by segment, a literal beats a parameter,
 which beats the catch-all's wildcard. Two consequences:
@@ -894,9 +894,9 @@ which beats the catch-all's wildcard. Two consequences:
   every one-segment path, `/about` included, before React Router sees it.
   Put alxia's routes under a prefix of their own, `/api`.
 
-The catch-all adds nothing to the app's route table: `RoutesOf` and the
-typed client never show `/*`. Pages and single-fetch data are not
-something a typed client calls; what it does call, your `/api`, is typed
+Pages and single-fetch data are not something a generated client calls:
+leave the catch-all out of the OpenAPI document with `isReactRouterRoute`
+([OpenAPI](#openapi)); what a client does call, your `/api`, is documented
 as always.
 
 What React Router answers comes back as it sent it: documents,

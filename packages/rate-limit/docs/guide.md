@@ -39,7 +39,7 @@ interface RateLimitOptions<Requires extends object = Empty> {
 
 `rateLimit` returns an app whose single route hook counts the request. Given
 to `use`, it adds `rateLimit` to the context of every route declared after
-it, and its 429 to each of those routes' types. `Requires` is what `key`
+it, and each of those routes may answer its 429. `Requires` is what `key`
 and `skip` read beyond `BaseContext`; see [Reading the app's context](#reading-the-apps-context).
 
 ## Options
@@ -165,8 +165,8 @@ counts live in that process and are lost when it stops. See
 
 The limit is a route hook, so order decides, at runtime and in the types:
 
-- a route declared **before** `use(rateLimit(…))` is not counted, and its
-  type has no 429;
+- a route declared **before** `use(rateLimit(…))` is not counted, and
+  never answers the 429;
 - a route declared **after** it is counted, and may answer the 429;
 - inside a [group](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/groups-and-plugins.md#groups),
   the limit stays in the group.
@@ -249,29 +249,24 @@ interface RateLimitedBody {
 `retryAfter` and `Retry-After` are the same number. A refused request
 counts nothing: retrying after `retryAfter` seconds succeeds.
 
-## On the client
+## On the wire
 
-[`@alxia/client`](https://www.npmjs.com/package/@alxia/client) reads the
-429 from the app's type: a route after the limit resolves to a union with
-`429`, whose `data` is `{ error: 'rate_limited'; retryAfter: number }`.
+Every route after the limit may answer `429 { error: 'rate_limited',
+retryAfter }`; a route declared before it never does. Declare the 429 in
+your OpenAPI document, and the client you generate from it (with
+`@nxgt/openapi-codegen`, say) reads it typed. A caller waits, then tries
+again:
 
 ```ts
-import { client } from '@alxia/client';
-import type { App } from './server';
-
-const api = client<App>('http://localhost:3000');
-
 async function search() {
 	for (;;) {
-		const result = await api.get('/search');
-		if (result.status !== 429) return result;
-		await Bun.sleep(result.data.retryAfter * 1000); // wait, then try again
+		const response = await fetch('http://localhost:3000/search');
+		if (response.status !== 429) return response;
+		const { retryAfter } = await response.json();
+		await Bun.sleep(retryAfter * 1000); // wait, then try again
 	}
 }
 ```
-
-A route declared before the limit has no 429 in its type; comparing its
-status to `429` is a compile error.
 
 ## Stores
 
@@ -390,7 +385,6 @@ nothing. Give the app an `ip` that reads a header, and send it:
 
 ```ts
 import { expect, test } from 'bun:test';
-import { client } from '@alxia/client';
 import { alxia } from '@alxia/core';
 import { rateLimit } from '@alxia/rate-limit';
 
@@ -399,15 +393,13 @@ const app = alxia({ ip: (request) => request.headers.get('x-ip') ?? undefined })
 	.get('/limited', ({ rateLimit, reply }) => reply(200, rateLimit?.remaining ?? -1));
 
 test('answers 429 past the limit, per address', async () => {
-	const api = client(app);
-	const init = { init: { headers: { 'x-ip': '1.1.1.1' } } };
-	expect((await api.get('/limited', init)).data).toBe(1);
-	await api.get('/limited', init);
-	const third = await api.get('/limited', init);
+	const from = (ip: string) => app.request('/limited', { headers: { 'x-ip': ip } });
+	expect(await (await from('1.1.1.1')).json()).toBe(1);
+	await from('1.1.1.1');
+	const third = await from('1.1.1.1');
 	expect(third.status).toBe(429);
-	expect(third.response.headers.get('retry-after')).toBe('60');
-	const other = await api.get('/limited', { init: { headers: { 'x-ip': '2.2.2.2' } } });
-	expect(other.status).toBe(200);
+	expect(third.headers.get('retry-after')).toBe('60');
+	expect((await from('2.2.2.2')).status).toBe(200);
 });
 ```
 

@@ -147,9 +147,6 @@ alxia().use(cors({ origin: 'https://app.example.com', credentials: true }));
 
 // the browser, with fetch
 await fetch('https://api.example.com/me', { credentials: 'include' });
-
-// or with @alxia/client
-await api.get('/me', { init: { credentials: 'include' } });
 ```
 
 A browser refuses `Access-Control-Allow-Origin: *` on a call with
@@ -303,8 +300,6 @@ export const app = alxia()
 		}),
 	)
 	.get('/items', ({ reply }) => reply(200, ['a', 'b'], { headers: { 'x-total': '2' } }));
-
-export type App = typeof app;
 ```
 
 And its tests, without a server — `app.fetch` takes a `Request` with any

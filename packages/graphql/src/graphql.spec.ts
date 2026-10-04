@@ -1,5 +1,5 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import { alxia, type RoutesOf } from '@alxia/core';
+import { alxia } from '@alxia/core';
 import { createSchema, type Plugin } from 'graphql-yoga';
 import { type GraphQLContext, graphql } from './graphql';
 import { SANDBOX_POLICY } from './sandbox';
@@ -165,13 +165,6 @@ describe('graphql', () => {
 			authorization: 'Bearer ok',
 		});
 		expect(await mounted.json()).toEqual({ data: { me: 'ok' } });
-
-		expectTypeOf<
-			keyof RoutesOf<typeof guarded>
-		>().toEqualTypeOf<'/api/graphql'>();
-		expectTypeOf<
-			RoutesOf<typeof guarded>['/api/graphql']['POST']['output']['status']
-		>().toExtend<number>();
 	});
 
 	test('GraphQLContext of something that is not an app says so, not never', () => {
@@ -197,7 +190,6 @@ describe('graphql', () => {
 			.derive(() => ({ viewer: null as string | null }))
 			.use((app) => graphql(app, { schema, path: '/gql', logging: false }));
 		expect((await post(custom, '/gql', '{ __typename }')).status).toBe(200);
-		expectTypeOf<keyof RoutesOf<typeof custom>>().toEqualTypeOf<'/gql'>();
 	});
 });
 

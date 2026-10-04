@@ -42,7 +42,6 @@
 	},
 	"devDependencies": {
 		"@alxia/cache": "workspace:^",
-		"@alxia/client": "workspace:^",
 		"@alxia/core": "workspace:^",
 		"@alxia/rate-limit": "workspace:^",
 		"@nxgt/redis": "^0.3.1",

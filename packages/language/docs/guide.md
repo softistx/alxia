@@ -28,7 +28,7 @@ client that names no language it supports gets `Hello`. `current` is typed
 ```ts
 function language<const L extends string, Ctx extends object = BaseContext>(
 	options: LanguageOptions<L, Ctx>,
-): Alxia<RequiresOf<Ctx> & LanguageContext<L>, Empty, '', never> &
+): Alxia<RequiresOf<Ctx> & LanguageContext<L>, '', never> &
 	Requiring<RequiresOf<Ctx>>;
 
 interface LanguageOptions<L extends string, Ctx extends object = BaseContext> {
@@ -499,8 +499,6 @@ export const app = alxia()
 		set.cookies.set('language', chosen, { path: '/', sameSite: 'lax', maxAge: 365 * 24 * 60 * 60 });
 		return reply(200, { language: chosen });
 	});
-
-export type App = typeof app;
 ```
 
 The saved choice is the `language` cookie, which the plugin reads on every

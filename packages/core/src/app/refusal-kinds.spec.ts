@@ -2,15 +2,13 @@ import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
 import type {
 	BodyLimitRefusal,
-	ContentTooLargeBody,
 	RefusalKind,
 	RequestPart,
 	ValidationErrorBody,
 	ValidationRefusal,
 } from '../errors/errors';
 import { problem } from '../reply/problem';
-import type { Jsonify } from '../types/json';
-import { alxia, type RoutesOf } from './alxia';
+import { alxia } from './alxia';
 
 const Name = z.object({ name: z.string().min(1) });
 const Invalid = z.object({ detail: z.string() });
@@ -236,7 +234,7 @@ describe('onRefusal(kind, hook): at runtime', () => {
 	});
 });
 
-describe('onRefusal(kind, hook): in the types', () => {
+describe('onRefusal(kind, hook): its types, and plugins', () => {
 	test('each hook reads its refusal narrowed', () => {
 		alxia()
 			.onRefusal('validation', (refusal) => {
@@ -252,119 +250,6 @@ describe('onRefusal(kind, hook): in the types', () => {
 			});
 	});
 
-	test('each kind replaces its own default in the route types, with the schemas of its hook', () => {
-		const app = alxia()
-			.onRefusal(
-				'validation',
-				{ response: { 422: Invalid } },
-				(refusal, { reply }) => reply(422, { detail: refusal.part }),
-			)
-			.onRefusal(
-				'body_limit',
-				{ response: { 413: TooLarge } },
-				(refusal, { reply }) => reply(413, { limit: refusal.limit }),
-			)
-			.post('/both', both, ({ reply }) => reply(200, 'ok'))
-			.post('/valid', { body: Name }, ({ reply }) => reply(200, 'ok'))
-			.post('/raw', { bodyLimit: 8 }, ({ reply }) => reply(200, 'ok'))
-			.get('/plain', ({ reply }) => reply(200, 'ok'));
-		type Routes = RoutesOf<typeof app>;
-		type Both = Routes['/both']['POST']['output'];
-		expectTypeOf<Both['status']>().toEqualTypeOf<200 | 413 | 422 | 500>();
-		expectTypeOf<Extract<Both, { status: 422 }>['data']>().toEqualTypeOf<{
-			detail: string;
-		}>();
-		expectTypeOf<Extract<Both, { status: 413 }>['data']>().toEqualTypeOf<{
-			limit: number;
-		}>();
-		// Per kind: a route that only validates gets the validation hook's replies alone…
-		expectTypeOf<Routes['/valid']['POST']['output']['status']>().toEqualTypeOf<
-			200 | 422 | 500
-		>();
-		// …and a route that is only limited the body_limit hook's.
-		expectTypeOf<Routes['/raw']['POST']['output']['status']>().toEqualTypeOf<
-			200 | 413 | 500
-		>();
-		expectTypeOf<Routes['/plain']['GET']['output']['status']>().toEqualTypeOf<
-			200 | 500
-		>();
-	});
-
-	test('a kind without a hook, or whose hook may return nothing, gets the general hook, then the default', () => {
-		const general = alxia()
-			.onRefusal(() => problem({ status: 400, detail: 'general' }))
-			.onRefusal('validation', (refusal) =>
-				refusal.part === 'body' ? problem({ status: 422 }) : undefined,
-			)
-			.post('/a', both, ({ reply }) => reply(200, 'ok'));
-		type A = RoutesOf<typeof general>['/a']['POST']['output'];
-		expectTypeOf<A['status']>().toEqualTypeOf<200 | 400 | 422 | 500>();
-		expectTypeOf<Extract<A, { status: 400 }>['data']>().toEqualTypeOf<{
-			status: 400;
-			detail: 'general';
-		}>();
-		const none = alxia()
-			.onRefusal('validation', () => problem({ status: 422 }))
-			.post('/a', both, ({ reply }) => reply(200, 'ok'));
-		type N = RoutesOf<typeof none>['/a']['POST']['output'];
-		expectTypeOf<N['status']>().toEqualTypeOf<200 | 413 | 422 | 500>();
-		expectTypeOf<Extract<N, { status: 413 }>['data']>().toEqualTypeOf<
-			Jsonify<ContentTooLargeBody>
-		>();
-		const maybe = alxia()
-			.onRefusal('body_limit', (refusal) =>
-				refusal.limit > 4 ? undefined : problem({ status: 413 }),
-			)
-			.post('/a', both, ({ reply }) => reply(200, 'ok'));
-		type M = RoutesOf<typeof maybe>['/a']['POST']['output'];
-		expectTypeOf<Extract<M, { status: 413 }>['data']>().toEqualTypeOf<
-			{ status: 413 } | Jsonify<ContentTooLargeBody>
-		>();
-	});
-
-	test('order is meaning in the types too', () => {
-		const replaced = alxia()
-			.onRefusal('validation', () => problem({ status: 422 }))
-			.onRefusal(() => problem({ status: 409 }))
-			.post('/a', { body: Name }, ({ reply }) => reply(200, 'ok'));
-		expectTypeOf<
-			RoutesOf<typeof replaced>['/a']['POST']['output']['status']
-		>().toEqualTypeOf<200 | 409 | 500>();
-		const kept = alxia()
-			.onRefusal(() => problem({ status: 409 }))
-			.onRefusal('body_limit', () => problem({ status: 413 }))
-			.post('/a', { body: Name }, ({ reply }) => reply(200, 'ok'));
-		expectTypeOf<
-			RoutesOf<typeof kept>['/a']['POST']['output']['status']
-		>().toEqualTypeOf<200 | 409 | 500>();
-	});
-
-	test("a plugin's route behind the app's hooks: its kind's default replaced by the app's hook of that kind", () => {
-		const plugin = alxia()
-			.onRefusal('body_limit', () => problem({ status: 413 }))
-			.post('/p', both, ({ reply }) => reply(200, 'ok'));
-		const app = alxia()
-			.onRefusal('validation', () => problem({ status: 422 }))
-			.use(plugin);
-		type P = RoutesOf<typeof app>['/p']['POST']['output'];
-		expectTypeOf<P['status']>().toEqualTypeOf<200 | 413 | 422 | 500>();
-		expectTypeOf<Extract<P, { status: 413 }>['data']>().toEqualTypeOf<{
-			status: 413;
-		}>();
-	});
-
-	test("a plugin's kind hook reaches the types of the app's routes after it", () => {
-		const plugin = alxia().onRefusal('body_limit', () =>
-			problem({ status: 413, detail: 'plugin' }),
-		);
-		const app = alxia()
-			.onRefusal(() => problem({ status: 409 }))
-			.use(plugin)
-			.post('/a', both, ({ reply }) => reply(200, 'ok'));
-		type A = RoutesOf<typeof app>['/a']['POST']['output'];
-		expectTypeOf<A['status']>().toEqualTypeOf<200 | 409 | 413 | 500>();
-	});
-
 	test("a plugin's kind hook that may return nothing: the app's hook of that kind, then the app's general hook", async () => {
 		const plugin = alxia()
 			.onRefusal('validation', (refusal) =>
@@ -377,8 +262,6 @@ describe('onRefusal(kind, hook): in the types', () => {
 				refusal.part === 'query' ? problem({ status: 422 }) : undefined,
 			)
 			.use(plugin);
-		type P = RoutesOf<typeof app>['/p']['POST']['output'];
-		expectTypeOf<P['status']>().toEqualTypeOf<200 | 409 | 418 | 422 | 500>();
 		expect((await app.request('/p', INVALID)).status).toBe(409);
 	});
 
@@ -390,13 +273,6 @@ describe('onRefusal(kind, hook): in the types', () => {
 			.onRefusal('validation', () => problem({ status: 422 }))
 			.use(plugin)
 			.post('/a', both, ({ reply }) => reply(200, 'ok'));
-		type Routes = RoutesOf<typeof app>;
-		expectTypeOf<Routes['/p']['POST']['output']['status']>().toEqualTypeOf<
-			200 | 409 | 500
-		>();
-		expectTypeOf<Routes['/a']['POST']['output']['status']>().toEqualTypeOf<
-			200 | 409 | 500
-		>();
 		expect((await app.request('/p', INVALID)).status).toBe(409);
 		expect((await app.request('/a', INVALID)).status).toBe(409);
 	});
@@ -413,11 +289,6 @@ describe('onRefusal(kind, hook): in the types', () => {
 		const app = alxia()
 			.onRefusal(() => problem({ status: 409 }))
 			.use(middle);
-		type Q = RoutesOf<typeof app>['/q']['POST']['output'];
-		expectTypeOf<Q['status']>().toEqualTypeOf<200 | 409 | 413 | 418 | 500>();
-		expectTypeOf<Extract<Q, { status: 413 }>['data']>().toEqualTypeOf<{
-			status: 413;
-		}>();
 		expect((await app.request('/q', INVALID)).status).toBe(409);
 		expect((await app.request('/q', LARGE)).status).toBe(413);
 	});

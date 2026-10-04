@@ -2,7 +2,7 @@
 
 This page covers `bearer`: a plugin that makes every route declared after
 it require a valid token, reads the token's claims as a typed `user`, and
-answers a typed 401 otherwise.
+answers a 401 otherwise.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -27,7 +27,7 @@ curl localhost:3000/me -H "authorization: Bearer $TOKEN"
 ```ts
 function bearer<Schema extends StandardSchemaV1 | undefined = undefined>(
 	options: BearerOptions<Schema>,
-): Alxia<{ user: User<Schema> }, Empty, '', Reply<401, UnauthorizedBody>>;
+): Alxia<{ user: User<Schema> }, '', Reply<401, UnauthorizedBody>>;
 // User<Schema>: the schema's output, or JwtClaims without one
 
 interface BearerOptions<Schema extends StandardSchemaV1 | undefined> {
@@ -116,15 +116,15 @@ interface UnauthorizedBody {
 
 The `verify` reasons are explained on [Signing and verifying](tokens.md#verify),
 and each one, with its fix, in [Troubleshooting](../troubleshooting.md#responses).
-The 401 is part of the type of every route after the guard, so a typed
-client reads it:
+Every route after the guard may answer this 401: declare it in your
+OpenAPI document, and the client you generate from it (with
+`@nxgt/openapi-codegen`, say) reads it typed. In the handler, `user` is
+the schema's output:
 
 ```ts
-import { client } from '@alxia/client';
-
-const result = await client(app).get('/me');
-if (result.status === 401) result.data.reason; // 'missing' | 'expired' | … | 'claims'
-if (result.status === 200) result.data.role;   // 'admin' | 'user'
+app.use(bearer({ jwt, schema: Claims })).get('/me', ({ user, reply }) =>
+	reply(200, { role: user.role }), // 'admin' | 'user'
+);
 ```
 
 With `claims`, each issue's `path` names the claim and its `target` where
@@ -139,7 +139,7 @@ startup ([Algorithms and keys](algorithms-and-keys.md#a-key-pair)).
 ## Roles after the guard
 
 The guard answers *who*; a `derive` after it answers *may they*. It reads
-the typed `user`, and its reply joins the type of the routes after it:
+the typed `user`, and its reply ends the request for the routes after it:
 
 ```ts
 const app = alxia()
@@ -199,17 +199,16 @@ no network:
 
 ```ts
 import { expect, test } from 'bun:test';
-import { client } from '@alxia/client';
 import { app, jwt } from './app';
 
 test('/me needs a token', async () => {
-	const missing = await client(app).get('/me');
+	const missing = await app.request('/me');
 	expect(missing.status).toBe(401);
-	if (missing.status === 401) expect(missing.data.reason).toBe('missing');
-	expect(missing.response.headers.get('www-authenticate')).toBe('Bearer');
+	expect((await missing.json()).reason).toBe('missing');
+	expect(missing.headers.get('www-authenticate')).toBe('Bearer');
 
 	const token = await jwt.sign({ sub: 'ada', role: 'admin' });
-	const me = await client(app).get('/me', { init: { headers: { authorization: `Bearer ${token}` } } });
+	const me = await app.request('/me', { headers: { authorization: `Bearer ${token}` } });
 	expect(me.status).toBe(200);
 });
 

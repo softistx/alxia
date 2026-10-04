@@ -35,14 +35,14 @@ import type { Empty, Method } from './types';
 /**
  * An app: its routes, and the hooks they run.
  *
- * Every method returns the app itself, typed with what it added, so declare
- * it in one chain and export its type for the client:
+ * Every method returns the app itself, typed with the context it added, so
+ * declare it in one chain. A route adds nothing to the app's type: the
+ * OpenAPI document is the contract, and a client is generated from it.
  *
  * ```ts
  * const app = alxia()
- *   .get('/users/:id', { params: UserId, response: { 200: User, 404: NotFound } },
+ *   .get('/users/:id', validate({ params: UserId }), responds({ 200: User, 404: NotFound }),
  *     ({ params, reply }) => { ... });
- * export type App = typeof app;
  * ```
  *
  * A route hook (`derive`, `decorate`, `onError`, `onRefusal`) applies to the routes
@@ -56,12 +56,9 @@ import type { Empty, Method } from './types';
  */
 export class Alxia<
 	Ctx extends object = Empty,
-	Routes extends object = Empty,
 	Prefix extends string = '',
 	Shortcuts extends AnyReply = never,
 > {
-	/** Never set: carries the route table to `typeof app`, which the client reads. */
-	declare readonly '~routes': Routes;
 	/** Never set: carries what a route declared next reads, for `ContextOf`. */
 	declare readonly '~context': Ctx;
 
@@ -86,35 +83,32 @@ export class Alxia<
 	 * body, validated like a `POST`'s.
 	 */
 	readonly query = this.#method('QUERY');
-	readonly route: OperationMethod<Ctx, Routes, Prefix, Shortcuts> = this.#do(
+	readonly route: OperationMethod<Ctx, Prefix, Shortcuts> = this.#do(
 		declare.addOperation,
 	);
-	readonly static: StaticMethod<Ctx, Routes, Prefix, Shortcuts> = this.#do(
+	readonly static: StaticMethod<Ctx, Prefix, Shortcuts> = this.#do(
 		declare.addStatic,
 	);
-	readonly file: FileMethod<Ctx, Routes, Prefix, Shortcuts> = this.#do(
-		declare.addFile,
-	);
+	readonly file: FileMethod<Ctx, Prefix, Shortcuts> = this.#do(declare.addFile);
 	readonly page: PageMethod<Prefix, this> = this.#do(declare.addPageAt);
-	readonly ws: SocketMethod<Ctx, Routes, Prefix, Shortcuts> = this.#do(
+	readonly ws: SocketMethod<Ctx, Prefix, Shortcuts> = this.#do(
 		declare.addSocket,
 	);
 
-	readonly decorate: DecorateMethod<Ctx, Routes, Prefix, Shortcuts> = this.#do(
+	readonly decorate: DecorateMethod<Ctx, Prefix, Shortcuts> = this.#do(
 		hooks.decorate,
 	);
-	readonly derive: DeriveMethod<Ctx, Routes, Prefix, Shortcuts> = this.#do(
+	readonly derive: DeriveMethod<Ctx, Prefix, Shortcuts> = this.#do(
 		hooks.derive,
 	);
-	readonly wrap: WrapMethod<Ctx, Routes, Prefix, Shortcuts> = this.#do(
-		hooks.wrap,
+	readonly wrap: WrapMethod<Ctx, Prefix, Shortcuts> = this.#do(hooks.wrap);
+	readonly bodyLimit: BodyLimitMethod<Ctx, Prefix, Shortcuts> = this.#do(
+		hooks.bodyLimit,
 	);
-	readonly bodyLimit: BodyLimitMethod<Ctx, Routes, Prefix, Shortcuts> =
-		this.#do(hooks.bodyLimit);
-	readonly onError: ErrorMethod<Ctx, Routes, Prefix, Shortcuts> = this.#do(
+	readonly onError: ErrorMethod<Ctx, Prefix, Shortcuts> = this.#do(
 		hooks.onError,
 	);
-	readonly onRefusal: RefusalMethod<Ctx, Routes, Prefix, Shortcuts> = this.#do(
+	readonly onRefusal: RefusalMethod<Ctx, Prefix, Shortcuts> = this.#do(
 		hooks.onRefusal,
 	);
 
@@ -131,7 +125,7 @@ export class Alxia<
 	readonly onStop: StopHookMethod<this> = this.#do(hooks.globalHook('onStop'));
 	readonly parser: ParserMethod<this> = this.#do(hooks.parser);
 
-	readonly group: GroupMethod<Ctx, Routes, Prefix, Shortcuts> = this.#do(
+	readonly group: GroupMethod<Ctx, Prefix, Shortcuts> = this.#do(
 		(state, ...args: GroupArgs) =>
 			group(state, args, (prefix) => {
 				const { validateResponses } = state.runtime;
@@ -139,7 +133,7 @@ export class Alxia<
 				return [child, child.#state];
 			}),
 	);
-	readonly use: UseMethod<this, Ctx, Routes, Prefix, Shortcuts> = ((
+	readonly use: UseMethod<this, Ctx, Prefix, Shortcuts> = ((
 		plugin: AnyAlxia | ((app: this) => AnyAlxia),
 	) => {
 		if (!(plugin instanceof Alxia)) return plugin(this);
@@ -202,9 +196,7 @@ export class Alxia<
 	}
 
 	/** A route method: its arguments read when it is called, see `RouteMethod`. */
-	#method<M extends Method>(
-		method: M,
-	): RouteMethod<M, Ctx, Routes, Prefix, Shortcuts> {
+	#method<M extends Method>(method: M): RouteMethod<M, Ctx, Prefix, Shortcuts> {
 		return this.#do((state, path: string, ...rest: unknown[]) =>
 			declare.addRoute(state, method, path, ...rest),
 		);
@@ -228,7 +220,7 @@ export class Alxia<
 /** A new app. */
 export function alxia<const Prefix extends '' | RoutePath = ''>(
 	options: AlxiaOptions<Prefix> = {},
-): Alxia<Empty, Empty, Prefix, never> {
+): Alxia<Empty, Prefix, never> {
 	return new Alxia(options);
 }
 
@@ -238,5 +230,4 @@ export type {
 	ContextOf,
 	ListenOptions,
 	Plugin,
-	RoutesOf,
 } from './signatures';

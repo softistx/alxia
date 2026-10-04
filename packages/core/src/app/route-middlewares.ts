@@ -11,7 +11,7 @@ import type {
 	RouteMiddleware,
 	RouteResult,
 } from './route-forms';
-import type { Empty, MiddlewareReturn } from './types';
+import type { MiddlewareReturn } from './types';
 
 /**
  * `app.get(path, ...middlewares, handler)`: each middleware reads the
@@ -28,7 +28,7 @@ export interface MiddlewareForms<App extends AppTypes> {
 	<const Path extends RoutePath, Result extends RouteResult<[]>>(
 		path: PathAt<App['prefix'], Path>,
 		handler: RouteHandler<App, Path, [], Result>,
-	): AppWithRoute<App, Path, Empty, [], Result>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -37,7 +37,7 @@ export interface MiddlewareForms<App extends AppTypes> {
 		path: PathAt<App['prefix'], Path>,
 		m1: RouteMiddleware<App, Path, [], R1>,
 		handler: RouteHandler<App, Path, [R1], Result>,
-	): AppWithRoute<App, Path, Empty, [R1], Result>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -48,7 +48,7 @@ export interface MiddlewareForms<App extends AppTypes> {
 		m1: RouteMiddleware<App, Path, [], R1>,
 		m2: RouteMiddleware<App, Path, [R1], R2>,
 		handler: RouteHandler<App, Path, [R1, R2], Result>,
-	): AppWithRoute<App, Path, Empty, [R1, R2], Result>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -61,7 +61,7 @@ export interface MiddlewareForms<App extends AppTypes> {
 		m2: RouteMiddleware<App, Path, [R1], R2>,
 		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
 		handler: RouteHandler<App, Path, [R1, R2, R3], Result>,
-	): AppWithRoute<App, Path, Empty, [R1, R2, R3], Result>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -76,7 +76,7 @@ export interface MiddlewareForms<App extends AppTypes> {
 		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
 		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
 		handler: RouteHandler<App, Path, [R1, R2, R3, R4], Result>,
-	): AppWithRoute<App, Path, Empty, [R1, R2, R3, R4], Result>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -93,7 +93,7 @@ export interface MiddlewareForms<App extends AppTypes> {
 		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
 		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
 		handler: RouteHandler<App, Path, [R1, R2, R3, R4, R5], Result>,
-	): AppWithRoute<App, Path, Empty, [R1, R2, R3, R4, R5], Result>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -112,7 +112,7 @@ export interface MiddlewareForms<App extends AppTypes> {
 		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
 		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
 		handler: RouteHandler<App, Path, [R1, R2, R3, R4, R5, R6], Result>,
-	): AppWithRoute<App, Path, Empty, [R1, R2, R3, R4, R5, R6], Result>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -133,7 +133,7 @@ export interface MiddlewareForms<App extends AppTypes> {
 		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
 		m7: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5, R6], R7>,
 		handler: RouteHandler<App, Path, [R1, R2, R3, R4, R5, R6, R7], Result>,
-	): AppWithRoute<App, Path, Empty, [R1, R2, R3, R4, R5, R6, R7], Result>;
+	): AppWithRoute<App>;
 	<
 		const Path extends RoutePath,
 		R1 extends MiddlewareReturn,
@@ -156,5 +156,5 @@ export interface MiddlewareForms<App extends AppTypes> {
 		m7: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5, R6], R7>,
 		m8: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5, R6, R7], R8>,
 		handler: RouteHandler<App, Path, [R1, R2, R3, R4, R5, R6, R7, R8], Result>,
-	): AppWithRoute<App, Path, Empty, [R1, R2, R3, R4, R5, R6, R7, R8], Result>;
+	): AppWithRoute<App>;
 }

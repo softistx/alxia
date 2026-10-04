@@ -10,7 +10,7 @@ describe('packageOf', () => {
 });
 
 describe('undeclaredImports', () => {
-	const smtp = { name: '@alxia/client' };
+	const smtp = { name: '@alxia/i18n' };
 
 	test('refuses a sibling the manifest lists only as a devDependency', () => {
 		const manifest = {
@@ -38,7 +38,7 @@ describe('undeclaredImports', () => {
 						'import { lookup } from "node:dns";',
 						'import { readFileSync } from "fs";',
 						'import { reply } from "./chunks/reply-abc.js";',
-						'import { x } from "@alxia/client/client";',
+						'import { x } from "@alxia/i18n/i18n";',
 						'export { listen, Database, lookup, readFileSync, reply, x };',
 					].join('\n'),
 				],

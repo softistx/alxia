@@ -43,7 +43,7 @@ const app = alxia()
 Every route after the guard needs a valid token — `Authorization: Bearer`,
 or the cookie named by `cookie` — and reads its claims, checked by `schema`
 (any Standard Schema), as `user`. Otherwise a 401 with `WWW-Authenticate:
-Bearer` and `{ error: 'unauthorized', reason }`, part of each route's type.
+Bearer` and `{ error: 'unauthorized', reason }`.
 
 ## API
 

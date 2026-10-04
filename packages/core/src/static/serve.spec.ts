@@ -1,16 +1,9 @@
-import {
-	afterAll,
-	beforeAll,
-	describe,
-	expect,
-	expectTypeOf,
-	test,
-} from 'bun:test';
+import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { gzipSync } from 'node:zlib';
-import { alxia, type RoutesOf } from '../app/alxia';
+import { alxia } from '../app/alxia';
 
 let root: string;
 const big = 'abcdefghijklmnopqrstuvwxyz'.repeat(100);
@@ -224,7 +217,7 @@ describe('app.static', () => {
 		expect((await app.request('/mem/other.json')).status).toBe(404);
 	});
 
-	test('behind the app’s hooks, and typed', async () => {
+	test('behind the app’s hooks', async () => {
 		const app = alxia()
 			.onResponse((response) => {
 				response.headers.set('x-hooked', 'yes');
@@ -233,14 +226,6 @@ describe('app.static', () => {
 		expect(
 			(await app.request('/files/hello.txt')).headers.get('x-hooked'),
 		).toBe('yes');
-		expectTypeOf<keyof RoutesOf<typeof app>>().toEqualTypeOf<'/files/*'>();
-		type Output = RoutesOf<typeof app>['/files/*']['GET']['output'];
-		expectTypeOf<
-			Extract<Output, { status: 200 }>['data']
-		>().toEqualTypeOf<Blob>();
-		expectTypeOf<Output['status']>().toEqualTypeOf<
-			200 | 206 | 304 | 404 | 416 | 500
-		>();
 	});
 });
 
@@ -264,9 +249,6 @@ describe('app.file', () => {
 			).text(),
 		).toBe('yes');
 		expect((await app.request('/missing')).status).toBe(404);
-		expectTypeOf<keyof RoutesOf<typeof app>>().toEqualTypeOf<
-			'/hello' | '/robots.txt' | '/maybe' | '/missing'
-		>();
 	});
 });
 

@@ -9,7 +9,6 @@ nothing of its own; past the limit it answers a 429.
 - [`Property 'user' does not exist on type 'BaseContext & Empty'`](#property-user-does-not-exist-on-type-basecontext--empty)
 - [`Type '() => Promise<boolean>' is not assignable to type '(ctx: BaseContext & Empty) => boolean'`](#type---promiseboolean-is-not-assignable-to-type-ctx-basecontext--empty--boolean)
 - [`'rateLimit' is possibly 'undefined'`](#ratelimit-is-possibly-undefined)
-- [`This comparison appears to be unintentional because the types '200 | 500' and '429' have no overlap`](#this-comparison-appears-to-be-unintentional-because-the-types-200--500-and-429-have-no-overlap)
 
 **Startup**
 
@@ -104,29 +103,6 @@ app
 	.get('/quota', ({ rateLimit, reply }) => reply(200, { remaining: rateLimit?.remaining ?? null }));
 ```
 
-### `This comparison appears to be unintentional because the types '200 | 500' and '429' have no overlap`
-
-**When:** client code checks for a 429 on a route that cannot answer one.
-The left-hand union is that route's statuses.
-
-```text
-error TS2367: This comparison appears to be unintentional because the types '200 | 500' and '429' have no overlap.
-```
-
-**Why:** the limit applies to the routes declared after
-`use(rateLimit(…))`, in the types as at runtime. This route was declared
-before it, or outside the group that holds the limit, so it is never
-limited and its type has no 429.
-
-**Fix:** declare the route after the limit, if it should be limited — or
-drop the check, if it should not:
-
-```ts
-const app = alxia()
-	.use(rateLimit({ limit: 100, windowMs: 60_000 }))
-	.get('/search', ({ reply }) => reply(200, [])); // now 200 | 429 | 500
-```
-
 ## Startup
 
 ### `TypeError: rateLimit: … must be a whole number of 1 or more, not …`
@@ -161,13 +137,12 @@ app.use(rateLimit({ limit: Number(Bun.env.RATE_LIMIT ?? 100), windowMs: 60_000 }
 header are the seconds until a request would be allowed, at least 1. The
 refused request counted nothing.
 
-**Fix:** on the client, wait that long; the 429 is in the route's type, so
-`data` is typed:
+**Fix:** on the client, wait that long, then try again:
 
 ```ts
-const result = await api.get('/search');
-if (result.status === 429) {
-	await Bun.sleep(result.data.retryAfter * 1000);
+const response = await fetch('http://localhost:3000/search');
+if (response.status === 429) {
+	await Bun.sleep((await response.json()).retryAfter * 1000);
 }
 ```
 
@@ -197,13 +172,13 @@ const app = alxia({
 
 **When:** requests past `limit` still answer 200, without a rate-limit
 header, and `ctx.rateLimit` is `undefined` — typically in a test calling
-the app through `client(app)`, `app.fetch` or `app.request`.
+the app through `app.fetch` or `app.request`.
 
 **Why:** a request whose key is `undefined` is not counted. Without a server
 there is no connection, so the default `ip` is `undefined`, and so is the
 default key. A custom `key` returning `undefined`, or a `skip` returning
 `true`, does the same. (A route declared before the limit is not counted
-either, and has no 429 in its type.)
+either, and never answers a 429.)
 
 **Fix:** in tests, read the address from a header you send:
 
@@ -212,7 +187,7 @@ const app = alxia({ ip: (request) => request.headers.get('x-ip') ?? undefined })
 	.use(rateLimit({ limit: 2, windowMs: 60_000 }))
 	.get('/limited', ({ reply }) => reply(200, 'ok'));
 
-await client(app).get('/limited', { init: { headers: { 'x-ip': '1.1.1.1' } } });
+await app.request('/limited', { headers: { 'x-ip': '1.1.1.1' } });
 ```
 
 ### A client makes more than `limit` requests

@@ -17,7 +17,7 @@ const app = alxia()
 		const user = tokens.get(request.headers.get('authorization') ?? '');
 		return user ? { user } : reply(401, { error: 'unauthenticated' as const });
 	})
-	.get('/me', ({ user, reply }) => reply(200, user)); // ctx.user is typed; the 401 is in its type
+	.get('/me', ({ user, reply }) => reply(200, user)); // ctx.user is typed; a stranger gets the 401
 ```
 
 ## Route hooks and global hooks
@@ -87,7 +87,7 @@ Runs on every request to a route declared after it. What it returns:
 | Returns | Effect |
 | --- | --- |
 | an object | merged into the context of the hooks and handler after it, and typed there |
-| a reply (`reply(…)`, `redirect(…)`) | ends the request with it; the reply is added to the type of every route after it |
+| a reply (`reply(…)`, `redirect(…)`) | ends the request with it |
 | `undefined` | nothing |
 
 ```ts
@@ -102,8 +102,7 @@ const app = alxia()
 // GET /public → 200; GET /me without the header → 401; with it → {"user":"ada"}
 ```
 
-Write the error literal `as const`: the client then reads
-`{ error: 'unauthenticated' }`, not `{ error: string }`. A hook's reply is
+A hook's reply is
 sent as it is: it is made before the route's middlewares, so a `responds`
 among them does not check it.
 
@@ -170,8 +169,8 @@ wrap<Result extends AnyReply | Response>(
 A route hook around the rest of the route: `next()` runs the hooks declared
 after it, the route's middlewares and the handler, and resolves to the
 `Response`. The
-hook returns that response, another one, or a reply of its own — which,
-like a `derive`'s, is added to the type of the routes after it.
+hook returns that response, another one, or a reply of its own, which
+ends the request as a `derive`'s does.
 
 ```ts
 const app = alxia()
@@ -250,7 +249,7 @@ const app = alxia()
 	.get('/bookmarks/:id', [canView, loadBookmark], ({ bookmark, reply }) => reply.ok(bookmark))
 	.patch('/bookmarks/:id', [canView, loadBookmark, canEdit], { body: z.object({ title: z.string() }) },
 		async ({ bookmark, body, reply }) => reply.ok(await bookmarks.update(bookmark, body)));
-// PATCH /bookmarks/:id answers 200, 400, 401, 403, 409 or 500, and its client reads each
+// PATCH /bookmarks/:id answers 200, 400, 401, 403, 409 or 500
 ```
 
 ### What a hook in the list does
@@ -262,9 +261,9 @@ const app = alxia()
 - **What it returns** is treated as a `derive`'s: an object is added to the
   context of the hooks after it in the list and of the handler, typed
   there; a reply ends the request; `undefined` does nothing.
-- **Its replies join that route's type** — not the routes after it, as a
-  `derive`'s would. The client reads them; `@alxia/openapi` documents a
-  route's schemas, and a hook in the list, like a `derive`, declares none.
+- **Its replies end that route's request** — not the routes after it, as a
+  `derive`'s would. `@alxia/openapi` documents a route's schemas, and a
+  hook in the list, like a `derive`, declares none.
 - **A `defineWrap`** runs the hooks after it in the list, validation and
   the handler inside `next()`, as `wrap` does. A socket's upgrade skips it.
 - **A thrown error** goes to the `onError` hooks in force; a refused
@@ -469,20 +468,14 @@ plugin given to `use` keeps its own hook for its routes. Its routes without
 one take the hook of the app using it, and the plugin's hook then applies to
 the routes declared after `use`, as its `derive`s do.
 
-**Typed.** The hook's reply replaces the default 400 in the type of every
-route after it that validates part of its request with a `validate`, so
-[`@alxia/client`](https://www.npmjs.com/package/@alxia/client) reads the
-problem. A route under a `bodyLimit` may be refused too, and its type
-gains the hook's replies in place of the default 413. A route that neither
-validates nor has a `bodyLimit` is never refused, and its type gains
-nothing. A hook that may return nothing keeps the default of each kind the
-route may refuse with — the 400, the 413 — in the type beside its own
-reply. A status other than 400 replaces it: a hook that answers 422 makes
-the route's outcomes 422 and no 400. The hook's type does not say which
-reply answers which kind, so every reply it may return is in the type of
-every route it may refuse: the JMAP hook above puts its 413 in the type of
-`/download/:blobId` too, though only `/jmap` has a limit. A
-[hook per kind](#one-hook-per-kind) says which, and keeps it out.
+**What it replaces.** The hook's reply replaces the default 400 of every
+route after it that validates part of its request with a `validate`. A
+route under a `bodyLimit` may be refused too, and the hook's reply replaces
+its default 413. A route that neither validates nor has a `bodyLimit` is
+never refused. A hook that returns nothing leaves the default of the kind
+— the 400, the 413 — to answer. A status other than 400 replaces it: a hook
+that answers 422 makes the route answer 422 and no 400. A
+[hook per kind](#one-hook-per-kind) answers one kind alone.
 
 **With schemas.** Given `{ response, contentType? }` first, the hook's
 `reply` is typed by those schemas, as a `responds` types a handler's. Its reply is checked by
@@ -530,8 +523,7 @@ const app = alxia()
 ```
 
 Here `/jmap` may answer the `Invalid` 400 and the `TooLarge` 413, and
-`/download/:blobId`, which has no limit, the `Invalid` 400 alone. The
-client reads each by its own schema, and
+`/download/:blobId`, which has no limit, the `Invalid` 400 alone.
 [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi) documents
 each kind's statuses on the routes that kind may refuse.
 
@@ -604,9 +596,9 @@ app.onRequest(({ request }) =>
 );
 ```
 
-That `Response` is in no route's type: use it only for what a typed client
-never asks — a CORS preflight, a redirect to HTTPS. What a client must
-read belongs in a `derive`.
+That `Response` is in no route's OpenAPI document: use it only for what a
+client generated from the document never asks — a CORS preflight, a
+redirect to HTTPS. What a client must read belongs in a `derive`.
 
 ### `onResponse`
 
@@ -616,7 +608,7 @@ type ResponseHook = (response: Response, ctx: RequestContext) => MaybePromise<Re
 
 Every response, in the order declared — 404s, 405s and 500s included. Edit
 the response, or return another to replace it; keep its status, which the
-client's types promise.
+OpenAPI document promises.
 
 ```ts
 import { alxia, withHeaders } from '@alxia/core';

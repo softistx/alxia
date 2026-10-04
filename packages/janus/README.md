@@ -3,7 +3,7 @@
 Identities, sessions and permissions for [alxia](https://www.npmjs.com/package/@alxia/core),
 on [`@nxgt/janus`](https://www.npmjs.com/package/@nxgt/janus): your process,
 your database. The user typed in the context, the session cookie kept and
-renewed, janus's refusals answered — every one typed for the client. No
+renewed, janus's refusals answered with their status and a safe body. No
 dependency.
 
 ```sh

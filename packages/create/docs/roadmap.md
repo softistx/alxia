@@ -40,6 +40,11 @@ Nothing scheduled yet.
   normalised, replaces the template's own, as a whole word, in every text
   file, as the README's
   `docker build -t` and `docker run`.
+- **No client package in a new project.** The `api` template's spec calls
+  the app with `app.request()`, and the project installs `@alxia/core`
+  alone of alxia's packages. alxia is OpenAPI spec first: a typed client
+  is generated from the API's OpenAPI document, with a generator such as
+  `@nxgt/openapi-codegen`.
 
 ### 0.1.4
 
@@ -78,8 +83,8 @@ Nothing scheduled yet.
   template ships inside `@alxia/create`, with alxia's layer, and is copied
   as it is: no `create-react-router` runs, and no change in it can make the
   command refuse.
-- **alxia's packages resolve at creation too.** `@alxia/core`,
-  `@alxia/client` and `@alxia/react-router` move to the newest version
+- **alxia's packages resolve at creation too.** `@alxia/core`
+  and `@alxia/react-router` move to the newest version
   within the ranges `@alxia/create` was published with. Right after a
   release, while the registry does not serve that version yet, the newest
   of the same minor is written, so `bun install` no longer fails with

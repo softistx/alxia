@@ -19,7 +19,7 @@ a realistic example for each.
 | [Server-sent events](guide/server-sent-events.md) | streaming typed events to a client |
 | [WebSockets](guide/websockets.md) | opening typed sockets, their upgrade run through middlewares, their messages validated both ways |
 | [Serving](guide/serving.md) | choosing a port or TLS, running behind a proxy, testing through `fetch`, serving the sockets from a `Bun.serve` of your own with `websocket`, or stopping cleanly |
-| [The app's type](guide/types.md) | typing a client, a service or a type test from `typeof app` |
+| [The app's type](guide/types.md) | typing a service or a type test from `typeof app`: `ContextOf`, and what a route checks |
 | [Upgrading](upgrading.md) | moving to the next release: what changed, before and after, and what can break |
 | [Troubleshooting](troubleshooting.md) | something went wrong and you have the message |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |

@@ -2,7 +2,7 @@
  * The key under which `reactRouter()` hands every loader, action and
  * middleware the request's alxia context, and the typed way to read it.
  */
-import type { Alxia, AnyAlxia, ContextOf, Empty } from '@alxia/core';
+import type { Alxia, AnyAlxia, ContextOf } from '@alxia/core';
 import { createContext, type RouterContextProvider } from 'react-router';
 import type { FreshApp, ReactRouterServer } from './server';
 
@@ -53,7 +53,6 @@ export type InvalidRegister = Alxia<
 	{
 		readonly 'Register.server must be typeof server, the default export of createServer()': never;
 	},
-	Empty,
 	'',
 	never
 >;

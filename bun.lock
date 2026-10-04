@@ -44,22 +44,8 @@
       "name": "@alxia/cache",
       "version": "0.1.2",
       "devDependencies": {
-        "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
-      },
-      "peerDependencies": {
-        "@alxia/core": "workspace:^",
-        "typescript": "^6.0.3 || ^7.0.0",
-      },
-    },
-    "packages/client": {
-      "name": "@alxia/client",
-      "version": "0.2.1",
-      "devDependencies": {
-        "@alxia/core": "workspace:^",
-        "@types/bun": "^1.4.2",
-        "zod": "^4.1.0",
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
@@ -70,7 +56,6 @@
       "name": "@alxia/compress",
       "version": "0.1.2",
       "devDependencies": {
-        "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
@@ -108,7 +93,6 @@
       "name": "@alxia/cors",
       "version": "0.1.2",
       "devDependencies": {
-        "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
@@ -125,7 +109,6 @@
         "create-alxia": "./dist/index.js",
       },
       "devDependencies": {
-        "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@alxia/react-router": "workspace:^",
         "@types/bun": "^1.4.2",
@@ -179,7 +162,6 @@
       "name": "@alxia/janus",
       "version": "0.1.2",
       "devDependencies": {
-        "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@nxgt/janus": "^0.17.1",
         "@types/bun": "^1.4.2",
@@ -195,7 +177,6 @@
       "name": "@alxia/jwt",
       "version": "0.1.2",
       "devDependencies": {
-        "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
@@ -221,7 +202,6 @@
       "name": "@alxia/logger",
       "version": "0.2.0",
       "devDependencies": {
-        "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
@@ -261,7 +241,6 @@
       "name": "@alxia/rate-limit",
       "version": "0.1.2",
       "devDependencies": {
-        "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
@@ -306,7 +285,6 @@
       "version": "0.1.3",
       "devDependencies": {
         "@alxia/cache": "workspace:^",
-        "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@alxia/rate-limit": "workspace:^",
         "@nxgt/redis": "^0.3.1",
@@ -332,7 +310,6 @@
       "name": "@alxia/secure-headers",
       "version": "0.2.0",
       "devDependencies": {
-        "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
         "zod": "^4.2.0",
@@ -346,7 +323,6 @@
       "name": "@alxia/telemetry",
       "version": "0.2.0",
       "devDependencies": {
-        "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@nxgt/telemetry": "^0.2.1",
         "@types/bun": "^1.4.2",
@@ -362,7 +338,6 @@
       "name": "@alxia/zod",
       "version": "0.1.0",
       "devDependencies": {
-        "@alxia/client": "workspace:^",
         "@alxia/core": "workspace:^",
         "@alxia/openapi": "workspace:^",
         "@types/bun": "^1.4.2",
@@ -379,8 +354,6 @@
   },
   "packages": {
     "@alxia/cache": ["@alxia/cache@workspace:packages/cache"],
-
-    "@alxia/client": ["@alxia/client@workspace:packages/client"],
 
     "@alxia/compress": ["@alxia/compress@workspace:packages/compress"],
 

@@ -267,10 +267,10 @@ const app = alxia().use((app) => (origins ? cors({ origin: origins })(app) : app
 
 ```text
 error TS2769: No overload matches this call.
-  Overload 1 of 2, '(plugin: (app: Alxia<Empty, Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '(options?: CorsOptions | undefined) => Plugin' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => AnyAlxia'.
+  Overload 1 of 2, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
+    Argument of type '(options?: CorsOptions | undefined) => Plugin' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
       Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, Empty, "", never>' has no properties in common with type 'CorsOptions'.
+        Type 'Alxia<Empty, "", never>' has no properties in common with type 'CorsOptions'.
 ```
 
 **When:** `app.use(cors)`, without calling it.

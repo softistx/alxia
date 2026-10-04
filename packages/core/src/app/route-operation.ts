@@ -10,7 +10,6 @@ import type {
 	HandlerResult,
 	MaybePromise,
 	Method,
-	RouteEntryOf,
 	RouteHookBase,
 	RouteSchema,
 	ThreadHooks,
@@ -81,16 +80,14 @@ export type CheckedOperation<
  */
 export interface OperationMethod<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
-> extends OperationForms<RouteApp<Method, Ctx, Routes, Prefix, Shortcuts>>,
-		DeprecatedOperationForm<Ctx, Routes, Prefix, Shortcuts> {}
+> extends OperationForms<RouteApp<Method, Ctx, Prefix, Shortcuts>>,
+		DeprecatedOperationForm<Ctx, Prefix, Shortcuts> {}
 
 /** The form of `route` that 0.3 had, which the middleware form replaces. */
 export interface DeprecatedOperationForm<
 	Ctx extends object,
-	Routes extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
 > {
@@ -124,23 +121,7 @@ export interface DeprecatedOperationForm<
 				OperationSchema<Operation>
 			>,
 		) => MaybePromise<Result>,
-	): Alxia<
-		Ctx,
-		Routes &
-			RouteEntryOf<
-				Operation['method'],
-				JoinPath<Prefix, Operation['path']>,
-				OperationSchema<Operation>,
-				Result,
-				| Shortcuts
-				| ThreadHooks<
-						RouteHookBase<Ctx, JoinPath<Prefix, Operation['path']>>,
-						Hooks
-				  >['replies']
-			>,
-		Prefix,
-		Shortcuts
-	>;
+	): Alxia<Ctx, Prefix, Shortcuts>;
 }
 
 /**

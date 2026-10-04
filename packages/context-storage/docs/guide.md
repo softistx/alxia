@@ -35,7 +35,7 @@ context of the request that called it, and never another's.
 // `uncalled` takes nothing: it makes `use(contextStorage)` a compile error
 function contextStorage<App = undefined>(...uncalled: readonly never[]): ContextStoragePlugin<App>;
 
-type ContextStoragePlugin<App> = Alxia<Empty, Empty, '', never> & {
+type ContextStoragePlugin<App> = Alxia<Empty, '', never> & {
 	context(): ContextOf<App> extends never ? BaseContext : ContextOf<App>;
 	tryContext(): (ContextOf<App> extends never ? BaseContext : ContextOf<App>) | undefined;
 };

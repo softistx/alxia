@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { vary } from '../reply/headers';
 import type { StandardSchemaV1 } from '../schema/standard-schema';
 import { eventStream } from '../sse/event-stream';
-import { type AnyAlxia, alxia, type Plugin, type RoutesOf } from './alxia';
+import { type AnyAlxia, alxia, type Plugin } from './alxia';
 
 /** A schema written by hand: the core needs no validator library. */
 function positive(): StandardSchemaV1<unknown, number> {
@@ -122,7 +122,6 @@ describe('global hooks', () => {
 		const app = alxia()
 			.get('/a', ({ reply }) => reply(200, 'a'))
 			.use(poweredBy('alxia'));
-		expectTypeOf<keyof RoutesOf<typeof app>>().toEqualTypeOf<'/a'>();
 		expect((await app.request('/a')).headers.get('x-powered-by')).toBe('alxia');
 	});
 
@@ -168,17 +167,6 @@ describe('group', () => {
 		expect(await (await app.request('/public')).json()).toEqual({
 			role: 'guest',
 		});
-	});
-
-	test('its routes are typed under its prefix, with its replies', () => {
-		type Routes = RoutesOf<typeof app>;
-		expectTypeOf<keyof Routes>().toEqualTypeOf<'/admin/stats' | '/public'>();
-		expectTypeOf<
-			Extract<Routes['/admin/stats']['GET']['output'], { status: 403 }>['data']
-		>().toEqualTypeOf<{ error: 'forbidden' }>();
-		expectTypeOf<
-			Extract<Routes['/public']['GET']['output'], { status: 403 }>
-		>().toEqualTypeOf<never>();
 	});
 });
 
@@ -286,16 +274,6 @@ describe('server-sent events', () => {
 		expect(await response.text()).toBe('data: {"n":1}\n\ndata: {"n":2}\n\n');
 	});
 
-	test('the client reads an async iterable of the values', () => {
-		type Routes = RoutesOf<typeof app>;
-		expectTypeOf<
-			Extract<Routes['/ticks']['GET']['output'], { status: 200 }>['data']
-		>().toEqualTypeOf<AsyncIterable<{ n: number }>>();
-		expectTypeOf<
-			Extract<Routes['/free']['GET']['output'], { status: 200 }>['data']
-		>().toEqualTypeOf<AsyncIterable<string>>();
-	});
-
 	test('an event its schema refuses ends the stream', async () => {
 		const original = console.error;
 		console.error = () => {};
@@ -340,14 +318,6 @@ describe('websockets', () => {
 				},
 			},
 		);
-
-	test('the route table records what each side sends', () => {
-		type Socket = RoutesOf<typeof app>['/rooms/:room']['WS'];
-		expectTypeOf<Socket['send']>().toEqualTypeOf<{ text: string }>();
-		expectTypeOf<Socket['input']>().toEqualTypeOf<{
-			readonly params: { readonly room: string | number };
-		}>();
-	});
 
 	test('messages are validated, replies sent as JSON', async () => {
 		const server = app.listen({ port: 0 });
@@ -519,7 +489,7 @@ describe('wrap', () => {
 		expect(order).toEqual(['wrap:in', 'derive x', 'wrap:out 400']);
 	});
 
-	test('only for the routes after it; its reply is in their type', async () => {
+	test('only for the routes after it', async () => {
 		order.length = 0;
 		const before = await app.request('/before', {
 			headers: { 'x-busy': 'yes' },
@@ -530,13 +500,6 @@ describe('wrap', () => {
 			headers: { 'x-busy': 'yes' },
 		});
 		expect(busy.status).toBe(409);
-		type Routes = RoutesOf<typeof app>;
-		expectTypeOf<
-			Extract<Routes['/items/:id']['GET']['output'], { status: 409 }>['data']
-		>().toEqualTypeOf<{ error: 'busy' }>();
-		expectTypeOf<
-			Extract<Routes['/before']['GET']['output'], { status: 409 }>
-		>().toEqualTypeOf<never>();
 	});
 
 	test("the handler's error reaches it, then onError", async () => {
@@ -662,19 +625,5 @@ describe('reply shortcuts', () => {
 			void reply.html(200, '<p>no</p>');
 			return reply.ok({ id: 1, name: 'Ada' });
 		});
-	});
-
-	test('the client reads the same replies as reply(status, body)', () => {
-		type Free = RoutesOf<typeof free>;
-		expectTypeOf<
-			Extract<Free['/ok']['GET']['output'], { status: 200 }>['data']
-		>().toEqualTypeOf<{ id: 1 }>();
-		expectTypeOf<
-			Extract<Free['/page']['GET']['output'], { status: 200 }>['data']
-		>().toEqualTypeOf<string>();
-		type Typed = RoutesOf<typeof typed>;
-		expectTypeOf<
-			Extract<Typed['/users/:id']['GET']['output'], { status: 404 }>['data']
-		>().toEqualTypeOf<{ error: 'not_found' }>();
 	});
 });

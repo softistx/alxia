@@ -41,7 +41,6 @@
 		]
 	},
 	"devDependencies": {
-		"@alxia/client": "workspace:^",
 		"@alxia/core": "workspace:^",
 		"@types/bun": "^1.4.2"
 	},

@@ -28,7 +28,7 @@ behaviour that prints nothing, or an error from `tsc`. A
 ```text
 error TS2769: No overload matches this call.
   …
-    Argument of type '<App = undefined>(...uncalled: readonly never[]) => ContextStoragePlugin<App>' is not assignable to parameter of type '(app: Alxia<Empty, Empty, "", never>) => ContextStoragePlugin<undefined>'.
+    Argument of type '<App = undefined>(...uncalled: readonly never[]) => ContextStoragePlugin<App>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => ContextStoragePlugin<undefined>'.
 ```
 
 **When:** at startup, on `.use(contextStorage)`: the factory given to `use`
