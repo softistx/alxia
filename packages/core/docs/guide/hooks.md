@@ -650,6 +650,8 @@ names that context outside the chain ([The app's type](types.md#contextofapp)).
 
 ## See also
 
+- [Middleware: which way to use](middleware.md): every way to run code
+  around routes, side by side, and the order a request runs them in.
 - [Groups and plugins](groups-and-plugins.md): scoping a hook to some
   routes, and sharing hooks across apps.
 - [Replies](replies.md): `reply`, `set`, and errors.

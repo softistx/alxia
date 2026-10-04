@@ -423,6 +423,9 @@ answers a request the route's schemas refuse, or whose body passes its
 is the one it uses, and a hook of one kind, `onRefusal('validation', hook)`,
 falls back to it.
 
+Which one to reach for, where each applies and the order a request runs
+them in: [Middleware: which way to use](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md).
+
 Global hooks apply to the whole app, wherever they are declared:
 
 | hook | |
@@ -558,5 +561,7 @@ covers all three kinds.
 ## Documentation
 
 - [Guide](https://github.com/softistx/alxia/tree/develop/packages/core/docs): a page per area — routes and schemas, replies, hooks, groups and plugins, writing a plugin, static files, server-sent events, WebSockets, serving, and the app's type.
+- [Middleware: which way to use](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md): every way to run code around routes, side by side, and the order a request runs them in.
+- [Upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md): what the next release changes, and what can break.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/core/docs/roadmap.md): what is coming, and what is not planned.

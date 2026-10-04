@@ -30,7 +30,9 @@ a trap that prints nothing is headed by its symptom.
 - [`a route's hooks are a list written in the call, [first, second]: a list of unknown length cannot be checked`](#a-routes-hooks-are-a-list-written-in-the-call-first-second-a-list-of-unknown-length-cannot-be-checked)
 - [`a route takes at most 8 hooks in its list: derive the rest in a group around it`](#a-route-takes-at-most-8-hooks-in-its-list-derive-the-rest-in-a-group-around-it)
 - [`Type '…' is not assignable to type 'MaybePromise<unique symbol>'`](#type--is-not-assignable-to-type-maybepromiseunique-symbol)
+- [`route() needs the path as a literal: declare the operation as const`](#route-needs-the-path-as-a-literal-declare-the-operation-as-const)
 - [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
+- [`Argument of type '"…"' is not assignable to parameter of type '"Invalid path: …"'`](#argument-of-type--is-not-assignable-to-parameter-of-type-invalid-path-)
 - [`Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`](#type-reply500--is-not-assignable-to-type-maybepromisevoid--replyclienterrorstatus-any--undefined)
 - [`'500' does not exist in type 'RefusalResponses'`](#500-does-not-exist-in-type-refusalresponses)
 - [`The inferred type of '…' cannot be named without a reference to '…' from '…/@alxia/core/dist/…'`](#the-inferred-type-of--cannot-be-named-without-a-reference-to--from-alxiacoredist)
@@ -53,6 +55,7 @@ a trap that prints nothing is headed by its symptom.
 - [`GET /…: hook 1 of the list is not a hook: make it with defineHook() or defineWrap()`](#get--hook-1-of-the-list-is-not-a-hook-make-it-with-definehook-or-definewrap)
 - [`defineHook(): the hook is not a function`](#definehook-the-hook-is-not-a-function)
 - [`GET /…: the handler is missing`](#get--the-handler-is-missing)
+- [`POST /…: bodyLimit must be a whole number of bytes, 0 or more; got …`](#post--bodylimit-must-be-a-whole-number-of-bytes-0-or-more-got-)
 - [`group(): build is missing`](#group-build-is-missing)
 - [`onRefusal(): the hook is missing`](#onrefusal-the-hook-is-missing)
 - [`onRefusal(): "…" is no kind of refusal; expected 'validation' or 'body_limit'`](#onrefusal--is-no-kind-of-refusal-expected-validation-or-body_limit)
@@ -63,11 +66,13 @@ a trap that prints nothing is headed by its symptom.
 
 - [`400 {"error":"validation","issues":[…]}`](#400-errorvalidationissues)
 - [A route still answers `{"error":"validation"}` after `onRefusal`](#a-route-still-answers-errorvalidation-after-onrefusal)
+- [`413 {"error":"content_too_large","limit":…}`](#413-errorcontent_too_largelimit)
 - [`404 {"error":"not_found"}`](#404-errornot_found)
 - [`405 {"error":"method_not_allowed"}`](#405-errormethod_not_allowed)
 - [`426 {"error":"upgrade_required"}`](#426-errorupgrade_required)
 - [`416 {"error":"range_not_satisfiable"}`](#416-errorrange_not_satisfiable)
 - [`500 {"error":"internal"}`](#500-errorinternal)
+- [A plugin's route reads a body past the app's `bodyLimit()`](#a-plugins-route-reads-a-body-past-the-apps-bodylimit)
 
 **Hooks**
 
@@ -83,6 +88,7 @@ a trap that prints nothing is headed by its symptom.
 - [`ResponseValidationError: … declares no 201 reply`](#responsevalidationerror--declares-no-201-reply)
 - [`TypeError: … the handler returned no reply. Return ctx.reply(status, body).`](#typeerror--the-handler-returned-no-reply-return-ctxreplystatus-body)
 - [`TypeError: … the onRefusal hook returned neither a reply nor nothing.`](#typeerror--the-onrefusal-hook-returned-neither-a-reply-nor-nothing)
+- [`TypeError: Body already used`](#typeerror-body-already-used), with `500 {"error":"internal"}`
 - [`TypeError: An event does not match its schema`](#typeerror-an-event-does-not-match-its-schema)
 - [`TypeError: An event id must not hold a line break or a NUL`](#typeerror-an-event-id-must-not-hold-a-line-break-or-a-nul), and `An event id must be a string`
 - [`TypeError: An event retry must be a whole number of milliseconds, 0 or more`](#typeerror-an-event-retry-must-be-a-whole-number-of-milliseconds-0-or-more)
@@ -1553,6 +1559,37 @@ refuses it, so this comes from JavaScript or a cast.
 ```ts
 app.onRefusal((refusal) =>
 	refusal.kind === 'validation' && refusal.part === 'body' ? problem({ status: 400, detail: 'bad body' }) : undefined,
+);
+```
+
+### `TypeError: Body already used`
+
+```text
+TypeError: Body already used
+ code: "ERR_BODY_ALREADY_USED"
+      at readBody (…/@alxia/core/dist/index.js)
+      at validate (…/@alxia/core/dist/index.js)
+```
+
+**When:** a route with a `body` schema answers `500 {"error":"internal"}`,
+and the server log prints this. A hook before it — a `derive`, a `wrap`, a
+plugin's — read the body itself, with `request.json()`, `request.text()` or
+`request.formData()`.
+
+**Why:** route hooks run before validation. A request's body can be read
+once: the hook used it up, and validation, which reads it next, fails.
+
+**Fix:** read the body in the handler, where `body` is the schema's output.
+A check that needs the body goes there; a hook decides on what it can read
+without it, such as `pathParams`, `cookies` and the headers
+([Middleware: hooks run before validation](guide/middleware.md#hooks-run-before-validation)):
+
+```ts
+import { alxia } from '@alxia/core';
+import { z } from 'zod';
+
+const app = alxia().post('/notes', { body: z.object({ title: z.string() }) }, ({ body, reply }) =>
+	body.title === 'admin' ? reply(403, { error: 'forbidden' as const }) : reply(201, body),
 );
 ```
 
