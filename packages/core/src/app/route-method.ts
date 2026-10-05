@@ -11,14 +11,19 @@ import type { Method } from './types';
  * A route method: `app.get(path, options?, ...middlewares, handler)`, see
  * `MiddlewareForms` and `OptionsForms`. The options forms come first, the
  * middleware forms last: a middleware the route's context does not give is
- * reported on them, naming the key it reads.
+ * reported on them, naming the key it reads. Every method shares one set
+ * of forms, `RouteApp<Method, …>`, which no form reads the method of: an
+ * app's methods then cost one instantiation of them, not one each.
  */
 export interface RouteMethod<
 	M extends Method,
 	Ctx extends object,
 	Prefix extends string,
-> extends MiddlewareForms<RouteApp<M, Ctx, Prefix>>,
-		OptionsForms<RouteApp<M, Ctx, Prefix>> {}
+> extends MiddlewareForms<RouteApp<Method, Ctx, Prefix>>,
+		OptionsForms<RouteApp<Method, Ctx, Prefix>> {
+	/** Never set: the method it declares, for a reader of its type. */
+	readonly '~method'?: M;
+}
 
 /** The types of an app and a method, as the middleware forms read them. */
 export interface RouteApp<

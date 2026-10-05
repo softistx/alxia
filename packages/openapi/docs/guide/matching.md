@@ -20,6 +20,11 @@ An operation is served by a route of the same method and path:
   that `GET` route, as `extra` or under `strict`, when no operation declares it.
 - **Every other method stands alone.** A `POST /employees` route does not
   serve a `QUERY /employees` operation.
+- **An `all` route serves no operation.** `app.all('/api/*', proxy(url))`
+  answers every method, but declares none of the document's: it is listed
+  as `ALL /api/*`, in `extra` or under `strict`, and an operation under its
+  path still needs a route of its own method. Leave it out of `strict`
+  with `exclude: (route) => route.method === 'ALL'`.
 - **Socket routes are not read.** `app.ws` routes live in `app.sockets`,
   and an OpenAPI operation is HTTP: `matchesSpec` never lists them.
 

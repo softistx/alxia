@@ -1,4 +1,5 @@
 import type { RoutePath } from '../types/path';
+import { type AllMethod, addAll } from './all';
 import type {
 	ParserMethod,
 	StartHookMethod,
@@ -76,6 +77,8 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 	 * body, validated like a `POST`'s.
 	 */
 	readonly query = this.#method('QUERY');
+	/** Every method at `path` its own routes leave, `HEAD` and `OPTIONS` included: see `all.ts`. */
+	readonly all: AllMethod<Ctx, Prefix> = this.#do(addAll);
 	readonly route: OperationMethod<Ctx, Prefix> = this.#do(declare.addOperation);
 	readonly static: StaticMethod<Ctx, Prefix> = this.#do(declare.addStatic);
 	readonly file: FileMethod<Ctx, Prefix> = this.#do(declare.addFile);
@@ -85,12 +88,8 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 	readonly decorate: DecorateMethod<Ctx, Prefix> = this.#do(hooks.decorate);
 	readonly derive: DeriveMethod<Ctx, Prefix> = this.#do(hooks.derive);
 	readonly bodyLimit: BodyLimitMethod<Ctx, Prefix> = this.#do(hooks.bodyLimit);
-	readonly onStart: StartHookMethod<this> = this.#do(
-		hooks.lifecycleHook('onStart'),
-	);
-	readonly onStop: StopHookMethod<this> = this.#do(
-		hooks.lifecycleHook('onStop'),
-	);
+	readonly onStart: StartHookMethod<this> = this.#do(hooks.onStart);
+	readonly onStop: StopHookMethod<this> = this.#do(hooks.onStop);
 	readonly parser: ParserMethod<this> = this.#do(hooks.parser);
 
 	readonly group: GroupMethod<Ctx, Prefix> = this.#do(

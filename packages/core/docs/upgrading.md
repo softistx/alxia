@@ -4,6 +4,91 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
+## Next
+
+The next `@alxia/core` minor adds `app.all(path, …)`, one route for every
+method at a path, which a middleware that answers — `@alxia/proxy`'s
+`proxy(url)` — may end. Nothing in its API breaks; the peer range of every
+package moves.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [Peers move to the next minor](#peers-move-to-the-next-minor) | every package | yes, for an install that holds a package of 0.10 beside the new core: update them together |
+| [`app.all`, every method at a path](#appall-every-method-at-a-path) | core | no: opt in |
+| [`ALL` among `app.routes`' methods](#all-among-approutes-methods) | core | notice: a tool reading `route.method` sees `ALL` for an `all` route |
+| [Route type errors name no method](#route-type-errors-name-no-method) | core | no: the message's type only |
+| [A proxy as a route](#a-proxy-as-a-route) | proxy | no: docs only |
+| [New projects install the new core](#new-projects-install-the-new-core) | create | no: a new project only |
+
+### Peers move to the next minor
+
+Every package's peer on `@alxia/core` moves from `^0.10.0` to the new
+minor's range, which a `^0.10.0` does not accept. Update `@alxia/core` and
+the `@alxia/*` packages you use in one change.
+
+**Can it break your code.** Only the install, as for
+[0.10](#peers-move-to-0100).
+
+### `app.all`, every method at a path
+
+**What changed.** `app.all(path, options?, ...middlewares, handler)`
+declares a route that takes every method its path has no route of its own
+for, typed as `get`'s; `app.all(path, options?, end)` ends it with a
+middleware that answers in place of a handler. A route of the path's own
+method wins over it, a `HEAD` goes to the path's `GET` first, and the path
+never answers 405
+([Every method: `all`](guide/routes.md#every-method-all)).
+
+```ts
+// before: every method under /api, shadowing the routes declared after it there
+app.use('/api', proxy('http://users.internal:8080', { rewrite: '/api' }));
+
+// after: one route, beside which /api/health keeps its own
+app
+	.all('/api/*', proxy('http://users.internal:8080', { rewrite: '/api' }))
+	.get('/api/health', ({ reply }) => reply(200, { ok: true }));
+```
+
+**Can it break your code.** No: it is a new method. A request that reached
+a 405 or a 404 at a path you now give an `all` reaches it instead.
+
+### `ALL` among `app.routes`' methods
+
+**What changed.** `RouteDefinition['method']` is `Method | 'ALL'`: an `all`
+route is listed as `ALL`, in `app.routes`, the dev route table and
+`@alxia/openapi`'s `extra`, where it serves no operation.
+
+**Can it break your code.** Notice it: a tool that switches over
+`route.method` exhaustively, or passes it where a `Method` is expected,
+meets one more case. An app without an `all` route lists none.
+
+### Route type errors name no method
+
+**What changed.** Every route method — `get` to `all` — shares one set of
+forms, so an app's methods are typed once rather than once each. An error
+on a route's context reads `RouteBase<RouteApp<Method, Empty, "">, "/posts">`
+where it read `RouteBase<RouteApp<"POST", Empty, "">, "/posts">`. `RouteMethod<M, …>`
+still carries its method, `'~method'`, a type alone.
+
+**Can it break your code.** No: the same calls compile and fail as before;
+only the text of a message changes.
+
+### A proxy as a route
+
+`@alxia/proxy` (patch) documents `app.all('/api/*', proxy(url))` beside
+`use('/api', proxy(url))`: `use` shadows the routes declared after it under
+its path, `all` is one route the routes beside it keep their methods
+against. Its code is unchanged.
+
+**Can it break your code.** No.
+
+### New projects install the new core
+
+`@alxia/create` (patch) makes projects whose `@alxia/core` has `app.all`.
+The templates are unchanged.
+
+**Can it break your code.** No: it changes new projects only.
+
 ## 0.10.0
 
 `@alxia/core` 0.10.0 gives `ctx.ip` one text per address and adds

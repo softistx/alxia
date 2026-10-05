@@ -331,7 +331,10 @@ app.get('/health', ({ reply }) => reply(200, 'ok'));
 ```
 
 A `Response` is only for a middleware, which may return one sent as it is,
-outside the typed contract.
+outside the typed contract. An `all` route may end with such a middleware
+in place of a handler, `app.all('/api/*', proxy(url))`
+([Every method: `all`](guide/routes.md#every-method-all)); every other
+route ends with a handler.
 
 ### `Property 'user' does not exist on type 'RouteBase<…>'`
 
@@ -344,10 +347,12 @@ app.post('/posts', ({ user }, next) => next({ id: user.id }), auth, handler);
 ```
 
 ```text
-error TS2339: Property 'user' does not exist on type 'RouteBase<RouteApp<"POST", Empty, "">, "/posts">'.
+error TS2339: Property 'user' does not exist on type 'RouteBase<RouteApp<Method, Empty, "">, "/posts">'.
 ```
 
-A handler gets the same error, on `RouteBase<RouteApp<"GET", …>, "/me">`. An
+A handler gets the same error, on `RouteBase<RouteApp<Method, …>, "/me">`
+(every route method shares one `RouteApp<Method, …>`, so the method is not
+named). An
 inline middleware given to `use` names the app's context,
 `Property 'user' does not exist on type 'BaseContext & Empty'`, and a
 route declared by `route(operation, …)` names
@@ -403,7 +408,7 @@ app.post('/posts', canPost, auth, handler);
 ```
 
 ```text
-error TS2345: Argument of type 'Middleware<{ user: User; }, …>' is not assignable to parameter of type 'Middleware<{ user: User; }, …> & Step<RouteBase<RouteApp<"POST", Empty, "">, "/posts">, MiddlewareContext<…>, …>'.
+error TS2345: Argument of type 'Middleware<{ user: User; }, …>' is not assignable to parameter of type 'Middleware<{ user: User; }, …> & Step<RouteBase<RouteApp<Method, Empty, "">, "/posts">, MiddlewareContext<…>, …>'.
   …
           Type 'Reply<403, { readonly error: "banned"; }>' is not assignable to type '"`user` is missing from the context: add a middleware that gives it before this one"'.
 ```
@@ -1577,6 +1582,10 @@ each on base.fork()` otherwise.
 `base.use(x).plugin(todos)` adds to `base` itself, so a second
 `base.plugin(todos)` — a spec's app, a variant — declares the routes on the
 same app again.
+
+An `all` route is `ALL /…`: two at one path are refused alike, while an
+`all` beside a `get` at the same path is not a duplicate — the `get`
+answers its method.
 
 **Fix:** keep one. `HEAD` runs the `GET` route, so you do not need to
 declare it. For several apps on one base, build each on a fork
@@ -2943,6 +2952,30 @@ app
 	.get('/api/*', ({ reply }) => reply(200, 'api')); // answers /api/…, declared last
 ```
 
+### An `all` route does not answer a method at a path of its own
+
+**When:** `all('/api/*', …)` is declared beside `get('/api/health', …)`,
+and `POST /api/health` answers 405 with `Allow: GET` instead of reaching
+the `all` route. Or `GET /r` reaches `get('/r')` although `all('/r')` was
+declared first.
+
+**Why:** the router picks the path first, then the method
+([Which route answers](guide/routes.md#which-route-answers)).
+`/api/health` is a path of its own, more specific than `/api/*`, and has
+no `POST`: an `all` route answers only the methods its own path has no
+route for, and a route of the path's own method wins over it, whatever
+the order declared ([Every method: `all`](guide/routes.md#every-method-all)).
+
+**Fix:** declare an `all` at that path too, or give the methods it should
+take routes of their own:
+
+```ts
+app
+	.all('/api/*', forward)
+	.get('/api/health', ({ reply }) => reply(200, 'ok'))
+	.all('/api/health', forward); // POST /api/health → forward, GET → the get route
+```
+
 ## Server log
 
 Each of these is printed by `console.error`, and the request is answered
@@ -3154,6 +3187,11 @@ app.post('/posts', auth, validate({ body: Post }), handler);
 **When:** a handler returns something that is not a `Reply`: a plain value,
 a `Response`, or nothing at all (a missing `return`). TypeScript refuses
 it, so this comes from JavaScript or a cast.
+
+An `all` route's last function may return a `Response` too, as a
+middleware that answers (`app.all('/api/*', proxy(url))`); anything else
+from it, an untyped middleware's `undefined` included, is this error, named
+`ALL /api/*: …`.
 
 **Fix:**
 

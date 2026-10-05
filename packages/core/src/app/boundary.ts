@@ -5,6 +5,7 @@
  */
 import { HttpError } from '../errors/errors';
 import { Reply, toResponse } from '../reply/reply';
+import { ALL } from '../router/router';
 import {
 	clientGone,
 	errorReply,
@@ -51,8 +52,11 @@ export async function handle(
 	(ctx as { [RUN]?: ChainRun })[RUN] = run;
 	try {
 		return await chain<never>(run, ctx, async (validated) => {
-			let reply = route.handler(validated as never);
+			let reply = ended(route, validated, request);
 			if (reply instanceof Promise) reply = await reply;
+			// An `all` route's end, a middleware: its own `Response`, sent. Its
+			// handler forms return a reply: the types keep them from this.
+			if (reply instanceof Response && route.method === ALL) return reply;
 			if (!(reply instanceof Reply)) {
 				throw new TypeError(
 					`${route.method} ${route.path}: the handler returned no reply. ` +
@@ -66,6 +70,24 @@ export async function handle(
 		// An error the observers settled: the response they made of it.
 		return settledResponse(run, error) ?? fail(error, ctx);
 	}
+}
+
+/**
+ * What the route's handler returns: an `all` route's, which may be a
+ * middleware that answers (`AllEnd`), is given a `next` too, answering the
+ * 404 of what is after it: nothing.
+ */
+function ended(
+	route: RouteDefinition,
+	validated: object,
+	request: RequestContext,
+): unknown {
+	if (route.method !== ALL) return route.handler(validated as never);
+	const end = route.handler as unknown as (
+		ctx: object,
+		next: unknown,
+	) => unknown;
+	return end(validated, async () => routingError(request, 404));
 }
 
 /**

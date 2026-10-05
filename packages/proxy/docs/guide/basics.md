@@ -48,8 +48,7 @@ and returns a path: it is always put under the target, whatever it returns
 ## Where the proxy sits
 
 `use(path, middleware)` runs on the requests under `path`, after the
-middlewares declared before it, and never calls `next`. Core has no `.all()`,
-so this is the form for any method under a path.
+middlewares declared before it, and never calls `next`.
 
 - A route declared **before** the `use` stays local.
 - A route declared **after** it, under the same path, is shadowed: the proxy
@@ -65,6 +64,45 @@ const app = alxia()
 	.use('/api', proxy('http://users.internal:8080', { rewrite: '/api' }))
 	.get('/api/never', ({ reply }) => reply(200, 'unreachable'));  // shadowed
 ```
+
+### As one route: `all`
+
+`app.all(path, proxy(url))` declares the proxy as one route for every
+method at `path`, with core 0.11 or later. It ends the route in place of a
+handler: what runs first is the chain in force, the `use()` middlewares
+declared before it.
+
+```ts
+import { alxia } from '@alxia/core';
+import { proxy } from '@alxia/proxy';
+
+const app = alxia()
+	.all('/api/*', proxy('http://users.internal:8080', { rewrite: '/api' }))
+	.get('/api/health', ({ reply }) => reply(200, { ok: true }))   // local, declared after
+	.all('/files/*', { bodyLimit: 10 * 1024 * 1024 }, proxy('http://files.internal:9000'));
+```
+
+Which to use:
+
+| | `use('/api', proxy(url))` | `all('/api/*', proxy(url))` |
+| --- | --- | --- |
+| a route under `/api` declared after it | shadowed: the proxy answers | local: it is a path of its own |
+| a route under `/api` declared before it | local | local |
+| a request no route matches under `/api` | the proxy | the proxy, as the wildcard's route |
+| `/api` itself | the proxy | the proxy: `/api/*` matches `/api` |
+| a method a path under it has no route for | the proxy | a 405 at that path: the router picks the path first |
+| `app.routes`, the route table, `matchesSpec` | nothing | `ALL /api/*` |
+| its options | the proxy's `bodyLimit` | the route's (`{ bodyLimit }`) or the proxy's |
+
+`all` reads better when the proxy is the path's answer and local routes sit
+beside it; `use` when everything under the path goes upstream, whatever is
+declared after it, a method a local path lacks included.
+
+`HEAD` reaches the upstream as a `HEAD`, and `OPTIONS` as an `OPTIONS`: a
+CORS preflight is forwarded unless `cors()` is given to `use` before the
+route.
+
+### Inside a route
 
 The proxy is also a route middleware, for one route, with that route's own
 options; its handler is never reached:
@@ -116,7 +154,9 @@ alxia().use(async (_ctx, next) => next({ tenant: 'acme' })).use(tenant); // comp
 ## Spec-first apps
 
 `proxy()` given to `use()` and `proxy.mount()` declare no route. A proxy given to a
-route is one: `@alxia/openapi`'s `matchesSpec` ignores routes that are not in
-the spec by default, and reports them under `strict: true`.
+route is one, `all('/api/*', proxy(url))` as `ALL /api/*`: `@alxia/openapi`'s
+`matchesSpec` ignores routes that are not in the spec by default, and
+reports them under `strict: true`. An `all` route serves no operation of the
+document: an operation under its path needs a route of its own.
 
 Next: [Headers](headers.md), [Mounting a prefix](mounting.md), [Failures](failures.md).

@@ -4,6 +4,7 @@
  * context, which an app's inferred type names and a plugin is written
  * against.
  */
+export type { AllEnd, AllMethod } from './app/all';
 export type {
 	ParserMethod,
 	StartHookMethod,

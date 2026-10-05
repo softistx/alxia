@@ -15,10 +15,14 @@ bun add -d typescript
 ## The app
 
 `proxy(target)` is a middleware that forwards every request it runs on.
-Given to `use('/api', …)`, it takes every method and path under `/api`.
-`proxy.mount(prefix, target)` is a plugin that takes everything under a
-prefix, and rewrites the old application's redirects and cookies back under
-it. What is declared before either runs first: the guard, the rate limit.
+Given to `all('/api/*', …)`, it is one route for every method and path
+under `/api`, beside which a local route — `/api/me` here — keeps its own
+methods, declared before or after it. Given to `use('/api', …)` instead, it
+would take every request under `/api`, and shadow a route declared after it
+there. `proxy.mount(prefix, target)` is a plugin that takes everything under
+a prefix, and rewrites the old application's redirects and cookies back
+under it. What is declared before any of them runs first: the guard, the
+rate limit.
 
 ```ts
 // file: src/app.ts
@@ -41,8 +45,8 @@ export function gateway(services: { users: string; legacy: string }) {
 			// Location and cookies rebased under /legacy.
 			.plugin(proxy.mount('/legacy', services.legacy))
 			.use(bearer({ jwt }))
-			.use(
-				'/api',
+			.all(
+				'/api/*',
 				proxy(services.users, {
 					rewrite: '/api', // /api/users/7 → /users/7, the query kept
 					timeout: 5_000,
@@ -56,6 +60,8 @@ export function gateway(services: { users: string; legacy: string }) {
 					},
 				}),
 			)
+			// A route of its own under /api: answered here, though declared after.
+			.get('/api/me', ({ user, reply }) => reply(200, { id: user.sub }))
 	);
 }
 ```
@@ -116,6 +122,14 @@ test('/api needs a token, and the service gets the user, not the token', async (
 	expect(await response.json()).toEqual({ path: '/users/7', user: 'u42', token: null });
 });
 
+test('/api/me is answered by the gateway, beside the proxied /api/*', async () => {
+	const token = await jwt.sign({ sub: 'u42' });
+	const response = await app.request('/api/me', {
+		headers: { authorization: `Bearer ${token}` },
+	});
+	expect(await response.json()).toEqual({ id: 'u42' });
+});
+
 test("the old application's redirect and cookie stay under /legacy", async () => {
 	const response = await app.request('/legacy/account');
 	expect(response.status).toBe(302);
@@ -152,8 +166,14 @@ test('/health is answered by the gateway itself', async () => {
   the upstream opens first, so the `101` carries its subprotocol and a dead
   upstream is a 502.
 - **Spec first.** `@alxia/openapi`'s `matchesSpec` ignores the requests a
-  proxy forwards by default (`use()` and `mount` declare no route) and
-  reports a route outside the document only under `strict`.
+  proxy forwards by default: `mount` declares no route, and the `all`
+  route is reported in `extra` as `ALL /api/*`, a failure only under
+  `strict`.
+- **`all` or `use`.** `all('/api/*', proxy(url))` is one route, in the route
+  table; a path of its own under it (`/api/me`) answers its other methods
+  with a 405, not the proxy. `use('/api', proxy(url))` forwards everything
+  under `/api` the routes declared before it leave, a method `/api/me`
+  lacks included.
 
 ## Reference
 

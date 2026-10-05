@@ -198,6 +198,12 @@ callback; `use()` compares it with what is in force.
 **Fix:** declare the middleware that gives it before the `use`, as above. If
 the callback does not need `user`, remove the annotation.
 
+On `app.all('/api/*', proxy(…))`, the same proxy is reported as
+``Property 'user' is missing in type 'MiddlewareBase<Empty, "/api/*">' but
+required in type '{ user: … }'``, on the overload whose `end` is a
+middleware: the fix is the same, a `use` that gives it declared before the
+route.
+
 ## Runtime
 
 ### `502 {"error":"bad_gateway"}`
@@ -289,14 +295,35 @@ See [WebSockets](guide/websockets.md#an-upstream-that-cannot-be-reached).
 the same path after `app.use('/api', proxy(…))` is shadowed. This holds for a
 route middleware too: in `app.post('/upload', proxy(url), handler)` the
 handler is not reached.
-**Fix:** declare local routes first:
+**Fix:** declare local routes first, or declare the proxy as one route,
+which shadows nothing:
 
 ```ts
-app.get('/api/health', () => ({ ok: true }));
+app.get('/api/health', ({ reply }) => reply(200, { ok: true }));
 app.use('/api', proxy('http://api.internal:3000', { rewrite: '/api' }));
+
+// or, with core 0.11 or later
+app
+	.all('/api/*', proxy('http://api.internal:3000', { rewrite: '/api' }))
+	.get('/api/health', ({ reply }) => reply(200, { ok: true }));
 ```
 
-See [Basics](guide/basics.md).
+See [Basics](guide/basics.md#as-one-route-all).
+
+### A method on a local path under `all('/api/*', proxy(…))` answers 405
+
+**Why:** `app.all('/api/*', proxy(url))` beside `app.get('/api/health', …)`:
+the router picks the path first, and `/api/health`, a path of its own, has
+no `POST`, so `POST /api/health` is a 405 that allows `GET`, never the
+proxy. A `use('/api', proxy(…))` would have forwarded it.
+**Fix:** give that path an `all` of its own, or use `use`:
+
+```ts
+app
+	.all('/api/*', proxy(url))
+	.get('/api/health', ({ reply }) => reply(200, { ok: true }))
+	.all('/api/health', proxy(url)); // POST /api/health → the upstream
+```
 
 ### A 413 that is not in the app's format, before the proxy runs
 
@@ -375,5 +402,8 @@ const app = alxia({ ip: forwardedIp({ trusted: 1 }) });
 
 **Why:** `proxy()` given to `use()` and `proxy.mount()` declare no route, and
 `@alxia/openapi`'s `matchesSpec` ignores routes that are not in the spec by
-default.
-**Fix:** none needed; pass `strict: true` to `matchesSpec` to have them reported.
+default. `all('/api/*', proxy(url))` is a route, reported in `extra` as
+`ALL /api/*`; it serves no operation.
+**Fix:** none needed; pass `strict: true` to `matchesSpec` to have them
+reported, and `exclude: (route) => route.method === 'ALL'` to leave an `all`
+route out of it.

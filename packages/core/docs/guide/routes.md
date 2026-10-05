@@ -36,14 +36,15 @@ before it passed `next`; they run after the `use` middlewares, `derive`s
 and `decorate`s declared before the route, in the order given ([Middleware](middleware.md#a-routes-middlewares)). An object right
 after the path is the route's options.
 
-`get`, `post`, `put`, `patch`, `delete`, `options`, `head` and `query` take
-the same arguments. `ws` declares a socket ([WebSockets](websockets.md)); `static`,
+`get`, `post`, `put`, `patch`, `delete`, `options`, `head`, `query` and
+`all` take the same arguments ([Every method: `all`](#every-method-all)). `ws` declares a socket ([WebSockets](websockets.md)); `static`,
 `file` and `page` serve files ([Static files](static-files.md)).
 
 ```ts no-check
 interface RouteMethod<M, Ctx, Prefix>
-	extends MiddlewareForms<RouteApp<M, Ctx, Prefix>>,
-		OptionsForms<RouteApp<M, Ctx, Prefix>> {}
+	extends MiddlewareForms<RouteApp<Method, Ctx, Prefix>>,
+		OptionsForms<RouteApp<Method, Ctx, Prefix>> {}
+// every method shares one set of forms: no form reads the method
 
 // MiddlewareForms: one overload per count of middlewares, 0 to 8. With two:
 <const Path extends RoutePath, R1 extends MiddlewareReturn, R2 extends MiddlewareReturn, Result extends …>(
@@ -105,6 +106,78 @@ It is in the `Allow` of a 405 on its path, like any route. The OpenAPI document 
 `query` operation (OpenAPI 3.2), and `@alxia/cors` allows it by default. A cache does not:
 `@alxia/cache` keys `GET` and `HEAD` only, as a `QUERY`'s key would have to
 include its body.
+
+### Every method: `all`
+
+`all` declares one route for every method at its path: what a proxy, a
+GraphQL-style endpoint or a handler that reads `request.method` itself is
+declared with. It is a route like `get`'s — the same middlewares, typed
+the same, `validate`, `responds`, the options, `defineRoutes` and
+`Register` — listed in `app.routes` as `ALL`:
+
+```ts
+import { alxia, validate } from '@alxia/core';
+import { z } from 'zod';
+
+const app = alxia()
+	.get('/hooks/:source', ({ params, reply }) => reply(200, deliveries(params.source)))
+	.all('/hooks/:source', validate({ params: z.object({ source: z.enum(['github', 'stripe']) }) }), ({ params, request, reply }) =>
+		reply(202, record(params.source, request.method)),
+	);
+// GET  /hooks/github → the get route
+// POST /hooks/github → the all route, as PUT, DELETE, … would be
+```
+
+Its last argument may also be a middleware that answers in place of a
+handler — `proxy(url)` from `@alxia/proxy` is one — with the options before
+it, and nothing between them: the chain in force (`use`, `derive`, a
+group's) runs first. Its `Response` is sent, as a middleware's is, and its
+`next()` answers 404, since nothing is after it. Only `all` takes one: a
+handler of any other route returns a reply.
+
+```ts
+import { alxia } from '@alxia/core';
+import { proxy } from '@alxia/proxy';
+
+const app = alxia()
+	.use(auth)
+	.all('/api/*', { bodyLimit: 1024 * 1024 }, proxy('http://users.internal:8080', { rewrite: '/api' }));
+```
+
+Which route answers a request at its path:
+
+- **A route of the path's own method wins**, whatever the order declared:
+  `get('/r')` answers `GET /r` beside `all('/r')`. The explicit route is
+  the narrower declaration, as a literal segment wins over a parameter.
+- **`HEAD`** goes to the path's `HEAD` route, else its `GET` (sent without
+  the body), else the `all` route, also sent without a body: its handler
+  sees `HEAD` and may answer it as a `GET`.
+- **`OPTIONS`** reaches the `all` route like any method, a CORS preflight
+  included. `@alxia/cors` given to `use` before it answers the preflight
+  first.
+- **No 405 at its path.** Every method has a route there, a custom one
+  (`PROPFIND`) included, so the path never answers 405, and its 405
+  hint and `Allow` never apply.
+- **A socket's upgrade** is not one of its methods: it needs a `ws` route,
+  which wins at the same path; without one, it is a `GET`.
+- **The path is chosen before the method** ([Which route answers](#which-route-answers)):
+  `all('/api/*')` beside `get('/api/health')` leaves `/api/health` its own
+  path, so `POST /api/health` is a 405 that allows `GET`, not the `all`
+  route. Give `/api/health` an `all` of its own, or leave it to the wildcard.
+
+In a group or a plugin with a prefix, the path is under it, behind its
+chain, as any route; a `fork()` copies it. In dev, the route table lists it
+as `ALL`, and a 404's hint offers it whatever the request's method.
+`@alxia/openapi`'s `matchesSpec` reads it as `ALL /api/*`: it serves no
+operation of the document, and is reported in `extra`, a failure under
+`strict`.
+
+`all` or `use(path, …)`: a middleware given to `use('/api', …)` runs on
+every request under `/api` that reaches a route declared after it, and on
+those no route matches, so it shadows the routes after it there; it adds
+nothing to `app.routes`. `all('/api/*', …)` is one route: the routes beside
+it keep their methods, the route table and `matchesSpec` see it, and a 404
+elsewhere never runs it.
 
 ### Routes as data: `route`
 
@@ -780,7 +853,8 @@ sees the 404 (`ctx.route` is `undefined` there).
 | a socket's path, without an upgrade | 426 | `{ "error": "upgrade_required" }` |
 
 `HEAD` on a path with a `GET` and no `HEAD` of its own runs the `GET` route
-and sends its headers without the body.
+and sends its headers without the body. A path with an `all` route answers
+every method, and never a 405 ([Every method: `all`](#every-method-all)).
 
 ## Any Standard Schema
 

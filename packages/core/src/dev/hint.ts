@@ -55,7 +55,9 @@ export function closestRoute(
 		// A route none of whose words is close to one asked is no suggestion.
 		if (!sharesAWord(asked, route)) continue;
 		const same =
-			routeMethod === method || (method === 'HEAD' && routeMethod === 'GET');
+			routeMethod === method ||
+			routeMethod === 'ALL' ||
+			(method === 'HEAD' && routeMethod === 'GET');
 		const distance = segmentDistance(asked, route) + (same ? 0 : OTHER_METHOD);
 		if (distance <= least) {
 			// A tie goes to the route declared first.

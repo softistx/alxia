@@ -54,7 +54,8 @@ export type StopHook = () => MaybePromise<void>;
 
 /** A route as the app runs it: its options, its handler, and the middlewares declared before it. */
 export interface RouteDefinition {
-	readonly method: Method;
+	/** Its method; `ALL` for an `all` route, which takes every method its path has no route of its own for. */
+	readonly method: Method | 'ALL';
 	readonly path: string;
 	/**
 	 * Its options — `detail`, `bodyLimit` — for a tool that reads

@@ -15,9 +15,6 @@ Nothing scheduled yet.
   the sender on the other, instead of frames piling up in memory.
 - **Several upstreams behind one proxy.** Load balancing over a list of
   targets, and retries of a request that never reached an upstream.
-- **An any-method route form.** `app.all(path, proxy(url))`, when core gains
-  `.all()`, so a proxied path is a route the router and the spec can see
-  rather than a `use()` prefix.
 - **HTTP/2 to the upstream.** A proxy that talks HTTP/2 to an upstream that
   offers it.
 
@@ -39,6 +36,15 @@ Nothing scheduled yet.
   each.
 
 ## Shipped
+
+### Next release
+
+- **The proxy as one route.** `app.all('/api/*', proxy(url))`, with
+  `@alxia/core`'s `all`, declares a proxied path as a route the router, the
+  route table and `matchesSpec` see, for every method, beside which a local
+  route keeps its own methods; the guide compares it with `use('/api', …)`,
+  which shadows the routes declared after it
+  ([The basics](guide/basics.md#as-one-route-all)).
 
 ### 0.2.0
 

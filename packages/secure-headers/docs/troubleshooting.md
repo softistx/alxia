@@ -170,7 +170,7 @@ app.use(secureHeaders());
 **When:** a route or a middleware reads `nonce` from its context.
 
 ```text
-error TS2339: Property 'nonce' does not exist on type 'RouteBase<RouteApp<"GET", Empty, "">, "/">'.
+error TS2339: Property 'nonce' does not exist on type 'RouteBase<RouteApp<Method, Empty, "">, "/">'.
 error TS2339: Property 'nonce' does not exist on type 'BaseContext & Empty'.
 ```
 
