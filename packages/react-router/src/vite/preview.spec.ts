@@ -10,10 +10,8 @@ import {
 import { mkdir } from 'node:fs/promises';
 import { join } from 'node:path';
 import type { PreviewServer } from 'vite';
-import { BROWSER, copyFixture } from '../../test/fixture';
+import { browser, copyFixture } from '../../test/fixture';
 import { build, type Fixture, previewServer } from '../../test/vite';
-
-const browser = { 'user-agent': BROWSER };
 
 describe('vite preview, after react-router build', () => {
 	let fixture: Fixture;
