@@ -88,11 +88,23 @@ function pluginApp(
 			'plugin(): the plugin is neither an app nor a function that returns one; a middleware is given to use()',
 		);
 	}
-	const result: unknown = plugin(app);
+	// A middleware given here is called with the app and this `next`: one
+	// that calls it is told the same as one that returns something else.
+	const result: unknown = plugin(app, notNext);
 	if (isApp(result)) return result;
 	if (result instanceof Promise) result.catch(() => {});
 	throw new TypeError(
-		`plugin(): the plugin function returned ${result instanceof Promise ? 'a promise' : typeof result}, not an app: a plugin returns the app it is given; a middleware is given to use()`,
+		`plugin(): the plugin function returned ${result instanceof Promise ? 'a promise' : typeof result}, not an app: ${notAnApp}`,
+	);
+}
+
+const notAnApp =
+	'a plugin returns the app it is given; a middleware is given to use()';
+
+/** The `next` a plugin function is given: a middleware's call of it throws. */
+function notNext(): never {
+	throw new TypeError(
+		`plugin(): the plugin function called next(): ${notAnApp}`,
 	);
 }
 

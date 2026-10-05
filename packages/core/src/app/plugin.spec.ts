@@ -107,6 +107,10 @@ describe('app.plugin, given what is no plugin', () => {
 		expect(() => untyped(stamp)).toThrow(
 			'plugin(): the plugin function returned object, not an app',
 		);
+		const sync = (_ctx: object, next: () => unknown) => next();
+		expect(() => untyped(sync)).toThrow(
+			'plugin(): the plugin function called next(): a plugin returns the app it is given; a middleware is given to use()',
+		);
 		await new Promise((resolve) => setTimeout(resolve, 10));
 		expect(unhandled).toEqual([]);
 		expect(requests).toBe(1);

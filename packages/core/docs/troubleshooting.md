@@ -1740,7 +1740,8 @@ refuse it, so this comes from JavaScript or a cast.
 `plugin(): the plugin function returned a promise, not an app: …` — most
 often because it is a middleware, `app.plugin(cors())`, the 0.3 form
 0.5 removed. `plugin` calls the function with the app, once; a middleware
-that calls `next` right away throws first, `next is not a function`.
+that calls `next` right away is told `plugin(): the plugin function called
+next(): …`, the same advice.
 
 **Why:** a plugin is a function too, `(app) => app`, run once when it is
 mounted. A middleware called that way would guard nothing; a result that
