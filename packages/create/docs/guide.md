@@ -503,7 +503,7 @@ const api = createClient<paths>({
   headers: { "x-api-key": env.API_KEY },
 });
 
-test("routes every operation of openapi.yaml, and nothing else", () => {
+test("routes every operation of openapi.yaml", () => {
   matchesSpec(app, operations);
 });
 
