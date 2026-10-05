@@ -6,6 +6,12 @@ under that name. The `@alxia/openapi` of 0.1.0 to 0.3.0, which wrote an OpenAPI
 document from an app's route schemas, is retired; its changelog is
 [in the repository's history](https://github.com/softistx/alxia/blob/3f80253/packages/openapi/CHANGELOG.md).
 
+## 0.4.1
+
+### Patch Changes
+
+- [#135](https://github.com/softistx/alxia/pull/135) [`3c00925`](https://github.com/softistx/alxia/commit/3c00925eead5f8409d23f1920ac07f92fbe72c00) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs: the generator notes now describe `@nxgt/openapi-codegen` 0.7.0, which validates cookie parameters as `cookies` and generates named server-sent events with JSON data.
+
 ## 0.4.0
 
 ### Minor Changes

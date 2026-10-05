@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.1.7
+
+### Patch Changes
+
+- [#135](https://github.com/softistx/alxia/pull/135) [`3c00925`](https://github.com/softistx/alxia/commit/3c00925eead5f8409d23f1920ac07f92fbe72c00) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `api` template pins `@nxgt/openapi-codegen` at exactly 0.7.0, which writes alxia's own 400 body, validates `in: cookie` parameters as `cookies` and supports named server-sent events; its committed `src/generated/` is regenerated.
+
 ## 0.1.6
 
 ### Patch Changes
