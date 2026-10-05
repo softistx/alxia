@@ -45,6 +45,7 @@ describe('create-alxia: the minimal and graphql projects written', () => {
 			'@alxia/core': ALXIA['@alxia/core'],
 			'@alxia/env': ALXIA['@alxia/env'],
 			'@alxia/graphql': ALXIA['@alxia/graphql'],
+			dataloader: '^2.2.3',
 			graphql: '^17.0.2',
 			'graphql-yoga': '^5.24.1',
 			zod: '^4.6.5',

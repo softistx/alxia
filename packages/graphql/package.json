@@ -43,6 +43,7 @@
 	"devDependencies": {
 		"@alxia/core": "workspace:^",
 		"@types/bun": "^1.4.2",
+		"dataloader": "^2.2.3",
 		"graphql": "^16.11.0",
 		"graphql-yoga": "^5.16.0"
 	},

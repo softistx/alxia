@@ -129,6 +129,18 @@ export const db = {
 // What a subscription streams: a mutation publishes, `noteAdded` subscribes.
 // One process only: across several, back it with a broker.
 export const pubsub = createPubSub<{ noteAdded: [NoteRecord] }>();
+
+// How many times the store was asked for users: a stand-in for a database's
+// query log. `findUsers` is one query however many ids it is given.
+export const queries = { users: 0 };
+
+// The batch behind `loaders.user` ([section 4](#4-batching-with-dataloader-n1)):
+// one `WHERE id IN (...)` in a database. It answers each id in order, an
+// Error for one that is missing.
+export async function findUsers(ids: readonly string[]): Promise<(UserRecord | Error)[]> {
+	queries.users += 1;
+	return ids.map((id) => db.users.get(id) ?? new Error(`No user ${id}`));
+}
 ```
 
 ```ts
@@ -146,6 +158,7 @@ export const jwt = createJwt({
 import { alxia, defineMiddleware, health } from '@alxia/core';
 import type { GraphQLContext } from '@alxia/graphql';
 import { jwt } from './jwt';
+import type { Loaders } from './loaders';
 import { db } from './store';
 
 // The user the bearer token names, or null: a bad token is anonymous here,
@@ -164,9 +177,11 @@ export const base = alxia({ errors: 'problem' })
 	.decorate({ db })
 	.use(viewerOf);
 
-// A resolver's context: Yoga's, and the base's (`db`, `viewer`).
-// The generated `Resolvers` takes it (codegen.ts: `contextType`).
-export type Context = GraphQLContext<typeof base>;
+// A resolver's context: Yoga's, the base's (`db`, `viewer`) and the
+// per-request `loaders` that `src/app.ts`'s `context` option builds
+// ([section 4](#4-batching-with-dataloader-n1)). The generated `Resolvers`
+// takes it (codegen.ts: `contextType`).
+export type Context = GraphQLContext<typeof base, { loaders: Loaders }>;
 ```
 
 ## 3. Typed resolvers
@@ -221,11 +236,8 @@ export const resolvers: Resolvers = {
 		},
 	},
 	Note: {
-		author: (note, _, { db }) => {
-			const author = db.users.get(note.authorId);
-			if (author === undefined) throw new Error(`No user ${note.authorId}`);
-			return author;
-		},
+		// The notes of one query load their authors in one batch: see section 4.
+		author: (note, _, { loaders }) => loaders.user.load(note.authorId),
 	},
 };
 ```
@@ -244,12 +256,53 @@ import { resolvers } from './resolvers';
 export const schema = createSchema<Context>({ typeDefs, resolvers });
 ```
 
-## 4. Mount it, with the IDE and the drain
+## 4. Batching with DataLoader (N+1)
+
+`Note.author` runs once per note. Resolved with `db.users.get` that is cheap,
+but with a database it is one query per note: a list of 50 notes makes 51
+queries, the N+1 problem. [DataLoader](https://github.com/graphql/dataloader)
+collects the `load(id)` calls made in the same tick of a request and calls
+your function once with all the ids.
+
+```sh
+bun add dataloader
+```
+
+```ts
+// file: src/loaders.ts
+import DataLoader from 'dataloader';
+import { findUsers } from './store';
+
+// The loaders of ONE request: `context` in src/app.ts calls this per request.
+export function createLoaders() {
+	return { user: new DataLoader(findUsers) };
+}
+
+export type Loaders = ReturnType<typeof createLoaders>;
+```
+
+**Build the loaders per request, in the `context` option.** The option runs
+for each request and what it returns is merged into the context, typed
+through `GraphQLContext`'s second argument (`Context` in section 2), so
+`loaders.user.load` is typed in every resolver. Do not make the loaders
+module-level or `decorate` them on the app:
+
+- A DataLoader **caches** every key it has loaded. One shared by all requests
+  keeps a user's data for the life of the process: it serves a stale record
+  after an update, grows without bound, and, for a loader that reads with the
+  viewer's permissions, hands one user's data to the next. A loader per
+  request caches only within that request, where one viewer sees one
+  consistent snapshot.
+- Its batching window is a tick of the event loop; the loaders of one
+  request need no coordination with another's.
+
+## 5. Mount it, with the IDE and the drain
 
 ```ts
 // file: src/app.ts
 import { graphql } from '@alxia/graphql';
 import { base } from './context';
+import { createLoaders } from './loaders';
 import { schema } from './schema';
 
 // GET and POST /graphql, behind the base's middlewares. Subscriptions are
@@ -258,6 +311,8 @@ import { schema } from './schema';
 export const app = base.plugin((app) =>
 	graphql(app, {
 		schema,
+		// The loaders, anew for each request: never share their cache.
+		context: () => ({ loaders: createLoaders() }),
 		logging: false, // Yoga's logger, quiet here
 	}),
 );
@@ -298,7 +353,7 @@ the `code`. `errors: 'problem'` changes the HTTP layer around the endpoint
 alone: a 413, a 500 from a middleware, a 405. To put a resolver's error on
 an HTTP status too, give the extension `http: { status: 401 }`.
 
-## 5. Test it, in process
+## 6. Test it, in process
 
 ```ts
 // file: src/app.spec.ts
