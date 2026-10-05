@@ -13,6 +13,7 @@ nothing of its own; past the limit it answers a 429.
 **Startup**
 
 - [`TypeError: rateLimit: … must be a whole number of 1 or more, not …`](#typeerror-ratelimit--must-be-a-whole-number-of-1-or-more-not-)
+- [`TypeError: rateLimit: limit … differs from the store's policy of …`](#typeerror-ratelimit-limit--differs-from-the-stores-policy-of-)
 
 **Responses**
 
@@ -126,6 +127,27 @@ let an empty or non-numeric value still fail at startup, as it should:
 
 ```ts
 app.use(rateLimit({ limit: Number(Bun.env.RATE_LIMIT ?? 100), windowMs: 60_000 }));
+```
+
+### `TypeError: rateLimit: limit … differs from the store's policy of …`
+
+**When:** `rateLimit()` is given a `store` that declares its own `policy`
+(`redisStore(handle.limits.api, api)`) and a `limit` or a `windowMs` that is
+not the store's. It throws at declaration, so the app fails at startup:
+
+```text
+TypeError: rateLimit: limit 50 differs from the store's policy of 100 per 60000ms. Leave limit and windowMs out to use the store's, or give the same numbers.
+```
+
+**Why:** the store counts by its policy, and the `RateLimit-*` headers are
+written from the numbers `rateLimit` holds: two values would make the headers
+say what the store does not enforce. (`windowMs` reads the same way.)
+
+**Fix:** leave `limit` and `windowMs` out; they come from the store. To change
+the rate, change the definition the store reads it from:
+
+```ts
+app.use(rateLimit({ store: redisStore(handle.limits.api, api) }));
 ```
 
 ## Responses

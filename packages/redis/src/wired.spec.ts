@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
-import { rateLimit } from '@alxia/rate-limit';
+import { type RateLimitStore, rateLimit } from '@alxia/rate-limit';
 import {
 	bindRateLimit,
 	defineIdempotency,
@@ -52,7 +52,7 @@ const open = () =>
 const keys = async () =>
 	((await db.client.send('KEYS', ['*'])) as string[]).sort();
 
-const limited = (store: ReturnType<typeof redisStore>) =>
+const limited = (store: RateLimitStore) =>
 	alxia({ ip: () => '1.2.3.4' })
 		.use(rateLimit({ limit: 2, windowMs: 60_000, store }))
 		.get('/', ({ reply }) => reply(200, 'ok'));

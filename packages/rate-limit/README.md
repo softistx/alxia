@@ -32,10 +32,10 @@ IETF draft's `RateLimit-Limit`, `-Remaining`, `-Reset` and `-Policy`.
 
 | option | default | |
 | --- | --- | --- |
-| `limit` | required | requests per window: a whole number, 1 or more |
-| `windowMs` | required | the window, in milliseconds: a whole number, 1 or more |
+| `limit` | required, unless the store has a `policy` | requests per window: a whole number, 1 or more |
+| `windowMs` | required, unless the store has a `policy` | the window, in milliseconds: a whole number, 1 or more |
 | `key` | the client's address | what is counted: `(ctx) => string \| undefined`; `undefined` is not counted. `rateLimit<{ user: User }>(…)` lets it read a `user` an earlier middleware adds |
-| `store` | `MemoryStore` | where: `redisStore` from `@alxia/redis`, or your own `RateLimitStore` |
+| `store` | `MemoryStore` | where: `redisStore` from `@alxia/redis`, or your own `RateLimitStore`. A store with a `policy` gives `limit` and `windowMs` |
 | `skip` | none | requests not counted |
 | `headers` | `'draft'` | `'legacy'` for `X-RateLimit-*`, or `false` |
 
@@ -61,8 +61,18 @@ import { redisStore } from '@alxia/redis';
 app.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis, { name: 'api' }) }));
 ```
 
-A store of your own implements `RateLimitStore`: `consume(key, { limit,
-windowMs })` decides — `allowed`, `remaining`, `resetAfter` and
+A store that counts by a rate of its own declares it as `policy: { limit,
+windowMs }`, and `rateLimit({ store })` reads both from it, headers included:
+the numbers are written once. `redisStore(handle.limits.api, api)` does, from
+the definition `api`. A `limit` or `windowMs` given beside it that differs
+throws at declaration.
+
+```ts
+app.use(rateLimit({ store: redisStore(handle.limits.api, api) }));
+```
+
+A store of your own implements `RateLimitStore` (and, to count by a rate of
+its own, the optional `policy`): `consume(key, { limit, windowMs })` decides — `allowed`, `remaining`, `resetAfter` and
 `retryAfter`, delays in milliseconds — and a refused request counts
 nothing.
 
@@ -72,7 +82,7 @@ nothing.
 | --- | --- |
 | `rateLimit(options)` | the middleware: gives `rateLimit` to what runs after it, or answers the 429 |
 | `MemoryStore` | a fixed window in one process's memory |
-| `RateLimitStore`, `Decision`, `Policy` | a store's contract |
+| `RateLimitStore`, `Decision`, `Policy`, `PolicyStore` | a store's contract; `PolicyStore` is a store with its own `policy`, which `rateLimit` reads `limit` and `windowMs` from |
 | `RateLimit`, `RateLimitedBody`, `RateLimitInfo`, `RateLimitOptions` | its types: `RateLimit<Requires>` is the middleware `rateLimit()` returns |
 
 ## Documentation

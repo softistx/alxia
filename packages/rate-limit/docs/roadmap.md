@@ -32,6 +32,16 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### 0.4.0: a store with a policy
+
+- **The rate, written once.** A store may declare `policy?: { limit,
+  windowMs }` (`PolicyStore` is one that does). `rateLimit({ store })` then
+  reads `limit` and `windowMs` from it, both optional in the type, headers
+  included; without a policy they stay required. A `limit` or `windowMs` that
+  differs from the policy throws at declaration. `@alxia/redis`'s
+  `redisStore(handle.limits.api, api)` is such a store. Every existing form
+  works as before.
+
 ### 0.1.0
 
 - **A rate limit as a plugin**, the 0.1 form. `rateLimit({ limit, windowMs })` counts
