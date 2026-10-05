@@ -32,7 +32,6 @@ print, or — for a trap that prints nothing — the symptom.
 - [`zod: no release within ^4.2.0; kept ^4.2.0`](#zod-no-release-within-420-kept-420)
 - [`@alxia/core: the registry has no release within ^0.3.1 yet; wrote ^0.3.0, the newest of ~0.3.0`](#alxiacore-the-registry-has-no-release-within-031-yet-wrote-030-the-newest-of-030)
 - [`create-alxia: bun install failed; the files are written.`](#create-alxia-bun-install-failed-the-files-are-written)
-- [`warn: incorrect peer dependency "typescript@7.0.2"`](#warn-incorrect-peer-dependency-typescript702)
 
 **After**
 
@@ -48,7 +47,6 @@ print, or — for a trap that prints nothing — the symptom.
 - [`src/generated/` changes after moving `@nxgt/openapi-codegen`](#srcgenerated-changes-after-moving-nxgtopenapi-codegen)
 - [`TypeError: matchesSpec(): 1 operation has no route: DELETE /todos/:id (deleteTodo)`](#typeerror-matchesspec-1-operation-has-no-route-delete-todosid-deletetodo)
 - [`ResponseValidationError: POST /todos: the 201 reply does not match its schema`](#responsevalidationerror-post-todos-the-201-reply-does-not-match-its-schema)
-- [``cookie parameter `session` is not supported [unsupported_parameter]``](#cookie-parameter-session-is-not-supported-unsupported_parameter)
 
 **Biome**
 
@@ -255,23 +253,6 @@ the next steps.
 **Fix:** what its output says, then `cd my-app && bun install`. The
 project is complete; only `node_modules` is missing.
 
-### `warn: incorrect peer dependency "typescript@7.0.2"`
-
-**When:** `bun install` in a new `api` project, the one `bun create @alxia`
-runs included, prints it once and finishes.
-
-**Why:** the project gets the newest TypeScript alxia's packages accept,
-`^6.0.3 || ^7.0.0`, and `@nxgt/openapi-codegen` 0.6.0, the generator the
-template pins, declares `typescript` `^6.0.3` alone. The generator never
-loads TypeScript, so nothing fails: `bun run generate`, `typecheck`, `test`
-and `build` all pass.
-
-**Fix:** none is needed. To silence it, hold the project to TypeScript 6:
-
-```sh
-bun add -d typescript@^6.0.3
-```
-
 ## After
 
 ### `error: lockfile had changes, but lockfile is frozen`
@@ -445,7 +426,7 @@ A change made by hand in `src/generated/` is lost: make it in
 right after `bun add --dev --exact @nxgt/openapi-codegen@…`, with no
 change to `openapi.yaml`.
 
-**When:** the generator moved to another minor, `0.6.x` to `0.7.0`. A new
+**When:** the generator moved to another minor, `0.7.x` to `0.8.0`. A new
 project never hits it: the command keeps the template's version
 ([Versions](guide.md#versions)).
 
@@ -464,8 +445,8 @@ bun run verify
 
 The diff is what the new release writes differently; `bun run verify`
 tells whether the app still compiles and passes against it. To stay
-where you were, pin the previous version again:
-`bun add --dev --exact @nxgt/openapi-codegen@0.6.0`.
+where you were, pin the previous version again, `0.7.0` after a move to `0.8.0`:
+`bun add --dev --exact @nxgt/openapi-codegen@0.7.0`.
 
 ### `TypeError: matchesSpec(): 1 operation has no route: DELETE /todos/:id (deleteTodo)`
 
@@ -528,34 +509,6 @@ reply.created({ id: todo.id, title: todo.title, done: todo.done }) // Todo: { id
 
 The other forms of the error, and how to turn the check off, are in
 [`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#responsevalidationerror--the-200-reply-does-not-match-its-schema).
-
-### ``cookie parameter `session` is not supported [unsupported_parameter]``
-
-```text
-error openapi.yaml#/paths/~1todos/get/parameters/0/in: cookie parameter `session` is not supported [unsupported_parameter]
-```
-
-**When:** `bun run generate`, once `openapi.yaml` declares a parameter
-`in: cookie`. It writes nothing and exits 1.
-
-**Why:** `@nxgt/openapi-codegen` 0.6.0 does not generate cookie
-parameters, and refuses the whole spec rather than leave one out.
-
-**Fix:** take the parameter out of `openapi.yaml`, and read the cookie in
-the app: in a middleware, or with a `validate({ cookies })` placed among
-the route's middlewares:
-
-```ts
-import { alxia, validate } from "@alxia/core";
-import { z } from "zod";
-import { operations } from "./generated/alxia";
-
-export const app = alxia().route(
-  operations.listTodos,
-  validate({ cookies: z.object({ session: z.string() }) }),
-  ({ cookies, reply }) => reply.ok(todosOf(cookies.session)),
-);
-```
 
 ## Biome
 

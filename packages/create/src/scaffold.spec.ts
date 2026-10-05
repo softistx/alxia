@@ -38,7 +38,7 @@ describe('create-alxia: the project written', () => {
 				'@alxia/openapi': ALXIA['@alxia/openapi'],
 				// Pinned exactly, as its output is committed: never moved, so
 				// `verify` still passes when a newer patch writes differently.
-				'@nxgt/openapi-codegen': '0.6.0',
+				'@nxgt/openapi-codegen': '0.7.0',
 				'@types/bun': '^1.4.2',
 				typescript: '^7.0.2',
 			},

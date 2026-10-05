@@ -174,8 +174,10 @@ schema.
   alxia's `{ error: 'validation', issues }` in the spec.
 - The generator does not turn `security` into a middleware: write one with
   `defineMiddleware` and give it to `route(operation, auth, handler)`.
-- In `@nxgt/openapi-codegen` 0.6.0, a `cookie` parameter makes the generator
-  refuse the whole document: read the cookie in a middleware instead.
+- In `@nxgt/openapi-codegen` 0.7.0, a `cookie` parameter is validated as
+  `cookies` by `alxia.ts` alone: the client files leave it out with an
+  `ignored` warning, since a client does not set cookies. A cookie that is a
+  list or an object fails the run.
 
 ## Coming from `@alxia/openapi` 0.3 or `@alxia/openapi-routes`
 

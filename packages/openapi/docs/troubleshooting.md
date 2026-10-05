@@ -14,10 +14,10 @@ name of `matchesSpec`: read the same entry.
 - [`TypeError: implemented(): the prefix "…" must start with "/" and not end with one`](#typeerror-implemented-the-prefix--must-start-with--and-not-end-with-one)
 - [`TypeError: implemented(): "…": ":…" is not a parameter name`](#typeerror-implemented---is-not-a-parameter-name)
 
-**Generator** (`@nxgt/openapi-codegen` 0.6.0)
+**Generator** (`@nxgt/openapi-codegen` 0.7.0)
 
-- [``cookie parameter `…` is not supported [unsupported_parameter]``](#cookie-parameter--is-not-supported-unsupported_parameter)
-- [`alxia.ts leaves it out. Its … reply streams events alxia cannot send … [ignored]`](#alxiats-leaves-it-out-its--reply-streams-events-alxia-cannot-send--ignored)
+- [`alxia.ts leaves it out. … [ignored]`](#alxiats-leaves-it-out--ignored)
+- [A cookie parameter is missing from `types.ts` and the client files](#a-cookie-parameter-is-missing-from-typests-and-the-client-files)
 - [A client refuses alxia's 400, or types it `{ status, message, timestamp, issues }`](#a-client-refuses-alxias-400-or-types-it--status-message-timestamp-issues-)
 
 **Types**
@@ -157,50 +157,58 @@ These come from `bunx nxgt-openapi generate`, with `alxia: true`, before
 any check runs. Its guide lists every
 [diagnostic](https://github.com/softistx/nxgt-http/blob/develop/packages/openapi-codegen/docs/guide/diagnostics.md).
 
-### ``cookie parameter `…` is not supported [unsupported_parameter]``
+### `alxia.ts leaves it out. … [ignored]`
 
 ```text
-error openapi.yaml#/paths/~1me/get/parameters/0/in: cookie parameter `session` is not supported [unsupported_parameter]
+warning openapi.yaml#/paths/~1feed/get: watchFeed: alxia.ts leaves it out. Its 200 reply streams the event `ping` with text data [ignored]
 ```
 
-**When:** an operation declares a parameter `in: cookie`. 0.6.0 refuses
-the whole document, with `alxia` on or off, writes no file, and exits 1.
+**When:** a reply is `text/event-stream` whose event has text data, or
+whose `itemSchema` names no events, so each event's data is not JSON.
 
-**Why:** the generator does not read cookie parameters yet.
+**Why:** the generated `eventStream({ name: schema })` sends each event's
+data as JSON, so 0.7.0 leaves the operation out of `alxia.ts` rather than
+type it wrongly. It is not in `operations`, so `implemented` does not list
+it either. Named events whose data is JSON are generated.
 
-**Fix:** remove the parameter from the spec, and read the cookie on the
-server in a middleware, or validate it with `validate({ cookies })`:
-
-```ts
-import { defineMiddleware } from '@alxia/core';
-
-const session = defineMiddleware(({ cookies, reply }, next) => {
-	const id = cookies['session'];
-	return id === undefined ? reply(401, { error: 'unauthorized' as const }) : next({ sessionId: id });
-});
-
-app.route(operations.getMe, session, ({ sessionId, reply }) => reply.ok(findUser(sessionId)));
-```
-
-### `alxia.ts leaves it out. Its … reply streams events alxia cannot send … [ignored]`
-
-```text
-warning openapi.yaml#/paths/~1feed/get: watchFeed: alxia.ts leaves it out. Its 200 reply streams events alxia cannot send: its eventStream sends unnamed events, each its data as JSON [ignored]
-```
-
-**When:** a reply is `text/event-stream` whose `itemSchema` declares named
-events, or data that is not JSON.
-
-**Why:** the generated `eventStream(schema)` describes unnamed events, each
-its data as JSON, so 0.6.0 leaves the operation out of `alxia.ts` rather
-than type it wrongly. It is not in `operations`, so `implemented` does not
-list it either.
-
-**Fix:** declare the route by hand, with `eventStream` from `@alxia/core`,
-which takes a schema per event name
+**Fix:** give each event's data `contentMediaType: application/json` and a
+`contentSchema` in the spec, as below, or declare the route by hand, with
+`eventStream` from `@alxia/core`, which takes a schema per event name
 ([server-sent events](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/server-sent-events.md)).
+
+```yaml
+text/event-stream:
+  itemSchema:
+    type: object
+    properties:
+      event: { const: tick }
+      data:
+        contentMediaType: application/json
+        contentSchema: { $ref: '#/components/schemas/Tick' }
+```
+
 Other `ignored` warnings — a `TRACE`, a binary body, a binary, JSON Lines
 or form reply — mean the same: declare the route by hand if you serve it.
+
+### A cookie parameter is missing from `types.ts` and the client files
+
+```text
+warning openapi.yaml#/paths/~1me/get: getMe: types.ts, zod.ts, operations.ts and paths.ts leave out its cookie `session`: a client does not set cookies, the browser or its cookie jar sends them [ignored]
+```
+
+**Symptom:** an operation declares a parameter `in: cookie`, and the
+generator warns `ignored`; the parameter is not in `types.ts`, `zod.ts`,
+`operations.ts` or `paths.ts`.
+
+**Why:** a client does not set cookies, so only `alxia.ts` validates the
+parameter, as `cookies`. Before 0.7.0 the generator refused the whole
+document instead.
+
+**Fix:** none: the route's handler reads the validated `cookies`.
+
+```ts
+app.route(operations.getMe, ({ cookies, reply }) => reply.ok(findUser(cookies.session)));
+```
 
 ### A client refuses alxia's 400, or types it `{ status, message, timestamp, issues }`
 
@@ -343,8 +351,8 @@ hand-written operation, write its path `/pets/:petId`.
 
 **Why:** the operation is not in `operations`. `@nxgt/openapi-codegen`
 leaves out what alxia cannot route or validate yet — a `TRACE`, a binary
-body, JSON Lines, named events — with an `ignored` warning
-([one of them](#alxiats-leaves-it-out-its--reply-streams-events-alxia-cannot-send--ignored)). The check only knows the
+body, JSON Lines, events with text data — with an `ignored` warning
+([one of them](#alxiats-leaves-it-out--ignored)). The check only knows the
 operations it is given.
 
 **Fix:** read the generator's warnings, and declare such a route by hand
