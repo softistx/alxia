@@ -705,7 +705,11 @@ that path, in the order those routes were declared: the `derive`s and
 middlewares of the groups they stand in, prefixed or not, and of a plugin
 mounted in a group. Each owner's chain runs on its own copy of the context
 the app's chain built, so what one group's `derive` adds never reaches
-another group's guard. A hook of the app's chain runs once, and one
+another group's guard. The copy is of the context, not of the objects on
+it: a middleware that changes an object the app's chain added, rather than
+passing `next` a key, changes it for the owners after it, and a header or
+cookie set by an owner that let the request through is on the answer. A
+hook of the app's chain runs once, and one
 group's two routes run its chain once. The first that answers is the
 answer, without `Allow`; once every one called `next`, the 405 is sent
 with it.

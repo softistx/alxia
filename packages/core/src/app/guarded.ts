@@ -10,7 +10,7 @@ import { chain } from './chain';
 import type { ChainHook, Definition, MiddlewareHook } from './definition';
 import { originOf } from './in-force';
 import type { ScopedHooks } from './scope';
-import { matches } from './scope-path';
+import { matches, type ScopePath } from './scope-path';
 import { runOf } from './settled';
 import type { BaseContext } from './types';
 import type { ChainRun } from './validation';
@@ -79,15 +79,25 @@ function ownersOf(chains: readonly ChainHook[][]): MiddlewareHook {
 function same(a: readonly ChainHook[], b: readonly ChainHook[]): boolean {
 	return (
 		a.length === b.length &&
-		a.every((hook, index) => originOf(hook) === originOf(b[index] as ChainHook))
+		a.every((hook, index) => {
+			const other = b[index] as ChainHook;
+			return (
+				originOf(hook) === originOf(other) && whenOf(hook) === whenOf(other)
+			);
+		})
 	);
+}
+
+/** The path a hook runs under alone, if any. */
+function whenOf(hook: ChainHook): ScopePath | undefined {
+	return 'when' in hook ? hook.when : undefined;
 }
 
 /** The hooks of the app's chain a request at `pathname` runs, as declared. */
 function runOn(unmatched: ScopedHooks, pathname: string): Set<ChainHook> {
 	const ran = new Set<ChainHook>();
 	for (const hook of unmatched.derive) {
-		const when = 'when' in hook ? hook.when : undefined;
+		const when = whenOf(hook);
 		if (when === undefined || matches(when, pathname)) {
 			ran.add(originOf(hook) ?? hook);
 		}
