@@ -5,6 +5,7 @@
 
 import { devOf } from '../dev/mode';
 import type { ErrorFormat } from '../errors/problems';
+import { canonicalIp } from '../request/ip-address';
 import { joinPath } from '../router/paths';
 import { Router } from '../router/router';
 import type { ChainHook, Definition, Globals, Runtime } from './definition';
@@ -44,7 +45,10 @@ export function createRuntime(
 		sockets: new Set(),
 		ip:
 			options.ip ??
-			((request, server) => server?.requestIP(request)?.address ?? undefined),
+			((request, server) => {
+				const address = server?.requestIP(request)?.address;
+				return address ? canonicalIp(address) : undefined;
+			}),
 		proxy: proxyOf(options),
 	};
 }

@@ -80,11 +80,15 @@ export {
 	forwardedIp,
 	type TrustedProxies,
 } from './request/forwarded-ip';
+export { canonicalIp } from './request/ip-address';
 export type { Origin } from './request/origin';
 export type { BodyParser } from './request/read';
 export {
 	type Forwarded,
+	type ProxyAllow,
+	type ProxyRefusal,
 	type ProxyTrust,
+	type StrictProxyOptions,
 	type TrustProxyOptions,
 	trustProxy,
 } from './request/trust-proxy';

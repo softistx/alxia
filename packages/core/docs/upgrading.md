@@ -4,6 +4,92 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the next one first: what changed, the code before and
 after, and whether it can break yours.
 
+## Next
+
+The next `@alxia/core` minor gives `ctx.ip` one text per address and adds
+`untrusted: 'refuse-all'`, for an app only its proxies may reach. Nothing
+in its API breaks; the peer range of every package moves.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [Peers move to the next minor](#peers-move-to-the-next-minor) | every package | yes, for an install that holds a package of 0.9 beside the new core: update them together |
+| [`ctx.ip` is one text per address](#ctxip-is-one-text-per-address) | core | notice: an IPv4-mapped address reads as IPv4, IPv6 compressed |
+| [`untrusted: 'refuse-all'` and `allow`](#untrusted-refuse-all-and-allow) | core | no: opt in |
+| [New projects install the new core](#new-projects-install-the-new-core) | create | no: a new project only |
+
+### Peers move to the next minor
+
+Every package's peer on `@alxia/core` moves from `^0.9.0` to the new
+minor's range, which a `^0.9.0` does not accept. Update `@alxia/core` and
+the `@alxia/*` packages you use in one change.
+
+**Can it break your code.** Only the install, as for
+[0.9](#peers-move-to-090).
+
+### `ctx.ip` is one text per address
+
+**What changed.** Every address core reads for `ctx.ip` — the
+connection's by default, and what `forwardedIp` and `trustProxy` read from
+a header or the socket — is given in its canonical text: an IPv4-mapped
+address as IPv4, IPv6 as RFC 5952 writes it (lowercase, no leading zeros,
+the longest zero run as `::`), brackets and a port dropped, a zone id kept
+after the address. A `trusted` function is given the same text.
+
+```ts
+// a dual-stack server, a client at 192.0.2.1
+// before: ctx.ip === '::ffff:192.0.2.1'
+// after:  ctx.ip === '192.0.2.1'
+
+// behind trustProxy, X-Forwarded-For: 2001:DB8:0:0:0:0:0:1
+// before: ctx.ip === '2001:db8:0:0:0:0:0:1'
+// after:  ctx.ip === '2001:db8::1'
+```
+
+**Can it break your code.** Notice it: it is the same address, only its
+text changes, so a rate limit, a log line and an allow list now see one
+client once — a client counted under two keys before, by its mapped and
+plain forms, is counted under one. Code that compares `ctx.ip` with a
+string written in another form (`ip === '::ffff:127.0.0.1'`), or a
+`trusted` function that matches the mapped form, needs the canonical form:
+pass your values through `canonicalIp`. Keys stored by the old form, in a
+Redis rate limit or an idempotency store, expire on their own. To keep the
+written form, `trustProxy({ …, canonical: false })` or
+`forwardedIp({ …, canonical: false })`, and without a proxy an `ip` of your
+own (`ip: (request, server) => server?.requestIP(request)?.address`). See
+[Serving: one text per address](guide/serving.md#one-text-per-address).
+
+### `untrusted: 'refuse-all'` and `allow`
+
+**What changed.** `trustProxy({ trusted, untrusted: 'refuse-all', allow? })`
+answers 403, in the app's error format, every request from a connection
+`trusted` does not name, forwarding headers or not, but for what `allow`
+lets through: peers by CIDR range, or a `(request, peer) => boolean`, such
+as the probes' paths. With a hop count it is a compile error, and throws.
+The new `StrictProxyOptions` types it; `TrustProxyOptions` gains
+`canonical` and an `allow?: undefined` that keeps `allow` to the new mode.
+
+```ts
+alxia({
+	proxy: trustProxy({
+		trusted: ['10.0.0.0/8'],
+		untrusted: 'refuse-all',
+		allow: (request) => ['/health', '/ready'].includes(new URL(request.url).pathname),
+	}),
+});
+```
+
+**Can it break your code.** No: opt in. `'refuse'` is unchanged; its
+problem `detail` stays `Forwarding headers from a connection that is no
+trusted proxy`. See
+[Serving: only the proxies](guide/serving.md#only-the-proxies-refuse-all).
+
+### New projects install the new core
+
+`@alxia/create` (patch) makes projects whose `@alxia/core` has the
+canonical `ctx.ip` and `'refuse-all'`. The templates are unchanged.
+
+**Can it break your code.** No: it changes new projects only.
+
 ## 0.9.0
 
 `@alxia/core` 0.9.0 adds the `proxy` option, `trustProxy` and `originalUrl`,

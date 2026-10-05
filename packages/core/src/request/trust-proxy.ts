@@ -4,7 +4,7 @@
  * from a connection the one trust definition names.
  */
 import { elementsOf, listOf } from './forwarded-header';
-import { type ParsedIp, parseIp } from './ip-address';
+import { canonicalIp, type ParsedIp, parseIp } from './ip-address';
 import { hostOf, type Origin, protocolOf } from './origin';
 import {
 	type ClientAt,
@@ -14,6 +14,9 @@ import {
 	type TrustedProxies,
 	trustOf,
 } from './trust';
+import { gateOf, type ProxyAllow, type ProxyRefusal } from './untrusted';
+
+export type { ProxyAllow, ProxyRefusal } from './untrusted';
 
 export interface TrustProxyOptions {
 	/**
@@ -38,8 +41,39 @@ export interface TrustProxyOptions {
 	 * reads none of them; `'refuse'` answers it 403, in the app's error
 	 * format. A request with no such header passes either way. Refusing
 	 * needs proxies named by address: a hop count cannot tell a proxy.
+	 * `'refuse-all'`, which refuses every such request, headers or not,
+	 * takes `StrictProxyOptions`.
 	 */
 	readonly untrusted?: 'ignore' | 'refuse';
+	/** `untrusted: 'refuse-all'`'s escape alone: see `StrictProxyOptions`. */
+	readonly allow?: undefined;
+	/**
+	 * Whether `ctx.ip` is the address's canonical text — IPv6 as RFC 5952
+	 * writes it, an IPv4-mapped address as IPv4, brackets and port dropped —
+	 * whether the header or the socket gave it (the default, `true`), or the
+	 * address as written (`false`). A `trusted` function is given the same.
+	 */
+	readonly canonical?: boolean;
+}
+
+/**
+ * `trustProxy` for an app only its proxies may reach: `untrusted:
+ * 'refuse-all'` answers 403 every request from a connection the ranges or
+ * the function do not name, forwarding headers or not, but for what
+ * `allow` lets through — a health probe's path, a loopback peer — whose
+ * headers are not read and whose `ctx.ip` is the connection's.
+ */
+export interface StrictProxyOptions
+	extends Omit<TrustProxyOptions, 'trusted' | 'untrusted' | 'allow'> {
+	/** The proxies, by CIDR range, address or a test of one: a hop count cannot tell a proxy. */
+	readonly trusted: Exclude<TrustedProxies, number>;
+	readonly untrusted: 'refuse-all';
+	/**
+	 * What passes from another connection: peers by CIDR range or address,
+	 * or a test of the request and the peer's address (`undefined` with no
+	 * server). Nothing by default.
+	 */
+	readonly allow?: ProxyAllow;
 }
 
 /** What the proxies say of a request, believed. */
@@ -48,8 +82,14 @@ export interface Forwarded {
 	readonly ip: string | undefined;
 	/** The scheme and host the client asked for, each when a trusted proxy said it and it is valid. */
 	readonly origin: Origin;
-	/** Whether the request is answered 403: forwarding headers from an untrusted connection, under `untrusted: 'refuse'`. */
+	/**
+	 * Whether the request is answered 403: forwarding headers from an
+	 * untrusted connection, under `untrusted: 'refuse'`, or any request
+	 * from one `allow` does not let through, under `'refuse-all'`.
+	 */
 	readonly refused: boolean;
+	/** Why it is refused, when it is: its forwarding headers (`'headers'`), or its connection (`'peer'`). */
+	readonly refusal?: ProxyRefusal;
 }
 
 /** The `proxy` option: what the proxies say of a request, from its connection. */
@@ -57,14 +97,6 @@ export type ProxyTrust = (
 	request: Request,
 	server: Bun.Server<unknown> | undefined,
 ) => Forwarded;
-
-/** The headers a request from an untrusted connection is refused for carrying. */
-const FORWARDING = [
-	'forwarded',
-	'x-forwarded-for',
-	'x-forwarded-host',
-	'x-forwarded-proto',
-];
 
 const NONE: Origin = {};
 
@@ -132,34 +164,45 @@ function fromLists(header: string): Reader {
 	};
 }
 
+/** The options `proxyReader` reads, whichever of `trustProxy`'s forms gave them. */
+type ReaderOptions = Omit<TrustProxyOptions, 'untrusted' | 'allow'> & {
+	readonly untrusted?: unknown;
+	readonly allow?: unknown;
+};
+
 /** `trustProxy`, or, with `withOrigin` false, the reading `forwardedIp` makes of the address alone. */
 export function proxyReader(
-	options: TrustProxyOptions,
+	options: ReaderOptions,
 	who: string,
 	withOrigin: boolean,
 ): ProxyTrust {
-	const trust = trustOf(options.trusted, who);
+	const canonical = options.canonical ?? true;
+	if (typeof canonical !== 'boolean')
+		throw new TypeError(`${who}: canonical must be true or false`);
+	const trust = trustOf(options.trusted, who, canonical);
 	const header = (options.header ?? 'x-forwarded-for').toLowerCase();
-	const untrusted = options.untrusted ?? 'ignore';
-	if (untrusted !== 'ignore' && untrusted !== 'refuse')
-		throw new TypeError(
-			`${who}: untrusted must be 'ignore' or 'refuse', not ${JSON.stringify(untrusted)}`,
-		);
-	if (untrusted === 'refuse' && 'hops' in trust)
-		throw new TypeError(
-			`${who}: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function), not a hop count`,
-		);
-	const refusing = untrusted === 'refuse' ? [...FORWARDING, header] : [];
+	const gate = gateOf(options, trust, header, who);
 	const read = header === 'forwarded' ? fromForwarded : fromLists(header);
+	const shown = (ip: ParsedIp) => (canonical ? ip.canonical : ip.text);
 	return (request, server) => {
 		const socket = server?.requestIP(request)?.address ?? undefined;
 		const peer = socket === undefined ? undefined : parseIp(socket);
+		const own =
+			socket === undefined || !canonical
+				? socket
+				: (peer?.canonical ?? canonicalIp(socket));
 		if (!peerTrusted(trust, peer)) {
-			const refused = refusing.some((name) => request.headers.has(name));
-			return { ip: socket, origin: NONE, refused };
+			const refusal = gate(request, peer, own);
+			if (refusal === undefined)
+				return { ip: own, origin: NONE, refused: false };
+			return { ip: own, origin: NONE, refused: true, refusal };
 		}
 		const { at, origin } = read(request.headers, trust, withOrigin);
-		return { ip: at?.text ?? socket, origin, refused: false };
+		return {
+			ip: at === undefined ? own : shown(at),
+			origin,
+			refused: false,
+		};
 	};
 }
 
@@ -176,7 +219,12 @@ export function proxyReader(
  * alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) });
  * alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
  * alxia({ proxy: trustProxy({ header: 'forwarded', trusted: 1 }) });
+ * alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse-all', allow: ['127.0.0.1'] }) });
  */
-export function trustProxy(options: TrustProxyOptions): ProxyTrust {
+export function trustProxy(options: StrictProxyOptions): ProxyTrust;
+export function trustProxy(options: TrustProxyOptions): ProxyTrust;
+export function trustProxy(
+	options: TrustProxyOptions | StrictProxyOptions,
+): ProxyTrust {
 	return proxyReader(options, 'trustProxy', true);
 }

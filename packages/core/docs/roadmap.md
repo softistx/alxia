@@ -114,6 +114,20 @@ number on it. Every release, with each change it made, is in
 
 ### Next release
 
+- **One text per client address.** `ctx.ip` is canonical, from the socket
+  or a header alike: an IPv4-mapped address as IPv4, IPv6 as RFC 5952
+  writes it, brackets and port dropped, so a rate limit, a log line and an
+  allow list see one client once; `canonicalIp(address)` gives an app's
+  own values the same form, and `canonical: false` keeps the written one
+  ([Serving](guide/serving.md#one-text-per-address)).
+- **Only the proxies.** `trustProxy({ untrusted: 'refuse-all' })` answers
+  403 every request from a connection that is no proxy, forwarding headers
+  or not, but for what `allow` lets through — a probe's path, a node's
+  range, a loopback — and is a compile error with a hop count
+  ([Serving](guide/serving.md#only-the-proxies-refuse-all)).
+
+### 0.9.0
+
 - **Behind a proxy, declared once.** `alxia({ proxy: trustProxy({ trusted }) })`
   reads `ctx.ip` and the scheme and host the client asked for,
   `originalUrl(ctx)`, through one trust definition: from a trusted

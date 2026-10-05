@@ -14,6 +14,13 @@ export interface ForwardedIpOptions {
 	 * that is not one.
 	 */
 	readonly trusted: TrustedProxies;
+	/**
+	 * Whether the address is its canonical text — IPv6 as RFC 5952 writes
+	 * it, an IPv4-mapped address as IPv4, brackets and port dropped — from
+	 * the header or the socket alike (the default, `true`), or as written
+	 * (`false`). A `trusted` function is given the same.
+	 */
+	readonly canonical?: boolean;
 }
 
 /**
@@ -42,6 +49,9 @@ export function forwardedIp(
 		{
 			trusted: options.trusted,
 			...(options.header === undefined ? {} : { header: options.header }),
+			...(options.canonical === undefined
+				? {}
+				: { canonical: options.canonical }),
 		},
 		'forwardedIp',
 		false,

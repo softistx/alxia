@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { elementsOf, unquote } from './forwarded-header';
+import { canonicalIp, parseIp } from './ip-address';
 import { hostOf, protocolOf } from './origin';
 import { trustProxy } from './trust-proxy';
 
@@ -126,6 +127,10 @@ const PIECES = [
 	'10.1.1.1',
 	'203.0.113.9',
 	'2001:db8::1',
+	'2001:DB8:0:0:0:0:0:1',
+	'::ffff:',
+	'0000:',
+	'%en0',
 	'example.com',
 	'443',
 	'99999',
@@ -135,7 +140,7 @@ const PIECES = [
 ];
 
 describe('fuzzed headers', () => {
-	test('never throw, and say only a valid scheme and host', () => {
+	test('never throw, say only a valid scheme and host, and an ip in its one text', () => {
 		const next = random(7239);
 		const piece = () => PIECES[Math.floor(next() * PIECES.length)] ?? '';
 		const value = () =>
@@ -145,6 +150,7 @@ describe('fuzzed headers', () => {
 			trustProxy({ trusted: 2, header: 'forwarded' }),
 			trustProxy({ trusted: ['10.0.0.0/8'] }),
 			trustProxy({ trusted: ['10.0.0.0/8'], header: 'forwarded' }),
+			trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse-all' }),
 		];
 		const server = {
 			requestIP: () => ({ address: '10.0.0.1' }),
@@ -161,7 +167,8 @@ describe('fuzzed headers', () => {
 			}
 			const request = new Request('http://app.internal:3000/', { headers });
 			for (const read of readers) {
-				const { origin } = read(request, server);
+				const { ip, origin } = read(request, server);
+				if (ip !== undefined) expect(canonicalIp(ip)).toBe(ip);
 				if (origin.protocol !== undefined)
 					expect(['http:', 'https:']).toContain(origin.protocol);
 				if (origin.host !== undefined) {
@@ -185,6 +192,8 @@ describe('fuzzed headers', () => {
 				hostOf(text),
 				elementsOf(text),
 				unquote(text),
+				parseIp(text),
+				canonicalIp(text),
 			]).not.toThrow();
 		}
 	});

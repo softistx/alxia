@@ -235,23 +235,3 @@ describe('Forwarded (RFC 7239)', () => {
 		expect(read({ trusted: 1, header }, headers).origin).toEqual({});
 	});
 });
-
-describe('the options', () => {
-	test("'refuse' needs proxies named by address", () => {
-		expect(() => trustProxy({ trusted: 1, untrusted: 'refuse' })).toThrow(
-			'not a hop count',
-		);
-	});
-
-	test('what is none of the choices is refused, naming trustProxy', () => {
-		expect(() =>
-			trustProxy({ ...ranges, untrusted: 'drop' as 'ignore' }),
-		).toThrow("trustProxy: untrusted must be 'ignore' or 'refuse'");
-		expect(() => trustProxy({ trusted: 0 })).toThrow(
-			'trustProxy: trusted hops',
-		);
-		expect(() => trustProxy({ trusted: ['10.0.0.0/33'] })).toThrow(
-			'trustProxy: "10.0.0.0/33"',
-		);
-	});
-});

@@ -34,7 +34,8 @@ export async function serve(
 		[SERVED]: runtime.served,
 		[ORIGIN]: forwarded?.origin,
 	} as RequestContext;
-	if (forwarded?.refused === true) return untrustedProxy(ctx);
+	if (forwarded?.refused === true)
+		return untrustedProxy(ctx, forwarded.refusal);
 	try {
 		const response = await route(runtime, ctx, path);
 		return response === UPGRADED ? (undefined as never) : response;

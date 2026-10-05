@@ -94,7 +94,10 @@ a trap that prints nothing is headed by its symptom.
 - [`GET /… is already served by a page`](#get--is-already-served-by-a-page)
 - [`forwardedIp: trusted hops must be an integer of 1 or more`](#forwardedip-trusted-hops-must-be-an-integer-of-1-or-more), and `forwardedIp: "…" is not an IP address or a CIDR range`
 - [`ctx.ip` is the proxy's address, or one a client chose](#ctxip-is-the-proxys-address-or-one-a-client-chose)
-- [``trustProxy: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function), not a hop count``](#trustproxy-untrusted-refuse-needs-the-proxies-named-by-address-cidr-ranges-or-a-function-not-a-hop-count), and ``trustProxy: untrusted must be 'ignore' or 'refuse', not "…"``
+- [``trustProxy: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function), not a hop count``](#trustproxy-untrusted-refuse-needs-the-proxies-named-by-address-cidr-ranges-or-a-function-not-a-hop-count), ``… untrusted: 'refuse-all' needs …``, and ``trustProxy: untrusted must be 'ignore', 'refuse' or 'refuse-all', not "…"``
+- [``trustProxy: allow is for untrusted: 'refuse-all' alone; under '…' a request with no forwarding header passes already``](#trustproxy-allow-is-for-untrusted-refuse-all-alone-under--a-request-with-no-forwarding-header-passes-already), and ``trustProxy: allow must be CIDR ranges or a function (request, peer) => boolean``
+- [`trustProxy: canonical must be true or false`](#trustproxy-canonical-must-be-true-or-false), and `forwardedIp: canonical must be true or false`
+- [`ctx.ip` reads `192.0.2.1` where it read `::ffff:192.0.2.1`, or IPv6 compressed](#ctxip-reads-192021-where-it-read-ffff192021-or-ipv6-compressed)
 - [`alxia(): give ip or proxy, not both: proxy reads ctx.ip itself`](#alxia-give-ip-or-proxy-not-both-proxy-reads-ctxip-itself), and `alxia(): proxy must be trustProxy({ trusted })`
 - [`originalUrl(ctx)` is `http://` and the internal host behind a TLS proxy](#originalurlctx-is-http-and-the-internal-host-behind-a-tls-proxy)
 
@@ -2098,7 +2101,7 @@ When it still reads the proxy, `trusted` counts too few hops (two proxies need `
 
 ### `trustProxy: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function), not a hop count`
 
-**When:** `trustProxy({ trusted: 1, untrusted: 'refuse' })`; or, as `trustProxy: untrusted must be 'ignore' or 'refuse', not "…"`, with another value.
+**When:** `trustProxy({ trusted: 1, untrusted: 'refuse' })`, or `untrusted: 'refuse-all'` with a hop count (a compile error too, unless cast); or, as `trustProxy: untrusted must be 'ignore', 'refuse' or 'refuse-all', not "…"`, with another value.
 
 **Why:** refusing tells a proxy's connection from a client's, and a hop count cannot: it believes every connection. The option throws when it is made, not on a request.
 
@@ -2106,6 +2109,52 @@ When it still reads the proxy, `trusted` counts too few hops (two proxies need `
 
 ```ts
 alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
+```
+
+### `trustProxy: allow is for untrusted: 'refuse-all' alone; under '…' a request with no forwarding header passes already`
+
+**When:** `trustProxy({ trusted, allow })` with `untrusted` left out, `'ignore'` or `'refuse'` (a compile error too); or, as `trustProxy: allow must be CIDR ranges or a function (request, peer) => boolean`, an `allow` that is neither; or, as `trustProxy: "…" is not an IP address or a CIDR range`, a range in it that is none.
+
+**Why:** `allow` is the escape from `'refuse-all'`, which refuses every request from a connection that is no proxy. Under `'ignore'` and `'refuse'`, a request with no forwarding header passes from anywhere, so there is nothing to escape.
+
+**Fix:** refuse every other connection, and let the probes through:
+
+```ts
+alxia({
+	proxy: trustProxy({
+		trusted: ['10.0.0.0/8'],
+		untrusted: 'refuse-all',
+		allow: (request) => ['/health', '/ready'].includes(new URL(request.url).pathname),
+	}),
+});
+```
+
+### `trustProxy: canonical must be true or false`
+
+**When:** `trustProxy({ trusted, canonical })`, or `forwardedIp(…)`, whose message begins `forwardedIp:`, with a `canonical` that is not a boolean (`'false'`, `0`).
+
+**Why:** `canonical` says whether `ctx.ip` is the address's one text or the address as written; a string `'false'` would read as on. The option throws when it is made.
+
+**Fix:** leave it out (on), or give `false`:
+
+```ts
+alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], canonical: false }) });
+```
+
+### `ctx.ip` reads `192.0.2.1` where it read `::ffff:192.0.2.1`, or IPv6 compressed
+
+**When:** after upgrading, `ctx.ip` is `192.0.2.1` on a dual-stack server where it was `::ffff:192.0.2.1`, or `2001:db8::1` where a proxy wrote `2001:DB8:0:0:0:0:0:1`; a `trusted` function, or an allow list compared with `===`, no longer matches the form it was written for.
+
+**Why:** core gives every address it reads — the connection's, `forwardedIp`'s and `trustProxy`'s — in one canonical text: an IPv4-mapped address as IPv4, IPv6 as RFC 5952 writes it (lowercase, no leading zeros, the longest zero run as `::`), brackets and a port dropped, a zone id kept after the address. It is the same address, so a rate limit, a log and an allow list see one client once. A custom `ip` function is read as it returns.
+
+**Fix:** compare against the canonical form, or pass your own values through `canonicalIp`; or keep the written form with `canonical: false`, or, without a proxy, an `ip` of your own:
+
+```ts
+import { alxia, canonicalIp } from '@alxia/core';
+
+const allowed = new Set(['::ffff:192.0.2.1', '2001:DB8::1'].map(canonicalIp));
+alxia().get('/admin', (ctx) => ctx.reply(allowed.has(ctx.ip ?? '') ? 200 : 403, 'admin'));
+alxia({ ip: (request, server) => server?.requestIP(request)?.address }); // as the socket wrote it
 ```
 
 ### `alxia(): give ip or proxy, not both: proxy reads ctx.ip itself`
@@ -2293,11 +2342,11 @@ A 413 with no JSON body comes from Bun itself. The body passed `listen`'s
 
 ### `403 {"error":"untrusted_proxy"}`
 
-**When:** under `trustProxy({ trusted, untrusted: 'refuse' })`, a request carries `Forwarded`, `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` or the `header` given, from a connection `trusted` does not name. Under `errors: 'problem'`, a problem with status 403. It is answered before routing and every middleware: a logger writes no line for it.
+**When:** under `trustProxy({ trusted, untrusted: 'refuse' })`, a request carries `Forwarded`, `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` or the `header` given, from a connection `trusted` does not name. Under `untrusted: 'refuse-all'`, any request from such a connection, headers or not, that `allow` does not let through: a health probe's too. Under `errors: 'problem'`, a problem with status 403, whose `detail` says which (`Forwarding headers from a connection that is no trusted proxy`, `A connection that is no trusted proxy`). It is answered before routing and every middleware: a logger writes no line for it.
 
-**Why:** such a request claims an address, a scheme or a host from a peer that is not your proxy: a client reaching the app around it, or a proxy missing from `trusted`. In a spec, `app.request` has no connection, which is never a proxy.
+**Why:** such a request claims an address, a scheme or a host from a peer that is not your proxy, or, under `'refuse-all'`, reaches the app around the proxies: a client going around them, a proxy missing from `trusted`, or an orchestrator's probe from a node's address. In a spec, `app.request` has no connection, which is never a proxy, so under `'refuse-all'` every `app.request` is refused.
 
-**Fix:** add the proxy's address or range to `trusted`; reach the app through the proxy alone; in a spec, give `fetch` a server whose `requestIP` names a proxy. A probe that sends no forwarding header is never refused.
+**Fix:** add the proxy's address or range to `trusted`; reach the app through the proxy alone; in a spec, give `fetch` a server whose `requestIP` names a proxy. Under `'refuse'`, a probe that sends no forwarding header is never refused; under `'refuse-all'`, let the probes through with `allow`, by their source range or their path (see [Serving: only the proxies](guide/serving.md#only-the-proxies-refuse-all)).
 
 ```ts
 const server = { requestIP: () => ({ address: '10.0.0.1' }) } as unknown as Bun.Server<unknown>;
