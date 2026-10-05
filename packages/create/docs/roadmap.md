@@ -34,6 +34,13 @@ number on it. Every release, with each change it made, is in
   the app through openapi-fetch over the generated `paths.ts`, with
   `app.fetch` as its `fetch`: in process, typed by `openapi.yaml`.
 
+- **`TRUSTED_PROXIES` in the `api` and `graphql` templates.** Optional and
+  unset by default, so a new project behaves as before; set to the load
+  balancer's CIDR ranges, the base declares `trustProxy({ trusted,
+  untrusted: 'refuse' })`: `ctx.ip` from a trusted proxy's
+  `X-Forwarded-For`, a forwarding header from any other connection refused,
+  health probes passing. Each template tests it with a peer.
+
 ## Next
 
 Nothing scheduled yet.

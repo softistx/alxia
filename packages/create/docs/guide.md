@@ -152,11 +152,12 @@ my-api/
 ├── openapi-codegen.config.ts  how `bun run generate` reads it
 ├── src/
 │   ├── generated/             what `bun run generate` writes: committed, never edited
-│   ├── env.ts                 defineEnv from @alxia/env: PORT, API_KEY and API_DOCS
+│   ├── env.ts                 defineEnv from @alxia/env: PORT, API_KEY, API_DOCS, TRUSTED_PROXIES
 │   ├── context.ts             the base: what every route reads, and its Register
 │   ├── routes/todos.ts        defineRoutes(): one route per operation
 │   ├── app.ts                 the app: the base, health(), apiDocs, the routes, and its type
 │   ├── app.spec.ts            bun test: the typed client over app.fetch, and matchesSpec
+│   ├── proxy.spec.ts          bun test: the base behind TRUSTED_PROXIES, with a peer
 │   └── server.ts              app.listen on env.PORT, which stops on SIGINT and SIGTERM
 ├── package.json
 ├── tsconfig.json
@@ -164,7 +165,7 @@ my-api/
 ├── .vscode/                   Biome's extension recommended, format on save
 ├── Dockerfile                 bun run build, then dist/ alone, on oven/bun:1-alpine
 ├── .dockerignore
-├── .env.example               PORT, API_KEY and API_DOCS, for a .env Bun loads
+├── .env.example               PORT, API_KEY, API_DOCS and TRUSTED_PROXIES, for a .env Bun loads
 ├── .gitignore
 └── README.md
 ```
@@ -326,6 +327,7 @@ instead:
 ### `src/env.ts`
 
 ```ts
+import { trustProxy } from "@alxia/core";
 import { defineEnv } from "@alxia/env";
 import { z } from "zod";
 
@@ -333,11 +335,32 @@ import { z } from "zod";
 // production included, is a deployment.
 const local = ["development", "test"].includes(Bun.env.NODE_ENV ?? "");
 
+// A range or an address trustProxy accepts: it throws on any other.
+const isRange = (range: string) => {
+  try {
+    trustProxy({ trusted: [range], untrusted: "refuse" });
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const env = defineEnv(
   {
     PORT: z.coerce.number().default(3000),
     API_KEY: local ? z.string().min(1).default("dev-key") : z.string().min(1),
     API_DOCS: z.stringbool().default(Bun.env.NODE_ENV === "development"),
+    TRUSTED_PROXIES: z
+      .string()
+      .transform((list) =>
+        list
+          .split(",")
+          .map((range) => range.trim())
+          .filter(Boolean),
+      )
+      .pipe(z.array(z.string().refine(isRange, "not a CIDR range or address")))
+      .transform((ranges) => (ranges.length > 0 ? ranges : undefined))
+      .optional(),
   },
   { secret: ["API_KEY"] },
 );
@@ -350,7 +373,10 @@ or malformed variable stops the process with every issue, before it listens.
 under `NODE_ENV=development` and `test` alone: anywhere else — `bun start`,
 the image — it is required, and the app does not start without it.
 `API_DOCS` turns the API reference at `/docs` on: by default in
-development alone. `Bun.env`, not `process.env.NODE_ENV`, which
+development alone. `TRUSTED_PROXIES` is optional and unset by default: the
+proxies in front of the app as comma-separated CIDR ranges or addresses,
+each checked by `trustProxy` itself, so a malformed one stops the process
+with the others' issues ([Behind a proxy](#behind-a-proxy)). `Bun.env`, not `process.env.NODE_ENV`, which
 `bun build` would replace with the mode of the build. `src/server.ts` listens on `env.PORT` and
 `src/routes/todos.ts` compares the `x-api-key` header with `env.API_KEY`.
 `@alxia/env` and `zod` are dependencies.
@@ -358,7 +384,8 @@ development alone. `Bun.env`, not `process.env.NODE_ENV`, which
 ### `src/context.ts`
 
 ```ts
-import { alxia } from "@alxia/core";
+import { alxia, trustProxy } from "@alxia/core";
+import { env } from "./env";
 import type { Todo } from "./generated/types";
 
 const todos: Todo[] = [];
@@ -367,7 +394,21 @@ const todos: Todo[] = [];
 // registered below, so a route file reads it with no import of the app.
 // alxia's own errors — a 400 the schemas refuse, a 404 no route matches, a
 // 500 — are RFC 9457 problems, as openapi.yaml declares them.
-export const base = alxia({ errors: "problem" }).decorate({ todos });
+//
+// Behind a load balancer, set TRUSTED_PROXIES to its range: its
+// X-Forwarded-For then sets ctx.ip, and a forwarding header from any other
+// connection is refused with a 403. A request that carries none, a health
+// probe's, passes from anywhere. Unset, no forwarding header is read.
+export function createBase(
+  trusted: string[] | undefined = env.TRUSTED_PROXIES,
+) {
+  return alxia({
+    errors: "problem",
+    ...(trusted && { proxy: trustProxy({ trusted, untrusted: "refuse" }) }),
+  }).decorate({ todos });
+}
+
+export const base = createBase();
 
 // Register the base, never the app: the app mounts the route files, whose
 // type reads this, and would then be typed by itself.
@@ -825,10 +866,11 @@ That pub/sub lives in one process: across several, back it with a broker.
 
 ### `src/env.ts`
 
-`defineEnv` from `@alxia/env` reads `PORT` (3000 by default), checked once,
-when the module is first imported: a malformed one stops the process with
-every issue, before it listens. Bun loads `.env`; copy `.env.example` to
-`.env` to set it.
+`defineEnv` from `@alxia/env` reads `PORT` (3000 by default) and
+`TRUSTED_PROXIES` (optional, as the `api` template's), checked once, when
+the module is first imported: a malformed one stops the process with every
+issue, before it listens. Bun loads `.env`; copy `.env.example` to `.env`
+to set them.
 
 ### Adding a field
 
@@ -954,6 +996,43 @@ bunx alxia-react-router reveal
 
 The [`@alxia/react-router` guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md)
 goes from there.
+
+## Behind a proxy
+
+The `api` and `graphql` templates are deployed behind a load balancer, and
+declare it with one optional variable, so a project that is not behind one
+changes nothing. `TRUSTED_PROXIES` is the proxies' CIDR ranges or addresses,
+comma-separated, validated when the app starts; `src/context.ts`'s
+`createBase` adds `proxy: trustProxy({ trusted, untrusted: 'refuse' })` to
+the base only when it is set:
+
+```sh
+TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/12 bun start
+```
+
+- **From a trusted proxy**, `X-Forwarded-For` sets `ctx.ip`, read from the
+  right, and `X-Forwarded-Proto` and `X-Forwarded-Host` give
+  `originalUrl(ctx)`.
+- **From any other connection**, a request carrying a forwarding header is
+  answered 403 (a problem under `api`'s `errors: 'problem'`), before any
+  middleware: a client cannot claim an address.
+- **A request with no forwarding header passes from anywhere**: that is why
+  the templates choose `'refuse'` over `'refuse-all'`. A Docker
+  `HEALTHCHECK`, a Kubernetes probe or a load balancer's check sends none,
+  so `/health` and `/ready` (from `health()`) answer as they did. With
+  `'refuse-all'`, a probe from the node would be refused unless `allow`
+  names its range or its paths
+  ([Only the proxies](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#only-the-proxies-refuse-all)).
+- **Unset**, nothing changes: no forwarding header is read, `ctx.ip` is the
+  connection's.
+
+`src/proxy.spec.ts` proves each: `app.request` has no connection, so it
+builds the base with `createBase(['10.0.0.0/8'])` and calls `app.fetch(request,
+server)` with a stub whose `requestIP()` names the peer. The proxy must
+overwrite `X-Forwarded-*` itself; core's guide says how
+([Serving](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#behind-a-proxy-proxy)),
+and the [deploying recipe](https://github.com/softistx/alxia/blob/develop/docs/recipes/deploying.md#on-a-platform)
+shows the whole path.
 
 ## Lint and format
 

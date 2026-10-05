@@ -71,7 +71,8 @@ Zod validators and the operations a typed client reads.
 ## Environment
 
 Bun loads `.env` on every command, and `src/env.ts` checks what it finds.
-Copy `.env.example` to `.env` to set `PORT`, `API_KEY` and `API_DOCS`.
+Copy `.env.example` to `.env` to set `PORT`, `API_KEY`, `API_DOCS` and
+`TRUSTED_PROXIES`.
 `API_KEY` defaults to `dev-key` under `NODE_ENV=development` (`bun dev`)
 and `test` (`bun test`) alone: anywhere else, `bun start` and the image
 included, it is required, and the app does not start without it.
@@ -83,6 +84,34 @@ never the secret's value.
 ```sh
 cp .env.example .env
 ```
+
+## Behind a proxy
+
+Behind a load balancer or a reverse proxy, every connection comes from
+the proxy, and `ctx.ip` is its address. Set `TRUSTED_PROXIES` to the
+proxies' CIDR ranges (or addresses), comma-separated, and `src/context.ts`
+declares them with `trustProxy`:
+
+```sh
+TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/12 bun start
+```
+
+- A request from one of them has its `ctx.ip` read from `X-Forwarded-For`,
+  from the right: the entries the client wrote are never believed.
+- A request that carries `X-Forwarded-For`, `X-Forwarded-Proto`,
+  `X-Forwarded-Host` or `Forwarded` from any other connection is answered
+  403 (`untrusted: 'refuse'`), so nothing reads what it claims.
+- A request that carries none passes from anywhere, so the Docker and
+  orchestrator health probes reach `/health` and `/ready` as before.
+- Unset, the default, no forwarding header is read: the app behaves as
+  though the variable did not exist. Your proxy must overwrite
+  `X-Forwarded-*` (an AWS load balancer does; nginx needs
+  `proxy_set_header`), and the ranges must name the proxies alone.
+
+To refuse every connection but the proxies', probes included, use
+`untrusted: 'refuse-all'` with `allow`: see
+[Serving](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#only-the-proxies-refuse-all).
+`src/proxy.spec.ts` shows both answers with `app.fetch` given a peer.
 
 ## Develop
 

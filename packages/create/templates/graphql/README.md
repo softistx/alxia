@@ -105,13 +105,41 @@ describes.
 ## Environment
 
 Bun loads `.env` on every command, and `src/env.ts` checks what it finds. Copy
-`.env.example` to `.env` to set `PORT`. GraphiQL follows alxia's dev
+`.env.example` to `.env` to set `PORT` and `TRUSTED_PROXIES`. GraphiQL follows alxia's dev
 switch: on under `bun dev`, which sets `NODE_ENV=development`, off
 otherwise — `bun start` and the image run with `NODE_ENV=production`.
 
 ```sh
 cp .env.example .env
 ```
+
+## Behind a proxy
+
+Behind a load balancer or a reverse proxy, every connection comes from
+the proxy, and `ctx.ip` is its address. Set `TRUSTED_PROXIES` to the
+proxies' CIDR ranges (or addresses), comma-separated, and `src/context.ts`
+declares them with `trustProxy`:
+
+```sh
+TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/12 bun start
+```
+
+- A request from one of them has its `ctx.ip` read from `X-Forwarded-For`,
+  from the right: the entries the client wrote are never believed.
+- A request that carries `X-Forwarded-For`, `X-Forwarded-Proto`,
+  `X-Forwarded-Host` or `Forwarded` from any other connection is answered
+  403 (`untrusted: 'refuse'`), so nothing reads what it claims.
+- A request that carries none passes from anywhere, so the Docker and
+  orchestrator health probes reach `/health` and `/ready` as before.
+- Unset, the default, no forwarding header is read: the app behaves as
+  though the variable did not exist. Your proxy must overwrite
+  `X-Forwarded-*` (an AWS load balancer does; nginx needs
+  `proxy_set_header`), and the ranges must name the proxies alone.
+
+To refuse every connection but the proxies', probes included, use
+`untrusted: 'refuse-all'` with `allow`: see
+[Serving](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#only-the-proxies-refuse-all).
+`src/proxy.spec.ts` shows both answers with `app.fetch` given a peer.
 
 ## Test
 

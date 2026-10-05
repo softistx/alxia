@@ -132,7 +132,12 @@ describe('the api template', () => {
 		const read = [...source.matchAll(/^\s+([A-Z_]+): /gm)].map(
 			([, name]) => name,
 		);
-		expect(read.sort()).toEqual(['API_DOCS', 'API_KEY', 'PORT']);
+		expect(read.sort()).toEqual([
+			'API_DOCS',
+			'API_KEY',
+			'PORT',
+			'TRUSTED_PROXIES',
+		]);
 		// API_KEY and API_DOCS commented out: `bun start` loads `.env` too.
 		for (const name of read)
 			expect(example).toMatch(new RegExp(`^(# )?${name}=`, 'm'));
@@ -142,5 +147,5 @@ describe('the api template', () => {
 	test("typechecks under this repository's strictest settings", () =>
 		expectTypechecks(dir));
 
-	test('its spec passes', () => expectSpecPasses(dir, 8), 30_000);
+	test('its spec passes', () => expectSpecPasses(dir, 12), 30_000);
 });
