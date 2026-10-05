@@ -2,7 +2,7 @@
  * Which proxies to believe, and where the client stands among the entries
  * of a header they append to: what `forwardedIp` and `trustProxy` share.
  */
-import { type ParsedIp, parseCidr } from './ip-address';
+import { canonicalOf, type ParsedIp, parseCidr } from './ip-address';
 
 /** Which proxies to believe: a number of hops, CIDR ranges or addresses, or a test of an address. */
 export type TrustedProxies =
@@ -27,15 +27,26 @@ export interface ClientAt {
 	readonly hops: number;
 }
 
-/** `trusted` checked and compiled once; `who` names the caller in what it throws. */
-export function trustOf(trusted: TrustedProxies, who: string): Trust {
+/**
+ * `trusted` checked and compiled once; `who` names the caller in what it
+ * throws. A function is given the address as `ctx.ip` would show it: its
+ * canonical text, or, with `canonical` false, as written.
+ */
+export function trustOf(
+	trusted: TrustedProxies,
+	who: string,
+	canonical = true,
+): Trust {
 	if (typeof trusted === 'number') {
 		if (!Number.isInteger(trusted) || trusted < 1)
 			throw new Error(`${who}: trusted hops must be an integer of 1 or more`);
 		return { hops: trusted };
 	}
 	if (typeof trusted === 'function')
-		return { isProxy: (address) => trusted(address.text) };
+		return {
+			isProxy: (address) =>
+				trusted(canonical ? canonicalOf(address) : address.text),
+		};
 	const ranges = (typeof trusted === 'string' ? [trusted] : trusted).map(
 		(range) => parseCidr(range, who),
 	);

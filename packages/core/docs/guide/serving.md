@@ -140,6 +140,7 @@ function forwardedIp(options: ForwardedIpOptions): (request: Request, server: Bu
 | --- | --- | --- | --- |
 | `trusted` | `number \| string \| string[] \| (address: string) => boolean` | required | the proxies in front of the app (below) |
 | `header` | `string` | `'x-forwarded-for'` | the header they append to; `'forwarded'` reads RFC 7239's `for=` |
+| `canonical` | `boolean` | `true` | the address in its one text ([below](#one-text-per-address)); `false`, as written |
 
 `trusted` names the proxies one of two ways:
 
@@ -165,6 +166,43 @@ malformed (`unknown`, `_hidden`, a name, an empty entry, a bad IPv6): it is
 never skipped to reach the entries to its left, which the client writes.
 IPv4 and IPv6 are read, with brackets and a port, which the result drops;
 an IPv4-mapped IPv6 address (`::ffff:10.0.0.1`) matches an IPv4 range.
+
+### One text per address
+
+The same address can be written many ways — `2001:DB8:0:0:0:0:0:1`,
+`2001:db8::1`, `[2001:db8::1]:443`; `::ffff:192.0.2.1` on a dual-stack
+socket and `192.0.2.1` in a header — and a rate-limit key, a log line or
+an allow list compared as a string would count one client as several.
+So every address core reads for `ctx.ip` — the connection's by default,
+`forwardedIp`'s and `trustProxy`'s from the header or the socket — is
+given in one canonical text:
+
+| Written | `ctx.ip` |
+| --- | --- |
+| `2001:0DB8:0000:0000:0000:0000:0000:0001` | `2001:db8::1` |
+| `2001:db8:0:0:1:0:0:1` | `2001:db8::1:0:0:1` (the first of equal zero runs) |
+| `[2001:db8::1]:443`, `203.0.113.9:8080` | `2001:db8::1`, `203.0.113.9` |
+| `::ffff:192.0.2.1`, `::FFFF:c000:201` | `192.0.2.1` |
+| `fe80:0:0:0:0:0:0:1%en0` (a socket's) | `fe80::1%en0` |
+
+IPv6 is written as RFC 5952 says: lowercase, no leading zeros, the
+longest run of two or more zero groups as `::`. An IPv4-mapped address is
+the IPv4 address it maps. A zone id, which only a link-local socket
+address carries, is kept as written after the canonical address; in a
+header, an entry with one names no client, as before. A `trusted` function
+is given the same text. It is the same address, only its text changes, so
+it is on by default; `canonical: false` keeps the address as written, and
+a custom `ip` function is read as it returns. `canonicalIp(address)` gives
+your own values the same form:
+
+```ts
+import { alxia, canonicalIp } from '@alxia/core';
+
+const blocked = new Set(['2001:DB8::0:1', '::ffff:198.51.100.4'].map(canonicalIp));
+const app = alxia()
+	.use((ctx, next) => (blocked.has(ctx.ip ?? '') ? ctx.reply(403, 'blocked') : next()))
+	.get('/', ({ reply }) => reply(200, 'ok'));
+```
 
 To read anything else, `ip` is any function
 `(request: Request, server: Bun.Server<unknown> | undefined) => string | undefined`,
@@ -203,9 +241,10 @@ so `alxia({ ip: forwardedIp(o) })` and `alxia({ proxy: trustProxy(o) })`
 give the same address: keep `forwardedIp` when the address is all the app
 reads. Give `ip` or `proxy`, not both: the app throws when it is built.
 
-### `trustProxy({ trusted, header, untrusted })`
+### `trustProxy({ trusted, header, untrusted, allow, canonical })`
 
 ```ts
+function trustProxy(options: StrictProxyOptions): ProxyTrust; // untrusted: 'refuse-all', trusted by address, allow
 function trustProxy(options: TrustProxyOptions): ProxyTrust;
 ```
 
@@ -213,7 +252,9 @@ function trustProxy(options: TrustProxyOptions): ProxyTrust;
 | --- | --- | --- | --- |
 | `trusted` | `number \| string \| string[] \| (address: string) => boolean` | required | the proxies in front of the app, as for [`forwardedIp`](#forwardedip-header-trusted-) |
 | `header` | `string` | `'x-forwarded-for'` | `'x-forwarded-for'`: the address from it, the scheme from `X-Forwarded-Proto`, the host from `X-Forwarded-Host`; `'forwarded'`: all three from RFC 7239's `for=`, `proto=` and `host=`; another name: the address from that header, the scheme and host from `X-Forwarded-*` |
-| `untrusted` | `'ignore' \| 'refuse'` | `'ignore'` | what a request whose forwarding headers come from a connection that is no proxy gets (below) |
+| `untrusted` | `'ignore' \| 'refuse' \| 'refuse-all'` | `'ignore'` | what a request from a connection that is no proxy gets: its forwarding headers ignored, refused when it carries one, or refused whatever it carries ([below](#refusing-an-untrusted-peer)) |
+| `allow` | `string \| string[] \| (request: Request, peer: string \| undefined) => boolean` | none | under `'refuse-all'` alone: what passes from another connection ([below](#only-the-proxies-refuse-all)) |
+| `canonical` | `boolean` | `true` | `ctx.ip` in its [one text](#one-text-per-address); `false`, as written |
 
 `originalUrl(ctx)` is a copy of `ctx.url` with the scheme and host the
 proxies said: change it freely, the request's URL stays. `ctx.url` itself
@@ -272,12 +313,71 @@ answered 403 — `{ "error": "untrusted_proxy" }`, or a problem under
 the app runs reads what such a request claims, and a logger does not see
 it. A request with none of those headers passes: a load balancer's or an
 orchestrator's health probe, which sends none, reaches `/health` and
-`/ready` from any address. Refusing needs the proxies named by address; with
-a hop count, which cannot tell a proxy, `trustProxy` throws.
+`/ready` from any address; to refuse those too, see
+[`refuse-all`](#only-the-proxies-refuse-all). Refusing needs the proxies
+named by address; with a hop count, which cannot tell a proxy,
+`trustProxy` throws.
 
 ```ts
 alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
 ```
+
+### Only the proxies: `refuse-all`
+
+`'refuse'` lets a request with no forwarding header through from anywhere,
+so that probes pass. An app that only its proxies may reach refuses every
+other connection, headers or not, with `untrusted: 'refuse-all'`: the same
+403, in the app's error format (a problem's `detail` reads `A connection
+that is no trusted proxy`), before routing and every middleware. A
+connection of unknown address — `app.request`, with no server — is
+refused too. As with `'refuse'`, a hop count cannot tell a proxy: with
+`trusted` a number, it is a compile error, and `trustProxy` throws.
+
+`allow` is the escape, checked only for a connection `trusted` does not
+name: peers by CIDR range or address, or a test of the request and the
+peer's address as `ctx.ip` shows it (`undefined` with no server), which
+lets the request through when it returns `true` — anything else, a
+throw included, refuses it. What it lets through is a direct client: its forwarding headers are not read, and its `ctx.ip` is
+the connection's.
+
+```ts
+alxia({
+	proxy: trustProxy({
+		trusted: ['10.0.0.0/8'],
+		untrusted: 'refuse-all',
+		allow: ['127.0.0.1', '::1'], // a sidecar or a local probe
+	}),
+});
+
+alxia({
+	proxy: trustProxy({
+		trusted: ['10.0.0.0/8'],
+		untrusted: 'refuse-all',
+		// the probes, from whatever node the orchestrator runs them on
+		allow: (request) => ['/health', '/ready'].includes(new URL(request.url).pathname),
+	}),
+});
+```
+
+**Keeping the probes working.** A load balancer's own health check comes
+from its addresses, which `trusted` already names: it passes. An
+orchestrator's probe — Kubernetes' kubelet, a container platform's agent —
+comes from the node, which is no proxy: allow the nodes' range (`allow:
+['10.1.0.0/16']`), or the probes' paths, as above. Compare the path
+exactly, as above: `pathname.startsWith('/health')` lets `/healthz-admin`
+through too, while the exact comparison refuses an encoded or
+differently cased spelling the router would still serve, which fails
+closed. A path predicate lets anyone reach those paths directly, so keep
+what they answer to the probes' needs (`health()`'s `details` off).
+
+**Pages are not gated.** Bun serves a [`page()`](static-files.md) itself,
+before anything the app runs, so `'refuse-all'` could not refuse it:
+`listen` throws when the app has one. Build the pages and serve them with
+`static()`, which runs behind the refusal, or keep `untrusted: 'refuse'`.
+
+`trustProxy`'s two forms are overloads: an `untrusted` typed as a union of
+modes (`'refuse' | 'refuse-all'`) matches neither, so pick the form where
+the options are written, or cast the options to the one you mean.
 
 With no server (`app.request`, `app.fetch` alone), the connection is
 unknown and never a proxy: a spec that sends forwarding headers gives

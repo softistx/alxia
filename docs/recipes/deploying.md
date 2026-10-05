@@ -171,6 +171,30 @@ import { alxia, trustProxy } from '@alxia/core';
 const app = alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
 ```
 
+When nothing but the proxies may reach the app, refuse every other
+connection, headers or not, with `untrusted: 'refuse-all'`, and let the
+platform's probes through with `allow`: a load balancer's own check comes
+from an address `trusted` names and passes, an orchestrator's comes from
+the node, so allow the nodes' range or the probes' exact paths
+([Only the proxies](../../packages/core/docs/guide/serving.md#only-the-proxies-refuse-all)):
+
+```ts no-check
+import { alxia, trustProxy } from '@alxia/core';
+
+const app = alxia({
+	proxy: trustProxy({
+		trusted: ['10.0.0.0/8'],
+		untrusted: 'refuse-all',
+		allow: (request) => ['/health', '/ready'].includes(new URL(request.url).pathname),
+	}),
+});
+```
+
+Either way, `ctx.ip` is the client's address in one canonical text, IPv6
+compressed and an IPv4-mapped address as IPv4, so a rate limit counts one
+client once however the socket or the proxy wrote it
+([One text per address](../../packages/core/docs/guide/serving.md#one-text-per-address)).
+
 Use [a shared store](caching-and-rate-limiting.md) when there are several
 replicas.
 

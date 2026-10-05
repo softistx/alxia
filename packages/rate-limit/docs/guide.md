@@ -115,6 +115,16 @@ load balancer), or their CIDR ranges, in which case a client that reaches the
 app directly is counted by its own address, whatever header it sends
 ([Serving](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#the-clients-address-ip)).
 
+One client is one key however its address is written: core gives `ctx.ip`
+in one canonical text, from the socket or the header alike — an
+IPv4-mapped `::ffff:203.0.113.9` as `203.0.113.9`, IPv6 as RFC 5952 writes
+it (`2001:DB8:0:0:0:0:0:1` as `2001:db8::1`) — so a client cannot buy a
+new allowance by writing its address another way, nor reach the app by
+socket and by proxy under two keys
+([One text per address](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#one-text-per-address)).
+A `key` of your own that reads an address elsewhere gets the same form
+from core's `canonicalIp`.
+
 Count by something else — an API key, a token — by returning it from `key`.
 It may be async. A request whose key is `undefined` is not counted: it passes,
 gets no rate-limit header, and its route reads `rateLimit` as `undefined`.
@@ -144,7 +154,7 @@ app.use(
 	rateLimit({
 		limit: 100,
 		windowMs: 60_000,
-		skip: ({ ip }) => ip === '127.0.0.1', // the local health checker
+		skip: ({ ip }) => ip === '127.0.0.1', // the local health checker, IPv4-mapped or not
 	}),
 );
 ```

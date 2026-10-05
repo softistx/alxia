@@ -37,8 +37,9 @@ export interface AlxiaOptions<Prefix extends string> {
 	 */
 	readonly dev?: boolean;
 	/**
-	 * Reads the client's address. By default, the address of the connection;
-	 * behind a proxy you trust, read its header instead.
+	 * Reads the client's address. By default, the address of the connection,
+	 * in its canonical text (`canonicalIp`); behind a proxy you trust, read
+	 * its header instead. What a function given here returns is read as is.
 	 */
 	readonly ip?: (
 		request: Request,
@@ -49,7 +50,8 @@ export interface AlxiaOptions<Prefix extends string> {
 	 * once, they give `ctx.ip`, in place of `ip`, and the scheme and host
 	 * the client asked for, `originalUrl(ctx)`; with `untrusted: 'refuse'`,
 	 * a request whose forwarding headers come from another connection is
-	 * answered 403. Give `ip` or `proxy`, not both.
+	 * answered 403, and with `'refuse-all'` any request from one that
+	 * `allow` does not let through. Give `ip` or `proxy`, not both.
 	 */
 	readonly proxy?: ProxyTrust;
 }

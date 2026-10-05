@@ -122,7 +122,7 @@ describe('the types', () => {
 			alxia({ proxy: forwardedIp({ trusted: 1 }) }),
 			// @ts-expect-error: trustProxy is the proxy option, not the ip one
 			alxia({ ip: trustProxy({ trusted: 1 }) }),
-			// @ts-expect-error: untrusted is 'ignore' or 'refuse'
+			// @ts-expect-error: untrusted is 'ignore', 'refuse' or 'refuse-all'
 			trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'reject' }),
 			// @ts-expect-error: trusted is required
 			trustProxy({}),

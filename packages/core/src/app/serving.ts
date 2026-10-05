@@ -4,6 +4,7 @@
  * graceful shutdown — on `SIGINT` and `SIGTERM`, or `stop()` — run once.
  */
 import { formatRoutes, routeRows } from '../dev/route-table';
+import { REFUSES_ALL } from '../request/trust-proxy';
 import type { Runtime, StopHook } from './definition';
 import { serve } from './pipeline';
 import { onSignals, SIGNALS } from './signals';
@@ -44,6 +45,7 @@ export function startServer(
 	} = typeof options === 'number' ? { port: options } : options;
 	milliseconds('shutdownTimeout', shutdownTimeout);
 	milliseconds('stopTimeout', stopTimeout);
+	refusablePages(runtime);
 	if (runtime.served.closing.signal.aborted) {
 		runtime.served.closing = new AbortController();
 	}
@@ -194,6 +196,19 @@ type Routes = Record<
 	| Bun.HTMLBundle
 	| ((request: Request, server: Bun.Server<unknown>) => Promise<Response>)
 >;
+
+/**
+ * Bun serves a page itself, past every check the app runs: under
+ * `untrusted: 'refuse-all'`, which promises to refuse every connection but
+ * the proxies', a page would answer anyone, so `listen` refuses the two.
+ */
+function refusablePages(runtime: Runtime): void {
+	const proxy = runtime.proxy as { [REFUSES_ALL]?: true } | undefined;
+	if (proxy?.[REFUSES_ALL] === true && runtime.globals.pages.size > 0)
+		throw new TypeError(
+			"listen(): trustProxy's untrusted: 'refuse-all' cannot refuse the page() routes, which Bun serves itself: build the pages and serve them with static(), or use untrusted: 'refuse'",
+		);
+}
 
 /** Each declared path for Bun's own router, and each HTML page. */
 function routesOf(runtime: Runtime): Routes {

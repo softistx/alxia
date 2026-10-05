@@ -1,4 +1,5 @@
 import { isIP } from 'node:net';
+import { ipv4Text, ipv6Text } from './ip-text';
 
 /** An IP address as a number, with its family: an IPv4-mapped IPv6 address is read as IPv4. */
 export interface ParsedIp {
@@ -6,6 +7,11 @@ export interface ParsedIp {
 	readonly value: bigint;
 	/** The address without port or brackets, lowercase. */
 	readonly text: string;
+}
+
+/** Its one canonical text: IPv4 dotted, IPv6 as RFC 5952 writes it, a mapped address as IPv4. */
+export function canonicalOf(ip: ParsedIp): string {
+	return ip.version === 4 ? ipv4Text(ip.value) : ipv6Text(ip.value);
 }
 
 function ipv4(text: string): bigint {
@@ -38,19 +44,67 @@ function ipv6(text: string): bigint {
  * `undefined` for anything else (`unknown`, `_hidden`, a name, an empty entry).
  */
 export function parseIp(entry: string): ParsedIp | undefined {
-	let text = entry.trim();
-	const bracket = /^\[([^\]]*)\](?::\d{1,5})?$/.exec(text);
-	if (bracket) text = bracket[1] ?? '';
-	else if (/^\d+\.\d+\.\d+\.\d+:\d{1,5}$/.test(text))
-		text = text.slice(0, text.lastIndexOf(':'));
+	const text = unwrapped(entry);
 	if (text.includes('%')) return undefined; // a zone id names an interface, not a client
+	return parsed(text);
+}
+
+/** An entry without its brackets and its port. */
+function unwrapped(entry: string): string {
+	const text = entry.trim();
+	const bracket = /^\[([^\]]*)\](?::\d{1,5})?$/.exec(text);
+	if (bracket) return bracket[1] ?? '';
+	if (/^\d+\.\d+\.\d+\.\d+:\d{1,5}$/.test(text))
+		return text.slice(0, text.lastIndexOf(':'));
+	return text;
+}
+
+/** A bare address, read; `undefined` for anything else. */
+function parsed(text: string): ParsedIp | undefined {
 	const family = isIP(text);
-	if (family === 4) return { version: 4, value: ipv4(text), text };
+	if (family === 4) {
+		return { version: 4, value: ipv4(text), text };
+	}
 	if (family !== 6) return undefined;
 	const value = ipv6(text);
+	const lower = text.toLowerCase();
 	if (value >> 32n === 0xffffn)
-		return { version: 4, value: value & 0xffffffffn, text: text.toLowerCase() };
-	return { version: 6, value, text: text.toLowerCase() };
+		return { version: 4, value: value & 0xffffffffn, text: lower };
+	return { version: 6, value, text: lower };
+}
+
+/** IPv4, bare or mapped into IPv6. */
+const DOTTED = /^(?:::ffff:)?(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})$/i;
+
+/**
+ * The one text of an address, however a header or a socket wrote it, so
+ * one client is one string in a rate-limit key, a log or an allow list:
+ * brackets and a port dropped, IPv6 as RFC 5952 writes it (lowercase, no
+ * leading zeros, the longest zero run as `::`), an IPv4-mapped address
+ * (`::ffff:192.0.2.1`) as IPv4. A zone id (`fe80::1%en0`) is kept, as
+ * written, after the canonical IPv6 address it qualifies. What is no
+ * address comes back as given.
+ *
+ * @example
+ * canonicalIp('[2001:DB8:0:0:0:0:0:1]:443'); // '2001:db8::1'
+ * canonicalIp('::ffff:192.0.2.1'); // '192.0.2.1'
+ */
+export function canonicalIp(address: string): string {
+	// What a socket gives most: IPv4, or IPv4 mapped, read without a parse.
+	const v4 = DOTTED.exec(address)?.[1];
+	if (v4 !== undefined && isIP(v4) === 4) return v4;
+	const text = unwrapped(address);
+	const zone = text.indexOf('%');
+	if (zone < 0) {
+		const ip = parsed(text);
+		return ip === undefined ? address : canonicalOf(ip);
+	}
+	const ip = parsed(text.slice(0, zone));
+	if (ip === undefined || zone === text.length - 1 || !text.includes(':'))
+		return address;
+	const at =
+		ip.version === 4 ? `::ffff:${ipv4Text(ip.value)}` : canonicalOf(ip);
+	return `${at}${text.slice(zone)}`;
 }
 
 /** A CIDR range, or one address: `10.0.0.0/8`, `fd00::/8`, `192.168.1.1`. Throws on anything else. */
