@@ -5,24 +5,8 @@
  * nothing, and runs the app's chain alone.
  */
 import { describe, expect, test } from 'bun:test';
+import { admin, guardOn, ok } from '../../test/fixtures/guards';
 import { alxia } from './alxia';
-import { defineMiddleware } from './define-middleware';
-import type { BaseContext } from './types';
-
-/** A guard that counts its runs, and lets through a request carrying `header`. */
-const guardOn = (header: string, status: 401 | 403 = 401) => {
-	const runs = { count: 0 };
-	const guard = defineMiddleware(({ request, reply }, next) => {
-		runs.count++;
-		return request.headers.has(header)
-			? next()
-			: reply(status, { error: header });
-	});
-	return Object.assign(guard, { runs });
-};
-
-const ok = ({ reply }: BaseContext) => reply(200, 'ok');
-const admin = { 'x-admin': '1' };
 
 describe("an unprefixed group's guard, on a 405 at its route's path", () => {
 	const app = () => {
@@ -106,52 +90,6 @@ describe('a prefixed group, on a 405 under its prefix', () => {
 	});
 });
 
-describe('two groups owning methods at one path', () => {
-	const shared = () => {
-		const seen = guardOn('x-any');
-		const first = guardOn('x-first', 401);
-		const second = guardOn('x-second', 403);
-		const app = alxia()
-			.use(seen)
-			.group((g) => g.use(first).get('/shared', ok))
-			.group((g) => g.use(second).post('/shared', ok));
-		return { app, seen, first, second };
-	};
-	const del = (headers: Record<string, string>) => ({
-		method: 'DELETE',
-		headers: { 'x-any': '1', ...headers },
-	});
-
-	test('run each chain in the order declared, the first refusal answering', async () => {
-		const { app, second } = shared();
-		expect((await app.request('/shared', del({}))).status).toBe(401);
-		expect(second.runs.count).toBe(0);
-		const refused = await app.request('/shared', del({ 'x-first': '1' }));
-		expect(refused.status).toBe(403);
-		expect(refused.headers.get('allow')).toBeNull();
-	});
-
-	test("answer the 405 once every chain called next; the app's chain runs once", async () => {
-		const { app, seen } = shared();
-		const passed = await app.request(
-			'/shared',
-			del({ 'x-first': '1', 'x-second': '1' }),
-		);
-		expect(passed.status).toBe(405);
-		expect(passed.headers.get('allow')).toBe('GET, POST');
-		expect(seen.runs.count).toBe(1);
-	});
-
-	test('a group owning two methods runs its chain once', async () => {
-		const guard = guardOn('x-admin');
-		const app = alxia().group((g) =>
-			g.use(guard).get('/both', ok).post('/both', ok),
-		);
-		await app.request('/both', { method: 'DELETE', headers: admin });
-		expect(guard.runs.count).toBe(1);
-	});
-});
-
 describe('a mounted plugin', () => {
 	const routes = () =>
 		alxia().group((g) => g.use(guardOn('x-admin')).get('/secret', ok));
@@ -183,15 +121,39 @@ describe('a mounted plugin', () => {
 		expect((await app.request('/missing')).status).toBe(404);
 	});
 
-	test('use(path, guard) refuses the 405 under its path, a plugin rebased', async () => {
-		const scoped = alxia()
-			.use('/secret', guardOn('x-admin'))
-			.get('/secret', ok);
+	test('use(path, guard) refuses the 405 under its path, once, a plugin rebased', async () => {
+		const guard = guardOn('x-admin');
+		const scoped = alxia().use('/secret', guard).get('/secret', ok);
 		for (const [app, path] of [
 			[scoped, '/secret'],
 			[alxia({ prefix: '/api' }).plugin(scoped), '/api/secret'],
+			[alxia().group((g) => g.plugin(scoped)), '/secret'],
 		] as const) {
 			expect((await app.request(path, { method: 'DELETE' })).status).toBe(401);
+			guard.runs.count = 0;
+			const passed = await app.request(path, {
+				method: 'DELETE',
+				headers: admin,
+			});
+			expect(passed.status).toBe(405);
+			expect(guard.runs.count).toBe(1);
 		}
+	});
+
+	test('a use(path) a route parameter may reach runs on the 405 the path decides', async () => {
+		const guard = guardOn('x-admin');
+		const app = alxia().group((g) =>
+			g.use('/users/admin', guard).get('/users/:id', ok).post('/users/:id', ok),
+		);
+		expect(
+			(await app.request('/users/admin', { method: 'DELETE' })).status,
+		).toBe(401);
+		guard.runs.count = 0;
+		expect((await app.request('/users/bob', { method: 'DELETE' })).status).toBe(
+			405,
+		);
+		expect(guard.runs.count).toBe(0);
+		await app.request('/users/admin', { method: 'DELETE', headers: admin });
+		expect(guard.runs.count).toBe(1);
 	});
 });

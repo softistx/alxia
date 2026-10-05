@@ -20,7 +20,8 @@ changes.
 so it now runs the chain in force of every route at that path before it
 answers: after the app's chain, as every request no route matches runs it,
 the `derive`s and middlewares of each route's groups, in the order the
-routes were declared, each hook once. A group without a prefix, whose
+routes were declared, each on its own copy of the context the app's chain
+built. A group without a prefix, whose
 middlewares a request no route matches never ran, now guards it too:
 
 ```ts
@@ -1527,7 +1528,9 @@ the request runs the chain, and an error nobody caught is answered:
   on its routes and, for a group with a prefix, on an unmatched request
   under it, before the 404 or 405. A group without a prefix adds none to
   unmatched requests (since the next release, it guards the 405 at its
-  routes' paths: [A guarded group refuses the 405 at its routes](#a-guarded-group-refuses-the-405-at-its-routes)). The middlewares of an app given to `plugin(app)` are
+  routes' paths: [A guarded group refuses the 405 at its
+  routes](#a-guarded-group-refuses-the-405-at-its-routes)). The
+  middlewares of an app given to `plugin(app)` are
   the mounting app's: they run on unmatched requests too, unless the app
   has a prefix of its own.
 - **Errors are rejections through `next()`**: a middleware's

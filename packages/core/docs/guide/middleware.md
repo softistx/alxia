@@ -122,7 +122,8 @@ Three rules follow, each spec'd:
   its `Allow` comes once the guard calls `next`. When several groups own
   methods at one path, each one's chain runs, in the order declared, after
   the app's, and the first refusal answers; a route's own middlewares never
-  run there ([Which chain a 405 runs](#which-chain-a-405-runs)). A plugin with a prefix of its
+  run there ([Which chain a 405 runs](#which-chain-a-405-runs)). A plugin
+  with a prefix of its
   own (`alxia({ prefix: '/todos' })`, `defineRoutes('/todos')`) is such a
   group once mounted. A plugin without one (`app.plugin(otherApp)`) gives
   its middlewares to the app: the routes declared after it, and every
@@ -670,7 +671,8 @@ given to. See
 Middlewares declared inside a group apply to its routes, and to an
 unmatched request under its prefix, before the 404 or 405: never to a
 route declared after the group. The group's routes keep every one
-declared before it.
+declared before it. With a prefix or without, they also run on a 405 at
+the group's routes' paths ([Which chain a 405 runs](#which-chain-a-405-runs)).
 `use` in a group is how a subtree's context is added to:
 
 ```ts
@@ -701,9 +703,12 @@ socket is there. Before it answers, it runs the app's chain, as every
 request no route matches does, then the chain in force of each route at
 that path, in the order those routes were declared: the `derive`s and
 middlewares of the groups they stand in, prefixed or not, and of a plugin
-mounted in a group. A hook already run — the app's, or one two routes
-share — runs once. The first that answers is the answer, without `Allow`;
-once every one called `next`, the 405 is sent with it.
+mounted in a group. Each owner's chain runs on its own copy of the context
+the app's chain built, so what one group's `derive` adds never reaches
+another group's guard. A hook of the app's chain runs once, and one
+group's two routes run its chain once. The first that answers is the
+answer, without `Allow`; once every one called `next`, the 405 is sent
+with it.
 
 ```ts
 const app = alxia()

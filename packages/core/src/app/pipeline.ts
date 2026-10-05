@@ -38,6 +38,35 @@ export async function serve(
 	}
 }
 
+/** What the router finds for `method`: a route, or the methods its path allows. */
+type Found =
+	| { readonly value: Definition; readonly params: Record<string, string> }
+	| { readonly path: string; readonly allowed: readonly string[] }
+	| undefined;
+
+/**
+ * The route `method` reaches at `url`: matched by the router, or at
+ * `path`, the one `Bun.serve` chose under `listen`.
+ */
+function found(
+	{ router, globals }: Runtime,
+	url: URL,
+	path: string | undefined,
+	method: string,
+): Found {
+	if (path === undefined) {
+		const pages = globals.pages.size === 0 ? undefined : globals.pages.keys();
+		return router.match(method, url.pathname, pages);
+	}
+	const methods = router.methodsAt(path);
+	if (methods === undefined) return undefined;
+	const value = methods.get(method);
+	if (value !== undefined) {
+		return { value, params: router.paramsAt(path, url.pathname) };
+	}
+	return { path, allowed: [...methods.keys()] };
+}
+
 /**
  * The route the request reached, run: the socket a `websocket` upgrade
  * asks for, a `GET` for a `HEAD` no route takes, or the 404, 405 or 426
@@ -50,26 +79,9 @@ async function route(
 	path: string | undefined,
 ): Promise<Response | typeof UPGRADED> {
 	const { router, globals } = runtime;
-	const { request, url } = ctx;
+	const { request } = ctx;
 	const upgrade = request.headers.get('upgrade')?.toLowerCase() === 'websocket';
-	const find = (
-		method: string,
-	):
-		| { readonly value: Definition; readonly params: Record<string, string> }
-		| { readonly path: string; readonly allowed: readonly string[] }
-		| undefined => {
-		if (path === undefined) {
-			const pages = globals.pages.size === 0 ? undefined : globals.pages.keys();
-			return router.match(method, url.pathname, pages);
-		}
-		const methods = router.methodsAt(path);
-		if (methods === undefined) return undefined;
-		const value = methods.get(method);
-		if (value !== undefined) {
-			return { value, params: router.paramsAt(path, url.pathname) };
-		}
-		return { path, allowed: [...methods.keys()] };
-	};
+	const find = (method: string) => found(runtime, ctx.url, path, method);
 
 	if (upgrade) {
 		const socket = find('WS');

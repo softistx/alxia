@@ -1,59 +1,30 @@
 /**
- * What a 405 or a 426 runs before it tells a path's methods: the chain of
- * every route that owns the path, as it stood where each was declared —
- * an unprefixed group's guard among it — so its `Allow` reaches only a
- * request those chains let through. A prefixed group's chain already runs
- * there (`Scope.enclose`), and a 404, which names nothing, runs the app's
- * chain alone.
- *
- * A hook of a chain in force is told from a route's own by `origins`:
- * every hook a scope holds is entered there, and so is each copy of it
- * given a path (`scopedAt`), under the same original, so a hook the app's
- * chain already ran is not run twice.
+ * What a 405 or a 426 runs before it tells a path's methods: the chain in
+ * force of every route that owns the path, as it stood where each was
+ * declared — an unprefixed group's guard among it — so its `Allow` reaches
+ * only a request every one of those chains lets through. A prefixed
+ * group's chain already runs there (`Scope.enclose`), and a 404, which
+ * names nothing, runs the app's chain alone.
  */
-import type { ChainHook, Definition } from './definition';
+import { chain } from './chain';
+import type { ChainHook, Definition, MiddlewareHook } from './definition';
+import { originOf } from './in-force';
 import type { ScopedHooks } from './scope';
-import { matches, type ScopePath } from './scope-path';
+import { matches } from './scope-path';
+import { runOf } from './settled';
+import type { BaseContext } from './types';
+import type { ChainRun } from './validation';
 
-const IN_FORCE = Symbol.for('alxia.inForce');
-
-/**
- * Each hook of a chain in force, and each copy of it, to the hook it was
- * declared as: one map for every copy of core, as their marks are
- * (`Symbol.for`), so a plugin built with another copy is read alike.
- */
-const origins = sharedOrigins(
-	globalThis as { [IN_FORCE]?: WeakMap<ChainHook, ChainHook> },
-);
-
-function sharedOrigins(global: {
-	[IN_FORCE]?: WeakMap<ChainHook, ChainHook>;
-}): WeakMap<ChainHook, ChainHook> {
-	const shared = global[IN_FORCE] ?? new WeakMap<ChainHook, ChainHook>();
-	global[IN_FORCE] = shared;
-	return shared;
-}
-
-/** Enters a hook a scope takes for its routes: one of a chain in force. */
-export function inForce<Hook extends ChainHook>(hook: Hook): Hook {
-	if (!origins.has(hook)) origins.set(hook, hook);
-	return hook;
-}
-
-/** `hook`, run under `when` alone: in force if `hook` is, as the same hook. */
-export function scopedAt(hook: ChainHook, when: ScopePath): ChainHook {
-	const copy = { ...hook, when } as ChainHook;
-	const origin = origins.get(hook);
-	if (origin !== undefined) origins.set(copy, origin);
-	return copy;
-}
+type Ctx = Record<string, unknown> & BaseContext;
 
 /**
  * The chain a 405 or a 426 at `pathname` runs: the app's, as every request
- * no route matches runs it, then, of each route `owners` holds in the order
- * declared, the hooks of its chain in force that the app's does not run on
- * this request — its own middlewares, its validation, never. A hook two
- * routes share runs once. The first that answers is the answer; the
+ * no route matches runs it, then each owner's — of the routes `owners`
+ * holds, in the order declared — the hooks of its chain in force the
+ * app's does not run on this request. Its own middlewares, its validation,
+ * never. Each owner runs on a copy of the context the app's chain built,
+ * so what one group adds never reaches another's guard; two routes of one
+ * group run their chain once. The first that answers is the answer; the
  * router's, with its `Allow`, comes once every one called `next`.
  */
 export function guardedHooks(
@@ -62,20 +33,54 @@ export function guardedHooks(
 	pathname: string,
 ): ScopedHooks {
 	let ran: Set<ChainHook> | undefined;
-	const guards: ChainHook[] = [];
+	const chains: ChainHook[][] = [];
 	for (const owner of owners) {
+		const own: ChainHook[] = [];
 		for (const hook of owner.derive) {
-			const origin = origins.get(hook);
+			const origin = originOf(hook);
 			if (origin === undefined) continue;
 			ran ??= runOn(unmatched, pathname);
-			if (ran.has(origin)) continue;
-			ran.add(origin);
-			guards.push(hook);
+			if (!ran.has(origin)) own.push(hook);
+		}
+		if (own.length > 0 && !chains.some((seen) => same(seen, own))) {
+			chains.push(own);
 		}
 	}
-	return guards.length === 0
-		? unmatched
-		: { derive: [...unmatched.derive, ...guards] };
+	if (chains.length === 0) return unmatched;
+	const hook: ChainHook = { kind: 'middleware', run: ownersOf(chains) };
+	return { derive: [...unmatched.derive, hook] };
+}
+
+/**
+ * The middleware that runs each owner's chain in turn, each on a copy of
+ * the context, each ending in the next one's; the last in the router's
+ * answer. A middleware of one awaits a real response from `next`.
+ */
+function ownersOf(chains: readonly ChainHook[][]): MiddlewareHook {
+	return (ctx, next) => {
+		const run = runOf(ctx) as ChainRun;
+		const at = async (index: number): Promise<Response> => {
+			const hooks = chains[index];
+			if (hooks === undefined) return next();
+			const owner: ChainRun = {
+				...run,
+				definition: { ...run.definition, derive: hooks },
+			};
+			return chain(owner, { ...(ctx as Ctx) }, () => at(index + 1));
+		};
+		return at(0);
+	};
+}
+
+/**
+ * Whether two owners' chains are the same hooks, as declared: one group's
+ * two routes, which would run the same steps on the same context.
+ */
+function same(a: readonly ChainHook[], b: readonly ChainHook[]): boolean {
+	return (
+		a.length === b.length &&
+		a.every((hook, index) => originOf(hook) === originOf(b[index] as ChainHook))
+	);
 }
 
 /** The hooks of the app's chain a request at `pathname` runs, as declared. */
@@ -84,7 +89,7 @@ function runOn(unmatched: ScopedHooks, pathname: string): Set<ChainHook> {
 	for (const hook of unmatched.derive) {
 		const when = 'when' in hook ? hook.when : undefined;
 		if (when === undefined || matches(when, pathname)) {
-			ran.add(origins.get(hook) ?? hook);
+			ran.add(originOf(hook) ?? hook);
 		}
 	}
 	return ran;

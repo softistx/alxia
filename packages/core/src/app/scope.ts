@@ -9,7 +9,7 @@ import type {
 	RouteDefinition,
 	SocketDefinition,
 } from './definition';
-import { inForce, scopedAt } from './guarded';
+import { inForce, scopedAt } from './in-force';
 import { prefixPath, reach, rebase, type ScopePath } from './scope-path';
 import type { RouteSchema } from './types';
 

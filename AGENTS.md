@@ -104,9 +104,11 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   own (`Scope.enclose`, `absorb`), which then adds nothing to the context
   after it (`MountedIn`). A 405 or a 426, which name a path's methods,
   also run the chain in force of every route at that path, after the
-  app's, in declaration order, each hook once (`guarded.ts`, which tells a
-  hook in force from a route's own): an unprefixed group's guard refuses
-  them as it refuses its routes, and a 404 runs the app's chain alone. The app's `use()` middlewares also wrap
+  app's, in declaration order, each owner's on its own copy of the
+  context, so one group's `derive` never passes another's guard
+  (`guarded.ts`; `in-force.ts` tells a hook in force from a route's own):
+  an unprefixed group's guard refuses them as it refuses its routes, and
+  a 404 runs the app's chain alone. The app's `use()` middlewares also wrap
   the router: a request no route matches — a 404, a 405, a preflight —
   runs every one of them, wherever declared, in declaration order, then
   its answer, so a `use()` after a route runs on unmatched requests and
