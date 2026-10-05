@@ -1,5 +1,16 @@
 # @alxia/react-router
 
+## 0.7.0
+
+### Minor Changes
+
+- [#190](https://github.com/softistx/alxia/pull/190) [`bc2573c`](https://github.com/softistx/alxia/commit/bc2573c7eb045fcfd954fa5457a340abefc32579) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Hand React Router its request at `originalUrl(ctx)`: behind a proxy the app trusts (`alxia({ proxy: trustProxy(…) })`), `request.url` in a loader or an action is the scheme and host the client asked for. `createServer({ proxy })` passes the option to the app it makes.
+
+### Patch Changes
+
+- Updated dependencies [[`86af86e`](https://github.com/softistx/alxia/commit/86af86e9c73dbc5084a468113de1ec98207cfdf0), [`17d28fe`](https://github.com/softistx/alxia/commit/17d28fe08a73e4c549f04b98411364ff5c6715f5), [`bc2573c`](https://github.com/softistx/alxia/commit/bc2573c7eb045fcfd954fa5457a340abefc32579)]:
+  - @alxia/core@0.9.0
+
 ## 0.6.3
 
 ### Patch Changes
