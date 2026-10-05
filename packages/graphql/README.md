@@ -68,7 +68,12 @@ the schema's resolvers read a context the app does not build: missing user
 A field that loads a record per parent — `Note.author` over 50 notes — is
 51 queries. Build [DataLoaders](https://github.com/graphql/dataloader) in
 the `context` option and type them through `GraphQLContext`'s second
-argument:
+argument. (Yoga's `batching` option, below, is another thing: several
+operations in one HTTP request.)
+
+```sh
+bun add dataloader
+```
 
 ```ts
 import DataLoader from 'dataloader';

@@ -226,6 +226,10 @@ of one tick and calls your batch function once. Build the loaders in the
 `context` option, so each request has its own, and type them through
 `GraphQLContext`'s second argument, so every resolver reads `loaders` typed:
 
+```sh
+bun add dataloader
+```
+
 ```ts
 import DataLoader from 'dataloader';
 
