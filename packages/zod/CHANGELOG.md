@@ -1,5 +1,11 @@
 # @alxia/zod
 
+## 0.2.0
+
+### Minor Changes
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Remove `zodConverter`, deprecated since nothing in alxia reads it. Use Zod's own `z.toJSONSchema(schema)`.
+
 ## 0.1.1
 
 ### Patch Changes

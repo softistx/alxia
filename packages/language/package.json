@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/language",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "The request's language for alxia, typed as the languages you support: from the query, a cookie, the path or Accept-Language, weights and regions included",
 	"license": "MIT",
 	"type": "module",

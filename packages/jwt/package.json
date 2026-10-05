@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/jwt",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "JSON Web Tokens for alxia, on Web Crypto: HS256, ES256, RS256, EdDSA, and a typed bearer guard",
 	"license": "MIT",
 	"type": "module",
