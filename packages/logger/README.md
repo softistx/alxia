@@ -46,6 +46,14 @@ or `batch` for an array body, whose `operationName` lists every name).
 {"time":"…","level":"info","requestId":"…","message":"POST /graphql 200","status":200,"operationName":"GetNotes","operationType":"query"}
 ```
 
+Over `@alxia/graphql`'s `ws: true`, the upgrade is one line, and each
+operation on the socket another once it ended, carrying the upgrade's
+`requestId`, its `duration`, and `outcome`: `ok`, or `errors` (a `warn`).
+
+```json
+{"time":"…","level":"info","requestId":"…","message":"subscription OnNote","method":"GET","path":"/graphql","duration":5130.2,"outcome":"ok","operationName":"OnNote","operationType":"subscription"}
+```
+
 The routes after it read `requestId`, and `log`, whose entries carry it.
 Give it to `use` first: its timing then holds everything after it, and
 every request is logged, a 404 or a 405 that matched no route included.

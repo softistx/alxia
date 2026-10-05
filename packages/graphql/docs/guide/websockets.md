@@ -144,11 +144,45 @@ nowhere.
 
 ## Logging and tracing
 
-`@alxia/logger` and `@alxia/telemetry` see the upgrade request, `101`, and
-not the operations on the socket: the request is answered before they run,
-so none of them gets an `operationName` or a span. Log from a Yoga plugin's
-`onExecute` for now; each operation over the socket is on the
-[roadmap](../roadmap.md).
+The upgrade is answered before the first operation runs, so its request
+cannot name one. Each operation on the socket is told to the observers
+around the upgrade instead, from its `subscribe` message to its end — a
+query's or a mutation's result sent, a subscription completed, stopped by
+its client or cut by the socket's close — with its type, its name and
+whether it was answered with errors. Give `logger()` and `telemetry()` to
+`use` before `graphql()`, as over HTTP; nothing else to set:
+
+```ts
+const app = alxia()
+	.use(logger())
+	.use(telemetry({ service: 'notes' }))
+	.plugin((app) => graphql(app, { schema, ws: true }));
+```
+
+- `@alxia/logger` writes the upgrade's line, then one line per operation,
+  carrying the upgrade's `requestId`, its `duration` and `outcome`: `ok`,
+  or `errors` (a `warn`):
+
+  ```json
+  {"level":"info","requestId":"7f3c…","message":"GET /graphql 200","status":200}
+  {"level":"info","requestId":"7f3c…","message":"query GetNotes","duration":2.4,"outcome":"ok","operationName":"GetNotes","operationType":"query"}
+  ```
+
+- `@alxia/telemetry` gives the upgrade a span that ends with its answer,
+  and each operation a span of its own, a child of the upgrade's:
+  `subscription OnNote`, with `graphql.operation.name` and
+  `graphql.operation.type`, an error when answered with errors. No span
+  lasts as long as the socket.
+- An error is an operation answered with errors: a resolver that threw
+  (in `errors[]`), a document that does not validate, a subscription that
+  failed. A message that does not parse names no operation, and is not
+  told.
+- Without either observer, nothing is told, and the operations run as
+  they do.
+
+`graphql()` tells them with core's `startOperation`, and they subscribe
+during the upgrade with `onOperation`: no package imports another
+([core's plugin guide](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md)).
 
 ## Errors
 

@@ -135,10 +135,47 @@ const watched = defineMiddleware(async ({ route }, next) => {
 
 - `set.headers` and `set.cookies` a middleware sets are sent with the `101`.
 
+### Before the `101`: `upgrade`
+
+A socket that needs something before it opens — a connection of its own,
+whose answer the `101` carries — does it in its `upgrade` handler. It runs
+after every middleware has let the upgrade through, and the upgrade waits
+for it:
+
+```ts
+import { alxia, HttpError } from '@alxia/core';
+
+const app = alxia().ws('/feed', {
+	async upgrade(data, headers) {
+		const offered = data.request.headers.get('sec-websocket-protocol');
+		if (offered?.split(',').some((p) => p.trim() === 'feed.v2') !== true) {
+			throw new HttpError(400, { error: 'unsupported_protocol' as const });
+		}
+		headers.set('sec-websocket-protocol', 'feed.v2'); // sent with the 101
+	},
+	message: () => {},
+});
+```
+
+- `data` is the object `socket.data` will be, the same one: what `upgrade`
+  stores on it, or keys by it, `open` finds.
+- `headers` are the `101`'s, `set.headers` and `set.cookies` already in them.
+- A throw answers the upgrade request instead of the `101` — an `HttpError`
+  with its status, anything else a 500 — in the app's error format, and a
+  middleware that awaits `next()` sees it rejected. No socket opens.
+- Without a server (`app.request`), or for a handshake Bun would refuse —
+  not a `GET`, no `Sec-WebSocket-Key`, or a version other than 13 — the `426` comes
+  first: `upgrade` is not run, so what it opens is only opened for a `101`
+  to follow.
+- The client may go away while it is awaited: `data.request.signal` aborts
+  then, and the socket never opens, so `open` and `close` are not called.
+  Undo there what `upgrade` opened.
+
 ## The handlers
 
 ```ts
 interface SocketHandlers<Data, Send, Message> {
+	upgrade?(data: Data, headers: Headers): MaybePromise<void>; // before the 101, awaited
 	open?(socket: Socket<Data, Send>): MaybePromise<void>;
 	message(socket: Socket<Data, Send>, message: Message): MaybePromise<void>;
 	close?(socket: Socket<Data, Send>, code: number, reason: string): MaybePromise<void>;

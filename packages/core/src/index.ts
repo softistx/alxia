@@ -10,6 +10,12 @@ export {
 } from './app/operation';
 export { errorFormat, isDev, shutdownSignal } from './app/served';
 export {
+	type OperationObserver,
+	type OperationOutcome,
+	onOperation,
+	startOperation,
+} from './app/socket-operation';
+export {
 	type RequestSchemas,
 	responds,
 	type Validated,

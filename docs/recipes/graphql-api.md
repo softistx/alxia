@@ -373,8 +373,11 @@ const app = base.fork().use(tracing).use(logger()).plugin((app) => graphql(app, 
   type is `batch` and the name lists every operation's, `GetNotes,AddNote`.
 - A request refused before it executes (a syntax error, a document that
   fails validation) names no operation. An anonymous one has a type alone.
-- An operation over `ws: true` is not logged or spanned yet: only the
-  upgrade is, and the socket's operations are on the roadmap.
+- Over `ws: true`, the upgrade is one line and one span, and each
+  operation on the socket another, from its `subscribe` message to its
+  end: a line carrying the upgrade's `requestId`, its `duration` and
+  `outcome` (`ok`, or `errors`, a `warn`), and a span that is a child of
+  the upgrade's, `subscription OnNote`, an error when answered with errors.
 
 ### Auth errors in three layers
 

@@ -32,8 +32,8 @@ type Reported = { [REPORTED]?: OperationReport[] };
  * Tells the observers around a request which operation it executes. For a
  * plugin that serves a query language, such as `@alxia/graphql`, which calls
  * it for each operation it executes. A socket's operations are not
- * reported: its upgrade has been answered already. A context with no run is
- * ignored.
+ * reported here: its upgrade has been answered already, so they go to
+ * `startOperation`. A context with no run is ignored.
  *
  * ```ts
  * reportOperation(ctx, { type: 'query', name: 'GetNotes' });

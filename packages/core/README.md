@@ -590,7 +590,10 @@ issues, the socket kept open); each one sent is checked by `send`.
 `socket.data` holds what the middlewares added and `validate` gave back. A
 middleware that awaits `next()` gets an empty `200` stand-in once the socket
 is open; what it returns after is ignored (a header set on the stand-in is
-lost: set `set.headers` before). `responds` has no
+lost: set `set.headers` before). An `upgrade(data, headers)` handler runs
+after the middlewares and is awaited before the `101`; a throw from it
+answers the upgrade request in the app's error format, and no socket opens.
+`responds` has no
 reply to check on a socket, and is refused there. Sockets need a
 server: `listen`, or `Bun.serve({ fetch: app.fetch, websocket: app.websocket })`.
 
@@ -914,7 +917,8 @@ joins middlewares past the 8 a call types:
 | `shutdownSignal(ctx)` | an `AbortSignal` aborted as soon as the app serving the request starts shutting down: what a long response ends on |
 | `isDev(ctx)` | whether the app serving the request is in dev (`alxia({ dev })`, else `NODE_ENV=development`): what a plugin reads to help the developer there alone, as `graphql()`'s GraphiQL and `health()`'s details do |
 | `ValidationError`, `refusalOf(error)` | what `validate` throws — an `HttpError` of the 400, its `refusal` `{ kind: 'validation', part, issues }` and its default `body` — and what reads the `Refusal` of it or of a `ContentTooLargeError`, else `undefined`: how a middleware before a `validate` answers a refusal |
-| `reportOperation(ctx, { type, name? })`, `operationOf(ctx)` | the operation a query-language endpoint ran, for the observers around it: `@alxia/graphql` reports each operation it executes, `@alxia/logger` and `@alxia/telemetry` read one summary (`{ type, name }`, or `type: 'batch'` and every name, joined by commas, for several). `undefined` when none was reported; a socket's operations are never reported. Types `OperationReport`, `OperationSummary` |
+| `reportOperation(ctx, { type, name? })`, `operationOf(ctx)` | the operation a query-language endpoint ran, for the observers around it: `@alxia/graphql` reports each operation it executes, `@alxia/logger` and `@alxia/telemetry` read one summary (`{ type, name }`, or `type: 'batch'` and every name, joined by commas, for several). `undefined` when none was reported; a socket's operations go to `startOperation`. Types `OperationReport`, `OperationSummary` |
+| `onOperation(ctx, observer)`, `startOperation(ctx, report)` | the operations a socket runs after its upgrade, for the observers around that upgrade: an observer subscribes before `next()` (`true` on a socket's upgrade, `false` and nothing subscribed elsewhere), `observer(report)` is called as each starts and may return `(outcome) => void`, told `'ok'` or `'errors'` once it ends; the plugin serving the socket calls `startOperation(socket.data, report)` and the function it returns once the operation ended. `@alxia/graphql` tells them over `ws`, `@alxia/logger` and `@alxia/telemetry` subscribe. An observer that throws is logged and skipped. Types `OperationObserver`, `OperationOutcome` |
 | `settle(ctx, next())` | for a middleware that must see the final response: resolves to what `next()` resolved to or, when it rejected, to the answer the route boundary would give — an `HttpError` with its status and body, a 500 — with the error on `ctx.error` |
 | `ContentTooLargeError`, `ContentTooLargeBody` | what reading a body past its route's `bodyLimit` throws — a `body_limit` refusal — and the body of its default 413: `{ error: 'content_too_large', limit }` |
 | `ReplyInit` | a reply's options: `headers` |

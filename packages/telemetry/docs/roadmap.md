@@ -11,8 +11,7 @@ number on it. Every release, with each change it made, is in
 
 ## Next
 
-- **Each operation over a socket.** A `ws: true` connection is logged and spanned at its upgrade alone: its operations — a query, a mutation, a subscription's stream — name no operation yet, because the request is answered before they run.
-
+Nothing scheduled yet.
 
 ## Later
 
@@ -31,6 +30,7 @@ Nothing scheduled yet.
 
 ### Next release
 
+- **Each operation over a socket.** A WebSocket upgrade gets a span that ends with its answer, and behind `@alxia/graphql`'s `ws: true` every query, mutation and subscription on the socket a span of its own, a child of the upgrade's: `subscription OnNote`, with `graphql.operation.*`, from its start to its end, an error when answered with errors ([guide](guide.md#the-operations-of-a-socket)).
 - **The GraphQL operation on the span.** Behind `@alxia/graphql`, the span is named `query GetNotes` and carries `graphql.operation.name` and `graphql.operation.type`, OpenTelemetry's conventions; a batched body is `batch GetNotes,AddNote` ([guide](guide.md#a-graphql-operation)).
 
 ### 0.2.0

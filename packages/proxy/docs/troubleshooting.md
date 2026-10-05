@@ -30,7 +30,7 @@ TypeScript error, or a response body. Entries that print nothing are under
 
 **WebSockets**
 
-- [Close code `1014` with the reason `bad gateway`](#close-code-1014-with-the-reason-bad-gateway)
+- [A socket route answers `502 {"error":"bad_gateway"}` or `504 {"error":"gateway_timeout"}`](#a-socket-route-answers-502-errorbad_gateway-or-504-errorgateway_timeout)
 
 **Traps**
 
@@ -41,7 +41,6 @@ TypeScript error, or a response body. Entries that print nothing are under
 - [A redirect sends the browser to the upstream's address](#a-redirect-sends-the-browser-to-the-upstreams-address)
 - [A cookie the upstream sets is never sent back](#a-cookie-the-upstream-sets-is-never-sent-back)
 - [The upstream sees the client's address as `127.0.0.1`](#the-upstream-sees-the-clients-address-as-127001)
-- [The client's subprotocol is not echoed on a socket](#the-clients-subprotocol-is-not-echoed-on-a-socket)
 - [A proxied route is missing from `matchesSpec`](#a-proxied-route-is-missing-from-matchesspec)
 
 ## Declaration
@@ -260,22 +259,27 @@ proxy('http://files.internal', { bodyLimit: 50 * 1024 * 1024 });
 
 ## WebSockets
 
-### Close code `1014` with the reason `bad gateway`
+### A socket route answers `502 {"error":"bad_gateway"}` or `504 {"error":"gateway_timeout"}`
 
-**When:** a client connected to a `proxy.ws()` route and was closed at once.
-**Why:** the upstream socket could not be opened. The client is closed with
-`BAD_GATEWAY_CLOSE` (1014), the socket's 502.
-**Fix:** check the target is reachable and speaks WebSocket at that path:
+**When:** a client's upgrade to a `proxy.ws()` route fails: a browser's
+`WebSocket` gets `error`, then `close` with 1006, and never `open`; the
+server's log or a logger before the proxy shows the 502 or the 504.
+**Why:** `proxy.ws()` opens the upstream socket before it upgrades the
+client. A 502 is an upstream that refused the connection or answered its
+handshake with anything but a `101`; a 504, one that had not opened within
+`timeout` (30 s by default). Before `@alxia/proxy` 0.2.0, the client was
+upgraded first and closed at once with `BAD_GATEWAY_CLOSE` (1014): that
+code is no longer sent.
+**Fix:** check the target is reachable and speaks WebSocket at the path
+`rewrite` gives; for a slow upstream, raise `timeout`:
 
 ```ts
-import { BAD_GATEWAY_CLOSE } from '@alxia/proxy';
+import { proxy } from '@alxia/proxy';
 
-socket.onclose = (event) => {
-	if (event.code === BAD_GATEWAY_CLOSE) console.warn('the upstream is down');
-};
+proxy.ws('ws://chat.internal:8080', { rewrite: '/live', timeout: 60_000 });
 ```
 
-See [WebSockets](guide/websockets.md).
+See [WebSockets](guide/websockets.md#an-upstream-that-cannot-be-reached).
 
 ## Traps
 
@@ -354,15 +358,6 @@ import { alxia, forwardedIp } from '@alxia/core';
 
 const app = alxia({ ip: forwardedIp({ trusted: 1 }) });
 ```
-
-### The client's subprotocol is not echoed on a socket
-
-**Why:** core answers the client's handshake before the upstream answers
-the proxy's, so the subprotocol the upstream picks is not sent back. The
-client's `Sec-WebSocket-Protocol` is passed to the upstream. This is a
-known limit on the roadmap.
-**Fix:** none yet; do not depend on the negotiated value. See
-[WebSockets](guide/websockets.md).
 
 ### A proxied route is missing from `matchesSpec`
 

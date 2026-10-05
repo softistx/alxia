@@ -417,7 +417,9 @@ const app = base.plugin((app) => graphql(app, { schema }));
 
 **Why:** an operation is reported only when Yoga executes it. A request
 refused before that (a syntax error, a document that fails validation) names
-none; an operation over `ws: true` is not reported; and a logger or a
+none; an operation over `ws: true` is a line and a span of its own, not
+the upgrade's ([the WebSocket guide](guide/websockets.md#logging-and-tracing));
+and a logger or a
 telemetry given to `use` *after* the endpoint, or a version of
 `@alxia/core` older than the one that reports (`operationOf`), never reads
 it.

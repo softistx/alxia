@@ -1,14 +1,15 @@
 /**
- * A socket route relayed to an upstream WebSocket: core's `ws()` upgrades
- * the client, behind the route's middlewares, then each frame goes across
- * as it came — text as text, binary as binary — and a close on either side
- * closes the other with the same code and reason.
+ * A socket route relayed to an upstream WebSocket: behind the route's
+ * middlewares, core's `upgrade` handler opens the upstream first — a 502
+ * or a 504 over HTTP when it cannot — and the `101` names the subprotocol
+ * it chose. Then each frame goes across as it came — text as text, binary
+ * as binary — and a close on either side closes the other with the same
+ * code and reason.
  */
 import type { Socket, SocketHandlers } from '@alxia/core';
-import { applyEdit, requestHeaders } from './headers';
 import type { ProxyOptions } from './options';
 import { type Plan, type ProxyContext, planOf } from './options';
-import { upstreamUrl } from './upstream-url';
+import { openUpstream } from './socket-upstream';
 
 /** What `proxy.ws` takes: the request side of `ProxyOptions`. */
 export type SocketProxyOptions<Ctx = unknown> = Omit<
@@ -25,28 +26,37 @@ export type SocketProxy<Ctx = unknown> = SocketHandlers<
 	string | Uint8Array
 >;
 
-/** The frames a client may send before the upstream opens; past them, a close with 1013. */
+/**
+ * The frames the upstream may send before the client's socket opens — a
+ * count, not bytes; past them, a close with 1013.
+ */
 const PENDING = 1024;
 
-/** The close code a client gets when the upstream cannot be reached: 1014, bad gateway. */
+/**
+ * The close code `proxy.ws` sent a client when the upstream could not be
+ * reached, 1014, bad gateway.
+ *
+ * @deprecated The upstream is now opened before the upgrade: one that
+ * cannot be reached answers a 502 (a 504 past `timeout`) over HTTP, and no
+ * socket opens. Nothing sends this code any more.
+ */
 export const BAD_GATEWAY_CLOSE = 1014;
-
-/** Headers the upgrade carries for the client's handshake alone. */
-const HANDSHAKE = [
-	'sec-websocket-key',
-	'sec-websocket-version',
-	'sec-websocket-extensions',
-	'sec-websocket-accept',
-	'sec-websocket-protocol',
-];
 
 /** A frame as the upstream socket sends it. */
 type Frame = string | Uint8Array<ArrayBuffer>;
 
+type ClientSocket = Socket<ProxyContext<unknown>, unknown>;
+
 interface Relay {
 	readonly upstream: WebSocket;
-	/** What the client sent before the upstream opened. */
+	/** The client's socket, once open. */
+	client?: ClientSocket;
+	/** What the upstream sent before the client's socket opened. */
 	readonly pending: Frame[];
+	/** How the upstream closed, when it did before the client's socket opened. */
+	ended?: readonly [code: number, reason: string];
+	/** Undoes what watches the client between the upgrade and its socket's open. */
+	settle?: (() => void) | undefined;
 }
 
 /** The relay handlers for `target`, checked once. */
@@ -60,24 +70,33 @@ export function socketProxy<Ctx>(
 		'http:',
 		'https:',
 	]);
+	// Keyed by the context, which is the socket's `data` once it opens.
 	const relays = new WeakMap<object, Relay>();
 	return {
+		async upgrade(ctx, headers) {
+			const upstream = await openUpstream(plan, ctx);
+			if (upstream.protocol !== '') {
+				headers.set('sec-websocket-protocol', upstream.protocol);
+			}
+			relays.set(ctx, relay(plan as Plan, ctx, upstream));
+		},
 		open(socket) {
-			const relay = connect(plan, socket);
-			relays.set(socket.raw, relay);
+			const relay = relays.get(socket.data);
+			if (relay === undefined) return;
+			relay.settle?.();
+			relay.client = socket as ClientSocket;
+			for (const frame of relay.pending.splice(0)) socket.raw.send(frame);
+			if (relay.ended !== undefined) socket.close(...relay.ended);
 		},
 		message(socket, message) {
-			const relay = relays.get(socket.raw);
-			if (relay === undefined) return;
-			if (relay.upstream.readyState === WebSocket.OPEN) {
-				relay.upstream.send(message as Frame);
-			} else if (relay.pending.length < PENDING) {
-				relay.pending.push(message as Frame);
-			} else socket.close(1013, 'upstream not open yet');
+			const upstream = relays.get(socket.data)?.upstream;
+			if (upstream?.readyState === WebSocket.OPEN) {
+				upstream.send(message as Frame);
+			}
 		},
 		close(socket, code, reason) {
-			const relay = relays.get(socket.raw);
-			relays.delete(socket.raw);
+			const relay = relays.get(socket.data);
+			relays.delete(socket.data);
 			if (relay === undefined) return;
 			const { upstream } = relay;
 			if (
@@ -90,45 +109,36 @@ export function socketProxy<Ctx>(
 	};
 }
 
-/** Opens the upstream socket for `socket`, and relays what it sends back. */
-function connect<Ctx>(
-	plan: Plan<Ctx>,
-	socket: Socket<ProxyContext<Ctx>, unknown>,
-): Relay {
-	const ctx = socket.data;
-	const url = upstreamUrl(plan as Plan, ctx.url);
-	url.protocol =
-		url.protocol === 'https:' || url.protocol === 'wss:' ? 'wss:' : 'ws:';
-	const headers = requestHeaders(plan as Plan, ctx, ctx.request);
-	for (const name of HANDSHAKE) headers.delete(name);
-	applyEdit(headers, plan.headers.request, ctx);
-	const protocols = ctx.request.headers.get('sec-websocket-protocol');
-	const upstream = new WebSocket(url.href, {
-		headers: Object.fromEntries(headers),
-		...(protocols === null
-			? {}
-			: { protocols: protocols.split(',').map((p) => p.trim()) }),
-	} as unknown as string[]);
-	upstream.binaryType = 'arraybuffer';
+/**
+ * The relay of an open `upstream` to the client's socket, which opens
+ * next: what the upstream sends is queued until then, and the upstream is
+ * closed if the client goes away first, or if its socket never opens
+ * within `timeout`.
+ */
+function relay(plan: Plan, ctx: ProxyContext, upstream: WebSocket): Relay {
 	const relay: Relay = { upstream, pending: [] };
-	let opened = false;
-	// An upstream that takes the connection and never completes the
-	// handshake: closed past `timeout`, which the client sees as 1014.
-	const late = setTimeout(() => upstream.close(), plan.timeout);
-	upstream.addEventListener('open', () => {
-		opened = true;
-		clearTimeout(late);
-		for (const message of relay.pending.splice(0)) upstream.send(message);
-	});
+	const { signal } = ctx.request;
+	const gone = () => upstream.close(1001, 'client gone');
+	const orphan = setTimeout(gone, plan.timeout);
+	signal.addEventListener('abort', gone, { once: true });
+	relay.settle = () => {
+		clearTimeout(orphan);
+		signal.removeEventListener('abort', gone);
+		relay.settle = undefined;
+	};
 	upstream.addEventListener('message', (event) => {
 		const { data } = event as MessageEvent<string | ArrayBuffer>;
-		socket.raw.send(typeof data === 'string' ? data : new Uint8Array(data));
+		const frame = typeof data === 'string' ? data : new Uint8Array(data);
+		if (relay.client !== undefined) relay.client.raw.send(frame);
+		else if (relay.pending.length < PENDING) relay.pending.push(frame);
+		else upstream.close(1013, 'client not open yet');
 	});
 	upstream.addEventListener('close', (event) => {
-		clearTimeout(late);
-		const code = opened ? sendable(event.code) : BAD_GATEWAY_CLOSE;
-		const reason = opened ? event.reason : 'bad gateway';
-		if (socket.raw.readyState === WebSocket.OPEN) socket.close(code, reason);
+		relay.settle?.();
+		const close = [sendable(event.code), event.reason] as const;
+		const { client } = relay;
+		if (client === undefined) relay.ended = close;
+		else if (client.raw.readyState === WebSocket.OPEN) client.close(...close);
 	});
 	return relay;
 }

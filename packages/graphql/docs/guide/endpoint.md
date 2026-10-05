@@ -186,9 +186,9 @@ const app = alxia()
   fails validation) names no operation: its line is the plain
   `POST /graphql`.
 - Your own middleware reads it with `operationOf(ctx)` after `next()`.
-- Over `ws: true`, the operations on a socket are not reported: logger and
-  telemetry see the upgrade alone, so they are not logged or spanned yet
-  ([roadmap](../roadmap.md)).
+- Over `ws: true`, each operation on a socket is a line and a span of its
+  own, told to the observers around the upgrade
+  ([WebSocket guide](websockets.md#logging-and-tracing)).
 
 ## Errors, health and shutdown
 

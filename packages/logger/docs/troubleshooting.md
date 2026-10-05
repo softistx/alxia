@@ -23,7 +23,7 @@ where the middleware sits in the app, and what those options return.
 - [The entries have no `ip`, or the proxy's](#the-entries-have-no-ip-or-the-proxys)
 - [`duration` is `0`, or shorter than the request took](#duration-is-0-or-shorter-than-the-request-took)
 - [A streamed request's entry comes long after the request](#a-streamed-requests-entry-comes-long-after-the-request)
-- [A WebSocket connection has no entry](#a-websocket-connection-has-no-entry)
+- [A WebSocket upgrade has no `X-Request-Id`, and its line a `200`](#a-websocket-upgrade-has-no-x-request-id-and-its-line-a-200)
 - [`logger()` logs a 500, not the reply of my `try`/`catch` middleware](#logger-logs-a-500-not-the-reply-of-my-trycatch-middleware)
 - [Requests outside the group are not logged](#requests-outside-the-group-are-not-logged)
 - [A skipped path still shows up in the log](#a-skipped-path-still-shows-up-in-the-log)
@@ -198,15 +198,20 @@ than the one that reports it, have none. An anonymous operation has an
 together, and give `logger()` to `use` before `graphql()`
 ([the guide](guide.md#a-graphql-operation)).
 
-### A WebSocket connection has no entry
+### A WebSocket upgrade has no `X-Request-Id`, and its line a `200`
 
-**When:** a `ws` route's connections never show up in the log, and the
-upgrade response has no `X-Request-Id`.
+**When:** a `ws` route's upgrade is logged as `GET /socket 200`, and the
+`101` the client receives has no `X-Request-Id`.
 
-**Why:** once a request is upgraded there is no response, so there is
-nothing for `logger()` to settle and no entry is written.
+**Why:** once a request is upgraded there is no response: the middlewares
+read a stand-in, an empty `200`, whose headers are never sent. `logger()`
+logs that stand-in.
 
-**Fix:** log from the socket's handlers yourself, with `write`'s sink.
+**Fix:** read the id from the log: the upgrade's line carries it, and so
+does each operation's line over a `ws: true` GraphQL socket
+([the guide](guide.md#the-operations-of-a-socket)). A socket route of your
+own logs its messages from its handlers, with `write`'s sink, or reports
+its operations with core's `startOperation`.
 
 ### `logger()` logs a 500, not the reply of my `try`/`catch` middleware
 

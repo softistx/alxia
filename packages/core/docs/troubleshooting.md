@@ -2290,7 +2290,10 @@ Under `alxia({ errors: 'problem' })` the same answer is an `application/problem+
 **When:** a request reaches a `ws` route without a WebSocket upgrade, or
 through `app.fetch` / `app.request`, which have no server to upgrade with.
 
-**Why:** a socket needs `Bun.serve`'s upgrade.
+**Why:** a socket needs `Bun.serve`'s upgrade. A socket's `upgrade`
+handler is not run then, nor for a handshake Bun would refuse — not a `GET`, no
+`Sec-WebSocket-Key`, or a version other than 13
+([Before the `101`](guide/websockets.md#before-the-101-upgrade)).
 
 **Fix:** serve the app with `listen`, or with `Bun.serve` given `fetch`
 and `websocket`, and connect with a WebSocket

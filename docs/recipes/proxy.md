@@ -148,7 +148,9 @@ test('/health is answered by the gateway itself', async () => {
   app's error format. A client that leaves aborts the upstream request, and a
   graceful shutdown lets in-flight requests drain before aborting them.
 - **WebSockets.** `app.ws('/live/*', proxy.ws('ws://chat.internal:8080'))`
-  relays a socket's frames and close codes, behind the route's middlewares.
+  relays a socket's frames and close codes, behind the route's middlewares;
+  the upstream opens first, so the `101` carries its subprotocol and a dead
+  upstream is a 502.
 - **Spec first.** `@alxia/openapi`'s `matchesSpec` ignores the requests a
   proxy forwards by default (`use()` and `mount` declare no route) and
   reports a route outside the document only under `strict`.
