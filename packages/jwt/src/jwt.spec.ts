@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { z } from 'zod';
+import { signHmac } from '../test/jwks-fixtures';
 import { bearer } from './bearer';
 import { createJwt } from './jwt';
 
@@ -36,6 +37,22 @@ describe('createJwt', () => {
 		const expired = await jwt.sign({ exp: Math.floor(Date.now() / 1000) - 60 });
 		expect(await jwt.verify(expired)).toEqual({ ok: false, reason: 'expired' });
 		expect(await jwt.verify('a.b')).toEqual({ ok: false, reason: 'malformed' });
+	});
+
+	test('refuses a validly signed token that marks an extension critical', async () => {
+		const jwt = createJwt({ secret });
+		const key = new TextEncoder().encode(secret);
+		const plain = await signHmac(key, { alg: 'HS256' }, { sub: 'ada' });
+		expect((await jwt.verify(plain)).ok).toBe(true);
+		const critical = await signHmac(
+			key,
+			{ alg: 'HS256', crit: ['exp'] },
+			{ sub: 'ada' },
+		);
+		expect(await jwt.verify(critical)).toEqual({
+			ok: false,
+			reason: 'malformed',
+		});
 	});
 
 	test('ES256 with a key pair; a verifier without the private key cannot sign', async () => {

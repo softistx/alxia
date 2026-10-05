@@ -393,8 +393,9 @@ app.use(bearer({ jwt, cookie: 'token' }));
 **When:** the token is not three base64url parts separated by dots, its
 header or payload is not JSON, its header is not an object (`null`, an
 array, a number, a string or a boolean), or its payload is not an object.
-A verifier by `jwks` or `discovery` also refuses a header with a `crit`
-member, which names extensions it does not implement.
+Every verifier, by a secret, a key pair, `jwks` or `discovery`, also
+refuses a header with a `crit` member, which names extensions it must
+understand: it implements none (RFC 7515, section 4.1.11).
 
 **Why:** usually not a JWT at all: an opaque session id, a token missing a part,
 a value still wrapped in quotes or URL-encoded. The header wins over the
@@ -406,6 +407,9 @@ cookie, so a stale `Authorization: Bearer` header hides a good cookie.
 const token = await jwt.sign({ sub: 'ada' });
 await fetch('/me', { headers: { authorization: `Bearer ${token}` } }); // not JSON.stringify(token)
 ```
+
+A signer that adds `crit` to the header, `b64` or a vendor extension,
+needs a verifier that implements it: sign without it for this guard.
 
 ### `401 {"error":"unauthorized","reason":"algorithm"}`
 
@@ -521,8 +525,12 @@ const web = createJwt({ secret, audience: 'web' }); // accepts it
 
 **When:** a verifier created with `jwks` or `discovery` finds no key for
 the token: its `kid` is not in the set (even after a refetch), it has no
-`kid` and the set has no single key that fits, or the key is an RSA key
-outside 2048 to 8192 bits, or with an even or trivial exponent.
+`kid` and the set has no single key that fits, or the key is refused: an
+RSA key whose modulus is outside 2048 to 8192 bits, or with an even or
+trivial exponent, an Ed25519 key that is not 32 bytes or is a point of
+small order (with which a signature anyone can make verifies), an EC key
+whose coordinates are not its curve's size, or a key whose `n`, `e`, `x` or
+`y` is not strict, unpadded base64url.
 
 **Why:** the token was signed by a key this issuer does not publish: another
 issuer or realm, a key already removed from the set, or a key added to the
@@ -531,7 +539,10 @@ guard refetches an unknown `kid` once, and never more often than that.
 
 **Fix:** check that `jwks` or `discovery` is the issuer that signed the
 token (`kid` is in its header: `jwt.io` shows it), and wait out `refetchMs`
-after a rotation. To follow a rotation faster, lower it:
+after a rotation. A key refused for its encoding is the issuer's to fix:
+RFC 7518 requires an EC coordinate at its full length, so a P-256 `x` of
+31 bytes, its leading zero byte stripped, is refused. To follow a rotation
+faster, lower `refetchMs`:
 
 ```ts
 createJwt({ jwks: Bun.env['JWKS_URL']!, refetchMs: 5_000 });

@@ -1,13 +1,15 @@
-import { afterAll, describe, expect, setSystemTime, test } from 'bun:test';
-import { JWKS_ALGORITHMS } from './jwk';
+import { afterAll, describe, expect, test } from 'bun:test';
 import {
 	type Issuer,
 	issuer,
 	keyFor,
+	later,
+	resetClock,
 	signHmac,
 	signWith,
 	testKey,
-} from './jwks-fixtures';
+} from '../test/jwks-fixtures';
+import { JWKS_ALGORITHMS } from './jwk';
 import { createJwt } from './jwt';
 
 const keys = await Promise.all(JWKS_ALGORITHMS.map((alg) => testKey(alg)));
@@ -122,14 +124,14 @@ describe('createJwt with a JWKS', () => {
 		// A key the issuer dropped stays accepted until the cached set expires.
 		server.keys = [fresh.jwk];
 		expect((await jwt.verify(await signWith(first))).ok).toBe(true);
-		setSystemTime(Date.now() + 601_000);
+		later(601_000);
 		try {
 			expect(await jwt.verify(await signWith(first))).toEqual({
 				ok: false,
 				reason: 'key',
 			});
 		} finally {
-			setSystemTime();
+			resetClock();
 		}
 	});
 });

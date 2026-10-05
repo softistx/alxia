@@ -114,7 +114,9 @@ export async function verifyToken(
 	token: string,
 ): Promise<VerifyResult> {
 	const decoded = decodeToken(token);
-	if (decoded === undefined) return fail('malformed');
+	// No extension is understood, so one the token marks critical is refused (RFC 7515, 4.1.11).
+	if (decoded === undefined || decoded.header['crit'] !== undefined)
+		return fail('malformed');
 	if (decoded.header['alg'] !== algorithm) return fail('algorithm');
 	// A signature Web Crypto cannot read — the wrong length for the
 	// curve — is a bad signature, not an error to answer with a 500.

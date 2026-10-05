@@ -1,5 +1,6 @@
-import { base64url } from './base64url';
-import type { JwksAlgorithm } from './jwk';
+import { base64url } from '../src/base64url';
+import type { JwksAlgorithm } from '../src/jwk';
+import { clock } from '../src/jwks/cache';
 
 const encoder = new TextEncoder();
 
@@ -163,4 +164,19 @@ export function keyFor(keys: readonly TestKey[], alg: JwksAlgorithm): TestKey {
 	const key = keys.find((k) => k.alg === alg);
 	if (key === undefined) throw new Error(`no ${alg} key`);
 	return key;
+}
+
+const monotonic = clock.now;
+let offset = 0;
+
+/** Moves the key cache's monotonic clock `ms` ahead: the wall clock it no longer reads would not. */
+export function later(ms: number): void {
+	offset += ms;
+	clock.now = () => monotonic() + offset;
+}
+
+/** Puts the key cache back on its own clock. */
+export function resetClock(): void {
+	offset = 0;
+	clock.now = monotonic;
 }

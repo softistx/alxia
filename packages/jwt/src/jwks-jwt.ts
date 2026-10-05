@@ -5,7 +5,8 @@ import {
 	selectKey,
 	verifyParams,
 } from './jwk';
-import { keySource, keyUrl } from './jwks';
+import { keySource } from './jwks/cache';
+import { keyUrl } from './jwks/url';
 import type { JwksJwt, JwksOptions, VerifyResult } from './jwt';
 import { checkClaims, decodeToken, fail } from './token';
 

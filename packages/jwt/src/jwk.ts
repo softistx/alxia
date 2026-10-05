@@ -1,3 +1,5 @@
+import { ecFits, okpFits, rsaFits } from './jwk-strength';
+
 /** The algorithms a JWKS key can verify: the asymmetric ones Web Crypto supports. */
 export type JwksAlgorithm =
 	| 'RS256'
@@ -76,10 +78,6 @@ const SPECS: Record<JwksAlgorithm, Spec> = {
 export const isJwksAlgorithm = (value: unknown): value is JwksAlgorithm =>
 	typeof value === 'string' && Object.hasOwn(SPECS, value);
 
-/** The RSA moduli accepted, in bytes: 2048 to 8192 bits. */
-const MIN_MODULUS = 256;
-const MAX_MODULUS = 1024;
-
 /** Keys that fit `algorithm`: right type and curve, usable for signatures, not pinned to another algorithm. */
 function fits(jwk: Jwk, algorithm: JwksAlgorithm): boolean {
 	const spec = SPECS[algorithm];
@@ -87,7 +85,8 @@ function fits(jwk: Jwk, algorithm: JwksAlgorithm): boolean {
 		jwk.kty === spec.kty &&
 		jwk.crv === spec.crv &&
 		(jwk.use === undefined || jwk.use === 'sig') &&
-		(jwk.key_ops === undefined || jwk.key_ops.includes('verify')) &&
+		(jwk.key_ops === undefined ||
+			(Array.isArray(jwk.key_ops) && jwk.key_ops.includes('verify'))) &&
 		(jwk.alg === undefined || jwk.alg === algorithm)
 	);
 }
@@ -128,7 +127,21 @@ function publicMembers(jwk: Jwk): JsonWebKey {
 
 const imported = new WeakMap<Jwk, Map<JwksAlgorithm, Promise<CryptoKey>>>();
 
-/** The verifying key of `jwk` for `algorithm`, imported once; rejects on a key Web Crypto or the size floor refuses. */
+/** Why Web Crypto is never handed `jwk`: a key it would import and that no signature should be checked by. */
+function weakness(jwk: Jwk): string | undefined {
+	if (jwk.kty === 'RSA' && !rsaFits(jwk)) {
+		return 'RSA key outside 2048 to 8192 bits, or with an even or trivial exponent';
+	}
+	if (jwk.kty === 'EC' && !ecFits(jwk)) {
+		return 'EC key whose coordinates are not strict base64url of its curve';
+	}
+	if (jwk.kty === 'OKP' && !okpFits(jwk)) {
+		return 'Ed25519 key not of 32 bytes, or a point of small order';
+	}
+	return undefined;
+}
+
+/** The verifying key of `jwk` for `algorithm`, imported once; rejects on a key Web Crypto or the strength checks refuse. */
 export function importKey(
 	jwk: Jwk,
 	algorithm: JwksAlgorithm,
@@ -138,44 +151,20 @@ export function importKey(
 	imported.set(jwk, byAlgorithm);
 	let key = byAlgorithm.get(algorithm);
 	if (key === undefined) {
-		const spec = SPECS[algorithm];
+		const weak = weakness(jwk);
 		key =
-			jwk.kty === 'RSA' && !modulusFits(jwk)
-				? Promise.reject(
-						new TypeError(
-							'RSA key outside 2048 to 8192 bits, or with an even or trivial exponent',
-						),
-					)
-				: crypto.subtle.importKey(
+			weak === undefined
+				? crypto.subtle.importKey(
 						'jwk',
 						publicMembers(jwk),
-						spec.import,
+						SPECS[algorithm].import,
 						false,
 						['verify'],
-					);
+					)
+				: Promise.reject(new TypeError(weak));
 		byAlgorithm.set(algorithm, key);
 	}
 	return key;
-}
-
-/** An odd public exponent of at least 3, which Web Crypto in Bun does not insist on. */
-function exponentFits(jwk: Jwk): boolean {
-	if (typeof jwk['e'] !== 'string') return false;
-	const bytes = Buffer.from(jwk['e'], 'base64url');
-	const last = bytes.at(-1) ?? 0;
-	return (
-		last % 2 === 1 &&
-		bytes.some((byte, i) => byte > (i === bytes.length - 1 ? 1 : 0))
-	);
-}
-
-function modulusFits(jwk: Jwk): boolean {
-	if (typeof jwk['n'] !== 'string') return false;
-	const bytes = Buffer.from(jwk['n'], 'base64url');
-	// A leading zero byte is padding, not size.
-	const first = bytes.findIndex((byte) => byte !== 0);
-	const size = first === -1 ? 0 : bytes.length - first;
-	return size >= MIN_MODULUS && size <= MAX_MODULUS && exponentFits(jwk);
 }
 
 export const verifyParams = (algorithm: JwksAlgorithm) =>

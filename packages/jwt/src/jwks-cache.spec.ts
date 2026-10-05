@@ -6,7 +6,14 @@ import {
 	setSystemTime,
 	test,
 } from 'bun:test';
-import { type Issuer, issuer, signWith, testKey } from './jwks-fixtures';
+import {
+	type Issuer,
+	issuer,
+	later,
+	resetClock,
+	signWith,
+	testKey,
+} from '../test/jwks-fixtures';
 import { createJwt } from './jwt';
 
 const key = await testKey('ES256');
@@ -20,9 +27,8 @@ const serve = () => {
 afterAll(() => {
 	for (const one of live) one.stop();
 });
-afterEach(() => setSystemTime());
+afterEach(resetClock);
 
-const later = (ms: number) => setSystemTime(Date.now() + ms);
 const unavailable = { ok: false, reason: 'keys_unavailable' } as const;
 
 describe('an issuer that cannot be reached', () => {
@@ -176,6 +182,35 @@ describe('the cache', () => {
 		later(86_400_001);
 		await long.verify(token);
 		expect(forever.hits['/jwks.json']).toBe(2);
+	});
+
+	test('max-age=0 with staleMs: 0 still keeps the set for refetchMs', async () => {
+		const server = serve();
+		server.headers = { 'cache-control': 'max-age=0' };
+		const jwt = createJwt({
+			jwks: server.jwksUrl,
+			refetchMs: 30_000,
+			staleMs: 0,
+		});
+		const token = await signWith(key);
+		expect((await jwt.verify(token)).ok).toBe(true);
+		later(10_000);
+		expect((await jwt.verify(token)).ok).toBe(true);
+		expect(server.hits['/jwks.json']).toBe(1);
+	});
+
+	test('the cache runs on a monotonic clock, not the wall clock', async () => {
+		const server = serve();
+		const jwt = createJwt({ jwks: server.jwksUrl, cacheMs: 1_000 });
+		const token = await signWith(key);
+		await jwt.verify(token);
+		setSystemTime(Date.now() + 86_400_000);
+		try {
+			await jwt.verify(token);
+		} finally {
+			setSystemTime();
+		}
+		expect(server.hits['/jwks.json']).toBe(1);
 	});
 
 	test('refresh() warms the cache at startup', async () => {

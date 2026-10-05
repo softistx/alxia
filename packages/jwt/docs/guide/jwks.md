@@ -56,8 +56,9 @@ accepted: have the provider put one in, or check it in a schema.
    the algorithm, if there is exactly one.
 3. The key's kind must fit the algorithm: an RSA key verifies `RS*` and
    `PS*`, an EC key `ES256` (P-256) and `ES384` (P-384), an Ed25519 key
-   `EdDSA`. A key with a `use` other than `sig`, without `verify` among its
-   `key_ops`, or with an `alg` of its own that differs, does not fit.
+   `EdDSA`. A key with a `use` other than `sig`, with a `key_ops` that is
+   not an array naming `verify`, or with an `alg` of its own that differs,
+   does not fit.
 4. The signature, then `exp`, `nbf`, `iss` and `aud`.
 
 The token never chooses how it is checked. An attacker who signs an `HS256`
@@ -94,10 +95,20 @@ the algorithm-confusion attack has nothing to work with.
   the verifier answers `keys_unavailable` until it can fetch).
 
 The fetch is strict: `https` only (plain `http` on localhost, for a local
-provider), no redirects, at most 256 KiB (counted as the body streams in), `application/json` asked for. An
-RSA key outside 2048 to 8192 bits, or with an even or trivial exponent, is
-refused, and a `jwks_uri` read from a discovery document must be `https`,
-unless the issuer itself is on localhost.
+provider), no redirects, at most 256 KiB (counted as the body streams in),
+within `timeoutMs`, `application/json` asked for. The keys are checked
+before Web Crypto sees them, and a key refused answers `key`: an RSA key
+whose modulus is outside 2048 to 8192 bits (counted from its first set
+bit), or with an even or trivial exponent; an Ed25519 key whose `x` is not
+exactly 32 bytes, or is a point of small order (the identity, the all-zero
+point, and the rest of libsodium's `has_small_order` list), under which a
+signature anyone can make verifies; an EC key whose `x` and `y` are not
+its curve's size (32 bytes for P-256, 48 for P-384); and any key whose
+`n`, `e`, `x` or `y` is not strict, unpadded base64url. Only a key's
+public members reach Web Crypto. A `jwks_uri` read from a discovery document must be `https`, unless the
+issuer itself is on localhost. The cache's lifetimes and refetch limit run
+on a monotonic clock, so setting the system clock neither keeps a set past
+its lifetime nor lifts the limit.
 
 ## Keycloak
 
