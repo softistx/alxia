@@ -4,6 +4,63 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the next one first: what changed, the code before and
 after, and whether it can break yours.
 
+## 0.9.0
+
+`@alxia/core` 0.9.0 adds the `proxy` option, `trustProxy` and
+`originalUrl`. Nothing breaks an app that does not use them; the peer range
+of every package moves.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [Peers move to `^0.9.0`](#peers-move-to-090) | every package | yes, for an install that holds a package of 0.8 beside core 0.9: update them together |
+| [`trustProxy` and `originalUrl`, behind a proxy](#trustproxy-and-originalurl-behind-a-proxy) | core, react-router | no: opt in; `forwardedIp` keeps working |
+
+### Peers move to `^0.9.0`
+
+Every package's peer on `@alxia/core` moves from `^0.8.0` to `^0.9.0`, which
+a `^0.8.0` does not accept. Update `@alxia/core` and the `@alxia/*` packages
+you use in one change, each to its release that names core `^0.9.0`.
+
+**Can it break your code.** Only the install, as for
+[0.8](#peers-move-to-080): a package left behind asks for core `^0.8.0`.
+
+### `trustProxy` and `originalUrl`, behind a proxy
+
+Behind a proxy that terminates TLS, `ctx.url` is the proxy's request to the
+app, `http://10.0.0.5:3000/…`. An app that needed the public scheme and host
+— for an absolute URL, a redirect to another origin, a `Secure` cookie —
+read `X-Forwarded-Proto` itself, which a client that reaches the app
+directly can write. `proxy: trustProxy(…)` declares the proxies once, for
+`ctx.ip` and for `originalUrl(ctx)`, read from a trusted connection alone:
+
+```ts
+// before
+const app = alxia({ ip: forwardedIp({ trusted: ['10.0.0.0/8'] }) }).get('/where', (ctx) => {
+	const proto = ctx.request.headers.get('x-forwarded-proto') ?? 'http'; // any client can send it
+	return ctx.reply(200, `${proto}://${ctx.request.headers.get('host')}${ctx.url.pathname}`);
+});
+```
+
+```ts
+// after
+import { alxia, originalUrl, trustProxy } from '@alxia/core';
+
+const app = alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) }).get('/where', (ctx) =>
+	ctx.reply(200, originalUrl(ctx).href),
+);
+```
+
+Move `trusted` and `header` from `forwardedIp` to `trustProxy` as they are:
+`ctx.ip` reads the same. `untrusted: 'refuse'` answers 403 to a request
+whose forwarding headers come from another connection; a probe that sends
+none passes. `@alxia/react-router` hands React Router a request at
+`originalUrl(ctx)`, so `request.url` in a loader is the public URL once the
+option is set ([Behind a proxy](guide/serving.md#behind-a-proxy-proxy)).
+
+**Can it break your code.** No: `ctx.url` is unchanged, and nothing reads
+the forwarded scheme or host without the option. `forwardedIp` is not
+deprecated. Giving `ip` and `proxy` together throws when the app is built.
+
 ## 0.8.0
 
 `@alxia/core` 0.8.0 adds `fork()`, a socket's `upgrade` handler and the

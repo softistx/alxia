@@ -4,6 +4,7 @@
  */
 import type { RouteRow } from '../dev/route-table';
 import type { ErrorFormat } from '../errors/problems';
+import type { ProxyTrust } from '../request/trust-proxy';
 import type { Alxia } from './alxia';
 import type { BaseContext } from './types';
 
@@ -43,6 +44,14 @@ export interface AlxiaOptions<Prefix extends string> {
 		request: Request,
 		server: Bun.Server<unknown> | undefined,
 	) => string | undefined;
+	/**
+	 * The proxies in front of the app, `trustProxy({ trusted })`: declared
+	 * once, they give `ctx.ip`, in place of `ip`, and the scheme and host
+	 * the client asked for, `originalUrl(ctx)`; with `untrusted: 'refuse'`,
+	 * a request whose forwarding headers come from another connection is
+	 * answered 403. Give `ip` or `proxy`, not both.
+	 */
+	readonly proxy?: ProxyTrust;
 }
 
 export interface ListenOptions {

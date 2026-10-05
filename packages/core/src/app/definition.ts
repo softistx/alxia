@@ -4,6 +4,7 @@
  */
 import type { AnyReply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
+import type { ProxyTrust } from '../request/trust-proxy';
 import type { Router } from '../router/router';
 import type { SocketHandlers, SocketSchema } from '../ws/types';
 import type { ScopedHooks } from './scope';
@@ -113,4 +114,6 @@ export interface Runtime {
 		request: Request,
 		server: Bun.Server<unknown> | undefined,
 	) => string | undefined;
+	/** The `proxy` option, which reads `ip` in its place, and the scheme and host. */
+	readonly proxy: ProxyTrust | undefined;
 }

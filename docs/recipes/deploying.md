@@ -154,6 +154,20 @@ for two, or the proxies' CIDR ranges), so a rate limit counts clients, not
 the proxy. Never read the first entry of `X-Forwarded-For`: the client writes
 it, and a rate limit keyed by it is bypassed with a header
 ([Serving](../../packages/core/docs/guide/serving.md#the-clients-address-ip)).
+
+When the proxy terminates TLS and the app builds absolute URLs, redirects
+to another origin or decides a cookie's `Secure`, declare the proxies once
+with `proxy` instead: `ctx.ip` reads the same, and `originalUrl(ctx)` is the
+`https://` URL the client asked for, from the proxies' addresses alone. With
+`untrusted: 'refuse'`, forwarding headers from any other connection are
+answered 403, while the platform's probes, which send none, still reach
+`/health` and `/ready`. Have the proxy set `X-Forwarded-Proto` and
+`X-Forwarded-Host` itself
+([Behind a proxy](../../packages/core/docs/guide/serving.md#behind-a-proxy-proxy)):
+
+```ts no-check
+alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
+```
 Use [a shared store](caching-and-rate-limiting.md) when there are several
 replicas.
 

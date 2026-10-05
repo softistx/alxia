@@ -371,6 +371,20 @@ alxia()
 `ip` is the client's address — behind a proxy, `alxia({ ip: forwardedIp({ trusted: 1 }) })` reads it
 ([Serving](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#the-clients-address-ip)) — and `server` the Bun server, when there is one. `HEAD` runs the `GET` route.
 
+Behind a proxy that terminates TLS, declare the proxies once with `proxy`:
+`ctx.ip` is the client's, and `originalUrl(ctx)` the URL it asked for,
+scheme and host as your proxy said them, from a trusted connection alone;
+`untrusted: 'refuse'` answers 403 to forwarding headers from anywhere else
+([Behind a proxy](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#behind-a-proxy-proxy)):
+
+```ts
+import { alxia, originalUrl, trustProxy } from '@alxia/core';
+
+alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) }).get('/where', (ctx) =>
+	ctx.reply(200, { ip: ctx.ip ?? null, url: originalUrl(ctx).href }), // https://example.com/where
+);
+```
+
 `query` declares a `QUERY` route: a safe, idempotent read whose criteria are
 too long or too structured for a query string, so they travel in the body —
 validated like a `POST`'s, a 400 when refused.
@@ -899,7 +913,9 @@ joins middlewares past the 8 a call types:
 | export | |
 | --- | --- |
 | `forwardedIp({ header?, trusted })`, `ForwardedIpOptions`, `TrustedProxies` | the `ip` option for an app behind proxies: the client from `X-Forwarded-For` or `Forwarded`, read from the right past `trusted` hops or CIDR ranges, never the first entry the client writes; the connection's address when the header does not name it |
-| `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip`, `errors`, `dev` (on only when `NODE_ENV` is `development`: the route table, the 404 hint, the dev error page) |
+| `trustProxy({ trusted, header?, untrusted? })`, `TrustProxyOptions`, `ProxyTrust`, `Forwarded`, `Origin` | the `proxy` option: the proxies in front of the app, declared once, for `ctx.ip` and the scheme and host the client asked for, read from a trusted connection alone and checked (`http`/`https`, a bare `host[:port]`); `untrusted: 'refuse'` answers 403 to forwarding headers from any other connection |
+| `originalUrl(ctx)` | a copy of `ctx.url` with the scheme and host the trusted proxy said, under `proxy`; `ctx.url`'s own otherwise |
+| `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip`, `proxy`, `errors`, `dev` (on only when `NODE_ENV` is `development`: the route table, the 404 hint, the dev error page) |
 | `Alxia<Ctx, Prefix>` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `use` `derive` `decorate` `bodyLimit` `onStart` `onStop` `parser`, `group` `plugin` `fork`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server`; `Ctx` is what a route declared next reads, `Prefix` the app's prefix |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream(schema)` made |

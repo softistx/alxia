@@ -94,12 +94,16 @@ a trap that prints nothing is headed by its symptom.
 - [`GET /… is already served by a page`](#get--is-already-served-by-a-page)
 - [`forwardedIp: trusted hops must be an integer of 1 or more`](#forwardedip-trusted-hops-must-be-an-integer-of-1-or-more), and `forwardedIp: "…" is not an IP address or a CIDR range`
 - [`ctx.ip` is the proxy's address, or one a client chose](#ctxip-is-the-proxys-address-or-one-a-client-chose)
+- [``trustProxy: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function), not a hop count``](#trustproxy-untrusted-refuse-needs-the-proxies-named-by-address-cidr-ranges-or-a-function-not-a-hop-count), and ``trustProxy: untrusted must be 'ignore' or 'refuse', not "…"``
+- [`alxia(): give ip or proxy, not both: proxy reads ctx.ip itself`](#alxia-give-ip-or-proxy-not-both-proxy-reads-ctxip-itself), and `alxia(): proxy must be trustProxy({ trusted })`
+- [`originalUrl(ctx)` is `http://` and the internal host behind a TLS proxy](#originalurlctx-is-http-and-the-internal-host-behind-a-tls-proxy)
 
 **Responses**
 
 - [`400 {"error":"validation","issues":[…]}`](#400-errorvalidationissues)
 - [A route still answers `{"error":"validation"}` after a middleware that catches refusals](#a-route-still-answers-errorvalidation-after-a-middleware-that-catches-refusals)
 - [`413 {"error":"content_too_large","limit":…}`](#413-errorcontent_too_largelimit)
+- [`403 {"error":"untrusted_proxy"}`](#403-erroruntrusted_proxy)
 - [`404 {"error":"not_found"}`](#404-errornot_found)
 - [`405 {"error":"method_not_allowed"}`](#405-errormethod_not_allowed)
 - [`426 {"error":"upgrade_required"}`](#426-errorupgrade_required)
@@ -2066,7 +2070,7 @@ app.page('/dashboard', dashboard).get('/api/dashboard', ({ reply }) => reply(200
 
 ### `forwardedIp: trusted hops must be an integer of 1 or more`
 
-**When:** `alxia({ ip: forwardedIp({ trusted }) })` with a `trusted` count that is `0`, negative, fractional or `NaN`; or, as `forwardedIp: "…" is not an IP address or a CIDR range`, with a range that is none (`10.0.0.0/33`, `office`).
+**When:** `alxia({ ip: forwardedIp({ trusted }) })`, or `trustProxy({ trusted })`, whose messages begin `trustProxy:`, with a `trusted` count that is `0`, negative, fractional or `NaN`; or, as `forwardedIp: "…" is not an IP address or a CIDR range`, with a range that is none (`10.0.0.0/33`, `office`).
 
 **Why:** `trusted` is how many proxies stand in front of the app, or the ranges they come from. Zero proxies is no header to read, and a range is an address and a prefix length of its family, at most 32 for IPv4 and 128 for IPv6. The app throws when it is built, not on a request.
 
@@ -2090,6 +2094,42 @@ alxia({ ip: forwardedIp({ trusted: 1 }) }); // one proxy: the last entry
 ```
 
 When it still reads the proxy, `trusted` counts too few hops (two proxies need `2`), or the header differs (`header: 'forwarded'`, or the one your proxy sets). When it falls back to the connection's address, the header is missing or the entry chosen is no address.
+
+### `trustProxy: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function), not a hop count`
+
+**When:** `trustProxy({ trusted: 1, untrusted: 'refuse' })`; or, as `trustProxy: untrusted must be 'ignore' or 'refuse', not "…"`, with another value.
+
+**Why:** refusing tells a proxy's connection from a client's, and a hop count cannot: it believes every connection. The option throws when it is made, not on a request.
+
+**Fix:** name the proxies by their addresses:
+
+```ts
+alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
+```
+
+### `alxia(): give ip or proxy, not both: proxy reads ctx.ip itself`
+
+**When:** `alxia({ ip: forwardedIp(…), proxy: trustProxy(…) })`; or, as `alxia(): proxy must be trustProxy({ trusted })`, a `proxy` that is not a function.
+
+**Why:** `proxy` reads `ctx.ip` with the same trust as the scheme and host; two readings of the address would disagree.
+
+**Fix:** keep `proxy` alone, with the `trusted` and `header` the `forwardedIp` had:
+
+```ts
+alxia({ proxy: trustProxy({ trusted: 1 }) });
+```
+
+### `originalUrl(ctx)` is `http://` and the internal host behind a TLS proxy
+
+**When:** behind a proxy that terminates TLS, `originalUrl(ctx)` is `http://10.0.0.5:3000/…`, as `ctx.url` is.
+
+**Why:** the scheme and host are read only from a trusted connection, and only when valid: the app has no `proxy` option (`ip: forwardedIp(…)` reads the address alone), the connection is not one `trusted` names, the proxy does not send `X-Forwarded-Proto` and `X-Forwarded-Host` (or `Forwarded` with `header: 'forwarded'`), or what it sends is not `http`, `https` or a bare `host[:port]`. `ctx.url` is never rewritten: read `originalUrl(ctx)`.
+
+**Fix:** declare the proxies with `proxy`, and have the proxy set both headers (nginx: `proxy_set_header X-Forwarded-Proto $scheme;` and `proxy_set_header X-Forwarded-Host $host;`):
+
+```ts
+alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) });
+```
 
 ## Responses
 
@@ -2249,6 +2289,19 @@ app
 A 413 with no JSON body comes from Bun itself. The body passed `listen`'s
 `maxRequestBodySize`, which applies to every route, before any route's
 `bodyLimit`.
+
+### `403 {"error":"untrusted_proxy"}`
+
+**When:** under `trustProxy({ trusted, untrusted: 'refuse' })`, a request carries `Forwarded`, `X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` or the `header` given, from a connection `trusted` does not name. Under `errors: 'problem'`, a problem with status 403. It is answered before routing and every middleware: a logger writes no line for it.
+
+**Why:** such a request claims an address, a scheme or a host from a peer that is not your proxy: a client reaching the app around it, or a proxy missing from `trusted`. In a spec, `app.request` has no connection, which is never a proxy.
+
+**Fix:** add the proxy's address or range to `trusted`; reach the app through the proxy alone; in a spec, give `fetch` a server whose `requestIP` names a proxy. A probe that sends no forwarding header is never refused.
+
+```ts
+const server = { requestIP: () => ({ address: '10.0.0.1' }) } as unknown as Bun.Server<unknown>;
+await app.fetch(new Request('http://localhost/', { headers: { 'x-forwarded-proto': 'https' } }), server);
+```
 
 ### `404 {"error":"not_found"}`
 

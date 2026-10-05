@@ -82,6 +82,13 @@ number on it. Every release, with each change it made, is in
   ([Errors](guide/errors.md#making-it-the-default)).
 - **Comments on a stream.** A handler yielding a comment line of its own
   (`: …`), beside the keep-alive the stream already sends while idle.
+- **The original scheme and host in the observers.** `@alxia/telemetry`'s
+  `url.scheme` and `server.address`, and the `X-Forwarded-Proto` and
+  `X-Forwarded-Host` `@alxia/proxy` sends upstream, from `originalUrl(ctx)`
+  when the app is behind a trusted proxy; today they read the request as
+  it reached the app.
+- **`X-Forwarded-Port`.** The port a proxy names apart from its host, for
+  `originalUrl(ctx)`; today a port is read from the host alone.
 
 ## Not planned
 
@@ -107,6 +114,15 @@ number on it. Every release, with each change it made, is in
 
 ### Next release
 
+- **Behind a proxy, declared once.** `alxia({ proxy: trustProxy({ trusted }) })`
+  reads `ctx.ip` and the scheme and host the client asked for,
+  `originalUrl(ctx)`, through one trust definition: from a trusted
+  connection alone, from what your proxies wrote, checked (`http` or
+  `https`, a bare `host[:port]`), so a direct client's
+  `X-Forwarded-Proto: https` is ignored; `untrusted: 'refuse'` answers 403
+  to forwarding headers from any other connection, never to a probe that
+  sends none. `@alxia/react-router` hands React Router the original URL
+  ([Serving](guide/serving.md#behind-a-proxy-proxy)).
 - **One base, several apps.** `base.fork()` copies an app — its routes,
   its chain in force, its lifecycle hooks — typed as it is, so the real app,
   a spec's and a variant each build on the registered base without

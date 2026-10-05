@@ -8,6 +8,7 @@ export {
 	operationOf,
 	reportOperation,
 } from './app/operation';
+export { originalUrl } from './app/original-url';
 export { errorFormat, isDev, shutdownSignal } from './app/served';
 export {
 	type OperationObserver,
@@ -79,7 +80,14 @@ export {
 	forwardedIp,
 	type TrustedProxies,
 } from './request/forwarded-ip';
+export type { Origin } from './request/origin';
 export type { BodyParser } from './request/read';
+export {
+	type Forwarded,
+	type ProxyTrust,
+	type TrustProxyOptions,
+	trustProxy,
+} from './request/trust-proxy';
 export { joinPath, shapeOf } from './router/paths';
 export type {
 	InferInput,

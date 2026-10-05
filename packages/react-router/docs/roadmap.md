@@ -7,6 +7,11 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
+- **The public URL behind a proxy.** `createServer({ proxy: trustProxy({ trusted }) })`,
+  or `alxia({ proxy })` for a server of your own: React Router's
+  `request.url` is the URL the client asked for, the scheme and host the
+  trusted proxy said, and `ctx.ip` the client's; a direct client's
+  forwarded headers are ignored.
 - **Middlewares around the pages.** `beforeAll` and `configure` take
   `use(logger())`, `use(secureHeaders())` and the other middlewares of
   alxia 0.4, which run on the pages, the client's files declared after
