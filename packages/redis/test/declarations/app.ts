@@ -8,12 +8,19 @@ import { rateLimit } from '@alxia/rate-limit';
 import {
 	type AnyCache,
 	idempotency,
+	idempotencyResult,
 	redis,
 	redisCacheStore,
 	redisCheck,
 	redisStore,
 } from '@alxia/redis';
-import { defineCache, defineRedis, openRedis } from '@nxgt/redis';
+import {
+	defineCache,
+	defineIdempotency,
+	defineRateLimit,
+	defineRedis,
+	openRedis,
+} from '@nxgt/redis';
 import { z } from 'zod';
 
 // Bun's `RedisClient`, named through the plugin: the fixtures compile
@@ -118,6 +125,41 @@ export async function handleEverywhere() {
 			}),
 		)
 		.get('/', ({ reply }) => reply(200, 'ok'));
+}
+
+// Rate limits and idempotency wired by `defineRedis`, given to the stores.
+const api = defineRateLimit({
+	name: 'api',
+	key: (ip: string) => ip,
+	limit: 10,
+	per: 1_000,
+});
+const orders = defineIdempotency({
+	name: 'orders',
+	key: (id: string) => id,
+	ttl: 600,
+	schema: idempotencyResult,
+});
+
+export async function wired() {
+	const handle = await openRedis(
+		defineRedis({
+			uri: 'redis://localhost',
+			prefix: 'shop',
+			limits: { api },
+			idempotency: { orders },
+		}),
+	);
+	return alxia()
+		.use(idempotency(handle.idempotency.orders, { required: true }))
+		.use(
+			rateLimit({
+				limit: 10,
+				windowMs: 1_000,
+				store: redisStore(handle.limits.api),
+			}),
+		)
+		.post('/orders', ({ reply }) => reply(201, { id: 'o1' }));
 }
 
 export const check = async () => redisCheck(await openShop());

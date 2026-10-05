@@ -12,7 +12,11 @@ shipped in 0.2.0 and finished in 0.3.0.
 
 ## Next
 
-Nothing scheduled yet.
+- **A rate limit that reads its policy from the store.** With
+  `redisStore(handle.limits.api)` the rate lives in the definition, and
+  `rateLimit({ limit, windowMs })` still repeats it for its headers. The store
+  telling `rateLimit` its own policy, so the numbers are written once, is
+  planned for `@alxia/rate-limit` and this package together.
 
 ## Later
 
@@ -27,6 +31,18 @@ Nothing scheduled yet.
   install, and it does not run on Node.
 
 ## Shipped
+
+### 0.3.0, continued: wired guards
+
+- **On `@nxgt/redis` 0.6.** The peer range is `^0.5.0 || ^0.6.0`: the new forms
+  need no more than 0.5's types, and 0.6 only adds `handle.limits` and
+  `handle.idempotency` to wire them.
+- **A rate limit and an idempotency defined once.** `redisStore(handle.limits.api)`
+  and `idempotency(handle.idempotency.orders)` take what `defineRedis`
+  wired, so the definition lives in one place and writes the keys
+  `@nxgt/redis` writes, `<prefix>:<name>:<key>`: every consumer of the handle
+  shares the count. `idempotencyResult` is the schema of the wired idempotency.
+  Both older forms stay.
 
 ### 0.3.0
 

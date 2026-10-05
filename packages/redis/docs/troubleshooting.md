@@ -23,7 +23,8 @@ each through. It prints one warning of its own, under
 - [`TypeError: connectRedis: this URI is already connected with other options. Pass the same options everywhere, or close the first connection.`](#typeerror-connectredis-this-uri-is-already-connected-with-other-options-pass-the-same-options-everywhere-or-close-the-first-connection)
 
 - [`TypeError: @alxia/redis: this @nxgt/redis handle wires N Redis instances (…), and one is needed.`](#typeerror-alxiaredis-this-nxgtredis-handle-wires-n-redis-instances--and-one-is-needed)
-- [`TypeError: defineRedis: instance "default" wires no cache and no channel. Pass the module that exports them, or drop the instance.`](#typeerror-defineredis-instance-default-wires-no-cache-and-no-channel-pass-the-module-that-exports-them-or-drop-the-instance)
+- [`TypeError: defineRedis: instance "default" wires no cache, no channel, no rate limit and no idempotency. Pass the module that exports them, or drop the instance.`](#typeerror-defineredis-instance-default-wires-no-cache-no-channel-no-rate-limit-and-no-idempotency-pass-the-module-that-exports-them-or-drop-the-instance)
+- [`TypeError: defineRedis: instance "default" wires the cache "users" and the rate limit "login" under one name, "user". They would share every key in Redis. Give one of them a name of its own.`](#typeerror-defineredis-instance-default-wires-the-cache-users-and-the-rate-limit-login-under-one-name-user-they-would-share-every-key-in-redis-give-one-of-them-a-name-of-its-own)
 
 **Runtime: a 500, with this in the log**
 
@@ -59,6 +60,7 @@ each through. It prints one warning of its own, under
 - [A `401` or a `429` is replayed, with `Idempotent-Replayed: true`, after the client fixed it](#a-401-or-a-429-is-replayed-with-idempotent-replayed-true-after-the-client-fixed-it)
 - [One client gets another client's response](#one-client-gets-another-clients-response)
 - [Counts and kept responses vanish after moving to a handle with a `prefix`](#counts-and-kept-responses-vanish-after-moving-to-a-handle-with-a-prefix)
+- [Counts restart after moving a rate limit to the wired form](#counts-restart-after-moving-a-rate-limit-to-the-wired-form)
 - [The handle is closed while something still uses it](#the-handle-is-closed-while-something-still-uses-it)
 
 ## Install and types
@@ -243,18 +245,41 @@ redisStore(handle.clients.cache, { name: 'shop:api' });
 
 or wire one instance per handle.
 
-### `TypeError: defineRedis: instance "default" wires no cache and no channel. Pass the module that exports them, or drop the instance.`
+### `TypeError: defineRedis: instance "default" wires no cache, no channel, no rate limit and no idempotency. Pass the module that exports them, or drop the instance.`
 
 **When:** `defineRedis({ uri, prefix })` is written only to give the stores
-and `idempotency` a prefix.
+and `idempotency` a prefix. `@nxgt/redis` 0.5 said `wires no cache and no
+channel`; 0.6 counts the rate limits and the idempotency it can now wire too.
 
 **Why:** `@nxgt/redis` refuses a handle that wires nothing.
 
-**Fix:** wire at least one cache (or channel) on it, the one `redis(handle)`
-then puts in the context as `caches`:
+**Fix:** wire at least one of the four on it: a cache, which `redis(handle)`
+then puts in the context as `caches`, a channel, a rate limit or an idempotency:
 
 ```ts
 defineRedis({ uri, prefix: 'shop', caches: { users } });
+defineRedis({ uri, prefix: 'shop', limits: { api } });
+```
+
+### `TypeError: defineRedis: instance "default" wires the cache "users" and the rate limit "login" under one name, "user". They would share every key in Redis. Give one of them a name of its own.`
+
+**When:** the `defineRedis(...)` of an app that gives `caches`, `limits` and
+`idempotency` one `name` on one instance: here the cache exported as `users`
+and the rate limit exported as `login`, both named `user`. The sentence says
+which two, and the export keys they are wired under. It is thrown at wiring
+time, before the app serves; with the same kind twice it reads `wires the rate
+limit named "user" twice, under "a" and "b"`.
+
+**Why:** a cache, a rate limit and an idempotency all write
+`<prefix>:<name>:<key>`, so one name is one keyspace, and they would
+overwrite each other's values or meet as `WRONGTYPE`. The same wiring that lets
+`redisStore(handle.limits.login)` and `idempotency(handle.idempotency.orders)`
+write the layout `@nxgt/redis` writes refuses the clash.
+
+**Fix:** rename one: the **definition's** `name`, not its export:
+
+```ts
+export const login = defineRateLimit({ name: 'login.limit', key: (ip: string) => ip, limit: 5, per: 60_000 });
 ```
 
 ## Runtime: a 500, with this in the log
@@ -697,6 +722,26 @@ new: `api:…` is now `shop:api:…`. The old ones expire on their own.
 
 **Fix:** none is needed beyond waiting for the longest `ttl`; switch during a
 quiet period, or keep the bare client until then.
+
+### Counts restart after moving a rate limit to the wired form
+
+**Symptom:** after `redisStore(handle, { name: 'api' })` becomes
+`redisStore(handle.limits.api)`, every client's allowance starts full again.
+An idempotent route does not do this: `idempotency(handle, { name: 'orders' })`
+and `idempotency(handle.idempotency.orders)` write the same keys, so a kept
+response is still replayed.
+
+**Why:** the two layouts differ. The by-name store keeps one bucket per policy,
+`shop:api:<limit>/<windowMs>:<key>` and `shop:api:policies`; the wired limit
+is `@nxgt/redis`'s own, `shop:api:<key>`, the layout every other consumer of
+the handle shares. The old buckets are not read any more and expire by
+themselves.
+
+**Fix:** none is needed but the wait, within `burst × per ÷ limit` of the
+limit; switch at a quiet moment. `redisStore(handle.limits.api)` counts by the
+definition's rate, not by the `limit` and `windowMs` the middleware is given,
+which only write the headers: if the `RateLimit-Policy` header says another
+rate than the limit enforces, make the two numbers equal.
 
 ### The handle is closed while something still uses it
 

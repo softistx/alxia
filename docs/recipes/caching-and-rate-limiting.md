@@ -12,7 +12,7 @@ one process at a time.
 [`@alxia/cache`](../../packages/cache) already take: the plugin never knows
 which store it was given, so you can start with the in-memory defaults and
 switch by one option. Everything runs on Bun's own Redis client, through
-[`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) 0.5.
+[`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) 0.6.
 
 ```sh
 bun add @alxia/core @alxia/rate-limit @alxia/cache @alxia/redis @nxgt/redis zod
@@ -23,12 +23,15 @@ bun add @alxia/core @alxia/rate-limit @alxia/cache @alxia/redis @nxgt/redis zod
 Open Redis once with `@nxgt/redis`, and hand the **handle** to every export
 that takes a client. `prefix` goes in front of every key of the deployment
 (`shop:api:…`, `shop:pages:…`, `lock:shop:…`), so two apps share a Redis
-without meeting, and the handle is closed with the app. The typed caches are
-declared on it.
+without meeting, and the handle is closed with the app. The typed caches, the
+rate limit and the idempotent operation are declared on it, once: their
+definitions live in `defineRedis`, and `redisStore` and `idempotency` are given
+what it wired.
 
 ```ts
 // file: src/redis.ts
-import { defineCache, defineRedis, openRedis } from '@nxgt/redis';
+import { idempotencyResult } from '@alxia/redis';
+import { defineCache, defineIdempotency, defineRateLimit, defineRedis, openRedis } from '@nxgt/redis';
 import { z } from 'zod';
 
 export const User = z.object({ id: z.string(), name: z.string() });
@@ -36,7 +39,14 @@ export const User = z.object({ id: z.string(), name: z.string() });
 // A value cached under `shop:user:<id>` for 5 minutes, checked by User when read.
 const users = defineCache({ name: 'user', key: (id: string) => id, ttl: 300, schema: User });
 
-export const open = (uri: string, prefix: string) => openRedis(defineRedis({ uri, prefix, caches: { users } }));
+// 100 requests a minute per client address, counted under `shop:api:<address>`.
+const api = defineRateLimit({ name: 'api', key: (address: string) => address, limit: 100, per: 60_000 });
+
+// An order is created once per `Idempotency-Key`; `idempotencyResult` is the response `@alxia/redis` keeps.
+const orders = defineIdempotency({ name: 'orders', key: (id: string) => id, ttl: 86_400, schema: idempotencyResult });
+
+export const open = (uri: string, prefix: string) =>
+	openRedis(defineRedis({ uri, prefix, caches: { users }, limits: { api }, idempotency: { orders } }));
 
 export type Handle = Awaited<ReturnType<typeof open>>;
 ```
@@ -48,7 +58,7 @@ export type Handle = Awaited<ReturnType<typeof open>>;
 import { cache } from '@alxia/cache';
 import { alxia, health, validate } from '@alxia/core';
 import { rateLimit } from '@alxia/rate-limit';
-import { redis, redisCacheStore, redisCheck, redisStore } from '@alxia/redis';
+import { idempotency, redis, redisCacheStore, redisCheck, redisStore } from '@alxia/redis';
 import { z } from 'zod';
 import type { Handle } from './redis';
 
@@ -68,8 +78,9 @@ export const createApp = (handle: Handle) => {
 			// The probes first: they are not rate limited, and /ready says whether Redis answers.
 			.plugin(health({ checks: { redis: redisCheck(handle) } }))
 			.plugin(redis(handle)) // `caches`, `lock`, `redis` in the context; closes the handle on stop
-			// 100 requests a minute per client address, counted in Redis (GCRA, the server's clock).
-			.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(handle, { name: 'api' }) }))
+			// The wired limit `api`, counted in Redis (GCRA, the server's clock). Its rate is the
+			// definition's; `limit` and `windowMs` write the headers, so they repeat it.
+			.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(handle.limits.api) }))
 			.post('/products', validate({ body: z.object({ id: z.string(), name: z.string() }) }), async ({ body, reply }) => {
 				catalogue.set(body.id, body);
 				await products.invalidateTag('products'); // forgotten in every process
@@ -84,9 +95,19 @@ export const createApp = (handle: Handle) => {
 			})
 			// A job that must not run twice at once, across processes.
 			.post('/reindex', async ({ lock, reply }) => reply(202, await lock('reindex', async () => 'done')))
+			// A retry with the same `Idempotency-Key` gets the first response back, from any process.
+			.use(idempotency(handle.idempotency.orders))
+			.post('/orders', ({ reply }) => reply(201, { id: crypto.randomUUID() }))
 	);
 };
 ```
+
+`redisStore(handle.limits.api)` counts under `shop:api:<address>`, the key
+`@nxgt/redis` writes for the wired limit, so a job in the same deployment that
+calls `handle.limits.api.consume(address)` shares the count with these routes.
+`idempotency(handle.idempotency.orders)` keeps its responses under
+`shop:orders:…` the same way. The older form, `redisStore(handle, { name:
+'api' })`, still works and keeps its own keys: [the difference](../../packages/redis/docs/troubleshooting.md#counts-restart-after-moving-a-rate-limit-to-the-wired-form).
 
 `rateLimit` counts every request it runs on, so it stands after `health()`
 and before the routes it limits. A client past its allowance gets a 429 with
@@ -159,6 +180,14 @@ test('two apps on one Redis share a count', async () => {
 	const refused = await other.request('/users/2', { headers: { 'x-real-ip': '10.0.0.3' } });
 	expect(refused.status).toBe(429);
 	expect(refused.headers.get('retry-after')).not.toBeNull();
+});
+
+test('a retried order is answered once', async () => {
+	const order = () => app.request('/orders', { method: 'POST', headers: { 'idempotency-key': 'k-1', 'x-real-ip': '10.0.0.4' } });
+	const first = await order();
+	const retry = await order();
+	expect(retry.headers.get('idempotent-replayed')).toBe('true');
+	expect(await retry.json()).toEqual(await first.json());
 });
 
 test('a value is loaded once, and the key carries the prefix', async () => {

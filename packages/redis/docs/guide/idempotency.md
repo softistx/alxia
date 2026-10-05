@@ -35,7 +35,8 @@ to the 404.
 ## The signature
 
 ```ts
-function idempotency(client: RedisClient, options: IdempotencyOptions);  // a middleware
+function idempotency(target: RedisClient | Redis<any>, options: IdempotencyOptions);  // a middleware
+function idempotency(wired: WiredIdempotency, options?: WiredIdempotencyOptions);   // wired by defineRedis
 
 interface IdempotencyOptions {
 	readonly name: string;
@@ -72,6 +73,12 @@ TypeError: defineIdempotency: an idempotent operation needs a name, for its keys
 `wait` is checked on the first guarded request: a wrong one makes every
 guarded request a `500`, logging
 `TypeError: run on "payments": wait is a whole number of milliseconds, 0 or more`.
+
+`idempotency(handle.idempotency.orders)` takes an idempotency wired by
+`defineRedis` instead: its definition holds the `name`, `ttl` and `lease`, and
+its `schema` is `idempotencyResult`. The options are the others of the table
+(`WiredIdempotencyOptions`). See
+[Defined once, in `defineRedis`](connecting.md#defined-once-in-defineredis).
 
 ## What each request gets
 
