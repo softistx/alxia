@@ -61,9 +61,10 @@ so `bun add` warns until it is raised; 7 works too.
 +    "start": "NODE_ENV=production bun build/server/index.js",
 ```
 
-alxia's dev helps — a 404's hint, a 500's error page — are on only under
-`NODE_ENV=development`, so `dev` sets it; `start` runs the build in
-production.
+alxia's dev helps — a 404's hint, a 500's error page — follow React
+Router's mode: on under `react-router dev`, off in the build, whatever
+`NODE_ENV` says. `dev` sets `NODE_ENV=development` anyway, so what the app
+reads of `Bun.env` itself agrees; `start` runs the build in production.
 
 ```toml
 # bunfig.toml, a new file beside package.json

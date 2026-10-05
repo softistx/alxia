@@ -70,12 +70,19 @@ Its other options — `subscriptionsProtocol`, `credentials`,
 `additionalHeaders`… — are listed in
 [Yoga's GraphiQL documentation](https://the-guild.dev/graphql/yoga-server/docs/features/graphiql).
 
-The page loads GraphiQL from `unpkg.com`. Yoga's response has no
-`Content-Security-Policy`, so the package adds one that lets it load:
+The page loads GraphiQL from one pinned folder on `unpkg.com`,
+`https://unpkg.com/@graphql-yoga/graphiql@<version>/`, the version the
+installed Yoga names. Yoga's response has no `Content-Security-Policy`, so
+the package adds one that lets that folder alone load — its scripts,
+styles and fonts, and the Monaco workers the page fetches — and no one
+frame the page:
 
 ```text
-default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https:; font-src 'self' data: https:; worker-src 'self' blob:; connect-src 'self'
+default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com/@graphql-yoga/graphiql@<version>/; style-src 'self' 'unsafe-inline' https://unpkg.com/@graphql-yoga/graphiql@<version>/; img-src 'self' data: https:; font-src 'self' data: https://unpkg.com/@graphql-yoga/graphiql@<version>/; worker-src 'self' blob:; connect-src 'self' https://unpkg.com/@graphql-yoga/graphiql@<version>/; frame-ancestors 'none'
 ```
+
+A page of your own (`renderGraphiQL`) that names no such folder gets
+`'self'` alone.
 
 ## Apollo Sandbox
 

@@ -75,7 +75,10 @@ server stops at startup with
 ```
 
 With the `bunfig.toml` in place, the template's `dev`, `build` and
-`typecheck` scripts are unchanged:
+`typecheck` scripts are unchanged. alxia's dev helps follow React Router's
+mode, on under `react-router dev`; `bun create @alxia` writes
+`NODE_ENV=development react-router dev` as `dev`, so that the app's own
+`Bun.env` reads agree:
 
 - **`bun run dev`**: every request Vite does not answer itself (pages,
   data, `/api`, an upgrade to a `ws` route) reaches alxia, with HMR.

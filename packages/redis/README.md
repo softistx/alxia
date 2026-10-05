@@ -194,7 +194,7 @@ The package's specs run against `$REDIS_URL`, or a `redis-server` on
 | `idempotency(client \| handle, options)` | the middleware, given to `app.use` |
 | `redis(client, { caches? })`, `RedisContextOptions` | a plugin, given to `app.plugin`: `redis`, `caches`, `lock` in the context |
 | `redis(handle, { close? })`, `RedisHandleOptions`, `RedisHandleContext` | the same from an `@nxgt/redis` handle: its typed caches, a prefixed `lock`, `prefix`; closes the handle in `onStop` unless `close: false` |
-| `redisCheck(client \| handle, { timeout? })`, `RedisCheckOptions` | a check for core's `health({ checks })`: down when a Redis instance does not answer a `PING` |
+| `redisCheck(client \| handle, { timeout? })`, `RedisCheckOptions` | a check for core's `health({ checks })`: down when a Redis instance does not answer a `PING`; `timeout` bounds a handle's ping, a client's is bounded by `health({ timeout })` |
 | `RedisTarget` | a client or a handle: what the factories above take |
 | `IdempotencyOptions`, `IdempotencyErrorBody`, `RedisContext`, `BoundCaches` | its types |
 | `IdempotencyMiddleware` | what `idempotency()` returns: a middleware that adds nothing, and may answer a 400, a 409 or a 422 |

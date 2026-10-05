@@ -621,8 +621,11 @@ build.
 Bun loads `.env` on every command. `.env.example` names the variables
 `src/env.ts` reads, `PORT` (3000 by default), `API_KEY` (`dev-key` by
 default in development and test alone, required elsewhere) and `API_DOCS`:
-copy it to `.env`, which `.gitignore`
-keeps out of git and `.dockerignore` out of the image.
+copy it to `.env`, which `.gitignore` keeps out of git and `.dockerignore`
+out of the image. Its `API_KEY` and `API_DOCS` are commented out: Bun
+loads `.env` on `bun start` too, where a development key or a public
+`/docs` would defeat the defaults; set them for a deployment in its own
+environment.
 
 `tsconfig.json` holds the settings alxia's own packages are checked under:
 `strict`, and past it `exactOptionalPropertyTypes`,

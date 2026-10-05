@@ -133,8 +133,10 @@ describe('the api template', () => {
 			([, name]) => name,
 		);
 		expect(read.sort()).toEqual(['API_DOCS', 'API_KEY', 'PORT']);
+		// API_KEY and API_DOCS commented out: `bun start` loads `.env` too.
 		for (const name of read)
-			expect(example).toMatch(new RegExp(`^${name}=`, 'm'));
+			expect(example).toMatch(new RegExp(`^(# )?${name}=`, 'm'));
+		expect(example).not.toMatch(/^(API_KEY|API_DOCS)=/m);
 	});
 
 	test("typechecks under this repository's strictest settings", () =>

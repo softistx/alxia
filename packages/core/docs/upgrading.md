@@ -465,8 +465,12 @@ app that wants the bodies of today then says `errors: 'json'`
 **What changed.** `app.plugin(health({ checks }))` adds `GET /health`,
 liveness, and `GET /ready`, readiness: the checks run at once, each
 within `timeout`, their report cached for `cache` ms, 503 when one fails
-and from the moment the app starts shutting down. `@alxia/openapi`'s
-`matchesSpec` leaves them out by itself (`isHealthRoute`).
+and from the moment the app starts shutting down. Outside dev, `/ready`
+answers `{ status, checks: {} }`: each check's name, status and duration
+are shown in dev alone, unless `details: true` (always) or `false`
+(never) decides. A check still running from an earlier probe is not
+started again. `@alxia/openapi`'s `matchesSpec` leaves them out by itself
+(`isHealthRoute`).
 
 ```ts
 // before: a route of your own, which knew nothing of the shutdown

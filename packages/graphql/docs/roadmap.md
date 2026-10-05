@@ -7,6 +7,12 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
+- **GraphiQL in dev alone, under a pinned policy.** Without `ide`, a
+  browser gets GraphiQL only while the serving app is in dev
+  (`NODE_ENV=development`, or `alxia({ dev: true })`); `ide: 'graphiql'`
+  serves it everywhere. Its `Content-Security-Policy` allows the one
+  pinned `@graphql-yoga/graphiql` folder it loads from, the Monaco workers
+  included, and no frame ([IDE guide](guide/ide.md)).
 - **Subscriptions drained on shutdown.** When the app starts shutting
   down — `SIGTERM`, `SIGINT`, `stop()` — a subscription over server-sent
   events ends, so `@alxia/core`'s drain answers the queries in flight and

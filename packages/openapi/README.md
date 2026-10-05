@@ -250,7 +250,7 @@ The core's side of the move is in its
 | `implemented(app, operations, options?)`, `ImplementedOptions` | throws a `TypeError` listing each operation with no route, or one with the core's reason for an operation path no route may be declared at. `prefix` |
 | `matchesSpec(app, operations, options?)`, `MatchesSpecOptions` | the same, and each route no operation declares — `apiDocs()`'s and `@alxia/core`'s `health()` probes left out. `prefix`, `exclude` |
 | `apiDocs(options)`, `ApiDocsOptions`, `DocsUi`, `DocsServer` | a plugin: the page at `path`, the document at `path/openapi.yaml` and `.json`. `spec`, `path`, `ui`, `title`, `servers`, `enabled` |
-| `isApiDocsRoute(route)` | whether `apiDocs` declared a route; `matchesSpec` leaves them out already |
+| `isApiDocsRoute(route)` | whether `apiDocs` declared a route, given any `{ handler }` (`Pick<RouteDefinition, 'handler'>`, as core's `isHealthRoute`); `matchesSpec` leaves them out already |
 | `Operations` | what both take: an object of core's `RouteOperation`, or a list of them |
 
 ## Documentation

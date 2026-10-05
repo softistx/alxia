@@ -141,8 +141,9 @@ process exits — 0, or 1 when an `onStop` hook throws or outlasts
 6. The process exits (on a signal only), unless `exit: false` or another
    listener for the signal is installed.
 
-A second signal while the app drains exits at once, with 1: a `Ctrl-C`
-pressed twice does not wait. The `onStop` hooks run once per `listen`: a
+A second signal while the app drains exits at once, with 1, when alxia owns
+the exit: a `Ctrl-C` pressed twice does not wait. Under `exit: false` or a
+listener of the process's own, alxia leaves it to the host. The `onStop` hooks run once per `listen`: a
 second `stop()` returns the first one's promise. `listen()` on an app that
 already listens throws, `listen(): the app already listens on <url>; stop()
 it first`, rather than start a second server and lose the first.

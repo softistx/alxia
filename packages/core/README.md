@@ -805,7 +805,8 @@ client:
 `SIGTERM` and `SIGINT`: readiness turns 503, new connections are refused,
 sockets close with 1001, the requests in flight finish within
 `shutdownTimeout` (10 s), the `onStop` hooks run within `stopTimeout`
-(5 s; past it the hung hook is logged and the exit code is 1), and the
+(5 s; past it the hung hook is named and the shutdown fails: on a
+signal, the exit code is 1; under `stop()`, the promise rejects), and the
 process exits. `exit: false` shuts down without `process.exit`, and a
 process with other listeners for the signal is left to them to exit.
 `listen` on an app that already listens throws; the `onStop` hooks run
