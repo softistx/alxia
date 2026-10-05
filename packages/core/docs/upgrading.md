@@ -4,6 +4,216 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the next one first: what changed, the code before and
 after, and whether it can break yours.
 
+## 0.7.0
+
+`@alxia/core` 0.7.0 adds a way for an endpoint to tell the observers around it which operation it ran. Nothing in its API breaks an app that does not use it; the peer range of every package moves.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [Peers move to `^0.7.0`](#peers-move-to-070) | every package | yes, for an install that holds a package of 0.6 beside core 0.7: update them together |
+| [`reportOperation` and `operationOf`](#reportoperation-and-operationof) | core, graphql, logger, telemetry | no: new; a GraphQL request's log line and span now name its operation |
+| [A socket's `upgrade` handler](#a-sockets-upgrade-handler) | core | no: new, and not in 0.7.0 itself: on develop, in the release after it |
+| [`onOperation` and `startOperation`](#onoperation-and-startoperation) | core, graphql, logger, telemetry | no: new, and not in 0.7.0 itself: on develop, in the release after it |
+| [`@alxia/jwt` verifies by an identity provider's keys](#alxiajwt-verifies-by-an-identity-providers-keys) | jwt | no: new; 0.4.1 refuses small-order Ed25519 keys, upgrade to it |
+| [`@alxia/proxy`](#alxiaproxy) | proxy | no: a new package |
+
+### Peers move to `^0.7.0`
+
+Every package's peer on `@alxia/core` moved from `^0.6.0` to `^0.7.0`, and
+a `^0.6.0` does not accept 0.7 (the minor is the breaking digit below 1.0).
+Update `@alxia/core` and the packages you use in one change:
+
+```sh
+bun add @alxia/core@^0.7.0 @alxia/logger@^0.5.0 @alxia/graphql@^0.5.0
+```
+
+**Can it break your code.** Only the install: a package left at its 0.6
+release asks for core `^0.6.0`, and the package manager warns of an unmet
+peer or installs a second core, whose context, `Register` and marks are not
+the first's. Nothing else changed in them.
+
+### `reportOperation` and `operationOf`
+
+**What changed.** An endpoint that runs several operations behind one route
+(a GraphQL server) tells the observers around it which one, with
+`reportOperation(ctx, { type, name? })`; an observer reads one summary after
+`next()` with `operationOf(ctx)`: `{ type, name }`, or `type: 'batch'` and
+every name joined by commas for a batched body. `@alxia/graphql` reports
+what it executes; `@alxia/logger` 0.5 and `@alxia/telemetry` 0.5 read it,
+and neither imports the other. New types `OperationReport` and
+`OperationSummary`.
+
+```ts
+import { defineMiddleware, operationOf } from '@alxia/core';
+
+const operations = defineMiddleware(async (ctx, next) => {
+	const response = await next();
+	console.log(operationOf(ctx)); // { type: 'query', name: 'GetNotes' }, or undefined
+	return response;
+});
+```
+
+**Can it break your code.** No. Nothing to do: every call to `/graphql` was
+an anonymous `POST /graphql` in the log and the span before; now the logger's
+entry has `operationName` and `operationType`, and the span is named
+`query GetNotes` with `graphql.operation.name` and `graphql.operation.type`.
+A dashboard or an alert that matches on the span name `POST /graphql` needs
+the new name. See
+[Writing a plugin: telling the observers what ran](guide/writing-a-plugin.md#telling-the-observers-what-ran).
+
+### A socket's `upgrade` handler
+
+**What changed.** `app.ws(path, ...middlewares, { upgrade, open, message })`
+awaits `upgrade(data, headers)` after the route's middlewares and before the
+`101`. `data` is what `socket.data` will be, `headers` the `101`'s, and a
+throw answers the upgrade request in the app's error format, with no socket
+opened.
+
+```ts
+app.ws('/feed', {
+	async upgrade(data, headers) {
+		headers.set('sec-websocket-protocol', 'feed.v2'); // sent with the 101
+	},
+	message: () => {},
+});
+```
+
+**Can it break your code.** No: a socket without `upgrade` opens as before.
+This one is on develop and not in the 0.7.0 tarball. See
+[WebSockets: before the `101`](guide/websockets.md#before-the-101-upgrade).
+
+### `onOperation` and `startOperation`
+
+**What changed.** The operations a socket runs after its upgrade are told to
+the observers around that upgrade: an observer subscribes with
+`onOperation(ctx, observer)` before `next()`, and the plugin serving the
+socket calls `startOperation(socket.data, report)` as each operation starts,
+and the function it returns, with `'ok'` or `'errors'`, when it ended. New
+types `OperationObserver` and `OperationOutcome`. `@alxia/graphql` over `ws`
+reports this way, so the logger and the telemetry follow an operation of a
+socket as well.
+
+**Can it break your code.** No: nothing subscribes unless an observer asks.
+Not in the 0.7.0 tarball either. See
+[Writing a plugin: the operations of a socket](guide/writing-a-plugin.md#the-operations-of-a-socket).
+
+### `@alxia/jwt` verifies by an identity provider's keys
+
+`createJwt({ jwks })` and `createJwt({ discovery })` verify a provider's
+tokens (Keycloak, Auth0, Ory, Cognito) by its published keys, with no
+dependency: additive, and an HS or key-pair verifier behaves as before.
+`@alxia/jwt` 0.4.1 is a security fix, upgrading is recommended: a key set
+holding an Ed25519 key of small order could be used to forge tokens, and is
+now refused.
+
+### `@alxia/proxy`
+
+A new package, a reverse proxy to a fixed upstream: `proxy(target)` given to
+`use(path, …)`, `proxy.mount(prefix, target)` and `proxy.ws(target)`. Nothing
+to do for an existing app.
+
+## 0.6.0
+
+`@alxia/core` 0.6.0 adds `forwardedIp`; `@alxia/openapi` 0.6.0 stops failing on a route its document does not declare.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [Peers move to `^0.6.0`](#peers-move-to-060) | every package | yes, for an install that holds a package of 0.5 beside core 0.6: update them together |
+| [`forwardedIp`, for an app behind proxies](#forwardedip-for-an-app-behind-proxies) | core, rate-limit | no: opt in; but read the warning about `split(',')[0]` |
+| [`matchesSpec` ignores routes outside the spec](#matchesspec-ignores-routes-outside-the-spec) | openapi, create | yes, for a spec test that relied on "and nothing else": pass `strict: true` |
+| [Other changes in the 0.6 line](#other-changes-in-the-06-line) | graphql, rate-limit, redis, core | no |
+
+### Peers move to `^0.6.0`
+
+Every package's peer on `@alxia/core` moved from `^0.5.0` to `^0.6.0`, and a
+`^0.5.0` does not accept 0.6. Update `@alxia/core` and the packages you use
+together; `@alxia/openapi` 0.6.0 is the one whose behaviour moved too
+([below](#matchesspec-ignores-routes-outside-the-spec)).
+
+```sh
+bun add @alxia/core@^0.6.0 @alxia/openapi@^0.6.0
+```
+
+**Can it break your code.** Only the install, as for
+[0.7.0](#peers-move-to-070): an unmet peer, or a second core.
+
+### `forwardedIp`, for an app behind proxies
+
+**What changed.** `ctx.ip` is the address of the connection, which behind a
+proxy is the proxy's. `alxia({ ip: forwardedIp({ trusted }) })` reads the
+client from `X-Forwarded-For`, or from `Forwarded` (RFC 7239) with
+`header: 'forwarded'`, **from the right**: `trusted` is a number of hops
+(the Nth entry from the right), CIDR ranges of the proxies, or a function.
+A connection from elsewhere is the client whatever it sends, and the entries
+left of the proxies' own, which the client writes, are never read. It falls
+back to the connection's address when the header is missing, a hop count
+exceeds the entries or the entry chosen is malformed.
+
+```ts
+// before: believed whatever the client wrote
+const ip = request.headers.get('x-forwarded-for')?.split(',')[0];
+
+// after: one proxy in front
+import { alxia, forwardedIp } from '@alxia/core';
+
+const app = alxia({ ip: forwardedIp({ trusted: 1 }) }).get('/ip', ({ ip, reply }) =>
+	reply(200, ip ?? 'unknown'),
+);
+```
+
+**Can it break your code.** No: `ip` is the connection's address until you
+pass the option, so opting in is the work. Do it when the app is behind a
+proxy: **never** use `x-forwarded-for.split(',')[0]`. A client writes that
+entry, so a rate limit keyed by `ip` is bypassed by changing the header, and
+an allow list by naming an allowed address. `@alxia/rate-limit`'s docs key a
+limit by `ip` with `forwardedIp` now. See
+[Serving: the client's address](guide/serving.md#the-clients-address-ip).
+
+### `matchesSpec` ignores routes outside the spec
+
+**What changed.** `@alxia/openapi`'s `matchesSpec(app, operations)` used to
+throw on every route the document does not declare. It no longer does: an
+app may serve routes its document does not describe (proxied, health, docs,
+hand-written) and still match it. It still throws on each operation with no
+route, including a route of another method or path than its operation. It
+returns a `MatchesSpecReport`, `{ extra: { method, path }[] }`, listing the
+undocumented routes without failing.
+
+```ts
+// before: failed on any route outside the spec
+matchesSpec(app, operations);
+
+// after, to keep the old check: `strict: true`, `exclude` and the
+// apiDocs() and health() skips included
+matchesSpec(app, operations, { strict: true });
+```
+
+**Can it break your code.** It loosens a check, so nothing that passed
+fails. A spec test that relied on it to catch a stray route now passes
+silently: pass `strict: true` to restore it. The `api` template's spec test
+dropped "and nothing else" from its title. See
+[`@alxia/openapi`: matching](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/matching.md).
+
+### Other changes in the 0.6 line
+
+Nothing to do for any of them:
+
+- `@alxia/graphql` 0.4 serves GraphQL over WebSocket with `ws: true` (the
+  `graphql-transport-ws` protocol, `graphql-ws` an optional peer); 0.3.x
+  document batching with a per-request DataLoader, and the `graphql`
+  template batches `Note.author` with one.
+- `@alxia/rate-limit` 0.4: a store may declare its own `policy`, and
+  `rateLimit({ store })` then reads `limit` and `windowMs` from it. A `limit`
+  or `windowMs` that differs from the store's policy throws a `TypeError` at
+  declaration. `RateLimitOptions` is a type alias of a union, so an
+  `interface` can no longer extend it.
+- `@alxia/redis` 0.5: `redisStore(handle.limits.api)` alone carries the rate;
+  the two-argument form `redisStore(bound, api)` works and is deprecated.
+  The peer is `@nxgt/redis` `^0.7.0`.
+- `@alxia/core` 0.5.1: `use(validate(…))`, `use(responds(…))` and
+  `use(compose(…))` fail on the error's first line, and `use(m1, …, m9)` is
+  one error naming the limit of 8.
+
 ## 0.5.0
 
 `@alxia/core` 0.5.0 removes every form 0.4 deprecated, and keeps one: a middleware is a plain `(ctx, next)` function.
@@ -239,6 +449,29 @@ alxia().use(async ({ reply }, next) => {
 
 `onRefusal(hook)`, of every kind, is the same middleware without the
 branch on `refusal.kind`.
+
+In 0.3 `onRefusal` applied to the routes declared after it. To keep a
+refusal handler for some routes only, give the middleware among those
+routes' own, before their `validate`, instead of to `use`:
+
+```ts
+const problems = defineMiddleware(async ({ reply }, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		const refusal = refusalOf(error);
+		if (refusal?.kind !== 'validation') throw error;
+		return reply(422, { detail: `the ${refusal.part} is invalid` });
+	}
+});
+
+alxia()
+	.post('/users', problems, validate({ body: userSchema }), ({ body, reply }) => reply(201, body))
+	.post('/tags', validate({ body: tagSchema }), ({ body, reply }) => reply(201, body)); // the default 400
+```
+
+[Routes: refusals of some routes only](guide/routes.md#refusals-of-some-routes-only)
+has the whole example.
 
 ### The forms of 0.3 are removed
 
@@ -1122,10 +1355,12 @@ the request runs the chain, and an error nobody caught is answered:
   });
   ```
 
-- **A group's middlewares stay with its routes**: they do not run on an
-  unmatched request, even one under the group's prefix. The middlewares of
-  an app given to `plugin(app)` are the mounting app's: they run on
-  unmatched requests too.
+- **A group's middlewares stay with its routes, and its prefix**: they run
+  on its routes and, for a group with a prefix, on an unmatched request
+  under it, before the 404 or 405. A group without a prefix adds none to
+  unmatched requests. The middlewares of an app given to `plugin(app)` are
+  the mounting app's: they run on unmatched requests too, unless the app
+  has a prefix of its own.
 - **Errors are rejections through `next()`**: a middleware's
   `try { return await next() } catch (error) { … }` sees what the rest threw,
   an `HttpError` included.
