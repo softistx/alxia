@@ -30,7 +30,9 @@ operations generated from it, and a client is generated from the same file.
   first imported. A malformed one stops the process with every issue,
   before it listens, and `API_KEY` prints as `***`.
 - `src/server.ts`: listens on `env.PORT`, 3000 by default.
-- `src/app.spec.ts`: `app.request()`, no port, and `matchesSpec` from
+- `src/app.spec.ts`: a typed client (openapi-fetch over `generated/paths.ts`,
+  its `fetch` being `app.fetch`: no server, no port), one `app.request()`
+  test, and `matchesSpec` from
   [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi): every
   operation of `openapi.yaml` has its route, and no route is outside it.
 - `biome.json`: Biome's lint and format settings ([Lint and format](#lint-and-format)).
