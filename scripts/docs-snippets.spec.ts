@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { linesOf, missingFrom, problemsOf, snippetsOf } from './docs-snippets';
+import {
+	linesOf,
+	missingFrom,
+	problemsOf,
+	snippetsOf,
+} from './docs-snippets/fences';
 
 const doc = [
 	'```ts',
@@ -41,6 +46,16 @@ describe('snippetsOf', () => {
 	test('reads the flags', () => {
 		expect(snippets[1]).toMatchObject({ file: null, excerpt: true });
 		expect(snippets[2]).toMatchObject({ skipped: true });
+	});
+});
+
+describe('snippetsOf, fences it must not miss', () => {
+	test('an indented fence and a tilde fence are read, not skipped', () => {
+		const snippets = snippetsOf(
+			'- item\n\n  ```ts\n  const a = 1;\n  ```\n\n~~~ts\nconst b = 2;\n~~~\n',
+		);
+		expect(snippets.map((snippet) => snippet.lang)).toEqual(['ts', 'ts']);
+		expect(problemsOf('doc.md', snippets)).toHaveLength(2);
 	});
 });
 

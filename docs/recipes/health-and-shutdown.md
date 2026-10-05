@@ -147,10 +147,12 @@ test('a failing check turns readiness 503, and liveness stays 200', async () => 
 
 ## Docker and Kubernetes
 
-`docker stop` sends `SIGTERM`, and `SIGKILL` after ten seconds: keep
-`shutdownTimeout` under that, or raise it with `docker stop -t 30`. The
-container's process 1 must be the server, not a shell around it, or the signal
-never arrives: the Dockerfile's `CMD ["bun", "--no-install", "dist/index.js"]`
+`docker stop` sends `SIGTERM`, and `SIGKILL` after ten seconds by default.
+The 25 seconds of `shutdownTimeout` above need `docker stop -t 30` (or a
+smaller `shutdownTimeout`), and under Kubernetes a
+`terminationGracePeriodSeconds` above it. The container's process 1 must be
+the server, not a shell around it, or the signal never arrives: the
+Dockerfile's `CMD ["bun", "--no-install", "dist/server.js"]`
 ([Deploying](deploying.md)) is that.
 
 ```yaml

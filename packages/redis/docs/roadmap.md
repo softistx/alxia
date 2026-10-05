@@ -7,11 +7,8 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **`idempotency` as a middleware.** `app.use(idempotency(client, { name }))` is
-  the form; `app.plugin(idempotency(…))`, deprecated in 0.2.0, was removed in
-  0.3.0 (the releases of `@alxia/core` they came with are 0.4 and 0.5). It skips a
-  request no route matches, and keeps what the route answers, an error's
-  answer included. `redis()` stays a plugin.
+Nothing in progress: `idempotency` as a middleware, the last change planned,
+shipped in 0.2.0 and finished in 0.3.0.
 
 ## Next
 
@@ -37,9 +34,8 @@ Nothing scheduled yet.
   `@nxgt/redis-guard` held live in `@nxgt/redis` now, and `@nxgt/redis-guard`
   is no longer a peer.
 - **One form for `idempotency`.** The middleware's type is a plain
-  `(ctx, next)` function, and the deprecated `app.plugin(idempotency(…))`
-  is gone: give it to `use(…)`.
-
+  `(ctx, next)` function, and `app.plugin(idempotency(…))`, deprecated in
+  0.2.0, is gone: give it to `use(…)`.
 - **An `@nxgt/redis` handle everywhere.** `redis(handle)` takes the handle
   `openRedis(defineRedis({ … }))` gives: typed `caches` from its scopes, a
   `lock` and every key under its `prefix`, and the handle closed once in

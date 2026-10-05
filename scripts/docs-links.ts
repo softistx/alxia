@@ -128,7 +128,11 @@ export function localTarget(
 	} else {
 		file = location === '' ? from : resolve(dirname(from), location);
 	}
-	return { file, anchor: decodeURIComponent(anchor) };
+	try {
+		return { file, anchor: decodeURIComponent(anchor) };
+	} catch {
+		return { file, anchor }; // a malformed %-escape: no heading makes it, and it is reported
+	}
 }
 
 /** Every broken link of one Markdown file, as `path:line: message`. */

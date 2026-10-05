@@ -15,7 +15,8 @@ This recipe reads it, rule by rule, so you can write your own.
    every dependency installed, from a frozen lockfile.
 2. **The final image holds the build output only**: no `node_modules`, no
    sources. `bun build --target=bun` bundles the app and its dependencies
-   into one file, `dist/server.js`; that file is all the image needs.
+   into one file, `dist/server.js` (`dist/index.js` for `minimal`); that file
+   is all the image needs.
 3. **The final stage is `oven/bun:1-alpine`**, the build stages stay on
    `oven/bun:1`. A bundle is JavaScript, which runs the same on musl. A
    dependency with a native addon built for glibc needs `oven/bun:1` there.

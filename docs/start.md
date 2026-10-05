@@ -21,8 +21,8 @@ generated code. (`npm create @alxia` works too; the project it writes runs
 on Bun either way.) The other templates start from another shape: `api`,
 spec first, from an OpenAPI document
 ([spec-first CRUD](recipes/spec-first-crud.md)); `graphql`
-([a GraphQL API](recipes/graphql-api.md)); `react-router`, a React Router
-app served by alxia.
+([a GraphQL API](recipes/graphql-api.md)); `react-router`, React Router's own
+template served by alxia ([`@alxia/react-router`](../packages/react-router))
 
 `bun dev` reloads `src/index.ts` on every change and prints the route table:
 
