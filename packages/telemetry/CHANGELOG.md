@@ -1,5 +1,16 @@
 # @alxia/telemetry
 
+## 0.6.0
+
+### Minor Changes
+
+- [#182](https://github.com/softistx/alxia/pull/182) [`9ab4a7f`](https://github.com/softistx/alxia/commit/9ab4a7fd3a62545b15f788e3c6da51ac73de2705) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Trace a WebSocket upgrade with a span that ends with its answer, and, behind `@alxia/graphql`'s `ws: true`, each operation on the socket with a span of its own, a child of the upgrade's: named `subscription OnNote`, with `graphql.operation.*`, from its start to its end, an error when answered with errors.
+
+### Patch Changes
+
+- Updated dependencies [[`89aa1df`](https://github.com/softistx/alxia/commit/89aa1df408840165fca6eb189aabedc3fee498ba), [`4a6df2b`](https://github.com/softistx/alxia/commit/4a6df2b1cfc4bf87c4f5b38a856c3157acf1e42f), [`e536262`](https://github.com/softistx/alxia/commit/e5362622a260faa3320bc1cdbd456bae07565953), [`d256d6a`](https://github.com/softistx/alxia/commit/d256d6a169bb9a532014814c3aea888fd592c762), [`9ab4a7f`](https://github.com/softistx/alxia/commit/9ab4a7fd3a62545b15f788e3c6da51ac73de2705)]:
+  - @alxia/core@0.8.0
+
 ## 0.5.0
 
 ### Minor Changes

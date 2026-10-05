@@ -6,6 +6,16 @@ under that name. The `@alxia/openapi` of 0.1.0 to 0.3.0, which wrote an OpenAPI
 document from an app's route schemas, is retired; its changelog is
 [in the repository's history](https://github.com/softistx/alxia/blob/3f80253/packages/openapi/CHANGELOG.md).
 
+## 0.6.2
+
+### Patch Changes
+
+- [#181](https://github.com/softistx/alxia/pull/181) [`f76d073`](https://github.com/softistx/alxia/commit/f76d0738fe3d715ebd1aa15c3f9f7bf7327062b4) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs: fix links to matching.md and fold "How a route is matched" into "Under a prefix".
+
+- [#177](https://github.com/softistx/alxia/pull/177) [`7608337`](https://github.com/softistx/alxia/commit/7608337a4e4468a0520bb8e61e414403c0321d76) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs: move route matching and prefix details to a new "How routes are matched" guide.
+- Updated dependencies [[`89aa1df`](https://github.com/softistx/alxia/commit/89aa1df408840165fca6eb189aabedc3fee498ba), [`4a6df2b`](https://github.com/softistx/alxia/commit/4a6df2b1cfc4bf87c4f5b38a856c3157acf1e42f), [`e536262`](https://github.com/softistx/alxia/commit/e5362622a260faa3320bc1cdbd456bae07565953), [`d256d6a`](https://github.com/softistx/alxia/commit/d256d6a169bb9a532014814c3aea888fd592c762), [`9ab4a7f`](https://github.com/softistx/alxia/commit/9ab4a7fd3a62545b15f788e3c6da51ac73de2705)]:
+  - @alxia/core@0.8.0
+
 ## 0.6.1
 
 ### Patch Changes
