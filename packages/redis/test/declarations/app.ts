@@ -152,13 +152,7 @@ export async function wired() {
 	);
 	return alxia()
 		.use(idempotency(handle.idempotency.orders, { required: true }))
-		.use(
-			rateLimit({
-				limit: 10,
-				windowMs: 1_000,
-				store: redisStore(handle.limits.api),
-			}),
-		)
+		.use(rateLimit({ store: redisStore(handle.limits.api) }))
 		.post('/orders', ({ reply }) => reply(201, { id: 'o1' }));
 }
 

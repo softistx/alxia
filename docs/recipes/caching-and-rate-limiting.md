@@ -12,7 +12,7 @@ one process at a time.
 [`@alxia/cache`](../../packages/cache) already take: the plugin never knows
 which store it was given, so you can start with the in-memory defaults and
 switch by one option. Everything runs on Bun's own Redis client, through
-[`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) 0.6.
+[`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) 0.7.
 
 ```sh
 bun add @alxia/core @alxia/rate-limit @alxia/cache @alxia/redis @nxgt/redis zod
@@ -60,7 +60,7 @@ import { alxia, health, validate } from '@alxia/core';
 import { rateLimit } from '@alxia/rate-limit';
 import { idempotency, redis, redisCacheStore, redisCheck, redisStore } from '@alxia/redis';
 import { z } from 'zod';
-import { type Handle, api } from './redis';
+import type { Handle } from './redis';
 
 const catalogue = new Map<string, { id: string; name: string }>(); // your database
 
@@ -78,9 +78,9 @@ export const createApp = (handle: Handle) => {
 			// The probes first: they are not rate limited, and /ready says whether Redis answers.
 			.plugin(health({ checks: { redis: redisCheck(handle) } }))
 			.plugin(redis(handle)) // `caches`, `lock`, `redis` in the context; closes the handle on stop
-			// The wired limit `api`, counted in Redis (GCRA, the server's clock). Given its definition,
-			// the store declares its rate as its policy: `limit`, `windowMs` and the headers come from it.
-			.use(rateLimit({ store: redisStore(handle.limits.api, api) }))
+			// The wired limit `api`, counted in Redis (GCRA, the server's clock). The bound limit carries
+			// its definition, so the store declares its rate as its policy: `limit`, `windowMs` and the headers come from it.
+			.use(rateLimit({ store: redisStore(handle.limits.api) }))
 			.post('/products', validate({ body: z.object({ id: z.string(), name: z.string() }) }), async ({ body, reply }) => {
 				catalogue.set(body.id, body);
 				await products.invalidateTag('products'); // forgotten in every process
@@ -102,10 +102,10 @@ export const createApp = (handle: Handle) => {
 };
 ```
 
-`redisStore(handle.limits.api, api)` counts under `shop:api:<address>`, the key
+`redisStore(handle.limits.api)` counts under `shop:api:<address>`, the key
 `@nxgt/redis` writes for the wired limit, so a job in the same deployment that
 calls `handle.limits.api.consume(address)` shares the count with these routes.
-The definition `api` is the one place the rate is written: the store gives it to
+The definition `api`, which the bound limit carries as `handle.limits.api.definition`, is the one place the rate is written: the store gives it to
 `rateLimit` as its `policy`, so the 429 and the `RateLimit-*` headers cannot
 drift from what Redis counts. A `limit` or `windowMs` given to `rateLimit` that
 differs from it throws at declaration.

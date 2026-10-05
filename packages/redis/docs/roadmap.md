@@ -28,6 +28,20 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### 0.5.0: the definition read from the bound limit
+
+- **`redisStore(handle.limits.api)` alone carries the policy.** On
+  `@nxgt/redis` 0.7 a bound limit exposes its `definition`, so the store reads
+  `limit` and `per` from it: `rateLimit({ store: redisStore(handle.limits.api) })`
+  needs no numbers, wired or bound by hand. The two-argument form,
+  `redisStore(handle.limits.api, api)`, is deprecated; it compares `limit` and
+  `per` (not the prefixed name) and throws on a mismatch.
+- **`idempotency(handle.idempotency.orders)` reads its definition.** It names
+  itself from `definition.name` and answers a 409's `Retry-After` from the
+  definition's `lease` when the guard gives none.
+- **The peer is `@nxgt/redis` `^0.7.0`.** The single-argument form has no rate
+  to read from an older bound limit, so it cannot degrade gracefully.
+
 ### 0.4.0: the rate, written once
 
 - **A rate limit that reads its policy from the store.**
@@ -42,7 +56,7 @@ Nothing scheduled yet.
 
 ### 0.3.0, continued: wired guards
 
-- **On `@nxgt/redis` 0.6.** The peer range is `^0.5.0 || ^0.6.0`: the new forms
+- **On `@nxgt/redis` 0.6 (until 0.5.0).** The peer range is `^0.5.0 || ^0.6.0`: the new forms
   need no more than 0.5's types, and 0.6 only adds `handle.limits` and
   `handle.idempotency` to wire them.
 - **A rate limit and an idempotency defined once.** `redisStore(handle.limits.api)`

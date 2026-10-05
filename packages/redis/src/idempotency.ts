@@ -176,22 +176,32 @@ export function idempotency(
 			);
 			return restore(value, replayed);
 		} catch (error) {
-			if (error instanceof Unstored) return error.response;
-			if (error instanceof GuardError && error.code === 'IN_PROGRESS') {
-				const retryAfter = Math.max(
-					1,
-					Math.ceil((error.retryAfter ?? 0) / 1000),
-				);
-				return reply(409, refuse('idempotency_in_progress', retryAfter), {
-					headers: { 'retry-after': String(retryAfter) },
-				});
-			}
-			if (error instanceof GuardError && error.code === 'MISMATCH') {
-				return reply(422, refuse('idempotency_key_reused'));
-			}
-			throw error;
+			return answer(error, reply, bound.definition.lease);
 		}
 	});
+}
+
+/** The answer to what a run threw: the response kept apart, a 409 or a 422, or the error itself. */
+function answer(
+	error: unknown,
+	reply: BaseContext['reply'],
+	lease: number | undefined,
+) {
+	if (error instanceof Unstored) return error.response;
+	if (error instanceof GuardError && error.code === 'IN_PROGRESS') {
+		// The guard's own estimate, else the definition's lease: the longest a run holds its key.
+		const retryAfter = Math.max(
+			1,
+			Math.ceil((error.retryAfter ?? lease ?? 0) / 1000),
+		);
+		return reply(409, refuse('idempotency_in_progress', retryAfter), {
+			headers: { 'retry-after': String(retryAfter) },
+		});
+	}
+	if (error instanceof GuardError && error.code === 'MISMATCH') {
+		return reply(422, refuse('idempotency_key_reused'));
+	}
+	throw error;
 }
 
 function refuse(
@@ -226,14 +236,7 @@ function wiredOf(wired: WiredIdempotency, options: object) {
 			);
 		}
 	}
-	const label = () => {
-		try {
-			return wired.keyFor('').replace(/:$/, '');
-		} catch {
-			return 'wired';
-		}
-	};
-	return { bound: wired, label };
+	return { bound: wired, label: () => wired.definition.name };
 }
 
 /** The warning a request with no scope prints, once per middleware. */

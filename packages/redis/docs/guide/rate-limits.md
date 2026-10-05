@@ -55,26 +55,31 @@ A limit wired by `defineRedis`, `redisStore(handle.limits.api)`, takes no
 
 ### The rate, written once
 
-`@nxgt/redis` 0.6 does not expose a bound limit's rate, so a store of the
-bound limit alone cannot tell `rateLimit` what it counts by, and `limit` and
-`windowMs` repeat the definition for the headers. Give the definition as the
-second argument and the store declares it as its `policy`:
+A bound limit carries its `definition` (`@nxgt/redis` 0.7), so the store of
+the bound limit alone declares it as its `policy`:
 
 ```ts
 const api = defineRateLimit({ name: 'api', key: (ip: string) => ip, limit: 100, per: 60_000 });
 const handle = await openRedis(defineRedis({ uri, prefix: 'shop', limits: { api } }));
 
-app.use(rateLimit({ store: redisStore(handle.limits.api, api) })); // 100 per 60 s
+app.use(rateLimit({ store: redisStore(handle.limits.api) })); // 100 per 60 s
 ```
 
 `rateLimit` reads `limit` (the definition's `limit`) and `windowMs` (its
 `per`) from the policy: the 429 and the `RateLimit-Limit`, `-Remaining`,
 `-Reset` and `-Policy` headers come from the definition, and one place holds
 the numbers. A `limit` or `windowMs` given too must equal them, or
-`rateLimit()` throws at declaration. A definition that is not the one that
-wired the limit — another `name` — is a `TypeError` from `redisStore`.
+`rateLimit()` throws at declaration. A limit bound by hand,
+`redisStore(bindRateLimit(client, api))`, does the same. (A wired
+limit's `definition.name` is prefixed: only `limit` and `per` are read.)
 The definition's `burst`, when it sets one, still governs how many requests
 pass at once; the policy states `limit` per `per`.
+
+**The two-argument form is deprecated.** `redisStore(handle.limits.api, api)`
+was the way before 0.7 exposed the rate, and still works: given both, it
+compares the definition's `limit` and `per` with the bound limit's, and a
+mismatch is a `TypeError` (the name is not compared: a wired one is prefixed).
+Drop the second argument.
 
 ## What changes with Redis
 

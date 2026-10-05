@@ -199,7 +199,7 @@ several is refused with a `TypeError` naming them. Give a bare client,
 `handle.clients.<name>`, to the factory that lives on one of them, with the
 prefix in its `name`.
 
-**Defined once.** With `@nxgt/redis` 0.6 the rate limit and the idempotent
+**Defined once.** With `@nxgt/redis` 0.7 the rate limit and the idempotent
 operation can be wired by `defineRedis` too, and `redisStore` and `idempotency`
 take what it wired: [Defined once, in `defineRedis`](#defined-once-in-defineredis).
 
@@ -229,7 +229,7 @@ const handle = await openRedis(
 );
 
 const app = alxia()
-	.use(rateLimit({ store: redisStore(handle.limits.api, api) })) // shop:api:<address>, 100 per 60 s from `api`
+	.use(rateLimit({ store: redisStore(handle.limits.api) })) // shop:api:<address>, 100 per 60 s from `api`
 	.use(idempotency(handle.idempotency.orders)) // shop:orders:<route>:<scope>:<key>
 	.post('/orders', ({ reply }) => reply(201, { id: crypto.randomUUID() }));
 ```
@@ -247,10 +247,10 @@ What to know:
   options (`required`, `scope`, `wait`, `methods`, `header`) but not `name`,
   `ttl` or `lease`: the types refuse them, and a script that passes them gets a
   `TypeError`.
-- **The rate is the definition's, and `rateLimit` repeats it for its
-  headers.** The store counts by the wired limit's own rate, so `limit` and
-  `windowMs` on `rateLimit` only write `RateLimit-*`: give them the definition's
-  numbers.
+- **The rate is the definition's, and `rateLimit` reads it.** The bound limit
+  carries its `definition`, so the store declares `limit` and `per` as its
+  `policy`: `rateLimit({ store })` needs no numbers, and one it is given that
+  differs throws at declaration. ([The rate, written once](rate-limits.md#the-rate-written-once).)
 - **The limit counts by a string.** `rateLimit` counts by the string its `key`
   returns, so the wired limit's key must take one, as `key: (ip: string) => ip`.
   `redisStore(handle.limits.byIp)` for a limit keyed by `{ ip }` does not
@@ -268,9 +268,9 @@ What to know:
   does not: the by-name store counts under `shop:api:<limit>/<windowMs>:<key>`,
   the wired one under `shop:api:<key>`, so counts restart:
   [troubleshooting](../troubleshooting.md#counts-restart-after-moving-a-rate-limit-to-the-wired-form).
-- **Both forms stay**, and need `@nxgt/redis` 0.6 only for `handle.limits` and
-  `handle.idempotency`: a limit or an idempotency bound by hand with 0.5 is
-  accepted the same.
+- **Both forms stay**, on `@nxgt/redis` 0.7: the peer is `^0.7.0`, because the
+  bound limit's `definition`, which the single-argument `redisStore` reads its
+  rate from, is 0.7's.
 
 ## Naming keys
 

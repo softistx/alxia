@@ -39,7 +39,7 @@ Nothing scheduled yet.
   reads `limit` and `windowMs` from it, both optional in the type, headers
   included; without a policy they stay required. A `limit` or `windowMs` that
   differs from the policy throws at declaration. `@alxia/redis`'s
-  `redisStore(handle.limits.api, api)` is such a store. Every existing form
+  `redisStore(handle.limits.api)` is such a store. Every existing form
   works as before.
 
 ### 0.1.0
