@@ -1807,7 +1807,9 @@ app.use(async (_ctx, next) => {
 
 ### `use(): argument 1 is a validate() or responds(), which belongs to a route`
 
-**When:** `use` is given a `validate(…)` or a `responds(…)`.
+**When:** `use` is given a `validate(…)` or a `responds(…)`, or a
+`compose(…)` holding one: `use(): argument 1 (compose member 2) is a
+validate() or responds(), …`.
 
 **Why:** `validate` and `responds` declare one route's schemas, and stand
 among its middlewares, where they run.

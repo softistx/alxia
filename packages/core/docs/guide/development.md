@@ -83,7 +83,8 @@ app.listen({
 
 `routes` is the table as data, one `RouteRow` per line — `method`, `path`,
 `middlewares`, `handler` — and `table` the text `listen` would print.
-`dev` is the app's switch. An `onListen` that throws is logged, and the
+Outside dev the table's head reads `alxia listening on <url>`, without
+`(dev)`. `dev` is the app's switch. An `onListen` that throws is logged, and the
 server keeps listening. The `bun create @alxia` templates print the table
 in dev and the URL alone in production this way.
 
@@ -247,7 +248,9 @@ not give it is refused with the same message as a middleware's
 reads the base context: one that reads what another adds is written with
 `defineMiddleware<Requires>()`. A `validate` or a `responds` among the
 members stands where it is on a route; `use` refuses a `compose` that holds
-one. Called on its own, a composed middleware throws
+one, naming the member: `use(): argument 1 (compose member 2) is a validate()
+or responds(), which belongs to a route`. Every refusal names a member so,
+`GET /x: middleware 2 (compose member 1) looks like a factory (logger): …`. Called on its own, a composed middleware throws
 `compose() runs among a route's middlewares or in use(), not called on its own`.
 
 `use(m1, …, m9)` is also refused, but `use`'s path form is a candidate

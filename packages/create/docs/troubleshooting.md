@@ -286,7 +286,7 @@ traps of the `react-router` image, a write refused to the `bun` user among them,
 **When:** `bun start` in an `api` project that was never built, or whose
 `dist/` was deleted.
 
-**Why:** `start` runs the build, `bun dist/server.js`, as the image does;
+**Why:** `start` runs the build, `NODE_ENV=production bun dist/server.js`, as the image does;
 it no longer runs `src/server.ts`. `bun dev` runs the sources.
 
 **Fix:** build first:

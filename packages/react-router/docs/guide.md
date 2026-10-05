@@ -42,7 +42,7 @@ of the next section, done.
   moved to the newest release alxia accepts (see
   [`@alxia/create`'s Versions](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#versions));
 - `alxia()` in `vite.config.ts`, the `bunfig.toml`, and `start` running
-  `bun build/server/index.js`;
+  `NODE_ENV=production bun build/server/index.js`;
 - Biome, with `lint`, `format`, `check`, `check:ci` and `verify` scripts;
 - a `Dockerfile` that builds on `oven/bun:1` and runs `build/` alone on
   `oven/bun:1-alpine`, as [Deploying](#deploying) describes.
