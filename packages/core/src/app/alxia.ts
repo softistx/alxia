@@ -51,6 +51,9 @@ import type { Empty, Method } from './types';
  * order of the request. A global hook (`onRequest`, `onStop`, …) applies
  * to the whole app. Each method is typed by an interface of its own —
  * `RouteMethod`, `UseMethod`, `PluginMethod`, … — holding its overloads.
+ * `Shortcuts` is deprecated: no handler reads it since 0.4, only `use`,
+ * `derive` and the deprecated `onRefusal` and `bodyLimit` still write it;
+ * it goes with those adapters in the next minor. Write `Alxia<Ctx, Prefix>`.
  */
 export class Alxia<
 	Ctx extends object = Empty,

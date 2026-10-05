@@ -7,6 +7,9 @@
 import type { AnyReply } from '../reply/reply';
 import type { PathAt, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
+import type { FormSlots } from './forms';
+import type { Ladder } from './ladder';
+import type { AppTypes } from './route-forms';
 import type {
 	AddedOf,
 	BaseContext,
@@ -78,115 +81,73 @@ export type PathMiddleware<Ctx extends object> = ((
 ) => MiddlewareReturn) &
 	MadeByDefineMiddleware;
 
-/** `app.use(...middlewares)` and `app.use(path, ...middlewares)`. */
+declare module './forms' {
+	interface Forms<
+		App extends AppTypes,
+		A,
+		B,
+		Results extends readonly unknown[],
+		Result,
+		Handled,
+	> {
+		readonly use: UseForm<App, Results, Result>;
+	}
+}
+
+/** The app `use` is called on: a route's `AppTypes`, whose method it does not read. */
+export interface UseApp<
+	Ctx extends object,
+	Prefix extends string,
+	Shortcuts extends AnyReply,
+> extends AppTypes {
+	readonly ctx: Ctx;
+	readonly prefix: Prefix;
+	readonly shortcuts: Shortcuts;
+}
+
+/** `app.use(...middlewares)`: no head, no tail, the app after them its result. */
+export interface UseForm<
+	App extends AppTypes,
+	Results extends readonly unknown[],
+	Result,
+> extends FormSlots {
+	readonly head: [];
+	readonly step: ScopeMiddleware<App['ctx'], Results, Result>;
+	readonly tail: [];
+	readonly out: AppAfterUse<
+		App['ctx'],
+		App['prefix'],
+		App['shortcuts'],
+		Results
+	>;
+}
+
+/**
+ * `app.use(...middlewares)`: middlewares made by `defineMiddleware`, run
+ * on every route declared after this — not before — in this app or group,
+ * before the route's own middlewares, in the order given; on the app, on
+ * every request no route matches too — a 404, a 405, a preflight —
+ * wherever declared. What each passes `next` is added to the context of
+ * the routes after it, typed; a reply it returns ends the request. And
+ * `app.use(path, ...middlewares)`, see `UsePathForm`.
+ *
+ * ```ts
+ * app.use(auth).get('/me', ({ user, reply }) => reply(200, user));
+ * ```
+ */
 export interface UseForms<
 	Ctx extends object,
 	Prefix extends string,
 	Shortcuts extends AnyReply,
+> extends Ladder<'use', UseApp<Ctx, Prefix, Shortcuts>>,
+		UsePathForm<Ctx, Prefix, Shortcuts> {}
+
+/** `app.use(path, ...middlewares)`. */
+export interface UsePathForm<
+	Ctx extends object,
+	Prefix extends string,
+	Shortcuts extends AnyReply,
 > {
-	/**
-	 * Middlewares made by `defineMiddleware`, run on every route declared
-	 * after this — not before — in this app or group, before the route's
-	 * own middlewares, in the order given; on the app, on every request no
-	 * route matches too — a 404, a 405, a preflight — wherever declared.
-	 * What each passes `next` is added to the context of the routes after
-	 * it, typed; a reply it returns ends the request:
-	 *
-	 * ```ts
-	 * app.use(auth).get('/me', ({ user, reply }) => reply(200, user));
-	 * ```
-	 */
-	<R1 extends MiddlewareReturn>(
-		m1: ScopeMiddleware<Ctx, [], R1>,
-	): AppAfterUse<Ctx, Prefix, Shortcuts, [R1]>;
-	<R1 extends MiddlewareReturn, R2 extends MiddlewareReturn>(
-		m1: ScopeMiddleware<Ctx, [], R1>,
-		m2: ScopeMiddleware<Ctx, [R1], R2>,
-	): AppAfterUse<Ctx, Prefix, Shortcuts, [R1, R2]>;
-	<
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-	>(
-		m1: ScopeMiddleware<Ctx, [], R1>,
-		m2: ScopeMiddleware<Ctx, [R1], R2>,
-		m3: ScopeMiddleware<Ctx, [R1, R2], R3>,
-	): AppAfterUse<Ctx, Prefix, Shortcuts, [R1, R2, R3]>;
-	<
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-	>(
-		m1: ScopeMiddleware<Ctx, [], R1>,
-		m2: ScopeMiddleware<Ctx, [R1], R2>,
-		m3: ScopeMiddleware<Ctx, [R1, R2], R3>,
-		m4: ScopeMiddleware<Ctx, [R1, R2, R3], R4>,
-	): AppAfterUse<Ctx, Prefix, Shortcuts, [R1, R2, R3, R4]>;
-	<
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		R5 extends MiddlewareReturn,
-	>(
-		m1: ScopeMiddleware<Ctx, [], R1>,
-		m2: ScopeMiddleware<Ctx, [R1], R2>,
-		m3: ScopeMiddleware<Ctx, [R1, R2], R3>,
-		m4: ScopeMiddleware<Ctx, [R1, R2, R3], R4>,
-		m5: ScopeMiddleware<Ctx, [R1, R2, R3, R4], R5>,
-	): AppAfterUse<Ctx, Prefix, Shortcuts, [R1, R2, R3, R4, R5]>;
-	<
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		R5 extends MiddlewareReturn,
-		R6 extends MiddlewareReturn,
-	>(
-		m1: ScopeMiddleware<Ctx, [], R1>,
-		m2: ScopeMiddleware<Ctx, [R1], R2>,
-		m3: ScopeMiddleware<Ctx, [R1, R2], R3>,
-		m4: ScopeMiddleware<Ctx, [R1, R2, R3], R4>,
-		m5: ScopeMiddleware<Ctx, [R1, R2, R3, R4], R5>,
-		m6: ScopeMiddleware<Ctx, [R1, R2, R3, R4, R5], R6>,
-	): AppAfterUse<Ctx, Prefix, Shortcuts, [R1, R2, R3, R4, R5, R6]>;
-	<
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		R5 extends MiddlewareReturn,
-		R6 extends MiddlewareReturn,
-		R7 extends MiddlewareReturn,
-	>(
-		m1: ScopeMiddleware<Ctx, [], R1>,
-		m2: ScopeMiddleware<Ctx, [R1], R2>,
-		m3: ScopeMiddleware<Ctx, [R1, R2], R3>,
-		m4: ScopeMiddleware<Ctx, [R1, R2, R3], R4>,
-		m5: ScopeMiddleware<Ctx, [R1, R2, R3, R4], R5>,
-		m6: ScopeMiddleware<Ctx, [R1, R2, R3, R4, R5], R6>,
-		m7: ScopeMiddleware<Ctx, [R1, R2, R3, R4, R5, R6], R7>,
-	): AppAfterUse<Ctx, Prefix, Shortcuts, [R1, R2, R3, R4, R5, R6, R7]>;
-	<
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		R5 extends MiddlewareReturn,
-		R6 extends MiddlewareReturn,
-		R7 extends MiddlewareReturn,
-		R8 extends MiddlewareReturn,
-	>(
-		m1: ScopeMiddleware<Ctx, [], R1>,
-		m2: ScopeMiddleware<Ctx, [R1], R2>,
-		m3: ScopeMiddleware<Ctx, [R1, R2], R3>,
-		m4: ScopeMiddleware<Ctx, [R1, R2, R3], R4>,
-		m5: ScopeMiddleware<Ctx, [R1, R2, R3, R4], R5>,
-		m6: ScopeMiddleware<Ctx, [R1, R2, R3, R4, R5], R6>,
-		m7: ScopeMiddleware<Ctx, [R1, R2, R3, R4, R5, R6], R7>,
-		m8: ScopeMiddleware<Ctx, [R1, R2, R3, R4, R5, R6, R7], R8>,
-	): AppAfterUse<Ctx, Prefix, Shortcuts, [R1, R2, R3, R4, R5, R6, R7, R8]>;
 	/**
 	 * Middlewares made by `defineMiddleware`, run on the requests under
 	 * `path` that reach a route declared after this — and, on the app, on
@@ -203,6 +164,7 @@ export interface UseForms<
 	 * app.group('/admin', (admin) => admin.use(auth).get('/me', ({ user, reply }) => reply(200, user)));
 	 * ```
 	 */
+	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	<
 		const Path extends RoutePath,
 		const Middlewares extends readonly [

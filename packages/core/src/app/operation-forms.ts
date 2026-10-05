@@ -3,6 +3,8 @@
  * handler)`, the operation's schemas as an implicit `validate` and an
  * implicit `responds`, just before the handler.
  */
+import type { FormSlots } from './forms';
+import type { Bare, Ladder } from './ladder';
 import type {
 	OperationApp,
 	OperationResponds,
@@ -17,7 +19,7 @@ import type {
 	RouteResult,
 } from './route-forms';
 import type { CheckedOperation, RouteOperation } from './route-operation';
-import type { MiddlewareReturn, ThreadContext } from './types';
+import type { ThreadContext } from './types';
 
 /** The context the implicit `validate` reads: the middlewares'. */
 type BeforeValidate<
@@ -35,26 +37,49 @@ type Steps<
 	OperationValidate<Op, BeforeValidate<App, Op, Results>>,
 	OperationResponds<Op>,
 ];
-/** Middleware `n`, after the ones that returned `Before`. */
-type Mw<
-	App extends AppTypes,
-	Op extends RouteOperation,
-	Before extends readonly unknown[],
-	Result,
-> = RouteMiddleware<OperationApp<App, Op>, Op['path'], Before, Result>;
-/** The handler, after the middlewares that returned `Results`. */
-type Handler<
+/** `A`, the operation a call inferred, as an operation. */
+type OpOf<A> = A extends RouteOperation ? A : never;
+
+declare module './forms' {
+	interface Forms<
+		App extends AppTypes,
+		A,
+		B,
+		Results extends readonly unknown[],
+		Result,
+		Handled,
+	> {
+		readonly operation: OperationForm<App, OpOf<A>, Results, Result, Handled>;
+	}
+}
+
+/** `app.route(operation, ...middlewares, handler)`. */
+export interface OperationForm<
 	App extends AppTypes,
 	Op extends RouteOperation,
 	Results extends readonly unknown[],
 	Result,
-> = RouteHandler<
-	OperationApp<App, Op>,
-	Op['path'],
-	Steps<App, Op, Results>,
-	Result
->;
-type R = MiddlewareReturn;
+	Handled,
+> extends FormSlots {
+	readonly aBound: RouteOperation;
+	readonly handledBound: RouteResult<Steps<App, Op, Results>>;
+	readonly head: [operation: CheckedOperation<App['prefix'], Op>];
+	readonly step: RouteMiddleware<
+		OperationApp<App, Op>,
+		Op['path'],
+		Results,
+		Result
+	>;
+	readonly tail: [
+		handler: RouteHandler<
+			OperationApp<App, Op>,
+			Op['path'],
+			Steps<App, Op, Results>,
+			Handled
+		>,
+	];
+	readonly out: AppWithRoute<App>;
+}
 
 /**
  * `app.route(operation, ...middlewares, handler)`: the route
@@ -70,142 +95,6 @@ type R = MiddlewareReturn;
  *   reply(200, update(user, params.petId, body)));
  * ```
  */
-export interface OperationForms<App extends AppTypes> {
-	<
-		const Op extends RouteOperation,
-		Result extends RouteResult<Steps<App, Op, []>>,
-	>(
-		operation: CheckedOperation<App['prefix'], Op>,
-		handler: Handler<App, Op, [], Result>,
-	): AppWithRoute<App>;
-	<
-		const Op extends RouteOperation,
-		R1 extends R,
-		Result extends RouteResult<Steps<App, Op, [R1]>>,
-	>(
-		operation: CheckedOperation<App['prefix'], Op>,
-		m1: Mw<App, Op, [], R1>,
-		handler: Handler<App, Op, [R1], Result>,
-	): AppWithRoute<App>;
-	<
-		const Op extends RouteOperation,
-		R1 extends R,
-		R2 extends R,
-		Result extends RouteResult<Steps<App, Op, [R1, R2]>>,
-	>(
-		operation: CheckedOperation<App['prefix'], Op>,
-		m1: Mw<App, Op, [], R1>,
-		m2: Mw<App, Op, [R1], R2>,
-		handler: Handler<App, Op, [R1, R2], Result>,
-	): AppWithRoute<App>;
-	<
-		const Op extends RouteOperation,
-		R1 extends R,
-		R2 extends R,
-		R3 extends R,
-		Result extends RouteResult<Steps<App, Op, [R1, R2, R3]>>,
-	>(
-		operation: CheckedOperation<App['prefix'], Op>,
-		m1: Mw<App, Op, [], R1>,
-		m2: Mw<App, Op, [R1], R2>,
-		m3: Mw<App, Op, [R1, R2], R3>,
-		handler: Handler<App, Op, [R1, R2, R3], Result>,
-	): AppWithRoute<App>;
-	<
-		const Op extends RouteOperation,
-		R1 extends R,
-		R2 extends R,
-		R3 extends R,
-		R4 extends R,
-		Result extends RouteResult<Steps<App, Op, [R1, R2, R3, R4]>>,
-	>(
-		operation: CheckedOperation<App['prefix'], Op>,
-		m1: Mw<App, Op, [], R1>,
-		m2: Mw<App, Op, [R1], R2>,
-		m3: Mw<App, Op, [R1, R2], R3>,
-		m4: Mw<App, Op, [R1, R2, R3], R4>,
-		handler: Handler<App, Op, [R1, R2, R3, R4], Result>,
-	): AppWithRoute<App>;
-	<
-		const Op extends RouteOperation,
-		R1 extends R,
-		R2 extends R,
-		R3 extends R,
-		R4 extends R,
-		R5 extends R,
-		Result extends RouteResult<Steps<App, Op, [R1, R2, R3, R4, R5]>>,
-	>(
-		operation: CheckedOperation<App['prefix'], Op>,
-		m1: Mw<App, Op, [], R1>,
-		m2: Mw<App, Op, [R1], R2>,
-		m3: Mw<App, Op, [R1, R2], R3>,
-		m4: Mw<App, Op, [R1, R2, R3], R4>,
-		m5: Mw<App, Op, [R1, R2, R3, R4], R5>,
-		handler: Handler<App, Op, [R1, R2, R3, R4, R5], Result>,
-	): AppWithRoute<App>;
-	<
-		const Op extends RouteOperation,
-		R1 extends R,
-		R2 extends R,
-		R3 extends R,
-		R4 extends R,
-		R5 extends R,
-		R6 extends R,
-		Result extends RouteResult<Steps<App, Op, [R1, R2, R3, R4, R5, R6]>>,
-	>(
-		operation: CheckedOperation<App['prefix'], Op>,
-		m1: Mw<App, Op, [], R1>,
-		m2: Mw<App, Op, [R1], R2>,
-		m3: Mw<App, Op, [R1, R2], R3>,
-		m4: Mw<App, Op, [R1, R2, R3], R4>,
-		m5: Mw<App, Op, [R1, R2, R3, R4], R5>,
-		m6: Mw<App, Op, [R1, R2, R3, R4, R5], R6>,
-		handler: Handler<App, Op, [R1, R2, R3, R4, R5, R6], Result>,
-	): AppWithRoute<App>;
-	<
-		const Op extends RouteOperation,
-		R1 extends R,
-		R2 extends R,
-		R3 extends R,
-		R4 extends R,
-		R5 extends R,
-		R6 extends R,
-		R7 extends R,
-		Result extends RouteResult<Steps<App, Op, [R1, R2, R3, R4, R5, R6, R7]>>,
-	>(
-		operation: CheckedOperation<App['prefix'], Op>,
-		m1: Mw<App, Op, [], R1>,
-		m2: Mw<App, Op, [R1], R2>,
-		m3: Mw<App, Op, [R1, R2], R3>,
-		m4: Mw<App, Op, [R1, R2, R3], R4>,
-		m5: Mw<App, Op, [R1, R2, R3, R4], R5>,
-		m6: Mw<App, Op, [R1, R2, R3, R4, R5], R6>,
-		m7: Mw<App, Op, [R1, R2, R3, R4, R5, R6], R7>,
-		handler: Handler<App, Op, [R1, R2, R3, R4, R5, R6, R7], Result>,
-	): AppWithRoute<App>;
-	<
-		const Op extends RouteOperation,
-		R1 extends R,
-		R2 extends R,
-		R3 extends R,
-		R4 extends R,
-		R5 extends R,
-		R6 extends R,
-		R7 extends R,
-		R8 extends R,
-		Result extends RouteResult<
-			Steps<App, Op, [R1, R2, R3, R4, R5, R6, R7, R8]>
-		>,
-	>(
-		operation: CheckedOperation<App['prefix'], Op>,
-		m1: Mw<App, Op, [], R1>,
-		m2: Mw<App, Op, [R1], R2>,
-		m3: Mw<App, Op, [R1, R2], R3>,
-		m4: Mw<App, Op, [R1, R2, R3], R4>,
-		m5: Mw<App, Op, [R1, R2, R3, R4], R5>,
-		m6: Mw<App, Op, [R1, R2, R3, R4, R5], R6>,
-		m7: Mw<App, Op, [R1, R2, R3, R4, R5, R6], R7>,
-		m8: Mw<App, Op, [R1, R2, R3, R4, R5, R6, R7], R8>,
-		handler: Handler<App, Op, [R1, R2, R3, R4, R5, R6, R7, R8], Result>,
-	): AppWithRoute<App>;
-}
+export interface OperationForms<App extends AppTypes>
+	extends Bare<'operation', App>,
+		Ladder<'operation', App> {}

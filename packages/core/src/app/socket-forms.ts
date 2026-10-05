@@ -5,6 +5,8 @@
 import type { StandardSchemaV1 } from '../schema/standard-schema';
 import type { PathAt, RoutePath } from '../types/path';
 import type { SocketHandlers, SocketMessage, SocketSend } from '../ws/types';
+import type { FormSlots } from './forms';
+import type { Bare, Ladder } from './ladder';
 import type {
 	AppTypes,
 	AppWithRoute,
@@ -12,13 +14,7 @@ import type {
 	RouteBase,
 	RouteMiddleware,
 } from './route-forms';
-import type {
-	Empty,
-	MiddlewareReturn,
-	RouteDetail,
-	ThreadContext,
-	ThreadSchema,
-} from './types';
+import type { Empty, RouteDetail, ThreadContext, ThreadSchema } from './types';
 
 /**
  * A socket route's options: the schema of each message the client sends,
@@ -84,136 +80,35 @@ export type SocketHandlersAfter<
  * });
  * ```
  */
-export interface SocketForms<App extends AppTypes> {
-	<const Path extends RoutePath>(
-		path: PathAt<App['prefix'], Path>,
-		handlers: SocketHandlersAfter<App, Path, [], Empty>,
-	): AppWithRoute<App>;
-	<const Path extends RoutePath, R1 extends MiddlewareReturn>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		handlers: SocketHandlersAfter<App, Path, [R1], Empty>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		handlers: SocketHandlersAfter<App, Path, [R1, R2], Empty>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
-		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3], Empty>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
-		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
-		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3, R4], Empty>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		R5 extends MiddlewareReturn,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
-		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
-		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
-		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3, R4, R5], Empty>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		R5 extends MiddlewareReturn,
-		R6 extends MiddlewareReturn,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
-		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
-		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
-		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
-		handlers: SocketHandlersAfter<App, Path, [R1, R2, R3, R4, R5, R6], Empty>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		R5 extends MiddlewareReturn,
-		R6 extends MiddlewareReturn,
-		R7 extends MiddlewareReturn,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
-		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
-		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
-		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
-		m7: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5, R6], R7>,
-		handlers: SocketHandlersAfter<
-			App,
-			Path,
-			[R1, R2, R3, R4, R5, R6, R7],
-			Empty
-		>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		R5 extends MiddlewareReturn,
-		R6 extends MiddlewareReturn,
-		R7 extends MiddlewareReturn,
-		R8 extends MiddlewareReturn,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
-		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
-		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
-		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
-		m7: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5, R6], R7>,
-		m8: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5, R6, R7], R8>,
-		handlers: SocketHandlersAfter<
-			App,
-			Path,
-			[R1, R2, R3, R4, R5, R6, R7, R8],
-			Empty
-		>,
-	): AppWithRoute<App>;
+export interface SocketForms<App extends AppTypes>
+	extends Bare<'socket', App>,
+		Ladder<'socket', App> {}
+
+declare module './forms' {
+	interface Forms<
+		App extends AppTypes,
+		A,
+		B,
+		Results extends readonly unknown[],
+		Result,
+		Handled,
+	> {
+		readonly socket: SocketForm<App, A, Results, Result>;
+	}
+}
+
+/** `app.ws(path, ...middlewares, handlers)`. */
+export interface SocketForm<
+	App extends AppTypes,
+	A,
+	Results extends readonly unknown[],
+	Result,
+> extends FormSlots {
+	readonly aBound: RoutePath;
+	readonly head: [path: PathAt<App['prefix'], A & string>];
+	readonly step: RouteMiddleware<App, A & string, Results, Result>;
+	readonly tail: [
+		handlers: SocketHandlersAfter<App, A & string, Results, Empty>,
+	];
+	readonly out: AppWithRoute<App>;
 }
