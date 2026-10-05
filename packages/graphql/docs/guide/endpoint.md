@@ -51,9 +51,10 @@ routes on `base` and returns it.
 | --- | --- | --- | --- |
 | `schema` | `GraphQLSchemaWithContext<SchemaCtx>` | — | The schema, from Yoga's `createSchema` or any tool that types its context. Its context is checked against the app's: see [The typed context](context.md). |
 | `path` | `` `/${string}` `` | `'/graphql'` | Where the endpoint is, under the app's prefix. |
-| `ide` | `'graphiql' \| 'apollo-sandbox' \| false` | `'graphiql'` | What a browser gets at the endpoint: see [GraphiQL and Apollo Sandbox](ide.md). |
+| `ide` | `'graphiql' \| 'apollo-sandbox' \| false` | GraphiQL in dev (`isDev`), none otherwise | What a browser gets at the endpoint: see [GraphiQL and Apollo Sandbox](ide.md). |
 | `graphiql` | Yoga's `GraphiQLOptions` | Yoga's | GraphiQL's options, when `ide` is `'graphiql'`. |
 | `sandbox` | `SandboxOptions` | — | Apollo Sandbox's options, when `ide` is `'apollo-sandbox'`. |
+| `ws` | `boolean \| { path?, keepAlive? }` | `false` | GraphQL over WebSocket too, with the optional peer `graphql-ws`: see [GraphQL over WebSocket](websockets.md). |
 | `cors` | Yoga's `cors` | `false` | Yoga's own CORS. Off: use `@alxia/cors` for the whole app instead ([Yoga's plugins and options](yoga.md#cors)). |
 | every other Yoga option | | Yoga's | `plugins`, `context`, `maskedErrors`, `batching`, `logging`… passed to `createYoga` as they are: see [Yoga's plugins and options](yoga.md). |
 
@@ -143,6 +144,7 @@ IDE page ([GraphiQL and Apollo Sandbox](ide.md)).
 | `POST` with `{"query": …}` | `200` and `{"data": …}`, with `errors` beside it when a resolver failed |
 | `GET ?query=…` | the same, for a query; a mutation is a `405` |
 | `POST` a subscription with `Accept: text/event-stream` | `200`, a `text/event-stream` of results ([subscriptions](yoga.md#subscriptions)) |
+| a WebSocket upgrade offering `graphql-transport-ws`, `ws` on | `101`, then queries, mutations and subscriptions over the socket ([GraphQL over WebSocket](websockets.md)); with `ws` off, no `101` |
 | `GET` from a browser (`Accept: text/html`), no `query` | the IDE page; with `ide: false`, a GraphQL answer (`Must provide query string.`) |
 | a middleware replied first | that middleware's reply, such as a `401` |
 
@@ -232,3 +234,5 @@ describe('graphql', () => {
 - [Yoga's plugins and options](yoga.md): plugins, errors, subscriptions,
   CORS.
 - [GraphiQL and Apollo Sandbox](ide.md): the page a browser gets.
+- [GraphQL over WebSocket](websockets.md): `ws`, for `graphql-ws`
+  clients.

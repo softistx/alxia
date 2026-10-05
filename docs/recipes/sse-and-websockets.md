@@ -150,5 +150,6 @@ test('a socket needs a server, and a token', async () => {
 - [Serving](../../packages/core/docs/guide/serving.md#websocket)
 - [Health and graceful shutdown](health-and-shutdown.md): every stream ends
   when the app is stopped; `shutdownSignal(ctx)` for a long response of your own
-- [GraphQL subscriptions](graphql-api.md) are server-sent events too
+- [GraphQL subscriptions](graphql-api.md) are server-sent events too, or a
+  socket with `ws: true` ([GraphQL over WebSocket](../../packages/graphql/docs/guide/websockets.md))
 - [`@alxia/core` troubleshooting](../../packages/core/docs/troubleshooting.md)

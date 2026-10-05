@@ -651,10 +651,11 @@ my-graphql-api/
 │   ├── generated/resolvers.ts  what `bun run generate` writes: committed, never edited
 │   ├── env.ts              defineEnv: PORT
 │   ├── store.ts            in-memory users, tokens and notes, and the pub/sub
+│   ├── loaders.ts          createLoaders(): the DataLoaders of one request
 │   ├── context.ts          the base, the viewerOf middleware, and Context
 │   ├── resolvers.ts        const resolvers: Resolvers
 │   ├── schema.ts           createSchema from schema.graphql and the resolvers
-│   ├── app.ts              health() and graphql(app, { schema }) mounted on the base
+│   ├── app.ts              health() and graphql(app, { schema, context }) mounted on the base
 │   ├── graphql.d.ts        declares the *.graphql module
 │   ├── app.spec.ts         bun test: POST /graphql through app.request()
 │   └── server.ts           app.listen on env.PORT, which stops on SIGINT and SIGTERM
@@ -721,6 +722,7 @@ not resolvers, and Pothos is code first.
 import { alxia, defineMiddleware } from "@alxia/core";
 import type { GraphQLContext } from "@alxia/graphql";
 import { env } from "./env";
+import type { Loaders } from "./loaders";
 import { db } from "./store";
 
 const viewerOf = defineMiddleware(({ request }, next) => {
@@ -734,13 +736,14 @@ const viewerOf = defineMiddleware(({ request }, next) => {
 });
 
 export const base = alxia().decorate({ env, db }).use(viewerOf);
-export type Context = GraphQLContext<typeof base>;
+export type Context = GraphQLContext<typeof base, { loaders: Loaders }>;
 ```
 
 `viewerOf` is a middleware given to `use`: it reads
 `Authorization: Bearer <token>` and passes `next({ viewer })`, the user or
 `null`. It never refuses, so a query may be anonymous (`me` is `null`), and
-`viewer` is typed in every resolver through `GraphQLContext<typeof base>`.
+`viewer` is typed in every resolver through `GraphQLContext`, whose second
+argument types the `loaders` the `context` option of `src/app.ts` adds.
 The tokens in `src/store.ts` are for development (`ada-token`): look a
 session up, or verify a JWT, in the same place.
 
@@ -761,6 +764,10 @@ export const resolvers: Resolvers = {
       // …
     },
   },
+  Note: {
+    // The notes of one query load their authors in one batch (N+1 otherwise).
+    author: (note, _, { loaders }) => loaders.user.load(note.authorId),
+  },
 };
 ```
 
@@ -768,12 +775,37 @@ A field the schema lacks, or a value its type refuses, is a compile error.
 `addNote` throws a `GraphQLError` with the code `UNAUTHENTICATED` when
 `viewer` is `null` ([troubleshooting](troubleshooting.md#sign-in-to-add-a-note)).
 
+### `src/loaders.ts`: one batch per request
+
+```ts
+// src/loaders.ts
+import DataLoader from "dataloader";
+import { findUsers } from "./store";
+
+export function createLoaders() {
+  return { user: new DataLoader(findUsers) };
+}
+
+export type Loaders = ReturnType<typeof createLoaders>;
+```
+
+`Note.author` calls `loaders.user.load(note.authorId)`. A DataLoader
+collects the `load` calls of one tick into one call of `findUsers` (in a
+database, one `WHERE id IN (...)`), so a list of N notes loads its authors
+in one batch, not N calls. It also caches each key it has seen, so loaders
+are built per request, never shared: `src/app.ts` passes `context` to
+`graphql()`, and a shared loader would serve one user's data to another and
+never see a change. `dataloader` is a dependency of the project; the spec
+asserts one batch for N notes and a fresh set of loaders per request.
+
 ### `src/app.ts` and the subscription
 
 ```ts
 export const app = base
   .plugin(health())
-  .plugin((app) => graphql(app, { schema }));
+  .plugin((app) =>
+    graphql(app, { schema, context: () => ({ loaders: createLoaders() }) }),
+  );
 ```
 
 `health()` answers `GET /health` and `GET /ready`. GraphiQL follows the

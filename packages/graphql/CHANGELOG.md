@@ -1,5 +1,19 @@
 # @alxia/graphql
 
+## 0.4.0
+
+### Minor Changes
+
+- [#164](https://github.com/softistx/alxia/pull/164) [`4b75042`](https://github.com/softistx/alxia/commit/4b75042a6eca327856254d7864ad27cae6cb11d9) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Serve GraphQL over WebSocket with `ws: true`: the `graphql-transport-ws` protocol of `graphql-ws`, an optional peer, the default of Apollo Client's `GraphQLWsLink` and urql's `subscriptionExchange`, at the endpoint's path beside server-sent events. The upgrade runs the app's middlewares, so a guard refuses the socket and a resolver reads what they added; each operation runs through Yoga's plugins, with the client's `connectionParams` in its context (`GraphQLWsContext`); a shutdown closes the sockets with 1001 and completes their subscriptions. `ws: { path, keepAlive }` moves the socket or spaces its pings.
+
+## 0.3.1
+
+### Patch Changes
+
+- [#161](https://github.com/softistx/alxia/pull/161) [`4f2daa4`](https://github.com/softistx/alxia/commit/4f2daa4da46fc0f6b50bd4a984ecd6f8a496cced) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Document batching with DataLoader (the N+1 problem) in the context guide: loaders built per request in the `context` option and typed through `GraphQLContext`, and why they must not outlive the request.
+- Updated dependencies [[`137c5c8`](https://github.com/softistx/alxia/commit/137c5c8b618b961674c63a6242568e6b800939ab)]:
+  - @alxia/core@0.6.0
+
 ## 0.3.0
 
 ### Minor Changes

@@ -1,7 +1,7 @@
 {
 	"name": "@alxia/graphql",
-	"version": "0.3.0",
-	"description": "GraphQL for alxia with GraphQL Yoga: its plugins, subscriptions over SSE and GraphiQL, behind the app's hooks, its resolvers reading the app's typed context",
+	"version": "0.4.0",
+	"description": "GraphQL for alxia with GraphQL Yoga: its plugins, subscriptions over SSE or WebSocket (graphql-ws) and GraphiQL, behind the app's hooks, its resolvers reading the app's typed context",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -45,12 +45,19 @@
 		"@types/bun": "^1.4.2",
 		"dataloader": "^2.2.3",
 		"graphql": "^16.11.0",
+		"graphql-ws": "^6.3.0",
 		"graphql-yoga": "^5.16.0"
 	},
 	"peerDependencies": {
 		"@alxia/core": "workspace:^",
 		"graphql": "^16.11.0 || ^17.0.0",
+		"graphql-ws": "^6.1.0",
 		"graphql-yoga": "^5.16.0",
 		"typescript": "^6.0.3 || ^7.0.0"
+	},
+	"peerDependenciesMeta": {
+		"graphql-ws": {
+			"optional": true
+		}
 	}
 }

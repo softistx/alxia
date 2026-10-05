@@ -353,6 +353,36 @@ the `code`. `errors: 'problem'` changes the HTTP layer around the endpoint
 alone: a 413, a 500 from a middleware, a 405. To put a resolver's error on
 an HTTP status too, give the extension `http: { status: 401 }`.
 
+### WebSocket clients
+
+Apollo Client's `GraphQLWsLink` and urql's `subscriptionExchange` subscribe
+over WebSocket, with `graphql-ws`. Add the optional peer and `ws: true`;
+server-sent events stay served at the same path:
+
+```sh
+bun add graphql-ws
+```
+
+```ts no-check
+graphql(app, { schema, ws: true }); // ws://localhost:3000/graphql too
+```
+
+The upgrade runs the base's middlewares, so `viewer` is read on it. A
+browser cannot set `authorization` on a socket: have `viewerOf` read the
+token from the URL too —
+
+```ts no-check
+const token =
+	request.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1] ??
+	new URL(request.url).searchParams.get('token') ?? undefined;
+```
+
+— or from a cookie. The client's `connectionParams` arrive after the
+upgrade, in the first message, so the base's middlewares never see them;
+they are in each resolver's context. A shutdown closes the sockets with
+`1001`. The client side, Apollo's and urql's, is in
+[GraphQL over WebSocket](../../packages/graphql/docs/guide/websockets.md#clients).
+
 ## 6. Test it, in process
 
 ```ts
@@ -468,6 +498,8 @@ describe('the IDE, the probes and the drain', () => {
 - [Yoga's plugins and options](../../packages/graphql/docs/guide/yoga.md):
   masked errors, batching, subscriptions, depth limits, response caching
 - [GraphiQL and Apollo Sandbox](../../packages/graphql/docs/guide/ide.md)
+- [GraphQL over WebSocket](../../packages/graphql/docs/guide/websockets.md):
+  `ws: true`, Apollo Client's and urql's WebSocket links
 - [Health and shutdown](../../packages/core/docs/guide/health-and-shutdown.md#graphql)
 - [Errors](../../packages/core/docs/guide/errors.md#graphql),
   [Authentication](authentication.md), [Testing](testing.md),
