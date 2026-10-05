@@ -1,8 +1,8 @@
 import { afterAll, describe, expect, expectTypeOf, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { z } from 'zod';
+import { issuer, signWith, testKey } from '../test/jwks-fixtures';
 import { bearer } from './bearer';
-import { issuer, signWith, testKey } from './jwks-fixtures';
 import { createJwt } from './jwt';
 
 const key = await testKey('RS256', 'kc-1');

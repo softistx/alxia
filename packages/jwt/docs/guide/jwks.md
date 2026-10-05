@@ -94,10 +94,19 @@ the algorithm-confusion attack has nothing to work with.
   the verifier answers `keys_unavailable` until it can fetch).
 
 The fetch is strict: `https` only (plain `http` on localhost, for a local
-provider), no redirects, at most 256 KiB (counted as the body streams in), `application/json` asked for. An
-RSA key outside 2048 to 8192 bits, or with an even or trivial exponent, is
-refused, and a `jwks_uri` read from a discovery document must be `https`,
-unless the issuer itself is on localhost.
+provider), no redirects, at most 256 KiB (counted as the body streams in),
+within `timeoutMs`, `application/json` asked for. The keys are checked
+before Web Crypto sees them, and a key refused answers `key`: an RSA key
+whose modulus is outside 2048 to 8192 bits (counted from its first set
+bit), or with an even or trivial exponent; an Ed25519 key whose `x` is not
+exactly 32 bytes, or is a point of small order (the identity, the all-zero
+point, and the rest of libsodium's `has_small_order` list), under which a
+signature anyone can make verifies; and any key whose members are not
+strict, unpadded base64url. Only a key's public members reach Web Crypto.
+A `jwks_uri` read from a discovery document must be `https`, unless the
+issuer itself is on localhost. The cache's lifetimes and refetch limit run
+on a monotonic clock, so setting the system clock neither keeps a set past
+its lifetime nor lifts the limit.
 
 ## Keycloak
 

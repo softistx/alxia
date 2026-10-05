@@ -1,7 +1,8 @@
 import { afterAll, describe, expect, test } from 'bun:test';
+import { issuer, signWith, testKey } from '../test/jwks-fixtures';
 import { base64url } from './base64url';
-import { keyUrl } from './jwks';
-import { issuer, signWith, testKey } from './jwks-fixtures';
+import { jwksUri } from './jwks/discovery';
+import { keyUrl } from './jwks/url';
 import { createJwt } from './jwt';
 
 const key = await testKey('RS256');
@@ -10,7 +11,7 @@ const unavailable = { ok: false, reason: 'keys_unavailable' } as const;
 const servers: { stop(close?: boolean): unknown }[] = [];
 
 /** A server answering `handler`, for the hostile answers the fixture issuer never gives. */
-function hostile(handler: (request: Request) => Response) {
+function hostile(handler: (request: Request) => Response | Promise<Response>) {
 	const server = Bun.serve({ port: 0, hostname: '127.0.0.1', fetch: handler });
 	servers.push(server);
 	return `http://127.0.0.1:${server.port}`;
@@ -45,20 +46,34 @@ describe('what is fetched', () => {
 					}),
 				),
 		);
-		expect(await createJwt({ jwks: streamed }).verify(token)).toEqual(
-			unavailable,
-		);
+		// Without the cap, an endless body would be read until the timeout, a minute here.
+		const started = performance.now();
+		expect(
+			await createJwt({ jwks: streamed, timeoutMs: 60_000 }).verify(token),
+		).toEqual(unavailable);
+		expect(performance.now() - started).toBeLessThan(2_000);
+	});
+
+	test('an issuer that never answers is given up on after timeoutMs', async () => {
+		const stalled = hostile(() => new Promise<Response>(() => {}));
+		const started = performance.now();
+		expect(
+			await createJwt({ jwks: stalled, timeoutMs: 200 }).verify(token),
+		).toEqual(unavailable);
+		expect(performance.now() - started).toBeLessThan(500);
 	});
 
 	test('a discovery document that names another issuer, or no jwks_uri, fails closed', async () => {
-		const document = (body: unknown) => hostile(() => Response.json(body));
-		const liar = document({
-			issuer: 'https://evil.example',
-			jwks_uri: 'http://127.0.0.1/jwks',
-		});
+		const real = issuer([key]);
+		servers.push({ stop: () => real.stop() });
+		// The keys it names are live and valid: only the issuer check refuses them.
+		const liar = hostile(() =>
+			Response.json({ issuer: 'https://evil.example', jwks_uri: real.jwksUrl }),
+		);
 		expect(await createJwt({ discovery: liar }).verify(token)).toEqual(
 			unavailable,
 		);
+		expect(real.hits['/jwks.json']).toBeUndefined();
 		const base = hostile((request) =>
 			Response.json({ issuer: new URL(request.url).origin }),
 		);
@@ -77,6 +92,24 @@ describe('what is fetched', () => {
 		);
 	});
 
+	test("a remote issuer's document naming an http jwks_uri is refused", async () => {
+		const naming = (jwks_uri: string) => async () => ({
+			body: { issuer: 'https://idp.example', jwks_uri },
+			cacheControl: null,
+		});
+		for (const uri of ['http://idp.example/jwks', 'http://127.0.0.1/jwks']) {
+			await expect(
+				jwksUri('https://idp.example', 1_000, naming(uri)),
+			).rejects.toThrow('jwks_uri must be an https URL');
+		}
+		const https = await jwksUri(
+			'https://idp.example',
+			1_000,
+			naming('https://idp.example/jwks'),
+		);
+		expect(https.href).toBe('https://idp.example/jwks');
+	});
+
 	test('an all-zero modulus and a trivial exponent are refused', async () => {
 		const server = issuer([key]);
 		servers.push({ stop: () => server.stop() });
@@ -92,6 +125,35 @@ describe('what is fetched', () => {
 				ok: false,
 				reason: 'key',
 			});
+		}
+	});
+
+	test('an Ed25519 key of small order is refused, so a token anyone can forge is not accepted', async () => {
+		const server = issuer([key]);
+		servers.push({ stop: () => server.stop() });
+		const identity = new Uint8Array(32);
+		identity[0] = 1;
+		expect(base64url(identity)).toBe(
+			'AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+		);
+		server.keys = [
+			{ kty: 'OKP', crv: 'Ed25519', kid: 'identity', x: base64url(identity) },
+			{
+				kty: 'OKP',
+				crv: 'Ed25519',
+				kid: 'zero',
+				x: base64url(new Uint8Array(32)),
+			},
+		];
+		const jwt = createJwt({ jwks: server.jwksUrl, refetchMs: 0 });
+		// R = the identity, S = 0: valid under the identity key for any message.
+		const signature = new Uint8Array(64);
+		signature[0] = 1;
+		for (const kid of ['identity', 'zero']) {
+			const part = (value: unknown) =>
+				base64url(new TextEncoder().encode(JSON.stringify(value)));
+			const forged = `${part({ alg: 'EdDSA', kid })}.${part({ sub: 'eve' })}.${base64url(signature)}`;
+			expect(await jwt.verify(forged)).toEqual({ ok: false, reason: 'key' });
 		}
 	});
 
