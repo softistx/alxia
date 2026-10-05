@@ -11,7 +11,8 @@ bun add @alxia/proxy @alxia/core
 bun add -d typescript
 ```
 
-`@alxia/core` and `typescript` are required peers.
+`@alxia/core` and `typescript` are required peers. `proxy.ws` needs
+`@alxia/core` 0.8 or later, whose socket routes run an `upgrade` handler.
 
 ## Usage
 
@@ -49,6 +50,12 @@ import { proxy } from '@alxia/proxy';
 
 const app = alxia().ws('/live/*', proxy.ws('ws://chat.internal:8080', { rewrite: '/live' }));
 ```
+
+The upstream socket is opened first, offered the client's subprotocols, and
+the client's `101` names the one it chose. An upstream that cannot be
+reached answers the upgrade with a 502, or a 504 past `timeout`, in the
+app's error format: no socket opens. Frames pass as they came, and a close
+on one side closes the other with its code.
 
 ## Change the headers
 
@@ -96,7 +103,7 @@ app whose context does not give it.
 | `trustForwarded` | `false` | keep the incoming `X-Forwarded-Proto` and `-Host` |
 | `forwarded` | `false` | add an RFC 7239 `Forwarded` element |
 | `headers` | none | `{ request?, response? }`: a record, or a function `(headers, ctx) => void` |
-| `timeout` | `30_000` | milliseconds of silence allowed until the upstream's response headers, counted again from each body chunk sent; past it, a 504 |
+| `timeout` | `30_000` | milliseconds of silence allowed until the upstream's response headers, counted again from each body chunk sent; past it, a 504. For `proxy.ws`, the milliseconds the upstream socket has to open |
 | `bodyLimit` | none | bytes of request body; past it, a 413 |
 
 ## API
@@ -105,8 +112,8 @@ app whose context does not give it.
 | --- | --- |
 | `proxy(target, options?)` | the middleware: forwards what it runs on to `target`; given to `use(path?, …)` or a route |
 | `proxy.mount(prefix, target, options?)` | a plugin forwarding everything under `prefix`, rebased |
-| `proxy.ws(target, options?)` | the handlers of a `ws()` route relayed to an upstream socket |
-| `BAD_GATEWAY_CLOSE` | `1014`, the close code a client gets when the upstream socket cannot be reached |
+| `proxy.ws(target, options?)` | the handlers of a `ws()` route relayed to an upstream socket, opened before the client's `101` |
+| `BAD_GATEWAY_CLOSE` | deprecated: `1014`, the close code an unreachable upstream socket used to get; it is now a 502 over HTTP |
 | `ProxyOptions<Ctx>`, `SocketProxyOptions<Ctx>` | the options, and those of `proxy.ws` |
 | `ProxyHeaders<Ctx>`, `HeaderEdit<Ctx>`, `HeaderValue<Ctx>`, `ProxyContext<Ctx>` | the `headers` option, and what its callbacks read |
 | `ProxyMiddleware<Ctx>`, `ProxyMount<Prefix, Ctx>`, `SocketProxy<Ctx>` | what the three functions return |

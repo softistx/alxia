@@ -1,80 +1,17 @@
 import { describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
-import { serve, until, upstream } from '../test/upstream';
-import { BAD_GATEWAY_CLOSE, proxy } from './index';
-
-interface Upgraded {
-	readonly path: string;
-	readonly headers: Record<string, string>;
-}
-
-/**
- * An upstream WebSocket server: it echoes each frame with its kind, says
- * `bye` by closing with 4001, and records the close the proxy sent it.
- */
-function socketUpstream() {
-	const state = {
-		upgraded: [] as Upgraded[],
-		closed: [] as [number, string][],
-	};
-	const up = upstream(
-		(request, server) => {
-			const url = new URL(request.url);
-			const upgraded: Upgraded = {
-				path: url.pathname + url.search,
-				headers: Object.fromEntries(request.headers),
-			};
-			state.upgraded.push(upgraded);
-			return server.upgrade(request, { data: upgraded })
-				? (undefined as never)
-				: new Response('upgrade expected', { status: 426 });
-		},
-		{
-			message(ws, message) {
-				if (message === 'bye') ws.close(4001, 'upstream says bye');
-				else if (typeof message === 'string') ws.send(`text:${message}`);
-				else ws.send(new Uint8Array([...new Uint8Array(message), 255]));
-			},
-			close(_ws, code, reason) {
-				state.closed.push([code, reason]);
-			},
-		},
-	);
-	return { up, state };
-}
-
-/** Opens a client socket on `url`, collecting what it receives and how it closes. */
-async function client(url: URL, path: string) {
-	const socket = new WebSocket(new URL(path, url.href.replace('http', 'ws')));
-	socket.binaryType = 'arraybuffer';
-	const received: (string | number[])[] = [];
-	const closed: { code?: number; reason?: string } = {};
-	socket.addEventListener('message', (event) => {
-		received.push(
-			typeof event.data === 'string'
-				? event.data
-				: [...new Uint8Array(event.data)],
-		);
-	});
-	socket.addEventListener('close', (event) => {
-		closed.code = event.code;
-		closed.reason = event.reason;
-	});
-	await new Promise((resolve) => {
-		socket.addEventListener('open', resolve, { once: true });
-		socket.addEventListener('close', resolve, { once: true });
-	});
-	return { socket, received, closed };
-}
+import { client, socketUpstream } from '../test/sockets';
+import { serve, until } from '../test/upstream';
+import { proxy } from './index';
 
 describe('proxy.ws', () => {
-	test('relays text and binary frames both ways, sent before the upstream opened included', async () => {
+	test('relays text and binary frames both ways, sent the moment the client opens included', async () => {
 		const { up, state } = socketUpstream();
 		const url = serve(
 			alxia().ws('/live/*', proxy.ws(up.url, { rewrite: '/live' })),
 		);
 		const { socket, received } = await client(url, '/live/room/1?token=t');
-		socket.send('hello'); // may well arrive before the upstream is open
+		socket.send('hello');
 		socket.send(new Uint8Array([1, 2, 3]));
 		await until(() => received.length === 2);
 		expect(received).toEqual(['text:hello', [1, 2, 3, 255]]);
@@ -114,38 +51,6 @@ describe('proxy.ws', () => {
 		await until(() => state.closed.length === 1 && closed.code !== undefined);
 		expect(closed.code).toBe(1001);
 		expect(state.closed[0]?.[0]).toBe(1001);
-	});
-
-	test('an upstream that cannot be reached closes the client with 1014', async () => {
-		const gone = Bun.serve({ port: 0, fetch: () => new Response() });
-		const target = gone.url;
-		gone.stop(true);
-		const url = serve(alxia().ws('/live', proxy.ws(target)));
-		const { closed } = await client(url, '/live');
-		await until(() => closed.code !== undefined);
-		expect(closed).toEqual({ code: BAD_GATEWAY_CLOSE, reason: 'bad gateway' });
-	});
-
-	test('an upstream that never completes the handshake is closed past timeout, 1014', async () => {
-		const silent = Bun.listen({
-			hostname: '127.0.0.1',
-			port: 0,
-			socket: { data() {} }, // takes the connection, answers nothing
-		});
-		try {
-			const target = `ws://127.0.0.1:${silent.port}`;
-			const url = serve(
-				alxia().ws('/live', proxy.ws(target, { timeout: 100 })),
-			);
-			const { closed } = await client(url, '/live');
-			await until(() => closed.code !== undefined);
-			expect(closed).toEqual({
-				code: BAD_GATEWAY_CLOSE,
-				reason: 'bad gateway',
-			});
-		} finally {
-			silent.stop(true);
-		}
 	});
 
 	test("the route's middlewares run before the upgrade", async () => {
