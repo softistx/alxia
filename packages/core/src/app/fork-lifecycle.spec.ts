@@ -91,17 +91,26 @@ describe('fork(): lifecycle hooks and parsers', () => {
 		);
 	});
 
-	test('a fork of an app that warned of a late use() does not warn again', () => {
+	test("a fork warns of its own late use() once, not of its base's again", () => {
 		const warn = spyOn(console, 'warn').mockImplementation(() => {});
 		try {
 			const late = (_ctx: object, next: () => Promise<Response>) => next();
 			const shared = alxia({ dev: true })
 				.get('/a', ({ reply }) => reply(200, 'a'))
 				.use(late);
-			shared.fork().use(late);
 			expect(warn).toHaveBeenCalledTimes(1);
+			const forked = shared.fork();
+			expect(warn).toHaveBeenCalledTimes(1);
+			forked.use(late).use(late);
+			expect(warn).toHaveBeenCalledTimes(2);
 		} finally {
 			warn.mockRestore();
 		}
+	});
+
+	test("a group's app is not forked: its hooks would be lost", () => {
+		expect(() => alxia().group('/g', (g) => g.fork())).toThrow(
+			"fork(): a group's app shares the app's lifecycle hooks and chain; fork the app the group is declared on",
+		);
 	});
 });

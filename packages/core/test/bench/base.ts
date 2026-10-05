@@ -10,9 +10,11 @@ const ROUNDS = 7;
 const BUILDS = 500;
 const REQUESTS = 50_000;
 
-const base = alxia()
-	.decorate({ db: 'db' })
-	.derive(() => ({ user: 'ada' }));
+const fresh = () =>
+	alxia()
+		.decorate({ db: 'db' })
+		.derive(() => ({ user: 'ada' }));
+const base = fresh();
 
 function build(on: typeof base) {
 	let app = on;
@@ -38,9 +40,7 @@ function time(run: () => void, times: number): number {
 const built: number[] = [];
 const forked: number[] = [];
 for (let round = 0; round < ROUNDS; round++) {
-	built.push(
-		time(() => build(alxia().decorate({ db: 'db' }) as never), BUILDS),
-	);
+	built.push(time(() => build(fresh()), BUILDS));
 	const full = build(base.fork());
 	forked.push(time(() => full.fork(), BUILDS));
 }

@@ -1,10 +1,10 @@
 # Groups and plugins
 
 This page covers splitting an app: route files that read the app's context
-with `defineRoutes`, several apps built on one base with `fork()`, groups that scope middlewares to some routes, `use`
-giving middlewares to the app, an app given to `plugin` bringing its routes
-and typed context, and a function plugin, given to `plugin` too, adding
-lifecycle hooks. What other packages call plugins — a logger, CORS, a bearer
+with `defineRoutes`, several apps built on one base with `fork()`, groups
+that scope middlewares to some routes, `use` giving middlewares to the app,
+an app given to `plugin` bringing its routes and typed context, and a
+function plugin, given to `plugin` too, adding lifecycle hooks. What other packages call plugins — a logger, CORS, a bearer
 check — are middlewares, given to `use`.
 
 ```ts
@@ -128,7 +128,9 @@ test('lists the todos', async () => {
 An app built once needs no fork: `export const app = base.plugin(todos)`
 is the app. A fork copies what the base holds when it is called; what the
 base declares after it does not reach the fork. Forking an app of 50 routes
-takes about as long as declaring them.
+takes about as long as declaring them. The app a group's build is given
+is not forked: it shares the app's lifecycle hooks, so `fork()` there
+throws; fork the app the group is declared on.
 
 Without `Register`, `defineRoutes` starts from `BaseContext` and requires
 nothing, and a file of routes can still export an app of its own, as

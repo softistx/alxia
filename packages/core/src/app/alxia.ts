@@ -130,7 +130,7 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 	 *
 	 * ```ts
 	 * export const app = base.fork().plugin(todos);
-	 * const testApp = base.fork().use(fakeAuth).plugin(todos);
+	 * const testApp = base.fork().use(fakeSession).plugin(todos);
 	 * ```
 	 */
 	fork(): this {

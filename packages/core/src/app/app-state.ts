@@ -22,6 +22,8 @@ export interface AppState {
 	scope: Scope;
 	/** Whether `late-use.ts` warned already: once per app. */
 	warnedLate?: boolean;
+	/** A group's app, inside its build: it shares the app's lifecycle hooks, and is not forked. */
+	grouped?: true;
 }
 
 /** A new app's state; a prefix that does not start with "/", or ends with one, throws. */

@@ -243,7 +243,11 @@ For two variants on one base, build each on a fork of it
 ([Several apps on one base](../../core/docs/guide/groups-and-plugins.md#several-apps-on-one-base-fork)):
 
 ```ts
+import { defineMiddleware } from '@alxia/core';
+import { base } from './context';
+
 export const app = base.fork().plugin((app) => graphql(app, { schema }));
+const fakeViewer = defineMiddleware((_ctx, next) => next({ viewer: { id: 'ada' } }));
 const testApp = base.fork().use(fakeViewer).plugin((app) => graphql(app, { schema }));
 ```
 

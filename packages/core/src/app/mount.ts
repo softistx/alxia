@@ -35,6 +35,7 @@ export function group(
 	if (build === undefined) throw new TypeError('group(): build is missing');
 	const [child, childState] = open(prefix);
 	childState.scope = state.scope.copy();
+	childState.grouped = true;
 	childState.runtime = {
 		...childState.runtime,
 		globals: state.runtime.globals,
