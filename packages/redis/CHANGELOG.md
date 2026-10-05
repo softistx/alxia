@@ -1,5 +1,16 @@
 # @alxia/redis
 
+## 0.4.0
+
+### Minor Changes
+
+- [#153](https://github.com/softistx/alxia/pull/153) [`87c9d67`](https://github.com/softistx/alxia/commit/87c9d6716ef3fe40f15f5965fd3442492abcc972) Thanks [@SteveGT96](https://github.com/SteveGT96)! - A rate limit that reads its policy from the store. `redisStore(handle.limits.api, api)`, given the definition beside the wired limit, declares the definition's `limit` and `per` as its `policy`, so `rateLimit({ store })` needs no `limit` nor `windowMs` and its `RateLimit-*` headers come from the definition; numbers that differ throw at declaration. A definition of another name than the wired limit's is a `TypeError`. (`@nxgt/redis` 0.6 does not expose a bound limit's rate, hence the definition as an argument.) `redisStore(handle.limits.api)` alone is unchanged. Requires `@alxia/rate-limit` 0.4.
+
+### Patch Changes
+
+- Updated dependencies [[`87c9d67`](https://github.com/softistx/alxia/commit/87c9d6716ef3fe40f15f5965fd3442492abcc972)]:
+  - @alxia/rate-limit@0.4.0
+
 ## 0.3.0
 
 ### Minor Changes
