@@ -61,7 +61,7 @@ export function redisStore(limit: BoundRateLimit<string>): RateLimitStore;
  * `limit` and `per` as its `policy`, so `rateLimit({ store })` takes `limit`
  * and `windowMs` from it and the numbers are written once. (`@nxgt/redis`
  * 0.6 does not expose a bound limit's rate, so the definition that wired it
- * is given beside it; one that is not the bound limit's is refused.)
+ * is given beside it; a definition of another name than the bound limit's is refused.)
  *
  * ```ts
  * app.use(rateLimit({ store: redisStore(handle.limits.api, api) }));
