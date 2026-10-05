@@ -73,8 +73,8 @@ function readerOf(trusted: TrustedProxies) {
 /**
  * The `ip` option for an app behind proxies: the client's address from a
  * header the proxies append to, which only the entries they wrote can be
- * believed in. The leftmost entry is what the client wrote, so it is never
- * the one read: `trusted: 1` takes the last entry, the one the single
+ * believed in. What stands left of those, what the client wrote, is never
+ * read: `trusted: 1` takes the last entry, the one the single
  * proxy appended; `trusted: ['10.0.0.0/8']` the first entry from the right
  * that is not in the range. Without the header, from a connection no
  * trusted range holds, with fewer entries than hops, or when the entry

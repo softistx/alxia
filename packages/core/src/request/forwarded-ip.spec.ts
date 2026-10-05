@@ -153,6 +153,15 @@ describe('malformed entries', () => {
 			).toBe('10.0.0.1');
 	});
 
+	test('a zone id is malformed, and never throws, from any peer', () => {
+		const headers = { 'x-forwarded-for': '1.1.1.1, fe80::1%eth0, 203.0.113.9' };
+		expect(read({ trusted: 1 }, headers)).toBe('203.0.113.9');
+		expect(read({ trusted: 2 }, headers)).toBe('10.0.0.1');
+		expect(read({ trusted: ['10.0.0.0/8'] }, headers, '198.51.100.4')).toBe(
+			'198.51.100.4',
+		);
+	});
+
 	test('one left of the chosen is never read', () => {
 		expect(
 			read({ trusted: 1 }, { 'x-forwarded-for': 'junk, 203.0.113.9' }),

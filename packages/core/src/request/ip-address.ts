@@ -43,6 +43,7 @@ export function parseIp(entry: string): ParsedIp | undefined {
 	if (bracket) text = bracket[1] ?? '';
 	else if (/^\d+\.\d+\.\d+\.\d+:\d{1,5}$/.test(text))
 		text = text.slice(0, text.lastIndexOf(':'));
+	if (text.includes('%')) return undefined; // a zone id names an interface, not a client
 	const family = isIP(text);
 	if (family === 4) return { version: 4, value: ipv4(text), text };
 	if (family !== 6) return undefined;
@@ -60,11 +61,14 @@ export function parseCidr(range: string): (address: ParsedIp) => boolean {
 		new Error(`forwardedIp: "${range}" is not an IP address or a CIDR range`);
 	if (network === undefined || extra !== undefined || base.includes(']'))
 		throw bad();
-	const size = network.version === 4 ? 32 : 128;
+	// A range written as an IPv4-mapped IPv6 address counts its prefix in IPv6 bits.
+	const mapped = network.version === 4 && base.includes(':');
+	const size = network.version === 4 && !mapped ? 32 : 128;
+	if (bits !== undefined && !/^\d{1,3}$/.test(bits)) throw bad();
 	const prefix = bits === undefined ? size : Number(bits);
-	if (!Number.isInteger(prefix) || prefix < 0 || prefix > size || bits === '')
-		throw bad();
-	const shift = BigInt(size - prefix);
+	const length = mapped ? prefix - 96 : prefix;
+	if (prefix > size || length < 0) throw bad();
+	const shift = BigInt((mapped ? 32 : size) - length);
 	return (address) =>
 		address.version === network.version &&
 		address.value >> shift === network.value >> shift;
