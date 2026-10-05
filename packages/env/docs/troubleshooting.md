@@ -14,15 +14,23 @@ wording; Valibot and ArkType say the same thing in other words.
 - [`DEBUG: Invalid option: expected one of "true"|"1"|"yes"|"on"|"y"|"enabled"|"false"|"0"|"no"|"off"|"n"|"disabled"`](#debug-invalid-option-expected-one-of-true1yesonyenabledfalse0nooffndisabled)
 - [`(root): Unrecognized keys: "…", "HOME", "PATH", …`](#root-unrecognized-keys--home-path-)
 - [`TypeError: parseEnv(): the schema must validate synchronously`](#typeerror-parseenv-the-schema-must-validate-synchronously)
+- [`TypeError: defineEnv(): the schema of A must validate synchronously`](#typeerror-defineenv-the-schema-of-a-must-validate-synchronously)
+- [`TypeError: envExample(): not an env made by defineEnv()`](#typeerror-envexample-not-an-env-made-by-defineenv)
+- [`alxia-env: src/env.ts ran no defineEnv() call`](#alxia-env-srcenvts-ran-no-defineenv-call)
+- [`alxia-env: src/env.ts failed: Cannot find module …`](#alxia-env-srcenvts-failed-cannot-find-module-)
+- [`usage: alxia-env example [module]`](#usage-alxia-env-example-module)
 - [`ReferenceError: Bun is not defined`](#referenceerror-bun-is-not-defined)
 
 **At runtime**
 
+- [`API_KEY` is printed in a log](#api_key-is-printed-in-a-log)
 - [`DEBUG=false` is read as `true`](#debugfalse-is-read-as-true)
 - [`PORT=` is read as `0`, not as the default](#port-is-read-as-0-not-as-the-default)
 
 **Types**
 
+- [`Type '"NOPE"' is not assignable to type '"DATABASE_URL" | "API_KEY"'.`](#type-nope-is-not-assignable-to-type-database_url--api_key)
+- [`Property 'env' does not exist on type 'MiddlewareContext<Empty>'.`](#property-env-does-not-exist-on-type-middlewarecontextempty)
 - [`Object literal may only specify known properties, and 'PORT' does not exist in type 'StandardSchema<unknown>'.`](#object-literal-may-only-specify-known-properties-and-port-does-not-exist-in-type-standardschemaunknown)
 - [`Argument of type '…' is not assignable to parameter of type 'StandardSchema<unknown>'.`](#argument-of-type--is-not-assignable-to-parameter-of-type-standardschemaunknown)
 - [`Type 'number' is not assignable to type 'string'.`](#type-number-is-not-assignable-to-type-string)
@@ -33,13 +41,14 @@ wording; Valibot and ArkType say the same thing in other words.
 
 ### `EnvError: The environment is invalid:`
 
-**When:** the module that calls `parseEnv` is imported, and the schema
+**When:** the module that calls `defineEnv` or `parseEnv` is imported, and the schema
 refuses at least one variable. The process stops before it listens.
 
 **Why:** that is the package's job: every refused variable is listed below
 the first line, one per line, as `<variable>: <the validator's message>`,
-so one deploy shows everything that is missing. The entries below cover
-the lines you will see most.
+so one deploy shows everything that is missing. With `defineEnv`, a line ends
+with `; expected string (url)` when the schema tells its type. A secret's
+value is never in a line. The entries below cover the lines you will see most.
 
 **Fix:** set or correct each variable listed. To print the list without the
 stack, catch the error and exit:
@@ -162,10 +171,68 @@ export const env = parseEnv(z.object({ DATABASE_URL: z.url() }));
 await checkDatabase(env.DATABASE_URL);
 ```
 
+### `TypeError: defineEnv(): the schema of A must validate synchronously`
+
+**When:** the schema of the variable `A` has an asynchronous refinement or
+transform.
+
+**Why:** the environment is read once, when the module is imported, before
+anything awaits.
+
+**Fix:** keep it synchronous, and check what needs a round trip after
+`defineEnv`, where the app starts.
+
+### `TypeError: envExample(): not an env made by defineEnv()`
+
+**When:** `envExample` is given `parseEnv`'s result, a copy (`{ ...env }`) or
+any other object.
+
+**Why:** the schema is kept beside the `env` `defineEnv` returned, not on a copy of it.
+
+**Fix:** pass `env` itself:
+
+```ts
+envExample(env);
+```
+
+### `alxia-env: src/env.ts ran no defineEnv() call`
+
+**When:** `bunx alxia-env example` imports a module that never calls `defineEnv`,
+for instance one that re-exports an `env` built elsewhere, or the file is not the one
+that declares the shape.
+
+**Why:** the bin collects the `defineEnv` calls the module makes while it loads.
+
+**Fix:** name the module that calls `defineEnv`:
+
+```sh
+bunx alxia-env example src/config/env.ts
+```
+
+### `alxia-env: src/env.ts failed: Cannot find module …`
+
+**When:** the module the bin imports throws, or does not exist: `alxia-env:
+<file> failed:` is followed by the error.
+
+**Why:** the bin imports the module to read its schema. A variable that is
+not set is not the cause: `defineEnv` refuses nothing in the bin, but an
+import that does not resolve, or other code in the module, does throw.
+
+**Fix:** correct the path or the error shown, or pass the module that
+declares the shape.
+
+### `usage: alxia-env example [module]`
+
+**When:** the bin is run with anything but `example [module]`, or with `--help`.
+
+**Why:** `example` is its only command and takes one module.
+
+**Fix:** `bunx alxia-env example [module] > .env.example`.
+
 ### `ReferenceError: Bun is not defined`
 
-**When:** `parseEnv(schema)` runs under a runtime other than Bun, with no
-`source`.
+**When:** `parseEnv(schema)` or `defineEnv(shape)` runs under a runtime other
+than Bun, with no `source`.
 
 **Why:** the default `source` is `Bun.env`.
 
@@ -173,9 +240,26 @@ await checkDatabase(env.DATABASE_URL);
 
 ```ts
 export const env = parseEnv(Env, process.env);
+export const config = defineEnv(shape, { source: process.env });
 ```
 
 ## At runtime
+
+### `API_KEY` is printed in a log
+
+**When:** a secret appears in a log line although it is in `secret`. Nothing is thrown.
+
+**Why:** the redaction is on `env` itself (`toJSON`, `inspect`, `toString`). A
+copy, `{ ...env }`, `Object.entries(env)` or `structuredClone(env)`, or the value
+read out, `env.API_KEY`, is plain data. The name must also be spelled in `secret`:
+a variable not listed is printed.
+
+**Fix:** log `env`, not a copy, and list the variable:
+
+```ts
+const env = defineEnv(shape, { secret: ['API_KEY'] });
+console.log(env); // API_KEY: '***'
+```
 
 ### `DEBUG=false` is read as `true`
 
@@ -212,6 +296,34 @@ export const env = parseEnv(Env, set);
 ```
 
 ## Types
+
+### `Type '"NOPE"' is not assignable to type '"DATABASE_URL" | "API_KEY"'.`
+
+**When:** `secret` names a variable the shape does not declare. The names in the message
+are the shape's.
+
+**Why:** `secret` is typed by the shape, so a typo is caught here and a secret is not left unlisted.
+
+**Fix:** spell it as the shape does:
+
+```ts
+defineEnv({ API_KEY: z.string() }, { secret: ['API_KEY'] });
+```
+
+### `Property 'env' does not exist on type 'MiddlewareContext<Empty>'.`
+
+**When:** a `defineMiddleware(fn)` reads `env`, with `app.decorate({ env })` registered.
+
+**Why:** a middleware may run before `base` adds anything, so it reads `BaseContext` unless
+it names the registered context. `defineRoutes()` routes need nothing.
+
+**Fix:**
+
+```ts
+import { type AppContext, defineMiddleware } from '@alxia/core';
+
+const withPort = defineMiddleware<AppContext>()(({ env }, next) => next({ port: env.PORT }));
+```
 
 ### `Object literal may only specify known properties, and 'PORT' does not exist in type 'StandardSchema<unknown>'.`
 

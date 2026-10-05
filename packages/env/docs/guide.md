@@ -1,8 +1,11 @@
 # Guide
 
-This page covers how `parseEnv` reads the environment, how a schema turns
-its strings into typed values, what it throws when one is wrong, and how to
-test a module that reads it.
+[`defineEnv`](define-env.md) is the form to start from: one schema per
+variable, secrets redacted, a `.env.example` from the schema. This page covers
+`parseEnv`, which checks one object schema over the whole environment, and
+what both share: how the environment is read, how a schema turns its strings
+into typed values, what is thrown when one is wrong, and how to test a module
+that reads it.
 
 ```ts
 import { parseEnv } from '@alxia/env';
@@ -36,6 +39,7 @@ class EnvError extends Error {
 	readonly issues: readonly {
 		readonly path: string;
 		readonly message: string;
+		readonly expected?: string; // defineEnv only, when the schema tells
 	}[];
 }
 ```
@@ -45,7 +49,7 @@ class EnvError extends Error {
 | `schema` | any [Standard Schema](https://standardschema.dev) | — | checks the variables and converts them; its output type is what `parseEnv` returns |
 | `source` | `Record<string, string \| undefined>` | `Bun.env` | the variables to check: pass an object in a test, or `process.env` |
 
-`StandardSchema` and `OutputOf` are not exported: any value with a
+`StandardSchema` and `OutputOf` are exported as types: any value with a
 `~standard` property is accepted, and the result is the schema's output
 type — the type after its defaults and transforms, not its input.
 

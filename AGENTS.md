@@ -15,7 +15,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its middlewares, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js` built for Bun (the `ssr` environment gains the `bun` condition, `bun` and `bun:*` as builtins, `esnext`, all merged with the app's own) and self-contained under `react-router build` (`resolve.noExternal: true`, unless the app set `ssr.external: true`; a list it sets stays external), so `build/` runs with no `node_modules`; the `alxia-react-router reveal` bin writes the default server out | core, react-router; vite (optional, `/vite`) |
 | `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | middlewares given to `use` first, on every response, 404s included; `secureHeaders({ nonce: true })` adds a typed `nonce` | core |
 | `@alxia/rate-limit`, `@alxia/jwt`, `@alxia/logger` | middlewares given to `use`: typed context, typed replies | core |
-| `@alxia/env` | environment variables through any Standard Schema | — |
+| `@alxia/env` | environment variables through any Standard Schema: `defineEnv(shape, { secret, source })`, each variable by its own schema, typed, one `EnvError` listing every issue, secrets printed as `***` (`toJSON`, `inspect`, `toString`), `envExample(env)` and the `alxia-env example` bin writing a `.env.example` (which import the module in a mode where `defineEnv` refuses nothing), and the earlier `parseEnv` | — (dev: core, for the `Register` spec) |
 | `@alxia/cache` | HTTP response caching, a store contract and a memory store | core |
 | `@alxia/language` | the request's language, typed by the supported ones | core |
 | `@alxia/i18n` | translations on `@nxgt/i18n`, the language from `@alxia/language` | core, language, @nxgt/i18n |
@@ -169,7 +169,7 @@ core ◄── openapi, graphql, cors, secure-headers, compress, rate-limit, jwt
          redis ◄── rate-limit, cache (optional peers: the stores' contracts)
          react-router   (peers: react-router; vite, optional, for /vite; dev: openapi, compress for its specs)
 zod             (peer: zod; dev: core for its specs)
-env             (standalone)
+env             (standalone; dev: core for its Register spec)
 create          (no peer; dev: core, openapi, react-router: the versions its projects install;
                  @nxgt/openapi-codegen, the version the api template pins)
 ```
