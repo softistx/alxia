@@ -5,7 +5,9 @@
  */
 import type { BodyParser } from '../request/read';
 import type { AppState } from './app-state';
+import { membersOf } from './compose-middlewares';
 import type { DeriveHook, Globals } from './definition';
+import { uncalledFactory } from './factory';
 import { warnLate } from './late-use';
 import { scopePath } from './scope-path';
 import { builtinOf } from './validate';
@@ -34,7 +36,7 @@ export function useMiddlewares(
 	const [first, ...rest] = args;
 	const scoped = typeof first === 'string';
 	const label = scoped ? `use("${first}")` : 'use()';
-	const middlewares = scoped ? rest : args;
+	const middlewares = membersOf(scoped ? rest : args);
 	if (middlewares.length === 0) {
 		throw new TypeError(`${label}: no middleware is given`);
 	}
@@ -66,6 +68,8 @@ function checkMiddleware(
 			`${at} is not a function: a middleware is (ctx, next) => …`,
 		);
 	}
+	const uncalled = uncalledFactory(middleware, at, 'use');
+	if (uncalled !== undefined) throw new TypeError(uncalled);
 	if (builtinOf(middleware) !== undefined) {
 		throw new TypeError(
 			`${at} is a validate() or responds(), which belongs to a route`,

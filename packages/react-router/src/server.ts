@@ -10,6 +10,7 @@ import {
 	alxia,
 	type ContextOf,
 	type Empty,
+	type ListenInfo,
 	type ListenOptions,
 	type MaybePromise,
 } from '@alxia/core';
@@ -74,7 +75,8 @@ export interface ServerOptions<Before extends AnyAlxia, App extends AnyAlxia> {
 	readonly listen?: ListenOptions;
 	/**
 	 * Called once the built server listens and its `SIGINT` and `SIGTERM` handlers are in place.
-	 * Prints `alxia listening on <url>` by default.
+	 * Prints `alxia listening on <url>` by default, and in dev the route
+	 * table (`alxia({ dev })`). An `onListen` in `listen` wins over it.
 	 */
 	readonly onListen?: (server: Bun.Server<unknown>) => void;
 }
@@ -150,21 +152,27 @@ export function createServer<
 			return app;
 		},
 		start(app) {
-			const server = app.listen({
+			const own = options.listen?.onListen;
+			// `listen` shuts the app down on SIGINT and SIGTERM — readiness 503,
+			// the requests in flight drained, the onStop hooks, then the exit —
+			// with its handlers in place before it tells onListen: a supervisor
+			// may signal as soon as it reads that the server listens.
+			return app.listen({
 				port: Number(process.env['PORT'] || 3000),
 				hostname: process.env['HOST'] || '0.0.0.0',
 				...options.listen,
+				onListen: (info) => {
+					if (own !== undefined) own(info);
+					else if (options.onListen !== undefined) {
+						options.onListen(info.server);
+					} else announce(info);
+				},
 			});
-			// `listen` shuts the app down on SIGINT and SIGTERM — readiness 503,
-			// the requests in flight drained, the onStop hooks, then the exit —
-			// with its handlers in place before it returns, so before onListen:
-			// a supervisor may signal as soon as it reads that the server listens.
-			(options.onListen ?? announce)(server);
-			return server;
 		},
 	};
 }
 
-function announce(server: Bun.Server<unknown>): void {
-	console.log(`alxia listening on ${server.url}`);
+/** In dev, the route table `listen` prints; else one line. */
+function announce({ dev, table, url }: ListenInfo): void {
+	console.log(dev ? table : `alxia listening on ${url}`);
 }

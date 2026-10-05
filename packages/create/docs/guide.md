@@ -102,14 +102,20 @@ export const app = alxia().get("/", ({ reply }) =>
 // Only when this file is the entry: the test imports `app` and listens on
 // no port.
 if (import.meta.main) {
-  const server = app.listen(Number(Bun.env["PORT"] ?? 3000));
-  console.log(`listening on ${server.url}`);
+  // In dev, the URL and the route table; in production, the URL alone.
+  app.listen({
+    port: Number(Bun.env["PORT"] ?? 3000),
+    onListen: ({ dev, table, url }) =>
+      console.log(dev ? table : `listening on ${url}`),
+  });
   process.once("SIGTERM", () => void app.stop().then(() => process.exit(0)));
 }
 ```
 
-`bun dev` runs `bun --hot src/index.ts`; `bun start` runs
-`bun dist/index.js`, what `bun run build` wrote. `import.meta.main` is why
+`bun dev` runs `bun --hot src/index.ts`, which prints the route table
+`@alxia/core` writes in dev; `bun start` runs `bun dist/index.js`, what
+`bun run build` wrote, and the image sets `NODE_ENV=production`, under
+which it prints the URL alone. `import.meta.main` is why
 the spec can import `app` without opening a port, and why the one file is
 both the app and its server. `SIGTERM` stops the app, since as a
 container's process 1 Bun would otherwise ignore it and `docker stop` would
@@ -150,7 +156,7 @@ my-api/
 │   ├── routes/todos.ts        defineRoutes(): one route per operation
 │   ├── app.ts                 the app: the base, then the routes, and its type
 │   ├── app.spec.ts            bun test: the typed client over app.fetch, and matchesSpec
-│   └── server.ts              app.listen(env.PORT), stopped on SIGINT and SIGTERM
+│   └── server.ts              app.listen on env.PORT, stopped on SIGINT and SIGTERM
 ├── package.json
 ├── tsconfig.json
 ├── biome.json                 Biome: lint, format, imports sorted
@@ -619,7 +625,7 @@ my-graphql-api/
 │   ├── app.ts              graphql(app, { schema }) mounted on the base
 │   ├── graphql.d.ts        declares the *.graphql module
 │   ├── app.spec.ts         bun test: POST /graphql through app.request()
-│   └── server.ts           app.listen(env.PORT), stopped on SIGINT and SIGTERM
+│   └── server.ts           app.listen on env.PORT, stopped on SIGINT and SIGTERM
 ├── package.json
 ├── tsconfig.json
 ├── biome.json              Biome; skips dist/ and src/generated/

@@ -3,7 +3,9 @@
  * its options, its middlewares and what ends it — the handler, or a
  * socket's handlers.
  */
+import { membersOf } from './compose-middlewares';
 import type { ChainHook } from './definition';
+import { uncalledFactory } from './factory';
 import type { RouteSchema } from './types';
 import { builtinOf } from './validate';
 
@@ -44,7 +46,7 @@ export function routeArgs<Last>(
 		args[0] !== null && typeof args[0] === 'object'
 			? (args.shift() as Record<string, unknown>)
 			: {};
-	return { config, middlewares: args, last };
+	return { config, middlewares: membersOf(args), last };
 }
 
 /** A route's chain, from its arguments, and the options it declares. */
@@ -77,6 +79,12 @@ function stepOf(middleware: unknown, index: number, label: string): ChainHook {
 			`${label}: middleware ${index + 1} is not a function: a middleware is (ctx, next) => …, or a validate() or responds()`,
 		);
 	}
+	const uncalled = uncalledFactory(
+		middleware,
+		`${label}: middleware ${index + 1}`,
+		'route',
+	);
+	if (uncalled !== undefined) throw new TypeError(uncalled);
 	return (
 		builtinOf(middleware) ?? { kind: 'middleware', run: middleware as never }
 	);

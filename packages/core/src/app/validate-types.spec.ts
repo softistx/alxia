@@ -95,7 +95,6 @@ describe('validate and responds among the options and middlewares', () => {
 		const declare = () => {
 			alxia().get(
 				'/',
-				// @ts-expect-error a route takes at most 8 middlewares
 				{},
 				add,
 				add,
@@ -105,6 +104,7 @@ describe('validate and responds among the options and middlewares', () => {
 				add,
 				add,
 				add,
+				// @ts-expect-error a route takes at most 8 middlewares, said on the ninth
 				add,
 				() => new Response('x'),
 			);

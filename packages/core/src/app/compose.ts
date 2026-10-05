@@ -4,6 +4,7 @@
  */
 import { joinPath } from '../router/paths';
 import { type AppState, mount, register } from './app-state';
+import { uncalledFactory } from './factory';
 import { refuseShadowedPages } from './pages';
 import { mergeGlobals } from './runtime';
 import type { AnyAlxia } from './signatures';
@@ -83,6 +84,8 @@ function pluginApp(
 	isApp: (value: unknown) => value is AnyAlxia,
 ): AnyAlxia {
 	if (isApp(plugin)) return plugin;
+	const uncalled = uncalledFactory(plugin, 'plugin(): argument 1', 'plugin');
+	if (uncalled !== undefined) throw new TypeError(uncalled);
 	if (typeof plugin !== 'function' || builtinOf(plugin) !== undefined) {
 		throw new TypeError(
 			'plugin(): the plugin is neither an app nor a function that returns one; a middleware is given to use()',

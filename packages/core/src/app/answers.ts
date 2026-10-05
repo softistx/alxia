@@ -3,11 +3,14 @@
  * router's 404, 405 and 426 — in the format of the app that serves the
  * request: its `{ error: … }` bodies, or RFC 9457 problems.
  */
+
+import { devFailure } from '../dev/failure';
+import { routingHint } from '../dev/hint';
 import type { InternalErrorBody, RoutingErrorBody } from '../errors/errors';
 import type { HttpError } from '../errors/http-error';
 import { type Problem, problemOf, problemOfError } from '../errors/problems';
 import { Reply, toResponse } from '../reply/reply';
-import { errorFormat } from './served';
+import { errorFormat, servedOf } from './served';
 
 /** What an answer reads of the request: its URL and method, and the serving app's format. */
 export interface Answered {
@@ -47,6 +50,7 @@ export function failed(error: unknown, ctx: Answered): Response {
 		return new Response(null, { status: CLIENT_GONE });
 	}
 	console.error(error);
+	if (servedOf(ctx)?.dev === true) return devFailure(error, ctx);
 	if (errorFormat(ctx) === 'json') {
 		return toResponse(500, internal, new Headers());
 	}
@@ -74,10 +78,12 @@ export function routingReply(
 	const headers: Record<string, string> =
 		allowed === undefined ? {} : { allow: allowed.join(', ') };
 	if (errorFormat(ctx) === 'json') {
-		return new Reply(status, { error: ROUTING[status] }, { headers });
+		const body = withHint(ctx, status, allowed, { error: ROUTING[status] });
+		return new Reply(status, body, { headers });
 	}
 	headers['content-type'] = PROBLEM;
-	return new Reply(status, routingProblem(ctx, status), { headers });
+	const body = withHint(ctx, status, allowed, routingProblem(ctx, status));
+	return new Reply(status, body, { headers });
 }
 
 /** `routingReply` as a response, for a request no chain runs. */
@@ -90,10 +96,23 @@ export function routingError(
 	if (allowed !== undefined) headers.set('allow', allowed.join(', '));
 	if (errorFormat(ctx) === 'json') {
 		const body: RoutingErrorBody = { error: ROUTING[status] };
-		return toResponse(status, body, headers);
+		return toResponse(status, withHint(ctx, status, allowed, body), headers);
 	}
 	headers.set('content-type', PROBLEM);
-	return toResponse(status, routingProblem(ctx, status), headers);
+	const body = withHint(ctx, status, allowed, routingProblem(ctx, status));
+	return toResponse(status, body, headers);
+}
+
+/** `body`, with the router's `hint` in dev; `body` itself outside it, at no cost. */
+function withHint<Body extends object>(
+	ctx: Answered,
+	status: 404 | 405 | 426,
+	allowed: readonly string[] | undefined,
+	body: Body,
+): Body {
+	if (servedOf(ctx)?.dev !== true) return body;
+	const hint = routingHint(ctx, at(ctx).url, status, allowed);
+	return hint === undefined ? body : { ...body, hint };
 }
 
 const ROUTING = {

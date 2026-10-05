@@ -4,8 +4,10 @@
  * readiness runs the dependencies' checks, and answers 503 as soon as the
  * app starts shutting down.
  */
+
 import { Alxia } from '../app/alxia';
 import type { RouteDefinition } from '../app/definition';
+import { markFactory } from '../app/factory';
 import { shutdownSignal } from '../app/served';
 import type { BaseContext, Empty } from '../app/types';
 import type { RoutePath } from '../types/path';
@@ -115,3 +117,5 @@ function marked<Handler extends object>(handler: Handler): Handler {
 	(handler as { [HEALTH]?: true })[HEALTH] = true;
 	return handler;
 }
+
+markFactory(health, 'plugin');

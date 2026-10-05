@@ -46,6 +46,11 @@ export interface FormSlots {
 	readonly excludes: unknown;
 	/** What the call returns. */
 	readonly out: unknown;
+	/**
+	 * What each middleware is joined to, which refuses what the form does
+	 * not take: `use` refuses a `validate` or a `responds` by its mark.
+	 */
+	readonly refuses: unknown;
 }
 
 /** The name of a form. */
@@ -131,8 +136,38 @@ export type Excludes<K extends FormName, App extends AppTypes> = Of<
 	[]
 >['excludes'];
 
-/** Nine arguments more than any form takes: a call this long matches no overload. */
-type TooLong = [never, never, never, never, never, never, never, never, never];
+/** What each middleware of form `K` is joined to: `FormSlots['refuses']`. */
+export type Refuses<K extends FormName, App extends AppTypes> = Of<
+	K,
+	App,
+	unknown,
+	unknown,
+	[]
+>['refuses'];
+
+/** Twenty arguments more than a form takes: a call this long matches no overload. */
+export type TooLong = [
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+	never,
+];
 
 /**
  * `T`, made too long to match when the argument after the head is what

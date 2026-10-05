@@ -6,6 +6,7 @@ import {
 	type Empty,
 	type Middleware,
 	type Mounted,
+	markFactory,
 	type RegisteredBase,
 	type RequestContext,
 	type RequiresOf,
@@ -148,7 +149,7 @@ export function contextStorage<App = RegisteredBase>(
 			'contextStorage is a factory: use(contextStorage()), not use(contextStorage)',
 		);
 	}
-	const middleware = defineMiddleware((ctx, next) => {
+	const middleware = defineMiddleware(function contextStorage(ctx, next) {
 		// A route's context; none for a request no route matches.
 		const routed = ctx.route === undefined ? undefined : ctx;
 		const current = storage.getStore();
@@ -166,3 +167,5 @@ export function contextStorage<App = RegisteredBase>(
 		tryContext: () => tryGetContext(),
 	}) as unknown as ContextStorageMiddleware<App>;
 }
+
+markFactory(contextStorage);

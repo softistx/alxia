@@ -2,6 +2,7 @@
  * The options of an app and of its `listen`, the types its methods are
  * written in, and what a type reads of an app.
  */
+import type { RouteRow } from '../dev/route-table';
 import type { ErrorFormat } from '../errors/problems';
 import type { Alxia } from './alxia';
 import type { BaseContext } from './types';
@@ -24,6 +25,15 @@ export interface AlxiaOptions<Prefix extends string> {
 	 * that serves the request decides: a plugin's own option is not read.
 	 */
 	readonly errors?: ErrorFormat;
+	/**
+	 * Whether the app helps the developer running it: `listen` prints its
+	 * URL and its routes, a 404 or a 405 it answers carries a `hint` naming
+	 * the closest route, and a 500 shows its error — an HTML page to a
+	 * browser, its `stack` in a JSON body. On unless `NODE_ENV` is
+	 * `production` or `test`; `true` or `false` decides. The app that
+	 * serves the request decides, as for `errors`.
+	 */
+	readonly dev?: boolean;
 	/**
 	 * Reads the client's address. By default, the address of the connection;
 	 * behind a proxy you trust, read its header instead.
@@ -54,6 +64,25 @@ export interface ListenOptions {
 	 * by default.
 	 */
 	readonly shutdownTimeout?: number;
+	/**
+	 * Called once the server listens, in every mode, with its URL, its
+	 * routes and the route table as text: what an app that logs its own
+	 * way gives, in place of the table `listen` prints in dev. A throw is
+	 * logged, and the server keeps listening.
+	 */
+	readonly onListen?: (info: ListenInfo) => void;
+}
+
+/** What `onListen` is told once the server listens. */
+export interface ListenInfo {
+	readonly server: Bun.Server<unknown>;
+	readonly url: URL;
+	/** Every route, in the order declared, then the pages. */
+	readonly routes: readonly RouteRow[];
+	/** The route table, as `listen` prints it in dev. */
+	readonly table: string;
+	/** The app's `dev` switch: whether `listen` would have printed the table. */
+	readonly dev: boolean;
 }
 
 /** Any app, whatever it holds. */

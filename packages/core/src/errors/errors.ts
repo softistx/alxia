@@ -65,14 +65,22 @@ export interface ValidationErrorBody {
 	readonly issues: readonly ValidationIssue[];
 }
 
-/** The body of the 500 any route may answer. Nothing of the error leaks. */
+/** The body of the 500 any route may answer. Outside dev, nothing of the error leaks. */
 export interface InternalErrorBody {
 	readonly error: 'internal';
+	/** In dev alone (`alxia({ dev })`): the error's stack, its name and message first. */
+	readonly stack?: string;
 }
 
 /** The body of the 404, 405 and 426 the app answers outside every route. */
 export interface RoutingErrorBody {
 	readonly error: 'not_found' | 'method_not_allowed' | 'upgrade_required';
+	/**
+	 * In dev alone (`alxia({ dev })`): on a 404, the closest route
+	 * declared, `did you mean GET /todos/:id?`; on a 405, the methods the
+	 * path allows.
+	 */
+	readonly hint?: string;
 }
 
 /** The body of the 413 a route with a `bodyLimit` answers to a larger body. */

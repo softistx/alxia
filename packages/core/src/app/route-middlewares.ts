@@ -13,6 +13,7 @@ import type {
 	RouteReads,
 	RouteResult,
 } from './route-forms';
+import type { TooMany } from './too-many';
 
 declare module './forms' {
 	interface Forms<
@@ -58,4 +59,5 @@ export interface RouteForm<
  */
 export interface MiddlewareForms<App extends AppTypes>
 	extends Bare<'route', App>,
-		Ladder<'route', App> {}
+		Ladder<'route', App>,
+		TooMany<'route', App> {}

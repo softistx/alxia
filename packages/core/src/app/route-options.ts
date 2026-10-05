@@ -14,6 +14,7 @@ import type {
 	RouteReads,
 	RouteResult,
 } from './route-forms';
+import type { TooMany } from './too-many';
 import type { FunctionLike } from './types';
 
 declare module './forms' {
@@ -61,4 +62,5 @@ export interface RouteOptionsForm<
  */
 export interface OptionsForms<App extends AppTypes>
 	extends Bare<'routeOptions', App>,
-		Ladder<'routeOptions', App> {}
+		Ladder<'routeOptions', App>,
+		TooMany<'routeOptions', App> {}

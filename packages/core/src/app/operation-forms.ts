@@ -19,6 +19,7 @@ import type {
 	RouteResult,
 } from './route-forms';
 import type { CheckedOperation, RouteOperation } from './route-operation';
+import type { TooMany } from './too-many';
 import type { ThreadContext } from './types';
 
 /** The context the implicit `validate` reads: the middlewares'. */
@@ -90,4 +91,5 @@ export interface OperationForm<
  */
 export interface OperationForms<App extends AppTypes>
 	extends Bare<'operation', App>,
-		Ladder<'operation', App> {}
+		Ladder<'operation', App>,
+		TooMany<'operation', App> {}

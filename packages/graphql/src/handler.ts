@@ -58,10 +58,11 @@ export function graphqlHandler<UserCtx extends YogaContext>(
 	yogaAt: (endpoint: string) => YogaServerInstance<YogaContext, UserCtx>,
 	sandbox: SandboxOptions | false,
 ) {
-	// A handler's context: its route is the one it was declared at.
-	return async (
+	// A handler's context: its route is the one it was declared at. Named
+	// `graphql`, the name the route table `listen` prints in dev shows.
+	return async function graphql(
 		ctx: Record<string, unknown> & BaseContext & { readonly route: string },
-	) => {
+	) {
 		const {
 			params: _params,
 			query: _query,

@@ -2,6 +2,7 @@
 // inferred: a declaration build must name each one through `@alxia/core`.
 import {
 	alxia,
+	compose,
 	defineMiddleware,
 	type Empty,
 	responds,
@@ -106,4 +107,16 @@ export function plugged() {
 			reply(200, body),
 		)
 		.get('/tenant', ({ tenant, reply }) => reply(200, tenant));
+}
+
+// `compose` made once and exported names `Composed`; an app that took it
+// through `use` names what its members add.
+export const guarded = compose(authed, owner, timed);
+
+export function composed() {
+	return alxia()
+		.use(guarded)
+		.get('/owner', ({ user, owner: o, reply }) =>
+			reply(200, { user, owner: o }),
+		);
 }

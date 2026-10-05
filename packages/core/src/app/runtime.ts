@@ -3,10 +3,11 @@
  * the lifecycle hooks and parsers of the plugins it uses.
  */
 
+import { devOf } from '../dev/mode';
 import type { ErrorFormat } from '../errors/problems';
 import { joinPath } from '../router/paths';
 import { Router } from '../router/router';
-import type { Globals, Runtime } from './definition';
+import type { Definition, Globals, Runtime } from './definition';
 import { addPage } from './pages';
 import type { AlxiaOptions } from './signatures';
 
@@ -18,12 +19,25 @@ export function createRuntime(
 	options: AlxiaOptions<string>,
 	unmatched: Runtime['unmatched'],
 ): Runtime {
+	const router = new Router<Definition>();
+	const dev = devOf(options.dev);
+	const globals: Globals = {
+		onStart: [],
+		onStop: [],
+		parsers: [],
+		pages: new Map(),
+	};
 	return {
-		router: new Router(),
+		router,
 		unmatched,
-		globals: { onStart: [], onStop: [], parsers: [], pages: new Map() },
+		globals,
 		validateResponses: options.validateResponses ?? true,
-		served: { errors: errorFormatOf(options), closing: new AbortController() },
+		served: {
+			errors: errorFormatOf(options),
+			closing: new AbortController(),
+			dev,
+			...(dev ? { declared: () => declaredOf(router, globals) } : {}),
+		},
 		sockets: new Set(),
 		ip:
 			options.ip ??
@@ -58,4 +72,17 @@ function errorFormatOf(options: AlxiaOptions<string>): ErrorFormat {
 		);
 	}
 	return errors;
+}
+
+/** Every method and path the app declares, its pages as `GET`s: what a 404's hint is chosen among. */
+function* declaredOf(
+	router: Router<Definition>,
+	globals: Globals,
+): Generator<readonly [method: string, path: string]> {
+	for (const [path, methods] of router.paths()) {
+		for (const method of methods.keys()) {
+			if (method !== 'WS') yield [method, path];
+		}
+	}
+	for (const path of globals.pages.keys()) yield ['GET', path];
 }

@@ -15,5 +15,9 @@ for (const signal of ["SIGINT", "SIGTERM"] as const) {
   });
 }
 
-const server = app.listen(env.PORT);
-console.log(`listening on ${server.url}`);
+// In dev, the URL and the route table; in production, the URL alone.
+app.listen({
+  port: env.PORT,
+  onListen: ({ dev, table, url }) =>
+    console.log(dev ? table : `listening on ${url}`),
+});

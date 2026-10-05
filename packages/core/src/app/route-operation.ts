@@ -1,4 +1,5 @@
 import type { JoinPath, PathAt, RoutePath } from '../types/path';
+import { membersOf } from './compose-middlewares';
 import type { OperationForms } from './operation-forms';
 import type { RouteApp } from './route-method';
 import type { Empty, Method, RouteSchema, ValidSchema } from './types';
@@ -87,7 +88,7 @@ export function operationArgs(
 			([, part]) => part !== undefined,
 		),
 	);
-	const middlewares = rest.slice(0, -1);
+	const middlewares = membersOf(rest.slice(0, -1));
 	const steps = middlewares.map(builtinOf);
 	// The operation's validate placed among them: one that validates each of
 	// its parts with the very schema the operation names for it.

@@ -173,9 +173,13 @@ export class Call {
 		if (this.#parked !== undefined) return this.#parked.value;
 		if (result instanceof Reply || result instanceof Response) return result;
 		const name = this.#hook.name ? ` (${this.#hook.name})` : '';
+		const factory =
+			typeof result === 'function'
+				? `: it looks like a factory given uncalled, call it, use(${this.#hook.name || 'factory'}())`
+				: ': return next(), a reply or a Response';
 		throw failure(
 			this.#definition,
-			`a middleware${name} returned ${result === undefined ? 'nothing' : typeof result}: return next(), a reply or a Response`,
+			`a middleware${name} returned ${result === undefined ? 'nothing' : typeof result}${factory}`,
 		);
 	}
 }

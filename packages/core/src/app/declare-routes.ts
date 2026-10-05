@@ -3,6 +3,7 @@
  * receives them: a route, a route declared as data, a directory, a file, a
  * page and a socket route.
  */
+import { markKind } from '../dev/kinds';
 import { joinPath } from '../router/paths';
 import { fileHandler, staticHandler } from '../static/serve';
 import type { FileOptions, FileSource, StaticOptions } from '../static/types';
@@ -63,7 +64,12 @@ export function addStatic(
 	options: StaticOptions = {},
 ): void {
 	const route = path === '/' ? '/*' : `${path}/*`;
-	addRoute(state, 'GET', route, staticHandler(source, options));
+	addRoute(
+		state,
+		'GET',
+		route,
+		markKind(staticHandler(source, options), 'static'),
+	);
 }
 
 /** `app.file(path, file, options?)`: a `GET` route at `path`. */
@@ -73,7 +79,7 @@ export function addFile(
 	file: Parameters<typeof fileHandler>[0],
 	options: FileOptions = {},
 ): void {
-	addRoute(state, 'GET', path, fileHandler(file, options));
+	addRoute(state, 'GET', path, markKind(fileHandler(file, options), 'file'));
 }
 
 /** `app.page(path, bundle)`: a page at its full path. */

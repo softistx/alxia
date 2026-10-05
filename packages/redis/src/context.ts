@@ -1,4 +1,4 @@
-import { alxia } from '@alxia/core';
+import { alxia, markFactory } from '@alxia/core';
 import {
 	type BoundCache,
 	bindCache,
@@ -150,3 +150,5 @@ export function redis(
 		? fromHandle(target, options)
 		: fromClient(target, options);
 }
+
+markFactory(redis, 'plugin');

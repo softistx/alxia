@@ -4,6 +4,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
+	markFactory,
 	settle,
 	vary,
 	withHeaders,
@@ -47,9 +48,9 @@ export function compress(options: CompressOptions = {}): CompressMiddleware {
 		threshold: options.threshold ?? 1024,
 		compressible: options.compressible ?? ((type) => COMPRESSIBLE.test(type)),
 	};
-	return defineMiddleware(async (ctx, next) =>
-		compressed(await settle(ctx, next()), ctx.request, settings),
-	);
+	return defineMiddleware(async function compress(ctx, next) {
+		return compressed(await settle(ctx, next()), ctx.request, settings);
+	});
 }
 
 interface Settings {
@@ -147,3 +148,5 @@ export function negotiate(
 	}
 	return best;
 }
+
+markFactory(compress);
