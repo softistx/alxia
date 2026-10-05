@@ -19,7 +19,6 @@ number on it. Every release, with each change it made, is in
   exits without waiting for it; `health()` probes mount beside the
   endpoint, and GraphQL errors stay in `errors[]` under core's problem
   details ([endpoint guide](guide/endpoint.md#errors-health-and-shutdown)).
-
 - **GraphQL over WebSocket.** `ws: true` serves the endpoint over
   WebSocket too, with the `graphql-transport-ws` protocol of `graphql-ws`
   — Apollo Client's and urql's default — beside server-sent events: the

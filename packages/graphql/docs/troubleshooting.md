@@ -353,7 +353,7 @@ with this code and reason.
 
 **Why:** the client offered no subprotocol, or only one the endpoint does
 not serve. `ws` serves `graphql-transport-ws`, the protocol of
-`graphql-ws` 5 and later; the legacy `subscriptions-transport-ws` client
+`graphql-ws`; the legacy `subscriptions-transport-ws` client
 offers `graphql-ws`, its own, older protocol, and a bare `new WebSocket(url)`
 offers none.
 

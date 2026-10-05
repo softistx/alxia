@@ -51,7 +51,7 @@ routes on `base` and returns it.
 | --- | --- | --- | --- |
 | `schema` | `GraphQLSchemaWithContext<SchemaCtx>` | — | The schema, from Yoga's `createSchema` or any tool that types its context. Its context is checked against the app's: see [The typed context](context.md). |
 | `path` | `` `/${string}` `` | `'/graphql'` | Where the endpoint is, under the app's prefix. |
-| `ide` | `'graphiql' \| 'apollo-sandbox' \| false` | `'graphiql'` | What a browser gets at the endpoint: see [GraphiQL and Apollo Sandbox](ide.md). |
+| `ide` | `'graphiql' \| 'apollo-sandbox' \| false` | GraphiQL in dev (`isDev`), none otherwise | What a browser gets at the endpoint: see [GraphiQL and Apollo Sandbox](ide.md). |
 | `graphiql` | Yoga's `GraphiQLOptions` | Yoga's | GraphiQL's options, when `ide` is `'graphiql'`. |
 | `sandbox` | `SandboxOptions` | — | Apollo Sandbox's options, when `ide` is `'apollo-sandbox'`. |
 | `ws` | `boolean \| { path?, keepAlive? }` | `false` | GraphQL over WebSocket too, with the optional peer `graphql-ws`: see [GraphQL over WebSocket](websockets.md). |

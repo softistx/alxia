@@ -83,8 +83,20 @@ const viewer = defineMiddleware(({ url, reply }, next) => {
 const base = alxia().use(viewer);
 
 const schema = createSchema<GraphQLContext<typeof base>>({
-	typeDefs: /* GraphQL */ 'type Query { me: String! }',
-	resolvers: { Query: { me: (_, __, { viewer }) => viewer } }, // over HTTP and over the socket
+	typeDefs: /* GraphQL */ `
+		type Query { me: String! }
+		type Subscription { countdown(from: Int!): Int! }
+	`,
+	resolvers: {
+		Query: { me: (_, __, { viewer }) => viewer }, // over HTTP and over the socket
+		Subscription: {
+			countdown: {
+				async *subscribe(_, { from }: { from: number }) {
+					for (let n = from; n >= 0; n--) yield { countdown: n };
+				},
+			},
+		},
+	},
 });
 
 export const app = base.plugin((app) => graphql(app, { schema, ws: true }));
@@ -209,7 +221,8 @@ subscriptionsProtocol: 'WS' }`.
 ## Testing it
 
 A socket needs a server: `listen({ port: 0 })`, then `graphql-ws`'s client
-with Bun's `WebSocket`.
+with Bun's `WebSocket`. Here `app` is the guarded one
+[above](#the-upgrade-runs-the-apps-middlewares), its token in the URL.
 
 ```ts no-check
 import { afterAll, expect, test } from 'bun:test';

@@ -12,6 +12,7 @@ bun add -d typescript
 ```
 
 `graphql-yoga` and `graphql` are peers: the package declares no dependency.
+`graphql-ws` is an optional one, for [`ws`](#websocket) alone.
 `graphql` 16 and 17 both work; with 17, `graphql-yoga` must be 5.22 or
 later, the first to accept it.
 
@@ -109,11 +110,7 @@ graphql(app, {
 `graphql-transport-ws` protocol of [`graphql-ws`](https://the-guild.dev/graphql/ws),
 the default of Apollo Client's `GraphQLWsLink` and urql's
 `subscriptionExchange`. `graphql-ws` is an optional peer; server-sent
-events stay served at the same path.
-
-```sh
-bun add graphql-ws
-```
+events stay served at the same path. Install it with `bun add graphql-ws`.
 
 ```ts
 const app = base.plugin((app) => graphql(app, { schema, ws: true })); // ws://…/graphql too

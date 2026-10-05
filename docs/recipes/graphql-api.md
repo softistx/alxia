@@ -367,10 +367,19 @@ bun add graphql-ws
 graphql(app, { schema, ws: true }); // ws://localhost:3000/graphql too
 ```
 
-The upgrade runs the base's middlewares, so `viewer` is read on it: a
-browser cannot set `authorization` on a socket, so send the token as a
-cookie or in the URL, and read it there. The client's `connectionParams`
-are in each resolver's context, and a shutdown closes the sockets with
+The upgrade runs the base's middlewares, so `viewer` is read on it. A
+browser cannot set `authorization` on a socket: have `viewerOf` read the
+token from the URL too —
+
+```ts no-check
+const token =
+	request.headers.get('authorization')?.match(/^Bearer (.+)$/i)?.[1] ??
+	new URL(request.url).searchParams.get('token') ?? undefined;
+```
+
+— or from a cookie. The client's `connectionParams` arrive after the
+upgrade, in the first message, so the base's middlewares never see them;
+they are in each resolver's context. A shutdown closes the sockets with
 `1001`. The client side, Apollo's and urql's, is in
 [GraphQL over WebSocket](../../packages/graphql/docs/guide/websockets.md#clients).
 
