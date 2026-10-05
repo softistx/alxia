@@ -137,8 +137,8 @@ This package holds only the part core should not know:
 - `implemented(app, operations)` throws, listing each operation of the spec
   that has no route on `app`, keyed by method and path. A test or startup
   calls it, as openapi-hono's `assertComplete()` does.
-- `matchesSpec(app, operations)` (named `exactly` until 0.2.0, kept as a
-  deprecated alias) throws the same way, and also lists each route
+- `matchesSpec(app, operations)` (named `exactly` until 0.2.0; the alias
+  was removed in 0.5) throws the same way, and also lists each route
   of `app` that the spec does not declare.
 
 It reads `app.routes` and nothing else. It is about 60 lines, plus its

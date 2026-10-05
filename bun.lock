@@ -229,20 +229,6 @@
         "typescript": "^6.0.3 || ^7.0.0",
       },
     },
-    "packages/openapi-routes": {
-      "name": "@alxia/openapi-routes",
-      "version": "0.3.0",
-      "devDependencies": {
-        "@alxia/core": "workspace:^",
-        "@alxia/openapi": "workspace:^",
-        "@types/bun": "^1.4.2",
-      },
-      "peerDependencies": {
-        "@alxia/core": "workspace:^",
-        "@alxia/openapi": "workspace:^",
-        "typescript": "^6.0.3 || ^7.0.0",
-      },
-    },
     "packages/rate-limit": {
       "name": "@alxia/rate-limit",
       "version": "0.2.0",
@@ -385,8 +371,6 @@
     "@alxia/logger": ["@alxia/logger@workspace:packages/logger"],
 
     "@alxia/openapi": ["@alxia/openapi@workspace:packages/openapi"],
-
-    "@alxia/openapi-routes": ["@alxia/openapi-routes@workspace:packages/openapi-routes"],
 
     "@alxia/rate-limit": ["@alxia/rate-limit@workspace:packages/rate-limit"],
 

@@ -59,9 +59,6 @@ export type SecureHeaders = Middleware<Empty, Promise<Response>> &
 export type NonceMiddleware = Middleware<Empty, Promise<Next<NonceContext>>> &
 	MiddlewareMark;
 
-/** @deprecated Renamed `NonceMiddleware`: it is a middleware. */
-export type NoncePlugin = NonceMiddleware;
-
 const DEFAULTS = {
 	'content-security-policy':
 		"default-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'",

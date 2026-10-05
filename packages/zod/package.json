@@ -1,7 +1,7 @@
 {
 	"name": "@alxia/zod",
 	"version": "0.1.1",
-	"description": "Zod 4 for alxia: query and path coercions typed by what a client sends, and a Zod schema as JSON Schema 2020-12, a Date as it crosses the wire",
+	"description": "Zod 4 for alxia: query and path coercions typed by what a client sends",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",

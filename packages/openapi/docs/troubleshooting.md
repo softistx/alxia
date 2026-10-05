@@ -4,8 +4,6 @@ Each entry is headed by the text you see: a `TypeError` one of the checks
 threw, a line `nxgt-openapi generate` printed, or an error from `tsc`. The counts, methods and paths in a message
 are the app's own, written `…` below. A check that passes when you expected
 it to fail prints nothing; those are under [Traps](#traps), by symptom.
-A message that starts `exactly():` comes from `exactly`, the deprecated
-name of `matchesSpec`: read the same entry.
 
 **Thrown**
 
@@ -38,7 +36,7 @@ name of `matchesSpec`: read the same entry.
 ### `TypeError: implemented(): … operations have no route: …`
 
 Also as `1 operation has no route: …`, and as the first half of a
-`matchesSpec()` message, or an `exactly()` one from the deprecated `exactly`.
+`matchesSpec()` message.
 
 ```text
 TypeError: implemented(): 2 operations have no route: GET /pets/:petId (getPet), QUERY /employees (searchEmployees)
@@ -73,7 +71,7 @@ operation is listed, see
 ### `TypeError: matchesSpec(): … routes have no operation: …`
 
 Also as `1 route has no operation: …`, after a `;` when operations are
-missing too, and as `exactly(): …` from the deprecated `exactly`:
+missing too:
 
 ```text
 TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
@@ -101,7 +99,7 @@ the check you want.
 
 ### `TypeError: implemented(): the prefix "…" must start with "/" and not end with one`
 
-Also as `matchesSpec(): the prefix "…" …`, and `exactly(): the prefix "…" …` from the deprecated `exactly`.
+Also as `matchesSpec(): the prefix "…" …`.
 
 ```text
 TypeError: implemented(): the prefix "/api/" must start with "/" and not end with one
@@ -120,7 +118,7 @@ reported missing.
 
 ### `TypeError: implemented(): "…": ":…" is not a parameter name`
 
-Also as `matchesSpec(): …` and `exactly(): …`, and with any other
+Also as `matchesSpec(): …`, and with any other
 message the core throws for a route path:
 `The route path "…" must start with "/"`, `"…": "*" may only end a path`,
 `"…" declares ":…" twice`, `"…": ":" may only start a segment, as a

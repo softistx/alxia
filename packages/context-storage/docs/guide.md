@@ -37,7 +37,6 @@ context of the request that called it, and never another's.
 function contextStorage<App = RegisteredBase>(...uncalled: readonly never[]): ContextStorageMiddleware<App>;
 
 // A middleware: it requires `App`'s context of the app that mounts it.
-// `ContextStoragePlugin<App>`, its name in 0.3, is a deprecated alias.
 type ContextStorageMiddleware<App> = Middleware<
 	RequiresOf<StoredContext<App>, 'context'>,
 	Promise<Response>

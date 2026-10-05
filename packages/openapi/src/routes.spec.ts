@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { alxia, eventStream } from '@alxia/core';
 import { z } from 'zod';
-import { exactly, implemented, matchesSpec, type Operations } from './routes';
+import { implemented, matchesSpec, type Operations } from './routes';
 
 // alxia.ts as `@nxgt/openapi-codegen` writes it with `alxia: true`.
 const zPet = z.object({ id: z.number(), name: z.string() });
@@ -255,17 +255,5 @@ describe('the operations it takes', () => {
 			matchesSpec(alxia(), operations, { exclude: (route: string) => route });
 		};
 		expect(_refused).toBeFunction();
-	});
-});
-
-describe('exactly', () => {
-	test('is matchesSpec under its old name, with its own messages', () => {
-		const app = alxia().get('/health', ({ reply }) => reply.ok('ok'));
-		expect(() => exactly(app, [])).toThrow(
-			new TypeError('exactly(): 1 route has no operation: GET /health'),
-		);
-		expect(() => exactly(app, { getPet }, { prefix: '/api/' })).toThrow(
-			'exactly(): the prefix "/api/" must start with "/" and not end with one',
-		);
 	});
 });

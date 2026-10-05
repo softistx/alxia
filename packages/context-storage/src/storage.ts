@@ -108,9 +108,6 @@ export type ContextStorageMiddleware<App> = Middleware<
 		tryContext(): StoredContext<App> | undefined;
 	};
 
-/** @deprecated Renamed `ContextStorageMiddleware`: it is a middleware. */
-export type ContextStoragePlugin<App> = ContextStorageMiddleware<App>;
-
 /** What `context()` reads: the context of `App`, or the base context when `App` is no app. */
 export type StoredContext<App> = [ContextOf<App>] extends [never]
 	? BaseContext

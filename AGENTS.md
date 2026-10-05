@@ -9,9 +9,8 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | package | what it is | peers |
 | --- | --- | --- |
 | `@alxia/core` | the framework: routes and their middlewares (`defineMiddleware`, `validate`, `responds`, `use(...middlewares)` for the routes after it and every request no route matches, `settle`, `refusalOf`), the deprecated request hooks, groups, plugins (`plugin(…)`), cookies, SSE, WebSockets; `Register`, which an app augments with `context: typeof base`, the chain that builds its context, read by `AppContext` and `defineRoutes(prefix?)`, a plugin built on that context that requires it of the app mounting it | — |
-| `@alxia/openapi` | OpenAPI spec first: `implemented` and `matchesSpec`, every operation `@nxgt/openapi-codegen`'s `alxia` option generates from the document has a route, read from `app.routes`, and no other. Formerly `@alxia/openapi-routes`, renamed at 0.4.0, after the 0.3.0 of the package that held the name and wrote a document from an app's schemas, retired. A client generator from the document is on its roadmap | core |
-| `@alxia/openapi-routes` | deprecated: a last release re-exporting `@alxia/openapi`, each export `@deprecated`; no docs/ | core, openapi |
-| `@alxia/zod` | Zod coercions (`zq`) and `zodConverter`, a Zod schema as JSON Schema 2020-12 | zod |
+| `@alxia/openapi` | OpenAPI spec first: `implemented` and `matchesSpec`, every operation `@nxgt/openapi-codegen`'s `alxia` option generates from the document has a route, read from `app.routes`, and no other. Formerly `@alxia/openapi-routes`, renamed at 0.4.0, after the 0.3.0 of the package that held the name and wrote a document from an app's schemas, retired; the old name was removed from the repository at 0.5. A client generator from the document is on its roadmap | core |
+| `@alxia/zod` | Zod coercions (`zq`) | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's middlewares and typed context, Yoga's plugins | core, graphql-yoga, graphql |
 | `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its middlewares, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js` built for Bun (the `ssr` environment gains the `bun` condition, `bun` and `bun:*` as builtins, `esnext`, all merged with the app's own) and self-contained under `react-router build` (`resolve.noExternal: true`, unless the app set `ssr.external: true`; a list it sets stays external), so `build/` runs with no `node_modules`; the `alxia-react-router reveal` bin writes the default server out | core, react-router; vite (optional, `/vite`) |
 | `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | middlewares given to `use` first, on every response, 404s included; `secureHeaders({ nonce: true })` adds a typed `nonce` | core |
@@ -165,7 +164,6 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
 ```
 core ◄── openapi, graphql, cors, secure-headers, compress, rate-limit, jwt, logger,
          telemetry, janus, context-storage, cache, language
-         openapi ◄── openapi-routes   (deprecated: a re-export)
          i18n ◄── language
          janus   (dev: i18n, language, @nxgt/i18n for its specs)
          redis ◄── rate-limit, cache (optional peers: the stores' contracts)

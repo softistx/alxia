@@ -12,9 +12,10 @@ number on it. Every release, with each change it made, is in
   `@alxia/core`'s `app.route(operation, ...middlewares, handler)` binds
   them, and `implemented` and `matchesSpec` check the app against them.
   The package that was `@alxia/openapi-routes` now carries this name;
-  `@alxia/openapi-routes` stays a while as a deprecated re-export. Same
-  `implemented`, `matchesSpec` and `exactly`, options and messages: change
-  the import. The docs cover the whole workflow, from the document to the
+  `@alxia/openapi-routes`, its deprecated re-export, was removed in 0.5,
+  with `exactly` and `ExactlyOptions`, the deprecated aliases of
+  `matchesSpec` and `MatchesSpecOptions`. Same `implemented` and
+  `matchesSpec`, options and messages: change the import. The docs cover the whole workflow, from the document to the
   generated operations, routes with middlewares, the check and a client.
   Ships as 0.4.0.
 
@@ -55,7 +56,7 @@ retired. The releases below are this package's, under its former name,
 ### `@alxia/openapi-routes` 0.2.0
 
 - **One name for the check both ways.** `matchesSpec(app, operations)`,
-  the new name of `exactly`, which stays as a deprecated alias.
+  the new name of `exactly`, which stayed as a deprecated alias until 0.5.
 
 ### `@alxia/openapi-routes` 0.1.0
 
