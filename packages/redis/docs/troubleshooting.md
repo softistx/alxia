@@ -2,9 +2,10 @@
 
 Each entry is headed by the text you see: a TypeScript error, an exception
 at startup, an exception in the log beside a `500 {"error":"internal"}`, or
-the response a client got. `@alxia/redis` throws nothing of its own: the
+the response a client got. `@alxia/redis` throws almost nothing of its own: the
 messages are `@nxgt/redis`'s and Bun's, and it lets
-each through. It prints one warning of its own, under
+each through; its own refusals, a handle of several instances, a wired guard given a
+`name`, `ttl` or `lease`, or a client given without a `name`, say what to pass instead. It prints one warning of its own, under
 [Runtime: a warning in the log](#runtime-a-warning-in-the-log). What prints nothing is under [Traps](#traps), by symptom.
 
 **Install and types**
