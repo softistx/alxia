@@ -8,7 +8,7 @@ a realistic example for each.
 
 | Page | Read it when |
 | --- | --- |
-| [Connecting](guide/connecting.md) | opening the client every export takes, deciding when to build what takes it, failing fast when Redis is down, closing it, or naming keys so features never share them |
+| [Connecting](guide/connecting.md) | opening the client every export takes, deciding when to build what takes it, failing fast when Redis is down, closing it, naming keys so features never share them, or giving every export one `@nxgt/redis` handle: a prefix on every key, a health check, closing on stop |
 | [Rate limits](guide/rate-limits.md) | sharing an `@alxia/rate-limit` count across processes, understanding why GCRA lets a burst through, choosing `name`, or resetting a key |
 | [Response cache](guide/response-cache.md) | sharing `@alxia/cache` responses across processes, invalidating them everywhere, or knowing what is stored in Redis |
 | [Idempotency](guide/idempotency.md) | making a `POST` run once per `Idempotency-Key`, reading the `409`, `422` and `400`, scoping keys by user, or ordering it with a rate limit or an auth check |

@@ -7,11 +7,11 @@ import {
 	settle,
 } from '@alxia/core';
 import { bindIdempotency, defineIdempotency, GuardError } from '@nxgt/redis';
-import type { RedisClient } from 'bun';
 import { z } from 'zod';
+import { nameUnder, type RedisTarget } from './handle';
 
 export interface IdempotencyOptions {
-	/** Names the keys it stores. */
+	/** Names the keys it stores, under a handle's prefix when it is given one. */
 	readonly name: string;
 	/** Seconds a finished response is kept and replayed. A day by default. */
 	readonly ttl?: number;
@@ -98,18 +98,22 @@ class Unstored extends Error {
  * ```ts
  * app.use(idempotency(redis.client, { name: 'payments' })).post('/payments', ...);
  * ```
+ *
+ * Given an `@nxgt/redis` handle instead of a client, the keys are under the
+ * handle's `prefix`: `idempotency(handle, { name: 'payments' })`.
  */
 export function idempotency(
-	client: RedisClient,
+	target: RedisTarget,
 	options: IdempotencyOptions,
 ): IdempotencyMiddleware {
+	const { client, name } = nameUnder(target, options.name);
 	const methods = new Set(options.methods ?? ['POST', 'PATCH']);
 	const header = options.header ?? 'idempotency-key';
 	const scope = options.scope ?? ((ctx: BaseContext) => ctx.ip);
 	const bound = bindIdempotency(
 		client,
 		defineIdempotency({
-			name: options.name,
+			name,
 			key: (key: string) => key,
 			ttl: options.ttl ?? 86_400,
 			...(options.lease === undefined ? {} : { lease: options.lease }),

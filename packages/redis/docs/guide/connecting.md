@@ -143,6 +143,64 @@ process.on('SIGTERM', async () => {
 `closeRedis()` from `@nxgt/redis` closes every client the process opened
 through `connectRedis` — the end of a test file, say.
 
+## With an `@nxgt/redis` handle
+
+`openRedis(defineRedis({ … }))` opens the client and wires the caches, a
+`prefix` and a lock in one object, the handle. Every export that takes a
+client takes the handle too, and the deployment's `prefix` is then in front of
+every key it writes:
+
+```ts
+import { cache } from '@alxia/cache';
+import { alxia, health } from '@alxia/core';
+import { idempotency, redis, redisCacheStore, redisCheck } from '@alxia/redis';
+import { defineCache, defineRedis, openRedis } from '@nxgt/redis';
+import { z } from 'zod';
+
+const users = defineCache({ name: 'user', key: (id: string) => id, ttl: 300, schema: z.object({ id: z.string(), name: z.string() }) });
+const handle = await openRedis(
+	defineRedis({ uri: Bun.env['REDIS_URL']!, prefix: 'shop', caches: { users } }),
+);
+
+const app = alxia()
+	.plugin(health({ checks: { redis: redisCheck(handle) } }))
+	.plugin(redis(handle))
+	.use(idempotency(handle, { name: 'orders' }))
+	.use(cache({ ttl: 60, store: redisCacheStore(handle, { name: 'pages' }) }))
+	.get('/users/:id', ({ caches, params, reply }) => reply.ok(caches.users.get(params.id)));
+```
+
+| Export | Keys under `prefix: 'shop'` |
+| --- | --- |
+| `redisStore(handle, { name: 'api' })` | `shop:api:<limit>/<windowMs>:<key>`, `shop:api:policies` |
+| `redisCacheStore(handle, { name: 'pages' })` | `shop:pages:response:<key>`, `shop:pages:tag:<tag>` |
+| `idempotency(handle, { name: 'orders' })` | `shop:orders:<route>:<scope>:<Idempotency-Key>` |
+| `redis(handle)` | `shop:<cache name>:<key>`, `lock:shop:<key>` |
+
+The lock is `@nxgt/redis`'s, which writes `lock:` first and the prefix inside
+it. `redis(handle)` puts `redis` (the client), `caches`, `lock` and `prefix` in
+the context; `caches` is the handle's own `cache` scope, typed by each schema.
+
+**Closing.** `redis(handle)` closes the handle in core's `onStop`, once, after
+the requests in flight drained, so `listen`'s graceful shutdown ends with the
+connection closed. Opt out with `redis(handle, { close: false })` when
+something else owns the handle. The stores and `idempotency` never close it;
+an app that does not mount `redis(handle)` closes the handle itself. A
+`client` that `defineRedis` was given is never closed by `@nxgt/redis`.
+
+**Health.** `redisCheck(handle)` is a check for `health({ checks })`: it
+passes while every instance answers a `PING` and is down when one does not;
+`{ timeoutMs }` bounds each ping (2 s by default). It takes a bare client too.
+
+**One instance.** The handle must wire exactly one Redis instance; a handle of
+several is refused with a `TypeError` naming them. Give a bare client,
+`handle.clients.<name>`, to the factory that lives on one of them, with the
+prefix in its `name`.
+
+**Switching from a bare client** changes the keys: a rate-limit count, a kept
+response or a replayable response written without the prefix is not found
+under it, and the new keys start empty.
+
 ## Naming keys
 
 Every export that writes takes a `name`, prepended to its keys, so several
@@ -155,7 +213,8 @@ apps and several features can share one Redis:
 | `idempotency(client, { name })` | `<name>:<route>:<scope>:<Idempotency-Key>` |
 | `redis(client, { caches })` | each cache's own `<name>:<key>`, and `lock:<key>` |
 
-Two features given the same `name` share their keys; give each its own.
+Two features given the same `name` share their keys; give each its own. Given a
+[handle](#with-an-nxgtredis-handle), each key also starts with its `prefix`.
 
 ## Next
 

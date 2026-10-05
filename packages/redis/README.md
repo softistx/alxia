@@ -7,7 +7,10 @@ Bun's own Redis client, no driver, no dependency:
 - `redisStore`: a rate-limit store every process shares;
 - `idempotency`: a middleware, so routes run once per `Idempotency-Key`;
 - `redisCacheStore`: an `@alxia/cache` store every process shares;
-- `redis`: the client, typed caches and a lock in the context.
+- `redis`: the client, typed caches and a lock in the context;
+- `redisCheck`: a readiness check for core's `health()`.
+
+Each takes Bun's `RedisClient`, or an [`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) handle: see [With @nxgt/redis](#with-nxgtredis).
 
 ```sh
 bun add @alxia/redis @nxgt/redis zod @alxia/core
@@ -143,6 +146,40 @@ const app = alxia()
 for everything else. It sits beside `@alxia/cache`'s `ctx.cache` — the
 response cache's `{ tag, skip }` — without touching it, in either order.
 
+## With @nxgt/redis
+
+Open the Redis once with `@nxgt/redis`'s `openRedis(defineRedis({ … }))` and
+hand the handle to every export that takes a client: one `prefix` is in front
+of every key of the deployment, and the handle closes with the app.
+
+```ts
+import { alxia, health } from '@alxia/core';
+import { redis, redisCheck, redisStore } from '@alxia/redis';
+import { rateLimit } from '@alxia/rate-limit';
+import { defineCache, defineRedis, openRedis } from '@nxgt/redis';
+import { z } from 'zod';
+
+const users = defineCache({ name: 'user', key: (id: string) => id, ttl: 300, schema: z.object({ id: z.string(), name: z.string() }) });
+const handle = await openRedis(defineRedis({ uri: Bun.env['REDIS_URL']!, prefix: 'shop', caches: { users } }));
+
+const app = alxia()
+	.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(handle, { name: 'api' }) })) // shop:api:…
+	.plugin(redis(handle))                                   // caches typed from handle.cache; handle.close() in onStop
+	.plugin(health({ checks: { redis: redisCheck(handle) } }))
+	.get('/users/:id', async ({ caches, lock, params, reply }) =>
+		reply.ok(await lock(params.id, () => caches.users.remember(params.id, () => ({ id: params.id, name: 'Ada' })))), // shop:user:…, lock:shop:…
+	);
+```
+
+`redisStore`, `redisCacheStore` and `idempotency` take the handle where they
+take a client, and put its `prefix` in front of their `name`: the keys are
+`shop:api:…`, `shop:pages:response:…`, `shop:orders:…`. `redis(handle)` puts
+`caches` (the handle's own bound caches), `lock` (under the prefix), `redis`
+(the client) and `prefix` in the context, and closes the handle once when the
+app stops, after the requests in flight finished: `redis(handle, { close: false })`
+when something else closes it. The handle must wire one Redis instance.
+The bare `RedisClient` forms are unchanged and add no prefix.
+
 ## Testing
 
 The package's specs run against `$REDIS_URL`, or a `redis-server` on
@@ -152,10 +189,13 @@ The package's specs run against `$REDIS_URL`, or a `redis-server` on
 
 | export | |
 | --- | --- |
-| `redisStore(client, { name })`, `RedisStoreOptions` | an `@alxia/rate-limit` store |
-| `redisCacheStore(client, { name })`, `RedisCacheStoreOptions` | an `@alxia/cache` store |
-| `idempotency(client, options)` | the middleware, given to `app.use` |
+| `redisStore(client \| handle, { name })`, `RedisStoreOptions` | an `@alxia/rate-limit` store |
+| `redisCacheStore(client \| handle, { name })`, `RedisCacheStoreOptions` | an `@alxia/cache` store |
+| `idempotency(client \| handle, options)` | the middleware, given to `app.use` |
 | `redis(client, { caches? })`, `RedisContextOptions` | a plugin, given to `app.plugin`: `redis`, `caches`, `lock` in the context |
+| `redis(handle, { close? })`, `RedisHandleOptions`, `RedisHandleContext` | the same from an `@nxgt/redis` handle: its typed caches, a prefixed `lock`, `prefix`; closes the handle in `onStop` unless `close: false` |
+| `redisCheck(client \| handle, { timeoutMs? })`, `RedisCheckOptions` | a check for core's `health({ checks })`: down when a Redis instance does not answer a `PING` |
+| `RedisTarget` | a client or a handle: what the factories above take |
 | `IdempotencyOptions`, `IdempotencyErrorBody`, `RedisContext`, `BoundCaches` | its types |
 | `IdempotencyMiddleware` | what `idempotency()` returns: a middleware that adds nothing, and may answer a 400, a 409 or a 422 |
 | `AnyCache` | any cache definition: the constraint of a function generic over the caches it hands to `redis()` |

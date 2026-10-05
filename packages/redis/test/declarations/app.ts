@@ -10,14 +10,18 @@ import {
 	idempotency,
 	redis,
 	redisCacheStore,
+	redisCheck,
 	redisStore,
 } from '@alxia/redis';
-import { defineCache } from '@nxgt/redis';
+import { defineCache, defineRedis, openRedis } from '@nxgt/redis';
 import { z } from 'zod';
 
 // Bun's `RedisClient`, named through the plugin: the fixtures compile
 // without Bun's types, as a consumer's declaration build may.
-declare const client: Parameters<typeof redis>[0];
+declare const client: Extract<
+	Parameters<typeof redisStore>[0],
+	{ send: unknown }
+>;
 
 const users = defineCache({
 	name: 'user',
@@ -77,3 +81,43 @@ export function withCaches<const Caches extends Record<string, AnyCache>>(
 export function guard() {
 	return idempotency(client, { name: 'refunds', wait: 1_000 });
 }
+
+// An `@nxgt/redis` handle: the caches typed from its scopes.
+export const openShop = () =>
+	openRedis(
+		defineRedis({
+			uri: 'redis://localhost',
+			prefix: 'shop',
+			caches: { users },
+		}),
+	);
+
+export async function withHandle() {
+	const handle = await openShop();
+	return alxia()
+		.plugin(redis(handle))
+		.get('/users/:id', async ({ caches, lock, pathParams, prefix, reply }) => {
+			const id = pathParams['id'] ?? '';
+			const user = await lock(id, () =>
+				caches.users.remember(id, async () => ({ id, name: 'Ada' })),
+			);
+			return reply(200, { user, prefix });
+		});
+}
+
+export async function handleEverywhere() {
+	const handle = await openShop();
+	return alxia()
+		.use(idempotency(handle, { name: 'orders' }))
+		.use(cache({ ttl: 60, store: redisCacheStore(handle, { name: 'pages' }) }))
+		.use(
+			rateLimit({
+				limit: 10,
+				windowMs: 1_000,
+				store: redisStore(handle, { name: 'api' }),
+			}),
+		)
+		.get('/', ({ reply }) => reply(200, 'ok'));
+}
+
+export const check = async () => redisCheck(await openShop());

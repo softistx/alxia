@@ -31,6 +31,16 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### 0.3.0
+
+- **An `@nxgt/redis` handle everywhere.** `redis(handle)` takes the handle
+  `openRedis(defineRedis({ … }))` gives: typed `caches` from its scopes, a
+  `lock` and every key under its `prefix`, and the handle closed once in
+  `onStop`, after the drain (`{ close: false }` to opt out). `redisStore`,
+  `redisCacheStore` and `idempotency` take it where they take a client and
+  put its prefix in front of their keys, and `redisCheck` is a readiness
+  check for `health()`. The bare `RedisClient` forms are unchanged.
+
 ### 0.1.0
 
 - **A rate limit every process shares.** `redisStore` is an

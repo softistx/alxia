@@ -4,10 +4,13 @@ import {
 	bindRateLimit,
 	defineRateLimit,
 } from '@nxgt/redis';
-import type { RedisClient } from 'bun';
+import { nameUnder, type RedisTarget } from './handle';
 
 export interface RedisStoreOptions {
-	/** Prepended to every key it counts: one name per limit, so two never share a count. */
+	/**
+	 * Prepended to every key it counts: one name per limit, so two never share
+	 * a count. Under a handle's prefix, when it is given one.
+	 */
 	readonly name: string;
 }
 
@@ -19,19 +22,24 @@ export interface RedisStoreOptions {
  * ```ts
  * app.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis.client, { name: 'api' }) }));
  * ```
+ *
+ * Given an `@nxgt/redis` handle instead of a client, every key is under the
+ * handle's `prefix`: `redisStore(handle, { name: 'api' })` counts under
+ * `<prefix>:api:…`.
  */
 export function redisStore(
-	client: RedisClient,
+	target: RedisTarget,
 	options: RedisStoreOptions,
 ): RateLimitStore {
+	const { client, name } = nameUnder(target, options.name);
 	const limits = new Map<string, Promise<BoundRateLimit<string>>>();
 	// Every policy counted under this name, by any process: what `reset` forgets.
-	const policies = `${options.name}:policies`;
+	const policies = `${name}:policies`;
 	const bind = (limit: number, windowMs: number) =>
 		bindRateLimit(
 			client,
 			defineRateLimit({
-				name: `${options.name}:${limit}/${windowMs}`,
+				name: `${name}:${limit}/${windowMs}`,
 				key: (key: string) => key,
 				limit,
 				per: windowMs,

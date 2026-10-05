@@ -213,6 +213,20 @@ Code written for the earlier name — `ctx.cache.users` — no longer compiles;
 [Troubleshooting](../troubleshooting.md#property-cache-does-not-exist-on-type---rediscontext-) has the
 message and the rename.
 
+## From an `@nxgt/redis` handle
+
+`redis(handle)` takes the handle `openRedis(defineRedis({ …, caches }))` gives
+instead of a client and a `caches` option: the context's `caches` are the
+handle's `cache` scope, the `lock` is under its `prefix`, and the handle is
+closed when the app stops. See [Connecting](connecting.md#with-an-nxgtredis-handle).
+
+```ts
+const handle = await openRedis(defineRedis({ uri: Bun.env['REDIS_URL']!, prefix: 'shop', caches: { users } }));
+alxia()
+	.plugin(redis(handle))
+	.get('/users/:id', ({ caches, params, reply }) => reply.ok(caches.users.get(params.id))); // shop:user:<id>
+```
+
 ## Next
 
 - [Connecting](connecting.md) — the client, and closing it.
