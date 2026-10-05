@@ -54,7 +54,8 @@ export async function handle(
 		return await chain<never>(run, ctx, async (validated) => {
 			let reply = ended(route, validated, request);
 			if (reply instanceof Promise) reply = await reply;
-			// An `all` route's end, a middleware: its own `Response`, sent.
+			// An `all` route's end, a middleware: its own `Response`, sent. Its
+			// handler forms return a reply: the types keep them from this.
 			if (reply instanceof Response && route.method === ALL) return reply;
 			if (!(reply instanceof Reply)) {
 				throw new TypeError(

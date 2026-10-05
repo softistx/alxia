@@ -420,11 +420,12 @@ app.query(
 );
 ```
 
-`all` declares one route for every method at its path its own routes
-leave: a `GET` beside it still goes to the `get` route, a `HEAD` to the
+`all` declares one route for the methods its path has no route of its
+own for: a `GET` beside it still goes to the `get` route, a `HEAD` to the
 `GET` first, and the path never answers 405. It is listed in `app.routes`
 as `ALL`. Its last argument may be a middleware that answers, as
-`@alxia/proxy`'s `proxy(url)`, in place of a handler
+`@alxia/proxy`'s `proxy(url)`, in place of a handler:
+`app.all('/api/*', proxy('http://users.internal:8080'))`
 ([Every method: `all`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/routes.md#every-method-all)).
 
 ```ts

@@ -140,11 +140,16 @@ async function route(
 		globals,
 		runtime.validateResponses,
 	);
-	// A `HEAD` the `GET` or the `all` route answered is sent without a body.
-	return request.method === 'HEAD' && definition.method !== 'HEAD'
-		? new Response(null, {
-				status: response.status,
-				headers: response.headers,
-			})
-		: response;
+	// A `HEAD` the `GET` or the `all` route answered is sent without a body,
+	// which is cancelled: a proxied upstream's stream is released.
+	if (request.method !== 'HEAD' || definition.method === 'HEAD') {
+		return response;
+	}
+	if (response.body !== null && !response.body.locked) {
+		response.body.cancel().catch(() => {});
+	}
+	return new Response(null, {
+		status: response.status,
+		headers: response.headers,
+	});
 }

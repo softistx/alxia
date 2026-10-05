@@ -3188,6 +3188,11 @@ app.post('/posts', auth, validate({ body: Post }), handler);
 a `Response`, or nothing at all (a missing `return`). TypeScript refuses
 it, so this comes from JavaScript or a cast.
 
+An `all` route's last function may return a `Response` too, as a
+middleware that answers (`app.all('/api/*', proxy(url))`); anything else
+from it, an untyped middleware's `undefined` included, is this error, named
+`ALL /api/*: …`.
+
 **Fix:**
 
 ```ts
