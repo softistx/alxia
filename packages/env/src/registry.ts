@@ -12,10 +12,11 @@ export interface Described {
  */
 const DESCRIBED = Symbol.for('alxia.env.described');
 const scope = globalThis as { [key: symbol]: unknown };
-export const described = (scope[DESCRIBED] ??= new WeakMap()) as WeakMap<
-	object,
-	Described
->;
+const shared =
+	(scope[DESCRIBED] as WeakMap<object, Described> | undefined) ??
+	new WeakMap<object, Described>();
+scope[DESCRIBED] = shared;
+export const described = shared;
 
 const COLLECT: unique symbol = Symbol.for('alxia.env.collect') as never;
 
