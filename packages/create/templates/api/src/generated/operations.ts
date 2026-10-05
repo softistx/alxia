@@ -52,7 +52,7 @@ export interface OperationSpec<Client = unknown> {
 /** A location with no parameters declared: whatever arrives there is dropped. */
 const none = z.object({});
 
-/** A number in a path, a query or a header: digits, where z.coerce.number() would read '' as 0. */
+/** A number in a path, a query, a header or a cookie: digits, where z.coerce.number() would read '' as 0. */
 const numeric = z
 	.string()
 	.regex(/^-?(?:0|[1-9]\d*)(?:\.\d+)?(?:[eE][+-]?\d+)?$/)

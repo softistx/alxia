@@ -232,19 +232,20 @@ bun run generate
 git diff src/generated
 ```
 
-What the generator does not write, in 0.6.0, and how the app does it
+What the generator does not write, in 0.7.0, and how the app does it
 instead:
 
 - **`security`**: no middleware is generated from it. Authentication is
   a middleware the app writes, `requireKey` here, given to the routes
   that need it.
-- **A cookie parameter**: the generator refuses the whole spec
-  ([troubleshooting](troubleshooting.md#cookie-parameter-session-is-not-supported-unsupported_parameter)).
-  Read the cookie in a middleware, or validate it with `validate({ cookies })`
-  by hand.
-- **Named server-sent events** (an `itemSchema` with `event` names): the
-  operation is left out of `alxia.ts` with a warning; declare that route
-  by hand with `@alxia/core`'s `eventStream`.
+- **A cookie parameter in the client files**: `alxia.ts` validates it as
+  the route's `cookies`; `types.ts`, `zod.ts`, `operations.ts` and
+  `paths.ts` leave it out with an `ignored` warning, since a client does not
+  set cookies.
+- **Server-sent events with text data**: the operation is left out of
+  `alxia.ts` with a warning; give each event's data a JSON `contentSchema`,
+  or declare that route by hand with `@alxia/core`'s `eventStream`. Named
+  events whose data is JSON are generated.
 
 ### `src/context.ts`
 
@@ -771,7 +772,7 @@ template pins exactly:
 | `vite` | `^7.0.0 \|\| ^8.0.0`, `@alxia/react-router`'s |
 | `react-router`, `@react-router/*` | `^8.0.0`, `@alxia/react-router`'s; the `@react-router/*` packages take `react-router`'s version, which `@react-router/node` pins exactly |
 | `@biomejs/biome` | its own minor, from the exact version the template pins (`~2.5.15`): written exactly, `2.5.16`, never `^`. A minor of Biome may add a recommended rule |
-| `@nxgt/openapi-codegen` | none: the template's exact version, `0.6.0`, is kept. Any release may write `src/generated/` differently, and `bun run verify` checks it with `generate --check` |
+| `@nxgt/openapi-codegen` | none: the template's exact version, `0.7.0`, is kept. Any release may write `src/generated/` differently, and `bun run verify` checks it with `generate --check` |
 | anything else: `react`, `isbot`, Tailwind, `@types/*` | no alxia range: npm's `latest` |
 
 The command prints each move, and each newer major it left out:

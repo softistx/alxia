@@ -17,7 +17,7 @@ export const app = alxia().route(operations.getTodo, ({ params, reply }) =>
 | Step | Who | What it gives |
 | --- | --- | --- |
 | [1. Write the document](#1-write-the-document) | you | the contract: operations, bodies, replies, alxia's 400 |
-| [2. Generate](#2-generate-the-operations) | `@nxgt/openapi-codegen` 0.6.0, `alxia: true` | `src/generated/alxia.ts`: each operation as `{ method, path, schema }` |
+| [2. Generate](#2-generate-the-operations) | `@nxgt/openapi-codegen` 0.7.0, `alxia: true` | `src/generated/alxia.ts`: each operation as `{ method, path, schema }` |
 | [3. Bind the routes](#3-bind-the-routes) | `@alxia/core`'s `app.route()` | the handlers, typed by the spec, with their middlewares |
 | [4. Check](#4-check-the-app-against-the-spec) | `@alxia/openapi`'s `matchesSpec` | a failing test while an operation has no route |
 | [5. A client](#5-a-client-from-the-same-document) | the generator of your choice | the other side of the contract |
@@ -285,13 +285,13 @@ With `validationErrors: false`, the 400 a client is typed by is the one the
 spec declares, the one alxia sends. In another project, generate from the
 same `openapi.yaml`.
 
-## What the generator leaves out (0.6.0)
+## What the generator leaves out (0.7.0)
 
 | In the document | What happens | Do instead |
 | --- | --- | --- |
 | `security` | not generated | a middleware, as `requireKey` above |
-| a `cookie` parameter | the whole document is refused, `unsupported_parameter` | remove it from the spec, and read `cookies` in a middleware, or with `validate({ cookies })` |
-| named server-sent events | the operation is left out of `alxia.ts`, with an `ignored` warning | declare the route by hand, with `eventStream({ ... })` from `@alxia/core` |
+| a `cookie` parameter in the client files | left out of `types.ts`, `zod.ts`, `operations.ts` and `paths.ts`, with an `ignored` warning: only `alxia.ts` validates it, as `cookies` | nothing: read `cookies` in the handler or a middleware |
+| server-sent events whose data is text, or with no `itemSchema` naming them | the operation is left out of `alxia.ts`, with an `ignored` warning | give each event's data a JSON `contentSchema`, or declare the route by hand, with `eventStream({ ... })` from `@alxia/core` |
 | a `TRACE`, a binary body, a binary, JSON Lines or form reply, a path alxia cannot route | left out, with an `ignored` warning | declare the route by hand, if you serve it |
 
 An operation left out is not in `operations`, so the checks do not know it:
