@@ -1080,7 +1080,7 @@ A guard that only answers or passes, `next()`, can stay on the path:
 `alxia().derive(…)`, the 0.3 way of mounting a plugin.
 
 ```text
-error TS2345: Argument of type 'Alxia<Empty, "">' is not assignable to parameter of type 'Alxia<Empty, ""> & Step<BaseContext & Empty, BaseContext & Empty, MiddlewareReturn>'.
+error TS2345: Argument of type 'Alxia<Empty, "">' is not assignable to parameter of type 'Alxia<Empty, ""> & ((ctx: BaseContext & Empty, next: NextFunction) => MiddlewareReturn)'.
   …
     Type 'Alxia<Empty, "">' provides no match for the signature '(ctx: BaseContext & Empty, next: NextFunction): MiddlewareReturn'.
 ```

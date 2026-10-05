@@ -270,6 +270,8 @@ added. A ninth is one error, on it:
 error TS2345: Argument of type 'Middleware<…>' is not assignable to parameter of type '"at most 8 middlewares per route: group them with compose(...)"'.
 ```
 
+`use(m1, …, m9)` reads the same error, on the ninth.
+
 `compose(...middlewares)` is one middleware standing for several, typed
 for any number of them. It goes wherever a middleware does — a route,
 `use`, `ws`, `route(operation, …)`, another `compose` — and its members
@@ -296,8 +298,6 @@ one, naming the member: `use(): argument 1 (compose member 2) is a validate()
 or responds(), which belongs to a route`. Every refusal names a member so,
 `GET /x: middleware 2 (compose member 1) looks like a factory (logger): …`. Called on its own, a composed middleware throws
 `compose() runs among a route's middlewares or in use(), not called on its own`.
-
-`use(m1, …, m9)` is refused the same way, on the ninth.
 
 ## `validate` and `responds` given to `use`
 
