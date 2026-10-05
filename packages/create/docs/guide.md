@@ -400,16 +400,14 @@ const todos: Todo[] = [];
 // X-Forwarded-For then sets ctx.ip, and a forwarding header from any other
 // connection is refused with a 403. A request that carries none, a health
 // probe's, passes from anywhere. Unset, no forwarding header is read.
-export function createBase(
-  trusted: string[] | undefined = env.TRUSTED_PROXIES,
-) {
+export function createBase(trusted: string[] | undefined) {
   return alxia({
     errors: "problem",
     ...(trusted && { proxy: trustProxy({ trusted, untrusted: "refuse" }) }),
   }).decorate({ todos });
 }
 
-export const base = createBase();
+export const base = createBase(env.TRUSTED_PROXIES);
 
 // Register the base, never the app: the app mounts the route files, whose
 // type reads this, and would then be typed by itself.
@@ -763,7 +761,7 @@ not resolvers, and Pothos is code first.
 
 ```ts
 // src/context.ts
-import { alxia, defineMiddleware } from "@alxia/core";
+import { alxia, defineMiddleware, trustProxy } from "@alxia/core";
 import type { GraphQLContext } from "@alxia/graphql";
 import { env } from "./env";
 import type { Loaders } from "./loaders";
@@ -783,9 +781,7 @@ const viewerOf = defineMiddleware(({ request }, next) => {
 // X-Forwarded-For from it sets ctx.ip, a forwarding header from any other
 // connection is refused with a 403, and a request with none passes. Unset,
 // no forwarding header is read.
-export function createBase(
-  trusted: string[] | undefined = env.TRUSTED_PROXIES,
-) {
+export function createBase(trusted: string[] | undefined) {
   return alxia({
     ...(trusted && { proxy: trustProxy({ trusted, untrusted: "refuse" }) }),
   })
@@ -793,7 +789,7 @@ export function createBase(
     .use(viewerOf);
 }
 
-export const base = createBase();
+export const base = createBase(env.TRUSTED_PROXIES);
 export type Context = GraphQLContext<typeof base, { loaders: Loaders }>;
 ```
 

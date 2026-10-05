@@ -13,16 +13,14 @@ const todos: Todo[] = [];
 // X-Forwarded-For then sets ctx.ip, and a forwarding header from any other
 // connection is refused with a 403. A request that carries none, a health
 // probe's, passes from anywhere. Unset, no forwarding header is read.
-export function createBase(
-  trusted: string[] | undefined = env.TRUSTED_PROXIES,
-) {
+export function createBase(trusted: string[] | undefined) {
   return alxia({
     errors: "problem",
     ...(trusted && { proxy: trustProxy({ trusted, untrusted: "refuse" }) }),
   }).decorate({ todos });
 }
 
-export const base = createBase();
+export const base = createBase(env.TRUSTED_PROXIES);
 
 // Register the base, never the app: the app mounts the route files, whose
 // type reads this, and would then be typed by itself.

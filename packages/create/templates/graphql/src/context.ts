@@ -23,9 +23,7 @@ const viewerOf = defineMiddleware(({ request }, next) => {
 // X-Forwarded-For then sets ctx.ip, and a forwarding header from any other
 // connection is refused with a 403. A request that carries none, a health
 // probe's, passes from anywhere. Unset, no forwarding header is read.
-export function createBase(
-  trusted: string[] | undefined = env.TRUSTED_PROXIES,
-) {
+export function createBase(trusted: string[] | undefined) {
   return alxia({
     ...(trusted && { proxy: trustProxy({ trusted, untrusted: "refuse" }) }),
   })
@@ -33,7 +31,7 @@ export function createBase(
     .use(viewerOf);
 }
 
-export const base = createBase();
+export const base = createBase(env.TRUSTED_PROXIES);
 
 // A resolver's context: Yoga's, the base's (`env`, `db`, `viewer`) and the
 // per-request `loaders` that src/app.ts's `context` option builds. The
