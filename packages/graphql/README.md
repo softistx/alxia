@@ -63,6 +63,34 @@ what the app does not build is a compile error:
 the schema's resolvers read a context the app does not build: missing user
 ```
 
+## Batching (N+1)
+
+A field that loads a record per parent — `Note.author` over 50 notes — is
+51 queries. Build [DataLoaders](https://github.com/graphql/dataloader) in
+the `context` option and type them through `GraphQLContext`'s second
+argument:
+
+```ts
+import DataLoader from 'dataloader';
+
+const createLoaders = () => ({
+	user: new DataLoader(async (ids: readonly string[]) => findUsers(ids)), // one query for all ids
+});
+type Loaders = ReturnType<typeof createLoaders>;
+
+const schema = createSchema<GraphQLContext<typeof base, { loaders: Loaders }>>({
+	typeDefs,
+	resolvers: { Note: { author: (note: { authorId: string }, _, { loaders }) => loaders.user.load(note.authorId) } },
+});
+
+const app = base.plugin((app) => graphql(app, { schema, context: () => ({ loaders: createLoaders() }) }));
+```
+
+Per request, never once for the process: a DataLoader caches what it
+loads, so a shared one would serve stale records and hand one user's data
+to the next. Over WebSocket, `context` runs for each operation. See
+[Batching with DataLoader](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/context.md#batching-with-dataloader-n1).
+
 ## Yoga's plugins
 
 Every Yoga option passes through, but `graphqlEndpoint`, which `path`
