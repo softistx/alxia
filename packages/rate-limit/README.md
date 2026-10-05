@@ -71,8 +71,8 @@ throws at declaration.
 app.use(rateLimit({ store: redisStore(handle.limits.api, api) }));
 ```
 
-A store of your own implements `RateLimitStore`: `consume(key, { limit,
-windowMs })` decides — `allowed`, `remaining`, `resetAfter` and
+A store of your own implements `RateLimitStore` (and, to count by a rate of
+its own, the optional `policy`): `consume(key, { limit, windowMs })` decides — `allowed`, `remaining`, `resetAfter` and
 `retryAfter`, delays in milliseconds — and a refused request counts
 nothing.
 
@@ -82,7 +82,7 @@ nothing.
 | --- | --- |
 | `rateLimit(options)` | the middleware: gives `rateLimit` to what runs after it, or answers the 429 |
 | `MemoryStore` | a fixed window in one process's memory |
-| `RateLimitStore`, `Decision`, `Policy` | a store's contract |
+| `RateLimitStore`, `Decision`, `Policy`, `PolicyStore` | a store's contract; `PolicyStore` is a store with its own `policy`, which `rateLimit` reads `limit` and `windowMs` from |
 | `RateLimit`, `RateLimitedBody`, `RateLimitInfo`, `RateLimitOptions` | its types: `RateLimit<Requires>` is the middleware `rateLimit()` returns |
 
 ## Documentation

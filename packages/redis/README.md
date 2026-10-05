@@ -225,7 +225,7 @@ The package's specs run against `$REDIS_URL`, or a `redis-server` on
 | --- | --- |
 | `redisStore(client \| handle, { name })`, `RedisStoreOptions` | an `@alxia/rate-limit` store |
 | `redisStore(handle.limits.api)` | the same for a rate limit wired by `defineRedis` (`@nxgt/redis` 0.6): the definition holds the name and the rate, the keys are `<prefix>:<name>:<key>` |
-| `redisStore(handle.limits.api, api)` | the same, given the definition: the store declares its `limit` and `per` as its `policy`, and `rateLimit({ store })` needs no `limit` nor `windowMs` |
+| `redisStore(handle.limits.api, api)` | the same, given the definition, returning a `PolicyStore` (from `@alxia/rate-limit`): the store declares its `limit` and `per` as its `policy`, and `rateLimit({ store })` needs no `limit` nor `windowMs` |
 | `redisCacheStore(client \| handle, { name })`, `RedisCacheStoreOptions` | an `@alxia/cache` store |
 | `idempotency(client \| handle, options)` | the middleware, given to `app.use` |
 | `idempotency(handle.idempotency.orders, options?)`, `WiredIdempotency`, `WiredIdempotencyOptions` | the same for an idempotency wired by `defineRedis`: its definition holds the `name`, `ttl` and `lease`, so the options take none of them |

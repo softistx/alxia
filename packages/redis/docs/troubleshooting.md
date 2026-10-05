@@ -21,6 +21,7 @@ each through; its own refusals, a handle of several instances, a wired guard giv
 - [`TypeError: defineIdempotency: "…" has a lease of …; it is a whole number of milliseconds, and must be at least 1`](#typeerror-defineidempotency--has-a-lease-of--it-is-a-whole-number-of-milliseconds-and-must-be-at-least-1)
 - [`TypeError: defineIdempotency: an idempotent operation needs a name, for its keys`](#typeerror-defineidempotency-an-idempotent-operation-needs-a-name-for-its-keys)
 - [`RedisError: Connection closed`](#rediserror-connection-closed)
+- [`TypeError: redisStore: the definition "…" is not the one that wired this limit`](#typeerror-redisstore-the-definition--is-not-the-one-that-wired-this-limit)
 - [`TypeError: connectRedis: this URI is already connected with other options. Pass the same options everywhere, or close the first connection.`](#typeerror-connectredis-this-uri-is-already-connected-with-other-options-pass-the-same-options-everywhere-or-close-the-first-connection)
 
 - [`TypeError: @alxia/redis: this @nxgt/redis handle wires N Redis instances (…), and one is needed.`](#typeerror-alxiaredis-this-nxgtredis-handle-wires-n-redis-instances--and-one-is-needed)
@@ -260,6 +261,27 @@ then puts in the context as `caches`, a channel, a rate limit or an idempotency:
 ```ts
 defineRedis({ uri, prefix: 'shop', caches: { users } });
 defineRedis({ uri, prefix: 'shop', limits: { api } });
+```
+
+### `TypeError: redisStore: the definition "…" is not the one that wired this limit`
+
+**When:** `redisStore(handle.limits.api, other)` is given a definition whose
+`name` is not the one `handle.limits.api` was wired from. The message adds the
+key the limit counts under:
+
+```text
+TypeError: redisStore: the definition "other" is not the one that wired this limit (it counts under "shop:api:probe")
+```
+
+**Why:** the definition gives `rateLimit` its `limit` and `windowMs`, and a
+definition of another limit would write headers for a rate Redis does not
+count by. A bound limit's keys are `<prefix>:<name>:<key>`, which is how the
+store checks the pair.
+
+**Fix:** give the definition `handle.limits.api` was wired from:
+
+```ts
+app.use(rateLimit({ store: redisStore(handle.limits.api, api) }));
 ```
 
 ### `TypeError: defineRedis: instance "default" wires the cache "users" and the rate limit "login" under one name, "user". They would share every key in Redis. Give one of them a name of its own.`
