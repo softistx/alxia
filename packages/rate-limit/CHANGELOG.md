@@ -1,5 +1,13 @@
 # @alxia/rate-limit
 
+## 0.4.7
+
+### Patch Changes
+
+- [#195](https://github.com/softistx/alxia/pull/195) [`db217ab`](https://github.com/softistx/alxia/commit/db217ab5c3add8956ca168cca2367963b088ca5d) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Document that, with `@alxia/core` 0.10, one client is counted once across the notations of its address.
+- Updated dependencies [[`db217ab`](https://github.com/softistx/alxia/commit/db217ab5c3add8956ca168cca2367963b088ca5d)]:
+  - @alxia/core@0.10.1
+
 ## 0.4.6
 
 ### Patch Changes

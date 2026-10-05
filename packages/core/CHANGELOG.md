@@ -1,5 +1,11 @@
 # @alxia/core
 
+## 0.10.1
+
+### Patch Changes
+
+- [#195](https://github.com/softistx/alxia/pull/195) [`db217ab`](https://github.com/softistx/alxia/commit/db217ab5c3add8956ca168cca2367963b088ca5d) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Answer a `trusted` function that throws at the app's error boundary. With `trustProxy({ trusted })` or `forwardedIp({ trusted })`, a function that threw gave Bun's default 500; the throw is now a logged 500 in the app's error format (a problem under `errors: 'problem'`), before any middleware or route runs. An `allow` that throws still refuses.
+
 ## 0.10.0
 
 ### Minor Changes
