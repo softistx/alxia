@@ -7,9 +7,12 @@ import {
 	defineMiddleware,
 	definePlugin,
 	type Empty,
+	errorFormat,
 	eventStream,
+	health,
 	type PathAt,
 	problem,
+	problemOf,
 	type RoutePath,
 	refusalOf,
 	responds,
@@ -201,4 +204,21 @@ export function methods() {
 		request: app.request,
 		listen: app.listen,
 	};
+}
+
+// Problem details: a middleware answering in the app's format, behind the
+// probes of `health()`, on an app that answers its own errors as problems.
+export function problems() {
+	return alxia({ errors: 'problem' })
+		.plugin(health({ checks: { db: () => true } }))
+		.use((ctx, next) =>
+			ctx.request.headers.has('x-quota')
+				? errorFormat(ctx) === 'problem'
+					? problem(
+							problemOf(ctx, { status: 429, detail: 'Over quota', quota: 3 }),
+						)
+					: ctx.reply(429, { error: 'quota' as const })
+				: next(),
+		)
+		.get('/ok', ({ reply }) => reply(200));
 }

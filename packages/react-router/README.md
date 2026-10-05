@@ -81,7 +81,8 @@ With the `bunfig.toml` in place, the template's `dev`, `build` and
   data, `/api`, an upgrade to a `ws` route) reaches alxia, with HMR.
 - **`bun run build`** writes `build/server/index.js`, a server you can run.
 - **`bun run start`** serves the pages and the client build. It listens on
-  `PORT` (3000) and `HOST` (`0.0.0.0`), and stops on `SIGTERM`.
+  `PORT` (3000) and `HOST` (`0.0.0.0`), and shuts down gracefully on
+  `SIGTERM`: the requests in flight finish, then the `onStop` hooks run.
 
 After a build, `bunx --bun vite preview` serves that built server through
 Vite's preview server, as `bun run start` would: the pages, `/api`, the

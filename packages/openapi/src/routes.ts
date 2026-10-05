@@ -1,4 +1,5 @@
 import {
+	isHealthRoute,
 	joinPath,
 	type RouteDefinition,
 	type RouteOperation,
@@ -26,8 +27,8 @@ export interface ImplementedOptions {
 
 export interface MatchesSpecOptions extends ImplementedOptions {
 	/**
-	 * A route no operation has to declare: a health check. The routes of
-	 * `apiDocs()` are left out already.
+	 * A route no operation has to declare. The routes of `apiDocs()` and
+	 * the probes of `@alxia/core`'s `health()` are left out already.
 	 */
 	readonly exclude?: (route: RouteDefinition) => boolean;
 }
@@ -91,6 +92,7 @@ function match(
 		(route) =>
 			!declared.has(keyOf(route)) &&
 			!isApiDocsRoute(route) &&
+			!isHealthRoute(route) &&
 			!(options.exclude?.(route) ?? false),
 	);
 	const parts: string[] = [];

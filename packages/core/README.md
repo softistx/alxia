@@ -624,8 +624,8 @@ each applies and the order a request runs them in:
 [Middleware: which way to use](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md).
 
 `onStart(server)`, `onStop()` and `parser(type, parse)` apply to the whole
-app: they run with `listen` and `stop`, and a body parser is tried before
-the built-in ones. The request hooks of 0.3 were removed in 0.5: what each
+app: they run with `listen` and its shutdown, and a body parser is tried
+before the built-in ones. The request hooks of 0.3 were removed in 0.5: what each
 did is a middleware given to `use`
 ([upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md#050)).
 
@@ -753,11 +753,66 @@ shapeOf('/pets/:id') === shapeOf('/pets/:petId');    // true: the router sends t
 [Writing a plugin](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md)
 covers all three kinds.
 
+## Errors as problem details
+
+What alxia answers on its own — an `HttpError` no middleware catches, a
+refused request's 400, a 413, a 500, the router's 404, 405 and 426 — is a
+`{ error: … }` body by default. `errors: 'problem'` makes each an
+[RFC 9457](https://www.rfc-editor.org/rfc/rfc9457) problem, sent as
+`application/problem+json`, with `type`, `title`, `status`, `detail` and
+`instance`:
+
+```ts
+import { alxia, HttpError } from '@alxia/core';
+
+const app = alxia({ errors: 'problem' }).get('/users/:id', ({ params }) => {
+	throw new HttpError(404, { error: 'no_user' }, { detail: `No user ${params.id}` });
+});
+// GET /users/7 → 404 {"type":"about:blank","title":"Not Found","status":404,
+//                     "detail":"No user 7","instance":"/users/7"}
+// a refused body → 400 { …, "detail":"The request's body is invalid", "issues": [ … ] }
+```
+
+An `HttpError` takes `type`, `title`, `detail` and `extensions`;
+`errorFormat(ctx)` and `problemOf(ctx, init)` let a middleware answer its
+own errors in the app's format, as `@alxia/jwt` and `@alxia/janus` do. A
+GraphQL error stays GraphQL's, inside a 200. The `Problem` schema for the
+OpenAPI document, and the `validationErrors` setting of a generated
+client:
+[Errors and problem details](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/errors.md).
+
+## Health and shutdown
+
+`health()` adds the probes, and `listen` shuts down gracefully on
+`SIGTERM` and `SIGINT`: readiness turns 503, new connections are refused,
+sockets close with 1001, the requests in flight finish within
+`shutdownTimeout` (10 s), the `onStop` hooks run, and the process exits.
+
+```ts
+import { alxia, health } from '@alxia/core';
+import { bearer } from '@alxia/jwt';
+
+const app = alxia()
+	.plugin(health({ checks: { redis: () => redis.ping(), db: () => sql`select 1` } }))
+	.use(bearer({ jwt })) // the probes need no token
+	.onStop(() => sql.end());
+
+app.listen({ port: 3000, shutdownTimeout: 15_000 });
+// GET /health → 200 { status: 'ok' }
+// GET /ready  → 200, or 503 { status: 'down', checks: { db: { status: 'down', duration: 1000, reason: 'timeout' } } }
+```
+
+Each check has a `timeout`, and the report is cached for `cache` ms so
+probes do not hammer the dependencies. `shutdownSignal(ctx)` ends a long
+response when the shutdown starts; streams of events end by themselves.
+`@alxia/openapi`'s `matchesSpec` leaves the probes out by itself:
+[Health and shutdown](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/health-and-shutdown.md).
+
 ## API
 
 | export | |
 | --- | --- |
-| `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip` |
+| `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip`, `errors` |
 | `Alxia<Ctx, Prefix>` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `use` `derive` `decorate` `bodyLimit` `onStart` `onStop` `parser`, `group` `plugin`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server`; `Ctx` is what a route declared next reads, `Prefix` the app's prefix |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream(schema)` made |
@@ -767,6 +822,12 @@ covers all three kinds.
 | `FileSource`, `StaticOptions`, `FileOptions`, `StaticReply`, `parseRange` | static files |
 | `Precompressed`, `FileNotFoundBody`, `RangeNotSatisfiableBody` | a coding stored beside a file, the bodies of the 404 and 416 |
 | `Reply`, `HttpError`, `ResponseValidationError` | what a handler returns or throws |
+| `HttpErrorOptions` | an `HttpError`'s third argument, or its message alone: `message`, `type`, `title`, `detail`, `extensions`, `cause` — what its problem is made of under `errors: 'problem'` |
+| `ErrorFormat`, `errorFormat(ctx)` | `'json' \| 'problem'`, and the format of the app serving the request: what a middleware reads to answer its own error as alxia would |
+| `Problem<Status, Extensions>`, `ValidationProblem`, `ContentTooLargeProblem`, `ProblemInit`, `problemOf(ctx, init)` | a problem as alxia sends it — `type`, `title`, `status`, `detail`, `instance`, then its extensions — the 400's and the 413's, and the problem `init` describes on a request, its defaults filled as alxia fills them |
+| `health(options?)`, `HealthOptions`, `HealthCheck`, `CheckResult`, `ReadinessReport`, `LivenessReport` | the probes as a plugin app: `GET /health`, 200 while the process is up; `GET /ready`, the checks run at once with a `timeout`, cached for `cache` ms, 200 or 503, and 503 from the moment shutdown starts |
+| `isHealthRoute(route)` | whether a route is one of `health()`'s, wherever mounted: what `@alxia/openapi`'s `matchesSpec` leaves out |
+| `shutdownSignal(ctx)` | an `AbortSignal` aborted as soon as the app serving the request starts shutting down: what a long response ends on |
 | `ValidationError`, `refusalOf(error)` | what `validate` throws — an `HttpError` of the 400, its `refusal` `{ kind: 'validation', part, issues }` and its default `body` — and what reads the `Refusal` of it or of a `ContentTooLargeError`, else `undefined`: how a middleware before a `validate` answers a refusal |
 | `settle(ctx, next())` | for a middleware that must see the final response: resolves to what `next()` resolved to or, when it rejected, to the answer the route boundary would give — an `HttpError` with its status and body, a 500 — with the error on `ctx.error` |
 | `ContentTooLargeError`, `ContentTooLargeBody` | what reading a body past its route's `bodyLimit` throws — a `body_limit` refusal — and the body of its default 413: `{ error: 'content_too_large', limit }` |
@@ -790,7 +851,7 @@ covers all three kinds.
 | `definePlugin<Requires>()(build)` | an app plugin built on an app whose context has `Requires`; `plugin` refuses it on an app that does not give them |
 | `Requiring<Requires>`, `ProvidedBy<Ctx, Requires>` | the marker on a `definePlugin` plugin, and the check `plugin` makes of it |
 | `RequiresOf<Ctx, Callback?>` | what a callback annotated `Ctx` reads beyond `BaseContext` — `{ user: User }` for `BaseContext & { user: User }`, `Empty` for nothing more: the `Requires` of a plugin that infers it from a callback it is given. A callback annotated `any` is refused on every app, with a message naming `Callback` |
-| `ListenOptions` | the options of `listen`: `port`, `hostname`, `development`, `idleTimeout`, `maxRequestBodySize`, `tls` |
+| `ListenOptions` | the options of `listen`: `port`, `hostname`, `development`, `idleTimeout`, `maxRequestBodySize`, `tls`, `shutdownTimeout` (10 000 ms), `signals` (`['SIGINT', 'SIGTERM']`, or `false`) |
 | `StartHook`, `StopHook`, `BodyParser` | the hooks of `onStart` and `onStop`, and a body parser |
 | `joinPath(prefix, path)` | a path under a prefix, as the app joins them: `joinPath('/api', '/')` is `'/api'`; typed `JoinPath` |
 | `shapeOf(path)` | the path with its parameter names erased, as the router compares them: `shapeOf('/pets/:id') === shapeOf('/pets/:petId')`; throws a `TypeError` for a path no route may be declared at |
@@ -806,7 +867,7 @@ covers all three kinds.
 | `StaticMethod`, `FileMethod`, `PageMethod`, `DecorateMethod`, `DeriveMethod`, `BodyLimitMethod`, `StartHookMethod`, `StopHookMethod`, `ParserMethod`, `GroupMethod`, `UseMethod`, `PluginMethod`, `RequestMethod`, `ListenMethod` | the types of the app's other methods, each holding its overloads and their documentation: `static`, `file`, `page`; `decorate`, `derive`, `bodyLimit`; `onStart`, `onStop`, `parser`; `group`, `use` and `plugin`; `request` and `listen`. Exported so an app's type can be named in a declaration file |
 | `SocketMethod`, `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage` | sockets: the type of `ws` (`path, options?, ...middlewares, handlers`), the parts of a socket route as the app reads them, what its handlers read, send and receive |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema types |
-| `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426 |
+| `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426, under `errors: 'json'` |
 | `ValidationIssue`, `ValidationTarget` | one issue of a 400, and where the refused value was read from |
 | `Refusal`, `ValidationRefusal`, `BodyLimitRefusal`, `RequestPart` | what `refusalOf` reads: the refusal by `kind` — `validation`, with the `part` that failed first and its `issues`, or `body_limit`, with the route's `limit` |
 | `RefusalKind`, `RefusalOfKind<Kind>` | the kinds of refusal, `'validation' \| 'body_limit'`, and the refusal of one kind: `refusalOf(error)` narrowed by its `kind` |
@@ -818,7 +879,7 @@ covers all three kinds.
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/core/docs): a page per area — routes and validation, replies, middleware, lifecycle hooks, groups and plugins, writing a plugin, static files, server-sent events, WebSockets, serving, and the app's type.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/core/docs): a page per area — routes and validation, replies, errors and problem details, middleware, lifecycle hooks, groups and plugins, writing a plugin, static files, server-sent events, WebSockets, serving, health and shutdown, and the app's type.
 - [Middleware: which way to use](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md): a route's middlewares, `use`, `derive`, groups and plugins side by side, and the order a request runs them in.
 - [Upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md): what the next release changes, and what can break.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md): an error message, and what to do about it.

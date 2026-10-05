@@ -1,8 +1,12 @@
 import {
 	type BaseContext,
 	defineMiddleware,
+	errorFormat,
 	type Middleware,
 	type Next,
+	type Problem,
+	problem,
+	problemOf,
 	type Reply,
 } from '@alxia/core';
 import {
@@ -56,17 +60,25 @@ export interface JanusErrorsOptions {
 	readonly report?: (error: JanusError, ctx: BaseContext) => unknown;
 }
 
+/**
+ * A `JanusError` answered under `alxia({ errors: 'problem' })`: an RFC
+ * 9457 problem, its `code` and the members of `JanusErrorBody` its
+ * extensions.
+ */
+export type JanusErrorProblem = Problem<JanusErrorStatus, JanusErrorBody>;
+
 /** What `janusErrors()` makes: a middleware that answers what janus throws behind it. */
 export type JanusErrors = Middleware<
 	object,
-	Promise<Next | Reply<JanusErrorStatus, JanusErrorBody>>
+	Promise<Next | Reply<JanusErrorStatus, JanusErrorBody | JanusErrorProblem>>
 >;
 
 /**
  * Janus's errors answered, as a middleware: every `JanusError` thrown
  * behind it — by `session()`, `permission()`, a route — a sign-in
  * refused, a login taken, a store down — is answered with janus's status
- * and `bodyOf(error)`, typed on the routes declared after it. A throttled
+ * and `bodyOf(error)` — under `alxia({ errors: 'problem' })`, a problem
+ * whose extensions are that body — typed on the routes declared after it. A throttled
  * sign-in carries `Retry-After`. Anything else goes on, thrown, to the
  * middlewares before it, or to the route boundary's 500.
  *
@@ -96,7 +108,7 @@ function answer(
 	error: JanusError,
 	ctx: BaseContext,
 	options: JanusErrorsOptions,
-): Reply<JanusErrorStatus, JanusErrorBody> {
+): Reply<JanusErrorStatus, JanusErrorBody | JanusErrorProblem> {
 	const status: JanusErrorStatus = statusOf(error.code);
 	if (status >= 500 && options.report !== undefined) {
 		Promise.resolve()
@@ -106,13 +118,14 @@ function answer(
 			);
 	}
 	const body = bodyOf(error);
-	return ctx.reply(
-		status,
-		body,
+	const init =
 		error.retryAfter === undefined
 			? {}
-			: { headers: { 'retry-after': String(error.retryAfter) } },
-	);
+			: { headers: { 'retry-after': String(error.retryAfter) } };
+	if (errorFormat(ctx) === 'problem') {
+		return problem(problemOf(ctx, { status, ...body }), init);
+	}
+	return ctx.reply(status, body, init);
 }
 
 export { statusOf };

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { alxia, eventStream } from '@alxia/core';
+import { alxia, eventStream, health } from '@alxia/core';
 import { z } from 'zod';
 import { implemented, matchesSpec, type Operations } from './routes';
 
@@ -222,6 +222,13 @@ describe('matchesSpec', () => {
 				exclude: (route) => route.path === '/health',
 			}),
 		).not.toThrow();
+	});
+
+	test("the probes of core's health() are left out already, under a prefix too", () => {
+		const app = routed()
+			.plugin(health())
+			.group('/ops', (group) => group.plugin(health()));
+		expect(() => matchesSpec(app, operations)).not.toThrow();
 	});
 
 	test('under a prefix, the routes listed as the app serves them', () => {

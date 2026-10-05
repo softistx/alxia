@@ -1,0 +1,5 @@
+---
+"@alxia/core": minor
+---
+
+Probes and a graceful shutdown. `app.plugin(health({ checks }))` adds `GET /health`, 200 while the process is up, and `GET /ready`, which runs the checks at once, each within `timeout`, caches the report for `cache` ms and answers 200, or 503 with each check's status and duration — and 503 from the moment the app starts shutting down; `isHealthRoute` tells the probes from any other route, which `@alxia/openapi`'s `matchesSpec` leaves out by it. `listen` now handles `SIGINT` and `SIGTERM` (`signals`, `false` to keep them yours): readiness turns 503, new connections are refused, open sockets close with 1001, streams of server-sent events end, the requests in flight finish within `shutdownTimeout` (10 000 ms), the `onStop` hooks run, and the process exits 0, or 1 when a hook throws. `stop()` runs the same shutdown without the exit, and returns the same promise when called again; it used to wait for the requests in flight indefinitely. `shutdownSignal(ctx)` ends a long response of your own when the shutdown starts.

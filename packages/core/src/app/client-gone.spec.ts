@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 import { connect } from 'node:net';
 import { alxia, settle, validate } from '../index';
-import { CLIENT_GONE } from './send';
+import { CLIENT_GONE } from './answers';
 
 afterEach(() => {
 	(console.error as unknown as { mockRestore?: () => void }).mockRestore?.();

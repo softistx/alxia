@@ -155,6 +155,42 @@ POST {}                               → 200 {"errors":[{"message":"Must provid
 Both methods answer a body to read as GraphQL, whatever its status, and
 the replies of the middlewares before them — a guard's `401`, say.
 
+## Errors, health and shutdown
+
+**GraphQL errors stay GraphQL's.** A resolver that throws, a query that
+does not validate, is an entry of `errors[]` in Yoga's answer — inside a
+`200`, as the GraphQL over HTTP specification has it — whatever
+`@alxia/core`'s `errors` option says. `alxia({ errors: 'problem' })`
+applies to the HTTP layer around the endpoint: `@alxia/jwt`'s 401 before
+it, a body past its `bodyLimit` (413), a middleware's 500, a `PUT` at its
+path (405) — each an `application/problem+json` problem
+([core's errors guide](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/errors.md#graphql)).
+
+```text
+POST {"query":"{ boom }"}      → 200 {"data":{"boom":null},"errors":[{"message":"Unexpected error.", …}]}
+POST without a token           → 401 application/problem+json {"type":"about:blank","title":"Unauthorized", …}
+```
+
+**Probes and the drain.** `@alxia/core`'s `health()` mounts beside the
+endpoint, and `listen`'s graceful shutdown covers it: on `SIGTERM` a
+query or a mutation in flight is answered, and a subscription over
+server-sent events ends — its stream cancelled as when the client leaves,
+the client reading the end and reconnecting elsewhere — so the drain does
+not wait for it until `shutdownTimeout`.
+
+```ts
+import { alxia, health } from '@alxia/core';
+import { bearer } from '@alxia/jwt';
+import { graphql } from '@alxia/graphql';
+
+const app = alxia({ errors: 'problem' })
+	.plugin(health({ checks: { db: () => sql`select 1` } }))
+	.use(bearer({ jwt }))
+	.plugin((app) => graphql(app, { schema }));
+
+app.listen({ port: 4000 }); // SIGTERM: /ready 503, queries answered, subscriptions ended, exit 0
+```
+
 ## Testing it
 
 The endpoint runs in process through `app.request` or `app.fetch`, like

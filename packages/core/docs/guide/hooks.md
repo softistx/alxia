@@ -118,9 +118,11 @@ type StopHook = () => MaybePromise<void>;
 ```
 
 `onStart` runs once `listen` has started the server; it is not awaited, and
-an error it throws is logged. `onStop` runs after `stop()` has stopped the
-server, each hook awaited in turn: close a pool, flush a log. Both apply to
-the whole app wherever they are declared.
+an error it throws is logged. `onStop` runs once the server has shut down —
+on `SIGTERM` or `SIGINT`, or `stop()` — after the requests in flight
+finished, each hook awaited in turn: close a pool, flush a log. One that
+throws on a signal ends the process with 1. Both apply to the whole app
+wherever they are declared.
 
 ```ts
 const app = alxia()
@@ -128,7 +130,7 @@ const app = alxia()
 	.onStop(() => pool.end());
 ```
 
-See [Serving](serving.md#stopping).
+See [Serving](serving.md#stopping) and [Health and shutdown](health-and-shutdown.md#graceful-shutdown).
 
 ## `parser`
 

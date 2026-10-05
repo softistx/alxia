@@ -2,7 +2,7 @@
  * The endpoint behind `graphql()`: one Yoga per path it is served at, and
  * the route handler that hands each request to it.
  */
-import type { BaseContext, StatusCode } from '@alxia/core';
+import { type BaseContext, type StatusCode, shutdownSignal } from '@alxia/core';
 import {
 	createYoga,
 	type YogaServerInstance,
@@ -95,8 +95,55 @@ export function graphqlHandler<UserCtx extends YogaContext>(
 		) {
 			headers.set('content-security-policy', GRAPHIQL_POLICY);
 		}
-		return reply(response.status as StatusCode, response.body ?? undefined, {
+		const body = endedOnShutdown(response, shutdownSignal(ctx));
+		return reply(response.status as StatusCode, body ?? undefined, {
 			headers,
 		});
 	};
+}
+
+/**
+ * A subscription's or an incremental delivery's body, which streams until
+ * its reader stops: ended when the app starts shutting down — Yoga's
+ * stream cancelled, as when the client leaves, and the client reading its
+ * end — so the drain does not wait for it. Any other body finishes within
+ * the drain as it is.
+ */
+function endedOnShutdown(
+	response: Response,
+	signal: AbortSignal,
+): ReadableStream<Uint8Array> | null {
+	const body = response.body;
+	const type = response.headers.get('content-type') ?? '';
+	if (body === null || !/text\/event-stream|multipart\/mixed/.test(type)) {
+		return body;
+	}
+	const reader = body.getReader();
+	return new ReadableStream<Uint8Array>({
+		start(controller) {
+			const end = () => {
+				void reader.cancel();
+				try {
+					controller.close();
+				} catch {
+					// Closed already: the stream had ended.
+				}
+			};
+			if (signal.aborted) end();
+			else signal.addEventListener('abort', end, { once: true });
+		},
+		async pull(controller) {
+			const { value, done } = await reader.read();
+			if (done) {
+				try {
+					controller.close();
+				} catch {
+					// Closed already: the shutdown ended it.
+				}
+				return;
+			}
+			controller.enqueue(value);
+		},
+		cancel: (reason) => reader.cancel(reason),
+	});
 }

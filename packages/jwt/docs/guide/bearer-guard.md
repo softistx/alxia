@@ -33,7 +33,7 @@ function bearer<Schema extends StandardSchemaV1 | undefined = undefined>(
 
 type Bearer<Schema extends StandardSchemaV1 | undefined = undefined> = Middleware<
 	Empty,
-	Promise<Reply<401, UnauthorizedBody> | Next<{ user: User<Schema> }>>
+	Promise<Reply<401, UnauthorizedBody | UnauthorizedProblem> | Next<{ user: User<Schema> }>>
 >;
 
 interface BearerOptions<Schema extends StandardSchemaV1 | undefined> {
@@ -126,6 +126,21 @@ interface UnauthorizedBody {
 401 {"error":"unauthorized","reason":"expired"}
 401 {"error":"unauthorized","reason":"claims","issues":[{"target":"headers","path":["role"],"code":"invalid_value","message":"Invalid option: expected one of \"admin\"|\"user\""}]}
 ```
+
+### As a problem
+
+On an app that answers its errors as RFC 9457 problems, the same 401 is
+an `application/problem+json` problem, its challenge kept: `reason` and
+`issues` are its extensions, typed `UnauthorizedProblem`.
+
+```text
+401 application/problem+json {"type":"about:blank","title":"Unauthorized","status":401,"detail":"The request carries no bearer token","instance":"/me","reason":"missing"}
+401 application/problem+json {"type":"about:blank","title":"Unauthorized","status":401,"detail":"The bearer token is refused: expired","instance":"/me","reason":"expired"}
+```
+
+The guard reads the format of the app serving the request
+(`errorFormat(ctx)`), so it follows the app it is mounted on
+([core's errors guide](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/errors.md)).
 
 The `verify` reasons are explained on [Signing and verifying](tokens.md#verify),
 and each one, with its fix, in [Troubleshooting](../troubleshooting.md#responses).

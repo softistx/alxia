@@ -100,6 +100,26 @@ graphql(app, {
 - **CORS** is `@alxia/cors`'s for the whole app: Yoga's own is off unless
   `cors` is given.
 
+## Errors, health and shutdown
+
+A GraphQL error stays GraphQL's — an entry of `errors[]`, inside a 200 —
+while `@alxia/core`'s `alxia({ errors: 'problem' })` makes the HTTP layer
+around the endpoint answer RFC 9457 problems: a guard's 401, a 413, a
+500. `health()` mounts beside it, and on `SIGTERM` the queries in flight
+are answered and the subscriptions ended before the process exits:
+
+```ts
+import { alxia, health } from '@alxia/core';
+import { graphql } from '@alxia/graphql';
+
+const app = alxia({ errors: 'problem' })
+	.plugin(health())
+	.plugin((app) => graphql(app, { schema }));
+app.listen({ port: 4000 });
+```
+
+See [the endpoint guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/endpoint.md#errors-health-and-shutdown).
+
 ## API
 
 | export | |

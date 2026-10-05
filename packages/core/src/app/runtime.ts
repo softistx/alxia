@@ -2,6 +2,8 @@
  * The runtime an app is built into: made from its options, and filled with
  * the lifecycle hooks and parsers of the plugins it uses.
  */
+
+import type { ErrorFormat } from '../errors/problems';
 import { joinPath } from '../router/paths';
 import { Router } from '../router/router';
 import type { Globals, Runtime } from './definition';
@@ -21,6 +23,8 @@ export function createRuntime(
 		unmatched,
 		globals: { onStart: [], onStop: [], parsers: [], pages: new Map() },
 		validateResponses: options.validateResponses ?? true,
+		served: { errors: errorFormatOf(options), closing: new AbortController() },
+		sockets: new Set(),
 		ip:
 			options.ip ??
 			((request, server) => server?.requestIP(request)?.address ?? undefined),
@@ -43,4 +47,15 @@ export function mergeGlobals(
 	for (const [path, bundle] of globals.pages) {
 		addPage(runtime, joinPath(prefix, path), bundle);
 	}
+}
+
+/** The `errors` option, `json` unless given; anything else throws. */
+function errorFormatOf(options: AlxiaOptions<string>): ErrorFormat {
+	const errors = options.errors ?? 'json';
+	if (errors !== 'json' && errors !== 'problem') {
+		throw new TypeError(
+			`alxia(): errors must be 'json' or 'problem', not ${JSON.stringify(errors)}`,
+		);
+	}
+	return errors;
 }
