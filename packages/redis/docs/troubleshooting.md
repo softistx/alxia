@@ -22,6 +22,9 @@ each through. It prints one warning of its own, under
 - [`RedisError: Connection closed`](#rediserror-connection-closed)
 - [`TypeError: connectRedis: this URI is already connected with other options. Pass the same options everywhere, or close the first connection.`](#typeerror-connectredis-this-uri-is-already-connected-with-other-options-pass-the-same-options-everywhere-or-close-the-first-connection)
 
+- [`TypeError: @alxia/redis: this @nxgt/redis handle wires N Redis instances (…), and one is needed.`](#typeerror-alxiaredis-this-nxgtredis-handle-wires-n-redis-instances--and-one-is-needed)
+- [`TypeError: defineRedis: instance "default" wires no cache and no channel.`](#typeerror-defineredis-instance-default-wires-no-cache-and-no-channel)
+
 **Runtime: a 500, with this in the log**
 
 - [`TypeError: defineRateLimit: "…" has a burst of … and a per of …ms; burst × per must be at most 9007199254740 for the script to count exactly`](#typeerror-defineratelimit--has-a-burst-of--and-a-per-of-ms-burst--per-must-be-at-most-9007199254740-for-the-script-to-count-exactly)
@@ -55,6 +58,8 @@ each through. It prints one warning of its own, under
 - [Two limits count each other's requests](#two-limits-count-each-others-requests)
 - [A `401` or a `429` is replayed, with `Idempotent-Replayed: true`, after the client fixed it](#a-401-or-a-429-is-replayed-with-idempotent-replayed-true-after-the-client-fixed-it)
 - [One client gets another client's response](#one-client-gets-another-clients-response)
+- [Counts and kept responses vanish after moving to a handle with a `prefix`](#counts-and-kept-responses-vanish-after-moving-to-a-handle-with-a-prefix)
+- [The handle is closed while something still uses it](#the-handle-is-closed-while-something-still-uses-it)
 
 ## Install and types
 
@@ -220,6 +225,36 @@ everywhere:
 const check = await connectRedis(Bun.env['REDIS_URL']!, { autoReconnect: false });
 await check.close();
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
+```
+
+### `TypeError: @alxia/redis: this @nxgt/redis handle wires N Redis instances (…), and one is needed.`
+
+**When:** a handle wiring several instances is given to `redis()`,
+`redisStore`, `redisCacheStore`, `idempotency` or `redisCheck`, at startup.
+
+**Why:** the keys of one deployment live on one Redis; which of several is
+meant is not guessed.
+
+**Fix:** give the bare client of the one, with the prefix in the `name`:
+
+```ts
+redisStore(handle.clients.cache, { name: 'shop:api' });
+```
+
+or wire one instance per handle.
+
+### `TypeError: defineRedis: instance "default" wires no cache and no channel.`
+
+**When:** `defineRedis({ uri, prefix })` is written only to give the stores
+and `idempotency` a prefix.
+
+**Why:** `@nxgt/redis` refuses a handle that wires nothing.
+
+**Fix:** wire at least one cache (or channel) on it, the one `redis(handle)`
+then puts in the context as `caches`:
+
+```ts
+defineRedis({ uri, prefix: 'shop', caches: { users } });
 ```
 
 ## Runtime: a 500, with this in the log
@@ -650,3 +685,30 @@ idempotency(connection.client, {
 
 [Scope](guide/idempotency.md#scope-whose-key-it-is) shows the `ip` option
 behind a proxy.
+
+### Counts and kept responses vanish after moving to a handle with a `prefix`
+
+**Symptom:** after `redisStore(client, …)` becomes `redisStore(handle, …)`,
+rate-limit counts start from zero, kept responses miss and an idempotent
+repeat runs again.
+
+**Why:** the handle's `prefix` is in front of every key, so the keys are
+new: `api:…` is now `shop:api:…`. The old ones expire on their own.
+
+**Fix:** none is needed beyond waiting for the longest `ttl`; switch during a
+quiet period, or keep the bare client until then.
+
+### The handle is closed while something still uses it
+
+**Symptom:** after the app stopped, or in a second app sharing the handle,
+commands fail with `RedisError: Connection closed`.
+
+**Why:** `redis(handle)` closes the handle when its app stops. Two apps
+given one handle close it with the first.
+
+**Fix:** pass `{ close: false }` to every `redis(handle, …)` but the one that
+owns the handle's life, or close it yourself:
+
+```ts
+app.plugin(redis(handle, { close: false }));
+```
