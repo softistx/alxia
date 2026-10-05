@@ -46,8 +46,20 @@ routes declared after it, and also a request no route matches: it is counted,
 and past the limit answers the 429 before the 404. Put it in a `group` to
 count only some routes: a path-scoped `use('/api', …)` cannot give `rateLimit` to the context.
 
-Behind a proxy, give the app an `ip` option that reads the header it sets:
-`alxia({ ip: (request) => request.headers.get('x-real-ip') ?? undefined })`.
+Behind a proxy, the connection is the proxy: give the app an `ip` option that
+reads the client from the header the proxy appends to, with core's `forwardedIp`:
+
+```ts
+import { alxia, forwardedIp } from '@alxia/core';
+
+const app = alxia({ ip: forwardedIp({ trusted: 1 }) }) // one proxy in front
+	.use(rateLimit({ limit: 100, windowMs: 60_000 }));
+```
+
+Never key by the first entry of `X-Forwarded-For` (`split(',')[0]`): the client
+writes it, so a new value in each request is a new allowance. `forwardedIp`
+reads the entry your proxy appended
+([Serving](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#the-clients-address-ip)).
 
 ## Across processes
 
