@@ -220,7 +220,7 @@ See [the endpoint guide](https://github.com/softistx/alxia/blob/develop/packages
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/graphql/docs): a page per area — mounting the endpoint, the typed context, Yoga's plugins and options, GraphQL over WebSocket, and GraphiQL and Apollo Sandbox.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/graphql/docs): a page per area — mounting the endpoint, the typed context, Yoga's plugins and options, GraphQL over WebSocket, GraphiQL and Apollo Sandbox, and [hardening an API for production](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/production.md) (rate limits, depth limits, introspection, errors, body size, CSRF, persisted operations).
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/roadmap.md): what is coming, and what is not planned.
 - [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [A GraphQL API](https://github.com/softistx/alxia/blob/develop/docs/recipes/graphql-api.md), [Authenticate requests](https://github.com/softistx/alxia/blob/develop/docs/recipes/authentication.md), [Test an alxia app](https://github.com/softistx/alxia/blob/develop/docs/recipes/testing.md), [Health checks and graceful shutdown](https://github.com/softistx/alxia/blob/develop/docs/recipes/health-and-shutdown.md), and more.

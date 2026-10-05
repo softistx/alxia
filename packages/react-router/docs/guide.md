@@ -1142,7 +1142,7 @@ test('the API routes every operation of openapi.yaml, and nothing else', async (
 When the app puts the operations under a prefix the document's paths
 leave out, `app.group('/api', (api) => api.route(…))`, give `matchesSpec`
 the same `prefix: '/api'`. See
-[`@alxia/openapi`'s checks](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md).
+[`@alxia/openapi`'s matching](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/matching.md#under-a-prefix).
 
 ## Testing
 

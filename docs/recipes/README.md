@@ -10,7 +10,7 @@ of their own, type-checked and, where they have a spec, run by
 | --- | --- | --- |
 | sign users in, guard routes, check a role, keep a session | [Authenticate requests](authentication.md) | `core`, `jwt`, `janus` |
 | write the contract first and get routes, a test, a client and docs from it | [A spec-first CRUD API](spec-first-crud.md) | `core`, `openapi`, `env` |
-| serve GraphQL with typed resolvers, a viewer, subscriptions and GraphiQL | [A GraphQL API](graphql-api.md) | `core`, `graphql`, `jwt` |
+| serve GraphQL with typed resolvers, a viewer, subscriptions and GraphiQL | [A GraphQL API](graphql-api.md) | `core`, `graphql`, `jwt`, `rate-limit`, `logger` |
 | take a file, validate it, cap the request, store it | [File uploads](file-uploads.md) | `core` |
 | push events to a client, or talk both ways | [SSE and WebSockets](sse-and-websockets.md) | `core` |
 | test routes, middlewares, sockets and Redis | [Test an alxia app](testing.md) | `core`, `openapi`, `redis` |
