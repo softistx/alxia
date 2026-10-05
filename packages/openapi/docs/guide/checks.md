@@ -90,9 +90,8 @@ check, a page, an admin route.
 
 ## `matchesSpec`
 
-Called `exactly` until 0.2.0 of `@alxia/openapi-routes`: `exactly` and
-`ExactlyOptions` still work, deprecated, and their messages still start
-with `exactly():`.
+Called `exactly` until 0.2.0 of `@alxia/openapi-routes`; `exactly` and
+`ExactlyOptions` were removed in 0.5.
 
 ```text
 TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
@@ -110,14 +109,17 @@ route as `app.routes` holds it — method, full path, schema — and returns
 import { isReactRouterRoute } from '@alxia/react-router';
 
 matchesSpec(app, api, {
-	// the pages a React Router app serves beside the API, and the load balancer's check
-	exclude: (route) => isReactRouterRoute(route) || route.path === '/health',
+	// the pages a React Router app serves beside the API, and a metrics route of its own
+	exclude: (route) => isReactRouterRoute(route) || route.path === '/metrics',
 });
 ```
 
 `isReactRouterRoute`, from `@alxia/react-router`, is one such predicate:
 `true` for the routes `reactRouter()` declared, its catch-all and the
-client build's files. Any function of the route works.
+client build's files. Any function of the route works. The routes of
+`apiDocs()` and the probes of `@alxia/core`'s `health()` — `/health` and
+`/ready`, wherever mounted — need none: `matchesSpec` leaves them out
+already.
 
 `exclude` is not consulted for the first half: an operation with no route
 is always listed.

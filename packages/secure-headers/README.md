@@ -103,7 +103,6 @@ value is refused at startup. `nonce` is off by default.
 | `NonceContext` | what `nonce: true` adds to the context: `nonce`, a string |
 | `SecureHeaders` | what `secureHeaders()` returns: a middleware that adds nothing to the context |
 | `NonceMiddleware` | what `secureHeaders({ nonce: true })` returns: a middleware adding `NonceContext` |
-| `NoncePlugin` | deprecated: the former name of `NonceMiddleware` |
 
 ## Traps
 

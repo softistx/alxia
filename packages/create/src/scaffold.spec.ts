@@ -33,13 +33,18 @@ describe('create-alxia: the project written', () => {
 			await json(join(project.root, 'my-api', 'package.json')),
 		).toMatchObject({
 			name: 'my-api',
-			dependencies: { '@alxia/core': ALXIA['@alxia/core'], zod: '^4.6.5' },
-			devDependencies: {
+			dependencies: {
+				'@alxia/core': ALXIA['@alxia/core'],
+				'@alxia/env': ALXIA['@alxia/env'],
 				'@alxia/openapi': ALXIA['@alxia/openapi'],
+				zod: '^4.6.5',
+			},
+			devDependencies: {
 				// Pinned exactly, as its output is committed: never moved, so
 				// `verify` still passes when a newer patch writes differently.
 				'@nxgt/openapi-codegen': '0.7.0',
 				'@types/bun': '^1.4.2',
+				'openapi-fetch': '^0.17.1',
 				typescript: '^7.0.2',
 			},
 		});
@@ -105,7 +110,9 @@ describe('create-alxia: the project written', () => {
 		expect(ran).toEqual([{ command: [process.execPath, 'install'], cwd: dir }]);
 		const manifest = await json(join(dir, 'package.json'));
 		expect(manifest.name).toBe('web');
-		expect(manifest.scripts.start).toBe('bun build/server/index.js');
+		expect(manifest.scripts.start).toBe(
+			'NODE_ENV=production bun build/server/index.js',
+		);
 		expect(manifest.dependencies).toEqual({
 			'@alxia/core': ALXIA['@alxia/core'],
 			'@alxia/react-router': ALXIA['@alxia/react-router'],
@@ -135,6 +142,8 @@ describe('create-alxia: the project written', () => {
 		// Fixed ranges, not this checkout's: at x.y.0 nothing older shares the minor.
 		const published = {
 			'@alxia/core': '^0.3.1',
+			'@alxia/env': ALXIA['@alxia/env'],
+			'@alxia/graphql': ALXIA['@alxia/graphql'],
 			'@alxia/openapi': ALXIA['@alxia/openapi'],
 			'@alxia/react-router': '^0.2.0',
 		};
@@ -165,7 +174,7 @@ describe('create-alxia: the project written', () => {
 			),
 		).toBe(0);
 		expect(err[0]).toBe(
-			'create-alxia: warning: the registry did not answer for @alxia/core, zod, @alxia/openapi, @biomejs/biome, @types/bun, typescript; kept the versions the template ships.',
+			'create-alxia: warning: the registry did not answer for @alxia/core, @alxia/env, @alxia/openapi, zod, @biomejs/biome, @types/bun, openapi-fetch, typescript; kept the versions the template ships.',
 		);
 		expect(
 			(await json(join(project.root, 'my-api', 'package.json'))).devDependencies

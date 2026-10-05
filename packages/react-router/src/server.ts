@@ -10,6 +10,7 @@ import {
 	alxia,
 	type ContextOf,
 	type Empty,
+	type ListenInfo,
 	type ListenOptions,
 	type MaybePromise,
 } from '@alxia/core';
@@ -17,7 +18,7 @@ import type { RouterContextProvider, ServerBuild } from 'react-router';
 import { declareClient, reactRouter } from './react-router';
 
 /** An app as `alxia()` makes it: what `beforeAll`, or `configure`, receives. */
-export type FreshApp = Alxia<Empty, '', never>;
+export type FreshApp = Alxia<Empty, ''>;
 
 /**
  * What the Vite plugin hands the server, and a test passes to `create`:
@@ -67,13 +68,15 @@ export interface ServerOptions<Before extends AnyAlxia, App extends AnyAlxia> {
 	 */
 	readonly client?: string | URL | false;
 	/**
-	 * `listen`'s options for `bun build/server/index.js`; a `port` or `hostname` here wins over `PORT` (3000)
+	 * `listen`'s options for `bun build/server/index.js` — `shutdownTimeout`,
+	 * `signals` among them; a `port` or `hostname` here wins over `PORT` (3000)
 	 * and `HOST` (`0.0.0.0`) from the environment.
 	 */
 	readonly listen?: ListenOptions;
 	/**
 	 * Called once the built server listens and its `SIGINT` and `SIGTERM` handlers are in place.
-	 * Prints `alxia listening on <url>` by default.
+	 * Prints `alxia listening on <url>` by default, and in dev the route
+	 * table (`alxia({ dev })`). An `onListen` in `listen` wins over it.
 	 */
 	readonly onListen?: (server: Bun.Server<unknown>) => void;
 }
@@ -93,9 +96,10 @@ export interface ReactRouterServer<App extends AnyAlxia> {
 	 */
 	create(wiring: ServerWiring): App;
 	/**
-	 * Listens with `app`, on `listen`, `PORT` and `HOST`, and stops it on
-	 * `SIGINT` or `SIGTERM`: its `onStop` hooks run, and the process exits.
-	 * What `bun build/server/index.js` runs.
+	 * Listens with `app`, on `listen`, `PORT` and `HOST`, and shuts it down
+	 * gracefully on `SIGINT` or `SIGTERM`, as `@alxia/core`'s `listen` does:
+	 * the requests in flight finish within `shutdownTimeout`, its `onStop`
+	 * hooks run, and the process exits. What `bun build/server/index.js` runs.
 	 */
 	start(app: App): Bun.Server<unknown>;
 }
@@ -126,7 +130,9 @@ export function createServer<
 				options.client === false
 					? undefined
 					: (options.client ?? wiring.client);
-			const fresh = alxia();
+			// The app helps the developer in React Router's dev alone: a production
+			// build is never in dev, whatever NODE_ENV says.
+			const fresh = alxia({ dev: mode === 'development' });
 			// Without beforeAll or configure, Before and App are their defaults,
 			// the app passed through: a type argument given by hand is believed.
 			const before = (options.beforeAll?.(fresh) ?? fresh) as Before;
@@ -148,31 +154,27 @@ export function createServer<
 			return app;
 		},
 		start(app) {
-			const server = app.listen({
+			const own = options.listen?.onListen;
+			// `listen` shuts the app down on SIGINT and SIGTERM — readiness 503,
+			// the requests in flight drained, the onStop hooks, then the exit —
+			// with its handlers in place before it tells onListen: a supervisor
+			// may signal as soon as it reads that the server listens.
+			return app.listen({
 				port: Number(process.env['PORT'] || 3000),
 				hostname: process.env['HOST'] || '0.0.0.0',
 				...options.listen,
+				onListen: (info) => {
+					if (own !== undefined) own(info);
+					else if (options.onListen !== undefined) {
+						options.onListen(info.server);
+					} else announce(info);
+				},
 			});
-			// Stop as the platform asks: the app's onStop hooks run, and the process ends.
-			// Installed before onListen: a supervisor may signal as soon as it reads
-			// that the server listens, and a signal with no handler yet kills the process.
-			for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-				process.once(signal, () => {
-					void app.stop().then(
-						() => process.exit(0),
-						(error: unknown) => {
-							console.error(error);
-							process.exit(1);
-						},
-					);
-				});
-			}
-			(options.onListen ?? announce)(server);
-			return server;
 		},
 	};
 }
 
-function announce(server: Bun.Server<unknown>): void {
-	console.log(`alxia listening on ${server.url}`);
+/** In dev, the route table `listen` prints; else one line. */
+function announce({ dev, table, url }: ListenInfo): void {
+	console.log(dev ? table : `alxia listening on ${url}`);
 }

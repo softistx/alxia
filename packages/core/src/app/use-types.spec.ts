@@ -1,6 +1,5 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
-import type { AnyReply, Reply } from '../reply/reply';
-import { type Alxia, alxia } from './alxia';
+import { alxia } from './alxia';
 import { defineMiddleware } from './define-middleware';
 import { definePlugin } from './define-plugin';
 import type { ContextOf } from './signatures';
@@ -47,17 +46,6 @@ describe('the types of app.use(...middlewares)', () => {
 		alxia().use(add, add, add, add, add, add, add, add, add);
 	});
 
-	test('their replies join the app’s shortcuts', () => {
-		const app = alxia().use(auth);
-		type Shortcut =
-			typeof app extends Alxia<object, string, infer S extends AnyReply>
-				? S
-				: never;
-		expectTypeOf<Shortcut>().toEqualTypeOf<
-			Reply<401, { readonly error: 'unauthorized' }>
-		>();
-	});
-
 	test('a group’s stay inside it', () => {
 		alxia()
 			.group('/me', (me) =>
@@ -67,15 +55,17 @@ describe('the types of app.use(...middlewares)', () => {
 			.get('/', ({ user, reply }) => reply(200, user.id));
 	});
 
-	test('only a function made by defineMiddleware is a middleware', () => {
-		expect(() =>
-			// @ts-expect-error a plain (ctx, next) function is read as a plugin
-			alxia().use((_ctx: object, next: () => Promise<Response>) => next()),
-		).toThrow(TypeError);
-		expect(() =>
-			// @ts-expect-error validate() belongs to a route
-			alxia().use(validate({})),
-		).toThrow(/validate\(\) or responds\(\), which belongs to a route/);
+	test('any (ctx, next) function is a middleware, typed by what it passes next()', () => {
+		const app = alxia()
+			.use((_ctx, next) => next({ x: 1 }))
+			.use(({ x }, next) => next({ y: `${x}` }));
+		expectTypeOf<ContextOf<typeof app>['x']>().toEqualTypeOf<number>();
+		expectTypeOf<ContextOf<typeof app>['y']>().toEqualTypeOf<string>();
+		// validate() belongs to a route: a compile error, and refused when declared.
+		// @ts-expect-error validate() and responds() belong to a route
+		expect(() => alxia().use(validate({}))).toThrow(
+			/validate\(\) or responds\(\), which belongs to a route/,
+		);
 	});
 
 	test('a plugin is still a plugin', () => {

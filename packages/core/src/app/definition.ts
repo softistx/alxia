@@ -1,31 +1,24 @@
 /**
- * An app as it runs: its hooks, and the definition of each route and socket
- * route it holds, with the hooks declared before it.
+ * An app as it runs: its lifecycle hooks, and the definition of each route
+ * and socket route it holds, with the middlewares declared before it.
  */
-import type { Refusal, RefusalKind } from '../errors/errors';
 import type { AnyReply } from '../reply/reply';
 import type { BodyParser } from '../request/read';
 import type { Router } from '../router/router';
 import type { SocketHandlers, SocketSchema } from '../ws/types';
 import type { ScopedHooks } from './scope';
 import type { ScopePath } from './scope-path';
+import type { Served } from './served';
 import type {
-	BaseContext,
 	MaybePromise,
 	Method,
-	RequestContext,
 	ResponseSchemas,
 	RouteSchema,
 } from './types';
 import type { RequestSchemas } from './validate';
 
-/** A hook that runs before validation, and may add to the context or end the request. */
+/** A `derive`: it may add to the context or end the request. */
 export type DeriveHook = (ctx: Record<string, unknown>) => unknown;
-/** A hook around the rest of a route: the hooks after it, validation, the handler. */
-export type WrapHook = (
-	ctx: Record<string, unknown>,
-	next: () => Promise<Response>,
-) => MaybePromise<Response | AnyReply>;
 /**
  * A middleware: it returns what `next(added)` resolves to, a reply, or a
  * `Response`.
@@ -35,11 +28,9 @@ export type MiddlewareHook = (
 	next: (added?: object) => Promise<Response>,
 ) => unknown;
 /**
- * A step of a route's chain, in the order declared: a hook in force where
- * it was declared or in its list, a middleware, its validation, the check
- * of its replies. `raw` is the validation of a route declared with a
- * schema and no middleware, the form of 0.3, which `app.routes` declares
- * by that schema rather than by its own.
+ * A step of a route's chain, in the order declared: a `derive` or a
+ * middleware in force where it was declared, a middleware of its own,
+ * its validation, the check of its replies.
  */
 export type ChainHook =
 	| {
@@ -48,96 +39,40 @@ export type ChainHook =
 			/** A group's or a prefixed plugin's, on a request no route matches: run only under its prefix. */
 			readonly when?: ScopePath;
 	  }
-	| { readonly kind: 'wrap'; readonly run: WrapHook }
 	| {
 			readonly kind: 'middleware';
 			readonly run: MiddlewareHook;
 			/** Given a path by `use`, run only on a request under it. */
 			readonly when?: ScopePath;
 	  }
-	| {
-			readonly kind: 'validate';
-			readonly schemas: RequestSchemas;
-			readonly raw?: boolean;
-	  }
+	| { readonly kind: 'validate'; readonly schemas: RequestSchemas }
 	| { readonly kind: 'responds'; readonly responses: ResponseSchemas };
-/** A hook that turns an error into a reply, or lets the next one try. */
-export type ErrorHook = (
-	error: unknown,
-	ctx: BaseContext,
-) => MaybePromise<AnyReply | undefined | void>;
-/** A hook that answers a request the app refused: a reply, or nothing for the default. */
-export type RefusalHook = (
-	refusal: Refusal,
-	ctx: BaseContext,
-) => MaybePromise<AnyReply | undefined | void>;
-/** The `onRefusal` hook in force for a route, and the schemas it declares. */
-export interface RefusalHandler {
-	readonly hook: RefusalHook;
-	/** The schema of each status the hook may answer: its reply is checked by it, and documented. */
-	readonly response?: ResponseSchemas;
-	/** The `content-type` of its reply, unless the reply sets one; documented too. */
-	readonly contentType?: string;
-}
 
-/**
- * The `onRefusal(kind, hook)` handlers in force for a route, by kind:
- * tried in order before its general `refusal`, the first that returns a
- * reply answering. A plugin's route lists its own before the app's.
- */
-export type RefusalHandlersByKind = {
-	readonly [Kind in RefusalKind]?: readonly RefusalHandler[];
-};
-
-/** Runs on every request, before routing; a `Response` it returns is sent as it is. */
-export type RequestHook = (
-	ctx: RequestContext,
-) => MaybePromise<Response | undefined | void>;
-/** Runs on every response, routed or not; a `Response` it returns replaces it. */
-export type ResponseHook = (
-	response: Response,
-	ctx: RequestContext,
-) => MaybePromise<Response | undefined | void>;
-/**
- * Runs around every request: `next()` runs the rest — the `onRequest`
- * hooks, the route, the `onResponse` hooks — and resolves to the response.
- * What the hook awaits around it runs in its async context: a span, a
- * transaction, a timer.
- */
-export type AroundHook = (
-	ctx: RequestContext,
-	next: () => Promise<Response>,
-) => Promise<Response>;
 export type StartHook = (server: Bun.Server<unknown>) => MaybePromise<void>;
 export type StopHook = () => MaybePromise<void>;
 
-/** A route as the app runs it: its schema, its handler, and the hooks declared before it. */
+/** A route as the app runs it: its options, its handler, and the middlewares declared before it. */
 export interface RouteDefinition {
 	readonly method: Method;
 	readonly path: string;
 	/**
-	 * What it validates and answers: its schema, or the schemas of its
-	 * `validate` and `responds` middlewares and its options, for a tool
-	 * that reads `app.routes`; the chain runs `derive`.
+	 * Its options — `detail`, `bodyLimit` — for a tool that reads
+	 * `app.routes`. The schemas of its `validate` and `responds` stay in its
+	 * chain: the OpenAPI document declares them.
 	 */
 	readonly schema: RouteSchema;
 	/**
-	 * The most bytes its request body may hold: its schema's `bodyLimit`,
+	 * The most bytes its request body may hold: its options' `bodyLimit`,
 	 * else the `bodyLimit` in effect where it was declared. None, no limit
 	 * beyond the server's `maxRequestBodySize`.
 	 */
 	readonly bodyLimit?: number;
 	readonly handler: (ctx: never) => MaybePromise<AnyReply>;
 	/**
-	 * Its chain, run before its handler: the hooks in force where it was
-	 * declared, then its own list, middlewares and validation.
+	 * Its chain, run before its handler: the middlewares in force where it
+	 * was declared, then its own, its validation among them.
 	 */
 	readonly derive: readonly ChainHook[];
-	readonly onError: readonly ErrorHook[];
-	/** The `onRefusal` hook declared last before it; none, and a refused request is the default 400. */
-	readonly refusal?: RefusalHandler | undefined;
-	/** The `onRefusal(kind, hook)` hooks in force for it, tried before `refusal`. */
-	readonly refusalByKind?: RefusalHandlersByKind | undefined;
 }
 
 /** A socket route as the app runs it. */
@@ -146,11 +81,6 @@ export interface SocketDefinition {
 	readonly schema: SocketSchema;
 	readonly handlers: SocketHandlers<never, never, never>;
 	readonly derive: readonly ChainHook[];
-	readonly onError: readonly ErrorHook[];
-	/** Answers a refused upgrade request, as a route's. */
-	readonly refusal?: RefusalHandler | undefined;
-	/** Answers a refused upgrade request of one kind, as a route's. */
-	readonly refusalByKind?: RefusalHandlersByKind | undefined;
 }
 
 export type Definition =
@@ -159,30 +89,25 @@ export type Definition =
 
 /** What is global to an app, wherever it is declared: a group's or a plugin's included. */
 export interface Globals {
-	readonly around: AroundHook[];
-	readonly onRequest: RequestHook[];
-	readonly onResponse: ResponseHook[];
 	readonly onStart: StartHook[];
 	readonly onStop: StopHook[];
 	readonly parsers: BodyParser[];
-	/**
-	 * The middlewares given to `plugin(middleware)`, deprecated: run first
-	 * on every route and every request no route matches, wherever declared,
-	 * as the global hooks of 0.3 they replace ran.
-	 */
-	readonly middlewares: ChainHook[];
 	/** Bun's HTML bundles, by their full path: served by `Bun.serve` itself. */
 	readonly pages: Map<string, Bun.HTMLBundle>;
 }
 
-/** What a request reads of an app: its routes, its global hooks, its options. */
+/** What a request reads of an app: its routes, its lifecycle hooks and parsers, its options. */
 export interface Runtime {
 	readonly router: Router<Definition>;
 	/** The chain a request no route matches runs: the app's own, every `use()` of it wherever declared. */
 	readonly unmatched: () => ScopedHooks;
-	/** Shared with the app's groups, whose global hooks are the app's. */
+	/** Shared with the app's groups, whose lifecycle hooks and parsers are the app's. */
 	readonly globals: Globals;
 	readonly validateResponses: boolean;
+	/** What its requests read of it: its error format, whether it is shutting down. */
+	readonly served: Served;
+	/** The sockets open on it, closed with 1001 when it shuts down. */
+	readonly sockets: Set<Bun.ServerWebSocket<unknown>>;
 	/** The `ip` option, or the address of the connection. */
 	readonly ip: (
 		request: Request,

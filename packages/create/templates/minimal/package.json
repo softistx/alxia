@@ -1,0 +1,25 @@
+{
+  "name": "my-app",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_ENV=development bun --hot src/index.ts",
+    "build": "bun build src/index.ts --target=bun --outdir=dist --minify --sourcemap=linked",
+    "start": "NODE_ENV=production bun dist/index.js",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "lint": "biome lint",
+    "format": "biome format --write",
+    "check": "biome check --write",
+    "check:ci": "biome ci",
+    "verify": "bun run check:ci && bun run typecheck && bun run test"
+  },
+  "dependencies": {
+    "@alxia/core": "workspace:^"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.5.15",
+    "@types/bun": "^1.4.2",
+    "typescript": "^6.0.3"
+  }
+}

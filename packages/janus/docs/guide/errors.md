@@ -56,7 +56,8 @@ down while the session is read (`STORE_FAILED`) is the app's 500
 before it: a `JanusError` it throws is not behind `janusErrors()`.
 
 It answers only a `JanusError`. Anything else goes on, thrown, to the
-middlewares before it, then the app's `onError`, or its 500.
+middlewares before it — a try/catch of your own around `await next()` — and,
+when none answers it, to the route boundary: an `HttpError`'s status, else a 500.
 
 An observer that settles `next()` (`logger()`, `secureHeaders()`,
 `telemetry()`, `createI18n()`) reads the response the error would be
@@ -173,13 +174,37 @@ if (me.status === 401) {
 if (me.status === 503) console.log(body.code);         // 'STORE_FAILED' and the like: try again later
 ```
 
+### As problems
+
+On an app that answers its errors as RFC 9457 problems, every answer of
+this package is one, sent as `application/problem+json`, with the
+`Retry-After` header kept: `janusErrors()`'s carries `bodyOf(error)` as
+its extensions, `code` first among them (`JanusErrorProblem`); a
+required `session()`'s 401 (`UnauthenticatedProblem`) and
+`permission()`'s 401, 404 and 403 (`PermissionRefusedProblem`) carry
+their five members alone. A caller narrows on `code` rather than on
+`error`:
+
+```text
+503 {"type":"about:blank","title":"Service Unavailable","status":503,"detail":"Service Unavailable","instance":"/me","code":"STORE_FAILED"}
+401 {"type":"about:blank","title":"Unauthorized","status":401,"detail":"The request has no session","instance":"/me"}
+403 {"type":"about:blank","title":"Forbidden","status":403,"detail":"The view permission on this record is not granted","instance":"/records/r1"}
+```
+
+Each reads the format of the app serving the request, with
+`@alxia/core`'s `errorFormat(ctx)`
+([core's errors guide](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/errors.md)).
+
 ## Signatures
 
 ```ts
 function janusErrors(options?: JanusErrorsOptions): JanusErrors;
 
 // a middleware: answers the JanusErrors thrown behind it
-type JanusErrors = Middleware<object, Promise<Next | Reply<JanusErrorStatus, JanusErrorBody>>> & MiddlewareMark;
+type JanusErrors = Middleware<object, Promise<Next | Reply<JanusErrorStatus, JanusErrorBody | JanusErrorProblem>>>;
+
+// under alxia({ errors: 'problem' })
+type JanusErrorProblem = Problem<JanusErrorStatus, JanusErrorBody>;
 
 interface JanusErrorsOptions {
 	readonly report?: (error: JanusError, ctx: BaseContext) => unknown;
@@ -199,7 +224,7 @@ function statusOf(code: JanusErrorCode): JanusErrorStatus; // @nxgt/janus's
 ```
 
 `JanusError`, `JanusErrorCode` and `JanusErrorStatus` are `@nxgt/janus`'s;
-`Middleware`, `MiddlewareMark`, `Next`, `Reply` and `BaseContext` are `@alxia/core`'s.
+`Middleware`, `Next`, `Reply`, `Problem` and `BaseContext` are `@alxia/core`'s.
 
 The permission guard's own refusals — `{ error: 'forbidden' }` and the
 like — are not `JanusError`s; see [Permissions](permissions.md#refusals).

@@ -3,55 +3,13 @@
  * merged with the reply's own, the body checked by the schema the route
  * declares for its status, and the answers the router gives on its own.
  */
-import {
-	type InternalErrorBody,
-	ResponseValidationError,
-	type RoutingErrorBody,
-} from '../errors/errors';
+import { ResponseValidationError } from '../errors/errors';
 import { vary } from '../reply/headers';
 import { type AnyReply, Reply, toResponse } from '../reply/reply';
 import { check, type StandardSchemaV1 } from '../schema/standard-schema';
 import { isAsyncIterable } from '../sse/async-iterable';
 import { isNamedEventStreamSchema, toFrames } from '../sse/named-events';
 import type { ResponseSchemas, ResponseSettings } from './types';
-
-const internal: InternalErrorBody = { error: 'internal' };
-
-/** The 500 of a request that failed: its body says no more than `internal`. */
-export function internalError(): Response {
-	return toResponse(500, internal, new Headers());
-}
-
-/**
- * Whether `error` is the client hanging up: the request's signal is
- * aborted and the error is that abort, as Bun's body read throws it (an
- * `AbortError`, not the signal's own reason). Any other error raised after
- * the client left, a bug included, is the app's.
- */
-export function clientGone(error: unknown, request: Request): boolean {
-	if (!request.signal.aborted) return false;
-	return (
-		error === request.signal.reason ||
-		(error instanceof DOMException && error.name === 'AbortError')
-	);
-}
-
-/**
- * What a request that failed with `error` gets. The client hanging up
- * mid-request (`clientGone`) is no app error: nothing is logged, and the
- * 499 nobody reads is only what an `onResponse` hook, a logger's, sees. Any
- * other error is logged and answered 500.
- */
-export function failed(error: unknown, request: Request): Response {
-	if (clientGone(error, request)) {
-		return new Response(null, { status: CLIENT_GONE });
-	}
-	console.error(error);
-	return internalError();
-}
-
-/** nginx's "client closed request": the status of a request its client left. */
-export const CLIENT_GONE = 499;
 
 /** A reply as it is, with what the route set on its response. */
 export function send(
@@ -81,8 +39,7 @@ export function send(
 
 /**
  * `reply` checked against the schema `responses` declares for its status,
- * as that schema's output: what a handler's reply and an `onRefusal`
- * hook's go through. A status with no schema, or a body its schema
+ * as that schema's output: what a reply after a `responds` goes through. A status with no schema, or a body its schema
  * refuses, throws a `ResponseValidationError`.
  */
 export async function checkReply(
@@ -109,18 +66,6 @@ export async function checkReply(
 	return new Reply(reply.status, checked.value, {
 		headers: reply.headers ?? {},
 	});
-}
-
-/** What the router answers when no route takes the request. */
-export function routingError(
-	status: 404 | 405 | 426,
-	error: RoutingErrorBody['error'],
-	allowed?: readonly string[],
-): Response {
-	const headers = new Headers();
-	if (allowed !== undefined) headers.set('allow', allowed.join(', '));
-	const body: RoutingErrorBody = { error };
-	return toResponse(status, body, headers);
 }
 
 /**

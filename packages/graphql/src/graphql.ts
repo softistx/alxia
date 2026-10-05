@@ -1,9 +1,9 @@
-import type {
-	Alxia,
-	AnyReply,
-	BaseContext,
-	Empty,
-	RoutePath,
+import {
+	type Alxia,
+	type BaseContext,
+	type Empty,
+	isDev,
+	type RoutePath,
 } from '@alxia/core';
 import type {
 	GraphQLSchemaWithContext,
@@ -24,7 +24,7 @@ type RouteOnly =
 	| 'redirect';
 
 /**
- * What alxia hands Yoga for each request: the context its hooks built —
+ * What alxia hands Yoga for each request: the context its middlewares built —
  * `user`, `db`, `log`… — with `request`, `url`, `ip` and `set`, through
  * which a resolver sets a cookie or a header on the response.
  */
@@ -60,7 +60,9 @@ export interface GraphQLOptions<
 	> {
 	/**
 	 * What a browser gets at the endpoint: Yoga's GraphiQL, Apollo Sandbox,
-	 * or nothing. GraphiQL by default; turn both off in production.
+	 * or nothing. By default, GraphiQL in the serving app's dev alone
+	 * (`isDev`: `alxia({ dev })`, else `NODE_ENV=development`), nothing
+	 * otherwise; `graphiql` or `apollo-sandbox` serves one everywhere.
 	 */
 	readonly ide?: 'graphiql' | 'apollo-sandbox' | false;
 	/** GraphiQL's options, Yoga's own, when `ide` is `graphiql`. */
@@ -73,7 +75,7 @@ export interface GraphQLOptions<
 	/**
 	 * The schema, from Yoga's `createSchema`, Pothos, or any tool that types
 	 * its context. Its context must be one the app builds: a resolver that
-	 * reads `user` behind no hook that derives one is a compile error.
+	 * reads `user` behind no middleware that adds one is a compile error.
 	 */
 	readonly schema: GraphQLSchemaWithContext<SchemaCtx>;
 	/** Where the endpoint is, under the app's prefix. `/graphql` by default. */
@@ -102,8 +104,8 @@ type ProvidesContext<Provided, Required> = Provided extends Required
 
 /**
  * A GraphQL endpoint on `app`, served by [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server):
- * `GET` and `POST` at `path`, behind every hook declared on `app` before it.
- * A guard before it guards it; what the hooks derived is in each
+ * `GET` and `POST` at `path`, behind every middleware given to `use` on `app`
+ * before it. A guard before it guards it; what the middlewares added is in each
  * resolver's context, typed. Yoga's options pass through — `plugins`
  * (Envelop's and Yoga's), `graphiql`, `maskedErrors`, `batching`… —
  * and subscriptions are served over server-sent events.
@@ -117,32 +119,34 @@ type ProvidesContext<Provided, Required> = Provided extends Required
 export function graphql<
 	Ctx extends object,
 	Prefix extends string,
-	Shortcuts extends AnyReply,
 	SchemaCtx,
 	UserCtx extends YogaContext = Empty,
 	const Path extends RoutePath = '/graphql',
 >(
-	app: Alxia<Ctx, Prefix, Shortcuts>,
+	app: Alxia<Ctx, Prefix>,
 	options: GraphQLOptions<ServerContext<Ctx>, UserCtx, Path, SchemaCtx> &
 		ProvidesContext<
 			YogaInitialContext & ServerContext<Ctx> & UserCtx,
 			SchemaCtx
 		>,
-): Alxia<Ctx, Prefix, Shortcuts> {
+): Alxia<Ctx, Prefix> {
 	const {
 		path = '/graphql' as Path,
 		cors = false,
-		ide = 'graphiql',
+		ide,
 		graphiql,
 		sandbox,
 		...yogaOptions
 	} = options;
+	const page = graphiql ?? true;
 	const yogaAt = yogaServers<UserCtx>({
 		...(yogaOptions as YogaServerOptions<YogaContext, UserCtx>),
 		cors,
-		graphiql: (ide === 'graphiql'
-			? (graphiql ?? true)
-			: false) as YogaServerOptions<YogaContext, UserCtx>['graphiql'],
+		graphiql: (ide === undefined
+			? (_request: Request, context: object) => isDev(context) && page
+			: ide === 'graphiql'
+				? page
+				: false) as YogaServerOptions<YogaContext, UserCtx>['graphiql'],
 	});
 	const handler = graphqlHandler(
 		yogaAt,

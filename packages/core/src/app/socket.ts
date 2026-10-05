@@ -10,11 +10,11 @@ import {
 import type { BodyParser } from '../request/read';
 import { check, type StandardSchemaV1 } from '../schema/standard-schema';
 import type { Socket } from '../ws/types';
+import { routingError } from './answers';
 import { fail, RUN } from './boundary';
 import { chain } from './chain';
 import { routeContext } from './context';
 import type { SocketDefinition } from './definition';
-import { routingError } from './send';
 import type { MaybePromise, RequestContext } from './types';
 
 /** What the pipeline returns once a socket is open: Bun wants no response then. */
@@ -54,7 +54,7 @@ export async function upgradeSocket(
 		(ctx as { [RUN]?: typeof run })[RUN] = run;
 		return await chain<typeof UPGRADED>(run, ctx, async (validated) => {
 			if (server === undefined) {
-				return routingError(426, 'upgrade_required');
+				return routingError(request, 426);
 			}
 			const headers = new Headers(set.headers);
 			if ((set as { touched?: () => boolean }).touched?.()) {
@@ -64,17 +64,19 @@ export async function upgradeSocket(
 			}
 			const data: SocketData = { definition, ctx: validated };
 			const upgraded = server.upgrade(request.request, { headers, data });
-			return upgraded ? UPGRADED : routingError(426, 'upgrade_required');
+			return upgraded ? UPGRADED : routingError(request, 426);
 		});
 	} catch (error) {
 		(request as { error: unknown }).error = error;
-		return fail(definition, error, ctx, validateResponses);
+		return fail(error, ctx);
 	}
 }
 
 /** The `websocket` handler `Bun.serve` runs every open socket through. */
 export function websocketHandler(
 	validate: boolean,
+	/** The sockets open, which a shutdown closes with 1001. */
+	sockets: Set<Bun.ServerWebSocket<unknown>>,
 ): Bun.WebSocketHandler<SocketData> {
 	const socketOf = (ws: Bun.ServerWebSocket<SocketData>) => {
 		ws.data.socket ??= createSocket(ws, validate);
@@ -92,10 +94,12 @@ export function websocketHandler(
 		}
 	};
 	return {
-		open: (ws) =>
-			guard(ws, () =>
+		open: (ws) => {
+			sockets.add(ws as Bun.ServerWebSocket<unknown>);
+			return guard(ws, () =>
 				ws.data.definition.handlers.open?.(socketOf(ws) as never),
-			),
+			);
+		},
 		message: (ws, raw) =>
 			guard(ws, async () => {
 				const { definition } = ws.data;
@@ -122,14 +126,16 @@ export function websocketHandler(
 				}
 				await definition.handlers.message(socket as never, message as never);
 			}),
-		close: (ws, code, reason) =>
-			guard(ws, () =>
+		close: (ws, code, reason) => {
+			sockets.delete(ws as Bun.ServerWebSocket<unknown>);
+			return guard(ws, () =>
 				ws.data.definition.handlers.close?.(
 					socketOf(ws) as never,
 					code,
 					reason,
 				),
-			),
+			);
+		},
 		drain: (ws) =>
 			guard(ws, () =>
 				ws.data.definition.handlers.drain?.(socketOf(ws) as never),

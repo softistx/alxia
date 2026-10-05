@@ -1,17 +1,19 @@
 # @alxia/redis
 
 Redis for [alxia](https://www.npmjs.com/package/@alxia/core), on
-[`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) and
-[`@nxgt/redis-guard`](https://www.npmjs.com/package/@nxgt/redis-guard) —
+[`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) —
 Bun's own Redis client, no driver, no dependency:
 
 - `redisStore`: a rate-limit store every process shares;
 - `idempotency`: a middleware, so routes run once per `Idempotency-Key`;
 - `redisCacheStore`: an `@alxia/cache` store every process shares;
-- `redis`: the client, typed caches and a lock in the context.
+- `redis`: the client, typed caches and a lock in the context;
+- `redisCheck`: a readiness check for core's `health()`.
+
+Each takes Bun's `RedisClient`, or an [`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) handle: see [With @nxgt/redis](#with-nxgtredis).
 
 ```sh
-bun add @alxia/redis @nxgt/redis @nxgt/redis-guard zod @alxia/core
+bun add @alxia/redis @nxgt/redis zod @alxia/core
 bun add -d typescript
 ```
 
@@ -144,6 +146,71 @@ const app = alxia()
 for everything else. It sits beside `@alxia/cache`'s `ctx.cache` — the
 response cache's `{ tag, skip }` — without touching it, in either order.
 
+## With @nxgt/redis
+
+Open the Redis once with `@nxgt/redis`'s `openRedis(defineRedis({ … }))` and
+hand the handle to every export that takes a client: one `prefix` is in front
+of every key of the deployment, and the handle closes with the app.
+
+```ts
+import { alxia, health } from '@alxia/core';
+import { redis, redisCheck, redisStore } from '@alxia/redis';
+import { rateLimit } from '@alxia/rate-limit';
+import { defineCache, defineRedis, openRedis } from '@nxgt/redis';
+import { z } from 'zod';
+
+const users = defineCache({ name: 'user', key: (id: string) => id, ttl: 300, schema: z.object({ id: z.string(), name: z.string() }) });
+const handle = await openRedis(defineRedis({ uri: Bun.env['REDIS_URL']!, prefix: 'shop', caches: { users } }));
+
+const app = alxia()
+	.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(handle, { name: 'api' }) })) // shop:api:…
+	.plugin(redis(handle))                                   // caches typed from handle.cache; handle.close() in onStop
+	.plugin(health({ checks: { redis: redisCheck(handle) } }))
+	.get('/users/:id', async ({ caches, lock, params, reply }) =>
+		reply.ok(await lock(params.id, () => caches.users.remember(params.id, () => ({ id: params.id, name: 'Ada' })))), // shop:user:…, lock:shop:…
+	);
+```
+
+`redisStore`, `redisCacheStore` and `idempotency` take the handle where they
+take a client, and put its `prefix` in front of their `name`: the keys are
+`shop:api:…`, `shop:pages:response:…`, `shop:orders:…`. `redis(handle)` puts
+`caches` (the handle's own bound caches), `lock` (under the prefix), `redis`
+(the client) and `prefix` in the context, and closes the handle once when the
+app stops, after the requests in flight finished: `redis(handle, { close: false })`
+when something else closes it. The handle must wire one Redis instance.
+The bare `RedisClient` forms are unchanged and add no prefix.
+
+### Defined once, in `defineRedis`
+
+With `@nxgt/redis` 0.6 the rate limit and the idempotency are wired by
+`defineRedis` too (`limits`, `idempotency`), and `redisStore` and `idempotency`
+take the wired entry, so the definition lives in one place and its types flow
+through:
+
+```ts
+import { idempotency, idempotencyResult, redisStore } from '@alxia/redis';
+import { defineIdempotency, defineRateLimit, defineRedis, openRedis } from '@nxgt/redis';
+
+const api = defineRateLimit({ name: 'api', key: (ip: string) => ip, limit: 100, per: 60_000 });
+const orders = defineIdempotency({ name: 'orders', key: (id: string) => id, ttl: 86_400, schema: idempotencyResult });
+const wired = await openRedis(defineRedis({ uri: Bun.env['REDIS_URL']!, prefix: 'shop', limits: { api }, idempotency: { orders } }));
+
+alxia()
+	.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(wired.limits.api) })) // shop:api:<address>
+	.use(idempotency(wired.idempotency.orders, { required: true }))                       // shop:orders:<route>:<scope>:<key>
+	.post('/orders', ({ reply }) => reply(201, { id: crypto.randomUUID() }));
+```
+
+The keys are those `@nxgt/redis` writes, `<prefix>:<name>:<key>`, so another
+consumer calling `wired.limits.api.consume(address)` shares the count. The
+rate, `ttl` and `lease` are the definition's: `rateLimit`'s `limit` and
+`windowMs` only write its headers, so repeat the definition's numbers, and the
+wired `idempotency` takes no `name`, `ttl` or `lease`. The limit's key takes a
+string, and the idempotency's `schema` is `idempotencyResult`: another is a
+compile error. A rate limit moved from `redisStore(handle, { name })` starts
+its counts again, the layouts differing; an idempotency keeps its keys. Both
+older forms stay. [More](docs/guide/connecting.md#defined-once-in-defineredis).
+
 ## Testing
 
 The package's specs run against `$REDIS_URL`, or a `redis-server` on
@@ -153,10 +220,16 @@ The package's specs run against `$REDIS_URL`, or a `redis-server` on
 
 | export | |
 | --- | --- |
-| `redisStore(client, { name })`, `RedisStoreOptions` | an `@alxia/rate-limit` store |
-| `redisCacheStore(client, { name })`, `RedisCacheStoreOptions` | an `@alxia/cache` store |
-| `idempotency(client, options)` | the middleware, given to `app.use` |
+| `redisStore(client \| handle, { name })`, `RedisStoreOptions` | an `@alxia/rate-limit` store |
+| `redisStore(handle.limits.api)` | the same for a rate limit wired by `defineRedis` (`@nxgt/redis` 0.6): the definition holds the name and the rate, the keys are `<prefix>:<name>:<key>` |
+| `redisCacheStore(client \| handle, { name })`, `RedisCacheStoreOptions` | an `@alxia/cache` store |
+| `idempotency(client \| handle, options)` | the middleware, given to `app.use` |
+| `idempotency(handle.idempotency.orders, options?)`, `WiredIdempotency`, `WiredIdempotencyOptions` | the same for an idempotency wired by `defineRedis`: its definition holds the `name`, `ttl` and `lease`, so the options take none of them |
+| `idempotencyResult`, `IdempotencyResult` | the `schema` a wired idempotency given to `idempotency()` must have: the response it keeps |
 | `redis(client, { caches? })`, `RedisContextOptions` | a plugin, given to `app.plugin`: `redis`, `caches`, `lock` in the context |
+| `redis(handle, { close? })`, `RedisHandleOptions`, `RedisHandleContext` | the same from an `@nxgt/redis` handle: its typed caches, a prefixed `lock`, `prefix`; closes the handle in `onStop` unless `close: false` |
+| `redisCheck(client \| handle, { timeout? })`, `RedisCheckOptions` | a check for core's `health({ checks })`: down when a Redis instance does not answer a `PING`; `timeout` bounds a handle's ping, a client's is bounded by `health({ timeout })` |
+| `RedisTarget` | a client or a handle: what the factories above take |
 | `IdempotencyOptions`, `IdempotencyErrorBody`, `RedisContext`, `BoundCaches` | its types |
 | `IdempotencyMiddleware` | what `idempotency()` returns: a middleware that adds nothing, and may answer a 400, a 409 or a 422 |
 | `AnyCache` | any cache definition: the constraint of a function generic over the caches it hands to `redis()` |
@@ -166,3 +239,4 @@ The package's specs run against `$REDIS_URL`, or a `redis-server` on
 - [Guide](https://github.com/softistx/alxia/tree/develop/packages/redis/docs): a page per area — connecting, rate limits, the response cache, idempotency, caches and locks, and testing against a real Redis.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/redis/docs/troubleshooting.md): an error message, a refusal a client got, or a limit, cache or replay that does not behave as expected, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/redis/docs/roadmap.md): what is coming, and what is not planned.
+- [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [Caching and rate limiting with Redis](https://github.com/softistx/alxia/blob/develop/docs/recipes/caching-and-rate-limiting.md), [Test an alxia app](https://github.com/softistx/alxia/blob/develop/docs/recipes/testing.md), [Health checks and graceful shutdown](https://github.com/softistx/alxia/blob/develop/docs/recipes/health-and-shutdown.md).

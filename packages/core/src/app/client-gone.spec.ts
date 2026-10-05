@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, spyOn, test } from 'bun:test';
 import { connect } from 'node:net';
-import { alxia } from '../index';
-import { CLIENT_GONE } from './send';
+import { alxia, settle, validate } from '../index';
+import { CLIENT_GONE } from './answers';
 
 afterEach(() => {
 	(console.error as unknown as { mockRestore?: () => void }).mockRestore?.();
@@ -18,23 +18,25 @@ async function hangUpMidBody(port: number): Promise<void> {
 	socket.destroy();
 }
 
+/** An observer settling `next()`: the status of every response, in `seen`. */
+function observer(seen: number[]) {
+	return async (ctx: object, next: () => Promise<Response>) => {
+		const response = await settle(ctx, next());
+		seen.push(response.status);
+		return response;
+	};
+}
+
 async function until(done: () => boolean): Promise<void> {
 	for (let i = 0; i < 100 && !done(); i++) await Bun.sleep(10);
 }
 
 describe('a client that hangs up mid-body', () => {
-	test('is no app error: nothing logged, no onError, a 499 for onResponse', async () => {
+	test('is no app error: nothing logged, a 499 for an observer', async () => {
 		const logged = spyOn(console, 'error').mockImplementation(() => {});
 		const seen: number[] = [];
-		let handled = false;
 		const app = alxia()
-			.onResponse((response) => {
-				seen.push(response.status);
-			})
-			.onError(() => {
-				handled = true;
-				return undefined;
-			})
+			.use(observer(seen))
 			.post('/up', async ({ request, reply }) =>
 				reply(200, await request.text()),
 			);
@@ -43,7 +45,6 @@ describe('a client that hangs up mid-body', () => {
 			await hangUpMidBody(server.port as number);
 			await until(() => seen.length > 0);
 			expect(seen).toEqual([CLIENT_GONE]);
-			expect(handled).toBe(false);
 			expect(logged).not.toHaveBeenCalled();
 		} finally {
 			server.stop(true);
@@ -61,10 +62,8 @@ describe('a client that hangs up mid-body', () => {
 			},
 		} as const;
 		const app = alxia()
-			.onResponse((response) => {
-				seen.push(response.status);
-			})
-			.post('/up', { body: Text }, ({ reply }) => reply(200, 'ok'));
+			.use(observer(seen))
+			.post('/up', validate({ body: Text }), ({ reply }) => reply(200, 'ok'));
 		const server = app.listen({ port: 0 });
 		try {
 			await hangUpMidBody(server.port as number);
@@ -75,14 +74,14 @@ describe('a client that hangs up mid-body', () => {
 			server.stop(true);
 		}
 	});
+});
 
+describe('a bug, wherever the client is', () => {
 	test('a bug thrown after the client left is still logged and answered 500', async () => {
 		const logged = spyOn(console, 'error').mockImplementation(() => {});
 		const seen: number[] = [];
 		const app = alxia()
-			.onResponse((response) => {
-				seen.push(response.status);
-			})
+			.use(observer(seen))
 			.get('/slow', async () => {
 				await Bun.sleep(100);
 				throw new TypeError('a real bug');

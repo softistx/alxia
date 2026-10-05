@@ -11,12 +11,18 @@ number on it. Every release, with each change it made, is in
   `@nxgt/openapi-codegen`'s `alxia` option generates the operations,
   `@alxia/core`'s `app.route(operation, ...middlewares, handler)` binds
   them, and `implemented` and `matchesSpec` check the app against them.
-  The package that was `@alxia/openapi-routes` now carries this name;
-  `@alxia/openapi-routes` stays a while as a deprecated re-export. Same
-  `implemented`, `matchesSpec` and `exactly`, options and messages: change
-  the import. The docs cover the whole workflow, from the document to the
-  generated operations, routes with middlewares, the check and a client.
-  Ships as 0.4.0.
+  The package that was `@alxia/openapi-routes` now carries this name.
+  The docs cover the whole workflow, from the document to the generated
+  operations, routes with middlewares, the check and a client.
+- **The deprecated names removed.** `@alxia/openapi-routes`, the
+  re-export package, is gone, with `exactly` and `ExactlyOptions`, the
+  aliases of `matchesSpec` and `MatchesSpecOptions`: import
+  `implemented` and `matchesSpec` from `@alxia/openapi`, same options and
+  messages. Ships as 0.5.0.
+- **The probes left out of `matchesSpec`.** The routes of `@alxia/core`'s
+  `health()` are no operation of a document, and `matchesSpec` skips them
+  as it skips `apiDocs()`'s, with no `exclude`
+  ([the checks](guide/checks.md#matchesspec)).
 
 ## Next
 
@@ -52,12 +58,28 @@ different package, which wrote a document from the app's routes; it is
 retired. The releases below are this package's, under its former name,
 `@alxia/openapi-routes`.
 
+### `@alxia/openapi` 0.5.0
+
+- **API docs, with no configuration.** `import spec from
+  '../openapi.yaml'`, then `app.plugin(apiDocs({ spec }))`, serves an
+  interactive page (Scalar, or Swagger UI) at `/docs` and the document at
+  `/docs/openapi.yaml` and `.json`. The page loads from a pinned CDN
+  version with an integrity hash, sets its own `Content-Security-Policy` —
+  that version's folder alone, requests to the app and the document's
+  servers alone — with Scalar's AI agent, MCP, developer tools and
+  telemetry off, and `matchesSpec` leaves its routes out.
+
 ### `@alxia/openapi-routes` 0.2.0
 
+Removed in 0.5: `matchesSpec` from `@alxia/openapi` is its name.
+
 - **One name for the check both ways.** `matchesSpec(app, operations)`,
-  the new name of `exactly`, which stays as a deprecated alias.
+  the new name of `exactly`, which stayed as a deprecated alias until 0.5.
 
 ### `@alxia/openapi-routes` 0.1.0
+
+Removed in 0.5: `implemented` and `matchesSpec` from `@alxia/openapi`
+are these checks.
 
 - **Every operation has a route.** `implemented(app, operations)` throws,
   listing each operation of the document that the app does not serve, by

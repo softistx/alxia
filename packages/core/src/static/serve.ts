@@ -1,6 +1,6 @@
 /**
- * Static files, served through the app's pipeline: every hook runs around
- * them, as around any route.
+ * Static files, served through the app's pipeline: every middleware runs
+ * around them, as around any route.
  */
 import { extname, resolve, sep } from 'node:path';
 import type { BaseContext, MaybePromise } from '../app/types';

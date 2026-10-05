@@ -3,7 +3,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
+	markFactory,
 	type Next,
 	type Reply,
 } from '@alxia/core';
@@ -58,8 +58,7 @@ export type RateLimit<Requires extends object = Empty> = Middleware<
 	Promise<
 		Reply<429, RateLimitedBody> | Next<{ rateLimit: RateLimitInfo | undefined }>
 	>
-> &
-	MiddlewareMark;
+>;
 
 /**
  * A rate limit, as a middleware: every request it runs on is counted —
@@ -88,7 +87,7 @@ export function rateLimit<Requires extends object = Empty>(
 	const store = options.store ?? new MemoryStore();
 	const key = options.key ?? ((ctx: BaseContext & Requires) => ctx.ip);
 	const style = options.headers ?? 'draft';
-	return defineMiddleware<Requires>()(async (ctx, next) => {
+	return defineMiddleware<Requires>()(async function rateLimit(ctx, next) {
 		const counted = options.skip?.(ctx) ? undefined : await key(ctx);
 		if (counted === undefined) {
 			const rateLimit: RateLimitInfo | undefined = undefined;
@@ -142,3 +141,5 @@ function said(
 		);
 	}
 }
+
+markFactory(rateLimit);

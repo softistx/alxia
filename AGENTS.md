@@ -8,23 +8,22 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 
 | package | what it is | peers |
 | --- | --- | --- |
-| `@alxia/core` | the framework: routes and their middlewares (`defineMiddleware`, `validate`, `responds`, `use(...middlewares)` for the routes after it and every request no route matches, `settle`, `refusalOf`), the deprecated request hooks, groups, plugins (`plugin(…)`), cookies, SSE, WebSockets; `Register`, which an app augments with `context: typeof base`, the chain that builds its context, read by `AppContext` and `defineRoutes(prefix?)`, a plugin built on that context that requires it of the app mounting it | — |
-| `@alxia/openapi` | OpenAPI spec first: `implemented` and `matchesSpec`, every operation `@nxgt/openapi-codegen`'s `alxia` option generates from the document has a route, read from `app.routes`, and no other. Formerly `@alxia/openapi-routes`, renamed at 0.4.0, after the 0.3.0 of the package that held the name and wrote a document from an app's schemas, retired. A client generator from the document is on its roadmap | core |
-| `@alxia/openapi-routes` | deprecated: a last release re-exporting `@alxia/openapi`, each export `@deprecated`; no docs/ | core, openapi |
-| `@alxia/zod` | Zod coercions (`zq`) and `zodConverter`, a Zod schema as JSON Schema 2020-12 | zod |
+| `@alxia/core` | the framework: routes and their middlewares (any `(ctx, next)` function, `defineMiddleware` to share a typed one, `validate`, `responds`, `use(...middlewares)` for the routes after it and every request no route matches, `settle`, `refusalOf`), `derive`, `decorate`, the lifecycle hooks `onStart`, `onStop` and `parser`, groups, plugins (`plugin(…)`), cookies, SSE, WebSockets; `alxia({ errors: 'problem' })`, alxia's own answers as RFC 9457 problems (`errorFormat`, `problemOf`, read from the serving app through `SERVED`, `served.ts`); `health()`, the probes as a plugin app; `listen`'s graceful shutdown on `SIGINT` and `SIGTERM` (`serving.ts`, one process handler per signal in `signals.ts`), `shutdownSignal(ctx)`; `Register`, which an app augments with `context: typeof base`, the chain that builds its context, read by `AppContext` and `defineRoutes(prefix?)`, a plugin built on that context that requires it of the app mounting it | — |
+| `@alxia/openapi` | OpenAPI spec first: `implemented` and `matchesSpec`, every operation `@nxgt/openapi-codegen`'s `alxia` option generates from the document has a route, read from `app.routes`, and no other, and `apiDocs`, a plugin serving the document and a Scalar or Swagger UI page (pinned CDN versions with SRI, its own Content-Security-Policy, which `secureHeaders` keeps; `matchesSpec` leaves its routes out). Formerly `@alxia/openapi-routes`, renamed at 0.4.0, after the 0.3.0 of the package that held the name and wrote a document from an app's schemas, retired; the old name was removed from the repository at 0.5. A client generator from the document is on its roadmap | core |
+| `@alxia/zod` | Zod coercions (`zq`) | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's middlewares and typed context, Yoga's plugins | core, graphql-yoga, graphql |
 | `@alxia/react-router` | a React Router framework app served by the app: the pages as a catch-all behind its middlewares, loaders reading its typed context, the client build's files; `createServer()` and `/vite`'s `alxia()` plugin, zero config: a default server without `app/server.ts`, a runnable `build/server/index.js` built for Bun (the `ssr` environment gains the `bun` condition, `bun` and `bun:*` as builtins, `esnext`, all merged with the app's own) and self-contained under `react-router build` (`resolve.noExternal: true`, unless the app set `ssr.external: true`; a list it sets stays external), so `build/` runs with no `node_modules`; the `alxia-react-router reveal` bin writes the default server out | core, react-router; vite (optional, `/vite`) |
 | `@alxia/cors`, `@alxia/secure-headers`, `@alxia/compress` | middlewares given to `use` first, on every response, 404s included; `secureHeaders({ nonce: true })` adds a typed `nonce` | core |
 | `@alxia/rate-limit`, `@alxia/jwt`, `@alxia/logger` | middlewares given to `use`: typed context, typed replies | core |
-| `@alxia/env` | environment variables through any Standard Schema | — |
+| `@alxia/env` | environment variables through any Standard Schema: `defineEnv(shape, { secret, source })`, each variable by its own schema, typed, one `EnvError` listing every issue, secrets printed as `***` (`toJSON`, `inspect`, `toString`), `envExample(env)` and the `alxia-env example` bin writing a `.env.example` (which import the module in a mode where `defineEnv` refuses nothing), and the earlier `parseEnv` | — (dev: core, for the `Register` spec) |
 | `@alxia/cache` | HTTP response caching, a store contract and a memory store | core |
 | `@alxia/language` | the request's language, typed by the supported ones | core |
 | `@alxia/i18n` | translations on `@nxgt/i18n`, the language from `@alxia/language` | core, language, @nxgt/i18n |
 | `@alxia/context-storage` | the request's context through `AsyncLocalStorage`, as nxgt-core reads Hono's with `hono/context-storage`; typed by an app, by default the one core's `Register` names, and required of the app that uses it | core |
 | `@alxia/telemetry` | a server span per request, on `@nxgt/telemetry` | core, @nxgt/telemetry |
-| `@alxia/redis` | rate-limit and response-cache stores, idempotency, caches and locks, on `@nxgt/redis` and `@nxgt/redis-guard` | core, @nxgt/redis, @nxgt/redis-guard, zod; rate-limit and cache (optional) |
+| `@alxia/redis` | rate-limit and response-cache stores, idempotency, caches and locks, on `@nxgt/redis` | core, @nxgt/redis, zod; rate-limit and cache (optional) |
 | `@alxia/janus` | sessions, refusals and permissions, on `@nxgt/janus` | core, @nxgt/janus |
-| `@alxia/create` | `bun create @alxia [dir] [--template api\|react-router]`: the `create-alxia` bin, no module. Each template is files under `templates/<name>/`, copied by one `copyTemplate` (`src/copy.ts`) that rewrites `package.json` (`workspace:^` on `@alxia/*` replaced by the ranges it was published with), replaces the stored manifest's `name` (`my-api`, `my-app`), as a whole word, by the project's in every other text file (the README's `docker` commands), and renames `gitignore` and `_bunfig.toml`, which `bun publish` drops, to `.gitignore` and `bunfig.toml`, and `_biome.json`, which this repository's Biome would refuse as a nested root, to `biome.json`. Both ship Biome: a standalone `biome.json` (spaces, double quotes, recommended rules), `@biomejs/biome` pinned exactly at the workspace's version, the scripts `lint`, `format`, `check`, `check:ci` (`biome ci`; `bun ci` is Bun's install) and `verify`, and `.vscode/`; a new project passes `bun run check:ci` with no finding. `api` is alxia's own and spec first: `openapi.yaml` describes its operations, `bun run generate` (`nxgt-openapi generate`, `openapi-codegen.config.ts`, `alxia: true`, `validationErrors: false`) writes `src/generated/`, which is committed and which Biome skips (`!!**/src/generated`), `src/context.ts` holds the base (`decorate`) and its `Register` declaration, `src/routes/todos.ts` binds each route with `defineRoutes().route(operation, ...middlewares, handler)`, `src/app.ts` is `base.plugin(todoRoutes)`, `src/app.spec.ts` asserts `@alxia/openapi`'s `matchesSpec`, and `verify` starts with `bun run generate --check`; it has a Bun `Dockerfile` that builds `dist/server.js` and holds `dist/` alone (`start` runs `bun dist/server.js`), `.dockerignore` and `.env.example`; `react-router` is React Router's official scaffold committed as generated plus `examples/react-router`'s alxia layer, its Bun `Dockerfile` included. No scaffold runs at creation. Every dependency is moved to the registry's newest at creation: alxia's within the ranges it was published with (the newest of the same minor while npm has not propagated the exact version yet), the rest within alxia's peer ranges; `@biomejs/biome`, pinned exactly, moves to the newest patch of its own minor, while the `api` template's `@nxgt/openapi-codegen` stays at the exact version the template ships (`KEPT_EXACT`), since `verify`'s `generate --check` fails on a generator patch that writes `src/generated/` differently | — (dev: core, openapi, react-router, whose versions it writes; @nxgt/openapi-codegen) |
+| `@alxia/create` | `bun create @alxia [dir] [--template minimal\|api\|graphql\|react-router]`: the `create-alxia` bin, no module. Each template is files under `templates/<name>/`, copied by one `copyTemplate` (`src/copy.ts`) that rewrites `package.json` (`workspace:^` on `@alxia/*` replaced by the ranges it was published with), replaces the stored manifest's `name` (`my-app`, `my-api`, `my-graphql-api`), as a whole word, by the project's in every other text file (the README's `docker` commands), and renames `gitignore` and `_bunfig.toml`, which `bun publish` drops, to `.gitignore` and `bunfig.toml`, and `_biome.json`, which this repository's Biome would refuse as a nested root, to `biome.json`. Every template ships Biome: a standalone `biome.json` (spaces, double quotes, recommended rules), `@biomejs/biome` pinned exactly at the workspace's version, the scripts `lint`, `format`, `check`, `check:ci` (`biome ci`; `bun ci` is Bun's install) and `verify`, and `.vscode/`; a new project passes `bun run check:ci` with no finding. `minimal` is one route: `src/index.ts` exports `alxia().get('/', …)` and listens only `if (import.meta.main)`, `src/index.spec.ts` calls it with `app.request`, one dependency (`@alxia/core`), no OpenAPI, no generator, a Dockerfile that bundles `dist/index.js` (`verify`: `check:ci`, `typecheck`, `test`), and it is the template the README recommends first, and the prompt's default. `api` is alxia's own and spec first: `openapi.yaml` describes its operations, `bun run generate` (`nxgt-openapi generate`, `openapi-codegen.config.ts`, `alxia: true`, `validationErrors: false`) writes `src/generated/`, which is committed and which Biome skips (`!!**/src/generated`), `src/context.ts` holds the base (`decorate`) and its `Register` declaration, `src/routes/todos.ts` binds each route with `defineRoutes().route(operation, ...middlewares, handler)`, `src/context.ts`'s base answers in `errors: 'problem'`, `src/app.ts` is `base.plugin(health()).plugin(apiDocs({ spec, enabled: env.API_DOCS })).plugin(todoRoutes)` with `import spec from '../openapi.yaml'` (bundled, so the dist-only image serves it; `@alxia/openapi` a dependency), `src/env.ts` is its `defineEnv` (`PORT`, `API_KEY` — required outside development and test, redacted — and `API_DOCS`, on in development alone), `src/app.spec.ts` asserts `@alxia/openapi`'s `matchesSpec` and calls the app through openapi-fetch over the generated `paths.ts` (`fetch: (request) => app.fetch(request)`, a devDependency), with one `app.request` test, and `verify` starts with `bun run generate --check`; it has a Bun `Dockerfile` that builds `dist/server.js` and holds `dist/` alone (`start` runs `NODE_ENV=production bun dist/server.js`), `.dockerignore` and `.env.example`; `graphql` is schema first on `@alxia/graphql` and GraphQL Yoga: `schema.graphql` is the contract, `bun run generate` (`graphql-codegen --config codegen.ts`: `typescript` and `typescript-resolvers`, `contextType: ../context#Context`, `mappers`) writes `src/generated/resolvers.ts`, committed and skipped by Biome, `src/context.ts` holds the base (`decorate({ env, db }).use(viewerOf)`, an inline middleware that types `viewer`) and `Context = GraphQLContext<typeof base>`, `src/resolvers.ts` is `Resolvers`, `src/schema.ts` imports `schema.graphql` with `{ type: 'text' }` (declared by `src/graphql.d.ts`, bundled by `bun run build`), a subscription over server-sent events, `src/env.ts` (`defineEnv`), `src/app.spec.ts` POSTs `/graphql` through `app.request`, and `verify` starts with `bun run generate --check`; `react-router` is React Router's official scaffold committed as generated plus `examples/react-router`'s alxia layer, its Bun `Dockerfile` included. No scaffold runs at creation. Every dependency is moved to the registry's newest at creation: alxia's within the ranges it was published with (the newest of the same minor while npm has not propagated the exact version yet), the rest within alxia's peer ranges; `@biomejs/biome`, pinned exactly, moves to the newest patch of its own minor, while the `api` template's `@nxgt/openapi-codegen` and the `graphql` template's three `@graphql-codegen/*` stay at the exact versions the templates ship (`KEPT_EXACT`), since `verify`'s `generate --check` fails on a generator patch that writes `src/generated/` differently | — (dev: core, env, graphql, openapi, react-router, whose versions it writes; @nxgt/openapi-codegen, @graphql-codegen/*, graphql, graphql-yoga) |
 
 Its skeleton is `softistx/nxgt-http`'s: the Bun workspace, the root
 `build.ts`, Biome, changesets, `scripts/publish.ts` and `verify:artifacts`.
@@ -53,7 +52,7 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
 
 | example | what it shows |
 | --- | --- |
-| `examples/react-router` | React Router's official template (`bunx create-react-router@latest`, committed as generated), then `@alxia/react-router` added in four changes (`bun add`, `alxia()` in `vite.config.ts`, `start: bun build/server/index.js`, a `bunfig.toml`), the template's Node `Dockerfile` replaced by a multi-stage one, built on `oven/bun:1` and run on `oven/bun:1-alpine`, whose image holds `build/` alone, then an optional `app/server.ts`. That file holds `createServer()` with logger, compress and secure-headers with a nonce per request and a policy the pages pass, a cookie session deriving `user`, `POST /api/todos` validated by Zod, `getLoadContext` and the `Register` declaration. On top of the template: `app/entry.server.tsx` as `react-router reveal` writes it, plus `nonceOf(loadContext)` in three lines; the home loader reading `alxiaOf(context).user`, a sign-in action, a todo form with a 400, and a page streamed behind `<Await>`. `app/server.spec.ts` builds it, runs `bun build/server/index.js` on a free port, starts `react-router dev` on a free port to check the nonce on every script there and in the build, and builds a copy without `app/server.ts` to check the default server. |
+| `examples/react-router` | React Router's official template (`bunx create-react-router@latest`, committed as generated), then `@alxia/react-router` added in four changes (`bun add`, `alxia()` in `vite.config.ts`, `dev: NODE_ENV=development react-router dev` and `start: NODE_ENV=production bun build/server/index.js`, a `bunfig.toml`), the template's Node `Dockerfile` replaced by a multi-stage one, built on `oven/bun:1` and run on `oven/bun:1-alpine`, whose image holds `build/` alone, then an optional `app/server.ts`. That file holds `createServer()` with logger, compress and secure-headers with a nonce per request and a policy the pages pass, a cookie session deriving `user`, `POST /api/todos` validated by Zod, `getLoadContext` and the `Register` declaration. On top of the template: `app/entry.server.tsx` as `react-router reveal` writes it, plus `nonceOf(loadContext)` in three lines; the home loader reading `alxiaOf(context).user`, a sign-in action, a todo form with a 400, and a page streamed behind `<Await>`. `app/server.spec.ts` builds it, runs `bun build/server/index.js` on a free port, starts `react-router dev` on a free port to check the nonce on every script there and in the build, and builds a copy without `app/server.ts` to check the default server. |
 
 ## Principles
 
@@ -75,10 +74,10 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   requests, a plugin when it adds routes or `decorate`s. A plugin is either
   an app given to `plugin` — it adds context, routes or typed replies — or
   a function `Plugin`, given to `plugin` too, that returns the app
-  unchanged in type; `plugin` throws when a function returns anything but
-  an app. `use` takes middlewares alone: its plugin forms of 0.3 are
-  deprecated. Plugins use the
-  core's public API only: if one needs more, export it from the core.
+  unchanged in type; `plugin` takes exactly one, and throws when a function
+  returns anything but an app. `use` takes middlewares alone, and throws
+  when given an app. Plugins use the core's public API only: if one needs
+  more, export it from the core.
 - **The types are the product.** A mistake a type can catch is a compile
   error: a params schema that does not read the path, an unknown key in a
   route, an undeclared status, a body its schema refuses. Each has a
@@ -92,12 +91,11 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   document by the developer's own generator. The server's types
   check a handler — what its middlewares add, its `reply` against its
   `responds`, its path — and accumulate no route table for a client:
-  `Alxia<Ctx, Prefix, Shortcuts>`, and a route returns the app unchanged in
-  type. A handler cannot return a raw `Response`. A global hook's
-  `Response` is outside the contract: use it only for what no operation
-  describes.
-- **Order is meaning.** A middleware given to `use`, and a route hook,
-  applies to the routes declared after it, at runtime and in the types
+  `Alxia<Ctx, Prefix>`, and a route returns the app unchanged in type. A
+  handler cannot return a raw `Response`. A middleware's `Response` is
+  outside the contract: use it only for what no operation describes.
+- **Order is meaning.** A middleware given to `use`, a `derive` and a
+  `decorate` apply to the routes declared after them, at runtime and in the types
   alike; a group's stay inside it — its routes, and the requests no route
   matches under its prefix — and so do a plugin's that has a prefix of its
   own (`Scope.enclose`, `absorb`), which then adds nothing to the context
@@ -108,8 +106,9 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   never on that route. A route's middlewares run in the order given,
   `validate` and `responds` among them, and what one passes `next` is
   typed only after it. Errors are rejections through `next()`; what no
-  middleware catches is answered at the route boundary, outermost — the
-  deprecated `onError` and `onRefusal`, an `HttpError`'s status, a 500 —
+  middleware catches is answered at the route boundary, outermost — an
+  `HttpError`'s status and body, a 500, in the serving app's `errors`
+  format (`answers.ts`) —
   and `settle(ctx, next())` gives an observer that answer early without
   swallowing the error: once the observer returns, the error goes on to
   the middlewares around it (`settled.ts`), and the response it made is
@@ -118,33 +117,45 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   after the observers, so they see its reply; it catches the error
   wherever it stands. Keep the runtime and the types in step.
 - **One route model.** A route, a socket's upgrade and `route(operation)`
-  take the same `...middlewares`, and `use(...middlewares)` gives them to
-  every route declared after it, before the route's own, in the scope
-  chain the route hooks are in. `use(path, …)` is matched against the
-  request's path: decided at declaration when the route's own pattern
-  settles it (`reach` in `scope-path.ts`), checked per request with a
-  pattern compiled once when it does not, so a
+  take the same `...middlewares`, each a plain `(ctx, next)` function, and
+  `use(...middlewares)` gives them to every route declared after it,
+  before the route's own. What a middleware passes `next` is inferred, and
+  the middlewares after it read it typed; each is checked against the
+  context in force where it stands (`Step` and `Missing`,
+  `types/step.ts`), so a middleware that reads what that context does not
+  give is one compile error on it, naming the key. `use(path, …)` is
+  matched against the request's path: decided at declaration when the
+  route's own pattern settles it (`reach` in `scope-path.ts`), checked per
+  request with a pattern compiled once when it does not, so a
   `/users/:id` route requested as `/users/admin` runs
   `use('/users/admin', …)`. The request's path is read fail closed, as the
   router, the static files and React Router read it: segments decoded, an
   encoded `/` splitting one, empty ones collapsed, compared without case;
   a path without `%` nor `/.` is read in place, allocating nothing. A
-  plugin's `use(path, …)` is rebased with its routes when it is mounted. `chain.ts` runs a route's chain and the
-  unmatched chain alike. The request hooks of 0.3 (`onRequest`,
-  `onResponse`, `around`, `wrap`, `onError`, `onRefusal`) are deprecated
-  adapters keeping their 0.3 behaviour; every package plugin that
-  installed them is a middleware given to `use`, under its old factory
-  name, and `plugin(middleware)`, deprecated, keeps 0.3's meaning of
-  those global hooks: app-wide (`Globals.middlewares`), on the routes
-  declared before it too, before the app's chain. `use` tells a middleware from a plugin, its
-  deprecated form, by the mark `defineMiddleware` sets (and `validate` and
-  `responds` theirs, both `Symbol.for`, shared by two copies of core), and
-  a middleware given a path adds
-  nothing, a compile error otherwise: a subtree's context is a group's.
-  `derive` stays, the shorthand for a middleware that only adds. The forms of 0.3 (a list of hooks, a
-  schema before the handler, `defineHook`, `defineWrap`) are deprecated
-  adapters in `@alxia/core`, kept until they are removed: no other package,
-  template or example writes them.
+  plugin's `use(path, …)` is rebased with its routes when it is mounted.
+  `chain.ts` runs a route's chain and the unmatched chain alike. Every
+  package middleware is given to `use`. `use` refuses an app, and a
+  `validate` or `responds` (their mark, `Symbol.for`, shared by two copies
+  of core), and a middleware given a path adds nothing, a compile error
+  otherwise: a subtree's context is a group's. `derive` stays, the
+  shorthand for a middleware that only adds. The forms 0.4 deprecated — the
+  request hooks, a list of hooks and the two helpers that made them, a
+  schema before the handler or in the options, `use(plugin)`,
+  `plugin(middleware)` —
+  were removed in 0.5, and each throws or fails to compile with a message
+  naming what replaced it (`removed-forms.spec.ts`). Every package factory
+  is marked with `markFactory` (`Symbol.for('alxia.factory')`, shared by two
+  copies of core), so `use`, a route and `plugin` refuse it uncalled at
+  declaration; a new factory is marked too, with an `uncalled.spec.ts`, and
+  the middleware it makes is a named function, which the route table shows.
+  `compose` (`compose-middlewares.ts`) is flattened into the chain at
+  declaration (`membersOf`), so it costs nothing per request.
+- **Dev helps cost nothing outside dev.** `alxia({ dev })` (`dev/mode.ts`,
+  on only when `NODE_ENV` is `development`: it fails closed) gates the route table,
+  the 404 and 405 `hint` and the dev error page (`src/dev/`); the serving
+  app's `dev` is read through `servedOf(ctx)`, and production's 404 and 500
+  paths read one boolean more, never build what dev adds. Check the chain
+  bench with `NODE_ENV=production` against the base when touching them.
 - **Register the base, not a key.** `Register` names the chain that builds
   the context (`context: typeof base`), never the app that mounts the
   routes, whose type would then read itself (TS7022), and never a context
@@ -152,7 +163,13 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   requires it: `defineRoutes()` carries the registered context in its own
   as a requirement `plugin` checks (`RequiredIn`, `Mounted` in
   `plugin-method.ts`), and `contextStorage()` marks its plugin with it.
-  `alxia()` and `defineMiddleware(fn)` stay on `BaseContext`. A spec that
+  `defineAppMiddleware(fn)` reads it too (`RegisteredContext`), and is
+  refused where the context does not give it; `defineMiddleware(fn)` reads
+  `BaseContext` alone (`Requires = Empty`, as an inline middleware), so a
+  middleware the registered base is itself built with stays sound, and a
+  package's middleware names what it reads (`<Requires>`), never the app's
+  registration.
+  `alxia()` stays on `BaseContext`. A spec that
   needs `Register` augmented runs `tsc` on a program of its own under
   `test/register/`, which the package's `tsconfig.json` excludes, and
   core's `test/declarations/registered.ts`, excluded too, is compiled by
@@ -165,15 +182,15 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
 ```
 core ◄── openapi, graphql, cors, secure-headers, compress, rate-limit, jwt, logger,
          telemetry, janus, context-storage, cache, language
-         openapi ◄── openapi-routes   (deprecated: a re-export)
          i18n ◄── language
+         openapi (dev: secure-headers, for the apiDocs spec)
          janus   (dev: i18n, language, @nxgt/i18n for its specs)
          redis ◄── rate-limit, cache (optional peers: the stores' contracts)
          react-router   (peers: react-router; vite, optional, for /vite; dev: openapi, compress for its specs)
 zod             (peer: zod; dev: core for its specs)
-env             (standalone)
-create          (no peer; dev: core, openapi, react-router: the versions its projects install;
-                 @nxgt/openapi-codegen, the version the api template pins)
+env             (standalone; dev: core for its Register spec)
+create          (no peer; dev: core, env, graphql, openapi, react-router: the versions its projects install;
+                 @nxgt/openapi-codegen and @graphql-codegen/*, the versions the api and graphql templates pin)
 ```
 
 A package that uses a sibling declares it by `workspace:^`, as a peer and a
@@ -185,7 +202,7 @@ devDependency, and imports it by its published name, which resolves through
 An integration with something the nxgt suite already does — telemetry,
 Redis, identities — is an adapter over the nxgt package, never a second
 implementation: `@alxia/telemetry` is `@nxgt/telemetry`, `@alxia/redis` is
-`@nxgt/redis` and `@nxgt/redis-guard`, `@alxia/janus` is `@nxgt/janus`. The
+`@nxgt/redis`, `@alxia/janus` is `@nxgt/janus`. The
 nxgt package is a peer. Where the suite has a Hono adapter, the alxia one
 mirrors it — `@nxgt/telemetry-hono`, `@nxgt/janus-hono` — and the table
 below records what is kept twice.
@@ -203,13 +220,13 @@ below records what is kept twice.
 | The Apollo Sandbox page, in `graphql/src/sandbox.ts` and `@nxgt/shared-graphql`'s `renderSandbox` | that one is Hono's `html`; both start the Sandbox at the URL the page was asked at (nxgt-core#171). alxia's passes the path, and the page resolves it against its own address, so a TLS proxy in front of the server changes nothing; that one still passes the server's URL. Importing it would depend on Hono. Change both together |
 | `bodyOf`, the permission guard's option types, the device cookie, in `janus/src/` and `@nxgt/janus-hono` | the same refusals and cookies whichever server answers; importing them would depend on Hono. Change both together. One divergence, on purpose: alxia's guard infers what `load`, `subject` and `ctx` read beyond `BaseContext` from their annotated parameters (`SubjectCtx` and `CheckCtx` on `PermissionOptions` and `OptionsArgs`, defaulted to `BaseContext`), and `plugin()` refuses an app that does not give it, and refuses the guard on every app when one is annotated `any`. Hono's callbacks take its `Context`, whose variables a middleware cannot require of the app, and `app.use()` checks nothing, so the Hono types have no such parameters. Every other part of the types stays in step |
 | The body watcher, `logger/src/body.ts` and `telemetry/src/body.ts`, with `body.spec.ts` beside each | both time a streamed body to its end (`settled`, `watched`), and neither depends on the other; the core exports no such helper, and exporting one would be a minor of `@alxia/core`, which moves every package's peer range. The two `body.ts` are byte for byte the same but for their first line, and the two specs are the same. Change both together |
-| The slots of each middleware form — `aBound`, `bBound`, `handledBound`, `head`, `step`, `tail`, `out` — written out in `RouteForm`, `RouteOptionsForm`, `SocketForm`, `SocketOptionsForm`, `OperationForm` and `UseForm` (`packages/core/src/app/*-forms.ts`, `route-middlewares.ts`, `route-options.ts`), which `Ladder` and `Bare` (`ladder.ts`) read through `Forms` (`forms.ts`) | inheriting the shared slots from a base interface costs each call an instantiation more: measured on core's `tsc`, the version with bases made 631k types, the written-out one 558k (2.37M instantiations before the shared ladder, 2.53M after). Change the route forms' `step` and `out`, and the two route forms' `handledBound` and `tail`, together |
-| `PEER_RANGES` in `create/src/versions.ts` and the peer ranges of `@alxia/core` (`typescript`), `@alxia/zod` (`zod`) and `@alxia/react-router` (`react-router`, `vite`) | the published `@alxia/create` cannot read its siblings' manifests, and holds a project's dependencies to these ranges. `versions.spec.ts` compares them: widening one of those peers fails there until `PEER_RANGES` is widened too, with a changeset for `@alxia/create` |
+| The slots of each middleware form — `aBound`, `bBound`, `handledBound`, `head`, `reads`, `excludes`, `tail`, `out`, `refuses` — written out in `RouteForm`, `RouteOptionsForm`, `SocketForm`, `SocketOptionsForm`, `OperationForm` and `UseForm` (`packages/core/src/app/*-forms.ts`, `route-middlewares.ts`, `route-options.ts`, `socket-options.ts`), each extending `FormSlots` for its shape alone, which `Ladder` and `Bare` (`ladder.ts`, its overloads 5 to 8 in `ladder-long.ts`) read through `Forms` (`forms.ts`); `refuses` is what every middleware is intersected with (`use`'s refuses a builtin), and each form interface extends `TooMany` (`too-many.ts`), the overload a ninth middleware meets. `Ladder` checks each middleware against its form's `reads` with `Step` and `Missing` (`types/step.ts`), and `Rest` and `Guarded` (`forms.ts`) refuse by its arity the call that the other form of the same method takes (`excludes`: `'object'` on a form whose first middleware stands where the options form's options stand, `'function'` on the options form), so that TypeScript reports the one form that applies | inheriting the shared slots from a base interface costs each call an instantiation more: measured on core's `tsc`, the version with bases made 631k types, the written-out one 558k (2.37M instantiations before the shared ladder, 2.53M after). Change the `reads` of the route, options, socket, socket options and operation forms (`RouteReads`) together, the two route forms' `handledBound` and `tail` together, and the `excludes` of each pair of forms of one method together |
+| `PEER_RANGES` in `create/src/versions.ts` and the peer ranges of `@alxia/core` (`typescript`), `@alxia/zod` (`zod`), `@alxia/graphql` (`graphql`, `graphql-yoga`) and `@alxia/react-router` (`react-router`, `vite`) | the published `@alxia/create` cannot read its siblings' manifests, and holds a project's dependencies to these ranges. `versions.spec.ts` compares them: widening one of those peers fails there until `PEER_RANGES` is widened too, with a changeset for `@alxia/create` |
 | React Router's official scaffold, in `create/templates/react-router/` and `examples/react-router` | both are `create-react-router`'s output committed as generated, plus the same alxia layer; the template is copied as it is, so a new project needs no network for its files and nothing to recognise. `create/src/templates/react-router.spec.ts` holds the template's `vite.config.ts`, `_bunfig.toml` and `Dockerfile` byte for byte to the example's `vite.config.ts`, `bunfig.toml` and `Dockerfile`; the regeneration script writes the example's `Dockerfile` over the scaffold's and gives the scaffold's `README.md` Bun's commands (`toBun`, which refuses an npm, npx, pnpm or yarn command it does not know), and `create/src/copy.spec.ts` refuses one in every stored template's README, `Dockerfile` or scripts. That pattern is kept twice, `OTHER_MANAGER` in the script and a copy in `copy.spec.ts`, since a package spec does not import from `scripts/`: change both together. When React Router ships a new major, once `@alxia/react-router`'s peer accepts it, regenerate the template with `bun scripts/regenerate-react-router-template.ts` (`bunx create-react-router@latest` with `--yes --no-install --no-git-init --no-agent-skills --no-motion`, then the layer), regenerate the example the same way, read both diffs, and add a patch changeset for `@alxia/create` |
-| The projects' Biome setup: `create/templates/api/_biome.json`, `README.md` and `package.json` scripts, and `BIOME_CONFIG`, `BIOME_SCRIPTS` and `LINT_SECTION` in `scripts/templates/biome.ts`, which `scripts/regenerate-react-router-template.ts` writes into the `react-router` template | a template is files, and the regeneration script writes the scaffold from nothing. `copy.spec.ts` holds both templates to the same `$schema`, `vcs`, `formatter`, `javascript` and `assist`, the same Biome scripts, the same `.vscode/settings.json`, and `@biomejs/biome` at the workspace's installed version; `scripts/templates/biome.spec.ts` holds the committed `_biome.json` to `BIOME_CONFIG`, and the `api` README to `LINT_SECTION` but for its lines on `dist/` and `verify`. `create/templates/biome.json` (`"root": false`) extends both `_biome.json`, so the root `biome ci` checks the templates by the union of both settings, and skips the `api` template's `src/generated/` as its `_biome.json` does (`!!**/src/generated` in both); each template's spec runs `bun run check:ci` on a generated project, by its own alone. Bumping the workspace's Biome fails `copy.spec.ts` until both templates pin it, are formatted by it (the script for `react-router`) and pass. Change them together |
-| The `SIGINT`/`SIGTERM` stop, in `create/templates/api/src/server.ts` and `react-router/src/server.ts`'s `start` | a template is the project's own code and cannot import it, and exporting a helper would be a minor of `@alxia/core`, which moves every package's peer range. Both stop the app and exit, so Bun as a container's process 1 stops on `docker stop`. Change both together |
+| The projects' Biome setup: `create/templates/{minimal,api,graphql}/_biome.json`, `README.md` and `package.json` scripts, and `BIOME_CONFIG`, `BIOME_SCRIPTS` and `LINT_SECTION` in `scripts/templates/biome.ts`, which `scripts/regenerate-react-router-template.ts` writes into the `react-router` template | a template is files, and the regeneration script writes the scaffold from nothing. `templates.spec.ts` holds every template to the same `$schema`, `vcs`, `formatter`, `javascript` and `assist`, the same Biome scripts, the same `.vscode/settings.json`, and `@biomejs/biome` at the workspace's installed version; `scripts/templates/biome.spec.ts` holds the committed `_biome.json` to `BIOME_CONFIG`, and the `api` README to `LINT_SECTION` but for its lines on `dist/` and `verify`. `create/templates/biome.json` (`"root": false`) extends each `_biome.json`, so the root `biome ci` checks the templates by the union of their settings, and skips the `api` template's `src/generated/` as its `_biome.json` does (`!!**/src/generated` in both); each template's spec runs `bun run check:ci` on a generated project, by its own alone. Bumping the workspace's Biome fails `templates.spec.ts` until every template pins it, are formatted by it (the script for `react-router`) and pass. Change them together |
+| The `Dockerfile` of `create/templates/{minimal,api,graphql}` | each template is stored files and the Dockerfile is the project's own, so it cannot import a shared one; they differ in the bundle's name (`dist/index.js`, `dist/server.js`) and a comment. `templates.spec.ts` holds each to a build stage on `oven/bun:1`, a final `oven/bun:1-alpine` stage that copies `dist/` from the build alone, and `bun --no-install`; the `react-router` one is a variant over `build/`. Change them together |
 | alxia's 400, as `ValidationErrorBody` in `core/src/app/refusal.ts` and as the `ValidationError` schema of `create/templates/api/openapi.yaml` | the spec-first `api` template declares the refusal alxia answers with, so a client generated from its document reads it, and `@nxgt/openapi-codegen`'s `validationErrors`, which would declare `@nxgt/openapi-hono`'s, is off. `responds` checks every reply with a declared status, a refusal's included: a body that drifts from the spec is a 500, which the template spec's 400 test catches. Change both together |
-| `@nxgt/openapi-codegen`'s version, in `create/templates/api/package.json` (exact) and `create/package.json`'s devDependencies, and the committed `create/templates/api/src/generated/` | the template's generated files are that version's output; `templates/api.spec.ts` holds the two versions equal to the installed one and runs `bun run generate --check` on a copy. A bump (`nxgt:outdated` lists it) moves both, runs `bun run generate` in the template, reads the diff, and adds a patch changeset for `@alxia/create` |
+| `@nxgt/openapi-codegen`'s version, in `create/templates/api/package.json` (exact) and `create/package.json`'s devDependencies, and the committed `create/templates/api/src/generated/`; likewise `@graphql-codegen/cli`, `typescript` and `typescript-resolvers`, and `create/templates/graphql/src/generated/` | the templates' generated files are those versions' output; `templates/api.spec.ts` and `templates/graphql.spec.ts` hold the versions equal to the installed ones and run `bun run generate --check` on a copy. A bump (`nxgt:outdated` lists it) moves both, runs `bun run generate` in the template, reads the diff, and adds a patch changeset for `@alxia/create` |
 | `scripts/check-nxgt-versions.ts`, its spec and `.github/workflows/nxgt-versions.yml`, here and in nxgt-data (itself from nxgt-janus) | each repository releases on its own, and this one's check reads no `examples/`. What differs here: the manifests come from `readManifests()` (`packages/*` alone), `latest` from `latestOnRegistry()`, each line names the peer range and whether it admits `latest`, and the issue asks for a changeset; `folderOf` and `manifestOf` are nxgt-data's alone. A fix to the check or the workflow belongs in every copy |
 | `scripts/verify-artifacts.ts` and `scripts/artifacts/`, here and in nxgt-http, nxgt-data, nxgt-janus and nxgt-core | the skeleton is nxgt-http's, and each repository releases on its own. `emit.ts`, the declaration-emit stage, started here (#87); softistx/nxgt-http#98, softistx/nxgt-data#146, softistx/nxgt-janus#186 and softistx/nxgt-core#173 port it in, so the copies are in step once they land, with the same `emit.spec.ts`, the injectable tsc run and Bun's types, which this copy took back from them. The `#!` skip in `imports.ts` (#79) is in nxgt-data's copy (softistx/nxgt-data#146) and nxgt-http's (softistx/nxgt-http#97); nxgt-janus and nxgt-core have no `imports.ts`. `testCodeProblems` in `tarball.ts` skips a `templates/` folder here only: `@alxia/create`'s `api` template ships the project's own `src/app.spec.ts`, and no other repository ships templates. A check added to one copy belongs in the others |
 
@@ -267,11 +284,13 @@ installed tarball with `--help`.
   packs every package, serves the tarballs from a registry on localhost
   that passes every other request to npm's (`scripts/templates/registry.ts`),
   and runs `bun create @alxia` against it, with an empty Bun cache, for each
-  template: the project installs this checkout's packages, then its
-  `typecheck` and `build` run (the `api` template's `verify` in place of
-  `typecheck`: `generate --check`, `check:ci`, `typecheck`, `test`), and its
-  `bun run start` answers (`POST /todos` 201, `GET /` 200 and one
-  `/assets/*.js` it names 200). It also runs
+  template (`scripts/templates/checks.ts`): the project installs this
+  checkout's packages, then its `typecheck` and `build` run (the `minimal`,
+  `api` and `graphql` templates' `verify` in place of `typecheck`:
+  `generate --check` for the last two, `check:ci`, `typecheck`, `test`), and
+  its `bun run start` answers (`GET /` 200, `POST /todos` 201, then `/health`,
+  `/docs` and `/docs/openapi.json` 200 under `API_KEY` and `API_DOCS=true`,
+  `POST /graphql` `{ __typename }` 200 then `/health` 200, `GET /` 200 and one `/assets/*.js` it names 200). It also runs
   `bunx @alxia/create --help`, and checks `@alxia/create`'s tarball holds
   each template's files, `gitignore` and `_bunfig.toml` included. Then it
   builds each project's `Dockerfile` and expects the same answer from the
@@ -280,8 +299,8 @@ installed tarball with `--help`.
   registry as `host.docker.internal`, mapped by `--add-host` on Linux. With
   no Docker daemon it skips that step locally and fails on CI (`CI` set). It
   needs the network: every non-alxia dependency comes from npm, at the
-  newest versions `@alxia/create` resolves. About 90 seconds measured
-  locally, most of it the two image builds; kept out of `bun run test`.
+  newest versions `@alxia/create` resolves. A few minutes measured
+  locally, most of it the four image builds; kept out of `bun run test`.
 
 The last three resolve without a lockfile, so an upstream release can turn
 them red with no change here. They are informational: read them, never make
@@ -371,3 +390,22 @@ package is public and MIT, with its own copy of `LICENSE`.
   message, or by its symptom for a trap that prints none) and `roadmap.md`.
   The README ends with a **Documentation** section linking them by full
   GitHub URL on `develop`, since npm does not resolve relative links.
+- The repository's own `docs/` is for what no one package owns, and does not
+  ship: `start.md` ("Start in 5 minutes"), `recipes/` (one task per page: the
+  problem, one complete runnable example, links to the reference) and
+  `design/`. A recipe is a task across packages; what one package does
+  belongs in that package's `docs/`, which ships. A package's README links a
+  recipe by its full GitHub URL on `develop`, as it links its own docs.
+  `bun run check:docs` (CI runs it after the build) fails on a broken
+  relative link or anchor in any Markdown file (`scripts/docs-links.ts`, which
+  also follows this repository's own GitHub URLs) and type-checks, and runs
+  where there is a spec, the code of the README, `start.md` and the recipes
+  (`scripts/docs-snippets.ts`); every other doc — each package's README and
+  `docs/**`, `docs/design` — has each fence without a `// file:` marker
+  parsed as a fragment, its `@alxia/*` imports checked against the built
+  declarations, and a trailing comment that swallows a chained call flagged
+  (`scripts/docs-snippets/docs.ts`, `syntax.ts`). A fence there begins with `// file: <path>`
+  (`# file:` in YAML), and the fences of one page are the files of one
+  project; `ts excerpt` shows lines of such a file or of a template, each of
+  which must exist, and `ts no-check` is for what is not a program. A recipe
+  that needs a Redis skips its spec without `REDIS_URL`.

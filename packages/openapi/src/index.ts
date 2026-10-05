@@ -1,6 +1,11 @@
 export {
-	type ExactlyOptions,
-	exactly,
+	type ApiDocsOptions,
+	apiDocs,
+	type DocsServer,
+	type DocsUi,
+	isApiDocsRoute,
+} from './api-docs';
+export {
 	type ImplementedOptions,
 	implemented,
 	type MatchesSpecOptions,

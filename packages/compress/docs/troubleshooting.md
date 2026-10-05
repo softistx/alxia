@@ -9,7 +9,7 @@ header you read in the response.
 
 - [`Type '"identity"' is not assignable to type 'Encoding'`](#type-identity-is-not-assignable-to-type-encoding)
 - [`Type 'RegExp' is not assignable to type '(type: string) => boolean'`](#type-regexp-is-not-assignable-to-type-type-string--boolean)
-- [`Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn'`](#type-compressmiddleware-is-not-assignable-to-type-middlewarereturn)
+- [`Type 'CompressMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`](#type-compressmiddleware-is-not-assignable-to-type-this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
 
 **Responses**
 
@@ -63,24 +63,27 @@ error TS2322: Type 'RegExp' is not assignable to type '(type: string) => boolean
 app.use(compress({ compressible: (type) => /json|text\//.test(type) }));
 ```
 
-### `Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn'`
-
-**When:** passing `compress` to `app.use` without calling it.
+### `Type 'CompressMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`
 
 ```text
-error TS2769: No overload matches this call.
-  The last overload gave the following error.
-    Argument of type '(options?: CompressOptions) => CompressMiddleware' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
-      Type '(options?: CompressOptions) => CompressMiddleware' is not assignable to type '(ctx: BaseContext & Empty, next: NextFunction) => MiddlewareReturn'.
-        Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn'.
+error TS2345: Argument of type '(options?: CompressOptions | undefined) => CompressMiddleware' is not assignable to parameter of type '…'.
+  …
+      Type 'CompressMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'.
 ```
 
-TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
+**When:** `app.use(compress)`, the factory given uncalled. The message names
+`cors` as its example, whichever factory it is. It also throws where it is
+declared, since alxia 0.5, rather than answering each request with a 500:
 
-**Why:** `compress` builds the middleware from its options; the middleware
-is what it returns.
+```text
+TypeError: use(): argument 1 looks like a factory (compress): call it, use(compress())
+```
 
-**Fix:**
+**Why:** `compress` makes the middleware; it is not the middleware. A
+function that returns a function is no middleware, and `compress` is marked
+as a factory, so `use`, a route and `plugin` refuse it.
+
+**Fix:** call it, with no options for the defaults:
 
 ```ts
 app.use(compress());

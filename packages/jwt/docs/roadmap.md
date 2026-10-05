@@ -8,9 +8,14 @@ number on it. Every release, with each change it made, is in
 ## Now
 
 - **`bearer` as a middleware.** `app.use(bearer({ jwt }))` is the form;
-  `app.plugin(bearer(…))` keeps working, deprecated. Given to the app, the guard
+  `app.plugin(bearer(…))`, deprecated in 0.4, was removed in 0.5. Given to the app, the guard
   also refuses a request no route matches, before its 404, and `Bearer<Schema>`
   names what `bearer()` returns.
+- **The 401 as a problem.** On an app with `@alxia/core`'s
+  `alxia({ errors: 'problem' })`, `bearer()` answers an RFC 9457 problem,
+  `reason` and `issues` its extensions and the challenge kept
+  (`UnauthorizedProblem`); the default stays `{ error: 'unauthorized' }`
+  ([guide](guide/bearer-guard.md#as-a-problem)).
 
 ## Next
 

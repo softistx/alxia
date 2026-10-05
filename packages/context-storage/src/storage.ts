@@ -5,8 +5,8 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
 	type Mounted,
+	markFactory,
 	type RegisteredBase,
 	type RequestContext,
 	type RequiresOf,
@@ -100,16 +100,12 @@ export function runWithContext<T>(ctx: BaseContext, work: () => T): T {
 export type ContextStorageMiddleware<App> = Middleware<
 	RequiresOf<StoredContext<App>, 'context'>,
 	Promise<Response>
-> &
-	MiddlewareMark & {
-		/** `getContext()`, typed by `App`. */
-		context(): StoredContext<App>;
-		/** `tryGetContext()`, typed by `App`. */
-		tryContext(): StoredContext<App> | undefined;
-	};
-
-/** @deprecated Renamed `ContextStorageMiddleware`: it is a middleware. */
-export type ContextStoragePlugin<App> = ContextStorageMiddleware<App>;
+> & {
+	/** `getContext()`, typed by `App`. */
+	context(): StoredContext<App>;
+	/** `tryGetContext()`, typed by `App`. */
+	tryContext(): StoredContext<App> | undefined;
+};
 
 /** What `context()` reads: the context of `App`, or the base context when `App` is no app. */
 export type StoredContext<App> = [ContextOf<App>] extends [never]
@@ -120,8 +116,8 @@ export type StoredContext<App> = [ContextOf<App>] extends [never]
  * The request's context, anywhere it runs, as a middleware: from the
  * routes declared after it, every function their handlers call — however
  * deep, through every `await` and timer — reads it with `getContext()`,
- * without it being passed down; the answer to an error too, an `onError`
- * hook's included. Give it to `use` before the middlewares whose errors
+ * without it being passed down; the answer to an error too, a try/catch
+ * middleware's included. Give it to `use` before the middlewares whose errors
  * your own middleware answers: what the rest throws is answered inside
  * it, as the route would.
  *
@@ -147,13 +143,13 @@ export function contextStorage<App = RegisteredBase>(
 	...uncalled: readonly never[]
 ): ContextStorageMiddleware<App> {
 	if (uncalled.length > 0) {
-		// `use(contextStorage)`: the app is handed to the factory, and what
-		// follows would be declared on a plugin nobody serves.
+		// `use(contextStorage)`: the factory runs as the middleware, handed
+		// each request's context, and would store none of them.
 		throw new TypeError(
 			'contextStorage is a factory: use(contextStorage()), not use(contextStorage)',
 		);
 	}
-	const middleware = defineMiddleware((ctx, next) => {
+	const middleware = defineMiddleware(function contextStorage(ctx, next) {
 		// A route's context; none for a request no route matches.
 		const routed = ctx.route === undefined ? undefined : ctx;
 		const current = storage.getStore();
@@ -171,3 +167,5 @@ export function contextStorage<App = RegisteredBase>(
 		tryContext: () => tryGetContext(),
 	}) as unknown as ContextStorageMiddleware<App>;
 }
+
+markFactory(contextStorage);

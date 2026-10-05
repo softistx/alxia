@@ -35,7 +35,8 @@ to the 404.
 ## The signature
 
 ```ts
-function idempotency(client: RedisClient, options: IdempotencyOptions);  // a middleware
+function idempotency(target: RedisClient | Redis<any>, options: IdempotencyOptions);  // a middleware
+function idempotency(wired: WiredIdempotency, options?: WiredIdempotencyOptions);   // wired by defineRedis
 
 interface IdempotencyOptions {
 	readonly name: string;
@@ -72,6 +73,12 @@ TypeError: defineIdempotency: an idempotent operation needs a name, for its keys
 `wait` is checked on the first guarded request: a wrong one makes every
 guarded request a `500`, logging
 `TypeError: run on "payments": wait is a whole number of milliseconds, 0 or more`.
+
+`idempotency(handle.idempotency.orders)` takes an idempotency wired by
+`defineRedis` instead: its definition holds the `name`, `ttl` and `lease`, and
+its `schema` is `idempotencyResult`. The options are the others of the table
+(`WiredIdempotencyOptions`). See
+[Defined once, in `defineRedis`](connecting.md#defined-once-in-defineredis).
 
 ## What each request gets
 
@@ -209,7 +216,7 @@ is two keys.
 
 The middleware wraps the routes declared after it, and every middleware
 declared after it too. Whatever those answer is kept like the route's
-answer: so is what an `onError` hook, an `HttpError` or a validation
+answer: so is what a try/catch middleware, an `HttpError` or a validation
 refusal answers, because `idempotency` settles the rest of the request before
 it keeps it. A rate limit or an authentication check declared **after**
 `idempotency` has its `429` or `401` kept and replayed — even once the
@@ -267,5 +274,5 @@ Yield (`await Bun.sleep(0)`) inside long synchronous work, or move it to a
 
 - [Rate limits](rate-limits.md) — `redisStore`.
 - [Testing](testing.md) — specs for a guarded route.
-- [`@nxgt/redis-guard`](https://www.npmjs.com/package/@nxgt/redis-guard) —
+- [`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) —
   the primitive underneath, for idempotency outside HTTP.

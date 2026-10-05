@@ -3,24 +3,32 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
+	markFactory,
 	type Reply,
 	settle,
 } from '@alxia/core';
 import {
+	type BoundIdempotency,
 	bindIdempotency,
 	defineIdempotency,
 	GuardError,
-} from '@nxgt/redis-guard';
-import type { RedisClient } from 'bun';
-import { z } from 'zod';
+} from '@nxgt/redis';
+import { isWiredIdempotency, nameUnder, type RedisTarget } from './handle';
+import {
+	fingerprintOf,
+	type IdempotencyResult,
+	idempotencyResult,
+	restore,
+	store,
+	Unstored,
+} from './idempotency-response';
 
 export interface IdempotencyOptions {
-	/** Names the keys it stores. */
+	/** Names the keys it stores, under a handle's prefix when it is given one. */
 	readonly name: string;
 	/** Seconds a finished response is kept and replayed. A day by default. */
 	readonly ttl?: number;
-	/** Milliseconds a running request holds its key unless renewed. `@nxgt/redis-guard`'s 10 s by default. */
+	/** Milliseconds a running request holds its key unless renewed. `@nxgt/redis`'s 10 s by default. */
 	readonly lease?: number;
 	/** Milliseconds a repeat waits for the first to finish before a 409. None by default. */
 	readonly wait?: number;
@@ -63,32 +71,29 @@ export type IdempotencyMiddleware = Middleware<
 		| Reply<409, IdempotencyErrorBody>
 		| Reply<422, IdempotencyErrorBody>
 	>
-> &
-	MiddlewareMark;
+>;
 
-const Stored = z.object({
-	status: z.number().int(),
-	headers: z.array(z.tuple([z.string(), z.string()])),
-	body: z.string(),
-});
-type Stored = z.infer<typeof Stored>;
+/**
+ * An idempotency wired by `defineRedis` — `handle.idempotency.orders` — whose
+ * definition holds `idempotencyResult` as its schema and a key taken as a
+ * string.
+ */
+export type WiredIdempotency = BoundIdempotency<
+	string,
+	IdempotencyResult,
+	IdempotencyResult
+>;
 
-/** Headers a replay never repeats: a session cookie belongs to one response. */
-const UNSTORED_HEADERS = new Set(['set-cookie', 'date', 'content-length']);
+/** What a wired idempotency leaves to the middleware: its name, `ttl` and `lease` are the definition's. */
+export type WiredIdempotencyOptions = Omit<
+	IdempotencyOptions,
+	'name' | 'ttl' | 'lease'
+>;
 
 const KEY = /^[\x21-\x7e]{1,255}$/;
 
-/** A response that is answered and not kept: a 5xx, a stream. */
-class Unstored extends Error {
-	readonly response: Response;
-	constructor(response: Response) {
-		super('unstored');
-		this.response = response;
-	}
-}
-
 /**
- * Idempotent routes, as a middleware, with `@nxgt/redis-guard`: a `POST` or
+ * Idempotent routes, as a middleware, with `@nxgt/redis`: a `POST` or
  * `PATCH` carrying an `Idempotency-Key` runs once per key, and every repeat
  * gets the first response back, marked `Idempotent-Replayed: true` — across
  * every process sharing the Redis. Routes declared after it are guarded; a
@@ -104,40 +109,44 @@ class Unstored extends Error {
  * ```ts
  * app.use(idempotency(redis.client, { name: 'payments' })).post('/payments', ...);
  * ```
+ *
+ * Given an `@nxgt/redis` handle instead of a client, the keys are under the
+ * handle's `prefix`: `idempotency(handle, { name: 'payments' })`.
+ *
+ * Given an idempotency wired by `defineRedis`, the definition — name, `ttl`,
+ * `lease` — is the one place, and the keys are those `@nxgt/redis` writes,
+ * `<prefix>:<name>:<route>:<scope>:<key>`:
+ *
+ * ```ts
+ * app.use(idempotency(handle.idempotency.orders, { required: true })).post('/orders', ...);
+ * ```
  */
 export function idempotency(
-	client: RedisClient,
+	target: RedisTarget,
 	options: IdempotencyOptions,
+): IdempotencyMiddleware;
+export function idempotency(
+	wired: WiredIdempotency,
+	options?: WiredIdempotencyOptions,
+): IdempotencyMiddleware;
+export function idempotency(
+	target: RedisTarget | WiredIdempotency,
+	options: IdempotencyOptions | WiredIdempotencyOptions = {},
 ): IdempotencyMiddleware {
+	const { bound, label } = isWiredIdempotency(target)
+		? wiredOf(target, options)
+		: boundOf(target, options as IdempotencyOptions);
 	const methods = new Set(options.methods ?? ['POST', 'PATCH']);
 	const header = options.header ?? 'idempotency-key';
 	const scope = options.scope ?? ((ctx: BaseContext) => ctx.ip);
-	const bound = bindIdempotency(
-		client,
-		defineIdempotency({
-			name: options.name,
-			key: (key: string) => key,
-			ttl: options.ttl ?? 86_400,
-			...(options.lease === undefined ? {} : { lease: options.lease }),
-			schema: Stored,
-		}),
-	);
 	let warned = false;
 	const warnUnscoped = () => {
 		if (warned) return;
 		warned = true;
-		console.warn(unscopedWarning(options.name));
-	};
-	const refuse = (
-		error: IdempotencyErrorBody['error'],
-		retryAfter?: number,
-	) => {
-		const body: IdempotencyErrorBody =
-			retryAfter === undefined ? { error } : { error, retryAfter };
-		return body;
+		console.warn(unscopedWarning(label()));
 	};
 
-	return defineMiddleware(async (ctx, next) => {
+	return defineMiddleware(async function idempotency(ctx, next) {
 		const { request, reply, route } = ctx;
 		if (route === undefined || !methods.has(request.method)) return next();
 		const key = request.headers.get(header);
@@ -185,48 +194,51 @@ export function idempotency(
 	});
 }
 
+function refuse(
+	error: IdempotencyErrorBody['error'],
+	retryAfter?: number,
+): IdempotencyErrorBody {
+	return retryAfter === undefined ? { error } : { error, retryAfter };
+}
+
+/** The idempotency bound from a client or a handle: the keys are `<prefix>:<name>:<id>`. */
+function boundOf(target: RedisTarget, options: IdempotencyOptions) {
+	const { client, name } = nameUnder(target, options.name);
+	const bound = bindIdempotency(
+		client,
+		defineIdempotency({
+			name,
+			key: (key: string) => key,
+			ttl: options.ttl ?? 86_400,
+			...(options.lease === undefined ? {} : { lease: options.lease }),
+			schema: idempotencyResult,
+		}),
+	);
+	return { bound: bound as WiredIdempotency, label: () => options.name };
+}
+
+/** The idempotency wired by `defineRedis`, which carries its own name, `ttl` and `lease`. */
+function wiredOf(wired: WiredIdempotency, options: object) {
+	for (const own of ['name', 'ttl', 'lease']) {
+		if (own in options) {
+			throw new TypeError(
+				`idempotency: "${own}" is the wired definition's, set in defineIdempotency: the middleware takes none with a wired idempotency`,
+			);
+		}
+	}
+	const label = () => {
+		try {
+			return wired.keyFor('').replace(/:$/, '');
+		} catch {
+			return 'wired';
+		}
+	};
+	return { bound: wired, label };
+}
+
 /** The warning a request with no scope prints, once per middleware. */
 function unscopedWarning(name: string): string {
 	return `idempotency "${name}": no client scope could be derived (ctx.ip is undefined and no scope option returned one), so these requests run unguarded, nothing stored or replayed. Pass a scope option, (ctx) => a user id, or an ip option to alxia().`;
 }
 
-/** What a key is bound to: the method, the path and query, the body. */
-async function fingerprintOf(request: Request, url: URL): Promise<Uint8Array> {
-	const body = new Uint8Array(await request.clone().arrayBuffer());
-	const head = new TextEncoder().encode(
-		`${request.method} ${url.pathname}${url.search}\n`,
-	);
-	const fingerprint = new Uint8Array(head.length + body.length);
-	fingerprint.set(head);
-	fingerprint.set(body, head.length);
-	return fingerprint;
-}
-
-async function store(response: Response): Promise<Stored> {
-	if (
-		response.status >= 500 ||
-		response.headers.get('content-type')?.startsWith('text/event-stream')
-	) {
-		throw new Unstored(response);
-	}
-	const headers: [string, string][] = [];
-	for (const [name, value] of response.headers) {
-		if (!UNSTORED_HEADERS.has(name)) headers.push([name, value]);
-	}
-	const bytes = new Uint8Array(await response.arrayBuffer());
-	return {
-		status: response.status,
-		headers,
-		body: Buffer.from(bytes).toString('base64'),
-	};
-}
-
-function restore(stored: Stored, replayed: boolean): Response {
-	const headers = new Headers(stored.headers);
-	if (replayed) headers.set('idempotent-replayed', 'true');
-	const body = Buffer.from(stored.body, 'base64');
-	return new Response(
-		stored.status === 204 || stored.status === 304 ? null : body,
-		{ status: stored.status, headers },
-	);
-}
+markFactory(idempotency);

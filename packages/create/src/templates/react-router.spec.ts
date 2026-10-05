@@ -3,6 +3,7 @@ import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { $ } from 'bun';
+import { ALXIA } from '../../test/templates';
 import { copyTemplate, RENAMED } from '../copy';
 import { PEER_RANGES } from '../versions';
 
@@ -10,11 +11,6 @@ const TEMPLATE = fileURLToPath(
 	new URL('../../templates/react-router', import.meta.url),
 );
 const EXAMPLE = new URL('../../../../examples/react-router/', import.meta.url);
-const ALXIA = {
-	'@alxia/core': '^0.3.0',
-	'@alxia/openapi': '^0.4.0',
-	'@alxia/react-router': '^0.2.0',
-};
 
 const stored = (file: string) => Bun.file(`${TEMPLATE}/${file}`);
 
@@ -56,8 +52,8 @@ describe("copyTemplate('react-router')", () => {
 		expect(manifest['name']).toBe('web');
 		expect(manifest['scripts']).toEqual({
 			build: 'react-router build',
-			dev: 'react-router dev',
-			start: 'bun build/server/index.js',
+			dev: 'NODE_ENV=development react-router dev',
+			start: 'NODE_ENV=production bun build/server/index.js',
 			typecheck: 'react-router typegen && tsc',
 			lint: 'biome lint',
 			format: 'biome format --write',

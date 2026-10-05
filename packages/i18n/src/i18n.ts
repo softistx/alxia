@@ -4,7 +4,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
+	markFactory,
 	type Next,
 	type NextFunction,
 	type RequiresOf,
@@ -123,14 +123,13 @@ export type I18nMiddleware<
 > = Middleware<
 	Requires,
 	Promise<Next<LanguageContext<Language> & I18nContext<Key>>>
-> &
-	MiddlewareMark & {
-		/** Translates into the current request's language, or the fallback outside one. */
-		t: Translate<Key>;
-		/** The current request's language, or the fallback outside one. */
-		language: () => Language;
-		supported: Language[];
-	};
+> & {
+	/** Translates into the current request's language, or the fallback outside one. */
+	t: Translate<Key>;
+	/** The current request's language, or the fallback outside one. */
+	language: () => Language;
+	supported: Language[];
+};
 
 /**
  * Translations, as a middleware, on [`@nxgt/i18n`](https://www.npmjs.com/package/@nxgt/i18n):
@@ -140,7 +139,7 @@ export type I18nMiddleware<
  * selects, numbers — and a missing key answers itself.
  *
  * Its own `t()` translates anywhere a request runs after it — a service,
- * the answer to an error, an `onError` hook's included — in that
+ * the answer to an error, a try/catch middleware's included — in that
  * request's language, and in the fallback outside.
  *
  * ```ts
@@ -200,7 +199,7 @@ export function createI18n<
 	// What the routes after it read, once `@alxia/language` has read it.
 	type Added = LanguageContext<Language> & I18nContext<Key>;
 	const middleware = defineMiddleware<RequiresOf<Ctx, 'resolve'>>()(
-		(ctx, next): Promise<Next<Added>> => {
+		function i18n(ctx, next): Promise<Next<Added>> {
 			const own: { language?: Language } = {};
 			const found = (heard: LanguageContext<Language>) => {
 				own.language = heard.language;
@@ -224,3 +223,5 @@ export function createI18n<
 		supported,
 	});
 }
+
+markFactory(createI18n);

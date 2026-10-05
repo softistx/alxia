@@ -313,26 +313,31 @@ test('the session reads the user, and anonymous is a 401', async () => {
 function session<A extends Auth<{ readonly type: string }>, const T extends UserOfAuth<A>['type']>(
 	auth: A,
 	options: SessionOptions<T> & { readonly required: true },
-): Alxia<
+): SessionMiddleware<
 	{ readonly user: UserOf<A, T>; readonly session: Session; readonly auth: RequestAuth },
-	'', Reply<401, UnauthenticatedBody>
+	Reply<401, UnauthenticatedBody | UnauthenticatedProblem>
 >;
 
 function session<A extends Auth<{ readonly type: string }>, const T extends UserOfAuth<A>['type']>(
 	auth: A,
 	options?: SessionOptions<T> & { readonly required?: false },
-): Alxia<
-	{ readonly user: UserOf<A, T> | null; readonly session: Session | null; readonly auth: RequestAuth },
-	'', never
+): SessionMiddleware<
+	{ readonly user: UserOf<A, T> | null; readonly session: Session | null; readonly auth: RequestAuth }
 >;
 
 function session<A extends Auth<{ readonly type: string }>, const T extends UserOfAuth<A>['type']>(
 	auth: A,
 	options?: SessionOptions<T>,
-): Alxia<
+): SessionMiddleware<
 	{ readonly user: UserOf<A, T> | null; readonly session: Session | null; readonly auth: RequestAuth },
-	'', Reply<401, UnauthenticatedBody>
+	Reply<401, UnauthenticatedBody | UnauthenticatedProblem>
 >;
+
+// a middleware that gives Added, or answers Refused
+type SessionMiddleware<Added extends object, Refused = never> = Middleware<Empty, Promise<Refused | Next<Added>>>;
+
+// the 401 under @alxia/core's alxia({ errors: 'problem' })
+type UnauthenticatedProblem = Problem<401>;
 
 interface SessionOptions<T extends string> {
 	readonly type?: T;
@@ -355,7 +360,7 @@ type UserOfAuth<A> = A extends Auth<infer U> ? U : never;
 `RequestAuth` and `DeviceCookieOptions` are shown in
 [Signing in and out](sign-in-and-out.md#signatures).
 `UserOf<A, T>` is `Extract<UserOfAuth<A>, { readonly type: T }>`; it is not
-exported. `Alxia`, `Empty` and `Reply` are `@alxia/core`'s; `Session` and
+exported. `Middleware`, `Next`, `Empty`, `Reply` and `Problem` are `@alxia/core`'s; `Session` and
 `SharedApi` are `@nxgt/janus`'s.
 
 Next: [Signing in and out](sign-in-and-out.md) sets the cookie this middleware

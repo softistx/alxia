@@ -69,6 +69,12 @@ jobs:
       # does and imports every declared subpath.
       - name: Verify the built artifacts load
         run: bun run verify:artifacts
+      # The docs: no broken relative link or anchor, and the code of the
+      # README, "Start in 5 minutes" and the recipes type-checked, and run
+      # where it has a spec (the Redis recipes use the service above). After
+      # the build: the snippets import the packages through their `dist/`.
+      - name: Check the docs
+        run: bun run check:docs
       # A change to a package without a changeset is a change that never
       # reaches a consumer: the release workflow has nothing to version.
       #
@@ -158,7 +164,7 @@ jobs:
     # React Router, TypeScript, Vite — comes from npm at the newest
     # versions @alxia/create resolves, so an upstream release can turn it red
     # with no change here: informational, like the two jobs above. Measured
-    # locally at about 90 seconds, most of it the two docker builds.
+    # locally in a few minutes, most of it the four docker builds.
     name: Templates
     runs-on: ubuntu-latest
     timeout-minutes: 10

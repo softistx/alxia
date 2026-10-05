@@ -68,7 +68,7 @@ One span per request, of kind `server`, opened by the middleware. It
 holds everything the request runs after it: the middlewares, validation,
 the route's own middlewares and handler, whatever they await, and the
 answer to an error: `telemetry()` settles `next()`, so the span sees the
-response the client gets, an `onError` reply or a 500 included. A log written with `createLogger` anywhere inside it,
+response the client gets, an `HttpError`'s status or a 500 included. A log written with `createLogger` anywhere inside it,
 and a span opened with `span()`, belong to it.
 
 ```ts
@@ -149,7 +149,7 @@ unmatched request still gets its span). A
 | --- | --- | --- |
 | `2xx`, `3xx`, `4xx` replied | `ok` | none |
 | a `4xx` an error-handling middleware made of a thrown error | `ok` | none: the middleware caught it |
-| a `4xx` the route boundary made of a thrown error (a deprecated `onError` hook, an `HttpError`) | `ok` | the error |
+| a `4xx` the route boundary made of a thrown `HttpError` | `ok` | the error |
 | `499`, the client hung up mid-request | `ok` | the `AbortError` |
 | a `5xx` from a throw | `error` | the error |
 | a `5xx` the route replied | `error` | none |
@@ -416,12 +416,7 @@ const app = alxia()
 	.get('/', ({ reply }) => reply(200, 'ok'))
 	.onStop(() => tracing.telemetry.close());
 
-app.listen(3000);
-
-process.on('SIGTERM', async () => {
-	await app.stop();
-	process.exit(0);
-});
+app.listen(3000); // SIGTERM: the requests in flight finish, then onStop closes it
 ```
 
 Once closed, a telemetry takes nothing more: the app still answers, and

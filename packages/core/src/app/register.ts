@@ -41,8 +41,7 @@ export type InvalidRegister = Alxia<
 	{
 		readonly 'Register.context must be typeof base, the alxia() chain that decorates and derives the context': never;
 	},
-	'',
-	never
+	''
 >;
 
 /** The app a `Register`-shaped interface names: its `context`, a fresh app, or `InvalidRegister`. */
@@ -50,7 +49,7 @@ export type RegisteredOf<R> = R extends { readonly context: infer App }
 	? App extends AnyAlxia
 		? App
 		: InvalidRegister
-	: Alxia<Empty, '', never>;
+	: Alxia<Empty, ''>;
 
 /** The app `Register` names, or a fresh one: what `AppContext` and `defineRoutes` read. */
 export type RegisteredBase = RegisteredOf<Register>;
@@ -64,10 +63,17 @@ export type RegisteredBase = RegisteredOf<Register>;
  * export async function listTodos({ db, user }: AppContext) { … }
  * ```
  *
- * A middleware that reads it says so, and is then refused on a route
- * whose context does not give it: `defineMiddleware<AppContext>()(fn)`.
+ * `defineMiddleware(fn)` reads it too, and is then refused on a route
+ * whose context does not give it.
  */
 export type AppContext = ContextOf<RegisteredBase>;
+
+/**
+ * What the registered app adds to the base context: what
+ * `defineMiddleware`, given no `Requires`, reads. `Empty` when nothing is
+ * registered.
+ */
+export type RegisteredContext = RegisteredBase['~context'];
 
 /**
  * What `defineRoutes` starts from: the registered context, with the

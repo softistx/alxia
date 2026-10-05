@@ -10,12 +10,17 @@ number on it. Every release, with each change it made, is in
 - **Middlewares around the pages.** `beforeAll` and `configure` take
   `use(logger())`, `use(secureHeaders())` and the other middlewares of
   alxia 0.4, which run on the pages, the client's files declared after
-  them, and every request no route matches; the hooks they replace still
-  work, deprecated.
+  them, and every request no route matches; the request hooks they replaced,
+  deprecated in 0.4, were removed in 0.5.
 - **Loaders typed by core's `Register`.** `alxiaOf(context)` reads the base
   `@alxia/core`'s `Register` names when this package's names no server, so
   an app that registers its context once types its loaders too. This
   package's `Register` still wins when both are declared.
+- **One graceful shutdown.** `start` relies on `@alxia/core`'s `listen`,
+  which handles `SIGINT` and `SIGTERM` itself, before `onListen` as
+  before: the requests in flight drain within `shutdownTimeout`
+  (`listen: { shutdownTimeout }`), readiness turns 503, the `onStop`
+  hooks run, then the process exits.
 
 ## Next
 
@@ -86,9 +91,9 @@ Nothing scheduled yet.
 
 - **React Router as a catch-all.** `reactRouter(app, { build })` serves
   documents, single-fetch data, actions, redirects with every cookie, lazy
-  route discovery and the error pages, behind every hook declared before
-  it, streamed as React renders them.
-- **The context, typed.** `alxiaOf<App>(context)` reads what alxia's hooks
+  route discovery and the error pages, behind every middleware declared
+  before it, streamed as React renders them.
+- **The context, typed.** `alxiaOf<App>(context)` reads what alxia's middlewares
   built in any loader, action or middleware, through a key that is one
   object however the server was built; `getLoadContext` sets the app's own
   keys.
@@ -113,7 +118,7 @@ Nothing scheduled yet.
 - **`vite preview` serves the built server.** After `react-router build`,
   `bunx --bun vite preview` hands every request to `build/server/index.js`,
   as `bun run start` would answer it: the pages, `/api`, the client's files
-  and the app's hooks. React Router's prerendering runs on the same
+  and the app's middlewares. React Router's prerendering runs on the same
   server, so a prerendered page's loader reads `alxiaOf`.
 - **`bunx alxia-react-router reveal`.** The package's bin writes the
   default server into the app, `app/server.ts` or `alxia({ entry })`'s
@@ -124,7 +129,7 @@ Nothing scheduled yet.
 - **WebSockets in dev and preview.** An alxia `ws` route connects under
   `react-router dev` and `vite preview` as from the build, with nothing to
   configure: the plugin relays each upgrade Vite does not claim (HMR, its
-  proxy) to a `Bun.serve` of the app, so its hooks, refusals,
+  proxy) to a `Bun.serve` of the app, so its middlewares, refusals,
   `socket.data` and handlers run as `listen` runs them, and in dev an edit
   to the server is used from the next connection.
 - **Loaders typed with no type argument.** A `Register` declaration beside

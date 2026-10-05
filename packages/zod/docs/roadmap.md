@@ -7,9 +7,8 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **`zodConverter` takes a Zod schema as it is.** `zodConverter(Todo, 'output')`
-  compiles, for any use of the JSON Schema it gives: a hand-written OpenAPI
-  document, a JSON Schema validator, a form builder.
+- **`zodConverter` removed in 0.2.** Nothing in alxia read it: Zod's own
+  `z.toJSONSchema(schema)` converts a schema.
 
 ## Next
 
@@ -49,7 +48,4 @@ Nothing scheduled yet.
   JSON, validates it with the schema, and lets the client send the object.
   An array is sent as its JSON text, since a query sends a list as repeated
   keys.
-- **JSON Schema that matches the wire.** `zodConverter` gives a Zod
-  schema as JSON Schema 2020-12, a `Date` as a `date-time` string and a
-  `bigint` as an integer, and keeps the rest of a schema when one field has
-  no JSON Schema, instead of losing all of it.
+- **JSON Schema that matches the wire.** `zodConverter`, removed in 0.2.

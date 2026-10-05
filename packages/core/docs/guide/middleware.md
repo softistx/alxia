@@ -2,9 +2,10 @@
 
 This page is the map of every way to run code around routes in alxia: the
 order one request runs them in, which tool fits which need, and a working
-snippet for each. A middleware is the one form — `(ctx, next) => …` — and
-the request hooks of 0.3 (`onRequest`, `onResponse`, `around`, `wrap`,
-`onError`, `onRefusal`) are deprecated for it ([Hooks](hooks.md)). The
+snippet for each. A middleware is the one form: a plain `(ctx, next) => …`
+function, written inline or kept in a const, and given to `use`, to a
+route, to `ws` or to `route(operation)`. What it passes `next({ … })` is
+inferred, and the middlewares after it and the handler read it typed. The
 details of each way live on [Routes and validation](routes.md),
 [Groups and plugins](groups-and-plugins.md) and [Replies](replies.md).
 
@@ -38,50 +39,36 @@ Routing is decided first, then the request runs one chain of middlewares
 around the router's answer, in the order declared: an onion. Code before
 `await next()` runs on the way in, code after it on the way out.
 
-1. **`around`** hooks (deprecated), the first declared outermost. A
-   WebSocket upgrade skips them.
-2. **`onRequest`** hooks (deprecated), in the order declared. A `Response`
-   one returns skips to step 8.
-3. **Routing.** The router finds the route, or none. From here `ctx.route`
+1. **Routing.** The router finds the route, or none. From here `ctx.route`
    is the route's path as declared (`/users/:id`), or `undefined` on a
    request no route matches: a 404, a 405, a 426, an `OPTIONS` to a path
    with no `OPTIONS` route.
-4. **The app's chain**, in the order declared: first the middlewares given
-   to the deprecated `plugin(middleware)`, which run app-wide as 0.3's
-   global hooks did, then every `use(middleware)`, `derive`, `decorate`
-   and `wrap` — the app's, then the group's, a plugin's after those of the
-   app that uses it. A `use(path, …)` one runs when the request's path is
-   under `path`. A middleware that returns a reply or a `Response` ends the
-   request there.
-5. **The route's own middlewares**, in the order given: the ones a route is
+2. **The app's chain**, in the order declared: every `use(middleware)`,
+   `derive` and `decorate` — the app's, then the group's, a plugin's after
+   those of the app that uses it. A `use(path, …)` one runs when the
+   request's path is under `path`. A middleware that returns a reply or a
+   `Response` ends the request there.
+3. **The route's own middlewares**, in the order given: the ones a route is
    given after its path, `validate` and `responds` where they stand.
-6. **The handler** — or, when no route matched, the router's 404, 405 or
+4. **The handler** — or, when no route matched, the router's 404, 405 or
    426.
-7. **Unwinding.** The reply is checked by the `responds` in force and sent;
+5. **Unwinding.** The reply is checked by the `responds` in force and sent;
    then every middleware that awaited `next()` runs its code after it, the
    last first. It sees the response, or what the rest threw as the
-   rejection of `next()`. **What nobody caught reaches the route
-   boundary**, outermost, which answers it:
-   - the client hung up: a bodyless `499`, no hook runs;
-   - a refusal — a `ValidationError`, or a body past `bodyLimit`: the
-     deprecated `onRefusal` hooks of its kind, then the general one, then
-     the default 400 or 413;
-   - anything else: the deprecated `onError` hooks in the order declared,
-     then an `HttpError` as it says, then a logged 500.
-8. **`onResponse`** hooks (deprecated), in the order declared, on every
-   response.
-9. **`around`** hooks unwind.
+   rejection of `next()` — a `validate` refusal included. **What nobody
+   caught reaches the route boundary**, outermost, which answers it:
+   - the client hung up: a bodyless `499` nobody reads, nothing logged;
+   - an `HttpError` — a refusal's 400 or 413 among them: its status and
+     body;
+   - anything else: a logged 500 that leaks nothing.
 
 ```
-around                                              deprecated, outermost
-└─ onRequest                                        deprecated; a Response here skips to onResponse
-   └─ routing                                       decides the route, or none: ctx.route
-      └─ use() middlewares, derive, decorate, wrap  the app's chain, in the order declared
-         └─ the route's middlewares                 auth ─ validate ─ responds ─ …
-            └─ handler                              or the 404 / 405 / 426 when no route matched
-         ↑ each middleware that awaited next() unwinds here, the last first
-      route boundary                                answers what nobody caught: refusal, onError, HttpError, 500
-   onResponse                                       deprecated, last
+routing                                       decides the route, or none: ctx.route
+└─ use() middlewares, derive, decorate        the app's chain, in the order declared
+   └─ the route's middlewares                 auth ─ validate ─ responds ─ …
+      └─ handler                              or the 404 / 405 / 426 when no route matched
+   ↑ each middleware that awaited next() unwinds here, the last first
+route boundary                                answers what nobody caught: an HttpError, a 500
 ```
 
 Three rules follow, each spec'd:
@@ -106,8 +93,7 @@ Three rules follow, each spec'd:
 - **A request no route matches runs every top-level `use()` middleware of
   the app, wherever declared**, then the 404, 405 or 426. So `/missing`
   above gets the stamp too, where `/early` does not. The same holds for the
-  top-level `derive` and `decorate`, never a deprecated `wrap`, which keeps
-  0.3's rule. A middleware may answer before
+  top-level `derive` and `decorate`. A middleware may answer before
   the 404: a 401, a preflight's 204.
 
   ```ts
@@ -156,9 +142,8 @@ Where an observer or an error handler stands in the chain matters, and is
 | Answering at once and finishing the work after | [`next.behind()`](#nextbehind-reply-now-finish-after) | where the middleware stands | yes | no |
 | Capping a body | `bodyLimit(bytes)`, or a route's `{ bodyLimit }` | the routes declared after it, or one route | a 413 | the limit, in `app.routes` |
 
-The hooks that were the answer before 0.4 — `onRequest`, `onResponse`,
-`around`, `wrap`, `onError`, `onRefusal` — are in the [mapping on the Hooks
-page](hooks.md#from-a-hook-to-a-middleware). They still run, as in 0.3.
+The request hooks of 0.3 were removed in 0.5: what each did, as a
+middleware, is on [Upgrading](../upgrading.md#050).
 
 "Typed" is what the handler and the middlewares after it read. alxia is
 spec first: the OpenAPI document, written by hand, is the contract a client
@@ -278,11 +263,11 @@ not compile, and a reply cast past the types is a 500, the
 ## What a middleware reads
 
 A middleware before any `validate` reads the request as it arrived; one
-after it reads what the `validate` gave back. A `use()` middleware, a
-`derive` or a `wrap` stands before every middleware of the route, so it
-reads the request as it arrived too:
+after it reads what the `validate` gave back. A `use()` middleware or a
+`derive` stands before every middleware of the route, so it reads the
+request as it arrived too:
 
-| | A middleware before `validate` | After `validate({ … })` | A `derive` or `wrap` on the chain | The handler |
+| | A middleware before `validate` | After `validate({ … })` | A `use()` middleware or a `derive` | The handler |
 | --- | --- | --- | --- | --- |
 | `params` | the path's parameters, strings, typed by the route's path | the `params` schema's output | there at runtime, not in its type: read `pathParams` | the output, or the strings without a `params` schema |
 | `pathParams` | the same strings | the same strings | the same strings | the same strings |
@@ -331,7 +316,7 @@ Two different maps:
 
 | | What it is | Where |
 | --- | --- | --- |
-| `ctx.cookies` | the **request's** cookies, parsed from `Cookie` on first read | every middleware and the handler; after a `validate({ cookies })`, the middlewares after it and the handler read its output instead, while the deprecated `onError` and `onRefusal` hooks still read the request's |
+| `ctx.cookies` | the **request's** cookies, parsed from `Cookie` on first read | every middleware and the handler; after a `validate({ cookies })`, the middlewares after it and the handler read its output instead |
 | `set.cookies` | the **response's** cookies, empty when the request starts | `set.cookies.set(…)` adds a `Set-Cookie`; `get` reads back only what this response set |
 
 ```ts
@@ -360,12 +345,14 @@ sent. The detail, and what a `cookies` schema changes, is on
 
 ### A route's middlewares
 
-Each made once with `defineMiddleware` and named on every route that needs
-it, after the path — or after the route's options. They run after the
-app's chain, in the order given. What one passes `next`, the ones after it
-and the handler read. Its replies end that route's request alone.
-`defineMiddleware<Requires>()` names what a middleware reads beyond the
-base context, and a route that does not give it there does not compile:
+Written inline, or kept in a const and named on every route that needs it,
+after the path — or after the route's options. They run after the app's
+chain, in the order given. What one passes `next`, the ones after it and
+the handler read. Its replies end that route's request alone. An inline
+middleware reads the context in force where it stands; a shared one is
+typed by `defineMiddleware`, and `defineMiddleware<Requires>()` names what
+it reads beyond the base context. A route that does not give it there does
+not compile, with one error on that middleware naming the key:
 
 ```ts
 import { alxia, defineMiddleware, validate } from '@alxia/core';
@@ -410,7 +397,16 @@ const app = alxia({ prefix: '/notes' })
 	});
 // PATCH /notes/:id → 401 without a session, 404 for a note it may not see, 403 for someone else's,
 // 400 for a bad body, 200 otherwise: in that order
+
+alxia().get('/:id', canView, ({ note, reply }) => reply(200, note));
+// Type 'Promise<Next<…>>' is not assignable to type
+// '"`user` is missing from the context: add a middleware that gives it before this one"'.
 ```
+
+The other messages: `` `user` is in the context with another type than this
+middleware reads``, and, for a `validate({ params })` naming a parameter the
+path lacks, ``the path parameter `id` is not in this route's path``
+([Troubleshooting](../troubleshooting.md)).
 
 `GET` checks only that the note may be seen. Every check stands before
 `validate`, so a 403 comes before a 400. `canView` reads `pathParams.id`,
@@ -443,14 +439,34 @@ reply of its own before the `next()` it called settled — `next(); return
 reply(403)` — has started the rest, which runs anyway: its reply is sent
 once the rest has run, `console.warn` says `GET /x: a middleware returned
 before the next() it called settled: …`, and an error the rest throws is
-logged rather than left unhandled. Decide before calling `next()`. A route takes up to 8
-middlewares, `validate` and `responds` included; a ninth does not compile.
-`ws` takes them on the upgrade ([WebSockets](websockets.md#the-upgrade));
-`route`, `static`, `file` and `page` do not.
+logged rather than left unhandled. Decide before calling `next()`.
 
-```ts
+> **A guard that calls `next()` has let the handler run.** Calling
+> `next()` starts the rest of the route, whatever the middleware does
+> after: a guard that calls it without returning it, then refuses —
+> `next(); return reply(401)` — still runs the handler (the request is
+> already through, as in Koa; alxia only warns). Check first, then
+> `return next()`, or return the refusal without calling it:
+>
+> ```ts
+> const auth = defineMiddleware(({ request, reply }, next) =>
+> 	request.headers.has('x-user') ? next() : reply(401, { error: 'unauthorized' as const }),
+> );
+> ```
+
+A route takes up to 8
+middlewares, `validate` and `responds` included; a ninth does not compile,
+`at most 8 middlewares per route: group them with compose(...)`, and
+`compose(...)` joins any number of them into one, spliced where it stands
+([Development](development.md#more-than-8-middlewares-compose)).
+`ws` takes them on the upgrade ([WebSockets](websockets.md#the-upgrade)),
+and `route(operation, …)` after its operation; `static`, `file` and `page`
+take none.
+
+```ts no-check
 defineMiddleware(middleware: Middleware<Empty, Result>): Middleware<Empty, Result>;
 defineMiddleware<Requires>(): (middleware: Middleware<Requires, Result>) => Middleware<Requires, Result>;
+defineAppMiddleware(middleware: Middleware<RegisteredContext, Result>): Middleware<RegisteredContext, Result>;
 
 type Middleware<Requires = Empty, Result = MiddlewareReturn> = (ctx: MiddlewareContext<Requires>, next: NextFunction) => Result;
 type MiddlewareContext<Requires = Empty> = BaseContext & Requires;
@@ -466,14 +482,20 @@ type Next<Added = Empty, Schema = Empty> = Response & { /* a brand, never set: w
 ```
 
 A middleware written inline, `app.get(path, (ctx, next) => next({ a: 1 }), handler)`,
-needs no `defineMiddleware`: its context is the route's, typed as it is
-written.
+needs no `defineMiddleware`: its context is the one in force where it
+stands, and what it adds is read from what it returns. `defineMiddleware(fn)`
+reads `BaseContext` alone, as an inline middleware does, so the
+registered base itself may be built with it. `defineAppMiddleware(fn)`
+reads the context the app [registers](types.md#register-and-appcontext) —
+`BaseContext` when nothing is registered — and is refused where the
+route's context does not give it; give it after the base, never to it,
+or the base's type would read itself.
 
 <a id="use-for-every-route-after-it"></a>
 
 ### `use` for every request after it
 
-Up to 8 middlewares made by `defineMiddleware`, run in the order given on
+Up to 8 middlewares, inline or made by `defineMiddleware`, run in the order given on
 every route declared after `use` in this app or group, before the route's
 own, and on every request no route matches. What each passes `next` is
 typed in those routes, as a route's own middleware's is; a route declared
@@ -500,19 +522,10 @@ const app = alxia()
 On an unmatched request `ctx.route` is `undefined`: a middleware that reads
 it, as a logger does, reads `route ?? url.pathname`.
 
-`use` takes middlewares made by `defineMiddleware`; a plugin goes to
-[`plugin`](#plugin-and-defineplugin). `use(plugin)` still mounts one, deprecated,
-and tells the two apart by the mark `defineMiddleware` puts on a
-middleware: a plain `(ctx, next) => …` given to `use` is called once as a
-plugin, with the app, and `use` throws when it returns no app —
-[`use(): the plugin function returned a promise, …`](../troubleshooting.md#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-made-with-definemiddleware-and-given-to-use).
-A route takes a plain function. In the next minor, `use` takes one too.
-`app.plugin(middleware)`, deprecated, keeps the meaning of 0.3, where
-those middlewares were global hooks: it runs app-wide, on every route
-declared before it and after it and on every unmatched request, before
-the app's chain. What it adds to the context is typed only for the routes
-after it. Given after routes, in development (`NODE_ENV` neither
-`production` nor `test`), it warns once, naming them.
+`use` takes middlewares alone: an app given to it throws
+`use(): argument 1 is an app: a plugin is given to app.plugin(), use() takes middlewares`
+— a plugin goes to [`plugin`](#plugin-and-defineplugin). A `validate` or a
+`responds` belongs to a route, and `use` refuses it too.
 
 `use(middleware)` given after routes does not run on them, by design — a
 `use()` after a route runs on unmatched requests and on the routes after
@@ -618,7 +631,7 @@ const app = alxia()
 	.get('/region', ({ config, reply }) => reply(200, config.region));
 ```
 
-`decorate` is not deprecated. See [Hooks: `decorate`](hooks.md#decorate).
+See [Hooks: `decorate`](hooks.md#decorate).
 
 ### `derive`
 
@@ -640,10 +653,10 @@ const app = alxia()
 // GET /me answers 200, 401 or 500
 ```
 
-`derive` is not deprecated: it is the shorthand for a middleware given to
-`use` that only adds, `use(defineMiddleware((ctx, next) => next({ … })))`,
-and it cannot wrap what follows. A middleware returning `next({ user })`
-does the same on the routes it is given to. See
+`derive` is the shorthand for a middleware given to `use` that only adds,
+`use((ctx, next) => next({ … }))`, and it cannot wrap what follows. A
+middleware returning `next({ user })` does the same on the routes it is
+given to. See
 [Hooks: `derive`](hooks.md#derive).
 
 ### `group`
@@ -655,17 +668,15 @@ declared before it.
 `use` in a group is how a subtree's context is added to:
 
 ```ts
-import { alxia, defineMiddleware } from '@alxia/core';
+import { alxia } from '@alxia/core';
 
 const app = alxia()
 	.group('/admin', (admin) =>
 		admin
-			.use(
-				defineMiddleware(({ request, reply }, next) =>
-					request.headers.get('x-admin') === 'yes'
-						? next({ admin: true as const })
-						: reply(403, { error: 'forbidden' as const }),
-				),
+			.use(({ request, reply }, next) =>
+				request.headers.get('x-admin') === 'yes'
+					? next({ admin: true as const })
+					: reply(403, { error: 'forbidden' as const }),
 			)
 			.get('/stats', ({ admin, reply }) => reply(200, { users: 1, admin })),
 	)
@@ -723,8 +734,8 @@ See [Groups and plugins: plugins](groups-and-plugins.md#plugins) and
 `next()` rejects when the rest threw. A middleware that must see every
 response — a logger, a header on errors too — awaits
 `settle(ctx, next())` instead: it resolves to what `next()` resolved to or,
-when it rejected, to the answer the route boundary would give (the
-deprecated `onError` and `onRefusal` hooks, an `HttpError`, a 500), and
+when it rejected, to the answer the route boundary would give (an
+`HttpError` with its status and body, a 500), and
 leaves the error on `ctx.error`.
 
 ```ts
@@ -863,35 +874,6 @@ const app = alxia()
 	.get('/time', ({ reply }) => reply(200, new Date().toISOString()));
 ```
 
-### A route's own hooks
-
-**Deprecated.** A list of hooks after the route's path, made with
-`defineHook` or `defineWrap`, still runs as it did in 0.3: after the
-app's chain, in the order listed, then the route's schema. Each is a
-middleware now — a `defineHook` that returned an object returns
-`next(added)`, one that returned nothing returns `next()`, a `defineWrap`
-awaits `next()`:
-
-```ts
-// deprecated: hooks in a list after the path, a schema before the handler
-const canEdit = defineHook<{ user: User; note: Note }>()(({ user, note, reply }) =>
-	note.owner === user.id ? undefined : reply(403, { error: 'forbidden' as const }),
-);
-app.derive(authenticate).patch('/:id', [canView, canEdit], { body: Update }, handler);
-
-// now: middlewares, in the order they run
-const canEdit = defineMiddleware<{ user: User; note: Note }>()(({ user, note, reply }, next) =>
-	note.owner === user.id ? next() : reply(403, { error: 'forbidden' as const }),
-);
-app.patch('/:id', auth, canView, canEdit, validate({ body: Update }), handler);
-```
-
-A hook of the list read `params` as strings; a middleware before a
-`validate` does too, but reads `pathParams` to stand anywhere. A route
-mixing a list with middlewares throws. The list's detail is on
-[Hooks: hooks on one route](hooks.md#hooks-on-one-route), and each change on
-[Upgrading](../upgrading.md).
-
 ### `bodyLimit`
 
 Caps the body of the routes after it, or of one route with the
@@ -917,12 +899,12 @@ See [Routes: body size](routes.md#body-size-bodylimit).
 
 ## See also
 
-- [Hooks](hooks.md): the deprecated request hooks, each beside the
-  middleware that replaces it, and what behaves differently once moved.
+- [Hooks](hooks.md): the lifecycle hooks, `onStart`, `onStop` and
+  `parser`, and `decorate` and `derive`.
 - [Routes and validation](routes.md): `validate`, `responds`, the options
   and the 400.
 - [Groups and plugins](groups-and-plugins.md): scoping, prefixes and what
   `plugin` mounts.
 - [Replies](replies.md): `reply`, `set`, and how errors become responses.
-- [Upgrading](../upgrading.md): moving the hooks and a list of hooks to
-  middlewares.
+- [Upgrading](../upgrading.md#050): what 0.5 removed, and the middleware
+  that replaces each form.

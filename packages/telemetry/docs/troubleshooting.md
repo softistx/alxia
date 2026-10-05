@@ -6,7 +6,7 @@ the server log, or, for what prints nothing, what you see in your traces.
 **Types**
 
 - [`Property 'span' does not exist on type 'Context<…>'`](#property-span-does-not-exist-on-type-context)
-- [`Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'`](#type-alxiaempty--never-is-not-assignable-to-type-telemetrypluginoptions)
+- [`Type 'TelemetryMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`](#type-telemetrymiddleware-is-not-assignable-to-type-this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
 - [`Property 'service' is missing in type '…' but required in type '{ readonly service: string; readonly instance?: undefined; }'`](#property-service-is-missing-in-type--but-required-in-type--readonly-service-string-readonly-instance-undefined-)
 - [`Type 'Telemetry' is not assignable to type 'undefined'`](#type-telemetry-is-not-assignable-to-type-undefined)
 - [`Object literal may only specify known properties, and 'version' does not exist in type 'Hooks & { readonly instance: Telemetry; … }'`](#object-literal-may-only-specify-known-properties-and-version-does-not-exist-in-type-hooks---readonly-instance-telemetry--)
@@ -60,22 +60,27 @@ const app = alxia()
 	});
 ```
 
-### `Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'`
+### `Type 'TelemetryMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`
 
 ```text
-error TS2769: No overload matches this call.
-  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '(options: TelemetryPluginOptions) => Middleware<…>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
-      Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'.
+error TS2345: Argument of type '(options: TelemetryPluginOptions) => TelemetryMiddleware' is not assignable to parameter of type '…'.
+  …
+      Type 'TelemetryMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'.
 ```
 
-**When:** `app.use(telemetry)`, without calling it.
+**When:** `app.use(telemetry)`, the factory given uncalled. The message names
+`cors` as its example, whichever factory it is. It also throws where it is
+declared, since alxia 0.5, rather than answering each request with a 500:
 
-**Why:** `telemetry` makes the middleware; it is not the middleware, and it
-needs a `service` or an `instance`.
+```text
+TypeError: use(): argument 1 looks like a factory (telemetry): call it, use(telemetry())
+```
 
-**Fix:**
+**Why:** `telemetry` makes the middleware; it is not the middleware. A
+function that returns a function is no middleware, and `telemetry` is marked
+as a factory, so `use`, a route and `plugin` refuse it.
+
+**Fix:** call it, with a `service` or an `instance`:
 
 ```ts
 alxia().use(telemetry({ service: 'checkout', exporters: [consoleExporter()] }));
@@ -208,7 +213,7 @@ is stopped, and the last spans and logs never reach the exporter — with
 or a second after it started. A process that exits first loses it. The
 middleware never closes the telemetry, not even one it built from `service`.
 
-**Fix:** close it in `onStop`, await `app.stop()` on shutdown, and await
+**Fix:** close it in `onStop`, which `listen`'s shutdown on `SIGTERM` awaits, and await
 `close()` in a script or a test before reading what was exported:
 
 ```ts
@@ -216,10 +221,7 @@ const app = alxia()
 	.use(tracing)
 	.onStop(() => tracing.telemetry.close());
 
-process.on('SIGTERM', async () => {
-	await app.stop();
-	process.exit(0);
-});
+app.listen(3000); // on SIGTERM: the requests drain, then onStop closes the telemetry
 ```
 
 ### A log written in a route has no `traceId`, or never arrives
@@ -390,8 +392,8 @@ app.use(telemetry({ service: 'checkout', exporters, traced: (ctx) => ctx.url.pat
 
 ### A span has an exception, and its status is `ok`
 
-**When:** a route throws, and the route boundary (an `HttpError`, a
-deprecated `onError` hook) answers with a `4xx`. An error-handling middleware
+**When:** a route throws, and the route boundary (an `HttpError`'s
+status) answers with a `4xx`. An error-handling middleware
 that catches it leaves the span `ok` with no exception at all.
 
 **Why:** the error is recorded as the span's exception, but only a

@@ -1,7 +1,7 @@
 {
 	"name": "@alxia/env",
 	"version": "0.1.0",
-	"description": "Environment variables, validated and typed with any Standard Schema, failing at startup with every issue",
+	"description": "Environment variables, validated and typed with any Standard Schema, secrets redacted, failing at startup with every issue",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -37,14 +37,21 @@
 	},
 	"alxia": {
 		"entrypoints": [
-			"src/index.ts"
+			"src/index.ts",
+			"src/cli/index.ts"
 		]
 	},
 	"devDependencies": {
+		"@alxia/core": "workspace:^",
 		"@types/bun": "^1.4.2",
+		"arktype": "^2.2.7",
+		"valibot": "^1.5.0",
 		"zod": "^4.2.0"
 	},
 	"peerDependencies": {
 		"typescript": "^6.0.3 || ^7.0.0"
+	},
+	"bin": {
+		"alxia-env": "./dist/cli/index.js"
 	}
 }

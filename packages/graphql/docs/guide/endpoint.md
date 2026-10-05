@@ -28,10 +28,10 @@ curl localhost:3000/graphql -H 'content-type: application/json' -d '{"query":"{ 
 ## `graphql`
 
 ```ts
-function graphql<Ctx, Prefix, Shortcuts, SchemaCtx, UserCtx = Empty, const Path = '/graphql'>(
-	app: Alxia<Ctx, Prefix, Shortcuts>,
+function graphql<Ctx, Prefix, SchemaCtx, UserCtx = Empty, const Path = '/graphql'>(
+	app: Alxia<Ctx, Prefix>,
 	options: GraphQLOptions<ServerContext<Ctx>, UserCtx, Path, SchemaCtx>,
-): Alxia<Ctx, Prefix, Shortcuts>;
+): Alxia<Ctx, Prefix>;
 ```
 
 `graphql` declares a `GET` and a `POST` route at `path` on `app`, and returns
@@ -87,19 +87,23 @@ const app = alxia()
 
 ## Behind the app's middlewares
 
-The endpoint is a route like any other: every middleware declared **before**
-it runs first, and one that replies ends the request there. A guard before
-it guards it:
+The endpoint is a route like any other: every middleware given to `use`
+**before** it runs first, and one that replies ends the request there. A
+guard before it guards it — a plain `(ctx, next)` function, what it passes
+`next` typed into each resolver's context:
 
 ```ts
 const app = alxia()
-	.derive(({ request, reply }) =>
+	.use(({ request, reply }, next) =>
 		request.headers.get('authorization') === `Bearer ${Bun.env['API_TOKEN']}`
-			? { viewer: 'service' }
+			? next({ viewer: 'service' })
 			: reply(401, { error: 'unauthorized' as const }),
 	)
 	.plugin((app) => graphql(app, { schema })); // 401 without the token
 ```
+
+`@alxia/jwt`'s `bearer()` is that guard for a JWT: `.use(bearer({ jwt }))`
+([The typed context](context.md#with-a-token-alxiajwt)).
 
 A middleware declared **after** `app.plugin` does not run for the endpoint: it
 answers without it. Give the observers (`@alxia/logger`, `@alxia/cors`,
@@ -150,6 +154,42 @@ POST {}                               → 200 {"errors":[{"message":"Must provid
 
 Both methods answer a body to read as GraphQL, whatever its status, and
 the replies of the middlewares before them — a guard's `401`, say.
+
+## Errors, health and shutdown
+
+**GraphQL errors stay GraphQL's.** A resolver that throws, a query that
+does not validate, is an entry of `errors[]` in Yoga's answer — inside a
+`200`, as the GraphQL over HTTP specification has it — whatever
+`@alxia/core`'s `errors` option says. `alxia({ errors: 'problem' })`
+applies to the HTTP layer around the endpoint: `@alxia/jwt`'s 401 before
+it, a body past its `bodyLimit` (413), a middleware's 500, a `PUT` at its
+path (405) — each an `application/problem+json` problem
+([core's errors guide](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/errors.md#graphql)).
+
+```text
+POST {"query":"{ boom }"}      → 200 {"data":{"boom":null},"errors":[{"message":"Unexpected error.", …}]}
+POST without a token           → 401 application/problem+json {"type":"about:blank","title":"Unauthorized", …}
+```
+
+**Probes and the drain.** `@alxia/core`'s `health()` mounts beside the
+endpoint, and `listen`'s graceful shutdown covers it: on `SIGTERM` a
+query or a mutation in flight is answered, and a subscription over
+server-sent events ends — its stream cancelled as when the client leaves,
+the client reading the end and reconnecting elsewhere — so the drain does
+not wait for it until `shutdownTimeout`.
+
+```ts
+import { alxia, health } from '@alxia/core';
+import { bearer } from '@alxia/jwt';
+import { graphql } from '@alxia/graphql';
+
+const app = alxia({ errors: 'problem' })
+	.plugin(health({ checks: { db: () => sql`select 1` } }))
+	.use(bearer({ jwt }))
+	.plugin((app) => graphql(app, { schema }));
+
+app.listen({ port: 4000 }); // SIGTERM: /ready 503, queries answered, subscriptions ended, exit 0
+```
 
 ## Testing it
 

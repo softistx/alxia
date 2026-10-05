@@ -4,7 +4,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
+	markFactory,
 	settle,
 	vary,
 	withHeaders,
@@ -23,8 +23,7 @@ export interface CompressOptions {
 }
 
 /** What `compress()` makes: a middleware that adds nothing to the context. */
-export type CompressMiddleware = Middleware<Empty, Promise<Response>> &
-	MiddlewareMark;
+export type CompressMiddleware = Middleware<Empty, Promise<Response>>;
 
 const COMPRESSIBLE =
 	/^(text\/(?!event-stream)|application\/(.+\+)?(json|javascript|xml)|image\/svg\+xml)/i;
@@ -49,9 +48,9 @@ export function compress(options: CompressOptions = {}): CompressMiddleware {
 		threshold: options.threshold ?? 1024,
 		compressible: options.compressible ?? ((type) => COMPRESSIBLE.test(type)),
 	};
-	return defineMiddleware(async (ctx, next) =>
-		compressed(await settle(ctx, next()), ctx.request, settings),
-	);
+	return defineMiddleware(async function compress(ctx, next) {
+		return compressed(await settle(ctx, next()), ctx.request, settings);
+	});
 }
 
 interface Settings {
@@ -149,3 +148,5 @@ export function negotiate(
 	}
 	return best;
 }
+
+markFactory(compress);

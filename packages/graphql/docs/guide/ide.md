@@ -18,7 +18,7 @@ const schema = createSchema({
 const app = alxia().plugin((app) =>
 	graphql(app, {
 		schema,
-		ide: Bun.env['NODE_ENV'] === 'production' ? false : 'apollo-sandbox',
+		ide: Bun.env['NODE_ENV'] === 'development' && 'apollo-sandbox', // read at runtime
 		sandbox: { title: 'Hello API', initialDocument: '{ hello }' },
 	}),
 );
@@ -29,7 +29,8 @@ const app = alxia().plugin((app) =>
 
 | `ide` | A browser's `GET` at the endpoint gets | Options |
 | --- | --- | --- |
-| `'graphiql'` (default) | Yoga's GraphiQL | `graphiql` |
+| not given (default) | Yoga's GraphiQL in the serving app's dev — `alxia({ dev })`, else `NODE_ENV=development` — and no page elsewhere | `graphiql` |
+| `'graphiql'` | Yoga's GraphiQL, in every mode | `graphiql` |
 | `'apollo-sandbox'` | [Apollo Sandbox](https://www.apollographql.com/docs/graphos/platform/sandbox), embedded | `sandbox` |
 | `false` | no page: the request is answered as a GraphQL request | — |
 
@@ -45,12 +46,13 @@ body](../troubleshooting.md#406-with-an-empty-body) instead.
 Both IDEs run the schema's introspection and any operation against the
 endpoint, behind the same middlewares as every other request: a guard before
 the endpoint guards the page too, and a browser without a token gets the
-guard's reply. Turn the IDE off in production unless you mean to publish
-it.
+guard's reply. By default the IDE is off outside dev; give `ide:
+'graphiql'` only where you mean to publish it. Before 0.5, GraphiQL was
+on in every mode.
 
 ## GraphiQL
 
-The default. `graphiql` takes Yoga's `GraphiQLOptions` — not `true` or
+The default, in dev. `graphiql` takes Yoga's `GraphiQLOptions` — not `true` or
 `false`, which `ide` decides:
 
 ```ts
@@ -68,12 +70,19 @@ Its other options — `subscriptionsProtocol`, `credentials`,
 `additionalHeaders`… — are listed in
 [Yoga's GraphiQL documentation](https://the-guild.dev/graphql/yoga-server/docs/features/graphiql).
 
-The page loads GraphiQL from `unpkg.com`. Yoga's response has no
-`Content-Security-Policy`, so the package adds one that lets it load:
+The page loads GraphiQL from one pinned folder on `unpkg.com`,
+`https://unpkg.com/@graphql-yoga/graphiql@<version>/`, the version the
+installed Yoga names. Yoga's response has no `Content-Security-Policy`, so
+the package adds one that lets that folder alone load — its scripts,
+styles and fonts, and the Monaco workers the page fetches — and no one
+frame the page:
 
 ```text
-default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com; style-src 'self' 'unsafe-inline' https://unpkg.com; img-src 'self' data: https:; font-src 'self' data: https:; worker-src 'self' blob:; connect-src 'self'
+default-src 'self'; script-src 'self' 'unsafe-inline' https://unpkg.com/@graphql-yoga/graphiql@<version>/; style-src 'self' 'unsafe-inline' https://unpkg.com/@graphql-yoga/graphiql@<version>/; img-src 'self' data: https:; font-src 'self' data: https://unpkg.com/@graphql-yoga/graphiql@<version>/; worker-src 'self' blob:; connect-src 'self' https://unpkg.com/@graphql-yoga/graphiql@<version>/; frame-ancestors 'none'
 ```
+
+A page of your own (`renderGraphiQL`) that names no such folder gets
+`'self'` alone.
 
 ## Apollo Sandbox
 
@@ -150,7 +159,7 @@ const app = alxia()
 
 ## `renderSandbox`
 
-```ts
+```ts no-check
 function renderSandbox(endpoint: string, options?: SandboxOptions): string;
 const SANDBOX_POLICY: string;
 ```

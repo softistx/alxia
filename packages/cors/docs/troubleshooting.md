@@ -31,7 +31,7 @@ Firefox and Safari say the same thing in other words.
 **Types**
 
 - [`Type 'false' is not assignable to type 'CorsOrigin | undefined'`](#type-false-is-not-assignable-to-type-corsorigin--undefined)
-- [`Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'`](#type-corsmiddleware-is-not-assignable-to-type-middlewarereturn)
+- [`Type 'CorsMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`](#type-corsmiddleware-is-not-assignable-to-type-this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
 - [`Type 'string' is not assignable to type 'readonly string[]'`](#type-string-is-not-assignable-to-type-readonly-string)
 
 ## In the browser
@@ -308,21 +308,25 @@ const base = alxia();
 const app = origins ? base.use(cors({ origin: origins })) : base;
 ```
 
-### `Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'`
+### `Type 'CorsMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`
 
 ```text
-error TS2769: No overload matches this call.
-  The last overload gave the following error.
-    Argument of type '(options?: CorsOptions) => CorsMiddleware' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
-      Type '(options?: CorsOptions) => CorsMiddleware' is not assignable to type '(ctx: BaseContext & Empty, next: NextFunction) => MiddlewareReturn'.
-        Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'.
+error TS2345: Argument of type '(options?: CorsOptions | undefined) => CorsMiddleware' is not assignable to parameter of type '…'.
+  …
+      Type 'CorsMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'.
 ```
 
-TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
+**When:** `app.use(cors)`, the factory given uncalled. The message names
+`cors` as its example, whichever factory it is. It also throws where it is
+declared, since alxia 0.5, rather than answering each request with a 500:
 
-**When:** `app.use(cors)`, without calling it.
+```text
+TypeError: use(): argument 1 looks like a factory (cors): call it, use(cors())
+```
 
-**Why:** `cors` makes the middleware; it is not the middleware.
+**Why:** `cors` makes the middleware; it is not the middleware. A
+function that returns a function is no middleware, and `cors` is marked
+as a factory, so `use`, a route and `plugin` refuse it.
 
 **Fix:** call it, with no options for the defaults:
 

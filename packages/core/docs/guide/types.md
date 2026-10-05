@@ -12,15 +12,14 @@ table, and no client is typed from it. What the types check is the
 server itself: what each handler reads, the replies `responds` declares,
 the paths and their parameters ([Routes](routes.md#what-the-types-refuse)).
 
-```ts
-class Alxia<Ctx extends object = Empty, Prefix extends string = '', Shortcuts extends AnyReply = never>;
+```ts no-check
+class Alxia<Ctx extends object = Empty, Prefix extends string = ''>;
 ```
 
 | Parameter | What it holds |
 | --- | --- |
-| `Ctx` | what `decorate`, `derive` and plugins added to the context of the routes declared next |
+| `Ctx` | what `decorate`, `derive`, `use` and plugins added to the context of the routes declared next |
 | `Prefix` | the prefix every route declared on the app is under |
-| `Shortcuts` | the replies the `derive`s and middlewares before the next route may answer with, and the `onRefusal` hooks (deprecated) in force |
 
 ## `ContextOf<App>`
 
@@ -80,7 +79,7 @@ export function greet({ greeting, user }: AppContext): string {
 | `Register` | the interface to augment, with `context: typeof base` |
 | `AppContext` | `ContextOf` of the registered app: `BaseContext` when nothing is registered |
 | `defineRoutes(prefix?)` | routes built on that context, requiring it of the app that mounts them ([Groups and plugins](groups-and-plugins.md#splitting-the-app-across-files)) |
-| `RegisteredBase` | the registered app, or `Alxia<Empty, '', never>` |
+| `RegisteredBase` | the registered app, or `Alxia<Empty, ''>` |
 | `RegisteredOf<R>` | the app a `Register`-shaped interface names: what a test reads without augmenting |
 | `InvalidRegister` | what a `context` that is not an alxia app reads as: an app whose only key is the message `Register.context must be typeof base, …`, so reading anything of it is a compile error |
 
@@ -94,17 +93,41 @@ What it types, and what it does not:
   give it cannot mount it.
 - **`alxiaOf(context)`** from `@alxia/react-router`, when that package's
   own `Register` names no server.
-- **Not `defineMiddleware(fn)`**: a middleware may run before `base` gives
-  anything, so it reads `BaseContext`. One that needs the registered
-  context names it, `defineMiddleware<AppContext>()(fn)`, and a route or a
-  `use` whose context does not give it refuses it.
+- **`defineAppMiddleware(fn)`**: a middleware file reads the registered
+  context with no import of the app, and a route or a `use` whose context
+  does not give it refuses it. `defineMiddleware(fn)` reads the base
+  context alone, and `defineMiddleware<Requires>()(fn)` reads `Requires`.
+
+```ts
+// src/middlewares/profile.ts
+import { defineAppMiddleware } from '@alxia/core';
+
+export const profile = defineAppMiddleware(async ({ db, user }, next) =>
+	next({ profile: await db.users.find(user.id) }),
+);
+```
 
 **Register `base`, not the app.** The app mounts the route files, and their
 type reads `Register`: registered, the app would be typed by itself, and
 TypeScript gives it `any` with `TS7022`. For the same reason the chain you
-register cannot read `Register` either: no `defineMiddleware<AppContext>()`
-or `defineRoutes()` in `base` itself (`TS7022`), and a `contextStorage()`
-there reads `BaseContext` alone; give them to the app, after it.
+register cannot read `Register` either: no `defineRoutes()` in `base`
+itself (`TS7022`), and a `contextStorage()` there reads `BaseContext`
+alone; give them to the app, after it. A middleware `base` is built with
+is a plain `defineMiddleware(fn)`, which reads the base context alone: a
+`defineAppMiddleware(fn)` there would read the base's own type, the
+registration resolves to nothing, and every middleware elsewhere fails with
+[`Property 'db' does not exist on type 'BaseContext'.`](../troubleshooting.md#property-db-does-not-exist-on-type-basecontext)
+
+```ts
+// src/context.ts
+import { alxia, defineMiddleware } from '@alxia/core';
+
+const requestId = defineMiddleware((ctx, next) =>
+	next({ requestId: ctx.request.headers.get('x-request-id') ?? 'none' }),
+);
+
+export const base = alxia().decorate({ db }).use(requestId);
+```
 
 **One `Register` per program.** A second declaration with another
 `context` is `TS2717`. In a monorepo, each app has its own `tsconfig.json`;
@@ -165,7 +188,7 @@ test('GET /users/:id answers 200, or 400 for an id that is not a number', async 
 
 | Types | Name |
 | --- | --- |
-| `Context`, `BaseContext`, `RequestContext`, `ResponseSettings`, `ResponseCookies` | what handlers and middlewares read ([Hooks](hooks.md#what-each-hook-reads)); `BaseContext.route` is `string \| undefined`, `undefined` in a middleware of a request no route matches |
+| `Context`, `BaseContext`, `RequestContext`, `ResponseSettings`, `ResponseCookies` | what handlers and middlewares read ([Middleware](middleware.md#what-a-middleware-reads)); `BaseContext.route` is `string \| undefined`, `undefined` in a middleware of a request no route matches |
 | `RequestSchemas`, `Validated`, `ResponseSchemas`, `RouteOptions`, `RouteDetail`, `RouteSchema`, `ValidSchema` | what a route declares — `validate`'s and `responds`' arguments, its options — and the checks on it ([Routes](routes.md#what-the-types-refuse)) |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema interface |
 | `ValidationErrorBody`, `ValidationIssue`, `ValidationTarget`, `InternalErrorBody`, `RoutingErrorBody` | the bodies the framework answers |

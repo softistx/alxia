@@ -5,7 +5,13 @@
  */
 import { stat } from 'node:fs/promises';
 import { relative, resolve } from 'node:path';
-import { isTemplate, NAME, parseArgs, TEMPLATES, type Template } from './args';
+import {
+	isTemplate,
+	NAME,
+	parseArgs,
+	TEMPLATE_LIST,
+	type Template,
+} from './args';
 import type { Io } from './io';
 import { clean, refusal } from './target';
 import { alxiaRanges } from './versions';
@@ -22,7 +28,9 @@ Writes a new alxia app in dir, which must be empty or not exist yet. Asks
 for what is not given.
 
 Options:
-  -t, --template <name>  api           an alxia app with Zod, a middleware and a spec
+  -t, --template <name>  minimal       one route and its test: try alxia in 30 seconds
+                         api           spec first: openapi.yaml, generated operations, Zod
+                         graphql       a GraphQL API, schema first, on GraphQL Yoga
                          react-router  React Router's official template, served by alxia
   --no-install           write the files, skip bun install
   -h, --help             show this help`;
@@ -112,12 +120,12 @@ function done(where: string, template: Template, installed: boolean): string {
 
 /** The template answered; null when cancelled. */
 function askTemplate(io: Io): Template | { error: string } | null {
-	const answer = io.ask(`Which template? ${TEMPLATES.join(' or ')}`, 'api');
+	const answer = io.ask(`Which template? ${TEMPLATE_LIST}`, 'minimal');
 	if (answer === null) return null;
 	if (answer === undefined) {
 		return { error: 'no --template given, and no terminal to ask in.' };
 	}
 	return isTemplate(answer)
 		? answer
-		: { error: `unknown template ${answer}: use ${TEMPLATES.join(' or ')}.` };
+		: { error: `unknown template ${answer}: use ${TEMPLATE_LIST}.` };
 }

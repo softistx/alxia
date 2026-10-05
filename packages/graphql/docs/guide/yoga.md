@@ -84,9 +84,9 @@ const slowOperations: Plugin = {
 graphql(app, { schema, plugins: [slowOperations] });
 ```
 
-Yoga's plugins run inside the route, after the app's route hooks: a plugin
-sees only requests the hooks let through, and its context holds what they
-added.
+Yoga's plugins run inside the route, after the app's middlewares: a plugin
+sees only requests the middlewares let through, and its context holds what
+they added.
 
 ## Errors
 
@@ -122,8 +122,9 @@ const resolvers = {
 ```
 
 `maskedErrors: false` sends every message as it is: for development only.
-A resolver's error is Yoga's to answer; it does not reach the app's
-`onError` hooks, which see only what fails around the endpoint.
+A resolver's error is Yoga's to answer; it never reaches a try/catch
+middleware before the endpoint, which sees only what fails around it — a
+middleware that throws, say.
 
 ## Batching
 

@@ -111,8 +111,9 @@ export function builtinOf(middleware: unknown): BuiltinStep | undefined {
  * A middleware that validates the request: each part a schema is given
  * for — `params`, `query`, `headers`, `cookies`, `body` — with any Standard
  * Schema. It passes their output on, typed, to what follows it; a request
- * they refuse is answered by the `onRefusal` hook in force, by default
- * `400 { error: 'validation', issues }`. It stands where it is given: an
+ * they refuse throws a `ValidationError`, which a middleware before it may
+ * answer, and the route answers `400 { error: 'validation', issues }`
+ * otherwise. It stands where it is given: an
  * `auth` before it answers a stranger 401 before his body is read.
  *
  * ```ts
@@ -120,9 +121,8 @@ export function builtinOf(middleware: unknown): BuiltinStep | undefined {
  *   ({ params, body, reply }) => reply(200, update(params.id, body)));
  * ```
  *
- * The middlewares and hooks before it, `onError` and `onRefusal` included,
- * read the request as it arrived; the request's cookies stay so for those
- * hooks, and the validated ones are what follows it reads.
+ * The middlewares before it read the request as it arrived, its cookies
+ * included, after `next()` too; what follows it reads the validated ones.
  *
  * Given an operation, `{ method, path, schema }`, it validates the request
  * parts of its `schema`: on `app.route(operation, …)`, where it stands

@@ -1,75 +1,41 @@
 /**
- * The whole of a request: the global hooks around it, routing, then the
- * route's own run or the socket's upgrade.
+ * The whole of a request: routing, then the route's own run or the
+ * socket's upgrade.
  */
+
+import { failed } from './answers';
 import { handle, unmatched } from './boundary';
 import type { Definition, Runtime } from './definition';
-import { failed } from './send';
+import { SERVED } from './served';
 import { UPGRADED, upgradeSocket } from './socket';
 import type { RequestContext } from './types';
 
-/** The whole of a request: global hooks around the route's own pipeline. */
+/**
+ * The whole of a request: the route it reaches, or the answer to one that
+ * reaches none, behind the app's middlewares. What escapes them all — a
+ * bug in the router — is a logged 500.
+ */
 export async function serve(
 	runtime: Runtime,
 	request: Request,
 	server: Bun.Server<unknown> | undefined,
 	path: string | undefined,
 ): Promise<Response> {
-	const url = new URL(request.url);
 	const ctx: RequestContext = {
 		request,
-		url,
+		url: new URL(request.url),
 		server,
 		ip: runtime.ip(request, server),
 		route: undefined,
 		error: undefined,
-	};
-	const around = runtime.globals.around;
-	const upgrade = request.headers.get('upgrade')?.toLowerCase() === 'websocket';
-	if (around.length === 0 || upgrade) return pipeline(runtime, ctx, path);
-	const run = (index: number): Promise<Response> => {
-		const hook = around[index];
-		if (hook === undefined) return pipeline(runtime, ctx, path);
-		return hook(ctx, () => run(index + 1));
-	};
+		[SERVED]: runtime.served,
+	} as RequestContext;
 	try {
-		return await run(0);
+		const response = await route(runtime, ctx, path);
+		return response === UPGRADED ? (undefined as never) : response;
 	} catch (error) {
-		return failed(error, ctx.request);
+		return failed(error, ctx);
 	}
-}
-
-/** The `onRequest` hooks, the route, then the `onResponse` hooks. */
-async function pipeline(
-	runtime: Runtime,
-	ctx: RequestContext,
-	path: string | undefined,
-): Promise<Response> {
-	let response: Response | typeof UPGRADED | undefined;
-	try {
-		for (const hook of runtime.globals.onRequest) {
-			let early = hook(ctx);
-			if (early instanceof Promise) early = await early;
-			if (early instanceof Response) {
-				response = early;
-				break;
-			}
-		}
-		response ??= await route(runtime, ctx, path);
-	} catch (error) {
-		response = failed(error, ctx.request);
-	}
-	if (response === UPGRADED) return undefined as never;
-	for (const hook of runtime.globals.onResponse) {
-		try {
-			let replaced = hook(response, ctx);
-			if (replaced instanceof Promise) replaced = await replaced;
-			if (replaced instanceof Response) response = replaced;
-		} catch (error) {
-			console.error(error);
-		}
-	}
-	return response;
 }
 
 /**

@@ -38,11 +38,11 @@ describe('what a middleware of use() passes next()', () => {
 		});
 	});
 
-	test('stays beside the parts a schema of 0.3 validates', async () => {
+	test('stays beside the parts a validate reads', async () => {
 		const scoped = alxia().use(addsBody) as unknown as ReturnType<typeof alxia>;
 		const app = scoped.get(
 			'/:id',
-			{ params: z.object({ id: z.coerce.number() }) },
+			validate({ params: z.object({ id: z.coerce.number() }) }),
 			({ body, params, reply }) =>
 				reply(200, { body: body as unknown, params }),
 		);
@@ -67,7 +67,7 @@ describe('a validate of another copy of @alxia/core', () => {
 		expect((await app.request('/?page=x')).status).toBe(400);
 		expect((await app.request('/?page=2')).status).toBe(200);
 		expect(() => alxia().use(foreign as never)).toThrow(
-			'use(): middleware 1 is a validate() or responds(), which belongs to a route',
+			'use(): argument 1 is a validate() or responds(), which belongs to a route',
 		);
 	});
 });

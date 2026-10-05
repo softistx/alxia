@@ -12,7 +12,7 @@ the response does that you did not expect.
 
 - [`Type '"de"' is not assignable to type '"en" | "fr"'`](#type-de-is-not-assignable-to-type-en--fr)
 - [`Property 'language' does not exist on type 'Context<Empty, "/", Empty>'`](#property-language-does-not-exist-on-type-contextempty--empty)
-- [`Type 'Alxia<Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback`](#type-alxiaempty--never-is-missing-the-following-properties-from-type-languageoptionsstring-basecontext-supported-fallback)
+- [`Type 'LanguageMiddleware<string, Empty>' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`](#type-languagemiddlewarestring-empty-is-not-assignable-to-type-this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
 - [`Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '{ en: string; fr: string; }'`](#element-implicitly-has-an-any-type-because-expression-of-type-string-cant-be-used-to-index-type--en-string-fr-string-)
 - [`Type 'string | null' is not assignable to type 'string | undefined'`](#type-string--null-is-not-assignable-to-type-string--undefined)
 - [`Type 'Promise<string>' is not assignable to type 'string'`](#type-promisestring-is-not-assignable-to-type-string)
@@ -92,22 +92,27 @@ const app = alxia()
 	.get('/', ({ language: current, reply }) => reply(200, current));
 ```
 
-### `Type 'Alxia<Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback`
+### `Type 'LanguageMiddleware<string, Empty>' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`
 
 ```text
-error TS2769: No overload matches this call.
-  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '<const L extends string, Ctx extends object = BaseContext>(options: LanguageOptions<L, Ctx>) => Middleware<…>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
-      Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, "", never>' is missing the following properties from type 'LanguageOptions<string, BaseContext>': supported, fallback
+error TS2345: Argument of type '<const L extends string, Ctx extends object = BaseContext>(options: LanguageOptions<L, Ctx>) => LanguageMiddleware<L, RequiresOf<Ctx, "resolve">>' is not assignable to parameter of type '…'.
+  …
+      Type 'LanguageMiddleware<string, Empty>' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'.
 ```
 
-**When:** `app.use(language)`, without calling it.
+**When:** `app.use(language)`, the factory given uncalled. The message names
+`cors` as its example, whichever factory it is. It also throws where it is
+declared, since alxia 0.5, rather than answering each request with a 500:
 
-**Why:** `language` makes the middleware from its options; it is not the
-middleware.
+```text
+TypeError: use(): argument 1 looks like a factory (language): call it, use(language())
+```
 
-**Fix:**
+**Why:** `language` makes the middleware; it is not the middleware. A
+function that returns a function is no middleware, and `language` is marked
+as a factory, so `use`, a route and `plugin` refuse it.
+
+**Fix:** call it with its options:
 
 ```ts
 alxia().use(language({ supported: ['en', 'fr'], fallback: 'en' }));
@@ -395,7 +400,7 @@ language({
 	supported: ['en', 'fr'],
 	fallback: 'en',
 	order: ['query', 'cookie', 'header'],
-	persist: { secure: process.env['NODE_ENV'] === 'production' },
+	persist: { secure: Bun.env.NODE_ENV !== 'development' }, // read at runtime: bun build inlines process.env
 });
 ```
 

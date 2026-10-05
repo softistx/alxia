@@ -88,7 +88,10 @@ and a body holding its `code` and only what a client can act on — the
 issues, a minimum length, attempts left, seconds to wait (with
 `Retry-After`). Never a login, a reason or a cause. `report(error, ctx)` is
 called for the 5xx. Anything else goes on, thrown, to the middlewares before
-it. Declared after `session()`, it would not see the session's
+it. On an app with `alxia({ errors: 'problem' })`, it answers an RFC 9457
+problem instead, the `code` and the rest of that body its extensions; a
+required `session()`'s 401 and `permission()`'s 401, 404 and 403 follow
+the app's format too. Declared after `session()`, it would not see the session's
 `STORE_FAILED`: it goes first, and after the observers (`logger()`,
 `secureHeaders()`), so that they see its reply. An observer settles
 `next()` without swallowing the error, so `janusErrors()` before one, or
@@ -194,6 +197,7 @@ on every app: annotate what it reads, or leave it unannotated.
 | `PermissionOptions`, `OptionsArgs` | its options: `subject`, `ctx`; and the rest of its arguments, the options required exactly when the permission has a condition; both take what `subject` and `ctx` read beyond `BaseContext` as their last two, defaulted, parameters |
 | `bodyOf`, `statusOf` | a refusal's body and status |
 | `UnauthenticatedBody`, `JanusErrorBody`, `PermissionRefusedBody` | their types |
+| `UnauthenticatedProblem`, `JanusErrorProblem`, `PermissionRefusedProblem` | the same answers under `@alxia/core`'s `alxia({ errors: 'problem' })`: RFC 9457 problems, `janusErrors()`'s with its `code` and body as extensions |
 | `Auth`, `UserOfAuth`, `ObjectData`, `Awaitable` | the part of `janus()` this package calls, the users it knows, an object as the application loads it, a value or its promise |
 
 ## Documentation
@@ -201,3 +205,4 @@ on every app: annotate what it reads, or leave it unannotated.
 - [Guide](https://github.com/softistx/alxia/tree/develop/packages/janus/docs): a page per area — sessions, signing in and out with `ctx.auth` and the device cookie, janus's errors and their statuses, and the permission guard, reading what an earlier middleware added included.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/janus/docs/troubleshooting.md): an error message, or a request anonymous, refused or a 404 when it should not be, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/janus/docs/roadmap.md): what is coming, and what is not planned.
+- [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [Authenticate requests](https://github.com/softistx/alxia/blob/develop/docs/recipes/authentication.md), [Answer errors consistently](https://github.com/softistx/alxia/blob/develop/docs/recipes/errors.md).

@@ -1,11 +1,14 @@
 /**
  * Runs `bun create @alxia` as a user would, from the packed tarballs, for
- * each template, then proves the project it wrote works: it installs, its
- * `typecheck`, `test` and `build` pass (the `api` template's `verify` runs
- * the first two, after `generate --check`: its committed `src/generated/` is
- * what the `@nxgt/openapi-codegen` it installed writes), then `check:ci` (Biome) with no
- * error, warning or info, over what they generated, its production server answers, and
- * so does the image its `Dockerfile` builds (`templates/docker.ts`): skipped
+ * each template (`templates/checks.ts`), then proves the project it wrote
+ * works: it installs, its scripts pass (`verify` for `minimal`, `api` and
+ * `graphql`: `generate --check` first for the last two, since their
+ * committed `src/generated/` is what the generator they installed writes,
+ * then `check:ci` and `typecheck` and `test`; `typecheck` and `build` for
+ * `react-router`, plus `build` for all), then `check:ci` (Biome) with no
+ * error, warning or info, over what they generated, its production server answers —
+ * the route a client calls first, `/health` for `api` and `graphql`, `/docs`
+ * for `api` — and so does the image its `Dockerfile` builds (`templates/docker.ts`): skipped
  * locally with no Docker daemon, a failure on CI.
  *
  * Every package is packed, and served by a registry on localhost that passes
@@ -28,65 +31,12 @@ import { pack } from './artifacts/install';
 import { readPackages } from './artifacts/packages';
 import { staleBuilds } from './artifacts/stale';
 import { biomeClean } from './templates/biome';
+import { CHECKS, type Check } from './templates/checks';
 import { dockerRuns, dockerServed } from './templates/docker';
 import { startRegistry } from './templates/registry';
 import { report } from './templates/report';
-import { pageAndAsset, served } from './templates/serve';
-import { type TemplateName, templateShipped } from './templates/shipped';
-
-interface Check {
-	readonly template: TemplateName;
-	/** Files the project must hold, as a template copied them. */
-	readonly files: readonly string[];
-	readonly scripts: readonly string[];
-	readonly request: (base: string) => Promise<Response>;
-	readonly expected: number;
-}
-
-const CHECKS: readonly Check[] = [
-	{
-		template: 'api',
-		files: [
-			'.gitignore',
-			'.dockerignore',
-			'.env.example',
-			'.vscode/extensions.json',
-			'.vscode/settings.json',
-			'biome.json',
-			'Dockerfile',
-			'openapi.yaml',
-			'openapi-codegen.config.ts',
-			'src/app.ts',
-			'src/context.ts',
-			'src/generated/alxia.ts',
-			'src/routes/todos.ts',
-		],
-		// verify: generate --check, check:ci, typecheck, then test.
-		scripts: ['verify', 'build'],
-		request: (base) =>
-			fetch(`${base}/todos`, {
-				method: 'POST',
-				headers: { 'content-type': 'application/json', 'x-api-key': 'dev-key' },
-				body: JSON.stringify({ title: 'From the template check' }),
-			}),
-		expected: 201,
-	},
-	{
-		template: 'react-router',
-		files: [
-			'.gitignore',
-			'.vscode/extensions.json',
-			'biome.json',
-			'bunfig.toml',
-			'Dockerfile',
-			'vite.config.ts',
-			'app/root.tsx',
-		],
-		scripts: ['typecheck', 'build'],
-		request: pageAndAsset,
-		expected: 200,
-	},
-];
+import { served } from './templates/serve';
+import { templateShipped } from './templates/shipped';
 
 /** `bun create @alxia` is `bunx @alxia/create`: the same bin, run alone. */
 async function helpRuns(workdir: string, env: Record<string, string>) {
@@ -148,7 +98,7 @@ async function templateWorks(
 		);
 	}
 	ok = (await biomeClean(check.template, dir, env)) && ok;
-	const status = await served(dir, env, check.request);
+	const status = await served(dir, env, check.request, check.env);
 	ok =
 		report(
 			status === check.expected,
@@ -161,6 +111,7 @@ async function templateWorks(
 		`alxia-template-${check.template}`,
 		registryUrl,
 		check.request,
+		check.env,
 	);
 	return (
 		report(

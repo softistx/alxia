@@ -1,10 +1,10 @@
-/** `nonceOf`: the request's CSP nonce, read from alxia's context if a hook set one. */
+/** `nonceOf`: the request's CSP nonce, read from alxia's context if a middleware set one. */
 import type { RouterContextProvider } from 'react-router';
 import { alxiaContext } from './context';
 
 /**
  * This request's CSP nonce, for `entry.server.tsx`: the `nonce` alxia's
- * hooks put on the context — `secureHeaders({ nonce: true })` from
+ * middlewares put on the context — `secureHeaders({ nonce: true })` from
  * `@alxia/secure-headers`, or a `derive` of your own — or `undefined` when
  * none did, or when the request did not come through alxia. It reads the
  * key if present: neither package depends on the other.

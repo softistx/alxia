@@ -9,7 +9,7 @@ number on it. Every release, with each change it made, is in
 
 - **Compression as a middleware.** `app.use(compress())` compresses every
   response that comes back through it, a 404's and an error's included;
-  `app.plugin(compress())` keeps working as a deprecated alias.
+  `app.plugin(compress())`, its deprecated alias, was removed in 0.5.
 
 ## Next
 
@@ -31,7 +31,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **Compression as a plugin.** `app.plugin(compress())` streams every response
+- **Compression as a plugin**, the 0.1 form. `compress()` streams every response
   worth it through zstd, Brotli, gzip or deflate, chosen from the client's
   `Accept-Encoding` and the server's order of preference, with the app's
   routes and type unchanged.

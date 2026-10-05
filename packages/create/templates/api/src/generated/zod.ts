@@ -20,8 +20,12 @@ export const zNotFound = z.object({
 	error: z.literal('not_found'),
 });
 
-export const zValidationError = z.object({
-	error: z.literal('validation'),
+export const zValidationProblem = z.object({
+	type: z.string(),
+	title: z.string(),
+	status: z.int(),
+	detail: z.string(),
+	instance: z.string(),
 	issues: z.array(z.object({
 		target: z.enum(['params', 'query', 'headers', 'cookies', 'body']),
 		path: z.array(z.union([z.string(), z.int()])),

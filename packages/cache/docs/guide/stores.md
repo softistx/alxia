@@ -21,7 +21,7 @@ is decided by the cache, not the store.
 
 ## In memory: `MemoryCacheStore`
 
-```ts
+```ts no-check
 new MemoryCacheStore(options?: MemoryCacheOptions)
 ```
 
@@ -74,7 +74,7 @@ every process sharing the Redis serves what one of them kept, and one
 `invalidateTag` reaches them all.
 
 ```sh
-bun add @alxia/redis @nxgt/redis @nxgt/redis-guard zod
+bun add @alxia/redis @nxgt/redis zod
 ```
 
 ```ts

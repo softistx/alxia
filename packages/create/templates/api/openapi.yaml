@@ -34,7 +34,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Todo" }
         "400":
-          $ref: "#/components/responses/ValidationError"
+          $ref: "#/components/responses/ValidationProblem"
         "401":
           description: No x-api-key header, or not the key
           content:
@@ -56,7 +56,7 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Todo" }
         "400":
-          $ref: "#/components/responses/ValidationError"
+          $ref: "#/components/responses/ValidationProblem"
         "404":
           description: No todo has this id
           content:
@@ -66,11 +66,11 @@ components:
   securitySchemes:
     apiKey: { type: apiKey, in: header, name: x-api-key }
   responses:
-    ValidationError:
-      description: alxia's own 400, for a request the schemas refuse
+    ValidationProblem:
+      description: alxia's own 400, for a request the schemas refuse, as an RFC 9457 problem
       content:
-        application/json:
-          schema: { $ref: "#/components/schemas/ValidationError" }
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/ValidationProblem" }
   schemas:
     Todo:
       type: object
@@ -94,11 +94,15 @@ components:
       required: [error]
       properties:
         error: { type: string, enum: [not_found] }
-    ValidationError:
+    ValidationProblem:
       type: object
-      required: [error, issues]
+      required: [type, title, status, detail, instance, issues]
       properties:
-        error: { type: string, enum: [validation] }
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
         issues:
           type: array
           items:

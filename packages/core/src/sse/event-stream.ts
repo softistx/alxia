@@ -123,7 +123,7 @@ export const KEEP_ALIVE_MS = 8_000;
  * The events of `values` as a `text/event-stream` body: each value as
  * `data:` lines of JSON, after its `event:`, `id:` and `retry:` lines on a
  * named stream, a comment while nothing is sent, and the iterator closed
- * when the client goes away.
+ * when `signal` aborts: the client went away, or the app is shutting down.
  */
 export function toEventStream(
 	values: AsyncIterable<unknown>,
@@ -152,6 +152,11 @@ export function toEventStream(
 				cancelled = true;
 				stop();
 				void iterator.return?.();
+				// Ended for the server's sake — it is shutting down — the client
+				// reads the end of the stream; one that left reads nothing.
+				try {
+					controller.close();
+				} catch {}
 			});
 		},
 		async pull(controller) {

@@ -11,7 +11,7 @@ number on it. Every release, with each change it made, is in
   first, sets the headers on every response that comes back through it, a
   404's, an error's and a 500's included; `NonceMiddleware` gives `nonce` to the
   routes after it and `SecureHeaders` is the plain one.
-  `app.plugin(secureHeaders())` keeps working as a deprecated alias.
+  `app.plugin(secureHeaders())`, the deprecated alias, was removed in 0.5.
 
 ## Next
 

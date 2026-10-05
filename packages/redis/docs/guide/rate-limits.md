@@ -28,7 +28,8 @@ bun add @alxia/rate-limit
 ## The signature
 
 ```ts
-function redisStore(client: RedisClient, options: RedisStoreOptions): RateLimitStore;
+function redisStore(target: RedisClient | Redis<any>, options: RedisStoreOptions): RateLimitStore;
+function redisStore(limit: BoundRateLimit<string>): RateLimitStore; // wired by defineRedis
 
 interface RedisStoreOptions {
 	/** Prepended to every key it counts: one name per limit, so two never share a count. */
@@ -45,6 +46,11 @@ interface RedisStoreOptions {
 `@alxia/rate-limit`'s guide. The 429 and its type are unchanged — a typed
 `429 { error: 'rate_limited', retryAfter }` with `Retry-After`, the same as
 with the memory store.
+
+A limit wired by `defineRedis`, `redisStore(handle.limits.api)`, takes no
+`name`: its definition holds the name and the rate, and the keys are
+`<prefix>:<name>:<key>`, shared with every other `@nxgt/redis` consumer. See
+[Defined once, in `defineRedis`](connecting.md#defined-once-in-defineredis).
 
 ## What changes with Redis
 
@@ -124,7 +130,7 @@ are the same count.
 `rateLimit` refuses a `limit` or a `windowMs` that is not a whole number of
 1 or more when it is created, with
 [`TypeError: rateLimit: … must be a whole number of 1 or more, not …`](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/troubleshooting.md#typeerror-ratelimit--must-be-a-whole-number-of-1-or-more-not-).
-`redisStore` checks two more bounds, `@nxgt/redis-guard`'s, only when it
+`redisStore` checks two more bounds, `@nxgt/redis`'s, only when it
 first counts under a policy, not when the app starts. A policy past either
 makes the first request it counts, and every one after it, a
 `500 {"error":"internal"}`, with the reason in the log — a refused policy

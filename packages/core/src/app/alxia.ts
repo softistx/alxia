@@ -1,19 +1,15 @@
-import type { AnyReply } from '../reply/reply';
 import type { RoutePath } from '../types/path';
 import type {
-	AroundMethod,
 	ParserMethod,
-	RequestHookMethod,
-	ResponseHookMethod,
 	StartHookMethod,
 	StopHookMethod,
 } from './app-hooks';
 import { type AppState, createState } from './app-state';
-import { compose, type GroupArgs, group } from './compose';
 import type { GroupMethod, UseMethod } from './compose-methods';
 import * as hooks from './declare-hooks';
 import * as declare from './declare-routes';
 import type { RouteDefinition, SocketDefinition } from './definition';
+import { type GroupArgs, group, mountPlugin } from './mount';
 import { serve } from './pipeline';
 import type { PluginMethod } from './plugin-method';
 import type { RouteMethod } from './route-method';
@@ -22,19 +18,17 @@ import type {
 	BodyLimitMethod,
 	DecorateMethod,
 	DeriveMethod,
-	ErrorMethod,
-	WrapMethod,
 } from './scope-methods';
-import { startServer, stopServer } from './serving';
+import { type Serving, startServer, stopServer } from './serving';
 import type { ListenMethod, RequestMethod } from './serving-methods';
-import type { AlxiaOptions, RefusalMethod } from './signatures';
+import type { AlxiaOptions } from './signatures';
 import { type SocketData, websocketHandler } from './socket';
 import type { SocketMethod } from './socket-method';
 import type { FileMethod, PageMethod, StaticMethod } from './static-methods';
 import type { Empty, Method } from './types';
 
 /**
- * An app: its routes, and the hooks they run.
+ * An app: its routes, and the middlewares they run.
  *
  * Every method returns the app itself, typed with the context it added, so
  * declare it in one chain. A route adds nothing to the app's type: the
@@ -46,26 +40,21 @@ import type { Empty, Method } from './types';
  *     ({ params, reply }) => { ... });
  * ```
  *
- * A middleware of `use`, or a route hook (`derive`, `onError`, …),
- * applies to the routes declared after it: the order of the chain is the
- * order of the request. A global hook (`onRequest`, `onStop`, …) applies
- * to the whole app. Each method is typed by an interface of its own —
+ * A middleware of `use`, a `derive` or a `decorate` applies to the routes
+ * declared after it: the order of the chain is the order of the request.
+ * A lifecycle hook (`onStart`, `onStop`) and a `parser` apply to the
+ * whole app. Each method is typed by an interface of its own —
  * `RouteMethod`, `UseMethod`, `PluginMethod`, … — holding its overloads.
- * `Shortcuts` is deprecated: no handler reads it since 0.4, only `use`,
- * `derive` and the deprecated `onRefusal` and `bodyLimit` still write it;
- * it goes with those adapters in the next minor. Write `Alxia<Ctx, Prefix>`.
  */
-export class Alxia<
-	Ctx extends object = Empty,
-	Prefix extends string = '',
-	Shortcuts extends AnyReply = never,
-> {
+export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 	/** Never set: carries what a route declared next reads, for `ContextOf`. */
 	declare readonly '~context': Ctx;
 
-	/** Its prefix, its runtime, its routes, the route hooks in force. */
+	/** Its prefix, its runtime, its routes, the chain in force. */
 	readonly #state: AppState;
-	#server: Bun.Server<unknown> | undefined;
+	#serving: Serving | undefined;
+	/** The shutdown of the last server `listen` started, once `stop` was called. */
+	#stopped: Promise<void> | undefined;
 	#websocket: Bun.WebSocketHandler<SocketData> | undefined;
 
 	constructor(options: AlxiaOptions<Prefix> = {}) {
@@ -84,60 +73,42 @@ export class Alxia<
 	 * body, validated like a `POST`'s.
 	 */
 	readonly query = this.#method('QUERY');
-	readonly route: OperationMethod<Ctx, Prefix, Shortcuts> = this.#do(
-		declare.addOperation,
-	);
-	readonly static: StaticMethod<Ctx, Prefix, Shortcuts> = this.#do(
-		declare.addStatic,
-	);
-	readonly file: FileMethod<Ctx, Prefix, Shortcuts> = this.#do(declare.addFile);
+	readonly route: OperationMethod<Ctx, Prefix> = this.#do(declare.addOperation);
+	readonly static: StaticMethod<Ctx, Prefix> = this.#do(declare.addStatic);
+	readonly file: FileMethod<Ctx, Prefix> = this.#do(declare.addFile);
 	readonly page: PageMethod<Prefix, this> = this.#do(declare.addPageAt);
-	readonly ws: SocketMethod<Ctx, Prefix, Shortcuts> = this.#do(
-		declare.addSocket,
-	);
+	readonly ws: SocketMethod<Ctx, Prefix> = this.#do(declare.addSocket);
 
-	readonly decorate: DecorateMethod<Ctx, Prefix, Shortcuts> = this.#do(
-		hooks.decorate,
-	);
-	readonly derive: DeriveMethod<Ctx, Prefix, Shortcuts> = this.#do(
-		hooks.derive,
-	);
-	readonly wrap: WrapMethod<Ctx, Prefix, Shortcuts> = this.#do(hooks.wrap);
-	readonly bodyLimit: BodyLimitMethod<Ctx, Prefix, Shortcuts> = this.#do(
-		hooks.bodyLimit,
-	);
-	readonly onError: ErrorMethod<Ctx, Prefix, Shortcuts> = this.#do(
-		hooks.onError,
-	);
-	readonly onRefusal: RefusalMethod<Ctx, Prefix, Shortcuts> = this.#do(
-		hooks.onRefusal,
-	);
-
-	readonly onRequest: RequestHookMethod<this> = this.#do(
-		hooks.globalHook('onRequest'),
-	);
-	readonly onResponse: ResponseHookMethod<this> = this.#do(
-		hooks.globalHook('onResponse'),
-	);
-	readonly around: AroundMethod<this> = this.#do(hooks.globalHook('around'));
+	readonly decorate: DecorateMethod<Ctx, Prefix> = this.#do(hooks.decorate);
+	readonly derive: DeriveMethod<Ctx, Prefix> = this.#do(hooks.derive);
+	readonly bodyLimit: BodyLimitMethod<Ctx, Prefix> = this.#do(hooks.bodyLimit);
 	readonly onStart: StartHookMethod<this> = this.#do(
-		hooks.globalHook('onStart'),
+		hooks.lifecycleHook('onStart'),
 	);
-	readonly onStop: StopHookMethod<this> = this.#do(hooks.globalHook('onStop'));
+	readonly onStop: StopHookMethod<this> = this.#do(
+		hooks.lifecycleHook('onStop'),
+	);
 	readonly parser: ParserMethod<this> = this.#do(hooks.parser);
 
-	readonly group: GroupMethod<Ctx, Prefix, Shortcuts> = this.#do(
+	readonly group: GroupMethod<Ctx, Prefix> = this.#do(
 		(state, ...args: GroupArgs) =>
 			group(state, args, (prefix) => {
-				const { validateResponses } = state.runtime;
-				const child = new Alxia({ prefix, validateResponses });
+				const { validateResponses, served } = state.runtime;
+				const child = new Alxia({
+					prefix,
+					validateResponses,
+					dev: served.dev === true,
+				});
 				return [child, child.#state];
 			}),
 	);
-	readonly use: UseMethod<this, Ctx, Prefix, Shortcuts> =
-		this.#compose('use()');
-	readonly plugin: PluginMethod<this, Ctx, Prefix, Shortcuts> =
-		this.#compose('plugin()');
+	readonly use: UseMethod<Ctx, Prefix> = this.#do((state, ...args) =>
+		hooks.useMiddlewares(state, args, (value) => value instanceof Alxia),
+	);
+	readonly plugin: PluginMethod<this, Ctx, Prefix> = ((...args: unknown[]) =>
+		mountPlugin(this.#state, args, this, (value) =>
+			value instanceof Alxia ? value.#state : undefined,
+		)) as never;
 
 	/** Every route, in the order declared: what `@alxia/openapi`'s `matchesSpec` checks against the document. */
 	get routes(): readonly RouteDefinition[] {
@@ -151,7 +122,7 @@ export class Alxia<
 
 	/** The server `listen` started, until `stop`. */
 	get server(): Bun.Server<unknown> | undefined {
-		return this.#server;
+		return this.#serving?.server;
 	}
 
 	/**
@@ -174,7 +145,8 @@ export class Alxia<
 	 * ```
 	 */
 	get websocket(): Bun.WebSocketHandler<SocketData> {
-		this.#websocket ??= websocketHandler(this.#state.runtime.validateResponses);
+		const { validateResponses, sockets } = this.#state.runtime;
+		this.#websocket ??= websocketHandler(validateResponses, sockets);
 		return this.#websocket;
 	}
 
@@ -182,27 +154,45 @@ export class Alxia<
 		this.fetch(new Request(new URL(path, 'http://localhost'), init));
 
 	readonly listen: ListenMethod = (options = {}) => {
-		this.#server = startServer(this.#state.runtime, options, this.websocket);
-		return this.#server;
+		const serving = this.#serving;
+		if (serving !== undefined && !serving.stopping) {
+			throw new Error(
+				`listen(): the app already listens on ${serving.server.url.href}; stop() it first`,
+			);
+		}
+		this.#serving = startServer(this.#state.runtime, options, this.websocket);
+		this.#stopped = undefined;
+		return this.#serving.server;
 	};
 
-	/** Stops the server `listen` started, then runs every `onStop` hook. */
+	/**
+	 * Shuts the server `listen` started down, gracefully — what `SIGINT`
+	 * and `SIGTERM` run: readiness turns 503, new connections are refused,
+	 * open sockets close with 1001, the requests in flight finish within
+	 * `shutdownTimeout` — then runs every `onStop` hook. With
+	 * `closeActiveConnections`, the requests in flight are not waited for, a
+	 * graceful shutdown already running included.
+	 * Called again while it runs, or once it ran, it returns the same
+	 * promise: the `onStop` hooks run once per `listen`.
+	 */
 	async stop(closeActiveConnections = false): Promise<void> {
-		const server = this.#server;
-		this.#server = undefined;
-		await stopServer(this.#state.runtime, server, closeActiveConnections);
-	}
-
-	/** `use` or `plugin`: middlewares, else the plugin `args` hold, see `compose`. */
-	#compose(label: 'use()' | 'plugin()'): never {
-		return ((...args: unknown[]) =>
-			compose(this.#state, label, args, this, (value) =>
-				value instanceof Alxia ? value.#state : undefined,
-			)) as never;
+		const serving = this.#serving;
+		// Stopped already: its `onStop` hooks ran once, and are not run again.
+		if (serving === undefined && this.#stopped !== undefined) {
+			return this.#stopped;
+		}
+		const stopped = stopServer(
+			this.#state.runtime,
+			serving,
+			closeActiveConnections,
+		);
+		if (serving !== undefined) this.#stopped = stopped;
+		await stopped;
+		if (this.#serving === serving) this.#serving = undefined;
 	}
 
 	/** A route method: its arguments read when it is called, see `RouteMethod`. */
-	#method<M extends Method>(method: M): RouteMethod<M, Ctx, Prefix, Shortcuts> {
+	#method<M extends Method>(method: M): RouteMethod<M, Ctx, Prefix> {
 		return this.#do((state, path: string, ...rest: unknown[]) =>
 			declare.addRoute(state, method, path, ...rest),
 		);
@@ -226,7 +216,7 @@ export class Alxia<
 /** A new app. */
 export function alxia<const Prefix extends '' | RoutePath = ''>(
 	options: AlxiaOptions<Prefix> = {},
-): Alxia<Empty, Prefix, never> {
+): Alxia<Empty, Prefix> {
 	return new Alxia(options);
 }
 

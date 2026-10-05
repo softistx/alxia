@@ -132,7 +132,7 @@ describe('a streamed body is flushed as it comes', () => {
 				if (response.body === null) throw new Error('no body');
 				expectStreamed(encoding, await timed(response.body, since));
 			} finally {
-				await server.stop(true);
+				await app.stop(true);
 			}
 		});
 	}
@@ -287,7 +287,7 @@ describe('errors and cancellation', () => {
 				SHELL + LATE,
 			);
 		} finally {
-			await server.stop(true);
+			await app.stop(true);
 		}
 	});
 
@@ -322,7 +322,7 @@ describe('errors and cancellation', () => {
 				await Bun.sleep(10);
 			expect(cancelled).toHaveLength(1);
 		} finally {
-			await server.stop(true);
+			await app.stop(true);
 		}
 	});
 

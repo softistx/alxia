@@ -79,8 +79,22 @@ components:
         message: { type: string }
 ```
 
-An app that answers refusals in its own format with `onRefusal` declares
-that format instead.
+An app that answers refusals in its own format, with a middleware that
+catches them around `await next()`, declares that format instead:
+
+```ts
+import { alxia, problem, refusalOf } from '@alxia/core';
+
+const app = alxia().use(async (_ctx, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		const refusal = refusalOf(error);
+		if (refusal === undefined) throw error;
+		return problem({ status: 400, detail: `the ${refusal.part} is invalid` });
+	}
+});
+```
 
 ## 2. Generate the operations
 
@@ -283,7 +297,8 @@ const { data, error } = await api.GET('/todos/{id}', { params: { path: { id: 1 }
 
 With `validationErrors: false`, the 400 a client is typed by is the one the
 spec declares, the one alxia sends. In another project, generate from the
-same `openapi.yaml`.
+same `openapi.yaml`. A test calls the app through the same client, in
+process: [Testing with the generated client](testing.md).
 
 ## What the generator leaves out (0.7.0)
 

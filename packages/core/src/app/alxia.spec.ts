@@ -1,7 +1,7 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
-import { HttpError } from '../errors/errors';
 import { alxia } from './alxia';
+import { responds, validate } from './validate';
 
 const User = z.object({ id: z.number(), name: z.string() });
 const NotFound = z.object({ error: z.literal('not_found') });
@@ -12,11 +12,11 @@ const app = alxia()
 	.decorate({ users })
 	.get(
 		'/users/:id',
-		{
+		validate({
 			params: z.object({ id: z.coerce.number().int() }),
 			query: z.object({ upper: z.enum(['yes', 'no']).optional() }),
-			response: { 200: User, 404: NotFound },
-		},
+		}),
+		responds({ 200: User, 404: NotFound }),
 		({ params, query, users, reply }) => {
 			expectTypeOf(params).toEqualTypeOf<{ id: number }>();
 			const user = users.get(params.id);
@@ -29,10 +29,8 @@ const app = alxia()
 	)
 	.post(
 		'/users',
-		{
-			body: z.object({ name: z.string().min(1) }),
-			response: { 201: User },
-		},
+		validate({ body: z.object({ name: z.string().min(1) }) }),
+		responds({ 201: User }),
 		({ body, reply, set }) => {
 			set.headers.set('x-created', 'yes');
 			return reply(201, { id: 2, name: body.name });
@@ -40,20 +38,15 @@ const app = alxia()
 	)
 	.query(
 		'/users',
-		{
-			body: z.object({ name: z.string().min(1) }),
-			response: { 200: z.array(User) },
-		},
+		validate({ body: z.object({ name: z.string().min(1) }) }),
+		responds({ 200: z.array(User) }),
 		({ body, users, reply }) =>
 			reply.ok(
 				[...users.values()].filter((user) => user.name.startsWith(body.name)),
 			),
 	)
 	.get('/health', ({ reply }) => reply(200, { ok: true }))
-	.get('/files/*', ({ params, reply }) => reply(200, params['*']))
-	.get('/boom', () => {
-		throw new Error('boom');
-	});
+	.get('/files/*', ({ params, reply }) => reply(200, params['*']));
 
 const call = (path: string, init?: RequestInit) =>
 	app.fetch(new Request(`http://localhost${path}`, init));
@@ -139,142 +132,6 @@ describe('validation', () => {
 	});
 });
 
-describe('hooks', () => {
-	const guarded = alxia()
-		.get('/public', ({ reply }) => reply(200, 'open'))
-		.derive(({ request, reply }) => {
-			const token = request.headers.get('authorization');
-			if (token !== 'Bearer ada') {
-				return reply(401, { error: 'unauthenticated' as const });
-			}
-			return { user: 'ada' };
-		})
-		.get('/me', ({ user, reply }) => reply(200, { user }));
-
-	test('a hook guards only the routes after it', async () => {
-		const open = await guarded.fetch(new Request('http://localhost/public'));
-		expect(open.status).toBe(200);
-		const closed = await guarded.fetch(new Request('http://localhost/me'));
-		expect(closed.status).toBe(401);
-	});
-
-	test('what a hook returns is in the context', async () => {
-		const response = await guarded.fetch(
-			new Request('http://localhost/me', {
-				headers: { authorization: 'Bearer ada' },
-			}),
-		);
-		expect(await response.json()).toEqual({ user: 'ada' });
-	});
-
-	test('an error becomes a 500 that leaks nothing', async () => {
-		const original = console.error;
-		console.error = () => {};
-		try {
-			const response = await call('/boom');
-			expect(response.status).toBe(500);
-			expect(await response.json()).toEqual({ error: 'internal' });
-		} finally {
-			console.error = original;
-		}
-	});
-
-	test('an HttpError is answered as it says, onError first', async () => {
-		const failing = alxia()
-			.onError((error, { reply }) =>
-				error instanceof RangeError
-					? reply(422, { error: 'range' })
-					: undefined,
-			)
-			.get('/range', () => {
-				throw new RangeError();
-			})
-			.get('/teapot', () => {
-				throw new HttpError(418, { error: 'teapot' });
-			});
-		const range = await failing.fetch(new Request('http://localhost/range'));
-		expect(range.status).toBe(422);
-		const teapot = await failing.fetch(new Request('http://localhost/teapot'));
-		expect(teapot.status).toBe(418);
-		expect(await teapot.json()).toEqual({ error: 'teapot' });
-	});
-});
-
-describe('plugins', () => {
-	const auth = alxia().derive(() => ({ user: 'ada' }));
-	const posts = alxia({ prefix: '/posts' }).get('/:id', ({ params, reply }) =>
-		reply(200, { id: params.id }),
-	);
-	const composed = alxia({ prefix: '/api' })
-		.plugin(auth)
-		.plugin(posts)
-		.get('/me', ({ user, reply }) => reply(200, user));
-
-	test("a plugin's routes are mounted under the app's prefix", async () => {
-		const response = await composed.fetch(
-			new Request('http://localhost/api/posts/7'),
-		);
-		expect(await response.json()).toEqual({ id: '7' });
-	});
-
-	test("a plugin's hooks apply to the routes after it", async () => {
-		const response = await composed.fetch(
-			new Request('http://localhost/api/me'),
-		);
-		expect(await response.text()).toBe('ada');
-	});
-});
-
-describe('responses', () => {
-	test('a reply that breaks its schema is a 500', async () => {
-		const original = console.error;
-		console.error = () => {};
-		try {
-			const broken = alxia().get(
-				'/broken',
-				{ response: { 200: z.object({ n: z.number() }) } },
-				({ reply }) => reply(200, JSON.parse('{"n":"x"}')),
-			);
-			const response = await broken.fetch(
-				new Request('http://localhost/broken'),
-			);
-			expect(response.status).toBe(500);
-		} finally {
-			console.error = original;
-		}
-	});
-
-	test('a reply with a status the route does not declare names the route', async () => {
-		const original = console.error;
-		const logged: unknown[] = [];
-		console.error = (error: unknown) => logged.push(error);
-		try {
-			const app = alxia().get(
-				'/u',
-				{ response: { 200: z.string() } },
-				({ reply }) => reply(201 as 200, 'made'),
-			);
-			expect((await app.request('/u')).status).toBe(500);
-			expect(String(logged[0])).toBe(
-				'ResponseValidationError: GET /u declares no 201 reply',
-			);
-		} finally {
-			console.error = original;
-		}
-	});
-
-	test('a redirect needs no schema', async () => {
-		const moved = alxia().get(
-			'/old',
-			{ response: { 200: z.string() } },
-			({ redirect }) => redirect('/new', 301),
-		);
-		const response = await moved.fetch(new Request('http://localhost/old'));
-		expect(response.status).toBe(301);
-		expect(response.headers.get('location')).toBe('/new');
-	});
-});
-
 describe('listen', () => {
 	test("Bun.serve routes to the app's handlers", async () => {
 		const server = app.listen({ port: 0 });
@@ -298,20 +155,16 @@ describe('types', () => {
 		alxia().get(
 			'/users/:id',
 			// @ts-expect-error: `name` is not a parameter of the path
-			{ params: z.object({ name: z.string() }) },
+			validate({ params: z.object({ name: z.string() }) }),
 			({ reply }) => reply(200),
 		);
-		alxia().get(
-			'/users',
-			// @ts-expect-error: `quey` is not a part of a route
-			{ quey: z.object({}) },
-			({ reply }) => reply(200),
-		);
-		alxia().get('/users', { response: { 200: User } }, ({ reply }) =>
+		// @ts-expect-error: `quey` is not a part of a request
+		validate({ quey: z.object({}) });
+		alxia().get('/users', responds({ 200: User }), ({ reply }) =>
 			// @ts-expect-error: 201 is not declared
 			reply(201, { id: 1, name: 'x' }),
 		);
-		alxia().get('/users', { response: { 200: User } }, ({ reply }) =>
+		alxia().get('/users', responds({ 200: User }), ({ reply }) =>
 			// @ts-expect-error: the body does not match the schema
 			reply(200, { id: '1', name: 'x' }),
 		);

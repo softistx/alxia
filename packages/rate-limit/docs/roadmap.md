@@ -8,7 +8,8 @@ number on it. Every release, with each change it made, is in
 ## Now
 
 - **A middleware, not a plugin.** `app.use(rateLimit({ limit, windowMs }))` is
-  the form; `app.plugin(rateLimit(…))` keeps working, deprecated. Given to the
+  the form; `app.plugin(rateLimit(…))`, deprecated in 0.4, was removed in 0.5.
+  Given to the
   app, the limit also counts a request no route matches, and `RateLimit<Requires>`
   names what `rateLimit()` returns.
 
@@ -33,7 +34,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **A rate limit as a plugin.** `plugin(rateLimit({ limit, windowMs }))` counts
+- **A rate limit as a plugin**, the 0.1 form. `rateLimit({ limit, windowMs })` counts
   the requests of every route declared after it, per client address by
   default, and answers a 429 with `Retry-After` and
   `{ error: 'rate_limited', retryAfter }` past the limit.

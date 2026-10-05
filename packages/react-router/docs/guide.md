@@ -42,7 +42,7 @@ of the next section, done.
   moved to the newest release alxia accepts (see
   [`@alxia/create`'s Versions](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#versions));
 - `alxia()` in `vite.config.ts`, the `bunfig.toml`, and `start` running
-  `bun build/server/index.js`;
+  `NODE_ENV=production bun build/server/index.js`;
 - Biome, with `lint`, `format`, `check`, `check:ci` and `verify` scripts;
 - a `Dockerfile` that builds on `oven/bun:1` and runs `build/` alone on
   `oven/bun:1-alpine`, as [Deploying](#deploying) describes.
@@ -96,7 +96,7 @@ middleware must come after alxia's.
 "scripts": {
 	"build": "react-router build",
 	"dev": "react-router dev",
-	"start": "bun build/server/index.js",
+	"start": "NODE_ENV=production bun build/server/index.js",
 	"typecheck": "react-router typegen && tsc"
 }
 ```
@@ -173,13 +173,21 @@ server build inside it, into one file:
   stay out of it.
 - **Run, it listens**: `bun build/server/index.js` listens on `PORT`
   (3000 by default) and `HOST` (`0.0.0.0`). It prints
-  `alxia listening on <url>`. On `SIGINT` or `SIGTERM` it stops the app,
-  runs its `onStop` hooks, and exits.
+  `alxia listening on <url>`, and in dev — under `react-router dev`; a
+  production build never is, whatever `NODE_ENV` says — the route table
+  ([`@alxia/core`'s Development](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/development.md#the-route-table)). On `SIGINT` or `SIGTERM` it shuts the app
+  down as `@alxia/core`'s `listen` does: readiness turns 503, new
+  connections are refused, the requests in flight finish within
+  `shutdownTimeout` (10 s; `listen: { shutdownTimeout }` sets it), the
+  `onStop` hooks run, and the process exits
+  ([core's guide](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/health-and-shutdown.md)).
 - **Imported, it starts nothing**: prerendering, a test or another server
   can import it safely, since it listens only when it is the process's
   entry point (`import.meta.main`).
 - **The mode follows the command**: `development` under `react-router dev`,
-  `production` in a build, whatever `NODE_ENV` says.
+  `production` in a build, whatever `NODE_ENV` says. The app's dev switch
+  follows it: `alxia({ dev: mode === 'development' })`, so a 500 of the
+  build never shows its stack.
 - **The client folder is resolved against the built file**: `../client`,
   from React Router's `buildDirectory`, so it is found wherever the
   process starts.
@@ -493,8 +501,8 @@ Every option is optional:
 | `beforeAll(app)` | runs first, on a new app. What it declares applies to the client's files too: a rate limit, a guard on everything, a logger that should see every asset. It returns the app, which `configure` then receives |
 | `getLoadContext(ctx, context)` | sets the app's own keys on React Router's provider, `ctx` typed by `configure`'s app |
 | `build`, `mode`, `client` | override what the plugin wires; see [Escape hatches](#escape-hatches) |
-| `listen` | `listen`'s options for `bun build/server/index.js`: `port`, `hostname`, `idleTimeout`, `maxRequestBodySize`, `tls`. A `port` or `hostname` given here wins over `PORT` and `HOST` |
-| `onListen(server)` | called once the built server listens and its `SIGINT` and `SIGTERM` handlers are in place, in place of the `alxia listening on …` line; a signal sent from then on runs the `onStop` hooks |
+| `listen` | `listen`'s options for `bun build/server/index.js`: `port`, `hostname`, `idleTimeout`, `maxRequestBodySize`, `tls`, `onListen`. A `port` or `hostname` given here wins over `PORT` and `HOST`; an `onListen` here, told `@alxia/core`'s `ListenInfo` — `url`, `routes`, `table`, `dev` — wins over the option below |
+| `onListen(server)` | called once the built server listens and its `SIGINT` and `SIGTERM` handlers are in place, in place of the `alxia listening on …` line (and, in dev, of the route table); a signal sent from then on runs the `onStop` hooks |
 
 A request goes through four layers, in order:
 
@@ -1263,5 +1271,6 @@ startup, where Bun would otherwise fetch it from npm.
   ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#error-cannot-find-package--from-appbuildserverindexjs)).
 
 `PORT` and `HOST` set where the server listens. The platform's `SIGTERM`
-stops it once the requests in flight are answered, and runs the app's
-`onStop` hooks.
+stops it once the requests in flight are answered, within
+`shutdownTimeout`, and runs the app's `onStop` hooks. Give the platform a
+readiness probe with `@alxia/core`'s `health()`, mounted in `beforeAll`.

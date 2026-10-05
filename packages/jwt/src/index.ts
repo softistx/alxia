@@ -4,6 +4,7 @@ export {
 	type BearerOptions,
 	bearer,
 	type UnauthorizedBody,
+	type UnauthorizedProblem,
 } from './bearer';
 export {
 	type Algorithm,

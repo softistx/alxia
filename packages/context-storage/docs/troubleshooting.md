@@ -7,7 +7,7 @@ behaviour that prints nothing, or an error from `tsc`. A
 
 **Runtime**
 
-- [`TypeError: contextStorage is a factory: use(contextStorage()), not use(contextStorage)`](#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)
+- [`use(): argument 1 looks like a factory (contextStorage): call it, use(contextStorage())`](#use-argument-1-looks-like-a-factory-contextstorage-call-it-usecontextstorage), and `TypeError: contextStorage is a factory: use(contextStorage()), not use(contextStorage)`
 - [`ContextStorageError: getContext(): called outside a request — use tryGetContext(), or runWithContext() in a job or a test`](#contextstorageerror-getcontext-called-outside-a-request--use-trygetcontext-or-runwithcontext-in-a-job-or-a-test)
 - [`ContextStorageError: getContext(): this request reached no route declared after contextStorage() — use it earlier, or getRequestContext()`](#contextstorageerror-getcontext-this-request-reached-no-route-declared-after-contextstorage--use-it-earlier-or-getrequestcontext)
 - [A header set from a timer never reaches the response](#a-header-set-from-a-timer-never-reaches-the-response)
@@ -22,25 +22,26 @@ behaviour that prints nothing, or an error from `tsc`. A
 
 ## Runtime
 
-### `TypeError: contextStorage is a factory: use(contextStorage()), not use(contextStorage)`
+### `use(): argument 1 looks like a factory (contextStorage): call it, use(contextStorage())`
 
 `tsc` reports the same mistake first:
 
 ```text
-error TS2769: No overload matches this call.
-  …
-    Argument of type '<App = Alxia<Empty, "", never>>(...uncalled: readonly never[]) => ContextStorageMiddleware<App>' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
-      …
-          Type 'BaseContext & Empty' is not assignable to type 'never'.
+error TS2345: Argument of type '<App = Alxia<Empty, "">>(...uncalled: readonly never[]) => ContextStorageMiddleware<App>' is not assignable to parameter of type '…'.
+  Type '<App = Alxia<Empty, "">>(...uncalled: readonly never[]) => ContextStorageMiddleware<App>' is not assignable to type '(ctx: never, next: NextFunction) => … & "this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'.
+    Types of parameters 'uncalled' and 'next' are incompatible.
+      Type 'NextFunction' is not assignable to type 'never'.
 ```
 
-**When:** at startup, on `.use(contextStorage)`: the factory given to
-`app.use` without being called.
+**When:** `.use(contextStorage)`, the factory given to `app.use` without
+being called. It throws where the app is declared, since alxia 0.5; before,
+each request the routes after it answered was a 500, with
+`TypeError: contextStorage is a factory: use(contextStorage()), not use(contextStorage)`
+in the server log, which a factory run past `use` still throws.
 
-**Why:** `app.use` calls a function it is given with the app, as a plugin.
-Called that way, `contextStorage` would be handed the app, and what
-follows would be declared on a plugin nobody serves; it refuses the
-argument instead.
+**Why:** `contextStorage` is marked as a factory, so `use`, a route and
+`plugin` refuse it. Run as a middleware, it would make a new middleware
+each time and store nothing.
 
 **Fix:** call it, once, and keep the result:
 
@@ -63,8 +64,7 @@ and `getRequestContext()` all throw it.
   and run later by such a timer;
 - in a route declared **before** `use(requestContext)`, or outside the
   `group` it is used in: the middleware never ran on that request;
-- in a middleware declared before it, or in the deprecated `onRequest` and
-  `onResponse` hooks, which run outside the chain;
+- in a middleware declared before it, which runs outside the store;
 - in a WebSocket's `open`, `message` or `close`, since a socket's handlers
   run outside the chain;
 - with two copies of `@alxia/context-storage` installed: each has its own

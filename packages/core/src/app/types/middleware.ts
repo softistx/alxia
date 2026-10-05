@@ -1,6 +1,6 @@
 /**
- * The middleware model: one function, `(ctx, next) => …`, for what used to
- * be a `derive`, a `wrap` and a route's validation. What it passes `next`
+ * The middleware model: one function, `(ctx, next) => …`, around the rest
+ * of the route, its validation included. What it passes `next`
  * is added to the context of what follows; what it returns says so in its
  * type, which a route threads from one middleware to the next.
  */
@@ -8,7 +8,6 @@ import type { AnyReply } from '../../reply/reply';
 import type { PathParams } from '../../types/path';
 import type { Empty, MaybePromise } from './common';
 import type { BaseContext } from './context';
-import type { RawRequestParts } from './route-hooks';
 import type { ResponsesOf } from './schema';
 import type { TypedReplyFunction } from './typed-reply';
 
@@ -48,6 +47,14 @@ export interface NextFunction {
 	behind(added?: object): Promise<Response>;
 }
 
+declare const noMiddlewareYet: unique symbol;
+
+/**
+ * Never a value: what `defineMiddleware<Requires>()`, given no middleware,
+ * infers as its result, and so answers the function that takes it.
+ */
+export type NoMiddlewareYet = typeof noMiddlewareYet;
+
 /** What a middleware may return: `next(…)`'s response, a reply, or a `Response` of its own. */
 export type MiddlewareResult = Next | AnyReply | Response;
 
@@ -67,34 +74,18 @@ export type Middleware<Requires = Empty, Result = MiddlewareReturn> = (
 ) => Result;
 
 /**
- * What `defineMiddleware` marks its middleware with, which `app.use` reads
- * to tell it from a plugin written as a function. Never set as such: at
- * runtime the mark is a symbol on the function.
- */
-export interface MiddlewareMark {
-	readonly '~middleware': true;
-}
-
-/**
- * `MiddlewareMark`, as `use` and a route require it: named to be read in
- * the compile error a plain `(ctx, next)` function gets — wrap it in
- * `defineMiddleware(fn)`.
- */
-export interface MadeByDefineMiddleware extends MiddlewareMark {}
-
-/**
  * What `validate` and `responds` mark their middleware with: a step the
  * chain runs itself, which `use` refuses. Never set as such: at runtime
  * the mark is `Symbol.for('alxia.builtin')` on the function, shared by
- * every copy of `@alxia/core`, as `defineMiddleware`'s is.
+ * every copy of `@alxia/core`.
  */
 export interface BuiltinMark<Kind extends 'validate' | 'responds'> {
 	readonly '~builtin': Kind;
 }
 
 /**
- * What a route's first middleware reads: the base context, what the hooks
- * before the route added, and the request as it arrived — the path
+ * What a route's first middleware reads: the base context, what the
+ * middlewares before the route added, and the request as it arrived — the path
  * parameters and query as strings, the headers, and no body until a
  * `validate` reads it.
  */
@@ -104,7 +95,7 @@ export type MiddlewareBase<Ctx, Path extends string> = BaseContext &
 		readonly route: string;
 		readonly params: PathParams<Path>;
 		readonly pathParams: PathParams<Path>;
-		readonly query: RawRequestParts['query'];
+		readonly query: Readonly<Record<string, string | readonly string[]>>;
 		readonly headers: Readonly<Record<string, string>>;
 		readonly body: undefined;
 	};

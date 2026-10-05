@@ -82,7 +82,7 @@ describe('app.plugin, given what is no plugin', () => {
 	test('throws when a function returns no app, and leaves its promise handled', async () => {
 		const untyped = alxia().plugin as (...args: unknown[]) => unknown;
 		expect(() => untyped(() => undefined)).toThrow(
-			'plugin(): the plugin function returned undefined, not an app: a plugin returns the app it is given; a middleware is made with defineMiddleware() and given to use()',
+			'plugin(): the plugin function returned undefined, not an app: a plugin returns the app it is given; a middleware is given to use()',
 		);
 		expect(() =>
 			untyped(async () => {
@@ -93,67 +93,45 @@ describe('app.plugin, given what is no plugin', () => {
 		expect(unhandled).toEqual([]);
 	});
 
+	test('refuses a middleware, which goes to use(): called once with the app, never on a request', async () => {
+		const untyped = alxia().plugin as (...args: unknown[]) => unknown;
+		let requests = 0;
+		const guard = defineMiddleware(async (_ctx, next) => {
+			requests += 1;
+			return next();
+		});
+		expect(() => untyped(guard)).toThrow(
+			'plugin(): the plugin function returned a promise, not an app: a plugin returns the app it is given; a middleware is given to use()',
+		);
+		const stamp = (ctx: object) => ({ ...ctx, stamp: 'ok' });
+		expect(() => untyped(stamp)).toThrow(
+			'plugin(): the plugin function returned object, not an app',
+		);
+		const sync = (_ctx: object, next: () => unknown) => next();
+		expect(() => untyped(sync)).toThrow(
+			'plugin(): the plugin function called next(): a plugin returns the app it is given; a middleware is given to use()',
+		);
+		await new Promise((resolve) => setTimeout(resolve, 10));
+		expect(unhandled).toEqual([]);
+		expect(requests).toBe(1);
+	});
+
 	test('refuses a validate, nothing, two plugins, or what is neither an app nor a function', () => {
 		const untyped = alxia().plugin as (...args: unknown[]) => unknown;
-		expect(() => untyped(validate({}))).toThrow(
-			'plugin(): a middleware is given to use()',
+		const neither =
+			'plugin(): the plugin is neither an app nor a function that returns one; a middleware is given to use()';
+		expect(() => untyped(validate({}))).toThrow(neither);
+		expect(() => untyped({})).toThrow(neither);
+		expect(() => untyped('/admin')).toThrow(neither);
+		expect(() => untyped()).toThrow(
+			'plugin(): nothing is given: an app or a function that returns one; middlewares are given to use()',
 		);
-		expect(() => untyped()).toThrow('plugin(): nothing is given');
 		expect(() => untyped(session, session)).toThrow(
-			'plugin(): a plugin is given alone, to app.plugin()',
+			'plugin(): a plugin is given alone: an app or a function that returns one',
 		);
-		expect(() => untyped({})).toThrow(
-			'plugin(): the plugin is neither an app nor a function',
-		);
-	});
-});
-
-describe('app.plugin(middleware), deprecated', () => {
-	test('runs app-wide, as 0.3: on the routes before it, after it, and a request no route matches', async () => {
-		const seen: string[] = [];
-		const stamp = defineMiddleware(({ url }, next) => {
-			seen.push(url.pathname);
-			return next({ stamp: 'ok' as const });
-		});
-		const app = alxia()
-			.get('/before', ({ reply }) => reply(200, 'before'))
-			.plugin(stamp)
-			.get('/after', ({ stamp, reply }) => reply(200, stamp));
-		expect(await (await app.request('/after')).text()).toBe('ok');
-		expect((await app.request('/before')).status).toBe(200);
-		expect((await app.request('/missing')).status).toBe(404);
-		expect(seen).toEqual(['/after', '/before', '/missing']);
-	});
-
-	test('takes no path, and refuses a function not made by defineMiddleware beside one', () => {
-		const untyped = alxia().plugin as (...args: unknown[]) => unknown;
 		const auth = defineMiddleware((_ctx, next) => next());
-		expect(() => untyped(auth, () => {})).toThrow(
-			'plugin(): middleware 2 was not made by defineMiddleware()',
-		);
 		expect(() => untyped('/admin', auth)).toThrow(
 			'plugin(): a plugin is given alone',
-		);
-	});
-});
-
-describe('app.use(plugin), deprecated', () => {
-	test('still mounts an app and calls a function, as plugin does', async () => {
-		const app = alxia()
-			.use(session)
-			.use((given) => given.decorate({ n: 1 as const }))
-			.get('/', ({ user, n, reply }) => reply(200, `${user.id} ${n}`));
-		expect(await (await app.request('/', ada)).text()).toBe('ada 1');
-	});
-
-	test('throws on a guard not made by defineMiddleware, rather than call it once as a plugin and never on a request', () => {
-		const guard = async (
-			ctx: { user?: User; reply: (status: 401) => unknown },
-			next: () => Promise<Response>,
-		) => (ctx.user ? next() : ctx.reply(401));
-		const app = alxia();
-		expect(() => app.use(guard as never)).toThrow(
-			'use(): the plugin function returned a promise, not an app',
 		);
 	});
 });

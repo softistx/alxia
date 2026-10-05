@@ -2,7 +2,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
+	markFactory,
 	settle,
 	vary,
 	withHeaders,
@@ -38,8 +38,7 @@ export interface CorsOptions {
 }
 
 /** What `cors()` makes: a middleware that adds nothing to the context. */
-export type CorsMiddleware = Middleware<Empty, Promise<Response>> &
-	MiddlewareMark;
+export type CorsMiddleware = Middleware<Empty, Promise<Response>>;
 
 const METHODS = [
 	'GET',
@@ -122,7 +121,7 @@ export function cors(options: CorsOptions = {}): CorsMiddleware {
 		return new Response(null, { status: 204, headers });
 	};
 
-	return defineMiddleware(async (ctx, next) => {
+	return defineMiddleware(async function cors(ctx, next) {
 		const { request } = ctx;
 		if (
 			request.method === 'OPTIONS' &&
@@ -153,3 +152,5 @@ function matcher(origin: CorsOrigin): (origin: string) => boolean {
 				: allowed.test(candidate),
 		);
 }
+
+markFactory(cors);

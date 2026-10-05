@@ -1,10 +1,10 @@
 import type { CachedResponse, CacheStore } from '@alxia/cache';
 import { bindCache, defineCache } from '@nxgt/redis';
-import type { RedisClient } from 'bun';
 import { z } from 'zod';
+import { nameUnder, type RedisTarget } from './handle';
 
 export interface RedisCacheStoreOptions {
-	/** Prepended to every key it writes: one name per app or deployment. */
+	/** Prepended to every key it writes: one name per app or deployment. Under a handle's prefix, when it is given one. */
 	readonly name: string;
 }
 
@@ -21,41 +21,20 @@ const Stored = z.object({
 /** What a Redis older than 7 answers to `EXPIRE … NX`. */
 const REFUSED_ARGUMENTS = /wrong number of arguments|syntax error/i;
 
+type Client = ReturnType<typeof nameUnder>['client'];
+
 /**
- * An `@alxia/cache` store in Redis, on `@nxgt/redis`'s typed caches: every
- * process sharing the Redis serves what one of them kept. A record that no
- * longer reads as a response is a miss, and is dropped. Tags are Redis sets
- * of the keys they name.
- *
- * ```ts
- * app.use(cache({ ttl: 60, store: redisCacheStore(connection.client, { name: 'shop' }) }));
- * ```
+ * Keeps a tag's set as long as its longest-kept response: `NX` gives a
+ * new set its first expiry — `GT` alone never would, a key without one
+ * counting as kept forever — and `GT` then only ever lengthens it. A
+ * Redis older than 7 refuses both arguments: it gets the plain `EXPIRE`,
+ * from then on. Any other error is the caller's.
  */
-export function redisCacheStore(
-	client: RedisClient,
-	options: RedisCacheStoreOptions,
-): CacheStore {
-	// `@nxgt/redis` keeps a record for whole seconds; the store's own `ttl`
-	// and `stale` decide freshness to the millisecond.
-	const records = bindCache(
-		client,
-		defineCache({
-			name: `${options.name}:response`,
-			key: (key: string) => key,
-			ttl: 60,
-			schema: Stored,
-		}),
-	);
-	const tagKey = (tag: string) => `${options.name}:tag:${tag}`;
-	/**
-	 * Keeps a tag's set as long as its longest-kept response: `NX` gives a
-	 * new set its first expiry — `GT` alone never would, a key without one
-	 * counting as kept forever — and `GT` then only ever lengthens it. A
-	 * Redis older than 7 refuses both arguments: it gets the plain `EXPIRE`,
-	 * from then on. Any other error is the caller's.
-	 */
+function tagKeeper(
+	client: Client,
+): (key: string, seconds: number) => Promise<void> {
 	let flagsKnown = true;
-	const keepTag = async (key: string, seconds: number) => {
+	return async (key, seconds) => {
 		const ttl = String(seconds);
 		if (flagsKnown) {
 			try {
@@ -69,6 +48,39 @@ export function redisCacheStore(
 		}
 		await client.send('EXPIRE', [key, ttl]);
 	};
+}
+
+/**
+ * An `@alxia/cache` store in Redis, on `@nxgt/redis`'s typed caches: every
+ * process sharing the Redis serves what one of them kept. A record that no
+ * longer reads as a response is a miss, and is dropped. Tags are Redis sets
+ * of the keys they name.
+ *
+ * ```ts
+ * app.use(cache({ ttl: 60, store: redisCacheStore(connection.client, { name: 'shop' }) }));
+ * ```
+ *
+ * Given an `@nxgt/redis` handle instead of a client, every key, the tag sets
+ * included, is under the handle's `prefix`.
+ */
+export function redisCacheStore(
+	target: RedisTarget,
+	options: RedisCacheStoreOptions,
+): CacheStore {
+	const { client, name } = nameUnder(target, options.name);
+	// `@nxgt/redis` keeps a record for whole seconds; the store's own `ttl`
+	// and `stale` decide freshness to the millisecond.
+	const records = bindCache(
+		client,
+		defineCache({
+			name: `${name}:response`,
+			key: (key: string) => key,
+			ttl: 60,
+			schema: Stored,
+		}),
+	);
+	const tagKey = (tag: string) => `${name}:tag:${tag}`;
+	const keepTag = tagKeeper(client);
 
 	return {
 		async get(key) {

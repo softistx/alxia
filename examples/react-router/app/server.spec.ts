@@ -336,7 +336,7 @@ describe("the default server, with no app/server.ts", () => {
     await rm(root, { recursive: true, force: true });
   });
 
-  test("serves the pages and the client's files, with none of the hooks", async () => {
+  test("serves the pages and the client's files, with none of the middlewares", async () => {
     const page = await server.get("/");
     expect(page.status).toBe(200);
     const html = await page.text();

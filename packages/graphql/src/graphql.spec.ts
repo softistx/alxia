@@ -136,37 +136,6 @@ describe('graphql', () => {
 			expect(text).toContain(`{"data":{"countdown":${n}}}`);
 	});
 
-	test('GraphiQL, with a policy that lets it load', async () => {
-		const response = await app.request('/graphql', {
-			headers: { accept: 'text/html' },
-		});
-		expect(response.headers.get('content-type')).toContain('text/html');
-		expect(response.headers.get('content-security-policy')).toContain(
-			'unpkg.com',
-		);
-	});
-
-	test('behind a guard, under a prefix', async () => {
-		const guarded = alxia({ prefix: '/api' })
-			.derive(({ request, reply }) =>
-				request.headers.get('authorization') === 'Bearer ok'
-					? { viewer: 'ok' as string | null, users }
-					: reply(401, { error: 'unauthorized' as const }),
-			)
-			.plugin((app) => graphql(app, { schema, logging: false }));
-		expect((await post(guarded, '/api/graphql', '{ me }')).status).toBe(401);
-		const ok = await post(guarded, '/api/graphql', '{ me }', {
-			authorization: 'Bearer ok',
-		});
-		expect(await ok.json()).toEqual({ data: { me: 'ok' } });
-
-		const root = alxia({ prefix: '/v1' }).plugin(guarded);
-		const mounted = await post(root, '/v1/api/graphql', '{ me }', {
-			authorization: 'Bearer ok',
-		});
-		expect(await mounted.json()).toEqual({ data: { me: 'ok' } });
-	});
-
 	test('GraphQLContext of something that is not an app says so, not never', () => {
 		type Wrong = GraphQLContext<{ readonly users: typeof users }>;
 		expectTypeOf<Wrong>().toEqualTypeOf<{
@@ -178,7 +147,7 @@ describe('graphql', () => {
 	test('a schema whose context the app does not build is a compile error', () => {
 		const _never = () =>
 			alxia().plugin((app) =>
-				// @ts-expect-error: the schema reads `viewer` and `users`, which no hook derives
+				// @ts-expect-error: the schema reads `viewer` and `users`, which nothing before it adds
 				graphql(app, { schema }),
 			);
 		expect(_never).toBeFunction();

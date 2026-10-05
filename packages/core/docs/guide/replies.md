@@ -211,7 +211,7 @@ error is sent without them.
 `set.cookies.get` reads back what this response set. To read the request's
 cookies, read `ctx.cookies` — in a handler, a middleware or a `derive` — or give the route
 `validate({ cookies })` to validate them for what follows it
-([Routes](routes.md#validate-and-responds), [Hooks](hooks.md#reading-the-requests-cookies)).
+([Routes](routes.md#validate-and-responds), [Middleware](middleware.md#reading-cookies)).
 
 ## Redirects
 
@@ -242,15 +242,12 @@ route's boundary, which answers:
 2. anything else is logged with `console.error` and answered
    `500 { "error": "internal" }`. Nothing of the error leaks.
 
-The deprecated `onError` hooks, declared before the route, are tried first,
-in the order declared: the first to return a reply answers
-([Hooks](hooks.md#onerror)).
-
 One error skips all of it: the client hanging up mid-request, which
 reaches the app as the `AbortError` Bun's body read throws once
-`request.signal` is aborted. Nobody reads the answer, so nothing is logged,
-no `onError` hook runs, and the request gets a bodyless `499` that only a
-middleware that settles `next()`, or a deprecated `onResponse` hook, sees.
+`request.signal` is aborted. It is a rejection of `next()` like any other,
+so a middleware's `try`/`catch` sees it and should throw it on; at the
+boundary nobody reads the answer, so nothing is logged, and the request gets
+a bodyless `499` that only a middleware that settles `next()` sees.
 Any other error, a bug thrown after the client left included, goes the
 steps above.
 
@@ -279,7 +276,7 @@ const app = alxia()
 A middleware that must see the response the client will get, an error's
 included — a logger, a header on every response — settles `next()` instead of
 catching it: `await settle(ctx, next())` resolves to the boundary's answer
-(the `onError` hooks, the `HttpError`, the 500) and keeps the error on
+(the `HttpError`'s status and body, or the 500) and keeps the error on
 `ctx.error`. The error then goes on to the middlewares around the observer,
 so a `try`/`catch` catches it wherever it is declared; give such an observer
 first and the middleware that answers errors after it, so the observer also
@@ -297,8 +294,8 @@ class HttpError<Status extends number = number, Body = unknown> extends Error {
 Core throws one subclass of its own, `ContentTooLargeError`, for a body past
 its route's `bodyLimit` ([Routes](routes.md#body-size-bodylimit)), and a
 `validate` throws `ValidationError`, an `HttpError` of the 400. Both are
-refusals: `refusalOf(error)` reads them in a middleware, and the deprecated
-`onRefusal` hooks see them before any `onError` hook
+refusals: `refusalOf(error)` reads them in a middleware that wraps
+`await next()` in a `try`/`catch`
 ([Refusals in your own format](routes.md#refusals-in-your-own-format)). Test
 for them with `instanceof`, not by `name`.
 

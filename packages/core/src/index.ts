@@ -1,5 +1,8 @@
 export { Alxia, alxia } from './app/alxia';
 export { settle } from './app/boundary';
+export { compose } from './app/compose-middlewares';
+export { type FactoryKind, markFactory } from './app/factory';
+export { errorFormat, isDev, shutdownSignal } from './app/served';
 export {
 	type RequestSchemas,
 	responds,
@@ -7,11 +10,13 @@ export {
 	type ValidateRequires,
 	validate,
 } from './app/validate';
+export type { RouteRow } from './dev/route-table';
 export {
 	type BodyLimitRefusal,
 	type ContentTooLargeBody,
 	ContentTooLargeError,
 	HttpError,
+	type HttpErrorOptions,
 	type InternalErrorBody,
 	type Refusal,
 	type RefusalKind,
@@ -26,7 +31,26 @@ export {
 	type ValidationRefusal,
 	type ValidationTarget,
 } from './errors/errors';
+export {
+	type ContentTooLargeProblem,
+	type ErrorFormat,
+	type Problem,
+	type ProblemInit,
+	problemOf,
+	type ValidationProblem,
+} from './errors/problems';
 export * from './exports-app';
+export type {
+	CheckResult,
+	HealthCheck,
+	ReadinessReport,
+} from './health/checks';
+export {
+	type HealthOptions,
+	health,
+	isHealthRoute,
+	type LivenessReport,
+} from './health/health';
 export { vary, withHeaders } from './reply/headers';
 export { type ProblemDetails, problem } from './reply/problem';
 export {

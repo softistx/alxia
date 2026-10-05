@@ -4,15 +4,21 @@
 import {
 	alxia,
 	type ClientErrorStatus,
-	defineHook,
+	defineMiddleware,
 	definePlugin,
-	defineWrap,
+	type Empty,
+	errorFormat,
 	eventStream,
+	health,
 	type PathAt,
 	problem,
+	problemOf,
 	type RoutePath,
+	refusalOf,
+	responds,
 	type StandardSchemaV1,
 	type StaticPath,
+	validate,
 } from '@alxia/core';
 
 const Ping = {
@@ -23,65 +29,41 @@ const Ping = {
 	},
 } as const;
 
+// A refusal answered by a try/catch middleware reading `refusalOf`: its
+// replies, by kind, are named in the declaration.
 export function refusing() {
 	return alxia()
 		.derive(() => ({ user: 'u' }))
 		.group('/jmap', (group) =>
 			group
 				.bodyLimit(1024)
-				.onRefusal((r) =>
-					r.kind === 'body_limit'
-						? problem({
-								type: 'urn:ietf:params:jmap:error:limit',
-								status: 413,
-								limit: 'maxSizeRequest',
-							})
-						: problem({
-								type: 'urn:ietf:params:jmap:error:notRequest',
-								status: 404,
-							}),
-				)
-				.post('/', { body: Ping }, ({ reply }) => reply(200, { ok: true })),
-		);
-}
-
-export function refusingMaybe() {
-	return alxia()
-		.onRefusal((r) =>
-			r.kind === 'validation'
-				? problem({ status: 400, detail: r.part })
-				: undefined,
-		)
-		.get('/:id', { params: Ping }, ({ reply }) => reply(200, 'x'));
-}
-
-export function refusingWithSchemas() {
-	return alxia().onRefusal(
-		{ response: { 400: Ping }, contentType: 'application/problem+json' },
-		(_refusal, { reply }) => reply(400, { interval: 1 }),
-	);
-}
-
-// A hook per kind, one with schemas: each kind's marked replies, and the
-// fallback of one that may return nothing, are named in the declaration.
-export function refusingByKind() {
-	return alxia()
-		.onRefusal(
-			'validation',
-			{ response: { 422: Ping }, contentType: 'application/problem+json' },
-			(_refusal, { reply }) => reply(422, { interval: 1 }),
-		)
-		.onRefusal('body_limit', (r) =>
-			r.limit > 0 ? problem({ status: 413, limit: r.limit }) : undefined,
-		)
-		.post('/', { body: Ping, bodyLimit: 1024 }, ({ reply }) =>
-			reply(200, { ok: true }),
+				.use(async (_ctx, next) => {
+					try {
+						return await next();
+					} catch (error) {
+						const refusal = refusalOf(error);
+						if (refusal === undefined) throw error;
+						return refusal.kind === 'body_limit'
+							? problem({
+									type: 'urn:ietf:params:jmap:error:limit',
+									status: 413,
+									limit: 'maxSizeRequest',
+								})
+							: problem({
+									type: 'urn:ietf:params:jmap:error:notRequest',
+									status: 404,
+								});
+					}
+				})
+				.post('/', validate({ body: Ping }), ({ reply }) =>
+					reply(200, { ok: true }),
+				),
 		);
 }
 
 export function streaming() {
 	const Push = eventStream({ ping: Ping });
-	return alxia().get('/push', { response: { 200: Push } }, ({ reply }) =>
+	return alxia().get('/push', responds({ 200: Push }), ({ reply }) =>
 		reply(
 			200,
 			(async function* () {
@@ -98,7 +80,13 @@ export function serving() {
 		.static('/assets', './public')
 		.file('/favicon.ico', './favicon.ico')
 		.decorate({ db: 'db' })
-		.onError((_error, { reply }) => reply(500, { error: 'internal' as const }))
+		.use(async ({ reply }, next) => {
+			try {
+				return await next();
+			} catch {
+				return reply(500, { error: 'internal' as const });
+			}
+		})
 		.ws(
 			'/rooms/:room',
 			{ message: Ping, send: Ping },
@@ -135,13 +123,20 @@ export const served = servedAt('/assets');
 export const routed = routedAt('/pets/:id');
 
 export function typedBy<R extends StandardSchemaV1>(schema: R) {
-	return alxia().get('/', { response: { 200: schema } }, ({ reply }) =>
+	return alxia().get('/', responds({ 200: schema }), ({ reply }) =>
 		reply(200, {} as never),
 	);
 }
 
 export function refusedWith<S extends ClientErrorStatus>(status: S) {
-	return alxia().onRefusal(() => problem({ status }));
+	return alxia().use(async (_ctx, next) => {
+		try {
+			return await next();
+		} catch (error) {
+			if (refusalOf(error) === undefined) throw error;
+			return problem({ status });
+		}
+	});
 }
 
 // The response's cookie map, carried in the context: `ResponseCookies`
@@ -152,44 +147,39 @@ export function withResponseCookies() {
 		.get('/', ({ sid, reply }) => reply(200, sid ?? ''));
 }
 
-// Hooks given to a route, in a list: a hook made once and exported names
-// `RouteHook` and `RouteWrap`; a route threading them names what they add
-// and reply in its record.
-export const canSee = defineHook<{ user: string; params: { id: string } }>()(
-	({ user, params, reply }) =>
-		user === params.id
-			? undefined
-			: reply(403, { error: 'forbidden' as const }),
+// Middlewares given to a route after its path, made once and exported:
+// a route threading them names what they add and reply in its record.
+export const canSee = defineMiddleware<{
+	user: string;
+	params: { id: string };
+}>()(({ user, params, reply }, next) =>
+	user === params.id ? next() : reply(403, { error: 'forbidden' as const }),
 );
-export const loaded = defineHook(({ params }) => ({ loadedAt: params['id'] }));
-export const exclusive = defineWrap<{ user: string }>()(async (_ctx, next) =>
-	next(),
+export const loaded = defineMiddleware<{ params: { id: string } }>()(
+	({ params }, next) => next({ loadedAt: params.id }),
 );
-export const busy = defineWrap(({ reply }) =>
+export const busy = defineMiddleware<Empty>()(({ reply }) =>
 	reply(409, { error: 'busy' as const }),
 );
 
 export function hooked() {
 	return alxia()
 		.derive(() => ({ user: 'u' }))
-		.get('/:id', [canSee, loaded, exclusive], ({ loadedAt, reply }) =>
+		.get('/:id', canSee, loaded, ({ loadedAt, reply }) =>
 			reply(200, loadedAt ?? ''),
 		)
-		.post('/:id', [busy], { body: Ping }, ({ body, reply }) => reply(200, body))
+		.post('/:id', busy, validate({ body: Ping }), ({ body, reply }) =>
+			reply(200, body),
+		)
 		.route(
 			{ method: 'PUT', path: '/:id', schema: { body: Ping } } as const,
-			[canSee],
+			canSee,
 			({ reply }) => reply(204),
 		)
-		.ws(
-			'/live/:id',
-			[canSee, loaded],
-			{},
-			{
-				open: (socket) => void socket.send(socket.data.loadedAt ?? ''),
-				message: () => {},
-			},
-		);
+		.ws('/live/:id', canSee, loaded, {
+			open: (socket) => void socket.send(socket.data.loadedAt ?? ''),
+			message: () => {},
+		});
 }
 
 // The app's methods taken as values: each is typed by an interface of its
@@ -204,19 +194,31 @@ export function methods() {
 		page: app.page,
 		decorate: app.decorate,
 		derive: app.derive,
-		wrap: app.wrap,
 		bodyLimit: app.bodyLimit,
-		onError: app.onError,
-		onRefusal: app.onRefusal,
-		onRequest: app.onRequest,
-		onResponse: app.onResponse,
-		around: app.around,
 		onStart: app.onStart,
 		onStop: app.onStop,
 		parser: app.parser,
 		group: app.group,
+		plugin: app.plugin,
 		use: app.use,
 		request: app.request,
 		listen: app.listen,
 	};
+}
+
+// Problem details: a middleware answering in the app's format, behind the
+// probes of `health()`, on an app that answers its own errors as problems.
+export function problems() {
+	return alxia({ errors: 'problem' })
+		.plugin(health({ checks: { db: () => true } }))
+		.use((ctx, next) =>
+			ctx.request.headers.has('x-quota')
+				? errorFormat(ctx) === 'problem'
+					? problem(
+							problemOf(ctx, { status: 429, detail: 'Over quota', quota: 3 }),
+						)
+					: ctx.reply(429, { error: 'quota' as const })
+				: next(),
+		)
+		.get('/ok', ({ reply }) => reply(200));
 }

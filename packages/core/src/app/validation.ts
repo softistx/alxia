@@ -14,11 +14,7 @@ import {
 	readQuery,
 } from '../request/read';
 import { check, type StandardSchemaV1 } from '../schema/standard-schema';
-import type {
-	ChainHook,
-	RouteDefinition,
-	SocketDefinition,
-} from './definition';
+import type { RouteDefinition, SocketDefinition } from './definition';
 import type { Settled } from './settled';
 import type { BaseContext, RequestContext, ResponseSettings } from './types';
 import type { RequestSchemas } from './validate';
@@ -33,8 +29,6 @@ export interface ChainRun {
 	readonly set: ResponseSettings;
 	readonly parsers: readonly BodyParser[];
 	readonly validateResponses: boolean;
-	/** The app-wide middlewares, of `plugin(middleware)`: run before the route's chain. */
-	readonly appWide?: readonly ChainHook[];
 	/** The error `settle` answered last, and what the observers made of it. */
 	settled?: Settled;
 	/** The body, read once by the first `validate` that reads it. */
@@ -44,11 +38,10 @@ export interface ChainRun {
 /**
  * The request checked by `schemas`: the context what follows reads, or a
  * `ValidationError` thrown, which the middlewares before it may answer,
- * and the route's `onRefusal` hooks or the default 400 otherwise. Each part is read as it arrived, `cookies`
- * included — those of the route's own context, never the output of an
- * earlier `validate`. A part it has no schema for is left as it is: what
- * a middleware of `use` passed `next` stays, the form of 0.3's validation
- * included.
+ * and the route boundary answers with its 400 otherwise. Each part is read
+ * as it arrived, `cookies` included — those of the route's own context,
+ * never the output of an earlier `validate`. A part it has no schema for
+ * is left as it is: what a middleware of `use` passed `next` stays.
  */
 export async function validateStep(
 	run: ChainRun,
@@ -73,9 +66,9 @@ export async function validateStep(
 			issues.push(...checked.issues);
 		}
 	}
-	// The request's cookies stay on `ctx`, where every hook reads them as
-	// they arrived — an `onError` or an `onRefusal` included; what follows
-	// the validation alone reads the validated ones, on a copy of it.
+	// The request's cookies stay on `ctx`, where the middlewares before the
+	// validation read them as they arrived, after `next()` too; what
+	// follows it alone reads the validated ones, on a copy of it.
 	let validCookies: { value: unknown } | undefined;
 	if (schemas.cookies !== undefined) {
 		const checked = await check(schemas.cookies, cookies, 'cookies');

@@ -24,20 +24,19 @@ beforeAll(async () => {
 });
 afterAll(() => rm(root, { recursive: true, force: true }));
 
-describe('app.static', () => {
-	const make = () =>
-		alxia().static('/files', root, {
-			extensions: ['html'],
-			precompressed: ['br', 'gzip'],
-			types: { '.wasm': 'application/wasm' },
-			cacheControl: (path) =>
-				path.endsWith('.js')
-					? 'public, max-age=31536000, immutable'
-					: 'no-cache',
-			headers: (path) =>
-				path.endsWith('.txt') ? { 'x-kind': 'text' } : undefined,
-		});
+/** The app of most specs: every option of `static` on one folder. */
+const make = () =>
+	alxia().static('/files', root, {
+		extensions: ['html'],
+		precompressed: ['br', 'gzip'],
+		types: { '.wasm': 'application/wasm' },
+		cacheControl: (path) =>
+			path.endsWith('.js') ? 'public, max-age=31536000, immutable' : 'no-cache',
+		headers: (path) =>
+			path.endsWith('.txt') ? { 'x-kind': 'text' } : undefined,
+	});
 
+describe('app.static', () => {
 	test('a file with its type, ETag, Last-Modified, and headers by path', async () => {
 		const response = await make().request('/files/hello.txt');
 		expect(await response.text()).toBe('hello');
@@ -63,7 +62,9 @@ describe('app.static', () => {
 			(await app.request('/files/module.wasm')).headers.get('content-type'),
 		).toBe('application/wasm');
 	});
+});
 
+describe('app.static, conditional and ranged', () => {
 	test('304 for a client that has it', async () => {
 		const app = make();
 		const first = await app.request('/files/hello.txt');
@@ -129,7 +130,9 @@ describe('app.static', () => {
 		});
 		expect(stale.status).toBe(200);
 	});
+});
 
+describe('app.static, precompressed copies and headers', () => {
 	test('a precompressed file, to a client that accepts it', async () => {
 		const app = make();
 		const gzip = await app.request('/files/app.js', {
@@ -179,7 +182,9 @@ describe('app.static', () => {
 		const response = await app.request('/files/hello.txt');
 		expect(response.headers.getSetCookie()).toEqual(['a=1', 'b=2']);
 	});
+});
 
+describe('app.static, what it does not serve, and its sources', () => {
 	test('dotfiles, traversal and missing files are 404s', async () => {
 		const app = make();
 		for (const path of [
@@ -217,121 +222,16 @@ describe('app.static', () => {
 		expect((await app.request('/mem/other.json')).status).toBe(404);
 	});
 
-	test('behind the app’s hooks', async () => {
+	test('behind the app’s middlewares', async () => {
 		const app = alxia()
-			.onResponse((response) => {
+			.use(async (_ctx, next) => {
+				const response = await next();
 				response.headers.set('x-hooked', 'yes');
+				return response;
 			})
 			.static('/files', root);
 		expect(
 			(await app.request('/files/hello.txt')).headers.get('x-hooked'),
 		).toBe('yes');
-	});
-});
-
-describe('app.file', () => {
-	test('a path, a Blob, or a function', async () => {
-		const app = alxia()
-			.file('/hello', join(root, 'hello.txt'))
-			.file('/robots.txt', new Blob(['User-agent: *'], { type: 'text/plain' }))
-			.file('/maybe', ({ request }) =>
-				request.headers.get('x-want') === 'yes' ? new Blob(['yes']) : null,
-			)
-			.file('/missing', join(root, 'nope.txt'));
-		expect(await (await app.request('/hello')).text()).toBe('hello');
-		expect(await (await app.request('/robots.txt')).text()).toBe(
-			'User-agent: *',
-		);
-		expect((await app.request('/maybe')).status).toBe(404);
-		expect(
-			await (
-				await app.request('/maybe', { headers: { 'x-want': 'yes' } })
-			).text(),
-		).toBe('yes');
-		expect((await app.request('/missing')).status).toBe(404);
-	});
-});
-
-describe('app.page', () => {
-	test('a route at a page, or a page at a route through a group, is refused', async () => {
-		const bundle = (await import('../../test/fixtures/page.html')).default;
-		expect(() =>
-			alxia()
-				.page('/x', bundle)
-				.get('/x', ({ reply }) => reply(200, 'x')),
-		).toThrow('GET /x is already served by a page');
-		expect(() =>
-			alxia()
-				.page('/x', bundle)
-				.ws('/x', {}, { message() {} }),
-		).toThrow('WS /x is already served by a page');
-		expect(() =>
-			alxia()
-				.get('/g/x', ({ reply }) => reply(200, 'x'))
-				.group('/g', (g) => g.page('/x', bundle)),
-		).toThrow('page(): /g/x is already served');
-		expect(() =>
-			alxia()
-				.group('/g', (g) => g.page('/x', bundle))
-				.get('/g/x', ({ reply }) => reply(200, 'x')),
-		).toThrow('GET /g/x is already served by a page');
-		expect(() =>
-			alxia()
-				.page('/y/:id', bundle)
-				.get('/y/:name', ({ reply }) => reply(200, 'y')),
-		).toThrow('GET /y/:name is already served by a page');
-		expect(() =>
-			alxia()
-				.get('/a/b/x', ({ reply }) => reply(200, 'x'))
-				.group('/a', (a) => a.group('/b', (b) => b.page('/x', bundle))),
-		).toThrow('page(): /a/b/x is already served');
-		expect(() =>
-			alxia()
-				.page('/x', bundle)
-				.plugin(alxia().get('/x', ({ reply }) => reply(200, 'x'))),
-		).toThrow('GET /x is already served by a page');
-		// A static path beside a parameter is no conflict: Bun serves the page at /x.
-		expect(() =>
-			alxia()
-				.page('/x', bundle)
-				.get('/:id', ({ reply }) => reply(200, 'id')),
-		).not.toThrow();
-		const plugin = alxia().page('/x', bundle);
-		expect(() =>
-			alxia()
-				.get('/x', ({ reply }) => reply(200, 'x'))
-				.plugin(plugin),
-		).toThrow('page(): /x is already served');
-	});
-
-	test("Bun's HTML bundle, served by Bun.serve; a path served twice is refused", async () => {
-		const bundle = (await import('../../test/fixtures/page.html')).default;
-		const app = alxia()
-			.get('/api', ({ reply }) => reply(200, 'api'))
-			.page('/', bundle);
-		expect(() => app.page('/', bundle)).toThrow('already served');
-		expect(() => app.page('/api', bundle)).toThrow('already served');
-		const server = app.listen({ port: 0 });
-		try {
-			const page = await fetch(server.url);
-			expect(page.headers.get('content-type')).toContain('text/html');
-			expect(await page.text()).toContain('<script type="module"');
-			expect(await (await fetch(new URL('/api', server.url))).text()).toBe(
-				'api',
-			);
-		} finally {
-			await app.stop(true);
-		}
-	});
-
-	test('a page of a plugin is mounted under its prefix', async () => {
-		const bundle = (await import('../../test/fixtures/page.html')).default;
-		const app = alxia({ prefix: '/app' }).plugin(alxia().page('/', bundle));
-		const server = app.listen({ port: 0 });
-		try {
-			expect((await fetch(new URL('/app', server.url))).status).toBe(200);
-		} finally {
-			await app.stop(true);
-		}
 	});
 });

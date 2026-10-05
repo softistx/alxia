@@ -98,6 +98,11 @@ Each guarded route may answer these refusals, with the body
 | `can` answers `false` | `403 {"error":"forbidden"}` |
 | allowed | the route runs, `object` set |
 
+On an app with `alxia({ errors: 'problem' })`, each refusal is an RFC 9457
+problem instead, sent as `application/problem+json` — `"title":"Forbidden",
+"detail":"The view permission on this record is not granted"` — typed
+`PermissionRefusedProblem` ([Errors](errors.md#as-problems)).
+
 **A failure throws.** A relation store that cannot answer throws
 `STORE_FAILED`, never a 403; a check that walks past `maxDepth` throws
 `PERMISSION_DEPTH`. Both are `JanusError`s: [`janusErrors()`](errors.md)
@@ -321,12 +326,13 @@ function permission<
 	type: T,
 	load: (ctx: BaseContext & LoadCtx) => Awaitable<O | null>,
 	...options: OptionsArgs<C, T, P, O, SubjectCtx, CheckCtx>
-): Alxia<
-	RequiresOf<LoadCtx & SubjectCtx & CheckCtx> & { object: O },
-	'',
-	Reply<401, PermissionRefusedBody> | Reply<404, PermissionRefusedBody> | Reply<403, PermissionRefusedBody>
-> &
-	Requiring<RequiresOf<LoadCtx & SubjectCtx & CheckCtx>>;
+): Middleware<
+	RequiresOf<LoadCtx & SubjectCtx & CheckCtx>,
+	Promise<
+		| Reply<401 | 404 | 403, PermissionRefusedBody | PermissionRefusedProblem>
+		| Next<{ object: O }>
+	>
+>;
 
 function byParam<O>(name: string, find: (id: string) => Awaitable<O | null>): (ctx: BaseContext) => Awaitable<O | null>;
 
@@ -344,10 +350,13 @@ interface PermissionRefusedBody {
 	readonly error: 'unauthenticated' | 'not_found' | 'forbidden';
 }
 
+// a refusal under @alxia/core's alxia({ errors: 'problem' })
+type PermissionRefusedProblem = Problem<401 | 403 | 404>;
+
 type Awaitable<V> = V | Promise<V>;
 ```
 
-`RequiresOf` and `Requiring` are `@alxia/core`'s. `LoadCtx`, `SubjectCtx`
+`RequiresOf`, `Middleware`, `Next`, `Reply` and `Problem` are `@alxia/core`'s. `LoadCtx`, `SubjectCtx`
 and `CheckCtx` are inferred from the types `load`, `subject` and `ctx`'s
 parameters are annotated with, `BaseContext` when they are not. `RequiresOf<X>` is what `X` adds to `BaseContext` — `{ tenant: Tenant }`
 for `BaseContext & { tenant: Tenant }` — and `Empty` when it adds nothing;

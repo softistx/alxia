@@ -1,6 +1,8 @@
 import {
 	type BaseContext,
 	defineMiddleware,
+	markFactory,
+	type Problem,
 	type RequiresOf,
 } from '@alxia/core';
 import type {
@@ -11,11 +13,15 @@ import type {
 	SubjectRef,
 } from '@nxgt/janus/permissions';
 import type { Awaitable, ObjectData, OptionsArgs } from './permission-options';
+import { refused } from './refused';
 
 /** The body of each refusal. */
 export interface PermissionRefusedBody {
 	readonly error: 'unauthenticated' | 'not_found' | 'forbidden';
 }
+
+/** A refusal under `alxia({ errors: 'problem' })`: its 401, 404 or 403 as a problem. */
+export type PermissionRefusedProblem = Problem<401 | 403 | 404>;
 
 type LooseCan = (
 	subject: SubjectRef<ModelConfig> | null,
@@ -71,27 +77,40 @@ export function permission<
 		readonly ctx?: (ctx: BaseContext, object: unknown) => Awaitable<unknown>;
 	};
 	const can = access.can as LooseCan;
-	const refuse = (error: PermissionRefusedBody['error']) => {
-		const body: PermissionRefusedBody = { error };
-		return body;
-	};
+	const refuse = <Status extends 401 | 403 | 404>(
+		ctx: BaseContext,
+		status: Status,
+		error: PermissionRefusedBody['error'],
+		detail: string,
+	) => refused(ctx, status, { error } as PermissionRefusedBody, detail);
 	return defineMiddleware<
 		RequiresOf<
 			LoadCtx & SubjectCtx & CheckCtx,
 			AnnotatedAny<LoadCtx, SubjectCtx>
 		>
-	>()(async (ctx, next) => {
+	>()(async function permissionGuard(ctx, next) {
 		const who = subject === undefined ? userOf(ctx) : await subject(ctx);
-		if (who === null) return ctx.reply(401, refuse('unauthenticated'));
+		if (who === null) {
+			return refuse(ctx, 401, 'unauthenticated', 'The request has no session');
+		}
 		const object = await loadOf(ctx);
-		if (object === null) return ctx.reply(404, refuse('not_found'));
+		if (object === null) {
+			return refuse(ctx, 404, 'not_found', `No ${type} is found here`);
+		}
 		const allowed = await can(
 			who,
 			permission,
 			view(object, type),
 			ctxOf === undefined ? undefined : { ctx: await ctxOf(ctx, object) },
 		);
-		if (!allowed) return ctx.reply(403, refuse('forbidden'));
+		if (!allowed) {
+			return refuse(
+				ctx,
+				403,
+				'forbidden',
+				`The ${permission} permission on this ${type} is not granted`,
+			);
+		}
 		return next({ object });
 	});
 }
@@ -145,3 +164,5 @@ function userOf(ctx: BaseContext): SubjectRef<ModelConfig> | null {
 	}
 	return user as SubjectRef<ModelConfig> | null;
 }
+
+markFactory(permission);

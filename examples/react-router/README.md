@@ -55,9 +55,16 @@ so `bun add` warns until it is raised; 7 works too.
 
 ```diff
  // package.json
+-    "dev": "react-router dev",
++    "dev": "NODE_ENV=development react-router dev",
 -    "start": "react-router-serve ./build/server/index.js",
-+    "start": "bun build/server/index.js",
++    "start": "NODE_ENV=production bun build/server/index.js",
 ```
+
+alxia's dev helps — a 404's hint, a 500's error page — follow React
+Router's mode: on under `react-router dev`, off in the build, whatever
+`NODE_ENV` says. `dev` sets `NODE_ENV=development` anyway, so what the app
+reads of `Bun.env` itself agrees; `start` runs the build in production.
 
 ```toml
 # bunfig.toml, a new file beside package.json
@@ -146,7 +153,7 @@ Then, in `examples/react-router`:
 ```sh
 bun run dev        # Vite with HMR, alxia answering the pages and /api: http://localhost:5173
 bun run build      # build/client, and build/server/index.js
-bun run start      # bun build/server/index.js, on PORT (3000) and HOST (0.0.0.0)
+bun run start      # NODE_ENV=production bun build/server/index.js, on PORT (3000) and HOST (0.0.0.0)
 bun run typecheck  # react-router typegen, then tsc
 bun run test       # the spec
 ```

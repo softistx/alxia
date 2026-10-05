@@ -10,9 +10,10 @@ import type {
 	AppTypes,
 	AppWithRoute,
 	RouteHandler,
-	RouteMiddleware,
+	RouteReads,
 	RouteResult,
 } from './route-forms';
+import type { TooMany } from './too-many';
 
 declare module './forms' {
 	interface Forms<
@@ -20,10 +21,9 @@ declare module './forms' {
 		A,
 		B,
 		Results extends readonly unknown[],
-		Result,
 		Handled,
 	> {
-		readonly route: RouteForm<App, A, Results, Result, Handled>;
+		readonly route: RouteForm<App, A, Results, Handled>;
 	}
 }
 
@@ -36,13 +36,13 @@ export interface RouteForm<
 	App extends AppTypes,
 	A,
 	Results extends readonly unknown[],
-	Result,
 	Handled,
 > extends FormSlots {
 	readonly aBound: RoutePath;
+	readonly excludes: 'object';
 	readonly handledBound: RouteResult<Results>;
 	readonly head: [path: PathAt<App['prefix'], A & string>];
-	readonly step: RouteMiddleware<App, A & string, Results, Result>;
+	readonly reads: RouteReads<App, A & string, Results>;
 	readonly tail: [handler: RouteHandler<App, A & string, Results, Handled>];
 	readonly out: AppWithRoute<App>;
 }
@@ -59,4 +59,5 @@ export interface RouteForm<
  */
 export interface MiddlewareForms<App extends AppTypes>
 	extends Bare<'route', App>,
-		Ladder<'route', App> {}
+		Ladder<'route', App>,
+		TooMany<'route', App> {}

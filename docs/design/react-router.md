@@ -80,7 +80,7 @@ refuses a dev or preview server on Node at startup.)
 
 The owner wants `@alxia/react-router`: alxia as the HTTP server of a React
 Router **framework-mode** app with SSR. Under it, the loaders read what
-alxia's hooks derived, typed. alxia's routes (`/api/*`) and hooks (logger,
+alxia's middlewares derived, typed. alxia's routes (`/api/*`) and middlewares (logger,
 compress, secure headers) live beside the pages, and development keeps
 Vite's HMR, all under Bun. This note covers the prior art, a probe that ran
 the whole thing under Bun 1.4.2, and the API the probe argues for.
@@ -175,7 +175,7 @@ holds `@alxia/logger`, `@alxia/compress`, `@alxia/secure-headers`, an
   - lazy route discovery (`/__manifest`);
   - the error pages: 500 from a loader that throws, 404 from a thrown
     `data(…, { status: 404 })`, 404 for no route.
-- **alxia's routes and hooks run around SSR.** `/api/health` answers its
+- **alxia's routes and middlewares run around SSR.** `/api/health` answers its
   JSON. Every page gets `x-request-id`, `server-timing`, the secure headers
   and `vary: Accept-Encoding`, and is compressed (zstd, br, gzip). The
   logger writes one entry per request.
@@ -260,7 +260,9 @@ Smaller findings:
   entry waits for `allReady` for a bot. That is React Router's choice, not
   a bug; a spec must send a browser's user agent.
 - **The logger times a streamed page by its first byte.** It logged about
-  2 ms for an 805 ms stream: `onResponse` runs when the headers leave.
+  2 ms for an 805 ms stream: its response hook, at the time of the probe,
+  ran when the headers left. The logger, a middleware now, times a
+  streamed body to its last byte.
 - **`@alxia/secure-headers`' default policy, `default-src 'none'`, blocks a
   page's scripts**, React Router's inline ones included. The probe turned
   it off; this was not tried in a browser. React Router takes a `nonce`
@@ -352,18 +354,18 @@ export async function loader({ context }: Route.LoaderArgs) {
 }
 ```
 
-- **`reactRouter(app, options)`** is called through `use`, as `graphql(app,
+- **`reactRouter(app, options)`** is called through `plugin`, as `graphql(app,
   …)` is, so that it reads the app's context type. It adds the catch-all:
-  `GET`, `POST`, `PUT`, `PATCH` and `DELETE` at `/*`, behind every hook
-  declared before it.
+  `GET`, `POST`, `PUT`, `PATCH` and `DELETE` at `/*`, behind every
+  middleware declared before it.
 - **The options:**
   - `build`: a `ServerBuild`, or a function returning one. In production
     it is called once; in dev, on each request, which is how a route edit
     is picked up.
   - `mode`: `'production'` by default, `'development'` under Vite.
   - `getLoadContext(ctx, context)`: sets the app's own keys on React
-    Router's provider. `ctx` is typed by the app, so reading a key no hook
-    before it derives is a compile error (probed: three
+    Router's provider. `ctx` is typed by the app, so reading a key no
+    middleware before it derives is a compile error (probed: three
     `@ts-expect-error`s held).
   - `client`: the client build. In production, `/assets/*` is served from
     it with `public, max-age=31536000, immutable`, and every other
@@ -383,7 +385,7 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 *Superseded by [the zero-config revision](#revised-2026-10-03-zero-config): `alxia()` replaced `alxiaServer()`, and `serve.js` is gone.*
 
-```ts
+```ts no-check
 // vite.config.ts
 import { reactRouter } from '@react-router/dev/vite';
 import { alxiaServer } from '@alxia/react-router/vite';

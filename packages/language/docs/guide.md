@@ -28,8 +28,11 @@ client that names no language it supports gets `Hello`. `current` is typed
 ```ts
 function language<const L extends string, Ctx extends object = BaseContext>(
 	options: LanguageOptions<L, Ctx>,
-): Alxia<RequiresOf<Ctx> & LanguageContext<L>, '', never> &
-	Requiring<RequiresOf<Ctx>>;
+): LanguageMiddleware<L, RequiresOf<Ctx, 'resolve'>>;
+
+// A middleware: it gives `language`, and requires of the app what `resolve` reads.
+type LanguageMiddleware<L extends string, Requires extends object = Empty> =
+	Middleware<Requires, Promise<Next<LanguageContext<L>>>>;
 
 interface LanguageOptions<L extends string, Ctx extends object = BaseContext> {
 	readonly supported: readonly L[];
@@ -494,7 +497,7 @@ export const app = alxia()
 		language({
 			supported,
 			fallback: 'en',
-			persist: { secure: process.env['NODE_ENV'] === 'production' },
+			persist: { secure: Bun.env.NODE_ENV !== 'development' }, // read at runtime: bun build inlines process.env
 		}),
 	)
 	.get('/', ({ language: current, reply }) => reply(200, messages[current].welcome))

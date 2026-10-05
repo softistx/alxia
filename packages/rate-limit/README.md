@@ -80,3 +80,4 @@ nothing.
 - [Guide](https://github.com/softistx/alxia/tree/develop/packages/rate-limit/docs): the options and their defaults, which requests are counted, the headers, the 429 on the wire, stores, and testing.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/roadmap.md): what is coming, and what is not planned.
+- [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [Caching and rate limiting with Redis](https://github.com/softistx/alxia/blob/develop/docs/recipes/caching-and-rate-limiting.md).

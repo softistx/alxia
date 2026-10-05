@@ -58,15 +58,24 @@ describe('use(middleware) after routes', () => {
 		}
 		expect(warned()).toEqual([]);
 	});
-});
 
-describe('plugin(middleware), deprecated, after routes', () => {
-	test('says it runs on them, untyped', () => {
+	test("follows the app's dev switch, not NODE_ENV alone, in its groups too", () => {
+		alxia({ dev: false })
+			.get('/a', ({ reply }) => reply(200, 'a'))
+			.use(pass);
+		expect(warned()).toEqual([]);
+		process.env.NODE_ENV = 'test';
+		alxia({ dev: true })
+			.get('/a', ({ reply }) => reply(200, 'a'))
+			.use(pass);
+		alxia({ dev: true }).group('/g', (g) =>
+			g.get('/a', ({ reply }) => reply(200, 'a')).use(pass),
+		);
+		expect(warned()).toHaveLength(2);
+		process.env.NODE_ENV = 'staging';
 		alxia()
 			.get('/a', ({ reply }) => reply(200, 'a'))
-			.plugin(pass);
-		expect(warned()[0]).toContain(
-			'plugin(middleware) is deprecated: the middleware runs on every route, the route (GET /a) declared before it included',
-		);
+			.use(pass);
+		expect(warned()).toHaveLength(2);
 	});
 });

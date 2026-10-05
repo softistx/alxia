@@ -143,6 +143,135 @@ process.on('SIGTERM', async () => {
 `closeRedis()` from `@nxgt/redis` closes every client the process opened
 through `connectRedis` — the end of a test file, say.
 
+## With an `@nxgt/redis` handle
+
+`openRedis(defineRedis({ … }))` opens the client and wires the caches, a
+`prefix` and a lock in one object, the handle. Every export that takes a
+client takes the handle too, and the deployment's `prefix` is then in front of
+every key it writes:
+
+```ts
+import { cache } from '@alxia/cache';
+import { alxia, health } from '@alxia/core';
+import { idempotency, redis, redisCacheStore, redisCheck } from '@alxia/redis';
+import { defineCache, defineRedis, openRedis } from '@nxgt/redis';
+import { z } from 'zod';
+
+const users = defineCache({ name: 'user', key: (id: string) => id, ttl: 300, schema: z.object({ id: z.string(), name: z.string() }) });
+const handle = await openRedis(
+	defineRedis({ uri: Bun.env['REDIS_URL']!, prefix: 'shop', caches: { users } }),
+);
+
+const app = alxia()
+	.plugin(health({ checks: { redis: redisCheck(handle) } }))
+	.plugin(redis(handle))
+	.use(idempotency(handle, { name: 'orders' }))
+	.use(cache({ ttl: 60, store: redisCacheStore(handle, { name: 'pages' }) }))
+	.get('/users/:id', ({ caches, params, reply }) => reply.ok(caches.users.get(params.id)));
+```
+
+| Export | Keys under `prefix: 'shop'` |
+| --- | --- |
+| `redisStore(handle, { name: 'api' })` | `shop:api:<limit>/<windowMs>:<key>`, `shop:api:policies` |
+| `redisCacheStore(handle, { name: 'pages' })` | `shop:pages:response:<key>`, `shop:pages:tag:<tag>` |
+| `idempotency(handle, { name: 'orders' })` | `shop:orders:<route>:<scope>:<Idempotency-Key>` |
+| `redis(handle)` | `shop:<cache name>:<key>`, `lock:shop:<key>` |
+
+The lock is `@nxgt/redis`'s, which writes `lock:` first and the prefix inside
+it. `redis(handle)` puts `redis` (the client), `caches`, `lock` and `prefix` in
+the context; `caches` is the handle's own `cache` scope, typed by each schema.
+
+**Closing.** `redis(handle)` closes the handle in core's `onStop`, once, after
+the requests in flight drained, so `listen`'s graceful shutdown ends with the
+connection closed. Opt out with `redis(handle, { close: false })` when
+something else owns the handle. The stores and `idempotency` never close it;
+an app that does not mount `redis(handle)` closes the handle itself. A
+`client` that `defineRedis` was given is never closed by `@nxgt/redis`.
+
+**Health.** `redisCheck(handle)` is a check for `health({ checks })`: it
+passes while every instance answers a `PING` and is down when one does not;
+given a handle, `{ timeout }` bounds each instance's ping, in milliseconds
+(2 s by default). It takes a bare client too, whose `PING` has no bound of
+its own: `health({ timeout })` bounds the check.
+
+**One instance.** The handle must wire exactly one Redis instance; a handle of
+several is refused with a `TypeError` naming them. Give a bare client,
+`handle.clients.<name>`, to the factory that lives on one of them, with the
+prefix in its `name`.
+
+**Defined once.** With `@nxgt/redis` 0.6 the rate limit and the idempotent
+operation can be wired by `defineRedis` too, and `redisStore` and `idempotency`
+take what it wired: [Defined once, in `defineRedis`](#defined-once-in-defineredis).
+
+**Switching from a bare client** changes the keys: a rate-limit count, a kept
+response or a replayable response written without the prefix is not found
+under it, and the new keys start empty.
+
+## Defined once, in `defineRedis`
+
+`defineRedis` takes `limits` and `idempotency` next to `caches`, and the handle
+exposes each as `handle.limits.<name>` and `handle.idempotency.<name>`, typed
+from the definitions and writing `<prefix>:<name>:<key>`, the layout every
+`@nxgt/redis` consumer of the deployment shares. Hand the wired entry to the
+store and to the middleware instead of a name:
+
+```ts
+import { alxia } from '@alxia/core';
+import { rateLimit } from '@alxia/rate-limit';
+import { idempotency, idempotencyResult, redisStore } from '@alxia/redis';
+import { defineIdempotency, defineRateLimit, defineRedis, openRedis } from '@nxgt/redis';
+
+const api = defineRateLimit({ name: 'api', key: (ip: string) => ip, limit: 100, per: 60_000 });
+const orders = defineIdempotency({ name: 'orders', key: (id: string) => id, ttl: 86_400, schema: idempotencyResult });
+
+const handle = await openRedis(
+	defineRedis({ uri: Bun.env['REDIS_URL']!, prefix: 'shop', limits: { api }, idempotency: { orders } }),
+);
+
+const app = alxia()
+	.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(handle.limits.api) })) // shop:api:<address>
+	.use(idempotency(handle.idempotency.orders)) // shop:orders:<route>:<scope>:<key>
+	.post('/orders', ({ reply }) => reply(201, { id: crypto.randomUUID() }));
+```
+
+| Wired | Keys under `prefix: 'shop'` | Also written by |
+| --- | --- | --- |
+| `redisStore(handle.limits.api)` | `shop:api:<key>` | `handle.limits.api.consume(key)` anywhere |
+| `idempotency(handle.idempotency.orders)` | `shop:orders:<route>:<scope>:<Idempotency-Key>` | `idempotency(handle, { name: 'orders' })`: the same keys |
+
+What to know:
+
+- **The definition is the one place.** The name, `limit`, `per` and `burst` of
+  a rate limit, the name, `ttl` and `lease` of an idempotency, are the
+  definition's. `idempotency(handle.idempotency.orders)` takes the middleware's
+  options (`required`, `scope`, `wait`, `methods`, `header`) but not `name`,
+  `ttl` or `lease`: the types refuse them, and a script that passes them gets a
+  `TypeError`.
+- **The rate is the definition's, and `rateLimit` repeats it for its
+  headers.** The store counts by the wired limit's own rate, so `limit` and
+  `windowMs` on `rateLimit` only write `RateLimit-*`: give them the definition's
+  numbers.
+- **The limit counts by a string.** `rateLimit` counts by the string its `key`
+  returns, so the wired limit's key must take one, as `key: (ip: string) => ip`.
+  `redisStore(handle.limits.byIp)` for a limit keyed by `{ ip }` does not
+  compile.
+- **The idempotency keeps a response.** Its `schema` must be
+  `idempotencyResult`, the shape `@alxia/redis` stores (status, headers, body),
+  and its key must take a string; the middleware builds
+  `<route>:<scope>:<Idempotency-Key>` itself. Another schema does not compile.
+- **A guard bound by hand works too**: `redisStore(bindRateLimit(client, api))`,
+  with no prefix.
+- **Same name, one kind.** One name shared by a cache and a limit or an
+  idempotency on one instance is refused when the handle is wired:
+  [troubleshooting](../troubleshooting.md#typeerror-defineredis-instance-default-wires-the-cache-users-and-the-rate-limit-login-under-one-name-user-they-would-share-every-key-in-redis-give-one-of-them-a-name-of-its-own).
+- **Moving from the by-name form.** An idempotency keeps its keys. A rate limit
+  does not: the by-name store counts under `shop:api:<limit>/<windowMs>:<key>`,
+  the wired one under `shop:api:<key>`, so counts restart:
+  [troubleshooting](../troubleshooting.md#counts-restart-after-moving-a-rate-limit-to-the-wired-form).
+- **Both forms stay**, and need `@nxgt/redis` 0.6 only for `handle.limits` and
+  `handle.idempotency`: a limit or an idempotency bound by hand with 0.5 is
+  accepted the same.
+
 ## Naming keys
 
 Every export that writes takes a `name`, prepended to its keys, so several
@@ -155,7 +284,8 @@ apps and several features can share one Redis:
 | `idempotency(client, { name })` | `<name>:<route>:<scope>:<Idempotency-Key>` |
 | `redis(client, { caches })` | each cache's own `<name>:<key>`, and `lock:<key>` |
 
-Two features given the same `name` share their keys; give each its own.
+Two features given the same `name` share their keys; give each its own. Given a
+[handle](#with-an-nxgtredis-handle), each key also starts with its `prefix`.
 
 ## Next
 

@@ -11,14 +11,14 @@ or a header in the wrong place.
 - [`Type 'true' is not assignable to type 'Setting | undefined'`](#type-true-is-not-assignable-to-type-setting--undefined)
 - [`No overload matches this call` … `is not assignable to type 'SecureHeadersOptions' with 'exactOptionalPropertyTypes: true'`](#no-overload-matches-this-call--is-not-assignable-to-type-secureheadersoptions-with-exactoptionalpropertytypes-true)
 - [`No overload matches this call` … `Object literal may only specify known properties, and '…' does not exist in type 'SecureHeadersOptions & …'`](#no-overload-matches-this-call--object-literal-may-only-specify-known-properties-and--does-not-exist-in-type-secureheadersoptions--)
-- [`No overload matches this call` … `Property 'nonce' is missing in type 'Alxia<Empty, "", never>'`](#no-overload-matches-this-call--property-nonce-is-missing-in-type-alxiaempty--never)
+- [`Type 'undefined' is not assignable to type 'SecureHeadersOptions & { readonly nonce: true; }'`](#type-undefined-is-not-assignable-to-type-secureheadersoptions---readonly-nonce-true-)
 - [`Property 'nonce' does not exist on type 'RouteBase<…>'`](#property-nonce-does-not-exist-on-type-routebase)
 - [`No overload matches this call` … `Type 'boolean' is not assignable to type 'true'`](#no-overload-matches-this-call--type-boolean-is-not-assignable-to-type-true)
 
 **Runtime**
 
 - [`TypeError: secureHeaders: … is empty; give false to leave the … header out`](#typeerror-secureheaders--is-empty-give-false-to-leave-the--header-out)
-- [`TypeError: use(): the plugin function returned function, not an app: …`](#typeerror-use-the-plugin-function-returned-function-not-an-app-)
+- [`use(): argument 1 looks like a factory (secureHeaders): call it, use(secureHeaders())`](#use-argument-1-looks-like-a-factory-secureheaders-call-it-usesecureheaders)
 - [`TypeError: secureHeaders: nonce is on, but the content-security-policy has no script-src to add it to: …`](#typeerror-secureheaders-nonce-is-on-but-the-content-security-policy-has-no-script-src-to-add-it-to-)
 - [`TypeError: secureHeaders: nonce is on, but contentSecurityPolicy is false: …`](#typeerror-secureheaders-nonce-is-on-but-contentsecuritypolicy-is-false-)
 - [`TypeError: secureHeaders: contentSecurityPolicy names NONCE, but nonce is off: give nonce: true`](#typeerror-secureheaders-contentsecuritypolicy-names-nonce-but-nonce-is-off-give-nonce-true)
@@ -141,22 +141,23 @@ const app = alxia()
 	.use(reportOnly);
 ```
 
-### `No overload matches this call` … `Property 'nonce' is missing in type 'Alxia<Empty, "", never>'`
+### `Type 'undefined' is not assignable to type 'SecureHeadersOptions & { readonly nonce: true; }'`
 
 **When:** `secureHeaders` is given to `app.use` without being called.
 
 ```text
-error TS2769: No overload matches this call.
-  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '{ (options: SecureHeadersOptions & { readonly nonce: true; }): NonceMiddleware; (options?: (SecureHeadersOptions & { readonly nonce?: false; }) | undefined): Plugin; }' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
-      Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, "", never>' is not assignable to type 'SecureHeadersOptions & { readonly nonce: true; }'.
-          Property 'nonce' is missing in type 'Alxia<Empty, "", never>' but required in type '{ readonly nonce: true; }'.
+error TS2345: Argument of type '{ (options: SecureHeadersOptions & { readonly nonce: true; }): NonceMiddleware; (options?: (SecureHeadersOptions & { ...; }) | undefined): SecureHeaders; }' is not assignable to parameter of type '{ (options: SecureHeadersOptions & { readonly nonce: true; }): NonceMiddleware; (options?: (SecureHeadersOptions & { ...; }) | undefined): SecureHeaders; } & Step<...>'.
+  Type '{ (options: SecureHeadersOptions & { readonly nonce: true; }): NonceMiddleware; (options?: (SecureHeadersOptions & { ...; }) | undefined): SecureHeaders; }' is not assignable to type 'Step<BaseContext & Empty, (SecureHeadersOptions & { readonly nonce?: false; }) | undefined, MiddlewareReturn>'.
+    Types of parameters 'options' and 'ctx' are incompatible.
+      Type '(SecureHeadersOptions & { readonly nonce?: false; }) | undefined' is not assignable to type 'SecureHeadersOptions & { readonly nonce: true; }'.
+        Type 'undefined' is not assignable to type 'SecureHeadersOptions & { readonly nonce: true; }'.
+          Type 'undefined' is not assignable to type 'SecureHeadersOptions'.
 ```
 
 **Why:** `secureHeaders` makes the middleware from its options; the
-middleware is what it returns. TypeScript tries the app as the options of its first
-overload, the nonce one, and says what that lacks.
+middleware is what it returns. Given to `use` as it is, it is read as a
+middleware whose context is its options, and TypeScript says those do not
+fit its first overload, the nonce one.
 
 **Fix:** call it, with or without options:
 
@@ -169,7 +170,7 @@ app.use(secureHeaders());
 **When:** a route or a middleware reads `nonce` from its context.
 
 ```text
-error TS2339: Property 'nonce' does not exist on type 'RouteBase<RouteApp<"GET", Empty, "", never>, "/">'.
+error TS2339: Property 'nonce' does not exist on type 'RouteBase<RouteApp<"GET", Empty, "">, "/">'.
 error TS2339: Property 'nonce' does not exist on type 'BaseContext & Empty'.
 ```
 
@@ -236,20 +237,18 @@ Only `false` leaves a header out.
 app.use(secureHeaders({ xFrameOptions: false }));
 ```
 
-### `TypeError: use(): the plugin function returned function, not an app: …`
+### `use(): argument 1 looks like a factory (secureHeaders): call it, use(secureHeaders())`
 
-**When:** the same mistake as above in JavaScript, or past a cast:
-`alxia().use(secureHeaders)`, the factory given uncalled. It throws at
-startup:
+**When:** `alxia().use(secureHeaders)`, the factory given uncalled, in
+JavaScript or past a cast. It throws where the app is declared, since
+alxia 0.5; before, each request was answered with a 500 and the log said
+`GET /: a middleware (secureHeaders) returned function: …`. TypeScript
+refuses it first, with `"this looks like a factory given uncalled: …"` in
+the error.
 
-```text
-TypeError: use(): the plugin function returned function, not an app: a plugin returns the app it is given; a middleware is made with defineMiddleware() and given to use()
-```
-
-**Why:** `app.use` takes a function that is not a middleware for a plugin:
-it calls it with the app, and expects the app back. Uncalled,
-`secureHeaders` reads the app as its options and returns a middleware, a
-function, not the app.
+**Why:** `use` takes a middleware, a `(ctx, next)` function; `secureHeaders`
+makes one, and is marked as a factory, so `use`, a route and `plugin`
+refuse it.
 
 **Fix:**
 
@@ -509,8 +508,7 @@ response.
 
 **Why:** the middleware deletes them when the response comes back through
 it. A middleware declared **before** `secureHeaders` that adds one sees the
-response after that, and keeps it; so does a deprecated `onResponse` hook,
-which runs after every middleware. A proxy in front of the app may add its
+response after that, and keeps it. A proxy in front of the app may add its
 own `Server` too.
 
 **Fix:** declare `secureHeaders` before the middleware that adds the header,
@@ -534,10 +532,9 @@ const app = alxia()
 **When:** a response has none of the headers, though `secureHeaders` is
 in use.
 
-**Why:** the middleware decorates what comes back through it, and three
-responses do not: a WebSocket upgrade that succeeds (the `101`), a page
-served with `page()`, which `Bun.serve` answers itself, and the 500 sent
-when a deprecated `around` hook throws.
+**Why:** the middleware decorates what comes back through it, and two
+responses do not: a WebSocket upgrade that succeeds (the `101`), and a page
+served with `page()`, which `Bun.serve` answers itself.
 
 **Fix:** serve a page that needs the headers through a route, `file` or
 `static` rather than `page()` — or give it its policy in its HTML with
@@ -595,8 +592,7 @@ its own format, is declared before `secureHeaders()`, and its reply comes
 back without the security headers.
 
 **Why:** `secureHeaders` settles `next()`: it sets the headers on the response
-the route boundary would give (`onError`, the `HttpError`'s status, or a
-500), then the error goes on to the middlewares around it. A `try`/`catch`
+the route boundary would give (the `HttpError`'s status, or a 500), then the error goes on to the middlewares around it. A `try`/`catch`
 declared **before** it catches the error, but its reply is made outside
 `secureHeaders`, so it carries no headers; the 500 inside did.
 

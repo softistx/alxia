@@ -1,9 +1,9 @@
 /**
- * Copies a template stored under `templates/<template>/`: the `api` one,
- * alxia's own, and the `react-router` one, React Router's official scaffold
+ * Copies a template stored under `templates/<template>/`: `minimal`, `api`
+ * and `graphql`, alxia's own, and the `react-router` one, React Router's official scaffold
  * with the layer `examples/react-router` adds on top. The files are copied
  * as they are, but for the project's name in place of the template's own
- * (`my-api`, `my-app`) wherever a text file names it, as the README's
+ * (`my-api`, `my-app`, …) wherever a text file names it, as the README's
  * `docker build -t` does; `package.json` is rewritten, with that name and
  * alxia's versions in place of `workspace:^`.
  */

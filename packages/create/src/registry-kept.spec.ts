@@ -27,6 +27,32 @@ describe('bumpDependencies, a pin kept as the template has it', () => {
 		expect(KEPT_EXACT.has('@nxgt/openapi-codegen')).toBe(true);
 	});
 
+	test("the graphql template's GraphQL Code Generator pins stay, whatever the registry has newer", async () => {
+		const fake = fakeRegistry({
+			'@graphql-codegen/cli': ['7.4.3', '7.4.4'],
+			'@graphql-codegen/typescript': ['6.1.0', '6.1.1'],
+			'@graphql-codegen/typescript-resolvers': ['6.1.0', '6.1.1'],
+			graphql: ['16.11.0', '17.0.2'],
+		});
+		stop = fake.stop;
+		const manifest: Manifest = {
+			dependencies: { graphql: '^16.11.0' },
+			devDependencies: {
+				'@graphql-codegen/cli': '7.4.3',
+				'@graphql-codegen/typescript': '6.1.0',
+				'@graphql-codegen/typescript-resolvers': '6.1.0',
+			},
+		};
+		await bumpDependencies(manifest, { url: fake.url });
+		expect(manifest.devDependencies).toEqual({
+			'@graphql-codegen/cli': '7.4.3',
+			'@graphql-codegen/typescript': '6.1.0',
+			'@graphql-codegen/typescript-resolvers': '6.1.0',
+		});
+		// graphql itself moves, within what @alxia/graphql accepts.
+		expect(manifest.dependencies?.['graphql']).toBe('^17.0.2');
+	});
+
 	test('a failing registry does not name a kept pin', async () => {
 		const fake = fakeRegistry(
 			{ '@nxgt/openapi-codegen': ['0.7.0', '0.7.1'] },

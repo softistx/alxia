@@ -2,7 +2,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
+	markFactory,
 	type Next,
 	type RequestContext,
 	settle,
@@ -65,8 +65,7 @@ export interface TelemetryContext {
 export type TelemetryMiddleware = Middleware<
 	Empty,
 	Promise<Next<TelemetryContext>>
-> &
-	MiddlewareMark & { telemetry: Telemetry };
+> & { telemetry: Telemetry };
 
 /**
  * One server span per request, with [`@nxgt/telemetry`](https://www.npmjs.com/package/@nxgt/telemetry),
@@ -103,7 +102,7 @@ export function telemetry(
 	const traced = guarded(options.traced ?? (() => true), () => true);
 	const spanName = guarded(options.spanName ?? defaultName, defaultName);
 
-	const middleware = defineMiddleware(async (ctx, next) => {
+	const middleware = defineMiddleware(async function telemetry(ctx, next) {
 		const untraced: TelemetryContext = { span: undefined, telemetry: instance };
 		const upgrade =
 			ctx.request.headers.get('upgrade')?.toLowerCase() === 'websocket';
@@ -230,3 +229,5 @@ function guarded<T>(
 		}
 	};
 }
+
+markFactory(telemetry);

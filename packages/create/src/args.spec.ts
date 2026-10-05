@@ -32,10 +32,11 @@ describe('parseArgs', () => {
 
 	test('refuses an unknown template, a template missing, an unknown option, two directories', () => {
 		expect(parseArgs(['--template', 'vue'])).toEqual({
-			error: 'unknown template vue: use api or react-router.',
+			error: 'unknown template vue: use minimal, api, graphql or react-router.',
 		});
 		expect(parseArgs(['--template'])).toEqual({
-			error: '--template needs a template: api or react-router.',
+			error:
+				'--template needs a template: minimal, api, graphql or react-router.',
 		});
 		expect(parseArgs(['--yes'])).toEqual({ error: 'unknown option --yes.' });
 		expect(parseArgs(['a', 'b'])).toEqual({

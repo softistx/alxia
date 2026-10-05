@@ -2,9 +2,10 @@
 
 Each entry is headed by the text you see: a TypeScript error, an exception
 at startup, an exception in the log beside a `500 {"error":"internal"}`, or
-the response a client got. `@alxia/redis` throws nothing of its own: the
-messages are `@nxgt/redis`'s, `@nxgt/redis-guard`'s and Bun's, and it lets
-each through. It prints one warning of its own, under
+the response a client got. `@alxia/redis` throws almost nothing of its own: the
+messages are `@nxgt/redis`'s and Bun's, and it lets
+each through; its own refusals, a handle of several instances, a wired guard given a
+`name`, `ttl` or `lease`, or a client given without a `name`, say what to pass instead. It prints one warning of its own, under
 [Runtime: a warning in the log](#runtime-a-warning-in-the-log). What prints nothing is under [Traps](#traps), by symptom.
 
 **Install and types**
@@ -21,6 +22,10 @@ each through. It prints one warning of its own, under
 - [`TypeError: defineIdempotency: an idempotent operation needs a name, for its keys`](#typeerror-defineidempotency-an-idempotent-operation-needs-a-name-for-its-keys)
 - [`RedisError: Connection closed`](#rediserror-connection-closed)
 - [`TypeError: connectRedis: this URI is already connected with other options. Pass the same options everywhere, or close the first connection.`](#typeerror-connectredis-this-uri-is-already-connected-with-other-options-pass-the-same-options-everywhere-or-close-the-first-connection)
+
+- [`TypeError: @alxia/redis: this @nxgt/redis handle wires N Redis instances (…), and one is needed.`](#typeerror-alxiaredis-this-nxgtredis-handle-wires-n-redis-instances--and-one-is-needed)
+- [`TypeError: defineRedis: instance "default" wires no cache, no channel, no rate limit and no idempotency. Pass the module that exports them, or drop the instance.`](#typeerror-defineredis-instance-default-wires-no-cache-no-channel-no-rate-limit-and-no-idempotency-pass-the-module-that-exports-them-or-drop-the-instance)
+- [`TypeError: defineRedis: instance "default" wires the cache "users" and the rate limit "login" under one name, "user". They would share every key in Redis. Give one of them a name of its own.`](#typeerror-defineredis-instance-default-wires-the-cache-users-and-the-rate-limit-login-under-one-name-user-they-would-share-every-key-in-redis-give-one-of-them-a-name-of-its-own)
 
 **Runtime: a 500, with this in the log**
 
@@ -55,6 +60,9 @@ each through. It prints one warning of its own, under
 - [Two limits count each other's requests](#two-limits-count-each-others-requests)
 - [A `401` or a `429` is replayed, with `Idempotent-Replayed: true`, after the client fixed it](#a-401-or-a-429-is-replayed-with-idempotent-replayed-true-after-the-client-fixed-it)
 - [One client gets another client's response](#one-client-gets-another-clients-response)
+- [Counts and kept responses vanish after moving to a handle with a `prefix`](#counts-and-kept-responses-vanish-after-moving-to-a-handle-with-a-prefix)
+- [Counts restart after moving a rate limit to the wired form](#counts-restart-after-moving-a-rate-limit-to-the-wired-form)
+- [The handle is closed while something still uses it](#the-handle-is-closed-while-something-still-uses-it)
 
 ## Install and types
 
@@ -222,6 +230,59 @@ await check.close();
 const connection = await connectRedis(Bun.env['REDIS_URL']!);
 ```
 
+### `TypeError: @alxia/redis: this @nxgt/redis handle wires N Redis instances (…), and one is needed.`
+
+**When:** a handle wiring several instances is given to `redis()`,
+`redisStore`, `redisCacheStore`, `idempotency` or `redisCheck`, at startup.
+
+**Why:** the keys of one deployment live on one Redis; which of several is
+meant is not guessed.
+
+**Fix:** give the bare client of the one, with the prefix in the `name`:
+
+```ts
+redisStore(handle.clients.cache, { name: 'shop:api' });
+```
+
+or wire one instance per handle.
+
+### `TypeError: defineRedis: instance "default" wires no cache, no channel, no rate limit and no idempotency. Pass the module that exports them, or drop the instance.`
+
+**When:** `defineRedis({ uri, prefix })` is written only to give the stores
+and `idempotency` a prefix. `@nxgt/redis` 0.5 said `wires no cache and no
+channel`; 0.6 counts the rate limits and the idempotency it can now wire too.
+
+**Why:** `@nxgt/redis` refuses a handle that wires nothing.
+
+**Fix:** wire at least one of the four on it: a cache, which `redis(handle)`
+then puts in the context as `caches`, a channel, a rate limit or an idempotency:
+
+```ts
+defineRedis({ uri, prefix: 'shop', caches: { users } });
+defineRedis({ uri, prefix: 'shop', limits: { api } });
+```
+
+### `TypeError: defineRedis: instance "default" wires the cache "users" and the rate limit "login" under one name, "user". They would share every key in Redis. Give one of them a name of its own.`
+
+**When:** the `defineRedis(...)` of an app that gives `caches`, `limits` and
+`idempotency` one `name` on one instance: here the cache exported as `users`
+and the rate limit exported as `login`, both named `user`. The sentence says
+which two, and the export keys they are wired under. It is thrown at wiring
+time, before the app serves; with the same kind twice it reads `wires the rate
+limit named "user" twice, under "a" and "b"`.
+
+**Why:** a cache, a rate limit and an idempotency all write
+`<prefix>:<name>:<key>`, so one name is one keyspace, and they would
+overwrite each other's values or meet as `WRONGTYPE`. The same wiring that lets
+`redisStore(handle.limits.login)` and `idempotency(handle.idempotency.orders)`
+write the layout `@nxgt/redis` writes refuses the clash.
+
+**Fix:** rename one: the **definition's** `name`, not its export:
+
+```ts
+export const login = defineRateLimit({ name: 'login.limit', key: (ip: string) => ip, limit: 5, per: 60_000 });
+```
+
 ## Runtime: a 500, with this in the log
 
 Each of these makes the request answer `500 {"error":"internal"}`; the
@@ -239,7 +300,7 @@ TypeError: defineRateLimit: "api:1000000/31536000000" has a burst of 1000000 and
 
 **Why:** the script counts in exact integers; `limit × windowMs` past that
 bound would lose precision. `redisStore` hands each policy to
-`@nxgt/redis-guard` when it first counts under it, and a refused policy is
+`@nxgt/redis` when it first counts under it, and a refused policy is
 not kept, so it is checked again, and refused again, on each request.
 
 **Fix:** state the same rate over a shorter window:
@@ -451,7 +512,7 @@ number, or below 1.
 TypeError: defineRateLimit: "api:5/1.5" has a per of 1.5; it is a whole number of milliseconds, and must be at least 1
 ```
 
-**Why:** `redisStore` hands each `limit`/`windowMs` to `@nxgt/redis-guard`
+**Why:** `redisStore` hands each `limit`/`windowMs` to `@nxgt/redis`
 the first time it counts under it, and the guard counts in whole
 milliseconds. `rateLimit` never passes such a value: it refuses it at
 startup, with [`TypeError: rateLimit: windowMs must be a whole number of 1 or more, not …`](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/troubleshooting.md#typeerror-ratelimit--must-be-a-whole-number-of-1-or-more-not-).
@@ -650,3 +711,50 @@ idempotency(connection.client, {
 
 [Scope](guide/idempotency.md#scope-whose-key-it-is) shows the `ip` option
 behind a proxy.
+
+### Counts and kept responses vanish after moving to a handle with a `prefix`
+
+**Symptom:** after `redisStore(client, …)` becomes `redisStore(handle, …)`,
+rate-limit counts start from zero, kept responses miss and an idempotent
+repeat runs again.
+
+**Why:** the handle's `prefix` is in front of every key, so the keys are
+new: `api:…` is now `shop:api:…`. The old ones expire on their own.
+
+**Fix:** none is needed beyond waiting for the longest `ttl`; switch during a
+quiet period, or keep the bare client until then.
+
+### Counts restart after moving a rate limit to the wired form
+
+**Symptom:** after `redisStore(handle, { name: 'api' })` becomes
+`redisStore(handle.limits.api)`, every client's allowance starts full again.
+An idempotent route does not do this: `idempotency(handle, { name: 'orders' })`
+and `idempotency(handle.idempotency.orders)` write the same keys, so a kept
+response is still replayed.
+
+**Why:** the two layouts differ. The by-name store keeps one bucket per policy,
+`shop:api:<limit>/<windowMs>:<key>` and `shop:api:policies`; the wired limit
+is `@nxgt/redis`'s own, `shop:api:<key>`, the layout every other consumer of
+the handle shares. The old buckets are not read any more and expire by
+themselves.
+
+**Fix:** none is needed but the wait, within `burst × per ÷ limit` of the
+limit; switch at a quiet moment. `redisStore(handle.limits.api)` counts by the
+definition's rate, not by the `limit` and `windowMs` the middleware is given,
+which only write the headers: if the `RateLimit-Policy` header says another
+rate than the limit enforces, make the two numbers equal.
+
+### The handle is closed while something still uses it
+
+**Symptom:** after the app stopped, or in a second app sharing the handle,
+commands fail with `RedisError: Connection closed`.
+
+**Why:** `redis(handle)` closes the handle when its app stops. Two apps
+given one handle close it with the first.
+
+**Fix:** pass `{ close: false }` to every `redis(handle, …)` but the one that
+owns the handle's life, or close it yourself:
+
+```ts
+app.plugin(redis(handle, { close: false }));
+```

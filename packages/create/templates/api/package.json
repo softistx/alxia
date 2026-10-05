@@ -4,9 +4,9 @@
   "type": "module",
   "scripts": {
     "generate": "nxgt-openapi generate",
-    "dev": "bun --watch src/server.ts",
+    "dev": "NODE_ENV=development bun --watch src/server.ts",
     "build": "bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked",
-    "start": "bun dist/server.js",
+    "start": "NODE_ENV=production bun dist/server.js",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "lint": "biome lint",
@@ -17,13 +17,15 @@
   },
   "dependencies": {
     "@alxia/core": "workspace:^",
+    "@alxia/env": "workspace:^",
+    "@alxia/openapi": "workspace:^",
     "zod": "^4.5.4"
   },
   "devDependencies": {
-    "@alxia/openapi": "workspace:^",
     "@biomejs/biome": "2.5.15",
     "@nxgt/openapi-codegen": "0.7.0",
     "@types/bun": "^1.4.2",
+    "openapi-fetch": "^0.17.0",
     "typescript": "^6.0.3"
   }
 }

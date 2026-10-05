@@ -93,7 +93,7 @@ describe('react-router dev, WebSocket routes', () => {
 		await fixture?.remove();
 	});
 
-	test("a ws route opens through Vite's server, echoes, and reads what the hooks derived", async () => {
+	test("a ws route opens through Vite's server, echoes, and reads what the middlewares derived", async () => {
 		const { socket, next } = await open(base, '/api/echo', { 'x-user': 'Ada' });
 		try {
 			expect(await next()).toEqual({ hello: 'Ada' });
@@ -104,7 +104,7 @@ describe('react-router dev, WebSocket routes', () => {
 		}
 	});
 
-	test('an upgrade a hook refuses gets its status and body, and never becomes a socket', async () => {
+	test('an upgrade a middleware refuses gets its status and body, and never becomes a socket', async () => {
 		const refused = await handshake(base, '/api/private');
 		expect(refused).toStartWith('HTTP/1.1 401');
 		expect(refused).toContain('{"error":"unauthenticated"}');

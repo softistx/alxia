@@ -283,7 +283,7 @@ Every request is answered, so every request gets an entry: a 404 or a 405
 that matched no route, a 500 from a handler that threw, a 401 a guard
 declared after `logger()` sent on its own. `logger()` settles the rest of
 the chain, so the entry holds the response the client gets, whatever
-answered it: an `onError` reply, an `HttpError`'s status, a 500. The error
+answered it: a middleware's reply, an `HttpError`'s status, a 500. The error
 behind a 500 is not in the entry; the app prints it with `console.error`,
 and [a middleware](#in-a-middleware-that-catches-errors) can log it with
 the request's id.
@@ -405,10 +405,6 @@ level, both with the same `requestId`. A `try`/`catch` declared **before**
 error would be answered with, not the catcher's reply (see
 [Where it sits in the app](#where-it-sits-in-the-app)).
 
-The deprecated `onError` hook still works, and still reads `log` after the
-middleware, typed as possibly `undefined`: an error thrown before
-`logger()` ran has no `log` yet.
-
 ## Where it sits in the app
 
 `logger()` is a middleware. It gives the request its id, adds `log` and
@@ -425,7 +421,7 @@ runs on **every** request, so:
   go first, so they wrap everything, 404s included;
 - an error-handling middleware, a `try`/`catch` around `next()`, goes
   **after** `logger()`: `logger()` settles `next()` and logs the response the
-  error would be answered with (the route's `onError`, `HttpError` or 500),
+  error would be answered with (an `HttpError`'s status or a 500),
   then the error goes on, so a `try`/`catch` catches it wherever it stands,
   and is logged only when it stands after `logger()`;
 - a `use()` inside a `group` stays inside it: its routes, and a request no
@@ -499,6 +495,5 @@ expect(entries.at(-1)).toMatchObject({ path: '/ticks', outcome: 'aborted' });
 
 - [Troubleshooting](troubleshooting.md): a missing header, a missing `log`,
   an id that was not kept.
-- [`@alxia/core`'s hooks](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/hooks.md):
-  the order a request runs through the middlewares, `derive` and the
-  deprecated hooks.
+- [`@alxia/core`'s middlewares](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md):
+  the order a request runs through the middlewares, and `derive`.

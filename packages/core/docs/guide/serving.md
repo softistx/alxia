@@ -2,7 +2,9 @@
 
 This page covers running an app: `listen` and its options, `fetch` and
 `request` for tests and other servers, `websocket` for a `Bun.serve` of
-your own, reading the client's address, and stopping cleanly.
+your own, reading the client's address, and stopping cleanly. Probes and
+the graceful shutdown on `SIGTERM` have a page of their own:
+[Health and shutdown](health-and-shutdown.md).
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -11,8 +13,7 @@ const app = alxia().get('/', ({ reply }) => reply(200, 'hello'));
 
 const server = app.listen({ port: 3000 });
 console.log(`listening on ${server.url}`);
-
-process.on('SIGTERM', () => app.stop());
+// SIGTERM, SIGINT: the requests in flight finish, the onStop hooks run, the process exits
 ```
 
 ## `listen(options?)`
@@ -35,6 +36,11 @@ a `Bun.serve` given [`websocket`](#websocket).
 | `idleTimeout` | `number` | Bun's | seconds before an idle connection is closed |
 | `maxRequestBodySize` | `number` | Bun's | the largest body the server accepts, in bytes; a route's [`bodyLimit`](routes.md#body-size-bodylimit) caps its own below it |
 | `tls` | `Bun.TLSOptions` | none | serve HTTPS |
+| `shutdownTimeout` | `number` | `10000` | how long the requests in flight have to finish once shutdown starts, in milliseconds ([Health and shutdown](health-and-shutdown.md#graceful-shutdown)) |
+| `stopTimeout` | `number` | `5000` | how long the `onStop` hooks have, all of them, in milliseconds; past it the hook still running is named, the hooks after it are skipped, and the shutdown fails ([Health and shutdown](health-and-shutdown.md#graceful-shutdown)) |
+| `signals` | `NodeJS.Signals[] \| false` | `['SIGINT', 'SIGTERM']` | the signals that shut the app down gracefully, then exit the process — unless `exit` is `false` or the process has another listener of the signal; `false` installs no handler |
+| `exit` | `boolean` | `true` | whether alxia exits the process once a signal shut the app down; `false` leaves the exit to the host |
+| `onListen` | `(info: ListenInfo) => void` | none | told the URL, the routes and the route table once the server listens, in every mode, in place of the table printed in dev |
 
 ```ts
 app.listen({
@@ -45,7 +51,8 @@ app.listen({
 ```
 
 It returns Bun's `Server`, also readable as `app.server` until `stop`.
-Every `onStart` hook then runs with it ([Hooks](hooks.md#onstart-and-onstop)).
+Its signal handlers are in place before it returns; every `onStart` hook
+then runs with the server ([Hooks](hooks.md#onstart-and-onstop)).
 
 ## `fetch` and `request`
 
@@ -128,6 +135,7 @@ function alxia<const Prefix extends '' | RoutePath = ''>(options?: AlxiaOptions<
 | `prefix` | `` `/${string}` `` | `''` | prepended to every route ([Groups and plugins](groups-and-plugins.md#prefixes)) |
 | `validateResponses` | `boolean` | `true` | check and strip replies ([Replies](replies.md#validateresponses)) |
 | `ip` | function | the connection's | above |
+| `errors` | `'json' \| 'problem'` | `'json'` | the format of the errors alxia answers itself: `{ error: … }` bodies, or RFC 9457 problems ([Errors](errors.md)) |
 
 ## Stopping
 
@@ -135,9 +143,17 @@ function alxia<const Prefix extends '' | RoutePath = ''>(options?: AlxiaOptions<
 stop(closeActiveConnections?: boolean): Promise<void>
 ```
 
-Stops the server `listen` started — waiting for requests in flight unless
-`closeActiveConnections` is `true` — then awaits each `onStop` hook in
-turn.
+Shuts the server `listen` started down, gracefully — what `SIGTERM` and
+`SIGINT` run, without the exit: readiness turns 503, new connections are
+refused, open sockets close with 1001, the requests in flight finish
+within `shutdownTimeout`, then each `onStop` hook is awaited in turn.
+`closeActiveConnections` closes the requests in flight at once. Called
+again while it runs, or once it ran, `stop()` returns the same promise:
+the `onStop` hooks run once per `listen`. Called before `listen`, it runs
+the `onStop` hooks alone. One server at a time: `listen()` on an app that
+already listens throws `listen(): the app already listens on <url>; stop()
+it first` — stop it with `app.stop()`, not the Bun server's own `stop()`,
+which the app does not see.
 
 ```ts
 const app = alxia()
@@ -146,15 +162,12 @@ const app = alxia()
 	})
 	.get('/', ({ reply }) => reply(200));
 
-app.listen(3000);
-
-for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-	process.on(signal, async () => {
-		await app.stop();
-		process.exit(0);
-	});
-}
+app.listen(3000); // SIGTERM: the requests in flight, queue.flush(), exit 0
 ```
+
+In a test, `await app.stop()` after `listen({ port: 0 })` frees the port
+and runs the hooks; the order of each step, and a process that keeps its
+signals, are in [Health and shutdown](health-and-shutdown.md#graceful-shutdown).
 
 ## Introspection
 
@@ -172,3 +185,5 @@ for (const route of app.routes) console.log(route.method, route.path);
 
 - [Getting started](getting-started.md): a first app and its tests.
 - [Hooks](hooks.md#onstart-and-onstop): `onStart` and `onStop`.
+- [Health and shutdown](health-and-shutdown.md): `health()`, and what a
+  `SIGTERM` does.

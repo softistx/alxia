@@ -7,11 +7,32 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
+- **Two templates: `minimal` and `graphql`.** `minimal` is one file, one
+  dependency and a test, the template to try alxia with, and what the
+  prompt offers first. `graphql` is a GraphQL Yoga API served by
+  `@alxia/graphql`, schema first: `schema.graphql` is the contract, GraphQL
+  Code Generator types the resolvers (committed, checked by
+  `generate --check`), `viewer` is typed in every resolver, and
+  `noteAdded` is a subscription over server-sent events.
+- **The `api` template reads its environment with `defineEnv`.**
+  `src/env.ts`, from `@alxia/env`, checks `PORT` and `API_KEY` (a secret)
+  once, before the server listens; `src/context.ts` no longer exports
+  `apiKey`.
 - **The `api` project split across files.** `src/context.ts` holds the
   base the routes read and registers it with `@alxia/core`'s `Register`;
   `src/routes/todos.ts` binds the operations with `defineRoutes()`,
   reading that context with no import of the app; `src/app.ts` mounts
   them, `base.plugin(todoRoutes)`.
+- **Production-safe defaults.** Every `dev` script sets
+  `NODE_ENV=development`, the only mode alxia's dev helps run in; the
+  `api` project's `API_KEY` is required outside development and test; the
+  `api` and `graphql` projects mount `health()`, the `api` project answers
+  alxia's own errors as problems and serves `/docs` from the bundled
+  `openapi.yaml`; no template installs signal handlers of its own, as
+  `listen` drains and exits on `SIGINT` and `SIGTERM`.
+- **The `api` template's tests use a typed client.** `src/app.spec.ts` calls
+  the app through openapi-fetch over the generated `paths.ts`, with
+  `app.fetch` as its `fetch`: in process, typed by `openapi.yaml`.
 
 ## Next
 
@@ -37,6 +58,9 @@ Nothing scheduled yet.
   code would describe whatever the code does.
 - **A runtime dependency.** The prompts are Bun's `prompt()`, the registry
   is read with `fetch`, versions are compared with `Bun.semver`.
+- **A code-first GraphQL template (Pothos, Nexus).** The `graphql`
+  template is schema first, as the `api` one is spec first: the schema file
+  is the contract, and the resolvers are typed from it.
 
 ## Shipped
 

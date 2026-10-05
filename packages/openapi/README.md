@@ -86,6 +86,39 @@ The [spec-first guide](https://github.com/softistx/alxia/blob/develop/packages/o
 walks through every step: the document, alxia's own 400, middlewares,
 committing the generated files, and a client from the same document.
 
+## API docs
+
+`apiDocs` serves the document and an interactive page for it, with no
+configuration. The page loads from a CDN, with a pinned version and a
+subresource integrity hash, so nothing is added to your dependencies.
+
+```ts
+import { alxia } from '@alxia/core';
+import { apiDocs } from '@alxia/openapi';
+import spec from '../openapi.yaml'; // Bun imports YAML, and bundles it
+
+const app = alxia().plugin(apiDocs({ spec }));
+// GET /docs                  the page (Scalar)
+// GET /docs/openapi.yaml     the document
+// GET /docs/openapi.json     the same, as JSON
+```
+
+`spec` is the document as an object — imported, as above, so `bun build`
+bundles it and an image that holds `dist/` alone still serves it — or a
+path to a YAML or JSON file, read once at startup from the working
+directory. Options: `path` (`/docs`), `ui` (`'scalar'` or `'swagger'`),
+`title`, `servers` (replaces the document's) and `enabled`. The document is
+public unless you guard it: to serve it in development alone, read the
+environment at runtime, with `Bun.env` —
+`apiDocs({ spec, enabled: Bun.env.NODE_ENV === 'development' })` —
+never `process.env.NODE_ENV`, which `bun build` replaces with the mode of
+the build; to keep it behind a login, give the guard to `use('/docs', …)`
+before the plugin. The page sets its own `Content-Security-Policy`, which
+`secureHeaders` keeps, and `matchesSpec` leaves its routes out. The
+[guide](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/api-docs.md)
+has the options, the policy, a guarded page, and `apiDocs` beside a GraphQL
+endpoint.
+
 ## Every operation has a route
 
 ```ts
@@ -106,12 +139,13 @@ TypeError: implemented(): 2 operations have no route: GET /pets/:petId (getPet),
 import { matchesSpec } from '@alxia/openapi';
 
 matchesSpec(app, operations, {
-	exclude: (route) => route.path === '/health',
+	exclude: (route) => route.path === '/metrics',
 });
 ```
 
 `matchesSpec` throws as `implemented` does, and also lists each route no
-operation declares, `exclude` aside:
+operation declares, `exclude` aside. The routes of `apiDocs()` and the
+probes of `@alxia/core`'s `health()` are left out already:
 
 ```text
 TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
@@ -188,15 +222,18 @@ the document it served, the app's `/openapi.json`, as the starting point
 of your own (the generator reads JSON as well as YAML), generate the
 operations from it, and bind the routes with `app.route()`.
 
-**`@alxia/openapi-routes`** is this package under its former name: the same
-functions, options and messages.
+**`@alxia/openapi-routes`** was this package under its former name, and is
+removed from the repository. Move to `@alxia/openapi`: the same
+functions, options and messages, except that `exactly` and `ExactlyOptions`,
+its deprecated aliases of `matchesSpec` and `MatchesSpecOptions`, are gone
+at 0.5.
 
 ```sh
 bun remove @alxia/openapi-routes
 bun add -d @alxia/openapi
 ```
 
-```ts
+```ts no-check
 // before
 import { implemented, matchesSpec } from '@alxia/openapi-routes';
 // after
@@ -211,14 +248,18 @@ The core's side of the move is in its
 | export | |
 | --- | --- |
 | `implemented(app, operations, options?)`, `ImplementedOptions` | throws a `TypeError` listing each operation with no route, or one with the core's reason for an operation path no route may be declared at. `prefix` |
-| `matchesSpec(app, operations, options?)`, `MatchesSpecOptions` | the same, and each route no operation declares. `prefix`, `exclude` |
-| `exactly`, `ExactlyOptions` | deprecated: `matchesSpec` and `MatchesSpecOptions` under their former names, with messages that start `exactly():` |
+| `matchesSpec(app, operations, options?)`, `MatchesSpecOptions` | the same, and each route no operation declares — `apiDocs()`'s and `@alxia/core`'s `health()` probes left out. `prefix`, `exclude` |
+| `apiDocs(options)`, `ApiDocsOptions`, `DocsUi`, `DocsServer` | a plugin: the page at `path`, the document at `path/openapi.yaml` and `.json`. `spec`, `path`, `ui`, `title`, `servers`, `enabled` |
+| `isApiDocsRoute(route)` | whether `apiDocs` declared a route, given any `{ handler }` (`Pick<RouteDefinition, 'handler'>`, as core's `isHealthRoute`); `matchesSpec` leaves them out already |
 | `Operations` | what both take: an object of core's `RouteOperation`, or a list of them |
 
 ## Documentation
 
 - [Documentation index](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/README.md): every page, and when to read it.
 - [Spec first](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/spec-first.md): the whole workflow, from `openapi.yaml` to the generated operations, the routes, the check and a client.
+- [Testing with the generated client](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/testing.md): openapi-fetch over `app.fetch`, in process, typed by the spec.
+- [API docs](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/api-docs.md): `apiDocs`, its options, the Content-Security-Policy, and beside a GraphQL endpoint.
 - [The checks](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md): `implemented` and `matchesSpec`, how a route is matched, the prefix, and the routes to exclude.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/troubleshooting.md): each message of the checks and the generator, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/roadmap.md): what is coming, and what is not planned.
+- [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [A spec-first CRUD API](https://github.com/softistx/alxia/blob/develop/docs/recipes/spec-first-crud.md), [Test an alxia app](https://github.com/softistx/alxia/blob/develop/docs/recipes/testing.md), [Answer errors consistently](https://github.com/softistx/alxia/blob/develop/docs/recipes/errors.md).

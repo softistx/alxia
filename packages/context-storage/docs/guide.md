@@ -37,15 +37,13 @@ context of the request that called it, and never another's.
 function contextStorage<App = RegisteredBase>(...uncalled: readonly never[]): ContextStorageMiddleware<App>;
 
 // A middleware: it requires `App`'s context of the app that mounts it.
-// `ContextStoragePlugin<App>`, its name in 0.3, is a deprecated alias.
 type ContextStorageMiddleware<App> = Middleware<
 	RequiresOf<StoredContext<App>, 'context'>,
 	Promise<Response>
-> &
-	MiddlewareMark & {
-		context(): StoredContext<App>;
-		tryContext(): StoredContext<App> | undefined;
-	};
+> & {
+	context(): StoredContext<App>;
+	tryContext(): StoredContext<App> | undefined;
+};
 
 // What `context()` returns: `App`'s context, or `BaseContext` when `App` is no app
 type StoredContext<App> = [ContextOf<App>] extends [never] ? BaseContext : Mounted<ContextOf<App>>;
@@ -64,11 +62,11 @@ class ContextStorageError extends Error {
 type ContextStorageErrorCode = 'OUTSIDE_REQUEST' | 'NOT_ROUTED';
 ```
 
-`contextStorage()` returns a middleware: pass it to `app.use`, called — `use(contextStorage)` fails `tsc` with `TS2769` and throws a `TypeError` at startup ([troubleshooting](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)). It adds
+`contextStorage()` returns a middleware: pass it to `app.use`, called — `use(contextStorage)` fails `tsc` with `TS2345`, and throws where it is declared ([troubleshooting](troubleshooting.md#use-argument-1-looks-like-a-factory-contextstorage-call-it-usecontextstorage)). It adds
 nothing to the app's type, but it requires `StoredContext<App>` of the app
 that mounts it: `app.use` on an app that does not give that context is a compile
 error. `BaseContext`, `RequestContext`, `ContextOf`, `RegisteredBase`,
-`Middleware`, `MiddlewareMark`, `RequiresOf` and `Mounted` come from `@alxia/core`.
+`Middleware`, `RequiresOf` and `Mounted` come from `@alxia/core`.
 
 | Export | Returns | Where it would have nothing |
 | --- | --- | --- |
@@ -101,14 +99,12 @@ relative to it:
 | the handler of a route the middleware ran on, and everything it calls | the request | the same | the context the handler receives, with what the middlewares added | the same |
 | a middleware that catches an error, after it | the request, with `route` and `error` | the same | the same context | the same |
 | a route declared **before** it, or outside the `group` it is used in | throws `OUTSIDE_REQUEST` | `undefined` | throws `OUTSIDE_REQUEST` | `undefined` |
-| the deprecated `onRequest` and `onResponse` hooks, which run outside the chain | throws `OUTSIDE_REQUEST` | `undefined` | throws `OUTSIDE_REQUEST` | `undefined` |
-| the deprecated `onError` and `onRefusal` hooks, which answer at the route boundary | the request, with `route` and `error` | the same | the same context | the same |
 | a socket's handlers (`open`, `message`, `close`) | throws `OUTSIDE_REQUEST` | `undefined` | throws `OUTSIDE_REQUEST` | `undefined` |
 | startup, a job, a timer started at startup | throws `OUTSIDE_REQUEST` | `undefined` | throws `OUTSIDE_REQUEST` | `undefined` |
 
 `contextStorage()` settles `next()`: an error the rest of the chain throws
-is answered inside the store, as the route would answer it, so a hook or
-a middleware that reads the context while answering an error still finds it.
+is answered inside the store, as the route would answer it, so a
+middleware that reads the context while answering an error still finds it.
 
 The two errors carry these messages:
 
@@ -323,7 +319,7 @@ answers needs the context; put it after the observers (`logger`,
 
 `contextStorage()` is a middleware, not an app: declare routes on the app,
 and pass `contextStorage()` to `app.use` called — the uncalled form is
-[refused](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage).
+[refused](troubleshooting.md#use-argument-1-looks-like-a-factory-contextstorage-call-it-usecontextstorage).
 
 ## What `AsyncLocalStorage` carries
 

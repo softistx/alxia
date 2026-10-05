@@ -10,7 +10,7 @@ number on it. Every release, with each change it made, is in
 - **CORS as a middleware.** `app.use(cors(options))`, declared first,
   answers a preflight to any path before routing's `404` or `405`, and adds
   the headers to every other response, a `404`'s and an error's included;
-  `app.plugin(cors(options))` keeps working as a deprecated alias.
+  `app.plugin(cors(options))`, its deprecated alias, was removed in 0.5.
 
 ## Next
 
@@ -30,7 +30,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **CORS as one plugin.** `alxia().plugin(cors(options))` sets the policy for
+- **CORS as one plugin**, the 0.1 form. `cors(options)` sets the policy for
   the whole app, every route and every error response included, and adds
   nothing to the app's type.
 - **Preflights answered before routing.** An `OPTIONS` with

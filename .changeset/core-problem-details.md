@@ -1,0 +1,5 @@
+---
+"@alxia/core": minor
+---
+
+Problem details, opt in: `alxia({ errors: 'problem' })` answers what alxia answers on its own — an `HttpError` no middleware catches, a refused request's 400 (`issues` an extension), a 413 (`limit`), a 500, the router's 404, 405 (with `Allow`) and 426 — as RFC 9457 problems sent as `application/problem+json`, each with `type`, `title`, `status`, `detail` and `instance`. The default, `errors: 'json'`, keeps today's bodies. `HttpError` takes an options object as its third argument — `type`, `title`, `detail`, `extensions`, `message`, `cause` — a string still being its message. `errorFormat(ctx)` and `problemOf(ctx, init)` answer a middleware's own error in the format of the app serving the request; `Problem`, `ValidationProblem`, `ContentTooLargeProblem` and `ProblemInit` type them. The errors guide gives the `Problem` schema for the OpenAPI document, and the `validationErrors: false` setting a client generated with `@nxgt/openapi-codegen` needs under `errors: 'problem'`.

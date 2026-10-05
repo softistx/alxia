@@ -2,7 +2,6 @@ import { describe, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
 import type { Reply } from '../reply/reply';
 import { alxia } from './alxia';
-import { defineHook, defineWrap } from './define-hook';
 import { defineMiddleware } from './define-middleware';
 import { responds, validate } from './validate';
 
@@ -88,7 +87,9 @@ describe('validate and responds', () => {
 			alxia().post('/', { body: Post }, auth, ({ reply }) => reply(200, 'x'));
 		void declare;
 	});
+});
 
+describe('validate and responds among the options and middlewares', () => {
 	test('a ninth middleware is refused after options, and on a socket', () => {
 		const add = defineMiddleware((_ctx, next) => next({ x: 1 }));
 		const declare = () => {
@@ -103,9 +104,9 @@ describe('validate and responds', () => {
 				add,
 				add,
 				add,
+				// @ts-expect-error a route takes at most 8 middlewares, said on the ninth
 				add,
-				// @ts-expect-error a route takes at most 8 middlewares
-				({ reply }) => reply(200, 'x'),
+				() => new Response('x'),
 			);
 			// @ts-expect-error a socket route takes at most 8 middlewares
 			alxia().ws('/', add, add, add, add, add, add, add, add, add, {
@@ -140,21 +141,18 @@ describe('validate and responds', () => {
 	});
 });
 
-describe('the forms of 0.3, deprecated, still compile', () => {
-	test('a list of hooks, a schema, defineHook and defineWrap', () => {
-		const canSee = defineHook<{ user: User }>()(({ user, reply }) =>
-			user.id === '' ? reply(403, { error: 'forbidden' as const }) : undefined,
-		);
-		const exclusive = defineWrap(async (_ctx, next) => next());
-		alxia()
-			.derive(() => ({ user: { id: 'u' } as User }))
-			.post('/a', { body: Post }, ({ body, reply }) => reply(200, body.title))
-			.post('/b', [canSee, exclusive], { body: Post }, ({ body, reply }) =>
-				reply(200, body.title),
-			)
-			.get('/c', [canSee], ({ user, reply }) => reply(200, user.id))
-			.ws('/d', { message: Post }, { message: (_socket, post) => void post })
-			.ws('/e', [canSee], {}, { message: (socket) => void socket.data.user });
+describe('the forms of 0.3, removed', () => {
+	test('a list of middlewares and a schema in the options are compile errors', () => {
+		// Never called: only compiled; each throws where it is declared.
+		const _removed = () => {
+			// @ts-expect-error: a schema is given by validate(…), not the options
+			alxia().post('/a', { body: Post }, ({ reply }) => reply(200, 'a'));
+			// @ts-expect-error: the middlewares follow the path, not in a list
+			alxia().get('/b', [auth], ({ reply }) => reply(200, 'b'));
+			// @ts-expect-error: a socket's schema is given by validate(…) too
+			alxia().ws('/c', { query: Post }, { message: () => {} });
+		};
+		expectTypeOf(_removed).toBeFunction();
 	});
 });
 

@@ -4,8 +4,6 @@ Each entry is headed by the text you see: a `TypeError` one of the checks
 threw, a line `nxgt-openapi generate` printed, or an error from `tsc`. The counts, methods and paths in a message
 are the app's own, written `…` below. A check that passes when you expected
 it to fail prints nothing; those are under [Traps](#traps), by symptom.
-A message that starts `exactly():` comes from `exactly`, the deprecated
-name of `matchesSpec`: read the same entry.
 
 **Thrown**
 
@@ -14,11 +12,19 @@ name of `matchesSpec`: read the same entry.
 - [`TypeError: implemented(): the prefix "…" must start with "/" and not end with one`](#typeerror-implemented-the-prefix--must-start-with--and-not-end-with-one)
 - [`TypeError: implemented(): "…": ":…" is not a parameter name`](#typeerror-implemented---is-not-a-parameter-name)
 
+**API docs**
+
+- [`TypeError: apiDocs(): cannot read the spec "…"`](#typeerror-apidocs-cannot-read-the-spec-)
+- [`TypeError: apiDocs(): the path "…" must start with "/" and not end with one`](#typeerror-apidocs-the-path--must-start-with--and-not-end-with-one)
+- [The page is blank, and the console reports a blocked script](#the-page-is-blank-and-the-console-reports-a-blocked-script)
+- [`matchesSpec(): … routes have no operation: GET /docs, …`](#matchesspec--routes-have-no-operation-get-docs-)
+
 **Generator** (`@nxgt/openapi-codegen` 0.7.0)
 
 - [`alxia.ts leaves it out. … [ignored]`](#alxiats-leaves-it-out--ignored)
 - [A cookie parameter is missing from `types.ts` and the client files](#a-cookie-parameter-is-missing-from-typests-and-the-client-files)
 - [A client refuses alxia's 400, or types it `{ status, message, timestamp, issues }`](#a-client-refuses-alxias-400-or-types-it--status-message-timestamp-issues-)
+- [A test through the client sends a request to a real address](#a-test-through-the-client-sends-a-request-to-a-real-address)
 
 **Types**
 
@@ -38,7 +44,7 @@ name of `matchesSpec`: read the same entry.
 ### `TypeError: implemented(): … operations have no route: …`
 
 Also as `1 operation has no route: …`, and as the first half of a
-`matchesSpec()` message, or an `exactly()` one from the deprecated `exactly`.
+`matchesSpec()` message.
 
 ```text
 TypeError: implemented(): 2 operations have no route: GET /pets/:petId (getPet), QUERY /employees (searchEmployees)
@@ -73,7 +79,7 @@ operation is listed, see
 ### `TypeError: matchesSpec(): … routes have no operation: …`
 
 Also as `1 route has no operation: …`, after a `;` when operations are
-missing too, and as `exactly(): …` from the deprecated `exactly`:
+missing too:
 
 ```text
 TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
@@ -85,7 +91,9 @@ named by method and full path.
 **Why:** the route is not in the spec — an admin route, a health check, the
 pages of a React Router app, an `app.static('/assets', …)` mount
 (`GET /assets/*`) — or the spec's operation was renamed or removed and the
-route was not.
+route was not. The probes of `@alxia/core`'s `health()` and the routes
+of `apiDocs()` are never listed: `matchesSpec` leaves them out by itself,
+so a `/health` here is a route written by hand.
 
 **Fix:** add the operation to the document and generate again, remove the
 route, or leave it out on purpose with `exclude`:
@@ -101,7 +109,7 @@ the check you want.
 
 ### `TypeError: implemented(): the prefix "…" must start with "/" and not end with one`
 
-Also as `matchesSpec(): the prefix "…" …`, and `exactly(): the prefix "…" …` from the deprecated `exactly`.
+Also as `matchesSpec(): the prefix "…" …`.
 
 ```text
 TypeError: implemented(): the prefix "/api/" must start with "/" and not end with one
@@ -120,7 +128,7 @@ reported missing.
 
 ### `TypeError: implemented(): "…": ":…" is not a parameter name`
 
-Also as `matchesSpec(): …` and `exactly(): …`, and with any other
+Also as `matchesSpec(): …`, and with any other
 message the core throws for a route path:
 `The route path "…" must start with "/"`, `"…": "*" may only end a path`,
 `"…" declares ":…" twice`, `"…": ":" may only start a segment, as a
@@ -150,6 +158,74 @@ the path as the core's entry for it says: a `:time` parameter for
 ([`":" may only start a segment`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#--may-only-start-a-segment-as-a-parameter)),
 `/caf%C3%A9` for `/café`
 ([`is not encoded as a request's URL carries it`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#-is-not-encoded-as-a-requests-url-carries-it-declare-)).
+
+## API docs
+
+### `TypeError: apiDocs(): cannot read the spec "…"`
+
+```text
+TypeError: apiDocs(): cannot read the spec "openapi.yaml" (ENOENT), looked up from the working directory /srv/app
+```
+
+**When:** the app starts, or `apiDocs` is called, and `spec` is a path that
+is not a readable file.
+
+**Why:** a relative path is looked up from the working directory of the
+process, not from the file that calls `apiDocs`: `bun run src/server.ts`
+from another folder, or a container whose image holds `dist/` alone, does
+not see `openapi.yaml`.
+
+**Fix:** import the document and give the object: `bun build` bundles it,
+so it is there wherever the app runs. Or give a path that holds there:
+
+```ts
+import spec from '../openapi.yaml'; // bundled with the app
+apiDocs({ spec });
+// or, from this file's folder:
+apiDocs({ spec: new URL('../openapi.yaml', import.meta.url).pathname });
+```
+
+The same error says `is not an OpenAPI document` for a file with no
+`openapi` version, and `neither valid YAML nor valid JSON` for one that does
+not parse. With `enabled: false` nothing is read.
+
+### `TypeError: apiDocs(): the path "…" must start with "/" and not end with one`
+
+Also `apiDocs(): ui "…" is not "scalar" or "swagger"`.
+
+**When:** `path` is `docs` or `/docs/`, or `ui` is another name.
+
+**Fix:** `apiDocs({ spec, path: '/docs', ui: 'scalar' })`.
+
+### The page is blank, and the console reports a blocked script
+
+```text
+Refused to load the script 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@…' because it violates the following Content Security Policy directive: "script-src 'self'"
+```
+
+**Symptom:** `/docs` answers 200 and the page stays empty.
+
+**Why:** the response carries a policy that is not the page's. The page
+sets its own `Content-Security-Policy`, which `secureHeaders` keeps, so
+this is a policy set by a proxy or a CDN in front of the app, or by a
+middleware that replaces the header after the page set it.
+
+**Fix:** let the policy of the page through: `curl -I /docs` should show
+`script-src https://cdn.jsdelivr.net 'nonce-…'`. If it must be your own,
+allow `https://cdn.jsdelivr.net` for `script-src` and `style-src`,
+`'unsafe-inline'` for `style-src`, and `'self'` for `connect-src`.
+
+### `matchesSpec(): … routes have no operation: GET /docs, …`
+
+**When:** the message lists the docs routes.
+
+**Why:** `matchesSpec` leaves out the routes `apiDocs` declared, by their
+handlers. A route declared by hand at `/docs`, or by a copy of
+`@alxia/openapi` the check does not share (two versions installed), is not
+recognised.
+
+**Fix:** one version of `@alxia/openapi` (`bun why @alxia/openapi`), or
+`matchesSpec(app, operations, { exclude: (r) => r.path.startsWith('/docs') })`.
 
 ## Generator
 
@@ -232,6 +308,27 @@ export default defineConfig({
 	validationErrors: false,
 });
 ```
+
+### A test through the client sends a request to a real address
+
+**Symptom:** a test using `createClient<paths>({ baseUrl })` fails with
+`ConnectionRefused` or `Unable to connect`, or reaches a server that is
+running.
+
+**Why:** no `fetch` was given, so openapi-fetch uses the global one and sends
+the request over the network. The app is called in process only when the
+client's `fetch` is `app.fetch`.
+
+**Fix:** pass it, and `baseUrl` stays a name nothing answers to:
+
+```ts
+const api = createClient<paths>({
+  baseUrl: 'http://alxia.test',
+  fetch: (request) => app.fetch(request),
+});
+```
+
+See [Testing with the generated client](guide/testing.md).
 
 ## Types
 

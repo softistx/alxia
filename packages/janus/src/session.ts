@@ -2,8 +2,9 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
+	markFactory,
 	type Next,
+	type Problem,
 	type Reply,
 	settle,
 	withHeaders,
@@ -11,6 +12,7 @@ import {
 import type { Session } from '@nxgt/janus';
 import { type DeviceCookieOptions, deviceOf } from './device';
 import { authenticateOnce, type Found } from './lookup';
+import { refused } from './refused';
 import { sendSession, signOut } from './send';
 import type { Auth, RequestAuth, UserOfAuth } from './types';
 
@@ -33,6 +35,9 @@ export interface UnauthenticatedBody {
 	readonly error: 'unauthenticated';
 }
 
+/** The 401 a required session answers under `alxia({ errors: 'problem' })`. */
+export type UnauthenticatedProblem = Problem<401>;
+
 type UserOf<A, T> = Extract<UserOfAuth<A>, { readonly type: T }>;
 
 /** What a session gives the routes after it. */
@@ -46,7 +51,7 @@ type Given<User, S> = {
 export type SessionMiddleware<
 	Added extends object,
 	Refused = never,
-> = Middleware<Empty, Promise<Refused | Next<Added>>> & MiddlewareMark;
+> = Middleware<Empty, Promise<Refused | Next<Added>>>;
 
 /**
  * Who a request belongs to, as a middleware: `auth.authenticate(request)`,
@@ -76,7 +81,7 @@ export function session<
 	options: SessionOptions<T> & { readonly required: true },
 ): SessionMiddleware<
 	Given<UserOf<A, T>, Session>,
-	Reply<401, UnauthenticatedBody>
+	Reply<401, UnauthenticatedBody | UnauthenticatedProblem>
 >;
 export function session<
 	A extends Auth<{ readonly type: string }>,
@@ -93,18 +98,18 @@ export function session<
 	options?: SessionOptions<T>,
 ): SessionMiddleware<
 	Given<UserOf<A, T> | null, Session | null>,
-	Reply<401, UnauthenticatedBody>
+	Reply<401, UnauthenticatedBody | UnauthenticatedProblem>
 >;
 export function session(
 	auth: Auth<{ readonly type: string }>,
 	options: SessionOptions<string> = {},
 ): unknown {
 	const unauthenticated: UnauthenticatedBody = { error: 'unauthenticated' };
-	return defineMiddleware(async (ctx, next) => {
-		const { request, reply } = ctx;
+	return defineMiddleware(async function session(ctx, next) {
+		const { request } = ctx;
 		const found = await authenticateOnce(auth, request, options.type);
 		if (found === null && options.required === true) {
-			return reply(401, unauthenticated);
+			return refused(ctx, 401, unauthenticated, 'The request has no session');
 		}
 		const bound: RequestAuth = {
 			device: deviceOf(ctx, options.device),
@@ -155,3 +160,5 @@ function renewed<R extends Response>(
 		),
 	) as R;
 }
+
+markFactory(session);

@@ -21,10 +21,6 @@ describe('the stored templates', () => {
 			config: await read(name, '_biome.json'),
 		});
 		const api = await stored('api');
-		const web = await stored('react-router');
-		for (const { manifest } of [api, web]) {
-			expect(manifest.devDependencies['@biomejs/biome']).toBe(workspace);
-		}
 		const biomeScripts = (scripts: Record<string, string>) =>
 			Object.fromEntries(
 				Object.entries(scripts).filter(([key]) =>
@@ -37,21 +33,33 @@ describe('the stored templates', () => {
 			check: 'biome check --write',
 			'check:ci': 'biome ci',
 		});
-		expect(biomeScripts(web.manifest.scripts)).toEqual(
-			biomeScripts(api.manifest.scripts),
-		);
-		// One style for every new project, whichever template made it.
-		for (const key of ['$schema', 'vcs', 'formatter', 'javascript', 'assist']) {
-			expect({ key, value: web.config[key] }).toEqual({
-				key,
-				value: api.config[key],
-			});
+		const settings = await Bun.file(
+			join(TEMPLATES, 'api/.vscode/settings.json'),
+		).text();
+		for (const name of NAMES) {
+			const { manifest, config } = await stored(name);
+			expect(manifest.devDependencies['@biomejs/biome']).toBe(workspace);
+			expect(biomeScripts(manifest.scripts)).toEqual(
+				biomeScripts(api.manifest.scripts),
+			);
+			// One style for every new project, whichever template made it.
+			for (const key of [
+				'$schema',
+				'vcs',
+				'formatter',
+				'javascript',
+				'assist',
+			]) {
+				expect({ name, key, value: config[key] }).toEqual({
+					name,
+					key,
+					value: api.config[key],
+				});
+			}
+			expect(
+				await Bun.file(join(TEMPLATES, name, '.vscode/settings.json')).text(),
+			).toBe(settings);
 		}
-		expect(
-			await Bun.file(
-				join(TEMPLATES, 'react-router/.vscode/settings.json'),
-			).text(),
-		).toBe(await Bun.file(join(TEMPLATES, 'api/.vscode/settings.json')).text());
 	});
 
 	test('are the ones the command offers', async () => {

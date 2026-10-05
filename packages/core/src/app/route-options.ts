@@ -10,10 +10,12 @@ import type {
 	AppWithRoute,
 	OptionsOnly,
 	RouteHandler,
-	RouteMiddleware,
 	RouteOptions,
+	RouteReads,
 	RouteResult,
 } from './route-forms';
+import type { TooMany } from './too-many';
+import type { FunctionLike } from './types';
 
 declare module './forms' {
 	interface Forms<
@@ -21,17 +23,9 @@ declare module './forms' {
 		A,
 		B,
 		Results extends readonly unknown[],
-		Result,
 		Handled,
 	> {
-		readonly routeOptions: RouteOptionsForm<
-			App,
-			A,
-			B,
-			Results,
-			Result,
-			Handled
-		>;
+		readonly routeOptions: RouteOptionsForm<App, A, B, Results, Handled>;
 	}
 }
 
@@ -41,17 +35,17 @@ export interface RouteOptionsForm<
 	A,
 	B,
 	Results extends readonly unknown[],
-	Result,
 	Handled,
 > extends FormSlots {
 	readonly aBound: RoutePath;
-	readonly bBound: RouteOptions;
+	readonly bBound: RouteOptions | FunctionLike;
+	readonly excludes: 'function';
 	readonly handledBound: RouteResult<Results>;
 	readonly head: [
 		path: PathAt<App['prefix'], A & string>,
 		options: OptionsOnly<B>,
 	];
-	readonly step: RouteMiddleware<App, A & string, Results, Result>;
+	readonly reads: RouteReads<App, A & string, Results>;
 	readonly tail: [handler: RouteHandler<App, A & string, Results, Handled>];
 	readonly out: AppWithRoute<App>;
 }
@@ -68,4 +62,5 @@ export interface RouteOptionsForm<
  */
 export interface OptionsForms<App extends AppTypes>
 	extends Bare<'routeOptions', App>,
-		Ladder<'routeOptions', App> {}
+		Ladder<'routeOptions', App>,
+		TooMany<'routeOptions', App> {}

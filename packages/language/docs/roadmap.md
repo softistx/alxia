@@ -7,7 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **A middleware, not a plugin (0.4).** `app.use(language({ ... }))` runs on every request, a 404 included, which then says `Content-Language` and `Vary` too. `app.plugin(language(...))` still works, deprecated.
+- **A middleware, not a plugin (0.4).** `app.use(language({ ... }))` runs on every request, a 404 included, which then says `Content-Language` and `Vary` too. `app.plugin(language(...))`, the deprecated plugin form, was removed with alxia 0.5: give it to `use`.
 
 ## Next
 

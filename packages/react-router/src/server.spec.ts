@@ -32,11 +32,11 @@ describe('createServer', () => {
 			headers: { ...browser, 'x-user': 'Ada' },
 		});
 		expect(response.status).toBe(200);
-		// No hook derives `user`.
+		// Nothing derives `user`.
 		expect(text(await response.text())).toContain('<h1>Hello anonymous</h1>');
 	});
 
-	test("configure's hooks and routes run before the pages, its context read by the loaders", async () => {
+	test("configure's middlewares and routes run before the pages, its context read by the loaders", async () => {
 		const app = createServer({ configure }).create({ build, client: CLIENT });
 		const page = await app.request('/', {
 			headers: { ...browser, 'x-user': 'Ada' },
@@ -46,7 +46,7 @@ describe('createServer', () => {
 		expect(await health.json()).toEqual({ ok: true });
 	});
 
-	test("the client's files come before configure's hooks, and after beforeAll's", async () => {
+	test("the client's files come before configure's middlewares, and after beforeAll's", async () => {
 		const asset = (app: { request(path: string): Promise<Response> }) =>
 			app.request('/robots.txt');
 		const configured = createServer({
@@ -158,7 +158,7 @@ describe('the types', () => {
 			});
 			createServer({
 				configure,
-				// @ts-expect-error: no hook of configure derives `tenant`
+				// @ts-expect-error: nothing in configure derives `tenant`
 				getLoadContext: ({ tenant }) => void tenant,
 			});
 			createServer({

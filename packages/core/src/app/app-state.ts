@@ -1,6 +1,6 @@
 /**
  * What an app holds — its prefix, its runtime, its routes and socket routes,
- * the route hooks in force — and how a route or a socket route enters it.
+ * the middlewares in force — and how a route or a socket route enters it.
  */
 import type { RouteDefinition, Runtime, SocketDefinition } from './definition';
 import { refusePage } from './pages';
@@ -10,11 +10,11 @@ import type { AlxiaOptions } from './signatures';
 
 export interface AppState {
 	readonly prefix: string;
-	/** The routes, the global hooks and the options a request is served with. */
+	/** The routes, the lifecycle hooks and the options a request is served with. */
 	runtime: Runtime;
 	readonly routes: RouteDefinition[];
 	readonly sockets: SocketDefinition[];
-	/** The route hooks in force for the routes declared next. */
+	/** The middlewares in force for the routes declared next. */
 	scope: Scope;
 	/** Whether `late-use.ts` warned already: once per app. */
 	warnedLate?: boolean;
