@@ -35,7 +35,9 @@ export async function main(
 		// A query, so a second run executes the module again.
 		await import(`${resolve(cwd, file)}?alxia-env=${++runs}`);
 	} catch (error) {
-		io.err(`alxia-env: ${file} failed: ${(error as Error).message}`);
+		io.err(
+			`alxia-env: ${file} failed: ${error instanceof Error ? error.message : String(error)}`,
+		);
 		return 1;
 	} finally {
 		stop();

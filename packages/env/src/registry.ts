@@ -5,8 +5,17 @@ export interface Described {
 	readonly secret: ReadonlySet<string>;
 }
 
-/** The shape behind each `env`, for `envExample` to read. */
-export const described = new WeakMap<object, Described>();
+/**
+ * The shape behind each `env`, for `envExample` to read. On `globalThis`
+ * under a `Symbol.for` key, so an app's copy of this package and the bin's
+ * share it.
+ */
+const DESCRIBED = Symbol.for('alxia.env.described');
+const scope = globalThis as { [key: symbol]: unknown };
+export const described = (scope[DESCRIBED] ??= new WeakMap()) as WeakMap<
+	object,
+	Described
+>;
 
 const COLLECT: unique symbol = Symbol.for('alxia.env.collect') as never;
 
