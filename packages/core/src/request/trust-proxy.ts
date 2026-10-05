@@ -190,13 +190,12 @@ export function proxyReader(
 	return (request, server) => {
 		const socket = server?.requestIP(request)?.address ?? undefined;
 		const peer = socket === undefined ? undefined : parseIp(socket);
-		const own =
-			socket === undefined || !canonical
-				? socket
-				: peer === undefined
-					? canonicalIp(socket)
-					: canonicalOf(peer);
+		const ownOf = () => {
+			if (socket === undefined || !canonical) return socket;
+			return peer === undefined ? canonicalIp(socket) : canonicalOf(peer);
+		};
 		if (!peerTrusted(trust, peer)) {
+			const own = ownOf();
 			const refusal = gate(request, peer, own);
 			if (refusal === undefined)
 				return { ip: own, origin: NONE, refused: false };
@@ -204,7 +203,7 @@ export function proxyReader(
 		}
 		const { at, origin } = read(request.headers, trust, withOrigin);
 		return {
-			ip: at === undefined ? own : shown(at),
+			ip: at === undefined ? ownOf() : shown(at),
 			origin,
 			refused: false,
 		};

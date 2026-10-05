@@ -6,9 +6,8 @@
 
 /** IPv4 as dotted decimal, no leading zeros: `192.0.2.1`. */
 export function ipv4Text(value: bigint): string {
-	return [24n, 16n, 8n, 0n]
-		.map((shift) => ((value >> shift) & 0xffn).toString())
-		.join('.');
+	const n = Number(value);
+	return `${n >>> 24}.${(n >>> 16) & 0xff}.${(n >>> 8) & 0xff}.${n & 0xff}`;
 }
 
 /** The longest run of two or more zero groups, the first of equal ones: what `::` stands for. */

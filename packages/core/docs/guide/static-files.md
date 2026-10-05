@@ -206,6 +206,8 @@ under `development`. Because Bun serves it itself:
 - the app's middlewares do **not** run around it, nor do `trustProxy`'s
   refusals: under `untrusted: 'refuse-all'`, which promises to refuse every
   connection but the proxies', `listen` throws when the app has a page
+  (it reads the function `trustProxy` returned: a `proxy` that wraps it
+  hides the mark, and the check with it)
   ([Serving](serving.md#only-the-proxies-refuse-all));
 - it is not in `app.routes`, so `matchesSpec` does not see it, and a client
   generated from the document does not call it.
