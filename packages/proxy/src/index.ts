@@ -9,6 +9,7 @@ export type {
 export { type ProxyMiddleware, type ProxyMount, proxy } from './proxy';
 export {
 	BAD_GATEWAY_CLOSE,
+	OVERLOADED_CLOSE,
 	type SocketProxy,
 	type SocketProxyOptions,
 } from './socket';

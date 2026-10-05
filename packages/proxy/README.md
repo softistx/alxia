@@ -77,6 +77,19 @@ reached answers the upgrade with a 502, or a 504 past `timeout`, in the
 app's error format: no socket opens. Frames pass as they came, and a close
 on one side closes the other with its code.
 
+A client that stops reading pauses the upstream's reads until it catches
+up, so the upstream feels the backpressure. Past `maxBuffered` bytes queued
+for either side (1 MiB by default), both close with `1013` rather than
+buffer more:
+
+```ts
+import { alxia } from '@alxia/core';
+import { proxy } from '@alxia/proxy';
+
+const app = alxia().ws('/live', proxy.ws('ws://chat.internal:8080', { maxBuffered: 4 * 1024 * 1024 }));
+// a reader more than 4 MiB behind: both sides closed with 1013 (OVERLOADED_CLOSE)
+```
+
 ## Change the headers
 
 ```ts
@@ -126,6 +139,7 @@ app whose context does not give it.
 | `headers` | none | `{ request?, response? }`: a record, or a function `(headers, ctx) => void` |
 | `timeout` | `30_000` | milliseconds of silence allowed until the upstream's response headers, counted again from each body chunk sent; past it, a 504. For `proxy.ws`, the milliseconds the upstream socket has to open |
 | `bodyLimit` | none | bytes of request body; past it, a 413 |
+| `maxBuffered` | `1_048_576` | `proxy.ws` only: bytes queued for one side, per direction; a frame for a side past it closes both with `1013`. Keep it above your largest frame |
 
 ## API
 
@@ -134,6 +148,7 @@ app whose context does not give it.
 | `proxy(target, options?)` | the middleware: forwards what it runs on to `target`; given to `use(path?, …)`, a route, or `all(path, …)` as the route's end |
 | `proxy.mount(prefix, target, options?)` | a plugin forwarding everything under `prefix`, rebased |
 | `proxy.ws(target, options?)` | the handlers of a `ws()` route relayed to an upstream socket, opened before the client's `101` |
+| `OVERLOADED_CLOSE` | `1013`, try again later: the close code of both sides when one is more than `maxBuffered` bytes behind |
 | `BAD_GATEWAY_CLOSE` | deprecated: `1014`, the close code an unreachable upstream socket used to get; it is now a 502 over HTTP |
 | `ProxyOptions<Ctx>`, `SocketProxyOptions<Ctx>` | the options, and those of `proxy.ws` |
 | `ProxyHeaders<Ctx>`, `HeaderEdit<Ctx>`, `HeaderValue<Ctx>`, `ProxyContext<Ctx>` | the `headers` option, and what its callbacks read |

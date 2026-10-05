@@ -164,7 +164,8 @@ test('/health is answered by the gateway itself', async () => {
 - **WebSockets.** `app.ws('/live/*', proxy.ws('ws://chat.internal:8080'))`
   relays a socket's frames and close codes, behind the route's middlewares;
   the upstream opens first, so the `101` carries its subprotocol and a dead
-  upstream is a 502.
+  upstream is a 502. A slow reader pauses the other side, and past
+  `maxBuffered` (1 MiB) both close with 1013.
 - **Spec first.** `@alxia/openapi`'s `matchesSpec` ignores the requests a
   proxy forwards by default: `mount` declares no route, and the `all`
   route is reported in `extra` as `ALL /api/*`, a failure only under

@@ -54,6 +54,22 @@ describe('proxy.ws, between the upstream open and the client open', () => {
 		expect(state.closed[0]).toEqual([1013, 'client not open yet']);
 	});
 
+	test('past maxBuffered bytes queued for a client not open yet, the upstream is closed with 1013', async () => {
+		const greeting = Array.from({ length: 8 }, () => 'x'.repeat(4096));
+		const { up, state } = socketUpstream({ greeting });
+		const app = alxia().ws(
+			'/live',
+			proxy.ws(up.url, { timeout: 5_000, maxBuffered: 16 * 1024 }),
+		);
+		const response = await app.fetch(
+			handshake(new AbortController()),
+			refusing(),
+		);
+		expect(response.status).toBe(426);
+		await until(() => state.closed.length === 1);
+		expect(state.closed[0]).toEqual([1013, 'client not open yet']);
+	});
+
 	test('a client gone before its socket opens closes the upstream with 1001', async () => {
 		const { up, state } = socketUpstream();
 		const controller = new AbortController();
