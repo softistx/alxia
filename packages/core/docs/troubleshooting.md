@@ -1038,7 +1038,7 @@ error TS2769: No overload matches this call.
 and returns it. Past the types, `plugin` calls the middleware with the
 app, and throws
 [`plugin(): the plugin function returned a promise, not an app`](#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-given-to-use),
-or the middleware itself throws, `next is not a function`.
+or, for one that calls `next` right away, `plugin(): the plugin function called next()`.
 
 **Fix:** give it to `use`, before the routes:
 
