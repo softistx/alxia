@@ -29,8 +29,10 @@ curl localhost:3000/graphql -H 'content-type: application/json' \
   resolver reads `viewer`, `db` and `env` from its context, typed.
 - `src/context.ts`: the base app and its middleware. `viewerOf` reads
   `Authorization: Bearer <token>` and gives every resolver `viewer`: the
-  user, or `null`. `Context` is `GraphQLContext<typeof base>`, which
+  user, or `null`. `Context` is `GraphQLContext<typeof base, { loaders }>`, which
   `codegen.ts` hands to `Resolvers`.
+- `src/loaders.ts`: the DataLoaders, built per request by the `context` option
+  of `src/app.ts` (`Note.author` loads its users in one batch: [Batching](#batching-n1)).
 - `src/schema.ts`, `src/app.ts`: `createSchema` from `schema.graphql` and the
   resolvers, then `health()`'s probes (`GET /health`, `GET /ready`) and
   `graphql(app, { schema })` mounted on the base.
@@ -43,7 +45,8 @@ curl localhost:3000/graphql -H 'content-type: application/json' \
 - `src/server.ts`: listens on `env.PORT`, 3000 by default, and shuts down
   gracefully on `SIGINT` and `SIGTERM`, which `listen` handles.
 - `src/app.spec.ts`: POST `/graphql` through `app.request()`, no port:
-  queries, the mutation with and without a token, and the subscription.
+  queries, the mutation with and without a token, one batch for N authors,
+  and the subscription.
 - `biome.json`: Biome's lint and format settings ([Lint and format](#lint-and-format)).
 
 ## The schema first
@@ -71,6 +74,17 @@ nothing, so a query may be anonymous: `me` is `null`. `addNote` throws a
 tokens in `src/store.ts` are for development (`ada-token`): verify a JWT with
 [`@alxia/jwt`](https://www.npmjs.com/package/@alxia/jwt)'s `bearer`, or look
 a session up, in the same place.
+
+## Batching (N+1)
+
+`Note.author` runs once per note: with a database that is a query per note.
+It reads `loaders.user.load(note.authorId)`, a
+[DataLoader](https://github.com/graphql/dataloader) that collects the ids of
+one request and calls `findUsers` in `src/store.ts` once for all of them
+(`src/app.spec.ts` asserts one call for five notes). `createLoaders()` runs
+for **each request**, in the `context` option: a loader caches what it loads,
+so one shared between requests would keep stale data and hand one user's to
+another. Add a loader for each field that loads a record by id.
 
 ## Subscriptions
 

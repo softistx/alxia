@@ -46,6 +46,7 @@ describe('the graphql template', () => {
 			'@alxia/core',
 			'@alxia/env',
 			'@alxia/graphql',
+			'dataloader',
 			'graphql',
 			'graphql-yoga',
 			'zod',
@@ -128,5 +129,5 @@ describe('the graphql template', () => {
 	test("typechecks under this repository's strictest settings", () =>
 		expectTypechecks(dir));
 
-	test('its spec passes', () => expectSpecPasses(dir, 6), 30_000);
+	test('its spec passes', () => expectSpecPasses(dir, 8), 30_000);
 });

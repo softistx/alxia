@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { app } from "./app";
-import { db, pubsub } from "./store";
+import { db, pubsub, queries } from "./store";
 
 interface Result {
   data?: Record<string, unknown>;
@@ -77,6 +77,33 @@ describe("mutations", () => {
     expect((await query("{ nothing }")).errors?.[0]?.message).toContain(
       "nothing",
     );
+  });
+});
+
+describe("batching", () => {
+  test("the authors of N notes are loaded in one batch", async () => {
+    db.users.set("2", { id: "2", name: "Grace" });
+    db.notes.splice(0, db.notes.length);
+    for (let i = 1; i <= 5; i++) {
+      db.notes.push({
+        id: String(i),
+        text: `Note ${i}`,
+        authorId: String((i % 2) + 1),
+      });
+    }
+    queries.users = 0;
+    const { data, errors } = await query("{ notes { text author { name } } }");
+    expect(errors).toBeUndefined();
+    expect(data?.["notes"]).toHaveLength(5);
+    expect(queries.users).toBe(1);
+  });
+
+  test("each request gets its own loaders", async () => {
+    queries.users = 0;
+    await query("{ notes { author { name } } }");
+    await query("{ notes { author { name } } }");
+    // A cache shared between requests would answer the second without a call.
+    expect(queries.users).toBe(2);
   });
 });
 
