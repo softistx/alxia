@@ -231,5 +231,6 @@ Passing Yoga's `cors` turns Yoga's on for this endpoint; do not use both.
 
 - [Mounting the endpoint](endpoint.md): what the endpoint answers.
 - [The typed context](context.md): the `context` option.
+- [Harden it for production](production.md): depth limits, introspection off, a body limit, CSRF and persisted operations, run.
 - [Troubleshooting](../troubleshooting.md): `Unexpected error.`, the `406`
   and the `405`.
