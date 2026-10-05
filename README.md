@@ -70,7 +70,7 @@ app.listen(3000); // in a test, in process: await app.request('/users/1')
 | [`@alxia/zod`](packages/zod) | Zod 4: query and path coercions (`zq.int()`, `zq.array()`…) |
 | [`@alxia/graphql`](packages/graphql) | GraphQL with Yoga and its plugins: behind the app's middlewares, resolvers reading its typed context, subscriptions over SSE, GraphiQL or Apollo Sandbox |
 | [`@alxia/react-router`](packages/react-router) | a React Router app served by alxia, under Bun: server rendering behind the app's middlewares, loaders reading its typed context, `/api` routes beside the pages; one Vite plugin, no server file needed, for the dev server and a runnable build |
-| [`@alxia/openapi`](packages/openapi) | OpenAPI spec first: the routes bound to the operations `@nxgt/openapi-codegen` generates from the document, and a test that every operation has its route, and no other (`matchesSpec`). Named `@alxia/openapi-routes` until 0.4 |
+| [`@alxia/openapi`](packages/openapi) | OpenAPI spec first: the routes bound to the operations `@nxgt/openapi-codegen` generates from the document, and a test that every operation has its route (`matchesSpec`, and with `strict: true` no other). Named `@alxia/openapi-routes` until 0.4 |
 | [`@alxia/cors`](packages/cors) | CORS: a middleware that answers preflights before routing and adds its headers to every response |
 | [`@alxia/secure-headers`](packages/secure-headers) | HSTS, CSP, nosniff and the rest |
 | [`@alxia/rate-limit`](packages/rate-limit) | a rate limit: a 429 past it, with its headers; pluggable stores |

@@ -1710,9 +1710,9 @@ That is code first, the opposite of spec first, so it is retired: 0.4.0 of
    app.file('/openapi.yaml', './openapi.yaml');
 
    matchesSpec(app, operations, {
-	strict: true,
-	exclude: (route) => route.path === '/openapi.yaml',
-});
+   	strict: true,
+   	exclude: (route) => route.path === '/openapi.yaml',
+   });
    ```
 
    A reference page is any static viewer pointed at that URL; alxia serves

@@ -453,7 +453,7 @@ export type App = typeof app;
 `health()` answers `GET /health` (liveness) and `GET /ready` (readiness),
 and `apiDocs` serves a Scalar page at `/docs` with the document at
 `/docs/openapi.yaml` and `/docs/openapi.json`. `matchesSpec` leaves both
-out: no operation of `openapi.yaml` describes them. The document is public
+out under `strict`: no operation of `openapi.yaml` describes them. The document is public
 wherever `/docs` is on.
 
 ```ts

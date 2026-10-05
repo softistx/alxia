@@ -6,8 +6,9 @@ The OpenAPI document is the source:
 `alxia` option generates each operation as `{ method, path, schema }`,
 `@alxia/core`'s `app.route(operation, ...middlewares, handler)` binds a
 handler to it, and this package's `implemented` and `matchesSpec` check
-that the app routes every operation of the document, and only those. A
-route the document declares and nobody wrote fails a test, not a client.
+that the app routes every operation of the document (and, with
+`strict: true`, only those). A route the document declares and nobody wrote
+fails a test, not a client.
 
 ```sh
 bun add -d @alxia/openapi typescript

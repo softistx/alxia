@@ -128,7 +128,7 @@ Either half appears only when it lists something. Before the check was
 lenient, this was the only behaviour: upgrading, pass `strict: true` to
 keep the old check.
 
-Under `strict`, `exclude` leaves a route out of the second half. It is given the
+`exclude` leaves a route out of the second half, and out of `extra`. It is given the
 route as `app.routes` holds it — method, full path, schema — and returns
 `true` for a route the document does not have to declare:
 

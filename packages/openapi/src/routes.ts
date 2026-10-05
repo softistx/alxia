@@ -33,7 +33,8 @@ export interface MatchesSpecOptions extends ImplementedOptions {
 	 */
 	readonly strict?: boolean;
 	/**
-	 * A route no operation has to declare, under `strict`. The routes of
+	 * A route no operation has to declare: left out of `extra`, and of the
+	 * failure under `strict`. The routes of
 	 * `apiDocs()` and the probes of `@alxia/core`'s `health()` are left out
 	 * already.
 	 */
