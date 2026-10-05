@@ -15,8 +15,9 @@ app.listen(3000);
 
 `static` and `file` are `GET` routes like any other: every middleware runs around
 them — headers, compression, logging, a `use` that guards them — and
-they are in `app.routes`: `@alxia/openapi`'s `matchesSpec` sees them, so
-leave them out with its `exclude` unless the document declares them.
+they are in `app.routes`: `@alxia/openapi`'s `matchesSpec` lists them as
+`extra`, and under `strict: true` fails on them: leave them out with its
+`exclude` unless the document declares them.
 `page` is the exception, below.
 
 ## `static(path, source, options?)`

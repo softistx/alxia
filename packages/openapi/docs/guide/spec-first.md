@@ -248,7 +248,8 @@ guides have the detail.
 ## 4. Check the app against the spec
 
 Nothing above notices an operation with no route: the app compiles, and the
-request gets a 404. `matchesSpec` does, from the same `operations`:
+request gets a 404. `matchesSpec` does, from the same `operations`. It does not mind a route the
+document lacks (a health check, a proxied route); `strict: true` does:
 
 ```ts
 // src/app.spec.ts
@@ -257,7 +258,7 @@ import { matchesSpec } from '@alxia/openapi';
 import { app } from './app';
 import { operations } from './generated/alxia';
 
-test('routes every operation of openapi.yaml, and nothing else', () => {
+test('routes every operation of openapi.yaml', () => {
 	matchesSpec(app, operations);
 });
 

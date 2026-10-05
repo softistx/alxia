@@ -180,6 +180,34 @@ test('a wrong password is a 401', async () => {
 });
 ```
 
+## A token from an identity provider
+
+When Keycloak, Auth0, Ory or Cognito issues the tokens, your API only
+verifies them, with the keys the provider publishes. `createJwt` takes the
+provider's URL instead of a secret: it fetches the keys, picks one by the
+token's `kid`, follows a rotation and refuses `alg: none` and an HMAC token
+signed with a public key. The guard and the routes behind it do not change.
+
+```ts
+// file: src/idp-auth.ts
+import { bearer, createJwt } from '@alxia/jwt';
+import { z } from 'zod';
+
+// `discovery` reads the keys' URL from the issuer's OpenID configuration,
+// and checks the token's `iss` against the issuer.
+export const idpJwt = createJwt({
+	discovery: 'https://idp.example.com/realms/my-realm',
+	audience: 'my-api',
+});
+
+export const Claims = z.object({ sub: z.string(), email: z.string().optional() });
+
+export const idpAuthenticated = bearer({ jwt: idpJwt, schema: Claims });
+```
+
+Fetching, caching, rotation and what happens when the provider is down are
+in [Verifying tokens from an identity provider](../../packages/jwt/docs/guide/jwks.md).
+
 ## A cookie session with janus
 
 When the browser holds the session, [`@alxia/janus`](../../packages/janus)
@@ -245,7 +273,8 @@ test('sign in sets the cookie, and the cookie opens /me', async () => {
 
 - [`bearer` and the guard](../../packages/jwt/docs/guide/bearer-guard.md),
   [signing and verifying](../../packages/jwt/docs/guide/tokens.md),
-  [algorithms and keys](../../packages/jwt/docs/guide/algorithms-and-keys.md)
+  [algorithms and keys](../../packages/jwt/docs/guide/algorithms-and-keys.md),
+  [tokens from an identity provider](../../packages/jwt/docs/guide/jwks.md)
 - [Sessions](../../packages/janus/docs/guide/sessions.md),
   [signing in and out](../../packages/janus/docs/guide/sign-in-and-out.md),
   [permissions](../../packages/janus/docs/guide/permissions.md),

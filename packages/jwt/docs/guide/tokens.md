@@ -117,7 +117,7 @@ type VerifyResult =
 	| { readonly ok: true; readonly claims: JwtClaims }
 	| {
 			readonly ok: false;
-			readonly reason: 'malformed' | 'algorithm' | 'signature' | 'expired' | 'not_yet_valid' | 'issuer' | 'audience';
+			readonly reason: 'malformed' | 'algorithm' | 'signature' | 'expired' | 'not_yet_valid' | 'issuer' | 'audience' | 'key' | 'keys_unavailable';
 	  };
 ```
 
@@ -126,7 +126,7 @@ in this order, and stops at the first failure:
 
 | `reason` | The token… |
 | --- | --- |
-| `malformed` | is not three base64url parts, or its header or payload is not JSON, or its header is not an object (`null`, an array, a number, a string or a boolean), or its payload is not an object |
+| `malformed` | is not three base64url parts, or its header or payload is not JSON, or its header is not an object (`null`, an array, a number, a string or a boolean), or its payload is not an object; with a `jwks` verifier, also a header with `crit` |
 | `algorithm` | names another `alg` than the one configured — `none` included |
 | `signature` | was not signed by this secret or key, or was altered, or its signature is not one the key could produce (the wrong length) |
 | `expired` | has an `exp` at or before now − `clockTolerance` |

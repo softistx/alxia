@@ -140,10 +140,10 @@ is untouched, so the strict one keeps guarding your API.
 ## `matchesSpec` ignores the docs routes
 
 The page and the files are not operations of the document, and
-`matchesSpec` leaves them out by itself:
+`matchesSpec` leaves them out by itself, in `extra` and under `strict`:
 
 ```ts
-matchesSpec(app, operations); // the three docs routes are not listed
+matchesSpec(app, operations, { strict: true }); // the three docs routes are not listed
 ```
 
 `isApiDocsRoute(route)` says whether `apiDocs` declared a route, for a check
@@ -151,6 +151,7 @@ of your own, and composes with `exclude`:
 
 ```ts
 matchesSpec(app, operations, {
+	strict: true,
 	exclude: (route) => isApiDocsRoute(route) || route.path === '/health',
 });
 ```
@@ -185,12 +186,15 @@ export const app = alxia()
 	.plugin(apiDocs({ spec, enabled: dev })); // GET /docs
 
 // the REST routes against the document: the GraphQL endpoint is not one of its operations
-matchesSpec(app, operations, { exclude: (route) => route.path === '/graphql' });
+matchesSpec(app, operations, {
+	strict: true,
+	exclude: (route) => route.path === '/graphql',
+});
 ```
 
 - `/docs` documents the REST operations only; the GraphQL schema is its own
   document, explored at `/graphql`.
 - Each page sets its own `Content-Security-Policy`; `secureHeaders` keeps
   both, and guards the rest.
-- `apiDocs` leaves its own routes to `matchesSpec`; the GraphQL endpoint is
-  excluded by its path, as above.
+- `apiDocs` leaves its own routes to `matchesSpec`; under `strict`, the GraphQL
+  endpoint is excluded by its path, as above.

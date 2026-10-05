@@ -37,7 +37,7 @@ type Bearer<Schema extends StandardSchemaV1 | undefined = undefined> = Middlewar
 >;
 
 interface BearerOptions<Schema extends StandardSchemaV1 | undefined> {
-	readonly jwt: Jwt;
+	readonly jwt: Verifier;
 	readonly schema?: Schema;
 	readonly cookie?: string;
 }
@@ -59,7 +59,7 @@ nothing to the context, and `bearer` adds `user`.
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `jwt` | `Jwt` | — | Verifies the token: what [`createJwt`](tokens.md) returns, or any object with the same `verify`. |
+| `jwt` | `Verifier` | — | Verifies the token: what [`createJwt`](tokens.md) returns, with a secret, a key pair or [an identity provider's JWKS](jwks.md), or any object with the same `verify`. |
 | `schema` | any Standard Schema | none | Checks the claims; `user` is its output. Without it, `user` is `JwtClaims`. |
 | `cookie` | `string` | none | A cookie to read the token from when no `Authorization: Bearer` header carries one. |
 
@@ -117,6 +117,7 @@ interface UnauthorizedBody {
 		| 'missing'                                   // no token found
 		| 'malformed' | 'algorithm' | 'signature'     // from verify
 		| 'expired' | 'not_yet_valid' | 'issuer' | 'audience'
+		| 'key' | 'keys_unavailable'                     // a JWKS verifier only
 		| 'claims';                                   // refused by the schema
 	readonly issues?: readonly ValidationIssue[];   // with 'claims' only
 }

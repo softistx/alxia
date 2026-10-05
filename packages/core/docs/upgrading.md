@@ -1487,7 +1487,7 @@ more. The server side takes three pieces:
 | --- | --- | --- |
 | the operations | [`@nxgt/openapi-codegen`](https://www.npmjs.com/package/@nxgt/openapi-codegen), with `alxia: true` | writes `src/generated/alxia.ts` from the document: each operation as `{ method, path, schema }`, with Zod schemas |
 | the routes | `@alxia/core`'s `route(operation, ...middlewares, handler)` | one route per operation; the operation's schemas check the request and every reply at run time |
-| the check | [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi)'s `matchesSpec` | reads `app.routes` and throws unless every operation has its route and every route its operation |
+| the check | [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi)'s `matchesSpec` | reads `app.routes` and throws unless every operation has its route (`strict: true`: and every route its operation) |
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -1506,7 +1506,7 @@ import { matchesSpec } from '@alxia/openapi';
 import { app } from './app';
 import { operations } from './generated/alxia';
 
-test('routes every operation of openapi.yaml, and nothing else', () => {
+test('routes every operation of openapi.yaml', () => {
 	matchesSpec(app, operations);
 });
 ```
@@ -1703,13 +1703,16 @@ That is code first, the opposite of spec first, so it is retired: 0.4.0 of
    [alxia is OpenAPI spec first](#alxia-is-openapi-spec-first).
 
 5. **Serve the document yourself**, if clients fetched it from the app:
-   it is a file now, served as any other, and a route `matchesSpec` is told
-   to leave out:
+   it is a file now, served as any other. `matchesSpec` does not mind a route
+   the document lacks; under `strict: true` it is told to leave it out:
 
    ```ts
    app.file('/openapi.yaml', './openapi.yaml');
 
-   matchesSpec(app, operations, { exclude: (route) => route.path === '/openapi.yaml' });
+   matchesSpec(app, operations, {
+   	strict: true,
+   	exclude: (route) => route.path === '/openapi.yaml',
+   });
    ```
 
    A reference page is any static viewer pointed at that URL; alxia serves

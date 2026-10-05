@@ -42,7 +42,8 @@ operations generated from it, and a client is generated from the same file.
   its `fetch` being `app.fetch`: no server, no port), one `app.request()`
   test, and `matchesSpec` from
   [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi): every
-  operation of `openapi.yaml` has its route, and no route is outside it.
+  operation of `openapi.yaml` has its route (`strict: true` also fails on a
+  route outside it).
 - `biome.json`: Biome's lint and format settings ([Lint and format](#lint-and-format)).
 
 ## The contract first

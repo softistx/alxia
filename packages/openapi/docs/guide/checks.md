@@ -18,8 +18,8 @@ export const app = alxia()
 	})
 	.route(api.searchEmployees, ({ body, reply }) => reply.ok(search(body)));
 
-matchesSpec(app, api); // throws if an operation of the spec has no route, or a route is not in the spec
-// or, for an app that serves more than its spec:
+matchesSpec(app, api); // throws if an operation of the spec has no route; reports the routes the spec lacks as `extra`
+matchesSpec(app, api, { strict: true }); // and throws on each route that is not in the spec
 implemented(app, api); // throws only if an operation of the spec has no route
 ```
 
@@ -36,7 +36,7 @@ function matchesSpec(
 	app: { readonly routes: readonly RouteDefinition[] },
 	operations: Operations,
 	options?: MatchesSpecOptions,
-): void;
+): MatchesSpecReport;
 
 type Operations =
 	| { readonly [name: string]: RouteOperation }
@@ -47,7 +47,12 @@ interface ImplementedOptions {
 }
 
 interface MatchesSpecOptions extends ImplementedOptions {
-	readonly exclude?: (route: RouteDefinition) => boolean;
+	readonly strict?: boolean; // fail on a route no operation declares
+	readonly exclude?: (route: RouteDefinition) => boolean; // under strict
+}
+
+interface MatchesSpecReport {
+	readonly extra: readonly { readonly method: string; readonly path: string }[];
 }
 ```
 
@@ -94,14 +99,36 @@ Called `exactly` until 0.2.0 of `@alxia/openapi-routes`; `exactly` and
 `ExactlyOptions` were removed in 0.5.
 
 ```text
+TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet)
+```
+
+It throws on each operation with no route, as `implemented` does. A route
+of another method or path does not serve an operation, so a `PUT` route
+where the spec says `GET` fails too. A route the document does not
+declare does not fail: an app may proxy routes, serve a health check, the
+docs or a hand-written route the spec never describes. They come back as
+the report's `extra`, in the order the app declared them, so a test can
+assert on them:
+
+```ts
+const { extra } = matchesSpec(app, api);
+expect(extra).toEqual([{ method: 'POST', path: '/admin/reset' }]);
+```
+
+### `strict: true`
+
+For a spec that must be exhaustive, `strict: true` fails on each route that
+no operation declares too, after a `;`, in the order the app declared them:
+
+```text
 TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
 ```
 
-It lists the missing operations as `implemented` does, then, after a `;`,
-each route of the app that no operation declares, in the order the app
-declared them. Either half appears only when it lists something.
+Either half appears only when it lists something. Before the check was
+lenient, this was the only behaviour: upgrading, pass `strict: true` to
+keep the old check.
 
-`exclude` leaves a route out of the second half. It is given the
+`exclude` leaves a route out of the second half, and out of `extra`. It is given the
 route as `app.routes` holds it — method, full path, schema — and returns
 `true` for a route the document does not have to declare:
 
@@ -109,6 +136,7 @@ route as `app.routes` holds it — method, full path, schema — and returns
 import { isReactRouterRoute } from '@alxia/react-router';
 
 matchesSpec(app, api, {
+	strict: true,
 	// the pages a React Router app serves beside the API, and a metrics route of its own
 	exclude: (route) => isReactRouterRoute(route) || route.path === '/metrics',
 });
@@ -119,7 +147,7 @@ matchesSpec(app, api, {
 client build's files. Any function of the route works. The routes of
 `apiDocs()` and the probes of `@alxia/core`'s `health()` — `/health` and
 `/ready`, wherever mounted — need none: `matchesSpec` leaves them out
-already.
+already, under `strict`, and from `extra`.
 
 `exclude` is not consulted for the first half: an operation with no route
 is always listed.
@@ -183,7 +211,7 @@ An operation is served by a route of the same method and path:
   `app.route(api.getPet, …)` keeps the spec's names and schemas.
 - **`HEAD`.** The core answers `HEAD` with the `GET` route, so a `HEAD`
   operation is served by a `GET` route at its path. `matchesSpec` still lists
-  that `GET` route when no operation declares it.
+  that `GET` route, as `extra` or under `strict`, when no operation declares it.
 - **Every other method stands alone.** A `POST /employees` route does not
   serve a `QUERY /employees` operation.
 - **Socket routes are not read.** `app.ws` routes live in `app.sockets`,
@@ -217,7 +245,7 @@ since those are what the app is missing. For operations served under a
 group, `alxia().group('/v1', …)`, give the group's prefix the same way. A
 call takes one prefix: check each group's operations in a call of their
 own, and use `matchesSpec` only when every route of the app is under that
-prefix, or excluded.
+prefix, or, under `strict`, excluded.
 
 ## Where to call it
 

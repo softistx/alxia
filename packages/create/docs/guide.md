@@ -453,7 +453,7 @@ export type App = typeof app;
 `health()` answers `GET /health` (liveness) and `GET /ready` (readiness),
 and `apiDocs` serves a Scalar page at `/docs` with the document at
 `/docs/openapi.yaml` and `/docs/openapi.json`. `matchesSpec` leaves both
-out: no operation of `openapi.yaml` describes them. The document is public
+out under `strict`: no operation of `openapi.yaml` describes them. The document is public
 wherever `/docs` is on.
 
 ```ts
@@ -503,7 +503,7 @@ const api = createClient<paths>({
   headers: { "x-api-key": env.API_KEY },
 });
 
-test("routes every operation of openapi.yaml, and nothing else", () => {
+test("routes every operation of openapi.yaml", () => {
   matchesSpec(app, operations);
 });
 
@@ -518,7 +518,8 @@ test("creates a todo from JSON", async () => {
 
 `matchesSpec(app, operations)`, from
 [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi), throws
-when an operation has no route, or a route has no operation, naming each.
+when an operation has no route, naming each; `strict: true` also throws on
+a route with no operation.
 The spec also checks the 400, the 401 before the body and the 404 through
 the client, and keeps one test on `app.request()`: the client sends only
 what the spec allows, so a request it forbids (`/todos/first`) goes

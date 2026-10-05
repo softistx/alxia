@@ -20,6 +20,9 @@ Problems that show no message are under [Traps](#traps), by symptom.
 - [`TypeError: A JWT secret must hold at least 32 bytes`](#typeerror-a-jwt-secret-must-hold-at-least-32-bytes)
 - [`TypeError: createJwt: ES256 needs an ECDSA P-256 key; the publicKey is ECDSA P-384`](#typeerror-createjwt-es256-needs-an-ecdsa-p-256-key-the-publickey-is-ecdsa-p-384)
 - [`TypeError: createJwt: the publicKey must be a public key that can verify; it is a private key that can sign`](#typeerror-createjwt-the-publickey-must-be-a-public-key-that-can-verify-it-is-a-private-key-that-can-sign)
+- [`TypeError: createJwt: jwks must be an https URL`](#typeerror-createjwt-jwks-must-be-an-https-url)
+- [`TypeError: createJwt: jwks is not a URL: /keys`](#typeerror-createjwt-jwks-is-not-a-url-keys)
+- [`TypeError: createJwt: give jwks or discovery, not both`](#typeerror-createjwt-give-jwks-or-discovery-not-both)
 
 **Runtime**
 
@@ -35,6 +38,8 @@ Problems that show no message are under [Traps](#traps), by symptom.
 - [`401 {"error":"unauthorized","reason":"not_yet_valid"}`](#401-errorunauthorizedreasonnot_yet_valid)
 - [`401 {"error":"unauthorized","reason":"issuer"}`](#401-errorunauthorizedreasonissuer)
 - [`401 {"error":"unauthorized","reason":"audience"}`](#401-errorunauthorizedreasonaudience)
+- [`401 {"error":"unauthorized","reason":"key"}`](#401-errorunauthorizedreasonkey)
+- [`401 {"error":"unauthorized","reason":"keys_unavailable"}`](#401-errorunauthorizedreasonkeys_unavailable)
 - [`401 {"error":"unauthorized","reason":"claims","issues":[…]}`](#401-errorunauthorizedreasonclaimsissues)
 
 **Traps**
@@ -292,7 +297,55 @@ const publicKey = await crypto.subtle.importKey('spki', publicDer, ES256, false,
 const jwt = createJwt({ algorithm: 'ES256', privateKey, publicKey });
 ```
 
+### `TypeError: createJwt: jwks must be an https URL`
+
+**When:** `createJwt` is given a `jwks` (or, as `createJwt: discovery must
+be an https URL`, a `discovery`) that is plain `http`, or another scheme.
+The same text names `jwks_uri` when an issuer's discovery document points
+there: that one is a failed fetch, so it surfaces as
+[`keys_unavailable`](#401-errorunauthorizedreasonkeys_unavailable).
+
+**Why:** keys fetched over `http` can be swapped on the way, and whoever
+swaps them signs tokens your app accepts. Only `http` on `localhost`,
+`127.0.0.1` and `[::1]` is allowed, for a local issuer.
+
+**Fix:** the issuer's `https` URL:
+
+```ts
+createJwt({ jwks: 'https://idp.example.com/.well-known/jwks.json' });
+```
+
+### `TypeError: createJwt: jwks is not a URL: /keys`
+
+**When:** the `jwks` option (or `discovery`, named in its place) is not an
+absolute URL: a path, an empty string, an unset environment variable. The
+message ends with the value it was given.
+
+**Why:** `new URL()` refused it, at startup, so a typo does not wait for
+the first request.
+
+**Fix:** an absolute URL, read from a variable checked at startup:
+
+```ts
+createJwt({ jwks: Bun.env['JWKS_URL']! });
+```
+
 ## Runtime
+
+### `TypeError: createJwt: give jwks or discovery, not both`
+
+**When:** `createJwt` is given a `jwks` and a `discovery` (TypeScript
+refuses it first, unless the options were cast or came from `any`).
+
+**Why:** each one says where the keys are; with both, which one wins would
+be a guess.
+
+**Fix:** `discovery` when the provider publishes an OpenID configuration,
+`jwks` with its `issuer` when it does not:
+
+```ts
+createJwt({ discovery: 'https://idp.example.com/realms/acme' });
+```
 
 ### `TypeError: Signing needs a private key`
 
@@ -340,6 +393,8 @@ app.use(bearer({ jwt, cookie: 'token' }));
 **When:** the token is not three base64url parts separated by dots, its
 header or payload is not JSON, its header is not an object (`null`, an
 array, a number, a string or a boolean), or its payload is not an object.
+A verifier by `jwks` or `discovery` also refuses a header with a `crit`
+member, which names extensions it does not implement.
 
 **Why:** usually not a JWT at all: an opaque session id, a token missing a part,
 a value still wrapped in quotes or URL-encoded. The header wins over the
@@ -368,6 +423,18 @@ verifier created without `algorithm` and with a `secret` expects `HS256`.
 const options = { algorithm: 'HS512', secret: Bun.env['JWT_SECRET']! } as const;
 const signer = createJwt(options);
 const verifier = createJwt(options);
+```
+
+With `jwks` or `discovery`, the algorithm is the key's: the token's `alg`
+must be an asymmetric one the set's key for its `kid` can verify (an RSA
+key verifies `RS*` and `PS*`, an EC key `ES256`/`ES384`, an Ed25519 key
+`EdDSA`), and one of `algorithms` when you list them. A token signed `HS256`
+is always refused there, which is what stops an RSA public key from being
+used as an HMAC secret. Check the token's header against the issuer's
+signing algorithm:
+
+```ts
+createJwt({ jwks: Bun.env['JWKS_URL']!, algorithms: ['RS256'] });
 ```
 
 ### `401 {"error":"unauthorized","reason":"signature"}`
@@ -448,6 +515,57 @@ token for several names them all:
 ```ts
 await jwt.sign({ sub: 'ada', aud: ['web', 'mobile'] });
 const web = createJwt({ secret, audience: 'web' }); // accepts it
+```
+
+### `401 {"error":"unauthorized","reason":"key"}`
+
+**When:** a verifier created with `jwks` or `discovery` finds no key for
+the token: its `kid` is not in the set (even after a refetch), it has no
+`kid` and the set has no single key that fits, or the key is an RSA key
+outside 2048 to 8192 bits, or with an even or trivial exponent.
+
+**Why:** the token was signed by a key this issuer does not publish: another
+issuer or realm, a key already removed from the set, or a key added to the
+set less than `refetchMs` (30 s by default) after the last fetch. The
+guard refetches an unknown `kid` once, and never more often than that.
+
+**Fix:** check that `jwks` or `discovery` is the issuer that signed the
+token (`kid` is in its header: `jwt.io` shows it), and wait out `refetchMs`
+after a rotation. To follow a rotation faster, lower it:
+
+```ts
+createJwt({ jwks: Bun.env['JWKS_URL']!, refetchMs: 5_000 });
+```
+
+### `401 {"error":"unauthorized","reason":"keys_unavailable"}`
+
+**When:** a verifier created with `jwks` or `discovery` has no keys: the
+issuer cannot be reached (refused connection, timeout after `timeoutMs`,
+a status other than 200, a redirect, a body that is not a key set or is
+over 256 KiB, a discovery document that names another issuer or has no
+`jwks_uri`) and nothing cached is within its lifetime plus `staleMs`.
+
+**Why:** the guard fails closed: with no key to check a signature against,
+no token is accepted. A set that was fetched once keeps working through an
+outage for `staleMs` (a day by default) after its lifetime. A failed fetch
+is not retried before `refetchMs`, so an issuer that is down is not
+hammered, and an app that starts while it is down recovers within
+`refetchMs` of its return.
+
+**Fix:** get the issuer reachable from the server (a proxy, a firewall, the
+URL). The reason hides the cause on purpose; to see it, fetch the URL from
+the same machine:
+
+```sh
+curl -i https://idp.example.com/.well-known/jwks.json
+```
+
+To ride out longer outages, raise `staleMs`; `staleMs: 0` refuses the
+moment the set expires. Fetch at startup to see a bad URL at once:
+
+```ts
+const jwt = createJwt({ jwks: Bun.env['JWKS_URL']! });
+await jwt.refresh();
 ```
 
 ### `401 {"error":"unauthorized","reason":"claims","issues":[…]}`

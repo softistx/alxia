@@ -15,7 +15,7 @@ whose `alxia` option writes each operation for `route()`. The operation's
 schemas check every request and reply at run time, and
 [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi)'s
 `matchesSpec` checks, in a test, that the app routes the document's
-operations and nothing else
+operations (and, under `strict: true`, nothing else)
 ([upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md#alxia-is-openapi-spec-first)).
 
 ## Getting started
