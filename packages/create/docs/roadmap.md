@@ -24,6 +24,10 @@ number on it. Every release, with each change it made, is in
   reading that context with no import of the app; `src/app.ts` mounts
   them, `base.plugin(todoRoutes)`.
 
+- **The `api` template's tests use a typed client.** `src/app.spec.ts` calls
+  the app through openapi-fetch over the generated `paths.ts`, with
+  `app.fetch` as its `fetch`: in process, typed by `openapi.yaml`.
+
 ## Next
 
 Nothing scheduled yet.

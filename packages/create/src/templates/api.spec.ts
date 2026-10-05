@@ -46,6 +46,7 @@ describe('the api template', () => {
 			'@biomejs/biome',
 			'@nxgt/openapi-codegen',
 			'@types/bun',
+			'openapi-fetch',
 			'typescript',
 		]);
 	});
@@ -120,5 +121,5 @@ describe('the api template', () => {
 	test("typechecks under this repository's strictest settings", () =>
 		expectTypechecks(dir));
 
-	test('its spec passes', () => expectSpecPasses(dir, 6), 30_000);
+	test('its spec passes', () => expectSpecPasses(dir, 7), 30_000);
 });

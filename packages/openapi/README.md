@@ -247,6 +247,7 @@ The core's side of the move is in its
 
 - [Documentation index](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/README.md): every page, and when to read it.
 - [Spec first](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/spec-first.md): the whole workflow, from `openapi.yaml` to the generated operations, the routes, the check and a client.
+- [Testing with the generated client](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/testing.md): openapi-fetch over `app.fetch`, in process, typed by the spec.
 - [API docs](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/api-docs.md): `apiDocs`, its options, the Content-Security-Policy, and beside a GraphQL endpoint.
 - [The checks](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md): `implemented` and `matchesSpec`, how a route is matched, the prefix, and the routes to exclude.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/troubleshooting.md): each message of the checks and the generator, and what to do about it.
