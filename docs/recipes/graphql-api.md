@@ -298,8 +298,6 @@ module-level or `decorate` them on the app:
 
 ## 5. Mount it, with the IDE and the drain
 
-The `context` option is where the loaders are built:
-
 ```ts
 // file: src/app.ts
 import { graphql } from '@alxia/graphql';
