@@ -21,4 +21,4 @@ a realistic example for each.
 
 A task that crosses packages, in [the repository's recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md), each with a complete example:
 
-- [A gateway in front of your services](https://github.com/softistx/alxia/blob/develop/docs/recipes/proxy.md): auth, rate limit and a proxy to the services behind them
+- [Put an app in front of other services](https://github.com/softistx/alxia/blob/develop/docs/recipes/proxy.md): auth, rate limit and a proxy to the services behind them
