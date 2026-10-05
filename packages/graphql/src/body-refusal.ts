@@ -5,7 +5,19 @@
  * can throw it again once Yoga has answered, and the app's own boundary
  * answers the 413 in its error format, leaking nothing of Yoga's.
  */
-import { ContentTooLargeError } from '@alxia/core';
+import type { ContentTooLargeError } from '@alxia/core';
+
+/**
+ * By its name and its limit, not `instanceof`: the copy of core that
+ * limited the body may not be the one this package resolves.
+ */
+function isTooLarge(error: unknown): error is ContentTooLargeError {
+	return (
+		error instanceof Error &&
+		error.name === 'ContentTooLargeError' &&
+		typeof (error as { limit?: unknown }).limit === 'number'
+	);
+}
 
 export interface WatchedRequest {
 	/** The request to hand to Yoga: the same, its body watched. */
@@ -29,7 +41,7 @@ export function watchBody(request: Request): WatchedRequest {
 				if (done) controller.close();
 				else controller.enqueue(value);
 			} catch (error) {
-				if (error instanceof ContentTooLargeError) refused = error;
+				if (isTooLarge(error)) refused = error;
 				throw error;
 			}
 		},
@@ -55,7 +67,10 @@ export async function withoutOriginalError(
 	response: Response,
 ): Promise<Response> {
 	const type = response.headers.get('content-type') ?? '';
-	if (response.status !== 400 || !type.startsWith('application/json')) {
+	if (
+		response.status !== 400 ||
+		!/^application\/(?:[\w.-]+\+)?json/.test(type)
+	) {
 		return response;
 	}
 	const text = await response.text();

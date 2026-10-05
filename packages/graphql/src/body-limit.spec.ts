@@ -117,6 +117,19 @@ describe('graphql(), a request Yoga cannot parse', () => {
 		expect(text).not.toContain('originalError');
 	});
 
+	test('a client asking for graphql-response+json gets none either', async () => {
+		const response = await app.request('/graphql', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				accept: 'application/graphql-response+json',
+			},
+			body: '{"query": ',
+		});
+		expect(response.status).toBe(400);
+		expect(await response.text()).not.toContain('originalError');
+	});
+
 	test('variables that are not JSON, in a GET, leak none either', async () => {
 		const response = await app.request(
 			'/graphql?query=%7Bping%7D&variables=%7Bnope',
