@@ -29,7 +29,7 @@ function refusing(before: () => void = () => {}): Bun.Server<unknown> {
 }
 
 describe('proxy.ws, between the upstream open and the client open', () => {
-	test('an upstream that closes before the client opens closes the client with its code', async () => {
+	test('an upstream that hangs up at once closes the client with its code', async () => {
 		const { up } = socketUpstream({ greeting: ['hi'], hangUp: 4002 });
 		const url = serve(alxia().ws('/live', proxy.ws(up.url)));
 		const { received, closed, opened } = await client(url, '/live');

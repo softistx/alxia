@@ -76,9 +76,10 @@ export async function upgradeSocket(
 	}
 }
 
-/** A WebSocket handshake as RFC 6455 has it: a key, and version 13. */
+/** A WebSocket handshake as RFC 6455 has it: a `GET`, a key, and version 13. */
 function isHandshake(request: Request): boolean {
 	return (
+		request.method === 'GET' &&
 		request.headers.has('sec-websocket-key') &&
 		request.headers.get('sec-websocket-version') === '13'
 	);

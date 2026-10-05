@@ -111,6 +111,12 @@ describe("a socket's upgrade handler", () => {
 				headers: { ...UPGRADE, 'sec-websocket-version': '8' },
 			});
 			expect(old.status).toBe(426);
+			const posted = await fetch(server.url, {
+				method: 'POST',
+				body: 'x',
+				headers: UPGRADE,
+			});
+			expect(posted.status).toBe(426);
 			expect(ran).toEqual([]);
 		} finally {
 			await server.stop(true);
