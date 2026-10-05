@@ -67,7 +67,7 @@ app.listen(3000);
 | attribute | |
 | --- | --- |
 | `http.request.method`, `url.path`, `url.scheme` | the request |
-| `server.address`, `server.port`, `client.address`, `graphql.operation.name`, `graphql.operation.type` | where it was addressed, and from |
+| `server.address`, `server.port`, `client.address` | where it was addressed, and from |
 | `http.route` | the route, once matched |
 | `http.response.status_code` | the status |
 | `graphql.operation.name`, `graphql.operation.type` | behind `@alxia/graphql`: the operation's name (when it has one) and type, with the span renamed `query GetNotes`; see below |

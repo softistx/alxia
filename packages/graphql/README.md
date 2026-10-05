@@ -144,7 +144,16 @@ which operation it executes. Behind `use(logger())` the request's line
 carries `operationName` and `operationType`, and behind
 `use(telemetry({ … }))` its span is named `query GetNotes`, with
 OpenTelemetry's `graphql.operation.name` and `graphql.operation.type`. A
-batched body is one line and one span, `batch`, with every name. A request
+batched body is one line and one span, `batch`, with every name.
+
+```ts
+const app = alxia()
+	.use(logger())
+	.use(telemetry({ service: 'notes' }))
+	.plugin((app) => graphql(app, { schema }));
+```
+
+A request
 refused before it executes, and an operation over `ws: true`, name none yet.
 See [the endpoint guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/endpoint.md#the-operation-in-the-log-and-the-trace).
 

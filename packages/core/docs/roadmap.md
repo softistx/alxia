@@ -28,11 +28,6 @@ number on it. Every release, with each change it made, is in
   refuses it: a middleware file needs no import of the app and no type
   argument, while `defineMiddleware(fn)` keeps reading the base context
   ([Upgrading](upgrading.md#defineappmiddlewarefn-reads-the-registered-context)).
-- **The operation a request ran, for the observers.** `@alxia/graphql`
-  reports each operation it executes with `reportOperation`; `operationOf(ctx)`
-  gives an observer one summary — the type and name, or `batch` and every
-  name — so `@alxia/logger` and `@alxia/telemetry` name it without importing
-  the GraphQL package or each other ([Writing a plugin](guide/writing-a-plugin.md#telling-the-observers-what-ran)).
 - **The forms deprecated in 0.4 removed.** The six request hooks of 0.3;
   a route's list of hooks and the two functions that made its hooks; a
   schema before the handler or in a route's options; `use(plugin)` and
@@ -112,6 +107,11 @@ number on it. Every release, with each change it made, is in
 
 ### Next release
 
+- **The operation a request ran, for the observers.** `@alxia/graphql`
+  reports each operation it executes with `reportOperation`; `operationOf(ctx)`
+  gives an observer one summary — the type and name, or `batch` and every
+  name — so `@alxia/logger` and `@alxia/telemetry` name it without importing
+  the GraphQL package or each other ([Writing a plugin](guide/writing-a-plugin.md#telling-the-observers-what-ran)).
 - **The client's address behind a proxy.** `forwardedIp({ trusted })`, the `ip` option for an app behind proxies: the client read from the right of `X-Forwarded-For` or `Forwarded`, past a number of hops or a list of CIDR ranges, never the first entry the client writes, so a rate limit keyed by `ip` cannot be bypassed with a header ([Serving](guide/serving.md#the-clients-address-ip)).
 
 ### 0.4.0

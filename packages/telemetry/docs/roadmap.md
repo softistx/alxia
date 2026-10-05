@@ -7,7 +7,6 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **The GraphQL operation on the span.** Behind `@alxia/graphql`, the span is named `query GetNotes` and carries `graphql.operation.name` and `graphql.operation.type`, OpenTelemetry's conventions; a batched body is `batch GetNotes,AddNote` ([guide](guide.md#a-graphql-operation)).
 - **A middleware, not a plugin (0.4).** `app.use(telemetry({ ... }))` opens a span for every request, a 404 or a 405 included, around everything after it, and sees the response the client gets. `app.plugin(telemetry(...))`, the deprecated form, was removed in 0.5.
 
 ## Next
@@ -29,6 +28,10 @@ Nothing scheduled yet.
   no runtime dependency.
 
 ## Shipped
+
+### Next release
+
+- **The GraphQL operation on the span.** Behind `@alxia/graphql`, the span is named `query GetNotes` and carries `graphql.operation.name` and `graphql.operation.type`, OpenTelemetry's conventions; a batched body is `batch GetNotes,AddNote` ([guide](guide.md#a-graphql-operation)).
 
 ### 0.2.0
 
