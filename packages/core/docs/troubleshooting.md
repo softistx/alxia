@@ -119,6 +119,7 @@ a trap that prints nothing is headed by its symptom.
 - [A `use(path)` guard runs on a path spelled otherwise, or in another case](#a-usepath-guard-runs-on-a-path-spelled-otherwise-or-in-another-case)
 - [`use(): the middleware runs on the routes declared after it …`](#use-the-middleware-runs-on-the-routes-declared-after-it-and-on-requests-no-route-matches-not-on-the--declared-before-it), a warning
 - [A path that does not exist answers `401`, not `404`](#a-path-that-does-not-exist-answers-401-not-404)
+- [A method a guarded route does not take answers `401`, not `405`](#a-method-a-guarded-route-does-not-take-answers-401-not-405)
 - [A middleware's `try`/`catch` never sees the error](#a-middlewares-trycatch-never-sees-the-error)
 - [A middleware's `try`/`catch` sees an `AbortError` when the client left](#a-middlewares-trycatch-sees-an-aborterror-when-the-client-left)
 - [`Type 'string | undefined' is not assignable to type 'string'` on `ctx.route`](#type-string--undefined-is-not-assignable-to-type-string-on-ctxroute)
@@ -2303,7 +2304,8 @@ the method, as `Bun.serve` chooses it. With `GET /users/:id` and
 
 **Fix:** call it with a method in `Allow`, or declare the route for the
 method you call at the path that answers. `HEAD` is answered by the `GET`
-route.
+route. A 401 or a 403 where you expected this 405: see
+[A method a guarded route does not take answers `401`, not `405`](#a-method-a-guarded-route-does-not-take-answers-401-not-405).
 
 ### `426 {"error":"upgrade_required"}`
 
@@ -2644,6 +2646,30 @@ is such a group once mounted: its guard answers under `/todos` alone.
 `use('/api', guard)` also scopes a guard to a path, but only a middleware
 that adds nothing to the context: `bearer` and `session` add, so they take a
 group ([`Invalid middleware: …`](#-is-not-assignable-to-type-invalid-middleware-a-middleware-given-a-path-may-add-nothing-to-the-context-)).
+
+### A method a guarded route does not take answers `401`, not `405`
+
+**When:** `DELETE /secret` without credentials answers the guard's
+`401` (or `403`), with no `Allow`, where a 405 was expected; with
+credentials, it answers `405` and `Allow: GET`:
+
+```ts
+const app = alxia().group((g) =>
+	g.use(bearer({ jwt })).get('/secret', ({ reply }) => reply(200, 'secret')),
+);
+```
+
+**Why:** a 405's `Allow` names the methods a path takes, so it runs the
+chain in force of every route at that path first — a group's, with a
+prefix or without — and a guard there refuses it as it refuses the route
+([Upgrading](upgrading.md#a-guarded-group-refuses-the-405-at-its-routes)).
+When several groups own methods at one path, each
+one's chain runs in the order declared, and the first refusal answers.
+
+**Fix:** none is needed: an anonymous client should not learn what a guard
+keeps. A client that probes methods sends its credentials. A route whose
+methods must be told to anyone goes outside the guarded group
+([Middleware: which chain a 405 runs](guide/middleware.md#which-chain-a-405-runs)).
 
 ### A middleware's `try`/`catch` never sees the error
 

@@ -9,6 +9,7 @@ import type {
 	RouteDefinition,
 	SocketDefinition,
 } from './definition';
+import { inForce, scopedAt } from './guarded';
 import { prefixPath, reach, rebase, type ScopePath } from './scope-path';
 import type { RouteSchema } from './types';
 
@@ -41,7 +42,7 @@ export class Scope {
 	 * `path` matches, given one.
 	 */
 	chain(hook: ChainHook, path?: ScopePath): void {
-		this.#derive.push({ hook, path });
+		this.#derive.push({ hook: inForce(hook), path });
 		this.#unmatched = undefined;
 	}
 
@@ -86,7 +87,7 @@ export class Scope {
 				path === undefined ||
 				(hook.kind !== 'middleware' && hook.kind !== 'derive')
 					? hook
-					: { ...hook, when: path },
+					: scopedAt(hook, path),
 			),
 		};
 		return this.#unmatched;
@@ -117,7 +118,7 @@ export class Scope {
 				? definition.derive
 				: definition.derive.map((hook) =>
 						'when' in hook && hook.when !== undefined
-							? { ...hook, when: rebase(hook.when, prefix) }
+							? scopedAt(hook, rebase(hook.when, prefix))
 							: hook,
 					);
 		return {
@@ -177,7 +178,7 @@ export class Scope {
 			}
 			const reached = reach(scoped, path);
 			if (reached === 'always') chain.push(hook);
-			else if (reached === 'maybe') chain.push({ ...hook, when: scoped });
+			else if (reached === 'maybe') chain.push(scopedAt(hook, scoped));
 		}
 		return chain;
 	}

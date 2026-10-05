@@ -4,6 +4,49 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the next one first: what changed, the code before and
 after, and whether it can break yours.
 
+## Next
+
+The next `@alxia/core` minor changes one status a client can get: a 405 at
+a guarded group's route, which its guard now answers. Nothing in its API
+changes.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [A guarded group refuses the 405 at its routes](#a-guarded-group-refuses-the-405-at-its-routes) | core | notice: a 401 or a 403 instead of a 405 for a client its guard refuses |
+
+### A guarded group refuses the 405 at its routes
+
+**What changed.** A 405 (and a 426) names a path's methods in its `Allow`,
+so it now runs the chain in force of every route at that path before it
+answers: after the app's chain, as every request no route matches runs it,
+the `derive`s and middlewares of each route's groups, in the order the
+routes were declared, each hook once. A group without a prefix, whose
+middlewares a request no route matches never ran, now guards it too:
+
+```ts
+const app = alxia().group((g) =>
+	g.use(requireUser).get('/secret', ({ reply }) => reply(200, 'secret')),
+);
+// before: DELETE /secret, anonymous → 405, Allow: GET
+// after:  DELETE /secret, anonymous → requireUser's 401, no Allow
+//         DELETE /secret, a user    → 405, Allow: GET
+```
+
+When several groups own methods at one path, each one's chain runs and the
+first refusal answers: the `Allow` names every owner's methods, so the
+request passes every owner's guard before it learns of them. A prefixed
+group behaves as before, its chain run once; a group in a mounted
+`plugin(app)` behaves as one on the app. A 404 is unchanged: it names
+nothing, and runs the app's chain alone. A route's own middlewares never
+run on a 405. The dev 405 `hint` follows the `Allow`. A preflight
+`cors()` answers from the app's `use()` is answered before any guard.
+
+**Can it break your code.** Notice it: a client or a test that expected a
+405 for a method a guarded route does not take, without the guard's
+credentials, now gets the guard's 401 or 403. With them, the 405 and its
+`Allow` are unchanged. See
+[Middleware: which chain a 405 runs](guide/middleware.md#which-chain-a-405-runs).
+
 ## 0.8.0
 
 `@alxia/core` 0.8.0 adds `fork()`, a socket's `upgrade` handler and the
@@ -1483,7 +1526,8 @@ the request runs the chain, and an error nobody caught is answered:
 - **A group's middlewares stay with its routes, and its prefix**: they run
   on its routes and, for a group with a prefix, on an unmatched request
   under it, before the 404 or 405. A group without a prefix adds none to
-  unmatched requests. The middlewares of an app given to `plugin(app)` are
+  unmatched requests (since the next release, it guards the 405 at its
+  routes' paths: [A guarded group refuses the 405 at its routes](#a-guarded-group-refuses-the-405-at-its-routes)). The middlewares of an app given to `plugin(app)` are
   the mounting app's: they run on unmatched requests too, unless the app
   has a prefix of its own.
 - **Errors are rejections through `next()`**: a middleware's

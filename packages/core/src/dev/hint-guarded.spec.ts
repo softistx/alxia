@@ -2,6 +2,7 @@
  * A 404's hint never names a route behind a guard the request has not
  * passed: a prefixed plugin's, a group's, a `use(path, …)`'s, a route's
  * own. The app-wide middlewares it did pass leave their routes offered.
+ * A 405's hint, which names a path's methods, is behind its routes' guards.
  */
 import { describe, expect, test } from 'bun:test';
 import { alxia } from '../app/alxia';
@@ -55,5 +56,25 @@ describe("a 404's hint and the guards", () => {
 			.get('/todos', ok);
 		const asked = await app.request('/todo', { headers: { 'x-pass': '1' } });
 		expect((await asked.json()).hint).toBe('did you mean GET /todos?');
+	});
+});
+
+describe("a 405's hint and the guards", () => {
+	test("a guarded group's methods are named only once its guard is passed, a prefix or none", async () => {
+		const app = alxia({ dev: true })
+			.group((g) => g.use(guard).get('/vault', ok))
+			.group('/ops', (g) => g.use(guard).get('/keys', ok));
+		for (const path of ['/vault', '/ops/keys']) {
+			const denied = await app.request(path, { method: 'DELETE' });
+			expect(denied.status).toBe(401);
+			expect(denied.headers.get('allow')).toBeNull();
+			expect(JSON.stringify(await denied.json())).not.toContain('GET');
+			const passed = await app.request(path, {
+				method: 'DELETE',
+				headers: { 'x-pass': '1' },
+			});
+			expect(passed.status).toBe(405);
+			expect((await passed.json()).hint).toBe(`${path} allows GET`);
+		}
 	});
 });

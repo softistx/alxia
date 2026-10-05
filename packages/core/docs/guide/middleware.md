@@ -116,9 +116,13 @@ Three rules follow, each spec'd:
   g.use(guard).get('/secret', …))` is the guard's 401, not a 405 whose
   `Allow` tells what is there — and on nothing else: no route declared
   after the group, no request outside its prefix. A group without a prefix
-  of its own adds none to unmatched requests, so `DELETE /secret` on its
-  guarded route is still a 405 with its `Allow`: to keep that from an anonymous
-  client, give the group a prefix or use `use(path, guard)`. A plugin with a prefix of its
+  of its own adds none to a 404, which names nothing, but guards what tells
+  its routes' methods: `DELETE /secret` behind `group(g =>
+  g.use(guard).get('/secret', …))` is the guard's 401 too, and the 405 with
+  its `Allow` comes once the guard calls `next`. When several groups own
+  methods at one path, each one's chain runs, in the order declared, after
+  the app's, and the first refusal answers; a route's own middlewares never
+  run there ([Which chain a 405 runs](#which-chain-a-405-runs)). A plugin with a prefix of its
   own (`alxia({ prefix: '/todos' })`, `defineRoutes('/todos')`) is such a
   group once mounted. A plugin without one (`app.plugin(otherApp)`) gives
   its middlewares to the app: the routes declared after it, and every
@@ -686,8 +690,36 @@ const app = alxia()
 // GET /admin/missing → 403 without x-admin, 404 with it; GET /missing → 404
 ```
 
-`group(build)` with no prefix is a scope alone. See
+`group(build)` with no prefix is a scope alone: its middlewares run on
+its routes, and on a 405 or a 426 at their paths, never on a 404. See
 [Groups and plugins: groups](groups-and-plugins.md#groups).
+
+### Which chain a 405 runs
+
+A 405 tells, in its `Allow`, the methods a path takes, and a 426 that a
+socket is there. Before it answers, it runs the app's chain, as every
+request no route matches does, then the chain in force of each route at
+that path, in the order those routes were declared: the `derive`s and
+middlewares of the groups they stand in, prefixed or not, and of a plugin
+mounted in a group. A hook already run — the app's, or one two routes
+share — runs once. The first that answers is the answer, without `Allow`;
+once every one called `next`, the 405 is sent with it.
+
+```ts
+const app = alxia()
+	.group((g) => g.use(requireUser).get('/reports', listReports))
+	.group((g) => g.use(requireAdmin).post('/reports', createReport));
+// DELETE /reports, anonymous             → requireUser's 401
+// DELETE /reports, a user                → requireAdmin's 403
+// DELETE /reports, an admin              → 405, Allow: GET, POST
+```
+
+Every owner's chain runs because the `Allow` names every owner's methods:
+a client must pass each guard whose route it would learn of. A route's own
+middlewares, its `validate` and `responds` among them, are its method's
+alone and never run on a 405; put a guard that must hide a path's methods
+in a group or in `use(path, guard)`. A preflight is answered by `cors()`,
+given to the app's `use()`, before any of these chains runs.
 
 ### `plugin` and `definePlugin`
 

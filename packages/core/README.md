@@ -250,7 +250,8 @@ Four rules follow from running on every request:
   guard that adds nothing to the context.
 - **A group's middlewares stay under its prefix**: its routes, and an
   unmatched request under the prefix, before its 404 or 405 — never a
-  route after the group. So does a plugin app with a prefix of its own,
+  route after the group. A group without a prefix guards the 405 at its
+  routes' paths, never a 404. So does a plugin app with a prefix of its own,
   `defineRoutes('/todos')`; the middlewares of a plugin app without one
   are the app's.
 - **A `use` after a route does not run for it**, and does for a request no
@@ -651,7 +652,8 @@ A group's routes are under its prefix and keep the middlewares declared
 before it; the ones it adds stay inside: its routes, and a request no
 route matches under its prefix, before the 404 or 405; never a route declared
 after the group, nor a request outside the prefix. `group(build)`, without a
-prefix, is a scope alone, and adds nothing to unmatched requests.
+prefix, is a scope alone: it adds nothing to a 404, and its guard still
+answers a 405 at its routes' paths, before the `Allow` that would name them.
 
 ## Plugins
 

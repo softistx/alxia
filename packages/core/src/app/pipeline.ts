@@ -41,7 +41,8 @@ export async function serve(
 /**
  * The route the request reached, run: the socket a `websocket` upgrade
  * asks for, a `GET` for a `HEAD` no route takes, or the 404, 405 or 426
- * when none answers, behind the app's chain (`unmatched`).
+ * when none answers, behind the app's chain (`unmatched`) — a 405's and a
+ * 426's behind the chains of the routes at its path too.
  */
 async function route(
 	runtime: Runtime,
@@ -55,7 +56,7 @@ async function route(
 		method: string,
 	):
 		| { readonly value: Definition; readonly params: Record<string, string> }
-		| { readonly allowed: readonly string[] }
+		| { readonly path: string; readonly allowed: readonly string[] }
 		| undefined => {
 		if (path === undefined) {
 			const pages = globals.pages.size === 0 ? undefined : globals.pages.keys();
@@ -67,7 +68,7 @@ async function route(
 		if (value !== undefined) {
 			return { value, params: router.paramsAt(path, url.pathname) };
 		}
-		return { allowed: [...methods.keys()] };
+		return { path, allowed: [...methods.keys()] };
 	};
 
 	if (upgrade) {
@@ -98,9 +99,13 @@ async function route(
 	}
 	if (match === undefined) return unmatched(runtime, ctx, 404);
 	if ('allowed' in match) {
+		// What tells the path's methods runs behind the chains of its routes.
+		const owners = router.methodsAt(match.path)?.values();
 		const allowed = match.allowed.filter((method) => method !== 'WS');
-		if (allowed.length === 0) return unmatched(runtime, ctx, 426);
-		return unmatched(runtime, ctx, 405, allowed);
+		if (allowed.length === 0) {
+			return unmatched(runtime, ctx, 426, undefined, owners);
+		}
+		return unmatched(runtime, ctx, 405, allowed, owners);
 	}
 	const definition = match.value;
 	(ctx as { route: string | undefined }).route = definition.path;
