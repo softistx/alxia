@@ -1,5 +1,19 @@
 # @alxia/graphql
 
+## 0.6.0
+
+### Minor Changes
+
+- [#182](https://github.com/softistx/alxia/pull/182) [`9ab4a7f`](https://github.com/softistx/alxia/commit/9ab4a7fd3a62545b15f788e3c6da51ac73de2705) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Tell the observers around a `ws: true` upgrade of each operation on the socket, from its `subscribe` message to its end, with its type, its name and whether it was answered with errors: `@alxia/logger` writes a line for each, `@alxia/telemetry` a span.
+
+### Patch Changes
+
+- [#184](https://github.com/softistx/alxia/pull/184) [`e17dfd8`](https://github.com/softistx/alxia/commit/e17dfd8889e6900ba4394e0a15dd96b9ac78f33c) Thanks [@SteveGT96](https://github.com/SteveGT96)! - A body past core's `bodyLimit` is answered with core's 413 (problem+json under `errors: 'problem'`), with a `Content-Length` or chunked, instead of Yoga's 400 "POST body sent invalid JSON."; and Yoga's 400 for a request it cannot parse no longer carries the parser's error in `extensions.originalError`.
+
+- [#178](https://github.com/softistx/alxia/pull/178) [`f08d901`](https://github.com/softistx/alxia/commit/f08d901ea5dd553a029382b6f18460306d1a1ae5) Thanks [@SteveGT96](https://github.com/SteveGT96)! - A guide page, "Harden a GraphQL API for production": rate limiting the endpoint (by viewer, or by `forwardedIp` behind a proxy; a batch is one request), depth limits, introspection off outside development with `isDev`, masked errors and the `GraphQLError`s a client may read, `bodyLimit` (Yoga answers a body past it with a 400), CSRF for a cookie session, and persisted operations, each snippet type-checked and run in the GraphQL recipe.
+- Updated dependencies [[`89aa1df`](https://github.com/softistx/alxia/commit/89aa1df408840165fca6eb189aabedc3fee498ba), [`4a6df2b`](https://github.com/softistx/alxia/commit/4a6df2b1cfc4bf87c4f5b38a856c3157acf1e42f), [`e536262`](https://github.com/softistx/alxia/commit/e5362622a260faa3320bc1cdbd456bae07565953), [`d256d6a`](https://github.com/softistx/alxia/commit/d256d6a169bb9a532014814c3aea888fd592c762), [`9ab4a7f`](https://github.com/softistx/alxia/commit/9ab4a7fd3a62545b15f788e3c6da51ac73de2705)]:
+  - @alxia/core@0.8.0
+
 ## 0.5.0
 
 ### Minor Changes

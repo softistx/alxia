@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.3.3
+
+### Patch Changes
+
+- [#183](https://github.com/softistx/alxia/pull/183) [`89aa1df`](https://github.com/softistx/alxia/commit/89aa1df408840165fca6eb189aabedc3fee498ba) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects install a `@alxia/core` that has `app.fork()`; the templates are unchanged.
+
 ## 0.3.2
 
 ### Patch Changes

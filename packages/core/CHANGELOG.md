@@ -1,5 +1,21 @@
 # @alxia/core
 
+## 0.8.0
+
+### Minor Changes
+
+- [#183](https://github.com/softistx/alxia/pull/183) [`89aa1df`](https://github.com/softistx/alxia/commit/89aa1df408840165fca6eb189aabedc3fee498ba) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `app.fork()` builds several apps on one base: a copy of the app — its routes, its middlewares and `derive`s in force, its lifecycle hooks, parsers and options — typed as it is, that shares nothing declared next with it. `base.fork().plugin(todos)` and a spec's `base.fork().use(fakeSession).plugin(todos)` no longer collide on the registered base. A method and path declared twice now says when `base.fork()` is the fix, naming the case where the very same route was mounted twice. `fork()` on the app a group's build is given throws: it shares the app's lifecycle hooks.
+
+- [#179](https://github.com/softistx/alxia/pull/179) [`d256d6a`](https://github.com/softistx/alxia/commit/d256d6a169bb9a532014814c3aea888fd592c762) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Add an `upgrade` socket handler: `app.ws(path, ...middlewares, { upgrade, open, message })` awaits `upgrade(data, headers)` after the route's middlewares and before the `101`. `data` is what `socket.data` will be, `headers` the `101`'s, and a throw answers the upgrade request in the app's error format, with no socket opened. It is not run without a server, nor for a handshake Bun would refuse (not a `GET`, no `Sec-WebSocket-Key`, or a version other than 13): those get the 426 first.
+
+- [#182](https://github.com/softistx/alxia/pull/182) [`9ab4a7f`](https://github.com/softistx/alxia/commit/9ab4a7fd3a62545b15f788e3c6da51ac73de2705) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Add `onOperation(ctx, observer)` and `startOperation(ctx, report)`, the operations a socket runs after its upgrade, for the observers around that upgrade: an observer subscribes before `next()`, is called as each operation starts, and is told `'ok'` or `'errors'` once it ends. New types `OperationObserver` and `OperationOutcome`.
+
+### Patch Changes
+
+- [#185](https://github.com/softistx/alxia/pull/185) [`4a6df2b`](https://github.com/softistx/alxia/commit/4a6df2b1cfc4bf87c4f5b38a856c3157acf1e42f) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs only: `upgrading.md` gains the 0.6.0 and 0.7.0 sections, its 0.4.0 note on a group's middlewares and unmatched requests no longer contradicts the Middleware guide (a group with a prefix guards the unmatched requests under it; one without adds none), a spec pins that for a group without a prefix and a group in a mounted app, and Routes gains a recipe for a refusal handler scoped to some routes.
+
+- [#186](https://github.com/softistx/alxia/pull/186) [`e536262`](https://github.com/softistx/alxia/commit/e5362622a260faa3320bc1cdbd456bae07565953) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs only: `upgrading.md` gains the 0.8.0 section (`fork()`, a socket's `upgrade` handler, `onOperation` and `startOperation`, the proxy's WebSocket, the GraphQL 413, the telemetry's upgrade span, the logger's wider `outcome`), and the two entries that were listed under 0.7.0 as not in it move there.
+
 ## 0.7.0
 
 ### Minor Changes

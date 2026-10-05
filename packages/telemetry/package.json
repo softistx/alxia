@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/telemetry",
-	"version": "0.5.0",
+	"version": "0.6.0",
 	"description": "Traces and logs for alxia on @nxgt/telemetry: one server span per request around everything it runs, the traceparent continued, the route as its name",
 	"license": "MIT",
 	"type": "module",
