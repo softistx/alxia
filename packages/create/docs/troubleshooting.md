@@ -462,17 +462,17 @@ where you were, pin the previous version again, `0.7.0` after a move to `0.8.0`:
 
 ### `TypeError: matchesSpec(): 1 operation has no route: DELETE /todos/:id (deleteTodo)`
 
-With several, `2 operations have no route: …`; a route outside the spec
-reads `1 route has no operation: …`, after a `;` when both happen.
+With several, `2 operations have no route: …`; under `matchesSpec(app, operations, { strict: true })`, a route outside
+the spec reads `1 route has no operation: …`, after a `;` when both happen.
 
 **When:** `bun test`, in `src/app.spec.ts`, after an operation was added
 to `openapi.yaml` and `bun run generate` run, before `src/routes/todos.ts` routes
 it. The path is in alxia's form, `/todos/:id`, and the `operationId` is
 in parentheses.
 
-**Why:** `matchesSpec(app, operations)` checks both ways: every operation
-of `src/generated/alxia.ts` has a route of its method and path, and every
-route has an operation.
+**Why:** `matchesSpec(app, operations)` checks that every operation
+of `src/generated/alxia.ts` has a route of its method and path (and, under
+`strict`, that every route has an operation).
 
 **Fix:** bind the operation in `src/routes/todos.ts`
 ([Adding an operation](guide.md#adding-an-operation)):

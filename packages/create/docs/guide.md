@@ -518,7 +518,8 @@ test("creates a todo from JSON", async () => {
 
 `matchesSpec(app, operations)`, from
 [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi), throws
-when an operation has no route, or a route has no operation, naming each.
+when an operation has no route, naming each; `strict: true` also throws on
+a route with no operation.
 The spec also checks the 400, the 401 before the body and the 404 through
 the client, and keeps one test on `app.request()`: the client sends only
 what the spec allows, so a request it forbids (`/todos/first`) goes

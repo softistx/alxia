@@ -77,7 +77,7 @@ import { matchesSpec } from '@alxia/openapi';
 import { app } from './app';
 import { operations } from './generated/alxia';
 
-test('routes every operation of openapi.yaml, and nothing else', () => {
+test('routes every operation of openapi.yaml', () => {
 	matchesSpec(app, operations);
 });
 ```
@@ -138,18 +138,31 @@ TypeError: implemented(): 2 operations have no route: GET /pets/:petId (getPet),
 ```ts
 import { matchesSpec } from '@alxia/openapi';
 
+const { extra } = matchesSpec(app, operations);
+```
+
+`matchesSpec` throws as `implemented` does: on each operation with no route,
+and so on a route of another method or path. A route no operation declares
+(a proxied one, a health check, a hand-written one) does not fail; it is
+returned as `extra`, `[{ method, path }]`, so a test can assert on it.
+
+For a spec that must be exhaustive, pass `strict: true`: each route no
+operation declares fails too, `exclude` aside. The routes of `apiDocs()`
+and the probes of `@alxia/core`'s `health()` are left out already:
+
+```ts
 matchesSpec(app, operations, {
+	strict: true,
 	exclude: (route) => route.path === '/metrics',
 });
 ```
 
-`matchesSpec` throws as `implemented` does, and also lists each route no
-operation declares, `exclude` aside. The routes of `apiDocs()` and the
-probes of `@alxia/core`'s `health()` are left out already:
-
 ```text
 TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
 ```
+
+Upgrading from before this check was lenient: to keep the old check, pass
+`strict: true`.
 
 ## Under a prefix
 
@@ -248,7 +261,7 @@ The core's side of the move is in its
 | export | |
 | --- | --- |
 | `implemented(app, operations, options?)`, `ImplementedOptions` | throws a `TypeError` listing each operation with no route, or one with the core's reason for an operation path no route may be declared at. `prefix` |
-| `matchesSpec(app, operations, options?)`, `MatchesSpecOptions` | the same, and each route no operation declares — `apiDocs()`'s and `@alxia/core`'s `health()` probes left out. `prefix`, `exclude` |
+| `matchesSpec(app, operations, options?)`, `MatchesSpecOptions`, `MatchesSpecReport` | the same, and returns `{ extra }`, the routes no operation declares; under `strict: true` they throw instead — `apiDocs()`'s and `@alxia/core`'s `health()` probes left out. `prefix`, `strict`, `exclude` |
 | `apiDocs(options)`, `ApiDocsOptions`, `DocsUi`, `DocsServer` | a plugin: the page at `path`, the document at `path/openapi.yaml` and `.json`. `spec`, `path`, `ui`, `title`, `servers`, `enabled` |
 | `isApiDocsRoute(route)` | whether `apiDocs` declared a route, given any `{ handler }` (`Pick<RouteDefinition, 'handler'>`, as core's `isHealthRoute`); `matchesSpec` leaves them out already |
 | `Operations` | what both take: an object of core's `RouteOperation`, or a list of them |

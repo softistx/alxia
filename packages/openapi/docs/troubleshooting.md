@@ -85,8 +85,10 @@ missing too:
 TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
 ```
 
-**When:** `matchesSpec` found a route on the app that no operation declares,
-named by method and full path.
+**When:** `matchesSpec` ran with `strict: true` and found a route on the app
+that no operation declares, named by method and full path. Without
+`strict`, such a route does not fail the check: it is listed in the report's
+`extra`.
 
 **Why:** the route is not in the spec — an admin route, a health check, the
 pages of a React Router app, an `app.static('/assets', …)` mount
@@ -96,16 +98,18 @@ of `apiDocs()` are never listed: `matchesSpec` leaves them out by itself,
 so a `/health` here is a route written by hand.
 
 **Fix:** add the operation to the document and generate again, remove the
-route, or leave it out on purpose with `exclude`:
+route, leave it out on purpose with `exclude`, or drop `strict` to let the
+app serve routes the document does not describe:
 
 ```ts
 matchesSpec(app, api, {
+	strict: true,
 	exclude: (route) => route.path === '/health' || route.path.startsWith('/assets/'),
 });
 ```
 
-If only the routes that need no operation are listed, `implemented` may be
-the check you want.
+If only the routes that need no operation are listed, the default
+`matchesSpec` or `implemented` may be the check you want.
 
 ### `TypeError: implemented(): the prefix "…" must start with "/" and not end with one`
 
@@ -217,15 +221,15 @@ allow `https://cdn.jsdelivr.net` for `script-src` and `style-src`,
 
 ### `matchesSpec(): … routes have no operation: GET /docs, …`
 
-**When:** the message lists the docs routes.
+**When:** the message lists the docs routes, under `strict`.
 
-**Why:** `matchesSpec` leaves out the routes `apiDocs` declared, by their
+**Why:** under `strict`, `matchesSpec` leaves out the routes `apiDocs` declared, by their
 handlers. A route declared by hand at `/docs`, or by a copy of
 `@alxia/openapi` the check does not share (two versions installed), is not
 recognised.
 
 **Fix:** one version of `@alxia/openapi` (`bun why @alxia/openapi`), or
-`matchesSpec(app, operations, { exclude: (r) => r.path.startsWith('/docs') })`.
+`matchesSpec(app, operations, { strict: true, exclude: (r) => r.path.startsWith('/docs') })`.
 
 ## Generator
 

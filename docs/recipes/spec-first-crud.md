@@ -13,7 +13,7 @@ taken one step further, with every operation of a CRUD. The shape:
 openapi.yaml ──generate──▶ src/generated/  ──▶ route(operation, handler)
      │                       alxia.ts: operations     │
      │                       paths.ts:  the client's types
-     ├──▶ matchesSpec(app, operations)   a test: no operation without a route, no route without one
+     ├──▶ matchesSpec(app, operations)   a test: no operation without a route
      └──▶ apiDocs({ spec })              the page and the document, served
 ```
 
@@ -280,8 +280,10 @@ app.listen({ port: Number(Bun.env['PORT'] ?? 3000) });
 
 ## 3. Prove it
 
-`matchesSpec` fails while an operation has no route and when a route has no
-operation: `apiDocs`'s routes and `health()`'s are left out by themselves.
+`matchesSpec` fails while an operation has no route, or a route has another
+method or path than its operation. A route the document lacks does not fail,
+and comes back as `extra`; pass `{ strict: true }` to fail on it too, where
+`apiDocs`'s routes and `health()`'s are left out by themselves.
 The client is typed from the same document, and its `fetch` is the app's:
 every call is in process, no server, and a test that no longer matches the
 document stops compiling.
@@ -301,7 +303,7 @@ const api = createClient<paths>({
 	headers: { 'x-api-key': 'dev-key' },
 });
 
-test('routes every operation of openapi.yaml, and nothing else', () => {
+test('routes every operation of openapi.yaml', () => {
 	matchesSpec(app, operations);
 });
 

@@ -80,5 +80,5 @@ Use the client for the contract, and `app.request` for what breaks it.
 ## Beside `matchesSpec`
 
 `matchesSpec(app, operations)` ([the checks](checks.md)) proves every
-operation has a route, and the client proves a call to it answers as the
+operation has a route (and, under `strict`, every route an operation), and the client proves a call to it answers as the
 spec says. Run both.

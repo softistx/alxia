@@ -27,10 +27,27 @@ export interface ImplementedOptions {
 
 export interface MatchesSpecOptions extends ImplementedOptions {
 	/**
-	 * A route no operation has to declare. The routes of `apiDocs()` and
-	 * the probes of `@alxia/core`'s `health()` are left out already.
+	 * Fail on each route no operation declares too, so the document is
+	 * exhaustive. Off by default: an app may serve routes the document does
+	 * not describe (a proxied one, a hand-written one) and still match it.
+	 */
+	readonly strict?: boolean;
+	/**
+	 * A route no operation has to declare, under `strict`. The routes of
+	 * `apiDocs()` and the probes of `@alxia/core`'s `health()` are left out
+	 * already.
 	 */
 	readonly exclude?: (route: RouteDefinition) => boolean;
+}
+
+/** What `matchesSpec` returns when it passes. */
+export interface MatchesSpecReport {
+	/**
+	 * The routes of the app no operation declares, by method and full path,
+	 * `exclude`, `apiDocs()` and `health()` aside. Information by default;
+	 * under `strict` a failure, so it is always empty on return.
+	 */
+	readonly extra: readonly { readonly method: string; readonly path: string }[];
 }
 
 /**
@@ -66,17 +83,17 @@ export function implemented(
 }
 
 /**
- * Throws a `TypeError` unless `app` and `operations` match both ways: each
- * operation with no route, as `implemented` lists it, and each route of
- * `app` that no operation declares, `exclude` aside. One call checks both;
- * `implemented` alone is for an app that serves more than its document.
+ * Throws a `TypeError` listing each operation with no route, as
+ * `implemented` does: a route of another method or path does not serve it.
+ * A route no operation declares does not fail, and is returned as `extra`;
+ * with `strict: true` it fails too, `exclude` aside.
  */
 export function matchesSpec(
 	app: { readonly routes: readonly RouteDefinition[] },
 	operations: Operations,
 	options: MatchesSpecOptions = {},
-): void {
-	match('matchesSpec', app, operations, options);
+): MatchesSpecReport {
+	return match('matchesSpec', app, operations, options);
 }
 
 function match(
@@ -84,21 +101,25 @@ function match(
 	app: Routed,
 	operations: Operations,
 	options: MatchesSpecOptions,
-): void {
+): MatchesSpecReport {
 	const all = wanted(check, operations, options.prefix);
 	const missing = unrouted(app, all);
 	const declared = new Set(all.map(keyOf));
-	const extra = app.routes.filter(
+	const undocumented = app.routes.filter(
 		(route) =>
 			!declared.has(keyOf(route)) &&
 			!isApiDocsRoute(route) &&
 			!isHealthRoute(route) &&
 			!(options.exclude?.(route) ?? false),
 	);
+	const extra = undocumented.map(({ method, path }) => ({ method, path }));
 	const parts: string[] = [];
 	if (missing.length > 0) parts.push(noRoute(missing));
-	if (extra.length > 0) parts.push(noOperation(extra));
+	if (options.strict === true && undocumented.length > 0) {
+		parts.push(noOperation(undocumented));
+	}
 	if (parts.length > 0) throw new TypeError(`${check}(): ${parts.join('; ')}`);
+	return { extra };
 }
 
 function wanted(
