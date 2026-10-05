@@ -31,7 +31,7 @@ bun create @alxia my-site --template react-router
 ```
 
 `minimal` is the one to start with: one file, one dependency, a test, and
-`bun dev` answering in under a minute.
+`bun dev` answering in 30 seconds.
 
 | template | what it writes |
 | --- | --- |
@@ -56,7 +56,7 @@ declare module "@alxia/core" {
 
 // src/routes/todos.ts, in part: no import of the app
 const requireKey = defineMiddleware(({ request, reply }, next) =>
-  request.headers.get("x-api-key") === apiKey
+  request.headers.get("x-api-key") === env.API_KEY
     ? next()
     : reply(401, { error: "unauthorized" as const }),
 );
@@ -199,7 +199,7 @@ or CI.
 
 ## Versions
 
-- **alxia's packages** — `@alxia/core`, `@alxia/env` and `@alxia/openapi` (`api`),
+- **alxia's packages** — `@alxia/core`, `@alxia/env` (`api`, `graphql`), `@alxia/openapi` (`api`),
   `@alxia/graphql` (`graphql`) and `@alxia/react-router` (`react-router`) — are moved to the newest version on the registry
   within the ranges this release of `@alxia/create` was published with:
   `^0.3.1` writes `^0.3.4` once 0.3.4 is out, never `^0.4.0`. Just after a

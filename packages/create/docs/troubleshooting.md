@@ -55,6 +55,10 @@ print, or — for a trap that prints nothing — the symptom.
 - [`error: Could not resolve: "../schema.graphql"`, or `TS2307` for it](#error-could-not-resolve-schemagraphql-or-ts2307-for-it)
 - [`Sign in to add a note`](#sign-in-to-add-a-note)
 
+**The environment**
+
+- [`EnvError: The environment is invalid:`](#enverror-the-environment-is-invalid)
+
 **Biome**
 
 - [`bun ci` installs, and checks nothing](#bun-ci-installs-and-checks-nothing)
@@ -615,6 +619,36 @@ curl localhost:3000/graphql -H 'content-type: application/json' \
 
 Tokens live in `src/store.ts`: replace them with a session lookup or a
 JWT check outside development.
+
+## The environment
+
+### `EnvError: The environment is invalid:`
+
+`bun dev`, `bun start` or `bun test` stops before it listens, in the `api`
+and `graphql` projects, with every variable that failed:
+
+```
+EnvError: The environment is invalid:
+  PORT: Invalid input: expected number, received NaN; expected number
+  NODE_ENV: Invalid option: expected one of "development"|"test"|"production"; expected "development" | "test" | "production"
+```
+
+**Why:** `src/env.ts` calls `defineEnv` from `@alxia/env`, which checks each
+variable with its own Zod schema once, when the module is first imported,
+from `Bun.env` (the shell's, and the `.env` Bun loads). A value that fails
+stops the process, as the first request that read it would have failed
+later. A secret's value is never printed: `API_KEY` shows as `***`.
+
+**Fix:** set the variables the message names, in the shell or in `.env`
+(`cp .env.example .env`), or remove the wrong line:
+
+```sh
+PORT=3000 bun dev
+```
+
+A variable the schema gives a default (`PORT`, `NODE_ENV`, the `api`
+project's `API_KEY`) is fine unset. `bun test` sets `NODE_ENV=test`: a
+`.env` that sets `NODE_ENV` to another value overrides it.
 
 ## Biome
 

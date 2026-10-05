@@ -150,7 +150,7 @@ my-api/
 │   ├── routes/todos.ts        defineRoutes(): one route per operation
 │   ├── app.ts                 the app: the base, then the routes, and its type
 │   ├── app.spec.ts            bun test: app.request(), no port, and matchesSpec
-│   └── server.ts              app.listen(PORT), stopped on SIGTERM
+│   └── server.ts              app.listen(env.PORT), stopped on SIGINT and SIGTERM
 ├── package.json
 ├── tsconfig.json
 ├── biome.json                 Biome: lint, format, imports sorted
@@ -453,7 +453,7 @@ route(operation, ...middlewares, handler)
 import { expect, test } from "bun:test";
 import { matchesSpec } from "@alxia/openapi";
 import { app } from "./app";
-import { apiKey } from "./context";
+import { env } from "./env";
 import { operations } from "./generated/alxia";
 
 test("routes every operation of openapi.yaml, and nothing else", () => {
@@ -463,7 +463,7 @@ test("routes every operation of openapi.yaml, and nothing else", () => {
 test("creates a todo from JSON", async () => {
   const response = await app.request("/todos", {
     method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": apiKey },
+    headers: { "content-type": "application/json", "x-api-key": env.API_KEY },
     body: JSON.stringify({ title: "Write a route" }),
   });
   expect(response.status).toBe(201);
@@ -1004,7 +1004,7 @@ Two stages: every dependency, installed with
 running `bun --no-install dist/server.js`, `start`'s command with
 Bun's `--no-install` (not create-alxia's option of the same name), so that a package missing from the bundle fails at
 startup rather than being fetched from npm, written out so that Bun
-is the container's process. `src/server.ts` stops the app on `SIGTERM`:
+is the container's process. `src/server.ts` stops the app on `SIGINT` and `SIGTERM`:
 as process 1, Bun would otherwise ignore it, and `docker stop` would wait.
 Nothing is generated in the image: `src/generated/` is committed, and
 `COPY . .` brings it with the rest, so the build stage runs no
