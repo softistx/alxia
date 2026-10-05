@@ -149,7 +149,7 @@ my-api/
 │   ├── context.ts             the base: what every route reads, and its Register
 │   ├── routes/todos.ts        defineRoutes(): one route per operation
 │   ├── app.ts                 the app: the base, then the routes, and its type
-│   ├── app.spec.ts            bun test: app.request(), no port, and matchesSpec
+│   ├── app.spec.ts            bun test: the typed client over app.fetch, and matchesSpec
 │   └── server.ts              app.listen(env.PORT), stopped on SIGINT and SIGTERM
 ├── package.json
 ├── tsconfig.json
@@ -449,32 +449,47 @@ route(operation, ...middlewares, handler)
 
 ### `src/app.spec.ts`
 
+The spec calls the app through the client the generated `paths.ts`
+describes, [openapi-fetch](https://openapi-ts.dev/openapi-fetch/) (a dev
+dependency), whose `fetch` is `app.fetch`: in process, no server, no port,
+and every path, parameter, body and reply typed by `openapi.yaml`.
+
 ```ts
 import { expect, test } from "bun:test";
 import { matchesSpec } from "@alxia/openapi";
+import createClient from "openapi-fetch";
 import { app } from "./app";
 import { env } from "./env";
 import { operations } from "./generated/alxia";
+import type { paths } from "./generated/paths";
+
+const api = createClient<paths>({
+  baseUrl: "http://alxia.test",
+  fetch: (request) => app.fetch(request),
+  headers: { "x-api-key": env.API_KEY },
+});
 
 test("routes every operation of openapi.yaml, and nothing else", () => {
   matchesSpec(app, operations);
 });
 
 test("creates a todo from JSON", async () => {
-  const response = await app.request("/todos", {
-    method: "POST",
-    headers: { "content-type": "application/json", "x-api-key": env.API_KEY },
-    body: JSON.stringify({ title: "Write a route" }),
+  const { data, response } = await api.POST("/todos", {
+    body: { title: "Write a route" },
   });
   expect(response.status).toBe(201);
+  expect(data?.title).toBe("Write a route");
 });
 ```
 
 `matchesSpec(app, operations)`, from
 [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi), throws
 when an operation has no route, or a route has no operation, naming each.
-The spec also checks the 400, the 401 before the body and the 404, each
-with `app.request()`, in process, with no port.
+The spec also checks the 400, the 401 before the body and the 404 through
+the client, and keeps one test on `app.request()`: the client sends only
+what the spec allows, so a request it forbids (`/todos/first`) goes
+through `app.request`. See
+[Testing with the generated client](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/testing.md).
 
 ### Adding an operation
 
@@ -758,6 +773,12 @@ to `.env` to set them.
 
 `bun run verify` is `generate --check`, `check:ci`, `typecheck`, then
 `test`: it fails when `src/generated/` is not what `schema.graphql` gives.
+
+The spec's `query` helper types its result by hand (`Result`). To type each
+operation's variables and data from `schema.graphql`, add
+`@graphql-codegen/client-preset` and write the operations with its `graphql()`
+tag; the template does not ship it, to keep `src/generated/` to the
+resolvers.
 
 ### The build bundles the schema
 

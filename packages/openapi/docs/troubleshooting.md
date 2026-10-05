@@ -24,6 +24,7 @@ it to fail prints nothing; those are under [Traps](#traps), by symptom.
 - [`alxia.ts leaves it out. … [ignored]`](#alxiats-leaves-it-out--ignored)
 - [A cookie parameter is missing from `types.ts` and the client files](#a-cookie-parameter-is-missing-from-typests-and-the-client-files)
 - [A client refuses alxia's 400, or types it `{ status, message, timestamp, issues }`](#a-client-refuses-alxias-400-or-types-it--status-message-timestamp-issues-)
+- [A test through the client sends a request to a real address](#a-test-through-the-client-sends-a-request-to-a-real-address)
 
 **Types**
 
@@ -305,6 +306,27 @@ export default defineConfig({
 	validationErrors: false,
 });
 ```
+
+### A test through the client sends a request to a real address
+
+**Symptom:** a test using `createClient<paths>({ baseUrl })` fails with
+`ConnectionRefused` or `Unable to connect`, or reaches a server that is
+running.
+
+**Why:** no `fetch` was given, so openapi-fetch uses the global one and sends
+the request over the network. The app is called in process only when the
+client's `fetch` is `app.fetch`.
+
+**Fix:** pass it, and `baseUrl` stays a name nothing answers to:
+
+```ts
+const api = createClient<paths>({
+  baseUrl: 'http://alxia.test',
+  fetch: (request) => app.fetch(request),
+});
+```
+
+See [Testing with the generated client](guide/testing.md).
 
 ## Types
 

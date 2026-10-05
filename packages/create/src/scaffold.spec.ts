@@ -44,6 +44,7 @@ describe('create-alxia: the project written', () => {
 				// `verify` still passes when a newer patch writes differently.
 				'@nxgt/openapi-codegen': '0.7.0',
 				'@types/bun': '^1.4.2',
+				'openapi-fetch': '^0.17.1',
 				typescript: '^7.0.2',
 			},
 		});
@@ -171,7 +172,7 @@ describe('create-alxia: the project written', () => {
 			),
 		).toBe(0);
 		expect(err[0]).toBe(
-			'create-alxia: warning: the registry did not answer for @alxia/core, @alxia/env, zod, @alxia/openapi, @biomejs/biome, @types/bun, typescript; kept the versions the template ships.',
+			'create-alxia: warning: the registry did not answer for @alxia/core, @alxia/env, zod, @alxia/openapi, @biomejs/biome, @types/bun, openapi-fetch, typescript; kept the versions the template ships.',
 		);
 		expect(
 			(await json(join(project.root, 'my-api', 'package.json'))).devDependencies

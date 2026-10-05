@@ -297,7 +297,8 @@ const { data, error } = await api.GET('/todos/{id}', { params: { path: { id: 1 }
 
 With `validationErrors: false`, the 400 a client is typed by is the one the
 spec declares, the one alxia sends. In another project, generate from the
-same `openapi.yaml`.
+same `openapi.yaml`. A test calls the app through the same client, in
+process: [Testing with the generated client](testing.md).
 
 ## What the generator leaves out (0.7.0)
 
