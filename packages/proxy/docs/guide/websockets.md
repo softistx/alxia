@@ -76,8 +76,8 @@ upstream is closed with 1001 past `timeout`.
 - Text stays text, binary stays binary.
 - What the upstream sends between its open and the client's is queued, then
   sent in order: 1024 frames and `maxBuffered` bytes at most, past which the
-  upstream is closed with 1013 (try again later), and so is the client as it
-  opens.
+  upstream is closed with 1013 (try again later), reason `client not open
+  yet`, and so is the client as it opens.
 - A close on either side closes the other with the same code and reason.
   Codes that a socket only reports are mapped: 1005 to 1000, and any code a
   peer may not send (1004, 1006, 1015, 1016 to 2999, outside 1000 to 4999) to 1011.
@@ -117,14 +117,16 @@ by default:
 
 ```ts
 import { alxia } from '@alxia/core';
-import { proxy, OVERLOADED_CLOSE } from '@alxia/proxy';
+import { proxy } from '@alxia/proxy';
 
 const app = alxia().ws('/live', proxy.ws('ws://chat.internal:8080', { maxBuffered: 256 * 1024 }));
+```
 
-// In the browser:
+```ts
+// In the browser: 1013 (OVERLOADED_CLOSE on the server) says try again later.
 const socket = new WebSocket('ws://localhost:3000/live');
 socket.addEventListener('close', (event) => {
-	if (event.code === OVERLOADED_CLOSE) setTimeout(reconnect, 1_000); // 1013: try again later
+	if (event.code === 1013) setTimeout(reconnect, 1_000);
 });
 declare function reconnect(): void;
 ```
@@ -142,8 +144,15 @@ declare function reconnect(): void;
   `maxBuffered` bytes, or a frame Bun dropped (past its own
   `backpressureLimit`, 16 MiB by default), closes both sides with 1013,
   `OVERLOADED_CLOSE`, reason `client too slow` or `upstream too slow`,
-  rather than queue it. What the proxy holds per direction is the cap plus
-  one frame.
+  rather than queue it. The slow side reads nothing, so it may never take
+  the close frame queued behind the rest: one second later its connection
+  is cut, and what Bun buffered for it is freed.
+
+What one relay may hold is about the cap plus one frame per direction (a
+frame is at most Bun's `maxPayloadLength`, 16 MiB by default), plus the
+kernel's socket buffers. This bounds each connection, not their number:
+limit how many sockets a client may open — a guard or a rate limit before
+`proxy.ws` — to bound the total.
 
 1013 rather than 1009: 1009 says a message is too big, whatever the
 reader's pace; 1013 says the peer is overloaded and the client may come back

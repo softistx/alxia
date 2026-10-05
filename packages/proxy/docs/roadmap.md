@@ -48,7 +48,7 @@ Nothing scheduled yet.
   so the upstream slows down instead of frames piling up in the proxy's
   memory. Past `maxBuffered` bytes queued for either side (1 MiB by
   default), both close with 1013 (`OVERLOADED_CLOSE`), so a reader that
-  never reads cannot exhaust the proxy. The frames queued before the
+  never reads holds no more than the cap. The frames queued before the
   client's socket opens count toward the same cap.
 
 ### 0.2.0

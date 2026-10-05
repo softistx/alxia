@@ -39,6 +39,16 @@ describe('proxy.ws, between the upstream open and the client open', () => {
 		expect(closed).toEqual({ code: 4002, reason: 'hung up' });
 	});
 
+	test("an upstream's burst at its open reaches the client whole, in order", async () => {
+		const greeting = Array.from({ length: 200 }, (_, i) => `f${i}`);
+		const { up } = socketUpstream({ greeting });
+		const url = serve(alxia().ws('/live', proxy.ws(up.url)));
+		const { socket, received } = await client(url, '/live');
+		await until(() => received.length === 200);
+		expect(received).toEqual(greeting);
+		socket.close();
+	});
+
 	test('past 1024 frames queued for a client not open yet, the upstream is closed with 1013', async () => {
 		// Bun opens the client's socket within its upgrade, before the upstream
 		// can send a frame: a server whose upgrade fails keeps the queue filling.

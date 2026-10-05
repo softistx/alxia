@@ -12,102 +12,30 @@
  * Either way, a frame for a side whose queue already holds more than
  * `maxBuffered` bytes — or one Bun dropped — closes both sides with 1013
  * (try again later) rather than queue it: memory stays bounded by the cap
- * and one frame, per direction.
+ * and one frame, per direction. The slow side, which reads nothing, may
+ * never take the close frame queued behind the rest: past a grace, its
+ * connection is cut, so what Bun buffered for it is freed.
  */
-import type { Socket } from '@alxia/core';
-import type { Plan, ProxyContext } from './options';
+import { OVERLOADED_CLOSE } from './socket-close';
+import type { Relay } from './socket-relay';
 
 /** The default `maxBuffered`: 1 MiB per direction. */
 export const MAX_BUFFERED = 1024 * 1024;
 
-/** The close code of a relay past its cap: 1013, try again later. */
-export const OVERLOADED_CLOSE = 1013;
-
-/**
- * The frames the upstream may send before the client's socket opens — a
- * count; `maxBuffered` bounds their bytes. Past either, a close with 1013.
- */
-const PENDING = 1024;
+/** Milliseconds a side closed for being slow has to take its close frame, before its connection is cut. */
+const CLOSE_GRACE = 1_000;
 
 /** A frame as the upstream socket sends it. */
 export type Frame = string | Uint8Array<ArrayBuffer>;
 
-type ClientSocket = Socket<ProxyContext<unknown>, unknown>;
-
-export interface Relay {
-	readonly upstream: WebSocket;
-	readonly maxBuffered: number;
-	/** The client's socket, once open. */
-	client?: ClientSocket;
-	/** What the upstream sent before the client's socket opened. */
-	readonly pending: Frame[];
-	/** The bytes in `pending`. */
-	pendingBytes: number;
-	/** How the upstream closed, when it did before the client's socket opened. */
-	ended?: readonly [code: number, reason: string];
-	/** Undoes what watches the client between the upgrade and its socket's open. */
-	settle?: (() => void) | undefined;
-}
-
 /**
- * Bun's client socket pauses its reads (Bun 1.4); the DOM's type does not
- * say so. On a Bun without them, the cap alone holds.
+ * What Bun's client socket adds to the DOM's (Bun 1.4): reads it can
+ * pause, and a cut. On a Bun without `pause`, the cap alone holds.
  */
-interface Pausable {
+interface BunWebSocket {
 	pause?(): boolean;
 	resume?(): boolean;
-	readonly isPaused?: boolean;
-}
-
-/**
- * The relay of an open `upstream` to the client's socket, which opens
- * next: what the upstream sends is queued until then, and the upstream is
- * closed if the client goes away first, or if its socket never opens
- * within `timeout`.
- */
-export function relay(
-	plan: Plan,
-	ctx: ProxyContext,
-	upstream: WebSocket,
-	maxBuffered: number,
-): Relay {
-	const relay: Relay = { upstream, maxBuffered, pending: [], pendingBytes: 0 };
-	const { signal } = ctx.request;
-	const gone = () => upstream.close(1001, 'client gone');
-	const orphan = setTimeout(gone, plan.timeout);
-	signal.addEventListener('abort', gone, { once: true });
-	relay.settle = () => {
-		clearTimeout(orphan);
-		signal.removeEventListener('abort', gone);
-		relay.settle = undefined;
-	};
-	upstream.addEventListener('message', (event) => {
-		const { data } = event as MessageEvent<string | ArrayBuffer>;
-		const frame = typeof data === 'string' ? data : new Uint8Array(data);
-		if (relay.client !== undefined) toClient(relay, frame);
-		else queue(relay, frame);
-	});
-	upstream.addEventListener('close', (event) => {
-		relay.settle?.();
-		const close = [sendable(event.code), event.reason] as const;
-		const { client } = relay;
-		if (client === undefined) relay.ended = close;
-		else if (client.raw.readyState === WebSocket.OPEN) client.close(...close);
-	});
-	return relay;
-}
-
-/** Keeps `frame` for the client's open, within the count and the cap. */
-function queue(relay: Relay, frame: Frame): void {
-	relay.pendingBytes += sizeOf(frame);
-	if (
-		relay.pending.length < PENDING &&
-		relay.pendingBytes <= relay.maxBuffered
-	) {
-		relay.pending.push(frame);
-	} else {
-		relay.upstream.close(OVERLOADED_CLOSE, 'client not open yet');
-	}
+	terminate?(): void;
 }
 
 /** Sends `frame` to the client, pausing the upstream when the client is behind. */
@@ -120,16 +48,18 @@ export function toClient(relay: Relay, frame: Frame): void {
 			? 0
 			: client.raw.send(frame);
 	if (sent === 0) overloaded(relay, 'client too slow');
-	else if (sent === -1) (upstream as Pausable).pause?.();
+	else if (sent === -1 && !relay.paused) {
+		relay.paused = (upstream as BunWebSocket).pause?.() === true;
+	}
 }
 
 /** The client read what was queued for it: the upstream is read again once the queue is back under half the cap. */
 export function drained(relay: Relay): void {
 	const { client, upstream } = relay;
-	const pausable = upstream as Pausable;
-	if (client === undefined || pausable.isPaused !== true) return;
+	if (client === undefined || !relay.paused) return;
 	if (client.raw.getBufferedAmount() <= relay.maxBuffered / 2) {
-		pausable.resume?.();
+		relay.paused = false;
+		(upstream as BunWebSocket).resume?.();
 	}
 }
 
@@ -144,7 +74,10 @@ export function toUpstream(relay: Relay, frame: Frame): void {
 	}
 }
 
-/** Closes both sides with 1013: one of them reads slower than the other sends. */
+/**
+ * Closes both sides with 1013, one of them reading slower than the other
+ * sends, and cuts the slow one past the grace.
+ */
 function overloaded(relay: Relay, reason: string): void {
 	const { client, upstream } = relay;
 	if (client !== undefined && client.raw.readyState === WebSocket.OPEN) {
@@ -156,10 +89,15 @@ function overloaded(relay: Relay, reason: string): void {
 	) {
 		upstream.close(OVERLOADED_CLOSE, reason);
 	}
+	const cut =
+		reason === 'client too slow'
+			? () => client?.raw.terminate()
+			: () => (upstream as BunWebSocket).terminate?.();
+	setTimeout(cut, CLOSE_GRACE).unref();
 }
 
 /** The bytes of `frame` on the wire, its text as UTF-8. */
-function sizeOf(frame: Frame): number {
+export function sizeOf(frame: Frame): number {
 	return typeof frame === 'string'
 		? Buffer.byteLength(frame)
 		: frame.byteLength;
@@ -177,18 +115,4 @@ export function maxBufferedOf(
 		);
 	}
 	return max;
-}
-
-/**
- * A close code a peer may send: 1000-1003, 1007-1014 and 3000-4999. 1005
- * (no code) closes with 1000; any other — 1006 and 1015, reserved for what
- * a socket reports, or one no peer may send — with 1011.
- */
-export function sendable(code: number): number {
-	if (code === 1005) return 1000;
-	const valid =
-		(code >= 1000 && code <= 1003) ||
-		(code >= 1007 && code <= 1014) ||
-		(code >= 3000 && code <= 4999);
-	return valid ? code : 1011;
 }

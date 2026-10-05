@@ -62,20 +62,42 @@ describe('proxy.ws, with a client slower than the upstream', () => {
 	});
 
 	test('past maxBuffered queued for a client that stopped reading, both sides close with 1013', async () => {
-		const { up, state } = floodUpstream({ frames: 256, size: 64 * KiB });
-		const url = serve(
-			alxia().ws('/live', proxy.ws(up.url, { maxBuffered: 16 * KiB })),
-		);
-		const { socket, closed } = await client(url, '/live');
-		(socket as Pausable).pause();
-		await within(2_000, () => state.closed.length === 1);
-		expect(state.closed[0]).toEqual([OVERLOADED_CLOSE, 'client too slow']);
-		(socket as Pausable).resume();
-		await within(2_000, () => closed.code !== undefined);
-		expect(closed).toEqual({
-			code: OVERLOADED_CLOSE,
-			reason: 'client too slow',
+		// Without Bun's pause, the cap alone holds; with it, whether a frame
+		// comes after the pause depends on how Bun's reads fall.
+		const pause = (WebSocket.prototype as Pausable).pause;
+		Object.defineProperty(WebSocket.prototype, 'pause', {
+			value: undefined,
+			configurable: true,
+			writable: true,
 		});
+		const { up, state } = floodUpstream({
+			frames: 256,
+			size: 64 * KiB,
+			from: 'message',
+		});
+		try {
+			const url = serve(
+				alxia().ws('/live', proxy.ws(up.url, { maxBuffered: 16 * KiB })),
+			);
+			const { socket, closed } = await client(url, '/live');
+			pause.call(socket);
+			socket.send('go');
+			await within(2_000, () => state.closed.length === 1);
+			expect(state.closed[0]).toEqual([OVERLOADED_CLOSE, 'client too slow']);
+			(socket as Pausable).resume();
+			await within(2_000, () => closed.code !== undefined);
+			expect(closed).toEqual({
+				code: OVERLOADED_CLOSE,
+				reason: 'client too slow',
+			});
+		} finally {
+			Object.defineProperty(WebSocket.prototype, 'pause', {
+				value: pause,
+				configurable: true,
+				enumerable: true,
+				writable: true,
+			});
+		}
 	});
 });
 

@@ -11,6 +11,8 @@ export interface FloodOptions {
 	readonly size: number;
 	/** Waits for Bun's `drain` after a -1, as a well-behaved upstream does; otherwise sends them all at once. */
 	readonly polite?: boolean;
+	/** Floods from the socket's open, or from the first message the client sends, once the relay is open both ways. */
+	readonly from?: 'open' | 'message';
 }
 
 /**
@@ -39,9 +41,9 @@ export function floodUpstream(options: FloodOptions) {
 				? (undefined as never)
 				: new Response('upgrade expected', { status: 426 }),
 		{
-			open: pump,
+			open: options.from === 'message' ? () => {} : pump,
 			drain: pump,
-			message() {},
+			message: options.from === 'message' ? pump : () => {},
 			close(_ws, code, reason) {
 				state.closed.push([code, reason]);
 			},

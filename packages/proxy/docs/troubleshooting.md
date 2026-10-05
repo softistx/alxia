@@ -32,7 +32,7 @@ TypeScript error, or a response body. Entries that print nothing are under
 **WebSockets**
 
 - [A socket route answers `502 {"error":"bad_gateway"}` or `504 {"error":"gateway_timeout"}`](#a-socket-route-answers-502-errorbad_gateway-or-504-errorgateway_timeout)
-- [A proxied socket closes with `1013` and `client too slow` or `upstream too slow`](#a-proxied-socket-closes-with-1013-and-client-too-slow-or-upstream-too-slow)
+- [A proxied socket closes with `1013` and `client too slow`, `upstream too slow` or `client not open yet`](#a-proxied-socket-closes-with-1013-and-client-too-slow-upstream-too-slow-or-client-not-open-yet)
 
 **Traps**
 
@@ -301,16 +301,19 @@ proxy.ws('ws://chat.internal:8080', { rewrite: '/live', timeout: 60_000 });
 
 See [WebSockets](guide/websockets.md#an-upstream-that-cannot-be-reached).
 
-### A proxied socket closes with `1013` and `client too slow` or `upstream too slow`
+### A proxied socket closes with `1013` and `client too slow`, `upstream too slow` or `client not open yet`
 
 **When:** a socket relayed by `proxy.ws()` closes on both sides with 1013
 (`OVERLOADED_CLOSE`, try again later), while one side was sending faster
 than the other read: `client too slow` when the upstream outpaced the
-client, `upstream too slow` the other way.
+client, `upstream too slow` the other way, `client not open yet` when the
+upstream sent more than 1024 frames or `maxBuffered` bytes before the
+client's socket opened.
 **Why:** more than `maxBuffered` bytes (1 MiB by default) were queued for
 the slow side when another frame for it arrived. The proxy closes rather
-than buffer without bound, so a reader that never reads cannot exhaust its
-memory. Toward the client, the upstream's reads are paused first, so this
+than buffer without bound, so a reader that never reads holds no more than
+the cap per direction, and its connection is cut one second after the
+close. Toward the client, the upstream's reads are paused first, so this
 mostly happens with frames close to the cap, or toward an upstream, whose
 client the proxy cannot pause.
 **Fix:** reconnect after a delay on 1013; if your frames are large or your

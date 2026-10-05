@@ -9,19 +9,18 @@
 import type { SocketHandlers } from '@alxia/core';
 import type { ProxyOptions } from './options';
 import { type Plan, type ProxyContext, planOf } from './options';
+import { sendable } from './socket-close';
 import {
 	drained,
 	type Frame,
 	maxBufferedOf,
-	type Relay,
-	relay,
-	sendable,
 	toClient,
 	toUpstream,
 } from './socket-flow';
+import { type Relay, relay } from './socket-relay';
 import { openUpstream } from './socket-upstream';
 
-export { OVERLOADED_CLOSE } from './socket-flow';
+export { BAD_GATEWAY_CLOSE, OVERLOADED_CLOSE } from './socket-close';
 
 /** What `proxy.ws` takes: the request side of `ProxyOptions`. */
 export type SocketProxyOptions<Ctx = unknown> = Omit<
@@ -44,16 +43,6 @@ export type SocketProxy<Ctx = unknown> = SocketHandlers<
 	string | Uint8Array
 >;
 
-/**
- * The close code `proxy.ws` sent a client when the upstream could not be
- * reached, 1014, bad gateway.
- *
- * @deprecated The upstream is now opened before the upgrade: one that
- * cannot be reached answers a 502 (a 504 past `timeout`) over HTTP, and no
- * socket opens. Nothing sends this code any more.
- */
-export const BAD_GATEWAY_CLOSE = 1014;
-
 /** The relay handlers for `target`, checked once. */
 export function socketProxy<Ctx>(
 	target: string | URL,
@@ -70,11 +59,10 @@ export function socketProxy<Ctx>(
 	const relays = new WeakMap<object, Relay>();
 	return {
 		async upgrade(ctx, headers) {
-			const upstream = await openUpstream(plan, ctx);
-			if (upstream.protocol !== '') {
-				headers.set('sec-websocket-protocol', upstream.protocol);
-			}
-			relays.set(ctx, relay(plan as Plan, ctx, upstream, maxBuffered));
+			const opened = await openUpstream(plan, ctx);
+			const { protocol } = opened.socket;
+			if (protocol !== '') headers.set('sec-websocket-protocol', protocol);
+			relays.set(ctx, relay(plan as Plan, ctx, opened, maxBuffered));
 		},
 		open(socket) {
 			const relay = relays.get(socket.data);
