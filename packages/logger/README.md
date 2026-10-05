@@ -66,3 +66,4 @@ every request is logged, a 404 or a 405 that matched no route included.
 - [Guide](https://github.com/softistx/alxia/tree/develop/packages/logger/docs): every option and default, the entry's fields, `log` and `requestId`, where the middleware sits among the others, and testing.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/logger/docs/troubleshooting.md): an error message or a missing header, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/logger/docs/roadmap.md): what is coming, and what is not planned.
+- [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [Health checks and graceful shutdown](https://github.com/softistx/alxia/blob/develop/docs/recipes/health-and-shutdown.md), [Answer errors consistently](https://github.com/softistx/alxia/blob/develop/docs/recipes/errors.md).

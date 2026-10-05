@@ -14,3 +14,9 @@ a realistic example for each.
 | [Stores](guide/stores.md) | sizing the memory store, sharing responses in Redis, or writing and testing a store of your own |
 | [Troubleshooting](troubleshooting.md) | something went wrong and you have the message, or the cache does not hit when you expected it to |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |
+
+## Recipes
+
+A task that crosses packages, in [the repository's recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md), each with a complete example:
+
+- [Caching and rate limiting with Redis](https://github.com/softistx/alxia/blob/develop/docs/recipes/caching-and-rate-limiting.md): a limit and a response cache shared by every process

@@ -63,3 +63,4 @@ missing path gets the 401. Put the guard in a `group` to guard only some routes.
 - [Guide](https://github.com/softistx/alxia/tree/develop/packages/jwt/docs): a page per area — signing and verifying, algorithms and keys, and the bearer guard.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/jwt/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/jwt/docs/roadmap.md): what is coming, and what is not planned.
+- [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [Authenticate requests](https://github.com/softistx/alxia/blob/develop/docs/recipes/authentication.md), [A GraphQL API](https://github.com/softistx/alxia/blob/develop/docs/recipes/graphql-api.md).

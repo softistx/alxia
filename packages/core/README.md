@@ -24,11 +24,11 @@ operations and nothing else
 bun create @alxia my-app
 ```
 
-writes a new app — an API with Zod, an API-key check on its route and a spec
-calling it in process, or React Router's official template served by alxia — installs it,
-and prints `cd my-app` and `bun dev`
-([`@alxia/create`](https://www.npmjs.com/package/@alxia/create)). Into an
-existing project:
+writes a new app from a template — `minimal` (the default), `api` (OpenAPI spec
+first), `graphql` or `react-router` — installs it, and prints `cd my-app` and
+`bun dev` ([`@alxia/create`](https://www.npmjs.com/package/@alxia/create)).
+[Start in 5 minutes](https://github.com/softistx/alxia/blob/develop/docs/start.md)
+walks through it. Into an existing project:
 
 ```sh
 bun add @alxia/core
@@ -936,3 +936,4 @@ joins middlewares past the 8 a call types:
 - [Upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md): what the next release changes, and what can break.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/core/docs/roadmap.md): what is coming, and what is not planned.
+- [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [Start in 5 minutes](https://github.com/softistx/alxia/blob/develop/docs/start.md), [Authenticate requests](https://github.com/softistx/alxia/blob/develop/docs/recipes/authentication.md), [A spec-first CRUD API](https://github.com/softistx/alxia/blob/develop/docs/recipes/spec-first-crud.md), [A GraphQL API](https://github.com/softistx/alxia/blob/develop/docs/recipes/graphql-api.md), and more.

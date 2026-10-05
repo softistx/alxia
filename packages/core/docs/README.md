@@ -26,3 +26,19 @@ a realistic example for each.
 | [Upgrading](upgrading.md) | moving to the next release: what changed, before and after, what can break, and each form 0.5 removed — the request hooks, a list of hooks, `use(plugin)`, … — as its replacement |
 | [Troubleshooting](troubleshooting.md) | something went wrong and you have the message |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |
+
+## Recipes
+
+A task that crosses packages, in [the repository's recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md), each with a complete example:
+
+- [Start in 5 minutes](https://github.com/softistx/alxia/blob/develop/docs/start.md): a first app, from `bun create @alxia` to Docker
+- [Authenticate requests](https://github.com/softistx/alxia/blob/develop/docs/recipes/authentication.md): a bearer token or a cookie session, a role check, the user typed in every handler
+- [A spec-first CRUD API](https://github.com/softistx/alxia/blob/develop/docs/recipes/spec-first-crud.md): `openapi.yaml` to routes, `matchesSpec`, a typed test client and `apiDocs`
+- [A GraphQL API](https://github.com/softistx/alxia/blob/develop/docs/recipes/graphql-api.md): typed resolvers, a viewer, subscriptions, GraphiQL, auth errors and the drain
+- [File uploads](https://github.com/softistx/alxia/blob/develop/docs/recipes/file-uploads.md): multipart through `validate`, body limits, a stored file
+- [SSE and WebSockets](https://github.com/softistx/alxia/blob/develop/docs/recipes/sse-and-websockets.md): typed events and sockets, authenticated on the upgrade
+- [Test an alxia app](https://github.com/softistx/alxia/blob/develop/docs/recipes/testing.md): `app.request`, a middleware alone, the typed client, sockets, Redis
+- [Answer errors consistently](https://github.com/softistx/alxia/blob/develop/docs/recipes/errors.md): problem details, `HttpError`, a `try`/`catch` middleware
+- [Health checks and graceful shutdown](https://github.com/softistx/alxia/blob/develop/docs/recipes/health-and-shutdown.md): probes, the drain, Docker and Kubernetes
+- [Caching and rate limiting with Redis](https://github.com/softistx/alxia/blob/develop/docs/recipes/caching-and-rate-limiting.md): a limit and a response cache shared by every process
+- [Deploy with Docker](https://github.com/softistx/alxia/blob/develop/docs/recipes/deploying.md): the build stage, the final image, `NODE_ENV=production`

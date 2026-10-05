@@ -79,9 +79,11 @@ describe('graphql(), health and the drain', () => {
 		expect((await app.request('/ready')).status).toBe(503);
 		const refused = await fetch(url, post('{ __typename }')).then(
 			() => 'answered',
-			(error: { code?: string }) => error.code,
+			(error: { code?: string }) => error.code ?? 'no code',
 		);
-		expect(refused).toBe('ConnectionRefused');
+		// Refused at the connect, or reset when fetch reused a pooled connection
+		// the server then closed: either way, no answer. Never 'answered'.
+		expect(['ConnectionRefused', 'ECONNRESET']).toContain(refused);
 		expect(await slow).toEqual({ data: { slow: 'answered' } });
 		expect(await events).toContain('{"data":{"ticks":0}}');
 		await stopping;

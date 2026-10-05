@@ -29,3 +29,6 @@ coverage
 .env
 .env.local
 .env.*.local
+
+# doc snippets, written by scripts/docs-snippets.ts
+.docs-check

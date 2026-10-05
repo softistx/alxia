@@ -452,3 +452,4 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.
+- [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [Deploy with Docker](https://github.com/softistx/alxia/blob/develop/docs/recipes/deploying.md), [Health checks and graceful shutdown](https://github.com/softistx/alxia/blob/develop/docs/recipes/health-and-shutdown.md).

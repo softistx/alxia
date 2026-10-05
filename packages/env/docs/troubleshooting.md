@@ -30,7 +30,7 @@ wording; Valibot and ArkType say the same thing in other words.
 **Types**
 
 - [`Type '"NOPE"' is not assignable to type '"DATABASE_URL" | "API_KEY"'.`](#type-nope-is-not-assignable-to-type-database_url--api_key)
-- [`Property 'env' does not exist on type 'MiddlewareContext<Empty>'.`](#property-env-does-not-exist-on-type-middlewarecontextempty)
+- [`Property 'env' does not exist on type 'BaseContext'.`](#property-env-does-not-exist-on-type-basecontext)
 - [`Object literal may only specify known properties, and 'PORT' does not exist in type 'StandardSchema<unknown>'.`](#object-literal-may-only-specify-known-properties-and-port-does-not-exist-in-type-standardschemaunknown)
 - [`Argument of type '…' is not assignable to parameter of type 'StandardSchema<unknown>'.`](#argument-of-type--is-not-assignable-to-parameter-of-type-standardschemaunknown)
 - [`Type 'number' is not assignable to type 'string'.`](#type-number-is-not-assignable-to-type-string)
