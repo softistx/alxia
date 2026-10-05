@@ -104,7 +104,7 @@ A `traced` or `spanName` that throws costs its answer, never the request.
 | `TelemetryContext` | what it adds to the context: `span` and `telemetry` |
 | `TelemetryMiddleware` | what `telemetry()` returns: a middleware adding `TelemetryContext`, with `.telemetry` |
 | `TelemetryPluginOptions` | its options: `service` and `@nxgt/telemetry`'s options, or an `instance`; `traced`, `spanName`, `traceResponse` |
-| `HTTP_METHOD`, `URL_PATH`, `URL_SCHEME`, `HTTP_ROUTE`, `HTTP_STATUS`, `SERVER_ADDRESS`, `SERVER_PORT`, `CLIENT_ADDRESS`, `GRAPHQL_NAME`, `GRAPHQL_TYPE` | the attribute names a server span carries: `http.request.method`, `url.path`, `url.scheme`, `http.route`, `http.response.status_code`, `server.address`, `server.port`, `client.address` |
+| `HTTP_METHOD`, `URL_PATH`, `URL_SCHEME`, `HTTP_ROUTE`, `HTTP_STATUS`, `SERVER_ADDRESS`, `SERVER_PORT`, `CLIENT_ADDRESS`, `GRAPHQL_NAME`, `GRAPHQL_TYPE` | the attribute names a server span carries: `http.request.method`, `url.path`, `url.scheme`, `http.route`, `http.response.status_code`, `server.address`, `server.port`, `client.address`, and behind `@alxia/graphql` `graphql.operation.name`, `graphql.operation.type` |
 
 ## Documentation
 
