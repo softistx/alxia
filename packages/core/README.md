@@ -766,6 +766,7 @@ declared next.
 
 ```ts
 export const app = base.fork().plugin(todos);
+const fakeSession = defineMiddleware((_ctx, next) => next({ user: { id: 'ada' } }));
 const testApp = base.fork().use(fakeSession).plugin(todos); // its own routes, middlewares and hooks
 ```
 

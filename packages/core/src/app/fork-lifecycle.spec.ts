@@ -3,7 +3,7 @@
  * the parsers — and keeps apart from it: each app runs the base's hooks
  * once, and its own alone.
  */
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { z } from 'zod';
 import { alxia } from './alxia';
 import { validate } from './validate';
@@ -74,5 +74,34 @@ describe('fork(): lifecycle hooks and parsers', () => {
 		expect(await (await a.request('/g')).text()).toBe('ada');
 		expect(await (await a.request('/p')).text()).toBe('p');
 		expect(shared.routes).toEqual([]);
+	});
+
+	test("a fork keeps the base's socket routes, and one added to it stays its own", () => {
+		const shared = alxia().ws('/chat', { message: () => {} });
+		const a = shared.fork().ws('/news', { message: () => {} });
+		expect(a.sockets.map((socket) => socket.path)).toEqual(['/chat', '/news']);
+		expect(shared.sockets.map((socket) => socket.path)).toEqual(['/chat']);
+	});
+
+	test("a fork keeps the base's pages, and refuses a route at one", async () => {
+		const bundle = (await import('../../test/fixtures/page.html')).default;
+		const forked = alxia().page('/dash', bundle).fork();
+		expect(() => forked.get('/dash', ({ reply }) => reply(200, 'x'))).toThrow(
+			'GET /dash is already served by a page',
+		);
+	});
+
+	test('a fork of an app that warned of a late use() does not warn again', () => {
+		const warn = spyOn(console, 'warn').mockImplementation(() => {});
+		try {
+			const late = (_ctx: object, next: () => Promise<Response>) => next();
+			const shared = alxia({ dev: true })
+				.get('/a', ({ reply }) => reply(200, 'a'))
+				.use(late);
+			shared.fork().use(late);
+			expect(warn).toHaveBeenCalledTimes(1);
+		} finally {
+			warn.mockRestore();
+		}
 	});
 });

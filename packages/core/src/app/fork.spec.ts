@@ -126,7 +126,7 @@ describe('one base built on twice, without fork()', () => {
 		const shared = base();
 		shared.plugin(todos);
 		expect(() => shared.plugin(todos)).toThrow(
-			'GET /todos is declared twice, by the same route: two apps built on one base each mounted it on the base itself; build each on base.fork()',
+			'GET /todos is declared twice, by the same route: mounted twice on one app, or by two apps built on one base; build each app on base.fork()',
 		);
 	});
 

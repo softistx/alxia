@@ -1,7 +1,7 @@
 # Groups and plugins
 
 This page covers splitting an app: route files that read the app's context
-with `defineRoutes`, groups that scope middlewares to some routes, `use`
+with `defineRoutes`, several apps built on one base with `fork()`, groups that scope middlewares to some routes, `use`
 giving middlewares to the app, an app given to `plugin` bringing its routes
 and typed context, and a function plugin, given to `plugin` too, adding
 lifecycle hooks. What other packages call plugins — a logger, CORS, a bearer

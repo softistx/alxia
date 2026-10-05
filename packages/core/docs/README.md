@@ -13,7 +13,7 @@ a realistic example for each.
 | [Replies](guide/replies.md) | answering with a status, a file, a header, a cookie, a redirect or an RFC 9457 problem, or turning an error into a response |
 | [Middleware: which way to use](guide/middleware.md) | writing a middleware, inline or shared with `defineMiddleware`, choosing between a route's middlewares, `use(...middlewares)` and `use(path, …)` for every request, `derive`, a group or a plugin, observing every response with `settle`, answering an error or a refusal with a `try`/`catch` and `refusalOf`, or reading the order a request runs them in, `validate` and `responds` included |
 | [Hooks](guide/hooks.md) | adding to the context with `derive` and `decorate`, reading a request's cookies, running code at `onStart` and `onStop`, or adding a body `parser` |
-| [Groups and plugins](guide/groups-and-plugins.md) | splitting the app across files with `defineRoutes`, scoping middlewares to some routes, or reading what `plugin` mounts |
+| [Groups and plugins](guide/groups-and-plugins.md) | splitting the app across files with `defineRoutes`, building several apps — a spec's, a variant — on one base with `fork()`, scoping middlewares to some routes, or reading what `plugin` mounts |
 | [Writing a plugin](guide/writing-a-plugin.md) | writing a plugin: an app, a `Plugin` function, or a `definePlugin` that reads what an earlier plugin added, or a middleware factory that reads the context |
 | [Static files](guide/static-files.md) | serving a directory, one file, a single-page app, or a Bun HTML bundle |
 | [Server-sent events](guide/server-sent-events.md) | streaming typed events to a client |

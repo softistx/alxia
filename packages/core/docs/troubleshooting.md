@@ -1556,9 +1556,10 @@ app.get('/users/:id', getUser).patch('/users/:id', updateUser);
 **When:** the same method and path are declared twice, often once directly
 and once through `plugin(app)` or a `group`, or as `static` beside a
 `GET /…/*`. Or two apps are built on one shared base: the message then
-goes on `…, by the same route: two apps built on one base each mounted it
-on the base itself; build each on base.fork()` when the very route was
-mounted twice, and `…: keep one; if two apps are built on one base, build
+goes on `…, by the same route: mounted twice on one app, or by two apps
+built on one base; build each app on base.fork()` when the very route was
+mounted twice — on one app, `app.plugin(todos).plugin(todos)`, or on a
+shared base — and `…: keep one; if two apps are built on one base, build
 each on base.fork()` otherwise.
 
 **Why:** every method declares on the app it is called on and returns it.

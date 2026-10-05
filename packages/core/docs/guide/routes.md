@@ -293,7 +293,7 @@ Paths are checked when the route is declared, and a mistake throws a
 | `'/a/./b'` | `"/a/./b": "." is a dot segment, which a request's URL never keeps` |
 | `'/café'` | `"/café" is not encoded as a request's URL carries it: declare "/caf%C3%A9"` |
 | `'/users/:userId'` after `'/users/:id'` | `"/users/:userId" has the shape of "/users/:id" with other parameter names. Use the same names: the two would match the same requests.` |
-| the same method and path twice | `GET /a is declared twice` |
+| the same method and path twice | `GET /a is declared twice: keep one; if two apps are built on one base, build each on base.fork()` |
 
 A path written as a literal is refused by its type first: the call does
 not compile, and the message is the `TypeError` above after

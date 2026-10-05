@@ -239,6 +239,14 @@ const app = alxia()
 	.plugin((app) => graphql(app, { schema: admin, path: '/admin/graphql' }));
 ```
 
+For two variants on one base, build each on a fork of it
+([Several apps on one base](../../core/docs/guide/groups-and-plugins.md#several-apps-on-one-base-fork)):
+
+```ts
+export const app = base.fork().plugin((app) => graphql(app, { schema }));
+const testApp = base.fork().use(fakeViewer).plugin((app) => graphql(app, { schema }));
+```
+
 ### `TypeError: graphql(app, { ws: { keepAlive: 0 } }): keepAlive is the milliseconds between pings, a positive number, or false for none`
 
 **When:** declaring `graphql(app, { ws: { keepAlive } })` with `0`, a
