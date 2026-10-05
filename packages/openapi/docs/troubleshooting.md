@@ -90,7 +90,9 @@ named by method and full path.
 **Why:** the route is not in the spec — an admin route, a health check, the
 pages of a React Router app, an `app.static('/assets', …)` mount
 (`GET /assets/*`) — or the spec's operation was renamed or removed and the
-route was not.
+route was not. The probes of `@alxia/core`'s `health()` and the routes
+of `apiDocs()` are never listed: `matchesSpec` leaves them out by itself,
+so a `/health` here is a route written by hand.
 
 **Fix:** add the operation to the document and generate again, remove the
 route, or leave it out on purpose with `exclude`:

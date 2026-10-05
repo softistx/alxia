@@ -94,12 +94,12 @@ export function health(options: HealthOptions = {}): Alxia<Empty, ''> {
 }
 
 /**
- * Whether `route` is one of `health()`'s probes: what `@alxia/openapi`'s
- * `matchesSpec` is given to leave them out, as no operation of the
- * document describes them.
+ * Whether `route` is one of `health()`'s probes, wherever mounted: what
+ * `@alxia/openapi`'s `matchesSpec` reads to leave them out by itself, as
+ * no operation of the document describes them.
  *
  * ```ts
- * matchesSpec(app, operations, { exclude: isHealthRoute });
+ * const documented = app.routes.filter((route) => !isHealthRoute(route));
  * ```
  */
 export function isHealthRoute(
