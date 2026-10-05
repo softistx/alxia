@@ -146,7 +146,9 @@ whose chain holds nothing beyond the app-wide middlewares, `derive`s and
 request that reached the 404 has just passed. A route behind a group's
 middleware, a prefixed plugin's, a `use(path, …)` or a middleware of its
 own is never suggested, even in dev, since the request has not passed its
-guard:
+guard. A 405's hint names a path's methods, as its `Allow` does, and comes
+only once the request passed the chain of every route at that path, a
+group's guard among it:
 
 ```ts
 const app = alxia()

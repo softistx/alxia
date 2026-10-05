@@ -123,6 +123,11 @@ number on it. Every release, with each change it made, is in
   to forwarding headers from any other connection, never to a probe that
   sends none. `@alxia/react-router` hands React Router the original URL
   ([Serving](guide/serving.md#behind-a-proxy-proxy)).
+- **A guard keeps a path's methods.** A 405 and a 426 run the chain of the
+  routes at their path before they answer, so a guarded group without a
+  prefix refuses `DELETE /secret` with its 401 instead of a 405 whose
+  `Allow` names its routes; several groups at one path each run theirs
+  ([Middleware](guide/middleware.md#which-chain-a-405-runs)).
 - **One base, several apps.** `base.fork()` copies an app — its routes,
   its chain in force, its lifecycle hooks — typed as it is, so the real app,
   a spec's and a variant each build on the registered base without

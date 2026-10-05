@@ -14,7 +14,13 @@ import {
 } from './answers';
 import { chain } from './chain';
 import { routeContext } from './context';
-import type { Globals, RouteDefinition, Runtime } from './definition';
+import type {
+	Definition,
+	Globals,
+	RouteDefinition,
+	Runtime,
+} from './definition';
+import { guardedHooks } from './guarded';
 import { send } from './send';
 import { RUN, runOf, settledResponse } from './settled';
 import type { BaseContext, Method, RequestContext } from './types';
@@ -64,17 +70,22 @@ export async function handle(
 
 /**
  * A request no route matches: the 404, 405 or 426, behind every
- * middleware of the app's chain (`Scope.unmatched`). The router's answer
- * alone when the chain is empty: no request pays for a chain it does not
- * have.
+ * middleware of the app's chain (`Scope.unmatched`); a 405's or a 426's
+ * behind the chain of the routes that own its path too (`owners`,
+ * `guarded.ts`). The router's answer alone when the chain is empty: no
+ * request pays for a chain it does not have.
  */
 export function unmatched(
 	runtime: Runtime,
 	request: RequestContext,
 	status: 404 | 405 | 426,
 	allowed?: readonly string[],
+	owners?: Iterable<Definition>,
 ): Promise<Response> | Response {
-	const hooks = runtime.unmatched();
+	const hooks =
+		owners === undefined
+			? runtime.unmatched()
+			: guardedHooks(runtime.unmatched(), owners, request.url.pathname);
 	if (hooks.derive.length === 0) {
 		return routingError(request, status, allowed);
 	}

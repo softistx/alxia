@@ -23,7 +23,7 @@ a realistic example for each.
 | [Development](guide/development.md) | running the app on your machine: the dev switch `alxia({ dev })`, the route table `listen` prints and `onListen`, the hint of a 404, the dev error page of a 500, a factory given uncalled, `markFactory`, and `compose` past 8 middlewares |
 | [Serving](guide/serving.md) | choosing a port or TLS, running behind a proxy (`forwardedIp`, `trustProxy`, `originalUrl`, refusing an untrusted peer), testing through `fetch`, serving the sockets from a `Bun.serve` of your own with `websocket`, or stopping cleanly |
 | [The app's type](guide/types.md) | typing a service or a type test from `typeof app`: `ContextOf`, `Register` and `AppContext`, and what a route checks |
-| [Upgrading](upgrading.md) | moving to the next release: what changed, before and after, what can break, the peers of 0.6 to 0.9, `trustProxy` and `originalUrl`, `fork()`, the socket `upgrade` handler, the GraphQL 413, `forwardedIp`, `matchesSpec`'s `strict`, and each form 0.5 removed — the request hooks, a list of hooks, `use(plugin)`, … — as its replacement |
+| [Upgrading](upgrading.md) | moving to the next release: what changed, before and after, what can break, the peers of 0.6 to 0.9, `trustProxy` and `originalUrl`, a guarded group's 405 answered by its guard, `fork()`, the socket `upgrade` handler, the GraphQL 413, `forwardedIp`, `matchesSpec`'s `strict`, and each form 0.5 removed — the request hooks, a list of hooks, `use(plugin)`, … — as its replacement |
 | [Troubleshooting](troubleshooting.md) | something went wrong and you have the message |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |
 
