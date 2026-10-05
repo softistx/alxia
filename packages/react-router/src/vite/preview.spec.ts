@@ -29,7 +29,7 @@ describe('vite preview, after react-router build', () => {
 		await fixture?.remove();
 	});
 
-	test("a page is the built server's: its hooks, alxiaOf and the app's own key", async () => {
+	test("a page is the built server's: its middlewares, alxiaOf and the app's own key", async () => {
 		const response = await fetch(`${base}/`, {
 			headers: { ...browser, 'x-user': 'Bo' },
 		});

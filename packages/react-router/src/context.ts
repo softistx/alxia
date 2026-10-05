@@ -56,8 +56,7 @@ export type InvalidRegister = Alxia<
 	{
 		readonly 'Register.server must be typeof server, the default export of createServer()': never;
 	},
-	'',
-	never
+	''
 >;
 
 /**

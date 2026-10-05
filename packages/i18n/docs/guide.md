@@ -36,12 +36,11 @@ function createI18n<
 	Ctx extends object = BaseContext,
 >(
 	options: I18nOptions<C, Fallback, Ctx>,
-): Middleware<RequiresOf<Ctx, 'resolve'>, Promise<Next<LanguageContext<keyof C & string> & I18nContext<KeyOf<C[Fallback]>>>>> &
-	MiddlewareMark & {
-		t: Translate<KeyOf<C[Fallback]>>;
-		language: () => keyof C & string;
-		supported: (keyof C & string)[];
-	};
+): Middleware<RequiresOf<Ctx, 'resolve'>, Promise<Next<LanguageContext<keyof C & string> & I18nContext<KeyOf<C[Fallback]>>>>> & {
+	t: Translate<KeyOf<C[Fallback]>>;
+	language: () => keyof C & string;
+	supported: (keyof C & string)[];
+};
 
 interface I18nOptions<C extends Catalogues, Fallback extends keyof C & string, Ctx extends object = BaseContext>
 	extends Omit<LanguageOptions<keyof C & string, Ctx>, 'supported' | 'fallback'> {
@@ -430,10 +429,8 @@ Before it, `i18n.t()` and `i18n.language()` answer in the fallback:
 | a middleware, `derive` or route declared after `.use(i18n)`, before and after its `next()`, and what they call | the request's language |
 | a middleware after it that catches an error | the request's language |
 | a middleware after it, on a `404` or a `405` no route matched | the request's language |
-| the deprecated `onError` hook, for what the chain after `use(i18n)` threw | the request's language |
 | a middleware declared before `.use(i18n)`, in and out | the fallback: the language is not read yet |
 | a route declared before `.use(i18n)` | the fallback: the middleware does not run for it |
-| the deprecated `onRequest` and `onResponse` hooks, which run outside the chain | the fallback |
 | code outside any request: start-up, a timer, a queue consumer | the fallback: pass the language, see below |
 
 An error-handling middleware translates an error's message with `i18n.t()`.

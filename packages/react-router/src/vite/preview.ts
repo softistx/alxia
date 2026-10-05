@@ -2,7 +2,7 @@
  * Under `vite preview`, and React Router's prerendering, which runs on it:
  * every request goes to the built server, `build/server/index.js`'s
  * default export, as `bun build/server/index.js` would answer it — its
- * hooks, its `/api`, the client's files and the pages.
+ * middlewares, its `/api`, the client's files and the pages.
  */
 import { existsSync } from 'node:fs';
 import { relative } from 'node:path';
@@ -39,7 +39,7 @@ async function load(file: string, label: string): Promise<Fetcher> {
 
 /**
  * Hands every request to the built server, before Vite's own files: the
- * app serves `build/client` itself, with its hooks and cache headers. Its
+ * app serves `build/client` itself, with its middlewares and cache headers. Its
  * WebSocket routes connect too, relayed as under `react-router dev`.
  */
 export function servePreview(server: PreviewServer): void {

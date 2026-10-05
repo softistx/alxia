@@ -2,7 +2,7 @@
 // inferred: a declaration build must be able to name each one through
 // `@alxia/graphql`, `@alxia/core` and `graphql-yoga` alone (TS2883
 // otherwise).
-import { alxia, problem } from '@alxia/core';
+import { alxia, problem, refusalOf } from '@alxia/core';
 import { type GraphQLContext, graphql } from '@alxia/graphql';
 import { createSchema } from 'graphql-yoga';
 
@@ -40,12 +40,19 @@ export function servedIn() {
 		.group('/data', (group) => graphql(group, { schema, ide: false }));
 }
 
-// Behind a guard that may answer 401, a body limit and a refusal hook: the
-// endpoint's routes then carry the app's shortcuts.
+// Behind a body limit, a middleware answering a refusal and a guard that may
+// answer 401: the endpoint's routes then carry what they answer.
 export function guarded() {
 	return alxia()
 		.bodyLimit(1024)
-		.onRefusal(() => problem({ status: 400 }))
+		.use(async (_ctx, next) => {
+			try {
+				return await next();
+			} catch (error) {
+				if (refusalOf(error) === undefined) throw error;
+				return problem({ status: 400 });
+			}
+		})
 		.decorate({ users: new Map([['1', 'Ada']]) })
 		.derive(({ request, reply }) => {
 			const viewer = request.headers.get('x-user');

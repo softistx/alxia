@@ -10,7 +10,7 @@ describe('redisStore', () => {
 	test('two apps sharing a Redis share a count, 429 and all', async () => {
 		const make = () =>
 			alxia({ ip: () => '1.2.3.4' })
-				.plugin(
+				.use(
 					rateLimit({
 						limit: 2,
 						windowMs: 60_000,

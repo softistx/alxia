@@ -2,7 +2,6 @@ import { fileURLToPath } from 'node:url';
 import type {
 	Alxia,
 	AnyAlxia,
-	AnyReply,
 	BaseContext,
 	MaybePromise,
 	RouteDefinition,
@@ -81,14 +80,10 @@ export function isReactRouterRoute(route: RouteDefinition): boolean {
  * );
  * ```
  */
-export function reactRouter<
-	Ctx extends object,
-	Prefix extends string,
-	Shortcuts extends AnyReply,
->(
-	app: Alxia<Ctx, Prefix, Shortcuts>,
+export function reactRouter<Ctx extends object, Prefix extends string>(
+	app: Alxia<Ctx, Prefix>,
 	options: ReactRouterOptions<Ctx>,
-): Alxia<Ctx, Prefix, Shortcuts> {
+): Alxia<Ctx, Prefix> {
 	const mode = options.mode ?? 'production';
 	const handle = requestHandler(options.build, mode);
 	const getLoadContext = options.getLoadContext;

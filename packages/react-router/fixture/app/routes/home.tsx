@@ -12,7 +12,7 @@ import { greetingContext } from '../context';
 export function loader({ context }: LoaderFunctionArgs) {
 	// Typed by the server `app/server.ts` registers.
 	const { user, route } = alxiaOf(context);
-	// @ts-expect-error: no hook of the registered server derives `tenant`
+	// @ts-expect-error: nothing in the registered server adds `tenant`
 	alxiaOf(context).tenant;
 	return {
 		name: user?.name ?? 'anonymous',

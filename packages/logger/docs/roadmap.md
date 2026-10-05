@@ -7,7 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **A middleware, not a plugin (0.4).** `app.use(logger())` logs every request, a 404, a 405 or a 500 included, and times everything after it. `app.plugin(logger())` still works, deprecated.
+- **A middleware, not a plugin (0.4).** `app.use(logger())` logs every request, a 404, a 405 or a 500 included, and times everything after it. `app.plugin(logger())`, the deprecated form, was removed in 0.5.
 
 ## Next
 

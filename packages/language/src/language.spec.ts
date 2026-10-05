@@ -221,7 +221,7 @@ describe('language', () => {
 		expectTypeOf(reads(byObject)).toEqualTypeOf<Empty>();
 		for (const plugin of [byUnknown, byObject]) {
 			const served = alxia()
-				.plugin(plugin)
+				.use(plugin)
 				.get('/', ({ language: current, reply }) => reply(200, current));
 			expect(await (await served.request('/')).text()).toBe('fr');
 		}

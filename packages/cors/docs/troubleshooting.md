@@ -31,7 +31,7 @@ Firefox and Safari say the same thing in other words.
 **Types**
 
 - [`Type 'false' is not assignable to type 'CorsOrigin | undefined'`](#type-false-is-not-assignable-to-type-corsorigin--undefined)
-- [`Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'`](#type-corsmiddleware-is-not-assignable-to-type-middlewarereturn)
+- [`Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn & "the context in force here does not give what this middleware reads"'`](#type-corsmiddleware-is-not-assignable-to-type-middlewarereturn--the-context-in-force-here-does-not-give-what-this-middleware-reads)
 - [`Type 'string' is not assignable to type 'readonly string[]'`](#type-string-is-not-assignable-to-type-readonly-string)
 
 ## In the browser
@@ -308,21 +308,18 @@ const base = alxia();
 const app = origins ? base.use(cors({ origin: origins })) : base;
 ```
 
-### `Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'`
+### `Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn & "the context in force here does not give what this middleware reads"'`
 
 ```text
-error TS2769: No overload matches this call.
-  The last overload gave the following error.
-    Argument of type '(options?: CorsOptions) => CorsMiddleware' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
-      Type '(options?: CorsOptions) => CorsMiddleware' is not assignable to type '(ctx: BaseContext & Empty, next: NextFunction) => MiddlewareReturn'.
-        Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn'.
+error TS2345: Argument of type '(options?: CorsOptions | undefined) => CorsMiddleware' is not assignable to parameter of type '((options?: CorsOptions | undefined) => CorsMiddleware) & Step<BaseContext & Empty, CorsOptions | undefined, MiddlewareReturn>'.
+  Type '(options?: CorsOptions | undefined) => CorsMiddleware' is not assignable to type 'Step<BaseContext & Empty, CorsOptions | undefined, MiddlewareReturn>'.
+    Type 'CorsMiddleware' is not assignable to type 'MiddlewareReturn & "the context in force here does not give what this middleware reads"'.
 ```
-
-TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
 
 **When:** `app.use(cors)`, without calling it.
 
-**Why:** `cors` makes the middleware; it is not the middleware.
+**Why:** `cors` makes the middleware; it is not the middleware. Given uncalled, `cors` is read as a middleware itself, its
+options as the context it reads, hence the message.
 
 **Fix:** call it, with no options for the defaults:
 

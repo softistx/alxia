@@ -34,7 +34,7 @@ function served() {
 const text = (html: string) => html.replaceAll('<!-- -->', '');
 
 describe('pages', () => {
-	test('a document is server rendered, its loader reading what the hooks built', async () => {
+	test('a document is server rendered, its loader reading what the middlewares built', async () => {
 		const response = await served().request('/', {
 			headers: { ...browser, 'x-user': 'Ada' },
 		});
@@ -332,7 +332,7 @@ describe('the context', () => {
 			const ctx = alxiaOf<Base>(context);
 			const name: string | undefined = ctx.user?.name;
 			const route: string = ctx.route;
-			// @ts-expect-error: no hook derives `tenant`
+			// @ts-expect-error: nothing derives `tenant`
 			ctx.tenant;
 			// @ts-expect-error: `user` is null without the header
 			ctx.user.name;
@@ -343,7 +343,7 @@ describe('the context', () => {
 		expect(typed).toBeFunction();
 	});
 
-	test('getLoadContext reads only what the hooks before it built', () => {
+	test('getLoadContext reads only what the middlewares before it built', () => {
 		const typed = () => {
 			const base = alxia().derive(() => ({ user: { id: '1' } }));
 			base.plugin((app) =>
@@ -352,7 +352,7 @@ describe('the context', () => {
 			base.plugin((app) =>
 				reactRouter(app, {
 					build,
-					// @ts-expect-error: no hook before it derives `tenant`
+					// @ts-expect-error: nothing before it derives `tenant`
 					getLoadContext: ({ tenant }) => void tenant,
 				}),
 			);
@@ -375,7 +375,7 @@ describe('the context', () => {
 				}),
 			);
 			base.plugin((app) =>
-				// @ts-expect-error: no hook before it derives `tenant`
+				// @ts-expect-error: nothing before it derives `tenant`
 				reactRouter(app, {
 					build,
 					getLoadContext: (ctx: BaseContext & { tenant: string }) =>
@@ -442,7 +442,7 @@ describe('streaming', () => {
 		'and still does behind @alxia/compress, in %s',
 		async (encoding) => {
 			const app = makeBase()
-				.plugin(compress())
+				.use(compress())
 				.plugin((app) => reactRouter(app, { build }));
 			const result = await slow(app, encoding);
 			expect(result.encoding).toBe(encoding);

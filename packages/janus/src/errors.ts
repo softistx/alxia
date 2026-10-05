@@ -2,7 +2,6 @@ import {
 	type BaseContext,
 	defineMiddleware,
 	type Middleware,
-	type MiddlewareMark,
 	type Next,
 	type Reply,
 } from '@alxia/core';
@@ -61,8 +60,7 @@ export interface JanusErrorsOptions {
 export type JanusErrors = Middleware<
 	object,
 	Promise<Next | Reply<JanusErrorStatus, JanusErrorBody>>
-> &
-	MiddlewareMark;
+>;
 
 /**
  * Janus's errors answered, as a middleware: every `JanusError` thrown
@@ -70,7 +68,7 @@ export type JanusErrors = Middleware<
  * refused, a login taken, a store down — is answered with janus's status
  * and `bodyOf(error)`, typed on the routes declared after it. A throttled
  * sign-in carries `Retry-After`. Anything else goes on, thrown, to the
- * middlewares before it, the app's `onError` or its 500.
+ * middlewares before it, or to the route boundary's 500.
  *
  * Give it to `use` before `session()`, so that a store down while the
  * session is read is answered too:

@@ -9,7 +9,7 @@ header you read in the response.
 
 - [`Type '"identity"' is not assignable to type 'Encoding'`](#type-identity-is-not-assignable-to-type-encoding)
 - [`Type 'RegExp' is not assignable to type '(type: string) => boolean'`](#type-regexp-is-not-assignable-to-type-type-string--boolean)
-- [`Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn'`](#type-compressmiddleware-is-not-assignable-to-type-middlewarereturn)
+- [`Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn & "the context in force here does not give what this middleware reads"'`](#type-compressmiddleware-is-not-assignable-to-type-middlewarereturn--the-context-in-force-here-does-not-give-what-this-middleware-reads)
 
 **Responses**
 
@@ -63,22 +63,19 @@ error TS2322: Type 'RegExp' is not assignable to type '(type: string) => boolean
 app.use(compress({ compressible: (type) => /json|text\//.test(type) }));
 ```
 
-### `Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn'`
+### `Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn & "the context in force here does not give what this middleware reads"'`
 
 **When:** passing `compress` to `app.use` without calling it.
 
 ```text
-error TS2769: No overload matches this call.
-  The last overload gave the following error.
-    Argument of type '(options?: CompressOptions) => CompressMiddleware' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
-      Type '(options?: CompressOptions) => CompressMiddleware' is not assignable to type '(ctx: BaseContext & Empty, next: NextFunction) => MiddlewareReturn'.
-        Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn'.
+error TS2345: Argument of type '(options?: CompressOptions | undefined) => CompressMiddleware' is not assignable to parameter of type '((options?: CompressOptions | undefined) => CompressMiddleware) & Step<BaseContext & Empty, CompressOptions | undefined, MiddlewareReturn>'.
+  Type '(options?: CompressOptions | undefined) => CompressMiddleware' is not assignable to type 'Step<BaseContext & Empty, CompressOptions | undefined, MiddlewareReturn>'.
+    Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn & "the context in force here does not give what this middleware reads"'.
 ```
 
-TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
-
 **Why:** `compress` builds the middleware from its options; the middleware
-is what it returns.
+is what it returns. Given uncalled, `compress` is read as a middleware itself, its
+options as the context it reads, hence the message.
 
 **Fix:**
 

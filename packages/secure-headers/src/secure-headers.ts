@@ -2,7 +2,6 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
 	type Next,
 	settle,
 	withHeaders,
@@ -48,16 +47,14 @@ interface NonceOption {
  * What `secureHeaders()` returns: a middleware, for `app.use`, that sets
  * the headers on every response after it.
  */
-export type SecureHeaders = Middleware<Empty, Promise<Response>> &
-	MiddlewareMark;
+export type SecureHeaders = Middleware<Empty, Promise<Response>>;
 
 /**
  * What `secureHeaders({ nonce: true })` returns: a middleware, for
  * `app.use`, whose routes after it read `nonce`, and which sets the header
  * with the same one.
  */
-export type NonceMiddleware = Middleware<Empty, Promise<Next<NonceContext>>> &
-	MiddlewareMark;
+export type NonceMiddleware = Middleware<Empty, Promise<Next<NonceContext>>>;
 
 const DEFAULTS = {
 	'content-security-policy':

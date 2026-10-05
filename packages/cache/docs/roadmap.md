@@ -8,7 +8,7 @@ number on it. Every release, with each change it made, is in
 ## Now
 
 - **A middleware, not a plugin.** `app.use(cache({ ttl }))` is the form;
-  `app.plugin(cache(…))` keeps working, deprecated. Stale responses are
+  `app.plugin(cache(…))`, deprecated in 0.4, was removed in 0.5. Stale responses are
   served at once with the refresh run behind them, and `CacheMiddleware<Requires>`
   names what `cache()` returns.
 
@@ -36,7 +36,7 @@ Nothing scheduled yet.
 
 ### 0.1.0
 
-- **Response caching as a plugin.** `plugin(cache({ ttl }))` answers the `GET`
+- **Response caching as a plugin**, the 0.1 form. `cache({ ttl })` answers the `GET`
   and `HEAD` requests of every route declared after it from a store while
   they are fresh, and from the route otherwise, saying `X-Cache: HIT` or
   `MISS` and `Age`.

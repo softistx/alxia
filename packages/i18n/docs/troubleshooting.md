@@ -15,7 +15,6 @@ nothing — what the response does that you did not expect.
 - [`Property 't' does not exist on type 'Context<Empty, "/", Empty>'`](#property-t-does-not-exist-on-type-contextempty--empty)
 - [`Type 'BaseContext & Empty' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`](#type-basecontext--empty-is-missing-the-following-properties-from-type-i18noptionsreadonlyrecordstring-readonlyrecordstring-unknown-string-basecontext-resources-fallback)
 - [`Object literal may only specify known properties, and 'supported' does not exist in type 'I18nOptions<…>'`](#object-literal-may-only-specify-known-properties-and-supported-does-not-exist-in-type-i18noptions)
-- [`Cannot invoke an object which is possibly 'undefined'`](#cannot-invoke-an-object-which-is-possibly-undefined)
 - [`t()` accepts any key, typos included](#t-accepts-any-key-typos-included)
 - [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
 - [`Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'`](#property-user-is-missing-in-type-basecontext--empty-but-required-in-type--user-user--null-)
@@ -150,15 +149,11 @@ const app = alxia()
 ### `Type 'BaseContext & Empty' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`
 
 ```text
-error TS2769: No overload matches this call.
-  The last overload gave the following error.
-    Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => I18nMiddleware<keyof C & string, KeyOf<C[Fallback]>, RequiresOf<...>>' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
-      …
-        Types of parameters 'options' and 'ctx' are incompatible.
-          Type 'BaseContext & Empty' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback
+error TS2345: Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => I18nMiddleware<keyof C & string, KeyOf<C[Fallback]>, RequiresOf<...>>' is not assignable to parameter of type 'FunctionLike & Step<BaseContext & Empty, BaseContext & Empty, MiddlewareReturn>'.
+  Type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => I18nMiddleware<keyof C & string, KeyOf<C[Fallback]>, RequiresOf<...>>' is not assignable to type 'Step<BaseContext & Empty, BaseContext & Empty, MiddlewareReturn>'.
+    Types of parameters 'options' and 'ctx' are incompatible.
+      Type 'BaseContext & Empty' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback
 ```
-
-TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
 
 **When:** `app.use(createI18n)`, without calling it.
 
@@ -190,42 +185,6 @@ ignored.
 
 ```ts
 createI18n({ resources: { en }, fallback: 'en' });
-```
-
-### `Cannot invoke an object which is possibly 'undefined'`
-
-```text
-error TS2722: Cannot invoke an object which is possibly 'undefined'.
-```
-
-**When:** a deprecated `onError` hook calls `t('…')` from its context. (A
-middleware declared after `.use(i18n)` has no such doubt: `t` is typed there.)
-
-**Why:** `onError` also handles what was thrown before the middleware ran —
-by a middleware declared before it — so what it adds is optional there.
-
-**Fix:** in an error-handling middleware declared after `.use(i18n)`, catch
-around `next()` and call `t`, or the middleware's own `i18n.t()`, which always
-answers, in the request's language and in the fallback when the error was
-thrown before the language was read:
-
-```ts
-import { alxia, defineMiddleware, HttpError } from '@alxia/core';
-
-alxia()
-	.use(i18n)
-	.use(
-		defineMiddleware(async ({ t, reply }, next) => {
-			try {
-				return await next();
-			} catch (error) {
-				if (error instanceof HttpError && error.status === 404) {
-					return reply(404, { error: t('errors.not-found') });
-				}
-				throw error;
-			}
-		}),
-	);
 ```
 
 ### `t()` accepts any key, typos included
@@ -426,17 +385,15 @@ export const i18n = createI18n({ resources: { en, de }, fallback: 'en' });
 
 **When:** a request is in French, but `i18n.t()`, `i18n.language()` or
 `@nxgt/i18n`'s `translate` answers in the fallback's language in a
-middleware declared before `.use(i18n)`, in a route declared before it, or
-in the deprecated `onRequest` and `onResponse` hooks.
+middleware declared before `.use(i18n)`, or in a route declared before it.
 
 **Why:** the middleware reads the request's language when the request
 reaches it, and holds it for what runs after it, the answer to an error
-included. What is declared before it, and the hooks that run outside the
-chain, run with no language to answer in.
+included. What is declared before it runs with no language to answer in.
 
 **Fix:** translate after the middleware: declare the middlewares and the
-routes that translate after `.use(i18n)`, and move what an `onRequest` hook
-renders (a deprecated hook) into a middleware declared after it:
+routes that translate after `.use(i18n)`, and move what a middleware before
+it renders into a middleware declared after it:
 
 ```ts
 import { alxia, defineMiddleware } from '@alxia/core';
@@ -478,7 +435,7 @@ alxia()
 ### `getLanguage()` answers `en` although the fallback is `fr`
 
 **When:** outside a request — at start-up, in a timer, a queue consumer —
-or in a hook [before the language is read](#i18nt-answers-in-the-fallback-before-the-language-is-read),
+or in a middleware [before the language is read](#i18nt-answers-in-the-fallback-before-the-language-is-read),
 `@nxgt/i18n`'s `getLanguage()` answers `'en'` while `i18n.language()`
 answers `'fr'`.
 
@@ -512,7 +469,7 @@ alxia()
 	.use(cache({ ttl: 60, vary: ['accept-language', 'cookie'] }));
 ```
 
-A middleware (or a deprecated `onResponse` hook) that sets `Vary` with `headers.set` replaces the
+A middleware that sets `Vary` with `headers.set` replaces the
 middleware's: see `@alxia/language`'s [troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#a-cache-serves-one-language-to-every-visitor),
 which also covers a response in the wrong language — `curl` getting the
 fallback, a `?lang=` that does not stick, a `404` on `/fr/products`.

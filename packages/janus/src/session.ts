@@ -2,7 +2,6 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
 	type Next,
 	type Reply,
 	settle,
@@ -46,7 +45,7 @@ type Given<User, S> = {
 export type SessionMiddleware<
 	Added extends object,
 	Refused = never,
-> = Middleware<Empty, Promise<Refused | Next<Added>>> & MiddlewareMark;
+> = Middleware<Empty, Promise<Refused | Next<Added>>>;
 
 /**
  * Who a request belongs to, as a middleware: `auth.authenticate(request)`,

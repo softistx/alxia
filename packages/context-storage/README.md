@@ -80,7 +80,8 @@ or where the middleware did not run (a route declared before it),
 a request that reached no route, `NOT_ROUTED`.
 
 Pass it to `app.use` called: `use(contextStorage)`, uncalled, is refused by
-`tsc` (`TS2769`) and throws a `TypeError` at startup
+`tsc` (`TS2345`), and each request it runs on throws a `TypeError`,
+answered with a 500
 ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)).
 
 ## API

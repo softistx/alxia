@@ -2,7 +2,7 @@
  * Under `react-router dev` and `vite preview`: the app's WebSocket routes. Vite's server is a
  * `node:http` one, and an alxia socket is `Bun.serve`'s upgrade, so each
  * upgrade Vite leaves is relayed, bytes as they come, to a `Bun.serve` of
- * the app's own on a loopback port: its hooks, its validation, its socket
+ * the app's own on a loopback port: its middlewares, its validation, its socket
  * handlers, exactly as `listen` runs them.
  */
 import type { IncomingMessage } from 'node:http';

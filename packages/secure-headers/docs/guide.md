@@ -292,12 +292,11 @@ client would get, whatever produced it.
 | Response | Headers |
 | --- | --- |
 | a route's reply, `static` and `file` included | yes |
-| the core's 400, 404, 405 and 500, and an `onError` reply | yes |
+| the core's 400, 404, 405 and 500, and a `try`/`catch` middleware's reply declared after it | yes |
 | a `Response` another middleware returned (a CORS preflight, a redirect) | yes, when that middleware is declared after `secureHeaders` |
 | a route declared before `app.use(secureHeaders())` | no: the middleware does not run for it |
 | a WebSocket upgrade that succeeds (`101`) | no: the upgrade is not a response a middleware can decorate |
 | a page served with `page()` | no: `Bun.serve` serves it, around no middleware |
-| the 500 sent when a deprecated `around` hook itself throws | no |
 
 ```ts
 const app = alxia().use(secureHeaders());
@@ -340,15 +339,11 @@ Declare `secureHeaders()` among the observers, first: `logger()`,
 `telemetry()`, `secureHeaders()`, `cors()`, `compress()`. An
 error-handling middleware — a `try`/`catch` around `next()`, or
 `janusErrors()` — goes **after** it. `secureHeaders()` settles `next()`: it
-sets the headers on the response the error would be answered with (the
-route's `onError` reply, its `HttpError`'s status, or a 500), then the error
+sets the headers on the response the error would be answered with (its
+`HttpError`'s status, or a 500), then the error
 goes on, so a `try`/`catch` catches it wherever it is declared; declared
 before `secureHeaders()`, its reply does not carry the headers. A guard on the app (`bearer`, a required
 session) declared before it answers its `401` without them.
-
-The deprecated `onResponse` and `around` hooks still run outside every
-middleware: an `onResponse` hook sees the headers `secureHeaders` set,
-wherever it is declared.
 
 ## A header the middleware does not know
 

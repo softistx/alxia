@@ -4,7 +4,6 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
 	settle,
 	vary,
 	withHeaders,
@@ -23,8 +22,7 @@ export interface CompressOptions {
 }
 
 /** What `compress()` makes: a middleware that adds nothing to the context. */
-export type CompressMiddleware = Middleware<Empty, Promise<Response>> &
-	MiddlewareMark;
+export type CompressMiddleware = Middleware<Empty, Promise<Response>>;
 
 const COMPRESSIBLE =
 	/^(text\/(?!event-stream)|application\/(.+\+)?(json|javascript|xml)|image\/svg\+xml)/i;

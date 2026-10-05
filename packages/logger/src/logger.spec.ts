@@ -118,16 +118,21 @@ describe('logger', () => {
 });
 
 describe('logger, around everything after it', () => {
-	test('logs the status an error ends with: an onError reply, a refusal, a 500', async () => {
+	test('logs the status an error ends with: a try/catch reply, a 500', async () => {
 		const entries: LogEntry[] = [];
 		const original = console.error;
 		console.error = () => {};
 		try {
 			const app = alxia()
 				.use(logger({ write: (entry) => entries.push(entry) }))
-				.onError((error, { reply }) =>
-					error instanceof RangeError ? reply(409, 'conflict') : undefined,
-				)
+				.use(async ({ reply }, next) => {
+					try {
+						return await next();
+					} catch (error) {
+						if (error instanceof RangeError) return reply(409, 'conflict');
+						throw error;
+					}
+				})
 				.get('/conflict', () => {
 					throw new RangeError('taken');
 				})
@@ -143,17 +148,5 @@ describe('logger, around everything after it', () => {
 		} finally {
 			console.error = original;
 		}
-	});
-
-	test('app.plugin(logger()), deprecated, still logs and types log', async () => {
-		const entries: LogEntry[] = [];
-		const app = alxia()
-			.plugin(logger({ write: (entry) => entries.push(entry) }))
-			.get('/', ({ requestId, reply }) => reply(200, requestId));
-		const response = await app.request('/');
-		expect(await response.text()).toBe(
-			response.headers.get('x-request-id') ?? '',
-		);
-		expect(entries).toHaveLength(1);
 	});
 });

@@ -301,7 +301,7 @@ describe('react-router dev, with no server file', () => {
 		});
 		expect(response.status).toBe(200);
 		const html = text(await response.text());
-		// No hook derives `user`: the loader falls back.
+		// Nothing derives `user`: the loader falls back.
 		expect(html).toContain('<h1>Hello anonymous</h1>');
 		expect(html).toContain('<p id="route">/*</p>');
 		expect(html).toContain('virtual:react-router/inject-hmr-runtime');
