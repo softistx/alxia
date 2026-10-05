@@ -50,7 +50,7 @@ Adapters to the [nxgt](https://github.com/softistx) suite:
 | Package | |
 | --- | --- |
 | [`@alxia/telemetry`](packages/telemetry) | traces and logs on `@nxgt/telemetry`: a server span per request, named for its route |
-| [`@alxia/redis`](packages/redis) | on `@nxgt/redis` and `@nxgt/redis-guard`: shared rate-limit and response-cache stores, idempotent routes, typed caches and locks |
+| [`@alxia/redis`](packages/redis) | on `@nxgt/redis`: shared rate-limit and response-cache stores, idempotent routes, typed caches and locks |
 | [`@alxia/i18n`](packages/i18n) | translations on `@nxgt/i18n`: `t()` in the request's language, typed keys, ICU |
 | [`@alxia/janus`](packages/janus) | identities, sessions and permissions on `@nxgt/janus`: the user typed, the cookie renewed, refusals typed |
 

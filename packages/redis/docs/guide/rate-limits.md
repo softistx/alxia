@@ -124,7 +124,7 @@ are the same count.
 `rateLimit` refuses a `limit` or a `windowMs` that is not a whole number of
 1 or more when it is created, with
 [`TypeError: rateLimit: … must be a whole number of 1 or more, not …`](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/troubleshooting.md#typeerror-ratelimit--must-be-a-whole-number-of-1-or-more-not-).
-`redisStore` checks two more bounds, `@nxgt/redis-guard`'s, only when it
+`redisStore` checks two more bounds, `@nxgt/redis`'s, only when it
 first counts under a policy, not when the app starts. A policy past either
 makes the first request it counts, and every one after it, a
 `500 {"error":"internal"}`, with the reason in the log — a refused policy

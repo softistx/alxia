@@ -267,5 +267,5 @@ Yield (`await Bun.sleep(0)`) inside long synchronous work, or move it to a
 
 - [Rate limits](rate-limits.md) — `redisStore`.
 - [Testing](testing.md) — specs for a guarded route.
-- [`@nxgt/redis-guard`](https://www.npmjs.com/package/@nxgt/redis-guard) —
+- [`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) —
   the primitive underneath, for idempotency outside HTTP.

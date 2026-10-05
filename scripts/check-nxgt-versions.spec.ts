@@ -17,12 +17,10 @@ const manifests = new Map<string, Manifest>([
 			peerDependencies: {
 				'@alxia/core': 'workspace:^',
 				'@nxgt/redis': '^0.3.1',
-				'@nxgt/redis-guard': '^0.3.1',
 			},
 			devDependencies: {
 				'@alxia/core': 'workspace:^',
 				'@nxgt/redis': '^0.3.1',
-				'@nxgt/redis-guard': '^0.3.1',
 				zod: '^4.6.5',
 			},
 		},
@@ -45,7 +43,6 @@ const lock = {
 	'@alxia/core': ['@alxia/core@workspace:packages/core'],
 	'@nxgt/i18n': ['@nxgt/i18n@2.0.0', '', {}, 'sha512-a'],
 	'@nxgt/redis': ['@nxgt/redis@0.3.1', '', {}, 'sha512-b'],
-	'@nxgt/redis-guard': ['@nxgt/redis-guard@0.3.1', '', {}, 'sha512-c'],
 	zod: ['zod@4.6.5', '', {}, 'sha512-d'],
 };
 
@@ -61,12 +58,6 @@ describe('tracked', () => {
 			{
 				name: '@nxgt/redis',
 				dirs: ['packages/core', 'packages/redis'],
-				peers: ['^0.3.1'],
-				locked: ['0.3.1'],
-			},
-			{
-				name: '@nxgt/redis-guard',
-				dirs: ['packages/redis'],
 				peers: ['^0.3.1'],
 				locked: ['0.3.1'],
 			},
@@ -90,21 +81,16 @@ describe('tracked', () => {
 	});
 
 	test('reads an empty lock as nothing locked', () => {
-		expect(tracked(manifests, {}).map((one) => one.locked)).toEqual([
-			[],
-			[],
-			[],
-		]);
+		expect(tracked(manifests, {}).map((one) => one.locked)).toEqual([[], []]);
 	});
 });
 
 describe('behind', () => {
 	const packages = tracked(manifests, lock);
-	const at = (redis: string, guard = '0.3.1', i18n = '2.0.0') =>
+	const at = (redis: string, i18n = '2.0.0') =>
 		new Map([
 			['@nxgt/i18n', i18n],
 			['@nxgt/redis', redis],
-			['@nxgt/redis-guard', guard],
 		]);
 
 	test('answers nothing when every lock is at latest', () => {
@@ -125,9 +111,9 @@ describe('behind', () => {
 	});
 
 	test('says when the peer range does not admit latest, as a 0.x minor', () => {
-		expect(
-			behind(packages, at('0.3.1', '0.4.0')).map((one) => one.admitted),
-		).toEqual([false]);
+		expect(behind(packages, at('0.4.0')).map((one) => one.admitted)).toEqual([
+			false,
+		]);
 	});
 
 	test('admits latest only when every peer range declaring it does', () => {
@@ -168,7 +154,7 @@ describe('behind', () => {
 	test('answers a package the lock does not hold', () => {
 		expect(
 			behind(tracked(manifests, {}), at('0.3.1')).map((one) => one.locked),
-		).toEqual([null, null, null]);
+		).toEqual([null, null]);
 	});
 
 	test('throws when latest is unknown, rather than calling it current', () => {
@@ -227,12 +213,11 @@ describe('check', () => {
 				latest({
 					'@nxgt/i18n': '2.0.0',
 					'@nxgt/redis': '0.3.1',
-					'@nxgt/redis-guard': '0.3.1',
 				}),
 			),
 		).toEqual({
 			code: 0,
-			lines: ['3 @nxgt/* devDependencies, all current'],
+			lines: ['2 @nxgt/* devDependencies, all current'],
 		});
 	});
 
@@ -243,7 +228,6 @@ describe('check', () => {
 				latest({
 					'@nxgt/i18n': '2.1.0',
 					'@nxgt/redis': '0.3.1',
-					'@nxgt/redis-guard': '0.3.1',
 				}),
 			),
 		).toEqual({
@@ -286,7 +270,6 @@ describe('read', () => {
 			['@nxgt/janus', ['packages/janus']],
 			['@nxgt/openapi-codegen', ['packages/create']],
 			['@nxgt/redis', ['packages/redis']],
-			['@nxgt/redis-guard', ['packages/redis']],
 			['@nxgt/telemetry', ['packages/telemetry']],
 		]);
 		for (const one of packages) {

@@ -6,11 +6,7 @@ import {
 	type Reply,
 	settle,
 } from '@alxia/core';
-import {
-	bindIdempotency,
-	defineIdempotency,
-	GuardError,
-} from '@nxgt/redis-guard';
+import { bindIdempotency, defineIdempotency, GuardError } from '@nxgt/redis';
 import type { RedisClient } from 'bun';
 import { z } from 'zod';
 
@@ -19,7 +15,7 @@ export interface IdempotencyOptions {
 	readonly name: string;
 	/** Seconds a finished response is kept and replayed. A day by default. */
 	readonly ttl?: number;
-	/** Milliseconds a running request holds its key unless renewed. `@nxgt/redis-guard`'s 10 s by default. */
+	/** Milliseconds a running request holds its key unless renewed. `@nxgt/redis`'s 10 s by default. */
 	readonly lease?: number;
 	/** Milliseconds a repeat waits for the first to finish before a 409. None by default. */
 	readonly wait?: number;
@@ -86,7 +82,7 @@ class Unstored extends Error {
 }
 
 /**
- * Idempotent routes, as a middleware, with `@nxgt/redis-guard`: a `POST` or
+ * Idempotent routes, as a middleware, with `@nxgt/redis`: a `POST` or
  * `PATCH` carrying an `Idempotency-Key` runs once per key, and every repeat
  * gets the first response back, marked `Idempotent-Replayed: true` — across
  * every process sharing the Redis. Routes declared after it are guarded; a

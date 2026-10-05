@@ -3,7 +3,7 @@ import {
 	type BoundRateLimit,
 	bindRateLimit,
 	defineRateLimit,
-} from '@nxgt/redis-guard';
+} from '@nxgt/redis';
 import type { RedisClient } from 'bun';
 
 export interface RedisStoreOptions {
@@ -12,7 +12,7 @@ export interface RedisStoreOptions {
 }
 
 /**
- * An `@alxia/rate-limit` store in Redis, with `@nxgt/redis-guard`'s GCRA:
+ * An `@alxia/rate-limit` store in Redis, with `@nxgt/redis`'s GCRA:
  * every process sharing the Redis counts together, timed by the Redis
  * server's clock, and a refused request counts nothing.
  *
