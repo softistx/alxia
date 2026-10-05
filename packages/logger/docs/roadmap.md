@@ -7,11 +7,13 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
+- **The GraphQL operation on the line.** Behind `@alxia/graphql`, an entry carries `operationName` and `operationType` (`batch` for an array body, with every name), so `POST /graphql` says whether it was `GetNotes` or `AddNote` ([guide](guide.md#a-graphql-operation)).
 - **A middleware, not a plugin (0.4).** `app.use(logger())` logs every request, a 404, a 405 or a 500 included, and times everything after it. `app.plugin(logger())`, the deprecated form, was removed in 0.5.
 
 ## Next
 
-Nothing scheduled yet.
+- **Each operation over a socket.** A `ws: true` connection is logged at its upgrade alone: its operations — a query, a mutation, a subscription's stream — name no operation yet, because the request is answered before they run.
+
 
 ## Later
 

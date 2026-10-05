@@ -27,10 +27,11 @@ number on it. Every release, with each change it made, is in
   plugins, with the client's `connectionParams` in its context; a
   shutdown closes the sockets with 1001 and completes their subscriptions
   ([WebSocket guide](guide/websockets.md)).
+- **The operation, told to the observers.** Each operation the endpoint executes is reported to the middlewares around it: `@alxia/logger` writes `operationName` and `operationType` on the request's line, `@alxia/telemetry` names its span `query GetNotes` with `graphql.operation.name` and `graphql.operation.type`. A batched body is one line and one span, `batch`, with every name ([endpoint guide](guide/endpoint.md#the-operation-in-the-log-and-the-trace)).
 
 ## Next
 
-Nothing scheduled yet.
+- **Each operation over a socket.** A `ws: true` connection is logged or spanned at its upgrade alone: its operations — a query, a mutation, a subscription's stream — name no operation yet, because the request is answered before they run.
 
 ## Later
 

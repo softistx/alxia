@@ -7,11 +7,13 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
+- **The GraphQL operation on the span.** Behind `@alxia/graphql`, the span is named `query GetNotes` and carries `graphql.operation.name` and `graphql.operation.type`, OpenTelemetry's conventions; a batched body is `batch GetNotes,AddNote` ([guide](guide.md#a-graphql-operation)).
 - **A middleware, not a plugin (0.4).** `app.use(telemetry({ ... }))` opens a span for every request, a 404 or a 405 included, around everything after it, and sees the response the client gets. `app.plugin(telemetry(...))`, the deprecated form, was removed in 0.5.
 
 ## Next
 
-Nothing scheduled yet.
+- **Each operation over a socket.** A `ws: true` connection is logged and spanned at its upgrade alone: its operations — a query, a mutation, a subscription's stream — name no operation yet, because the request is answered before they run.
+
 
 ## Later
 

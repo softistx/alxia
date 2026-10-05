@@ -192,6 +192,8 @@ interface LogEntry {
 	readonly timeToHeaders?: number;            // a streamed body's: milliseconds to its headers
 	readonly outcome?: 'completed' | 'aborted' | 'errored'; // a streamed body's
 	readonly ip?: string;
+	readonly operationName?: string;            // a GraphQL operation's, when `@alxia/graphql` served it
+	readonly operationType?: string;            // `query`, `mutation`, `subscription` or `batch`
 	readonly [field: string]: unknown;          // the fields given to `log`
 }
 ```
@@ -205,6 +207,31 @@ interface LogEntry {
 | `timeToHeaders` | a streamed body's only: from the request to the response, when the headers leave. The key is absent on any other entry |
 | `outcome` | a streamed body's only: `completed` when it was sent whole, `aborted` when the client left before its end, `errored` when the stream failed. The key is absent on any other entry |
 | `ip` | the app's `ctx.ip`; the key is absent when it is `undefined` |
+| `operationName`, `operationType` | a GraphQL operation's: see below. Both keys are absent on a request no GraphQL endpoint executed an operation for |
+
+### A GraphQL operation
+
+Every call to a GraphQL endpoint is one `POST /graphql`, so the line alone
+cannot tell a `GetNotes` from an `AddNote`. `@alxia/graphql` tells the
+observers around it the operation it executes (`operationOf`, from
+`@alxia/core`: neither package imports the other), and the entry gains two
+fields; `message` is unchanged:
+
+```json
+{"time":"…","level":"info","requestId":"…","message":"POST /graphql 200","method":"POST","path":"/graphql","status":200,"duration":3.1,"operationName":"GetNotes","operationType":"query"}
+```
+
+- `operationType` is `query`, `mutation` or `subscription`. An anonymous
+  operation has a type and no `operationName`.
+- A batched body (`batching: true`, an array) is one line: `operationType`
+  is `batch`, and `operationName` lists every named operation's name,
+  joined by commas, `GetNotes,AddNote`.
+- A request refused before it executes (a syntax error, a document that
+  fails validation) has neither field.
+- A subscription over server-sent events is a streamed body: its line is
+  written when the stream ends, with the operation.
+- Over `ws: true`, only the upgrade is logged, never the operations on the
+  socket: they are on the roadmap.
 
 ### A streamed body
 

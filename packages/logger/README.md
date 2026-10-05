@@ -38,6 +38,14 @@ to the last byte, with `timeToHeaders` and an `outcome`: `completed`,
 {"time":"…","level":"warn","requestId":"…","message":"GET /events 200 aborted","method":"GET","path":"/events","status":200,"duration":5012.3,"timeToHeaders":0.84,"outcome":"aborted","ip":"127.0.0.1"}
 ```
 
+Behind `@alxia/graphql`, the entry also says which operation ran:
+`operationName` and `operationType` (`query`, `mutation`, `subscription`,
+or `batch` for an array body, whose `operationName` lists every name).
+
+```json
+{"time":"…","level":"info","requestId":"…","message":"POST /graphql 200","status":200,"operationName":"GetNotes","operationType":"query"}
+```
+
 The routes after it read `requestId`, and `log`, whose entries carry it.
 Give it to `use` first: its timing then holds everything after it, and
 every request is logged, a 404 or a 405 that matched no route included.

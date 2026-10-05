@@ -67,12 +67,21 @@ app.listen(3000);
 | attribute | |
 | --- | --- |
 | `http.request.method`, `url.path`, `url.scheme` | the request |
-| `server.address`, `server.port`, `client.address` | where it was addressed, and from |
+| `server.address`, `server.port`, `client.address`, `graphql.operation.name`, `graphql.operation.type` | where it was addressed, and from |
 | `http.route` | the route, once matched |
 | `http.response.status_code` | the status |
+| `graphql.operation.name`, `graphql.operation.type` | behind `@alxia/graphql`: the operation's name (when it has one) and type, with the span renamed `query GetNotes`; see below |
 
 They are `@nxgt/telemetry-hono`'s names: a span from either reads the same
 in a dashboard.
+
+Behind `@alxia/graphql`, the span follows OpenTelemetry's GraphQL
+conventions: it is named `<type> <name>` (`query GetNotes`, or `mutation`
+for an anonymous operation) instead of `POST /graphql`, and carries
+`graphql.operation.name` and `graphql.operation.type`. A batched body (an
+array) is named `batch GetNotes,AddNote`: its `graphql.operation.name`
+lists every operation, and it has no type, `batch` not being one of the
+convention's. `http.route` stays.
 
 ## Options
 
@@ -95,7 +104,7 @@ A `traced` or `spanName` that throws costs its answer, never the request.
 | `TelemetryContext` | what it adds to the context: `span` and `telemetry` |
 | `TelemetryMiddleware` | what `telemetry()` returns: a middleware adding `TelemetryContext`, with `.telemetry` |
 | `TelemetryPluginOptions` | its options: `service` and `@nxgt/telemetry`'s options, or an `instance`; `traced`, `spanName`, `traceResponse` |
-| `HTTP_METHOD`, `URL_PATH`, `URL_SCHEME`, `HTTP_ROUTE`, `HTTP_STATUS`, `SERVER_ADDRESS`, `SERVER_PORT`, `CLIENT_ADDRESS` | the attribute names a server span carries: `http.request.method`, `url.path`, `url.scheme`, `http.route`, `http.response.status_code`, `server.address`, `server.port`, `client.address` |
+| `HTTP_METHOD`, `URL_PATH`, `URL_SCHEME`, `HTTP_ROUTE`, `HTTP_STATUS`, `SERVER_ADDRESS`, `SERVER_PORT`, `CLIENT_ADDRESS`, `GRAPHQL_NAME`, `GRAPHQL_TYPE` | the attribute names a server span carries: `http.request.method`, `url.path`, `url.scheme`, `http.route`, `http.response.status_code`, `server.address`, `server.port`, `client.address` |
 
 ## Documentation
 

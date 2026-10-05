@@ -136,12 +136,34 @@ await instance.close();
 | --- | --- |
 | when it opens | `spanName(ctx)`, by default `"<METHOD> <path>"`: `GET /orders/o-1` |
 | routing matched a route | `"<METHOD> <route>"`: `GET /orders/:id`, and `http.route` is set |
+| a GraphQL operation ran | `"<type> <name>"`: `query GetNotes`, see below |
 | no route matched (`404`, `405`) | stays `spanName(ctx)`, `"<METHOD> <path>"` by default |
 
 A route's name replaces any `spanName`: one dashboard row per route, not
 one per order. So `spanName` only names what routing did not match (an
 unmatched request still gets its span). A
 `HEAD` request answered by a `GET` route is named `HEAD /orders/:id`.
+
+### A GraphQL operation
+
+Every call to a GraphQL endpoint is one `POST /graphql`: a dashboard row
+for the route holds every query and mutation of the schema. `@alxia/graphql`
+tells the observers around it the operation it executes (`operationOf`,
+from `@alxia/core`: neither package imports the other), and the span follows
+OpenTelemetry's GraphQL conventions once the response is answered:
+
+| The request | The span's name | Attributes |
+| --- | --- | --- |
+| a named query | `query GetNotes` | `graphql.operation.name`: `GetNotes`, `graphql.operation.type`: `query` |
+| an anonymous mutation | `mutation` | `graphql.operation.type`: `mutation` |
+| a batched body | `batch GetNotes,AddNote` | `graphql.operation.name`: `GetNotes,AddNote`, and no type: `batch` is not one of the convention's |
+| refused before it executes (a syntax error), or over a socket | `POST /graphql`, as above | none |
+
+`http.route` is kept, so the HTTP row of the route is still one query
+away. The name replaces a `spanName` too. A subscription over server-sent
+events is a streamed body: its span stays open until the stream ends.
+Over `ws: true`, only the upgrade happens in the request, and it gets no
+span: the socket's operations are on the roadmap.
 
 ### Its status, and the route's error
 
@@ -197,6 +219,8 @@ await app.request('/range'); // 400; the span is ok, with no exception: the midd
 | `client.address` | `CLIENT_ADDRESS` | the caller's address, as the app's `ip` option reads it | when there is one: not through `app.request` |
 | `http.route` | `HTTP_ROUTE` | `/orders/:id` | once routing matched |
 | `http.response.status_code` | `HTTP_STATUS` | `200`, a number | always |
+| `graphql.operation.name` | `GRAPHQL_NAME` | `GetNotes`; a batch's names joined by commas | behind `@alxia/graphql`, for a named operation |
+| `graphql.operation.type` | `GRAPHQL_TYPE` | `query`, `mutation` or `subscription` | behind `@alxia/graphql`, except for a batch |
 
 They are the names of `@nxgt/telemetry-hono`, so a span from either reads
 the same in a dashboard. The constants are exported for code that reads

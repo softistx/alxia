@@ -141,6 +141,11 @@ POST [{"query":"{ admin }"},{"query":"{ __typename }"}]
 200  [{"data":{"admin":"welcome"}},{"data":{"__typename":"Query"}}]
 ```
 
+A batch is one request, so one log line and one span: `@alxia/logger` writes
+`operationType: 'batch'` and every name, `operationName: 'GetNotes,AddNote'`,
+and `@alxia/telemetry` names the span `batch GetNotes,AddNote`
+([endpoint guide](endpoint.md#the-operation-in-the-log-and-the-trace)).
+
 ## Subscriptions
 
 Subscriptions are served over server-sent events, Yoga's default: a

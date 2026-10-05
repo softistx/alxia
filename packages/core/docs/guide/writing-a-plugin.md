@@ -315,6 +315,38 @@ A plugin published for several apps should not read `Register`: each app
 registers its own base, and the plugin cannot know it. Name what it reads
 with `definePlugin<Requires>()`, as above.
 
+## Telling the observers what ran
+
+A plugin that serves a query language — as `@alxia/graphql` serves GraphQL
+— runs many operations behind one route, and the observers around it
+(`@alxia/logger`, `@alxia/telemetry`, your own) see one `POST /graphql`.
+It tells them with `reportOperation`, once for each operation it
+executes; an observer reads the summary with `operationOf`, after
+`next()`, and imports neither the plugin nor the other observers:
+
+```ts
+import { defineMiddleware, operationOf, reportOperation } from '@alxia/core';
+
+// In the plugin's handler, for each operation it executes.
+export function executed(ctx: object) {
+	reportOperation(ctx, { type: 'query', name: 'GetNotes' });
+}
+
+// In an observer, given to `use` before the plugin.
+export const operations = defineMiddleware(async (ctx, next) => {
+	const response = await next();
+	console.log(operationOf(ctx)); // { type: 'query', name: 'GetNotes' }
+	return response;
+});
+```
+
+`type` is `query`, `mutation` or `subscription`, and `name` is absent for an
+anonymous operation. One report is read as it was made; several (a batched
+body) read as `{ type: 'batch', name: 'GetNotes,AddNote' }`, the names of
+the named ones joined by commas. Nothing reported reads `undefined`. A
+socket's operations are not reported: its upgrade has been answered
+already, and a report would outlive it.
+
 ## See also
 
 - [Groups and plugins](groups-and-plugins.md): what `plugin` mounts, and the

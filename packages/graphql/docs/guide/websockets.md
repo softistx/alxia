@@ -142,6 +142,14 @@ before you trust it. A header the upgrade's middlewares set with
 `set.headers` is sent with the `101`; set during an operation, it goes
 nowhere.
 
+## Logging and tracing
+
+`@alxia/logger` and `@alxia/telemetry` see the upgrade request, `101`, and
+not the operations on the socket: the request is answered before they run,
+so none of them gets an `operationName` or a span. Log from a Yoga plugin's
+`onExecute` for now; each operation over the socket is on the
+[roadmap](../roadmap.md).
+
 ## Errors
 
 An error stays GraphQL's. A resolver's arrives in a `next` message with
