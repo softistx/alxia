@@ -154,7 +154,7 @@ a repeat never receives a session.
 
 `retryAfter` is when the running request's lease lapses **unless it is
 renewed**, rounded up to the second — 10 by default, however short the
-route actually is (the definition's `lease`, should the guard give no estimate). A client that waits that long and repeats gets the
+route actually is. A client that waits that long and repeats gets the
 replay. With `wait`, the repeat waits on the server instead, and usually
 gets the replay rather than the `409`:
 

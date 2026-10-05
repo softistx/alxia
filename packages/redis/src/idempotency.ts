@@ -176,24 +176,16 @@ export function idempotency(
 			);
 			return restore(value, replayed);
 		} catch (error) {
-			return answer(error, reply, bound.definition.lease);
+			return answer(error, reply);
 		}
 	});
 }
 
 /** The answer to what a run threw: the response kept apart, a 409 or a 422, or the error itself. */
-function answer(
-	error: unknown,
-	reply: BaseContext['reply'],
-	lease: number | undefined,
-) {
+function answer(error: unknown, reply: BaseContext['reply']) {
 	if (error instanceof Unstored) return error.response;
 	if (error instanceof GuardError && error.code === 'IN_PROGRESS') {
-		// The guard's own estimate, else the definition's lease: the longest a run holds its key.
-		const retryAfter = Math.max(
-			1,
-			Math.ceil((error.retryAfter ?? lease ?? 0) / 1000),
-		);
+		const retryAfter = Math.max(1, Math.ceil((error.retryAfter ?? 0) / 1000));
 		return reply(409, refuse('idempotency_in_progress', retryAfter), {
 			headers: { 'retry-after': String(retryAfter) },
 		});

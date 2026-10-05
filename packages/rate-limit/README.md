@@ -63,12 +63,12 @@ app.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(redis, { nam
 
 A store that counts by a rate of its own declares it as `policy: { limit,
 windowMs }`, and `rateLimit({ store })` reads both from it, headers included:
-the numbers are written once. `redisStore(handle.limits.api, api)` does, from
-the definition `api`. A `limit` or `windowMs` given beside it that differs
+the numbers are written once. `redisStore(handle.limits.api)` does, from
+the bound limit's definition. A `limit` or `windowMs` given beside it that differs
 throws at declaration.
 
 ```ts
-app.use(rateLimit({ store: redisStore(handle.limits.api, api) }));
+app.use(rateLimit({ store: redisStore(handle.limits.api) }));
 ```
 
 A store of your own implements `RateLimitStore` (and, to count by a rate of

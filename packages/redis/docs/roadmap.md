@@ -37,8 +37,8 @@ Nothing scheduled yet.
   `redisStore(handle.limits.api, api)`, is deprecated; it compares `limit` and
   `per` (not the prefixed name) and throws on a mismatch.
 - **`idempotency(handle.idempotency.orders)` reads its definition.** It names
-  itself from `definition.name` and answers a 409's `Retry-After` from the
-  definition's `lease` when the guard gives none.
+  itself from `definition.name` in the unscoped-request warning, where it
+  rebuilt the name from a key.
 - **The peer is `@nxgt/redis` `^0.7.0`.** The single-argument form has no rate
   to read from an older bound limit, so it cannot degrade gracefully.
 
