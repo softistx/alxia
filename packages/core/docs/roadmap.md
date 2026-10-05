@@ -112,6 +112,12 @@ number on it. Every release, with each change it made, is in
   a spec's and a variant each build on the registered base without
   declaring on it twice; a route declared twice says when a fork is the fix
   ([Groups and plugins](guide/groups-and-plugins.md#several-apps-on-one-base-fork)).
+- **Before the `101`, on a socket.** `app.ws(path, { upgrade, open, message })`
+  awaits `upgrade(data, headers)` after the route's middlewares: `data` is
+  what `socket.data` will be, `headers` the `101`'s, and a throw answers the
+  upgrade request in the app's error format with no socket opened. Without a
+  server, or for a handshake Bun would refuse, the `426` comes first and
+  `upgrade` is not run ([WebSockets](guide/websockets.md#before-the-101-upgrade)).
 - **The operation a request ran, for the observers.** `@alxia/graphql`
   reports each operation it executes with `reportOperation`; `operationOf(ctx)`
   gives an observer one summary — the type and name, or `batch` and every
