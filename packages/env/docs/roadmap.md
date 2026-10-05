@@ -11,7 +11,10 @@ Nothing scheduled yet.
 
 ## Next
 
-Nothing scheduled yet.
+- **A description from every validator.** `envExample` reads a variable's
+  type and description from Zod, Valibot and ArkType's definitions. When
+  Standard Schema gets a JSON Schema form, it reads that, and any validator
+  that implements it is described.
 
 ## Later
 
@@ -25,6 +28,19 @@ Nothing scheduled yet.
   `@alxia/core` either, and works in any Bun program.
 
 ## Shipped
+
+### 0.2.0
+
+- **`defineEnv(shape, { secret?, source? })`.** One schema per variable, checked
+  once when the module is imported, from `Bun.env` or a `source`. A `.default()` is a
+  required key, an `.optional()` an optional one. `app.decorate({ env })` gives it to
+  `ctx.env`, typed in every route through `Register`.
+- **Secrets.** A variable in `secret` is `'***'` through `toJSON`, `inspect` and
+  `toString`, and a validator's message never carries its value.
+- **Every issue, with its expected type.** An `EnvIssue` is `path`, `message` and,
+  when the schema tells, `expected`.
+- **`envExample(env)` and `bunx alxia-env example`.** A `.env.example` from the schema:
+  names, expected types, defaults and descriptions, no secret's default.
 
 ### 0.1.0
 
