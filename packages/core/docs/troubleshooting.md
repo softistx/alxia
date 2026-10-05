@@ -97,6 +97,7 @@ a trap that prints nothing is headed by its symptom.
 - [`ctx.ip` is the proxy's address, or one a client chose](#ctxip-is-the-proxys-address-or-one-a-client-chose)
 - [``trustProxy: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function), not a hop count``](#trustproxy-untrusted-refuse-needs-the-proxies-named-by-address-cidr-ranges-or-a-function-not-a-hop-count), ``… untrusted: 'refuse-all' needs …``, and ``trustProxy: untrusted must be 'ignore', 'refuse' or 'refuse-all', not "…"``
 - [``trustProxy: allow is for untrusted: 'refuse-all' alone; under '…' a request with no forwarding header passes already``](#trustproxy-allow-is-for-untrusted-refuse-all-alone-under--a-request-with-no-forwarding-header-passes-already), and ``trustProxy: allow must be CIDR ranges or a function (request, peer) => boolean``
+- [A `trusted` function that throws answers 500](#a-trusted-function-that-throws-answers-500), and an `allow` that throws refuses
 - [`trustProxy: canonical must be true or false`](#trustproxy-canonical-must-be-true-or-false), and `forwardedIp: canonical must be true or false`
 - [`ctx.ip` reads `192.0.2.1` where it read `::ffff:192.0.2.1`, or IPv6 compressed](#ctxip-reads-192021-where-it-read-ffff192021-or-ipv6-compressed)
 - [`alxia(): give ip or proxy, not both: proxy reads ctx.ip itself`](#alxia-give-ip-or-proxy-not-both-proxy-reads-ctxip-itself), and `alxia(): proxy must be trustProxy({ trusted })`
@@ -2138,6 +2139,28 @@ alxia({
 		trusted: ['10.0.0.0/8'],
 		untrusted: 'refuse-all',
 		allow: (request) => ['/health', '/ready'].includes(new URL(request.url).pathname),
+	}),
+});
+```
+
+### A `trusted` function that throws answers 500
+
+**When:** `trustProxy({ trusted: (address) => … })` or `forwardedIp({ trusted: … })` with a function that throws (a lookup that fails, a bug), and every request it runs on gets a 500.
+
+**Why:** the function runs on each request, before routing. A throw there is an escaped error like any other: logged with `console.error`, answered `{ "error": "internal" }` (a problem under `errors: 'problem'`), and no middleware or route runs. The body says nothing of the request or the address. An `allow` function that throws is not an error: it lets nothing through, so the request is refused 403.
+
+**Fix:** read the log for the error, and have the function return `false` for what it cannot judge:
+
+```ts
+alxia({
+	proxy: trustProxy({
+		trusted: (address) => {
+			try {
+				return knownProxies.has(address);
+			} catch {
+				return false;
+			}
+		},
 	}),
 });
 ```
