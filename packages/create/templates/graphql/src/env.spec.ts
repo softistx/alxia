@@ -1,7 +1,8 @@
 import { expect, test } from "bun:test";
 
 // src/env.ts checks Bun.env once, when it is first imported: a spec gives it
-// a fresh copy (a query string makes a new module) under the value it tests.
+// a fresh copy (a query string makes a new module, so the import names its
+// extension) under the value it tests.
 const key = "TRUSTED_PROXIES";
 const load = async (trustedProxies: string) => {
   const before = Bun.env[key];

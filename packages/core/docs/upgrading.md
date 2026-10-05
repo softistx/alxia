@@ -10,7 +10,7 @@ after, and whether it can break yours.
 a path, which a middleware that answers — `@alxia/proxy`'s `proxy(url)` —
 may end. Nothing in its API breaks; the peer range of every package moves.
 It ships with `@alxia/proxy` 0.3.0, `@alxia/telemetry` 0.7.0 and
-`@alxia/create` 0.4.0, each a minor that changes nothing you call.
+`@alxia/create` 0.4.0, each a minor that changes nothing you already call.
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
@@ -88,7 +88,7 @@ exactly needs the new one.
 `@alxia/proxy` documents `app.all('/api/*', proxy(url))` beside
 `use('/api', proxy(url))`: `use` shadows the routes declared after it under
 its path, `all` is one route the routes beside it keep their methods
-against ([The basics](../../proxy/docs/guide/basics.md#as-one-route-all)).
+against ([The basics](https://github.com/softistx/alxia/blob/develop/packages/proxy/docs/guide/basics.md#as-one-route-all)).
 Its code is unchanged by this.
 
 **Can it break your code.** No.
