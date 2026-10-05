@@ -1,5 +1,13 @@
 # @alxia/rate-limit
 
+## 0.4.6
+
+### Patch Changes
+
+- [#192](https://github.com/softistx/alxia/pull/192) [`3385725`](https://github.com/softistx/alxia/commit/33857253e8a67fc33f39884d58bdd55377ae2915) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Document that the default key, `ctx.ip`, is one text per address under core's canonical `ctx.ip`, so an IPv4-mapped or uncompressed IPv6 notation counts against the same bucket, with a spec that holds it.
+- Updated dependencies [[`3385725`](https://github.com/softistx/alxia/commit/33857253e8a67fc33f39884d58bdd55377ae2915), [`da95f24`](https://github.com/softistx/alxia/commit/da95f24391b942db81c082c253aeeaa5fcade07b)]:
+  - @alxia/core@0.10.0
+
 ## 0.4.5
 
 ### Patch Changes
