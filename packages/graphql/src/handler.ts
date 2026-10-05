@@ -8,6 +8,7 @@ import {
 	type YogaServerInstance,
 	type YogaServerOptions,
 } from 'graphql-yoga';
+import { watchBody, withoutOriginalError } from './body-refusal';
 import { renderSandbox, SANDBOX_POLICY, type SandboxOptions } from './sandbox';
 
 export type YogaContext = Record<string, any>;
@@ -113,7 +114,16 @@ export function graphqlHandler<UserCtx extends YogaContext>(
 				},
 			});
 		}
-		const response = await yogaAt(ctx.route).fetch(ctx.request, server);
+		const watched = watchBody(ctx.request);
+		const answered = await yogaAt(ctx.route).fetch(watched.request, server);
+		// Yoga answered a body past `bodyLimit` with its own 400: core's 413
+		// is the answer, in the app's format.
+		const refusal = watched.refusal();
+		if (refusal !== undefined) {
+			void answered.body?.cancel();
+			throw refusal;
+		}
+		const response = await withoutOriginalError(answered);
 		const headers = new Headers(response.headers);
 		if (
 			headers.get('content-type')?.startsWith('text/html') &&

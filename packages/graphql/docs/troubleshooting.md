@@ -28,6 +28,7 @@ symptom.
 **Responses**
 
 - [`200 {"errors":[{"message":"Unexpected error.", … "code":"INTERNAL_SERVER_ERROR"}}]}`](#200-errorsmessageunexpected-error--codeinternal_server_error)
+- [`413 {"error":"content_too_large", …}`](#413-errorcontent_too_large--on-post-graphql)
 - [`405 {"error":"method_not_allowed"}` on `OPTIONS /graphql`](#405-errormethod_not_allowed-on-options-graphql)
 - [`405 {"errors":[{"message":"Can only perform a mutation operation from a POST request."}]}`](#405-errorsmessagecan-only-perform-a-mutation-operation-from-a-post-request)
 - [`406` with an empty body](#406-with-an-empty-body)
@@ -276,6 +277,25 @@ throw createGraphQLError('Admins only', {
 ```
 
 `maskedErrors: false` shows every message, for development only.
+
+### `413 {"error":"content_too_large", …}` on `POST /graphql`
+
+**When:** the body of a `POST` is larger than the `bodyLimit` declared
+before `graphql(...)`. Before the fix the same request was a
+`400 POST body sent invalid JSON.`, with the read's error in
+`extensions.originalError`.
+
+**Why:** core counts the bytes as they arrive and fails the read past the
+limit; the endpoint answers it as any route does, in the app's error format
+(`application/problem+json` under `errors: 'problem'`).
+
+**Fix:** a client sends less, or the route takes a larger limit:
+
+```ts
+alxia()
+	.bodyLimit(512 * 1024) // before graphql(...)
+	.plugin((app) => graphql(app, { schema }));
+```
 
 ### `405 {"error":"method_not_allowed"}` on `OPTIONS /graphql`
 
