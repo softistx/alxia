@@ -7,24 +7,21 @@ import {
 	type Next,
 	type Reply,
 } from '@alxia/core';
-import { type Decision, MemoryStore, type RateLimitStore } from './store';
+import { resolvePolicy } from './policy';
+import {
+	type Decision,
+	MemoryStore,
+	type Policy,
+	type PolicyStore,
+	type RateLimitStore,
+} from './store';
 
-/**
- * `Requires` is what `key` and `skip` read from the context beyond
- * `BaseContext` — a `user` an earlier middleware adds — and what the app that
- * uses the limit must then give.
- */
-export interface RateLimitOptions<Requires extends object = Empty> {
-	/** How many requests a key may make in a window: a whole number, 1 or more. */
-	readonly limit: number;
-	/** The window, in milliseconds: a whole number, 1 or more. */
-	readonly windowMs: number;
+/** What `RateLimitOptions` holds whatever the store: how a request is counted and answered. */
+interface CountingOptions<Requires extends object> {
 	/** What is counted: the client's address by default. `undefined` is not counted. */
 	readonly key?: (
 		ctx: BaseContext & Requires,
 	) => string | undefined | Promise<string | undefined>;
-	/** Where it is counted: one process's memory by default. */
-	readonly store?: RateLimitStore;
 	/** Requests not counted at all. */
 	readonly skip?: (ctx: BaseContext & Requires) => boolean;
 	/**
@@ -33,6 +30,34 @@ export interface RateLimitOptions<Requires extends object = Empty> {
 	 */
 	readonly headers?: 'draft' | 'legacy' | false;
 }
+
+/**
+ * `Requires` is what `key` and `skip` read from the context beyond
+ * `BaseContext` — a `user` an earlier middleware adds — and what the app that
+ * uses the limit must then give.
+ *
+ * `limit` and `windowMs` are required, unless the `store` declares its own
+ * `policy` (`@alxia/redis`'s `redisStore` of a wired limit): they are then
+ * read from it, and one that is given must equal it.
+ */
+export type RateLimitOptions<Requires extends object = Empty> =
+	CountingOptions<Requires> &
+		(
+			| {
+					/** How many requests a key may make in a window: a whole number, 1 or more. */
+					readonly limit: number;
+					/** The window, in milliseconds: a whole number, 1 or more. */
+					readonly windowMs: number;
+					/** Where it is counted: one process's memory by default. */
+					readonly store?: RateLimitStore;
+			  }
+			| {
+					readonly limit?: number;
+					readonly windowMs?: number;
+					/** A store with a policy of its own gives `limit` and `windowMs`. */
+					readonly store: PolicyStore;
+			  }
+		);
 
 /** The body of the 429. */
 export interface RateLimitedBody {
@@ -75,16 +100,8 @@ export type RateLimit<Requires extends object = Empty> = Middleware<
 export function rateLimit<Requires extends object = Empty>(
 	options: RateLimitOptions<Requires>,
 ): NoInfer<RateLimit<Requires>> {
-	for (const name of ['limit', 'windowMs'] as const) {
-		const value = options[name];
-		if (!Number.isSafeInteger(value) || value < 1) {
-			// 0 refuses every request; a window of 0 or less never ends one.
-			throw new TypeError(
-				`rateLimit: ${name} must be a whole number of 1 or more, not ${String(value)}`,
-			);
-		}
-	}
 	const store = options.store ?? new MemoryStore();
+	const policy = resolvePolicy(options);
 	const key = options.key ?? ((ctx: BaseContext & Requires) => ctx.ip);
 	const style = options.headers ?? 'draft';
 	return defineMiddleware<Requires>()(async function rateLimit(ctx, next) {
@@ -93,11 +110,8 @@ export function rateLimit<Requires extends object = Empty>(
 			const rateLimit: RateLimitInfo | undefined = undefined;
 			return next({ rateLimit });
 		}
-		const decision = await store.consume(counted, {
-			limit: options.limit,
-			windowMs: options.windowMs,
-		});
-		said(ctx.set.headers, style, options, decision);
+		const decision = await store.consume(counted, policy);
+		said(ctx.set.headers, style, policy, decision);
 		if (!decision.allowed) {
 			const retryAfter = Math.max(1, Math.ceil(decision.retryAfter / 1000));
 			const body: RateLimitedBody = { error: 'rate_limited', retryAfter };
@@ -106,7 +120,7 @@ export function rateLimit<Requires extends object = Empty>(
 			});
 		}
 		const rateLimit: RateLimitInfo | undefined = {
-			limit: options.limit,
+			limit: policy.limit,
 			remaining: decision.remaining,
 			resetAfter: decision.resetAfter,
 		};
@@ -118,7 +132,7 @@ export function rateLimit<Requires extends object = Empty>(
 function said(
 	headers: Headers,
 	style: 'draft' | 'legacy' | false,
-	options: { readonly limit: number; readonly windowMs: number },
+	options: Policy,
 	decision: Decision,
 ): void {
 	if (style === 'draft') {

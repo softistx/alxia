@@ -9,5 +9,6 @@ export {
 	type Decision,
 	MemoryStore,
 	type Policy,
+	type PolicyStore,
 	type RateLimitStore,
 } from './store';

@@ -25,7 +25,17 @@ export interface RateLimitStore {
 	consume(key: string, policy: Policy): Decision | Promise<Decision>;
 	/** Forgets `key`: a user who just logged in. */
 	reset(key: string): void | Promise<void>;
+	/**
+	 * The policy the store counts by itself, when it has one of its own — a
+	 * rate limit defined elsewhere, as `@alxia/redis`'s `redisStore` of a wired
+	 * limit. `rateLimit({ store })` then reads `limit` and `windowMs` from it,
+	 * and refuses numbers that differ.
+	 */
+	readonly policy?: Policy;
 }
+
+/** A store that declares its own policy: `rateLimit` needs no `limit` nor `windowMs` with it. */
+export type PolicyStore = RateLimitStore & { readonly policy: Policy };
 
 /** A fixed-window counter in memory, swept as windows end. */
 export class MemoryStore implements RateLimitStore {

@@ -27,14 +27,16 @@ function rateLimit<Requires extends object = Empty>(
 	options: RateLimitOptions<Requires>,
 ): RateLimit<Requires>; // a middleware, given to `app.use`, which checks `Requires`
 
-interface RateLimitOptions<Requires extends object = Empty> {
-	readonly limit: number;
-	readonly windowMs: number;
+type RateLimitOptions<Requires extends object = Empty> = {
 	readonly key?: (ctx: BaseContext & Requires) => string | undefined | Promise<string | undefined>;
-	readonly store?: RateLimitStore;
 	readonly skip?: (ctx: BaseContext & Requires) => boolean;
 	readonly headers?: 'draft' | 'legacy' | false;
-}
+} & (
+	| { readonly limit: number; readonly windowMs: number; readonly store?: RateLimitStore }
+	| { readonly limit?: number; readonly windowMs?: number; readonly store: PolicyStore } // a store with a policy
+);
+
+type PolicyStore = RateLimitStore & { readonly policy: { limit: number; windowMs: number } };
 ```
 
 `rateLimit` returns a middleware that counts the request. Given to `app.use`,
@@ -55,16 +57,35 @@ type RateLimit<Requires extends object = Empty> = Middleware<
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `limit` | `number` | required | requests one key may make in a window: a whole number, 1 or more |
-| `windowMs` | `number` | required | the window, in milliseconds: a whole number, 1 or more |
+| `limit` | `number` | required, unless the store has a `policy` | requests one key may make in a window: a whole number, 1 or more |
+| `windowMs` | `number` | required, unless the store has a `policy` | the window, in milliseconds: a whole number, 1 or more |
 | `key` | `(ctx: BaseContext & Requires) => string \| undefined \| Promise<…>` | `ctx.ip` | what is counted; `undefined` is not counted |
-| `store` | `RateLimitStore` | a new `MemoryStore` | where the counts are kept |
+| `store` | `RateLimitStore` | a new `MemoryStore` | where the counts are kept; with a `policy`, it gives `limit` and `windowMs` |
 | `skip` | `(ctx: BaseContext & Requires) => boolean` | none | requests not counted at all |
 | `headers` | `'draft' \| 'legacy' \| false` | `'draft'` | which rate-limit headers each counted response carries |
 
 A `limit` or a `windowMs` that is not a whole number of 1 or more makes
 `rateLimit()` throw a `TypeError` when it is called, so the app fails at
 startup ([troubleshooting](troubleshooting.md#typeerror-ratelimit--must-be-a-whole-number-of-1-or-more-not-)).
+
+### A store with a policy
+
+A store that counts by a rate of its own — a rate limit defined elsewhere —
+declares it as `policy?: { limit: number; windowMs: number }`. With one,
+`limit` and `windowMs` are optional in the type and read from the store, the
+`RateLimit-*` headers and `ctx.rateLimit.limit` included, so the rate is
+written once. Without one they are required, and a type error says so.
+
+```ts
+import { redisStore } from '@alxia/redis';
+
+// `api` is the defineRateLimit definition the handle wired.
+app.use(rateLimit({ store: redisStore(handle.limits.api, api) })); // 100 per 60 s, from `api`
+```
+
+A `limit` or a `windowMs` given beside a policy must equal it, or
+`rateLimit()` throws at declaration
+([troubleshooting](troubleshooting.md#typeerror-ratelimit-limit--differs-from-the-stores-policy-of-)).
 
 A store may refuse larger values than `rateLimit` does: `redisStore`
 refuses a `limit × windowMs` above 9,007,199,254,740 and a `windowMs`

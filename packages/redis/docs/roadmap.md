@@ -12,11 +12,7 @@ shipped in 0.2.0 and finished in 0.3.0.
 
 ## Next
 
-- **A rate limit that reads its policy from the store.** With
-  `redisStore(handle.limits.api)` the rate lives in the definition, and
-  `rateLimit({ limit, windowMs })` still repeats it for its headers. The store
-  telling `rateLimit` its own policy, so the numbers are written once, is
-  planned for `@alxia/rate-limit` and this package together.
+Nothing scheduled yet.
 
 ## Later
 
@@ -31,6 +27,18 @@ Nothing scheduled yet.
   install, and it does not run on Node.
 
 ## Shipped
+
+### 0.4.0: the rate, written once
+
+- **A rate limit that reads its policy from the store.**
+  `redisStore(handle.limits.api, api)`, given the definition beside the wired
+  limit, declares the definition's `limit` and `per` as the store's `policy`;
+  `rateLimit({ store })` takes `limit` and `windowMs` from it (optional in the
+  type, with `@alxia/rate-limit` 0.4) and writes its `RateLimit-*` headers
+  from it, and numbers that differ throw at declaration. `redisStore` returns
+  a `PolicyStore`. The one-argument form stays, with its numbers repeated.
+  (`@nxgt/redis` 0.6 does not expose a bound limit's rate, hence the
+  definition as an argument.)
 
 ### 0.3.0, continued: wired guards
 

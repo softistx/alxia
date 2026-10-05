@@ -30,6 +30,7 @@ bun add @alxia/rate-limit
 ```ts
 function redisStore(target: RedisClient | Redis<any>, options: RedisStoreOptions): RateLimitStore;
 function redisStore(limit: BoundRateLimit<string>): RateLimitStore; // wired by defineRedis
+function redisStore(limit: BoundRateLimit<string>, definition: RateLimitDefinition<string>): PolicyStore; // and its policy
 
 interface RedisStoreOptions {
 	/** Prepended to every key it counts: one name per limit, so two never share a count. */
@@ -51,6 +52,29 @@ A limit wired by `defineRedis`, `redisStore(handle.limits.api)`, takes no
 `name`: its definition holds the name and the rate, and the keys are
 `<prefix>:<name>:<key>`, shared with every other `@nxgt/redis` consumer. See
 [Defined once, in `defineRedis`](connecting.md#defined-once-in-defineredis).
+
+### The rate, written once
+
+`@nxgt/redis` 0.6 does not expose a bound limit's rate, so a store of the
+bound limit alone cannot tell `rateLimit` what it counts by, and `limit` and
+`windowMs` repeat the definition for the headers. Give the definition as the
+second argument and the store declares it as its `policy`:
+
+```ts
+const api = defineRateLimit({ name: 'api', key: (ip: string) => ip, limit: 100, per: 60_000 });
+const handle = await openRedis(defineRedis({ uri, prefix: 'shop', limits: { api } }));
+
+app.use(rateLimit({ store: redisStore(handle.limits.api, api) })); // 100 per 60 s
+```
+
+`rateLimit` reads `limit` (the definition's `limit`) and `windowMs` (its
+`per`) from the policy: the 429 and the `RateLimit-Limit`, `-Remaining`,
+`-Reset` and `-Policy` headers come from the definition, and one place holds
+the numbers. A `limit` or `windowMs` given too must equal them, or
+`rateLimit()` throws at declaration. A definition that is not the one that
+wired the limit — another `name` — is a `TypeError` from `redisStore`.
+The definition's `burst`, when it sets one, still governs how many requests
+pass at once; the policy states `limit` per `per`.
 
 ## What changes with Redis
 

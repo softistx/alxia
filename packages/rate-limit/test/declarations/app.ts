@@ -2,7 +2,7 @@
 // inferred: a declaration build must be able to name each one through
 // `@alxia/rate-limit` and `@alxia/core` alone (TS2883 otherwise).
 import { alxia, type BaseContext } from '@alxia/core';
-import { MemoryStore, rateLimit } from '@alxia/rate-limit';
+import { MemoryStore, type PolicyStore, rateLimit } from '@alxia/rate-limit';
 
 export function limited() {
 	return alxia()
@@ -32,4 +32,10 @@ export function limitedOn<Ctx extends BaseContext>(
 	skip: (ctx: Ctx) => boolean,
 ) {
 	return rateLimit<Ctx>({ limit: 1, windowMs: 1_000, skip });
+}
+
+export function limitedByStorePolicy(store: PolicyStore) {
+	return alxia()
+		.use(rateLimit({ store }))
+		.get('/', ({ rateLimit: info, reply }) => reply(200, info?.limit ?? 0));
 }

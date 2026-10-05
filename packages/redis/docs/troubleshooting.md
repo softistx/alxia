@@ -742,7 +742,13 @@ themselves.
 limit; switch at a quiet moment. `redisStore(handle.limits.api)` counts by the
 definition's rate, not by the `limit` and `windowMs` the middleware is given,
 which only write the headers: if the `RateLimit-Policy` header says another
-rate than the limit enforces, make the two numbers equal.
+rate than the limit enforces, give the definition as the second argument,
+`redisStore(handle.limits.api, api)`, and leave `limit` and `windowMs` out of
+`rateLimit`: the store declares the definition's rate and the headers come
+from it. A `limit` or `windowMs` that differs from it throws
+[`rateLimit: limit … differs from the store's policy of …`](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/troubleshooting.md#typeerror-ratelimit-limit--differs-from-the-stores-policy-of-)
+at startup; a definition that is not the one that wired the limit throws
+`redisStore: the definition "…" is not the one that wired this limit`.
 
 ### The handle is closed while something still uses it
 

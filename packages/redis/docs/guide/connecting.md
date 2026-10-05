@@ -229,7 +229,7 @@ const handle = await openRedis(
 );
 
 const app = alxia()
-	.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(handle.limits.api) })) // shop:api:<address>
+	.use(rateLimit({ store: redisStore(handle.limits.api, api) })) // shop:api:<address>, 100 per 60 s from `api`
 	.use(idempotency(handle.idempotency.orders)) // shop:orders:<route>:<scope>:<key>
 	.post('/orders', ({ reply }) => reply(201, { id: crypto.randomUUID() }));
 ```

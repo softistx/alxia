@@ -40,7 +40,7 @@ export const User = z.object({ id: z.string(), name: z.string() });
 const users = defineCache({ name: 'user', key: (id: string) => id, ttl: 300, schema: User });
 
 // 100 requests a minute per client address, counted under `shop:api:<address>`.
-const api = defineRateLimit({ name: 'api', key: (address: string) => address, limit: 100, per: 60_000 });
+export const api = defineRateLimit({ name: 'api', key: (address: string) => address, limit: 100, per: 60_000 });
 
 // An order is created once per `Idempotency-Key`; `idempotencyResult` is the response `@alxia/redis` keeps.
 const orders = defineIdempotency({ name: 'orders', key: (id: string) => id, ttl: 86_400, schema: idempotencyResult });
@@ -60,7 +60,7 @@ import { alxia, health, validate } from '@alxia/core';
 import { rateLimit } from '@alxia/rate-limit';
 import { idempotency, redis, redisCacheStore, redisCheck, redisStore } from '@alxia/redis';
 import { z } from 'zod';
-import type { Handle } from './redis';
+import { type Handle, api } from './redis';
 
 const catalogue = new Map<string, { id: string; name: string }>(); // your database
 
@@ -78,9 +78,9 @@ export const createApp = (handle: Handle) => {
 			// The probes first: they are not rate limited, and /ready says whether Redis answers.
 			.plugin(health({ checks: { redis: redisCheck(handle) } }))
 			.plugin(redis(handle)) // `caches`, `lock`, `redis` in the context; closes the handle on stop
-			// The wired limit `api`, counted in Redis (GCRA, the server's clock). Its rate is the
-			// definition's; `limit` and `windowMs` write the headers, so they repeat it.
-			.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(handle.limits.api) }))
+			// The wired limit `api`, counted in Redis (GCRA, the server's clock). Given its definition,
+			// the store declares its rate as its policy: `limit`, `windowMs` and the headers come from it.
+			.use(rateLimit({ store: redisStore(handle.limits.api, api) }))
 			.post('/products', validate({ body: z.object({ id: z.string(), name: z.string() }) }), async ({ body, reply }) => {
 				catalogue.set(body.id, body);
 				await products.invalidateTag('products'); // forgotten in every process
@@ -102,9 +102,13 @@ export const createApp = (handle: Handle) => {
 };
 ```
 
-`redisStore(handle.limits.api)` counts under `shop:api:<address>`, the key
+`redisStore(handle.limits.api, api)` counts under `shop:api:<address>`, the key
 `@nxgt/redis` writes for the wired limit, so a job in the same deployment that
 calls `handle.limits.api.consume(address)` shares the count with these routes.
+The definition `api` is the one place the rate is written: the store gives it to
+`rateLimit` as its `policy`, so the 429 and the `RateLimit-*` headers cannot
+drift from what Redis counts. A `limit` or `windowMs` given to `rateLimit` that
+differs from it throws at declaration.
 `idempotency(handle.idempotency.orders)` keeps its responses under
 `shop:orders:…` the same way. The older form, `redisStore(handle, { name:
 'api' })`, still works and keeps its own keys: [the difference](../../packages/redis/docs/troubleshooting.md#counts-restart-after-moving-a-rate-limit-to-the-wired-form).
