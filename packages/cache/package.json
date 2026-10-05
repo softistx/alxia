@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/cache",
-	"version": "0.3.1",
+	"version": "0.3.2",
 	"description": "HTTP response caching for alxia: TTL, stale-while-revalidate, one load for concurrent misses, tags, ETags \u2014 in memory, or in Redis with @alxia/redis",
 	"license": "MIT",
 	"type": "module",
