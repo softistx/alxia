@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/cors",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "CORS for alxia: preflights answered before routing, and the headers a browser needs on every response",
 	"license": "MIT",
 	"type": "module",

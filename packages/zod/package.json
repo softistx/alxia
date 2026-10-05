@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/zod",
-	"version": "0.1.1",
+	"version": "0.2.0",
 	"description": "Zod 4 for alxia: query and path coercions typed by what a client sends",
 	"license": "MIT",
 	"type": "module",

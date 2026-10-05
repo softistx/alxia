@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/i18n",
-	"version": "0.2.0",
+	"version": "0.3.0",
 	"description": "Translations for alxia on @nxgt/i18n: t() bound to the request's language, keys typed by your catalogue, ICU messages",
 	"license": "MIT",
 	"type": "module",

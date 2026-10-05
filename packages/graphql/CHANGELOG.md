@@ -1,5 +1,23 @@
 # @alxia/graphql
 
+## 0.3.0
+
+### Minor Changes
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - A subscription over server-sent events, or an incremental delivery, ends when the app starts shutting down — `@alxia/core`'s `shutdownSignal` — so the graceful shutdown of `listen` answers the queries in flight and exits without waiting for it until `shutdownTimeout`. The docs say how GraphQL errors stay in `errors[]`, inside a 200, under core's `errors: 'problem'`, which applies to the HTTP layer around the endpoint, and show `health()` beside it.
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - GraphiQL follows the serving app's dev switch: by default it answers a browser in dev alone (`NODE_ENV=development`, or `alxia({ dev: true })`), and nothing outside it — it used to be on everywhere unless `ide: false`. `ide: 'graphiql'` serves it everywhere, as before. Its page's `Content-Security-Policy` allows exactly the pinned `https://unpkg.com/@graphql-yoga/graphiql@<version>/` folder the page loads from, for its scripts, styles, fonts and the Monaco workers it fetches (which the old `connect-src 'self'` blocked), instead of all of unpkg.com, and adds `frame-ancestors 'none'`.
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - For `@alxia/core` 0.5: `graphql()` is typed by `Alxia<Ctx, Prefix>`, without the removed `Shortcuts` parameter. A guard before the endpoint is any `(ctx, next)` middleware given to `use`, `bearer()` among them, and what it passes `next` is typed into the resolvers; the docs show it.
+
+### Patch Changes
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The docs are organised around tasks. Each README and docs index links the new "Start in 5 minutes" and the recipes of the repository (authentication, a spec-first CRUD, a GraphQL API, file uploads, SSE and WebSockets, testing, errors, health and shutdown, caching and rate limiting, deploying), whose code is type-checked. `@alxia/core`'s README names the four templates of `bun create @alxia`. `@alxia/redis`'s roadmap gains its 0.2.0 entry and says which release removed `app.plugin(idempotency(…))`, and its troubleshooting entry for a handle that wires nothing carries `@nxgt/redis` 0.5's whole message. The tables of contents of the `@alxia/env` and `@alxia/janus` troubleshooting pages link the right headings.
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - For `@alxia/core`'s dev comfort: the endpoint's handler is named `graphql`, so the dev route table shows `GET /graphql … → graphql` and `POST /graphql … → graphql`. A resolver's error stays in Yoga's `errors[]`, and the dev error page never replaces it.
+- Updated dependencies [[`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787), [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787), [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787), [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787), [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787)]:
+  - @alxia/core@0.5.0
+
 ## 0.2.0
 
 ### Minor Changes

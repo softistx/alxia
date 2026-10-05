@@ -6,6 +6,28 @@ under that name. The `@alxia/openapi` of 0.1.0 to 0.3.0, which wrote an OpenAPI
 document from an app's route schemas, is retired; its changelog is
 [in the repository's history](https://github.com/softistx/alxia/blob/3f80253/packages/openapi/CHANGELOG.md).
 
+## 0.5.0
+
+### Minor Changes
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `apiDocs`: an interactive page (Scalar, or Swagger UI) and the OpenAPI document served by the app, with no configuration: `import spec from '../openapi.yaml'` then `app.plugin(apiDocs({ spec }))` answers `GET /docs`, `GET /docs/openapi.yaml` and `GET /docs/openapi.json`. `spec` is the document as an object — imported, so `bun build` bundles it and an image holding `dist/` alone serves it — or a YAML or JSON file, read once at startup from the working directory; `path`, `ui`, `title`, `servers` and `enabled` are options (`enabled: Bun.env.NODE_ENV === 'development'` for development alone: `process.env.NODE_ENV` is inlined by `bun build`). The document is public unless guarded: `use('/docs', guard)` before the plugin keeps it behind a login. The page loads from a CDN at a pinned version with an integrity hash and sets its own `Content-Security-Policy`, which `secureHeaders` keeps: scripts and styles from that version's folder alone, requests to the app and to the origins of the document's absolute `servers` alone, framed by no one. Scalar's AI agent, MCP generator, share-and-deploy developer tools and telemetry are off. `matchesSpec` leaves its routes out, and `isApiDocsRoute(route)` says whether a route is one, typed as `isHealthRoute` (`Pick<RouteDefinition, 'handler'>`).
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `matchesSpec` leaves out the probes of `@alxia/core`'s `health()` — `/health` and `/ready`, wherever mounted, told apart by `isHealthRoute` — as it does the routes of `apiDocs()`: no `exclude` is needed for them.
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Remove `exactly` and `ExactlyOptions`, the deprecated aliases of `matchesSpec` and `MatchesSpecOptions`. Use `matchesSpec`; its messages start `matchesSpec():` instead of `exactly():`.
+
+### Patch Changes
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The docs are organised around tasks. Each README and docs index links the new "Start in 5 minutes" and the recipes of the repository (authentication, a spec-first CRUD, a GraphQL API, file uploads, SSE and WebSockets, testing, errors, health and shutdown, caching and rate limiting, deploying), whose code is type-checked. `@alxia/core`'s README names the four templates of `bun create @alxia`. `@alxia/redis`'s roadmap gains its 0.2.0 entry and says which release removed `app.plugin(idempotency(…))`, and its troubleshooting entry for a handle that wires nothing carries `@nxgt/redis` 0.5's whole message. The tables of contents of the `@alxia/env` and `@alxia/janus` troubleshooting pages link the right headings.
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - For `@alxia/core`'s dev comfort: `apiDocs` is marked with `markFactory` as making a plugin, so `plugin(apiDocs)` throws where it is declared, `plugin(): argument 1 looks like a factory (apiDocs): call it, plugin(apiDocs())`.
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The spec-first guide shows the single middleware form of `@alxia/core` 0.5.
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs: a guide to testing with the generated client (openapi-fetch over `app.fetch`), and a troubleshooting entry.
+- Updated dependencies [[`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787), [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787), [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787), [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787), [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787)]:
+  - @alxia/core@0.5.0
+
 ## 0.4.1
 
 ### Patch Changes

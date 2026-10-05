@@ -1,5 +1,23 @@
 # @alxia/react-router
 
+## 0.6.0
+
+### Minor Changes
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - For `@alxia/core` 0.5: `reactRouter()`, `FreshApp` and `InvalidRegister` are typed by `Alxia<Ctx, Prefix>`, without the removed `Shortcuts` parameter; the docs show the single middleware form.
+
+### Patch Changes
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The docs are organised around tasks. Each README and docs index links the new "Start in 5 minutes" and the recipes of the repository (authentication, a spec-first CRUD, a GraphQL API, file uploads, SSE and WebSockets, testing, errors, health and shutdown, caching and rate limiting, deploying), whose code is type-checked. `@alxia/core`'s README names the four templates of `bun create @alxia`. `@alxia/redis`'s roadmap gains its 0.2.0 entry and says which release removed `app.plugin(idempotency(…))`, and its troubleshooting entry for a handle that wires nothing carries `@nxgt/redis` 0.5's whole message. The tables of contents of the `@alxia/env` and `@alxia/janus` troubleshooting pages link the right headings.
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `start` prints `@alxia/core`'s route table in dev, and `alxia listening on <url>` otherwise; `listen: { onListen }` is given the core's `ListenInfo` and wins over the `onListen(server)` option.
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The app `createServer()` makes is in dev in React Router's `development` mode alone: a production build answers a 500 without its stack, and prints no route table, whatever `NODE_ENV` says.
+
+- [#151](https://github.com/softistx/alxia/pull/151) [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `start` relies on `@alxia/core`'s `listen` for `SIGINT` and `SIGTERM` rather than on handlers of its own: the same order as 0.1.2 — the handlers in place before `onListen` — with core's graceful shutdown: the requests in flight drain within `shutdownTimeout`, readiness turns 503, the `onStop` hooks run, and the process exits 0, or 1 when a hook throws.
+- Updated dependencies [[`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787), [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787), [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787), [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787), [`815211b`](https://github.com/softistx/alxia/commit/815211bb38525dd5d0f97265c1f1ebe14b5a3787)]:
+  - @alxia/core@0.5.0
+
 ## 0.5.0
 
 ### Minor Changes
