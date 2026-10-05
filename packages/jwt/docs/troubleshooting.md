@@ -528,8 +528,9 @@ the token: its `kid` is not in the set (even after a refetch), it has no
 `kid` and the set has no single key that fits, or the key is refused: an
 RSA key whose modulus is outside 2048 to 8192 bits, or with an even or
 trivial exponent, an Ed25519 key that is not 32 bytes or is a point of
-small order (with which a signature anyone can make verifies), or a key
-whose members are not strict, unpadded base64url.
+small order (with which a signature anyone can make verifies), an EC key
+whose coordinates are not its curve's size, or a key whose `n`, `e`, `x` or
+`y` is not strict, unpadded base64url.
 
 **Why:** the token was signed by a key this issuer does not publish: another
 issuer or realm, a key already removed from the set, or a key added to the

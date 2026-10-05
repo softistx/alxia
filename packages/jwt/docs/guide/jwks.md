@@ -56,8 +56,9 @@ accepted: have the provider put one in, or check it in a schema.
    the algorithm, if there is exactly one.
 3. The key's kind must fit the algorithm: an RSA key verifies `RS*` and
    `PS*`, an EC key `ES256` (P-256) and `ES384` (P-384), an Ed25519 key
-   `EdDSA`. A key with a `use` other than `sig`, without `verify` among its
-   `key_ops`, or with an `alg` of its own that differs, does not fit.
+   `EdDSA`. A key with a `use` other than `sig`, with a `key_ops` that is
+   not an array naming `verify`, or with an `alg` of its own that differs,
+   does not fit.
 4. The signature, then `exp`, `nbf`, `iss` and `aud`.
 
 The token never chooses how it is checked. An attacker who signs an `HS256`
@@ -101,8 +102,9 @@ whose modulus is outside 2048 to 8192 bits (counted from its first set
 bit), or with an even or trivial exponent; an Ed25519 key whose `x` is not
 exactly 32 bytes, or is a point of small order (the identity, the all-zero
 point, and the rest of libsodium's `has_small_order` list), under which a
-signature anyone can make verifies; and any key whose members are not
-strict, unpadded base64url. Only a key's public members reach Web Crypto.
+signature anyone can make verifies; an EC key whose `x` and `y` are not
+its curve's size (32 bytes for P-256, 48 for P-384); and any key whose
+`n`, `e`, `x` or `y` is not strict, unpadded base64url. Only a key's public members reach Web Crypto.
 A `jwks_uri` read from a discovery document must be `https`, unless the
 issuer itself is on localhost. The cache's lifetimes and refetch limit run
 on a monotonic clock, so setting the system clock neither keeps a set past

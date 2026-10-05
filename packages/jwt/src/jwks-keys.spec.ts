@@ -35,7 +35,7 @@ function modulus(bytes: number, first: number): string {
 
 const refused = (reason: Reason) => ({ ok: false as const, reason });
 
-describe('the RSA keys a set may hold', () => {
+describe('the RSA and EC keys a set may hold', () => {
 	test('the modulus is counted in bits: 2047 is refused, 2048 and 8192 are not, 8193 is', async () => {
 		const rsaKey = (n: string) => ({ kty: 'RSA', n, e: 'AQAB' });
 		// A key that passes the size check is imported, and the forged signature fails.
@@ -78,6 +78,22 @@ describe('the RSA keys a set may hold', () => {
 		);
 		expect(await verifyAgainst({ ...rsa.jwk, n: respelled })).toEqual(
 			refused('key'),
+		);
+	});
+
+	test('an EC coordinate padded, respelled or of the wrong size is refused', async () => {
+		const x = String(ec.jwk.x);
+		const alphabet =
+			'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+		const respelled = `${x.slice(0, -1)}${alphabet[alphabet.indexOf(x.at(-1) as string) ^ 1]}`;
+		for (const bad of [`${x}=`, respelled, x.slice(0, -2)]) {
+			expect(await verifyAgainst({ ...ec.jwk, x: bad }, ec)).toEqual(
+				refused('key'),
+			);
+		}
+		expect((await verifyAgainst({ ...ec.jwk }, ec)) as object).toHaveProperty(
+			'ok',
+			true,
 		);
 	});
 

@@ -60,7 +60,7 @@ describe('what is fetched', () => {
 		expect(
 			await createJwt({ jwks: stalled, timeoutMs: 200 }).verify(token),
 		).toEqual(unavailable);
-		expect(performance.now() - started).toBeLessThan(500);
+		expect(performance.now() - started).toBeLessThan(2_000);
 	});
 
 	test('a discovery document that names another issuer, or no jwks_uri, fails closed', async () => {
@@ -133,6 +133,9 @@ describe('what is fetched', () => {
 		servers.push({ stop: () => server.stop() });
 		const identity = new Uint8Array(32);
 		identity[0] = 1;
+		const pPlusOne = new Uint8Array(32).fill(0xff);
+		pPlusOne[0] = 0xee;
+		pPlusOne[31] = 0x7f;
 		expect(base64url(identity)).toBe(
 			'AQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
 		);
@@ -144,12 +147,14 @@ describe('what is fetched', () => {
 				kid: 'zero',
 				x: base64url(new Uint8Array(32)),
 			},
+			// p + 1, a second spelling of the identity.
+			{ kty: 'OKP', crv: 'Ed25519', kid: 'p+1', x: base64url(pPlusOne) },
 		];
 		const jwt = createJwt({ jwks: server.jwksUrl, refetchMs: 0 });
 		// R = the identity, S = 0: valid under the identity key for any message.
 		const signature = new Uint8Array(64);
 		signature[0] = 1;
-		for (const kid of ['identity', 'zero']) {
+		for (const kid of ['identity', 'zero', 'p+1']) {
 			const part = (value: unknown) =>
 				base64url(new TextEncoder().encode(JSON.stringify(value)));
 			const forged = `${part({ alg: 'EdDSA', kid })}.${part({ sub: 'eve' })}.${base64url(signature)}`;

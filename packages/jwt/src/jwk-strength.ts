@@ -90,3 +90,16 @@ export function okpFits(jwk: Jwk): boolean {
 		),
 	);
 }
+
+/** The coordinate size of each EC curve a JWKS key may use, in bytes. */
+const EC_SIZES: Record<string, number> = { 'P-256': 32, 'P-384': 48 };
+
+/** An EC key whose `x` and `y` are strict base64url of its curve's size; Web Crypto checks the point is on it. */
+export function ecFits(jwk: Jwk): boolean {
+	const size = typeof jwk.crv === 'string' ? EC_SIZES[jwk.crv] : undefined;
+	return (
+		size !== undefined &&
+		strictBytes(jwk['x'])?.length === size &&
+		strictBytes(jwk['y'])?.length === size
+	);
+}

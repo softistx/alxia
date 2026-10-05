@@ -1,4 +1,4 @@
-import { okpFits, rsaFits } from './jwk-strength';
+import { ecFits, okpFits, rsaFits } from './jwk-strength';
 
 /** The algorithms a JWKS key can verify: the asymmetric ones Web Crypto supports. */
 export type JwksAlgorithm =
@@ -131,6 +131,9 @@ const imported = new WeakMap<Jwk, Map<JwksAlgorithm, Promise<CryptoKey>>>();
 function weakness(jwk: Jwk): string | undefined {
 	if (jwk.kty === 'RSA' && !rsaFits(jwk)) {
 		return 'RSA key outside 2048 to 8192 bits, or with an even or trivial exponent';
+	}
+	if (jwk.kty === 'EC' && !ecFits(jwk)) {
+		return 'EC key whose coordinates are not strict base64url of its curve';
 	}
 	if (jwk.kty === 'OKP' && !okpFits(jwk)) {
 		return 'Ed25519 key not of 32 bytes, or a point of small order';
