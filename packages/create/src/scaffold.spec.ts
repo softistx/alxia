@@ -33,7 +33,11 @@ describe('create-alxia: the project written', () => {
 			await json(join(project.root, 'my-api', 'package.json')),
 		).toMatchObject({
 			name: 'my-api',
-			dependencies: { '@alxia/core': ALXIA['@alxia/core'], zod: '^4.6.5' },
+			dependencies: {
+				'@alxia/core': ALXIA['@alxia/core'],
+				'@alxia/env': ALXIA['@alxia/env'],
+				zod: '^4.6.5',
+			},
 			devDependencies: {
 				'@alxia/openapi': ALXIA['@alxia/openapi'],
 				// Pinned exactly, as its output is committed: never moved, so
@@ -135,6 +139,8 @@ describe('create-alxia: the project written', () => {
 		// Fixed ranges, not this checkout's: at x.y.0 nothing older shares the minor.
 		const published = {
 			'@alxia/core': '^0.3.1',
+			'@alxia/env': ALXIA['@alxia/env'],
+			'@alxia/graphql': ALXIA['@alxia/graphql'],
 			'@alxia/openapi': ALXIA['@alxia/openapi'],
 			'@alxia/react-router': '^0.2.0',
 		};
@@ -165,7 +171,7 @@ describe('create-alxia: the project written', () => {
 			),
 		).toBe(0);
 		expect(err[0]).toBe(
-			'create-alxia: warning: the registry did not answer for @alxia/core, zod, @alxia/openapi, @biomejs/biome, @types/bun, typescript; kept the versions the template ships.',
+			'create-alxia: warning: the registry did not answer for @alxia/core, @alxia/env, zod, @alxia/openapi, @biomejs/biome, @types/bun, typescript; kept the versions the template ships.',
 		);
 		expect(
 			(await json(join(project.root, 'my-api', 'package.json'))).devDependencies

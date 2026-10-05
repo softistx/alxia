@@ -24,7 +24,12 @@ operations generated from it, and a client is generated from the same file.
   against the operation's responses.
 - `src/app.ts`: the app, `base.plugin(todoRoutes)`. Mounting the routes on
   an app that does not give the base's context is a compile error.
-- `src/server.ts`: listens on `PORT`, 3000 by default.
+- `src/env.ts`: the environment, `defineEnv` from
+  [`@alxia/env`](https://www.npmjs.com/package/@alxia/env): `PORT` and
+  `API_KEY`, each checked by its own Zod schema once, when the module is
+  first imported. A malformed one stops the process with every issue,
+  before it listens, and `API_KEY` prints as `***`.
+- `src/server.ts`: listens on `env.PORT`, 3000 by default.
 - `src/app.spec.ts`: `app.request()`, no port, and `matchesSpec` from
   [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi): every
   operation of `openapi.yaml` has its route, and no route is outside it.
@@ -54,9 +59,11 @@ Zod validators and the operations a typed client reads.
 
 ## Environment
 
-Bun loads `.env` on every command. Copy `.env.example` to `.env` to set
-`PORT` and `API_KEY`. Outside development, set `API_KEY`: its default,
-`dev-key`, is for development only.
+Bun loads `.env` on every command, and `src/env.ts` checks what it finds.
+Copy `.env.example` to `.env` to set `PORT` and `API_KEY`. Outside
+development, set `API_KEY`: its default, `dev-key`, is for development only.
+A variable that fails its schema stops `bun dev` with every issue named,
+never the secret's value.
 
 ```sh
 cp .env.example .env

@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { ALXIA } from '../test/templates';
 import { TEMPLATES as NAMES } from './args';
-import { copyTemplate, withName } from './copy';
+import { copyTemplate, TEMPLATES, withName } from './copy';
 import { packageName } from './target';
 
 describe('copyTemplate', () => {
@@ -106,9 +106,13 @@ describe('a project named "Mon Super Projet"', () => {
 			expect(project).toBe('mon-super-projet');
 			const { manifest, files } = await copyTemplate(name, project, ALXIA);
 			expect(manifest['name']).toBe(project);
+			const stored = await Bun.file(
+				join(TEMPLATES, name, 'package.json'),
+			).json();
+			const own = new RegExp(`(?<![\\w-])${stored.name}(?![\\w-])`);
 			const naming: string[] = [];
 			for (const [path, file] of Object.entries(files)) {
-				if (/\b(my-api|my-app)\b/.test(await file.text())) naming.push(path);
+				if (own.test(await file.text())) naming.push(path);
 			}
 			expect(naming).toEqual([]);
 			const docker = ((await files['README.md']?.text()) ?? '')

@@ -4,8 +4,11 @@
 export const NAME = 'create-alxia';
 
 /** The templates, in the order the prompt lists them. */
-export const TEMPLATES = ['api', 'react-router'] as const;
+export const TEMPLATES = ['minimal', 'api', 'graphql', 'react-router'] as const;
 export type Template = (typeof TEMPLATES)[number];
+
+/** The templates as a sentence: `minimal, api, graphql or react-router`. */
+export const TEMPLATE_LIST = `${TEMPLATES.slice(0, -1).join(', ')} or ${TEMPLATES.at(-1)}`;
 
 export function isTemplate(value: string): value is Template {
 	return (TEMPLATES as readonly string[]).includes(value);
@@ -40,11 +43,11 @@ export function parseArgs(
 				? arg.slice(arg.indexOf('=') + 1)
 				: args[++i];
 			if (value === undefined || value === '') {
-				return { error: `${arg} needs a template: ${TEMPLATES.join(' or ')}.` };
+				return { error: `${arg} needs a template: ${TEMPLATE_LIST}.` };
 			}
 			if (!isTemplate(value)) {
 				return {
-					error: `unknown template ${value}: use ${TEMPLATES.join(' or ')}.`,
+					error: `unknown template ${value}: use ${TEMPLATE_LIST}.`,
 				};
 			}
 			template = value;

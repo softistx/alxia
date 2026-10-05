@@ -5,6 +5,8 @@ import { TEMPLATES } from '../src/copy';
 /** The ranges the specs copy `@alxia/*` with. */
 export const ALXIA = {
 	'@alxia/core': '^0.3.0',
+	'@alxia/env': '^0.1.0',
+	'@alxia/graphql': '^0.2.0',
 	'@alxia/openapi': '^0.4.0',
 	'@alxia/react-router': '^0.2.0',
 };

@@ -9,11 +9,15 @@ import { dirname } from 'node:path';
 /** The `@alxia/*` packages a template depends on. */
 export type AlxiaPackage =
 	| '@alxia/core'
+	| '@alxia/env'
+	| '@alxia/graphql'
 	| '@alxia/openapi'
 	| '@alxia/react-router';
 
 const ALXIA_PACKAGES: readonly AlxiaPackage[] = [
 	'@alxia/core',
+	'@alxia/env',
+	'@alxia/graphql',
 	'@alxia/openapi',
 	'@alxia/react-router',
 ];
@@ -22,7 +26,8 @@ const ALXIA_PACKAGES: readonly AlxiaPackage[] = [
  * The peer ranges of alxia's packages that a template's other dependencies
  * must stay within, by the package they constrain: `typescript` is every
  * package's, `zod` is `@alxia/zod`'s, `react-router` and `vite` are
- * `@alxia/react-router`'s. `versions.spec.ts` checks each against the
+ * `@alxia/react-router`'s, `graphql` and `graphql-yoga` are
+ * `@alxia/graphql`'s. `versions.spec.ts` checks each against the
  * package that declares it, so a widened peer fails there until it is
  * widened here too.
  */
@@ -31,6 +36,8 @@ export const PEER_RANGES = {
 	zod: '^4.2.0',
 	'react-router': '^8.0.0',
 	vite: '^7.0.0 || ^8.0.0',
+	graphql: '^16.11.0 || ^17.0.0',
+	'graphql-yoga': '^5.16.0',
 } as const;
 
 /**

@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@alxia/core": "workspace:^",
+    "@alxia/env": "workspace:^",
     "zod": "^4.5.4"
   },
   "devDependencies": {

@@ -1,9 +1,6 @@
 import { alxia } from "@alxia/core";
 import type { Todo } from "./generated/types";
 
-/** Set API_KEY in the environment: this default is for development. */
-export const apiKey = Bun.env["API_KEY"] ?? "dev-key";
-
 const todos: Todo[] = [];
 
 // The base: what every route reads, decorated or derived here. It is

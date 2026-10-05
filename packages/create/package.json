@@ -1,7 +1,7 @@
 {
 	"name": "@alxia/create",
 	"version": "0.1.7",
-	"description": "Start an alxia app: `bun create @alxia` writes an API with Zod, or React Router's official template served by alxia",
+	"description": "Start an alxia app: `bun create @alxia` writes a minimal API, a spec-first one, a GraphQL one, or React Router's official template served by alxia",
 	"license": "MIT",
 	"type": "module",
 	"bin": {
@@ -10,7 +10,9 @@
 	"files": [
 		"dist",
 		"docs",
+		"templates/minimal",
 		"templates/api",
+		"templates/graphql",
 		"templates/react-router",
 		"README.md",
 		"package.json",
@@ -40,10 +42,17 @@
 	},
 	"devDependencies": {
 		"@alxia/core": "workspace:^",
+		"@alxia/env": "workspace:^",
+		"@alxia/graphql": "workspace:^",
 		"@alxia/openapi": "workspace:^",
 		"@alxia/react-router": "workspace:^",
+		"@graphql-codegen/cli": "7.4.3",
+		"@graphql-codegen/typescript": "6.1.0",
+		"@graphql-codegen/typescript-resolvers": "6.1.0",
 		"@nxgt/openapi-codegen": "0.7.0",
 		"@types/bun": "^1.4.2",
+		"graphql": "^16.11.0",
+		"graphql-yoga": "^5.16.0",
 		"zod": "^4.6.5"
 	}
 }
