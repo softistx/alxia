@@ -145,7 +145,9 @@ const { extra } = matchesSpec(app, operations);
 `matchesSpec` throws as `implemented` does: on each operation with no route,
 and so on a route of another method or path. A route no operation declares
 (a proxied one, a health check, a hand-written one) does not fail; it is
-returned as `extra`, `[{ method, path }]`, so a test can assert on it.
+returned as `extra`, `[{ method, path }]`, so a test can assert on it. An
+`app.all(path, …)` route serves no operation, and is listed as
+`{ method: 'ALL', path }`.
 
 For a spec that must be exhaustive, pass `strict: true`: each route no
 operation declares fails too, `exclude` aside. The routes of `apiDocs()`

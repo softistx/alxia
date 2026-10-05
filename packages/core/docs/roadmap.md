@@ -112,6 +112,19 @@ number on it. Every release, with each change it made, is in
 
 ## Shipped
 
+### Next release
+
+- **Every method at a path, as one route.** `app.all(path, …)` takes every
+  method its path has no route of its own for, typed and checked as any
+  route, listed in `app.routes` and the route table as `ALL`; a middleware
+  that answers, such as `@alxia/proxy`'s `proxy(url)`, may end it in place
+  of a handler. A route of the path's own method wins over it, `HEAD` goes
+  to the `GET` first, and its path never answers 405
+  ([Routes](guide/routes.md#every-method-all)).
+- **Cheaper route types.** Every route method shares one set of forms, so
+  an app's methods are typed once, not once each: TypeScript instantiates
+  fewer types for the same app.
+
 ### 0.10.0
 
 - **One text per client address.** `ctx.ip` is canonical, from the socket

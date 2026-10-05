@@ -78,6 +78,7 @@ alxia listening on http://localhost:3000/ (dev)
   DELETE  /todos/:id   cors › logger › auth
   POST    /graphql     cors › logger → graphql
   WS      /chat        cors › logger › auth [ws]
+  ALL     /api/*       cors › logger → proxy
   GET     /assets/*    cors › logger [static]
   GET     /robots.txt  cors › logger [file]
   PAGE    /            [page]
@@ -87,7 +88,9 @@ Each line is a method, a path, the names of the route's middlewares in the
 order they run — the app's `use()`, then the route's own, `validate` and
 `responds` among them — and what answers it: the handler's name after `→`
 when it has one, `[ws]` for a socket route, `[static]` and `[file]` for
-`app.static` and `app.file`, `[page]` for a Bun HTML bundle. A middleware's
+`app.static` and `app.file`, `[page]` for a Bun HTML bundle. An `all`
+route's method is `ALL`
+([Every method: `all`](routes.md#every-method-all)). A middleware's
 name is its function's: `anonymous` for one written inline in the call,
 `auth` for one assigned to `const auth`. Every package of alxia names its
 own (`cors`, `logger`, `secureHeaders`, `bearer`, …); `derive` and
@@ -130,6 +133,9 @@ await app.request('/todo/1');
 await app.request('/todos/1', { method: 'POST' });
 // 405 { "error": "method_not_allowed", "hint": "/todos/1 allows GET, DELETE" }
 ```
+
+An `all` route is offered whatever the request's method, `ALL /api/*`,
+and its path never answers a 405.
 
 The closest route is chosen by an edit distance on path segments: a
 parameter takes any segment and a wildcard the rest, a word costs the

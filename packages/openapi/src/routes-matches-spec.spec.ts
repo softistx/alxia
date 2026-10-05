@@ -140,6 +140,10 @@ describe('matchesSpec', () => {
 				'matchesSpec(): 1 route has no operation: ALL /pets/:petId',
 			),
 		);
+		const exclude = (route: { method: string }) => route.method === 'ALL';
+		expect(
+			matchesSpec(both, { getPet }, { strict: true, exclude }).extra,
+		).toEqual([]);
 	});
 
 	test('exclude: under strict, a route the document does not have to declare', () => {

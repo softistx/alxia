@@ -420,6 +420,20 @@ app.query(
 );
 ```
 
+`all` declares one route for every method at its path its own routes
+leave: a `GET` beside it still goes to the `get` route, a `HEAD` to the
+`GET` first, and the path never answers 405. It is listed in `app.routes`
+as `ALL`. Its last argument may be a middleware that answers, as
+`@alxia/proxy`'s `proxy(url)`, in place of a handler
+([Every method: `all`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/routes.md#every-method-all)).
+
+```ts
+app
+	.get('/api/health', ({ reply }) => reply(200, { ok: true }))
+	.all('/api/*', ({ request, url, reply }) => reply(200, `${request.method} ${url.pathname}`));
+// GET /api/health → the get route; DELETE /api/users/7 → "DELETE /api/users/7"
+```
+
 `route(operation, ...middlewares, handler)` declares the same route from
 data — `{ method, path, schema? }`, written once and shared, or generated
 from an OpenAPI document — with the same types and the same compile
@@ -940,7 +954,7 @@ joins middlewares past the 8 a call types:
 | `canonicalIp(address)` | an address's one text, as `ctx.ip` gives it: brackets and port dropped, IPv4-mapped as IPv4, IPv6 as RFC 5952 writes it, a zone id kept; what is no address as given |
 | `originalUrl(ctx)` | a copy of `ctx.url` with the scheme and host the trusted proxy said, under `proxy`; `ctx.url`'s own otherwise |
 | `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip`, `proxy`, `errors`, `dev` (on only when `NODE_ENV` is `development`: the route table, the 404 hint, the dev error page) |
-| `Alxia<Ctx, Prefix>` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `use` `derive` `decorate` `bodyLimit` `onStart` `onStop` `parser`, `group` `plugin` `fork`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server`; `Ctx` is what a route declared next reads, `Prefix` the app's prefix |
+| `Alxia<Ctx, Prefix>` | `get` `post` `put` `patch` `delete` `options` `head` `query` `all` `route` `ws`, `static` `file` `page`, `use` `derive` `decorate` `bodyLimit` `onStart` `onStop` `parser`, `group` `plugin` `fork`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server`; `Ctx` is what a route declared next reads, `Prefix` the app's prefix |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream(schema)` made |
 | `eventStream({ name: schema })`, `NamedEventStreamSchema`, `EventSchemas` | the response schema of a stream of named events, its `event(name, data, fields?)` builder, its schemas by name under `~events` |
@@ -975,6 +989,7 @@ joins middlewares past the 8 a call types:
 | `Middleware<Requires, Result>`, `MiddlewareContext<Requires>`, `MiddlewareResult`, `MiddlewareReturn`, `Next<Added, Schema>`, `NextFunction` | a middleware, what it reads (`BaseContext & Requires`), what it may return, and `next`: called once at most, it resolves to the rest of the route's `Response`, branded by what was added. A middleware typed `Middleware` alone adds nothing: its result's brand is `Next`, never `any` |
 | `RouteOptions`, `SocketOptions` | a route's options, `bodyLimit` and `detail`; a socket's, `message`, `send` and `detail` |
 | `RouteMethod`'s `MiddlewareForms` and `OptionsForms`; `SocketMethod`'s `SocketForms` and `SocketOptionsForms`; `RouteApp`, `AppWithRoute` | the forms of a route method and of `ws`: without and with options; the app's types and the method, as those forms read them; the app a call returns, unchanged in type. Exported so an app's type can be named in a declaration file |
+| `AllMethod<Ctx, Prefix>`, `AllEnd<Ctx, Prefix, Path>` | `all`: the route method's forms, and the two that end the route with a middleware that answers (`path, options?, end`); that middleware, read from the route's context, its `next()` a 404 |
 | `PluginMethod` | the type of `plugin`: an app, or a function given the app that returns it, checked against what the plugin requires. Exported so an app's type can be named in a declaration file |
 | `UseForms`, `ScopeMiddleware`, `PathMiddleware`, `AddingNothing`, `ScopePathAt`, `AppAfterUse` | the forms of `use` — middlewares, with a path or without — what each middleware form takes, the check that a middleware given a path adds nothing (`Invalid middleware: …`), the check of that path (a route's, with no trailing `/`), and the app after them. Exported so an app's type can be named in a declaration file |
 | `defineAppMiddleware(fn)` | `defineMiddleware<RegisteredContext>()(fn)`: a shared middleware reading the registered context, refused where the route's context does not give it |
@@ -996,7 +1011,7 @@ joins middlewares past the 8 a call types:
 | `ContextOf<App>` | what a route declared next on `App` reads: to type a GraphQL schema, a service |
 | `RequestContext`, `BaseContext`, `Context`, `ResponseSettings`, `HandlerResult` | what every middleware reads (`BaseContext.cookies`: the request's; `BaseContext.route`: the route's path as declared, `undefined` on a request no route matches), what a handler reads, what a route sets on its response, what a handler may return |
 | `ResponseCookies` | `set.cookies`: Bun's `CookieMap` of the cookies the response sets, whose `get` and `has` read those, never the request's |
-| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod` (`path, options?, ...middlewares, handler`), `RouteDefinition`, `SocketDefinition` | a route: what it validates, its `detail` (`summary`, `operationId`, …), the checks its schema's type cannot express, a route method, a route and a socket as the app runs them |
+| `RouteSchema`, `ResponseSchemas`, `RouteDetail`, `ValidSchema`, `RouteMethod` (`path, options?, ...middlewares, handler`), `RouteDefinition`, `SocketDefinition` | a route: what it validates, its `detail` (`summary`, `operationId`, …), the checks its schema's type cannot express, a route method, a route (`method: 'ALL'` for an `all` route) and a socket as the app runs them |
 | `RouteOperation`, `OperationSchema`, `OperationMethod`, `CheckedOperation` | a route as data for `route`: `{ method, path, schema? }`, its schema (or `Empty`), the type of `route` — `OperationForms` — and the check it makes of the operation |
 | `OperationForms`, `OperationApp`, `OperationParts`, `OperationOptions`, `OperationResponds`, `OperationValidate` | `route(operation, ...middlewares, handler)`, up to 8 middlewares; the app it reads; the operation's request parts, its options (`bodyLimit`, `detail`), and the implicit `validate` and `responds` it threads, just before the handler. Exported so an app's type can be named in a declaration file |
 | `StaticMethod`, `FileMethod`, `PageMethod`, `DecorateMethod`, `DeriveMethod`, `BodyLimitMethod`, `StartHookMethod`, `StopHookMethod`, `ParserMethod`, `GroupMethod`, `UseMethod`, `PluginMethod`, `RequestMethod`, `ListenMethod` | the types of the app's other methods, each holding its overloads and their documentation: `static`, `file`, `page`; `decorate`, `derive`, `bodyLimit`; `onStart`, `onStop`, `parser`; `group`, `use` and `plugin`; `request` and `listen`. Exported so an app's type can be named in a declaration file |

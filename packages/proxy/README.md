@@ -12,7 +12,8 @@ bun add -d typescript
 ```
 
 `@alxia/core` and `typescript` are required peers. `proxy.ws` needs
-`@alxia/core` 0.8 or later, whose socket routes run an `upgrade` handler.
+`@alxia/core` 0.8 or later, whose socket routes run an `upgrade` handler,
+and `app.all(path, proxy(url))` core 0.11 or later, which has `all`.
 
 ## Usage
 
@@ -30,6 +31,25 @@ app.listen({ port: 3000 });
 
 The proxy never calls `next`: what it runs on is answered by the upstream.
 The middlewares before it run first.
+
+## As one route: `all`
+
+```ts
+import { alxia } from '@alxia/core';
+import { proxy } from '@alxia/proxy';
+
+const app = alxia()
+	.all('/api/*', proxy('http://users.internal:8080', { rewrite: '/api' }))
+	.get('/api/health', ({ reply }) => reply(200, { ok: true }));   // declared after: still local
+```
+
+`app.all(path, proxy(url))` is one route for every method at its path,
+listed in `app.routes` and the route table as `ALL /api/*`. Use it where
+the proxy is the path's answer: a route at a path of its own under it keeps
+its methods, wherever it is declared. Use `use('/api', proxy(url))` where
+the proxy must take everything under `/api`, the routes declared after it
+included, and the requests no route matches: `use` shadows them, `all`
+shadows nothing.
 
 ## Mount a prefix
 
@@ -85,7 +105,8 @@ app whose context does not give it.
 
 ## Traps
 
-- A route declared after `use('/api', proxy(…))` under `/api` is never reached; declare it before.
+- A route declared after `use('/api', proxy(…))` under `/api` is never reached; declare it before, or declare the proxy as `all('/api/*', proxy(…))`.
+- Under `all('/api/*', …)`, a path of its own (`/api/health`) answers its other methods with a 405, not the proxy: the router picks the path first.
 - The upstream sees its own `Host`. Add `preserveHost: true` for a virtual host.
 - A redirect or cookie keeps the upstream's address unless `rebase` is on (it is, for `proxy.mount`).
 - An app's `bodyLimit()` covers its routes, not the requests no route matches that `use('/api', proxy(…))` forwards: give the proxy its own `bodyLimit`.
@@ -110,7 +131,7 @@ app whose context does not give it.
 
 | export | |
 | --- | --- |
-| `proxy(target, options?)` | the middleware: forwards what it runs on to `target`; given to `use(path?, …)` or a route |
+| `proxy(target, options?)` | the middleware: forwards what it runs on to `target`; given to `use(path?, …)`, a route, or `all(path, …)` as the route's end |
 | `proxy.mount(prefix, target, options?)` | a plugin forwarding everything under `prefix`, rebased |
 | `proxy.ws(target, options?)` | the handlers of a `ws()` route relayed to an upstream socket, opened before the client's `101` |
 | `BAD_GATEWAY_CLOSE` | deprecated: `1014`, the close code an unreachable upstream socket used to get; it is now a 502 over HTTP |
