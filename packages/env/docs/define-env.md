@@ -130,10 +130,11 @@ so a logger that serialises `env` or `ctx` through `JSON.stringify` or
 `Object.entries(env)`, holds the real values: do not log one.
 
 The error never prints a secret either. A validator may quote the value it
-refused (`Invalid URL: Received "…"`): for a secret, `defineEnv` replaces that
-value with `***` in every message and in `error.issues`, and the missing ones
-say `received undefined`. A variable that is not a secret keeps the
-validator's message whole.
+refused, or part of it (`Invalid URL: Received "…"`), so a secret that is set
+keeps its name and its expected type in the error and loses the validator's
+message: `API_KEY: Invalid value (hidden: it is a secret); expected string`.
+A secret that is not set says what the validator says, `received undefined`,
+and a variable that is not a secret keeps the validator's message whole.
 
 ## `.env`, Docker and the platform
 
@@ -168,12 +169,15 @@ bunx alxia-env example apps/api/src/env.ts     # another module
 ```
 
 ```
-# Key of the billing provider
-# string, required, secret
-API_KEY=
+# string (url), required, secret
+DATABASE_URL=
 
 # number, optional, default 3000
 PORT=3000
+
+# Key of the billing provider
+# string, required, secret
+API_KEY=
 
 # string (url), optional
 # SENTRY_DSN=

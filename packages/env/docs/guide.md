@@ -39,6 +39,7 @@ class EnvError extends Error {
 	readonly issues: readonly {
 		readonly path: string;
 		readonly message: string;
+		readonly expected?: string; // defineEnv only, when the schema tells
 	}[];
 }
 ```
@@ -48,7 +49,7 @@ class EnvError extends Error {
 | `schema` | any [Standard Schema](https://standardschema.dev) | — | checks the variables and converts them; its output type is what `parseEnv` returns |
 | `source` | `Record<string, string \| undefined>` | `Bun.env` | the variables to check: pass an object in a test, or `process.env` |
 
-`StandardSchema` and `OutputOf` are not exported: any value with a
+`StandardSchema` and `OutputOf` are exported as types: any value with a
 `~standard` property is accepted, and the result is the schema's output
 type — the type after its defaults and transforms, not its input.
 

@@ -72,12 +72,14 @@ expect(envExample(env)).toBe(await Bun.file('.env.example').text()); // no drift
 ```
 
 ```
-# Where the data lives
-# string (url), required
+# string (url), required, secret
 DATABASE_URL=
 
 # number, optional, default 3000
 PORT=3000
+
+# string, required, secret
+API_KEY=
 ```
 
 `parseEnv(schema, source?)` checks one object schema (`z.object({...})`) the same way, with every
@@ -91,7 +93,7 @@ issue in one `EnvError`, and no redaction nor example.
 | `envExample(env)` | the `.env.example` of an `env`: names, expected types, defaults, descriptions |
 | `parseEnv(schema, source?)` | one object schema over the whole environment: typed and frozen |
 | `EnvError` | thrown with every `issues` entry: `path`, `message`, `expected?` |
-| `Env<Shape>`, `EnvShape`, `DefineEnvOptions<Shape>` | the types |
+| `Env<Shape>`, `EnvShape`, `DefineEnvOptions<Shape>`, `EnvIssue`, `StandardSchema`, `OutputOf` | the types |
 | `alxia-env example [module]` | the bin: prints `envExample` of each `defineEnv` in `module` (`src/env.ts`) |
 
 Schemas must validate synchronously.

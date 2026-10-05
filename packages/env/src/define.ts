@@ -1,8 +1,10 @@
 import { expectedOf } from './describe';
 import { EnvError, type EnvIssue } from './error';
-import { printable, REDACTED } from './redact';
+import { printable } from './redact';
 import { collector, described } from './registry';
 import { type OutputOf, pathOf, type StandardSchema } from './standard';
+
+const HIDDEN = 'Invalid value (hidden: it is a secret)';
 
 /** The variables, each by its own schema. */
 export type EnvShape = Readonly<Record<string, StandardSchema<unknown>>>;
@@ -48,9 +50,9 @@ function check(
 	if (result.issues === undefined) return result.value;
 	const expected = expectedOf(schema);
 	for (const issue of result.issues) {
-		// A validator may echo the value it refused: never a secret's.
-		const message =
-			secret && raw ? issue.message.replaceAll(raw, REDACTED) : issue.message;
+		// A validator may echo the value it refused, or part of it: a secret
+		// that is set keeps its name and type in the error, not its message.
+		const message = secret && raw !== undefined ? HIDDEN : issue.message;
 		const rest = pathOf(issue.path);
 		into.push({ path: rest ? `${name}.${rest}` : name, message, expected });
 	}

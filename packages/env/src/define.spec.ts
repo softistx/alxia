@@ -73,6 +73,8 @@ describe('defineEnv', () => {
 			),
 		);
 		expect(error.message).not.toContain('sk-not-a-url');
+		expect(error.message).toContain('TOKEN: Invalid value (hidden');
+		expect(error.message).toContain('; expected string');
 		expect(JSON.stringify(error.issues)).not.toContain('sk-not-a-url');
 		const open = failure(() =>
 			defineEnv(

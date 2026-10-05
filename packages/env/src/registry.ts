@@ -8,7 +8,7 @@ export interface Described {
 /** The shape behind each `env`, for `envExample` to read. */
 export const described = new WeakMap<object, Described>();
 
-const COLLECT = Symbol.for('alxia.env.collect');
+const COLLECT: unique symbol = Symbol.for('alxia.env.collect') as never;
 
 /**
  * Set by `alxia-env example`, which imports the app's env module only for
@@ -19,8 +19,10 @@ export function collector(): object[] | undefined {
 	return (globalThis as { [COLLECT]?: object[] })[COLLECT];
 }
 
-export function collect(): object[] {
-	const list: object[] = [];
-	(globalThis as { [COLLECT]?: object[] })[COLLECT] = list;
-	return list;
+/** Starts collecting; `stop()` ends it, so a later `defineEnv` throws again. */
+export function collect(): { envs: object[]; stop(): void } {
+	const envs: object[] = [];
+	const scope = globalThis as { [COLLECT]?: object[] };
+	scope[COLLECT] = envs;
+	return { envs, stop: () => delete scope[COLLECT] };
 }

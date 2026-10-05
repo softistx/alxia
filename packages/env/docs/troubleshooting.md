@@ -17,6 +17,8 @@ wording; Valibot and ArkType say the same thing in other words.
 - [`TypeError: defineEnv(): the schema of A must validate synchronously`](#typeerror-defineenv-the-schema-of-a-must-validate-synchronously)
 - [`TypeError: envExample(): not an env made by defineEnv()`](#typeerror-envexample-not-an-env-made-by-defineenv)
 - [`alxia-env: src/env.ts ran no defineEnv() call`](#alxia-env-srcenvts-ran-no-defineenv-call)
+- [`alxia-env: src/env.ts failed: Cannot find module …`](#alxia-env-srcenvts-failed-cannot-find-module-)
+- [`usage: alxia-env example [module]`](#usage-alxia-env-example-module)
 - [`ReferenceError: Bun is not defined`](#referenceerror-bun-is-not-defined)
 
 **At runtime**
@@ -39,7 +41,7 @@ wording; Valibot and ArkType say the same thing in other words.
 
 ### `EnvError: The environment is invalid:`
 
-**When:** the module that calls `parseEnv` is imported, and the schema
+**When:** the module that calls `defineEnv` or `parseEnv` is imported, and the schema
 refuses at least one variable. The process stops before it listens.
 
 **Why:** that is the package's job: every refused variable is listed below
@@ -207,13 +209,30 @@ that declares the shape.
 bunx alxia-env example src/config/env.ts
 ```
 
-The same line starts `alxia-env: <file> failed:` followed by the error, when the module throws
-for a reason of its own, such as an import that does not resolve.
+### `alxia-env: src/env.ts failed: Cannot find module …`
+
+**When:** the module the bin imports throws, or does not exist: `alxia-env:
+<file> failed:` is followed by the error.
+
+**Why:** the bin imports the module to read its schema. A variable that is
+not set is not the cause: `defineEnv` refuses nothing in the bin, but an
+import that does not resolve, or other code in the module, does throw.
+
+**Fix:** correct the path or the error shown, or pass the module that
+declares the shape.
+
+### `usage: alxia-env example [module]`
+
+**When:** the bin is run with anything but `example [module]`, or with `--help`.
+
+**Why:** `example` is its only command and takes one module.
+
+**Fix:** `bunx alxia-env example [module] > .env.example`.
 
 ### `ReferenceError: Bun is not defined`
 
-**When:** `parseEnv(schema)` runs under a runtime other than Bun, with no
-`source`.
+**When:** `parseEnv(schema)` or `defineEnv(shape)` runs under a runtime other
+than Bun, with no `source`.
 
 **Why:** the default `source` is `Bun.env`.
 
@@ -221,6 +240,7 @@ for a reason of its own, such as an import that does not resolve.
 
 ```ts
 export const env = parseEnv(Env, process.env);
+export const config = defineEnv(shape, { source: process.env });
 ```
 
 ## At runtime

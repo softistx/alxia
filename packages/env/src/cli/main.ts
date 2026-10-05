@@ -13,23 +13,32 @@ Prints a .env.example from the schema of each defineEnv() call that
 module runs (src/env.ts by default):
   bunx alxia-env example > .env.example`;
 
+let runs = 0;
+
 /** The bin's work, apart from the process, so a spec can run it. */
 export async function main(
 	args: readonly string[],
 	cwd: string,
 	io: Io,
 ): Promise<number> {
+	if (args.includes('--help') || args.includes('-h')) {
+		io.out(USAGE);
+		return 0;
+	}
 	const [command, file = 'src/env.ts', ...rest] = args;
 	if (command !== 'example' || rest.length > 0) {
 		io.err(USAGE);
-		return command === undefined || command === '--help' ? 0 : 1;
+		return 1;
 	}
-	const envs = collect();
+	const { envs, stop } = collect();
 	try {
-		await import(resolve(cwd, file));
+		// A query, so a second run executes the module again.
+		await import(`${resolve(cwd, file)}?alxia-env=${++runs}`);
 	} catch (error) {
 		io.err(`alxia-env: ${file} failed: ${(error as Error).message}`);
 		return 1;
+	} finally {
+		stop();
 	}
 	if (envs.length === 0) {
 		io.err(`alxia-env: ${file} ran no defineEnv() call`);
