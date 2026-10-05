@@ -17,7 +17,7 @@ with a development token in place of a JWT. This recipe goes on to the
 production parts: a real token, authorisation, the drain and the probes.
 
 ```sh
-bun add @alxia/core @alxia/graphql @alxia/jwt graphql graphql-yoga
+bun add @alxia/core @alxia/graphql @alxia/jwt @alxia/logger graphql graphql-yoga
 bun add -d @graphql-codegen/cli @graphql-codegen/typescript @graphql-codegen/typescript-resolvers typescript
 ```
 
@@ -301,6 +301,7 @@ module-level or `decorate` them on the app:
 ```ts
 // file: src/app.ts
 import { graphql } from '@alxia/graphql';
+import { logger } from '@alxia/logger';
 import { base } from './context';
 import { createLoaders } from './loaders';
 import { schema } from './schema';
@@ -308,7 +309,8 @@ import { schema } from './schema';
 // GET and POST /graphql, behind the base's middlewares. Subscriptions are
 // served over server-sent events. GraphiQL answers a browser's GET in the
 // app's dev alone (NODE_ENV=development, the dev script's); deployed, none.
-export const app = base.plugin((app) =>
+// `logger()` goes first: one line per request, naming the operation.
+export const app = base.use(logger()).plugin((app) =>
 	graphql(app, {
 		schema,
 		// The loaders, anew for each request: never share their cache.
@@ -338,6 +340,32 @@ app.listen({ port: Number(Bun.env['PORT'] ?? 3000), shutdownTimeout: 10_000 });
   starts. `GET /health` stays 200, so the platform does not restart the
   process; `GET /ready` turns 503 so it stops sending traffic
   ([Health and graceful shutdown](health-and-shutdown.md)).
+
+### See which operation ran
+
+Every GraphQL call is a `POST /graphql`, so a log of the route alone cannot
+tell `GetNotes` from `AddNote`. `graphql()` tells the observers around it
+the operation it executes, and they read it with no import of one another:
+`logger()`, above, adds `operationName` and `operationType` to the request's
+line, and `telemetry()` names its span `query GetNotes`, with
+OpenTelemetry's `graphql.operation.name` and `graphql.operation.type`.
+
+```json
+{"level":"info","message":"POST /graphql 200","operationName":"AddNote","operationType":"mutation","status":200}
+```
+
+```ts no-check
+// Tracing is one more middleware, given first, beside the logger.
+const tracing = telemetry({ service: 'notes', exporters: [otlpExporter({ endpoint })] });
+const app = base.use(tracing).use(logger()).plugin((app) => graphql(app, { schema }));
+```
+
+- A batched body (`batching: true`, an array) is one line and one span: the
+  type is `batch` and the name lists every operation's, `GetNotes,AddNote`.
+- A request refused before it executes (a syntax error, a document that
+  fails validation) names no operation. An anonymous one has a type alone.
+- An operation over `ws: true` is not logged or spanned yet: only the
+  upgrade is, and the socket's operations are on the roadmap.
 
 ### Auth errors in three layers
 
@@ -387,7 +415,7 @@ they are in each resolver's context. A shutdown closes the sockets with
 
 ```ts
 // file: src/app.spec.ts
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { app } from './app';
 import { jwt } from './jwt';
 import { db, pubsub } from './store';
@@ -431,6 +459,21 @@ describe('queries and mutations', () => {
 		const refused = await query(del, { as: '3', variables: { id } });
 		expect(refused.errors?.[0]?.extensions?.code).toBe('FORBIDDEN');
 		expect((await query(del, { as: '2', variables: { id } })).data).toEqual({ deleteNote: true });
+	});
+});
+
+describe('the log', () => {
+	test('a request line names the operation', async () => {
+		const log = spyOn(console, 'log').mockImplementation(() => {});
+		try {
+			await query('query GetMe { me { name } }');
+			const lines = log.mock.calls.map(([line]) => JSON.parse(String(line)));
+			expect(lines).toMatchObject([
+				{ message: 'POST /graphql 200', operationName: 'GetMe', operationType: 'query' },
+			]);
+		} finally {
+			log.mockRestore();
+		}
 	});
 });
 
@@ -500,6 +543,7 @@ describe('the IDE, the probes and the drain', () => {
 - [GraphiQL and Apollo Sandbox](../../packages/graphql/docs/guide/ide.md)
 - [GraphQL over WebSocket](../../packages/graphql/docs/guide/websockets.md):
   `ws: true`, Apollo Client's and urql's WebSocket links
+- [The operation in the log and the trace](../../packages/logger/docs/guide.md#a-graphql-operation)
 - [Health and shutdown](../../packages/core/docs/guide/health-and-shutdown.md#graphql)
 - [Errors](../../packages/core/docs/guide/errors.md#graphql),
   [Authentication](authentication.md), [Testing](testing.md),

@@ -11,6 +11,7 @@ import type {
 	YogaServerOptions,
 } from 'graphql-yoga';
 import { graphqlHandler, type YogaContext, yogaServers } from './handler';
+import { reportsOperations } from './operation';
 import type { SandboxOptions } from './sandbox';
 import { type GraphQLWsOptions, graphqlSocket } from './ws';
 
@@ -161,6 +162,7 @@ export function graphql<
 	const page = graphiql ?? true;
 	const yogaAt = yogaServers<UserCtx>({
 		...(yogaOptions as YogaServerOptions<YogaContext, UserCtx>),
+		plugins: [...(yogaOptions.plugins ?? []), reportsOperations()],
 		cors,
 		graphiql: (ide === undefined
 			? (_request: Request, context: object) => isDev(context) && page

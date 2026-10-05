@@ -372,6 +372,22 @@ app.get('/orders/:id', ({ params, span, reply }) => {
 });
 ```
 
+### A GraphQL span is named `POST /graphql`
+
+**When:** the spans of a GraphQL endpoint all share one name, with no
+`graphql.operation.name`.
+
+**Why:** the name and attributes come from what `@alxia/graphql` reports when
+it executes an operation. A request refused before it executes (a syntax
+error, an invalid document) and an operation over `ws: true` report none;
+neither does a `@alxia/core` or `@alxia/graphql` older than the one that
+reports. A batched body is named `batch GetNotes,AddNote` and has no
+`graphql.operation.type`: `batch` is not one of the convention's values.
+
+**Fix:** none for a refused document. Otherwise update the packages
+together, and give `telemetry()` to `use` before `graphql()`
+([the guide](guide.md#a-graphql-operation)).
+
 ### A streamed request's span lasts as long as its stream
 
 **When:** the span of a page streamed as it renders, or of an event

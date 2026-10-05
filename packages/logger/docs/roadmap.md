@@ -11,7 +11,8 @@ number on it. Every release, with each change it made, is in
 
 ## Next
 
-Nothing scheduled yet.
+- **Each operation over a socket.** A `ws: true` connection is logged at its upgrade alone: its operations — a query, a mutation, a subscription's stream — name no operation yet, because the request is answered before they run.
+
 
 ## Later
 
@@ -25,6 +26,10 @@ Nothing scheduled yet.
   the app already uses, with no transitive package to audit or update.
 
 ## Shipped
+
+### Next release
+
+- **The GraphQL operation on the line.** Behind `@alxia/graphql`, an entry carries `operationName` and `operationType` (`batch` for an array body, with every name), so `POST /graphql` says whether it was `GetNotes` or `AddNote` ([guide](guide.md#a-graphql-operation)).
 
 ### 0.2.0
 

@@ -401,6 +401,24 @@ const base = alxia().use(bearer({ jwt }));
 const app = base.plugin((app) => graphql(app, { schema }));
 ```
 
+### Every log line and span is an anonymous `POST /graphql`
+
+**When:** `@alxia/logger` writes `POST /graphql 200` with no
+`operationName`, and the span of `@alxia/telemetry` is named
+`POST /graphql`.
+
+**Why:** an operation is reported only when Yoga executes it. A request
+refused before that (a syntax error, a document that fails validation) names
+none; an operation over `ws: true` is not reported; and a logger or a
+telemetry given to `use` *after* the endpoint, or a version of
+`@alxia/core` older than the one that reports (`operationOf`), never reads
+it.
+
+**Fix:** give `logger()` and `telemetry()` to `use` before `graphql()`, and
+update `@alxia/core`, `@alxia/graphql`, `@alxia/logger` and
+`@alxia/telemetry` together. See
+[the endpoint guide](guide/endpoint.md#the-operation-in-the-log-and-the-trace).
+
 ### The logger, CORS or secure headers miss the endpoint
 
 **When:** `use(logger())`, `use(cors(…))` or `use(secureHeaders())` comes

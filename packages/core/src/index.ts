@@ -2,6 +2,12 @@ export { Alxia, alxia } from './app/alxia';
 export { settle } from './app/boundary';
 export { compose } from './app/compose-middlewares';
 export { type FactoryKind, markFactory } from './app/factory';
+export {
+	type OperationReport,
+	type OperationSummary,
+	operationOf,
+	reportOperation,
+} from './app/operation';
 export { errorFormat, isDev, shutdownSignal } from './app/served';
 export {
 	type RequestSchemas,

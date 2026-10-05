@@ -11,7 +11,8 @@ number on it. Every release, with each change it made, is in
 
 ## Next
 
-Nothing scheduled yet.
+- **Each operation over a socket.** A `ws: true` connection is logged and spanned at its upgrade alone: its operations — a query, a mutation, a subscription's stream — name no operation yet, because the request is answered before they run.
+
 
 ## Later
 
@@ -27,6 +28,10 @@ Nothing scheduled yet.
   no runtime dependency.
 
 ## Shipped
+
+### Next release
+
+- **The GraphQL operation on the span.** Behind `@alxia/graphql`, the span is named `query GetNotes` and carries `graphql.operation.name` and `graphql.operation.type`, OpenTelemetry's conventions; a batched body is `batch GetNotes,AddNote` ([guide](guide.md#a-graphql-operation)).
 
 ### 0.2.0
 

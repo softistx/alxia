@@ -4,6 +4,7 @@ import {
 	type Middleware,
 	markFactory,
 	type Next,
+	operationOf,
 	type RequestContext,
 	settle,
 } from '@alxia/core';
@@ -18,6 +19,7 @@ import {
 import {
 	HTTP_ROUTE,
 	HTTP_STATUS,
+	operationSpan,
 	requestAttributes,
 	serverFailed,
 } from './attributes';
@@ -129,6 +131,12 @@ export function telemetry(
 					if (ctx.route !== undefined) {
 						scope.name = `${ctx.request.method} ${ctx.route}`;
 						scope.attribute(HTTP_ROUTE, ctx.route);
+					}
+					const operation = operationOf(ctx);
+					if (operation !== undefined) {
+						const { name, attributes } = operationSpan(operation);
+						scope.name = name;
+						scope.attributes(attributes);
 					}
 					record(scope, response.status, ctx.error);
 					if (options.traceResponse) {

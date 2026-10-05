@@ -4,6 +4,8 @@ import {
 	type Middleware,
 	markFactory,
 	type Next,
+	type OperationSummary,
+	operationOf,
 	settle,
 	withHeaders,
 } from '@alxia/core';
@@ -29,6 +31,13 @@ export interface LogEntry {
 	/** A streamed body's: whether it was sent whole, left by its client, or failed. */
 	readonly outcome?: 'completed' | 'aborted' | 'errored';
 	readonly ip?: string;
+	/**
+	 * The GraphQL operation's name, when `@alxia/graphql` served it and it has
+	 * one; a batched body's names, joined by commas.
+	 */
+	readonly operationName?: string;
+	/** `query`, `mutation`, `subscription`, or `batch` for a batched body. */
+	readonly operationType?: string;
 	readonly [field: string]: unknown;
 }
 
@@ -110,6 +119,7 @@ export function logger(options: LoggerOptions = {}): LoggerMiddleware {
 			path: url.pathname,
 			status: sent.status,
 			ip,
+			operation: operationOf(ctx),
 		};
 		if (settled(sent)) {
 			write(entryOf(answered, duration));
@@ -159,6 +169,7 @@ interface Answered {
 	readonly path: string;
 	readonly status: number;
 	readonly ip: string | undefined;
+	readonly operation: OperationSummary | undefined;
 }
 
 /** What a streamed body's entry says beside the rest. */
@@ -173,7 +184,7 @@ function entryOf(
 	duration: number,
 	streamed?: Streamed,
 ): LogEntry {
-	const { id, method, path, status, ip } = answered;
+	const { id, method, path, status, ip, operation } = answered;
 	const outcome =
 		streamed === undefined || streamed.outcome === 'completed'
 			? ''
@@ -189,6 +200,14 @@ function entryOf(
 		duration,
 		...streamed,
 		...(ip === undefined ? {} : { ip }),
+		...(operation === undefined
+			? {}
+			: {
+					...(operation.name === undefined
+						? {}
+						: { operationName: operation.name }),
+					operationType: operation.type,
+				}),
 	};
 }
 

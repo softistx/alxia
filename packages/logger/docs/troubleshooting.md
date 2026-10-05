@@ -182,6 +182,22 @@ To keep an event stream's `warn` out of an alert, filter on its path or on
 app.use(logger({ skip: (_, url) => url.pathname === '/events' }));
 ```
 
+### A GraphQL entry has no `operationName`
+
+**When:** a `POST /graphql` is logged without `operationName` or
+`operationType`.
+
+**Why:** the fields come from what `@alxia/graphql` reports when it
+executes an operation. A request refused before it executes (a syntax
+error, an invalid document), an operation over `ws: true`, an endpoint
+that is not `@alxia/graphql`, or a `@alxia/core` or `@alxia/graphql` older
+than the one that reports it, have none. An anonymous operation has an
+`operationType` and no name.
+
+**Fix:** none for a refused document. Otherwise update the packages
+together, and give `logger()` to `use` before `graphql()`
+([the guide](guide.md#a-graphql-operation)).
+
 ### A WebSocket connection has no entry
 
 **When:** a `ws` route's connections never show up in the log, and the

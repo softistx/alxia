@@ -157,6 +157,39 @@ POST {}                               → 200 {"errors":[{"message":"Must provid
 Both methods answer a body to read as GraphQL, whatever its status, and
 the replies of the middlewares before them — a guard's `401`, say.
 
+## The operation in the log and the trace
+
+Every call is a `POST /graphql`, so the route alone cannot tell `GetNotes`
+from `AddNote`. For each operation Yoga executes or subscribes to,
+`graphql()` reports its type and name to the middlewares around it
+(`reportOperation` of `@alxia/core`, a Yoga plugin it adds after yours),
+and no package imports another: `@alxia/logger` adds `operationName` and
+`operationType` to the request's line, and `@alxia/telemetry` names its
+span `query GetNotes` with `graphql.operation.name` and
+`graphql.operation.type`. Give both to `use` before `graphql()`:
+
+```ts
+const app = alxia()
+	.use(logger())
+	.use(telemetry({ service: 'notes' }))
+	.plugin((app) => graphql(app, { schema }));
+```
+
+```json
+{"message":"POST /graphql 200","status":200,"operationName":"GetNotes","operationType":"query"}
+```
+
+- A batched body (`batching`, an array) is one line and one span: the type
+  is `batch`, the names are listed, `GetNotes,AddNote`.
+- An anonymous operation has a type and no name.
+- A request refused before it executes (a syntax error, a document that
+  fails validation) names no operation: its line is the plain
+  `POST /graphql`.
+- Your own middleware reads it with `operationOf(ctx)` after `next()`.
+- Over `ws: true`, the operations on a socket are not reported: logger and
+  telemetry see the upgrade alone, so they are not logged or spanned yet
+  ([roadmap](../roadmap.md)).
+
 ## Errors, health and shutdown
 
 **GraphQL errors stay GraphQL's.** A resolver that throws, a query that
