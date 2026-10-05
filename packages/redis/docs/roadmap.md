@@ -24,9 +24,8 @@ Nothing scheduled yet.
 ## Not planned
 
 - **A second Redis implementation.** `@alxia/redis` is an adapter over
-  [`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) and
-  [`@nxgt/redis-guard`](https://www.npmjs.com/package/@nxgt/redis-guard),
-  never a rewrite of them: their scripts, keys and errors are what it runs.
+  [`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis),
+  never a rewrite of it: its scripts, keys and errors are what it runs.
   They run on Bun's built-in `RedisClient`, so there is no driver to
   install, and it does not run on Node.
 

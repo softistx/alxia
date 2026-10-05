@@ -1,8 +1,7 @@
 # @alxia/redis
 
 Redis for [alxia](https://www.npmjs.com/package/@alxia/core), on
-[`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) and
-[`@nxgt/redis-guard`](https://www.npmjs.com/package/@nxgt/redis-guard) —
+[`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) —
 Bun's own Redis client, no driver, no dependency:
 
 - `redisStore`: a rate-limit store every process shares;
@@ -11,7 +10,7 @@ Bun's own Redis client, no driver, no dependency:
 - `redis`: the client, typed caches and a lock in the context.
 
 ```sh
-bun add @alxia/redis @nxgt/redis @nxgt/redis-guard zod @alxia/core
+bun add @alxia/redis @nxgt/redis zod @alxia/core
 bun add -d typescript
 ```
 

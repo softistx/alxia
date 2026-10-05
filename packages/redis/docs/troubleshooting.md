@@ -3,7 +3,7 @@
 Each entry is headed by the text you see: a TypeScript error, an exception
 at startup, an exception in the log beside a `500 {"error":"internal"}`, or
 the response a client got. `@alxia/redis` throws nothing of its own: the
-messages are `@nxgt/redis`'s, `@nxgt/redis-guard`'s and Bun's, and it lets
+messages are `@nxgt/redis`'s and Bun's, and it lets
 each through. It prints one warning of its own, under
 [Runtime: a warning in the log](#runtime-a-warning-in-the-log). What prints nothing is under [Traps](#traps), by symptom.
 
@@ -239,7 +239,7 @@ TypeError: defineRateLimit: "api:1000000/31536000000" has a burst of 1000000 and
 
 **Why:** the script counts in exact integers; `limit × windowMs` past that
 bound would lose precision. `redisStore` hands each policy to
-`@nxgt/redis-guard` when it first counts under it, and a refused policy is
+`@nxgt/redis` when it first counts under it, and a refused policy is
 not kept, so it is checked again, and refused again, on each request.
 
 **Fix:** state the same rate over a shorter window:
@@ -451,7 +451,7 @@ number, or below 1.
 TypeError: defineRateLimit: "api:5/1.5" has a per of 1.5; it is a whole number of milliseconds, and must be at least 1
 ```
 
-**Why:** `redisStore` hands each `limit`/`windowMs` to `@nxgt/redis-guard`
+**Why:** `redisStore` hands each `limit`/`windowMs` to `@nxgt/redis`
 the first time it counts under it, and the guard counts in whole
 milliseconds. `rateLimit` never passes such a value: it refuses it at
 startup, with [`TypeError: rateLimit: windowMs must be a whole number of 1 or more, not …`](https://github.com/softistx/alxia/blob/develop/packages/rate-limit/docs/troubleshooting.md#typeerror-ratelimit--must-be-a-whole-number-of-1-or-more-not-).
