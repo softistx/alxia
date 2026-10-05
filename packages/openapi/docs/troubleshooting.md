@@ -15,6 +15,7 @@ it to fail prints nothing; those are under [Traps](#traps), by symptom.
 **API docs**
 
 - [`TypeError: apiDocs(): cannot read the spec "…"`](#typeerror-apidocs-cannot-read-the-spec-)
+- [`TypeError: apiDocs(): the path "…" must start with "/" and not end with one`](#typeerror-apidocs-the-path--must-start-with--and-not-end-with-one)
 - [The page is blank, and the console reports a blocked script](#the-page-is-blank-and-the-console-reports-a-blocked-script)
 - [`matchesSpec(): … routes have no operation: GET /docs, …`](#matchesspec--routes-have-no-operation-get-docs-)
 
@@ -184,6 +185,14 @@ apiDocs({ spec: new URL('../openapi.yaml', import.meta.url).pathname });
 The same error says `is not an OpenAPI document` for a file with no
 `openapi` version, and `neither valid YAML nor valid JSON` for one that does
 not parse. With `enabled: false` nothing is read.
+
+### `TypeError: apiDocs(): the path "…" must start with "/" and not end with one`
+
+Also `apiDocs(): ui "…" is not "scalar" or "swagger"`.
+
+**When:** `path` is `docs` or `/docs/`, or `ui` is another name.
+
+**Fix:** `apiDocs({ spec, path: '/docs', ui: 'scalar' })`.
 
 ### The page is blank, and the console reports a blocked script
 

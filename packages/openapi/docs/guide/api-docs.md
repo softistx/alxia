@@ -63,7 +63,7 @@ apiDocs({
 
 ```ts
 const app = alxia().group('/internal', (g) =>
-	g.use(requireAdmin).plugin(apiDocs({ spec: 'openapi.yaml' })),
+	g.use(requireAdmin) // your own middleware.plugin(apiDocs({ spec: 'openapi.yaml' })),
 );
 ```
 

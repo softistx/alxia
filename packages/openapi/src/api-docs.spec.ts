@@ -96,6 +96,12 @@ describe('the spec', () => {
 		expect(() => apiDocs({ spec, path: '/docs/' })).toThrow(
 			'must start with "/" and not end with one',
 		);
+		expect(() => apiDocs({ spec, path: 'docs' as '/docs' })).toThrow(
+			'must start with "/" and not end with one',
+		);
+		expect(() => apiDocs({ spec, ui: 'redoc' as 'scalar' })).toThrow(
+			'ui "redoc" is not "scalar" or "swagger"',
+		);
 	});
 });
 
