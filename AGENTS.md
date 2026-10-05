@@ -8,7 +8,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 
 | package | what it is | peers |
 | --- | --- | --- |
-| `@alxia/core` | the framework: routes and their middlewares (`defineMiddleware`, `validate`, `responds`, `use(...middlewares)` for the routes after it and every request no route matches, `settle`, `refusalOf`), the deprecated request hooks, groups, plugins (`plugin(…)`), cookies, SSE, WebSockets; `Register`, which an app augments with `context: typeof base`, the chain that builds its context, read by `AppContext` and `defineRoutes(prefix?)`, a plugin built on that context that requires it of the app mounting it | — |
+| `@alxia/core` | the framework: routes and their middlewares (any `(ctx, next)` function, `defineMiddleware` to share a typed one, `validate`, `responds`, `use(...middlewares)` for the routes after it and every request no route matches, `settle`, `refusalOf`), `derive`, `decorate`, the lifecycle hooks `onStart`, `onStop` and `parser`, groups, plugins (`plugin(…)`), cookies, SSE, WebSockets; `Register`, which an app augments with `context: typeof base`, the chain that builds its context, read by `AppContext` and `defineRoutes(prefix?)`, a plugin built on that context that requires it of the app mounting it | — |
 | `@alxia/openapi` | OpenAPI spec first: `implemented` and `matchesSpec`, every operation `@nxgt/openapi-codegen`'s `alxia` option generates from the document has a route, read from `app.routes`, and no other. Formerly `@alxia/openapi-routes`, renamed at 0.4.0, after the 0.3.0 of the package that held the name and wrote a document from an app's schemas, retired; the old name was removed from the repository at 0.5. A client generator from the document is on its roadmap | core |
 | `@alxia/zod` | Zod coercions (`zq`) | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's middlewares and typed context, Yoga's plugins | core, graphql-yoga, graphql |
@@ -74,10 +74,10 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   requests, a plugin when it adds routes or `decorate`s. A plugin is either
   an app given to `plugin` — it adds context, routes or typed replies — or
   a function `Plugin`, given to `plugin` too, that returns the app
-  unchanged in type; `plugin` throws when a function returns anything but
-  an app. `use` takes middlewares alone: its plugin forms of 0.3 are
-  deprecated. Plugins use the
-  core's public API only: if one needs more, export it from the core.
+  unchanged in type; `plugin` takes exactly one, and throws when a function
+  returns anything but an app. `use` takes middlewares alone, and throws
+  when given an app. Plugins use the core's public API only: if one needs
+  more, export it from the core.
 - **The types are the product.** A mistake a type can catch is a compile
   error: a params schema that does not read the path, an unknown key in a
   route, an undeclared status, a body its schema refuses. Each has a
@@ -91,12 +91,11 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   document by the developer's own generator. The server's types
   check a handler — what its middlewares add, its `reply` against its
   `responds`, its path — and accumulate no route table for a client:
-  `Alxia<Ctx, Prefix, Shortcuts>`, and a route returns the app unchanged in
-  type. A handler cannot return a raw `Response`. A global hook's
-  `Response` is outside the contract: use it only for what no operation
-  describes.
-- **Order is meaning.** A middleware given to `use`, and a route hook,
-  applies to the routes declared after it, at runtime and in the types
+  `Alxia<Ctx, Prefix>`, and a route returns the app unchanged in type. A
+  handler cannot return a raw `Response`. A middleware's `Response` is
+  outside the contract: use it only for what no operation describes.
+- **Order is meaning.** A middleware given to `use`, a `derive` and a
+  `decorate` apply to the routes declared after them, at runtime and in the types
   alike; a group's stay inside it — its routes, and the requests no route
   matches under its prefix — and so do a plugin's that has a prefix of its
   own (`Scope.enclose`, `absorb`), which then adds nothing to the context
@@ -107,8 +106,8 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   never on that route. A route's middlewares run in the order given,
   `validate` and `responds` among them, and what one passes `next` is
   typed only after it. Errors are rejections through `next()`; what no
-  middleware catches is answered at the route boundary, outermost — the
-  deprecated `onError` and `onRefusal`, an `HttpError`'s status, a 500 —
+  middleware catches is answered at the route boundary, outermost — an
+  `HttpError`'s status and body, a 500 —
   and `settle(ctx, next())` gives an observer that answer early without
   swallowing the error: once the observer returns, the error goes on to
   the middlewares around it (`settled.ts`), and the response it made is
@@ -117,33 +116,33 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   after the observers, so they see its reply; it catches the error
   wherever it stands. Keep the runtime and the types in step.
 - **One route model.** A route, a socket's upgrade and `route(operation)`
-  take the same `...middlewares`, and `use(...middlewares)` gives them to
-  every route declared after it, before the route's own, in the scope
-  chain the route hooks are in. `use(path, …)` is matched against the
-  request's path: decided at declaration when the route's own pattern
-  settles it (`reach` in `scope-path.ts`), checked per request with a
-  pattern compiled once when it does not, so a
+  take the same `...middlewares`, each a plain `(ctx, next)` function, and
+  `use(...middlewares)` gives them to every route declared after it,
+  before the route's own. What a middleware passes `next` is inferred, and
+  the middlewares after it read it typed; each is checked against the
+  context in force where it stands (`Step` and `Missing`,
+  `types/step.ts`), so a middleware that reads what that context does not
+  give is one compile error on it, naming the key. `use(path, …)` is
+  matched against the request's path: decided at declaration when the
+  route's own pattern settles it (`reach` in `scope-path.ts`), checked per
+  request with a pattern compiled once when it does not, so a
   `/users/:id` route requested as `/users/admin` runs
   `use('/users/admin', …)`. The request's path is read fail closed, as the
   router, the static files and React Router read it: segments decoded, an
   encoded `/` splitting one, empty ones collapsed, compared without case;
   a path without `%` nor `/.` is read in place, allocating nothing. A
-  plugin's `use(path, …)` is rebased with its routes when it is mounted. `chain.ts` runs a route's chain and the
-  unmatched chain alike. The request hooks of 0.3 (`onRequest`,
-  `onResponse`, `around`, `wrap`, `onError`, `onRefusal`) are deprecated
-  adapters keeping their 0.3 behaviour; every package plugin that
-  installed them is a middleware given to `use`, under its old factory
-  name, and `plugin(middleware)`, deprecated, keeps 0.3's meaning of
-  those global hooks: app-wide (`Globals.middlewares`), on the routes
-  declared before it too, before the app's chain. `use` tells a middleware from a plugin, its
-  deprecated form, by the mark `defineMiddleware` sets (and `validate` and
-  `responds` theirs, both `Symbol.for`, shared by two copies of core), and
-  a middleware given a path adds
-  nothing, a compile error otherwise: a subtree's context is a group's.
-  `derive` stays, the shorthand for a middleware that only adds. The forms of 0.3 (a list of hooks, a
-  schema before the handler, `defineHook`, `defineWrap`) are deprecated
-  adapters in `@alxia/core`, kept until they are removed: no other package,
-  template or example writes them.
+  plugin's `use(path, …)` is rebased with its routes when it is mounted.
+  `chain.ts` runs a route's chain and the unmatched chain alike. Every
+  package middleware is given to `use`. `use` refuses an app, and a
+  `validate` or `responds` (their mark, `Symbol.for`, shared by two copies
+  of core), and a middleware given a path adds nothing, a compile error
+  otherwise: a subtree's context is a group's. `derive` stays, the
+  shorthand for a middleware that only adds. The forms 0.4 deprecated — the
+  request hooks, a list of hooks and the two helpers that made them, a
+  schema before the handler or in the options, `use(plugin)`,
+  `plugin(middleware)` —
+  were removed in 0.5, and each throws or fails to compile with a message
+  naming what replaced it (`removed-forms.spec.ts`).
 - **Register the base, not a key.** `Register` names the chain that builds
   the context (`context: typeof base`), never the app that mounts the
   routes, whose type would then read itself (TS7022), and never a context
@@ -151,7 +150,12 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   requires it: `defineRoutes()` carries the registered context in its own
   as a requirement `plugin` checks (`RequiredIn`, `Mounted` in
   `plugin-method.ts`), and `contextStorage()` marks its plugin with it.
-  `alxia()` and `defineMiddleware(fn)` stay on `BaseContext`. A spec that
+  `defineMiddleware(fn)` reads it too (`RegisteredContext`), and is
+  refused where the context does not give it; a middleware the registered
+  base is itself built with says `defineMiddleware<Empty>()(fn)`, or the
+  base's type would read itself, and a package's middleware names what it
+  reads (`<Empty>` or `<Requires>`), never the app's registration.
+  `alxia()` stays on `BaseContext`. A spec that
   needs `Register` augmented runs `tsc` on a program of its own under
   `test/register/`, which the package's `tsconfig.json` excludes, and
   core's `test/declarations/registered.ts`, excluded too, is compiled by
@@ -201,7 +205,7 @@ below records what is kept twice.
 | The Apollo Sandbox page, in `graphql/src/sandbox.ts` and `@nxgt/shared-graphql`'s `renderSandbox` | that one is Hono's `html`; both start the Sandbox at the URL the page was asked at (nxgt-core#171). alxia's passes the path, and the page resolves it against its own address, so a TLS proxy in front of the server changes nothing; that one still passes the server's URL. Importing it would depend on Hono. Change both together |
 | `bodyOf`, the permission guard's option types, the device cookie, in `janus/src/` and `@nxgt/janus-hono` | the same refusals and cookies whichever server answers; importing them would depend on Hono. Change both together. One divergence, on purpose: alxia's guard infers what `load`, `subject` and `ctx` read beyond `BaseContext` from their annotated parameters (`SubjectCtx` and `CheckCtx` on `PermissionOptions` and `OptionsArgs`, defaulted to `BaseContext`), and `plugin()` refuses an app that does not give it, and refuses the guard on every app when one is annotated `any`. Hono's callbacks take its `Context`, whose variables a middleware cannot require of the app, and `app.use()` checks nothing, so the Hono types have no such parameters. Every other part of the types stays in step |
 | The body watcher, `logger/src/body.ts` and `telemetry/src/body.ts`, with `body.spec.ts` beside each | both time a streamed body to its end (`settled`, `watched`), and neither depends on the other; the core exports no such helper, and exporting one would be a minor of `@alxia/core`, which moves every package's peer range. The two `body.ts` are byte for byte the same but for their first line, and the two specs are the same. Change both together |
-| The slots of each middleware form — `aBound`, `bBound`, `handledBound`, `head`, `step`, `tail`, `out` — written out in `RouteForm`, `RouteOptionsForm`, `SocketForm`, `SocketOptionsForm`, `OperationForm` and `UseForm` (`packages/core/src/app/*-forms.ts`, `route-middlewares.ts`, `route-options.ts`), which `Ladder` and `Bare` (`ladder.ts`) read through `Forms` (`forms.ts`) | inheriting the shared slots from a base interface costs each call an instantiation more: measured on core's `tsc`, the version with bases made 631k types, the written-out one 558k (2.37M instantiations before the shared ladder, 2.53M after). Change the route forms' `step` and `out`, and the two route forms' `handledBound` and `tail`, together |
+| The slots of each middleware form — `aBound`, `bBound`, `handledBound`, `head`, `reads`, `excludes`, `tail`, `out` — written out in `RouteForm`, `RouteOptionsForm`, `SocketForm`, `SocketOptionsForm`, `OperationForm` and `UseForm` (`packages/core/src/app/*-forms.ts`, `route-middlewares.ts`, `route-options.ts`, `socket-options.ts`), each extending `FormSlots` for its shape alone, which `Ladder` and `Bare` (`ladder.ts`) read through `Forms` (`forms.ts`). `Ladder` checks each middleware against its form's `reads` with `Step` and `Missing` (`types/step.ts`), and `Rest` and `Guarded` (`forms.ts`) refuse by its arity the call that the other form of the same method takes (`excludes`: `'object'` on a form whose first middleware stands where the options form's options stand, `'function'` on the options form), so that TypeScript reports the one form that applies | inheriting the shared slots from a base interface costs each call an instantiation more: measured on core's `tsc`, the version with bases made 631k types, the written-out one 558k (2.37M instantiations before the shared ladder, 2.53M after). Change the `reads` of the route, options, socket, socket options and operation forms (`RouteReads`) together, the two route forms' `handledBound` and `tail` together, and the `excludes` of each pair of forms of one method together |
 | `PEER_RANGES` in `create/src/versions.ts` and the peer ranges of `@alxia/core` (`typescript`), `@alxia/zod` (`zod`) and `@alxia/react-router` (`react-router`, `vite`) | the published `@alxia/create` cannot read its siblings' manifests, and holds a project's dependencies to these ranges. `versions.spec.ts` compares them: widening one of those peers fails there until `PEER_RANGES` is widened too, with a changeset for `@alxia/create` |
 | React Router's official scaffold, in `create/templates/react-router/` and `examples/react-router` | both are `create-react-router`'s output committed as generated, plus the same alxia layer; the template is copied as it is, so a new project needs no network for its files and nothing to recognise. `create/src/templates/react-router.spec.ts` holds the template's `vite.config.ts`, `_bunfig.toml` and `Dockerfile` byte for byte to the example's `vite.config.ts`, `bunfig.toml` and `Dockerfile`; the regeneration script writes the example's `Dockerfile` over the scaffold's and gives the scaffold's `README.md` Bun's commands (`toBun`, which refuses an npm, npx, pnpm or yarn command it does not know), and `create/src/copy.spec.ts` refuses one in every stored template's README, `Dockerfile` or scripts. That pattern is kept twice, `OTHER_MANAGER` in the script and a copy in `copy.spec.ts`, since a package spec does not import from `scripts/`: change both together. When React Router ships a new major, once `@alxia/react-router`'s peer accepts it, regenerate the template with `bun scripts/regenerate-react-router-template.ts` (`bunx create-react-router@latest` with `--yes --no-install --no-git-init --no-agent-skills --no-motion`, then the layer), regenerate the example the same way, read both diffs, and add a patch changeset for `@alxia/create` |
 | The projects' Biome setup: `create/templates/api/_biome.json`, `README.md` and `package.json` scripts, and `BIOME_CONFIG`, `BIOME_SCRIPTS` and `LINT_SECTION` in `scripts/templates/biome.ts`, which `scripts/regenerate-react-router-template.ts` writes into the `react-router` template | a template is files, and the regeneration script writes the scaffold from nothing. `copy.spec.ts` holds both templates to the same `$schema`, `vcs`, `formatter`, `javascript` and `assist`, the same Biome scripts, the same `.vscode/settings.json`, and `@biomejs/biome` at the workspace's installed version; `scripts/templates/biome.spec.ts` holds the committed `_biome.json` to `BIOME_CONFIG`, and the `api` README to `LINT_SECTION` but for its lines on `dist/` and `verify`. `create/templates/biome.json` (`"root": false`) extends both `_biome.json`, so the root `biome ci` checks the templates by the union of both settings, and skips the `api` template's `src/generated/` as its `_biome.json` does (`!!**/src/generated` in both); each template's spec runs `bun run check:ci` on a generated project, by its own alone. Bumping the workspace's Biome fails `copy.spec.ts` until both templates pin it, are formatted by it (the script for `react-router`) and pass. Change them together |

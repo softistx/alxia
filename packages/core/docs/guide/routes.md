@@ -29,8 +29,9 @@ app.get(path, auth, validate(schemas), responds(responses), handler);
 ```
 
 The last argument is the handler, which returns the route's reply. Before
-it, the route's middlewares: functions made by `defineMiddleware`, written
-inline, or made by `validate` and `responds`. Each reads what the ones
+it, the route's middlewares: plain `(ctx, next)` functions written inline,
+shared ones typed by `defineMiddleware`, and those `validate` and `responds`
+make. Each reads what the ones
 before it passed `next`; they run after the `use` middlewares, `derive`s
 and `decorate`s declared before the route, in the order given ([Middleware](middleware.md#a-routes-middlewares)). An object right
 after the path is the route's options.
@@ -40,15 +41,14 @@ the same arguments. `ws` declares a socket ([WebSockets](websockets.md)); `stati
 `file` and `page` serve files ([Static files](static-files.md)).
 
 ```ts
-interface RouteMethod<M, Ctx, Prefix, Shortcuts>
-	extends MiddlewareForms<RouteApp<M, Ctx, Prefix, Shortcuts>>,
-		OptionsForms<RouteApp<M, Ctx, Prefix, Shortcuts>>,
-		DeprecatedForms<Ctx, Prefix, Shortcuts> {}
+interface RouteMethod<M, Ctx, Prefix>
+	extends MiddlewareForms<RouteApp<M, Ctx, Prefix>>,
+		OptionsForms<RouteApp<M, Ctx, Prefix>> {}
 
 // MiddlewareForms: one overload per count of middlewares, 0 to 8. With two:
 <const Path extends RoutePath, R1 extends MiddlewareReturn, R2 extends MiddlewareReturn, Result extends …>(
 	path: Path, // a literal the app would refuse does not compile: `Invalid path: …`
-	m1: (ctx: /* the middlewares' context, and the request as it arrived */, next: NextFunction) => R1,
+	m1: (ctx: /* the context in force, and the request as it arrived */, next: NextFunction) => R1,
 	m2: (ctx: /* the same, and what m1 passed `next` */, next: NextFunction) => R2,
 	handler: (ctx: /* the same, and what m2 passed `next`; `reply` typed by a `responds` */) => MaybePromise<Result>,
 ): Alxia</* … the app, unchanged in type: a route adds nothing to it */>;
@@ -62,14 +62,20 @@ interface RouteMethod<M, Ctx, Prefix, Shortcuts>
 ): Alxia</* … the app, unchanged in type */>;
 ```
 
+Each middleware is checked against the context in force where it stands: a
+shared one that reads a key the route does not give there is one error, on
+that middleware, naming the key
+([What the types refuse](#what-the-types-refuse)).
+
 A route method checks its arguments when the route is declared, and a
 mistake throws a `TypeError` at startup:
 
 | Declared | Thrown |
 | --- | --- |
 | no handler last | `GET /a: the handler is missing` |
-| something other than a function among the middlewares | `GET /a: middleware 1 is not a function: make it with defineMiddleware(), validate() or responds()` |
-| a schema in the options beside middlewares, past the types | `GET /a: the options hold no schema: give validate(…) and responds(…) among the middlewares` |
+| something other than a function among the middlewares | `GET /a: middleware 1 is not a function: a middleware is (ctx, next) => …, or a validate() or responds()` |
+| the middlewares in a list, `[auth]`, past the types | `GET /a: a route takes its middlewares after the path, not in a list: drop the brackets` |
+| a schema in the options, past the types — the form `(path, schema, handler)` of 0.3 included | `GET /a: the options hold no schema (body): give validate(…) and responds(…) among the middlewares`, naming every schema key it holds |
 
 A handler must return a reply. One that returns anything else is answered
 with a 500, and the server logs
@@ -115,10 +121,8 @@ reply — a middleware's reply, an auth's 401, is its own. Given
 `validate(operation)` or `responds(operation)` among the middlewares, the
 route runs it there instead, once
 ([Middlewares on a route declared as data](#middlewares-on-a-route-declared-as-data)).
-`route(operation, [hooks], handler)`, a list of hooks, is the form of 0.3,
-deprecated ([Hooks on one route](hooks.md#hooks-on-one-route)); given
-middlewares after the list too, it throws
-[`GET /pets/:petId: a list of hooks and middlewares are two forms, never mixed: …`](../troubleshooting.md#get--a-list-of-hooks-and-middlewares-are-two-forms-never-mixed-give-the-hooks-as-middlewares-made-by-definemiddleware).
+A list, `route(operation, [auth], handler)`, throws
+`GET /pets/:petId: a route takes its middlewares after the path, not in a list: drop the brackets`.
 
 ```ts
 // operations.ts: data, importing only the schemas
@@ -511,7 +515,7 @@ cap its own body below that limit:
 | `bodyLimit` in a route's options | that route, whatever `bodyLimit()` was called before it |
 | `app.bodyLimit(bytes)` | every route declared after it on the app, a group's included |
 | `group.bodyLimit(bytes)` inside a group | the group's routes declared after it, never the app's |
-| a plugin's routes, given to `plugin` | their own limit only: the app's `bodyLimit()` never reaches them. A `bodyLimit()` the plugin calls applies to the app's routes declared after `plugin`, as its hooks do |
+| a plugin's routes, given to `plugin` | their own limit only: the app's `bodyLimit()` never reaches them. A `bodyLimit()` the plugin calls applies to the app's routes declared after `plugin`, as its middlewares do |
 
 ```ts
 import { alxia, validate } from '@alxia/core';
@@ -562,10 +566,6 @@ with 256 MiB offered: the handler read 25 MiB, the client had sent about
 repeats that run: it holds the read and the growth under the limit, and the
 bytes sent within 8 MiB of it.
 
-A deprecated `onRequest` or `around` hook runs before the route is known,
-so it reads the body whole. If one has read it, the route's limit is
-skipped: cap such a hook with `maxRequestBodySize`.
-
 Past the limit the request is answered with a 413:
 
 ```json
@@ -580,8 +580,7 @@ What the read throws is a `ContentTooLargeError`, an `HttpError` with the
 route's `limit`. It is a refusal, as a 400 is: a middleware before the
 route catches it, `refusalOf(error)` reads `{ kind: 'body_limit', limit }`,
 and it may answer in another format, such as an RFC 9457 problem. Nobody
-catches it, and the answer is the default 413. The `onError` hooks never see
-it.
+catches it, and the answer is the default 413.
 
 ```ts
 import { alxia, defineMiddleware, problem, refusalOf, validate } from '@alxia/core';
@@ -606,9 +605,7 @@ const api = alxia()
 
 Its reply takes the default 413's place on every route under a limit; a
 middleware that rethrows leaves the default 413
-([Refusals in your own format](#refusals-in-your-own-format)). The
-`onRefusal` hook of 0.3 still answers a `body_limit` refusal, and is
-deprecated.
+([Refusals in your own format](#refusals-in-your-own-format)).
 
 A handler that streams its own response while it reads the body may have
 sent its headers before the count passes the limit. In that case its
@@ -688,9 +685,7 @@ Give it before the `validate` — on the app with `use`, or among the route's
 middlewares — and after the observers (`logger()`, `secureHeaders()`): so
 the observers also see its reply: an observer settles `next()` and the error
 goes on, so a `try`/`catch` catches it wherever it is declared
-([Middleware](middleware.md)). The `onRefusal` hook of 0.3
-still answers a refusal for the routes declared after it, and is deprecated for
-this middleware.
+([Middleware](middleware.md)).
 
 ## What the types refuse
 
@@ -700,35 +695,37 @@ against what the route gives it where it stands. Each of these is a compile
 error; the comment is what TypeScript reports:
 
 ```ts
-// No overload matches this call. … Argument of type 'Middleware<{ readonly pathParams: { readonly name: string; }; }, …>' is not assignable to parameter of type …
+// … is not assignable to type '"the path parameter `name` is not in this route's path"'
 app.get('/users/:id', validate({ params: z.object({ name: z.string() }) }), ({ reply }) => reply(200));
 
-// the same, 'pathParams: { readonly id: number; }', for a schema that does not coerce: the path gives "7", not 7
+// … '"the path parameters are read with another type than the strings they arrive as"': the path gives "7", not 7
 app.get('/users/:id', validate({ params: z.object({ id: z.number() }) }), ({ reply }) => reply(200));
 
-// the same, 'pathParams: { readonly id: string; }', for a path with no parameter
+// … '"the path parameter `id` is not in this route's path"', for a path with no parameter
 app.get('/users', validate({ params: z.object({ id: z.string() }) }), ({ reply }) => reply(200));
 
-// the same, 'pathParams: { readonly id: string; readonly extra: string | undefined; }', for a key the path lacks, optional or not
+// … '"the path parameter `extra` is not in this route's path"', for a key the path lacks, optional or not
 app.get('/users/:id', validate({ params: z.object({ id: z.string(), extra: z.string().optional() }) }), ({ reply }) => reply(200));
 
-// 'quey' does not exist in type 'RequestSchemas'. Did you mean to write 'query'?
+// 'quey' does not exist in type 'RouteOperation | RequestSchemas'
 app.get('/users', validate({ quey: z.object({}) }), ({ reply }) => reply(200));
 
-// '999' does not exist in type 'ResponseSchemas'
+// '999' does not exist in type 'ResponseSchemas | RouteOperation'
 app.get('/users', responds({ 999: z.string() }), ({ reply }) => reply(200, ''));
 
-// No overload matches this call: a schema in the options — Type 'ZodString' is not assignable to type 'never'
+// a schema in the options: Type 'ZodString' is not assignable to type 'never'
 app.post('/users', { body: z.string() }, auth, ({ reply }) => reply(200));
 
-// Property 'user' does not exist: no middleware before this one added it
+// Property 'user' does not exist on type 'RouteBase<…>': no middleware before this one added it
 app.get('/me', ({ user }, next) => next({ id: user.id }), auth, ({ reply }) => reply(200));
+
+// … '"`user` is missing from the context: add a middleware that gives it before this one"'
+app.get('/me', defineMiddleware<{ user: { id: string } }>()(({ user }, next) => next({ id: user.id })), ({ reply }) => reply(200));
 ```
 
-A ninth middleware does not compile either: the types thread eight. With
-the params, the message TypeScript prints is that of the last overload it
-tried; the argument it names is the `validate(…)` whose `pathParams` the
-path does not give. A `params` schema reads the path's parameters and no
+Each of these is one error, on the argument at fault: a `validate`, a
+shared middleware, the options' key. A ninth middleware does not compile either: the types thread eight. A
+`params` schema reads the path's parameters and no
 other: every key it declares, an optional one included, must be a
 parameter of the path, as a string. What `reply` refuses is on
 [Replies](replies.md#with-response-schemas).
@@ -777,37 +774,6 @@ const app = alxia().get('/items', validate({ query: Page }), ({ query, reply }) 
 `InferInput<Schema>` is what a schema accepts — what a client sends, what a
 handler passes to `reply` — and `InferOutput<Schema>` what it gives back.
 
-## The forms of 0.3, deprecated
-
-A schema before the handler, and a list of hooks after the path, still
-compile and run as they did in 0.3, and will be removed in a later minor:
-
-```ts
-app.get(path, schema, handler);                  // deprecated: validate(…) and responds(…), options for bodyLimit and detail
-app.get(path, [canView, loadPet], schema, handler); // deprecated: middlewares, made by defineMiddleware
-app.get(path, [canView], handler);
-```
-
-A schema there validates the request just before the handler, after the
-list, with `responds` checking the handler's reply: at runtime it becomes
-`validate(…)` and `responds(…)` placed last, so the route answers exactly as
-it did. The parts it has no schema for are left as they are: a `body` a
-`use` middleware passed `next` reaches the handler. Its `bodyLimit` and `detail` move to the options:
-
-```ts
-// deprecated
-app.post('/upload', { body: Upload, response: { 201: Stored }, bodyLimit: 25 * 1024 * 1024 }, handler);
-// now
-app.post('/upload', { bodyLimit: 25 * 1024 * 1024 }, validate({ body: Upload }), responds({ 201: Stored }), handler);
-```
-
-A schema there is checked against the path as `validate`'s is, an optional
-key the path does not declare included. After a list of hooks, TypeScript
-names the key — `/users/:id` with `{ id, extra? }` is refused with
-`the params schema reads "extra", which "/users/:id" does not declare`.
-Each change is on [Upgrading](../upgrading.md); the list's hooks on
-[Hooks on one route](hooks.md#hooks-on-one-route).
-
 ## See also
 
 - [Replies](replies.md): what a handler returns.
@@ -815,5 +781,7 @@ Each change is on [Upgrading](../upgrading.md); the list's hooks on
   `responds` stand among the route's middlewares, and the order a request
   runs them in.
 - [Hooks](hooks.md): `derive` and `decorate`, which run before the route's
-  middlewares, and the deprecated request hooks.
+  middlewares, and the lifecycle hooks.
+- [Upgrading](../upgrading.md#050): what 0.5 removed — the forms of 0.3, a
+  schema before the handler and a list of hooks — and what replaces each.
 - [The app's type](types.md): `ContextOf`, and testing a route.
