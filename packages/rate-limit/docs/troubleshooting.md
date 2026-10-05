@@ -132,7 +132,7 @@ app.use(rateLimit({ limit: Number(Bun.env.RATE_LIMIT ?? 100), windowMs: 60_000 }
 ### `TypeError: rateLimit: limit … differs from the store's policy of …`
 
 **When:** `rateLimit()` is given a `store` that declares its own `policy`
-(`redisStore(handle.limits.api, api)`) and a `limit` or a `windowMs` that is
+(`redisStore(handle.limits.api)`) and a `limit` or a `windowMs` that is
 not the store's. It throws at declaration, so the app fails at startup:
 
 ```text
@@ -147,7 +147,7 @@ say what the store does not enforce. (`windowMs` reads the same way.)
 the rate, change the definition the store reads it from:
 
 ```ts
-app.use(rateLimit({ store: redisStore(handle.limits.api, api) }));
+app.use(rateLimit({ store: redisStore(handle.limits.api) }));
 ```
 
 ## Responses

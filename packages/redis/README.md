@@ -18,7 +18,8 @@ bun add -d typescript
 ```
 
 They are peers, with `@alxia/rate-limit` for `redisStore` and `@alxia/cache`
-for `redisCacheStore`. **Bun 1.4 or
+for `redisCacheStore`. `@nxgt/redis` is `^0.7.0`: `redisStore` reads the
+rate from the bound limit's `definition`, which 0.7 added. **Bun 1.4 or
 later**: Bun's `RedisClient` is what the nxgt packages run on.
 
 ## A shared rate limit
@@ -182,7 +183,7 @@ The bare `RedisClient` forms are unchanged and add no prefix.
 
 ### Defined once, in `defineRedis`
 
-With `@nxgt/redis` 0.6 the rate limit and the idempotency are wired by
+With `@nxgt/redis` 0.7 the rate limit and the idempotency are wired by
 `defineRedis` too (`limits`, `idempotency`), and `redisStore` and `idempotency`
 take the wired entry, so the definition lives in one place and its types flow
 through:
@@ -196,19 +197,18 @@ const orders = defineIdempotency({ name: 'orders', key: (id: string) => id, ttl:
 const wired = await openRedis(defineRedis({ uri: Bun.env['REDIS_URL']!, prefix: 'shop', limits: { api }, idempotency: { orders } }));
 
 alxia()
-	.use(rateLimit({ store: redisStore(wired.limits.api, api) }))                         // shop:api:<address>, 100 per 60 s from `api`
+	.use(rateLimit({ store: redisStore(wired.limits.api) }))                              // shop:api:<address>, 100 per 60 s from the definition
 	.use(idempotency(wired.idempotency.orders, { required: true }))                       // shop:orders:<route>:<scope>:<key>
 	.post('/orders', ({ reply }) => reply(201, { id: crypto.randomUUID() }));
 ```
 
 The keys are those `@nxgt/redis` writes, `<prefix>:<name>:<key>`, so another
 consumer calling `wired.limits.api.consume(address)` shares the count. The
-rate, `ttl` and `lease` are the definition's. `redisStore(wired.limits.api, api)`,
-given the definition, declares its rate as the store's `policy`, so `rateLimit`
-needs no `limit` nor `windowMs` and writes its headers from it (one it is given
-that differs throws at declaration); `redisStore(wired.limits.api)` alone has
-no policy, and `rateLimit` then takes the numbers, which only write its
-headers. The wired `idempotency` takes no `name`, `ttl` or `lease`. The limit's key takes a
+rate, `ttl` and `lease` are the definition's. The bound limit carries its
+`definition`, so `redisStore(wired.limits.api)` declares its `limit` and `per`
+as the store's `policy`: `rateLimit` needs no `limit` nor `windowMs` and writes
+its headers from it (one it is given that differs throws at declaration).
+`redisStore(wired.limits.api, api)` still works and is deprecated. The wired `idempotency` takes no `name`, `ttl` or `lease`. The limit's key takes a
 string, and the idempotency's `schema` is `idempotencyResult`: another is a
 compile error. A rate limit moved from `redisStore(handle, { name })` starts
 its counts again, the layouts differing; an idempotency keeps its keys. Both
@@ -224,8 +224,8 @@ The package's specs run against `$REDIS_URL`, or a `redis-server` on
 | export | |
 | --- | --- |
 | `redisStore(client \| handle, { name })`, `RedisStoreOptions` | an `@alxia/rate-limit` store |
-| `redisStore(handle.limits.api)` | the same for a rate limit wired by `defineRedis` (`@nxgt/redis` 0.6): the definition holds the name and the rate, the keys are `<prefix>:<name>:<key>` |
-| `redisStore(handle.limits.api, api)` | the same, given the definition, returning a `PolicyStore` (from `@alxia/rate-limit`): the store declares its `limit` and `per` as its `policy`, and `rateLimit({ store })` needs no `limit` nor `windowMs` |
+| `redisStore(handle.limits.api)` | the same for a rate limit wired by `defineRedis` (`@nxgt/redis` 0.7) or bound by hand, returning a `PolicyStore` (from `@alxia/rate-limit`): the definition holds the name and the rate, the store declares its `limit` and `per` (read from `definition`) as its `policy`, and `rateLimit({ store })` needs no `limit` nor `windowMs`; the keys are `<prefix>:<name>:<key>` |
+| `redisStore(handle.limits.api, api)` | deprecated: the same, given the definition beside the limit; its `limit` and `per` must equal the limit's, or it throws |
 | `redisCacheStore(client \| handle, { name })`, `RedisCacheStoreOptions` | an `@alxia/cache` store |
 | `idempotency(client \| handle, options)` | the middleware, given to `app.use` |
 | `idempotency(handle.idempotency.orders, options?)`, `WiredIdempotency`, `WiredIdempotencyOptions` | the same for an idempotency wired by `defineRedis`: its definition holds the `name`, `ttl` and `lease`, so the options take none of them |

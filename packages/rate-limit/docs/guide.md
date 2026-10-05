@@ -80,7 +80,7 @@ written once. Without one they are required, and a type error says so.
 import { redisStore } from '@alxia/redis';
 
 // `api` is the defineRateLimit definition the handle wired.
-app.use(rateLimit({ store: redisStore(handle.limits.api, api) })); // 100 per 60 s, from `api`
+app.use(rateLimit({ store: redisStore(handle.limits.api) })); // 100 per 60 s, from `api`
 ```
 
 A `limit` or a `windowMs` given beside a policy must equal it, or

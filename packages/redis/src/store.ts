@@ -38,37 +38,32 @@ export function redisStore(
 	options: RedisStoreOptions,
 ): RateLimitStore;
 /**
- * The store of a rate limit wired by `defineRedis`: the definition — its
- * name, `limit`, `per` and `burst` — is the one place, and the keys are
- * those `@nxgt/redis` writes, `<prefix>:<name>:<key>`, so every consumer of
- * the handle counts together, alxia's routes included.
+ * The store of a rate limit bound by `@nxgt/redis` (0.7 and later), wired by
+ * `defineRedis` or by hand: the definition — its `limit`, `per` and `burst` —
+ * is the one place. The store declares its `limit` and `per` as its `policy`,
+ * so `rateLimit({ store })` takes `limit` and `windowMs` from it and the
+ * numbers are written once. The keys are those `@nxgt/redis` writes,
+ * `<prefix>:<name>:<key>`, so every consumer of the handle counts together,
+ * alxia's routes included.
  *
  * ```ts
  * const api = defineRateLimit({ name: 'api', key: (ip: string) => ip, limit: 100, per: 60_000 });
  * const handle = await openRedis(defineRedis({ uri, prefix: 'shop', limits: { api } }));
- * app.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(handle.limits.api) }));
- * ```
- *
- * It counts by the wired limit's own rate, not by the `limit` and
- * `windowMs` the middleware is given, which only write its headers: give it
- * the same numbers, or give the definition as the second argument, which
- * `rateLimit` then reads them from (below). The limit's key must take a
- * string, the one `rateLimit` counts by.
- */
-export function redisStore(limit: BoundRateLimit<string>): RateLimitStore;
-/**
- * A wired rate limit with its definition: the store declares the definition's
- * `limit` and `per` as its `policy`, so `rateLimit({ store })` takes `limit`
- * and `windowMs` from it and the numbers are written once. (`@nxgt/redis`
- * 0.6 does not expose a bound limit's rate, so the definition that wired it
- * is given beside it; a definition of another name than the bound limit's is refused.)
- *
- * ```ts
- * app.use(rateLimit({ store: redisStore(handle.limits.api, api) }));
+ * app.use(rateLimit({ store: redisStore(handle.limits.api) }));
  * ```
  *
  * A `limit` or `windowMs` given to `rateLimit` too must equal the
- * definition's, or `rateLimit()` throws at declaration.
+ * definition's, or `rateLimit()` throws at declaration. The limit's key must
+ * take a string, the one `rateLimit` counts by.
+ */
+export function redisStore(limit: BoundRateLimit<string>): PolicyStore;
+/**
+ * A bound rate limit with its definition beside it.
+ *
+ * @deprecated The bound limit carries its definition since `@nxgt/redis`
+ * 0.7: `redisStore(handle.limits.api)` alone is the same store. Given both,
+ * the definition's `limit` and `per` must equal the bound limit's, or this
+ * throws.
  */
 export function redisStore(
 	limit: BoundRateLimit<string>,
@@ -79,9 +74,10 @@ export function redisStore(
 	options?: RedisStoreOptions | RateLimitDefinition<string>,
 ): RateLimitStore {
 	if (isWiredLimit(target)) {
-		return options === undefined
-			? wiredStore(target)
-			: policyStore(target, options as RateLimitDefinition<string>);
+		return policyStore(
+			target,
+			options as RateLimitDefinition<string> | undefined,
+		);
 	}
 	if (options === undefined || !('name' in options)) {
 		throw new TypeError(
@@ -165,19 +161,19 @@ function wiredStore(limit: BoundRateLimit<string>): RateLimitStore {
 	};
 }
 
-/** A wired limit with its definition: the same store, declaring the definition's rate as its policy. */
+/**
+ * A bound limit as a store, declaring the rate of its `definition` as its
+ * policy. A definition given beside it must hold the same rate.
+ */
 function policyStore(
 	limit: BoundRateLimit<string>,
-	definition: RateLimitDefinition<string>,
+	given?: RateLimitDefinition<string>,
 ): PolicyStore {
-	// A bound limit's key is `<prefix>:<name>:<key>`: a definition of another
-	// name is not the one that wired it.
-	const probe = definition.key('probe');
-	if (!limit.keyFor(probe).endsWith(`${definition.name}:${probe}`)) {
+	const { limit: count, per } = limit.definition;
+	if (given !== undefined && (given.limit !== count || given.per !== per)) {
 		throw new TypeError(
-			`redisStore: the definition "${definition.name}" is not the one that wired this limit (it counts under "${limit.keyFor(probe)}")`,
+			`redisStore: the definition "${given.name}" (${given.limit} per ${given.per}ms) is not the rate this limit counts by (${count} per ${per}ms)`,
 		);
 	}
-	const policy: Policy = { limit: definition.limit, windowMs: definition.per };
-	return { ...wiredStore(limit), policy };
+	return { ...wiredStore(limit), policy: { limit: count, windowMs: per } };
 }
