@@ -1,5 +1,13 @@
 # @alxia/rate-limit
 
+## 0.4.2
+
+### Patch Changes
+
+- [#160](https://github.com/softistx/alxia/pull/160) [`137c5c8`](https://github.com/softistx/alxia/commit/137c5c8b618b961674c63a6242568e6b800939ab) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The README, guide and troubleshooting key a limit by `ip` behind a proxy with core's `forwardedIp`, not the first entry of `X-Forwarded-For`, which a client writes and so bypasses the limit; a spec proves the spoofed header buys no allowance.
+- Updated dependencies [[`137c5c8`](https://github.com/softistx/alxia/commit/137c5c8b618b961674c63a6242568e6b800939ab)]:
+  - @alxia/core@0.6.0
+
 ## 0.4.1
 
 ### Patch Changes
