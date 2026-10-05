@@ -140,4 +140,36 @@ describe("a group's middlewares, on a request no route matches under its prefix"
 			await status(app, '/admin/missing', { headers: { 'x-role': 'admin' } }),
 		).toBe(404);
 	});
+
+	test('a group without a prefix is a scope alone: nothing it holds runs on a request no route matches', async () => {
+		const app = alxia()
+			.group((scope) =>
+				scope.use(guard).get('/secret', ({ reply }) => reply(200, 'secret')),
+			)
+			.get('/public', ({ reply }) => reply(200, 'public'));
+		expect(await status(app, '/secret')).toBe(401);
+		expect(await status(app, '/missing')).toBe(404);
+		expect(await status(app, '/secret', { method: 'DELETE' })).toBe(405);
+		expect(await status(app, '/public')).toBe(200);
+	});
+
+	test('a group inside a mounted app guards its prefix, as it does on the app itself', async () => {
+		const admin = alxia().group('/admin', (g) =>
+			g.use(guard).get('/secret', ({ reply }) => reply(200, 'secret')),
+		);
+		const bare = alxia().group((g) =>
+			g.use(guard).get('/secret', ({ reply }) => reply(200, 'secret')),
+		);
+		for (const [app, prefix] of [
+			[alxia().plugin(admin), ''],
+			[alxia({ prefix: '/api' }).plugin(admin), '/api'],
+			[alxia({ prefix: '/p' }).group('/admin', (g) => g.use(guard)), '/p'],
+		] as const) {
+			expect(await status(app, `${prefix}/admin/missing`)).toBe(401);
+			expect(await status(app, `${prefix}/missing`)).toBe(404);
+		}
+		const mounted = alxia().plugin(bare);
+		expect(await status(mounted, '/secret')).toBe(401);
+		expect(await status(mounted, '/missing')).toBe(404);
+	});
 });

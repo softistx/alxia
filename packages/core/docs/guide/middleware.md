@@ -116,7 +116,9 @@ Three rules follow, each spec'd:
   g.use(guard).get('/secret', …))` is the guard's 401, not a 405 whose
   `Allow` tells what is there — and on nothing else: no route declared
   after the group, no request outside its prefix. A group without a prefix
-  of its own adds none to unmatched requests. A plugin with a prefix of its
+  of its own adds none to unmatched requests, so `DELETE /secret` on its
+  guarded route is still a 405 with its `Allow`: to keep that from an anonymous
+  client, give the group a prefix or use `use(path, guard)`. A plugin with a prefix of its
   own (`alxia({ prefix: '/todos' })`, `defineRoutes('/todos')`) is such a
   group once mounted. A plugin without one (`app.plugin(otherApp)`) gives
   its middlewares to the app: the routes declared after it, and every

@@ -687,6 +687,43 @@ the observers also see its reply: an observer settles `next()` and the error
 goes on, so a `try`/`catch` catches it wherever it is declared
 ([Middleware](middleware.md)).
 
+#### Refusals of some routes only
+
+A middleware given to `use` answers the routes declared after it. To answer
+the refusals of some routes alone, give the same middleware among those
+routes' own, before their `validate`; the others keep the default 400:
+
+```ts
+import { alxia, defineMiddleware, problem, refusalOf, validate } from '@alxia/core';
+import { z } from 'zod';
+
+const asProblem = defineMiddleware(async (_ctx, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		const refusal = refusalOf(error);
+		if (refusal === undefined) throw error; // not a refusal: the default answer
+		return problem({
+			type: 'https://example.com/problems/invalid-request',
+			status: refusal.kind === 'body_limit' ? 413 : 422,
+			detail: refusal.kind === 'validation' ? `the ${refusal.part} is invalid` : 'the body is too large',
+		});
+	}
+});
+
+const app = alxia()
+	.post('/users', asProblem, validate({ body: z.object({ name: z.string() }) }), ({ body, reply }) =>
+		reply(201, body),
+	) // a refusal here is a problem+json
+	.post('/tags', validate({ body: z.object({ label: z.string() }) }), ({ body, reply }) =>
+		reply(201, body),
+	); // the default 400
+```
+
+This is what `onRefusal` did in 0.3, for the routes declared after it; the
+handler stands in front of the `validate` it answers for, so it covers the
+routes it is given to and no others.
+
 ## What the types refuse
 
 `validate`'s schemas are checked against the path and against

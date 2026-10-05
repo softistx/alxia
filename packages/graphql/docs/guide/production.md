@@ -125,10 +125,14 @@ declared after it: the bytes are counted as they arrive, and reading stops
 at the limit. A query is a few kilobytes: 100 KiB is generous. A mutation
 that takes a file by `multipart` needs a larger limit on a route of its own.
 
-Put the call before `graphql(...)`, as in [Together](#together). The
-refusal is Yoga's to answer here: it reads the body itself and reports a
-body it could not read as `400`, `POST body sent invalid JSON.`, so a client
-sees a 400, not the 413 a plain route answers. The memory is capped either way.
+Put the call before `graphql(...)`, as in [Together](#together). Yoga reads
+the body itself and would report a body it could not read as `400`, `POST
+body sent invalid JSON.`; `@alxia/graphql` throws core's `ContentTooLargeError`
+again instead, so a client gets the 413 a plain route answers, in the app's
+error format (`application/problem+json` under `errors: 'problem'`), with a
+`Content-Length` or without one (a chunked body). Whatever else Yoga cannot
+parse is still its 400, and its parser's own error is never sent
+(`extensions.originalError` is removed).
 
 ## CSRF for a cookie-authenticated API
 
@@ -205,7 +209,7 @@ export const production = base.fork()
 	.use(logger())
 	.use(limitTo(120)) // the probes above it are not counted
 	.use(jsonOnly)
-	.bodyLimit(100 * 1024) // a body past 100 KiB is refused (Yoga answers 400), for the routes below
+	.bodyLimit(100 * 1024) // a body past 100 KiB is refused (a 413), for the routes below
 	.plugin((app) =>
 		graphql(app, {
 			schema,
