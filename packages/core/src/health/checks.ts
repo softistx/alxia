@@ -63,16 +63,18 @@ const pending = new WeakMap<HealthCheck, Promise<'ok' | 'failed'>>();
 function runOf(check: HealthCheck): Promise<'ok' | 'failed'> {
 	let run = pending.get(check);
 	if (run !== undefined) return run;
-	run = (async () => {
+	const settled = (async () => {
 		try {
 			return (await check()) === false ? 'failed' : 'ok';
 		} catch {
 			return 'failed';
-		} finally {
-			pending.delete(check);
 		}
 	})();
-	// `finally` runs after this: `await check()` defers it at least a tick.
+	// Cleared once settled, a tick later at least: a check that throws
+	// before its first `await` settles at once, and must not stay joined.
+	run = settled.finally(() => {
+		if (pending.get(check) === run) pending.delete(check);
+	});
 	pending.set(check, run);
 	return run;
 }

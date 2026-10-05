@@ -66,3 +66,17 @@ describe('a hung check', () => {
 		expect(started).toBe(2);
 	});
 });
+
+describe('a check that throws before its first await', () => {
+	test('recovers once its dependency does: its failed run is not joined again', async () => {
+		let up = false;
+		const db = () => {
+			if (!up) throw new Error('not connected');
+			return true;
+		};
+		const app = alxia().plugin(health({ cache: 0, checks: { db } }));
+		expect((await app.request('/ready')).status).toBe(503);
+		up = true;
+		expect((await app.request('/ready')).status).toBe(200);
+	});
+});

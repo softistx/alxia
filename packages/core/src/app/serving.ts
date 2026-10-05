@@ -170,8 +170,10 @@ async function runStopHooks(
 	} finally {
 		clearTimeout(timer);
 	}
+	// The last hook settled in the same tick as the timer: all of them ran.
+	if (index >= hooks.length) return;
 	run.catch(() => {}); // a hook that fails after the timeout is not news
-	const name = (hooks[index] as StopHook).name || 'anonymous';
+	const name = hooks[index]?.name || 'anonymous';
 	const left = hooks.length - index - 1;
 	throw new Error(
 		`onStop hook ${name} (${index + 1} of ${hooks.length}) did not finish within ${timeout} ms${left > 0 ? `; ${left} after it not run` : ''}: raise listen()'s stopTimeout, or make it settle`,
