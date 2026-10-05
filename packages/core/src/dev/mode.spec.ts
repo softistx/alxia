@@ -3,6 +3,9 @@
  * is `production` or `test`.
  */
 import { afterEach, expect, test } from 'bun:test';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { alxia } from '../app/alxia';
 import { devOf } from './mode';
 
@@ -48,7 +51,7 @@ test('read when the app is made, and anything but a boolean throws', async () =>
 test('a bundle built without NODE_ENV still reads it when it runs', async () => {
 	// `bun build` inlines `process.env.NODE_ENV`: the switch must not be
 	// decided by the build's mode.
-	const dir = `${import.meta.dir}/../../.bundle-probe`;
+	const dir = mkdtempSync(join(tmpdir(), 'alxia-dev-bundle-'));
 	const entry = `${dir}/entry.ts`;
 	await Bun.write(
 		entry,
@@ -74,6 +77,6 @@ test('a bundle built without NODE_ENV still reads it when it runs', async () => 
 		});
 		expect(run.stdout.toString().trim()).toBe('false');
 	} finally {
-		await Bun.$`rm -rf ${dir}`.quiet();
+		rmSync(dir, { recursive: true, force: true });
 	}
 });
