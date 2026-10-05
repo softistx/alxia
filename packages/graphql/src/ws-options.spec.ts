@@ -75,6 +75,17 @@ describe('graphql({ ws: { path } })', () => {
 		expect(created).toBe(1);
 	});
 
+	test("a socket at '/' under the group's prefix, run by the endpoint's Yoga", async () => {
+		let created = 0;
+		const at = serve({ path: '/' }, [{ onYogaInit: () => void created++ }]);
+		expect(await ok(at('/api'))).toEqual([{ data: { ok: true } }]);
+		const http = new URL(at('/api/graphql'));
+		http.protocol = 'http:';
+		http.searchParams.set('query', '{ ok }');
+		expect(await (await fetch(http)).json()).toEqual({ data: { ok: true } });
+		expect(created).toBe(1);
+	});
+
 	test("a path that does not start with '/' is a compile error", () => {
 		const _never = () =>
 			alxia().plugin((app) =>

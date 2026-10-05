@@ -69,7 +69,10 @@ interface Paths {
  * prefix of each app it is mounted into included, then its own `path`.
  */
 function endpointOf(route: string, paths: Paths): string {
-	return route.slice(0, route.length - paths.socket.length) + paths.endpoint;
+	// A path of `/` adds nothing to a prefix: `/api` + `/` is `/api`.
+	const own = paths.socket === '/' ? '' : paths.socket;
+	const at = paths.endpoint === '/' ? '' : paths.endpoint;
+	return route.slice(0, route.length - own.length) + at || '/';
 }
 
 /**
