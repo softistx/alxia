@@ -18,7 +18,7 @@ import type { Method } from './types';
 /** `app[method](path, ...rest)`: a route, behind the middlewares in force. */
 export function addRoute(
 	state: AppState,
-	method: Method,
+	method: Method | 'ALL',
 	path: string,
 	...rest: unknown[]
 ): void {

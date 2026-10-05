@@ -19,7 +19,11 @@ export const owner = defineAppMiddleware(({ user }, next) =>
 
 export const todos = defineRoutes('/todos')
 	.use(owner)
-	.get('/', (ctx) => ctx.reply(200, { text: greet(ctx), owner: ctx.owner }));
+	.get('/', (ctx) => ctx.reply(200, { text: greet(ctx), owner: ctx.owner }))
+	// An all route reads it the same.
+	.all('/any/*', (ctx) =>
+		ctx.reply(200, { owner: ctx.owner, by: ctx.user.id }),
+	);
 
 // @ts-expect-error: an app with no `user` cannot mount the routes
 alxia().plugin(todos);

@@ -154,7 +154,11 @@ function wanted(
 	});
 }
 
-/** The operations no route serves. `HEAD` is served by the `GET` route. */
+/**
+ * The operations no route serves. `HEAD` is served by the `GET` route. An
+ * `all` route (`ALL`) serves none: it answers every method, but declares no
+ * operation's, so it is `extra`.
+ */
 function unrouted(app: Routed, all: readonly Wanted[]): Wanted[] {
 	const routed = new Set(app.routes.map(keyOf));
 	return all.filter(

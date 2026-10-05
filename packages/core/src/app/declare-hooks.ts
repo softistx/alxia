@@ -89,6 +89,9 @@ export function lifecycleHook<Name extends 'onStart' | 'onStop'>(name: Name) {
 	};
 }
 
+export const onStart = lifecycleHook('onStart');
+export const onStop = lifecycleHook('onStop');
+
 /** `app.parser(type, parse)`: a body parser, before the built-in ones. */
 export function parser(
 	state: AppState,

@@ -3,6 +3,7 @@
  * socket's upgrade.
  */
 
+import { routeAt } from '../router/router';
 import { failed } from './answers';
 import { handle, unmatched } from './boundary';
 import type { Definition, Runtime } from './definition';
@@ -73,7 +74,7 @@ function found(
 	}
 	const methods = router.methodsAt(path);
 	if (methods === undefined) return undefined;
-	const value = methods.get(method);
+	const value = routeAt(methods, method);
 	if (value !== undefined) {
 		return { value, params: router.paramsAt(path, url.pathname) };
 	}
@@ -82,7 +83,8 @@ function found(
 
 /**
  * The route the request reached, run: the socket a `websocket` upgrade
- * asks for, a `GET` for a `HEAD` no route takes, or the 404, 405 or 426
+ * asks for, a `GET` for a `HEAD` no `HEAD` route takes, before the path's
+ * `all` route, or the 404, 405 or 426
  * when none answers, behind the app's chain (`unmatched`) — a 405's and a
  * 426's behind the chains of the routes at its path too.
  */
@@ -114,13 +116,9 @@ async function route(
 		}
 	}
 	let match = find(request.method);
-	let head = false;
 	if (request.method === 'HEAD' && match !== undefined && 'allowed' in match) {
 		const get = find('GET');
-		if (get !== undefined && 'value' in get) {
-			match = get;
-			head = true;
-		}
+		if (get !== undefined && 'value' in get) match = get;
 	}
 	if (match === undefined) return unmatched(runtime, ctx, 404);
 	if ('allowed' in match) {
@@ -142,7 +140,8 @@ async function route(
 		globals,
 		runtime.validateResponses,
 	);
-	return head
+	// A `HEAD` the `GET` or the `all` route answered is sent without a body.
+	return request.method === 'HEAD' && definition.method !== 'HEAD'
 		? new Response(null, {
 				status: response.status,
 				headers: response.headers,

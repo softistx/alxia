@@ -171,6 +171,9 @@ export function hooked() {
 		.post('/:id', busy, validate({ body: Ping }), ({ body, reply }) =>
 			reply(200, body),
 		)
+		.all('/any/:id', canSee, loaded, ({ loadedAt, reply }) =>
+			reply(200, loadedAt ?? ''),
+		)
 		.route(
 			{ method: 'PUT', path: '/:id', schema: { body: Ping } } as const,
 			canSee,
@@ -188,6 +191,7 @@ export function methods() {
 	const app = alxia().derive(() => ({ user: 'u' }));
 	return {
 		get: app.get,
+		all: app.all,
 		ws: app.ws,
 		static: app.static,
 		file: app.file,

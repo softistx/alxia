@@ -19,6 +19,24 @@ interface Entry<Value> {
 
 type Found<Value> = [Entry<Value>, Record<string, string>];
 
+/** The method an `all` route is declared under: every method its path has no route of its own for. */
+export const ALL = 'ALL';
+
+/**
+ * What `method` reaches among the routes of one path: its own route, else
+ * the path's `ALL` one. Not for a `HEAD` the path's `GET` answers, which
+ * the pipeline serves without its body, nor for a socket's upgrade.
+ */
+export function routeAt<Value>(
+	methods: ReadonlyMap<string, Value>,
+	method: string,
+): Value | undefined {
+	const own = methods.get(method);
+	if (own !== undefined || method === 'WS') return own;
+	if (method === 'HEAD' && methods.has('GET')) return undefined;
+	return methods.get(ALL);
+}
+
 /** What `match` found: the route, or the methods its path allows instead. */
 export type Match<Value> =
 	| {
@@ -117,7 +135,7 @@ export class Router<Value> {
 		if (found === undefined) return undefined;
 		const [entry, params] = found;
 		const path = entry.compiled.path;
-		const value = entry.methods.get(method);
+		const value = routeAt(entry.methods, method);
 		if (value !== undefined) return { path, value, params };
 		return { path, allowed: [...entry.methods.keys()] };
 	}

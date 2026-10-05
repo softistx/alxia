@@ -121,6 +121,27 @@ describe('matchesSpec', () => {
 		expect(() => matchesSpec(app, [head, get])).not.toThrow();
 	});
 
+	test('an all route covers no operation: it is extra, and fails under strict', () => {
+		const app = alxia().all('/pets/*', ({ reply }) => reply(200, 'x'));
+		expect(() => matchesSpec(app, { getPet })).toThrow(
+			new TypeError(
+				'matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet)',
+			),
+		);
+		// Beside the operation's own route, it is reported, never matched.
+		const both = alxia()
+			.route(getPet, ({ reply }) => reply.notFound({ title: 'x' }))
+			.all('/pets/:petId', ({ reply }) => reply(200, 'x'));
+		expect(matchesSpec(both, { getPet }).extra).toEqual([
+			{ method: 'ALL', path: '/pets/:petId' },
+		]);
+		expect(() => matchesSpec(both, { getPet }, { strict: true })).toThrow(
+			new TypeError(
+				'matchesSpec(): 1 route has no operation: ALL /pets/:petId',
+			),
+		);
+	});
+
 	test('exclude: under strict, a route the document does not have to declare', () => {
 		const app = routed().get('/health', ({ reply }) => reply(200, 'ok'));
 		const exclude = (route: { path: string }) => route.path === '/health';
