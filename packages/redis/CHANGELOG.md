@@ -1,5 +1,16 @@
 # @alxia/redis
 
+## 0.5.0
+
+### Minor Changes
+
+- [#158](https://github.com/softistx/alxia/pull/158) [`990ab0b`](https://github.com/softistx/alxia/commit/990ab0ba8fc72d392250d48a1079938320fae3fe) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `redisStore(handle.limits.api)` alone carries the rate: it reads `limit` and `per` from the bound limit's `definition` (`@nxgt/redis` 0.7), so `rateLimit({ store: redisStore(handle.limits.api) })` needs no numbers and returns a `PolicyStore`. A limit bound by hand with `bindRateLimit` does the same. The two-argument form, `redisStore(bound, api)`, still works and is deprecated: it now compares `limit` and `per` rather than the name, and throws on a mismatch (a definition of another name and the same rate is accepted). `idempotency(handle.idempotency.orders)` names itself from the definition in its warning. The peer is `@nxgt/redis` `^0.7.0`: the single-argument form has no rate to read from an older bound limit.
+
+### Patch Changes
+
+- Updated dependencies [[`990ab0b`](https://github.com/softistx/alxia/commit/990ab0ba8fc72d392250d48a1079938320fae3fe)]:
+  - @alxia/rate-limit@0.4.1
+
 ## 0.4.0
 
 ### Minor Changes
