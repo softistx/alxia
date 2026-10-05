@@ -37,6 +37,10 @@ and `X-Forwarded-Host`, and a `rewrite` that returns an absolute URL. A
   an alxia upstream, core's `forwardedIp({ trusted: 1 })`.
 - `X-Forwarded-Proto` and `-Host` are overwritten, unless `trustForwarded` is
   on. Turn it on only behind a proxy you trust, which itself overwrites them.
+- With `alxia({ proxy: trustProxy(…) })`, the values written are core's
+  `originalUrl(ctx)`: what the outermost trusted proxy said, so a chain of
+  alxia apps stays truthful with no `trustForwarded`. A client that is no
+  trusted proxy changes nothing, whatever headers it sends.
 
 ## Strip what must not cross
 

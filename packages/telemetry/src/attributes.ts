@@ -24,7 +24,11 @@ export function serverFailed(status: number): boolean {
 	return status >= 500;
 }
 
-/** What is known of a request before routing: the route is not, yet. */
+/**
+ * What is known of a request before routing: the route is not, yet. `url`
+ * is `originalUrl(ctx)`, so `url.scheme`, `server.address` and
+ * `server.port` are the ones the client used behind a trusted proxy.
+ */
 export function requestAttributes(
 	url: URL,
 	method: string,

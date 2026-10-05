@@ -3,6 +3,7 @@
  * (RFC 9110 §7.6.1), the forwarding ones set, `Host` chosen, then the
  * app's own edits.
  */
+import { originalUrl } from '@alxia/core';
 import type { HeaderEdit, Plan, ProxyContext } from './options';
 
 /** Headers that describe one connection, never forwarded. */
@@ -43,8 +44,11 @@ export function requestHeaders(
 ): Headers {
 	const headers = new Headers(request.headers);
 	stripHopByHop(headers);
-	const host = request.headers.get('host') ?? ctx.url.host;
-	const proto = ctx.url.protocol.slice(0, -1);
+	// What the client asked for: what a trusted proxy said, else the request's own.
+	const origin = originalUrl(ctx);
+	const received = request.headers.get('host') ?? ctx.url.host;
+	const host = origin.host === ctx.url.host ? received : origin.host;
+	const proto = origin.protocol.slice(0, -1);
 	const client = clientOf(ctx);
 	if (plan.xForwarded) {
 		if (client !== undefined) {
@@ -66,7 +70,7 @@ export function requestHeaders(
 		const prior = headers.get('forwarded');
 		headers.set('forwarded', prior === null ? element : `${prior}, ${element}`);
 	}
-	headers.set('host', plan.preserveHost ? host : plan.target.host);
+	headers.set('host', plan.preserveHost ? received : plan.target.host);
 	return headers;
 }
 
