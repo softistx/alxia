@@ -273,7 +273,7 @@ export default createServer({
 `ctx.ip` is the client's and React Router's `request.url` the URL the
 client asked for, `https://` and the public host, so a loader can build an
 absolute link from it; from any other connection the forwarded headers are
-ignored. [More](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#behind-a-proxy-proxy)
+ignored. A server of your own gives `alxia({ proxy })` the same option. [More](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#behind-a-proxy-proxy)
 
 `build`, `mode` and `client` override what the plugin wires;
 `client: false` serves no client files, so you can serve them yourself.
@@ -428,7 +428,7 @@ has the commented file, and what to copy for a package left external.
 
 | export | |
 | --- | --- |
-| `createServer(options?)` | the server of `app/server.ts`. `beforeAll`, `configure`, `getLoadContext`, `build`, `mode`, `client`, `listen`, `onListen` |
+| `createServer(options?)` | the server of `app/server.ts`. `beforeAll`, `configure`, `getLoadContext`, `proxy` (`alxia({ proxy })`'s, `trustProxy(…)` from `@alxia/core`), `build`, `mode`, `client`, `listen`, `onListen` |
 | `ServerOptions<Before, App>` | its options |
 | `ReactRouterServer<App>` | what it returns: `create(wiring)` makes the app, `start(app)` listens |
 | `ServerWiring` | what `create` takes: `build`, `mode`, `client` |

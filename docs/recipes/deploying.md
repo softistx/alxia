@@ -166,8 +166,11 @@ answered 403, while the platform's probes, which send none, still reach
 ([Behind a proxy](../../packages/core/docs/guide/serving.md#behind-a-proxy-proxy)):
 
 ```ts no-check
-alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
+import { alxia, trustProxy } from '@alxia/core';
+
+const app = alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
 ```
+
 Use [a shared store](caching-and-rate-limiting.md) when there are several
 replicas.
 
