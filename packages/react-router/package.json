@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/react-router",
-	"version": "0.7.1",
+	"version": "0.7.2",
 	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served",
 	"license": "MIT",
 	"type": "module",

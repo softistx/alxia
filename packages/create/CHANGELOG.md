@@ -1,5 +1,17 @@
 # @alxia/create
 
+## 0.4.0
+
+### Minor Changes
+
+- [#198](https://github.com/softistx/alxia/pull/198) [`b1d7af1`](https://github.com/softistx/alxia/commit/b1d7af1c466aff102d4e49fc4036ea9127c09911) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `api` and `graphql` templates take an optional `TRUSTED_PROXIES`. In `src/env.ts` (`defineEnv`) it is comma-separated CIDR ranges or addresses, each validated, listed in `.env.example`; set, `src/context.ts`'s base is built with `proxy: trustProxy({ trusted, untrusted: 'refuse' })`, so a trusted proxy's `X-Forwarded-For` sets `ctx.ip` and a forwarding header from any other connection is refused, while a request with none, a health probe's, passes. Unset, nothing changes. Each template has a `src/proxy.spec.ts` that calls `app.fetch` with a stub peer; the READMEs, the guide and the deploying recipe say how.
+
+### Patch Changes
+
+- [#200](https://github.com/softistx/alxia/pull/200) [`79fbd81`](https://github.com/softistx/alxia/commit/79fbd81a9e1d9e72cbd9d733085fbc8d73d3ed72) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects install `@alxia/core` with `app.all`, one route for every method at a path.
+
+- [#202](https://github.com/softistx/alxia/pull/202) [`c7c994a`](https://github.com/softistx/alxia/commit/c7c994a48eeaa4b069bc81e0eeb73aa7217dd12e) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `api` and `graphql` templates have a `src/env.spec.ts` that feeds `env.ts` a malformed `TRUSTED_PROXIES` and checks the error naming the entry, and the troubleshooting page has an entry for the 403 an untrusted peer gets.
+
 ## 0.3.5
 
 ### Patch Changes
