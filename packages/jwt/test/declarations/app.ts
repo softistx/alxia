@@ -40,3 +40,19 @@ export function guardedBy<S extends StandardSchemaV1>(schema: S) {
 export function guard() {
 	return bearer({ jwt, schema: Claims });
 }
+
+const idp = createJwt({ discovery: 'https://idp.example.com/realms/acme' });
+
+export function guardedByIdp() {
+	return alxia()
+		.use(bearer({ jwt: idp, schema: Claims }))
+		.get('/me', ({ user, reply }) => reply(200, user.role));
+}
+
+// Refused by the types: both sources, and an algorithm a key set cannot verify.
+// @ts-expect-error jwks or discovery, not both
+createJwt({ jwks: 'https://a.example/jwks', discovery: 'https://a.example' });
+// @ts-expect-error HS256 is never verified by a key set
+createJwt({ jwks: 'https://a.example/jwks', algorithms: ['HS256'] });
+// @ts-expect-error a verifier by key set cannot sign
+idp.sign({});

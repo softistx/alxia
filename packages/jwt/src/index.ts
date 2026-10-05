@@ -6,13 +6,17 @@ export {
 	type UnauthorizedBody,
 	type UnauthorizedProblem,
 } from './bearer';
+export type { Jwk, JwksAlgorithm } from './jwk';
 export {
 	type Algorithm,
 	createJwt,
 	type HmacAlgorithm,
+	type JwksJwt,
+	type JwksOptions,
 	type Jwt,
 	type JwtClaims,
 	type JwtOptions,
 	type KeyAlgorithm,
+	type Verifier,
 	type VerifyResult,
 } from './jwt';

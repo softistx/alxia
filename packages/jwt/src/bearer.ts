@@ -15,10 +15,10 @@ import {
 	type StandardSchemaV1,
 	type ValidationIssue,
 } from '@alxia/core';
-import type { Jwt, JwtClaims, VerifyResult } from './jwt';
+import type { JwtClaims, Verifier, VerifyResult } from './jwt';
 
 export interface BearerOptions<Schema extends StandardSchemaV1 | undefined> {
-	readonly jwt: Jwt;
+	readonly jwt: Verifier;
 	/** Checks the claims: what the routes behind the guard read as `user`. */
 	readonly schema?: Schema;
 	/** Reads the token from this cookie when no `Authorization` header carries one. */

@@ -7,6 +7,14 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
+- **Tokens from an identity provider.** `createJwt({ jwks })` and
+  `createJwt({ discovery })` verify the tokens of Keycloak, Auth0, Ory or
+  Cognito by the keys they publish: found by `kid`, cached by
+  `Cache-Control` or `cacheMs`, refetched once on an unknown `kid` (never
+  more often than `refetchMs`), kept through an outage for `staleMs`, failing
+  closed otherwise. `RS*`, `PS*`, `ES256`, `ES384` and `EdDSA`; `alg: none`,
+  `HS*` and an algorithm the key's type does not allow are refused
+  ([guide](guide/jwks.md)).
 - **`bearer` as a middleware.** `app.use(bearer({ jwt }))` is the form;
   `app.plugin(bearer(…))`, deprecated in 0.4, was removed in 0.5. Given to the app, the guard
   also refuses a request no route matches, before its 404, and `Bearer<Schema>`
@@ -19,7 +27,7 @@ number on it. Every release, with each change it made, is in
 
 ## Next
 
-Nothing scheduled yet.
+- **`ES512`**, once Web Crypto's P-521 is worth a test matrix of its own.
 
 ## Later
 
