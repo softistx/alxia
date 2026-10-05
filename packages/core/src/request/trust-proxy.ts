@@ -79,6 +79,21 @@ function written<T>(entries: readonly T[], client: ClientAt): T | undefined {
 	return entries[Math.max(0, entries.length - client.hops)];
 }
 
+/**
+ * Whether the entries show the request came through the proxies: under a
+ * hop count, which checks no connection, only when the entry it names is
+ * an address — fewer entries than hops, or one no proxy would write, is a
+ * request that may have bypassed them, whose scheme and host are then not
+ * read, as its address is not. Ranges and a function checked the peer.
+ */
+function passed(
+	trust: Trust,
+	entries: readonly (ParsedIp | undefined)[],
+	client: ClientAt,
+): boolean {
+	return !('hops' in trust) || entries[client.at] !== undefined;
+}
+
 function originOf(proto: string | undefined, host: string | undefined) {
 	const protocol = protocolOf(proto);
 	const name = hostOf(host);
@@ -95,7 +110,8 @@ const fromForwarded: Reader = (headers, trust, withOrigin) => {
 		element.for === undefined ? undefined : parseIp(element.for),
 	);
 	const client = clientAt(trust, entries);
-	if (!withOrigin) return { at: entries[client.at], origin: NONE };
+	if (!withOrigin || !passed(trust, entries, client))
+		return { at: entries[client.at], origin: NONE };
 	const params = written(elements, client)?.params;
 	return {
 		at: entries[client.at],
@@ -108,7 +124,8 @@ function fromLists(header: string): Reader {
 	return (headers, trust, withOrigin) => {
 		const entries = listOf(headers.get(header)).map(parseIp);
 		const client = clientAt(trust, entries);
-		if (!withOrigin) return { at: entries[client.at], origin: NONE };
+		if (!withOrigin || !passed(trust, entries, client))
+			return { at: entries[client.at], origin: NONE };
 		const proto = written(listOf(headers.get('x-forwarded-proto')), client);
 		const host = written(listOf(headers.get('x-forwarded-host')), client);
 		return { at: entries[client.at], origin: originOf(proto, host) };

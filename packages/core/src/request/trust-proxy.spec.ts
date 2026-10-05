@@ -43,6 +43,7 @@ describe('hops', () => {
 
 	test('what the client wrote left of the proxies is never read', () => {
 		const headers = {
+			'x-forwarded-for': '6.6.6.6, 203.0.113.9',
 			'x-forwarded-proto': 'https, http',
 			'x-forwarded-host': 'evil.example, example.com',
 		};
@@ -54,8 +55,44 @@ describe('hops', () => {
 	});
 
 	test('fewer entries than hops: the leftmost, which the outermost proxy set', () => {
-		const headers = { 'x-forwarded-proto': 'https' };
+		const headers = {
+			'x-forwarded-for': '203.0.113.9, 10.0.0.2',
+			'x-forwarded-proto': 'https',
+		};
 		expect(read({ trusted: 2 }, headers).origin.protocol).toBe('https:');
+	});
+
+	test('fewer addresses than hops: the proxies were bypassed, nothing is read', () => {
+		const headers = {
+			'x-forwarded-proto': 'https',
+			'x-forwarded-host': 'evil.example',
+		};
+		expect(read({ trusted: 1 }, headers, '8.8.8.8')).toEqual({
+			ip: '8.8.8.8',
+			origin: {},
+			refused: false,
+		});
+		expect(
+			read({ trusted: 2 }, { ...headers, 'x-forwarded-for': '203.0.113.9' })
+				.origin,
+		).toEqual({});
+		expect(
+			read(
+				{ trusted: 1, header: 'forwarded' },
+				{ forwarded: 'proto=https;host=evil.example' },
+			).origin,
+		).toEqual({});
+	});
+
+	test('known unsafe: an outer proxy that appends, an inner one that passes it on', () => {
+		// The client sent evil.example, the outer proxy appended example.com,
+		// the inner one passed the list on: the list cannot tell this from
+		// two proxies appending to a client that sent nothing. Overwrite.
+		const headers = {
+			'x-forwarded-for': '203.0.113.9, 10.0.0.2',
+			'x-forwarded-host': 'evil.example, example.com',
+		};
+		expect(read(ranges, headers).origin.host?.hostname).toBe('evil.example');
 	});
 });
 

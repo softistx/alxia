@@ -232,7 +232,10 @@ is the one the outermost of your proxies wrote, as for the address: with
 proxies (the hop count, or those the ranges found), the leftmost when a
 proxy set the header rather than appending to it; with `Forwarded`, the
 `proto=` and `host=` of the element whose `for=` is the client. What the
-client wrote to the left is never read.
+client wrote to the left is never read. Under a hop count, a request whose
+address entry is missing or malformed — fewer entries than hops, the sign
+it did not come through every proxy — has neither read, as its `ctx.ip` is
+the connection's.
 
 **What is valid.** The scheme is `http` or `https`, in any case; the host
 is a bare `host[:port]` — a name, an IPv4 address, or an IPv6 address in
@@ -243,15 +246,19 @@ the request's URL stands. A `Forwarded` value may be quoted
 (`host="example.com:8443"`); a parameter given twice in one element says
 nothing.
 
-> **Security.** Your outermost proxy must **set** `X-Forwarded-Proto` and
-> `X-Forwarded-Host` (or `Forwarded`), overwriting what the client sent, or
-> append to them: one that passes the client's header on unchanged hands
-> the app a value the client chose, and no reading of it can tell. nginx
-> passes it on unless told otherwise: write
-> `proxy_set_header X-Forwarded-Proto $scheme;` and
-> `proxy_set_header X-Forwarded-Host $host;`. A load balancer such as AWS's
-> sets them. Prefer ranges to a hop count, so a connection that bypasses
-> the proxies is never believed.
+> **Security.** Your outermost proxy must **overwrite**
+> `X-Forwarded-Proto` and `X-Forwarded-Host` (or `Forwarded`) with what it
+> saw, and the proxies behind it pass them on. Appending is safe only when
+> **every** proxy in the chain appends: an outer proxy that appends while
+> an inner one passes the list on hands the app the client's own value
+> (`evil.example, example.com` reads `evil.example`), and one that passes
+> the client's header on unchanged does the same. No reading of the list
+> can tell those apart, and `untrusted: 'refuse'` does not help: the
+> connection is your proxy's. nginx passes the client's header on unless
+> told otherwise: write `proxy_set_header X-Forwarded-Proto $scheme;` and
+> `proxy_set_header X-Forwarded-Host $host;` at the edge. A load balancer
+> such as AWS's overwrites them. Prefer ranges to a hop count, so a
+> connection that bypasses the proxies is never believed.
 
 ### Refusing an untrusted peer
 

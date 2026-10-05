@@ -2123,9 +2123,9 @@ alxia({ proxy: trustProxy({ trusted: 1 }) });
 
 **When:** behind a proxy that terminates TLS, `originalUrl(ctx)` is `http://10.0.0.5:3000/…`, as `ctx.url` is.
 
-**Why:** the scheme and host are read only from a trusted connection, and only when valid: the app has no `proxy` option (`ip: forwardedIp(…)` reads the address alone), the connection is not one `trusted` names, the proxy does not send `X-Forwarded-Proto` and `X-Forwarded-Host` (or `Forwarded` with `header: 'forwarded'`), or what it sends is not `http`, `https` or a bare `host[:port]`. `ctx.url` is never rewritten: read `originalUrl(ctx)`.
+**Why:** the scheme and host are read only from a trusted connection, and only when valid: the app has no `proxy` option (`ip: forwardedIp(…)` reads the address alone), the connection is not one `trusted` names, the proxy does not send `X-Forwarded-Proto` and `X-Forwarded-Host` (or `Forwarded` with `header: 'forwarded'`), or what it sends is not `http`, `https` or a bare `host[:port]`; under a hop count, the address header has fewer entries than hops, or a malformed one where the client stands. With the scheme forwarded and not the host, the request's host and port stay: `https://10.0.0.5:3000/…`. `ctx.url` is never rewritten: read `originalUrl(ctx)`.
 
-**Fix:** declare the proxies with `proxy`, and have the proxy set both headers (nginx: `proxy_set_header X-Forwarded-Proto $scheme;` and `proxy_set_header X-Forwarded-Host $host;`):
+**Fix:** declare the proxies with `proxy`, and have the outermost proxy overwrite both headers (nginx: `proxy_set_header X-Forwarded-Proto $scheme;` and `proxy_set_header X-Forwarded-Host $host;`):
 
 ```ts
 alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) });

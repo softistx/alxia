@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { elementsOf, listOf, unquote } from './forwarded-header';
+import { elementsOf, unquote } from './forwarded-header';
 import { hostOf, protocolOf } from './origin';
 import { trustProxy } from './trust-proxy';
 
@@ -83,21 +83,6 @@ describe('hostOf', () => {
 			`${'a.'.repeat(130)}example`,
 		])
 			expect(hostOf(value)).toBeUndefined();
-	});
-});
-
-describe('the header lists', () => {
-	test('quoted-strings are unquoted, their escapes undone', () => {
-		expect(unquote(' "a\\"b" ')).toBe('a"b');
-		expect(unquote('"')).toBe('"');
-		expect(unquote('plain')).toBe('plain');
-	});
-
-	test('a quote never swallows the entries a proxy appended after it', () => {
-		expect(listOf('"https, http')).toEqual(['"https', 'http']);
-		const [, last] = elementsOf('for="6.6.6.6, for=203.0.113.9;proto=https');
-		expect(last?.for).toBe('203.0.113.9');
-		expect(last?.params.get('proto')).toBe('https');
 	});
 });
 

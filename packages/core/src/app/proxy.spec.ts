@@ -113,6 +113,24 @@ describe('alxia({ proxy })', () => {
 	});
 });
 
+describe('the types', () => {
+	test('what is no proxy reading is a compile error', () => {
+		const refused = () => [
+			// @ts-expect-error: trustProxy uncalled is the factory, not the option
+			alxia({ proxy: trustProxy }),
+			// @ts-expect-error: forwardedIp reads an address, not what proxy reads
+			alxia({ proxy: forwardedIp({ trusted: 1 }) }),
+			// @ts-expect-error: trustProxy is the proxy option, not the ip one
+			alxia({ ip: trustProxy({ trusted: 1 }) }),
+			// @ts-expect-error: untrusted is 'ignore' or 'refuse'
+			trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'reject' }),
+			// @ts-expect-error: trusted is required
+			trustProxy({}),
+		];
+		expect(refused).toBeFunction();
+	});
+});
+
 describe('originalUrl', () => {
 	test('without the option, a copy of ctx.url', async () => {
 		let same: boolean | undefined;
@@ -132,7 +150,14 @@ describe('originalUrl', () => {
 			(ctx) => ctx.reply(200, originalUrl(ctx).href),
 		);
 		const href = async (headers: Record<string, string>) =>
-			(await get(served, '/', headers, PROXY)).text();
+			(
+				await get(
+					served,
+					'/',
+					{ 'x-forwarded-for': '203.0.113.9', ...headers },
+					PROXY,
+				)
+			).text();
 		expect(
 			await href({
 				'x-forwarded-proto': 'https',

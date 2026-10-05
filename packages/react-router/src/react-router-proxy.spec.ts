@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { alxia, trustProxy } from '@alxia/core';
 import { createServer, reactRouter } from '@alxia/react-router';
 import type { ServerBuild } from 'react-router';
-import { browser } from '../test/fixture';
+import { browser, text } from '../test/fixture';
 import { build, loadBuild } from '../test/react-router-helpers';
 
 loadBuild();
@@ -59,6 +59,24 @@ describe('behind a trusted proxy', () => {
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe('');
 		expect(seen).toEqual(['https://example.com/?tab=1']);
+	});
+
+	test("an action reads the body through the request at the client's URL", async () => {
+		const seen: string[] = [];
+		const response = await served(seen).fetch(
+			new Request('http://app.internal:3000/?index', {
+				method: 'POST',
+				headers: {
+					...forwarded,
+					'content-type': 'application/x-www-form-urlencoded',
+				},
+				body: new URLSearchParams({ step: '2' }),
+			}),
+			from('10.0.0.1'),
+		);
+		expect(response.status).toBe(200);
+		expect(text(await response.text())).toContain('<p id="added">added 2</p>');
+		expect(seen).toEqual(['https://example.com/?index']);
 	});
 
 	test('a direct client spoofing the headers keeps the request URL', async () => {

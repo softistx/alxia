@@ -161,8 +161,8 @@ with `proxy` instead: `ctx.ip` reads the same, and `originalUrl(ctx)` is the
 `https://` URL the client asked for, from the proxies' addresses alone. With
 `untrusted: 'refuse'`, forwarding headers from any other connection are
 answered 403, while the platform's probes, which send none, still reach
-`/health` and `/ready`. Have the proxy set `X-Forwarded-Proto` and
-`X-Forwarded-Host` itself
+`/health` and `/ready`. Have the outermost proxy overwrite
+`X-Forwarded-Proto` and `X-Forwarded-Host` with what it saw
 ([Behind a proxy](../../packages/core/docs/guide/serving.md#behind-a-proxy-proxy)):
 
 ```ts no-check
