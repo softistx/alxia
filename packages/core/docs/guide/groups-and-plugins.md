@@ -190,7 +190,10 @@ routes and on a request no route matches under it, before its 404 or 405 —
 a guarded group answers `DELETE /admin/secret` with its 401, not a 405
 whose `Allow` tells what is there — and never on a route declared after
 the group, nor on a request outside it. A group without a prefix of its
-own adds none to unmatched requests. `use(path, ...middlewares)` guards a subtree without
+own adds none to a 404, and still guards the 405 or 426 at its routes'
+paths: `DELETE /secret` on its guarded `GET /secret` is its guard's 401
+([Middleware: which chain a 405 runs](middleware.md#which-chain-a-405-runs)).
+`use(path, ...middlewares)` guards a subtree without
 a group, on the app it also answers a missing path under it, and its
 middlewares may add nothing
 ([Middleware: `use(path, …)`](middleware.md#use-with-a-path)).

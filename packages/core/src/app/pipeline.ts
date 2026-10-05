@@ -38,10 +38,40 @@ export async function serve(
 	}
 }
 
+/** What the router finds for `method`: a route, or the methods its path allows. */
+type Found =
+	| { readonly value: Definition; readonly params: Record<string, string> }
+	| { readonly path: string; readonly allowed: readonly string[] }
+	| undefined;
+
+/**
+ * The route `method` reaches at `url`: matched by the router, or at
+ * `path`, the one `Bun.serve` chose under `listen`.
+ */
+function found(
+	{ router, globals }: Runtime,
+	url: URL,
+	path: string | undefined,
+	method: string,
+): Found {
+	if (path === undefined) {
+		const pages = globals.pages.size === 0 ? undefined : globals.pages.keys();
+		return router.match(method, url.pathname, pages);
+	}
+	const methods = router.methodsAt(path);
+	if (methods === undefined) return undefined;
+	const value = methods.get(method);
+	if (value !== undefined) {
+		return { value, params: router.paramsAt(path, url.pathname) };
+	}
+	return { path, allowed: [...methods.keys()] };
+}
+
 /**
  * The route the request reached, run: the socket a `websocket` upgrade
  * asks for, a `GET` for a `HEAD` no route takes, or the 404, 405 or 426
- * when none answers, behind the app's chain (`unmatched`).
+ * when none answers, behind the app's chain (`unmatched`) — a 405's and a
+ * 426's behind the chains of the routes at its path too.
  */
 async function route(
 	runtime: Runtime,
@@ -49,26 +79,9 @@ async function route(
 	path: string | undefined,
 ): Promise<Response | typeof UPGRADED> {
 	const { router, globals } = runtime;
-	const { request, url } = ctx;
+	const { request } = ctx;
 	const upgrade = request.headers.get('upgrade')?.toLowerCase() === 'websocket';
-	const find = (
-		method: string,
-	):
-		| { readonly value: Definition; readonly params: Record<string, string> }
-		| { readonly allowed: readonly string[] }
-		| undefined => {
-		if (path === undefined) {
-			const pages = globals.pages.size === 0 ? undefined : globals.pages.keys();
-			return router.match(method, url.pathname, pages);
-		}
-		const methods = router.methodsAt(path);
-		if (methods === undefined) return undefined;
-		const value = methods.get(method);
-		if (value !== undefined) {
-			return { value, params: router.paramsAt(path, url.pathname) };
-		}
-		return { allowed: [...methods.keys()] };
-	};
+	const find = (method: string) => found(runtime, ctx.url, path, method);
 
 	if (upgrade) {
 		const socket = find('WS');
@@ -98,9 +111,13 @@ async function route(
 	}
 	if (match === undefined) return unmatched(runtime, ctx, 404);
 	if ('allowed' in match) {
+		// What tells the path's methods runs behind the chains of its routes.
+		const owners = router.methodsAt(match.path)?.values();
 		const allowed = match.allowed.filter((method) => method !== 'WS');
-		if (allowed.length === 0) return unmatched(runtime, ctx, 426);
-		return unmatched(runtime, ctx, 405, allowed);
+		if (allowed.length === 0) {
+			return unmatched(runtime, ctx, 426, undefined, owners);
+		}
+		return unmatched(runtime, ctx, 405, allowed, owners);
 	}
 	const definition = match.value;
 	(ctx as { route: string | undefined }).route = definition.path;

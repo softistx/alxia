@@ -141,7 +141,7 @@ describe("a group's middlewares, on a request no route matches under its prefix"
 		).toBe(404);
 	});
 
-	test('a group without a prefix is a scope alone: nothing it holds runs on a request no route matches', async () => {
+	test('a group without a prefix runs nothing it holds on a 404; it guards the 405 at its routes (guarded-405.spec.ts)', async () => {
 		const app = alxia()
 			.group((scope) =>
 				scope.use(guard).get('/secret', ({ reply }) => reply(200, 'secret')),
@@ -149,7 +149,8 @@ describe("a group's middlewares, on a request no route matches under its prefix"
 			.get('/public', ({ reply }) => reply(200, 'public'));
 		expect(await status(app, '/secret')).toBe(401);
 		expect(await status(app, '/missing')).toBe(404);
-		expect(await status(app, '/secret', { method: 'DELETE' })).toBe(405);
+		expect(await status(app, '/secret', { method: 'DELETE' })).toBe(401);
+		expect(await status(app, '/public', { method: 'DELETE' })).toBe(405);
 		expect(await status(app, '/public')).toBe(200);
 	});
 
