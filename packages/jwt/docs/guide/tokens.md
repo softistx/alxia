@@ -117,7 +117,7 @@ type VerifyResult =
 	| { readonly ok: true; readonly claims: JwtClaims }
 	| {
 			readonly ok: false;
-			readonly reason: 'malformed' | 'algorithm' | 'signature' | 'expired' | 'not_yet_valid' | 'issuer' | 'audience';
+			readonly reason: 'malformed' | 'algorithm' | 'signature' | 'expired' | 'not_yet_valid' | 'issuer' | 'audience' | 'key' | 'keys_unavailable';
 	  };
 ```
 

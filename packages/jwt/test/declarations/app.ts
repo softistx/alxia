@@ -40,3 +40,11 @@ export function guardedBy<S extends StandardSchemaV1>(schema: S) {
 export function guard() {
 	return bearer({ jwt, schema: Claims });
 }
+
+const idp = createJwt({ discovery: 'https://idp.example.com/realms/acme' });
+
+export function guardedByIdp() {
+	return alxia()
+		.use(bearer({ jwt: idp, schema: Claims }))
+		.get('/me', ({ user, reply }) => reply(200, user.role));
+}

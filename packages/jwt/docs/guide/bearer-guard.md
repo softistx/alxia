@@ -117,6 +117,7 @@ interface UnauthorizedBody {
 		| 'missing'                                   // no token found
 		| 'malformed' | 'algorithm' | 'signature'     // from verify
 		| 'expired' | 'not_yet_valid' | 'issuer' | 'audience'
+		| 'key' | 'keys_unavailable'                     // a JWKS verifier only
 		| 'claims';                                   // refused by the schema
 	readonly issues?: readonly ValidationIssue[];   // with 'claims' only
 }

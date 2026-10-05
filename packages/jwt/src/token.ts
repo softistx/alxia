@@ -14,10 +14,10 @@ export interface TokenContext {
 	readonly tolerance: number;
 }
 
-type Failure = Extract<VerifyResult, { ok: false }>;
-type Reason = Failure['reason'];
+export type Failure = Extract<VerifyResult, { ok: false }>;
+export type Reason = Failure['reason'];
 
-const fail = (reason: Reason): Failure => ({ ok: false, reason });
+export const fail = (reason: Reason): Failure => ({ ok: false, reason });
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === 'object' && !Array.isArray(value);
@@ -50,7 +50,7 @@ export async function signToken(
 	return `${head}.${body}.${base64url(new Uint8Array(signature))}`;
 }
 
-interface Decoded {
+export interface Decoded {
 	readonly header: Record<string, unknown>;
 	readonly claims: JwtClaims;
 	/** The signing input, `head.body`: the text the signature covers. */
@@ -59,7 +59,7 @@ interface Decoded {
 }
 
 /** The three parts of `token`, or `undefined` when it is not a JWT of two JSON objects. */
-function decodeToken(token: string): Decoded | undefined {
+export function decodeToken(token: string): Decoded | undefined {
 	const parts = token.split('.');
 	if (parts.length !== 3) return undefined;
 	const [head, body, signature] = parts as [string, string, string];
@@ -83,9 +83,12 @@ function decodeToken(token: string): Decoded | undefined {
 }
 
 /** Why `claims` are refused at `now`, or `undefined` when their times, issuer and audience hold. */
-function checkClaims(
+export function checkClaims(
 	claims: JwtClaims,
-	options: JwtOptions,
+	options: {
+		readonly issuer?: string | undefined;
+		readonly audience?: string | undefined;
+	},
 	tolerance: number,
 ): Reason | undefined {
 	const now = Math.floor(Date.now() / 1000);
