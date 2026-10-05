@@ -242,7 +242,7 @@ const app = alxia()
 ### `TypeError: graphql(app, { ws: { keepAlive: 0 } }): keepAlive is the milliseconds between pings, a positive number, or false for none`
 
 **When:** declaring `graphql(app, { ws: { keepAlive } })` with `0`, a
-negative number or `NaN`; the message names the value given.
+negative number, `NaN` or `Infinity` — anything but a finite positive number; the message names the value given.
 
 **Why:** `keepAlive` is the interval of each socket's pings: `0` would
 ping in a loop.

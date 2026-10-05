@@ -51,7 +51,7 @@ of each kind works against one deployment.
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `path` | `` `/${string}` `` | the endpoint's `path` | where a client opens its socket, under the app's prefix |
-| `keepAlive` | `number \| false` | `12_000` | milliseconds between the WebSocket pings the server sends each socket, so a proxy does not close an idle subscription; `false` for none. Anything but a positive number throws where `graphql()` is declared |
+| `keepAlive` | `number \| false` | `12_000` | milliseconds between the WebSocket pings the server sends each socket, so a proxy does not close an idle subscription; `false` for none. Anything but a finite positive number throws where `graphql()` is declared |
 
 ```ts no-check
 graphql(app, { schema, ws: { path: '/graphql/ws', keepAlive: 30_000 } });
