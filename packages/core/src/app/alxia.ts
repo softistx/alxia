@@ -157,7 +157,8 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 	 * and `SIGTERM` run: readiness turns 503, new connections are refused,
 	 * open sockets close with 1001, the requests in flight finish within
 	 * `shutdownTimeout` — then runs every `onStop` hook. With
-	 * `closeActiveConnections`, the requests in flight are not waited for.
+	 * `closeActiveConnections`, the requests in flight are not waited for, a
+	 * graceful shutdown already running included.
 	 * Called again while it runs, it returns the same promise.
 	 */
 	async stop(closeActiveConnections = false): Promise<void> {

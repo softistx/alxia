@@ -121,6 +121,17 @@ describe('health(): the cache and the shutdown', () => {
 			['/readyz', true],
 			['/users', false],
 		]);
+		const nested = alxia()
+			.group('/ops', (group) => group.plugin(health()))
+			.plugin(alxia({ prefix: '/v1' }).plugin(health()));
+		expect(
+			nested.routes.map((route) => [route.path, isHealthRoute(route)]),
+		).toEqual([
+			['/ops/health', true],
+			['/ops/ready', true],
+			['/v1/health', true],
+			['/v1/ready', true],
+		]);
 	});
 
 	test('a timeout or a cache that is not a number of milliseconds throws', () => {

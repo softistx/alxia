@@ -15,7 +15,7 @@ export const SHUTDOWN_TIMEOUT = 10_000;
 /** A server `listen` started, and how it shuts down: once, however often it is asked. */
 export interface Serving {
 	readonly server: Bun.Server<unknown>;
-	/** Shuts down, as `stop()` describes; the same promise for every call. */
+	/** Shuts down, as `stop()` describes; the same promise for every call, a forced one cutting the drain short. */
 	stop(force: boolean): Promise<void>;
 }
 
@@ -54,6 +54,8 @@ export function startServer(
 	const serving: Serving = {
 		server,
 		stop(force) {
+			// Forced while a graceful drain runs: its connections close now.
+			if (stopping !== undefined && force) void server.stop(true);
 			stopping ??= shutdown(
 				runtime,
 				server,

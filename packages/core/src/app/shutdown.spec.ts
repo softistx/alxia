@@ -60,6 +60,20 @@ describe('stop(): a graceful shutdown', () => {
 		expect(order).toEqual(['onStop']);
 	});
 
+	test('stop(true) during a graceful stop cuts the drain short', async () => {
+		const order: string[] = [];
+		const app = slowApp(order, 2_000);
+		const server = app.listen({ port: 0, signals: false });
+		const slow = fetch(`${server.url.href}slow`).catch(() => 'cut');
+		await Bun.sleep(50);
+		const start = performance.now();
+		const graceful = app.stop();
+		await app.stop(true);
+		await graceful;
+		expect(performance.now() - start).toBeLessThan(1_000);
+		expect(await slow).toBe('cut');
+	});
+
 	test('stop() twice is one shutdown: onStop runs once', async () => {
 		const order: string[] = [];
 		const app = slowApp(order);
