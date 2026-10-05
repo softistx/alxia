@@ -7,116 +7,50 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **One middleware model.** A route takes its middlewares after its path or
-  its options — `app.post(path, { bodyLimit }, auth, validate({ body: Post }), responds({ 201: Post }), handler)` —
-  each a `(ctx, next) => …` written once with `defineMiddleware`. What a
-  middleware passes to `next(added)` the ones after it and the handler read,
-  typed; awaiting `next()` wraps the rest of the route; a reply it returns
-  ends the request. `validate` stands where it is given, so an `auth`
-  before it answers 401 before the body is read, and `responds` checks the
-  replies made after it. `ws` takes the same, and so does
-  `route(operation, ...middlewares, handler)`: the operation's schema is a
-  `validate` and a `responds` just before the handler, or where
-  `validate(operation)` and `responds(operation)` are placed: an auth's
-  401 is its own. A middleware that calls `next()` and returns nothing
-  answers with the rest's response. The 0.3 forms — a list of hooks, a
-  schema before the handler, `defineHook`, `defineWrap` — keep working,
-  deprecated.
-- **Middlewares for every request.** `app.use(auth)` runs a
-  `defineMiddleware` on every request, in the order declared, and types what
-  it adds in the routes after it; a request no route matches — a 404, a 405, a
-  preflight — runs them all, so a guard answers a missing path and an
-  observer sees every response. `app.use('/admin', requireAdmin)` guards the
-  requests under a path, matched against the request's path, and adds
-  nothing; a group's `use` adds to its subtree's context and stays inside it:
-  its routes, and the unmatched requests under its prefix. `derive` stays, the shorthand for a middleware that only adds
-  ([Upgrading](upgrading.md#middlewares-for-every-request-use)).
-- **`use(path)` reads the path as the router does.** The request's path is
-  decoded, an encoded `/` splits a segment, empty ones collapse and the
-  comparison ignores case, so `/Admin//x` and `/%61dmin/x` meet
-  `use('/admin', guard)`; a path that cannot be read is refused, never let
-  through.
-- **A group, and a plugin with a prefix, guard what is under it.** A group's
-  middlewares run on its routes and on a request no route matches under its
-  prefix, before the 404 or 405, so a guard answers `DELETE /admin/secret`
-  with its 401; never on a route declared after the group, nor outside the
-  prefix. A plugin with a prefix of its own (`alxia({ prefix })`,
-  `defineRoutes('/x')`) behaves the same once mounted, and adds nothing to
-  the context of the routes after it.
-- **`settle` no longer swallows the error.** An observer — `logger`,
-  `telemetry`, `secureHeaders`, `cors`, `compress` — reads the response the
-  client would get, then the error goes on to the middlewares around it, so a
-  try/catch middleware catches it wherever it is declared; when none does,
-  the response the observer made is sent.
-- **Middlewares replace the request hooks.** `onRequest`, `onResponse`,
-  `around`, `wrap`, `onError` and `onRefusal` are deprecated, and still run
-  as in 0.3, for a middleware: code before and after `await next()`; a
-  try/catch around it for an error; `settle(ctx, next())` for a middleware
-  that must see the final response, an error's included; `ctx.route`, which
-  is `undefined` on a request no route matches. `validate` throws a
-  `ValidationError` and a body past its limit a `ContentTooLargeError`, and
-  `refusalOf(error)` reads either, so a middleware before the `validate`
-  answers a refusal in its own format. `next.behind` runs the rest behind a
-  reply sent at once. The packages' plugins — `logger`, `telemetry`,
-  `compress`, `cors`, `secureHeaders`, `rateLimit`, `cache`, `bearer`,
-  `session`, `janusErrors` and the others — are middlewares given to `use`
-  ([Upgrading](upgrading.md#middlewares-replace-the-request-hooks)).
-- **Plugins are apps.** `app.plugin(plugin)` mounts an app — a sub-app,
-  `defineRoutes`, `definePlugin` — or calls a function given the app, and
-  checks what the plugin reads of the context; a function that returns
-  anything but an app throws. `use(plugin)` and `plugin(middleware)` still
-  run, deprecated
-  ([Upgrading](upgrading.md#plugins-are-apps-appplugin)).
-- **Spec first, no client typed from the app.** The OpenAPI document is the
-  contract, and a client is generated from it with the generator you
-  choose — the examples use `@nxgt/openapi-codegen`. `Alxia` takes
-  `Ctx, Prefix, Shortcuts`: a route adds nothing to the app's type, the
-  route table and its types are gone, and the typed client package is
-  retired. An app is tested in process with `app.request()`. What a handler
-  reads, `reply` typed by `responds` and the path checks are typed as
-  before ([Upgrading](upgrading.md#no-more-client-spec-first)).
-- **Routes from the OpenAPI document.** The document, written by hand, is
-  the source: `@nxgt/openapi-codegen`'s `alxia` option writes its
-  operations, `route(operation, ...middlewares, handler)` binds each, its
-  schemas check the request and every reply, and `@alxia/openapi`'s
-  `matchesSpec` checks the routes against the document. `@alxia/openapi`
-  is the package that was `@alxia/openapi-routes`; the one that generated
-  a document from an app is retired
-  ([Upgrading](upgrading.md#the-old-alxiaopenapi-is-retired)).
-- **A context declared once.** `declare module '@alxia/core' { interface
-  Register { context: typeof base } }`, beside the chain that builds the
-  context, and a file of routes reads it with no import of the app:
-  `defineRoutes('/todos').get('/', ({ user, reply }) => …)`, mounted with
-  `base.plugin(todos)`, which `plugin` refuses on an app that does not give that
-  context. `AppContext` types a service with it, `contextStorage()` reads
-  it, and so does `@alxia/react-router`'s `alxiaOf` when no server is
-  registered ([The app's type](guide/types.md#register-and-appcontext)).
+- **One middleware form.** A middleware is a plain `(ctx, next) => …`
+  function: `use(...)`, a route's middlewares, `ws(path, ...)` and
+  `route(operation, ...)` take one written inline, and what it passes
+  `next({ … })` the middlewares after it and the handler read, typed. Up to
+  8 per call, each reading what the ones before it added.
+  `defineMiddleware` stays, to share a typed middleware
+  ([Upgrading](upgrading.md#one-middleware-form)).
+- **A missing context, named.** A middleware that reads what the context in
+  force does not give is one TypeScript error on that middleware, on
+  TypeScript 6 as on 7, naming the key — `` `user` is missing from the
+  context: add a middleware that gives it before this one ``, `` `user` is
+  in the context with another type than this middleware reads ``, ``the
+  path parameter `id` is not in this route's path`` — instead of "No
+  overload matches this call"
+  ([Upgrading](upgrading.md#readable-type-errors)).
+- **A shared middleware reads the registered context.**
+  `defineMiddleware(fn)` reads the context `Register` names, as
+  `defineRoutes` and `AppContext` do, and a route that does not give it
+  refuses it: a middleware file needs no import of the app and no type
+  argument
+  ([Upgrading](upgrading.md#definemiddlewarefn-reads-the-registered-context)).
+- **The forms deprecated in 0.4 removed.** The six request hooks of 0.3;
+  a route's list of hooks and the two functions that made its hooks; a
+  schema before the handler or in a route's options; `use(plugin)` and
+  `plugin(middleware)`; `Alxia`'s third type parameter. One way is left to
+  run code around a request: a middleware, with an error answered by a
+  `try`/`catch` around `await next()` or, uncaught, at the route boundary.
+  Each removed form throws or fails to compile with a message naming its
+  replacement ([Upgrading](upgrading.md#050)).
 
 ## Next
 
-- **`use` takes any `(ctx, next)` function.** In the next minor, the
-  `use(plugin)` forms and `plugin(middleware)` are removed, and `use` reads
-  every function it is given as a middleware, with no `defineMiddleware`
-  mark needed: a plugin is given to `app.plugin(…)` alone.
 - **The retired client deprecated on npm.** Its last published version
   marked deprecated, pointing at the upgrading guide, once the owner runs
   the command the [upgrading guide](upgrading.md#no-more-client-spec-first)
   gives.
 - **The old packages deprecated on npm.** `@alxia/openapi` 0.3.0 and
-  earlier, and `@alxia/openapi-routes`, marked deprecated with the commands
-  the [upgrading guide](upgrading.md#the-old-alxiaopenapi-is-retired) gives,
+  earlier, and the retired package name the checks were published under
+  until 0.4, marked deprecated with the commands the
+  [upgrading guide](upgrading.md#the-old-alxiaopenapi-is-retired) gives,
   once the owner runs them after the releases.
 
 ## Later
 
-- **The 0.3 route forms removed.** In the minor after the middleware model:
-  a list of hooks after the path or after an operation, a schema before the
-  handler, `defineHook` and `defineWrap` are gone, leaving one way to
-  declare a route.
-- **The deprecated request hooks removed.** `onRequest`, `onResponse`,
-  `around`, `wrap`, `onError` and `onRefusal`, and `plugin(middleware)`, are
-  gone once a release has carried the middlewares, leaving one way to run
-  code around a request. `derive` and `decorate` stay.
 - **Comments on a stream.** A handler yielding a comment line of its own
   (`: …`), beside the keep-alive the stream already sends while idle.
 
@@ -142,7 +76,46 @@ number on it. Every release, with each change it made, is in
 
 ## Shipped
 
+### 0.4.0
+
+- **One middleware model.** A route takes its middlewares after its path or
+  its options — `app.post(path, { bodyLimit }, auth, validate({ body: Post }), responds({ 201: Post }), handler)`.
+  What a middleware passes to `next(added)` the ones after it and the
+  handler read, typed; awaiting `next()` wraps the rest of the route; a
+  reply it returns ends the request. `validate` stands where it is given,
+  so an `auth` before it answers 401 before the body is read, and
+  `responds` checks the replies made after it. `ws` and
+  `route(operation, ...middlewares, handler)` take the same. The forms of
+  0.3 kept working, deprecated, until 0.5 removed them.
+- **Middlewares for every request.** `app.use(auth)` runs on every request,
+  in the order declared, and types what it adds in the routes after it; a
+  request no route matches — a 404, a 405, a preflight — runs them all.
+  `app.use('/admin', requireAdmin)` guards the requests under a path,
+  matched against the request's path decoded, empty segments collapsed and
+  without case; a group's `use` adds to its subtree's context and stays
+  inside it, and so does a plugin with a prefix of its own.
+- **Errors through `next()`.** `validate` throws a `ValidationError` and a
+  body past its limit a `ContentTooLargeError`; `refusalOf(error)` reads
+  either, so a try/catch middleware answers a refusal in its own format.
+  `settle(ctx, next())` gives an observer the response the client gets
+  without swallowing the error, and `next.behind` runs the rest behind a
+  reply sent at once. The packages' plugins became middlewares given to
+  `use`.
+- **Plugins are apps.** `app.plugin(plugin)` mounts an app — a sub-app,
+  `defineRoutes`, `definePlugin` — or calls a function given the app, and
+  checks what the plugin reads of the context.
+- **Spec first.** The OpenAPI document is the contract: a route adds
+  nothing to the app's type, the typed client is retired, and
+  `@alxia/openapi`'s `matchesSpec` checks the routes against the
+  operations `@nxgt/openapi-codegen`'s `alxia` option generates.
+- **A context declared once.** `Register` names the chain that builds the
+  context; `defineRoutes`, `AppContext`, `contextStorage()` and
+  `@alxia/react-router`'s `alxiaOf` read it.
+
 ### 0.3.0
+
+The hooks and route forms below were deprecated in 0.4 and removed in
+0.5: each is a middleware now ([Upgrading](upgrading.md#050)).
 
 - **Hooks on one route.** A route takes a list of hooks after its path —
   `app.patch('/bookmarks/:id', [canView, loadBookmark, canEdit], schema, handler)` — run
@@ -200,6 +173,9 @@ number on it. Every release, with each change it made, is in
   it with its own problem.
 
 ### 0.1.0
+
+The request hooks below were removed in 0.5, and `use` no longer mounts
+an app: a plugin goes to `plugin`.
 
 - **Typed routes on Bun.** `alxia()` declares `get`, `post`, `put`, `patch`,
   `delete`, `options`, `head` and `query` routes whose `params`, `query`, `headers`,

@@ -16,9 +16,11 @@ look at making the options form friendlier.
 `@alxia/core` 0.4.0, with a step for the response after all: `responds`.
 Core has `defineMiddleware`, `validate`, `responds`, the forms
 `app.<method>(path, options?, ...middlewares, handler)` and
-`ws(path, options?, ...middlewares, handlers)`, and the forms of 0.3 — a
-list of hooks, a schema before the handler, `defineHook`, `defineWrap` — as
-deprecated adapters onto the same chain. Where the implementation decided
+`ws(path, options?, ...middlewares, handlers)`, and, in 0.4 only, the forms
+of 0.3 — a list of hooks, a schema before the handler, and their two
+builders — as deprecated adapters onto the same chain; 0.5 removed them,
+with the request hooks, and the middleware form is the only one. Where the
+implementation decided
 differently from the proposal below:
 
 - **One function, `defineMiddleware`, not `step`.** A middleware is

@@ -71,7 +71,8 @@ type AnyMessage<Requires> = [Requires] extends [never]
  * function audit<Ctx extends object = BaseContext>(
  *   who: (ctx: BaseContext & Ctx) => string,
  * ) {
- *   return definePlugin<RequiresOf<Ctx, 'who'>>()((app) => app.onResponse(…));
+ *   return definePlugin<RequiresOf<Ctx, 'who'>>()((app) =>
+ *     app.use((ctx, next) => { audit.log(who(ctx)); return next(); }));
  * }
  * ```
  *

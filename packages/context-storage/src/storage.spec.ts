@@ -120,8 +120,22 @@ describe('contextStorage', () => {
 		await traced.request('/nowhere');
 		expect(seen).toEqual(['/here', '/nowhere']);
 
-		// @ts-expect-error the factory, uncalled
-		expect(() => alxia().use(contextStorage)).toThrow(
+		// The factory, uncalled, runs as the middleware: each request is refused.
+		const errors: unknown[] = [];
+		const original = console.error;
+		console.error = (...args: unknown[]) => errors.push(...args);
+		try {
+			const uncalled = alxia()
+				// @ts-expect-error the factory, uncalled
+				.use(contextStorage)
+				.get('/', ({ reply }: BaseContext) => reply(200, 'ok'));
+			expect((await uncalled.request('/')).status).toBe(500);
+		} finally {
+			console.error = original;
+		}
+		expect(
+			String(errors.find((error) => error instanceof TypeError)),
+		).toContain(
 			'contextStorage is a factory: use(contextStorage()), not use(contextStorage)',
 		);
 	});

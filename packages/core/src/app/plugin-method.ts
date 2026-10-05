@@ -4,30 +4,17 @@
  * app; and what a plugin's context requires of, and adds to, the app that
  * mounts it.
  */
-import type { AnyReply } from '../reply/reply';
 import type { Alxia } from './alxia';
 import type { AnyAlxia } from './signatures';
-import type {
-	Empty,
-	MiddlewareReturn,
-	ProvidedBy,
-	RequiringContext,
-	ThenShortcuts,
-} from './types';
-import type { AppAfterUse, ScopeMiddleware } from './use-forms';
+import type { Empty, ProvidedBy, RequiringContext } from './types';
 
 /** `app.plugin(plugin)`: an app, or a function given this app. */
-export interface PluginMethod<
-	App,
-	Ctx extends object,
-	Prefix extends string,
-	Shortcuts extends AnyReply,
-> {
+export interface PluginMethod<App, Ctx extends object, Prefix extends string> {
 	/**
 	 * A plugin written as a function, given this app, that returns it: a
 	 * `Plugin`, which adds lifecycle hooks or parsers. A function that
-	 * returns anything else than an app throws. A package's middleware —
-	 * `cors()`, `logger()` — goes to `use`.
+	 * returns anything else than an app throws. A middleware — `cors()`,
+	 * `logger()` — goes to `use`.
 	 *
 	 * ```ts
 	 * const shutdown: Plugin = (app) => app.onStop(() => pool.end());
@@ -41,12 +28,12 @@ export interface PluginMethod<
 	): Result;
 	/**
 	 * A plugin. An app: its routes, under this app's prefix and behind this
-	 * app's middlewares and hooks, its own `use(path, …)` moved with them;
-	 * and, when it has no prefix of its own, its hooks and middlewares,
+	 * app's middlewares, its own `use(path, …)` moved with them; and, when
+	 * it has no prefix of its own, its middlewares, `derive`s and `decorate`s,
 	 * which then apply to the routes declared on this app after it — a
 	 * plugin can be an `auth` that only derives a `user`. One with a prefix
 	 * of its own keeps them under it, as a group does, and adds nothing to
-	 * the context after it. Its global hooks become this app's. It is read
+	 * the context after it. Its lifecycle hooks become this app's. It is read
 	 * once, here: declare it completely before giving it. A plugin made by
 	 * `definePlugin`, and the routes of `defineRoutes`, name what they read
 	 * from this app's context: giving one to an app that does not give it
@@ -59,26 +46,13 @@ export interface PluginMethod<
 	<
 		PluginCtx extends object,
 		PluginPrefix extends string,
-		PluginShortcuts extends AnyReply,
 		PluginRequires = Empty,
 	>(
-		plugin: Alxia<PluginCtx, PluginPrefix, PluginShortcuts> & {
+		plugin: Alxia<PluginCtx, PluginPrefix> & {
 			readonly '~requires'?: PluginRequires;
 		} & ProvidedBy<Ctx, PluginRequires> &
 			ProvidedBy<Ctx, RequiredIn<PluginCtx>>,
-	): Alxia<
-		MountedIn<Ctx, PluginCtx, PluginPrefix>,
-		Prefix,
-		ThenShortcuts<Shortcuts, PluginShortcuts>
-	>;
-	/**
-	 * @deprecated A middleware is given to `app.use(middleware)`, which
-	 * this is: a package's factory — `logger()`, `cors()`, `bearer(…)` —
-	 * returns one now. See the upgrading guide.
-	 */
-	<R1 extends MiddlewareReturn>(
-		middleware: ScopeMiddleware<Ctx, [], R1>,
-	): AppAfterUse<Ctx, Prefix, Shortcuts, [R1]>;
+	): Alxia<MountedIn<Ctx, PluginCtx, PluginPrefix>, Prefix>;
 }
 
 /**

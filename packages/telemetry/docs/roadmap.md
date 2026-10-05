@@ -7,7 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **A middleware, not a plugin (0.4).** `app.use(telemetry({ ... }))` opens a span for every request, a 404 or a 405 included, around everything after it, and sees the response the client gets. `app.plugin(telemetry(...))` still works, deprecated.
+- **A middleware, not a plugin (0.4).** `app.use(telemetry({ ... }))` opens a span for every request, a 404 or a 405 included, around everything after it, and sees the response the client gets. `app.plugin(telemetry(...))`, the deprecated form, was removed in 0.5.
 
 ## Next
 
@@ -39,7 +39,7 @@ Nothing scheduled yet.
 ### 0.1.0
 
 - **One server span per request.** `alxia().use(telemetry({ service, exporters }))`
-  opens a span around everything a request runs — hooks, handler, what
+  opens a span around everything a request runs — middlewares, handler, what
   they await — and every log written with `@nxgt/telemetry`'s
   `createLogger` inside it carries its trace id.
 - **Named for the route.** The span is renamed `GET /orders/:id` once

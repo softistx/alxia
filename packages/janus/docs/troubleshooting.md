@@ -254,7 +254,7 @@ before the guard added — a tenant, a member — and its parameter is not
 annotated: `load: (ctx) => ctx.tenant.records.get(…)`.
 
 **Why:** an unannotated callback is typed with the request's `BaseContext`
-— the request, the URL, the path parameters — not with what other hooks
+— the request, the URL, the path parameters — not with what other middlewares
 added. `permission()` is built before it is used, so it cannot see the app
 it will be used on.
 

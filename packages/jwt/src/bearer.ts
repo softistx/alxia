@@ -4,7 +4,6 @@ import {
 	type Empty,
 	type InferOutput,
 	type Middleware,
-	type MiddlewareMark,
 	type Next,
 	type Reply,
 	type StandardSchemaV1,
@@ -41,8 +40,7 @@ export type Bearer<Schema extends StandardSchemaV1 | undefined = undefined> =
 	Middleware<
 		Empty,
 		Promise<Reply<401, UnauthorizedBody> | Next<{ user: User<Schema> }>>
-	> &
-		MiddlewareMark;
+	>;
 
 /**
  * A guard, as a middleware: every request it runs on needs a valid token —

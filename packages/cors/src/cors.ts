@@ -2,7 +2,6 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
 	settle,
 	vary,
 	withHeaders,
@@ -38,8 +37,7 @@ export interface CorsOptions {
 }
 
 /** What `cors()` makes: a middleware that adds nothing to the context. */
-export type CorsMiddleware = Middleware<Empty, Promise<Response>> &
-	MiddlewareMark;
+export type CorsMiddleware = Middleware<Empty, Promise<Response>>;
 
 const METHODS = [
 	'GET',

@@ -310,19 +310,26 @@ are the shape's.
 defineEnv({ API_KEY: z.string() }, { secret: ['API_KEY'] });
 ```
 
-### `Property 'env' does not exist on type 'MiddlewareContext<Empty>'.`
+### `Property 'env' does not exist on type 'BaseContext'.`
 
-**When:** a `defineMiddleware(fn)` reads `env`, with `app.decorate({ env })` registered.
+**When:** a `defineMiddleware(fn)` reads `env`, and the registered `base` is itself
+built with a `defineMiddleware(fn)` that names nothing it reads.
 
-**Why:** a middleware may run before `base` adds anything, so it reads `BaseContext` unless
-it names the registered context. `defineRoutes()` routes need nothing.
+**Why:** `defineMiddleware(fn)` reads the registered context. One that `base` is built
+with would read `base`'s own type, so the registration resolves to nothing, and every
+middleware reads `BaseContext` alone.
 
-**Fix:**
+**Fix:** a middleware `base` is built with says it reads nothing of the registered
+context:
 
 ```ts
-import { type AppContext, defineMiddleware } from '@alxia/core';
+import { alxia, defineMiddleware, type Empty } from '@alxia/core';
 
-const withPort = defineMiddleware<AppContext>()(({ env }, next) => next({ port: env.PORT }));
+const requestId = defineMiddleware<Empty>()((ctx, next) =>
+	next({ requestId: ctx.request.headers.get('x-request-id') ?? 'none' }),
+);
+
+export const base = alxia().decorate({ env }).use(requestId);
 ```
 
 ### `Object literal may only specify known properties, and 'PORT' does not exist in type 'StandardSchema<unknown>'.`

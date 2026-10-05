@@ -1,5 +1,6 @@
 import { describe, expect, spyOn, test } from 'bun:test';
 import { z } from 'zod';
+import { refusalOf } from '../errors/errors';
 import { alxia } from './alxia';
 import { defineMiddleware } from './define-middleware';
 import { validate } from './validate';
@@ -59,11 +60,17 @@ describe('the order of the middlewares is the order of the request', () => {
 		expect((await post(app, { title: 'Hi' }, null)).status).toBe(401);
 	});
 
-	test('a refusal is answered by the onRefusal hook in force, as a schema of 0.3 is', async () => {
+	test('a refusal is answered by a try/catch middleware reading refusalOf', async () => {
 		const app = alxia()
-			.onRefusal((refusal, { reply }) =>
-				reply(422, { part: refusal.kind === 'validation' ? refusal.part : '' }),
-			)
+			.use(async ({ reply }, next) => {
+				try {
+					return await next();
+				} catch (error) {
+					const refusal = refusalOf(error);
+					if (refusal?.kind !== 'validation') throw error;
+					return reply(422, { part: refusal.part });
+				}
+			})
 			.post('/posts', validate({ body: Post }), ({ reply }) => reply(204));
 		const refused = await post(app, { title: '' }, null);
 		expect(refused.status).toBe(422);
@@ -200,7 +207,7 @@ describe('a middleware', () => {
 				({ reply }) => reply(200, 'x'),
 			),
 		).toThrow(
-			'GET /: the options hold no schema: give validate(…) and responds(…) among the middlewares',
+			'GET /: the options hold no schema (query): give validate(…) and responds(…) among the middlewares',
 		);
 	});
 
@@ -210,7 +217,7 @@ describe('a middleware', () => {
 				reply(200, 'x'),
 			),
 		).toThrow(
-			'GET /: middleware 1 is not a function: make it with defineMiddleware(), validate() or responds()',
+			'GET /: middleware 1 is not a function: a middleware is (ctx, next) => …, or a validate() or responds()',
 		);
 		expect(() => defineMiddleware('auth' as never)).toThrow(
 			'defineMiddleware(): the middleware is not a function',

@@ -31,10 +31,6 @@ you notice. A `400` from validation reads like this, and the heading is its
 
 - [`Expected 1 arguments, but got 0.`](#expected-1-arguments-but-got-0)
 
-**JSON Schema**
-
-- [`Date cannot be represented in JSON Schema`](#date-cannot-be-represented-in-json-schema)
-- [`zodConverter` returns `undefined`](#zodconverter-returns-undefined)
 
 ## A `400` from validation
 
@@ -220,55 +216,4 @@ JSON.
 ```ts
 zq.array(z.string());
 zq.json(z.object({ min: z.number() }));
-```
-
-## JSON Schema
-
-### `Date cannot be represented in JSON Schema`
-
-**When:** converting a Zod schema that holds a `z.date()`, a `zq.date()`
-or a `z.bigint()` with Zod's own conversion — `z.toJSONSchema(schema)`, or
-its Standard JSON Schema `'~standard'.jsonSchema` — to write it into an
-OpenAPI document or hand it to a JSON Schema tool.
-
-Also as `BigInt cannot be represented in JSON Schema` and `Transforms
-cannot be represented in JSON Schema`.
-
-**Why:** Zod refuses what JSON Schema cannot say, and one such field fails
-the whole object.
-
-**Fix:** convert it with `zodConverter`, which says it as it crosses the
-wire — a `Date` as a `date-time` string, a `bigint` as an integer:
-
-```ts
-import { zodConverter } from '@alxia/zod';
-
-const schema = zodConverter(Event, 'output'); // a response: its output
-const query = zodConverter(Search, 'input'); // a request part: its input
-```
-
-A field that still has no JSON Schema — a `.transform()`'s output, a
-`z.map()` — is `{}` on its own, and the rest of the schema is kept. Say its
-output with an explicit schema when it matters:
-
-```ts
-const Item = z.object({
-	name: z.string().transform((name) => name.trim()).pipe(z.string()),
-});
-```
-
-### `zodConverter` returns `undefined`
-
-**When:** `zodConverter(schema, side)` gives `undefined` instead of a JSON
-Schema.
-
-**Why:** the schema is not Zod's — its `'~standard'.vendor` is another
-library's — or the app's `zod` is older than 4.2, the version that carries
-JSON Schema conversion.
-
-**Fix:** convert another vendor's schema with that library's own tool, and
-upgrade `zod`:
-
-```sh
-bun add zod@latest
 ```

@@ -18,11 +18,11 @@ export function owner(): string {
 	return requestContext.context().user.id;
 }
 
-export const app = base.plugin(requestContext);
+export const app = base.use(requestContext);
 
 // @ts-expect-error: an app that gives no `user` cannot use it
-alxia().plugin(requestContext);
+alxia().use(requestContext);
 
 // Typed by a defineRoutes app, it reads that context, and the base gives it.
 const routes = defineRoutes().get('/', ({ reply }) => reply(200, 'x'));
-export const byRoutes = base.plugin(contextStorage<typeof routes>());
+export const byRoutes = base.use(contextStorage<typeof routes>());

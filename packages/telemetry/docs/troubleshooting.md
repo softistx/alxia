@@ -6,7 +6,7 @@ the server log, or, for what prints nothing, what you see in your traces.
 **Types**
 
 - [`Property 'span' does not exist on type 'Context<…>'`](#property-span-does-not-exist-on-type-context)
-- [`Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'`](#type-alxiaempty--never-is-not-assignable-to-type-telemetrypluginoptions)
+- [`Type 'TelemetryMiddleware' is not assignable to type 'MiddlewareReturn & …'`](#type-telemetrymiddleware-is-not-assignable-to-type-middlewarereturn--)
 - [`Property 'service' is missing in type '…' but required in type '{ readonly service: string; readonly instance?: undefined; }'`](#property-service-is-missing-in-type--but-required-in-type--readonly-service-string-readonly-instance-undefined-)
 - [`Type 'Telemetry' is not assignable to type 'undefined'`](#type-telemetry-is-not-assignable-to-type-undefined)
 - [`Object literal may only specify known properties, and 'version' does not exist in type 'Hooks & { readonly instance: Telemetry; … }'`](#object-literal-may-only-specify-known-properties-and-version-does-not-exist-in-type-hooks---readonly-instance-telemetry--)
@@ -60,20 +60,20 @@ const app = alxia()
 	});
 ```
 
-### `Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'`
+### `Type 'TelemetryMiddleware' is not assignable to type 'MiddlewareReturn & …'`
 
 ```text
-error TS2769: No overload matches this call.
-  Overload 1 of 11, '(plugin: (app: Alxia<Empty, "", never>) => AnyAlxia): AnyAlxia', gave the following error.
-    Argument of type '(options: TelemetryPluginOptions) => Middleware<…>' is not assignable to parameter of type '(app: Alxia<Empty, "", never>) => AnyAlxia'.
-      Types of parameters 'options' and 'app' are incompatible.
-        Type 'Alxia<Empty, "", never>' is not assignable to type 'TelemetryPluginOptions'.
+error TS2345: Argument of type '(options: TelemetryPluginOptions) => TelemetryMiddleware' is not assignable to parameter of type '((options: TelemetryPluginOptions) => TelemetryMiddleware) & Step<BaseContext & Empty, TelemetryPluginOptions, MiddlewareReturn>'.
+  Type '(options: TelemetryPluginOptions) => TelemetryMiddleware' is not assignable to type 'Step<BaseContext & Empty, TelemetryPluginOptions, MiddlewareReturn>'.
+    Type 'TelemetryMiddleware' is not assignable to type 'MiddlewareReturn & ("`traced` is missing from the context: add a middleware that gives it before this one" | "`spanName` is missing from the context: add a middleware that gives it before this one" | … )'.
 ```
 
 **When:** `app.use(telemetry)`, without calling it.
 
 **Why:** `telemetry` makes the middleware; it is not the middleware, and it
-needs a `service` or an `instance`.
+needs a `service` or an `instance`. Given to `use` as it is, it is read as
+a middleware whose context is its options, hence the keys said missing
+from the context.
 
 **Fix:**
 
@@ -390,8 +390,8 @@ app.use(telemetry({ service: 'checkout', exporters, traced: (ctx) => ctx.url.pat
 
 ### A span has an exception, and its status is `ok`
 
-**When:** a route throws, and the route boundary (an `HttpError`, a
-deprecated `onError` hook) answers with a `4xx`. An error-handling middleware
+**When:** a route throws, and the route boundary (an `HttpError`'s
+status) answers with a `4xx`. An error-handling middleware
 that catches it leaves the span `ok` with no exception at all.
 
 **Why:** the error is recorded as the span's exception, but only a

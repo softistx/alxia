@@ -13,7 +13,7 @@ describe('alxiaOf and Register', () => {
 		const typed = (context: RouterContextProvider) => {
 			const name: string | undefined =
 				alxiaOf<typeof server>(context).user?.name;
-			// @ts-expect-error: no hook of the server derives `tenant`
+			// @ts-expect-error: nothing in the server derives `tenant`
 			alxiaOf<typeof server>(context).tenant;
 			// Unregistered in this program: BaseContext.
 			const base: BaseContext = alxiaOf(context);

@@ -51,7 +51,7 @@ export function yogaServers<UserCtx extends YogaContext>(
 /**
  * The handler of the endpoint's `GET` and `POST`: Apollo Sandbox's page to
  * a browser when `sandbox` is not `false`, else the request to Yoga, with
- * the route's context — the hooks' work, minus what a resolver has no use
+ * the route's context — the middlewares' work, minus what a resolver has no use
  * for — as Yoga's server context.
  */
 export function graphqlHandler<UserCtx extends YogaContext>(

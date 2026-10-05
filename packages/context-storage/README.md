@@ -80,7 +80,8 @@ or where the middleware did not run (a route declared before it),
 a request that reached no route, `NOT_ROUTED`.
 
 Pass it to `app.use` called: `use(contextStorage)`, uncalled, is refused by
-`tsc` (`TS2769`) and throws a `TypeError` at startup
+`tsc` (`TS2345`), and each request it runs on throws a `TypeError`,
+answered with a 500
 ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/context-storage/docs/troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)).
 
 ## API
@@ -90,7 +91,6 @@ Pass it to `app.use` called: `use(contextStorage)`, uncalled, is refused by
 | `contextStorage<App>()` | the middleware, given to `app.use`, with `context()` and `tryContext()` typed by `App` — by default the app `@alxia/core`'s `Register` names, `BaseContext` when none — and required of the app that mounts it |
 | `StoredContext<App>` | what `context()` returns: `ContextOf<App>`, or `BaseContext` when `App` is no app |
 | `ContextStorageMiddleware<App>` | its type: a middleware with `context()` and `tryContext()` |
-| `ContextStoragePlugin<App>` | deprecated: the former name of `ContextStorageMiddleware` |
 | `getContext`, `tryGetContext`, `getRequestContext`, `tryGetRequestContext`, `runWithContext` | the store, untyped |
 | `ContextStorageError`, `ContextStorageErrorCode` | why there is no context |
 

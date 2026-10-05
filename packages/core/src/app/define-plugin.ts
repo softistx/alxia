@@ -47,7 +47,7 @@ export function definePlugin<Requires extends object = Empty>() {
  */
 export function defineRoutes<const Prefix extends '' | RoutePath = ''>(
 	prefix?: Prefix,
-): Alxia<RoutesContext, Prefix, never> {
+): Alxia<RoutesContext, Prefix> {
 	return requiring<RoutesContext, Prefix>(prefix);
 }
 
@@ -57,7 +57,7 @@ export function defineRoutes<const Prefix extends '' | RoutePath = ''>(
  */
 function requiring<Requires extends object, Prefix extends '' | RoutePath>(
 	prefix: Prefix | undefined,
-): Alxia<Requires, Prefix, never> {
+): Alxia<Requires, Prefix> {
 	const app = prefix === undefined ? alxia() : alxia({ prefix });
-	return app as unknown as Alxia<Requires, Prefix, never>;
+	return app as unknown as Alxia<Requires, Prefix>;
 }

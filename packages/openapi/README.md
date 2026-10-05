@@ -188,8 +188,11 @@ the document it served, the app's `/openapi.json`, as the starting point
 of your own (the generator reads JSON as well as YAML), generate the
 operations from it, and bind the routes with `app.route()`.
 
-**`@alxia/openapi-routes`** is this package under its former name: the same
-functions, options and messages.
+**`@alxia/openapi-routes`** was this package under its former name, and is
+removed from the repository. Move to `@alxia/openapi`: the same
+functions, options and messages, except that `exactly` and `ExactlyOptions`,
+its deprecated aliases of `matchesSpec` and `MatchesSpecOptions`, are gone
+at 0.5.
 
 ```sh
 bun remove @alxia/openapi-routes
@@ -212,7 +215,6 @@ The core's side of the move is in its
 | --- | --- |
 | `implemented(app, operations, options?)`, `ImplementedOptions` | throws a `TypeError` listing each operation with no route, or one with the core's reason for an operation path no route may be declared at. `prefix` |
 | `matchesSpec(app, operations, options?)`, `MatchesSpecOptions` | the same, and each route no operation declares. `prefix`, `exclude` |
-| `exactly`, `ExactlyOptions` | deprecated: `matchesSpec` and `MatchesSpecOptions` under their former names, with messages that start `exactly():` |
 | `Operations` | what both take: an object of core's `RouteOperation`, or a list of them |
 
 ## Documentation

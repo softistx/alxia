@@ -3,7 +3,6 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
 	type Next,
 } from '@alxia/core';
 import { requestControls } from './control';
@@ -75,7 +74,6 @@ export type CacheMiddleware<Requires extends object = Empty> = Middleware<
 	Requires,
 	Promise<Response | Next<{ cache: CacheControls }>>
 > &
-	MiddlewareMark &
 	Cache;
 
 /**

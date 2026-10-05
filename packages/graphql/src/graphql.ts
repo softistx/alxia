@@ -1,10 +1,4 @@
-import type {
-	Alxia,
-	AnyReply,
-	BaseContext,
-	Empty,
-	RoutePath,
-} from '@alxia/core';
+import type { Alxia, BaseContext, Empty, RoutePath } from '@alxia/core';
 import type {
 	GraphQLSchemaWithContext,
 	YogaInitialContext,
@@ -24,7 +18,7 @@ type RouteOnly =
 	| 'redirect';
 
 /**
- * What alxia hands Yoga for each request: the context its hooks built —
+ * What alxia hands Yoga for each request: the context its middlewares built —
  * `user`, `db`, `log`… — with `request`, `url`, `ip` and `set`, through
  * which a resolver sets a cookie or a header on the response.
  */
@@ -73,7 +67,7 @@ export interface GraphQLOptions<
 	/**
 	 * The schema, from Yoga's `createSchema`, Pothos, or any tool that types
 	 * its context. Its context must be one the app builds: a resolver that
-	 * reads `user` behind no hook that derives one is a compile error.
+	 * reads `user` behind no middleware that adds one is a compile error.
 	 */
 	readonly schema: GraphQLSchemaWithContext<SchemaCtx>;
 	/** Where the endpoint is, under the app's prefix. `/graphql` by default. */
@@ -102,8 +96,8 @@ type ProvidesContext<Provided, Required> = Provided extends Required
 
 /**
  * A GraphQL endpoint on `app`, served by [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server):
- * `GET` and `POST` at `path`, behind every hook declared on `app` before it.
- * A guard before it guards it; what the hooks derived is in each
+ * `GET` and `POST` at `path`, behind every middleware given to `use` on `app`
+ * before it. A guard before it guards it; what the middlewares added is in each
  * resolver's context, typed. Yoga's options pass through — `plugins`
  * (Envelop's and Yoga's), `graphiql`, `maskedErrors`, `batching`… —
  * and subscriptions are served over server-sent events.
@@ -117,18 +111,17 @@ type ProvidesContext<Provided, Required> = Provided extends Required
 export function graphql<
 	Ctx extends object,
 	Prefix extends string,
-	Shortcuts extends AnyReply,
 	SchemaCtx,
 	UserCtx extends YogaContext = Empty,
 	const Path extends RoutePath = '/graphql',
 >(
-	app: Alxia<Ctx, Prefix, Shortcuts>,
+	app: Alxia<Ctx, Prefix>,
 	options: GraphQLOptions<ServerContext<Ctx>, UserCtx, Path, SchemaCtx> &
 		ProvidesContext<
 			YogaInitialContext & ServerContext<Ctx> & UserCtx,
 			SchemaCtx
 		>,
-): Alxia<Ctx, Prefix, Shortcuts> {
+): Alxia<Ctx, Prefix> {
 	const {
 		path = '/graphql' as Path,
 		cors = false,

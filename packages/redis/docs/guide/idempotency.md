@@ -209,7 +209,7 @@ is two keys.
 
 The middleware wraps the routes declared after it, and every middleware
 declared after it too. Whatever those answer is kept like the route's
-answer: so is what an `onError` hook, an `HttpError` or a validation
+answer: so is what a try/catch middleware, an `HttpError` or a validation
 refusal answers, because `idempotency` settles the rest of the request before
 it keeps it. A rate limit or an authentication check declared **after**
 `idempotency` has its `429` or `401` kept and replayed — even once the

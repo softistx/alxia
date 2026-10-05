@@ -1,11 +1,11 @@
 /**
  * A refusal is thrown — a `ValidationError` by `validate`, a
  * `ContentTooLargeError` by a body read past its limit — so that a
- * middleware before it answers it; the route's `onRefusal` hooks,
- * deprecated, or the default 400 or 413 answer it otherwise. And
- * `settle`, which answers what `next()` threw as the route would.
+ * middleware before it answers it; the default 400 or 413 answers it
+ * otherwise. And `settle`, which answers what `next()` threw as the route
+ * would.
  */
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { z } from 'zod';
 import {
 	ContentTooLargeError,
@@ -18,6 +18,8 @@ import { defineMiddleware } from './define-middleware';
 import { validate } from './validate';
 
 const Note = z.object({ title: z.string().min(1) });
+
+class Unavailable extends Error {}
 
 const post = (body: string, headers: Record<string, string> = {}) =>
 	new Request('http://localhost/notes', {
@@ -112,25 +114,10 @@ describe('a refusal, thrown', () => {
 		});
 		expect(refusalOf(new Error('no'))).toBeUndefined();
 	});
-
-	test('a wrap, deprecated, still reads the 400 from next(), as in 0.3', async () => {
-		const seen: number[] = [];
-		const app = alxia()
-			.wrap(async (_ctx, next) => {
-				const response = await next();
-				seen.push(response.status);
-				return response;
-			})
-			.post('/notes', validate({ body: Note }), ({ reply }) =>
-				reply(201, 'ok'),
-			);
-		expect((await app.fetch(post('{}'))).status).toBe(400);
-		expect(seen).toEqual([400]);
-	});
 });
 
 describe('settle(ctx, next())', () => {
-	test('answers what the rest threw as the route would: onError, onRefusal, HttpError', async () => {
+	test('sees every response: a caught error, a 400, a 404 and a 500', async () => {
 		const statuses: number[] = [];
 		const watch = defineMiddleware(async (ctx, next) => {
 			const response = await settle(ctx, next());
@@ -138,25 +125,44 @@ describe('settle(ctx, next())', () => {
 			response.headers.set('x-watched', '1');
 			return response;
 		});
+		const unavailable = defineMiddleware(async ({ reply }, next) => {
+			try {
+				return await next();
+			} catch (error) {
+				if (!(error instanceof Unavailable)) throw error;
+				return reply(503, 'handled');
+			}
+		});
 		const app = alxia()
-			.use(watch)
-			.onError((_error, { reply }) => reply(503, 'handled'))
-			.onRefusal(() => undefined)
+			.use(watch, unavailable)
 			.post('/notes', validate({ body: Note }), ({ reply }) => reply(201, 'ok'))
-			.get('/boom', () => {
-				throw new Error('boom');
+			.get('/busy', () => {
+				throw new Unavailable('busy');
+			})
+			.get('/bug', () => {
+				throw new Error('bug');
 			});
-		const boom = await app.request('/boom');
-		expect(boom.status).toBe(503);
-		expect(boom.headers.get('x-watched')).toBe('1');
+		const busy = await app.request('/busy');
+		expect(busy.status).toBe(503);
+		expect(busy.headers.get('x-watched')).toBe('1');
 		const refused = await app.fetch(post('{}'));
 		expect(refused.status).toBe(400);
 		expect(refused.headers.get('x-watched')).toBe('1');
 		const missing = await app.request('/missing');
 		expect(missing.headers.get('x-watched')).toBe('1');
-		expect(statuses).toEqual([503, 400, 404]);
+		const logged = spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const bug = await app.request('/bug');
+			expect(bug.headers.get('x-watched')).toBe('1');
+			expect(await bug.json()).toEqual({ error: 'internal' });
+		} finally {
+			logged.mockRestore();
+		}
+		expect(statuses).toEqual([503, 400, 404, 500]);
 	});
+});
 
+describe('settle(ctx, next()), its error and the middlewares inside it', () => {
 	test('keeps the error on ctx.error, and passes a response through', async () => {
 		let error: unknown;
 		const watch = defineMiddleware(async (ctx, next) => {

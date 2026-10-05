@@ -12,7 +12,7 @@ import type {
 	AppWithRoute,
 	NotAFunction,
 	RouteBase,
-	RouteMiddleware,
+	RouteReads,
 } from './route-forms';
 import type { Empty, RouteDetail, ThreadContext, ThreadSchema } from './types';
 
@@ -90,10 +90,9 @@ declare module './forms' {
 		A,
 		B,
 		Results extends readonly unknown[],
-		Result,
 		Handled,
 	> {
-		readonly socket: SocketForm<App, A, Results, Result>;
+		readonly socket: SocketForm<App, A, Results>;
 	}
 }
 
@@ -102,11 +101,11 @@ export interface SocketForm<
 	App extends AppTypes,
 	A,
 	Results extends readonly unknown[],
-	Result,
 > extends FormSlots {
 	readonly aBound: RoutePath;
+	readonly excludes: 'object';
 	readonly head: [path: PathAt<App['prefix'], A & string>];
-	readonly step: RouteMiddleware<App, A & string, Results, Result>;
+	readonly reads: RouteReads<App, A & string, Results>;
 	readonly tail: [
 		handlers: SocketHandlersAfter<App, A & string, Results, Empty>,
 	];

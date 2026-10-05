@@ -56,7 +56,8 @@ down while the session is read (`STORE_FAILED`) is the app's 500
 before it: a `JanusError` it throws is not behind `janusErrors()`.
 
 It answers only a `JanusError`. Anything else goes on, thrown, to the
-middlewares before it, then the app's `onError`, or its 500.
+middlewares before it — a try/catch of your own around `await next()` — and,
+when none answers it, to the route boundary: an `HttpError`'s status, else a 500.
 
 An observer that settles `next()` (`logger()`, `secureHeaders()`,
 `telemetry()`, `createI18n()`) reads the response the error would be
@@ -179,7 +180,7 @@ if (me.status === 503) console.log(body.code);         // 'STORE_FAILED' and the
 function janusErrors(options?: JanusErrorsOptions): JanusErrors;
 
 // a middleware: answers the JanusErrors thrown behind it
-type JanusErrors = Middleware<object, Promise<Next | Reply<JanusErrorStatus, JanusErrorBody>>> & MiddlewareMark;
+type JanusErrors = Middleware<object, Promise<Next | Reply<JanusErrorStatus, JanusErrorBody>>>;
 
 interface JanusErrorsOptions {
 	readonly report?: (error: JanusError, ctx: BaseContext) => unknown;
@@ -199,7 +200,7 @@ function statusOf(code: JanusErrorCode): JanusErrorStatus; // @nxgt/janus's
 ```
 
 `JanusError`, `JanusErrorCode` and `JanusErrorStatus` are `@nxgt/janus`'s;
-`Middleware`, `MiddlewareMark`, `Next`, `Reply` and `BaseContext` are `@alxia/core`'s.
+`Middleware`, `Next`, `Reply` and `BaseContext` are `@alxia/core`'s.
 
 The permission guard's own refusals — `{ error: 'forbidden' }` and the
 like — are not `JanusError`s; see [Permissions](permissions.md#refusals).

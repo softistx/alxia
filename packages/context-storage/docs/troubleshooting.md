@@ -27,20 +27,20 @@ behaviour that prints nothing, or an error from `tsc`. A
 `tsc` reports the same mistake first:
 
 ```text
-error TS2769: No overload matches this call.
-  …
-    Argument of type '<App = Alxia<Empty, "", never>>(...uncalled: readonly never[]) => ContextStorageMiddleware<App>' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], MiddlewareReturn>'.
-      …
-          Type 'BaseContext & Empty' is not assignable to type 'never'.
+error TS2345: Argument of type '<App = Alxia<Empty, "">>(...uncalled: readonly never[]) => ContextStorageMiddleware<App>' is not assignable to parameter of type 'FunctionLike & Step<BaseContext & Empty, BaseContext & Empty, MiddlewareReturn>'.
+  Type '<App = Alxia<Empty, "">>(...uncalled: readonly never[]) => ContextStorageMiddleware<App>' is not assignable to type 'Step<BaseContext & Empty, BaseContext & Empty, MiddlewareReturn>'.
+    Types of parameters 'uncalled' and 'ctx' are incompatible.
+      Type 'BaseContext & Empty' is not assignable to type 'never'.
 ```
 
-**When:** at startup, on `.use(contextStorage)`: the factory given to
-`app.use` without being called.
+**When:** on each request the routes after `.use(contextStorage)` answer:
+the factory given to `app.use` without being called. The request is
+answered with a 500, and the error is in the server log.
 
-**Why:** `app.use` calls a function it is given with the app, as a plugin.
-Called that way, `contextStorage` would be handed the app, and what
-follows would be declared on a plugin nobody serves; it refuses the
-argument instead.
+**Why:** `app.use` takes any `(ctx, next)` function as a middleware, so
+the factory itself runs on every request, handed the request's context.
+Called that way, it would make a new middleware each time and store
+nothing; it refuses the argument instead.
 
 **Fix:** call it, once, and keep the result:
 
@@ -63,8 +63,7 @@ and `getRequestContext()` all throw it.
   and run later by such a timer;
 - in a route declared **before** `use(requestContext)`, or outside the
   `group` it is used in: the middleware never ran on that request;
-- in a middleware declared before it, or in the deprecated `onRequest` and
-  `onResponse` hooks, which run outside the chain;
+- in a middleware declared before it, which runs outside the store;
 - in a WebSocket's `open`, `message` or `close`, since a socket's handlers
   run outside the chain;
 - with two copies of `@alxia/context-storage` installed: each has its own

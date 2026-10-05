@@ -79,8 +79,22 @@ components:
         message: { type: string }
 ```
 
-An app that answers refusals in its own format with `onRefusal` declares
-that format instead.
+An app that answers refusals in its own format, with a middleware that
+catches them around `await next()`, declares that format instead:
+
+```ts
+import { alxia, problem, refusalOf } from '@alxia/core';
+
+const app = alxia().use(async (_ctx, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		const refusal = refusalOf(error);
+		if (refusal === undefined) throw error;
+		return problem({ status: 400, detail: `the ${refusal.part} is invalid` });
+	}
+});
+```
 
 ## 2. Generate the operations
 

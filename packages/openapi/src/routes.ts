@@ -28,9 +28,6 @@ export interface MatchesSpecOptions extends ImplementedOptions {
 	readonly exclude?: (route: RouteDefinition) => boolean;
 }
 
-/** @deprecated Renamed `MatchesSpecOptions`, as `exactly` is `matchesSpec`. */
-export interface ExactlyOptions extends MatchesSpecOptions {}
-
 /**
  * Any `alxia()` app: its routes, with their full paths. The public
  * signatures spell it out, so that `tsc` names the shape, not this alias.
@@ -77,20 +74,8 @@ export function matchesSpec(
 	match('matchesSpec', app, operations, options);
 }
 
-/**
- * @deprecated Renamed `matchesSpec`, which checks the same both ways. Its
- * messages still start with `exactly():`.
- */
-export function exactly(
-	app: { readonly routes: readonly RouteDefinition[] },
-	operations: Operations,
-	options: MatchesSpecOptions = {},
-): void {
-	match('exactly', app, operations, options);
-}
-
 function match(
-	check: 'matchesSpec' | 'exactly',
+	check: 'matchesSpec',
 	app: Routed,
 	operations: Operations,
 	options: MatchesSpecOptions,
@@ -109,7 +94,7 @@ function match(
 }
 
 function wanted(
-	check: 'implemented' | 'matchesSpec' | 'exactly',
+	check: 'implemented' | 'matchesSpec',
 	operations: Operations,
 	prefix = '',
 ): Wanted[] {

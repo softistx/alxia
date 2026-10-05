@@ -3,7 +3,6 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
 	type Next,
 	type RequiresOf,
 } from '@alxia/core';
@@ -61,7 +60,7 @@ export interface LanguageOptions<
 export type LanguageMiddleware<
 	L extends string,
 	Requires extends object = Empty,
-> = Middleware<Requires, Promise<Next<LanguageContext<L>>>> & MiddlewareMark;
+> = Middleware<Requires, Promise<Next<LanguageContext<L>>>>;
 
 /**
  * The request's language, as a middleware: the routes declared after it read

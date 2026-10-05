@@ -15,7 +15,7 @@ import type {
 	AppWithRoute,
 	RouteBase,
 	RouteHandler,
-	RouteMiddleware,
+	RouteReads,
 	RouteResult,
 } from './route-forms';
 import type { CheckedOperation, RouteOperation } from './route-operation';
@@ -46,10 +46,9 @@ declare module './forms' {
 		A,
 		B,
 		Results extends readonly unknown[],
-		Result,
 		Handled,
 	> {
-		readonly operation: OperationForm<App, OpOf<A>, Results, Result, Handled>;
+		readonly operation: OperationForm<App, OpOf<A>, Results, Handled>;
 	}
 }
 
@@ -58,18 +57,12 @@ export interface OperationForm<
 	App extends AppTypes,
 	Op extends RouteOperation,
 	Results extends readonly unknown[],
-	Result,
 	Handled,
 > extends FormSlots {
 	readonly aBound: RouteOperation;
 	readonly handledBound: RouteResult<Steps<App, Op, Results>>;
 	readonly head: [operation: CheckedOperation<App['prefix'], Op>];
-	readonly step: RouteMiddleware<
-		OperationApp<App, Op>,
-		Op['path'],
-		Results,
-		Result
-	>;
+	readonly reads: RouteReads<OperationApp<App, Op>, Op['path'], Results>;
 	readonly tail: [
 		handler: RouteHandler<
 			OperationApp<App, Op>,

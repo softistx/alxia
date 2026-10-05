@@ -54,7 +54,7 @@ describe('redisCacheStore', () => {
 			return {
 				products,
 				app: alxia()
-					.plugin(products)
+					.use(products)
 					.get('/products', ({ reply }) => reply(200, { runs: ++runs })),
 			};
 		};
@@ -91,7 +91,7 @@ describe('redisCacheStore', () => {
 					},
 				}),
 			)
-			.plugin(pages)
+			.use(pages)
 			.get('/hello', ({ cache: controls, caches, request, reply }) => {
 				expectTypeOf(controls.tag).toBeFunction();
 				expectTypeOf(caches.greetings.remember).toBeFunction();

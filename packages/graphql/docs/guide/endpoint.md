@@ -28,10 +28,10 @@ curl localhost:3000/graphql -H 'content-type: application/json' -d '{"query":"{ 
 ## `graphql`
 
 ```ts
-function graphql<Ctx, Prefix, Shortcuts, SchemaCtx, UserCtx = Empty, const Path = '/graphql'>(
-	app: Alxia<Ctx, Prefix, Shortcuts>,
+function graphql<Ctx, Prefix, SchemaCtx, UserCtx = Empty, const Path = '/graphql'>(
+	app: Alxia<Ctx, Prefix>,
 	options: GraphQLOptions<ServerContext<Ctx>, UserCtx, Path, SchemaCtx>,
-): Alxia<Ctx, Prefix, Shortcuts>;
+): Alxia<Ctx, Prefix>;
 ```
 
 `graphql` declares a `GET` and a `POST` route at `path` on `app`, and returns
@@ -87,19 +87,23 @@ const app = alxia()
 
 ## Behind the app's middlewares
 
-The endpoint is a route like any other: every middleware declared **before**
-it runs first, and one that replies ends the request there. A guard before
-it guards it:
+The endpoint is a route like any other: every middleware given to `use`
+**before** it runs first, and one that replies ends the request there. A
+guard before it guards it — a plain `(ctx, next)` function, what it passes
+`next` typed into each resolver's context:
 
 ```ts
 const app = alxia()
-	.derive(({ request, reply }) =>
+	.use(({ request, reply }, next) =>
 		request.headers.get('authorization') === `Bearer ${Bun.env['API_TOKEN']}`
-			? { viewer: 'service' }
+			? next({ viewer: 'service' })
 			: reply(401, { error: 'unauthorized' as const }),
 	)
 	.plugin((app) => graphql(app, { schema })); // 401 without the token
 ```
+
+`@alxia/jwt`'s `bearer()` is that guard for a JWT: `.use(bearer({ jwt }))`
+([The typed context](context.md#with-a-token-alxiajwt)).
 
 A middleware declared **after** `app.plugin` does not run for the endpoint: it
 answers without it. Give the observers (`@alxia/logger`, `@alxia/cors`,

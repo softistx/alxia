@@ -41,8 +41,9 @@ ws(path, options, ...middlewares, handlers);  // options: message, send, detail
 ```
 
 The last argument is the handlers. Before them, the middlewares the upgrade
-request runs, in the order given: made by `defineMiddleware`, written
-inline, or a `validate` that checks the upgrade request
+request runs, in the order given: plain `(ctx, next)` functions written
+inline, shared ones typed with `defineMiddleware`, or a `validate` that
+checks the upgrade request
 ([Middleware](middleware.md#a-routes-middlewares)). An object right after
 the path is the socket's options:
 
@@ -82,6 +83,11 @@ The options hold no schema of the request — `params`, `query`, `headers`,
 `responds` on a socket does not compile, and throws where the socket is
 declared:
 `` WS /x: responds() checks replies, and a socket route sends none: check its messages with the `send` option ``.
+A schema of the request in the options throws too —
+`WS /live: the options hold no schema (query): give validate(…) and responds(…) among the middlewares` —
+and a list of middlewares after the path, `ws('/live', [auth], handlers)`,
+throws `WS /live: a route takes its middlewares after the path, not in a list: drop the brackets`
+([Upgrading](../upgrading.md#050)).
 
 ## The upgrade
 
@@ -127,10 +133,6 @@ const watched = defineMiddleware(async ({ route }, next) => {
 });
 ```
 
-- The deprecated `wrap` and `around` hooks are skipped: there is no
-  response to wrap. A telemetry span is not opened for an upgrade.
-- The deprecated `onRequest` hooks run; `onResponse` hooks do not run for
-  an upgrade that succeeds.
 - `set.headers` and `set.cookies` a middleware sets are sent with the `101`.
 
 ## The handlers
@@ -227,23 +229,6 @@ test('a message is checked, then answered', async () => {
 A socket route adds nothing to the app's type, as a route does not.
 `SocketSchema`, `SocketContext`, `SocketSend` and `SocketMessage` name what
 its handlers read, send and receive ([The app's type](types.md)).
-
-## The forms of 0.3, deprecated
-
-`ws(path, schema, handlers)`, with the request's schemas beside `message`
-and `send`, and `ws(path, [hooks], schema, handlers)` still run as they
-did in 0.3, and will be removed in a later minor:
-
-```ts
-// deprecated
-app.ws('/live', [canJoin], { query: Channel, message: Chat, send: Chat }, handlers);
-// now
-app.ws('/live', { message: Chat, send: Chat }, canJoin, validate({ query: Channel }), handlers);
-```
-
-In the list, a `defineWrap` was skipped on the upgrade; a middleware that
-awaits `next()` runs, and gets the stand-in. Each change is on
-[Upgrading](../upgrading.md).
 
 ## See also
 

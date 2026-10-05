@@ -1,8 +1,9 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
+import { refusalOf } from '../errors/errors';
 import type { StandardSchemaV1 } from '../schema/standard-schema';
 import { type AnyAlxia, alxia } from './alxia';
-import type { ResponseCookies } from './types';
+import { validate } from './validate';
 
 /** A schema written by hand: a `visits` cookie, as a number. */
 function visits(): StandardSchemaV1<unknown, { visits: number }> {
@@ -21,7 +22,7 @@ function visits(): StandardSchemaV1<unknown, { visits: number }> {
 	};
 }
 
-describe("a hook reads the request's cookies", () => {
+describe("a middleware reads the request's cookies", () => {
 	test('a derive reads a request cookie from ctx.cookies', async () => {
 		const app = alxia()
 			.derive(({ cookies }) => {
@@ -48,34 +49,40 @@ describe("a hook reads the request's cookies", () => {
 		expect(await response.json()).toEqual({ fromResponse: null });
 	});
 
-	test('wrap, onError and onRefusal read them too', async () => {
+	test('a try/catch middleware reads them, answering an error or a refusal', async () => {
 		const seen: string[] = [];
 		const app = alxia()
-			.wrap(({ cookies }, next) => {
-				seen.push(`wrap:${cookies['sid']}`);
-				return next();
+			.use(async ({ cookies, reply }, next) => {
+				seen.push(`in:${cookies['sid']}`);
+				try {
+					return await next();
+				} catch (error) {
+					const sid = cookies['sid'] ?? null;
+					return refusalOf(error) === undefined
+						? reply(500, { sid })
+						: reply(400, { sid });
+				}
 			})
-			.onError((_error, { cookies, reply }) =>
-				reply(500, { sid: cookies['sid'] ?? null }),
-			)
-			.onRefusal((_refusal, { cookies, reply }) =>
-				reply(400, { sid: cookies['sid'] ?? null }),
-			)
 			.get('/boom', () => {
 				throw new Error('boom');
 			})
-			.get('/n', { query: z.object({ n: z.string() }) }, ({ reply }) =>
-				reply(200, 'ok'),
+			.get(
+				'/n',
+				validate({ query: z.object({ n: z.string() }) }),
+				({ reply }) => reply(200, 'ok'),
 			);
 		const headers = { cookie: 'sid=abc' };
 		const failed = await app.request('/boom', { headers });
+		expect(failed.status).toBe(500);
 		expect(await failed.json()).toEqual({ sid: 'abc' });
 		const refused = await app.request('/n', { headers });
 		expect(refused.status).toBe(400);
 		expect(await refused.json()).toEqual({ sid: 'abc' });
-		expect(seen).toEqual(['wrap:abc', 'wrap:abc']);
+		expect(seen).toEqual(['in:abc', 'in:abc']);
 	});
+});
 
+describe("a route's cookies without a schema", () => {
 	test('a route without a cookies schema gives its handler the same map', async () => {
 		const app = alxia().get('/raw', ({ cookies, reply }) => {
 			expectTypeOf(cookies).toEqualTypeOf<Readonly<Record<string, string>>>();
@@ -111,12 +118,34 @@ describe("a hook reads the request's cookies", () => {
 describe('a route with a cookies schema', () => {
 	const app = alxia()
 		.derive(({ cookies }) => ({ raw: cookies['visits'] ?? null }))
-		.onError((_error, { cookies, reply }) => reply(500, { cookies }))
-		.get('/visits', { cookies: visits() }, ({ cookies, raw, reply }) => {
-			expectTypeOf(cookies).toEqualTypeOf<{ visits: number }>();
-			return reply(200, { visits: cookies.visits, raw });
+		.use(async ({ cookies, reply }, next) => {
+			try {
+				return await next();
+			} catch (error) {
+				if (refusalOf(error) !== undefined) throw error;
+				return reply(500, { cookies });
+			}
 		})
-		.get('/after', { cookies: visits() }, () => {
+		.get(
+			'/visits',
+			validate({ cookies: visits() }),
+			({ cookies, raw, reply }) => {
+				expectTypeOf(cookies).toEqualTypeOf<{ visits: number }>();
+				return reply(200, { visits: cookies.visits, raw });
+			},
+		)
+		.get(
+			'/order',
+			({ cookies }, next) => next({ before: cookies['visits'] }),
+			validate({ cookies: visits() }),
+			({ cookies }, next) => next({ after: cookies.visits }),
+			({ before, after, reply }) => {
+				expectTypeOf(before).toEqualTypeOf<string | undefined>();
+				expectTypeOf(after).toEqualTypeOf<number>();
+				return reply(200, { before, after });
+			},
+		)
+		.get('/after', validate({ cookies: visits() }), () => {
 			throw new Error('after validation');
 		});
 
@@ -125,6 +154,13 @@ describe('a route with a cookies schema', () => {
 			headers: { cookie: 'visits=3' },
 		});
 		expect(await response.json()).toEqual({ visits: 3, raw: '3' });
+	});
+
+	test('a middleware reads them raw before validate, validated after', async () => {
+		const response = await app.request('/order', {
+			headers: { cookie: 'visits=3' },
+		});
+		expect(await response.json()).toEqual({ before: '3', after: 3 });
 	});
 
 	test('still refuses what its schema refuses', async () => {
@@ -138,44 +174,12 @@ describe('a route with a cookies schema', () => {
 		});
 	});
 
-	test('leaves the hooks the cookies as they arrived, past validation too', async () => {
+	test('leaves a middleware before validate the cookies as they arrived, past validation too', async () => {
 		const response = await app.request('/after', {
 			headers: { cookie: 'visits=3' },
 		});
-		// onError reads strings, as its type says, not the schema's number.
+		// The catching middleware reads strings, as its type says, not the schema's number.
 		expect(await response.json()).toEqual({ cookies: { visits: '3' } });
-	});
-});
-
-describe('set.cookies', () => {
-	test('still sets the response cookies, from a hook and a handler', async () => {
-		const app = alxia()
-			.derive(({ set }) => {
-				expectTypeOf(set.cookies).toEqualTypeOf<ResponseCookies>();
-				set.cookies.set('seen', '1', { path: '/' });
-			})
-			.post('/login', ({ set, reply }) => {
-				set.cookies.set('sid', 'abc', { httpOnly: true, path: '/' });
-				// What this response set reads back.
-				return reply(200, { sid: set.cookies.get('sid') });
-			});
-		const response = await app.request('/login', { method: 'POST' });
-		expect(await response.json()).toEqual({ sid: 'abc' });
-		const cookies = response.headers.getSetCookie();
-		expect(cookies).toHaveLength(2);
-		expect(cookies[0]).toContain('seen=1');
-		expect(cookies[1]).toContain('sid=abc');
-		expect(cookies[1]).toContain('HttpOnly');
-	});
-
-	test('a request cookie is not echoed back as a Set-Cookie', async () => {
-		const app = alxia()
-			.derive(({ cookies }) => ({ sid: cookies['sid'] }))
-			.get('/', ({ reply }) => reply(204));
-		const response = await app.request('/', {
-			headers: { cookie: 'sid=abc' },
-		});
-		expect(response.headers.getSetCookie()).toEqual([]);
 	});
 });
 
@@ -212,17 +216,13 @@ describe('a socket', () => {
 	});
 
 	test('reads the validated values with one', async () => {
-		const app = alxia().ws(
-			'/visits',
-			{ cookies: visits() },
-			{
-				open: (socket) => {
-					expectTypeOf(socket.data.cookies).toEqualTypeOf<{ visits: number }>();
-					void socket.send(socket.data.cookies);
-				},
-				message: () => {},
+		const app = alxia().ws('/visits', validate({ cookies: visits() }), {
+			open: (socket) => {
+				expectTypeOf(socket.data.cookies).toEqualTypeOf<{ visits: number }>();
+				void socket.send(socket.data.cookies);
 			},
-		);
+			message: () => {},
+		});
 		expect(await opened(app, '/visits')).toEqual({ visits: 3 });
 	});
 });

@@ -59,14 +59,3 @@ describe('use(middleware) after routes', () => {
 		expect(warned()).toEqual([]);
 	});
 });
-
-describe('plugin(middleware), deprecated, after routes', () => {
-	test('says it runs on them, untyped', () => {
-		alxia()
-			.get('/a', ({ reply }) => reply(200, 'a'))
-			.plugin(pass);
-		expect(warned()[0]).toContain(
-			'plugin(middleware) is deprecated: the middleware runs on every route, the route (GET /a) declared before it included',
-		);
-	});
-});

@@ -17,7 +17,7 @@ import type { RouterContextProvider, ServerBuild } from 'react-router';
 import { declareClient, reactRouter } from './react-router';
 
 /** An app as `alxia()` makes it: what `beforeAll`, or `configure`, receives. */
-export type FreshApp = Alxia<Empty, '', never>;
+export type FreshApp = Alxia<Empty, ''>;
 
 /**
  * What the Vite plugin hands the server, and a test passes to `create`:

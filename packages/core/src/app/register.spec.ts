@@ -28,7 +28,7 @@ async function typecheck(name: string): Promise<string> {
 describe('Register, unregistered', () => {
 	test('AppContext is the base context, defineRoutes requires nothing', async () => {
 		expectTypeOf<AppContext>().toEqualTypeOf<BaseContext & Empty>();
-		expectTypeOf<RegisteredBase>().toEqualTypeOf<Alxia<Empty, '', never>>();
+		expectTypeOf<RegisteredBase>().toEqualTypeOf<Alxia<Empty, ''>>();
 		const routes = defineRoutes('/todos').get('/', ({ route, reply }) =>
 			reply(200, route),
 		);
@@ -49,9 +49,7 @@ describe('Register, unregistered', () => {
 		expectTypeOf<RegisteredOf<{ context: typeof base }>>().toEqualTypeOf<
 			typeof base
 		>();
-		expectTypeOf<RegisteredOf<object>>().toEqualTypeOf<
-			Alxia<Empty, '', never>
-		>();
+		expectTypeOf<RegisteredOf<object>>().toEqualTypeOf<Alxia<Empty, ''>>();
 		expectTypeOf<
 			RegisteredOf<{ context: ContextOf<typeof base> }>
 		>().toEqualTypeOf<InvalidRegister>();
@@ -62,6 +60,11 @@ describe('Register, augmented', () => {
 	test('a route file reads the registered context with no import of the app; mounting it early is refused', async () => {
 		// Every refusal there is a @ts-expect-error: no output is each one failing.
 		expect(await typecheck('split')).toBe('');
+	}, 30_000);
+
+	test('defineMiddleware(fn) reads the registered context; the base says Empty for its own', async () => {
+		// Every refusal there is a @ts-expect-error: no output is each one failing.
+		expect(await typecheck('middleware')).toBe('');
 	}, 30_000);
 
 	test('registering the app that mounts the routes is a cycle', async () => {

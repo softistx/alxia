@@ -1,17 +1,15 @@
 /**
  * A route's own run, once the router has found it: one loop over its
- * chain — the hooks and middlewares in force where it was declared, then
+ * chain — the `derive`s and middlewares in force where it was declared, then
  * its own, its validation among them, in the order declared — then its
  * handler. A request no route matches runs the app's chain the same way,
  * before its 404. A middleware given a path runs when the request's path
  * matches it. What any of it throws is answered by `boundary.ts`.
  */
-import { ValidationError } from '../errors/errors';
 import { type AnyReply, Reply } from '../reply/reply';
 import type { StatusCode } from '../types/status';
-import { middleware, wrapped } from './chain-middleware';
+import { middleware } from './chain-middleware';
 import type { ChainHook } from './definition';
-import { refuse } from './refusal';
 import { matches, type ScopePath } from './scope-path';
 import { checkReply, isRedirect, send } from './send';
 import type { BaseContext, ResponseSchemas } from './types';
@@ -21,17 +19,14 @@ type Ctx = Record<string, unknown> & BaseContext;
 type Settles<T> = T | Promise<T>;
 type Responses = ResponseSchemas | undefined;
 
-const NONE: readonly ChainHook[] = [];
-
 /**
  * Runs the chain of a route, step by step: a `derive` adds to the context
- * or ends the request, a `wrap` or a middleware runs the rest inside it,
- * a `validate` checks the request, a `responds` checks every reply after
- * it; past the last, `last` — the handler — reads the context they built.
- * Each reply is checked by the `responds` in force where it is made, then
- * sent. A socket's upgrade skips the `wrap` hooks and the `responds`: it
- * has no response to wrap or check. A step may throw at once: the caller
- * awaits it inside its `try`.
+ * or ends the request, a middleware runs the rest inside it, a `validate`
+ * checks the request, a `responds` checks every reply after it; past the
+ * last, `last` — the handler — reads the context they built. Each reply is
+ * checked by the `responds` in force where it is made, then sent. A
+ * socket's upgrade skips the `responds`: it has no response to check. A
+ * step may throw at once: the caller awaits it inside its `try`.
  */
 export function chain<Last>(
 	run: ChainRun,
@@ -49,12 +44,10 @@ export function chain<Last>(
  */
 class Runner<Last> {
 	readonly #run: ChainRun;
-	/** The route's own context: what `onError` reads, and the request's cookies. */
+	/** The route's own context: the request's cookies, as they arrived. */
 	readonly #ctx: Ctx;
 	readonly #last: (ctx: Ctx) => Promise<AnyReply | Response | Last>;
 	readonly #socket: boolean;
-	/** The app-wide middlewares, steps before the route's chain. */
-	readonly #before: readonly ChainHook[];
 
 	constructor(
 		run: ChainRun,
@@ -65,7 +58,6 @@ class Runner<Last> {
 		this.#ctx = ctx;
 		this.#last = last;
 		this.#socket = !('method' in run.definition);
-		this.#before = run.appWide ?? NONE;
 	}
 
 	/**
@@ -80,12 +72,9 @@ class Runner<Last> {
 
 	step(from: number, ctx: Ctx, given: Responses): Settles<Response | Last> {
 		const steps = this.#run.definition.derive;
-		const before = this.#before;
 		let responses = given;
 		for (let index = from; ; index++) {
-			const hook = (
-				index < before.length ? before[index] : steps[index - before.length]
-			) as ChainHook | undefined;
+			const hook = steps[index] as ChainHook | undefined;
 			if (hook === undefined) {
 				return this.#answer(this.#last(ctx), responses, true);
 			}
@@ -110,9 +99,6 @@ class Runner<Last> {
 					continue;
 				case 'validate':
 					return this.#validate(hook.schemas, index + 1, ctx, responses);
-				case 'wrap':
-					if (this.#socket) continue;
-					return this.#wrap(hook.run, index + 1, ctx, responses);
 				case 'middleware': {
 					if (hook.when !== undefined && !this.#under(hook.when)) continue;
 					const at = responses;
@@ -160,31 +146,6 @@ class Runner<Last> {
 	): Promise<Response | Last> {
 		return validateStep(this.#run, schemas, ctx, this.#ctx.cookies).then(
 			(validated) => this.step(next, validated, responses),
-		);
-	}
-
-	/**
-	 * A `wrap` around the rest. Its `next()` resolves to what 0.3 resolved
-	 * it to: a refusal of a `validate` after it answered — by the
-	 * `onRefusal` hooks, or the 400 — rather than thrown, as it is to a
-	 * middleware.
-	 */
-	#wrap(
-		hook: Parameters<typeof wrapped>[0],
-		next: number,
-		ctx: Ctx,
-		responses: Responses,
-	): Settles<Response | Last> {
-		const run = this.#run;
-		const rest = () =>
-			this.#rest(next, ctx, responses).catch((error: unknown) => {
-				if (!(error instanceof ValidationError)) throw error;
-				const { definition, set, validateResponses } = run;
-				return refuse(definition, error.refusal, set, ctx, validateResponses);
-			});
-		return this.#answer(
-			wrapped(hook, ctx, rest) as Promise<Response | Last>,
-			responses,
 		);
 	}
 

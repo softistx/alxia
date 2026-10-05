@@ -11,7 +11,6 @@ where the middleware sits in the app, and what those options return.
 **Types**
 
 - [`Property 'log' does not exist on type 'Context<…>'`](#property-log-does-not-exist-on-type-context)
-- [`'log' is possibly 'undefined'`](#log-is-possibly-undefined)
 
 **Responses**
 
@@ -55,37 +54,6 @@ const app = alxia()
 		log.info('early');
 		return reply(200, 'ok');
 	});
-```
-
-### `'log' is possibly 'undefined'`
-
-```text
-error TS18048: 'log' is possibly 'undefined'.
-```
-
-**When:** a deprecated `onError` hook, or a callback that runs outside the
-chain, calls `log.error(…)`.
-
-**Why:** an `onError` hook also runs for an error thrown before
-`logger()` had run, when there is no `log` yet. A middleware after
-`logger()` has no such doubt: `log` is typed there.
-
-**Fix:** catch in a middleware declared after `logger()`, with a `try`/`catch`
-around `next()`, and read `log` there:
-
-```ts
-import { alxia, defineMiddleware } from '@alxia/core';
-
-app.use(logger()).use(
-	defineMiddleware(async ({ log }, next) => {
-		try {
-			return await next();
-		} catch (error) {
-			log.error('request failed', { error: String(error) });
-			throw error; // rethrow what is not yours
-		}
-	}),
-);
 ```
 
 ## Responses
@@ -231,7 +199,7 @@ in its own format (a 503, a problem document), and the log line for that
 request shows a 500.
 
 **Why:** `logger()` settles `next()`: it logs the response the error would be
-answered with, a 500 when no `onError` or `HttpError` says otherwise, then
+answered with, an `HttpError`'s status or a 500, then
 the error goes on to the middlewares around it. Declared **before**
 `logger()`, the catcher still catches the error, but the logger inside it
 saw the 500, not its reply. The same holds for `telemetry()` and

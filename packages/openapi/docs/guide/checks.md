@@ -90,9 +90,8 @@ check, a page, an admin route.
 
 ## `matchesSpec`
 
-Called `exactly` until 0.2.0 of `@alxia/openapi-routes`: `exactly` and
-`ExactlyOptions` still work, deprecated, and their messages still start
-with `exactly():`.
+Called `exactly` until 0.2.0 of `@alxia/openapi-routes`; `exactly` and
+`ExactlyOptions` were removed in 0.5.
 
 ```text
 TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset

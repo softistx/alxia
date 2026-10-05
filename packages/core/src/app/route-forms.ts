@@ -3,7 +3,6 @@
  * context each middleware reads, the handler after them, and the app the
  * call returns.
  */
-import type { AnyReply } from '../reply/reply';
 import type { JoinPath } from '../types/path';
 import type { Alxia } from './alxia';
 import type {
@@ -12,7 +11,6 @@ import type {
 	MaybePromise,
 	Method,
 	MiddlewareBase,
-	NextFunction,
 	RouteDetail,
 	ThreadContext,
 	ThreadSchema,
@@ -61,7 +59,6 @@ export interface AppTypes {
 	readonly method: Method;
 	readonly ctx: object;
 	readonly prefix: string;
-	readonly shortcuts: AnyReply;
 }
 
 /** The context of the first middleware of a route at `Path` on `App`. */
@@ -71,18 +68,14 @@ export type RouteBase<
 > = MiddlewareBase<App['ctx'], JoinPath<App['prefix'], Path>>;
 
 /**
- * A middleware of a route at `Path` on `App`, after the middlewares that
- * returned `Before`: it reads their context, and returns `Result`.
+ * What a middleware of a route at `Path` on `App` reads, after the
+ * middlewares that returned `Before`: the context they built.
  */
-export type RouteMiddleware<
+export type RouteReads<
 	App extends AppTypes,
 	Path extends string,
 	Before extends readonly unknown[],
-	Result,
-> = (
-	ctx: ThreadContext<RouteBase<App, Path>, Before>,
-	next: NextFunction,
-) => Result;
+> = ThreadContext<RouteBase<App, Path>, Before>;
 
 /** The handler of a route at `Path` on `App`, after the middlewares that returned `Results`. */
 export type RouteHandler<
@@ -103,12 +96,11 @@ export type RouteResult<Results extends readonly unknown[]> = HandlerResult<
 >;
 
 /**
- * What a route method returns: `App` itself, its context, prefix and
- * shortcuts unchanged. A route adds nothing to the app's type: the
- * OpenAPI document is the contract a client is generated from.
+ * What a route method returns: `App` itself, its context and prefix
+ * unchanged. A route adds nothing to the app's type: the OpenAPI document
+ * is the contract a client is generated from.
  */
 export type AppWithRoute<App extends AppTypes> = Alxia<
 	App['ctx'],
-	App['prefix'],
-	App['shortcuts']
+	App['prefix']
 >;

@@ -37,8 +37,8 @@ describe('declaring', () => {
 
 	test('a hook method taken off the app stays bound to it', async () => {
 		const app = alxia();
-		const { onRequest } = app;
-		onRequest(() => new Response(null, { status: 418 }));
+		const { use } = app;
+		use(() => new Response(null, { status: 418 }));
 		expect((await app.request('/')).status).toBe(418);
 	});
 });

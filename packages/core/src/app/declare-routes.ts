@@ -14,7 +14,7 @@ import { operationArgs, type RouteOperation } from './route-operation';
 import { routeArgs, routeChain } from './route-steps';
 import type { Method } from './types';
 
-/** `app[method](path, ...rest)`: a route, behind the hooks in force. */
+/** `app[method](path, ...rest)`: a route, behind the middlewares in force. */
 export function addRoute(
 	state: AppState,
 	method: Method,
@@ -86,8 +86,8 @@ export function addPageAt(
 }
 
 /**
- * `app.ws(path, options?, ...middlewares, handlers)`, or `app.ws(path,
- * [hooks]?, schema, handlers)`: a socket route, behind the hooks in force.
+ * `app.ws(path, options?, ...middlewares, handlers)`: a socket route,
+ * behind the middlewares in force.
  */
 export function addSocket(
 	state: AppState,

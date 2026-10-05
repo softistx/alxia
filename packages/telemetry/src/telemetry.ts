@@ -2,7 +2,6 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
 	type Next,
 	type RequestContext,
 	settle,
@@ -65,8 +64,7 @@ export interface TelemetryContext {
 export type TelemetryMiddleware = Middleware<
 	Empty,
 	Promise<Next<TelemetryContext>>
-> &
-	MiddlewareMark & { telemetry: Telemetry };
+> & { telemetry: Telemetry };
 
 /**
  * One server span per request, with [`@nxgt/telemetry`](https://www.npmjs.com/package/@nxgt/telemetry),

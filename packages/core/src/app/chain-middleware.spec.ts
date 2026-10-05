@@ -42,9 +42,15 @@ describe('a middleware that calls next() and returns nothing', () => {
 		expect(await later.text()).toBe('later');
 	});
 
-	test("passes the rest's error on to the route's onError hooks", async () => {
+	test("passes the rest's error on to a try/catch middleware around it", async () => {
 		const app = alxia()
-			.onError((error, { reply }) => reply(503, String(error)))
+			.use(async ({ reply }, next) => {
+				try {
+					return await next();
+				} catch (error) {
+					return reply(503, String(error));
+				}
+			})
 			.get(
 				'/',
 				(async (_ctx: unknown, next: () => Promise<Response>) => {

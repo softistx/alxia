@@ -2,22 +2,17 @@
  * The types of what an app serves from files: `static`, a directory under a
  * path; `file`, one file at a path; `page`, one of Bun's HTML bundles.
  */
-import type { AnyReply } from '../reply/reply';
 import type { FileOptions, FileSource, StaticOptions } from '../static/types';
 import type { PathAt, RoutePath, StaticPath } from '../types/path';
 import type { Alxia } from './alxia';
 import type { BaseContext, MaybePromise } from './types';
 
 /** `app.static(path, source, options?)`. */
-export interface StaticMethod<
-	Ctx extends object,
-	Prefix extends string,
-	Shortcuts extends AnyReply,
-> {
+export interface StaticMethod<Ctx extends object, Prefix extends string> {
 	/**
 	 * A directory of files — or any `FileSource` — served under `path`: a
 	 * `GET` route at `path/*`, typed and documented like any other, every
-	 * hook around it.
+	 * middleware around it.
 	 *
 	 * ```ts
 	 * app.static('/assets', './public', {
@@ -35,15 +30,11 @@ export interface StaticMethod<
 		path: PathAt<Prefix, Path, StaticPath<Path>>,
 		source: FileSource,
 		options?: StaticOptions,
-	): Alxia<Ctx, Prefix, Shortcuts>;
+	): Alxia<Ctx, Prefix>;
 }
 
 /** `app.file(path, file, options?)`. */
-export interface FileMethod<
-	Ctx extends object,
-	Prefix extends string,
-	Shortcuts extends AnyReply,
-> {
+export interface FileMethod<Ctx extends object, Prefix extends string> {
 	/**
 	 * One file at `path`: a path on disk, read anew on each request, a `Blob`,
 	 * or a function answering one — `null` a 404. `/favicon.ico`,
@@ -57,7 +48,7 @@ export interface FileMethod<
 			| Blob
 			| ((ctx: BaseContext & Ctx) => MaybePromise<Blob | null | undefined>),
 		options?: FileOptions,
-	): Alxia<Ctx, Prefix, Shortcuts>;
+	): Alxia<Ctx, Prefix>;
 }
 
 /** `app.page(path, bundle)`. */
@@ -66,7 +57,7 @@ export interface PageMethod<Prefix extends string, App> {
 	 * A page of Bun's full-stack bundling: `import index from './index.html'`,
 	 * its scripts and styles bundled by Bun — with hot reloading under
 	 * `development` — and served by `Bun.serve` itself. So it needs `listen`,
-	 * and the app's hooks do not run around it; `app.fetch` answers it 404.
+	 * and the app's middlewares do not run around it; `app.fetch` answers it 404.
 	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	<const Path extends RoutePath>(

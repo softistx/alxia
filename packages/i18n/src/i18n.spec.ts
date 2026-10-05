@@ -56,13 +56,20 @@ describe('i18n', () => {
 	});
 });
 
-describe('onError', () => {
-	test("an error hook speaks the request's language", async () => {
+describe('an error answered', () => {
+	test("a try/catch middleware after it speaks the request's language", async () => {
 		const failing = alxia()
 			.use(i18n)
-			.onError((_error, { reply }) =>
-				reply(500, { message: i18n.t('home.title'), nxgt: getLanguage() }),
-			)
+			.use(async ({ reply }, next) => {
+				try {
+					return await next();
+				} catch {
+					return reply(500, {
+						message: i18n.t('home.title'),
+						nxgt: getLanguage(),
+					});
+				}
+			})
 			.get('/boom', async () => {
 				await Bun.sleep(1);
 				throw new Error('boom');

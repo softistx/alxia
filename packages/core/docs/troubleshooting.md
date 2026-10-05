@@ -8,52 +8,43 @@ a trap that prints nothing is headed by its symptom.
 
 - [`the params schema must accept the parameters of "…", which arrive as strings`](#the-params-schema-must-accept-the-parameters-of--which-arrive-as-strings)
 - [`the params schema reads "…", which "…" does not declare`](#the-params-schema-reads--which--does-not-declare)
-- [`'quey' does not exist in type 'RouteSchema'`](#quey-does-not-exist-in-type-routeschema)
-- [`'299' does not exist in type 'ResponseSchemas'`](#299-does-not-exist-in-type-responseschemas)
+- [`'quey' does not exist in type 'OptionsOnly<FunctionLike | RouteOptions>'`](#quey-does-not-exist-in-type-optionsonlyfunctionlike--routeoptions)
+- [`'299' does not exist in type 'RouteOperation | ResponseSchemas'`](#299-does-not-exist-in-type-routeoperation--responseschemas)
 - [`Argument of type '201' is not assignable to parameter of type '200'`](#argument-of-type-201-is-not-assignable-to-parameter-of-type-200)
 - [`Type 'string' is not assignable to type 'number'` on a `reply`](#type-string-is-not-assignable-to-type-number-on-a-reply)
 - [`Type 'Response' is not assignable to type 'MaybePromise<AnyReply>'`](#type-response-is-not-assignable-to-type-maybepromiseanyreply)
-- [`Property 'user' does not exist on type 'Context<…>'`](#property-user-does-not-exist-on-type-context)
-- [`… is not assignable to type 'MadeByDefineMiddleware'`](#-is-not-assignable-to-type-madebydefinemiddleware)
+- [`Property 'user' does not exist on type 'RouteBase<…>'`](#property-user-does-not-exist-on-type-routebase), and `… on type 'BaseContext & Empty'`
+- [``… is not assignable to type '"`user` is missing from the context: add a middleware that gives it before this one"'``](#-is-not-assignable-to-type-user-is-missing-from-the-context-add-a-middleware-that-gives-it-before-this-one)
+- [``… is not assignable to type '"`user` is in the context with another type than this middleware reads"'``](#-is-not-assignable-to-type-user-is-in-the-context-with-another-type-than-this-middleware-reads)
+- [`… is not assignable to type '"the context in force here does not give what this middleware reads"'`](#-is-not-assignable-to-type-the-context-in-force-here-does-not-give-what-this-middleware-reads)
+- [``… is not assignable to type '"the path parameter `id` is not in this route's path"'``](#-is-not-assignable-to-type-the-path-parameter-id-is-not-in-this-routes-path)
+- [`… is not assignable to type '"the path parameters are read with another type than the strings they arrive as"'`](#-is-not-assignable-to-type-the-path-parameters-are-read-with-another-type-than-the-strings-they-arrive-as)
 - [`the plugin reads "…", which this app's context does not give: add the plugin or middleware that gives it first`](#the-plugin-reads--which-this-apps-context-does-not-give-add-the-plugin-or-middleware-that-gives-it-first)
 - [`the plugin reads "…", which this app's context gives with another type`](#the-plugin-reads--which-this-apps-context-gives-with-another-type)
 - [`this app's context does not give what the plugin reads`](#this-apps-context-does-not-give-what-the-plugin-reads)
 - [`the plugin's … reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins--reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 - [`… is not assignable to type 'ProvidedBy<C, …>'`](#-is-not-assignable-to-type-providedbyc-)
-- [`the hook reads "…", which this route's context does not give: derive it before this route, or earlier in its list`](#the-hook-reads--which-this-routes-context-does-not-give-derive-it-before-this-route-or-earlier-in-its-list)
-- [`the hook reads "…", which this route's context gives with another type`](#the-hook-reads--which-this-routes-context-gives-with-another-type)
-- [`the hook reads the path parameter "…", which this route's path does not declare`](#the-hook-reads-the-path-parameter--which-this-routes-path-does-not-declare)
-- [`the hook reads the path parameter "…" as another type than the string it arrives as`](#the-hook-reads-the-path-parameter--as-another-type-than-the-string-it-arrives-as)
-- [`the hook reads the query parameter "…" as another type than the string | readonly string[] it arrives as`](#the-hook-reads-the-query-parameter--as-another-type-than-the-string--readonly-string-it-arrives-as)
-- [`the hook reads the cookie "…" as another type than the string it arrives as`](#the-hook-reads-the-cookie--as-another-type-than-the-string-it-arrives-as)
-- [`the hook reads "body", which no hook reads: the body is validated after the hooks, so read it in the handler`](#the-hook-reads-body-which-no-hook-reads-the-body-is-validated-after-the-hooks-so-read-it-in-the-handler)
-- [`this route's context does not give what the hook reads`](#this-routes-context-does-not-give-what-the-hook-reads)
-- [`a route's hooks are a list written in the call, [first, second]: a list of unknown length cannot be checked`](#a-routes-hooks-are-a-list-written-in-the-call-first-second-a-list-of-unknown-length-cannot-be-checked)
-- [`a route takes at most 8 hooks in its list: derive the rest in a group around it`](#a-route-takes-at-most-8-hooks-in-its-list-derive-the-rest-in-a-group-around-it)
-- [`Type '…' is not assignable to type 'MaybePromise<unique symbol>'`](#type--is-not-assignable-to-type-maybepromiseunique-symbol), and `Type 'Promise<Next<…>>' is not assignable to type 'unique symbol'`
-- [`Types of property 'body' are incompatible. Type 'undefined' is not assignable to type '…'`](#types-of-property-body-are-incompatible-type-undefined-is-not-assignable-to-type-), on `route(operation, …)`
-- [`Property 'user' does not exist on type 'RouteBase<…>'`](#property-user-does-not-exist-on-type-routebase)
-- [`Property 'user' is missing in type 'RouteBase<…>' but required in type '{ user: User; }'`](#property-user-is-missing-in-type-routebase-but-required-in-type--user-user-)
-- [`Property 'id' is missing in type 'Readonly<Record<string, string>> & PathParams<"…">'`](#property-id-is-missing-in-type-readonlyrecordstring-string--pathparams)
+- [`Type 'Promise<Next<…>>' is not assignable to type 'unique symbol'`](#type-promisenext-is-not-assignable-to-type-unique-symbol)
+- [`Type 'undefined' is not assignable to type '…'`](#type-undefined-is-not-assignable-to-type--on-routeoperation-), and `'body' is possibly 'undefined'`, on `route(operation, …)`
 - [`Type '…' is not assignable to type 'never'` in a route's options](#type--is-not-assignable-to-type-never-in-a-routes-options)
-- [`Type 'Middleware<…>' has no properties in common with type 'OptionsOnly<RouteOptions>'`](#type-middleware-has-no-properties-in-common-with-type-optionsonlyrouteoptions), `Expected 2-11 arguments, but got 12` and, on `route()`, `Expected 2-10 arguments, but got 11`
+- [`Argument of type 'Middleware<…>[]' is not assignable to parameter of type 'OptionsOnly<FunctionLike | RouteOptions>'`](#argument-of-type-middleware-is-not-assignable-to-parameter-of-type-optionsonlyfunctionlike--routeoptions)
+- [`Expected 20 arguments, but got 11`](#expected-20-arguments-but-got-11), and the other errors of nine middlewares
 - [`Type 'string' is not assignable to type 'MiddlewareReturn'`](#type-string-is-not-assignable-to-type-middlewarereturn)
-- [`'response' does not exist in type 'RequestSchemas'`](#response-does-not-exist-in-type-requestschemas)
+- [`'response' does not exist in type 'RouteOperation | RequestSchemas'`](#response-does-not-exist-in-type-routeoperation--requestschemas)
 - [`route() needs the path as a literal: declare the operation as const`](#route-needs-the-path-as-a-literal-declare-the-operation-as-const)
 - [`route() needs one method: declare the operation as const`](#route-needs-one-method-declare-the-operation-as-const)
 - [`Argument of type '"…"' is not assignable to parameter of type '"Invalid path: …"'`](#argument-of-type--is-not-assignable-to-parameter-of-type-invalid-path-)
 - [`… is not assignable to type '"Invalid middleware: a middleware given a path may add nothing to the context, …"'`](#-is-not-assignable-to-type-invalid-middleware-a-middleware-given-a-path-may-add-nothing-to-the-context-)
-- [`Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`](#type-reply500--is-not-assignable-to-type-maybepromisevoid--replyclienterrorstatus-any--undefined)
-- [`'500' does not exist in type 'RefusalResponses'`](#500-does-not-exist-in-type-refusalresponses)
-- [`The inferred type of '…' cannot be named without a reference to '…' from '…/@alxia/core/dist/…'`](#the-inferred-type-of--cannot-be-named-without-a-reference-to--from-alxiacoredist)
-- [`Argument of type '"validation" | "body_limit"' is not assignable to parameter of type 'never'`](#argument-of-type-validation--body_limit-is-not-assignable-to-parameter-of-type-never)
+- [`Type 'Alxia<Empty, "">' provides no match for the signature '(ctx: BaseContext & Empty, next: NextFunction): MiddlewareReturn'`](#type-alxiaempty--provides-no-match-for-the-signature-ctx-basecontext--empty-next-nextfunction-middlewarereturn), on `use(app)`
+- [`Target signature provides too few arguments. Expected 2 or more, but got 1.`](#target-signature-provides-too-few-arguments-expected-2-or-more-but-got-1), on `plugin(middleware)`
 - [`Property 'part' does not exist on type 'Refusal'`](#property-part-does-not-exist-on-type-refusal)
-- [`Module '"@alxia/core"' has no exported member 'RoutesOf'`](#module-alxiacore-has-no-exported-member-routesof)
-- [`Generic type 'Alxia<Ctx, Prefix, Shortcuts>' requires between 0 and 3 type arguments`](#generic-type-alxiactx-prefix-shortcuts-requires-between-0-and-3-type-arguments)
+- [`The inferred type of '…' cannot be named without a reference to '…' from '…/@alxia/core/dist/…'`](#the-inferred-type-of--cannot-be-named-without-a-reference-to--from-alxiacoredist)
+- [`Module '"@alxia/core"' has no exported member 'RoutesOf'`](#module-alxiacore-has-no-exported-member-routesof), and the names removed in 0.5
+- [`Generic type 'Alxia<Ctx, Prefix>' requires between 0 and 2 type arguments`](#generic-type-alxiactx-prefix-requires-between-0-and-2-type-arguments)
 - [`'app' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer`](#app-implicitly-has-type-any-because-it-does-not-have-a-type-annotation-and-is-referenced-directly-or-indirectly-in-its-own-initializer), with `Register`
 - [`Property '…' does not exist on type 'BaseContext & { readonly 'Register.context must be typeof base, …': never; }'`](#property--does-not-exist-on-type-basecontext---readonly-registercontext-must-be-typeof-base--never-)
 - [`Subsequent property declarations must have the same type.  Property 'context' must be of type '…'`](#subsequent-property-declarations-must-have-the-same-type--property-context-must-be-of-type-)
-- [`Property 'user' does not exist on type 'MiddlewareContext<Empty>'`](#property-user-does-not-exist-on-type-middlewarecontextempty), with `Register`
+- [`Property 'db' does not exist on type 'BaseContext'.`](#property-db-does-not-exist-on-type-basecontext), with `Register`
 
 **Building the app**
 
@@ -68,34 +59,31 @@ a trap that prints nothing is headed by its symptom.
 - [`"…" declares ":…" twice`](#-declares--twice)
 - [`"…" has the shape of "…" with other parameter names`](#-has-the-shape-of--with-other-parameter-names)
 - [`GET /… is declared twice`](#get--is-declared-twice)
-- [`GET /…: hook 1 of the list is not a hook: make it with defineHook() or defineWrap()`](#get--hook-1-of-the-list-is-not-a-hook-make-it-with-definehook-or-definewrap)
-- [`defineHook(): the hook is not a function`](#definehook-the-hook-is-not-a-function)
-- [`GET /…: middleware 1 is not a function: make it with defineMiddleware(), validate() or responds()`](#get--middleware-1-is-not-a-function-make-it-with-definemiddleware-validate-or-responds)
-- [`GET /…: the options hold no schema: give validate(…) and responds(…) among the middlewares`](#get--the-options-hold-no-schema-give-validate-and-responds-among-the-middlewares)
+- [`GET /…: middleware 1 is not a function: a middleware is (ctx, next) => …, or a validate() or responds()`](#get--middleware-1-is-not-a-function-a-middleware-is-ctx-next---or-a-validate-or-responds)
+- [`GET /…: a route takes its middlewares after the path, not in a list: drop the brackets`](#get--a-route-takes-its-middlewares-after-the-path-not-in-a-list-drop-the-brackets)
+- [`GET /…: the options hold no schema (body): give validate(…) and responds(…) among the middlewares`](#get--the-options-hold-no-schema-body-give-validate-and-responds-among-the-middlewares)
 - [``WS /…: responds() checks replies, and a socket route sends none: check its messages with the `send` option``](#ws--responds-checks-replies-and-a-socket-route-sends-none-check-its-messages-with-the-send-option)
 - [`defineMiddleware(): the middleware is not a function`](#definemiddleware-the-middleware-is-not-a-function)
 - [`validate(): the schemas are not an object`](#validate-the-schemas-are-not-an-object), and `responds(): …`
 - [`GET /…: the handler is missing`](#get--the-handler-is-missing)
 - [`POST /…: bodyLimit must be a whole number of bytes, 0 or more; got …`](#post--bodylimit-must-be-a-whole-number-of-bytes-0-or-more-got-)
 - [`group(): build is missing`](#group-build-is-missing)
-- [`use(): middleware 2 was not made by defineMiddleware()`](#use-middleware-2-was-not-made-by-definemiddleware), and `use(): middleware 1 is a validate() or responds(), which belongs to a route`
-- [`use("…"): no middleware is given`](#use-no-middleware-is-given), and `use("/a/*/b"): "/a/*/b": "*" may only end a path`
+- [`use(): argument 1 is an app: a plugin is given to app.plugin(), use() takes middlewares`](#use-argument-1-is-an-app-a-plugin-is-given-to-appplugin-use-takes-middlewares)
+- [`use(): argument 1 is not a function: a middleware is (ctx, next) => …`](#use-argument-1-is-not-a-function-a-middleware-is-ctx-next--)
+- [`use(): argument 1 is a validate() or responds(), which belongs to a route`](#use-argument-1-is-a-validate-or-responds-which-belongs-to-a-route)
+- [`use(): no middleware is given`](#use-no-middleware-is-given), and `use("/a/*/b"): "/a/*/b": "*" may only end a path`
 - [`use("/admin/"): a path given to use() does not end with "/"`](#useadmin-a-path-given-to-use-does-not-end-with-)
-- [`plugin(): a plugin is given alone, to app.plugin(); middlewares are made with defineMiddleware() and given to use()`](#plugin-a-plugin-is-given-alone-to-appplugin-middlewares-are-made-with-definemiddleware-and-given-to-use), `plugin(): nothing is given: …`, and the same of `use()`
-- [`plugin(): the plugin is neither an app nor a function; a middleware is made with defineMiddleware() and given to use()`](#plugin-the-plugin-is-neither-an-app-nor-a-function-a-middleware-is-made-with-definemiddleware-and-given-to-use), and the same of `use()`
-- [`plugin(): a middleware is given to use(), not taken for a plugin`](#plugin-a-middleware-is-given-to-use-not-taken-for-a-plugin)
-- [`plugin(): the plugin function returned undefined, not an app: a plugin returns the app it is given; a middleware is made with defineMiddleware() and given to use()`](#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-made-with-definemiddleware-and-given-to-use), and `use(): the plugin function returned a promise, …` for a middleware written without `defineMiddleware`
-- [`GET /…: a list of hooks and middlewares are two forms, never mixed: give the hooks as middlewares, made by defineMiddleware()`](#get--a-list-of-hooks-and-middlewares-are-two-forms-never-mixed-give-the-hooks-as-middlewares-made-by-definemiddleware)
+- [`plugin(): a plugin is given alone: an app or a function that returns one; middlewares are given to use()`](#plugin-a-plugin-is-given-alone-an-app-or-a-function-that-returns-one-middlewares-are-given-to-use), and `plugin(): nothing is given: …`
+- [`plugin(): the plugin is neither an app nor a function that returns one; a middleware is given to use()`](#plugin-the-plugin-is-neither-an-app-nor-a-function-that-returns-one-a-middleware-is-given-to-use)
+- [`plugin(): the plugin function returned undefined, not an app: a plugin returns the app it is given; a middleware is given to use()`](#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-given-to-use), and `… returned a promise, …`
 - [`responds(): the operation GET /… declares no response`](#responds-the-operation-get--declares-no-response)
-- [`onRefusal(): the hook is missing`](#onrefusal-the-hook-is-missing)
-- [`onRefusal(): "…" is no kind of refusal; expected 'validation' or 'body_limit'`](#onrefusal--is-no-kind-of-refusal-expected-validation-or-body_limit)
 - [`page(): /… is already served`](#page--is-already-served)
 - [`GET /… is already served by a page`](#get--is-already-served-by-a-page)
 
 **Responses**
 
 - [`400 {"error":"validation","issues":[…]}`](#400-errorvalidationissues)
-- [A route still answers `{"error":"validation"}` after `onRefusal`](#a-route-still-answers-errorvalidation-after-onrefusal)
+- [A route still answers `{"error":"validation"}` after a middleware that catches refusals](#a-route-still-answers-errorvalidation-after-a-middleware-that-catches-refusals)
 - [`413 {"error":"content_too_large","limit":…}`](#413-errorcontent_too_largelimit)
 - [`404 {"error":"not_found"}`](#404-errornot_found)
 - [`405 {"error":"method_not_allowed"}`](#405-errormethod_not_allowed)
@@ -106,13 +94,13 @@ a trap that prints nothing is headed by its symptom.
 
 **Middlewares**
 
-- [`set.cookies.get()` returns null in a hook](#setcookiesget-returns-null-in-a-hook)
+- [`set.cookies.get()` returns null in a middleware](#setcookiesget-returns-null-in-a-middleware)
 - [A `use(path)` guard did not run on a request under its path](#a-usepath-guard-did-not-run-on-a-request-under-its-path)
 - [A `use(path)` guard runs on a path spelled otherwise, or in another case](#a-usepath-guard-runs-on-a-path-spelled-otherwise-or-in-another-case)
 - [`use(): the middleware runs on the routes declared after it …`](#use-the-middleware-runs-on-the-routes-declared-after-it-and-on-requests-no-route-matches-not-on-the--declared-before-it), a warning
-- [`plugin(): plugin(middleware) is deprecated: …`](#plugin-pluginmiddleware-is-deprecated-the-middleware-runs-on-every-route-the--declared-before-it-included-but-what-it-adds-to-the-context-is-typed-only-for-the-routes-after-it), a warning
 - [A path that does not exist answers `401`, not `404`](#a-path-that-does-not-exist-answers-401-not-404)
 - [A middleware's `try`/`catch` never sees the error](#a-middlewares-trycatch-never-sees-the-error)
+- [A middleware's `try`/`catch` sees an `AbortError` when the client left](#a-middlewares-trycatch-sees-an-aborterror-when-the-client-left)
 - [`Type 'string | undefined' is not assignable to type 'string'` on `ctx.route`](#type-string--undefined-is-not-assignable-to-type-string-on-ctxroute)
 - [A `use()` did not run for a route](#a-use-did-not-run-for-a-route)
 
@@ -130,7 +118,6 @@ a trap that prints nothing is headed by its symptom.
 - [`GET /…: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`](#get--a-middleware-returned-before-the-next-it-called-settled-the-rest-of-the-route-ran-anyway-await-next-or-return-it), a warning
 - [`TypeError: validate() runs among a route's middlewares, not called on its own`](#typeerror-validate-runs-among-a-routes-middlewares-not-called-on-its-own), and `responds() …`
 - [`TypeError: … the handler returned no reply. Return ctx.reply(status, body).`](#typeerror--the-handler-returned-no-reply-return-ctxreplystatus-body)
-- [`TypeError: … the onRefusal hook returned neither a reply nor nothing.`](#typeerror--the-onrefusal-hook-returned-neither-a-reply-nor-nothing)
 - [`TypeError: Body already used`](#typeerror-body-already-used), with `500 {"error":"internal"}`
 - [`TypeError: An event does not match its schema`](#typeerror-an-event-does-not-match-its-schema)
 - [`TypeError: An event id must not hold a line break or a NUL`](#typeerror-an-event-id-must-not-hold-a-line-break-or-a-nul), and `An event id must be a string`
@@ -151,11 +138,11 @@ could not honour. Each one below is what `tsc` prints.
 
 ### `the params schema must accept the parameters of "…", which arrive as strings`
 
-**When:** the `params` schema of an operation given to `route()`, or of the
-deprecated schema before the handler, expects something other than a
-string for a path parameter, or requires a key the path does not have.
-The same mistake in `validate({ params })` is reported as
-[`Property 'id' is missing in type …`](#property-id-is-missing-in-type-readonlyrecordstring-string--pathparams).
+**When:** the `params` schema of an operation given to `route()` expects
+something other than a string for a path parameter, or requires a key the
+path does not have. The same mistake in `validate({ params })` is reported
+as
+[`"the path parameters are read with another type than the strings they arrive as"`](#-is-not-assignable-to-type-the-path-parameters-are-read-with-another-type-than-the-strings-they-arrive-as).
 
 ```text
 error TS2322: Type 'ZodObject<{ id: ZodNumber; }, $strip>' is not assignable to type 'ZodObject<{ id: ZodNumber; }, $strip> & "the params schema must accept the parameters of \"/users/:id\", which arrive as strings"'.
@@ -181,10 +168,10 @@ app.route({ method: 'GET', path: '/users/:id', schema: { params: z.object({ id: 
 
 ### `the params schema reads "…", which "…" does not declare`
 
-**When:** the `params` schema of an operation given to `route()`, or of the
-deprecated schema before the handler, has an optional key the path does
-not declare. In `validate({ params })` the same key is refused as
-[`Property 'org' is missing in type …`](#property-id-is-missing-in-type-readonlyrecordstring-string--pathparams).
+**When:** the `params` schema of an operation given to `route()` has an
+optional key the path does not declare. In `validate({ params })` the same
+key is refused as
+[``"the path parameter `org` is not in this route's path"``](#-is-not-assignable-to-type-the-path-parameter-id-is-not-in-this-routes-path).
 
 ```text
 error TS2322: Type 'ZodObject<{ id: ZodString; org: ZodOptional<ZodString>; }, $strip>' is not assignable to type 'ZodObject<{ id: ZodString; org: ZodOptional<ZodString>; }, $strip> & "the params schema reads \"org\", which \"/users/:id\" does not declare"'.
@@ -201,27 +188,24 @@ message per key.
 app.get('/orgs/:org/users/:id', validate({ params: z.object({ org: z.string(), id: z.string() }) }), handler);
 ```
 
-### `'quey' does not exist in type 'RouteSchema'`
+### `'quey' does not exist in type 'OptionsOnly<FunctionLike | RouteOptions>'`
 
-**When:** the deprecated schema before the handler, after a list of
-hooks, has a key that is not a part of a route. TypeScript prints it under
-`No overload matches this call`:
+**When:** a route's options, the object after its path, hold a key that is
+neither `bodyLimit` nor `detail`:
 
 ```text
-error TS2769: No overload matches this call.
-  …
-    Object literal may only specify known properties, but 'quey' does not exist in type 'RouteSchema & NotAFunction'. Did you mean to write 'query'?
+error TS2561: Object literal may only specify known properties, but 'quey' does not exist in type 'OptionsOnly<FunctionLike | RouteOptions>'. Did you mean to write 'query'?
 ```
 
-Without a list, `get(path, { quey }, handler)`, only the last overload is
-printed: `'quey' does not exist in type '(readonly [] | readonly AnyRouteHook[]) & …'`.
-When the schema object is a variable, the message names the key instead:
-`"quey" is not a part of a route: params, query, headers, cookies, body, response, bodyLimit or detail`.
+When the options are a variable, TypeScript prints `Argument of type '{ quey: … }'
+is not assignable to parameter of type 'OptionsOnly<FunctionLike | RouteOptions>'`.
+A schema part spelled right, `{ query }`, is refused otherwise:
+[`… is not assignable to type 'never'`](#type--is-not-assignable-to-type-never-in-a-routes-options).
 In `validate`, the same key is
-[`'quey' does not exist in type 'RequestSchemas'`](#response-does-not-exist-in-type-requestschemas).
+[`'quey' does not exist in type 'RouteOperation | RequestSchemas'`](#response-does-not-exist-in-type-routeoperation--requestschemas).
 
-**Why:** a misspelt part would never be validated, and the handler would
-read the raw value.
+**Why:** the options are the route's configuration. A misspelt part would
+never be validated, and the handler would read the raw value.
 
 **Fix:** give the parts to `validate`, the statuses to `responds`, and
 `bodyLimit` and `detail` to the options:
@@ -232,19 +216,19 @@ import { responds, validate } from '@alxia/core';
 app.get('/users', { detail: { summary: 'Users' } }, validate({ query: z.object({ page: zq.int().optional() }) }), responds({ 200: z.array(User) }), handler);
 ```
 
-### `'299' does not exist in type 'ResponseSchemas'`
+### `'299' does not exist in type 'RouteOperation | ResponseSchemas'`
 
-**When:** `responds(…)` declares a key that is not an HTTP status. The
-deprecated `response` of a schema before the handler is refused the same
-way.
+**When:** `responds(…)` declares a key that is not an HTTP status.
 
 ```text
-error TS2353: Object literal may only specify known properties, and '299' does not exist in type 'ResponseSchemas'.
+error TS2353: Object literal may only specify known properties, and '299' does not exist in type 'RouteOperation | ResponseSchemas'.
 ```
 
-When the schemas are a variable, the message is
-`"299 is not an HTTP status"`; a variable with no registered status at all
-gives `TS2559: Type '{ 299: … }' has no properties in common with type 'ResponseSchemas'`.
+TypeScript may print the union the other way round,
+`'ResponseSchemas | RouteOperation'`. The handler's `reply` then takes no
+status, `Argument of type '200' is not assignable to parameter of type
+'never'`, which goes away with the fix. When the schemas are a variable,
+the message is `"299 is not an HTTP status"`.
 
 **Why:** `responds` is keyed by the statuses a route may answer, the
 `StatusCode` type: the registered codes from 100 to 511.
@@ -312,31 +296,42 @@ app.get('/health', ({ reply }) => reply(200, 'ok'));
 A `Response` is only for a middleware, which may return one sent as it is,
 outside the typed contract.
 
-### `Property 'user' does not exist on type 'Context<…>'`
+### `Property 'user' does not exist on type 'RouteBase<…>'`
 
-**When:** a route declared with the deprecated schema before the handler
-reads what a `derive` or `decorate` adds, but the route is declared before
-that hook. A route declared by `route(operation, …)` gets the same error
-naming another type:
-`Property 'user' does not exist on type 'Omit<BaseContext & Empty & { readonly params: PathParams<"/me">; … }, "params" | … | "body"> & { …; }'`;
-the fix is the same.
-
-```text
-error TS2339: Property 'user' does not exist on type 'Context<Empty, "/me", Empty>'.
-```
-
-A route declared by its method, `get(path, …middlewares, handler)`, reports
-the same mistake as
-[`Property 'user' does not exist on type 'RouteBase<…>'`](#property-user-does-not-exist-on-type-routebase).
-
-**Why:** a `derive`, a `decorate` or a `use` applies only to the routes declared after it. This is
-true at runtime too: in JavaScript, `ctx.user` would be `undefined`.
-
-**Fix:** declare the `derive` first ([Hooks](../README.md#context-and-hooks)):
+**When:** a middleware written inline in the route, or the handler, reads
+a key that nothing before it adds: a middleware **after** it, a `derive`,
+`decorate` or `use` declared after the route, or nothing at all.
 
 ```ts
-const app = alxia()
-	.derive(async ({ request }) => ({ user: await authenticate(request) }))
+app.post('/posts', ({ user }, next) => next({ id: user.id }), auth, handler);
+```
+
+```text
+error TS2339: Property 'user' does not exist on type 'RouteBase<RouteApp<"POST", Empty, "">, "/posts">'.
+```
+
+A handler gets the same error, on `RouteBase<RouteApp<"GET", …>, "/me">`. An
+inline middleware given to `use` names the app's context,
+`Property 'user' does not exist on type 'BaseContext & Empty'`, and a
+route declared by `route(operation, …)` names
+`Omit<RouteBase<OperationApp<…>, "/me">, "params" | … | "body"> & { …; } & Empty`.
+A middleware made by `defineMiddleware<Requires>()`, which names what it
+reads, is reported where it stands instead:
+[``"`user` is missing from the context: …"``](#-is-not-assignable-to-type-user-is-missing-from-the-context-add-a-middleware-that-gives-it-before-this-one).
+
+**Why:** a route's middlewares run in the order given, and each one reads
+only what the middlewares in force and the ones before it added. A `use`,
+a `derive` or a `decorate` applies only to the routes declared after it.
+Here `user` would be `undefined` at runtime too.
+
+**Fix:** put the middleware that adds the key first, or declare it before
+the route:
+
+```ts
+app.post('/posts', auth, ({ user }, next) => next({ id: user.id }), handler);
+
+alxia()
+	.use(auth)
 	.get('/me', ({ user, reply }) => reply(200, user));
 ```
 
@@ -355,25 +350,150 @@ alxia().plugin(todos).get('/me', ({ user, reply }) => reply(200, user));
 Give `auth` to the app before both, or mount a plugin without a prefix
 (`alxia().use(auth)`), whose middlewares are the app's.
 
-### `… is not assignable to type 'MadeByDefineMiddleware'`
+### ``… is not assignable to type '"`user` is missing from the context: add a middleware that gives it before this one"'``
 
-```text
-error TS2769: No overload matches this call.
-  The last overload gave the following error.
-    Argument of type '(ctx: …, next: …) => Promise<Response>' is not assignable to parameter of type 'ScopeMiddleware<Empty, [], Promise<Response>>'.
-      Type '(ctx: …, next: …) => Promise<Response>' is not assignable to type 'MadeByDefineMiddleware'.
+**When:** a middleware that names what it reads — made by
+`defineMiddleware<Requires>()`, or one whose `ctx` is annotated — is
+given where nothing before it gives a key it reads: to `use(…)`, a
+route, a socket's upgrade or `route(operation, …)`. TypeScript reports one
+error, on that middleware, whose last line names the key:
+
+```ts
+const canPost = defineMiddleware<{ user: User }>()(({ user, reply }, next) =>
+	user.banned ? reply(403, { error: 'banned' as const }) : next());
+
+app.post('/posts', canPost, auth, handler);
 ```
 
-TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
+```text
+error TS2345: Argument of type 'Middleware<{ user: User; }, …>' is not assignable to parameter of type 'Middleware<{ user: User; }, …> & Step<RouteBase<RouteApp<"POST", Empty, "">, "/posts">, MiddlewareContext<…>, …>'.
+  …
+          Type 'Reply<403, { readonly error: "banned"; }>' is not assignable to type '"`user` is missing from the context: add a middleware that gives it before this one"'.
+```
 
-**When:** `app.use` is given a plain `(ctx, next) => …` function.
+The type before the message is what the middleware returns, here its
+`Reply<403, …>`; one that only calls `next` prints
+`Type 'Promise<Next<Empty, Empty>>' is not assignable to type '"`user` is
+missing …"'`. On `use(…)`, the context named in `Step<…>` is the app's,
+`BaseContext & Empty`. TypeScript may add `Binding element 'reply'
+implicitly has an 'any' type` on the handler: it goes away with the fix.
+A middleware that reads several missing keys names each, one message per
+key, joined by `|`.
 
-**Why:** `use` tells a middleware by the mark `defineMiddleware` sets on
-it; a plain function has none, and at runtime would be taken for a
-plugin, deprecated, and throw.
+**Why:** the error is reported where the middleware stands: at that place
+the context has no `user`, so it would read `undefined`.
 
-**Fix:** wrap it: `app.use(defineMiddleware((ctx, next) => …))`. A
-route's own middlewares take a plain function.
+**Fix:** put the middleware that gives the key before it — on the route,
+or in a `use` before the route:
+
+```ts
+app.post('/posts', auth, canPost, handler);
+app.use(auth).post('/drafts', canPost, handler);
+```
+
+### ``… is not assignable to type '"`user` is in the context with another type than this middleware reads"'``
+
+**When:** the context in force gives the key a middleware reads, but of a
+type that does not satisfy it: a `user: number` where it reads
+`user: { id: string }`, or a `User | null` where it reads a `User`.
+
+```ts
+const numericUser = defineMiddleware((_ctx, next) => next({ user: { id: 1 } }));
+const needsUser = defineMiddleware<{ user: { id: string } }>()(({ user }, next) => next({ name: user.id }));
+
+app.get('/b', numericUser, needsUser, handler);
+```
+
+```text
+error TS2345: Argument of type 'Middleware<{ user: { id: string; }; }, …>' is not assignable to parameter of type 'Step<…>'.
+  Type 'Promise<Next<{ name: string; }, Empty>>' is not assignable to type 'Promise<Next<{ name: string; }, Empty>> & "`user` is in the context with another type than this middleware reads"'.
+```
+
+**Why:** the middleware would read a value of the wrong shape.
+
+**Fix:** make the middleware that gives the key give the type the other
+one reads — here, answer 401 rather than pass a `null` — or name the type
+the context gives in the reader's `Requires`:
+
+```ts
+const auth = defineMiddleware(async ({ request, reply }, next) => {
+	const user = await authenticate(request); // User | null
+	return user ? next({ user }) : reply(401, { error: 'unauthenticated' as const });
+});
+```
+
+### `… is not assignable to type '"the context in force here does not give what this middleware reads"'`
+
+**When:** as for the two entries above, but the middleware's `Requires`
+has no key the message can name: a symbol key, or a union such as
+`{ a: string } | { b: string }`.
+
+```text
+    Type 'Promise<Next<Empty, Empty>>' is not assignable to type '"the context in force here does not give what this middleware reads"'.
+```
+
+**Fix:** give what the middleware reads before it, or name its
+requirement as an object type with string keys.
+
+### ``… is not assignable to type '"the path parameter `id` is not in this route's path"'``
+
+**When:** `validate({ params })` names a key the path does not declare, on
+a route, a socket's upgrade or a route in a group, or a middleware made by
+`defineMiddleware<{ pathParams: { id: string } }>()` is given to a route
+whose path has no `:id`. Every key counts, optional or not: an
+`extra: z.string().optional()` beside `/rooms/:room` is refused like a
+required one.
+
+```ts
+app.get('/posts', validate({ params: z.object({ id: z.string() }) }), handler);
+app.ws('/rooms/:room', validate({ params: z.object({ room: z.string(), extra: z.string().optional() }) }), handlers);
+```
+
+```text
+error TS2345: Argument of type 'Middleware<{ readonly pathParams: { readonly id: string; }; }, …> & BuiltinMark<…>' is not assignable to parameter of type '… & Step<…>'.
+  …
+      Type 'Next<Validated<{ readonly params: ZodObject<{ id: ZodString; }, $strip>; }>, …>' is not assignable to type '"the path parameter `id` is not in this route's path"'.
+```
+
+On the socket, the message names `extra`.
+
+**Why:** `validate`'s `params` schema reads the path's parameters. A key
+the path does not declare is never there. A route under a group or a
+prefix is checked by its whole path, the prefix's parameters included.
+
+**Fix:** declare the parameter in the path, under the schema's name:
+
+```ts
+app.get('/posts/:id', validate({ params: z.object({ id: z.coerce.number() }) }), handler);
+```
+
+### `… is not assignable to type '"the path parameters are read with another type than the strings they arrive as"'`
+
+**When:** `validate({ params })` reads a parameter with a schema whose
+input is not a string, `z.number()` rather than `z.coerce.number()`, or a
+`defineMiddleware<{ pathParams: { id: number } }>()` is given to a route.
+
+```text
+      Type 'Next<Validated<{ readonly params: ZodObject<{ id: ZodNumber; }, $strip>; }>, …>' is not assignable to type '"the path parameters are read with another type than the strings they arrive as"'.
+```
+
+**Why:** a path parameter is always a string. `z.number()` refuses `"42"`,
+so the route would refuse every request; `pathParams`, read before or
+after a `validate`, holds the strings the path carried.
+
+**Fix:** coerce the string, with `zq` from `@alxia/zod` or with your
+validator's own coercion, and read `pathParams` as strings:
+
+```ts
+import { defineMiddleware, validate } from '@alxia/core';
+import { zq } from '@alxia/zod';
+
+app.get('/posts/:id', validate({ params: z.object({ id: zq.int() }) }), ({ params, reply }) => reply(200, { id: params.id }));
+
+const loadPost = defineMiddleware<{ pathParams: { id: string } }>()(({ pathParams }, next) =>
+	next({ id: Number(pathParams.id) }),
+);
+```
 
 ### `the plugin reads "…", which this app's context does not give: add the plugin or middleware that gives it first`
 
@@ -393,22 +513,18 @@ alxia().plugin(tenant);
 ```text
 error TS2769: No overload matches this call.
   …
-  Overload 2 of 3, '(plugin: Alxia<…> & { readonly '~requires'?: { user: { tenantId: string; }; }; } & { ...; }): Alxia<…>', gave the following error.
+  Overload 2 of 2, '(plugin: Alxia<…> & { readonly '~requires'?: { user: { tenantId: string; }; }; } & { ...; }): Alxia<…>', gave the following error.
     …
         Types of property ''~requires'' are incompatible.
           Type '{ user: { tenantId: string; }; }' is not assignable to type '"the plugin reads \"user\", which this app's context does not give: add the plugin or middleware that gives it first"'.
-  Overload 3 of 3, '(middleware: ScopeMiddleware<Empty, [], MiddlewareReturn>): …', gave the following error.
-    …
 ```
 
-The first overload's error, about a function plugin, and the third, about
-the deprecated middleware form, are noise: the message of the second is
-the one that matters.
+The first overload's error, about a function plugin, is noise: the
+message of the second is the one that matters.
 
 A middleware given to `use` whose context the app does not give reads
-otherwise: `use`'s middleware form is reported last — alone, on
-TypeScript 7 — ending
-`Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: … }'`.
+otherwise:
+[``"`user` is missing from the context: …"``](#-is-not-assignable-to-type-user-is-missing-from-the-context-add-a-middleware-that-gives-it-before-this-one).
 
 Returned from a `group` or a plugin function, `group(() => todos)` or
 `plugin(() => todos)`, the error is a `TS2322: Type 'AppWithRoute<…>' is not
@@ -418,8 +534,8 @@ on the returned app, with the same message.
 For routes made by `defineRoutes()`, the last line reads
 `Property ''~requires'' is missing in type 'Alxia<…>' but required in type '{ readonly '~requires': "the plugin reads \"user\", which this app's context does not give: add the plugin or middleware that gives it first"; }'`.
 
-**Why:** the plugin's hooks read `user`, and on this app no plugin or
-`derive` before it adds one, so at runtime `user` would be `undefined`. The
+**Why:** the plugin's `derive` reads `user`, and on this app no plugin or
+middleware before it adds one, so at runtime `user` would be `undefined`. The
 message names each key at fault; with several, the error lists one message
 per key, joined by `|`, and a key of another type gets the message of the
 entry below.
@@ -544,7 +660,7 @@ const withTenant = <C extends { user: { tenantId: string } }>(app: Alxia<C>) =>
 ```text
 error TS2769: No overload matches this call.
   …
-      Type 'Alxia<{ user: { tenantId: string; }; } & { tenant: …; }, "", never> & Requiring<{ user: { tenantId: string; }; }>' is not assignable to type 'ProvidedBy<C, { user: { tenantId: string; }; }>'.
+      Type 'Alxia<{ user: { tenantId: string; }; } & { tenant: …; }, ""> & Requiring<{ user: { tenantId: string; }; }>' is not assignable to type 'ProvidedBy<C, { user: { tenantId: string; }; }>'.
 ```
 
 **Why:** the check is a conditional type, and TypeScript does not decide a
@@ -553,245 +669,10 @@ conditional type on a type parameter, even when its bound would pass.
 **Fix:** type the app with a concrete context, or as `AnyAlxia` and give
 the function's return type yourself. `AnyAlxia` is not checked.
 
-### `the hook reads "…", which this route's context does not give: derive it before this route, or earlier in its list`
-
-**When:** a route's deprecated list of hooks holds a hook made by
-`defineHook<Requires>()` (or `defineWrap<Requires>()`), and neither the
-hooks in force where the route is declared nor the hooks before it in the
-list add a key it requires.
-
-```ts
-// deprecated: a list of hooks, then a schema
-const canView = defineHook<{ user: User; params: { id: string } }>()(({ user, params, reply }) =>
-	params.id.startsWith(user.id) ? undefined : reply(403, { error: 'forbidden' as const }));
-
-alxia().patch('/bookmarks/:id', [canView], { body: Update }, handler);
-```
-
-```text
-error TS2769: No overload matches this call.
-  …
-  Overload 2 of 21, '(path: "/bookmarks/:id", hooks: [RouteHook<…>] & NoInfer<readonly [{ readonly '~requires': "the hook reads \"user\", …"; }]>, …)', gave the following error.
-    …
-        Types of property ''~requires'' are incompatible.
-          Type '{ user: User; params: { id: string; }; }' is not assignable to type '"the hook reads \"user\", which this route's context does not give: derive it before this route, or earlier in its list"'.
-```
-
-Overload 1, about `OptionsOnly<RouteOptions>`, and overload 3, about
-`RouteMiddleware<…>`, are the other forms TypeScript tried: noise here.
-
-**Why:** the hook reads `user`, which nothing before it on this route adds,
-so at runtime it would be `undefined`. Each hook is checked against the
-context the route has built when it runs: the scope's, then the list's up
-to it. A hook that reads what a hook **after** it in the list adds is
-refused the same way.
-
-**Fix:** make the hooks middlewares, and put the one that adds the key
-first. A middleware placed too early is refused as
-[`Property 'user' is missing in type 'RouteBase<…>'`](#property-user-is-missing-in-type-routebase-but-required-in-type--user-user-):
-
-```ts
-import { defineMiddleware, validate } from '@alxia/core';
-
-const canView = defineMiddleware<{ user: User; pathParams: { id: string } }>()(({ user, pathParams, reply }, next) =>
-	pathParams.id.startsWith(user.id) ? next() : reply(403, { error: 'forbidden' as const }));
-
-alxia().patch('/bookmarks/:id', auth, canView, validate({ body: Update }), handler); // auth adds user
-```
-
-Keeping the list, derive the key before the route, or put the hook that
-adds it earlier in the list: `[loadBookmark, canEdit]`, not
-`[canEdit, loadBookmark]`.
-
-### `the hook reads "…", which this route's context gives with another type`
-
-**When:** the route's context has the key a hook in its list requires, but
-of a type that does not satisfy it: a `user: string` where the hook reads
-`user: User`.
-
-**Why:** the hook would read a value of the wrong shape.
-
-**Fix:** make the `derive` that adds the key return the type the hook
-names, or name the type the route gives in the hook's `Requires`.
-
-### `the hook reads the path parameter "…", which this route's path does not declare`
-
-**When:** a hook names `params: { id: string }` in its `Requires`, and is
-given in a deprecated list to a route whose path has no `:id`.
-
-```ts
-app.get('/bookmarks', [canView], handler); // deprecated list; canView reads params.id
-```
-
-**Why:** the hook reads `params.id`, which a request to `/bookmarks` never
-has.
-
-**Fix:** give it to a route whose path declares the parameter, under its
-name: `/bookmarks/:id`. A route under a group or a prefix is checked by its
-whole path, the prefix's parameters included. A middleware made by
-`defineMiddleware<{ pathParams: { id: string } }>()` is held to the path
-the same way, and refused as
-[`Property 'id' is missing in type …`](#property-id-is-missing-in-type-readonlyrecordstring-string--pathparams):
-
-```ts
-app.get('/bookmarks/:id', auth, canView, handler);
-```
-
-### `the hook reads the path parameter "…" as another type than the string it arrives as`
-
-**When:** a hook of a deprecated list names a path parameter with a type a
-string is not, in `params` or `pathParams`:
-`defineHook<{ params: { id: number } }>()`.
-
-**Why:** a hook of the list runs before the `params` schema, so
-`params.id` is the string the path carried, whatever the schema makes of it
-for the handler.
-
-**Fix:** make it a middleware. Read `pathParams`, the string, wherever it
-stands, or stand it after a `validate({ params })` and read its output:
-
-```ts
-import { defineMiddleware, validate } from '@alxia/core';
-
-const loadBookmark = defineMiddleware<{ pathParams: { id: string } }>()(({ pathParams }, next) =>
-	next({ id: Number(pathParams.id) }),
-);
-
-app.get('/bookmarks/:id', validate({ params: z.object({ id: z.coerce.number() }) }), ({ params }, next) =>
-	next({ id: params.id }), // number
-	handler,
-);
-```
-
-A middleware that names `pathParams: { id: number }` is refused: with
-options or a second middleware, TypeScript prints
-`The types of 'pathParams.id' are incompatible between these types`.
-
-### `the hook reads the query parameter "…" as another type than the string | readonly string[] it arrives as`
-
-**When:** a hook of a deprecated list names a query parameter as anything
-narrower than `string | readonly string[]`, optional or not:
-`{ query: { page?: number } }`, or `{ query: { page?: string } }`.
-
-**Why:** the query a hook of the list reads is the query string as it
-arrived, and a repeated key — `?page=1&page=2` — arrives as a list. A
-`query` schema's output is the handler's alone.
-
-**Fix:** make it a middleware placed after a `validate({ query })`, which
-reads the schema's output:
-
-```ts
-import { validate } from '@alxia/core';
-import { zq } from '@alxia/zod';
-
-app.get('/bookmarks', validate({ query: z.object({ page: zq.int().default(1) }) }), ({ query }, next) =>
-	next({ offset: (query.page - 1) * 20 }), // query.page: number
-	handler,
-);
-```
-
-### `the hook reads the cookie "…" as another type than the string it arrives as`
-
-**When:** a hook of a deprecated list names a cookie as anything a string
-is not: `{ cookies: { visits?: number } }`.
-
-**Why:** a hook of the list reads the cookies the `Cookie` header sent,
-strings; a `cookies` schema's output is the handler's alone.
-
-**Fix:** make it a middleware placed after a `validate({ cookies })`, which
-reads the schema's output, or name it `string`
-(`{ cookies: { visits?: string } }`) and convert it in the hook.
-
-### `the hook reads "body", which no hook reads: the body is validated after the hooks, so read it in the handler`
-
-**When:** a hook of a deprecated list names `body` in its `Requires`.
-
-**Why:** the hooks of a route's list run before the request is validated,
-and the body is read then: no hook ever has one.
-
-**Fix:** make it a middleware placed after `validate({ body })`: it reads
-the validated body, and may end the request
-([What a middleware reads](guide/middleware.md#what-a-middleware-reads)):
-
-```ts
-import { defineMiddleware, validate } from '@alxia/core';
-
-const notReserved = defineMiddleware<{ body: { title: string } }>()(({ body, reply }, next) =>
-	body.title === 'admin' ? reply(403, { error: 'reserved' as const }) : next());
-
-app.post('/notes', validate({ body: z.object({ title: z.string() }) }), notReserved, ({ body, reply }) => reply(201, body));
-```
-
-### `this route's context does not give what the hook reads`
-
-**When:** a hook's `Requires` is not satisfied, and no key can be named: a
-union, or a symbol key.
-
-**Fix:** name the requirement as an object type with string keys.
-
-### `a route's hooks are a list written in the call, [first, second]: a list of unknown length cannot be checked`
-
-**When:** a route is given its deprecated list of hooks as an array typed
-`AnyRouteHook[]` — built elsewhere, or annotated — rather than written in
-the call.
-
-```ts
-const guards: AnyRouteHook[] = [canView];
-app.get('/bookmarks/:id', guards, handler); // deprecated list
-```
-
-**Why:** each hook is checked against what the hooks before it added, which
-takes knowing each one's place: a list of unknown length has none.
-
-**Fix:** make the hooks middlewares, given one by one after the path —
-`app.get('/bookmarks/:id', auth, canView, handler)`. Keeping the list,
-write it in the call, `[canView]`, or keep it as a tuple:
-`const guards = [canView, loadBookmark, canEdit] as const`.
-
-The message most often follows an error of a route **without** a list, as
-the last overload TypeScript tried:
-
-- a route with **one middleware** and no options reports any mistake in it
-  this way: `The last overload gave the following error`, then
-  `Argument of type 'Middleware<…>' is not assignable to parameter of type
-  '(readonly [] | readonly AnyRouteHook[]) & …'`. The list is not the
-  problem; the middleware's type is. Its first argument names what it
-  reads, such as `Middleware<{ readonly pathParams: { readonly id: string; }; }, …>`
-  for [a `validate({ params })` the path does not declare](#property-id-is-missing-in-type-readonlyrecordstring-string--pathparams).
-  Giving the route its options, `{}`, or a second middleware, makes
-  TypeScript print the error of the middleware overloads instead;
-- a deprecated schema the route refuses, `get('/a/:id', { params: … }, handler)`,
-  is reported only as `'params' does not exist in type '(readonly [] | readonly AnyRouteHook[]) & …'`:
-  the schema's own message is not printed. Give the schema to
-  `validate(…)` and `responds(…)`, which name what is wrong.
-
-### `a route takes at most 8 hooks in its list: derive the rest in a group around it`
-
-**When:** a route's deprecated list holds nine hooks or more.
-
-```text
-Property ''~hooks'' is missing in type '[RouteHook<…>, …]' but required in type '{ readonly '~hooks': "a route takes at most 8 hooks in its list: derive the rest in a group around it"; }'.
-```
-
-**Why:** the types thread the list one hook at a time, and the bound keeps
-that recursion cheap and finite.
-
-**Fix:** move the hooks every route of a set shares into a `derive` in a
-group around them, and give the route, as middlewares, what differs route
-by route. A route takes up to 8 middlewares too
-([`Expected 2-11 arguments`](#type-middleware-has-no-properties-in-common-with-type-optionsonlyrouteoptions)):
-
-```ts
-app.group((g) => g.derive(authenticate).derive(loadTenant)
-	.patch('/bookmarks/:id', canView, loadBookmark, canEdit, validate({ body: Update }), handler));
-```
-
-### `Type '…' is not assignable to type 'MaybePromise<unique symbol>'`
-
 ### `Type 'Promise<Next<…>>' is not assignable to type 'unique symbol'`
 
-**When:** `defineMiddleware<Requires>(middleware)`, or the deprecated
-`defineHook<Requires>(hook)`: the requirement and the function in one call.
+**When:** `defineMiddleware<Requires>(middleware)`: the requirement and the
+function in one call.
 
 ```ts
 defineMiddleware<{ user: User }>(({ user }, next) => next({ id: user.id }));
@@ -802,9 +683,6 @@ error TS2345: Argument of type '({ user }: MiddlewareContext<{ user: User; }>, n
   Type 'Promise<Next<{ id: string; }, Empty>>' is not assignable to type 'unique symbol'.
 ```
 
-`defineHook` prints `… parameter of type 'DeriveFn<{ user: User; }, unique symbol>'`,
-then `Type '{ id: string; }' is not assignable to type 'MaybePromise<unique symbol>'`.
-
 **Why:** TypeScript infers no type argument once one is given, so the
 function's result could not be inferred beside `Requires`.
 
@@ -814,139 +692,24 @@ function's result could not be inferred beside `Requires`.
 defineMiddleware<{ user: User }>()(({ user }, next) => next({ id: user.id }));
 ```
 
-### `Types of property 'body' are incompatible. Type 'undefined' is not assignable to type '…'`
+### `Type 'undefined' is not assignable to type '…'` on `route(operation, …)`
 
 **When:** a middleware given to `route(operation, m, handler)` reads `body`,
 or the validated `params`, of the operation. The operation's `validate`
 stands just before the handler, so a middleware before it reads the
-request as it arrived: `body` is `undefined`, `params` strings. TypeScript
-reports it on the middleware forms, which come last.
+request as it arrived: `body` is `undefined`, `params` strings.
 
 ```ts
-app.route(op, ({ body }, next) => next({ title: body.title }), handler); // body: undefined here
+app.route(op, ({ body }, next) => next({ title: body.title }), handler);
+// error TS18048: 'body' is possibly 'undefined'.
+app.route(op, (ctx, next) => { const body: { title: string } = ctx.body; return next({ body }); }, handler);
+// error TS2322: Type 'undefined' is not assignable to type '{ title: string; }'.
 ```
 
 **Fix:** place the operation's validation before the middleware:
 
 ```ts
 app.route(op, validate(op), ({ body }, next) => next({ title: body.title }), handler);
-```
-
-### `Property 'user' does not exist on type 'RouteBase<…>'`
-
-**When:** a middleware written in the route reads a key that only a
-middleware **after** it adds:
-
-```ts
-app.post('/posts', ({ user }, next) => next({ id: user.id }), auth, handler);
-```
-
-```text
-error TS2339: Property 'user' does not exist on type 'RouteBase<RouteApp<"POST", …>, "/posts">'.
-```
-
-A handler that reads what a `derive` or `decorate` declared **after** the
-route adds gets the same error, on `RouteBase<RouteApp<"GET", …>, "/me">`.
-
-**Why:** a route's middlewares run in the order given, and each one reads
-only what the hooks in force and the middlewares before it added. A route
-hook applies only to the routes declared after it. Here `user` would be
-`undefined`.
-
-**Fix:** put the middleware that adds the key first, or declare the hook
-before the route:
-
-```ts
-app.post('/posts', auth, ({ user }, next) => next({ id: user.id }), handler);
-
-alxia()
-	.derive(async ({ request }) => ({ user: await authenticate(request) }))
-	.get('/me', ({ user, reply }) => reply(200, user));
-```
-
-### `Property 'user' is missing in type 'RouteBase<…>' but required in type '{ user: User; }'`
-
-**When:** a middleware made by `defineMiddleware<Requires>()` is placed
-where nothing before it gives what it requires — on a route, a socket,
-`route(operation, …)` or `use(…)`. TypeScript prints it under `No overload
-matches this call`, on the middleware forms, which it tries last:
-
-```ts
-const canPost = defineMiddleware<{ user: User }>()(({ user, reply }, next) =>
-	user.banned ? reply(403, { error: 'banned' as const }) : next());
-
-app.post('/posts', canPost, auth, handler);
-```
-
-```text
-error TS2769: No overload matches this call.
-  …
-  Overload 3 of 21, '(path: "/posts", m1: RouteMiddleware<…>, m2: RouteMiddleware<…>, handler: RouteHandler<…>): AppWithRoute<…>', gave the following error.
-    Argument of type 'Middleware<{ user: User; }, …>' is not assignable to parameter of type 'RouteMiddleware<…>'.
-      Types of parameters 'ctx' and 'ctx' are incompatible.
-        …
-          Property 'user' is missing in type 'RouteBase<…>' but required in type '{ user: User; }'.
-```
-
-The overloads before it — one about `OptionsOnly<RouteOptions>`, one about
-a list of hooks — are the other forms of a route TypeScript tried; they
-are noise here. With more forms in reach, TypeScript prints the last
-alone, `The last overload gave the following error.`, and that one is the
-middleware form, naming the key.
-
-On `use(canPost)`, the type named is the app's context, `'BaseContext &
-Empty'`, rather than `RouteBase<…>`; before 0.4 TypeScript reported there
-the plugin form of `use`, `not assignable to parameter of type
-'Alxia<object, string, AnyReply> & …'`, which named no key.
-
-**Why:** the error is reported where the middleware stands: at that place
-the route's context has no `user`, so it would read `undefined`.
-
-**Fix:** put the middleware that adds the key before it, or derive the key
-for every route in a `derive` before them:
-
-```ts
-app.post('/posts', auth, canPost, handler);
-```
-
-TypeScript 7 prints the last overload alone, as above; TypeScript 6 lists the deprecated plugin forms of `use` first, then this one as `Overload 3 of 11`.
-
-### `Property 'id' is missing in type 'Readonly<Record<string, string>> & PathParams<"…">'`
-
-**When:** `validate({ params })` names a key the path does not declare, on
-a route or on a socket's upgrade. Every key counts, optional or not: an
-`extra: z.string().optional()` beside `/users/:id` is refused like a
-required one. A schema that reads a parameter as something other than the
-string it arrives as is refused too.
-
-```ts
-app.get('/posts', { bodyLimit: 1024 }, validate({ params: z.object({ id: z.string() }) }), handler);
-app.ws('/rooms/:room', validate({ params: z.object({ room: z.string(), extra: z.string().optional() }) }), handlers);
-```
-
-```text
-error TS2769: No overload matches this call.
-  …
-              Property 'id' is missing in type 'Readonly<Record<string, string>> & PathParams<"/posts">' but required in type '{ readonly id: string; }'.
-```
-
-On the socket, the key is named the same way: `Property 'extra' is missing
-in type 'Readonly<Record<string, string>> & PathParams<"/rooms/:room">' but
-required in type '{ readonly room: string; readonly extra: string | undefined; }'`.
-
-The middleware forms are the last overloads TypeScript tries, so it names
-the key on a route with no options and one middleware too; before 0.4 it
-printed the deprecated list of hooks' `'~hooks'` message there instead.
-
-**Why:** `validate`'s `params` schema reads the path's parameters, which
-are strings. A key the path does not declare is never there; a schema that
-refuses a string refuses every request.
-
-**Fix:** declare the parameter in the path, under the schema's name, and
-coerce the string the schema reads:
-
-```ts
-app.get('/posts/:id', validate({ params: z.object({ id: z.coerce.number() }) }), handler);
 ```
 
 ### `Type '…' is not assignable to type 'never'` in a route's options
@@ -981,28 +744,50 @@ import { responds, validate } from '@alxia/core';
 app.post('/posts', { bodyLimit: 1024 * 1024 }, auth, validate({ body: Post }), responds({ 201: Post }), handler);
 ```
 
-### `Type 'Middleware<…>' has no properties in common with type 'OptionsOnly<RouteOptions>'`
-### `Expected 2-11 arguments, but got 12`
-### `Expected 2-10 arguments, but got 11`
+### `Argument of type 'Middleware<…>[]' is not assignable to parameter of type 'OptionsOnly<FunctionLike | RouteOptions>'`
 
-**When:** a route is given nine middlewares or more. Without options,
-TypeScript reports the first, `TS2559`, on the first middleware; with
-options, it counts the arguments, `TS2554`. `route(operation, …)` counts
-them too, `Expected 2-10 arguments`.
+**When:** a route is given its middlewares in a list, the form of 0.3's
+hooks: `app.get('/l', [auth], handler)`.
 
-```ts
-app.get('/', m1, m2, m3, m4, m5, m6, m7, m8, m9, handler);
+```text
+error TS2345: Argument of type 'Middleware<Empty, …>[]' is not assignable to parameter of type 'OptionsOnly<FunctionLike | RouteOptions>'.
 ```
 
-**Why:** the types thread the context one middleware at a time, through
-eight at most, to keep the check cheap and finite.
+**Why:** a route takes its middlewares one by one after the path (and its
+options); a list there is read as the options. Past the types, the route
+throws when it is declared:
+[`a route takes its middlewares after the path, not in a list`](#get--a-route-takes-its-middlewares-after-the-path-not-in-a-list-drop-the-brackets).
 
-**Fix:** move what every route of a set shares into a `derive` in a group
-around them, or join two middlewares into one, and keep in the route what
-differs route by route:
+**Fix:** drop the brackets:
 
 ```ts
-app.group((g) => g.derive(authenticate).derive(loadTenant)
+app.get('/l', auth, handler);
+```
+
+### `Expected 20 arguments, but got 11`
+
+**When:** a route, `use` or `route(operation, …)` is given nine middlewares
+or more. Each form reports it its own way:
+
+| call | what TypeScript prints |
+| --- | --- |
+| `app.get('/', m1, …, m9, handler)` | `TS2554: Expected 20 arguments, but got 11.` |
+| `app.get('/', { bodyLimit }, m1, …, m9, handler)` | `TS2345: Argument of type '{ bodyLimit: number; }' is not assignable to parameter of type '… & Step<…>'`, on the options |
+| ten or more, without options | `TS2345: Argument of type 'Middleware<…>' is not assignable to parameter of type 'OptionsOnly<Middleware<…>>'`, on the first |
+| `app.route(op, m1, …, m9, handler)` | `TS2554: Expected 2-10 arguments, but got 11.` |
+| `app.use(m1, …, m9)` | ``TS2345: Argument of type 'Middleware<…>' is not assignable to parameter of type '`/${string}`'``, on the first |
+
+The handler's parameters can then read as `any` (`TS7031`).
+
+**Why:** the types thread the context one middleware at a time, through
+eight at most per call, to keep the check cheap and finite.
+
+**Fix:** split them: `use` them in two calls, they accumulate; move what
+every route of a set shares into a `use` in a group around them; or join
+two middlewares into one:
+
+```ts
+app.group((g) => g.use(authenticate, loadTenant)
 	.patch('/posts/:id', canEdit, loadPost, validate({ body: Update }), handler));
 ```
 
@@ -1011,7 +796,8 @@ app.group((g) => g.derive(authenticate).derive(loadTenant)
 **When:** a middleware returns something other than what `next()`
 resolves to, a reply or a `Response`: a plain value, an object, or
 nothing. Made by `defineMiddleware`, the message ends in
-`'unique symbol | MiddlewareReturn'`:
+`'unique symbol | MiddlewareReturn'`; written inline in a route, in
+`Type 'string' is not assignable to type 'MiddlewareReturn'`:
 
 ```ts
 defineMiddleware(() => 'nothing');
@@ -1021,10 +807,6 @@ defineMiddleware(() => 'nothing');
 error TS2345: Argument of type '() => string' is not assignable to parameter of type 'Middleware<Empty, unique symbol | MiddlewareReturn>'.
   Type 'string' is not assignable to type 'unique symbol | MiddlewareReturn'.
 ```
-
-A middleware that returns nothing, alone in a route, is reported against
-the last overload, the list of hooks, as described
-[above](#a-routes-hooks-are-a-list-written-in-the-call-first-second-a-list-of-unknown-length-cannot-be-checked).
 
 **Why:** a middleware either passes the request on, `next(added?)`, or ends
 it, with a reply or a `Response`. Anything else would leave the request
@@ -1040,19 +822,17 @@ const logged = defineMiddleware(async ({ request }, next) => {
 });
 ```
 
-### `'response' does not exist in type 'RequestSchemas'`
+### `'response' does not exist in type 'RouteOperation | RequestSchemas'`
 
 **When:** `validate` is given a key that is not a part of the request,
 such as `response`, or a misspelt `quey`.
 
 ```text
-error TS2353: Object literal may only specify known properties, and 'response' does not exist in type 'RequestSchemas'.
+error TS2353: Object literal may only specify known properties, and 'response' does not exist in type 'RouteOperation | RequestSchemas'.
 ```
 
 When the schemas are a variable that also holds a part, the message is
-`"response" is not a part validate() reads: params, query, headers, cookies or body`;
-one holding only unknown keys, `const s = { response: Post }`, gives
-`TS2559: Type '…' has no properties in common with type 'RequestSchemas'`.
+`"response" is not a part validate() reads: params, query, headers, cookies or body`.
 
 **Why:** `validate` reads the request: `params`, `query`, `headers`,
 `cookies` and `body`. The statuses a route answers are `responds`'.
@@ -1194,7 +974,7 @@ routedAt('/at/10:30'); // does not compile: Invalid path: …
 ```text
 error TS2769: No overload matches this call.
   …
-      Type 'Middleware<Empty, Reply<401, …> | Promise<Next<{ user: User; }, Empty>>> & MiddlewareMark' is not assignable to type '"Invalid middleware: a middleware given a path may add nothing to the context, and this one passes \"user\" to next(): give it to the routes of a group instead, app.group(path, (group) => group.use(middleware))"'.
+      Type 'Middleware<Empty, Promise<Next<{ user: User; }, Empty>> | Reply<401, …>>' is not assignable to type '"Invalid middleware: a middleware given a path may add nothing to the context, and this one passes \"user\" to next(): give it to the routes of a group instead, app.group(path, (group) => group.use(middleware))"'.
 ```
 
 **When:** `use(path, ...middlewares)` is given a middleware that passes
@@ -1219,97 +999,81 @@ app.group('/admin', (admin) => admin.use(auth).get('/me', ({ user, reply }) => r
 A guard that only answers or passes, `next()`, can stay on the path:
 `app.use('/admin', requireAdmin)`.
 
-### `Type 'Reply<500, …>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'`
+### `Type 'Alxia<Empty, "">' provides no match for the signature '(ctx: BaseContext & Empty, next: NextFunction): MiddlewareReturn'`
 
-**When:** an `onRefusal` hook returns a reply whose status is not a client
-error, such as a 500 or a 200.
+**When:** `use` is given an app: `app.use(auth)` where `auth` is
+`alxia().derive(…)`, the 0.3 way of mounting a plugin.
 
 ```text
-error TS2322: Type 'Reply<500, { readonly status: 500; }>' is not assignable to type 'MaybePromise<void | Reply<ClientErrorStatus, any> | undefined>'.
+error TS2345: Argument of type 'Alxia<Empty, "">' is not assignable to parameter of type 'Alxia<Empty, ""> & Step<BaseContext & Empty, BaseContext & Empty, MiddlewareReturn>'.
+  …
+    Type 'Alxia<Empty, "">' provides no match for the signature '(ctx: BaseContext & Empty, next: NextFunction): MiddlewareReturn'.
 ```
 
-**Why:** a refused request is the client's error. A 5xx would tell a client
-to retry a request that will be refused again, and a 2xx would say it
-succeeded.
+**Why:** `use` takes middlewares alone; a plugin is mounted by
+`app.plugin(…)`. Past the types, `use` throws
+[`use(): argument 1 is an app: …`](#use-argument-1-is-an-app-a-plugin-is-given-to-appplugin-use-takes-middlewares).
 
-**Fix:** answer with a 4xx, such as 400 or 422:
+**Fix:**
 
 ```ts
-app.onRefusal((refusal) => problem({ status: 422, detail: `the request is refused: ${refusal.kind}` }));
+app.plugin(auth);
 ```
 
-### `Argument of type '"validation" | "body_limit"' is not assignable to parameter of type 'never'`
+### `Target signature provides too few arguments. Expected 2 or more, but got 1.`
 
-**When:** `onRefusal` is given a kind typed as a union, `RefusalKind`, or
-as a generic parameter, as a plugin's helper may:
+**When:** `plugin` is given a middleware, `app.plugin(cors())`, the 0.3
+way of installing a package's hooks:
 
 ```text
 error TS2769: No overload matches this call.
-  …
-    Argument of type '"validation" | "body_limit"' is not assignable to parameter of type 'never'.
+  Overload 1 of 2, '(plugin: (app: Alxia<Empty, "">) => AnyAlxia): AnyAlxia', gave the following error.
+    Argument of type 'Middleware<…>' is not assignable to parameter of type '(app: Alxia<Empty, "">) => AnyAlxia'.
+      Target signature provides too few arguments. Expected 2 or more, but got 1.
+  Overload 2 of 2, '(plugin: Alxia<object, string> & …)', gave the following error.
+    …
 ```
 
-For a generic `K extends RefusalKind`, the line reads
-`Argument of type 'K' is not assignable to parameter of type 'K & OneKind<K>'`.
+**Why:** a middleware runs on every request; a plugin once, on the app,
+and returns it. Past the types, `plugin` calls the middleware with the
+app, and throws
+[`plugin(): the plugin function returned a promise, not an app`](#plugin-the-plugin-function-returned-undefined-not-an-app-a-plugin-returns-the-app-it-is-given-a-middleware-is-given-to-use),
+or, for one that calls `next` right away, `plugin(): the plugin function called next()`.
 
-**Why:** the hook is registered for the one string it is given, so the
-types could not say which kind's replies it answers.
-
-**Fix:** write the kind out, or one call per kind:
+**Fix:** give it to `use`, before the routes:
 
 ```ts
-app
-	.onRefusal('validation', (refusal) => problem({ status: 422, detail: refusal.part }))
-	.onRefusal('body_limit', (refusal) => problem({ status: 413, limit: refusal.limit }));
+app.use(cors()).get('/', ({ reply }) => reply(200, 'ok'));
 ```
 
 ### `Property 'part' does not exist on type 'Refusal'`
 
-**When:** an `onRefusal` hook reads `part` or `issues` without checking
-the refusal's `kind`, often by destructuring it:
+**When:** a middleware that catches refusals reads `refusalOf(error)`'s
+`part` or `issues` without checking its `kind`:
 
 ```text
 error TS2339: Property 'part' does not exist on type 'Refusal'.
   Property 'part' does not exist on type 'BodyLimitRefusal'.
 ```
 
-**Why:** a hook answers every kind of refusal. A `body_limit` refusal, a
+**Why:** `refusalOf` reads every kind of refusal. A `body_limit` refusal, a
 body past the route's `bodyLimit`, has a `limit` and no `part` or
 `issues`.
 
-**Fix:** check `kind` first. Return nothing for a kind you leave to its
-default:
+**Fix:** check `kind` first, and rethrow what you leave to its default:
 
 ```ts
-app.onRefusal((refusal) =>
-	refusal.kind === 'validation' ? problem({ status: 400, detail: `the ${refusal.part} is invalid` }) : undefined,
-);
-```
+import { defineMiddleware, problem, refusalOf } from '@alxia/core';
 
-Or give the kind first: that hook answers it alone and reads it narrowed.
-
-```ts
-app.onRefusal('validation', (refusal) => problem({ status: 400, detail: `the ${refusal.part} is invalid` }));
-```
-
-### `'500' does not exist in type 'RefusalResponses'`
-
-**When:** the schemas given to `onRefusal` declare a status that is not a
-client error. `onRefusal` has several forms, so TypeScript reports it
-under the call, as no overload matching, with this line among each form's:
-
-```text
-error TS2769: No overload matches this call.
-  Overload 1 of 4, '(schema: RefusalSchema<RefusalResponses>, hook: …)', gave the following error.
-    Object literal may only specify known properties, and '500' does not exist in type 'RefusalResponses'.
-```
-
-**Fix:** declare the 4xx the hook answers:
-
-```ts
-app.onRefusal({ response: { 400: Problem } }, (_, { reply }) =>
-	reply(400, { type: 'urn:example:invalid', status: 400, detail: 'invalid' }),
-);
+const refusals = defineMiddleware(async (_ctx, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		const refusal = refusalOf(error);
+		if (refusal?.kind !== 'validation') throw error;
+		return problem({ status: 400, detail: `the ${refusal.part} is invalid` });
+	}
+});
 ```
 
 ### `The inferred type of '…' cannot be named without a reference to '…' from '…/@alxia/core/dist/…'`
@@ -1320,13 +1084,12 @@ inferred from its builders: TS2883, *"This is likely not portable. A type
 annotation is necessary."*
 
 **Why:** the declaration of that export must name every type the app's
-type is made of, through `@alxia/core` itself. Before 0.2.1,
-`RefusalsOf`, `RefusalOutcome` and `DeclaredRefusal` were not exported, so
-an app with an `onRefusal` hook could not be named.
+type is made of, through `@alxia/core` itself, which exports each of them
+(`AppWithRoute`, `RouteApp`, `MiddlewareForms`, `Next`, …).
 
-**Fix:** upgrade to `@alxia/core` 0.2.1 or later. A type core still fails
-to export is a bug: report it with the code. Until then, annotate the
-export or the hook's return type, e.g. `Reply<400 | 413, ProblemDetails>`, with `Reply` and `ProblemDetails` from `@alxia/core`.
+**Fix:** a type core fails to export is a bug: report it with the code.
+Until then, annotate the export, for example as `AnyAlxia`, or as
+`Alxia<Ctx, Prefix>` with the context it builds.
 
 ### `Module '"@alxia/core"' has no exported member 'RoutesOf'`
 
@@ -1336,7 +1099,11 @@ described a route to a client — `RouteEntryOf`, `RouteRecord`,
 `SocketRecord`, `SocketEntryOf`, `RefusalOutcome`, `KindOutcome`,
 `DefaultRefusalOutcome`, `DefaultLimitOutcome`, `IsLimited`,
 `BehindShortcuts`, `AppWithSocket`, or `@alxia/graphql`'s `GraphQLRoutes`
-— from `@alxia/core` 0.4 or later:
+— from `@alxia/core` 0.4 or later. Code written for 0.4 that imports a
+type of the request hooks or the forms 0.5 removed gets the same error,
+naming it: `RouteHook`, `RefusalHook`, `RefusalSchema`, `WrapMethod`,
+`DeprecatedForms`, `PluginForms`, … (the list is in
+[Upgrading](upgrading.md)).
 
 ```text
 error TS2305: Module '"@alxia/core"' has no exported member 'RoutesOf'.
@@ -1346,33 +1113,36 @@ error TS2305: Module '"@alxia/core"' has no exported member 'RoutesOf'.
 type, and the route table, its types and the typed client are gone: a
 client is generated from the OpenAPI document.
 
-**Fix:** generate the client from the document, for example with
+**Fix:** for a 0.5 removal, write the middleware form
+([Upgrading](upgrading.md)). For the route table, generate the client from the document, for example with
 `@nxgt/openapi-codegen`; check a route in a test with `app.request()`, and
 what its handler reads with `expectTypeOf` inside it. See
 [No more client: spec first](upgrading.md#no-more-client-spec-first).
 
-### `Generic type 'Alxia<Ctx, Prefix, Shortcuts>' requires between 0 and 3 type arguments`
+### `Generic type 'Alxia<Ctx, Prefix>' requires between 0 and 2 type arguments`
 
-**When:** code written for 0.3 names an app with four type arguments:
-
-```ts
-type Fresh = Alxia<Empty, Empty, '', never>;
-```
-
-```text
-error TS2707: Generic type 'Alxia<Ctx, Prefix, Shortcuts>' requires between 0 and 3 type arguments.
-```
-
-**Why:** the second parameter, `Routes`, is gone: `Alxia` is
-`Alxia<Ctx, Prefix, Shortcuts>`.
-
-**Fix:** drop the second argument:
+**When:** code written for 0.4 names an app with three type arguments,
+as 0.4's `Alxia` took, or with the four of 0.3:
 
 ```ts
 type Fresh = Alxia<Empty, '', never>;
 ```
 
-See [No more client: spec first](upgrading.md#no-more-client-spec-first).
+```text
+error TS2707: Generic type 'Alxia<Ctx, Prefix>' requires between 0 and 2 type arguments.
+```
+
+**Why:** 0.5 removed the third parameter, which carried the
+replies of the request hooks 0.5 removed: `Alxia` is `Alxia<Ctx, Prefix>`. 0.4
+had removed the second of 0.3's, `Routes`.
+
+**Fix:** drop the third argument (and, from 0.3, the second):
+
+```ts
+type Fresh = Alxia<Empty, ''>;
+```
+
+See [Upgrading](upgrading.md).
 
 ### `'app' implicitly has type 'any' because it does not have a type annotation and is referenced directly or indirectly in its own initializer`
 
@@ -1396,7 +1166,10 @@ todos.ts(3,14): error TS7022: 'todos' implicitly has type 'any' because it does 
 ```
 
 The same happens when the registered chain itself reads `Register`: a
-`defineMiddleware<AppContext>()` or a `defineRoutes()` given to `base`.
+`defineMiddleware<AppContext>()` or a `defineRoutes()` given to `base`. A
+plain `defineMiddleware(fn)` given to `base` reads `Register` too, and
+fails otherwise:
+[`Property 'db' does not exist on type 'BaseContext'.`](#property-db-does-not-exist-on-type-basecontext).
 (A `contextStorage()` given to `base` compiles, but its `context()` reads
 `BaseContext`: give it to the app after `base`.)
 
@@ -1454,7 +1227,7 @@ declare module '@alxia/core' {
 `context`, with different apps.
 
 ```text
-error TS2717: Subsequent property declarations must have the same type.  Property 'context' must be of type 'Alxia<Empty & { user: string; }, "", never>', but here has type 'Alxia<Empty & { tenant: string; }, "", never>'.
+error TS2717: Subsequent property declarations must have the same type.  Property 'context' must be of type 'Alxia<Empty & { user: string; }, "">', but here has type 'Alxia<Empty & { tenant: string; }, "">'.
 ```
 
 **Why:** a program has one `Register`, and it names one context.
@@ -1464,26 +1237,46 @@ repository each get their own `tsconfig.json`, so each is its own program;
 a package shared by both names what it reads with
 `definePlugin<Requires>()`, not `Register`.
 
-### `Property 'user' does not exist on type 'MiddlewareContext<Empty>'`
+### `Property 'db' does not exist on type 'BaseContext'.`
 
-**When:** with `Register` augmented, a `defineMiddleware(fn)` reads a key
-of the registered context.
+**When:** with `Register` augmented, every `defineMiddleware(fn)` that
+reads a key of the registered context fails with it, on each key, and the
+`@ts-expect-error` a route that does not give the context had becomes
+unused:
 
-```ts
-const owner = defineMiddleware(({ user }, next) => next({ owner: user.id }));
+```text
+middlewares.ts(6,50): error TS2339: Property 'db' does not exist on type 'BaseContext'.
+middlewares.ts(6,54): error TS2339: Property 'user' does not exist on type 'BaseContext'.
 ```
 
-**Why:** a middleware may be given to a route before `base` adds
-anything, so with no type argument it reads `BaseContext` alone,
-registered or not.
+**Why:** `defineMiddleware(fn)`, with no type argument, reads the
+registered context: the context of the base `Register` names. A
+middleware the base itself is built with, `base.use(requestId)`, then
+reads the type of the base it is part of, so the registration resolves to
+nothing and every middleware reads `BaseContext` alone.
 
-**Fix:** name the registered context as what it requires; a route or a
-`use` whose context does not give it then refuses the middleware:
+**Fix:** a middleware the registered base is built with says it reads
+nothing of it, `defineMiddleware<Empty>()(fn)` (or names what it reads,
+`defineMiddleware<{ db: Db }>()(fn)`):
 
 ```ts
-import { type AppContext, defineMiddleware } from '@alxia/core';
+// src/context.ts
+import { alxia, defineMiddleware, type Empty } from '@alxia/core';
 
-const owner = defineMiddleware<AppContext>()(({ user }, next) => next({ owner: user.id }));
+const requestId = defineMiddleware<Empty>()((ctx, next) =>
+	next({ requestId: ctx.request.headers.get('x-request-id') ?? 'none' }),
+);
+
+export const base = alxia().decorate({ db }).use(requestId);
+
+declare module '@alxia/core' {
+	interface Register {
+		context: typeof base;
+	}
+}
+
+// src/middlewares.ts — reads the registered context, no generic needed
+export const profile = defineMiddleware(({ db, requestId }, next) => next({ profile: db.find(requestId) }));
 ```
 
 ## Building the app
@@ -1497,8 +1290,7 @@ by the type first when the path is a literal, with the same message after
 ([the compile error](#argument-of-type--is-not-assignable-to-parameter-of-type-invalid-path-)). The eight about a path's syntax are also thrown
 by `shapeOf(path)`, and so by a tool that calls it: `@alxia/openapi`'s
 `implemented` and `matchesSpec` throw them for an operation path no route may
-be declared at, after their own name (`implemented(): …`; `exactly(): …` from the
-deprecated `exactly`).
+be declared at, after their own name (`implemented(): …`, `matchesSpec(): …`).
 
 ### `The route path "…" must start with "/"`
 
@@ -1687,30 +1479,13 @@ and once through `plugin(app)` or a `group`, or as `static` beside a
 **Fix:** keep one. `HEAD` runs the `GET` route, so you do not need to
 declare it.
 
-### `GET /…: hook 1 of the list is not a hook: make it with defineHook() or defineWrap()`
-
-**When:** a route's list holds something `defineHook` or `defineWrap` did
-not make: a bare function, an object cast to a hook.
-
-**Fix:** wrap it: `[defineHook(({ request }) => …)]`.
-
-### `defineHook(): the hook is not a function`
-
-**When:** `defineHook(value)` or `defineWrap(value)` is given something that
-is not a function — `defineWrap()` reports `defineWrap(): …`. Calling
-either with nothing at all is not this error: `defineHook<Requires>()`
-returns the function that takes the hook.
-
-**Fix:** give it the hook, `defineHook(({ request }) => …)`, or name the
-requirement and give the hook next, `defineHook<{ user: User }>()((ctx) => …)`.
-
-### `GET /…: middleware 1 is not a function: make it with defineMiddleware(), validate() or responds()`
+### `GET /…: middleware 1 is not a function: a middleware is (ctx, next) => …, or a validate() or responds()`
 
 **When:** a route is given, between its path (or options) and its handler,
-something that is not a function: a string, an object, a schema handed
-bare instead of `validate({ body: Post })`. The count starts after the
-options, so `middleware 1` is the first middleware. A socket route reports
-`WS /…: …`.
+something that is not a function: a string, a second object, a schema
+handed bare instead of `validate({ body: Post })`. The count starts after
+the options, so `middleware 1` is the first middleware. A socket route
+reports `WS /…: …`.
 
 **Why:** each argument between the options and the last is a middleware,
 run in turn. Only the first object after the path is read as the options.
@@ -1723,17 +1498,45 @@ import { validate } from '@alxia/core';
 app.post('/posts', auth, validate({ body: Post }), handler);   // not app.post('/posts', auth, { body: Post }, handler)
 ```
 
-### `GET /…: the options hold no schema: give validate(…) and responds(…) among the middlewares`
+### `GET /…: a route takes its middlewares after the path, not in a list: drop the brackets`
 
-**When:** a route given middlewares also has a schema part — `params`,
-`query`, `headers`, `cookies`, `body` or `response` — in its options. The
-types refuse it ([`… is not assignable to type 'never'`](#type--is-not-assignable-to-type-never-in-a-routes-options));
+**When:** a route, a socket or `route(operation, …)` is given an array
+among its arguments: `app.get('/', [auth], handler)`, the list of hooks of
+0.3. `route(operation, [auth], handler)` names the operation:
+`GET /pets/:petId: a route takes its middlewares …`. The types refuse it
+first ([`Middleware<…>[]` is not assignable to …](#argument-of-type-middleware-is-not-assignable-to-parameter-of-type-optionsonlyfunctionlike--routeoptions)),
+so this comes from JavaScript or a cast. It throws where the route is
+declared.
+
+**Why:** 0.5 removed the list form. A route reads its middlewares one by
+one, after the path and its options.
+
+**Fix:** drop the brackets:
+
+```ts
+app.get('/posts/:id', loadPost, auth, handler);
+```
+
+See [Upgrading](upgrading.md).
+
+### `GET /…: the options hold no schema (body): give validate(…) and responds(…) among the middlewares`
+
+```text
+POST /posts: the options hold no schema (body, response): give validate(…) and responds(…) among the middlewares
+```
+
+**When:** a route's options — the object after its path — hold a schema
+part: `params`, `query`, `headers`, `cookies`, `body` or `response`. The
+message names each. This is also the 0.3 form, a schema before the
+handler, `app.get('/', { params }, handler)`, and a socket's schema,
+`WS /…: …`. The types refuse it
+([`… is not assignable to type 'never'`](#type--is-not-assignable-to-type-never-in-a-routes-options));
 plain JavaScript or a cast reaches the runtime, which refuses it where the
 route is declared.
 
 **Why:** the options are the route's configuration, `bodyLimit` and
-`detail`. A schema there would validate after the middlewares and undo
-what a `validate` among them did.
+`detail` (and a socket's `message` and `send`). A schema is a middleware,
+`validate(…)` or `responds(…)`, so it stands where it runs.
 
 **Fix:** move the schemas into middlewares:
 
@@ -1788,30 +1591,6 @@ for `validate`, the status for `responds`.
 app.post('/posts', validate({ body: Post }), responds({ 201: Post }), handler);
 ```
 
-### `GET /…: a list of hooks and middlewares are two forms, never mixed: give the hooks as middlewares, made by defineMiddleware()`
-
-**When:** a route is given a list of hooks, the form of 0.3, and
-middlewares after it: `app.get('/', [hook], auth, handler)`, or `[hook],
-schema, auth, handler`. `route(operation, [hook], auth, handler)` throws
-the same, named by the operation: `GET /pets/:petId: a list of hooks and
-middlewares are two forms, …`. The types refuse both, so this comes from
-JavaScript or a cast. It throws where the route is declared.
-
-**Why:** the two forms read the arguments differently. Before 0.4 the
-route kept one of them: `route(operation, [hook], auth, handler)` took
-`auth` for the handler and dropped the real one without a word.
-
-**Fix:** give the hooks as middlewares, after the path:
-
-```ts
-const loadPost = defineMiddleware(async ({ pathParams }, next) =>
-	next({ post: await posts.find(pathParams.id) }),
-);
-app.get('/posts/:id', loadPost, auth, handler);
-```
-
-See [Upgrading](upgrading.md#3-the-list-of-hooks-becomes-middlewares-after-the-path).
-
 ### `responds(): the operation GET /… declares no response`
 
 **When:** `responds(operation)` is given an operation whose `schema` has no
@@ -1865,33 +1644,56 @@ app.post('/upload', { bodyLimit: 25 * 1024 * 1024 }, handler);
 app.group('/admin', (admin) => admin.derive(requireAdmin).get('/stats', stats));
 ```
 
-### `use(): middleware 2 was not made by defineMiddleware()`
+### `use(): argument 1 is an app: a plugin is given to app.plugin(), use() takes middlewares`
 
-**When:** `use(first, second, …)`, whose first argument is a middleware
-made by `defineMiddleware` or a path, is given something else among them:
-a plain function, or — as `use(): middleware 1 is a validate() or
-responds(), which belongs to a route` says — a `validate(…)` or
-`responds(…)`. The types refuse both, so this comes from JavaScript or a
-cast. Given a path first, the message starts with it:
-`use("/admin"): middleware 1 was not made by defineMiddleware()`.
+**When:** `use` is given an app among its middlewares, `use(auth)` where
+`auth` is `alxia().derive(…)`: 0.3's `use(plugin)`, removed in 0.5. With
+a path first, the message starts with it, `use("/admin"): argument 1 is an
+app: …`, and counts after the path. The types refuse it first
+([`provides no match for the signature`](#type-alxiaempty--provides-no-match-for-the-signature-ctx-basecontext--empty-next-nextfunction-middlewarereturn)).
 
-**Why:** `use` tells a middleware from a plugin by the mark
-`defineMiddleware` puts on it. `validate` and `responds` declare one
-route's schemas, and belong among its middlewares.
-
-**Fix:** wrap the function, and give the schemas to the route:
+**Fix:** mount the app with `plugin`:
 
 ```ts
-const timed = defineMiddleware(async (_ctx, next) => next());
-app.use(auth, timed).post('/posts', validate({ body: Post }), handler);
+app.plugin(auth).get('/me', ({ user, reply }) => reply(200, user));
 ```
 
-### `use("…"): no middleware is given`
+### `use(): argument 1 is not a function: a middleware is (ctx, next) => …`
 
-**When:** `use(path)` is called with a path and no middleware, or with a
-path a route could not be declared at: `use("/a/*/b"): "/a/*/b": "*" may
-only end a path` gives the reason, as [Building the app](#building-the-app)
-lists them for a route.
+**When:** `use` is given something that is not a function: `null`, an
+object, a schema. The types refuse it, so this comes from JavaScript or a
+cast.
+
+**Fix:** give a `(ctx, next)` function, written inline or kept in a const:
+
+```ts
+app.use(async (_ctx, next) => {
+	const response = await next();
+	response.headers.set('x-served-by', 'alxia');
+	return response;
+});
+```
+
+### `use(): argument 1 is a validate() or responds(), which belongs to a route`
+
+**When:** `use` is given a `validate(…)` or a `responds(…)`.
+
+**Why:** `validate` and `responds` declare one route's schemas, and stand
+among its middlewares, where they run.
+
+**Fix:** give the schemas to the route:
+
+```ts
+app.use(auth).post('/posts', validate({ body: Post }), responds({ 201: Post }), handler);
+```
+
+### `use(): no middleware is given`
+
+**When:** `use()` is called with nothing, or `use(path)` with a path and
+no middleware: `use("/admin"): no middleware is given`. A path a route
+could not be declared at says why instead: `use("/a/*/b"): "/a/*/b": "*"
+may only end a path`, as [Building the app](#building-the-app) lists them
+for a route.
 
 **Why:** a string first is read as the path of the middlewares after it,
 checked as a route path is; with none after it, `use` would do nothing.
@@ -1913,107 +1715,44 @@ nothing.
 **Fix:** drop the slash: `use('/admin', guard)` for `/admin` and under,
 `use('/admin/*', guard)` for under it alone.
 
-### `plugin(): a plugin is given alone, to app.plugin(); middlewares are made with defineMiddleware() and given to use()`
+### `plugin(): a plugin is given alone: an app or a function that returns one; middlewares are given to use()`
 
-**When:** `plugin` is given more than one argument, or `use` an app or a
-plugin function followed by more — `use(auth, logger)` where `auth` is a
-plain function or an app, which `use` reads in its deprecated plugin form
-and says `use(): a plugin is given alone, …`. Given nothing, `plugin()`
-says `plugin(): nothing is given: a plugin, an app or a function`, and
-`use()` says `use(): nothing is given: middlewares`.
+**When:** `plugin` is given more than one argument. Given nothing,
+`plugin()` says `plugin(): nothing is given: an app or a function that
+returns one; middlewares are given to use()`.
 
 **Fix:** one plugin per call, `plugin(a).plugin(b)`; middlewares, several
-to a `use`, made by `defineMiddleware`.
+to a `use`.
 
-### `plugin(): the plugin is neither an app nor a function; a middleware is made with defineMiddleware() and given to use()`
+### `plugin(): the plugin is neither an app nor a function that returns one; a middleware is given to use()`
 
-**When:** `plugin` — or `use`, in its deprecated plugin form, `use(): the
-plugin is neither …` — is given what is neither an app nor a function: a
-hook made by `defineHook` or `defineWrap`, an object, `null`. The types
+**When:** `plugin` is given what is neither an app nor a function — an
+object, `null`, a number — or a `validate(…)` or `responds(…)`. The types
 refuse it, so this comes from JavaScript or a cast.
 
-**Fix:** give `plugin` an app or a function `(app) => app`; a hook of
-`defineHook` goes in a route's list, or better rewritten as a middleware
-([Upgrading](upgrading.md#migrating-to-middlewares)).
+**Fix:** give `plugin` an app, or a function `(app) => app`; give a
+`validate` or a `responds` to a route.
 
-### `plugin(): a middleware is given to use(), not taken for a plugin`
+### `plugin(): the plugin function returned undefined, not an app: a plugin returns the app it is given; a middleware is given to use()`
 
-**When:** `plugin` is given a middleware made by `defineMiddleware`, or a
-`validate(…)` or `responds(…)`. The types refuse it first.
+**When:** a function given to `plugin` returns anything but an app:
+`undefined` (a block body with no `return`), a reply, or a promise —
+`plugin(): the plugin function returned a promise, not an app: …` — most
+often because it is a middleware, `app.plugin(cors())`, the 0.3 form
+0.5 removed. `plugin` calls the function with the app, once; a middleware
+that calls `next` right away is told `plugin(): the plugin function called
+next(): …`, the same advice.
 
-**Why:** a middleware runs on requests, a plugin once, on the app: called
-as a plugin, a guard would guard nothing.
+**Why:** a plugin is a function too, `(app) => app`, run once when it is
+mounted. A middleware called that way would guard nothing; a result that
+is not an app throws, and a promise it returned is left handled.
 
-**Fix:** give it to `use`, or to the route:
-
-```ts
-app.use(auth).get('/me', ({ user, reply }) => reply(200, user));
-```
-
-### `plugin(): the plugin function returned undefined, not an app: a plugin returns the app it is given; a middleware is made with defineMiddleware() and given to use()`
-
-**When:** a function given to `plugin` returns anything but an app —
-`undefined`, a promise, a reply — and, the most common case, a middleware
-written without `defineMiddleware`, `(ctx, next) => …`, given to `use`,
-which reads it in its deprecated plugin form and says `use(): the plugin
-function returned a promise, not an app: …`:
+**Fix:** return the app from a plugin function, and give a middleware to
+`use`:
 
 ```ts
-const auth = async ({ request, reply }, next) => { … }; // a plain function
-app.use(auth); // called once as a plugin, auth(app): it returns a promise, and use throws
-```
-
-A middleware that calls `ctx.reply` or `next` before its first `await`
-throws first, `TypeError: next is not a function` or the like, from the
-function run with the app as `ctx`.
-
-**Why:** a plugin is a function too, `(app) => app`. `use` tells the two
-apart by the mark `defineMiddleware` puts on a middleware; any other
-function is a plugin, called with the app. Before 0.4 `use` returned what
-it returned, so a guard ran on no request without a word; now a result
-that is not an app throws, and a promise it returned is left handled. A
-route's own middlewares take a plain function: only `use` needs the mark.
-
-**Fix:** make a middleware with `defineMiddleware`, and return the app
-from a plugin function:
-
-```ts
-const auth = defineMiddleware(async ({ request, reply }, next) => { … });
-app.use(auth);
 app.plugin((app) => app.onStop(close)); // onStop returns the app
-```
-
-The types say so first: a plain `(ctx, next) => …` given to `use` does not
-compile, since a plugin takes the app alone and returns an app. In the
-next minor, `use` takes any `(ctx, next)` function as a middleware.
-
-### `onRefusal(): the hook is missing`
-
-**When:** `onRefusal` is given its schemas but no hook, or a kind with no
-hook — `onRefusal('validation')`, `onRefusal('validation', schema)`. The
-types refuse that, so this comes from JavaScript or a cast.
-
-**Fix:** pass the hook last:
-
-```ts
-app.onRefusal({ response: { 400: Problem } }, (_, { reply }) =>
-	reply(400, { type: 'urn:example:invalid', status: 400, detail: 'invalid' }),
-);
-app.onRefusal('validation', { response: { 400: Problem } }, (refusal, { reply }) =>
-	reply(400, { type: 'urn:example:invalid', status: 400, detail: refusal.part }),
-);
-```
-
-### `onRefusal(): "…" is no kind of refusal; expected 'validation' or 'body_limit'`
-
-**When:** `onRefusal` is given a string that is not a kind of refusal, a
-typo such as `'body-limit'`. The types refuse that too, so this comes from
-JavaScript or a cast.
-
-**Fix:** give one of the two kinds, with an underscore in `body_limit`:
-
-```ts
-app.onRefusal('body_limit', (refusal) => problem({ status: 413, limit: refusal.limit }));
+app.use(cors());
 ```
 
 ### `page(): /… is already served`
@@ -2050,8 +1789,8 @@ The app answers these itself. Their bodies are the exported
 ### `400 {"error":"validation","issues":[…]}`
 
 **When:** a request reaches a `validate(…)` whose `params`, `query`,
-`headers`, `cookies` or `body` schema refuses it — or a deprecated schema
-before the handler. Every issue is listed, each with the part it was read
+`headers`, `cookies` or `body` schema refuses it, or the schema of an
+operation given to `route()`. Every issue is listed, each with the part it was read
 from:
 
 ```json
@@ -2100,40 +1839,47 @@ you.
 To answer it in another format, such as an RFC 9457 problem, give a
 middleware before the routes that catches the `ValidationError` and reads
 `refusalOf(error)` ([Routes](guide/routes.md#refusals-in-your-own-format)).
-The `onRefusal` hook does the same and is deprecated for it.
 
-### A route still answers `{"error":"validation"}` after `onRefusal`
+### A route still answers `{"error":"validation"}` after a middleware that catches refusals
 
-**When:** an app declares `onRefusal`, and a refused request to one of its
-routes still gets the default 400.
+**When:** an app gives a middleware that catches a `ValidationError` and
+answers it in its own format, and a refused request to one of its routes
+still gets the default 400.
 
 **Why**, by what you find:
 
-- The route is declared **before** the hook. A hook applies to the
-  routes declared after it, never before: move the hook up the chain.
-- The hook is declared inside a `group`. A group's hooks stay inside it:
-  declare the hook on the app, before the group.
-- The hook returned nothing, `undefined`, for this refusal. Nothing means
-  the default: return a reply for every refusal you want answered.
-- The hook is a hook of the other kind, `onRefusal('body_limit', …)`. It
-  answers that kind alone: declare one for `'validation'`, or a general
-  `onRefusal(hook)`.
-- A general `onRefusal(hook)` declared after `onRefusal('validation', …)`
-  replaces it: declare the hook of the kind last.
+- The route is declared **before** the `use`. A middleware applies to the
+  routes declared after it, never before: move the `use` up the chain.
+- The `use` is inside a `group`. A group's middlewares stay inside it:
+  declare it on the app, before the group.
+- The middleware stands **after** the `validate` on the route: a refusal
+  rejects the `next()` of the middlewares before the `validate` alone.
+- It rethrows the error: `refusalOf(error)` is `undefined` for an error
+  that is no refusal, and a check on `kind` may leave this one out.
+- Something between them answered the error first
+  ([A middleware's `try`/`catch` never sees the error](#a-middlewares-trycatch-never-sees-the-error)).
 
-**Fix:** declare the hook first, and return a reply:
+**Fix:** give the middleware first, and return a reply for the refusal:
 
 ```ts
-const app = alxia()
-	.onRefusal((refusal) =>
-		refusal.kind === 'validation' ? problem({ status: 400, detail: `the ${refusal.part} is invalid` }) : undefined,
-	)
-	.post('/users', validate({ body: NewUser }), handler);
+import { alxia, defineMiddleware, problem, refusalOf, validate } from '@alxia/core';
+
+const refusals = defineMiddleware(async (_ctx, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		const refusal = refusalOf(error);
+		if (refusal?.kind !== 'validation') throw error;
+		return problem({ status: 400, detail: `the ${refusal.part} is invalid` });
+	}
+});
+
+const app = alxia().use(refusals).post('/users', validate({ body: NewUser }), handler);
 ```
 
 A body past the route's `bodyLimit` still gets the default
-`413 {"error":"content_too_large","limit":…}` from that hook, which returns nothing
-for a `body_limit`. Return a reply for it too to answer it in your format
+`413 {"error":"content_too_large","limit":…}` from that middleware, which
+rethrows a `body_limit` refusal. Answer it too to answer it in your format
 ([`413`](#413-errorcontent_too_largelimit)).
 
 ### `413 {"error":"content_too_large","limit":…}`
@@ -2166,7 +1912,7 @@ app
 
 To answer in another format, such as an RFC 9457 problem, return it from a
 middleware given before the route that catches the `ContentTooLargeError`,
-for the refusal of kind `body_limit`. The `onError` hooks never see it:
+for the refusal of kind `body_limit`:
 
 ```ts
 import { defineMiddleware, problem, refusalOf, validate } from '@alxia/core';
@@ -2184,8 +1930,6 @@ app
 	.use(limits)
 	.post('/api', { bodyLimit: 10_000_000 }, validate({ body: z.unknown() }), handler);
 ```
-
-The deprecated `onRefusal` hook answers it too.
 
 A 413 with no JSON body comes from Bun itself. The body passed `listen`'s
 `maxRequestBodySize`, which applies to every route, before any route's
@@ -2273,18 +2017,18 @@ app.static('/media', join(import.meta.dir, 'media'), { ranges: false });
 
 ### `500 {"error":"internal"}`
 
-**When:** a handler or a hook throws, or a reply breaks its schema. The
+**When:** a handler or a middleware throws, or a reply breaks its schema. The
 body never says why, by design.
 
 **Why:** the app prints the error with `console.error`, then answers 500.
 The next section lists the messages it prints. An error thrown in a route
 rejects `next()` through the middlewares, which may answer it; one nobody
-catches reaches the route's deprecated `onError` hooks. An `HttpError` is
-answered with its own status and body.
+catches is answered at the route boundary: an `HttpError` with its own
+status and body, anything else with this 500.
 
 A request that fails because its client hung up (its `request.signal`
 aborted, and the error is the `AbortError` a body read then throws) is
-not an error of the app: nothing is printed, no `onError` hook runs, and
+not an error of the app: nothing is printed, and
 a middleware that settles `next()`, a logger's, sees a `499` with no body. Any other
 error is printed and answered 500, a bug thrown after the client left
 included. A handler that ignores the abort and replies gets its own
@@ -2320,8 +2064,8 @@ app plugin, and a route of that plugin accepts a larger body.
 
 **Why:** an app's `bodyLimit()` reaches the routes declared on it and in
 its groups, never a plugin's. A plugin's route keeps the limit it was
-declared with. A plugin route with no `onRefusal` of
-its own is still answered by the app's hook. A function plugin that declares its routes on the app is
+declared with. A middleware the app gives before `plugin`, one that
+catches refusals included, still runs on the plugin's routes. A function plugin that declares its routes on the app is
 bounded like any of them.
 
 **Fix:** give the plugin's route a `bodyLimit` of its own:
@@ -2332,14 +2076,14 @@ const app = alxia().bodyLimit(64 * 1024).plugin(uploads);
 ```
 
 A `bodyLimit()` the plugin calls instead also applies to the app's routes
-declared after `plugin`, as its hooks do. Call the app's own after `plugin`
+declared after `plugin`, as its middlewares do. Call the app's own after `plugin`
 to keep it.
 
 ## Middlewares
 
 Traps that print nothing: a middleware runs where you did not expect, or does not run where you did.
 
-### `set.cookies.get()` returns null in a hook
+### `set.cookies.get()` returns null in a middleware
 
 **When:** a `derive` or a middleware reads a cookie the request sent
 through `set.cookies` — a session id — and always gets `null`, so every
@@ -2362,7 +2106,7 @@ middleware has:
 
 A `validate({ cookies })` validates them for the middlewares after it and
 the handler; a middleware before it reads them as they arrived
-([Hooks](guide/hooks.md#reading-the-requests-cookies)).
+([Reading cookies](guide/middleware.md#reading-cookies)).
 
 ### A `use(path)` guard did not run on a request under its path
 
@@ -2430,19 +2174,6 @@ not run on those routes. That is often meant — a `/health` before an
 the warning is the only effect; it never prints in production or under
 `bun test`.
 
-### `plugin(): plugin(middleware) is deprecated: the middleware runs on every route, the … declared before it included, but what it adds to the context is typed only for the routes after it`
-
-**When:** in development, once per app, `app.plugin(middleware)` is given
-after routes.
-
-**Why:** `plugin(middleware)` keeps its meaning of 0.3, where
-`secureHeaders()`, `cors()`, `logger()`, `compress()` and `telemetry()`
-were global hooks: it runs app-wide, before the app's chain, on the routes
-declared before it too. A guard given that way guards those routes too;
-what a middleware adds is typed only after it.
-
-**Fix:** give it to `use`, before the routes: `app.use(secureHeaders()).get(…)`.
-
 ### A path that does not exist answers `401`, not `404`
 
 **When:** `GET /nowhere` with no credentials answers
@@ -2482,12 +2213,11 @@ group ([`Invalid middleware: …`](#-is-not-assignable-to-type-invalid-middlewar
 ### A middleware's `try`/`catch` never sees the error
 
 **When:** a middleware catches what `next()` throws, and the error never
-reaches it: the response is the 500 or the `onError` reply, and the `catch`
-does not run.
+reaches it: the response is the 500 or another middleware's reply, and
+the `catch` does not run.
 
 **Why:** something between them answered the error without throwing it
-on: an `onError` hook, deprecated, that returned a reply; a middleware of
-your own that caught it and returned a response; or a middleware that
+on: a middleware of your own that caught it and returned a response; or a middleware that
 read `next()` with `.catch()` or `.then(…, …)` rather than through
 `settle`; or one that settled a promise other than `next()` itself,
 `settle(ctx, next().then(…))`, or returned a reply of its own after
@@ -2510,6 +2240,31 @@ const app = alxia()
 
 `janusErrors()` answers what is thrown **behind** it:
 `app.use(janusErrors(), session(accounts))`.
+
+### A middleware's `try`/`catch` sees an `AbortError` when the client left
+
+**When:** a middleware that wraps `await next()` in `try`/`catch` catches
+an `AbortError`, or the error a body read throws, on a request whose
+client hung up mid-request — a large upload cancelled.
+
+**Why:** an error is a rejection through `next()`, whatever threw it, and
+a client that left is one: the body read fails. It is no error of the app:
+nothing is printed, and a middleware that settles `next()`, a logger's,
+sees a `499` with no body, which nobody reads.
+
+**Fix:** rethrow what you do not answer, as for any error; to tell it
+apart, read `request.signal.aborted`:
+
+```ts
+const errors = defineMiddleware(async ({ request, reply }, next) => {
+	try {
+		return await next();
+	} catch (error) {
+		if (request.signal.aborted || !(error instanceof NotFoundError)) throw error;
+		return reply(404, { error: 'not_found' as const });
+	}
+});
+```
 
 ### `Type 'string | undefined' is not assignable to type 'string'` on `ctx.route`
 
@@ -2607,9 +2362,6 @@ at runtime. Data from a database, `JSON.parse` or `any` gets past the types.
 **Why:** what leaves the server is the schema's output. A body the schema
 refuses is never sent, so the client never reads an undeclared shape.
 
-An `onRefusal` hook given schemas is checked the same way: the message
-names the route that was refused and the status the hook replied with.
-
 **Fix:** map the data to the schema before replying. To skip the check in
 a hot path you trust, turn it off for the app; the declared status is still
 enforced:
@@ -2627,12 +2379,9 @@ ResponseValidationError: GET /u declares no 201 reply
 **When:** the handler of a route given `responds(…)` replies with a status
 it does not declare. The types refuse that, so this comes from JavaScript
 or a cast. Redirects (3xx without a body) are exempt, and so is a reply
-returned by `onError`, a `derive`, or a middleware with a status `responds`
-does not declare, which is sent as it is
+returned by a `derive`, or by a middleware with a status `responds` does
+not declare, which is sent as it is
 ([Where `validate` stands](guide/middleware.md#where-validate-stands)).
-An `onRefusal` hook given schemas that replies with a status they do not
-declare fails the same way, naming the refused route: declare the status
-in the hook's `response`.
 
 **Fix:** declare the status in `responds`:
 
@@ -2789,20 +2538,6 @@ app.get('/users', async ({ reply }) => {
 });
 ```
 
-### `TypeError: … the onRefusal hook returned neither a reply nor nothing.`
-
-**When:** an `onRefusal` hook returns something that is neither a `Reply`
-nor `undefined`, such as a plain object or a `Response`. TypeScript
-refuses it, so this comes from JavaScript or a cast.
-
-**Fix:** return `reply(…)` or `problem(…)`, or nothing for the default:
-
-```ts
-app.onRefusal((refusal) =>
-	refusal.kind === 'validation' && refusal.part === 'body' ? problem({ status: 400, detail: 'bad body' }) : undefined,
-);
-```
-
 ### `TypeError: Body already used`
 
 ```text
@@ -2816,11 +2551,11 @@ TypeError: Body already used
 **When:** a route with a `validate({ body })` answers
 `500 {"error":"internal"}`, and the server log prints this. Something
 before the `validate` — a middleware placed before it, a `derive`, a
-`wrap` — read the body itself, with `request.json()`,
+`use` — read the body itself, with `request.json()`,
 `request.text()` or `request.formData()`.
 
 **Why:** `derive`s, and the middlewares before a `validate`, run before
-it. A request's body can be read once: the hook used it up, and the
+it. A request's body can be read once: that middleware used it up, and the
 `validate`, which reads it next, fails. Two `validate`s of the body are
 not this: the second checks the body the first read.
 

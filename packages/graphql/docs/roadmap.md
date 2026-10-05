@@ -24,11 +24,11 @@ Nothing scheduled yet.
 - **GraphQL Yoga as a route.** `graphql(app, options)` serves a schema at
   `GET` and `POST` `/graphql`, or any `path`, under the app's prefix and
   the prefix of every app it is mounted into. The endpoint runs behind the
-  app's hooks like any route: a guard declared before it guards it, and its
+  app's middlewares like any route: a guard given to `use` before it guards it, and its
   reply is part of the endpoint's type.
 - **The app's context in every resolver, typed and checked.**
   `GraphQLContext<typeof app>` types a schema with Yoga's context and
-  everything the app's hooks add — a user, a database handle — plus `set`,
+  everything the app's middlewares add — a user, a database handle — plus `set`,
   through which a resolver sets a header or a cookie. A schema whose
   resolvers read what the app does not build is a compile error naming the
   missing field, and `GraphQLContext` of anything but an app is a message

@@ -3,7 +3,6 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
 	type Next,
 	type Reply,
 } from '@alxia/core';
@@ -58,8 +57,7 @@ export type RateLimit<Requires extends object = Empty> = Middleware<
 	Promise<
 		Reply<429, RateLimitedBody> | Next<{ rateLimit: RateLimitInfo | undefined }>
 	>
-> &
-	MiddlewareMark;
+>;
 
 /**
  * A rate limit, as a middleware: every request it runs on is counted —

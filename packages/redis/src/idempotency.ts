@@ -3,7 +3,6 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
 	type Reply,
 	settle,
 } from '@alxia/core';
@@ -63,8 +62,7 @@ export type IdempotencyMiddleware = Middleware<
 		| Reply<409, IdempotencyErrorBody>
 		| Reply<422, IdempotencyErrorBody>
 	>
-> &
-	MiddlewareMark;
+>;
 
 const Stored = z.object({
 	status: z.number().int(),

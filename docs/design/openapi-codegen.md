@@ -2,7 +2,8 @@
 
 > **Since 0.4:** this note's `@alxia/openapi-routes` shipped, and is now
 > `@alxia/openapi`; the document writer it calls `@alxia/openapi` is
-> retired. alxia is spec first.
+> retired. alxia is spec first. The old name left the repository at 0.5:
+> below, `@alxia/openapi-routes` is the package as it was planned.
 
 Status: **approved** by the owner on 2026-10-02. Each slice below is one
 PR, built in the order given at the end.
@@ -137,8 +138,8 @@ This package holds only the part core should not know:
 - `implemented(app, operations)` throws, listing each operation of the spec
   that has no route on `app`, keyed by method and path. A test or startup
   calls it, as openapi-hono's `assertComplete()` does.
-- `matchesSpec(app, operations)` (named `exactly` until 0.2.0, kept as a
-  deprecated alias) throws the same way, and also lists each route
+- `matchesSpec(app, operations)` (named `exactly` until 0.2.0; the alias
+  was removed in 0.5) throws the same way, and also lists each route
   of `app` that the spec does not declare.
 
 It reads `app.routes` and nothing else. It is about 60 lines, plus its

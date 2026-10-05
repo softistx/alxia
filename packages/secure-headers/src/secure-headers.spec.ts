@@ -63,15 +63,20 @@ describe('secureHeaders', () => {
 		expect(response.headers.get('x-content-type-options')).toBe('nosniff');
 	});
 
-	test('an error answered by onError, and a 500, are covered too', async () => {
+	test('an error a try/catch middleware answers, and a 500, are covered too', async () => {
 		const original = console.error;
 		console.error = () => {};
 		try {
 			const app = alxia()
 				.use(secureHeaders())
-				.onError((error, { reply }) =>
-					error instanceof RangeError ? reply(409, 'taken') : undefined,
-				)
+				.use(async ({ reply }, next) => {
+					try {
+						return await next();
+					} catch (error) {
+						if (error instanceof RangeError) return reply(409, 'taken');
+						throw error;
+					}
+				})
 				.get('/taken', () => {
 					throw new RangeError('taken');
 				})

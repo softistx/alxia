@@ -2,7 +2,6 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
-	type MiddlewareMark,
 	type Next,
 	settle,
 	withHeaders,
@@ -66,8 +65,7 @@ export interface LoggerOptions {
 }
 
 /** What `logger()` makes: a middleware that gives `requestId` and `log`. */
-export type LoggerMiddleware = Middleware<Empty, Promise<Next<LoggerContext>>> &
-	MiddlewareMark;
+export type LoggerMiddleware = Middleware<Empty, Promise<Next<LoggerContext>>>;
 
 /**
  * Logging, as a middleware: every request gets an id — kept from the

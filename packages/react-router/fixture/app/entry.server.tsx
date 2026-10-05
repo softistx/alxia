@@ -17,7 +17,7 @@ export default async function handleRequest(
 	loadContext: RouterContextProvider,
 ) {
 	let status = responseStatusCode;
-	// The nonce of the request's Content-Security-Policy, when alxia's hooks set one.
+	// The nonce of the request's Content-Security-Policy, when alxia's middlewares set one.
 	const nonce = nonceOf(loadContext);
 	const body = await renderToReadableStream(
 		<ServerRouter

@@ -1,6 +1,4 @@
 export {
-	type ExactlyOptions,
-	exactly,
 	type ImplementedOptions,
 	implemented,
 	type MatchesSpecOptions,
