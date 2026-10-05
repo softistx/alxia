@@ -217,6 +217,46 @@ Prefer a `derive` on the app for what every route needs — the user, a
 database handle — and the `context` option for what only resolvers do, such
 as per-request data loaders.
 
+## Batching with DataLoader (N+1)
+
+A field that loads a record for each parent, `Note.author` over a list of
+notes, runs a query per parent: 50 notes, 51 queries. A
+[DataLoader](https://github.com/graphql/dataloader) collects the `load` calls
+of one tick and calls your batch function once. Build the loaders in the
+`context` option, so each request has its own, and type them through
+`GraphQLContext`'s second argument, so every resolver reads `loaders` typed:
+
+```ts
+import DataLoader from 'dataloader';
+
+// `findUsers` is your batch query: one result per id, in the order of the ids.
+
+const createLoaders = () => ({
+	user: new DataLoader(async (ids: readonly string[]) => findUsers(ids)), // one query for all ids
+});
+type Loaders = ReturnType<typeof createLoaders>;
+type Context = GraphQLContext<typeof base, { loaders: Loaders }>;
+
+const schema = createSchema<Context>({
+	typeDefs: /* GraphQL */ `type User { id: ID!, name: String! } type Note { author: User! } type Query { notes: [Note!]! }`,
+	resolvers: { Note: { author: (note: { authorId: string }, _, { loaders }) => loaders.user.load(note.authorId) } },
+});
+
+const app = base.plugin((app) =>
+	graphql(app, { schema, context: () => ({ loaders: createLoaders() }) }),
+);
+```
+
+**The loaders must be per request.** A DataLoader caches every key it loads.
+Created once, at module level or with `decorate`, its cache outlives the
+request: it keeps serving a record after an update, grows for the life of the
+process, and a loader that reads with the viewer's permissions hands one
+user's data to the next. Per request, the cache lives and dies with one
+response, and the same user loaded twice in it is one lookup.
+
+The [GraphQL recipe](https://github.com/softistx/alxia/blob/develop/docs/recipes/graphql-api.md)
+builds this step by step, with a spec that counts the calls to the store: five notes, one batch.
+
 ## See also
 
 - [Mounting the endpoint](endpoint.md): which middlewares run before it.

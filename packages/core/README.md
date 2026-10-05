@@ -368,8 +368,8 @@ alxia()
 // POST /notes answers 201, 413 { limit: number }, 422 { detail: string } or 500
 ```
 
-`ip` is the client's address — the `ip` option reads it behind a proxy —
-and `server` the Bun server, when there is one. `HEAD` runs the `GET` route.
+`ip` is the client's address — behind a proxy, `alxia({ ip: forwardedIp({ trusted: 1 }) })` reads it
+([Serving](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#the-clients-address-ip)) — and `server` the Bun server, when there is one. `HEAD` runs the `GET` route.
 
 `query` declares a `QUERY` route: a safe, idempotent read whose criteria are
 too long or too structured for a query string, so they travel in the body —
@@ -882,6 +882,7 @@ joins middlewares past the 8 a call types:
 
 | export | |
 | --- | --- |
+| `forwardedIp({ header?, trusted })`, `ForwardedIpOptions`, `TrustedProxies` | the `ip` option for an app behind proxies: the client from `X-Forwarded-For` or `Forwarded`, read from the right past `trusted` hops or CIDR ranges, never the first entry the client writes; the connection's address when the header does not name it |
 | `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip`, `errors`, `dev` (on only when `NODE_ENV` is `development`: the route table, the 404 hint, the dev error page) |
 | `Alxia<Ctx, Prefix>` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `use` `derive` `decorate` `bodyLimit` `onStart` `onStop` `parser`, `group` `plugin`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server`; `Ctx` is what a route declared next reads, `Prefix` the app's prefix |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |

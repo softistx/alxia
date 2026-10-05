@@ -263,7 +263,7 @@ test('a reply is typed by responds', () => {
 ## GraphQL
 
 A GraphQL endpoint is a route: POST to `/graphql` through `app.request`.
-The [GraphQL recipe](graphql-api.md#5-test-it-in-process) has a helper
+The [GraphQL recipe](graphql-api.md#6-test-it-in-process) has a helper
 for it, and a subscription read over server-sent events.
 
 ## Reference

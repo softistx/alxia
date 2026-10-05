@@ -1,6 +1,7 @@
 import { alxia, defineMiddleware } from "@alxia/core";
 import type { GraphQLContext } from "@alxia/graphql";
 import { env } from "./env";
+import type { Loaders } from "./loaders";
 import { db } from "./store";
 
 // Reads the bearer token: `viewer` is the user it names, or null. A query
@@ -19,6 +20,7 @@ const viewerOf = defineMiddleware(({ request }, next) => {
 // The base: what every resolver reads, decorated or derived here.
 export const base = alxia().decorate({ env, db }).use(viewerOf);
 
-// A resolver's context: Yoga's, and the base's (`env`, `db`, `viewer`).
-// The generated `Resolvers` takes it (codegen.ts: `contextType`).
-export type Context = GraphQLContext<typeof base>;
+// A resolver's context: Yoga's, the base's (`env`, `db`, `viewer`) and the
+// per-request `loaders` that src/app.ts's `context` option builds. The
+// generated `Resolvers` takes it (codegen.ts: `contextType`).
+export type Context = GraphQLContext<typeof base, { loaders: Loaders }>;

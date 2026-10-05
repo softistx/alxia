@@ -148,10 +148,14 @@ alone and the server listens on `PORT` and `HOST`
 The container needs the probes of [health and shutdown](health-and-shutdown.md):
 `/health` for liveness, `/ready` for readiness, and a termination grace
 period longer than `shutdownTimeout`. Behind a proxy or a load balancer,
-give the app an `ip` option that reads the header it sets
-(`alxia({ ip: (request) => request.headers.get('x-real-ip') ?? undefined })`),
-so a rate limit counts clients, not the proxy, and
-[a shared store](caching-and-rate-limiting.md) when there are several replicas.
+give the app an `ip` option that reads the client from the header the proxy
+appends to (`alxia({ ip: forwardedIp({ trusted: 1 }) })` for one proxy, `2`
+for two, or the proxies' CIDR ranges), so a rate limit counts clients, not
+the proxy. Never read the first entry of `X-Forwarded-For`: the client writes
+it, and a rate limit keyed by it is bypassed with a header
+([Serving](../../packages/core/docs/guide/serving.md#the-clients-address-ip)).
+Use [a shared store](caching-and-rate-limiting.md) when there are several
+replicas.
 
 ## Reference
 

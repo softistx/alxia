@@ -33,10 +33,7 @@ export const resolvers: Resolvers = {
     },
   },
   Note: {
-    author: (note, _, { db }) => {
-      const author = db.users.get(note.authorId);
-      if (author === undefined) throw new Error(`No user ${note.authorId}`);
-      return author;
-    },
+    // The notes of one query load their authors in one batch (N+1 otherwise).
+    author: (note, _, { loaders }) => loaders.user.load(note.authorId),
   },
 };
