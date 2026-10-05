@@ -244,7 +244,9 @@ For two variants on one base, build each on a fork of it
 
 ```ts
 import { defineMiddleware } from '@alxia/core';
+import { graphql } from '@alxia/graphql';
 import { base } from './context';
+import { schema } from './schema';
 
 export const app = base.fork().plugin((app) => graphql(app, { schema }));
 const fakeViewer = defineMiddleware((_ctx, next) => next({ viewer: { id: 'ada' } }));
