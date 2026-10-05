@@ -4,14 +4,12 @@ import { beforeAll, describe, expect, test } from 'bun:test';
 import { alxiaContext, nonceOf, reactRouter } from '@alxia/react-router';
 import { RouterContextProvider, type ServerBuild } from 'react-router';
 import { makeBase } from '../fixture/base';
-import { BROWSER, fixtureBuild } from '../test/fixture';
+import { browser, fixtureBuild } from '../test/fixture';
 
 let build: ServerBuild;
 beforeAll(async () => {
 	build = await fixtureBuild();
 }, 60_000);
-
-const browser = { 'user-agent': BROWSER };
 
 /** Every `<script …>` opening tag of a page. */
 const scriptsOf = (html: string) => html.match(/<script\b[^>]*>/g) ?? [];

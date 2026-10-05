@@ -4,12 +4,9 @@ import { builtinModules } from 'node:module';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { resolveConfig } from 'vite';
-import { BROWSER, copyFixture } from '../../test/fixture';
+import { browser, copyFixture, text } from '../../test/fixture';
 import { build, configFile, type Fixture, start } from '../../test/vite';
 import { bundledEnvironment } from './bundle';
-
-const browser = { 'user-agent': BROWSER };
-const text = (html: string) => html.replaceAll('<!-- -->', '');
 
 /** The fixture's own externals, which the configs below replace. */
 const EXTERNALS = "ssr: { external: ['@alxia/react-router', '@alxia/core'] }";
