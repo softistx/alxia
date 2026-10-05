@@ -15,5 +15,11 @@ export {
 	type IdempotencyMiddleware,
 	type IdempotencyOptions,
 	idempotency,
+	type WiredIdempotency,
+	type WiredIdempotencyOptions,
 } from './idempotency';
+export {
+	type IdempotencyResult,
+	idempotencyResult,
+} from './idempotency-response';
 export { type RedisStoreOptions, redisStore } from './store';

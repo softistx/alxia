@@ -1,4 +1,4 @@
-import type { Redis } from '@nxgt/redis';
+import type { BoundIdempotency, BoundRateLimit, Redis } from '@nxgt/redis';
 import type { RedisClient } from 'bun';
 
 /**
@@ -54,4 +54,27 @@ export function nameUnder(
 } {
 	const { client, prefix } = resolve(target);
 	return { client, name: prefix === undefined ? name : `${prefix}:${name}` };
+}
+
+/** A rate limit bound by `@nxgt/redis`, wired or by hand: `consume`, `peek`, `reset` and `keyFor`. */
+export function isWiredLimit(value: object): value is BoundRateLimit<string> {
+	const limit = value as Partial<BoundRateLimit<string>>;
+	return (
+		typeof limit.consume === 'function' &&
+		typeof limit.peek === 'function' &&
+		typeof limit.reset === 'function' &&
+		typeof limit.keyFor === 'function'
+	);
+}
+
+/** An idempotency bound by `@nxgt/redis`, wired or by hand: `run`, `forget` and `keyFor`. */
+export function isWiredIdempotency(
+	value: object,
+): value is BoundIdempotency<string, any, any> {
+	const bound = value as Partial<BoundIdempotency<string, unknown>>;
+	return (
+		typeof bound.run === 'function' &&
+		typeof bound.forget === 'function' &&
+		typeof bound.keyFor === 'function'
+	);
 }

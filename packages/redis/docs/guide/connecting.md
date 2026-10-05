@@ -199,9 +199,78 @@ several is refused with a `TypeError` naming them. Give a bare client,
 `handle.clients.<name>`, to the factory that lives on one of them, with the
 prefix in its `name`.
 
+**Defined once.** With `@nxgt/redis` 0.6 the rate limit and the idempotent
+operation can be wired by `defineRedis` too, and `redisStore` and `idempotency`
+take what it wired: [Defined once, in `defineRedis`](#defined-once-in-defineredis).
+
 **Switching from a bare client** changes the keys: a rate-limit count, a kept
 response or a replayable response written without the prefix is not found
 under it, and the new keys start empty.
+
+## Defined once, in `defineRedis`
+
+`defineRedis` takes `limits` and `idempotency` next to `caches`, and the handle
+exposes each as `handle.limits.<name>` and `handle.idempotency.<name>`, typed
+from the definitions and writing `<prefix>:<name>:<key>`, the layout every
+`@nxgt/redis` consumer of the deployment shares. Hand the wired entry to the
+store and to the middleware instead of a name:
+
+```ts
+import { alxia } from '@alxia/core';
+import { rateLimit } from '@alxia/rate-limit';
+import { idempotency, idempotencyResult, redisStore } from '@alxia/redis';
+import { defineIdempotency, defineRateLimit, defineRedis, openRedis } from '@nxgt/redis';
+
+const api = defineRateLimit({ name: 'api', key: (ip: string) => ip, limit: 100, per: 60_000 });
+const orders = defineIdempotency({ name: 'orders', key: (id: string) => id, ttl: 86_400, schema: idempotencyResult });
+
+const handle = await openRedis(
+	defineRedis({ uri: Bun.env['REDIS_URL']!, prefix: 'shop', limits: { api }, idempotency: { orders } }),
+);
+
+const app = alxia()
+	.use(rateLimit({ limit: 100, windowMs: 60_000, store: redisStore(handle.limits.api) })) // shop:api:<address>
+	.use(idempotency(handle.idempotency.orders)) // shop:orders:<route>:<scope>:<key>
+	.post('/orders', ({ reply }) => reply(201, { id: crypto.randomUUID() }));
+```
+
+| Wired | Keys under `prefix: 'shop'` | Also written by |
+| --- | --- | --- |
+| `redisStore(handle.limits.api)` | `shop:api:<key>` | `handle.limits.api.consume(key)` anywhere |
+| `idempotency(handle.idempotency.orders)` | `shop:orders:<route>:<scope>:<Idempotency-Key>` | `idempotency(handle, { name: 'orders' })`: the same keys |
+
+What to know:
+
+- **The definition is the one place.** The name, `limit`, `per` and `burst` of
+  a rate limit, the name, `ttl` and `lease` of an idempotency, are the
+  definition's. `idempotency(handle.idempotency.orders)` takes the middleware's
+  options (`required`, `scope`, `wait`, `methods`, `header`) but not `name`,
+  `ttl` or `lease`: the types refuse them, and a script that passes them gets a
+  `TypeError`.
+- **The rate is the definition's, and `rateLimit` repeats it for its
+  headers.** The store counts by the wired limit's own rate, so `limit` and
+  `windowMs` on `rateLimit` only write `RateLimit-*`: give them the definition's
+  numbers.
+- **The limit counts by a string.** `rateLimit` counts by the string its `key`
+  returns, so the wired limit's key must take one, as `key: (ip: string) => ip`.
+  `redisStore(handle.limits.byIp)` for a limit keyed by `{ ip }` does not
+  compile.
+- **The idempotency keeps a response.** Its `schema` must be
+  `idempotencyResult`, the shape `@alxia/redis` stores (status, headers, body),
+  and its key must take a string; the middleware builds
+  `<route>:<scope>:<Idempotency-Key>` itself. Another schema does not compile.
+- **A guard bound by hand works too**: `redisStore(bindRateLimit(client, api))`,
+  with no prefix.
+- **Same name, one kind.** One name shared by a cache and a limit or an
+  idempotency on one instance is refused when the handle is wired:
+  [troubleshooting](../troubleshooting.md#typeerror-defineredis-instance-default-wires-the-cache-users-and-the-rate-limit-login-under-one-name-user-they-would-share-every-key-in-redis-give-one-of-them-a-name-of-its-own).
+- **Moving from the by-name form.** An idempotency keeps its keys. A rate limit
+  does not: the by-name store counts under `shop:api:<limit>/<windowMs>:<key>`,
+  the wired one under `shop:api:<key>`, so counts restart:
+  [troubleshooting](../troubleshooting.md#counts-restart-after-moving-a-rate-limit-to-the-wired-form).
+- **Both forms stay**, and need `@nxgt/redis` 0.6 only for `handle.limits` and
+  `handle.idempotency`: a limit or an idempotency bound by hand with 0.5 is
+  accepted the same.
 
 ## Naming keys
 
