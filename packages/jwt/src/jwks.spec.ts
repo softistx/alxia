@@ -100,7 +100,7 @@ describe('createJwt with a JWKS', () => {
 			await jwt.verify(await signWith(key, { iss: 'https://evil' })),
 		).toEqual({ ok: false, reason: 'issuer' });
 		expect(server.hits['/.well-known/openid-configuration']).toBe(1);
-		// A discovery document that names another issuer is refused.
+		// The issuer is compared byte for byte: a trailing slash the document lacks is refused.
 		const liar = createJwt({ discovery: `${server.url}/` });
 		expect(await liar.verify(await signWith(key))).toEqual({
 			ok: false,

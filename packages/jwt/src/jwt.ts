@@ -111,9 +111,10 @@ export type JwksOptions = Pick<
 				/**
 				 * An issuer URL: the set's URL is the `jwks_uri` of its
 				 * `/.well-known/openid-configuration`, which must name that issuer,
-				 * and `issuer` defaults to it.
+				 * and `issuer` defaults to it. Compared byte for byte: write it as the
+				 * provider does, with or without a trailing slash.
 				 */
-				readonly discovery: string | URL;
+				readonly discovery: string;
 				readonly jwks?: undefined;
 		  }
 	);

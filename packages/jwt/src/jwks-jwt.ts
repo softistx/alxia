@@ -18,11 +18,13 @@ const encoder = new TextEncoder();
  * HS one, so a public key used as a secret is refused as `algorithm`.
  */
 export function createJwksJwt(options: JwksOptions): JwksJwt {
-	const discovery =
-		options.discovery === undefined ? undefined : String(options.discovery);
+	if (options.jwks !== undefined && options.discovery !== undefined) {
+		throw new TypeError('createJwt: give jwks or discovery, not both');
+	}
+	const discovery = options.discovery;
 	const source = keySource({
 		url: keyUrl(
-			options.jwks ?? (options.discovery as string | URL),
+			options.jwks ?? (options.discovery as string),
 			discovery === undefined ? 'jwks' : 'discovery',
 		),
 		discovery,

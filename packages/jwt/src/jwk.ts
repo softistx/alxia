@@ -76,8 +76,9 @@ const SPECS: Record<JwksAlgorithm, Spec> = {
 export const isJwksAlgorithm = (value: unknown): value is JwksAlgorithm =>
 	typeof value === 'string' && Object.hasOwn(SPECS, value);
 
-/** The smallest RSA modulus accepted, in bytes (2048 bits). */
+/** The RSA moduli accepted, in bytes: 2048 to 8192 bits. */
 const MIN_MODULUS = 256;
+const MAX_MODULUS = 1024;
 
 /** Keys that fit `algorithm`: right type and curve, usable for signatures, not pinned to another algorithm. */
 function fits(jwk: Jwk, algorithm: JwksAlgorithm): boolean {
@@ -139,8 +140,8 @@ export function importKey(
 	if (key === undefined) {
 		const spec = SPECS[algorithm];
 		key =
-			jwk.kty === 'RSA' && modulusBytes(jwk) < MIN_MODULUS
-				? Promise.reject(new TypeError('RSA key under 2048 bits'))
+			jwk.kty === 'RSA' && !modulusFits(jwk)
+				? Promise.reject(new TypeError('RSA key outside 2048 to 8192 bits'))
 				: crypto.subtle.importKey(
 						'jwk',
 						publicMembers(jwk),
@@ -153,9 +154,12 @@ export function importKey(
 	return key;
 }
 
-function modulusBytes(jwk: Jwk): number {
-	if (typeof jwk['n'] !== 'string') return 0;
-	return Buffer.from(jwk['n'], 'base64url').length;
+function modulusFits(jwk: Jwk): boolean {
+	if (typeof jwk['n'] !== 'string') return false;
+	const bytes = Buffer.from(jwk['n'], 'base64url');
+	// A leading zero byte is padding, not size.
+	const size = bytes.length - bytes.findIndex((byte) => byte !== 0);
+	return size >= MIN_MODULUS && size <= MAX_MODULUS;
 }
 
 export const verifyParams = (algorithm: JwksAlgorithm) =>

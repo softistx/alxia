@@ -32,8 +32,10 @@ refuses at once a key that does not fit the algorithm (a P-384 key under
 ## An identity provider's tokens
 
 ```ts
+import { createJwt } from '@alxia/jwt';
+
 const jwt = createJwt({ discovery: 'https://idp.example.com/realms/acme', audience: 'my-api' });
-// or: createJwt({ jwks: 'https://idp.example.com/.well-known/jwks.json', issuer: '…' })
+// or the keys' URL: createJwt({ jwks: 'https://idp.example.com/jwks.json', issuer: 'https://idp.example.com', audience: 'my-api' })
 ```
 
 Verifies by the token's `kid` against the keys the provider publishes, with

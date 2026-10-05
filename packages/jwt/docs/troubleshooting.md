@@ -21,7 +21,8 @@ Problems that show no message are under [Traps](#traps), by symptom.
 - [`TypeError: createJwt: ES256 needs an ECDSA P-256 key; the publicKey is ECDSA P-384`](#typeerror-createjwt-es256-needs-an-ecdsa-p-256-key-the-publickey-is-ecdsa-p-384)
 - [`TypeError: createJwt: the publicKey must be a public key that can verify; it is a private key that can sign`](#typeerror-createjwt-the-publickey-must-be-a-public-key-that-can-verify-it-is-a-private-key-that-can-sign)
 - [`TypeError: createJwt: jwks must be an https URL`](#typeerror-createjwt-jwks-must-be-an-https-url)
-- [`TypeError: createJwt: jwks is not a URL`](#typeerror-createjwt-jwks-is-not-a-url)
+- [`TypeError: createJwt: jwks is not a URL: /keys`](#typeerror-createjwt-jwks-is-not-a-url-keys)
+- [`TypeError: createJwt: give jwks or discovery, not both`](#typeerror-createjwt-give-jwks-or-discovery-not-both)
 
 **Runtime**
 
@@ -314,10 +315,11 @@ swaps them signs tokens your app accepts. Only `http` on `localhost`,
 createJwt({ jwks: 'https://idp.example.com/.well-known/jwks.json' });
 ```
 
-### `TypeError: createJwt: jwks is not a URL`
+### `TypeError: createJwt: jwks is not a URL: /keys`
 
-**When:** the `jwks` (or `discovery`) option is not an absolute URL: a
-path, an empty string, an unset environment variable.
+**When:** the `jwks` option (or `discovery`, named in its place) is not an
+absolute URL: a path, an empty string, an unset environment variable. The
+message ends with the value it was given.
 
 **Why:** `new URL()` refused it, at startup, so a typo does not wait for
 the first request.
@@ -329,6 +331,21 @@ createJwt({ jwks: Bun.env['JWKS_URL']! });
 ```
 
 ## Runtime
+
+### `TypeError: createJwt: give jwks or discovery, not both`
+
+**When:** `createJwt` is given a `jwks` and a `discovery` (TypeScript
+refuses it first, unless the options were cast or came from `any`).
+
+**Why:** each one says where the keys are; with both, which one wins would
+be a guess.
+
+**Fix:** `discovery` when the provider publishes an OpenID configuration,
+`jwks` with its `issuer` when it does not:
+
+```ts
+createJwt({ discovery: 'https://idp.example.com/realms/acme' });
+```
 
 ### `TypeError: Signing needs a private key`
 
@@ -376,6 +393,8 @@ app.use(bearer({ jwt, cookie: 'token' }));
 **When:** the token is not three base64url parts separated by dots, its
 header or payload is not JSON, its header is not an object (`null`, an
 array, a number, a string or a boolean), or its payload is not an object.
+A verifier by `jwks` or `discovery` also refuses a header with a `crit`
+member, which names extensions it does not implement.
 
 **Why:** usually not a JWT at all: an opaque session id, a token missing a part,
 a value still wrapped in quotes or URL-encoded. The header wins over the
@@ -503,7 +522,7 @@ const web = createJwt({ secret, audience: 'web' }); // accepts it
 **When:** a verifier created with `jwks` or `discovery` finds no key for
 the token: its `kid` is not in the set (even after a refetch), it has no
 `kid` and the set has no single key that fits, or the key is an RSA key
-under 2048 bits.
+outside 2048 to 8192 bits.
 
 **Why:** the token was signed by a key this issuer does not publish: another
 issuer or realm, a key already removed from the set, or a key added to the

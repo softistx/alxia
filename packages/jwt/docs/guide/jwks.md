@@ -26,8 +26,9 @@ imported with Web Crypto.
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `jwks` | | the key set's URL; `https`, or `http` on localhost |
-| `discovery` | | instead of `jwks`: an issuer URL, whose `/.well-known/openid-configuration` names the set (`jwks_uri`); the document must name that same issuer, and `issuer` defaults to it |
-| `issuer`, `audience`, `clockTolerance` | | as for any verifier: checked against `iss`, `aud`, `exp` and `nbf` |
+| `discovery` | | instead of `jwks`, never both: an issuer URL, whose `/.well-known/openid-configuration` names the set (`jwks_uri`, which must be `https`); the document must name that same issuer, compared byte for byte, trailing slash included, and `issuer` defaults to it |
+| `issuer`, `audience` | with `jwks`, none; with `discovery`, `issuer` is the discovery URL | checked against `iss` and `aud` |
+| `clockTolerance` | `5` | seconds of skew allowed on `exp` and `nbf` |
 | `cacheMs` | `600_000` | how long a fetched set is used, when the response has no `Cache-Control: max-age` |
 | `staleMs` | `86_400_000` | how long a set past its lifetime stays usable while the issuer cannot be reached |
 | `refetchMs` | `30_000` | the least time between two fetches, failures included |
@@ -40,6 +41,11 @@ publishes an OpenID configuration:
 ```ts
 const jwt = createJwt({ discovery: 'https://idp.example.com/realms/acme', audience: 'my-api' });
 ```
+
+Set `audience` (and `issuer`, with `jwks`): a signature proves the provider
+issued the token, not that it was issued for your API, and a provider signs
+tokens for all its clients with the same keys. A token without `exp` is
+accepted: have the provider put one in, or check it in a schema.
 
 ## How a token is checked
 
@@ -80,14 +86,17 @@ the algorithm-confusion attack has nothing to work with.
   cached, an outage is ridden out: the expired set stays usable for
   `staleMs` (a day by default), because an issuer's keys change rarely and
   its outage should not take your API down. After that, `keys_unavailable`.
-  `staleMs: 0` refuses the moment the set expires.
+  `staleMs: 0` refuses the moment the set expires. The price is that a key
+  the provider revoked or rotated out stays trusted for that long while it
+  is down: choose `staleMs` by which risk you mind more.
 - **Fetch at startup.** `await jwt.refresh()` warms the cache, so the first
   request pays no fetch and a wrong URL shows at boot (it never throws:
   the verifier answers `keys_unavailable` until it can fetch).
 
 The fetch is strict: `https` only (plain `http` on localhost, for a local
-provider), no redirects, at most 256 KiB, `application/json` asked for. An
-RSA key under 2048 bits is refused.
+provider), no redirects, at most 256 KiB (counted as the body streams in), `application/json` asked for. An
+RSA key outside 2048 to 8192 bits is refused, and a `jwks_uri` read from a
+discovery document must be `https`, whatever the configured URL allows.
 
 ## Keycloak
 

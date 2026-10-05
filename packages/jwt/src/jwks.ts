@@ -19,7 +19,11 @@ const MAX_TTL_MS = 24 * 60 * 60 * 1000;
 const local = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 /** Parses a URL that keys may be fetched from: `https`, or `http` on the machine itself. */
-export function keyUrl(value: string | URL, option: string): URL {
+export function keyUrl(
+	value: string | URL,
+	option: string,
+	allowLocal = true,
+): URL {
 	let url: URL;
 	try {
 		url = new URL(value);
@@ -28,11 +32,31 @@ export function keyUrl(value: string | URL, option: string): URL {
 	}
 	if (
 		url.protocol !== 'https:' &&
-		!(url.protocol === 'http:' && local.has(url.hostname))
+		!(allowLocal && url.protocol === 'http:' && local.has(url.hostname))
 	) {
 		throw new TypeError(`createJwt: ${option} must be an https URL`);
 	}
 	return url;
+}
+
+/** The body as text, cancelled once it passes `MAX_BYTES`: a hostile endpoint cannot make the server buffer it. */
+async function readLimited(response: Response): Promise<string> {
+	const declared = Number(response.headers.get('content-length'));
+	if (declared > MAX_BYTES) throw new Error('the response is too large');
+	const chunks: Uint8Array[] = [];
+	let size = 0;
+	const reader = response.body?.getReader();
+	for (;;) {
+		const part = await reader?.read();
+		if (part === undefined || part.done) break;
+		size += part.value.byteLength;
+		if (size > MAX_BYTES) {
+			await reader?.cancel();
+			throw new Error('the response is too large');
+		}
+		chunks.push(part.value);
+	}
+	return new TextDecoder().decode(Buffer.concat(chunks));
 }
 
 async function getJson(
@@ -46,8 +70,7 @@ async function getJson(
 	});
 	if (!response.ok)
 		throw new Error(`${url.origin}${url.pathname} answered ${response.status}`);
-	const text = await response.text();
-	if (text.length > MAX_BYTES) throw new Error('the response is too large');
+	const text = await readLimited(response);
 	return {
 		body: JSON.parse(text),
 		cacheControl: response.headers.get('cache-control'),
@@ -69,7 +92,12 @@ async function jwksUri(issuer: string, timeoutMs: number): Promise<URL> {
 	}
 	if (typeof document.jwks_uri !== 'string')
 		throw new Error('the discovery document has no jwks_uri');
-	return keyUrl(document.jwks_uri, 'jwks_uri');
+	// Read from a remote document, so never a URL on this machine, unless the issuer is.
+	return keyUrl(
+		document.jwks_uri,
+		'jwks_uri',
+		local.has(new URL(issuer).hostname),
+	);
 }
 
 /** The cache lifetime a response asks for, kept between the refetch floor and a day. */
