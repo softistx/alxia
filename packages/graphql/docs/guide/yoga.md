@@ -1,7 +1,8 @@
 # Yoga's plugins and options
 
 This page covers what passes through to GraphQL Yoga: its plugins and
-Envelop's, error masking, batching, subscriptions over server-sent events,
+Envelop's, error masking, batching, subscriptions over server-sent events
+(and over WebSocket with [`ws`](websockets.md)),
 and how CORS and compression meet the endpoint.
 
 ```ts
@@ -189,8 +190,10 @@ curl -N localhost:3000/graphql -H 'content-type: application/json' -H 'accept: t
 ```
 
 A subscription asked for with `Accept: application/json` is refused with
-`406`. WebSockets (`graphql-ws`) are not served: a client must speak
-server-sent events. `createPubSub` lives in one
+`406`. A client that speaks WebSocket — `graphql-ws`, Apollo Client's
+`GraphQLWsLink`, urql's `subscriptionExchange` — needs `ws: true`
+([GraphQL over WebSocket](websockets.md)); server-sent events stay served
+beside it. `createPubSub` lives in one
 process; across several, give it an event target backed by a broker, as
 [Yoga's subscriptions guide](https://the-guild.dev/graphql/yoga-server/docs/features/subscriptions)
 describes.

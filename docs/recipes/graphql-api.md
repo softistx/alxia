@@ -298,6 +298,27 @@ the `code`. `errors: 'problem'` changes the HTTP layer around the endpoint
 alone: a 413, a 500 from a middleware, a 405. To put a resolver's error on
 an HTTP status too, give the extension `http: { status: 401 }`.
 
+### WebSocket clients
+
+Apollo Client's `GraphQLWsLink` and urql's `subscriptionExchange` subscribe
+over WebSocket, with `graphql-ws`. Add the optional peer and `ws: true`;
+server-sent events stay served at the same path:
+
+```sh
+bun add graphql-ws
+```
+
+```ts no-check
+graphql(app, { schema, ws: true }); // ws://localhost:3000/graphql too
+```
+
+The upgrade runs the base's middlewares, so `viewer` is read on it: a
+browser cannot set `authorization` on a socket, so send the token as a
+cookie or in the URL, and read it there. The client's `connectionParams`
+are in each resolver's context, and a shutdown closes the sockets with
+`1001`. The client side, Apollo's and urql's, is in
+[GraphQL over WebSocket](../../packages/graphql/docs/guide/websockets.md#clients).
+
 ## 5. Test it, in process
 
 ```ts
@@ -413,6 +434,8 @@ describe('the IDE, the probes and the drain', () => {
 - [Yoga's plugins and options](../../packages/graphql/docs/guide/yoga.md):
   masked errors, batching, subscriptions, depth limits, response caching
 - [GraphiQL and Apollo Sandbox](../../packages/graphql/docs/guide/ide.md)
+- [GraphQL over WebSocket](../../packages/graphql/docs/guide/websockets.md):
+  `ws: true`, Apollo Client's and urql's WebSocket links
 - [Health and shutdown](../../packages/core/docs/guide/health-and-shutdown.md#graphql)
 - [Errors](../../packages/core/docs/guide/errors.md#graphql),
   [Authentication](authentication.md), [Testing](testing.md),

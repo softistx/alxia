@@ -20,6 +20,15 @@ number on it. Every release, with each change it made, is in
   endpoint, and GraphQL errors stay in `errors[]` under core's problem
   details ([endpoint guide](guide/endpoint.md#errors-health-and-shutdown)).
 
+- **GraphQL over WebSocket.** `ws: true` serves the endpoint over
+  WebSocket too, with the `graphql-transport-ws` protocol of `graphql-ws`
+  — Apollo Client's and urql's default — beside server-sent events: the
+  upgrade runs the app's middlewares, so a guard refuses the socket and a
+  resolver reads what they added; each operation runs through Yoga's
+  plugins, with the client's `connectionParams` in its context; a
+  shutdown closes the sockets with 1001 and completes their subscriptions
+  ([WebSocket guide](guide/websockets.md)).
+
 ## Next
 
 Nothing scheduled yet.
