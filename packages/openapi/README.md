@@ -86,6 +86,30 @@ The [spec-first guide](https://github.com/softistx/alxia/blob/develop/packages/o
 walks through every step: the document, alxia's own 400, middlewares,
 committing the generated files, and a client from the same document.
 
+## API docs
+
+`apiDocs` serves the document and an interactive page for it, with no
+configuration. The page loads from a CDN, with a pinned version and a
+subresource integrity hash, so nothing is added to your dependencies.
+
+```ts
+import { alxia } from '@alxia/core';
+import { apiDocs } from '@alxia/openapi';
+
+const app = alxia().plugin(apiDocs({ spec: 'openapi.yaml' }));
+// GET /docs                  the page (Scalar)
+// GET /docs/openapi.yaml     the document, as written
+// GET /docs/openapi.json     the same, as JSON
+```
+
+`spec` is a YAML or JSON file, read once at startup, or an object. Options:
+`path` (`/docs`), `ui` (`'scalar'` or `'swagger'`), `title`, `servers`
+(replaces the document's) and `enabled`, which a production app turns off:
+`apiDocs({ spec, enabled: process.env.NODE_ENV !== 'production' })`. The
+page sets its own `Content-Security-Policy`, which `secureHeaders` keeps, and
+`matchesSpec` leaves its routes out. The [guide](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/api-docs.md)
+has the options, the policy, and `apiDocs` beside a GraphQL endpoint.
+
 ## Every operation has a route
 
 ```ts
@@ -215,12 +239,15 @@ The core's side of the move is in its
 | --- | --- |
 | `implemented(app, operations, options?)`, `ImplementedOptions` | throws a `TypeError` listing each operation with no route, or one with the core's reason for an operation path no route may be declared at. `prefix` |
 | `matchesSpec(app, operations, options?)`, `MatchesSpecOptions` | the same, and each route no operation declares. `prefix`, `exclude` |
+| `apiDocs(options)`, `ApiDocsOptions`, `DocsUi`, `DocsServer` | a plugin: the page at `path`, the document at `path/openapi.yaml` and `.json`. `spec`, `path`, `ui`, `title`, `servers`, `enabled` |
+| `isApiDocsRoute(route)` | whether `apiDocs` declared a route; `matchesSpec` leaves them out already |
 | `Operations` | what both take: an object of core's `RouteOperation`, or a list of them |
 
 ## Documentation
 
 - [Documentation index](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/README.md): every page, and when to read it.
 - [Spec first](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/spec-first.md): the whole workflow, from `openapi.yaml` to the generated operations, the routes, the check and a client.
+- [API docs](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/api-docs.md): `apiDocs`, its options, the Content-Security-Policy, and beside a GraphQL endpoint.
 - [The checks](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md): `implemented` and `matchesSpec`, how a route is matched, the prefix, and the routes to exclude.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/troubleshooting.md): each message of the checks and the generator, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/roadmap.md): what is coming, and what is not planned.

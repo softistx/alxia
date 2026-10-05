@@ -54,6 +54,14 @@ different package, which wrote a document from the app's routes; it is
 retired. The releases below are this package's, under its former name,
 `@alxia/openapi-routes`.
 
+### `@alxia/openapi` 0.5.0
+
+- **API docs, with no configuration.** `app.plugin(apiDocs({ spec:
+  'openapi.yaml' }))` serves an interactive page (Scalar, or Swagger UI) at
+  `/docs` and the document at `/docs/openapi.yaml` and `.json`. The page
+  loads from a pinned CDN version with an integrity hash, sets its own
+  `Content-Security-Policy`, and `matchesSpec` leaves its routes out.
+
 ### `@alxia/openapi-routes` 0.2.0
 
 Removed in 0.5: `matchesSpec` from `@alxia/openapi` is its name.

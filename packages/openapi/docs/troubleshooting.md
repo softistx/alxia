@@ -12,6 +12,13 @@ it to fail prints nothing; those are under [Traps](#traps), by symptom.
 - [`TypeError: implemented(): the prefix "…" must start with "/" and not end with one`](#typeerror-implemented-the-prefix--must-start-with--and-not-end-with-one)
 - [`TypeError: implemented(): "…": ":…" is not a parameter name`](#typeerror-implemented---is-not-a-parameter-name)
 
+**API docs**
+
+- [`TypeError: apiDocs(): cannot read the spec "…"`](#typeerror-apidocs-cannot-read-the-spec-)
+- [`TypeError: apiDocs(): the path "…" must start with "/" and not end with one`](#typeerror-apidocs-the-path--must-start-with--and-not-end-with-one)
+- [The page is blank, and the console reports a blocked script](#the-page-is-blank-and-the-console-reports-a-blocked-script)
+- [`matchesSpec(): … routes have no operation: GET /docs, …`](#matchesspec--routes-have-no-operation-get-docs-)
+
 **Generator** (`@nxgt/openapi-codegen` 0.7.0)
 
 - [`alxia.ts leaves it out. … [ignored]`](#alxiats-leaves-it-out--ignored)
@@ -148,6 +155,74 @@ the path as the core's entry for it says: a `:time` parameter for
 ([`":" may only start a segment`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#--may-only-start-a-segment-as-a-parameter)),
 `/caf%C3%A9` for `/café`
 ([`is not encoded as a request's URL carries it`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#-is-not-encoded-as-a-requests-url-carries-it-declare-)).
+
+## API docs
+
+### `TypeError: apiDocs(): cannot read the spec "…"`
+
+```text
+TypeError: apiDocs(): cannot read the spec "openapi.yaml" (ENOENT), looked up from the working directory /srv/app
+```
+
+**When:** the app starts, or `apiDocs` is called, and `spec` is a path that
+is not a readable file.
+
+**Why:** a relative path is looked up from the working directory of the
+process, not from the file that calls `apiDocs`: `bun run src/server.ts`
+from another folder, or a container whose image holds `dist/` alone, does
+not see `openapi.yaml`.
+
+**Fix:** give a path that holds wherever the app runs, or load the document
+where it can be found and give the object:
+
+```ts
+import spec from '../openapi.json'; // bundled with the app
+apiDocs({ spec });
+// or, from this file's folder:
+apiDocs({ spec: new URL('../openapi.yaml', import.meta.url).pathname });
+```
+
+The same error says `is not an OpenAPI document` for a file with no
+`openapi` version, and `neither valid YAML nor valid JSON` for one that does
+not parse. With `enabled: false` nothing is read.
+
+### `TypeError: apiDocs(): the path "…" must start with "/" and not end with one`
+
+Also `apiDocs(): ui "…" is not "scalar" or "swagger"`.
+
+**When:** `path` is `docs` or `/docs/`, or `ui` is another name.
+
+**Fix:** `apiDocs({ spec, path: '/docs', ui: 'scalar' })`.
+
+### The page is blank, and the console reports a blocked script
+
+```text
+Refused to load the script 'https://cdn.jsdelivr.net/npm/@scalar/api-reference@…' because it violates the following Content Security Policy directive: "script-src 'self'"
+```
+
+**Symptom:** `/docs` answers 200 and the page stays empty.
+
+**Why:** the response carries a policy that is not the page's. The page
+sets its own `Content-Security-Policy`, which `secureHeaders` keeps, so
+this is a policy set by a proxy or a CDN in front of the app, or by a
+middleware that replaces the header after the page set it.
+
+**Fix:** let the policy of the page through: `curl -I /docs` should show
+`script-src https://cdn.jsdelivr.net 'nonce-…'`. If it must be your own,
+allow `https://cdn.jsdelivr.net` for `script-src` and `style-src`,
+`'unsafe-inline'` for `style-src`, and `'self'` for `connect-src`.
+
+### `matchesSpec(): … routes have no operation: GET /docs, …`
+
+**When:** the message lists the docs routes.
+
+**Why:** `matchesSpec` leaves out the routes `apiDocs` declared, by their
+handlers. A route declared by hand at `/docs`, or by a copy of
+`@alxia/openapi` the check does not share (two versions installed), is not
+recognised.
+
+**Fix:** one version of `@alxia/openapi` (`bun why @alxia/openapi`), or
+`matchesSpec(app, operations, { exclude: (r) => r.path.startsWith('/docs') })`.
 
 ## Generator
 

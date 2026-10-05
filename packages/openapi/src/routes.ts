@@ -5,6 +5,7 @@ import {
 	type RoutePath,
 	shapeOf,
 } from '@alxia/core';
+import { isApiDocsRoute } from './api-docs';
 
 /**
  * The operations to check: the `operations` object a code generator writes,
@@ -24,7 +25,10 @@ export interface ImplementedOptions {
 }
 
 export interface MatchesSpecOptions extends ImplementedOptions {
-	/** A route no operation has to declare: the document's own, a health check. */
+	/**
+	 * A route no operation has to declare: a health check. The routes of
+	 * `apiDocs()` are left out already.
+	 */
 	readonly exclude?: (route: RouteDefinition) => boolean;
 }
 
@@ -85,7 +89,9 @@ function match(
 	const declared = new Set(all.map(keyOf));
 	const extra = app.routes.filter(
 		(route) =>
-			!declared.has(keyOf(route)) && !(options.exclude?.(route) ?? false),
+			!declared.has(keyOf(route)) &&
+			!isApiDocsRoute(route) &&
+			!(options.exclude?.(route) ?? false),
 	);
 	const parts: string[] = [];
 	if (missing.length > 0) parts.push(noRoute(missing));

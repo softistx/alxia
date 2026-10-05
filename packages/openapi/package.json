@@ -42,6 +42,7 @@
 	},
 	"devDependencies": {
 		"@alxia/core": "workspace:^",
+		"@alxia/secure-headers": "workspace:^",
 		"@types/bun": "^1.4.2",
 		"zod": "^4.2.0"
 	},

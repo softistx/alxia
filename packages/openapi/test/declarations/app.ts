@@ -3,7 +3,13 @@
 // through `@alxia/openapi`, `@alxia/core` and `zod` alone (TS2883
 // otherwise).
 import { alxia } from '@alxia/core';
-import { implemented, matchesSpec, type Operations } from '@alxia/openapi';
+import {
+	apiDocs,
+	implemented,
+	isApiDocsRoute,
+	matchesSpec,
+	type Operations,
+} from '@alxia/openapi';
 import { z } from 'zod';
 
 // As `@nxgt/openapi-codegen` writes them with its `alxia` option.
@@ -41,4 +47,14 @@ export function checked() {
 
 export function operationsOf() {
 	return operations;
+}
+
+export function documented() {
+	const app = bound().plugin(
+		apiDocs({
+			spec: { openapi: '3.1.0', info: { title: 'Pets', version: '1' } },
+		}),
+	);
+	matchesSpec(app, operations, { exclude: isApiDocsRoute });
+	return app;
 }
