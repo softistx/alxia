@@ -104,8 +104,8 @@ exactly 32 bytes, or is a point of small order (the identity, the all-zero
 point, and the rest of libsodium's `has_small_order` list), under which a
 signature anyone can make verifies; an EC key whose `x` and `y` are not
 its curve's size (32 bytes for P-256, 48 for P-384); and any key whose
-`n`, `e`, `x` or `y` is not strict, unpadded base64url. Only a key's public members reach Web Crypto.
-A `jwks_uri` read from a discovery document must be `https`, unless the
+`n`, `e`, `x` or `y` is not strict, unpadded base64url. Only a key's
+public members reach Web Crypto. A `jwks_uri` read from a discovery document must be `https`, unless the
 issuer itself is on localhost. The cache's lifetimes and refetch limit run
 on a monotonic clock, so setting the system clock neither keeps a set past
 its lifetime nor lifts the limit.

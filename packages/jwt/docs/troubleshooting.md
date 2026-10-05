@@ -539,7 +539,10 @@ guard refetches an unknown `kid` once, and never more often than that.
 
 **Fix:** check that `jwks` or `discovery` is the issuer that signed the
 token (`kid` is in its header: `jwt.io` shows it), and wait out `refetchMs`
-after a rotation. To follow a rotation faster, lower it:
+after a rotation. A key refused for its encoding is the issuer's to fix:
+RFC 7518 requires an EC coordinate at its full length, so a P-256 `x` of
+31 bytes, its leading zero byte stripped, is refused. To follow a rotation
+faster, lower `refetchMs`:
 
 ```ts
 createJwt({ jwks: Bun.env['JWKS_URL']!, refetchMs: 5_000 });

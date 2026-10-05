@@ -82,14 +82,16 @@ describe('the RSA and EC keys a set may hold', () => {
 	});
 
 	test('an EC coordinate padded, respelled or of the wrong size is refused', async () => {
-		const x = String(ec.jwk.x);
 		const alphabet =
 			'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
-		const respelled = `${x.slice(0, -1)}${alphabet[alphabet.indexOf(x.at(-1) as string) ^ 1]}`;
-		for (const bad of [`${x}=`, respelled, x.slice(0, -2)]) {
-			expect(await verifyAgainst({ ...ec.jwk, x: bad }, ec)).toEqual(
-				refused('key'),
-			);
+		for (const member of ['x', 'y'] as const) {
+			const value = String(ec.jwk[member]);
+			const respelled = `${value.slice(0, -1)}${alphabet[alphabet.indexOf(value.at(-1) as string) ^ 1]}`;
+			for (const bad of [`${value}=`, respelled, value.slice(0, -2)]) {
+				expect(await verifyAgainst({ ...ec.jwk, [member]: bad }, ec)).toEqual(
+					refused('key'),
+				);
+			}
 		}
 		expect((await verifyAgainst({ ...ec.jwk }, ec)) as object).toHaveProperty(
 			'ok',
