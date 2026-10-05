@@ -23,7 +23,7 @@ the server log, or, for what prints nothing, what you see in your traces.
 - [A log written outside a request never arrives](#a-log-written-outside-a-request-never-arrives)
 - [Logs carry a `traceId`, but its span is never exported](#logs-carry-a-traceid-but-its-span-is-never-exported)
 - [Spans stop arriving, and the app still answers](#spans-stop-arriving-and-the-app-still-answers)
-- [No span for a WebSocket connection](#no-span-for-a-websocket-connection)
+- [No span for a WebSocket message](#no-span-for-a-websocket-message)
 - [A request no route matched has no span, or a request has none at all](#a-request-no-route-matched-has-no-span-or-a-request-has-none-at-all)
 - [The response has no `traceparent` header](#the-response-has-no-traceparent-header)
 
@@ -289,14 +289,19 @@ const instance = createTelemetry('test', { exporters: [exporter] });
 const app = alxia().use(telemetry({ instance }));
 ```
 
-### No span for a WebSocket connection
+### No span for a WebSocket message
 
-**When:** a route declared with `app.ws`.
+**When:** a route declared with `app.ws` has its upgrade's span, and
+nothing for the messages that follow.
 
-**Why:** a WebSocket upgrade has no response to settle, and the span lasts
-as long as the response it wraps.
+**Why:** the upgrade's span ends with its answer, as the socket would
+otherwise keep it open for as long as it lives. A `ws: true` GraphQL
+socket's operations get spans of their own
+([the guide](guide.md#the-operations-of-a-socket)); a socket of your own
+says nothing of its messages.
 
-**Fix:** open a span for the work a message does:
+**Fix:** open a span for the work a message does, or report each
+operation with core's `startOperation`:
 
 ```ts
 app.ws('/rooms/:room', {}, {

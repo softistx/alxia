@@ -205,7 +205,7 @@ interface LogEntry {
 | `path` | the URL's path, **without** its query string, so a token in the query never reaches the log |
 | `duration` | from the moment `logger()` receives the request to the moment its response is settled, rounded to two decimals: everything after it in the chain is counted. For a streamed body, to the end of that body |
 | `timeToHeaders` | a streamed body's only: from the request to the response, when the headers leave. The key is absent on any other entry |
-| `outcome` | a streamed body's only: `completed` when it was sent whole, `aborted` when the client left before its end, `errored` when the stream failed. The key is absent on any other entry |
+| `outcome` | a streamed body's: `completed` when it was sent whole, `aborted` when the client left before its end, `errored` when the stream failed. An operation over a socket's: `ok`, or `errors` when it was answered with errors ([below](#the-operations-of-a-socket)). The key is absent on any other entry |
 | `ip` | the app's `ctx.ip`; the key is absent when it is `undefined` |
 | `operationName`, `operationType` | a GraphQL operation's: see below. Both keys are absent on a request no GraphQL endpoint executed an operation for |
 
@@ -230,8 +230,38 @@ fields; `message` is unchanged:
   fails validation) has neither field.
 - A subscription over server-sent events is a streamed body: its line is
   written when the stream ends, with the operation.
-- Over `ws: true`, only the upgrade is logged, never the operations on the
-  socket: they are on the roadmap.
+- Over `ws: true`, the upgrade is one line, and each operation on the
+  socket another ([below](#the-operations-of-a-socket)).
+
+### The operations of a socket
+
+A socket's upgrade is answered before its first operation runs, so its
+line cannot name one. Each operation `@alxia/graphql` runs over `ws: true`
+gets a line of its own instead, written once it ended: a query or a
+mutation once its result is sent, a subscription once it completed, its
+client stopped it or the socket closed. The upgrade keeps its own line,
+and every operation's carries the upgrade's `requestId`, so one `grep`
+finds a connection and all it ran:
+
+```json
+{"time":"…","level":"info","requestId":"7f3c…","message":"GET /graphql 200","method":"GET","path":"/graphql","status":200,"duration":0.9}
+{"time":"…","level":"info","requestId":"7f3c…","message":"query GetNotes","method":"GET","path":"/graphql","duration":2.4,"outcome":"ok","operationName":"GetNotes","operationType":"query"}
+{"time":"…","level":"warn","requestId":"7f3c…","message":"subscription OnNote errors","method":"GET","path":"/graphql","duration":5130.2,"outcome":"errors","operationName":"OnNote","operationType":"subscription"}
+```
+
+- `message` is the operation's type and name, `errors` added when it was
+  answered with errors: a resolver that threw, a document that fails
+  validation, a subscription that failed. Such a line is a `warn`; an
+  operation answered whole is an `info`.
+- `duration` runs from the operation's `subscribe` message to its end: a
+  subscription's covers its whole stream.
+- It has no `status`: the socket has none per operation.
+- A socket `skip` leaves out has no line, nor have its operations.
+- No configuration: `logger()` subscribes during the upgrade with core's
+  `onOperation`, and `@alxia/graphql` tells it of each operation with
+  `startOperation`; neither package imports the other. A socket route of
+  your own reports its operations the same way
+  ([core's plugin guide](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/writing-a-plugin.md)).
 
 ### A streamed body
 
@@ -472,8 +502,11 @@ const app = alxia()
 `duration` stops when the response object is ready, or, for a streamed
 body, when that body has been sent ([A streamed body](#a-streamed-body)).
 
-A WebSocket upgrade gets no entry and no header: once upgraded, there is no
-response to settle.
+A WebSocket upgrade gets one entry, its status the `200` of the stand-in
+response a middleware reads once the socket is open, and no
+`X-Request-Id` on its `101`: the stand-in's headers are not sent. Each
+operation over a `ws: true` socket gets an entry of its own
+([The operations of a socket](#the-operations-of-a-socket)).
 
 ## Testing
 

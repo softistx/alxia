@@ -2,12 +2,15 @@
  * GraphQL over WebSocket, the `graphql-transport-ws` protocol of
  * `graphql-ws`, on a socket route of the app: the upgrade runs the app's
  * middlewares, each operation runs through Yoga's envelop — its plugins,
- * its `context` — and the app's shutdown closes the sockets with 1001.
+ * its `context` — and is told to the observers around the upgrade
+ * (`ws-operations.ts`, through `ws-server.ts`'s options), and the app's shutdown closes the sockets with 1001.
  */
 import type { BaseContext, NextFunction, RoutePath, Socket } from '@alxia/core';
-import type { Server, ServerOptions, SubscribePayload } from 'graphql-ws';
-import type { YogaInitialContext, YogaServerInstance } from 'graphql-yoga';
-import { serverContext, type YogaContext } from './handler';
+import type { Server } from 'graphql-ws';
+import type { YogaServerInstance } from 'graphql-yoga';
+import type { YogaContext } from './handler';
+import { SocketOperations } from './ws-operations';
+import { type Extra, type Paths, serverOptions } from './ws-server';
 
 /** `graphql(app, { ws })`: GraphQL over WebSocket beside the HTTP endpoint. */
 export interface GraphQLWsOptions {
@@ -25,15 +28,6 @@ export interface GraphQLWsOptions {
 	readonly keepAlive?: number | false;
 }
 
-/**
- * What `graphql-ws` keeps of each socket: the context its upgrade built,
- * and the request each of its operations reads as Yoga's `request`.
- */
-interface Extra {
-	readonly ctx: Record<string, unknown> & BaseContext;
-	readonly request: Request;
-}
-
 type Module = typeof import('graphql-ws');
 
 /** What the missing optional peer is answered with: the package to add. */
@@ -48,78 +42,6 @@ function loader(): () => Promise<Module> {
 			throw new Error(MISSING_PEER, { cause });
 		});
 		return loading;
-	};
-}
-
-/** The rest of each operation, run by the functions Yoga's envelop gave it. */
-interface Enveloped {
-	readonly execute: (args: never) => unknown;
-	readonly subscribe: (args: never) => unknown;
-}
-
-/** Where the socket route is, and the endpoint whose Yoga it runs. */
-interface Paths {
-	readonly endpoint: string;
-	readonly socket: string;
-}
-
-/**
- * The Yoga of the endpoint a socket route serves: the HTTP one, so its
- * plugins are set up once. The socket's route is its full path, the
- * prefix of each app it is mounted into included, then its own `path`.
- */
-function endpointOf(route: string, paths: Paths): string {
-	// A path of `/` adds nothing to a prefix: `/api` + `/` is `/api`.
-	const own = paths.socket === '/' ? '' : paths.socket;
-	const at = paths.endpoint === '/' ? '' : paths.endpoint;
-	return route.slice(0, route.length - own.length) + at || '/';
-}
-
-/**
- * `graphql-ws`'s options: each operation parsed, validated, executed and
- * subscribed through Yoga's envelop, with the context the upgrade built,
- * the operation's `params` and the client's `connectionParams`.
- */
-function serverOptions<UserCtx extends YogaContext>(
-	yogaAt: (endpoint: string) => YogaServerInstance<YogaContext, UserCtx>,
-	paths: Paths,
-): ServerOptions<Record<string, unknown> | undefined, Extra> {
-	// Each operation's envelop, found by its context: one object per
-	// operation, which the root resolvers' `parent` is not.
-	const enveloped = new WeakMap<object, Enveloped>();
-	const of = (args: { contextValue?: unknown }) =>
-		enveloped.get(args.contextValue as object) as Enveloped;
-	return {
-		execute: (args) => of(args).execute(args as never) as never,
-		subscribe: (args) => of(args).subscribe(args as never) as never,
-		async onSubscribe(context, _id, params: SubscribePayload) {
-			const { ctx, request } = context.extra;
-			const initial = {
-				...serverContext(ctx),
-				request,
-				params,
-				connectionParams: context.connectionParams,
-			} as unknown as YogaInitialContext & YogaContext;
-			const { schema, execute, subscribe, contextFactory, parse, validate } =
-				yogaAt(endpointOf(ctx.route as string, paths)).getEnveloped(initial);
-			let document: ReturnType<typeof parse>;
-			try {
-				document = parse(params.query);
-			} catch (error) {
-				return [error as never];
-			}
-			const errors = validate(schema, document);
-			if (errors.length > 0) return errors;
-			const contextValue = await contextFactory();
-			enveloped.set(contextValue, { execute, subscribe });
-			return {
-				schema,
-				document,
-				operationName: params.operationName,
-				variableValues: params.variables,
-				contextValue,
-			};
-		},
 	};
 }
 
@@ -159,6 +81,7 @@ interface Client {
 	closed?: (code?: number, reason?: string) => Promise<void>;
 	pings?: ReturnType<typeof setInterval>;
 	readonly gone: AbortController;
+	readonly operations: SocketOperations;
 }
 
 /**
@@ -192,7 +115,10 @@ export function graphqlSocket<UserCtx extends YogaContext>(
 	const handlers = {
 		open(socket: GraphQLSocket) {
 			const raw = socket.raw;
-			const client: Client = { gone: new AbortController() };
+			const client: Client = {
+				gone: new AbortController(),
+				operations: new SocketOperations(socket.data),
+			};
 			clients.set(raw, client);
 			// The upgrade loaded both: a socket opens behind its middleware alone.
 			const graphqlWsServer = server as NonNullable<typeof server>;
@@ -211,6 +137,7 @@ export function graphqlSocket<UserCtx extends YogaContext>(
 				{
 					ctx: socket.data,
 					request: operationRequest(socket.data.request, client.gone.signal),
+					operations: client.operations,
 				},
 			);
 			if (keepAlive !== false) {
@@ -231,6 +158,7 @@ export function graphqlSocket<UserCtx extends YogaContext>(
 			clients.delete(socket.raw);
 			client.gone.abort();
 			await client.closed?.(code, reason);
+			client.operations.closed();
 		},
 	};
 	return { path: paths.socket, middleware: graphqlWs, handlers };

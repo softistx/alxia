@@ -42,6 +42,9 @@
 	},
 	"devDependencies": {
 		"@alxia/core": "workspace:^",
+		"@alxia/logger": "workspace:^",
+		"@alxia/telemetry": "workspace:^",
+		"@nxgt/telemetry": "^0.2.1",
 		"@types/bun": "^1.4.2",
 		"dataloader": "^2.2.3",
 		"graphql": "^16.11.0",

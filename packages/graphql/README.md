@@ -154,8 +154,11 @@ const app = alxia()
 ```
 
 A request
-refused before it executes, and an operation over `ws: true`, name none yet.
-See [the endpoint guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/endpoint.md#the-operation-in-the-log-and-the-trace).
+refused before it executes names none. Over `ws: true`, each operation on
+the socket is a line and a span of its own, from its `subscribe` message
+to its end, marked when answered with errors.
+See [the endpoint guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/endpoint.md#the-operation-in-the-log-and-the-trace)
+and [the WebSocket guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/websockets.md#logging-and-tracing).
 
 ## WebSocket
 

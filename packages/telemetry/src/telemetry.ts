@@ -4,9 +4,7 @@ import {
 	type Middleware,
 	markFactory,
 	type Next,
-	operationOf,
 	type RequestContext,
-	settle,
 } from '@alxia/core';
 import {
 	continuing,
@@ -16,9 +14,8 @@ import {
 	type TelemetryOptions,
 	withTelemetry,
 } from '@nxgt/telemetry';
-import { HTTP_ROUTE, operationSpan, requestAttributes } from './attributes';
 import { defaultName, guarded } from './hooks';
-import { handOver, record } from './span';
+import { traceRequest } from './request';
 
 interface Hooks {
 	/**
@@ -75,7 +72,10 @@ export type TelemetryMiddleware = Middleware<
  * inbound `traceparent` continues its trace; an unusable one starts a
  * fresh trace. The span is named for the route, `GET /users/:id`, once
  * routing has matched. Only a 5xx marks it an error. A WebSocket upgrade
- * gets no span: there is no response to time.
+ * gets a span that ends with its answer, and each operation its socket's
+ * plugin reports with core's `startOperation` (`@alxia/graphql` over `ws`
+ * does) a span of its own, a child of the upgrade's, from its start to its
+ * end: `subscription OnNote`, an error when answered with errors.
  *
  * A streamed body (a page rendered as it goes, an event stream) keeps the
  * span open until it has been sent: a body that fails midway marks it an
@@ -100,49 +100,20 @@ export function telemetry(
 	const spanName = guarded(options.spanName ?? defaultName, defaultName);
 
 	const middleware = defineMiddleware(async function telemetry(ctx, next) {
-		const untraced: TelemetryContext = { span: undefined, telemetry: instance };
-		const upgrade =
-			ctx.request.headers.get('upgrade')?.toLowerCase() === 'websocket';
-		if (upgrade || !traced(ctx)) return next(untraced);
+		if (!traced(ctx)) return next({ span: undefined, telemetry: instance });
 		// Resolved with the response as soon as there is one; the span itself
 		// stays open until a streamed body has been sent, or has stopped.
 		const { promise, resolve, reject } =
 			Promise.withResolvers<Next<TelemetryContext>>();
 		const answer = (response: Response) =>
 			resolve(response as Next<TelemetryContext>);
+		const tracing = { instance, traceResponse: options.traceResponse, answer };
 		withTelemetry(instance, () =>
 			continuing(
 				ctx.request.headers.get('traceparent'),
 				spanName(ctx),
 				{ kind: 'server' },
-				async (scope) => {
-					// The span's own, not `SpanOptions.attributes`: those every span
-					// and log inside inherits, and a database call is not the request.
-					scope.attributes(
-						requestAttributes(ctx.url, ctx.request.method, ctx.ip),
-					);
-					const added: TelemetryContext = { span: scope, telemetry: instance };
-					const response = await settle(ctx, next(added));
-					if (ctx.route !== undefined) {
-						scope.name = `${ctx.request.method} ${ctx.route}`;
-						scope.attribute(HTTP_ROUTE, ctx.route);
-					}
-					const operation = operationOf(ctx);
-					if (operation !== undefined) {
-						const { name, attributes } = operationSpan(operation);
-						scope.name = name;
-						scope.attributes(attributes);
-					}
-					record(scope, response.status, ctx.error);
-					if (options.traceResponse) {
-						try {
-							response.headers.set('traceparent', scope.traceparent());
-						} catch {
-							// An immutable response keeps its headers; the span is what matters.
-						}
-					}
-					return handOver(scope, response, answer);
-				},
+				(scope) => traceRequest(scope, ctx, next, tracing),
 			),
 		).then(answer, reject);
 		return promise;

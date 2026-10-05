@@ -344,8 +344,53 @@ export const operations = defineMiddleware(async (ctx, next) => {
 anonymous operation. One report is read as it was made; several (a batched
 body) read as `{ type: 'batch', name: 'GetNotes,AddNote' }`, the names of
 the named ones joined by commas. Nothing reported reads `undefined`. A
-socket's operations are not reported: its upgrade has been answered
-already, and a report would outlive it.
+socket's operations are not reported so: its upgrade has been answered
+already, and a report would outlive it. They have their own pair, below.
+
+### The operations of a socket
+
+A socket runs its operations after its upgrade was answered, for as long
+as it stays open. An observer subscribes during the upgrade, before
+`next()`, with `onOperation`; the plugin serving the socket tells it of
+each operation as it starts, with `startOperation` on the socket's
+context, and calls the function that returns once the operation ended,
+with `'ok'` or `'errors'`:
+
+```ts
+import { defineMiddleware, onOperation, startOperation } from '@alxia/core';
+
+// In an observer, given to `use` before the socket route.
+export const operations = defineMiddleware((ctx, next) => {
+	onOperation(ctx, ({ type, name }) => {
+		const start = performance.now();
+		return (outcome) => console.log(type, name, outcome, performance.now() - start);
+	});
+	return next();
+});
+
+// In the socket's handlers, for each operation it runs.
+app.ws('/rpc', {
+	async message(socket, message) {
+		const end = startOperation(socket.data, { type: 'query', name: 'GetNotes' });
+		await socket.send(await run(message));
+		end('ok');
+	},
+});
+```
+
+- `onOperation` returns `true` on a socket's upgrade, and `false`,
+  subscribing nothing, on any other request.
+- The observer is called as each operation starts, and may return the
+  function told how it ended; `startOperation`'s end tells every one of
+  them once, whatever calls it after.
+- With no observer, `startOperation` tells no one: a plugin calls it
+  whether or not a logger is there.
+- An observer that throws is logged with `console.error` and skipped: the
+  operation runs all the same.
+
+`@alxia/graphql` tells them for each operation over `ws: true`;
+`@alxia/logger` writes a line per operation, `@alxia/telemetry` a span, a
+child of the upgrade's.
 
 ## See also
 

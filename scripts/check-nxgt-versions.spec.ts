@@ -87,7 +87,8 @@ describe('read', () => {
 			['@nxgt/janus', ['packages/janus']],
 			['@nxgt/openapi-codegen', ['packages/create']],
 			['@nxgt/redis', ['packages/redis']],
-			['@nxgt/telemetry', ['packages/telemetry']],
+			// @alxia/graphql's is a devDependency, for its observed-socket spec.
+			['@nxgt/telemetry', ['packages/graphql', 'packages/telemetry']],
 		]);
 		for (const one of packages) {
 			expect(one.locked.length).toBeGreaterThan(0);
