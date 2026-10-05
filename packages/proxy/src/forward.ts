@@ -26,8 +26,11 @@ export async function forward<Ctx>(
 	applyEdit(headers, plan.headers.request, ctx);
 	const timer = new AbortController();
 	let timeout: ReturnType<typeof setTimeout> | undefined;
+	let answered = false;
+	// Until the headers: a body chunk sent re-arms it. After: never again.
 	const arm = () => {
 		clearTimeout(timeout);
+		if (answered) return;
 		timeout = setTimeout(() => timer.abort(), plan.timeout);
 	};
 	const body =
@@ -56,6 +59,7 @@ export async function forward<Ctx>(
 	} catch (error) {
 		throw failureOf(error, { plan, url, body, request, timer });
 	} finally {
+		answered = true;
 		clearTimeout(timeout);
 	}
 	return respond(plan, ctx, upstream);

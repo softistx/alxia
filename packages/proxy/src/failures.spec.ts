@@ -107,6 +107,41 @@ describe('an upstream that fails', () => {
 		expect(response.status).toBe(200);
 		expect(await response.text()).toBe('01234');
 	});
+
+	test('once the headers came, a pause in the upload longer than timeout cuts nothing', async () => {
+		const up = upstream(
+			(request) =>
+				new Response(
+					new ReadableStream<Uint8Array>({
+						async start(controller) {
+							controller.enqueue(new TextEncoder().encode('hi|'));
+							const body = request.body as ReadableStream<Uint8Array>;
+							for await (const chunk of body as unknown as AsyncIterable<Uint8Array>) {
+								controller.enqueue(chunk);
+							}
+							await Bun.sleep(400); // the response goes on past the timeout
+							controller.enqueue(new TextEncoder().encode('|end'));
+							controller.close();
+						},
+					}),
+				),
+		);
+		const url = serve(alxia().use(proxy(up.url, { timeout: 200 })));
+		const body = new ReadableStream<Uint8Array>({
+			async start(controller) {
+				controller.enqueue(new TextEncoder().encode('a'));
+				await Bun.sleep(500); // after the headers, longer than the timeout
+				controller.enqueue(new TextEncoder().encode('b'));
+				controller.close();
+			},
+		});
+		const response = await fetch(url, {
+			method: 'POST',
+			body,
+			duplex: 'half',
+		} as RequestInit);
+		expect(await response.text()).toBe('hi|ab|end');
+	});
 });
 
 describe('aborting', () => {
