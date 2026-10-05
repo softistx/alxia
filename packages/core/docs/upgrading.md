@@ -4,6 +4,164 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the next one first: what changed, the code before and
 after, and whether it can break yours.
 
+## 0.8.0
+
+`@alxia/core` 0.8.0 adds `fork()`, a socket's `upgrade` handler and the
+operations of a socket. Nothing in its API breaks an app that does not use
+them; the peer range of every package moves, and a few behaviours a consumer
+may notice are flagged below.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [Peers move to `^0.8.0`](#peers-move-to-080) | every package | yes, for an install that holds a package of 0.7 beside core 0.8: update them together |
+| [`fork()`](#fork) | core | no: new; a method and path declared twice now says when `fork()` is the fix |
+| [A socket's `upgrade` handler](#a-sockets-upgrade-handler) | core | no: new |
+| [`onOperation` and `startOperation`](#onoperation-and-startoperation) | core, graphql, logger, telemetry | no: new |
+| [`proxy.ws()` connects before the upgrade](#proxyws-connects-before-the-upgrade) | proxy | notice: a 502 or a 504 over HTTP instead of a socket closed with 1014; `BAD_GATEWAY_CLOSE` is deprecated |
+| [GraphQL answers an over-limit body with 413](#graphql-answers-an-over-limit-body-with-413) | graphql | notice: a 413 instead of a 400, and no `originalError` |
+| [The telemetry traces a socket's upgrade](#the-telemetry-traces-a-sockets-upgrade) | telemetry | notice: a new span for every socket route, with the stand-in status 200 |
+| [The logger's `outcome` gains `ok` and `errors`](#the-loggers-outcome-gains-ok-and-errors) | logger | notice: a widened union; an exhaustive `switch` stops compiling |
+| [Other changes in the 0.8 line](#other-changes-in-the-08-line) | graphql, openapi, react-router, create | no: nothing to do |
+
+### Peers move to `^0.8.0`
+
+Every package's peer on `@alxia/core` moved from `^0.7.0` to `^0.8.0`, and
+a `^0.7.0` does not accept 0.8 (the minor is the breaking digit below 1.0).
+Update `@alxia/core` and the packages you use in one change:
+
+```sh
+bun add @alxia/core@^0.8.0 @alxia/graphql@^0.6.0 @alxia/logger@^0.6.0 @alxia/telemetry@^0.6.0 @alxia/proxy@^0.2.0
+```
+
+**Can it break your code.** Only the install: a package left at its 0.7
+release asks for core `^0.7.0`, and the package manager warns of an unmet
+peer or installs a second core, whose context, `Register` and marks are not
+the first's. Nothing else changed in them.
+
+### `fork()`
+
+**What changed.** `app.fork()` builds several apps on one base: a copy of
+the app, with its routes, its middlewares and `derive`s in force, its
+lifecycle hooks, parsers and options, typed as it is, that shares nothing
+declared next with it. A method and path declared twice now says when
+`base.fork()` is the fix, naming the case where the very same route was
+mounted twice. `fork()` on the app a group's build is given throws: it
+shares the app's lifecycle hooks.
+
+```ts
+const real = base.fork().plugin(todos);
+const spec = base.fork().use(fakeSession).plugin(todos); // no collision on the base
+```
+
+**Can it break your code.** No: new, nothing to do. The only visible change
+is the wording of the "declared twice" error. See
+[Groups and plugins: several apps on one base](guide/groups-and-plugins.md#several-apps-on-one-base-fork).
+New projects from `@alxia/create` build their spec's app and the real app on
+`fork()`.
+
+### A socket's `upgrade` handler
+
+**What changed.** `app.ws(path, ...middlewares, { upgrade, open, message })`
+awaits `upgrade(data, headers)` after the route's middlewares and before the
+`101`. `data` is what `socket.data` will be, `headers` the `101`'s, and a
+throw answers the upgrade request in the app's error format, with no socket
+opened.
+
+```ts
+app.ws('/feed', {
+	async upgrade(data, headers) {
+		headers.set('sec-websocket-protocol', 'feed.v2'); // sent with the 101
+	},
+	message: () => {},
+});
+```
+
+**Can it break your code.** No: a socket without `upgrade` opens as before.
+See
+[WebSockets: before the `101`](guide/websockets.md#before-the-101-upgrade).
+
+### `onOperation` and `startOperation`
+
+**What changed.** The operations a socket runs after its upgrade are told to
+the observers around that upgrade: an observer subscribes with
+`onOperation(ctx, observer)` before `next()`, and the plugin serving the
+socket calls `startOperation(socket.data, report)` as each operation starts,
+and the function it returns, with `'ok'` or `'errors'`, when it ended. New
+types `OperationObserver` and `OperationOutcome`. `@alxia/graphql` over `ws`
+reports this way, so the logger and the telemetry follow an operation of a
+socket as well.
+
+**Can it break your code.** No: nothing subscribes unless an observer asks.
+See
+[Writing a plugin: the operations of a socket](guide/writing-a-plugin.md#the-operations-of-a-socket).
+
+### `proxy.ws()` connects before the upgrade
+
+**What changed.** `@alxia/proxy` 0.2.0 opens the upstream socket before the
+client is upgraded: the client's `101` names the subprotocol the upstream
+chose, and an upstream that cannot be reached answers a 502 (a 504 past
+`timeout`) over HTTP, in the app's error format, instead of a socket closed at
+once with 1014. A client gone during the connect closes the upstream.
+`BAD_GATEWAY_CLOSE` is deprecated: nothing sends it any more.
+
+**Can it break your code.** Notice it, if a client or a monitor treats the
+close code 1014 as "upstream down": it now gets a failed handshake with a 502
+or a 504. Nothing else to do; stop importing `BAD_GATEWAY_CLOSE`.
+
+### GraphQL answers an over-limit body with 413
+
+**What changed.** `@alxia/graphql` 0.6.0 answers a body past core's
+`bodyLimit` with core's 413 (problem+json under `errors: 'problem'`), with a
+`Content-Length` or chunked, where Yoga answered a 400 "POST body sent
+invalid JSON.". Yoga's 400 for a request it cannot parse no longer carries
+the parser's error in `extensions.originalError`.
+
+**Can it break your code.** Notice it: a client or a test that matched the
+400 for an oversized body now sees a 413, and one that read
+`extensions.originalError` of a parse failure finds nothing there (it is
+the parser's message, not part of the contract).
+
+### The telemetry traces a socket's upgrade
+
+**What changed.** `@alxia/telemetry` 0.6.0 traces a WebSocket upgrade with a
+span that ends with its answer, for every socket route, not only a GraphQL
+one. Behind `@alxia/graphql`'s `ws: true`, each operation on the socket gets a
+span of its own, a child of the upgrade's: named `subscription OnNote`, with
+`graphql.operation.*`, from its start to its end, an error when answered with
+errors. The span records the stand-in status 200, as the logger's upgrade line
+already did; the logger's line is unchanged.
+
+**Can it break your code.** Notice it: a trace backend shows a span per
+socket upgrade that was absent before, which can move a span count, a
+sampling budget or an alert. An upgrade left out of `traced` has no span.
+Nothing to change in the code.
+
+### The logger's `outcome` gains `ok` and `errors`
+
+**What changed.** `@alxia/logger` 0.6.0 logs each operation over a socket:
+behind `@alxia/graphql`'s `ws: true`, every query, mutation and subscription
+gets a line of its own once it ended, with the upgrade's `requestId`,
+`operationName`, `operationType`, its `duration` and `outcome: 'ok'` or
+`'errors'` (a `warn`), beside the upgrade's line.
+
+**Can it break your code.** Notice it: `LogEntry.outcome` is a wider union.
+A `switch` over it that is exhaustive (a `never` check) stops compiling until
+it handles `'ok'` and `'errors'`, and a sink that filters on `outcome` sees
+the new lines.
+
+### Other changes in the 0.8 line
+
+Nothing to do for any of them:
+
+- `@alxia/graphql`: a guide page, "Harden a GraphQL API for production" (rate
+  limiting, depth limits, introspection off outside development, masked
+  errors, `bodyLimit`, CSRF, persisted operations).
+- `@alxia/openapi` and `@alxia/react-router`: documentation only, route
+  matching moved to a "How routes are matched" guide and the links follow.
+- `@alxia/core`: documentation only, the 0.6.0 and 0.7.0 sections of this
+  page, and a recipe for a refusal handler scoped to some routes.
+- `@alxia/create`: new projects install `@alxia/core` with `fork()`.
+
 ## 0.7.0
 
 `@alxia/core` 0.7.0 adds a way for an endpoint to tell the observers around it which operation it ran. Nothing in its API breaks an app that does not use it; the peer range of every package moves.
@@ -12,8 +170,6 @@ after, and whether it can break yours.
 | --- | --- | --- |
 | [Peers move to `^0.7.0`](#peers-move-to-070) | every package | yes, for an install that holds a package of 0.6 beside core 0.7: update them together |
 | [`reportOperation` and `operationOf`](#reportoperation-and-operationof) | core, graphql, logger, telemetry | no: new; a GraphQL request's log line and span now name its operation |
-| [A socket's `upgrade` handler](#a-sockets-upgrade-handler) | core | no: new, and not in 0.7.0 itself: on develop, in the release after it |
-| [`onOperation` and `startOperation`](#onoperation-and-startoperation) | core, graphql, logger, telemetry | no: new, and not in 0.7.0 itself: on develop, in the release after it |
 | [`@alxia/jwt` verifies by an identity provider's keys](#alxiajwt-verifies-by-an-identity-providers-keys) | jwt | no: new; 0.4.1 refuses small-order Ed25519 keys, upgrade to it |
 | [`@alxia/proxy`](#alxiaproxy) | proxy | no: a new package |
 
@@ -60,42 +216,6 @@ entry has `operationName` and `operationType`, and the span is named
 A dashboard or an alert that matches on the span name `POST /graphql` needs
 the new name. See
 [Writing a plugin: telling the observers what ran](guide/writing-a-plugin.md#telling-the-observers-what-ran).
-
-### A socket's `upgrade` handler
-
-**What changed.** `app.ws(path, ...middlewares, { upgrade, open, message })`
-awaits `upgrade(data, headers)` after the route's middlewares and before the
-`101`. `data` is what `socket.data` will be, `headers` the `101`'s, and a
-throw answers the upgrade request in the app's error format, with no socket
-opened.
-
-```ts
-app.ws('/feed', {
-	async upgrade(data, headers) {
-		headers.set('sec-websocket-protocol', 'feed.v2'); // sent with the 101
-	},
-	message: () => {},
-});
-```
-
-**Can it break your code.** No: a socket without `upgrade` opens as before.
-This one is on develop and not in the 0.7.0 tarball. See
-[WebSockets: before the `101`](guide/websockets.md#before-the-101-upgrade).
-
-### `onOperation` and `startOperation`
-
-**What changed.** The operations a socket runs after its upgrade are told to
-the observers around that upgrade: an observer subscribes with
-`onOperation(ctx, observer)` before `next()`, and the plugin serving the
-socket calls `startOperation(socket.data, report)` as each operation starts,
-and the function it returns, with `'ok'` or `'errors'`, when it ended. New
-types `OperationObserver` and `OperationOutcome`. `@alxia/graphql` over `ws`
-reports this way, so the logger and the telemetry follow an operation of a
-socket as well.
-
-**Can it break your code.** No: nothing subscribes unless an observer asks.
-Not in the 0.7.0 tarball either. See
-[Writing a plugin: the operations of a socket](guide/writing-a-plugin.md#the-operations-of-a-socket).
 
 ### `@alxia/jwt` verifies by an identity provider's keys
 
