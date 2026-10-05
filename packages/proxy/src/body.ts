@@ -21,6 +21,8 @@ export function watchBody(
 	source: ReadableStream<Uint8Array>,
 	limit: number | undefined,
 	declared: string | null,
+	/** Called on every chunk read: the upload is progressing. */
+	onChunk: () => void = () => {},
 ): WatchedBody {
 	let failure: unknown;
 	if (limit !== undefined && Number(declared ?? Number.NaN) > limit) {
@@ -37,6 +39,7 @@ export function watchBody(
 					controller.close();
 					return;
 				}
+				onChunk();
 				count += value.byteLength;
 				if (limit !== undefined && count > limit) {
 					throw new ContentTooLargeError(limit);

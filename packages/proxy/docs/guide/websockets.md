@@ -42,17 +42,21 @@ const app = alxia().ws(
 ## What is relayed
 
 - The upstream socket opens when the client's does. Frames the client sends
-  before it is open are queued, then sent in order.
+  before it is open are queued, then sent in order: 1024 at most, past which
+  the client is closed with 1013 (try again later).
 - Text stays text, binary stays binary.
 - A close on either side closes the other with the same code and reason.
-  Codes that a socket only reports are mapped: 1005 to 1000, 1006 and 1015 to 1011.
+  Codes that a socket only reports are mapped: 1005 to 1000, and any code a
+  peer may not send (1004, 1006, 1015, 1016 to 2999, outside 1000 to 4999) to 1011.
 - On shutdown both sides close with 1001.
 - The upstream's request headers are the client's, less hop-by-hop and the client's
   handshake headers, plus the forwarding ones.
 
 ## An upstream that cannot be reached
 
-The client is closed with `BAD_GATEWAY_CLOSE` (1014) and the reason `bad gateway`:
+The client is closed with `BAD_GATEWAY_CLOSE` (1014) and the reason `bad gateway`,
+whether the connection is refused or the upstream does not complete its
+handshake within `timeout` (30 s by default):
 
 ```ts
 import { BAD_GATEWAY_CLOSE } from '@alxia/proxy';

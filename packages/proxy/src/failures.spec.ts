@@ -86,6 +86,27 @@ describe('an upstream that fails', () => {
 			.request('/');
 		expect(await response.text()).toBe('late but whole');
 	});
+
+	test('the timeout counts silence: a slow upload that keeps sending is not cut', async () => {
+		const up = upstream(async (request) => new Response(await request.text()));
+		const url = serve(alxia().use(proxy(up.url, { timeout: 300 })));
+		const body = new ReadableStream<Uint8Array>({
+			async start(controller) {
+				for (let i = 0; i < 5; i++) {
+					controller.enqueue(new TextEncoder().encode(String(i)));
+					await Bun.sleep(150); // 750 ms in all, more than the timeout
+				}
+				controller.close();
+			},
+		});
+		const response = await fetch(url, {
+			method: 'POST',
+			body,
+			duplex: 'half',
+		} as RequestInit);
+		expect(response.status).toBe(200);
+		expect(await response.text()).toBe('01234');
+	});
 });
 
 describe('aborting', () => {

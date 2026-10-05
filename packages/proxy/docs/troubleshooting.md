@@ -217,10 +217,11 @@ See [Failures](guide/failures.md).
 
 ### `504 {"error":"gateway_timeout"}`
 
-**When:** the upstream sent no response headers within `timeout` (30 000 ms by
-default). The log line is `proxy: <origin> sent no response within <n> ms`.
-**Why:** the upstream is slow to the first byte, or holds its headers until
-it has a first body chunk.
+**When:** the exchange stayed silent for `timeout` (30 000 ms by default)
+before the upstream's response headers: no headers, and no request body chunk
+sent meanwhile. The log line is `proxy: <origin> sent no response within <n> ms`.
+**Why:** the upstream is slow to the first byte, holds its headers until it
+has a first body chunk, or the client paused its upload that long.
 **Fix:** raise it for that upstream, or answer earlier from it:
 
 ```ts
@@ -307,7 +308,8 @@ app.listen({ port: 3000, maxRequestBodySize: 256 * 1024 * 1024 });
 
 ### A 504 though the upstream answers
 
-**Why:** the timeout runs until the response headers arrive. An upstream
+**Why:** the timeout counts silence until the response headers arrive, again
+from each request body chunk sent. An upstream
 that sends its headers with its first body chunk, or is slow to the first
 byte, is cut. A slow body after the headers is not (server-sent events
 pass).

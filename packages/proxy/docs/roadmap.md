@@ -7,10 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **A reverse proxy as a middleware.** `app.use('/api', proxy(url, { rewrite: '/api' }))`
-  forwards every method under a path to one upstream, streaming both ways,
-  and `app.plugin(proxy.mount('/legacy', url))` mounts an upstream under a
-  prefix; the 0.1.0 release below is this form.
+Nothing scheduled yet.
 
 ## Next
 

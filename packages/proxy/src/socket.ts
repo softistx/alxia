@@ -25,6 +25,9 @@ export type SocketProxy<Ctx = unknown> = SocketHandlers<
 	string | Uint8Array
 >;
 
+/** The frames a client may send before the upstream opens; past them, a close with 1013. */
+const PENDING = 1024;
+
 /** The close code a client gets when the upstream cannot be reached: 1014, bad gateway. */
 export const BAD_GATEWAY_CLOSE = 1014;
 
@@ -68,7 +71,9 @@ export function socketProxy<Ctx>(
 			if (relay === undefined) return;
 			if (relay.upstream.readyState === WebSocket.OPEN) {
 				relay.upstream.send(message as Frame);
-			} else relay.pending.push(message as Frame);
+			} else if (relay.pending.length < PENDING) {
+				relay.pending.push(message as Frame);
+			} else socket.close(1013, 'upstream not open yet');
 		},
 		close(socket, code, reason) {
 			const relay = relays.get(socket.raw);
@@ -107,8 +112,12 @@ function connect<Ctx>(
 	upstream.binaryType = 'arraybuffer';
 	const relay: Relay = { upstream, pending: [] };
 	let opened = false;
+	// An upstream that takes the connection and never completes the
+	// handshake: closed past `timeout`, which the client sees as 1014.
+	const late = setTimeout(() => upstream.close(), plan.timeout);
 	upstream.addEventListener('open', () => {
 		opened = true;
+		clearTimeout(late);
 		for (const message of relay.pending.splice(0)) upstream.send(message);
 	});
 	upstream.addEventListener('message', (event) => {
@@ -116,6 +125,7 @@ function connect<Ctx>(
 		socket.raw.send(typeof data === 'string' ? data : new Uint8Array(data));
 	});
 	upstream.addEventListener('close', (event) => {
+		clearTimeout(late);
 		const code = opened ? sendable(event.code) : BAD_GATEWAY_CLOSE;
 		const reason = opened ? event.reason : 'bad gateway';
 		if (socket.raw.readyState === WebSocket.OPEN) socket.close(code, reason);
@@ -124,14 +134,15 @@ function connect<Ctx>(
 }
 
 /**
- * A close code a peer may send: 1005, 1006 and 1015 are reserved for what
- * a socket reports, never sent — 1005 (no code) closes with 1000, an
- * abnormal close (1006, 1015) with 1011.
+ * A close code a peer may send: 1000-1003, 1007-1014 and 3000-4999. 1005
+ * (no code) closes with 1000; any other — 1006 and 1015, reserved for what
+ * a socket reports, or one no peer may send — with 1011.
  */
 function sendable(code: number): number {
 	if (code === 1005) return 1000;
-	if (code === 1006 || code === 1015 || code < 1000 || code >= 5000) {
-		return 1011;
-	}
-	return code;
+	const valid =
+		(code >= 1000 && code <= 1003) ||
+		(code >= 1007 && code <= 1014) ||
+		(code >= 3000 && code <= 4999);
+	return valid ? code : 1011;
 }

@@ -96,7 +96,7 @@ app whose context does not give it.
 | `trustForwarded` | `false` | keep the incoming `X-Forwarded-Proto` and `-Host` |
 | `forwarded` | `false` | add an RFC 7239 `Forwarded` element |
 | `headers` | none | `{ request?, response? }`: a record, or a function `(headers, ctx) => void` |
-| `timeout` | `30_000` | milliseconds to the upstream's response headers; past it, a 504 |
+| `timeout` | `30_000` | milliseconds of silence allowed until the upstream's response headers, counted again from each body chunk sent; past it, a 504 |
 | `bodyLimit` | none | bytes of request body; past it, a 413 |
 
 ## API

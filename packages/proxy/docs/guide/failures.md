@@ -45,10 +45,14 @@ The bodies are typed: `BadGatewayBody`, `GatewayTimeoutBody` and `OutsideTargetB
 
 ## `timeout`
 
-`timeout` (default `30_000` ms, above 0) is the time the upstream has to send
-the response's **headers**. A slow body after them is not cut, so server-sent
-events live on. An upstream that holds its headers until the first chunk of the
-body counts as slow. A bad value throws a `TypeError` at declaration.
+`timeout` (default `30_000` ms, above 0) is how long the exchange may stay
+silent before the upstream sends the response's **headers**: it counts from
+the request, and again from each chunk of the request body sent, so a long
+upload that keeps moving is never cut, while a client or an upstream that
+stalls for `timeout` is a 504. A slow body after the headers is not cut, so
+server-sent events live on. An upstream that holds its headers until the first
+chunk of its body counts as slow. A bad value throws a `TypeError` at
+declaration.
 
 A failure after the headers, an upstream that dies mid-body, cannot change the
 status: the client's connection is cut.

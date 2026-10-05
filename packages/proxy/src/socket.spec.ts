@@ -126,6 +126,28 @@ describe('proxy.ws', () => {
 		expect(closed).toEqual({ code: BAD_GATEWAY_CLOSE, reason: 'bad gateway' });
 	});
 
+	test('an upstream that never completes the handshake is closed past timeout, 1014', async () => {
+		const silent = Bun.listen({
+			hostname: '127.0.0.1',
+			port: 0,
+			socket: { data() {} }, // takes the connection, answers nothing
+		});
+		try {
+			const target = `ws://127.0.0.1:${silent.port}`;
+			const url = serve(
+				alxia().ws('/live', proxy.ws(target, { timeout: 100 })),
+			);
+			const { closed } = await client(url, '/live');
+			await until(() => closed.code !== undefined);
+			expect(closed).toEqual({
+				code: BAD_GATEWAY_CLOSE,
+				reason: 'bad gateway',
+			});
+		} finally {
+			silent.stop(true);
+		}
+	});
+
 	test("the route's middlewares run before the upgrade", async () => {
 		const { up, state } = socketUpstream();
 		const app = alxia().ws(

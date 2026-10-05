@@ -4,7 +4,8 @@
  * back with its headers made for the client. Nothing is buffered either
  * way. The upstream fetch is aborted with the client's request — a client
  * that leaves, or a shutdown that closes what the drain left — and, until
- * the upstream's headers arrive, by the `timeout`.
+ * the upstream's headers arrive, by the `timeout`: the most the upstream
+ * may stay silent, counted again from each chunk of the request body sent.
  */
 import { HttpError, shutdownSignal } from '@alxia/core';
 import { type WatchedBody, watchBody } from './body';
@@ -23,6 +24,12 @@ export async function forward<Ctx>(
 	const url = upstreamUrl(plan as Plan, ctx.url);
 	const headers = requestHeaders(plan as Plan, ctx, request);
 	applyEdit(headers, plan.headers.request, ctx);
+	const timer = new AbortController();
+	let timeout: ReturnType<typeof setTimeout> | undefined;
+	const arm = () => {
+		clearTimeout(timeout);
+		timeout = setTimeout(() => timer.abort(), plan.timeout);
+	};
 	const body =
 		request.body === null ||
 		request.method === 'GET' ||
@@ -32,9 +39,9 @@ export async function forward<Ctx>(
 					request.body,
 					plan.bodyLimit,
 					request.headers.get('content-length'),
+					arm,
 				);
-	const timer = new AbortController();
-	const timeout = setTimeout(() => timer.abort(), plan.timeout);
+	arm();
 	let upstream: Response;
 	try {
 		upstream = await fetch(url, {
