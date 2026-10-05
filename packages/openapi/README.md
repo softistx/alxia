@@ -167,8 +167,8 @@ Upgrading from before this check was lenient: to keep the old check, pass
 
 ## Under a prefix
 
-`app.routes` holds full paths. For `alxia({ prefix: '/api' })`, say so, and
-each operation is looked up under it:
+For details about prefixes and how routes are matched, see
+[How routes are matched](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/matching.md).
 
 ```ts
 implemented(app, operations, { prefix: '/api' });
@@ -203,16 +203,10 @@ would reveal the schema.
 
 ## How a route is matched
 
-- by method and path, as `app.routes` holds them: groups, plugins and the
-  prefix included
-- by the path's shape, the core's `shapeOf`: a `GET /pets/:id` serves the
-  `GET /pets/:petId` operation, as the router matches them alike
-- a `HEAD` operation is served by the `GET` route, as the core serves it
-- operations as an object, named by their keys (`operations` of `alxia.ts`),
-  or as a list, named by `schema.detail.operationId` when they have one
-- socket routes (`app.ws`) are not read: an OpenAPI operation is HTTP
+For details about route matching, including path shapes, prefixes, and special cases,
+see [How routes are matched](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/matching.md).
 
-It reads `app.routes` and nothing else: it sends no request, and checks no
+The checks read `app.routes` and nothing else: they send no request, and check no
 schema.
 
 ## Traps
@@ -273,7 +267,8 @@ The core's side of the move is in its
 - [Spec first](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/spec-first.md): the whole workflow, from `openapi.yaml` to the generated operations, the routes, the check and a client.
 - [Testing with the generated client](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/testing.md): openapi-fetch over `app.fetch`, in process, typed by the spec.
 - [API docs](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/api-docs.md): `apiDocs`, its options, the Content-Security-Policy, and beside a GraphQL endpoint.
-- [The checks](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md): `implemented` and `matchesSpec`, how a route is matched, the prefix, and the routes to exclude.
+- [The checks](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/checks.md): `implemented` and `matchesSpec`, and the routes to exclude.
+- [How routes are matched](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/matching.md): the path's shape, prefixes, and special cases.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/troubleshooting.md): each message of the checks and the generator, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/roadmap.md): what is coming, and what is not planned.
 - [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [A spec-first CRUD API](https://github.com/softistx/alxia/blob/develop/docs/recipes/spec-first-crud.md), [Test an alxia app](https://github.com/softistx/alxia/blob/develop/docs/recipes/testing.md), [Answer errors consistently](https://github.com/softistx/alxia/blob/develop/docs/recipes/errors.md).
