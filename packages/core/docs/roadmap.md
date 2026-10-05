@@ -128,6 +128,8 @@ number on it. Every release, with each change it made, is in
   prefix refuses `DELETE /secret` with its 401 instead of a 405 whose
   `Allow` names its routes; several groups at one path each run theirs
   ([Middleware](guide/middleware.md#which-chain-a-405-runs)).
+### 0.8.0
+
 - **One base, several apps.** `base.fork()` copies an app — its routes,
   its chain in force, its lifecycle hooks — typed as it is, so the real app,
   a spec's and a variant each build on the registered base without
@@ -149,6 +151,8 @@ number on it. Every release, with each change it made, is in
   tells it of each operation the socket runs, then of its end, `'ok'` or
   `'errors'`: `@alxia/graphql` tells them over `ws`, `@alxia/logger` writes
   a line and `@alxia/telemetry` a span for each ([Writing a plugin](guide/writing-a-plugin.md#the-operations-of-a-socket)).
+### 0.6.0
+
 - **The client's address behind a proxy.** `forwardedIp({ trusted })`, the `ip` option for an app behind proxies: the client read from the right of `X-Forwarded-For` or `Forwarded`, past a number of hops or a list of CIDR ranges, never the first entry the client writes, so a rate limit keyed by `ip` cannot be bypassed with a header ([Serving](guide/serving.md#the-clients-address-ip)).
 
 ### 0.4.0
