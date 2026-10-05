@@ -9,6 +9,7 @@ import type { GroupMethod, UseMethod } from './compose-methods';
 import * as hooks from './declare-hooks';
 import * as declare from './declare-routes';
 import type { RouteDefinition, SocketDefinition } from './definition';
+import { forkInto } from './fork';
 import { type GroupArgs, group, mountPlugin } from './mount';
 import { serve } from './pipeline';
 import type { PluginMethod } from './plugin-method';
@@ -45,6 +46,8 @@ import type { Empty, Method } from './types';
  * A lifecycle hook (`onStart`, `onStop`) and a `parser` apply to the
  * whole app. Each method is typed by an interface of its own —
  * `RouteMethod`, `UseMethod`, `PluginMethod`, … — holding its overloads.
+ * Each declares on the app itself: an app built on a shared base builds
+ * on `base.fork()`.
  */
 export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 	/** Never set: carries what a route declared next reads, for `ContextOf`. */
@@ -118,6 +121,22 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 	/** Every socket route, in the order declared. */
 	get sockets(): readonly SocketDefinition[] {
 		return this.#state.sockets;
+	}
+
+	/**
+	 * A copy of this app — its routes, its chain in force, its lifecycle
+	 * hooks — typed as it is, that shares nothing declared next with it:
+	 * how one base builds several apps.
+	 *
+	 * ```ts
+	 * export const app = base.fork().plugin(todos);
+	 * const testApp = base.fork().use(fakeSession).plugin(todos);
+	 * ```
+	 */
+	fork(): this {
+		const copy = new Alxia(this.#state.options);
+		forkInto(this.#state, copy.#state);
+		return copy as this;
 	}
 
 	/** The server `listen` started, until `stop`. */

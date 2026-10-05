@@ -62,6 +62,7 @@ a trap that prints nothing is headed by its symptom.
 - [`"…" declares ":…" twice`](#-declares--twice)
 - [`"…" has the shape of "…" with other parameter names`](#-has-the-shape-of--with-other-parameter-names)
 - [`GET /… is declared twice`](#get--is-declared-twice)
+- [`fork(): a group's app shares the app's lifecycle hooks and chain`](#fork-a-groups-app-shares-the-apps-lifecycle-hooks-and-chain)
 - [`GET /…: middleware 1 is not a function: a middleware is (ctx, next) => …, or a validate() or responds()`](#get--middleware-1-is-not-a-function-a-middleware-is-ctx-next---or-a-validate-or-responds)
 - [`GET /…: a route takes its middlewares after the path, not in a list: drop the brackets`](#get--a-route-takes-its-middlewares-after-the-path-not-in-a-list-drop-the-brackets)
 - [`GET /…: the options hold no schema (body): give validate(…) and responds(…) among the middlewares`](#get--the-options-hold-no-schema-body-give-validate-and-responds-among-the-middlewares)
@@ -1555,10 +1556,47 @@ app.get('/users/:id', getUser).patch('/users/:id', updateUser);
 
 **When:** the same method and path are declared twice, often once directly
 and once through `plugin(app)` or a `group`, or as `static` beside a
-`GET /…/*`.
+`GET /…/*`. Or two apps are built on one shared base: the message then
+goes on `…, by the same route: mounted twice on one app, or by two apps
+built on one base; build each app on base.fork()` when the very route was
+mounted twice — on one app, `app.plugin(todos).plugin(todos)`, or on a
+shared base — and `…: keep one; if two apps are built on one base, build
+each on base.fork()` otherwise.
+
+**Why:** every method declares on the app it is called on and returns it.
+`base.use(x).plugin(todos)` adds to `base` itself, so a second
+`base.plugin(todos)` — a spec's app, a variant — declares the routes on the
+same app again.
 
 **Fix:** keep one. `HEAD` runs the `GET` route, so you do not need to
-declare it.
+declare it. For several apps on one base, build each on a fork
+([Several apps on one base](guide/groups-and-plugins.md#several-apps-on-one-base-fork)):
+
+```ts
+export const app = base.fork().plugin(todos);
+const testApp = base.fork().use(fakeSession).plugin(todos);
+```
+
+### `fork(): a group's app shares the app's lifecycle hooks and chain`
+
+```text
+TypeError: fork(): a group's app shares the app's lifecycle hooks and chain; fork the app the group is declared on
+```
+
+**When:** `fork()` is called on the app a `group`'s build is given:
+`app.group('/g', (g) => g.fork().get(…))`.
+
+**Why:** a group's app declares its lifecycle hooks, parsers and pages on
+the app the group is declared on, and its routes are copied there once the
+build returns. A fork of it would keep its hooks to itself, and they would
+never run.
+
+**Fix:** declare on the group's app as it is, and fork the app the group
+is declared on:
+
+```ts
+const variant = base.fork().group('/g', (g) => g.get('/x', handler));
+```
 
 ### `GET /…: middleware 1 is not a function: a middleware is (ctx, next) => …, or a validate() or responds()`
 

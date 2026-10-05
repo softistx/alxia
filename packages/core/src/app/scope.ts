@@ -59,6 +59,13 @@ export class Scope {
 		return copy;
 	}
 
+	/** A fork's scope: this one whole, which the fork adds to apart. */
+	fork(): Scope {
+		const fork = this.copy();
+		fork.#inherited = this.#inherited;
+		return fork;
+	}
+
 	/**
 	 * The hooks of a route declared now at `path`, its full path: those in
 	 * force that run on it, in the order declared, then its own.

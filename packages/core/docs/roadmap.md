@@ -107,6 +107,11 @@ number on it. Every release, with each change it made, is in
 
 ### Next release
 
+- **One base, several apps.** `base.fork()` copies an app — its routes,
+  its chain in force, its lifecycle hooks — typed as it is, so the real app,
+  a spec's and a variant each build on the registered base without
+  declaring on it twice; a route declared twice says when a fork is the fix
+  ([Groups and plugins](guide/groups-and-plugins.md#several-apps-on-one-base-fork)).
 - **The operation a request ran, for the observers.** `@alxia/graphql`
   reports each operation it executes with `reportOperation`; `operationOf(ctx)`
   gives an observer one summary — the type and name, or `batch` and every

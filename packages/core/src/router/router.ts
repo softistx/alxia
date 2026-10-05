@@ -52,6 +52,7 @@ export class Router<Value> {
 			this.#paths.set(path, entry);
 			this.#ranked = undefined;
 		}
+		// An app's `register` and `mount` refuse this first, naming `fork()`.
 		if (entry.methods.has(method)) {
 			throw new TypeError(`${method} ${path} is declared twice`);
 		}

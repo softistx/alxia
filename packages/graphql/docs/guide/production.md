@@ -5,7 +5,7 @@ needs is not in a schema: one request can ask for a great deal, nothing says
 who may ask how often, and the defaults that help a developer help an
 attacker. Seven points, each a few lines, from the
 [GraphQL API recipe](https://github.com/softistx/alxia/blob/develop/docs/recipes/graphql-api.md),
-whose files they are (`src/context.ts` holds the base and `newBase()`). Add the packages the snippets use:
+whose files they are (`src/context.ts` holds the base, which each app builds on with `base.fork()`). Add the packages the snippets use:
 
 ```sh
 bun add @alxia/rate-limit @envelop/depth-limit @graphql-yoga/plugin-csrf-prevention @graphql-yoga/plugin-persisted-operations
@@ -196,7 +196,7 @@ export const persisted: Plugin = usePersistedOperations({
 ```ts no-check
 // file: src/production.ts
 import { logger } from '@alxia/logger';
-import { newBase } from './context';
+import { base } from './context';
 import { csrf, jsonOnly } from './csrf';
 import { depthLimit } from './depth';
 import { introspectionOnlyInDev } from './introspection';
@@ -205,7 +205,7 @@ import { createLoaders } from './loaders';
 import { schema } from './schema';
 import { graphql } from '@alxia/graphql';
 
-export const production = newBase()
+export const production = base.fork()
 	.use(logger())
 	.use(limitTo(120)) // the probes above it are not counted
 	.use(jsonOnly)
