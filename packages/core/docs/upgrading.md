@@ -19,7 +19,7 @@ may notice are flagged below.
 | [`onOperation` and `startOperation`](#onoperation-and-startoperation) | core, graphql, logger, telemetry | no: new |
 | [`proxy.ws()` connects before the upgrade](#proxyws-connects-before-the-upgrade) | proxy | notice: a 502 or a 504 over HTTP instead of a socket closed with 1014; `BAD_GATEWAY_CLOSE` is deprecated |
 | [GraphQL answers an over-limit body with 413](#graphql-answers-an-over-limit-body-with-413) | graphql | notice: a 413 instead of a 400, and no `originalError` |
-| [The telemetry traces a socket's upgrade](#the-telemetry-traces-a-sockets-upgrade) | telemetry, logger | notice: a new span for every socket route, and the upgrade is recorded as 200 |
+| [The telemetry traces a socket's upgrade](#the-telemetry-traces-a-sockets-upgrade) | telemetry | notice: a new span for every socket route, with the stand-in status 200 |
 | [The logger's `outcome` gains `ok` and `errors`](#the-loggers-outcome-gains-ok-and-errors) | logger | notice: a widened union; an exhaustive `switch` stops compiling |
 | [Other changes in the 0.8 line](#other-changes-in-the-08-line) | graphql, openapi, react-router, create | no: nothing to do |
 
@@ -128,12 +128,13 @@ span that ends with its answer, for every socket route, not only a GraphQL
 one. Behind `@alxia/graphql`'s `ws: true`, each operation on the socket gets a
 span of its own, a child of the upgrade's: named `subscription OnNote`, with
 `graphql.operation.*`, from its start to its end, an error when answered with
-errors. The upgrade's log line and span record the status 200.
+errors. The span records the stand-in status 200, as the logger's upgrade line
+already did; the logger's line is unchanged.
 
 **Can it break your code.** Notice it: a trace backend shows a span per
 socket upgrade that was absent before, which can move a span count, a
-sampling budget or an alert; the upgrade is recorded as 200 where it was
-not given a status. Nothing to change in the code.
+sampling budget or an alert. An upgrade left out of `traced` has no span.
+Nothing to change in the code.
 
 ### The logger's `outcome` gains `ok` and `errors`
 
@@ -141,8 +142,7 @@ not given a status. Nothing to change in the code.
 behind `@alxia/graphql`'s `ws: true`, every query, mutation and subscription
 gets a line of its own once it ended, with the upgrade's `requestId`,
 `operationName`, `operationType`, its `duration` and `outcome: 'ok'` or
-`'errors'` (a `warn`), beside the upgrade's line. `@alxia/graphql` tells the
-logger and the telemetry of each operation as it starts and ends.
+`'errors'` (a `warn`), beside the upgrade's line.
 
 **Can it break your code.** Notice it: `LogEntry.outcome` is a wider union.
 A `switch` over it that is exhaustive (a `never` check) stops compiling until
