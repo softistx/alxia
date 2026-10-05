@@ -109,20 +109,71 @@ opens, its groups' and plugins' included.
 ## The client's address: `ip`
 
 `ctx.ip` is the address of the connection by default. Behind a proxy that
-is the proxy; read the header it sets instead, and only from a proxy you
-trust:
+is the proxy. `forwardedIp` reads the client from the header the proxies
+append to:
 
 ```ts
-const app = alxia({
-	ip: (request, server) =>
-		request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ??
-		server?.requestIP(request)?.address,
-}).get('/ip', ({ ip, reply }) => reply(200, ip ?? 'unknown'));
+import { alxia, forwardedIp } from '@alxia/core';
+
+const app = alxia({ ip: forwardedIp({ trusted: 1 }) }) // one proxy in front
+	.get('/ip', ({ ip, reply }) => reply(200, ip ?? 'unknown'));
+```
+
+> **Security.** Never read the first entry of `X-Forwarded-For`
+> (`header.split(',')[0]`). The client writes that entry, and each proxy
+> appends the address it saw to the right, so a client that sends
+> `X-Forwarded-For: 1.2.3.4` is believed to be `1.2.3.4`: a rate limit keyed
+> by `ip` is bypassed by changing the header, and an allow list by naming an
+> allowed address. Read from the right, past the proxies you run, as
+> `forwardedIp` does. And trust a header only when every request reaches the
+> app through your proxy: a port a client can reach directly lets it send
+> any header, which `trusted` as CIDR ranges ignores, but a count cannot.
+
+### `forwardedIp({ header, trusted })`
+
+```ts
+function forwardedIp(options: ForwardedIpOptions): (request: Request, server: Bun.Server<unknown> | undefined) => string | undefined;
 ```
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
+| `trusted` | `number \| string \| string[] \| (address: string) => boolean` | required | the proxies in front of the app (below) |
+| `header` | `string` | `'x-forwarded-for'` | the header they append to; `'forwarded'` reads RFC 7239's `for=` |
+
+`trusted` names the proxies one of two ways:
+
+- **A number of hops**, `n`: the client is the `n`th entry from the right.
+  `trusted: 1` is the last entry, which the one proxy appended;
+  `trusted: 2`, the one before it, behind two proxies (a CDN, then a load
+  balancer). Whatever stands to its left is never read.
+- **CIDR ranges** (`'10.0.0.0/8'`, `'fd00::/8'`, one address `'192.168.1.1'`)
+  or a function of the address: the header is believed only when the
+  connection comes from such a proxy, and the client is the first entry
+  from the right that is not one. A connection from anywhere else is the
+  client, whatever it sends. With no server (`app.request`), the
+  connection is unknown, and so is the `ip`.
+
+```ts
+alxia({ ip: forwardedIp({ trusted: ['10.0.0.0/8', 'fd00::/8'] }) });
+alxia({ ip: forwardedIp({ header: 'forwarded', trusted: 1 }) }); // for="[2001:db8::17]:4711"
+```
+
+The connection's address is the answer when the header is missing, when a
+hop count is larger than the entries, and when the entry chosen is
+malformed (`unknown`, `_hidden`, a name, an empty entry, a bad IPv6): it is
+never skipped to reach the entries to its left, which the client writes.
+IPv4 and IPv6 are read, with brackets and a port, which the result drops;
+an IPv4-mapped IPv6 address (`::ffff:10.0.0.1`) matches an IPv4 range.
+
+To read anything else, `ip` takes any function:
+
+| Option | Type | Default | Effect |
+| --- | --- | --- | --- |
 | `ip` | `(request: Request, server: Bun.Server<unknown> \| undefined) => string \| undefined` | the connection's address | what `ctx.ip` reads, in every middleware and handler |
+
+A platform that sets one trusted header, such as `CF-Connecting-IP`, is
+`ip: (request) => request.headers.get('cf-connecting-ip') ?? undefined`
+only when the app is reachable through that platform alone.
 
 ## The options of `alxia()`
 

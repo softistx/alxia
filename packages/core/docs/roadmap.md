@@ -105,6 +105,10 @@ number on it. Every release, with each change it made, is in
 
 ## Shipped
 
+### Next release
+
+- **The client's address behind a proxy.** `forwardedIp({ trusted })`, the `ip` option for an app behind proxies: the client read from the right of `X-Forwarded-For` or `Forwarded`, past a number of hops or a list of CIDR ranges, never the first entry the client writes, so a rate limit keyed by `ip` cannot be bypassed with a header ([Serving](guide/serving.md#the-clients-address-ip)).
+
 ### 0.4.0
 
 - **One middleware model.** A route takes its middlewares after its path or

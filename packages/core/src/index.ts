@@ -62,6 +62,11 @@ export {
 	SHORTCUTS,
 	type Shortcuts,
 } from './reply/reply';
+export {
+	type ForwardedIpOptions,
+	forwardedIp,
+	type TrustedProxies,
+} from './request/forwarded-ip';
 export type { BodyParser } from './request/read';
 export { joinPath, shapeOf } from './router/paths';
 export type {

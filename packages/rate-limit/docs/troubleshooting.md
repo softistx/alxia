@@ -181,15 +181,30 @@ busy client, or a handful of ordinary ones, and everyone gets the 429.
 **Why:** the default key is `ctx.ip`, the connection's address — the
 proxy's, the same for every request. All clients share one allowance.
 
-**Fix:** give the app an `ip` option that reads the header your proxy sets,
-and only from a proxy you trust:
+**Fix:** give the app an `ip` option that reads the client from the header
+your proxy appends to, with core's `forwardedIp`:
 
 ```ts
-const app = alxia({
-	ip: (request, server) =>
-		request.headers.get('x-real-ip') ?? server?.requestIP(request)?.address,
-}).use(rateLimit({ limit: 100, windowMs: 60_000 }));
+import { alxia, forwardedIp } from '@alxia/core';
+
+const app = alxia({ ip: forwardedIp({ trusted: 1 }) }).use(
+	rateLimit({ limit: 100, windowMs: 60_000 }),
+);
 ```
+
+### One client is never refused, whatever it sends
+
+**When:** behind a proxy, a client changes its `X-Forwarded-For` in each
+request and is never answered a 429, or one address is refused for a
+header another client wrote.
+
+**Why:** the `ip` option reads the header's first entry
+(`split(',')[0]`). That entry is what the client wrote, so each value is a
+new key. Each proxy appends the address it saw to the right.
+
+**Fix:** read from the right, as `forwardedIp` does: `trusted: 1` is the
+last entry, `2` the one before it behind two proxies, and a list of CIDR
+ranges the first entry from the right that is not a proxy of yours.
 
 ### Nothing is limited, and no `RateLimit-*` header is sent
 

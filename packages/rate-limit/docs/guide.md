@@ -96,14 +96,24 @@ above ten 365-day years (315,360,000,000), on the first request it counts rather
 
 By default a limit counts per client address, `ctx.ip`, which is what the
 app's [`ip` option](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#the-clients-address-ip)
-reads. Behind a proxy, that is the proxy's address unless you set `ip`:
+reads. Behind a proxy, that is the proxy's address unless you set `ip`, and
+the header to read it from is the client's to write: the first entry of
+`X-Forwarded-For` is whatever the client sent, so a limit keyed by it is
+bypassed with a new value in each request. Use core's `forwardedIp`, which
+reads the entry your own proxies appended, from the right:
 
 ```ts
+import { alxia, forwardedIp } from '@alxia/core';
+
 const app = alxia({
-	ip: (request, server) =>
-		request.headers.get('x-real-ip') ?? server?.requestIP(request)?.address,
+	ip: forwardedIp({ trusted: 1 }), // or ['10.0.0.0/8'], the proxies' own ranges
 }).use(rateLimit({ limit: 100, windowMs: 60_000 }));
 ```
+
+`trusted` is the number of proxies in front of the app (`2` for a CDN and a
+load balancer), or their CIDR ranges, in which case a client that reaches the
+app directly is counted by its own address, whatever header it sends
+([Serving](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#the-clients-address-ip)).
 
 Count by something else — an API key, a token — by returning it from `key`.
 It may be async. A request whose key is `undefined` is not counted: it passes,

@@ -91,6 +91,8 @@ a trap that prints nothing is headed by its symptom.
 - [`responds(): the operation GET /… declares no response`](#responds-the-operation-get--declares-no-response)
 - [`page(): /… is already served`](#page--is-already-served)
 - [`GET /… is already served by a page`](#get--is-already-served-by-a-page)
+- [`forwardedIp: trusted hops must be an integer of 1 or more`](#forwardedip-trusted-hops-must-be-an-integer-of-1-or-more), and `forwardedIp: "…" is not an IP address or a CIDR range`
+- [`ctx.ip` is the proxy's address, or one a client chose](#ctxip-is-the-proxys-address-or-one-a-client-chose)
 
 **Responses**
 
@@ -2023,6 +2025,33 @@ then answers every method there, so the route would never be reached.
 ```ts
 app.page('/dashboard', dashboard).get('/api/dashboard', ({ reply }) => reply(200, stats()));
 ```
+
+### `forwardedIp: trusted hops must be an integer of 1 or more`
+
+**When:** `alxia({ ip: forwardedIp({ trusted }) })` with a `trusted` count that is `0`, negative, fractional or `NaN`; or, as `forwardedIp: "…" is not an IP address or a CIDR range`, with a range that is none (`10.0.0.0/33`, `office`).
+
+**Why:** `trusted` is how many proxies stand in front of the app, or the ranges they come from. Zero proxies is no header to read, and a range is an address and a prefix length of its family, at most 32 for IPv4 and 128 for IPv6. The app throws when it is built, not on a request.
+
+**Fix:** give the number of proxies, or valid ranges:
+
+```ts
+alxia({ ip: forwardedIp({ trusted: 1 }) });
+alxia({ ip: forwardedIp({ trusted: ['10.0.0.0/8', 'fd00::/8'] }) });
+```
+
+### `ctx.ip` is the proxy's address, or one a client chose
+
+**When:** behind a proxy, `ctx.ip` is the same for every client; or a client sends `X-Forwarded-For: 1.2.3.4` and `ctx.ip` is `1.2.3.4`, so a rate limit keyed by it is bypassed by changing the header.
+
+**Why:** with no `ip` option, `ctx.ip` is the connection's address, the proxy's. The first entry of `X-Forwarded-For` is what the client wrote, so `split(',')[0]` reads the one entry an attacker controls: each proxy appends the address it saw to the right.
+
+**Fix:** read the entry your own proxies wrote, with `forwardedIp`:
+
+```ts
+alxia({ ip: forwardedIp({ trusted: 1 }) }); // one proxy: the last entry
+```
+
+When it still reads the proxy, `trusted` counts too few hops (two proxies need `2`), or the header differs (`header: 'forwarded'`, or the one your proxy sets). When it falls back to the connection's address, the header is missing or the entry chosen is no address.
 
 ## Responses
 

@@ -56,7 +56,7 @@ export type Handle = Awaited<ReturnType<typeof open>>;
 ```ts
 // file: src/app.ts
 import { cache } from '@alxia/cache';
-import { alxia, health, validate } from '@alxia/core';
+import { alxia, forwardedIp, health, validate } from '@alxia/core';
 import { rateLimit } from '@alxia/rate-limit';
 import { idempotency, redis, redisCacheStore, redisCheck, redisStore } from '@alxia/redis';
 import { z } from 'zod';
@@ -74,7 +74,7 @@ export const createApp = (handle: Handle) => {
 	});
 
 	return (
-		alxia({ ip: (request) => request.headers.get('x-real-ip') ?? undefined }) // behind a proxy: its header
+		alxia({ ip: forwardedIp({ trusted: 1 }) }) // behind one proxy: the client it appended, never the first entry, which a client writes
 			// The probes first: they are not rate limited, and /ready says whether Redis answers.
 			.plugin(health({ checks: { redis: redisCheck(handle) } }))
 			.plugin(redis(handle)) // `caches`, `lock`, `redis` in the context; closes the handle on stop
@@ -155,14 +155,14 @@ beforeEach(async () => {
 });
 afterEach(() => handle.close());
 
-const get = (path: string, client = '10.0.0.1') => app.request(path, { headers: { 'x-real-ip': client } });
+const get = (path: string, client = '10.0.0.1') => app.request(path, { headers: { 'x-forwarded-for': client } });
 
 test('a response is cached, and forgotten when the data changes', async () => {
 	expect((await get('/products')).headers.get('x-cache')).toBe('MISS');
 	expect((await get('/products')).headers.get('x-cache')).toBe('HIT');
 	await app.request('/products', {
 		method: 'POST',
-		headers: { 'content-type': 'application/json', 'x-real-ip': '10.0.0.1' },
+		headers: { 'content-type': 'application/json', 'x-forwarded-for': '10.0.0.1' },
 		body: JSON.stringify({ id: '1', name: 'Kettle' }),
 	});
 	const again = await get('/products');
@@ -178,16 +178,24 @@ test('the allowance is the client address, counted in Redis', async () => {
 	expect((await get('/ready')).status).toBe(200); // the probes are not limited
 });
 
+test('a spoofed first entry buys no allowance', async () => {
+	// The proxy appends the address it saw, 10.0.0.9; the client writes what stands before it.
+	const spoofed = (i: number) => app.request('/users/3', { headers: { 'x-forwarded-for': `9.9.${i}.1, 10.0.0.9` } });
+	const statuses: number[] = [];
+	for (let i = 0; i < 101; i++) statuses.push((await spoofed(i)).status);
+	expect(statuses.at(-1)).toBe(429);
+});
+
 test('two apps on one Redis share a count', async () => {
 	const other = createApp(handle); // as another process would
 	for (let i = 0; i < 100; i++) await get('/users/2', '10.0.0.3');
-	const refused = await other.request('/users/2', { headers: { 'x-real-ip': '10.0.0.3' } });
+	const refused = await other.request('/users/2', { headers: { 'x-forwarded-for': '10.0.0.3' } });
 	expect(refused.status).toBe(429);
 	expect(refused.headers.get('retry-after')).not.toBeNull();
 });
 
 test('a retried order is answered once', async () => {
-	const order = () => app.request('/orders', { method: 'POST', headers: { 'idempotency-key': 'k-1', 'x-real-ip': '10.0.0.4' } });
+	const order = () => app.request('/orders', { method: 'POST', headers: { 'idempotency-key': 'k-1', 'x-forwarded-for': '10.0.0.4' } });
 	const first = await order();
 	const retry = await order();
 	expect(retry.headers.get('idempotent-replayed')).toBe('true');
