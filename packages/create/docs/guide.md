@@ -1,12 +1,15 @@
 # Guide
 
 How `bun create @alxia` asks, what each template writes, how the `api`
-project grows from its OpenAPI document, and how the command chooses the
-versions it writes.
+project grows from its OpenAPI document and the `graphql` one from its
+schema, and how the command chooses the versions it writes.
 
 - [Running it](#running-it)
+- [The `minimal` template](#the-minimal-template)
 - [The `api` template](#the-api-template)
   - [Adding an operation](#adding-an-operation)
+- [The `graphql` template](#the-graphql-template)
+  - [Adding a field](#adding-a-field)
 - [The `react-router` template](#the-react-router-template)
 - [Lint and format](#lint-and-format)
 - [Docker](#docker)
@@ -24,14 +27,14 @@ answer takes:
 
 ```
 Where should the project go? [alxia-app] my-app
-Which template? api or react-router [api]
+Which template? minimal, api, graphql or react-router [minimal]
 ```
 
 then writes the project, runs `bun install` in it, and prints what to run
 next:
 
 ```
-Done: my-app holds the api template. Next:
+Done: my-app holds the minimal template. Next:
 
   cd my-app
   bun dev
@@ -40,7 +43,7 @@ Done: my-app holds the api template. Next:
 | option | default | |
 | --- | --- | --- |
 | `[dir]` | asked, `alxia-app` | where to write: empty, or not there yet |
-| `--template <name>`, `--template=<name>`, `-t <name>` | asked, `api` | `api` or `react-router` |
+| `--template <name>`, `--template=<name>`, `-t <name>` | asked, `minimal` | `minimal`, `api`, `graphql` or `react-router` |
 | `--no-install` | install | write the files, skip `bun install` |
 | `--help`, `-h` | | the usage, and nothing else |
 
@@ -57,8 +60,8 @@ files, as the README's `docker build -t` and `docker run`: `bun create
 to the package `@scope/create`, and npm maps `npm create @scope` the same
 way. Any of the three runs the same bin, on Bun.
 
-Both templates are files shipped in this package, under
-`templates/api/` and `templates/react-router/`, and copied as they are:
+The templates are files shipped in this package, under `templates/minimal/`,
+`templates/api/`, `templates/graphql/` and `templates/react-router/`, and copied as they are:
 nothing is downloaded but the dependencies. `package.json` is written
 again, with the directory's name, alxia's versions and the newest of the
 others ([Versions](#versions)); in every other text file, the template's
@@ -69,6 +72,71 @@ publish` leaves those out of a tarball, and `_biome.json` as `biome.json`,
 since alxia's own Biome refuses a second root configuration inside its
 repository ([Lint and format](#lint-and-format)).
 
+## The `minimal` template
+
+The template to try alxia with: one file, one dependency, a test.
+
+```
+my-app/
+├── src/
+│   ├── index.ts        the app, exported; listens only when it is the entry file
+│   └── index.spec.ts   bun test: app.request(), no port
+├── package.json
+├── tsconfig.json
+├── biome.json          Biome: lint, format, imports sorted
+├── .vscode/            Biome's extension recommended, format on save
+├── Dockerfile          bun run build, then dist/ alone, on oven/bun:1-alpine
+├── .dockerignore
+├── .gitignore
+└── README.md
+```
+
+```ts
+// src/index.ts
+import { alxia } from "@alxia/core";
+
+export const app = alxia().get("/", ({ reply }) =>
+  reply(200, { hello: "world" }),
+);
+
+// Only when this file is the entry: the test imports `app` and listens on
+// no port.
+if (import.meta.main) {
+  const server = app.listen(Number(Bun.env["PORT"] ?? 3000));
+  console.log(`listening on ${server.url}`);
+  process.once("SIGTERM", () => void app.stop().then(() => process.exit(0)));
+}
+```
+
+`bun dev` runs `bun --hot src/index.ts`; `bun start` runs
+`bun dist/index.js`, what `bun run build` wrote. `import.meta.main` is why
+the spec can import `app` without opening a port, and why the one file is
+both the app and its server. `SIGTERM` stops the app, since as a
+container's process 1 Bun would otherwise ignore it and `docker stop` would
+wait.
+
+The spec:
+
+```ts
+// src/index.spec.ts
+import { expect, test } from "bun:test";
+import { app } from "./index";
+
+test("GET / says hello", async () => {
+  const response = await app.request("/");
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ hello: "world" });
+});
+```
+
+What it leaves out is the point: one dependency, `@alxia/core`; no
+OpenAPI, no code generation, no validator, no `.env` file (`PORT` is read
+as it is). `bun run verify` is `check:ci`, `typecheck`, then `test`. When
+the app outgrows one file, move to the layout of the
+[`api`](#the-api-template) or [`graphql`](#the-graphql-template) template,
+or read
+[`@alxia/core`'s guide](https://github.com/softistx/alxia/tree/develop/packages/core/docs).
+
 ## The `api` template
 
 ```
@@ -77,6 +145,7 @@ my-api/
 ├── openapi-codegen.config.ts  how `bun run generate` reads it
 ├── src/
 │   ├── generated/             what `bun run generate` writes: committed, never edited
+│   ├── env.ts                 defineEnv from @alxia/env: PORT and API_KEY
 │   ├── context.ts             the base: what every route reads, and its Register
 │   ├── routes/todos.ts        defineRoutes(): one route per operation
 │   ├── app.ts                 the app: the base, then the routes, and its type
@@ -247,14 +316,34 @@ instead:
   or declare that route by hand with `@alxia/core`'s `eventStream`. Named
   events whose data is JSON are generated.
 
+### `src/env.ts`
+
+```ts
+import { defineEnv } from "@alxia/env";
+import { z } from "zod";
+
+export const env = defineEnv(
+  {
+    PORT: z.coerce.number().default(3000),
+    API_KEY: z.string().min(1).default("dev-key"),
+  },
+  { secret: ["API_KEY"] },
+);
+```
+
+[`defineEnv`](https://github.com/softistx/alxia/tree/develop/packages/env/docs)
+checks the environment once, when the module is first imported: a missing
+or malformed variable stops the process with every issue, before it listens.
+`API_KEY` is a secret, so it prints as `***`; its default is for
+development, set it outside. `src/server.ts` listens on `env.PORT` and
+`src/routes/todos.ts` compares the `x-api-key` header with `env.API_KEY`.
+`@alxia/env` and `zod` are dependencies.
+
 ### `src/context.ts`
 
 ```ts
 import { alxia } from "@alxia/core";
 import type { Todo } from "./generated/types";
-
-/** Set API_KEY in the environment: this default is for development. */
-export const apiKey = Bun.env["API_KEY"] ?? "dev-key";
 
 const todos: Todo[] = [];
 
@@ -283,13 +372,13 @@ for a `user` from a session goes here too, and every route then reads
 
 ```ts
 import { defineMiddleware, defineRoutes } from "@alxia/core";
-import { apiKey } from "../context";
+import { env } from "../env";
 import { operations } from "../generated/alxia";
 
 // A middleware of the routes it is given to: it answers 401 without the key,
 // before the body is read. openapi.yaml declares that 401.
 const requireKey = defineMiddleware(({ request, reply }, next) =>
-  request.headers.get("x-api-key") === apiKey
+  request.headers.get("x-api-key") === env.API_KEY
     ? next()
     : reply(401, { error: "unauthorized" as const }),
 );
@@ -481,18 +570,221 @@ is linked from it: Bun reads the map, so a stack trace names the lines of
 build.
 
 Bun loads `.env` on every command. `.env.example` names the two variables
-the app reads, `PORT` (3000 by default) and `API_KEY` (`dev-key` by
+`src/env.ts` reads, `PORT` (3000 by default) and `API_KEY` (`dev-key` by
 default, for development only): copy it to `.env`, which `.gitignore`
 keeps out of git and `.dockerignore` out of the image.
 
 `tsconfig.json` holds the settings alxia's own packages are checked under:
 `strict`, and past it `exactOptionalPropertyTypes`,
 `noUncheckedIndexedAccess`, `noPropertyAccessFromIndexSignature`,
-`noUnusedLocals` and the rest. Hence `Bun.env["API_KEY"]` and not
-`Bun.env.API_KEY`, and Biome's `useLiteralKeys`, which would ask for the
+`noUnusedLocals` and the rest. Hence `Bun.env["PORT"]` and not
+`Bun.env.PORT` (in the `minimal` project), and Biome's `useLiteralKeys`, which would ask for the
 second, is off in `biome.json`. Loosen what you would rather not keep:
 alxia's types, and the generated files, compile under each one, and under
 none.
+
+## The `graphql` template
+
+A GraphQL API with [GraphQL Yoga](https://the-guild.dev/graphql/yoga-server),
+served by `@alxia/graphql` as a route of the app, behind its middlewares.
+It is schema first, as the `api` project is spec first: `schema.graphql` is
+written first, the resolvers are typed from it.
+
+```
+my-graphql-api/
+├── schema.graphql          the contract: Query, Mutation, Subscription and their types
+├── codegen.ts              how `bun run generate` reads it
+├── src/
+│   ├── generated/resolvers.ts  what `bun run generate` writes: committed, never edited
+│   ├── env.ts              defineEnv: PORT and NODE_ENV
+│   ├── store.ts            in-memory users, tokens and notes, and the pub/sub
+│   ├── context.ts          the base, the viewerOf middleware, and Context
+│   ├── resolvers.ts        const resolvers: Resolvers
+│   ├── schema.ts           createSchema from schema.graphql and the resolvers
+│   ├── app.ts              graphql(app, { schema }) mounted on the base
+│   ├── graphql.d.ts        declares the *.graphql module
+│   ├── app.spec.ts         bun test: POST /graphql through app.request()
+│   └── server.ts           app.listen(env.PORT), stopped on SIGINT and SIGTERM
+├── package.json
+├── tsconfig.json
+├── biome.json              Biome; skips dist/ and src/generated/
+├── .vscode/
+├── Dockerfile              bun run build, then dist/ alone, on oven/bun:1-alpine
+├── .dockerignore
+├── .env.example            PORT and NODE_ENV, for a .env Bun loads
+├── .gitignore
+└── README.md
+```
+
+`bun dev` serves `http://localhost:3000/graphql`; a browser's GET opens
+GraphiQL, and a POST answers queries:
+
+```sh
+curl localhost:3000/graphql -H 'content-type: application/json' \
+  -H 'authorization: Bearer ada-token' \
+  -d '{"query":"mutation { addNote(text: \"Hello\") { id author { name } } }"}'
+```
+
+### `schema.graphql` and `codegen.ts`
+
+The schema declares `Query` (`me`, `notes`), `Mutation` (`addNote(text:
+String!): Note!`), `Subscription` (`noteAdded: Note!`) and the `User` and
+`Note` types. `bun run generate` is `graphql-codegen --config codegen.ts`:
+
+```ts
+// codegen.ts
+const config: CodegenConfig = {
+  schema: "schema.graphql",
+  generates: {
+    "src/generated/resolvers.ts": {
+      plugins: ["typescript", "typescript-resolvers"],
+      config: {
+        contextType: "../context#Context",
+        mappers: { Note: "../store#NoteRecord" },
+        useTypeImports: true,
+        useIndexSignature: true,
+      },
+    },
+  },
+};
+```
+
+It writes the schema's types and `Resolvers`, whose context is the app's own
+`Context` and whose `Note` is the `NoteRecord` the store holds, so a resolver
+returns the record and `Note.author` reads it. `src/generated/` is
+committed, so nothing is generated at install or build, in Docker too, and
+Biome skips it. Never edit it.
+
+Why GraphQL Code Generator: it is the de facto standard for typed
+resolvers from a `schema.graphql`, and the generator that types `Resolvers`
+with a custom context type and mappers. It is a devDependency, so the image
+stays bundle-only. Lighter tools were not chosen: gql.tada types documents,
+not resolvers, and Pothos is code first.
+
+### `src/context.ts`, `src/resolvers.ts`
+
+```ts
+// src/context.ts
+import { alxia, defineMiddleware } from "@alxia/core";
+import type { GraphQLContext } from "@alxia/graphql";
+import { env } from "./env";
+import { db } from "./store";
+
+const viewerOf = defineMiddleware(({ request }, next) => {
+  const token = request.headers
+    .get("authorization")
+    ?.match(/^Bearer (.+)$/i)?.[1];
+  const id = token === undefined ? undefined : db.tokens.get(token);
+  return next({
+    viewer: (id === undefined ? undefined : db.users.get(id)) ?? null,
+  });
+});
+
+export const base = alxia().decorate({ env, db }).use(viewerOf);
+export type Context = GraphQLContext<typeof base>;
+```
+
+`viewerOf` is a middleware given to `use`: it reads
+`Authorization: Bearer <token>` and passes `next({ viewer })`, the user or
+`null`. It never refuses, so a query may be anonymous (`me` is `null`), and
+`viewer` is typed in every resolver through `GraphQLContext<typeof base>`.
+The tokens in `src/store.ts` are for development (`ada-token`): look a
+session up, or verify a JWT, in the same place.
+
+```ts
+// src/resolvers.ts, in part
+export const resolvers: Resolvers = {
+  Query: {
+    me: (_, __, { viewer }) => viewer,
+    notes: (_, __, { db }) => db.notes,
+  },
+  Mutation: {
+    addNote: (_, { text }, { viewer, db }) => {
+      if (viewer === null) {
+        throw new GraphQLError("Sign in to add a note", {
+          extensions: { code: "UNAUTHENTICATED" },
+        });
+      }
+      // …
+    },
+  },
+};
+```
+
+A field the schema lacks, or a value its type refuses, is a compile error.
+`addNote` throws a `GraphQLError` with the code `UNAUTHENTICATED` when
+`viewer` is `null` ([troubleshooting](troubleshooting.md#sign-in-to-add-a-note)).
+
+### `src/app.ts` and the subscription
+
+```ts
+export const app = base.plugin((app) =>
+  graphql(app, {
+    schema,
+    ide: env.NODE_ENV === "production" ? false : "graphiql",
+  }),
+);
+```
+
+GraphiQL is for development: `NODE_ENV=production`, which the image sets,
+turns it off. `noteAdded` is served over server-sent events, Yoga's default,
+so no WebSockets: a request with `Accept: text/event-stream` gets a result
+each time `addNote` publishes to the `createPubSub` of `src/store.ts`:
+
+```sh
+curl -N localhost:3000/graphql -H 'content-type: application/json' \
+  -H 'accept: text/event-stream' \
+  -d '{"query":"subscription { noteAdded { text author { name } } }"}'
+```
+
+That pub/sub lives in one process: across several, back it with a broker.
+
+### `src/env.ts`
+
+`defineEnv` from `@alxia/env` reads `PORT` (3000 by default) and `NODE_ENV`
+(`development`, `test` or `production`; development by default), checked
+once, when the module is first imported: a malformed one stops the process
+with every issue, before it listens. Bun loads `.env`; copy `.env.example`
+to `.env` to set them.
+
+### Adding a field
+
+1. Add it to `schema.graphql`: `notesBy(userId: ID!): [Note!]!` on `Query`.
+2. `bun run generate`: `Resolvers` has `notesBy`, its arguments typed.
+3. Write the resolver in `src/resolvers.ts`:
+   `notesBy: (_, { userId }, { db }) => db.notes.filter(…)`.
+4. Add a query to `src/app.spec.ts`, which POSTs to `/graphql` through
+   `app.request()`, with no port, and `bun test`.
+
+`bun run verify` is `generate --check`, `check:ci`, `typecheck`, then
+`test`: it fails when `src/generated/` is not what `schema.graphql` gives.
+
+### The build bundles the schema
+
+`src/schema.ts` imports the schema as text:
+
+```ts
+import typeDefs from "../schema.graphql" with { type: "text" };
+```
+
+`src/graphql.d.ts` declares the `*.graphql` module for TypeScript, and
+`bun run build` puts the file's content in `dist/server.js`, so the image
+holds `dist/` alone and no `.graphql` file beside it.
+
+### Pinned versions
+
+`@graphql-codegen/cli` (7.4.3), `typescript` and `typescript-resolvers`
+(6.1.0 each) are pinned exactly, and `@alxia/create` keeps them at those
+versions ([Versions](#versions)): a generator patch may write
+`src/generated/` differently, which `generate --check` would then fail in a
+fresh project. To move them, run `bun run generate`, read `git diff
+src/generated`, then `bun run verify`
+([troubleshooting](troubleshooting.md#srcgenerated-changes-after-moving-graphql-codegen)).
+
+The scripts are those of the [`api`](#the-rest) project, with `generate` as
+`graphql-codegen --config codegen.ts` and `start` as `bun dist/server.js`.
+For Yoga's plugins, the IDE and the typed context, see
+[`@alxia/graphql`'s guide](https://github.com/softistx/alxia/tree/develop/packages/graphql/docs).
 
 ## The `react-router` template
 
@@ -576,8 +868,8 @@ goes from there.
 
 ## Lint and format
 
-Both projects lint and format with [Biome](https://biomejs.dev), in one
-style whichever template wrote them. Their `biome.json` is a root
+Every project lints and formats with [Biome](https://biomejs.dev), in one
+style whichever template wrote it. Its `biome.json` is a root
 configuration of its own, extending nothing:
 
 ```json
@@ -608,8 +900,8 @@ configuration of its own, extending nothing:
 ```
 
 That is the `react-router` project's, written here compact. The `api`
-project's skips `dist/` and `src/generated/` instead of `build/` and
-`.react-router/`, has no
+and `graphql` projects' skip `dist/` and `src/generated/` instead of
+`build/` and `.react-router/`, and the `minimal` one `dist/` alone; they have no
 CSS settings and no overrides, and turns `complexity.useLiteralKeys` off
 in place of `noEmptyPattern` ([the `api` template](#the-api-template)).
 
@@ -617,7 +909,7 @@ in place of `noEmptyPattern` ([the `api` template](#the-api-template)).
   quotes, 80 columns. React Router's scaffold is written so, and so is
   the `package.json` the command writes: formatting the scaffold once
   changed three of its files, where tabs would change every line. The
-  `api` project takes the same style, so the two read alike.
+  other projects take the same style, so they read alike.
 - **`$schema` is the installed Biome's own schema**, so an editor checks
   the file against the version `bun install` put in `node_modules`,
   whichever the command wrote.
@@ -651,7 +943,7 @@ bunx biome migrate --write
 | `bun run lint` | `biome lint` |
 | `bun run format` | `biome format --write` |
 | `bun run check:ci` | `biome ci`: changes nothing, and fails on any error |
-| `bun run verify` | `api`: `generate --check`, `check:ci`, `typecheck`, then `test`; `react-router`: `check:ci`, `typecheck`, then `build` |
+| `bun run verify` | `minimal`: `check:ci`, `typecheck`, then `test`; `api` and `graphql`: `generate --check`, then those; `react-router`: `check:ci`, `typecheck`, then `build` |
 
 The read-only one is `check:ci`, not `ci`: `bun ci` is Bun's
 `bun install --frozen-lockfile`, and a script named `ci` would only run
@@ -690,6 +982,19 @@ final stage goes back to `oven/bun:1`
 ([troubleshooting](troubleshooting.md#error--is-linked-against-glibc-dt_needed-libmso6-but-this-bun-build-uses-musl)). A dependency that cannot be bundled is kept external and
 copied in: see
 [troubleshooting](troubleshooting.md#error-cannot-find-package--from-appdistserverjs).
+
+### `minimal`
+
+Two stages, as `api`'s below: every dependency and `bun run build`, which
+writes `dist/index.js`, then an image with `dist/` alone, running
+`bun --no-install dist/index.js`. `src/index.ts` stops the app on
+`SIGTERM`, only when it is the entry file.
+
+```sh
+cd my-app
+docker build -t my-app .
+docker run -p 3000:3000 my-app
+```
 
 ### `api`
 
@@ -734,6 +1039,21 @@ docker run -p 3000:3000 -e API_KEY=change-me my-api
 The server listens on `PORT`, 3000 in the image; set `API_KEY`, whose
 default is for development.
 
+### `graphql`
+
+The same two stages as `api`'s, `Dockerfile` and all but the file name:
+`bun run build` writes `dist/server.js`, with `schema.graphql` bundled in
+as text, and the image holds `dist/` alone and runs
+`bun --no-install dist/server.js`. `src/generated/` is committed, so the
+build generates nothing. The image sets `NODE_ENV=production`, which turns
+GraphiQL off. `src/server.ts` stops the app on `SIGINT` and `SIGTERM`.
+
+```sh
+cd my-graphql-api
+docker build -t my-graphql-api .
+docker run -p 3000:3000 my-graphql-api
+```
+
 ### `react-router`
 
 Two stages: every dependency and `bun run build`, then an image with
@@ -766,12 +1086,15 @@ template pins exactly:
 
 | dependency | moved to the newest within |
 | --- | --- |
-| `@alxia/core`, `@alxia/openapi`, `@alxia/react-router` | the ranges this `@alxia/create` was published with, such as `^0.3.1`; while the registry does not serve that version yet, the newest of its minor, `~0.3.0` |
+| `@alxia/core`, `@alxia/env`, `@alxia/graphql`, `@alxia/openapi`, `@alxia/react-router` | the ranges this `@alxia/create` was published with, such as `^0.3.1`; while the registry does not serve that version yet, the newest of its minor, `~0.3.0` |
 | `typescript` | `^6.0.3 \|\| ^7.0.0`, every alxia package's peer range |
 | `zod` | `^4.2.0`, `@alxia/zod`'s |
 | `vite` | `^7.0.0 \|\| ^8.0.0`, `@alxia/react-router`'s |
 | `react-router`, `@react-router/*` | `^8.0.0`, `@alxia/react-router`'s; the `@react-router/*` packages take `react-router`'s version, which `@react-router/node` pins exactly |
 | `@biomejs/biome` | its own minor, from the exact version the template pins (`~2.5.15`): written exactly, `2.5.16`, never `^`. A minor of Biome may add a recommended rule |
+| `graphql` | `^16.11.0 \|\| ^17.0.0`, `@alxia/graphql`'s; so a new project may declare `^17` where the template ships `^16.11.0` |
+| `graphql-yoga` | `^5.16.0`, `@alxia/graphql`'s |
+| `@graphql-codegen/cli`, `@graphql-codegen/typescript`, `@graphql-codegen/typescript-resolvers` | none: the template's exact versions, 7.4.3, 6.1.0 and 6.1.0, are kept, for the reason `@nxgt/openapi-codegen`'s are: `generate --check` |
 | `@nxgt/openapi-codegen` | none: the template's exact version, `0.7.0`, is kept. Any release may write `src/generated/` differently, and `bun run verify` checks it with `generate --check` |
 | anything else: `react`, `isbot`, Tailwind, `@types/*` | no alxia range: npm's `latest` |
 

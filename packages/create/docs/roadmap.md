@@ -7,6 +7,17 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
+- **Two templates: `minimal` and `graphql`.** `minimal` is one file, one
+  dependency and a test, the template to try alxia with, and what the
+  prompt offers first. `graphql` is a GraphQL Yoga API served by
+  `@alxia/graphql`, schema first: `schema.graphql` is the contract, GraphQL
+  Code Generator types the resolvers (committed, checked by
+  `generate --check`), `viewer` is typed in every resolver, and
+  `noteAdded` is a subscription over server-sent events.
+- **The `api` template reads its environment with `defineEnv`.**
+  `src/env.ts`, from `@alxia/env`, checks `PORT` and `API_KEY` (a secret)
+  once, before the server listens; `src/context.ts` no longer exports
+  `apiKey`.
 - **The `api` project split across files.** `src/context.ts` holds the
   base the routes read and registers it with `@alxia/core`'s `Register`;
   `src/routes/todos.ts` binds the operations with `defineRoutes()`,
@@ -37,6 +48,9 @@ Nothing scheduled yet.
   code would describe whatever the code does.
 - **A runtime dependency.** The prompts are Bun's `prompt()`, the registry
   is read with `fetch`, versions are compared with `Bun.semver`.
+- **A code-first GraphQL template (Pothos, Nexus).** The `graphql`
+  template is schema first, as the `api` one is spec first: the schema file
+  is the contract, and the resolvers are typed from it.
 
 ## Shipped
 

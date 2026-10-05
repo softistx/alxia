@@ -11,8 +11,8 @@ print, or — for a trap that prints nothing — the symptom.
 
 **The command line**
 
-- [`create-alxia: unknown template vue: use api or react-router.`](#create-alxia-unknown-template-vue-use-api-or-react-router)
-- [`create-alxia: --template needs a template: api or react-router.`](#create-alxia---template-needs-a-template-api-or-react-router)
+- [`create-alxia: unknown template vue: use minimal, api, graphql or react-router.`](#create-alxia-unknown-template-vue-use-minimal-api-graphql-or-react-router)
+- [`create-alxia: --template needs a template: minimal, api, graphql or react-router.`](#create-alxia---template-needs-a-template-minimal-api-graphql-or-react-router)
 - [`create-alxia: unknown option --yes.`](#create-alxia-unknown-option---yes)
 - [`create-alxia: one directory only, given a and b.`](#create-alxia-one-directory-only-given-a-and-b)
 - [`create-alxia: no directory given, and no terminal to ask in.`](#create-alxia-no-directory-given-and-no-terminal-to-ask-in)
@@ -47,6 +47,13 @@ print, or — for a trap that prints nothing — the symptom.
 - [`src/generated/` changes after moving `@nxgt/openapi-codegen`](#srcgenerated-changes-after-moving-nxgtopenapi-codegen)
 - [`TypeError: matchesSpec(): 1 operation has no route: DELETE /todos/:id (deleteTodo)`](#typeerror-matchesspec-1-operation-has-no-route-delete-todosid-deletetodo)
 - [`ResponseValidationError: POST /todos: the 201 reply does not match its schema`](#responsevalidationerror-post-todos-the-201-reply-does-not-match-its-schema)
+
+**The `graphql` project's schema**
+
+- [`The following stale files were detected: src/generated/resolvers.ts`](#the-following-stale-files-were-detected-srcgeneratedresolversts)
+- [`src/generated/` changes after moving `@graphql-codegen/*`](#srcgenerated-changes-after-moving-graphql-codegen)
+- [`error: Could not resolve: "../schema.graphql"`, or `TS2307` for it](#error-could-not-resolve-schemagraphql-or-ts2307-for-it)
+- [`Sign in to add a note`](#sign-in-to-add-a-note)
 
 **Biome**
 
@@ -85,21 +92,21 @@ then run `bun create @alxia`.
 
 ## The command line
 
-### `create-alxia: unknown template vue: use api or react-router.`
+### `create-alxia: unknown template vue: use minimal, api, graphql or react-router.`
 
 **When:** `--template` names a template the command does not have, or the
 prompt was answered with one.
 
-**Fix:** `--template api` or `--template react-router`. `bun create @alxia
---help` lists them.
+**Fix:** `--template minimal`, `--template api`, `--template graphql` or
+`--template react-router`. `bun create @alxia --help` lists them.
 
-### `create-alxia: --template needs a template: api or react-router.`
+### `create-alxia: --template needs a template: minimal, api, graphql or react-router.`
 
 **When:** `--template` is the last argument, or `--template=` is empty.
 The message names the option as typed: `-t needs a template` for `-t`,
 `--template= needs a template` for the empty form.
 
-**Fix:** name one: `bun create @alxia my-app --template api`.
+**Fix:** name one: `bun create @alxia my-app --template minimal`.
 
 ### `create-alxia: unknown option --yes.`
 
@@ -130,7 +137,8 @@ terminal: a script, CI, a pipe.
 
 **When:** a directory but no `--template`, with no terminal.
 
-**Fix:** add `--template api` or `--template react-router`.
+**Fix:** add `--template minimal`, `--template api`, `--template graphql` or
+`--template react-router`.
 
 ### `create-alxia: cancelled, nothing written.`
 
@@ -509,6 +517,104 @@ reply.created({ id: todo.id, title: todo.title, done: todo.done }) // Todo: { id
 
 The other forms of the error, and how to turn the check off, are in
 [`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#responsevalidationerror--the-200-reply-does-not-match-its-schema).
+
+## The `graphql` project's schema
+
+### `The following stale files were detected: src/generated/resolvers.ts`
+
+`bun run verify` stops at its first step, with the stale file listed
+below the line:
+
+```
+The following stale files were detected:
+  - src/generated/resolvers.ts
+```
+
+**When:** `bun run generate --check`, alone or as `verify`'s first step,
+after `schema.graphql` or `codegen.ts` changed and `bun run generate` was
+not run, or after `src/generated/resolvers.ts` was edited by hand. It
+writes nothing and exits 1.
+
+**Why:** `src/generated/` is committed, so that nothing is generated at
+install or build; the check is what keeps it equal to `schema.graphql`.
+
+**Fix:** generate, then commit the file with the schema:
+
+```sh
+bun run generate
+git add schema.graphql src/generated
+```
+
+A change made by hand in `src/generated/` is lost: make it in
+`schema.graphql`, or in `codegen.ts`.
+
+### `src/generated/` changes after moving `@graphql-codegen/*`
+
+**Symptom:** `bun run verify` fails with
+`The following stale files were detected` right after
+`bun add --dev --exact @graphql-codegen/cli@…`, or one of the two
+plugins, with no change to `schema.graphql`.
+
+**When:** a generator moved to another version. A new project never hits
+it: the command keeps the template's versions, `@graphql-codegen/cli` 7.4.3,
+`typescript` 6.1.0 and `typescript-resolvers` 6.1.0
+([Versions](guide.md#versions)).
+
+**Why:** `src/generated/resolvers.ts` is the output of one release of the
+generator and its plugins, and another may write it differently. That is
+why the template pins the three exactly.
+
+**Fix:** generate again, read what changed before committing it, and verify:
+
+```sh
+bun run generate
+git diff src/generated
+bun run verify
+```
+
+To stay where you were, pin the previous versions again:
+`bun add --dev --exact @graphql-codegen/cli@7.4.3`.
+
+### `error: Could not resolve: "../schema.graphql"`, or `TS2307` for it
+
+**When:** `bun run build` prints `error: Could not resolve: "../schema.graphql"`, or `bun run typecheck` prints `error TS2307: Cannot find module '../schema.graphql' or its corresponding type declarations`: neither can resolve the import
+of `schema.graphql` that `src/schema.ts` makes, or the file is not where
+`../schema.graphql` says: the project's root.
+
+**Why:** the import is `import typeDefs from "../schema.graphql" with { type: "text" }`:
+Bun reads the file as text, and `bun run build` bundles it into
+`dist/server.js`. TypeScript knows the module through `src/graphql.d.ts`,
+which declares `*.graphql`, and the text attribute is what makes Bun read
+it as a string and not as a module.
+
+**Fix:** keep `schema.graphql` at the root, `src/graphql.d.ts` in
+`src/` (the `tsconfig.json` includes `src`), and the import as written,
+attribute included:
+
+```ts
+import typeDefs from "../schema.graphql" with { type: "text" };
+```
+
+### `Sign in to add a note`
+
+**When:** a new project's `addNote` mutation answers an error with the
+message `Sign in to add a note` and the code `UNAUTHENTICATED`. It is the
+template working, not failing.
+
+**Why:** `viewerOf` reads `Authorization: Bearer <token>` and gives each
+resolver a `viewer`, `null` without a known token; `addNote` throws a
+`GraphQLError` when it is `null`. The development token is `ada-token`.
+
+**Fix:** send it:
+
+```sh
+curl localhost:3000/graphql -H 'content-type: application/json' \
+  -H 'authorization: Bearer ada-token' \
+  -d '{"query":"mutation { addNote(text: \"Hello\") { id } }"}'
+```
+
+Tokens live in `src/store.ts`: replace them with a session lookup or a
+JWT check outside development.
 
 ## Biome
 
