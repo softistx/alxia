@@ -9,6 +9,7 @@ export {
 	type ImplementedOptions,
 	implemented,
 	type MatchesSpecOptions,
+	type MatchesSpecReport,
 	matchesSpec,
 	type Operations,
 } from './routes';

@@ -290,7 +290,8 @@ An API under `/api`, spec first, is checked against its OpenAPI document
 by [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi)'s
 `matchesSpec` (`bun add -d @alxia/openapi`), which reads `app.routes`. The
 catch-all and the client's files are routes too, and no operation of the
-document:
+document: left alone, they only come back as `extra`, and `strict: true`
+makes them fail:
 
 ```ts
 // app/server.test.ts
@@ -304,12 +305,12 @@ import server from './server';
 test('the API routes every operation of openapi.yaml, and nothing else', async () => {
 	const build: ServerBuild = await import(new URL('../build/server/index.js', import.meta.url).href);
 	const app = server.create({ build });
-	matchesSpec(app, operations, { exclude: isReactRouterRoute });
+	matchesSpec(app, operations, { strict: true, exclude: isReactRouterRoute });
 });
 ```
 
 `isReactRouterRoute` is true for each route this package declared, so
-`matchesSpec` checks your own routes alone.
+`matchesSpec` checks your own routes alone, under `strict`.
 
 ## Built for Bun
 

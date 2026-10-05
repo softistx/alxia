@@ -23,6 +23,10 @@ number on it. Every release, with each change it made, is in
   `health()` are no operation of a document, and `matchesSpec` skips them
   as it skips `apiDocs()`'s, with no `exclude`
   ([the checks](guide/checks.md#matchesspec)).
+- **A lenient `matchesSpec`.** An app may serve routes its document does not
+  describe (proxied, health, docs, hand-written): they no longer fail the
+  check, and come back as `extra`. `strict: true` restores the exhaustive
+  check ([the checks](guide/checks.md#strict-true)).
 
 ## Next
 

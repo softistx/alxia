@@ -97,9 +97,9 @@ describe('beside the app', () => {
 		]);
 		const health = { method: 'GET', path: '/api/health' } as const;
 		expect(() =>
-			matchesSpec(app, [health], { exclude: isReactRouterRoute }),
+			matchesSpec(app, [health], { strict: true, exclude: isReactRouterRoute }),
 		).not.toThrow();
-		expect(() => matchesSpec(app, [health])).toThrow(
+		expect(() => matchesSpec(app, [health], { strict: true })).toThrow(
 			'7 routes have no operation',
 		);
 	});

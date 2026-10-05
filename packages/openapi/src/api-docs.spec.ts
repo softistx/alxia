@@ -164,9 +164,12 @@ describe('matchesSpec', () => {
 		expect(app.routes.filter(isApiDocsRoute)).toHaveLength(3);
 	});
 
-	test('still names a route of its own that no operation declares', () => {
+	test('still names a route of its own that no operation declares, under strict', () => {
 		const extra = app.get('/admin', ({ reply }) => reply(200, 'x'));
-		expect(() => matchesSpec(extra, { ping })).toThrow(
+		expect(matchesSpec(extra, { ping }).extra).toEqual([
+			{ method: 'GET', path: '/admin' },
+		]);
+		expect(() => matchesSpec(extra, { ping }, { strict: true })).toThrow(
 			'1 route has no operation: GET /admin',
 		);
 	});
