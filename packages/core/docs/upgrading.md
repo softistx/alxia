@@ -56,8 +56,8 @@ const spec = base.fork().use(fakeSession).plugin(todos); // no collision on the 
 **Can it break your code.** No: new, nothing to do. The only visible change
 is the wording of the "declared twice" error. See
 [Groups and plugins: several apps on one base](guide/groups-and-plugins.md#several-apps-on-one-base-fork).
-New projects from `@alxia/create` build their spec's app and the real app on
-`fork()`.
+New projects from `@alxia/create` install a core that has `fork()`; their
+templates are unchanged and still build on the base with `.plugin(...)`.
 
 ### A socket's `upgrade` handler
 
@@ -75,6 +75,10 @@ app.ws('/feed', {
 	message: () => {},
 });
 ```
+
+Without a server (`app.request`), or for a handshake Bun would refuse (not a
+`GET`, no `Sec-WebSocket-Key`, or a version other than 13), the `426` comes
+first: `upgrade` is not run.
 
 **Can it break your code.** No: a socket without `upgrade` opens as before.
 See
@@ -160,7 +164,8 @@ Nothing to do for any of them:
   matching moved to a "How routes are matched" guide and the links follow.
 - `@alxia/core`: documentation only, the 0.6.0 and 0.7.0 sections of this
   page, and a recipe for a refusal handler scoped to some routes.
-- `@alxia/create`: new projects install `@alxia/core` with `fork()`.
+- `@alxia/create`: new projects install a core that has `fork()`; the templates
+  are unchanged.
 
 ## 0.7.0
 
