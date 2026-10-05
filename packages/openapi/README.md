@@ -167,12 +167,11 @@ Upgrading from before this check was lenient: to keep the old check, pass
 
 ## Under a prefix
 
-For details about prefixes and how routes are matched, see
-[How routes are matched](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/matching.md).
-
 ```ts
 implemented(app, operations, { prefix: '/api' });
 ```
+
+For details about prefixes and how routes are matched, see [matching.md](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/matching.md#under-a-prefix). The checks read `app.routes` and nothing else: they send no request, and check no schema.
 
 ## Routes with middlewares
 
@@ -200,14 +199,6 @@ export const app = alxia()
 Put the key check before `validate(...)`: auth first, so an anonymous client
 gets no body parsed, up to `bodyLimit`, and no validation issues back, which
 would reveal the schema.
-
-## How a route is matched
-
-For details about route matching, including path shapes, prefixes, and special cases,
-see [How routes are matched](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/matching.md).
-
-The checks read `app.routes` and nothing else: they send no request, and check no
-schema.
 
 ## Traps
 

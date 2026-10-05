@@ -273,8 +273,8 @@ test("answers alxia's 400, as the spec declares it", async () => {
 TypeError: matchesSpec(): 1 operation has no route: GET /todos/:id (getTodo)
 ```
 
-[The checks](checks.md) covers `implemented`, `exclude`, the prefix, and
-calling the check at startup.
+[The checks](checks.md) covers `implemented`, `exclude`, and
+calling the check at startup. Prefixes are in [matching.md](matching.md#under-a-prefix).
 
 ## 5. A client from the same document
 
