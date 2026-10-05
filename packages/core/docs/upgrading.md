@@ -4,27 +4,31 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the next one first: what changed, the code before and
 after, and whether it can break yours.
 
-## Next
+## 0.10.0
 
-The next `@alxia/core` minor gives `ctx.ip` one text per address and adds
-`untrusted: 'refuse-all'`, for an app only its proxies may reach. Nothing
-in its API breaks; the peer range of every package moves.
+`@alxia/core` 0.10.0 gives `ctx.ip` one text per address and adds
+`untrusted: 'refuse-all'`, for an app only its proxies may reach.
+`@alxia/rate-limit` documents its default key under the canonical `ctx.ip`,
+and `@alxia/create` installs this core. Nothing in its API breaks; the peer
+range of every package moves.
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
-| [Peers move to the next minor](#peers-move-to-the-next-minor) | every package | yes, for an install that holds a package of 0.9 beside the new core: update them together |
+| [Peers move to `^0.10.0`](#peers-move-to-0100) | every package | yes, for an install that holds a package of 0.9 beside core 0.10: update them together |
 | [`ctx.ip` is one text per address](#ctxip-is-one-text-per-address) | core | notice: an IPv4-mapped address reads as IPv4, IPv6 compressed |
 | [`untrusted: 'refuse-all'` and `allow`](#untrusted-refuse-all-and-allow) | core | no: opt in |
-| [New projects install the new core](#new-projects-install-the-new-core) | create | no: a new project only |
+| [Rate limit keys by the canonical `ctx.ip`](#rate-limit-keys-by-the-canonical-ctxip) | rate-limit | notice: one bucket for the forms of an address |
+| [New projects install core 0.10](#new-projects-install-core-010) | create | no: a new project only |
 
-### Peers move to the next minor
+### Peers move to `^0.10.0`
 
-Every package's peer on `@alxia/core` moves from `^0.9.0` to the new
-minor's range, which a `^0.9.0` does not accept. Update `@alxia/core` and
-the `@alxia/*` packages you use in one change.
+Every package's peer on `@alxia/core` moves from `^0.9.0` to `^0.10.0`,
+which a `^0.9.0` does not accept. Update `@alxia/core` and the `@alxia/*`
+packages you use in one change, each to its release that names core
+`^0.10.0`.
 
 **Can it break your code.** Only the install, as for
-[0.9](#peers-move-to-090).
+[0.9](#peers-move-to-090): a package left behind asks for core `^0.9.0`.
 
 ### `ctx.ip` is one text per address
 
@@ -87,12 +91,24 @@ problem `detail` stays `Forwarding headers from a connection that is no
 trusted proxy`. See
 [Serving: only the proxies](guide/serving.md#only-the-proxies-refuse-all).
 
-### New projects install the new core
+### Rate limit keys by the canonical `ctx.ip`
+
+`@alxia/rate-limit` (patch) changes no code: its default key is `ctx.ip`,
+which is now one text per address, so an IPv4-mapped address and an
+uncompressed IPv6 one count against the same bucket, where they were two.
+
+**Can it break your code.** Notice it: a client that was counted under two
+keys is counted under one, so it reaches its limit sooner. Buckets keyed by
+the old form expire on their own. A `key` of your own is read as it
+returns.
+
+### New projects install core 0.10
 
 `@alxia/create` (patch) makes projects whose `@alxia/core` has the
 canonical `ctx.ip` and `'refuse-all'`. The templates are unchanged.
 
-**Can it break your code.** No: it changes new projects only.
+**Can it break your code.** No: it changes new projects only; an existing
+one moves with the sections above.
 
 ## 0.9.0
 
@@ -1704,7 +1720,7 @@ the request runs the chain, and an error nobody caught is answered:
 - **A group's middlewares stay with its routes, and its prefix**: they run
   on its routes and, for a group with a prefix, on an unmatched request
   under it, before the 404 or 405. A group without a prefix adds none to
-  unmatched requests (since the next release, it guards the 405 at its
+  unmatched requests (since 0.9.0, it guards the 405 at its
   routes' paths: [A guarded group refuses the 405 at its
   routes](#a-guarded-group-refuses-the-405-at-its-routes)). The
   middlewares of an app given to `plugin(app)` are

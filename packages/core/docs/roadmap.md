@@ -112,7 +112,7 @@ number on it. Every release, with each change it made, is in
 
 ## Shipped
 
-### Next release
+### 0.10.0
 
 - **One text per client address.** `ctx.ip` is canonical, from the socket
   or a header alike: an IPv4-mapped address as IPv4, IPv6 as RFC 5952
