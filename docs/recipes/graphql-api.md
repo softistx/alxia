@@ -155,7 +155,7 @@ export const jwt = createJwt({
 
 ```ts
 // file: src/context.ts
-import { alxia, defineMiddleware, health } from '@alxia/core';
+import { alxia, defineMiddleware, forwardedIp, health } from '@alxia/core';
 import type { GraphQLContext } from '@alxia/graphql';
 import { jwt } from './jwt';
 import type { Loaders } from './loaders';
@@ -170,12 +170,22 @@ const viewerOf = defineMiddleware(async ({ request }, next) => {
 	return next({ viewer: viewer ?? null });
 });
 
+// How many proxies sit in front of the app (`PROXY_HOPS=1` behind one load
+// balancer, 0 for none). With some, the client's address is the one they
+// append to `X-Forwarded-For` ([section 7](#7-harden-it-for-production)).
+const hops = Number(Bun.env['PROXY_HOPS'] ?? 0);
+
 // The base: what every resolver reads. The probes come first, so they run
-// no middleware and need no token; then `db` and `viewer` for the rest.
-export const base = alxia({ errors: 'problem' })
-	.plugin(health())
-	.decorate({ db })
-	.use(viewerOf);
+// no middleware and need no token; then `db` and `viewer` for the rest. A
+// function, because an app is built on once: a second entry point or a spec
+// that needs its own ([section 7](#7-harden-it-for-production)) calls it again.
+export const newBase = () =>
+	alxia({ errors: 'problem', ...(hops > 0 && { ip: forwardedIp({ trusted: hops }) }) })
+		.plugin(health())
+		.decorate({ db })
+		.use(viewerOf);
+
+export const base = newBase();
 
 // A resolver's context: Yoga's, the base's (`db`, `viewer`) and the
 // per-request `loaders` that `src/app.ts`'s `context` option builds
@@ -531,6 +541,380 @@ describe('the IDE, the probes and the drain', () => {
 });
 ```
 
+## 7. Harden it for production
+
+The endpoint above works. What a GraphQL API exposed to the internet also
+needs is not in a schema: one request can ask for a great deal, nothing says
+who may ask how often, and the defaults that help a developer help an
+attacker. Seven points, each a few lines. Add the packages the snippets use:
+
+```sh
+bun add @alxia/rate-limit @envelop/depth-limit @graphql-yoga/plugin-csrf-prevention @graphql-yoga/plugin-persisted-operations
+```
+
+### Rate limit the endpoint
+
+`@alxia/rate-limit` goes to `use` before the endpoint, and counts the
+requests to it. Key it by the viewer, so one user's allowance is theirs
+wherever they connect from, and by the client's address for an anonymous
+request. Behind a proxy, the address is the proxy's unless the app reads the
+header it appends to: that is `PROXY_HOPS` in [section 2](#2-the-viewer-a-middleware-every-resolver-reads)'s
+base (`forwardedIp`, which never believes the entries the client wrote).
+
+```ts
+// file: src/limits.ts
+import { rateLimit } from '@alxia/rate-limit';
+import type { UserRecord } from './store';
+
+// What is counted: the viewer's id, else the client's address. `undefined`
+// is not counted: with no address (a request made in process, with no
+// socket) there is nothing to count.
+export const keyOf = ({ viewer, ip }: { viewer: UserRecord | null; ip: string | undefined }) =>
+	viewer ? `user:${viewer.id}` : ip && `ip:${ip}`;
+
+// `max` requests a minute for each key. Past it, a 429 with `Retry-After`.
+export const limitTo = (max: number) =>
+	rateLimit<{ viewer: UserRecord | null }>({ limit: max, windowMs: 60_000, key: keyOf });
+```
+
+**One HTTP request is not one operation.** A client may send an array of
+operations in a single `POST` when `batching` is on, and a document may ask
+for a hundred fields, or the same expensive field a hundred times under
+aliases. The limit counts the request: keep `batching` off, or give it a
+small `limit`, and bound the cost of one operation with the next point.
+
+### Limit depth and complexity
+
+`useDepthLimit` from `@envelop/depth-limit` refuses a document nested deeper
+than `maxDepth` before it executes
+([Yoga's plugins](../../packages/graphql/docs/guide/yoga.md#plugins) shows
+it beside the others). Depth is one dimension: aliases, list sizes and
+fragments multiply the work at a depth that is allowed, so give every list
+argument a maximum in the schema, and add a cost plugin when a client
+may write its own documents.
+
+```ts
+// file: src/depth.ts
+import { useDepthLimit } from '@envelop/depth-limit';
+
+// A document nested deeper than `maxDepth` is refused at validation, before
+// a resolver runs: a 200 with `errors`, GraphQL's own format.
+export const depthLimit = (maxDepth: number) => useDepthLimit({ maxDepth });
+```
+
+### Introspection off in production
+
+Introspection hands anyone the whole schema, the fields you meant to keep
+quiet included. GraphiQL needs it, so it follows the same switch: on in
+development, off everywhere else. `isDev(context)` is the `ide`'s own test
+(`alxia({ dev })`, else `NODE_ENV=development`), and the plugin adds
+graphql-js's rule that refuses `__schema` and `__type` otherwise.
+
+```ts
+// file: src/introspection.ts
+import { isDev } from '@alxia/core';
+import { NoSchemaIntrospectionCustomRule } from 'graphql';
+import type { Plugin } from 'graphql-yoga';
+
+export const introspectionOnlyInDev: Plugin = {
+	onValidate({ addValidationRule, context }) {
+		if (!isDev(context)) addValidationRule(NoSchemaIntrospectionCustomRule);
+	},
+};
+```
+
+This hides the schema from a client that asks, not from one that guesses
+field names: it is not authorisation. Yoga's error suggestions ("Did you
+mean…") also leak names; the plugin `@escape.tech/graphql-armor-block-field-suggestions`
+removes them.
+
+### Masked errors
+
+Yoga masks errors by default (`maskedErrors: true`): an `Error` a resolver
+throws reaches the client as `Unexpected error.`, with its message and stack
+kept on the server. Leave it on. To tell the client something, throw a
+`GraphQLError`, whose message is shown, with an `extensions.code` the client
+can switch on; `extensions.http.status` puts the same refusal on the HTTP
+status too (the [layers of an auth error](#auth-errors-in-three-layers)).
+
+```ts
+// file: src/errors.ts
+import { GraphQLError } from 'graphql';
+
+// What a client may read: a stable `code`, and a message meant for people.
+export function invalid(message: string, field: string): GraphQLError {
+	return new GraphQLError(message, { extensions: { code: 'BAD_USER_INPUT', field } });
+}
+
+export function notFound(what: string): GraphQLError {
+	return new GraphQLError(`No ${what}`, { extensions: { code: 'NOT_FOUND', http: { status: 404 } } });
+}
+```
+
+### Cap the body
+
+Yoga reads the whole body of a `POST` before it parses it, so a megabyte of
+JSON costs a megabyte of memory. Core's `bodyLimit(bytes)` caps every route
+declared after it: the bytes are counted as they arrive, and reading stops
+at the limit. A query is a few kilobytes: 100 KiB is generous. A mutation
+that takes a file by `multipart` needs a larger limit on a route of its own.
+
+Put the call before `graphql(...)`, as in [Together](#together). The
+refusal is Yoga's to answer here: it reads the body itself and reports a
+body it could not read as `400`, `POST body sent invalid JSON.`, so a client
+sees a 400, not the 413 a plain route answers. The memory is capped either way.
+
+### CSRF for a cookie-authenticated API
+
+A bearer token in a header cannot be sent by another site's form. A
+**cookie** can: a page on another origin may make the browser `POST` the
+cookie to `/graphql`. `SameSite=Lax` on the cookie is the first line (a
+cross-site `POST` does not carry it); two more close the rest.
+
+- Yoga's CSRF prevention plugin refuses a request without a custom header
+  (`x-graphql-yoga-csrf` by default): a browser cannot add one to a request
+  across origins without a CORS preflight, which `@alxia/cors` answers only
+  for the origins you named.
+- Require `application/json` on a `POST`, which an HTML form cannot send. Yoga
+  also accepts a form-encoded `POST` and a `GET` query, the two a form or a
+  link can make, so this is a middleware before the endpoint.
+
+```ts
+// file: src/csrf.ts
+import { defineMiddleware, HttpError } from '@alxia/core';
+import { useCSRFPrevention } from '@graphql-yoga/plugin-csrf-prevention';
+
+export const csrf = useCSRFPrevention({ requestHeaders: ['x-csrf'] });
+
+// A POST that is not JSON is refused with a 415 before Yoga reads it.
+export const jsonOnly = defineMiddleware(async ({ request }, next) => {
+	if (request.method === 'POST' && !request.headers.get('content-type')?.startsWith('application/json')) {
+		throw new HttpError(415, { error: 'unsupported_media_type' });
+	}
+	return next();
+});
+```
+
+### Persisted operations, briefly
+
+A client that sends only the hash of an operation it registered at build
+time cannot send any other: the strongest limit on what it can ask. Yoga's
+[persisted operations plugin](https://the-guild.dev/graphql/yoga-server/docs/features/persisted-operations)
+works as it does elsewhere, since it is a Yoga plugin in the route:
+
+```ts
+// file: src/persisted.ts
+import { usePersistedOperations } from '@graphql-yoga/plugin-persisted-operations';
+import type { Plugin } from 'graphql-yoga';
+
+// Hash to document: from a file the build wrote, here a literal.
+export const operations = new Map([
+	['5f1bb2a0c2a0', '{ notes { text } }'],
+]);
+
+// `allowArbitraryOperations: false` refuses any document that was not
+// registered, the point of it. Apollo's `extensions.persistedQuery.sha256Hash`
+// names the operation.
+export const persisted: Plugin = usePersistedOperations({
+	allowArbitraryOperations: false,
+	getPersistedOperation: (hash) => operations.get(hash) ?? null,
+});
+```
+
+### Together
+
+```ts
+// file: src/production.ts
+import { logger } from '@alxia/logger';
+import { newBase } from './context';
+import { csrf, jsonOnly } from './csrf';
+import { depthLimit } from './depth';
+import { introspectionOnlyInDev } from './introspection';
+import { limitTo } from './limits';
+import { createLoaders } from './loaders';
+import { schema } from './schema';
+import { graphql } from '@alxia/graphql';
+
+export const production = newBase()
+	.use(logger())
+	.use(limitTo(120)) // the probes above it are not counted
+	.use(jsonOnly)
+	.bodyLimit(100 * 1024) // a 413 past 100 KiB, for the routes below
+	.plugin((app) =>
+		graphql(app, {
+			schema,
+			context: () => ({ loaders: createLoaders() }),
+			logging: false,
+			plugins: [depthLimit(8), introspectionOnlyInDev, csrf],
+		}),
+	);
+```
+
+A spec proves each point, in process. The app above has the real schema and
+the real viewer; a small schema with a field that throws and a type that
+nests itself shows what the real one has no field for.
+
+```ts
+// file: src/hardening.spec.ts
+import { describe, expect, test } from 'bun:test';
+import { alxia } from '@alxia/core';
+import { graphql } from '@alxia/graphql';
+import { createSchema } from 'graphql-yoga';
+import { newBase } from './context';
+import { invalid, notFound } from './errors';
+import { introspectionOnlyInDev } from './introspection';
+import { depthLimit } from './depth';
+import { jwt } from './jwt';
+import { limitTo } from './limits';
+import { createLoaders } from './loaders';
+import { operations, persisted } from './persisted';
+import { production } from './production';
+import { schema } from './schema';
+
+type Answer = { data?: unknown; errors?: { message: string; extensions?: Record<string, unknown> }[] };
+
+function post(app: { request: typeof production.request }, body: unknown, headers: Record<string, string> = {}) {
+	return app.request('/graphql', {
+		method: 'POST',
+		headers: { 'content-type': 'application/json', 'x-csrf': '1', ...headers },
+		body: typeof body === 'string' ? body : JSON.stringify(body),
+	});
+}
+
+// A schema with what the real one lacks: a field that throws, a refusal for
+// the client, and a type that contains itself.
+const node = { name: 'root', get child(): unknown { return node; } };
+const tiny = createSchema({
+	typeDefs: /* GraphQL */ `
+		type Query { hello: String! boom: String! missing: String! bad: String! tree: Node! }
+		type Node { name: String! child: Node! }
+	`,
+	resolvers: {
+		Query: {
+			hello: () => 'hi',
+			boom: () => { throw new Error('connection string postgres://admin:hunter2@db'); },
+			missing: () => { throw notFound('thing'); },
+			bad: () => { throw invalid('Not an email', 'email'); },
+			tree: () => node,
+		},
+	},
+});
+
+describe('rate limit', () => {
+	test('a viewer and an address each have an allowance, and a batch is one request', async () => {
+		const app = newBase().use(limitTo(2)).plugin((app) =>
+			graphql(app, {
+				schema,
+				context: () => ({ loaders: createLoaders() }),
+				logging: false,
+				batching: { limit: 5 },
+			}),
+		);
+		const server = app.listen({ port: 0, signals: false });
+		const url = `${server.url.href}graphql`;
+		const send = (body: unknown, token?: string) =>
+			fetch(url, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json', ...(token && { authorization: `Bearer ${token}` }) },
+				body: JSON.stringify(body),
+			});
+		try {
+			const ada = await jwt.sign({ sub: '1' });
+			const grace = await jwt.sign({ sub: '2' });
+			const three = Array.from({ length: 3 }, () => ({ query: '{ me { name } }' }));
+			expect((await send(three, ada)).status).toBe(200); // three operations, one request
+			expect((await send(three, ada)).status).toBe(200);
+			const refused = await send(three, ada);
+			expect(refused.status).toBe(429);
+			expect(Number(refused.headers.get('retry-after'))).toBeGreaterThan(0);
+			expect((await send(three, grace)).status).toBe(200); // another viewer, another allowance
+			await send({ query: '{ notes { text } }' });
+			await send({ query: '{ notes { text } }' });
+			expect((await send({ query: '{ notes { text } }' })).status).toBe(429); // no viewer: by address
+		} finally {
+			await server.stop(true);
+		}
+	});
+});
+
+describe('depth', () => {
+	test('a document nested deeper than the limit is refused before it runs', async () => {
+		const app = alxia().plugin((app) => graphql(app, { schema: tiny, logging: false, plugins: [depthLimit(2)] }));
+		const deep = (await (await post(app, { query: '{ tree { child { child { child { name } } } } }' })).json()) as Answer;
+		expect(deep.errors?.[0]?.message).toContain('exceeds maximum operation depth');
+		const shallow = (await (await post(app, { query: '{ tree { name } }' })).json()) as Answer;
+		expect(shallow.data).toEqual({ tree: { name: 'root' } });
+	});
+});
+
+describe('introspection', () => {
+	const query = '{ __schema { queryType { name } } }';
+
+	test('is refused outside development, and answers in it', async () => {
+		const plugins = [introspectionOnlyInDev];
+		const deployed = alxia().plugin((app) => graphql(app, { schema: tiny, logging: false, plugins }));
+		const refused = (await (await post(deployed, { query })).json()) as Answer;
+		expect(refused.errors?.[0]?.message).toContain('introspection');
+		const dev = alxia({ dev: true }).plugin((app) => graphql(app, { schema: tiny, logging: false, plugins }));
+		expect(((await (await post(dev, { query })).json()) as Answer).data).toEqual({ __schema: { queryType: { name: 'Query' } } });
+	});
+
+	test('the real app refuses it too', async () => {
+		const refused = (await (await post(production, { query })).json()) as Answer;
+		expect(refused.errors?.[0]?.message).toContain('introspection');
+	});
+});
+
+describe('errors', () => {
+	const app = alxia().plugin((app) => graphql(app, { schema: tiny, logging: false }));
+	const ask = async (field: string) => (await (await post(app, { query: `{ ${field} }` })).json()) as Answer;
+
+	test('an Error is masked, a GraphQLError reaches the client with its extensions', async () => {
+		const masked = await ask('boom');
+		expect(masked.errors?.[0]?.message).toBe('Unexpected error.');
+		expect(JSON.stringify(masked)).not.toContain('hunter2');
+		expect((await ask('bad')).errors?.[0]).toMatchObject({
+			message: 'Not an email',
+			extensions: { code: 'BAD_USER_INPUT', field: 'email' },
+		});
+	});
+
+	test('extensions.http.status is the HTTP status too', async () => {
+		const response = await post(app, { query: '{ missing }' });
+		expect(response.status).toBe(404);
+		expect(((await response.json()) as Answer).errors?.[0]?.extensions?.['code']).toBe('NOT_FOUND');
+	});
+});
+
+describe('the body, and CSRF', () => {
+	test('a body past the limit is refused, and no operation runs', async () => {
+		const response = await post(production, { query: `{ me { name } } # ${'x'.repeat(200 * 1024)}` });
+		expect(response.status).toBe(400); // Yoga's answer to a body it could not read
+		expect(((await response.json()) as Answer).data).toBeUndefined();
+	});
+
+	test('a request with no CSRF header is refused, a form is a 415, JSON with the header runs', async () => {
+		expect((await production.request('/graphql?query={me{name}}')).status).toBe(403);
+		const form = await post(production, 'query=%7Bme%7Bname%7D%7D', { 'content-type': 'application/x-www-form-urlencoded' });
+		expect(form.status).toBe(415);
+		expect(((await (await post(production, { query: '{ me { name } }' })).json()) as Answer).data).toEqual({ me: null });
+	});
+});
+
+describe('persisted operations', () => {
+	test('a registered hash runs on alxia, an arbitrary document does not', async () => {
+		const app = newBase().plugin((app) =>
+			graphql(app, { schema, context: () => ({ loaders: createLoaders() }), logging: false, plugins: [persisted] }),
+		);
+		const [hash] = [...operations.keys()];
+		const known = (await (await post(app, { extensions: { persistedQuery: { version: 1, sha256Hash: hash } } })).json()) as Answer;
+		expect(known.data).toEqual({ notes: [] });
+		const arbitrary = (await (await post(app, { query: '{ notes { text } }' })).json()) as Answer;
+		expect(arbitrary.errors?.[0]?.message).toMatch(/persisted/i);
+	});
+});
+```
+
 ## Reference
 
 - [Mounting the endpoint](../../packages/graphql/docs/guide/endpoint.md):
@@ -540,6 +924,8 @@ describe('the IDE, the probes and the drain', () => {
   `@alxia/jwt`
 - [Yoga's plugins and options](../../packages/graphql/docs/guide/yoga.md):
   masked errors, batching, subscriptions, depth limits, response caching
+- [Harden it for production](../../packages/graphql/docs/guide/production.md):
+  the guide page of [section 7](#7-harden-it-for-production)
 - [GraphiQL and Apollo Sandbox](../../packages/graphql/docs/guide/ide.md)
 - [GraphQL over WebSocket](../../packages/graphql/docs/guide/websockets.md):
   `ws: true`, Apollo Client's and urql's WebSocket links

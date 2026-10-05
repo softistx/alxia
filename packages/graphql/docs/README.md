@@ -12,6 +12,7 @@ a realistic example for each.
 | [The typed context](guide/context.md) | typing a schema with the app's context, reading `user` or a database handle in a resolver, setting a cookie, adding per-request loaders, or reading the `missing …` compile error |
 | [Yoga's plugins and options](guide/yoga.md) | adding Yoga or Envelop plugins, exposing or masking errors, batching, serving subscriptions, or calling the endpoint from another origin |
 | [GraphQL over WebSocket](guide/websockets.md) | serving Apollo Client's, urql's or `graphql-ws`'s WebSocket clients with `ws: true`, guarding the upgrade, reading `connectionParams`, the subprotocol, closing the sockets on shutdown, or testing a subscription over a socket |
+| [Harden it for production](guide/production.md) | putting a GraphQL API on the internet: rate limiting the endpoint, depth limits, introspection off outside development, masked errors and the errors a client may read, a body limit, CSRF for a cookie session, persisted operations |
 | [GraphiQL and Apollo Sandbox](guide/ide.md) | choosing the IDE a browser gets, configuring it, keeping it working under a strict `Content-Security-Policy`, or serving it outside dev with `ide: 'graphiql'` |
 | [Troubleshooting](troubleshooting.md) | something went wrong and you have the message |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |
