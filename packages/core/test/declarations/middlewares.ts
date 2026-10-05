@@ -1,6 +1,12 @@
 // The middleware model behind exported functions whose return types are
 // inferred: a declaration build must name each one through `@alxia/core`.
-import { alxia, defineMiddleware, responds, validate } from '@alxia/core';
+import {
+	alxia,
+	defineMiddleware,
+	type Empty,
+	responds,
+	validate,
+} from '@alxia/core';
 
 const Ping = {
 	'~standard': {
@@ -13,7 +19,7 @@ const Ping = {
 // Middlewares, the model since 0.4: a middleware made once and exported names
 // `Middleware` and `Next`; a route threading them, with its options, a
 // `validate` and a `responds`, names what they add, declare and reply.
-export const authed = defineMiddleware(({ request, reply }, next) =>
+export const authed = defineMiddleware<Empty>()(({ request, reply }, next) =>
 	request.headers.has('x-user')
 		? next({ user: request.headers.get('x-user') ?? '' })
 		: reply(401, { error: 'unauthorized' as const }),
@@ -24,7 +30,7 @@ export const owner = defineMiddleware<{ user: string }>()(
 			? next({ owner: true as const })
 			: reply(403, { error: 'forbidden' as const }),
 );
-export const timed = defineMiddleware(async (_ctx, next) => {
+export const timed = defineMiddleware<Empty>()(async (_ctx, next) => {
 	const response = await next();
 	response.headers.set('x-timed', '1');
 	return response;
@@ -70,10 +76,11 @@ export function operations() {
 
 // Scope middlewares, through `use`: an exported middleware names
 // `Middleware`, and an app that took them names what they add.
-export const adminOnly = defineMiddleware(({ request, reply }, next) =>
-	request.headers.has('x-admin')
-		? next()
-		: reply(403, { error: 'forbidden' as const }),
+export const adminOnly = defineMiddleware<Empty>()(
+	({ request, reply }, next) =>
+		request.headers.has('x-admin')
+			? next()
+			: reply(403, { error: 'forbidden' as const }),
 );
 
 export function scoped() {

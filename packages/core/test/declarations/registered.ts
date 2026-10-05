@@ -22,7 +22,8 @@ declare module '@alxia/core' {
 	}
 }
 
-export const owner = defineMiddleware<AppContext>()(({ user }, next) =>
+// Reads the registered context with no generic.
+export const owner = defineMiddleware(({ user }, next) =>
 	next({ owner: user.id }),
 );
 

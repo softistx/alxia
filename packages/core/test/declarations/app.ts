@@ -6,6 +6,7 @@ import {
 	type ClientErrorStatus,
 	defineMiddleware,
 	definePlugin,
+	type Empty,
 	eventStream,
 	type PathAt,
 	problem,
@@ -154,7 +155,7 @@ export const canSee = defineMiddleware<{
 export const loaded = defineMiddleware<{ params: { id: string } }>()(
 	({ params }, next) => next({ loadedAt: params.id }),
 );
-export const busy = defineMiddleware(({ reply }) =>
+export const busy = defineMiddleware<Empty>()(({ reply }) =>
 	reply(409, { error: 'busy' as const }),
 );
 
