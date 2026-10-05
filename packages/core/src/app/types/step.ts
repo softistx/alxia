@@ -21,10 +21,12 @@ import type { MiddlewareReturn, NextFunction } from './middleware';
  * A function that returns a function is a factory given uncalled —
  * `use(cors)` — and is told so; anything else a middleware returns that
  * is not `next()`, a reply or a `Response` is told what it may return.
- * `Refused` is what the form refuses, joined to the function: `use`'s
- * refuses a `validate` or a `responds` (`FormSlots['refuses']`).
+ * What a form refuses outright is `Taken`'s. `Unaliased`, `unknown`, is
+ * joined to the function so that an error prints the function, its
+ * message included, rather than `Step<…>`: an intersection made when the
+ * alias is instantiated loses the alias, one written out does not.
  */
-export type Step<Given, Reads, Result, Refused = unknown> = Refused &
+export type Step<Given, Reads, Result, Unaliased = unknown> = Unaliased &
 	((
 		ctx: Reads,
 		next: NextFunction,
@@ -34,6 +36,33 @@ export type Step<Given, Reads, Result, Refused = unknown> = Refused &
 			: Result extends FunctionLike
 				? 'this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)'
 				: 'a middleware returns next(), a reply or a Response'));
+
+/**
+ * The parameter a middleware `F` stands in, `Checked` when its form
+ * refuses nothing (`Refused` is `unknown`, `FormSlots['refuses']`). When
+ * the form refuses something — `use` a `validate` or a `responds`, or a
+ * `compose(...)` holding one, by their mark — the parameter is `F &
+ * Checked`, so that `F` is inferred from the argument itself, and the
+ * argument that carries the mark meets a message instead, as a whole: the
+ * first line of the error says it, where a property's type would be
+ * reported three lines down, under its own name.
+ *
+ * ```text
+ * Argument of type 'Composed<…>' is not assignable to parameter of type
+ * '"validate() belongs to a route, not to use(): give it among the route's middlewares"'.
+ * ```
+ */
+export type Taken<F, Refused, Checked> = unknown extends Refused
+	? Checked
+	: [F] extends [Refused]
+		? F extends { readonly '~builtin': infer Kind }
+			? [Kind] extends ['validate']
+				? "validate() belongs to a route, not to use(): give it among the route's middlewares"
+				: [Kind] extends ['responds']
+					? "responds() belongs to a route, not to use(): give it among the route's middlewares"
+					: "validate() and responds() belong to a route, not to use(): give them among the route's middlewares"
+			: never
+		: F & Checked;
 
 /**
  * `unknown` when `Given` gives what `Reads` names; else why not, one

@@ -31,7 +31,7 @@ a trap that prints nothing is headed by its symptom.
 - [`… is not assignable to parameter of type '"at most 8 middlewares per route: group them with compose(...)"'`](#-is-not-assignable-to-parameter-of-type-at-most-8-middlewares-per-route-group-them-with-compose), a ninth middleware (`Expected 20 arguments, but got 11` before 0.5)
 - [`… is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`](#-is-not-assignable-to-type-this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
 - [`Type 'string' is not assignable to type '"a middleware returns next(), a reply or a Response"'`](#type-string-is-not-assignable-to-type-a-middleware-returns-next-a-reply-or-a-response)
-- [`Type 'string' is not assignable to type '{ readonly refused: "validate() and responds() belong to a route: …"; }'`](#type-string-is-not-assignable-to-type--readonly-refused-validate-and-responds-belong-to-a-route-give-them-among-its-middlewares-not-to-use-), on `use(validate(…))`
+- [`… is not assignable to parameter of type '"validate() belongs to a route, not to use(): give it among the route's middlewares"'`](#-is-not-assignable-to-parameter-of-type-validate-belongs-to-a-route-not-to-use-give-it-among-the-routes-middlewares), on `use(validate(…))` or `use(compose(validate(…)))` (`Type 'string' is not assignable to type '{ readonly refused: … }'` before 0.5.1)
 - [`Type 'string' is not assignable to type 'MiddlewareReturn'`](#type-string-is-not-assignable-to-type-middlewarereturn)
 - [`'response' does not exist in type 'RouteOperation | RequestSchemas'`](#response-does-not-exist-in-type-routeoperation--requestschemas)
 - [`route() needs the path as a literal: declare the operation as const`](#route-needs-the-path-as-a-literal-declare-the-operation-as-const)
@@ -794,11 +794,12 @@ app.get('/l', auth, handler);
 error TS2345: Argument of type 'Middleware<Empty, Promise<Next<Empty, Empty>>>' is not assignable to parameter of type '"at most 8 middlewares per route: group them with compose(...)"'.
 ```
 
-**When:** a route, a route with options, `ws` or `route(operation, …)` is
-given nine middlewares or more: the error is on the ninth. On `use(m1, …,
-m9)`, whose path form takes any number, TypeScript prints `No overload
-matches this call` with this message under the first overload. Before
-0.5 the same call read `Expected 20 arguments, but got 11`.
+**When:** a route, a route with options, `ws`, `route(operation, …)` or
+`use` is given nine middlewares or more: the error is on the ninth.
+Before 0.5.1, `use(m1, …, m9)` read `No overload matches this call`, with
+this message under the first overload on TypeScript 6 and not at all on
+TypeScript 7, which prints the last overload alone, `use(path, …)`'s.
+Before 0.5 a route's read `Expected 20 arguments, but got 11`.
 
 **Why:** the types thread the context one middleware at a time, through
 eight at most per call, to keep the check cheap and finite.
@@ -844,17 +845,23 @@ refused by its own type, [below](#type-string-is-not-assignable-to-type-middlewa
 
 **Fix:** return `next()`, a reply or a `Response`.
 
-### `Type 'string' is not assignable to type '{ readonly refused: "validate() and responds() belong to a route: give them among its middlewares, not to use()"; }'`
+### `… is not assignable to parameter of type '"validate() belongs to a route, not to use(): give it among the route's middlewares"'`
 
 ```text
-error TS2345: Argument of type 'Middleware<Empty, Next<Validated<{}>, {}>> & BuiltinMark<"validate">' is not assignable to parameter of type '…'.
-  Type '…' is not assignable to type '{ readonly '~builtin'?: { readonly refused: "validate() and responds() belong to a route: …"; }; }'.
-    Types of property ''~builtin'' are incompatible.
+error TS2345: Argument of type 'Composed<readonly [NoInfer<Middleware<Empty, Next<Validated<{}>, {}>> & BuiltinMark<"validate">>]>' is not assignable to parameter of type '"validate() belongs to a route, not to use(): give it among the route's middlewares"'.
 ```
 
-**When:** `use` is given a `validate(…)` or a `responds(…)`, or a
-`compose(…)` that holds one. It also [throws when
+**When:** `use` is given a `validate(…)`, or a `compose(…)` that holds
+one, wherever it stands among `use`'s middlewares. A `responds(…)` reads
+`"responds() belongs to a route, not to use(): give it among the route's
+middlewares"`, and a `compose(…)` holding both `"validate() and responds()
+belong to a route, not to use(): give them among the route's
+middlewares"`. It also [throws when
 declared](#use-argument-1-is-a-validate-or-responds-which-belongs-to-a-route).
+Before 0.5.1 the message stood three lines down, under `Types of property
+''~builtin'' are incompatible`: `Type 'string' is not assignable to type
+'{ readonly refused: "validate() and responds() belong to a route: give
+them among its middlewares, not to use()"; }'`.
 
 **Fix:** give the schemas to the route, among its middlewares:
 `app.use(auth).post('/posts', validate({ body: Post }), handler)`.
@@ -1073,7 +1080,7 @@ A guard that only answers or passes, `next()`, can stay on the path:
 `alxia().derive(…)`, the 0.3 way of mounting a plugin.
 
 ```text
-error TS2345: Argument of type 'Alxia<Empty, "">' is not assignable to parameter of type 'Alxia<Empty, ""> & Step<BaseContext & Empty, BaseContext & Empty, MiddlewareReturn>'.
+error TS2345: Argument of type 'Alxia<Empty, "">' is not assignable to parameter of type 'Alxia<Empty, ""> & ((ctx: BaseContext & Empty, next: NextFunction) => MiddlewareReturn)'.
   …
     Type 'Alxia<Empty, "">' provides no match for the signature '(ctx: BaseContext & Empty, next: NextFunction): MiddlewareReturn'.
 ```

@@ -6,13 +6,14 @@
  */
 import type { PathAt, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
-import type { FormSlots } from './forms';
+import type { FormSlots, TooLong } from './forms';
 import type { Ladder } from './ladder';
 import type { AppTypes } from './route-forms';
 import type { TooMany } from './too-many';
 import type {
 	AddedOf,
 	BaseContext,
+	FunctionLike,
 	MiddlewareReturn,
 	NextFunction,
 	ThreadContext,
@@ -67,6 +68,18 @@ export type ScopePathAt<
 		: NoInfer<`Invalid path: "${Path}": a path given to use() does not end with "/"`>
 	: PathAt<Prefix, Path>;
 
+/**
+ * The middlewares after `use`'s path; `TooLong`, refused by its length,
+ * when the first argument is a middleware, not a path: a call of nine
+ * middlewares then meets `TooMany` alone, whose message is the error,
+ * not one overload among those "No overload matches this call" lists.
+ */
+export type PathMiddlewares<Path, Middlewares extends readonly unknown[]> = [
+	Path,
+] extends [FunctionLike]
+	? TooLong
+	: Middlewares & AddingNothing<Middlewares>;
+
 /** A middleware `use(path, …)` takes: reading `Ctx`. */
 export type PathMiddleware<Ctx extends object> = (
 	ctx: BaseContext & Ctx,
@@ -101,11 +114,8 @@ export interface UseForm<
 	readonly reads: BaseContext & ThreadContext<App['ctx'], Results>;
 	readonly tail: [];
 	readonly out: AppAfterUse<App['ctx'], App['prefix'], Results>;
-	readonly refuses: {
-		readonly '~builtin'?: {
-			readonly refused: 'validate() and responds() belong to a route: give them among its middlewares, not to use()';
-		};
-	};
+	/** A `validate`, a `responds`, or a `compose(...)` holding one, by their mark (`Taken`). */
+	readonly refuses: { readonly '~builtin': unknown };
 }
 
 /**
@@ -146,13 +156,13 @@ export interface UsePathForm<Ctx extends object, Prefix extends string> {
 	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	<
-		const Path extends RoutePath,
+		const Path extends RoutePath | FunctionLike,
 		const Middlewares extends readonly [
 			PathMiddleware<Ctx>,
 			...PathMiddleware<Ctx>[],
 		],
 	>(
-		path: ScopePathAt<Prefix, Path>,
-		...middlewares: Middlewares & AddingNothing<Middlewares>
+		path: Path extends string ? ScopePathAt<Prefix, Path> : Path,
+		...middlewares: PathMiddlewares<Path, Middlewares>
 	): Alxia<Ctx, Prefix>;
 }

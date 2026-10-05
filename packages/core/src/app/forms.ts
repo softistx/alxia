@@ -4,7 +4,7 @@
  * and `Ladder` (`ladder.ts`) lay its overloads out from.
  */
 import type { AppTypes } from './route-forms';
-import type { FunctionLike } from './types';
+import type { FunctionLike, Step, Taken } from './types';
 
 /**
  * Every middleware form, by name, given what a call inferred: `A` and `B`
@@ -144,6 +144,23 @@ export type Refuses<K extends FormName, App extends AppTypes> = Of<
 	unknown,
 	[]
 >['refuses'];
+
+/**
+ * The parameter middleware `F` stands in, in form `K`: `Step` checks it
+ * against `Given`, the context in force there, reading `Reads` and
+ * returning `Result`; `Taken` refuses it as a whole when it is what the
+ * form refuses. `Joined` is joined to the check: the first middleware's
+ * own type, `F1`, which `Rest` reads.
+ */
+export type Slot<
+	K extends FormName,
+	App extends AppTypes,
+	F,
+	Given,
+	Reads,
+	Result,
+	Joined = unknown,
+> = Taken<F, Refuses<K, App>, Joined & Step<Given, Reads, Result>>;
 
 /** Twenty arguments more than a form takes: a call this long matches no overload. */
 export type TooLong = [

@@ -3,6 +3,7 @@
 // error naming the cause.
 import {
 	alxia,
+	compose,
 	defineMiddleware,
 	type Empty,
 	type Middleware,
@@ -36,3 +37,11 @@ alxia().ws('/e', { detail: {} }, m, m, m, m, m, m, m, m, m, {
 // 9: route(operation), a ninth middleware.
 const op = { method: 'GET', path: '/f', schema: {} } as const;
 alxia().route(op, m, m, m, m, m, m, m, m, m, ok);
+// 10: use, a ninth middleware.
+alxia().use(m, m, m, m, m, m, m, m, m);
+// 11: use, a compose() holding a validate().
+alxia().use(compose(validate({})));
+// 12: use, a compose() holding a responds(), after a middleware.
+alxia().use(m, compose(m, responds({ 200: z.string() })));
+// 13: use, a compose() holding both.
+alxia().use(compose(validate({}), responds({ 200: z.string() })));

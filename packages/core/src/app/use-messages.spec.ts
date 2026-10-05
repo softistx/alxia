@@ -5,7 +5,9 @@
  * error on the middleware itself — not "No overload matches this call" —
  * whose last line names the key, on TypeScript 6 as on 7. And
  * `test/messages/limits`: a ninth middleware, a `validate` or a `responds`
- * given to `use`, a factory given uncalled, each told why.
+ * given to `use` — or a `compose(...)` holding one — a factory given
+ * uncalled, each told why; the ninth and the `validate`, on the error's
+ * first line.
  */
 import { expect, test } from 'bun:test';
 import { join } from 'node:path';
@@ -48,22 +50,57 @@ test('each mistake is one error on the middleware, naming what is missing', asyn
 
 const tooMany =
 	'"at most 8 middlewares per route: group them with compose(...)"';
-const builtin =
-	'"validate() and responds() belong to a route: give them among its middlewares, not to use()"';
 const factory =
 	'"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"';
+const belongs = (what: string) =>
+	`is not assignable to parameter of type '"${what} belongs to a route, not to use(): give it among the route's middlewares"'.`;
+const both = `is not assignable to parameter of type '"validate() and responds() belong to a route, not to use(): give them among the route's middlewares"'.`;
+
+/** The first line of an error: what TypeScript prints before it elaborates. */
+const firstLine = (error = '') => error.split('\n')[0];
 
 test('a ninth middleware, a validate() given to use(), an uncalled factory: one error each, naming it', async () => {
 	const errors = await typecheck('limits');
-	expect(errors).toHaveLength(9);
+	expect(errors).toHaveLength(13);
 	for (const error of errors) {
 		expect(error).toContain('error TS2345');
 		expect(error).not.toContain('No overload matches');
 	}
-	const [route, options, socket, validated, responded, used, given, ...rest] =
-		errors;
-	for (const error of [route, options, socket, ...rest])
-		expect(error).toContain(tooMany);
-	for (const error of [validated, responded]) expect(error).toContain(builtin);
+	const [
+		route,
+		options,
+		socket,
+		validated,
+		responded,
+		used,
+		given,
+		socketOptions,
+		operation,
+		useNine,
+		composedValidate,
+		composedResponds,
+		composedBoth,
+	] = errors;
+	for (const error of [
+		route,
+		options,
+		socket,
+		socketOptions,
+		operation,
+		useNine,
+	]) {
+		expect(firstLine(error)).toEndWith(
+			`is not assignable to parameter of type '${tooMany}'.`,
+		);
+	}
+	// Said on the first line, the whole argument refused: a compose()
+	// holding one alike, wherever it stands among use()'s middlewares.
+	for (const error of [validated, composedValidate]) {
+		expect(firstLine(error)).toEndWith(belongs('validate()'));
+	}
+	for (const error of [responded, composedResponds]) {
+		expect(firstLine(error)).toEndWith(belongs('responds()'));
+	}
+	expect(firstLine(composedBoth)).toEndWith(both);
 	for (const error of [used, given]) expect(error).toContain(factory);
 });

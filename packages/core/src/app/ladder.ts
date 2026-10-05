@@ -7,16 +7,17 @@
  * The middlewares are written out, `m1` to `m8`: TypeScript prints their
  * names in the overloads it reports.
  *
- * Each middleware `mI` is typed by two parameters: `RI`, what it returns,
- * and `CI`, what it reads, inferred from its `ctx` parameter when it is
- * annotated — a middleware of `defineMiddleware<Requires>()` — and the
- * context in force otherwise, so that an inline one reads that context.
- * `Step` checks `CI` against that context, and says what is missing;
- * `RI` is unconstrained, so that `Step` tells a factory given uncalled,
- * whose result is a function, from a middleware; each is joined to what
- * the form refuses (`Refuses`: `use` refuses a `validate`). `F1`, the
- * first middleware's type, lets `Rest` refuse a call another form of the
- * method takes.
+ * Each middleware `mI` is typed by three parameters (`Slot`, `forms.ts`):
+ * `RI`, what it returns, and `CI`, what it reads, inferred from its `ctx`
+ * parameter when it is annotated — a middleware of
+ * `defineMiddleware<Requires>()` — and the context in force otherwise, so
+ * that an inline one reads that context. `Step` checks `CI` against that
+ * context, and says what is missing; `RI` is unconstrained, so that `Step`
+ * tells a factory given uncalled, whose result is a function, from a
+ * middleware. `FI`, the middleware's own type, is read where the form
+ * refuses something (`Taken`: `use` refuses a `validate`), so that the
+ * refusal is the parameter's whole type; `F1` also lets `Rest` refuse a
+ * call another form of the method takes.
  */
 import type {
 	ABound,
@@ -26,12 +27,12 @@ import type {
 	Head,
 	Out,
 	Reads,
-	Refuses,
 	Rest,
+	Slot,
 } from './forms';
 import type { LadderLong } from './ladder-long';
 import type { AppTypes } from './route-forms';
-import type { FunctionLike, MiddlewareReturn, Step } from './types';
+import type { FunctionLike, MiddlewareReturn } from './types';
 
 type R = MiddlewareReturn;
 
@@ -64,7 +65,7 @@ export interface Ladder<K extends FormName, App extends AppTypes>
 	>(
 		...args: [
 			...Head<K, App, A, B>,
-			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1, Refuses<K, App>>,
+			m1: Slot<K, App, F1, Reads<K, App, A, B, []>, C1, R1, F1>,
 			...Rest<K, App, A, B, [R1], Handled, F1>,
 		]
 	): Out<K, App, A, B, [R1]>;
@@ -75,13 +76,14 @@ export interface Ladder<K extends FormName, App extends AppTypes>
 		F1 = FunctionLike,
 		C1 = Reads<K, App, A, B, []>,
 		R1 = R,
+		F2 = FunctionLike,
 		C2 = Reads<K, App, A, B, [R1]>,
 		R2 = R,
 	>(
 		...args: [
 			...Head<K, App, A, B>,
-			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1, Refuses<K, App>>,
-			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2, Refuses<K, App>>,
+			m1: Slot<K, App, F1, Reads<K, App, A, B, []>, C1, R1, F1>,
+			m2: Slot<K, App, F2, Reads<K, App, A, B, [R1]>, C2, R2>,
 			...Rest<K, App, A, B, [R1, R2], Handled, F1>,
 		]
 	): Out<K, App, A, B, [R1, R2]>;
@@ -92,16 +94,18 @@ export interface Ladder<K extends FormName, App extends AppTypes>
 		F1 = FunctionLike,
 		C1 = Reads<K, App, A, B, []>,
 		R1 = R,
+		F2 = FunctionLike,
 		C2 = Reads<K, App, A, B, [R1]>,
 		R2 = R,
+		F3 = FunctionLike,
 		C3 = Reads<K, App, A, B, [R1, R2]>,
 		R3 = R,
 	>(
 		...args: [
 			...Head<K, App, A, B>,
-			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1, Refuses<K, App>>,
-			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2, Refuses<K, App>>,
-			m3: Step<Reads<K, App, A, B, [R1, R2]>, C3, R3, Refuses<K, App>>,
+			m1: Slot<K, App, F1, Reads<K, App, A, B, []>, C1, R1, F1>,
+			m2: Slot<K, App, F2, Reads<K, App, A, B, [R1]>, C2, R2>,
+			m3: Slot<K, App, F3, Reads<K, App, A, B, [R1, R2]>, C3, R3>,
 			...Rest<K, App, A, B, [R1, R2, R3], Handled, F1>,
 		]
 	): Out<K, App, A, B, [R1, R2, R3]>;
@@ -112,19 +116,22 @@ export interface Ladder<K extends FormName, App extends AppTypes>
 		F1 = FunctionLike,
 		C1 = Reads<K, App, A, B, []>,
 		R1 = R,
+		F2 = FunctionLike,
 		C2 = Reads<K, App, A, B, [R1]>,
 		R2 = R,
+		F3 = FunctionLike,
 		C3 = Reads<K, App, A, B, [R1, R2]>,
 		R3 = R,
+		F4 = FunctionLike,
 		C4 = Reads<K, App, A, B, [R1, R2, R3]>,
 		R4 = R,
 	>(
 		...args: [
 			...Head<K, App, A, B>,
-			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1, Refuses<K, App>>,
-			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2, Refuses<K, App>>,
-			m3: Step<Reads<K, App, A, B, [R1, R2]>, C3, R3, Refuses<K, App>>,
-			m4: Step<Reads<K, App, A, B, [R1, R2, R3]>, C4, R4, Refuses<K, App>>,
+			m1: Slot<K, App, F1, Reads<K, App, A, B, []>, C1, R1, F1>,
+			m2: Slot<K, App, F2, Reads<K, App, A, B, [R1]>, C2, R2>,
+			m3: Slot<K, App, F3, Reads<K, App, A, B, [R1, R2]>, C3, R3>,
+			m4: Slot<K, App, F4, Reads<K, App, A, B, [R1, R2, R3]>, C4, R4>,
 			...Rest<K, App, A, B, [R1, R2, R3, R4], Handled, F1>,
 		]
 	): Out<K, App, A, B, [R1, R2, R3, R4]>;
