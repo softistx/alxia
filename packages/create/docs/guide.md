@@ -376,9 +376,10 @@ the image — it is required, and the app does not start without it.
 development alone. `TRUSTED_PROXIES` is optional and unset by default: the
 proxies in front of the app as comma-separated CIDR ranges or addresses,
 each checked by `trustProxy` itself, so a malformed one stops the process
-with the others' issues ([Behind a proxy](#behind-a-proxy)). `Bun.env`, not `process.env.NODE_ENV`, which
-`bun build` would replace with the mode of the build. `src/server.ts` listens on `env.PORT` and
-`src/routes/todos.ts` compares the `x-api-key` header with `env.API_KEY`.
+with the others' issues ([Behind a proxy](#behind-a-proxy)). The mode is
+read from `Bun.env`, not `process.env.NODE_ENV`, which `bun build` would
+replace with the mode of the build. `src/server.ts` listens on `env.PORT`
+and `src/routes/todos.ts` compares the `x-api-key` header with `env.API_KEY`.
 `@alxia/env` and `zod` are dependencies.
 
 ### `src/context.ts`
@@ -691,7 +692,7 @@ my-graphql-api/
 ├── codegen.ts              how `bun run generate` reads it
 ├── src/
 │   ├── generated/resolvers.ts  what `bun run generate` writes: committed, never edited
-│   ├── env.ts              defineEnv: PORT
+│   ├── env.ts              defineEnv: PORT, TRUSTED_PROXIES
 │   ├── store.ts            in-memory users, tokens and notes, and the pub/sub
 │   ├── loaders.ts          createLoaders(): the DataLoaders of one request
 │   ├── context.ts          the base, the viewerOf middleware, and Context
@@ -700,6 +701,7 @@ my-graphql-api/
 │   ├── app.ts              health() and graphql(app, { schema, context }) mounted on the base
 │   ├── graphql.d.ts        declares the *.graphql module
 │   ├── app.spec.ts         bun test: POST /graphql through app.request()
+│   ├── proxy.spec.ts       bun test: the base behind TRUSTED_PROXIES, with a peer
 │   └── server.ts           app.listen on env.PORT, which stops on SIGINT and SIGTERM
 ├── package.json
 ├── tsconfig.json
@@ -707,7 +709,7 @@ my-graphql-api/
 ├── .vscode/
 ├── Dockerfile              bun run build, then dist/ alone, on oven/bun:1-alpine
 ├── .dockerignore
-├── .env.example            PORT, for a .env Bun loads
+├── .env.example            PORT and TRUSTED_PROXIES, for a .env Bun loads
 ├── .gitignore
 └── README.md
 ```
@@ -777,7 +779,21 @@ const viewerOf = defineMiddleware(({ request }, next) => {
   });
 });
 
-export const base = alxia().decorate({ env, db }).use(viewerOf);
+// Behind a load balancer, TRUSTED_PROXIES (src/env.ts) declares its range:
+// X-Forwarded-For from it sets ctx.ip, a forwarding header from any other
+// connection is refused with a 403, and a request with none passes. Unset,
+// no forwarding header is read.
+export function createBase(
+  trusted: string[] | undefined = env.TRUSTED_PROXIES,
+) {
+  return alxia({
+    ...(trusted && { proxy: trustProxy({ trusted, untrusted: "refuse" }) }),
+  })
+    .decorate({ env, db })
+    .use(viewerOf);
+}
+
+export const base = createBase();
 export type Context = GraphQLContext<typeof base, { loaders: Loaders }>;
 ```
 

@@ -646,6 +646,11 @@ later. A secret's value is never printed: `API_KEY` shows as `***`.
 PORT=3000 bun dev
 ```
 
+A malformed `TRUSTED_PROXIES` stops the app the same way, with
+`TRUSTED_PROXIES: not a CIDR range or address`: it is comma-separated CIDR
+ranges or addresses (`10.0.0.0/8,172.16.0.0/12`), and unset or empty it
+declares no proxy.
+
 A variable the schema gives a default (`PORT`, the `api` project's
 `API_DOCS`) is fine unset. The `api` project's `API_KEY` defaults to
 `dev-key` under `NODE_ENV=development` (`bun dev`) and `test` (`bun test`)

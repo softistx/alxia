@@ -33,7 +33,6 @@ number on it. Every release, with each change it made, is in
 - **The `api` template's tests use a typed client.** `src/app.spec.ts` calls
   the app through openapi-fetch over the generated `paths.ts`, with
   `app.fetch` as its `fetch`: in process, typed by `openapi.yaml`.
-
 - **`TRUSTED_PROXIES` in the `api` and `graphql` templates.** Optional and
   unset by default, so a new project behaves as before; set to the load
   balancer's CIDR ranges, the base declares `trustProxy({ trusted,
