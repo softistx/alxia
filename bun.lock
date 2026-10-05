@@ -302,7 +302,7 @@
         "@alxia/cache": "workspace:^",
         "@alxia/core": "workspace:^",
         "@alxia/rate-limit": "workspace:^",
-        "@nxgt/redis": "^0.5.0 || ^0.6.0",
+        "@nxgt/redis": "^0.7.0",
         "typescript": "^6.0.3 || ^7.0.0",
         "zod": "^4.6.5",
       },
