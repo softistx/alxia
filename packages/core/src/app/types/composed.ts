@@ -15,6 +15,7 @@ import type {
 	ThreadContext,
 	ThreadSchema,
 } from './middleware';
+import type { Missing } from './step';
 
 /**
  * A middleware `compose` takes: any `(ctx, next)` function. Its `ctx` is
@@ -52,6 +53,30 @@ export type ComposedReads<
 	? Omit<ReadsOf<M>, keyof BaseContext | Given<Have, ReadsOf<M>>> &
 			ComposedReads<Rest, ThreadContext<Have, [ResultOf<M>]>>
 	: unknown;
+
+/**
+ * `Ms`, each member checked against what the members before it add: one
+ * that reads a key one of them adds with another type is joined to the
+ * message a route gives (`Missing`), on the member itself. What no member
+ * before it adds is the route's to give, checked where compose stands.
+ */
+export type CheckedMembers<
+	Ms extends readonly unknown[],
+	Have = Empty,
+> = Ms extends readonly [infer M, ...infer Rest]
+	? [
+			[Missing<Have, Pick<ReadsOf<M>, keyof ReadsOf<M> & keyof Have>>] extends [
+				infer Message,
+			]
+				? unknown extends Message
+					? M
+					: (ctx: ReadsOf<M>, next: NextFunction) => ResultOf<M> & Message
+				: never,
+			...CheckedMembers<Rest, ThreadContext<Have, [ResultOf<M>]>>,
+		]
+	: // Not a tuple — the constraint, while an inline member is typed — or
+		// none left: as it is, so that each member's `ctx` is still inferred.
+		Ms;
 
 /** What a member's result is besides `next()`'s: a reply or a `Response` of its own. */
 type OwnResults<Ms extends readonly unknown[]> = Exclude<

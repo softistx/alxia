@@ -582,7 +582,7 @@ import ownFr from './locales/fr.json';
 export const i18n = createI18n({
 	resources: { en: { ...shared.en, ...ownEn }, fr: { ...shared.fr, ...ownFr } },
 	fallback: 'en',
-	persist: { secure: process.env['NODE_ENV'] === 'production' },
+	persist: { secure: Bun.env.NODE_ENV !== 'development' }, // read at runtime: bun build inlines process.env
 });
 ```
 

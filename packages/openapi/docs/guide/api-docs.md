@@ -7,8 +7,9 @@ dependencies.
 ```ts
 import { alxia } from '@alxia/core';
 import { apiDocs } from '@alxia/openapi';
+import spec from '../openapi.yaml'; // Bun imports YAML, and bundles it
 
-export const app = alxia().plugin(apiDocs({ spec: 'openapi.yaml' }));
+export const app = alxia().plugin(apiDocs({ spec }));
 ```
 
 | Route | Answers |
@@ -25,11 +26,15 @@ It is for the REST side of an app, the document you wrote first
 
 `spec` is one of:
 
+- the document as an object. Import it: Bun reads a `.yaml` or `.json`
+  import as an object, and `bun build` bundles it, so the app a Dockerfile
+  builds into `dist/` alone still has it. This is the form to start with;
 - a path to a YAML or JSON file, read once, when `apiDocs` is called. A
-  relative path is looked up from the working directory of the process. The
-  file is parsed with Bun's own YAML support (`Bun.YAML`), so there is no
-  parser to install. A YAML file is served as written, comments included;
-- the document as an object.
+  relative path is looked up from the working directory of the process, so
+  the file must ship beside the app: a bundled app whose image holds
+  `dist/` alone throws at startup. The file is parsed with Bun's own YAML
+  support (`Bun.YAML`), so there is no parser to install, and a YAML file
+  is served as written, comments included.
 
 A file that is missing, does not parse, or has no `openapi` version throws a
 `TypeError` at startup, naming `apiDocs()`, rather than serving a blank page
@@ -39,12 +44,12 @@ A file that is missing, does not parse, or has no `openapi` version throws a
 
 ```ts
 apiDocs({
-	spec: 'openapi.yaml',
+	spec, // import spec from '../openapi.yaml'
 	path: '/reference', // default '/docs'; the files are at /reference/openapi.yaml and .json
 	ui: 'swagger', // 'scalar' (default) or 'swagger'
 	title: 'Todos API', // default: the document's info.title
 	servers: [{ url: 'http://localhost:3000', description: 'local' }],
-	enabled: process.env.NODE_ENV !== 'production', // default true
+	enabled: Bun.env.NODE_ENV === 'development', // default true
 });
 ```
 
@@ -57,13 +62,34 @@ apiDocs({
   files: the page's "Try it out" then calls the server you name, such as
   localhost in development.
 - **`enabled: false`** mounts nothing and reads nothing, so the file may be
-  absent. To keep the page out of production, give it the environment
-  check above; to put it behind a login instead, mount it in a group after
-  the middleware that guards it:
+  absent. Read the environment at runtime, with `Bun.env`, as above, never
+  `process.env.NODE_ENV`: `bun build` replaces that with the mode of the
+  build, so a bundle built without it would serve the page in production.
+
+## The document is public unless you guard it
+
+Mounted as above, the page and the document answer anyone who can reach the
+app, as every route does. To keep them behind a login, give the guard to
+`use('/docs', …)` before the plugin: it runs on the three routes, and on
+nothing else.
+
+```ts
+import { alxia } from '@alxia/core';
+import { apiDocs } from '@alxia/openapi';
+import spec from '../openapi.yaml';
+import { requireAdmin } from './auth'; // your own middleware
+
+export const app = alxia()
+	.use('/docs', requireAdmin)
+	.plugin(apiDocs({ spec }));
+```
+
+Or mount it in a group, after the guard; its routes then move under the
+group's prefix, `/internal/docs`:
 
 ```ts
 const app = alxia().group('/internal', (g) =>
-	g.use(requireAdmin) // your own middleware.plugin(apiDocs({ spec: 'openapi.yaml' })),
+	g.use(requireAdmin).plugin(apiDocs({ spec })),
 );
 ```
 
@@ -90,16 +116,25 @@ import { secureHeaders } from '@alxia/secure-headers';
 
 const app = alxia()
 	.use(secureHeaders({ nonce: true }))
-	.plugin(apiDocs({ spec: 'openapi.yaml' }));
+	.plugin(apiDocs({ spec }));
 // /docs: its own policy. Every other response: secureHeaders' policy, a nonce included.
 ```
 
 The policy is written for this page and is fresh for each response: scripts
-from `cdn.jsdelivr.net` and, for Swagger UI's one inline script, a nonce
-the page makes itself; styles from the CDN and inline ones (both UIs inject
-styles); images and fonts over `https:` and `data:`; `connect-src` to
-`'self'`, `https:` and `http:` (the spec, and the servers "Try it out"
-calls); no frames, no base URI, no forms. The policy of the rest of the app
+from the pinned version's folder on `cdn.jsdelivr.net` alone
+(`/npm/@scalar/api-reference@<version>/` or `/npm/swagger-ui-dist@<version>/`)
+and, for Swagger UI's one inline script, a nonce the page makes itself;
+styles from that folder and inline ones (both UIs inject styles); images
+over `https:` and `data:`; fonts from `data:` and, for Scalar, its own
+`fonts.scalar.com`; `connect-src` to `'self'` — the spec — and the origin
+of each absolute `servers` URL of the document (or of the `servers`
+option), which "Try it out" calls; no frames, no base URI, no forms. A
+server URL with a template (`https://{region}.example.com`) names no
+origin: give the `servers` option the URLs the page may call.
+
+Scalar is configured to reach none of its own services: its AI agent
+("Ask AI"), its MCP generator, the developer tools that share or deploy the
+document on scalar.com, and its telemetry are off. The policy of the rest of the app
 is untouched, so the strict one keeps guarding your API.
 
 ## `matchesSpec` ignores the docs routes
@@ -133,6 +168,7 @@ import { graphql } from '@alxia/graphql';
 import { apiDocs, matchesSpec } from '@alxia/openapi';
 import { secureHeaders } from '@alxia/secure-headers';
 import { createSchema } from 'graphql-yoga';
+import spec from '../openapi.yaml';
 import { operations } from './generated/alxia';
 
 const schema = createSchema({
@@ -140,13 +176,13 @@ const schema = createSchema({
 	resolvers: { Query: { hello: () => 'world' } },
 });
 
-const dev = process.env.NODE_ENV !== 'production';
+const dev = Bun.env.NODE_ENV === 'development'; // at runtime: bun build inlines process.env.NODE_ENV
 
 export const app = alxia()
 	.use(secureHeaders())
 	.route(operations.listTodos, ({ reply }) => reply.ok([])) // REST, from openapi.yaml
-	.plugin((app) => graphql(app, { schema, ide: dev ? 'graphiql' : false })) // POST and GET /graphql
-	.plugin(apiDocs({ spec: 'openapi.yaml', enabled: dev })); // GET /docs
+	.plugin((app) => graphql(app, { schema })) // POST and GET /graphql; GraphiQL in dev alone
+	.plugin(apiDocs({ spec, enabled: dev })); // GET /docs
 
 // the REST routes against the document: the GraphQL endpoint is not one of its operations
 matchesSpec(app, operations, { exclude: (route) => route.path === '/graphql' });

@@ -213,7 +213,7 @@ is stopped, and the last spans and logs never reach the exporter — with
 or a second after it started. A process that exits first loses it. The
 middleware never closes the telemetry, not even one it built from `service`.
 
-**Fix:** close it in `onStop`, await `app.stop()` on shutdown, and await
+**Fix:** close it in `onStop`, which `listen`'s shutdown on `SIGTERM` awaits, and await
 `close()` in a script or a test before reading what was exported:
 
 ```ts
@@ -221,10 +221,7 @@ const app = alxia()
 	.use(tracing)
 	.onStop(() => tracing.telemetry.close());
 
-process.on('SIGTERM', async () => {
-	await app.stop();
-	process.exit(0);
-});
+app.listen(3000); // on SIGTERM: the requests drain, then onStop closes the telemetry
 ```
 
 ### A log written in a route has no `traceId`, or never arrives

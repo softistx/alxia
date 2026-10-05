@@ -2,9 +2,9 @@
 import {
 	type AppContext,
 	alxia,
+	defineAppMiddleware,
 	defineMiddleware,
 	defineRoutes,
-	type Empty,
 } from '@alxia/core';
 
 /** A service: typed by the registered context. */
@@ -13,7 +13,7 @@ export function greet({ greeting, user }: AppContext): string {
 }
 
 /** Reads the registered context, checked where it is used. */
-export const owner = defineMiddleware(({ user }, next) =>
+export const owner = defineAppMiddleware(({ user }, next) =>
 	next({ owner: user.id }),
 );
 
@@ -42,8 +42,8 @@ defineRoutes().get('/', (ctx) => {
 // @ts-expect-error: nor run the middleware that reads it
 alxia().get('/', owner, ({ reply }) => reply(200, 'x'));
 
-// One that requires nothing of it says so, and reads the base context alone.
-defineMiddleware<Empty>()((ctx, next) => {
+// `defineMiddleware(fn)` reads the base context alone.
+defineMiddleware((ctx, next) => {
 	// @ts-expect-error: it may run before the base gives `user`
 	void ctx.user;
 	return next();

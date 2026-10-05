@@ -33,7 +33,9 @@ const declared = new WeakSet<RouteDefinition['handler']>();
  * Whether `apiDocs()` declared this route: the page and the two files.
  * `matchesSpec` already leaves them out; this is for a check of your own.
  */
-export function isApiDocsRoute(route: RouteDefinition): boolean {
+export function isApiDocsRoute(
+	route: Pick<RouteDefinition, 'handler'>,
+): boolean {
 	return declared.has(route.handler);
 }
 
@@ -65,7 +67,9 @@ export function apiDocs(options: ApiDocsOptions) {
 		const nonce = freshNonce();
 		const specUrl = `${url.pathname.replace(/\/+$/, '')}/openapi.json`;
 		return reply.html(200, page(ui, { title, specUrl, nonce }), {
-			headers: { 'content-security-policy': policy(nonce) },
+			headers: {
+				'content-security-policy': policy(ui, nonce, spec.origins),
+			},
 		});
 	};
 	const yaml = ({ reply }: PageContext) =>

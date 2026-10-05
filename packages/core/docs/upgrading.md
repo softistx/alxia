@@ -6,14 +6,13 @@ after, and whether it can break yours.
 
 ## 0.5.0
 
-The next release, `@alxia/core` 0.5.0, removes every form 0.4 deprecated,
-and keeps one: a middleware is a plain `(ctx, next)` function.
+`@alxia/core` 0.5.0 removes every form 0.4 deprecated, and keeps one: a middleware is a plain `(ctx, next)` function.
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
 | [One middleware form](#one-middleware-form) | core | no: new; a plain function is now a middleware wherever one is given |
 | [Readable type errors](#readable-type-errors) | core | no: the same mistakes, one error each, naming the key |
-| [`defineMiddleware(fn)` reads the registered context](#definemiddlewarefn-reads-the-registered-context) | core | yes, for a middleware the registered base is built with: `defineMiddleware<Empty>()(fn)` |
+| [`defineAppMiddleware(fn)` reads the registered context](#defineappmiddlewarefn-reads-the-registered-context) | core | no: new; `defineMiddleware(fn)` still reads the base context alone |
 | [The request hooks are removed](#the-request-hooks-are-removed) | core | yes: `onRequest`, `onResponse`, `around`, `wrap`, `onError` and `onRefusal` are gone |
 | [The forms of 0.3 are removed](#the-forms-of-03-are-removed) | core | yes: a list of hooks, `defineHook`, `defineWrap`, a schema before the handler or in the options |
 | [`use` takes middlewares, `plugin` takes plugins](#use-takes-middlewares-plugin-takes-plugins) | core, and every package middleware | yes: `use(plugin)`, `plugin(middleware)` and `app.plugin(cors())` throw |
@@ -21,9 +20,13 @@ and keeps one: a middleware is a plain `(ctx, next)` function.
 | [`@alxia/openapi-routes` leaves the repository](#alxiaopenapi-routes-leaves-the-repository) | openapi, openapi-routes | yes, for an import of `@alxia/openapi-routes` or of `exactly` |
 | [Problem details, opt in](#problem-details-opt-in) | core, jwt, janus | no: `errors: 'json'` stays the default |
 | [Probes: `health()`](#probes-health) | core | no: new |
-| [A graceful shutdown on `SIGTERM`](#a-graceful-shutdown-on-sigterm) | core, react-router, graphql | yes, for a process with signal handlers of its own: `listen` installs its own |
+| [A graceful shutdown on `SIGTERM`](#a-graceful-shutdown-on-sigterm) | core, react-router, graphql | yes, for a process with signal handlers of its own: `listen` installs its own, and exits unless told `exit: false` or another handler listens; `listen` twice throws |
 | [What behaves differently](#what-behaves-differently) | core | yes, for a middleware that relied on a hook answering an error or a refusal first |
-| [Dev comfort, on in dev](#dev-comfort-on-in-dev) | core, every package middleware, graphql, react-router, create | yes, for a process run without `NODE_ENV`: `listen` prints its routes, a 404 carries a `hint`, a 500 its stack; a factory given uncalled throws where it is declared |
+| [Dev comfort, on in dev](#dev-comfort-on-in-dev) | core, every package middleware, graphql, react-router, create | yes: dev is on only under `NODE_ENV=development`, so a `dev` script must set it; a factory given uncalled throws where it is declared |
+| [`dev` and `start` scripts](#dev-and-start-scripts) | your app, create | yes, for a `dev` script without `NODE_ENV=development`: no route table, no hint, no error page |
+| [GraphiQL follows the dev switch](#graphiql-follows-the-dev-switch) | graphql | yes: `graphql()` without `ide` serves no GraphiQL outside dev |
+| [`@alxia/redis` on `@nxgt/redis` 0.5](#alxiaredis-on-nxgtredis-05) | redis | yes: `@nxgt/redis` `^0.5.0`, `@nxgt/redis-guard` dropped |
+| [`bun create @alxia` and `@alxia/env`](#bun-create-alxia-and-alxiaenv) | create, env | no, for an existing app: new templates, `defineEnv` |
 | [More than 8 middlewares: `compose`](#more-than-8-middlewares-compose) | core | no: new; a ninth middleware's error now names the limit |
 
 ### One middleware form
@@ -77,14 +80,16 @@ route's path" `` ([Troubleshooting](troubleshooting.md#types)).
 **Can it break your code.** No: what compiled still compiles. A
 `@ts-expect-error` stays an error.
 
-### `defineMiddleware(fn)` reads the registered context
+### `defineAppMiddleware(fn)` reads the registered context
 
-**What changed.** Given no `Requires`, `defineMiddleware(fn)` reads the
-context the app's `Register` names, as `defineRoutes` and `AppContext` do,
-and a route or a `use` whose context does not give it refuses it. Nothing
-registered, it reads `BaseContext`, as before. The workaround of 0.4 goes:
+**What changed.** `defineAppMiddleware(fn)` (new) reads the context the
+app's `Register` names, as `defineRoutes` and `AppContext` do, and a route
+or a `use` whose context does not give it refuses it. `defineMiddleware(fn)`
+keeps reading the base context alone, as an inline middleware does: one
+the registered base is itself built with stays sound. The workaround of
+0.4 still compiles, and reads shorter now:
 
-```ts
+```ts no-check
 // before
 import { type AppContext, defineMiddleware } from '@alxia/core';
 
@@ -93,38 +98,17 @@ export const profile = defineMiddleware<AppContext>()(async ({ db, user }, next)
 );
 
 // after
-import { defineMiddleware } from '@alxia/core';
+import { defineAppMiddleware } from '@alxia/core';
 
-export const profile = defineMiddleware(async ({ db, user }, next) =>
+export const profile = defineAppMiddleware(async ({ db, user }, next) =>
 	next({ profile: await db.users.find(user.id) }),
 );
 ```
 
-**Can it break your code.** Yes, for a middleware the registered base is
-itself built with: its type would read the base's, and the registration
-then resolves to nothing — every middleware elsewhere fails with
-`Property 'db' does not exist on type 'BaseContext'.` Say it reads nothing
-of the registered context:
-
-```ts
-// src/context.ts
-import { alxia, defineMiddleware, type Empty } from '@alxia/core';
-
-const requestId = defineMiddleware<Empty>()((ctx, next) =>
-	next({ requestId: ctx.request.headers.get('x-request-id') ?? 'none' }),
-);
-
-export const base = alxia().decorate({ db }).use(requestId);
-
-declare module '@alxia/core' {
-	interface Register {
-		context: typeof base;
-	}
-}
-```
-
-A middleware a package publishes for any app says what it reads the same
-way, `defineMiddleware<Empty>()(fn)` or `defineMiddleware<Requires>()(fn)`.
+**Can it break your code.** No. Keep `defineMiddleware(fn)` for a
+middleware the registered base is built with, and for one a package
+publishes for any app: `defineMiddleware<Requires>()(fn)` says what it
+reads.
 
 ### The request hooks are removed
 
@@ -397,7 +381,7 @@ alxia().use(logger(), secureHeaders(), cors());
 | `NoncePlugin` (`@alxia/secure-headers`) | `NonceMiddleware` |
 | `zodConverter` (`@alxia/zod`) | Zod's own `z.toJSONSchema(schema, { io: 'output' })`, or the schema written in the OpenAPI document, which is the source |
 
-```ts
+```ts no-check
 // before
 type App = Alxia<{ db: Db }, '/api', never>;
 import type { ContextStoragePlugin } from '@alxia/context-storage';
@@ -409,7 +393,7 @@ import type { ContextStorageMiddleware } from '@alxia/context-storage';
 import type { NonceMiddleware } from '@alxia/secure-headers';
 ```
 
-```ts
+```ts no-check
 // before
 import { zodConverter } from '@alxia/zod';
 const schema = zodConverter(Todo, 'output');
@@ -431,7 +415,7 @@ bun remove @alxia/openapi-routes
 bun add -d @alxia/openapi
 ```
 
-```ts
+```ts no-check
 // before
 import { exactly, type ExactlyOptions } from '@alxia/openapi-routes';
 
@@ -481,8 +465,12 @@ app that wants the bodies of today then says `errors: 'json'`
 **What changed.** `app.plugin(health({ checks }))` adds `GET /health`,
 liveness, and `GET /ready`, readiness: the checks run at once, each
 within `timeout`, their report cached for `cache` ms, 503 when one fails
-and from the moment the app starts shutting down. `@alxia/openapi`'s
-`matchesSpec` leaves them out by itself (`isHealthRoute`).
+and from the moment the app starts shutting down. Outside dev, `/ready`
+answers `{ status, checks: {} }`: each check's name, status and duration
+are shown in dev alone, unless `details: true` (always) or `false`
+(never) decides. A check still running from an earlier probe is not
+started again. `@alxia/openapi`'s `matchesSpec` leaves them out by itself
+(`isHealthRoute`).
 
 ```ts
 // before: a route of your own, which knew nothing of the shutdown
@@ -518,13 +506,38 @@ process.on('SIGTERM', async () => {
 app.onStop(() => pool.end()).listen(3000);
 ```
 
+Three options of `listen` shape it: `signals` (`false` installs no
+handler), `exit: false`, which shuts the app down on a signal but never
+calls `process.exit`, and `stopTimeout`, how long the `onStop` hooks may
+take, 5 000 ms by default: past it the hung hook is logged by name and
+the process exits 1, where a hung hook kept it alive forever. When the
+process has other listeners for the signal, `listen` does not exit
+either: it shuts its apps down, and your handler finishes and exits.
+
+```ts
+// a host that owns the exit: alxia drains, your handler decides
+process.on('SIGTERM', async () => {
+	await flushMetrics();
+	process.exit(0);
+});
+app.onStop(() => pool.end()).listen({ port: 3000, stopTimeout: 10_000 });
+```
+
+`listen()` on an app that already listens throws, `listen(): the app
+already listens on <url>; stop() it first`, where it started a second
+server and lost the first; the `onStop` hooks run once per `listen`, a
+second `stop()` returning the first one's promise.
+
 **Can it break your code.** Yes, for a process that handles its signals
-itself: `listen`'s handler runs beside yours and exits once the `onStop`
-hooks ran, so code after `await app.stop()` in your handler may not run.
-Move that code into `onStop`, or keep the signals yours with
+itself: `listen`'s handler runs beside yours. Your handler now keeps the
+exit to itself — alxia shuts its apps down and leaves the process to it —
+but code after `await app.stop()` runs while the drain may still be going:
+move it into `onStop`, or keep the signals yours with
 `listen({ signals: false })`. A `stop()` now waits at most
 `shutdownTimeout` for the requests in flight, where it waited for them
-indefinitely, and closes the open sockets with 1001
+indefinitely, and closes the open sockets with 1001; an `onStop` hook that
+outlasts `stopTimeout` makes the shutdown reject. A second `listen()` on
+the same app throws: `stop()` it first
 ([Health and shutdown](guide/health-and-shutdown.md#graceful-shutdown)).
 
 ### What behaves differently
@@ -552,13 +565,15 @@ indefinitely, and closes the open sockets with 1001
 ### Dev comfort, on in dev
 
 **What changed.** `alxia({ dev })` turns on what helps the developer
-running the app; left out, it is on unless `NODE_ENV` is `production` or
-`test`. In dev:
+running the app; left out, it is on only when `NODE_ENV` is
+`development`, and fails closed: `NODE_ENV` unset, `staging`, `prod`,
+`Production`, `production` and `test` all leave it off. In dev:
 
 - `listen` prints its URL and the route table, every route with its
   middlewares; `listen({ onListen })` is told them instead, in every mode;
 - the router's 404 and 405 carry a `hint`: `"did you mean GET
-  /todos/:id?"`, `"/todos/1 allows GET, DELETE"`;
+  /todos/:id?"`, `"/todos/1 allows GET, DELETE"` — never a route behind a
+  guard the request has not passed;
 - a 500 sends its error: an HTML page to a browser, a `stack` member (an
   extension under `errors: 'problem'`) to any other client.
 
@@ -573,17 +588,118 @@ the table in dev, and the `bun create @alxia` templates print it through
 
 ```ts
 // a deployed app says nothing of its routes nor its errors
-const app = alxia({ dev: false }); // or NODE_ENV=production, as every template's Dockerfile sets
+const app = alxia({ dev: false }); // or any NODE_ENV but development
 ```
 
-**Can it break your code.** Yes, for a process run without `NODE_ENV`
-where it serves real clients: it would send its stacks and its routes. Set
-`NODE_ENV=production` there, or `dev: false`; the templates' `start`
-scripts now set it. A test that compares a whole
-404, 405 or 500 body runs with `NODE_ENV=test` under `bun test`, so it is
-unchanged; one run otherwise gets the `hint` and the `stack`. A test that
-asserted the 500 of an uncalled factory now sees the declaration throw
+**Can it break your code.** Yes, for a `dev` script that sets no
+`NODE_ENV`: it no longer shows the table, the hints nor the error page.
+Set `NODE_ENV=development` in it ([below](#dev-and-start-scripts)), or
+pass `dev: true`. A deployed process is in dev only if it says so. A test
+that compares a whole 404, 405 or 500 body runs with `NODE_ENV=test`
+under `bun test`, so it is unchanged. A test that asserted the 500 of an
+uncalled factory now sees the declaration throw
 ([Development](guide/development.md)).
+
+### `dev` and `start` scripts
+
+**What changed.** Dev is on under `NODE_ENV=development` alone, so the
+`dev` script says so; `start` runs the build with `NODE_ENV=production`,
+so a project started outside its image is not in dev. Every `bun create
+@alxia` template's scripts now read this way.
+
+```json
+// before
+{
+	"scripts": {
+		"dev": "bun --hot src/server.ts",
+		"start": "bun dist/server.js"
+	}
+}
+```
+
+```json
+// after
+{
+	"scripts": {
+		"dev": "NODE_ENV=development bun --hot src/server.ts",
+		"start": "NODE_ENV=production bun dist/server.js"
+	}
+}
+```
+
+A React Router app's `dev` is `NODE_ENV=development react-router dev`, its
+`start` `NODE_ENV=production bun build/server/index.js`; its production
+build runs alxia out of dev, whatever `NODE_ENV` says.
+
+**Can it break your code.** Yes, for a `dev` script left as it was: the
+app runs, without the dev helps.
+
+### GraphiQL follows the dev switch
+
+**What changed.** `graphql(app, { schema })` without `ide` serves
+GraphiQL in dev alone — the serving app's switch, on under
+`NODE_ENV=development` — and none elsewhere, where it served it in every
+mode. `ide: 'graphiql'` or `ide: 'apollo-sandbox'` keeps one on, `ide:
+false` off.
+
+```ts no-check
+// before: GraphiQL in production unless you said otherwise
+graphql(app, { schema, ide: Bun.env['NODE_ENV'] === 'production' ? false : 'graphiql' });
+
+// 0.5: the same, by default
+graphql(app, { schema });
+```
+
+**Can it break your code.** Yes, for a deployed app that meant to serve
+GraphiQL: give `ide: 'graphiql'`. A test that loads the IDE under
+`bun test` (`NODE_ENV=test`, so not in dev) gives `ide` too.
+
+### `@alxia/redis` on `@nxgt/redis` 0.5
+
+**What changed.** `@alxia/redis`, released with core 0.5, is on `@nxgt/redis` `^0.5.0` alone:
+the rate limits and the idempotency `@nxgt/redis-guard` held moved into
+`@nxgt/redis`, and `@nxgt/redis-guard` is no longer a peer. `redis(handle)`
+takes an `@nxgt/redis` handle, closed in `onStop`, and `redisCheck(handle,
+{ timeout })` is a readiness check for `health({ checks })`.
+
+```sh
+# before
+bun add @alxia/redis @nxgt/redis@^0.3.1 @nxgt/redis-guard@^0.3.1
+
+# after
+bun remove @nxgt/redis-guard
+bun add @alxia/redis@latest @nxgt/redis@^0.5.0
+```
+
+```ts no-check
+// before
+import { defineIdempotency } from '@nxgt/redis-guard';
+
+// after: the same names, from @nxgt/redis
+import { defineIdempotency } from '@nxgt/redis';
+```
+
+**Can it break your code.** Yes: install `@nxgt/redis` `^0.5.0` and remove
+`@nxgt/redis-guard`. A hand-built `IdempotencyDefinition` now needs its
+`lease`, which `defineIdempotency` fills with 10 000. `@alxia/redis`'s own
+API is unchanged for a bare `RedisClient`.
+
+### `bun create @alxia` and `@alxia/env`
+
+**What changed.** `bun create @alxia` offers `minimal` (the default),
+`api`, `graphql` and `react-router`. Each template's `dev` script sets
+`NODE_ENV=development` and its `start` `NODE_ENV=production`; it lets
+`listen` handle the signals, with no handler of its own. `api` answers
+problems (`errors: 'problem'`), mounts `health()` and serves `apiDocs` from
+its imported `openapi.yaml`; its `API_KEY` is required outside
+`development` and `test`. `graphql` mounts `health()`, and its GraphiQL
+follows the dev switch. `@alxia/env`'s `defineEnv(shape, { secret, source
+})` reads each variable by its own Standard Schema, typed, one `EnvError`
+listing every issue, secrets printed as `***`; `parseEnv` is unchanged.
+
+**Can it break your code.** No, for an app already created: copy what you
+want of a new template. A project of the earlier `api` template that ran
+in production on its `dev-key` default sets `API_KEY` now.
 
 ### More than 8 middlewares: `compose`
 
@@ -688,7 +804,7 @@ A middleware takes `next` as its second argument, and always returns:
 `next(added)` where the hook returned what it added, `next()` where it
 returned nothing, and the same reply where it replied.
 
-```ts
+```ts no-check
 // before
 import { defineHook } from '@alxia/core';
 
@@ -735,7 +851,7 @@ TypeError: GET /posts/:id: a middleware returned nothing: return next(), a reply
 their response. Return it, set a header on it first, or return a reply of
 your own.
 
-```ts
+```ts no-check
 // before
 import { defineWrap } from '@alxia/core';
 
@@ -1453,7 +1569,7 @@ checked against its schema, and `ContextOf`.
 the source; [the old `@alxia/openapi` is retired](#the-old-alxiaopenapi-is-retired)
 shows how to start from the one 0.3 made — and generate the client from it:
 
-```ts
+```ts no-check
 // before
 import { client } from '@alxia/client';
 import type { App } from './server';
@@ -1501,7 +1617,7 @@ bun remove @alxia/openapi-routes
 bun add -d @alxia/openapi
 ```
 
-```ts
+```ts no-check
 // before
 import { matchesSpec } from '@alxia/openapi-routes';
 
@@ -1534,7 +1650,7 @@ That is code first, the opposite of spec first, so it is retired: 0.4.0 of
    once *before* you upgrade, with `@alxia/openapi` 0.3 still installed;
    from then on it is the source, edited by hand:
 
-   ```ts
+   ```ts no-check
    // export-openapi.ts — bun export-openapi.ts, once, then delete it
    import { openapi } from '@alxia/openapi'; // 0.3
    import { zodConverter } from '@alxia/zod';
@@ -1748,7 +1864,7 @@ app.group((note) =>
 );
 ```
 
-```ts
+```ts no-check
 // after: the check, named once, listed on the routes that need it
 import { defineHook } from '@alxia/core';
 
@@ -1779,7 +1895,7 @@ type threads its list with. All of them were removed in 0.5: see
 `Cookie` header on first read. A route's `cookies` schema still gives its
 handler the validated values.
 
-```ts
+```ts no-check
 // before: parsing the header yourself
 .derive(({ request }) => {
 	const sid = /(?:^|;\s*)sid=([^;]*)/.exec(request.headers.get('cookie') ?? '')?.[1];
@@ -1897,7 +2013,7 @@ refusal narrowed, and its replies replace that kind's default only, in the
 route's type, the client and the OpenAPI document. `onRefusal(hook)` and
 `onRefusal(schema, hook)` are unchanged.
 
-```ts
+```ts no-check
 // before: one hook, checking the kind
 .onRefusal((refusal) =>
 	refusal.kind === 'validation'
@@ -1934,7 +2050,7 @@ New exports: `RefusalKind`, `RefusalOfKind`, `RefusalHandlersByKind`,
 **What changed.** In `@alxia/openapi-routes`, `exactly(app, operations)` is
 renamed `matchesSpec`, and `ExactlyOptions` `MatchesSpecOptions`.
 
-```ts
+```ts no-check
 // before
 import { exactly } from '@alxia/openapi-routes';
 exactly(app, operations);

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "react-router build",
-    "dev": "react-router dev",
+    "dev": "NODE_ENV=development react-router dev",
     "start": "NODE_ENV=production bun build/server/index.js",
     "typecheck": "react-router typegen && tsc",
     "lint": "biome lint",

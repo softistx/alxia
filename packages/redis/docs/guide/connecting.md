@@ -190,7 +190,9 @@ an app that does not mount `redis(handle)` closes the handle itself. A
 
 **Health.** `redisCheck(handle)` is a check for `health({ checks })`: it
 passes while every instance answers a `PING` and is down when one does not;
-`{ timeoutMs }` bounds each ping (2 s by default). It takes a bare client too.
+given a handle, `{ timeout }` bounds each instance's ping, in milliseconds
+(2 s by default). It takes a bare client too, whose `PING` has no bound of
+its own: `health({ timeout })` bounds the check.
 
 **One instance.** The handle must wire exactly one Redis instance; a handle of
 several is refused with a `TypeError` naming them. Give a bare client,

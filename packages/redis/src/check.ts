@@ -3,8 +3,11 @@ import type { RedisTarget } from './handle';
 import { isHandle } from './handle';
 
 export interface RedisCheckOptions {
-	/** Milliseconds a handle's ping waits for each instance. `@nxgt/redis`'s 2 s by default. */
-	readonly timeoutMs?: number;
+	/**
+	 * Milliseconds a handle's ping waits for each instance, as
+	 * `health({ timeout })` names its own: `@nxgt/redis`'s 2 s by default.
+	 */
+	readonly timeout?: number;
 }
 
 /**
@@ -26,9 +29,9 @@ export function redisCheck(
 			return true;
 		}
 		const results: Record<string, PingResult> = await target.ping(
-			options.timeoutMs === undefined
+			options.timeout === undefined
 				? undefined
-				: { timeoutMs: options.timeoutMs },
+				: { timeoutMs: options.timeout },
 		);
 		return Object.values(results).every((result) => result.ok);
 	};

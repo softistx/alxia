@@ -21,7 +21,7 @@ const app = alxia()
 
 app.listen({ port: 3000 });
 // GET /health → 200 { status: 'ok' }
-// GET /ready  → 200 { status: 'ok', checks: { redis: { status: 'ok', duration: 1 }, db: { … } } }
+// GET /ready  → 200 { status: 'ok', checks: {} }; in dev, each check: { redis: { status: 'ok', duration: 1 }, … }
 // SIGTERM     → /ready 503, the requests in flight finish, sql.end(), exit 0
 ```
 
@@ -37,7 +37,7 @@ A plugin app, given to `app.plugin`, with two `GET` routes (and their
 | Route | Answers |
 | --- | --- |
 | `GET /health`, liveness | 200 `{ status: 'ok' }` while the process is up, shutting down included: a failing liveness probe restarts the process, which a shutdown must not cause |
-| `GET /ready`, readiness | 200 `{ status: 'ok', checks }` when every check passes; 503 `{ status: 'down', checks }` when one fails; 503 `{ status: 'shutting_down', checks: {} }` from the moment the app starts shutting down, without running a check |
+| `GET /ready`, readiness | 200 `{ status: 'ok', checks }` when every check passes; 503 `{ status: 'down', checks }` when one fails — `checks` empty unless `details`; 503 `{ status: 'shutting_down', checks: {} }` from the moment the app starts shutting down, without running a check |
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
@@ -46,11 +46,15 @@ A plugin app, given to `app.plugin`, with two `GET` routes (and their
 | `readyPath` | `RoutePath` | `/ready` | where readiness answers |
 | `timeout` | `number` | `1000` | how long each check may take, in milliseconds |
 | `cache` | `number` | `1000` | how long a readiness report is kept, in milliseconds; `0` runs the checks on every probe |
+| `details` | `boolean` | the serving app's `dev` | whether `/ready` names each check, with its status, duration and reason; hidden, `checks` is `{}` |
 
 A check **passes** when it returns or resolves, and **fails** when it
 throws, rejects, returns `false` or outlasts `timeout`. Every check runs
-at once, so readiness takes as long as the slowest. Each result says how
-long it took, and why it is down:
+at once, so readiness takes as long as the slowest. A check that outlasted
+`timeout` and is still running is not started again by the next probe:
+that probe waits for the same run, within its own `timeout`, so a hung
+dependency never piles up calls. With `details` — in dev, by default —
+each result says how long it took, and why it is down:
 
 ```json
 {
@@ -64,6 +68,9 @@ long it took, and why it is down:
 
 `reason` is `timeout` or `failed`, never the error's message, which may
 name a host or a credential: the probe is often reachable from outside.
+For the same reason the names and durations are hidden outside dev,
+`{ "status": "down", "checks": {} }`: give `details: true` to show them
+to a probe you trust, `details: false` to hide them in dev too.
 Every probe answer carries `Cache-Control: no-store`.
 
 **The report is cached.** A probe every second from three replicas of a
@@ -116,7 +123,8 @@ terminationGracePeriodSeconds: 15 # more than shutdownTimeout
 ## Graceful shutdown
 
 `listen` handles `SIGTERM` and `SIGINT`: the app shuts down, then the
-process exits — 0, or 1 when an `onStop` hook throws, the error printed.
+process exits — 0, or 1 when an `onStop` hook throws or outlasts
+`stopTimeout`, the error printed.
 `app.stop()` runs the same shutdown without exiting. In order:
 
 1. **Readiness turns 503**, and `shutdownSignal(ctx)` aborts: every stream
@@ -127,19 +135,28 @@ process exits — 0, or 1 when an `onStop` hook throws, the error printed.
 4. **The requests in flight finish**, for `shutdownTimeout` milliseconds
    at most; past it, their connections are closed.
 5. **Every `onStop` hook runs**, each awaited in turn: close a pool, flush
-   a queue.
-6. The process exits (on a signal only).
+   a queue — for `stopTimeout` milliseconds in all. Past it, the hook still
+   running is logged by name, the ones after it are not run, and the
+   shutdown fails: a hung hook never keeps the process alive.
+6. The process exits (on a signal only), unless `exit: false` or another
+   listener for the signal is installed.
 
-A second signal while the app drains exits at once, with 1: a `Ctrl-C`
-pressed twice does not wait.
+A second signal while the app drains exits at once, with 1, when alxia owns
+the exit: a `Ctrl-C` pressed twice does not wait. Under `exit: false` or a
+listener of the process's own, alxia leaves it to the host. The `onStop` hooks run once per `listen`: a
+second `stop()` returns the first one's promise. `listen()` on an app that
+already listens throws, `listen(): the app already listens on <url>; stop()
+it first`, rather than start a second server and lose the first.
 
 | `listen` option | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `shutdownTimeout` | `number` | `10000` | how long the requests in flight have to finish, in milliseconds |
+| `stopTimeout` | `number` | `5000` | how long the `onStop` hooks have, in all, in milliseconds |
 | `signals` | `NodeJS.Signals[] \| false` | `['SIGINT', 'SIGTERM']` | the signals that shut the app down; `false` installs none |
+| `exit` | `boolean` | `true` | whether the process exits once a signal shut the app down; `false` never calls `process.exit` |
 
 ```ts
-app.listen({ port: 3000, shutdownTimeout: 25_000 });
+app.listen({ port: 3000, shutdownTimeout: 25_000, stopTimeout: 5_000 });
 ```
 
 The handlers are installed before `listen` returns, so a supervisor that
@@ -149,9 +166,22 @@ One handler per signal serves every app of the process, however many
 
 ### A process that handles its signals itself
 
-Cleanup belongs in `onStop`: `listen`'s handler exits once the hooks ran,
-so code after `await app.stop()` in a handler of your own may not run.
-To keep the signals yours, turn them off and call `stop()`:
+Cleanup belongs in `onStop`. When the process has a listener of its own
+for the signal, `listen` shuts its apps down and does not exit: your
+handler finishes, and exits when it decides. `exit: false` says the same
+for a host whose exit is somewhere else:
+
+```ts
+app.listen({ port: 3000, exit: false });
+
+process.on('SIGTERM', async () => {
+	await app.stop(); // the shutdown the signal started: the same promise
+	await report.flush();
+	process.exit(0);
+});
+```
+
+To keep the signals yours altogether, turn them off and call `stop()`:
 
 ```ts
 app.listen({ port: 3000, signals: false });

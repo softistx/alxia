@@ -130,7 +130,9 @@ export function createServer<
 				options.client === false
 					? undefined
 					: (options.client ?? wiring.client);
-			const fresh = alxia();
+			// The app helps the developer in React Router's dev alone: a production
+			// build is never in dev, whatever NODE_ENV says.
+			const fresh = alxia({ dev: mode === 'development' });
 			// Without beforeAll or configure, Before and App are their defaults,
 			// the app passed through: a type argument given by hand is believed.
 			const before = (options.beforeAll?.(fresh) ?? fresh) as Before;

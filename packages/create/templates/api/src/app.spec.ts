@@ -30,13 +30,14 @@ test("creates a todo from JSON", async () => {
   });
 });
 
-test("refuses an empty title with a 400 naming it", async () => {
+test("refuses an empty title with a 400 problem naming it", async () => {
   const { error, response } = await api.POST("/todos", {
     body: { title: "" },
   });
   expect(response.status).toBe(400);
+  expect(response.headers.get("content-type")).toBe("application/problem+json");
   // error is the 400 or the 401 body: a match, not a property read
-  expect(error).toMatchObject({ issues: [{ path: ["title"] }] });
+  expect(error).toMatchObject({ status: 400, issues: [{ path: ["title"] }] });
 });
 
 test("asks for the key before it reads the body", async () => {
@@ -64,6 +65,12 @@ test("reads the id from the path as a number, as the spec types it", async () =>
 test("lists the todos", async () => {
   const { data } = await api.GET("/todos");
   expect(Array.isArray(data)).toBe(true);
+});
+
+test("answers the liveness probe", async () => {
+  const response = await app.request("/health");
+  expect(response.status).toBe(200);
+  expect(await response.json()).toEqual({ status: "ok" });
 });
 
 test("app.request is the same app, with a hand-written request", async () => {

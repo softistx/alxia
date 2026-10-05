@@ -32,14 +32,16 @@ curl localhost:3000/graphql -H 'content-type: application/json' \
   user, or `null`. `Context` is `GraphQLContext<typeof base>`, which
   `codegen.ts` hands to `Resolvers`.
 - `src/schema.ts`, `src/app.ts`: `createSchema` from `schema.graphql` and the
-  resolvers, then `graphql(app, { schema })` mounted on the base.
+  resolvers, then `health()`'s probes (`GET /health`, `GET /ready`) and
+  `graphql(app, { schema })` mounted on the base.
 - `src/env.ts`: `defineEnv` from
-  [`@alxia/env`](https://www.npmjs.com/package/@alxia/env): `PORT` and
-  `NODE_ENV`, each checked once, when the module is first imported. A
-  malformed one stops the process with every issue, before it listens.
+  [`@alxia/env`](https://www.npmjs.com/package/@alxia/env): `PORT`, checked
+  once, when the module is first imported. A malformed one stops the
+  process with every issue, before it listens.
 - `src/store.ts`: the in-memory users, tokens and notes, and the pub/sub the
   subscription reads. Swap it for your database.
-- `src/server.ts`: listens on `env.PORT`, 3000 by default.
+- `src/server.ts`: listens on `env.PORT`, 3000 by default, and shuts down
+  gracefully on `SIGINT` and `SIGTERM`, which `listen` handles.
 - `src/app.spec.ts`: POST `/graphql` through `app.request()`, no port:
   queries, the mutation with and without a token, and the subscription.
 - `biome.json`: Biome's lint and format settings ([Lint and format](#lint-and-format)).
@@ -89,8 +91,9 @@ describes.
 ## Environment
 
 Bun loads `.env` on every command, and `src/env.ts` checks what it finds. Copy
-`.env.example` to `.env` to set `PORT`. `NODE_ENV=production`, which the image
-sets, turns the GraphiQL page off.
+`.env.example` to `.env` to set `PORT`. GraphiQL follows alxia's dev
+switch: on under `bun dev`, which sets `NODE_ENV=development`, off
+otherwise — `bun start` and the image run with `NODE_ENV=production`.
 
 ```sh
 cp .env.example .env
@@ -155,8 +158,8 @@ on `oven/bun:1-alpine`. The build stage installs every dependency with
 `--frozen-lockfile`, from the `bun.lock` that `bun install` wrote (commit
 it), and runs `bun run build`. The image holds `dist/` alone, no
 `node_modules` and no `src/`, and runs `bun --no-install dist/server.js` as
-its non-root `bun` user. `src/server.ts` stops the app on `SIGTERM`, so
-`docker stop` is immediate.
+its non-root `bun` user. `listen` drains the app and exits on `SIGTERM`,
+so `docker stop` is immediate.
 
 ```sh
 docker build -t my-graphql-api .

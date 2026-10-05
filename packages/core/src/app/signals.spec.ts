@@ -2,7 +2,8 @@
  * `listen` shuts the app down on `SIGTERM` and `SIGINT`, in a process of
  * its own (`test/fixtures/shutdown.ts`): the request in flight finishes,
  * the `onStop` hooks run, and the process exits 0 — or 1 when a hook
- * throws; `signals: false` leaves the signal to the process.
+ * throws or outlasts `stopTimeout`; `signals: false` leaves the signal to
+ * the process, `exit: false` and another listener of the signal the exit.
  */
 import { describe, expect, test } from 'bun:test';
 import { fileURLToPath } from 'node:url';
@@ -64,5 +65,34 @@ describe('listen() and the signals', () => {
 		child.kill('SIGTERM');
 		expect(await child.exited).not.toBe(0);
 		expect(await printed()).not.toContain('onStop');
+	});
+
+	test('exit: false shuts the app down and leaves the exit to the process', async () => {
+		const { child, printed } = await started({ EXIT: 'off' });
+		child.kill('SIGTERM');
+		expect(await child.exited).toBe(5);
+		expect(await printed()).toContain('onStop\nafter stop');
+	});
+
+	test("another SIGTERM listener: alxia stops its app and lets the host's cleanup finish", async () => {
+		const { child, printed } = await started({ HOST: 'on' });
+		child.kill('SIGTERM');
+		expect(await child.exited).toBe(3);
+		const out = await printed();
+		expect(out).toContain('onStop');
+		expect(out).toContain('host cleanup');
+	});
+
+	test('an onStop hook that never settles: past stopTimeout, it is named and the process exits 1', async () => {
+		const { child } = await started({ STOP: 'hang' });
+		const start = performance.now();
+		child.kill('SIGTERM');
+		const code = await Promise.race([child.exited, Bun.sleep(3_000)]);
+		if (code === undefined) child.kill('SIGKILL');
+		expect(code).toBe(1);
+		expect(performance.now() - start).toBeLessThan(2_000);
+		expect(await new Response(child.stderr).text()).toContain(
+			'onStop hook closePool (1 of 1) did not finish within 200 ms',
+		);
 	});
 });

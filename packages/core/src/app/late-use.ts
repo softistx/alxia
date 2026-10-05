@@ -1,16 +1,10 @@
 /**
- * The one warning, in development, of a middleware given after routes:
- * `use(mw)` does not run on the routes declared before it. Never in
- * production nor under `bun test`: `NODE_ENV` says which.
+ * The one warning, in dev, of a middleware given after routes: `use(mw)`
+ * does not run on the routes declared before it. Only when the app's dev
+ * switch is on (`dev/mode.ts`): `alxia({ dev })`, else `NODE_ENV=development`.
  */
 import type { AppState } from './app-state';
 import { reach, type ScopePath } from './scope-path';
-
-/** Whether the process is a developer's: neither `production` nor `test`. */
-export function developing(): boolean {
-	const mode = Bun.env.NODE_ENV; // not process.env, which `bun build` inlines
-	return mode !== 'production' && mode !== 'test';
-}
 
 /**
  * Warns, once per app, when middlewares are given after routes they
@@ -21,7 +15,12 @@ export function warnLate(
 	label: string,
 	path: ScopePath | undefined,
 ): void {
-	if (state.warnedLate || state.routes.length === 0 || !developing()) return;
+	if (
+		state.warnedLate ||
+		state.routes.length === 0 ||
+		state.runtime.served.dev !== true
+	)
+		return;
 	const before = state.routes
 		.filter(
 			(route) => path === undefined || reach(path, route.path) !== 'never',

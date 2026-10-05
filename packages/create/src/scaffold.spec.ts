@@ -36,10 +36,10 @@ describe('create-alxia: the project written', () => {
 			dependencies: {
 				'@alxia/core': ALXIA['@alxia/core'],
 				'@alxia/env': ALXIA['@alxia/env'],
+				'@alxia/openapi': ALXIA['@alxia/openapi'],
 				zod: '^4.6.5',
 			},
 			devDependencies: {
-				'@alxia/openapi': ALXIA['@alxia/openapi'],
 				// Pinned exactly, as its output is committed: never moved, so
 				// `verify` still passes when a newer patch writes differently.
 				'@nxgt/openapi-codegen': '0.7.0',
@@ -174,7 +174,7 @@ describe('create-alxia: the project written', () => {
 			),
 		).toBe(0);
 		expect(err[0]).toBe(
-			'create-alxia: warning: the registry did not answer for @alxia/core, @alxia/env, zod, @alxia/openapi, @biomejs/biome, @types/bun, openapi-fetch, typescript; kept the versions the template ships.',
+			'create-alxia: warning: the registry did not answer for @alxia/core, @alxia/env, @alxia/openapi, zod, @biomejs/biome, @types/bun, openapi-fetch, typescript; kept the versions the template ships.',
 		);
 		expect(
 			(await json(join(project.root, 'my-api', 'package.json'))).devDependencies

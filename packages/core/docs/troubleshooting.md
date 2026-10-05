@@ -73,6 +73,8 @@ a trap that prints nothing is headed by its symptom.
 - [``alxia(): errors must be 'json' or 'problem', not "…"``](#alxia-errors-must-be-json-or-problem-not-)
 - [``alxia(): dev must be true or false, not "…"``](#alxia-dev-must-be-true-or-false-not-)
 - [`listen(): shutdownTimeout must be a number of milliseconds, 0 or more; got …`](#listen-shutdowntimeout-must-be-a-number-of-milliseconds-0-or-more-got-)
+- [`listen(): the app already listens on …; stop() it first`](#listen-the-app-already-listens-on--stop-it-first)
+- [`onStop hook … (… of …) did not finish within … ms`](#onstop-hook---of--did-not-finish-within--ms)
 - [`health(): timeout must be a number of milliseconds, 0 or more; got …`](#health-timeout-must-be-a-number-of-milliseconds-0-or-more-got-), and `health(): cache …`
 - [`group(): build is missing`](#group-build-is-missing)
 - [`use(): argument 1 is an app: a plugin is given to app.plugin(), use() takes middlewares`](#use-argument-1-is-an-app-a-plugin-is-given-to-appplugin-use-takes-middlewares)
@@ -101,6 +103,7 @@ a trap that prints nothing is headed by its symptom.
 - [`416 {"error":"range_not_satisfiable"}`](#416-errorrange_not_satisfiable)
 - [`500 {"error":"internal"}`](#500-errorinternal)
 - [A 404 carries a `hint`, a 500 a `stack` or an HTML page](#a-404-carries-a-hint-a-500-a-stack-or-an-html-page)
+- [No route table, no 404 hint, no error page while developing](#no-route-table-no-404-hint-no-error-page-while-developing)
 - [`503 {"status":"shutting_down","checks":{}}`](#503-statusshutting_downchecks) on `/ready`
 - [`503 {"status":"down",…}`](#503-statusdown) on `/ready`
 - [A client generated with `@nxgt/openapi-codegen` refuses the 400 after `errors: 'problem'`](#a-client-generated-with-nxgtopenapi-codegen-refuses-the-400-after-errors-problem)
@@ -1231,9 +1234,8 @@ todos.ts(3,14): error TS7022: 'todos' implicitly has type 'any' because it does 
 ```
 
 The same happens when the registered chain itself reads `Register`: a
-`defineMiddleware<AppContext>()` or a `defineRoutes()` given to `base`. A
-plain `defineMiddleware(fn)` given to `base` reads `Register` too, and
-fails otherwise:
+`defineAppMiddleware(fn)`, a `defineMiddleware<AppContext>()` or a
+`defineRoutes()` given to `base`, which fails otherwise:
 [`Property 'db' does not exist on type 'BaseContext'.`](#property-db-does-not-exist-on-type-basecontext).
 (A `contextStorage()` given to `base` compiles, but its `context()` reads
 `BaseContext`: give it to the app after `base`.)
@@ -1304,31 +1306,34 @@ a package shared by both names what it reads with
 
 ### `Property 'db' does not exist on type 'BaseContext'.`
 
-**When:** with `Register` augmented, every `defineMiddleware(fn)` that
-reads a key of the registered context fails with it, on each key, and the
-`@ts-expect-error` a route that does not give the context had becomes
-unused:
+**When:** a shared middleware reads a key of the registered context, and
+either is `defineMiddleware(fn)`, which reads the base context alone, or is
+a `defineAppMiddleware(fn)` given to the registered base itself — then
+every one of them fails, on each key, and the `@ts-expect-error` a route
+that does not give the context had becomes unused:
 
 ```text
 middlewares.ts(6,50): error TS2339: Property 'db' does not exist on type 'BaseContext'.
 middlewares.ts(6,54): error TS2339: Property 'user' does not exist on type 'BaseContext'.
 ```
 
-**Why:** `defineMiddleware(fn)`, with no type argument, reads the
-registered context: the context of the base `Register` names. A
-middleware the base itself is built with, `base.use(requestId)`, then
-reads the type of the base it is part of, so the registration resolves to
-nothing and every middleware reads `BaseContext` alone.
+**Why:** `defineMiddleware(fn)`, with no type argument, reads
+`BaseContext`, as an inline middleware does. `defineAppMiddleware(fn)`
+reads the registered context, the context of the base `Register` names;
+given to that base, `base.use(audit)`, it reads the type of the base it is
+part of, so the registration resolves to nothing and every middleware
+reads `BaseContext` alone.
 
-**Fix:** a middleware the registered base is built with says it reads
-nothing of it, `defineMiddleware<Empty>()(fn)` (or names what it reads,
+**Fix:** a middleware that reads the registered context, given after the
+base, is a `defineAppMiddleware(fn)`; one the registered base is built
+with stays a `defineMiddleware(fn)` (or names what it reads,
 `defineMiddleware<{ db: Db }>()(fn)`):
 
 ```ts
 // src/context.ts
-import { alxia, defineMiddleware, type Empty } from '@alxia/core';
+import { alxia, defineMiddleware } from '@alxia/core';
 
-const requestId = defineMiddleware<Empty>()((ctx, next) =>
+const requestId = defineMiddleware((ctx, next) =>
 	next({ requestId: ctx.request.headers.get('x-request-id') ?? 'none' }),
 );
 
@@ -1340,8 +1345,10 @@ declare module '@alxia/core' {
 	}
 }
 
-// src/middlewares.ts — reads the registered context, no generic needed
-export const profile = defineMiddleware(({ db, requestId }, next) => next({ profile: db.find(requestId) }));
+// src/middlewares.ts — reads the registered context
+import { defineAppMiddleware } from '@alxia/core';
+
+export const profile = defineAppMiddleware(({ db, requestId }, next) => next({ profile: db.find(requestId) }));
 ```
 
 ## Building the app
@@ -1723,15 +1730,17 @@ See [Errors](guide/errors.md).
 **When:** `alxia({ dev })` is given anything but a boolean: `dev:
 process.env.DEV`, a string.
 
-**Fix:** pass a boolean, or leave it out to read `NODE_ENV`:
-`alxia({ dev: process.env['DEV'] === '1' })`
+**Fix:** pass a boolean, or leave it out to read `NODE_ENV` (dev only
+when it is `development`): `alxia({ dev: Bun.env['DEV'] === '1' })`
 ([Development](guide/development.md#the-dev-switch)).
 
 ### `listen(): shutdownTimeout must be a number of milliseconds, 0 or more; got …`
 
-**When:** `listen({ shutdownTimeout })` is negative, `NaN`, `Infinity`, or
-not a number, `'10s'` for instance. It is thrown by `listen`, before the
-server starts.
+Also `listen(): stopTimeout must be …`, for the bound of the `onStop` hooks.
+
+**When:** `listen({ shutdownTimeout })` or `listen({ stopTimeout })` is
+negative, `NaN`, `Infinity`, or not a number, `'10s'` for instance. It is
+thrown by `listen`, before the server starts.
 
 **Why:** the timeout is how long a shutdown waits for the requests in
 flight, in milliseconds.
@@ -1744,6 +1753,54 @@ app.listen({ port: 3000, shutdownTimeout: 5_000 });
 ```
 
 See [Health and shutdown](guide/health-and-shutdown.md).
+
+### `listen(): the app already listens on …; stop() it first`
+
+```text
+Error: listen(): the app already listens on http://localhost:3000/; stop() it first
+```
+
+**When:** `listen()` is called on an app whose server, from an earlier
+`listen()`, has not stopped: a server file imported twice, a test that
+listens in each case without stopping.
+
+**Why:** a second server would take the app's place in `app.server` and in
+the shutdown, and the first would keep its port and its connections with
+nobody to stop it.
+
+**Fix:** stop the first one, then listen again, or listen once:
+
+```ts
+const server = app.listen({ port: 0, signals: false });
+// …
+await app.stop();
+app.listen({ port: 0, signals: false }); // fine: the first one stopped
+```
+
+### `onStop hook … (… of …) did not finish within … ms`
+
+```text
+Error: onStop hook closePool (2 of 3) did not finish within 5000 ms; 1 after it not run: raise listen()'s stopTimeout, or make it settle
+```
+
+**When:** the app shuts down — on `SIGTERM`, `SIGINT` or `stop()` — and an
+`onStop` hook is still running once `stopTimeout` (5 000 ms by default)
+has passed since the hooks started. `stop()` rejects with it; on a signal
+it is printed and the process exits 1.
+
+**Why:** the hooks run in turn, and their phase is bounded so that a hung
+one — a pool that never closes, a flush to a dead host — never keeps the
+process alive. `anonymous` names a hook written as an arrow function.
+
+**Fix:** make the hook settle (give its client its own timeout), or give
+the hooks more time:
+
+```ts
+app.onStop(async function closePool() {
+	await pool.end();
+});
+app.listen({ port: 3000, stopTimeout: 15_000 });
+```
 
 ### `health(): timeout must be a number of milliseconds, 0 or more; got …`
 
@@ -2215,7 +2272,7 @@ Under `alxia({ errors: 'problem' })` the same answer is an `application/problem+
 
 **When:** a handler or a middleware throws, or a reply breaks its schema. The
 body never says why outside dev, by design. In dev (`alxia({ dev })`, on
-unless `NODE_ENV` is `production` or `test`) it does: a browser gets a page
+only when `NODE_ENV` is `development`) it does: a browser gets a page
 with the error and its stack, any other client a `stack` beside `error`
 ([Development](guide/development.md#the-dev-error-page)).
 
@@ -2256,17 +2313,41 @@ Prefer a declared `reply` to `throw new HttpError(…)`: a thrown status is
 not declared, so a client generated from the OpenAPI document does not
 expect it.
 
+### No route table, no 404 hint, no error page while developing
+
+**When:** the app runs with `bun src/server.ts` or `bun --hot
+src/server.ts` and `NODE_ENV` unset, or set to anything but `development`:
+`listen` prints nothing, a 404 has no `hint`, a 500 is `{"error":"internal"}`.
+
+**Why:** since 0.5 dev is on only when `NODE_ENV` is exactly
+`development`, so an app deployed without `NODE_ENV` never shows its
+routes nor its stacks. Before 0.5 it was on unless `NODE_ENV` was
+`production` or `test`.
+
+**Fix:** set it in the `dev` script, as every `bun create @alxia` template
+does, or decide in the app:
+
+```json
+{ "scripts": { "dev": "NODE_ENV=development bun --hot src/server.ts" } }
+```
+
+```ts
+const app = alxia({ dev: Bun.env['APP_DEV'] === '1' });
+```
+
 ### A 404 carries a `hint`, a 500 a `stack` or an HTML page
 
-**When:** the app runs in dev: `NODE_ENV` is neither `production` nor
-`test`, and `alxia({ dev })` is not given. `listen` then prints the route
-table too.
+**When:** the app runs in dev: `NODE_ENV` is `development` and
+`alxia({ dev })` is not given, or `alxia({ dev: true })`. `listen` then
+prints the route table too.
 
 **Why:** dev helps the developer running the app; the deployed one should
-say nothing of its routes nor its errors.
+say nothing of its routes nor its errors. Dev fails closed: `NODE_ENV`
+unset, `staging` or `Production` leaves it off.
 
-**Fix:** where the app is deployed, set `NODE_ENV=production`, as every
-`bun create @alxia` template's `Dockerfile` does, or say so in the app:
+**Fix:** where the app is deployed, do not set `NODE_ENV=development`
+(every `bun create @alxia` template's `Dockerfile` sets `production`), or
+say so in the app:
 
 ```ts
 const app = alxia({ dev: false });
@@ -2439,7 +2520,7 @@ to the route.
 use(): the middleware runs on the routes declared after it and on requests no route matches, not on the route (GET /health) declared before it. Give it to use() before them if they need it.
 ```
 
-**When:** in development (`NODE_ENV` neither `production` nor `test`),
+**When:** in dev (`NODE_ENV=development`, or `alxia({ dev: true })`),
 once per app, when `use` is given a middleware after routes it would have
 run on — those under its path, given one.
 
@@ -2988,14 +3069,19 @@ What `listen`'s graceful shutdown does on `SIGTERM` and `SIGINT`
 
 ### The process exits before my own `SIGTERM` handler finishes
 
-**When:** the app is served with `listen`, and your own `process.on('SIGTERM', …)`
-does asynchronous cleanup that never completes: the process exits first.
+**When:** the app is served with `listen`, your own `process.on('SIGTERM', …)`
+does asynchronous cleanup, and the process exits before it completes: an
+alxia before 0.5's fix, or a handler installed after `listen` already
+received the signal.
 
-**Why:** since 0.5, `listen` installs `SIGINT` and `SIGTERM` handlers and
-shuts down gracefully: readiness 503, new connections refused, sockets
-closed with 1001, the requests in flight drained, the `onStop` hooks, then
-`process.exit(0)`, or `process.exit(1)` when an `onStop` hook throws (its
-error is printed). Yours runs beside it, and the exit does not wait for it.
+**Why:** `listen` installs `SIGINT` and `SIGTERM` handlers and shuts down
+gracefully: readiness 503, new connections refused, sockets closed with
+1001, the requests in flight drained, the `onStop` hooks, then
+`process.exit(0)`, or `process.exit(1)` when an `onStop` hook throws or
+outlasts `stopTimeout` (its error is printed). When the process has another
+listener for the signal, `listen` shuts its apps down and does not exit:
+your handler runs to its end and exits when it decides. A handler that
+never calls `process.exit` keeps the process alive.
 
 **Fix:** move the cleanup into an `onStop` hook, which the shutdown awaits:
 
@@ -3005,18 +3091,20 @@ app.onStop(async () => {
 });
 ```
 
-Or take the signals yourself, and stop the app from your handler:
+Or keep the exit yours, with `exit: false` or a handler of your own that
+awaits the same shutdown:
 
 ```ts
-app.listen({ port: 3000, signals: false });
+app.listen({ port: 3000, exit: false });
 process.on('SIGTERM', async () => {
+	await app.stop(); // the shutdown the signal started
 	await cleanup();
-	await app.stop();
 	process.exit(0);
 });
 ```
 
-A second signal during the drain exits at once with 1. See
+`signals: false` takes the signals from `listen` altogether. A second
+signal during the drain exits at once with 1 when alxia owns the exit. See
 [Health and shutdown](guide/health-and-shutdown.md).
 
 ### Shutdown takes 10 seconds

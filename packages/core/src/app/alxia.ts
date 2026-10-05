@@ -5,11 +5,11 @@ import type {
 	StopHookMethod,
 } from './app-hooks';
 import { type AppState, createState } from './app-state';
-import { compose, type GroupArgs, group } from './compose';
 import type { GroupMethod, UseMethod } from './compose-methods';
 import * as hooks from './declare-hooks';
 import * as declare from './declare-routes';
 import type { RouteDefinition, SocketDefinition } from './definition';
+import { type GroupArgs, group, mountPlugin } from './mount';
 import { serve } from './pipeline';
 import type { PluginMethod } from './plugin-method';
 import type { RouteMethod } from './route-method';
@@ -53,6 +53,8 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 	/** Its prefix, its runtime, its routes, the chain in force. */
 	readonly #state: AppState;
 	#serving: Serving | undefined;
+	/** The shutdown of the last server `listen` started, once `stop` was called. */
+	#stopped: Promise<void> | undefined;
 	#websocket: Bun.WebSocketHandler<SocketData> | undefined;
 
 	constructor(options: AlxiaOptions<Prefix> = {}) {
@@ -91,8 +93,12 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 	readonly group: GroupMethod<Ctx, Prefix> = this.#do(
 		(state, ...args: GroupArgs) =>
 			group(state, args, (prefix) => {
-				const { validateResponses } = state.runtime;
-				const child = new Alxia({ prefix, validateResponses });
+				const { validateResponses, served } = state.runtime;
+				const child = new Alxia({
+					prefix,
+					validateResponses,
+					dev: served.dev === true,
+				});
 				return [child, child.#state];
 			}),
 	);
@@ -100,7 +106,7 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 		hooks.useMiddlewares(state, args, (value) => value instanceof Alxia),
 	);
 	readonly plugin: PluginMethod<this, Ctx, Prefix> = ((...args: unknown[]) =>
-		compose(this.#state, args, this, (value) =>
+		mountPlugin(this.#state, args, this, (value) =>
 			value instanceof Alxia ? value.#state : undefined,
 		)) as never;
 
@@ -148,7 +154,14 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 		this.fetch(new Request(new URL(path, 'http://localhost'), init));
 
 	readonly listen: ListenMethod = (options = {}) => {
+		const serving = this.#serving;
+		if (serving !== undefined && !serving.stopping) {
+			throw new Error(
+				`listen(): the app already listens on ${serving.server.url.href}; stop() it first`,
+			);
+		}
 		this.#serving = startServer(this.#state.runtime, options, this.websocket);
+		this.#stopped = undefined;
 		return this.#serving.server;
 	};
 
@@ -159,15 +172,21 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 	 * `shutdownTimeout` — then runs every `onStop` hook. With
 	 * `closeActiveConnections`, the requests in flight are not waited for, a
 	 * graceful shutdown already running included.
-	 * Called again while it runs, it returns the same promise.
+	 * Called again while it runs, or once it ran, it returns the same
+	 * promise: the `onStop` hooks run once per `listen`.
 	 */
 	async stop(closeActiveConnections = false): Promise<void> {
 		const serving = this.#serving;
+		// Stopped already: its `onStop` hooks ran once, and are not run again.
+		if (serving === undefined && this.#stopped !== undefined) {
+			return this.#stopped;
+		}
 		const stopped = stopServer(
 			this.#state.runtime,
 			serving,
 			closeActiveConnections,
 		);
+		if (serving !== undefined) this.#stopped = stopped;
 		await stopped;
 		if (this.#serving === serving) this.#serving = undefined;
 	}

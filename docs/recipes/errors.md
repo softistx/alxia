@@ -114,7 +114,7 @@ What each one answers, and what stays private:
 | `GET /nowhere`, `PUT /users` | 404, 405 | alxia's problems; `Allow` on the 405 |
 | `GET /crash` | 500 | `The server failed to answer the request`: the error is logged, never sent |
 
-In development (`NODE_ENV` neither `production` nor `test`) a 500 also carries its
+In development (`NODE_ENV=development`) a 500 also carries its
 `stack`, and a 404 a `hint`: that never ships.
 
 ```ts

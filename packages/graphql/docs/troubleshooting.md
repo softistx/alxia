@@ -39,6 +39,7 @@ symptom.
 - [A WebSocket client cannot connect: `Expected 101 status code`](#a-websocket-client-cannot-connect-expected-101-status-code)
 - [The IDE page is blank](#the-ide-page-is-blank)
 - [GraphiQL is served in production](#graphiql-is-served-in-production)
+- [GraphiQL does not open in development, or in a test](#graphiql-does-not-open-in-development-or-in-a-test)
 
 ## Install
 
@@ -434,10 +435,29 @@ app.use(defaultPolicy); // before the endpoint, so it wraps it
 
 **When:** a browser opening the production endpoint gets GraphiQL.
 
-**Why:** `ide` is `'graphiql'` by default.
+**Why:** the app gives `ide: 'graphiql'`, which serves it in every mode, or
+the serving app is in dev there (`NODE_ENV=development`, or
+`alxia({ dev: true })`). Without `ide`, GraphiQL follows the dev switch
+since 0.5; before, it was on everywhere.
 
-**Fix:**
+**Fix:** leave `ide` out, and keep `NODE_ENV=development` out of the
+deployed environment, or turn it off:
 
 ```ts
-graphql(app, { schema, ide: Bun.env['NODE_ENV'] === 'production' ? false : 'graphiql' });
+graphql(app, { schema, ide: false });
+```
+
+### GraphiQL does not open in development, or in a test
+
+**When:** a browser's `GET` at the endpoint gets a JSON result, or
+`Must provide query string.`, where GraphiQL used to open.
+
+**Why:** without `ide`, GraphiQL is served in the serving app's dev alone,
+on only under `NODE_ENV=development`; `bun test` sets `NODE_ENV=test`.
+
+**Fix:** run the `dev` script with `NODE_ENV=development`, or give the IDE
+explicitly where it must open:
+
+```ts
+graphql(app, { schema, ide: 'graphiql' });
 ```

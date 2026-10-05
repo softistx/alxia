@@ -4,7 +4,8 @@
  * official scaffold, then adds alxia's layer — the same three edits
  * `examples/react-router` made: `@alxia/core` and `@alxia/react-router` in
  * the dependencies (as `workspace:^`, which `@alxia/create` replaces with
- * the versions it was published beside), `start` running the build on Bun,
+ * the versions it was published beside), `dev` under
+ * `NODE_ENV=development` (alxia's dev switch), `start` running the build on Bun,
  * `alxia()` after `reactRouter()` in `vite.config.ts`; plus
  * `examples/react-router`'s `bunfig.toml`, and its `Dockerfile` in place of
  * the scaffold's, which builds and runs the app on Node; and its
@@ -89,7 +90,7 @@ type Manifest = {
 	[key: string]: unknown;
 };
 
-/** The manifest with alxia's packages in, sorted, and `start` on Bun. */
+/** The manifest with alxia's packages in, sorted, `dev` in development and `start` on Bun. */
 export function addAlxia(manifest: Manifest): Manifest {
 	if (
 		manifest.scripts['dev'] !== 'react-router dev' ||
@@ -112,6 +113,7 @@ export function addAlxia(manifest: Manifest): Manifest {
 		...manifest,
 		scripts: {
 			...manifest.scripts,
+			dev: 'NODE_ENV=development react-router dev',
 			start: 'NODE_ENV=production bun build/server/index.js',
 		},
 		dependencies,

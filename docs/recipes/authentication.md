@@ -88,7 +88,7 @@ export const login = defineRoutes().post(
 
 The guard turns every request after it into one with a typed `user`, or a
 401. A role check is a middleware of its own that **requires** `user`: its
-type argument says what it reads beyond the registered context, so a route
+type argument says what it reads beyond the base context, so a route
 without the guard before it does not compile.
 
 ```ts
@@ -108,6 +108,12 @@ export const requireRole = (role: z.infer<typeof Claims>['role']) =>
 		user.role === role ? next() : reply(403, { error: 'forbidden' as const }),
 	);
 ```
+
+A guard decides before it calls `next()`, and returns what it calls:
+`next()` starts the handler, so a guard that calls it without returning it
+and then refuses — `next(); return reply(403)` — has already let the
+handler run (Koa's semantics; alxia only warns). Write `check ? next() :
+reply(403, …)`, as above.
 
 ```ts
 // file: src/app.ts

@@ -8,7 +8,7 @@
 import { Alxia } from '../app/alxia';
 import type { RouteDefinition } from '../app/definition';
 import { markFactory } from '../app/factory';
-import { shutdownSignal } from '../app/served';
+import { isDev, shutdownSignal } from '../app/served';
 import type { BaseContext, Empty } from '../app/types';
 import type { RoutePath } from '../types/path';
 import { type HealthCheck, type ReadinessReport, readiness } from './checks';
@@ -32,6 +32,14 @@ export interface HealthOptions {
 	 * that asks meanwhile: 1 000 by default; `0` runs the checks on each.
 	 */
 	readonly cache?: number;
+	/**
+	 * Whether `/ready` names each check, with its status and duration, to
+	 * whoever asks: by default, in the serving app's dev alone (`dev/mode.ts`),
+	 * so a deployed probe tells an anonymous client `{ status }` and
+	 * nothing of what the app depends on. `true` shows them always — for a
+	 * `/ready` an orchestrator alone reaches — `false` never.
+	 */
+	readonly details?: boolean;
 }
 
 /** What `GET /health` answers while the process is up. */
@@ -46,8 +54,8 @@ const HEALTH: unique symbol = Symbol.for('alxia.health');
  * The probes of an app, as a plugin: `GET /health`, liveness, answers 200
  * `{ status: 'ok' }` while the process is up; `GET /ready`, readiness,
  * runs every check at once, each within `timeout`, and answers 200, or
- * 503 with each check's status and duration, its report kept for `cache`
- * milliseconds. From the moment the app starts shutting down, readiness
+ * 503 — with each check's status and duration in dev, or under
+ * `details: true` — its report kept for `cache` milliseconds. From the moment the app starts shutting down, readiness
  * answers 503 `{ status: 'shutting_down' }` without running a check.
  * Mount it before any guard, so that a probe needs no credentials:
  *
@@ -64,6 +72,7 @@ export function health(options: HealthOptions = {}): Alxia<Empty, ''> {
 		readyPath = '/ready',
 		timeout = 1_000,
 		cache = 1_000,
+		details,
 	} = options;
 	for (const [name, value] of [
 		['timeout', timeout],
@@ -85,7 +94,11 @@ export function health(options: HealthOptions = {}): Alxia<Empty, ''> {
 			return ctx.reply(503, closing, NO_STORE);
 		}
 		const result = await report();
-		return ctx.reply(result.status === 'ok' ? 200 : 503, result, NO_STORE);
+		const shown = details ?? isDev(ctx);
+		const body: ReadinessReport = shown
+			? result
+			: { status: result.status, checks: {} };
+		return ctx.reply(result.status === 'ok' ? 200 : 503, body, NO_STORE);
 	});
 	const app = new Alxia() as unknown as {
 		get(path: string, handler: unknown): unknown;

@@ -146,7 +146,8 @@ const app = alxia().post(
 | `app.<method>(path, options?, ...middlewares, handler)` | up to 8 middlewares, each reading what the ones before it added; the handler last |
 | `options` | `bodyLimit` (bytes, a 413 past it) and `detail` (`summary`, `operationId`, `tags`…: read by nothing at run time; a generated operation carries it); a schema there does not compile, and throws where the route is declared |
 | `(ctx, next) => …` | a middleware: what it passes `next` is inferred and read by the middlewares after it and the handler. One that calls `next()` and returns nothing answers with the rest's response, as Koa and Hono do |
-| `defineMiddleware(fn)` | types `fn` and returns it: a middleware kept in a module and shared |
+| `defineMiddleware(fn)` | types `fn` and returns it: a middleware kept in a module and shared, reading the base context |
+| `defineAppMiddleware(fn)` | the same, reading the `Register`ed context (`db`, `env`, `user`…) with no import of the app |
 | `compose(...middlewares)` | several middlewares as one, typed for any number of them: past the 8 a call takes, or to name a set once; spliced into the chain where it stands |
 | `app.use(...middlewares)` | up to 8 middlewares, run on every request in the order declared: a route runs the ones declared before it, then its own, and a request no route matches — a 404 — runs them all; what each adds is typed in the routes after it |
 | `app.use(path, ...middlewares)` | the same for the requests under `path` alone, matched against the request's path; they may add nothing |
@@ -740,10 +741,21 @@ context, which it requires of the app that mounts it. `AppContext` is that
 context, for a service or a resolver. Register `base`, never the app that
 mounts the routes: their type reads `Register`, so the app would be typed
 by itself (TS7022). Nothing registered, `AppContext` is `BaseContext`. A
-`defineMiddleware(fn)` reads the registered context too, and is checked
+`defineAppMiddleware(fn)` reads the registered context too, and is checked
 where it is given: a route whose context does not give it is a compile
-error. `defineMiddleware<Empty>()(fn)` reads `BaseContext` alone — one the
-registered base is itself built with.
+error. `defineMiddleware(fn)` reads `BaseContext` alone, as an inline
+middleware does: write the middlewares the registered base is itself built
+with that way.
+
+```ts
+import { defineAppMiddleware } from '@alxia/core';
+
+// src/audit.ts: db and user typed from the registered base, no import of the app
+export const audit = defineAppMiddleware(async ({ db, user }, next) => {
+	await db.audit.add(user.id);
+	return next();
+});
+```
 
 A tool that reads `app.routes` — a route check, a document — finds a path
 as the core declares and matches it with `joinPath` and `shapeOf`:
@@ -792,7 +804,13 @@ client:
 `health()` adds the probes, and `listen` shuts down gracefully on
 `SIGTERM` and `SIGINT`: readiness turns 503, new connections are refused,
 sockets close with 1001, the requests in flight finish within
-`shutdownTimeout` (10 s), the `onStop` hooks run, and the process exits.
+`shutdownTimeout` (10 s), the `onStop` hooks run within `stopTimeout`
+(5 s; past it the hung hook is named and the shutdown fails: on a
+signal, the exit code is 1; under `stop()`, the promise rejects), and the
+process exits. `exit: false` shuts down without `process.exit`, and a
+process with other listeners for the signal is left to them to exit.
+`listen` on an app that already listens throws; the `onStop` hooks run
+once per `listen`.
 
 ```ts
 import { alxia, health } from '@alxia/core';
@@ -803,20 +821,25 @@ const app = alxia()
 	.use(bearer({ jwt })) // the probes need no token
 	.onStop(() => sql.end());
 
-app.listen({ port: 3000, shutdownTimeout: 15_000 });
+app.listen({ port: 3000, shutdownTimeout: 15_000, stopTimeout: 5_000 });
 // GET /health → 200 { status: 'ok' }
-// GET /ready  → 200, or 503 { status: 'down', checks: { db: { status: 'down', duration: 1000, reason: 'timeout' } } }
+// GET /ready  → 200, or 503 { status: 'down', checks: {} }
+//   in dev, or with details: true → checks: { db: { status: 'down', duration: 1000, reason: 'timeout' } }
 ```
 
 Each check has a `timeout`, and the report is cached for `cache` ms so
-probes do not hammer the dependencies. `shutdownSignal(ctx)` ends a long
+probes do not hammer the dependencies; a check still running from an
+earlier probe is not started again. `details`, whether `/ready` names each
+check with its status and duration, follows the serving app's dev switch:
+shown in dev, hidden elsewhere, since a probe is often reachable from
+outside. `shutdownSignal(ctx)` ends a long
 response when the shutdown starts; streams of events end by themselves.
 `@alxia/openapi`'s `matchesSpec` leaves the probes out by itself:
 [Health and shutdown](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/health-and-shutdown.md).
 
 ## Development
 
-`alxia({ dev })`, on unless `NODE_ENV` is `production` or `test`, helps the
+`alxia({ dev })`, on only when `NODE_ENV` is `development`, helps the
 developer running the app: `listen` prints its URL and its routes, a 404 or
 a 405 the router answers carries a `hint`, and a 500 shows its error — a
 page to a browser, its `stack` to any other client. Outside dev, each is
@@ -830,7 +853,7 @@ import { logger } from '@alxia/logger';
 const todos = new Map([['7', { id: '7', title: 'Write the docs' }]]);
 const auth = defineMiddleware((_ctx, next) => next({ user: 'ada' }));
 
-const app = alxia() // dev: NODE_ENV is neither production nor test
+const app = alxia() // dev: NODE_ENV=development bun --hot src/server.ts
 	.use(cors(), logger())
 	.get('/todos/:id', auth, function getTodo({ params, reply }) {
 		return reply(200, todos.get(params.id) ?? null);
@@ -859,7 +882,7 @@ joins middlewares past the 8 a call types:
 
 | export | |
 | --- | --- |
-| `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip`, `errors`, `dev` (on unless `NODE_ENV` is `production` or `test`: the route table, the 404 hint, the dev error page) |
+| `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip`, `errors`, `dev` (on only when `NODE_ENV` is `development`: the route table, the 404 hint, the dev error page) |
 | `Alxia<Ctx, Prefix>` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `use` `derive` `decorate` `bodyLimit` `onStart` `onStop` `parser`, `group` `plugin`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server`; `Ctx` is what a route declared next reads, `Prefix` the app's prefix |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream(schema)` made |
@@ -875,6 +898,7 @@ joins middlewares past the 8 a call types:
 | `health(options?)`, `HealthOptions`, `HealthCheck`, `CheckResult`, `ReadinessReport`, `LivenessReport` | the probes as a plugin app: `GET /health`, 200 while the process is up; `GET /ready`, the checks run at once with a `timeout`, cached for `cache` ms, 200 or 503, and 503 from the moment shutdown starts |
 | `isHealthRoute(route)` | whether a route is one of `health()`'s, wherever mounted: what `@alxia/openapi`'s `matchesSpec` leaves out |
 | `shutdownSignal(ctx)` | an `AbortSignal` aborted as soon as the app serving the request starts shutting down: what a long response ends on |
+| `isDev(ctx)` | whether the app serving the request is in dev (`alxia({ dev })`, else `NODE_ENV=development`): what a plugin reads to help the developer there alone, as `graphql()`'s GraphiQL and `health()`'s details do |
 | `ValidationError`, `refusalOf(error)` | what `validate` throws — an `HttpError` of the 400, its `refusal` `{ kind: 'validation', part, issues }` and its default `body` — and what reads the `Refusal` of it or of a `ContentTooLargeError`, else `undefined`: how a middleware before a `validate` answers a refusal |
 | `settle(ctx, next())` | for a middleware that must see the final response: resolves to what `next()` resolved to or, when it rejected, to the answer the route boundary would give — an `HttpError` with its status and body, a 500 — with the error on `ctx.error` |
 | `ContentTooLargeError`, `ContentTooLargeBody` | what reading a body past its route's `bodyLimit` throws — a `body_limit` refusal — and the body of its default 413: `{ error: 'content_too_large', limit }` |
@@ -885,7 +909,7 @@ joins middlewares past the 8 a call types:
 | `compose(...middlewares)`, `Composed<Ms>`, `Composable`, `ComposedReads<Ms>` | one middleware standing for several, typed for any number: its members spliced into the chain where it stands, what they add passed on, what they read and no member before adds required where it is given (`ComposedReads`); a `validate` or `responds` among them refused by `use` |
 | `markFactory(factory, kind?)`, `FactoryKind` | marks a function that makes a middleware (`'middleware'`, the default) or a plugin (`'plugin'`): given uncalled to `use`, a route, `ws` or `plugin`, it throws at declaration, naming it; every package's factory is marked |
 | `TooMany`, `TooManyMiddlewares` | the overload a call with a ninth middleware meets, and its message: `at most 8 middlewares per route: group them with compose(...)`. Exported so an app's type can be named in a declaration file |
-| `defineMiddleware(fn)`, `defineMiddleware<Requires>()(fn)`, `NoMiddlewareYet` | a middleware, `(ctx, next) => …`, typed and returned, to be shared: `next(added)` adds `added` to the context after it, `next.behind(added?)` runs the rest behind a reply it returns at once, a reply ends the request, a `Response` is sent as it is, nothing once `next()` was called is the rest's response. `defineMiddleware(fn)` reads the registered context (`RegisteredContext`, `Empty` when nothing is registered); `Requires` is what it reads instead, beyond `BaseContext`. Either way the route must give it where the middleware is placed. `NoMiddlewareYet` is what `defineMiddleware<Requires>()` infers before it is given the middleware. A plain `(ctx, next)` function needs none of it: given inline, it reads the context in force |
+| `defineMiddleware(fn)`, `defineMiddleware<Requires>()(fn)`, `NoMiddlewareYet` | a middleware, `(ctx, next) => …`, typed and returned, to be shared: `next(added)` adds `added` to the context after it, `next.behind(added?)` runs the rest behind a reply it returns at once, a reply ends the request, a `Response` is sent as it is, nothing once `next()` was called is the rest's response. `defineMiddleware(fn)` reads `BaseContext` alone; `Requires` is what it reads beyond it. Either way the route must give it where the middleware is placed. `NoMiddlewareYet` is what `defineMiddleware<Requires>()` infers before it is given the middleware. A plain `(ctx, next)` function needs none of it: given inline, it reads the context in force |
 | `validate(schemas)`, `validate(operation)`, `RequestSchemas`, `Validated<Schemas>`, `ValidateRequires<Schemas>` | the middleware that validates `params`, `query`, `headers`, `cookies` and `body`, each with any Standard Schema — or the request parts of an operation's `schema`, which its `route` then validates nowhere else; what it takes, what it passes on, the path parameters its `params` schema must read |
 | `responds(responses)`, `responds(operation)` | the middleware that types the handler's `reply` by the statuses it declares, and checks the replies after it of those statuses against their schemas; given an operation, its `schema.response`, which its `route` then checks nowhere else — it throws for an operation that declares none |
 | `BuiltinMark<Kind>` | the mark `validate` and `responds` carry in their type, `'~builtin': 'validate' \| 'responds'`; at runtime `Symbol.for('alxia.builtin')`, so one made by another copy of `@alxia/core` is still recognised, and `use` refuses it |
@@ -894,14 +918,15 @@ joins middlewares past the 8 a call types:
 | `RouteMethod`'s `MiddlewareForms` and `OptionsForms`; `SocketMethod`'s `SocketForms` and `SocketOptionsForms`; `RouteApp`, `AppWithRoute` | the forms of a route method and of `ws`: without and with options; the app's types and the method, as those forms read them; the app a call returns, unchanged in type. Exported so an app's type can be named in a declaration file |
 | `PluginMethod` | the type of `plugin`: an app, or a function given the app that returns it, checked against what the plugin requires. Exported so an app's type can be named in a declaration file |
 | `UseForms`, `ScopeMiddleware`, `PathMiddleware`, `AddingNothing`, `ScopePathAt`, `AppAfterUse` | the forms of `use` — middlewares, with a path or without — what each middleware form takes, the check that a middleware given a path adds nothing (`Invalid middleware: …`), the check of that path (a route's, with no trailing `/`), and the app after them. Exported so an app's type can be named in a declaration file |
-| `Register`, `AppContext`, `RegisteredContext` | the interface an app augments with `context: typeof base`, that base's context — `BaseContext` when nothing is registered — and what the base adds to `BaseContext`, which `defineMiddleware(fn)` reads |
+| `defineAppMiddleware(fn)` | `defineMiddleware<RegisteredContext>()(fn)`: a shared middleware reading the registered context, refused where the route's context does not give it |
+| `Register`, `AppContext`, `RegisteredContext` | the interface an app augments with `context: typeof base`, that base's context — `BaseContext` when nothing is registered — and what the base adds to `BaseContext`, which `defineAppMiddleware(fn)` reads |
 | `defineRoutes(prefix?)` | an app plugin built on the registered context, requiring it of the app that mounts it with `plugin`: a file of routes with no import of the app |
 | `RegisteredOf<R>`, `RegisteredBase`, `InvalidRegister`, `RoutesContext` | the app a `Register`-shaped interface names (a fresh app when it names none), the one `Register` names, what a `context` that is not an app reads as (every key of the app's own a compile error), and the context `defineRoutes` starts from, its requirement in it |
 | `RequiringContext<Requires>`, `RequiredIn<PluginCtx>`, `Mounted<PluginCtx>`, `MountedIn<Ctx, PluginCtx, PluginPrefix>` | the requirement a `defineRoutes` plugin carries in its context (a function type, never set, so a route reading it gets nothing usable), what it requires of the app that mounts it — checked by `plugin(app)`, `plugin((app) => plugin)` and a `group` returning it (`plugin-method.ts`) — and what it adds to it: nothing when the plugin has a prefix of its own (`MountedIn`). Exported so an app's type can be named in a declaration file |
 | `definePlugin<Requires>()(build)` | an app plugin built on an app whose context has `Requires`; `plugin` refuses it on an app that does not give them |
 | `Requiring<Requires>`, `ProvidedBy<Ctx, Requires>` | the marker on a `definePlugin` plugin, and the check `plugin` makes of it |
 | `RequiresOf<Ctx, Callback?>` | what a callback annotated `Ctx` reads beyond `BaseContext` — `{ user: User }` for `BaseContext & { user: User }`, `Empty` for nothing more: the `Requires` of a plugin that infers it from a callback it is given. A callback annotated `any` is refused on every app, with a message naming `Callback` |
-| `ListenOptions` | the options of `listen`: `port`, `hostname`, `development`, `idleTimeout`, `maxRequestBodySize`, `tls`, `shutdownTimeout` (10 000 ms), `signals` (`['SIGINT', 'SIGTERM']`, or `false`), `onListen` |
+| `ListenOptions` | the options of `listen`: `port`, `hostname`, `development`, `idleTimeout`, `maxRequestBodySize`, `tls`, `shutdownTimeout` (10 000 ms), `stopTimeout` (5 000 ms, the `onStop` hooks' bound), `signals` (`['SIGINT', 'SIGTERM']`, or `false`), `exit` (`false`: no `process.exit` on a signal), `onListen` |
 | `ListenInfo`, `RouteRow` | what `onListen` is told once the server listens, in every mode: `server`, `url`, `routes`, `table`, `dev`; a route as the table shows it: `method` (`WS`, `PAGE`), `path`, `middlewares`, `handler` (`ws`, `static`, `file`, `page`, or its name) |
 | `StartHook`, `StopHook`, `BodyParser` | the hooks of `onStart` and `onStop`, and a body parser |
 | `joinPath(prefix, path)` | a path under a prefix, as the app joins them: `joinPath('/api', '/')` is `'/api'`; typed `JoinPath` |

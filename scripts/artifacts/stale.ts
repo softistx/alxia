@@ -48,7 +48,7 @@ export const NOT_A_BUILD_INPUT =
  * verify yesterday's artifact — and `dist/` is gitignored, so the staleness is
  * invisible and cannot be reasoned about from the diff. Measured in `nxgt-core`
  * on 2026-09-22, where it cost an hour: four subpaths failed on `Cannot find
- * package 'stx-sdk'` while the same commit passed in CI, and a *resolution*
+ * package '…'` while the same commit passed in CI, and a *resolution*
  * error sends you to the environment, not to the build.
  */
 export async function staleBuilds(

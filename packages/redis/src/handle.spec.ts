@@ -182,4 +182,21 @@ describe('the handle in the stores, the guard and the check', () => {
 	test('redisCheck on a bare client pings it', async () => {
 		expect(await redisCheck(db.client)()).toBe(true);
 	});
+
+	test("redisCheck's timeout, named as health()'s, bounds the handle's ping", async () => {
+		const asked: unknown[] = [];
+		const handle = {
+			instances: {},
+			close: async () => {},
+			ping: async (options: unknown) => {
+				asked.push(options);
+				return { main: { ok: true } };
+			},
+		} as unknown as Parameters<typeof redisCheck>[0];
+		expect(await redisCheck(handle, { timeout: 50 })()).toBe(true);
+		expect(await redisCheck(handle)()).toBe(true);
+		expect(asked).toEqual([{ timeoutMs: 50 }, undefined]);
+		// @ts-expect-error: the option is `timeout`, as health({ timeout })
+		redisCheck(handle, { timeoutMs: 50 });
+	});
 });

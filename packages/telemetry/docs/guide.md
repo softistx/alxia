@@ -416,12 +416,7 @@ const app = alxia()
 	.get('/', ({ reply }) => reply(200, 'ok'))
 	.onStop(() => tracing.telemetry.close());
 
-app.listen(3000);
-
-process.on('SIGTERM', async () => {
-	await app.stop();
-	process.exit(0);
-});
+app.listen(3000); // SIGTERM: the requests in flight finish, then onStop closes it
 ```
 
 Once closed, a telemetry takes nothing more: the app still answers, and

@@ -90,11 +90,14 @@ stage.
 
 ## Production, as it was tested
 
-`NODE_ENV=production` is what turns the development helpers off: `listen`
+The development helpers are on only under `NODE_ENV=development`, which
+the `dev` script sets and the image never does: in production `listen`
 prints the URL alone, no route table; a 404 carries no hint; a 500 carries
-no stack and no error page. Whatever else you keyed on it is yours:
-GraphiQL (`ide: Bun.env['NODE_ENV'] === 'production' ? false : 'graphiql'`)
-and `apiDocs({ enabled: … })` in the recipes.
+no stack and no error page; `@alxia/graphql`'s GraphiQL is off. They fail
+closed, so an image that forgot `NODE_ENV` shows none of them either.
+`NODE_ENV=production` is still worth setting, for what else you keyed on
+it: `apiDocs({ enabled: … })` in the recipes. Read it with `Bun.env` at
+runtime, never `process.env.NODE_ENV`, which `bun build` inlines.
 
 The configuration comes from the environment, read once at startup by
 [`defineEnv`](../../packages/env/docs/define-env.md): a missing or malformed

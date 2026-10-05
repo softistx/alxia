@@ -4,17 +4,23 @@ export type DocsUi = 'scalar' | 'swagger';
 
 const CDN = 'https://cdn.jsdelivr.net';
 
+/** Each UI's files: the one pinned version's folder, which its policy allows alone. */
+const FILES = {
+	scalar: `${CDN}/npm/@scalar/api-reference@1.72.4/`,
+	swagger: `${CDN}/npm/swagger-ui-dist@5.33.1/`,
+} as const;
+
 const SCALAR = {
-	src: `${CDN}/npm/@scalar/api-reference@1.72.4/dist/browser/standalone.js`,
+	src: `${FILES.scalar}dist/browser/standalone.js`,
 	integrity:
 		'sha384-omTRdD9MbjA1vm12DqRUVvqJlr3VzSixvAdF1Jruu9AJOiJKyTKraIB6DyX+m10M',
 } as const;
 
 const SWAGGER = {
-	script: `${CDN}/npm/swagger-ui-dist@5.33.1/swagger-ui-bundle.js`,
+	script: `${FILES.swagger}swagger-ui-bundle.js`,
 	scriptIntegrity:
 		'sha384-ZPehFMQommnnuaZ4rpxgkgTT2DKFVp4hZC/7pLit+9Lek9T1YGSo23eHFbvNkXkw',
-	css: `${CDN}/npm/swagger-ui-dist@5.33.1/swagger-ui.css`,
+	css: `${FILES.swagger}swagger-ui.css`,
 	cssIntegrity:
 		'sha384-Ov4/wv3j2bmct8cDc5X4ngJZohVPzEmc6uDPH8WeljUxO5vtoykvMEfbu9Vh6RaW',
 } as const;
@@ -35,25 +41,51 @@ export function freshNonce(): string {
 	);
 }
 
+/** Scalar's fonts, unless the app's own CSS replaces them. */
+const SCALAR_FONTS = 'https://fonts.scalar.com';
+
 /**
  * The page's own policy, which `secureHeaders` keeps (a header a route set
- * is kept, as for `@alxia/graphql`'s IDE): the CDN's scripts, the one inline
- * script of Swagger UI by its nonce, and nothing else. Requests go to the
- * spec and to the servers "Try it out" calls.
+ * is kept, as for `@alxia/graphql`'s IDE): the pinned version's scripts
+ * and styles alone, the one inline script of Swagger UI by its nonce, and
+ * nothing else. Requests go to this server — the spec — and to the
+ * `origins` of the document's servers, which "Try it out" calls.
  */
-export function policy(nonce: string): string {
+export function policy(
+	ui: DocsUi,
+	nonce: string,
+	origins: readonly string[],
+): string {
+	const files = FILES[ui];
+	const fonts = ui === 'scalar' ? ` ${SCALAR_FONTS}` : '';
 	return [
 		"default-src 'none'",
-		`script-src ${CDN} 'nonce-${nonce}'`,
-		`style-src ${CDN} 'unsafe-inline'`,
+		`script-src ${files} 'nonce-${nonce}'`,
+		`style-src ${files} 'unsafe-inline'`,
 		'img-src https: data:',
-		'font-src https: data:',
-		"connect-src 'self' https: http:",
+		`font-src data:${fonts}`,
+		["connect-src 'self'", ...origins].join(' '),
 		'worker-src blob:',
 		"base-uri 'none'",
 		"form-action 'none'",
 		"frame-ancestors 'none'",
 	].join('; ');
+}
+
+/**
+ * Scalar's configuration: the document at `url`, and none of the services
+ * it would reach beyond this server — its AI agent, its MCP generator,
+ * the developer tools that share or deploy the document to scalar.com,
+ * its telemetry.
+ */
+function scalarConfiguration(url: string): string {
+	return JSON.stringify({
+		url,
+		agent: { disabled: true },
+		mcp: { disabled: true },
+		showDeveloperTools: 'never',
+		telemetry: false,
+	});
 }
 
 export interface PageOptions {
@@ -76,7 +108,7 @@ function scalarPage({ title, specUrl }: PageOptions): string {
 <title>${escapeHtml(title)}</title>
 </head>
 <body>
-<script id="api-reference" data-url="${escapeHtml(specUrl)}"></script>
+<script id="api-reference" data-configuration="${escapeHtml(scalarConfiguration(specUrl))}"></script>
 <script src="${SCALAR.src}" integrity="${SCALAR.integrity}" crossorigin="anonymous"></script>
 </body>
 </html>

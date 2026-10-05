@@ -53,7 +53,7 @@ the path is the socket's options:
 | `send` | any Standard Schema | none: anything is sent | each message the server sends: checked, then sent as its output. A refused one is not sent: `send` rejects with a `ResponseValidationError`, which, in a handler, closes the socket with `1011` |
 | `detail` | `RouteDetail` | none | nothing at runtime: `summary`, `operationId`, `tags`…, on the socket's definition |
 
-```ts
+```ts no-check
 interface SocketOptions {
 	readonly message?: StandardSchemaV1;
 	readonly send?: StandardSchemaV1;

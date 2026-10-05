@@ -35,18 +35,8 @@ export function useFixture(template: string): string {
 	return dir;
 }
 
-/**
- * `bun run build` in `dir`, then `dist/` alone, with no `node_modules`,
- * run as the image runs it (`--no-install`, which would fetch a missing
- * package): `request` answers from it, and SIGTERM stops it with exit 0 — in
- * a container Bun is process 1, which a signal with no handler leaves running
- * until `docker stop`'s timeout. Resolves to the response's status.
- */
-export async function distAnswers(
-	dir: string,
-	entry: string,
-	request: (base: URL) => Promise<Response>,
-): Promise<number> {
+/** `bun run build` in `dir`, then `dist/` copied alone into a new directory. */
+async function builtAlone(dir: string): Promise<string> {
 	const built = await $`${process.execPath} run build`
 		.cwd(dir)
 		.nothrow()
@@ -54,9 +44,28 @@ export async function distAnswers(
 	expect(built.exitCode).toBe(0);
 	const alone = await mkdtemp(join(tmpdir(), 'alxia-dist-'));
 	await cp(join(dir, 'dist'), join(alone, 'dist'), { recursive: true });
+	return alone;
+}
+
+/**
+ * `bun run build` in `dir`, then `dist/` alone, with no `node_modules`,
+ * run as the image runs it (`--no-install`, which would fetch a missing
+ * package), with `env` beside `PATH` and `PORT`: `request` answers from
+ * it, and SIGTERM stops it with exit 0 — `listen`'s own handler, which
+ * the template does not repeat: in a container Bun is process 1, which a
+ * signal with no handler leaves running until `docker stop`'s timeout.
+ * Resolves to the response's status.
+ */
+export async function distAnswers(
+	dir: string,
+	entry: string,
+	request: (base: URL) => Promise<Response>,
+	env: Record<string, string> = {},
+): Promise<number> {
+	const alone = await builtAlone(dir);
 	const server = Bun.spawn([process.execPath, '--no-install', entry], {
 		cwd: alone,
-		env: { PATH: process.env['PATH'] ?? '', PORT: '0' },
+		env: { PATH: process.env['PATH'] ?? '', PORT: '0', ...env },
 		stdout: 'pipe',
 	});
 	try {
@@ -75,6 +84,33 @@ export async function distAnswers(
 		return status;
 	} finally {
 		server.kill();
+		await rm(alone, { recursive: true, force: true });
+	}
+}
+
+/**
+ * `dist/` alone, run with `env` as `distAnswers` runs it, for an app that
+ * must refuse to start: its exit code and what it printed, within 10 s.
+ */
+export async function distRefuses(
+	dir: string,
+	entry: string,
+	env: Record<string, string>,
+): Promise<{ code: number | null; output: string }> {
+	const alone = await builtAlone(dir);
+	const server = Bun.spawn([process.execPath, '--no-install', entry], {
+		cwd: alone,
+		env: { PATH: process.env['PATH'] ?? '', PORT: '0', ...env },
+		stdout: 'pipe',
+		stderr: 'pipe',
+	});
+	const timer = setTimeout(() => server.kill(), 10_000);
+	try {
+		const code = await server.exited;
+		const output = `${await new Response(server.stdout).text()}${await new Response(server.stderr).text()}`;
+		return { code, output };
+	} finally {
+		clearTimeout(timer);
 		await rm(alone, { recursive: true, force: true });
 	}
 }

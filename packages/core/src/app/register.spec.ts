@@ -62,7 +62,7 @@ describe('Register, augmented', () => {
 		expect(await typecheck('split')).toBe('');
 	}, 30_000);
 
-	test('defineMiddleware(fn) reads the registered context; the base says Empty for its own', async () => {
+	test('defineAppMiddleware(fn) reads the registered context; defineMiddleware(fn) the base context alone', async () => {
 		// Every refusal there is a @ts-expect-error: no output is each one failing.
 		expect(await typecheck('middleware')).toBe('');
 	}, 30_000);

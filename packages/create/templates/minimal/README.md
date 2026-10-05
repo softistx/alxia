@@ -12,12 +12,17 @@ export const app = alxia().get("/", ({ reply }) =>
 ```
 
 ```sh
-bun dev                    # http://localhost:3000, reloaded on every change
+bun dev                    # NODE_ENV=development: http://localhost:3000, reloaded on every change
 curl localhost:3000        # {"hello":"world"}
 ```
 
+`bun dev` sets `NODE_ENV=development`, alxia's dev switch: `listen`
+prints the route table, a 404 hints at the closest route and a 500 shows
+its error. Under any other `NODE_ENV`, none of them is.
+
 - `src/index.ts`: the app, and `app.listen()` on `PORT` (3000 by default)
-  when the file is run, not when a test imports it.
+  when the file is run, not when a test imports it. `listen` shuts the app
+  down gracefully on `SIGINT` and `SIGTERM`.
 - `src/index.spec.ts`: `app.request()`, no port: the request goes through
   the app and the response comes back.
 - `biome.json`: Biome's lint and format settings ([Lint and format](#lint-and-format)).
@@ -90,8 +95,8 @@ on `oven/bun:1-alpine`. The build stage installs every dependency with
 `--frozen-lockfile`, from the `bun.lock` that `bun install` wrote (commit
 it), and runs `bun run build`. The image holds `dist/` alone, no
 `node_modules` and no `src/`, and runs `bun --no-install dist/index.js` as
-its non-root `bun` user. `src/index.ts` stops the app on `SIGTERM`, so
-`docker stop` is immediate.
+its non-root `bun` user. `listen` drains the app and exits on `SIGTERM`,
+so `docker stop` is immediate.
 
 ```sh
 docker build -t my-app .

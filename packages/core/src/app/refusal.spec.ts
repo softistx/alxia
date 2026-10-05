@@ -70,8 +70,11 @@ const transports = {
 	'app.request': (app: AnyAlxia) => (path: string, init?: RequestInit) =>
 		app.request(path, init) as Promise<Response>,
 	listen: (app: AnyAlxia) => {
-		const server = app.listen({ port: 0 }) as Bun.Server<unknown>;
-		servers.push(server);
+		// One server per app: an app listens once at a time.
+		const server =
+			(app.server as Bun.Server<unknown> | undefined) ??
+			(app.listen({ port: 0, signals: false }) as Bun.Server<unknown>);
+		if (!servers.includes(server)) servers.push(server);
 		return (path: string, init?: RequestInit) =>
 			fetch(new URL(path, server.url), init);
 	},

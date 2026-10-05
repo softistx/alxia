@@ -37,7 +37,10 @@ a `Bun.serve` given [`websocket`](#websocket).
 | `maxRequestBodySize` | `number` | Bun's | the largest body the server accepts, in bytes; a route's [`bodyLimit`](routes.md#body-size-bodylimit) caps its own below it |
 | `tls` | `Bun.TLSOptions` | none | serve HTTPS |
 | `shutdownTimeout` | `number` | `10000` | how long the requests in flight have to finish once shutdown starts, in milliseconds ([Health and shutdown](health-and-shutdown.md#graceful-shutdown)) |
-| `signals` | `NodeJS.Signals[] \| false` | `['SIGINT', 'SIGTERM']` | the signals that shut the app down gracefully, then exit the process; `false` installs no handler |
+| `stopTimeout` | `number` | `5000` | how long the `onStop` hooks have, all of them, in milliseconds; past it the hook still running is named, the hooks after it are skipped, and the shutdown fails ([Health and shutdown](health-and-shutdown.md#graceful-shutdown)) |
+| `signals` | `NodeJS.Signals[] \| false` | `['SIGINT', 'SIGTERM']` | the signals that shut the app down gracefully, then exit the process — unless `exit` is `false` or the process has another listener of the signal; `false` installs no handler |
+| `exit` | `boolean` | `true` | whether alxia exits the process once a signal shut the app down; `false` leaves the exit to the host |
+| `onListen` | `(info: ListenInfo) => void` | none | told the URL, the routes and the route table once the server listens, in every mode, in place of the table printed in dev |
 
 ```ts
 app.listen({
@@ -145,8 +148,12 @@ Shuts the server `listen` started down, gracefully — what `SIGTERM` and
 refused, open sockets close with 1001, the requests in flight finish
 within `shutdownTimeout`, then each `onStop` hook is awaited in turn.
 `closeActiveConnections` closes the requests in flight at once. Called
-again while it runs, `stop()` returns the same promise; called before
-`listen`, it runs the `onStop` hooks alone.
+again while it runs, or once it ran, `stop()` returns the same promise:
+the `onStop` hooks run once per `listen`. Called before `listen`, it runs
+the `onStop` hooks alone. One server at a time: `listen()` on an app that
+already listens throws `listen(): the app already listens on <url>; stop()
+it first` — stop it with `app.stop()`, not the Bun server's own `stop()`,
+which the app does not see.
 
 ```ts
 const app = alxia()

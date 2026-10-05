@@ -19,7 +19,10 @@ describe('health()', () => {
 
 	test('GET /ready answers 200 with each check, its status and its duration', async () => {
 		const app = alxia().plugin(
-			health({ checks: { redis: () => 'PONG', db: async () => [{ one: 1 }] } }),
+			health({
+				details: true,
+				checks: { redis: () => 'PONG', db: async () => [{ one: 1 }] },
+			}),
 		);
 		const response = await app.request('/ready');
 		expect(response.status).toBe(200);
@@ -35,6 +38,7 @@ describe('health()', () => {
 	test('a check that throws, rejects, returns false or is late makes it a 503', async () => {
 		const app = alxia().plugin(
 			health({
+				details: true,
 				timeout: 50,
 				checks: {
 					ok: () => true,

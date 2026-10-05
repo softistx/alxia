@@ -173,8 +173,8 @@ server build inside it, into one file:
   stay out of it.
 - **Run, it listens**: `bun build/server/index.js` listens on `PORT`
   (3000 by default) and `HOST` (`0.0.0.0`). It prints
-  `alxia listening on <url>`, and in dev — `NODE_ENV` neither `production`
-  nor `test` — the route table
+  `alxia listening on <url>`, and in dev — under `react-router dev`; a
+  production build never is, whatever `NODE_ENV` says — the route table
   ([`@alxia/core`'s Development](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/development.md#the-route-table)). On `SIGINT` or `SIGTERM` it shuts the app
   down as `@alxia/core`'s `listen` does: readiness turns 503, new
   connections are refused, the requests in flight finish within
@@ -185,7 +185,9 @@ server build inside it, into one file:
   can import it safely, since it listens only when it is the process's
   entry point (`import.meta.main`).
 - **The mode follows the command**: `development` under `react-router dev`,
-  `production` in a build, whatever `NODE_ENV` says.
+  `production` in a build, whatever `NODE_ENV` says. The app's dev switch
+  follows it: `alxia({ dev: mode === 'development' })`, so a 500 of the
+  build never shows its stack.
 - **The client folder is resolved against the built file**: `../client`,
   from React Router's `buildDirectory`, so it is found wherever the
   process starts.

@@ -75,13 +75,13 @@ export const health = defineRoutes().get('/health', ({ env, reply }) =>
 
 `defineRoutes()` reads the registered context, so `env.PORT` is a `number`
 and `env.SENTRY_DSN` a `string | undefined`, and a variable the shape does not
-declare is a compile error. A `defineMiddleware(fn)` reads it the same way,
-and is refused on a route whose app does not give `env`:
+declare is a compile error. A `defineAppMiddleware(fn)` reads it the same
+way, and is refused on a route whose app does not give `env`:
 
 ```ts
-import { defineMiddleware } from '@alxia/core';
+import { defineAppMiddleware } from '@alxia/core';
 
-export const withPort = defineMiddleware(({ env }, next) =>
+export const withPort = defineAppMiddleware(({ env }, next) =>
 	next({ port: env.PORT }),
 );
 ```

@@ -21,7 +21,7 @@ is decided by the cache, not the store.
 
 ## In memory: `MemoryCacheStore`
 
-```ts
+```ts no-check
 new MemoryCacheStore(options?: MemoryCacheOptions)
 ```
 

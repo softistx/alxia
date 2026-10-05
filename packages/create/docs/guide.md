@@ -102,24 +102,25 @@ export const app = alxia().get("/", ({ reply }) =>
 // Only when this file is the entry: the test imports `app` and listens on
 // no port.
 if (import.meta.main) {
-  // In dev, the URL and the route table; in production, the URL alone.
+  // In dev, the URL and the route table; in production, the URL alone. On
+  // SIGINT and SIGTERM, listen drains the requests in flight and exits.
   app.listen({
     port: Number(Bun.env["PORT"] ?? 3000),
     onListen: ({ dev, table, url }) =>
       console.log(dev ? table : `listening on ${url}`),
   });
-  process.once("SIGTERM", () => void app.stop().then(() => process.exit(0)));
 }
 ```
 
-`bun dev` runs `bun --hot src/index.ts`, which prints the route table
-`@alxia/core` writes in dev; `bun start` runs `NODE_ENV=production bun dist/index.js`, what
+`bun dev` runs `NODE_ENV=development bun --hot src/index.ts`, which
+prints the route table `@alxia/core` writes in dev — on under
+`NODE_ENV=development` alone; `bun start` runs `NODE_ENV=production bun dist/index.js`, what
 `bun run build` wrote, and the image sets `NODE_ENV=production`, under
 which it prints the URL alone. `import.meta.main` is why
 the spec can import `app` without opening a port, and why the one file is
-both the app and its server. `SIGTERM` stops the app, since as a
-container's process 1 Bun would otherwise ignore it and `docker stop` would
-wait.
+both the app and its server. `listen` shuts the app down gracefully on
+`SIGINT` and `SIGTERM`, then exits, so as a container's process 1 Bun stops
+at once on `docker stop`: the template installs no handler of its own.
 
 The spec:
 
@@ -151,19 +152,19 @@ my-api/
 ├── openapi-codegen.config.ts  how `bun run generate` reads it
 ├── src/
 │   ├── generated/             what `bun run generate` writes: committed, never edited
-│   ├── env.ts                 defineEnv from @alxia/env: PORT and API_KEY
+│   ├── env.ts                 defineEnv from @alxia/env: PORT, API_KEY and API_DOCS
 │   ├── context.ts             the base: what every route reads, and its Register
 │   ├── routes/todos.ts        defineRoutes(): one route per operation
-│   ├── app.ts                 the app: the base, then the routes, and its type
+│   ├── app.ts                 the app: the base, health(), apiDocs, the routes, and its type
 │   ├── app.spec.ts            bun test: the typed client over app.fetch, and matchesSpec
-│   └── server.ts              app.listen on env.PORT, stopped on SIGINT and SIGTERM
+│   └── server.ts              app.listen on env.PORT, which stops on SIGINT and SIGTERM
 ├── package.json
 ├── tsconfig.json
 ├── biome.json                 Biome: lint, format, imports sorted
 ├── .vscode/                   Biome's extension recommended, format on save
 ├── Dockerfile                 bun run build, then dist/ alone, on oven/bun:1-alpine
 ├── .dockerignore
-├── .env.example               PORT and API_KEY, for a .env Bun loads
+├── .env.example               PORT, API_KEY and API_DOCS, for a .env Bun loads
 ├── .gitignore
 └── README.md
 ```
@@ -328,10 +329,15 @@ instead:
 import { defineEnv } from "@alxia/env";
 import { z } from "zod";
 
+// `bun dev` and `bun test` run in development and test; anything else,
+// production included, is a deployment.
+const local = ["development", "test"].includes(Bun.env.NODE_ENV ?? "");
+
 export const env = defineEnv(
   {
     PORT: z.coerce.number().default(3000),
-    API_KEY: z.string().min(1).default("dev-key"),
+    API_KEY: local ? z.string().min(1).default("dev-key") : z.string().min(1),
+    API_DOCS: z.stringbool().default(Bun.env.NODE_ENV === "development"),
   },
   { secret: ["API_KEY"] },
 );
@@ -340,8 +346,12 @@ export const env = defineEnv(
 [`defineEnv`](https://github.com/softistx/alxia/tree/develop/packages/env/docs)
 checks the environment once, when the module is first imported: a missing
 or malformed variable stops the process with every issue, before it listens.
-`API_KEY` is a secret, so it prints as `***`; its default is for
-development, set it outside. `src/server.ts` listens on `env.PORT` and
+`API_KEY` is a secret, so it prints as `***`. It defaults to `dev-key`
+under `NODE_ENV=development` and `test` alone: anywhere else — `bun start`,
+the image — it is required, and the app does not start without it.
+`API_DOCS` turns the API reference at `/docs` on: by default in
+development alone. `Bun.env`, not `process.env.NODE_ENV`, which
+`bun build` would replace with the mode of the build. `src/server.ts` listens on `env.PORT` and
 `src/routes/todos.ts` compares the `x-api-key` header with `env.API_KEY`.
 `@alxia/env` and `zod` are dependencies.
 
@@ -355,7 +365,9 @@ const todos: Todo[] = [];
 
 // The base: what every route reads, decorated or derived here. It is
 // registered below, so a route file reads it with no import of the app.
-export const base = alxia().decorate({ todos });
+// alxia's own errors — a 400 the schemas refuse, a 404 no route matches, a
+// 500 — are RFC 9457 problems, as openapi.yaml declares them.
+export const base = alxia({ errors: "problem" }).decorate({ todos });
 
 // Register the base, never the app: the app mounts the route files, whose
 // type reads this, and would then be typed by itself.
@@ -418,15 +430,31 @@ error. It takes no prefix here: an operation's path is already whole.
 ### `src/app.ts`
 
 ```ts
+import { health } from "@alxia/core";
+import { apiDocs } from "@alxia/openapi";
+import spec from "../openapi.yaml";
 import { base } from "./context";
+import { env } from "./env";
 import { todoRoutes } from "./routes/todos";
 
-// The base, then the route files: each requires the base's context, so
-// mounting one before it is a compile error.
-export const app = base.plugin(todoRoutes);
+// The base, then the probes (GET /health, GET /ready) before any guard,
+// the API reference at /docs (on in development; API_DOCS=true elsewhere),
+// and the route files: each requires the base's context, so mounting one
+// before it is a compile error. openapi.yaml is imported, so `bun run build`
+// puts it inside dist/server.js: the image needs no copy of it.
+export const app = base
+  .plugin(health())
+  .plugin(apiDocs({ spec, enabled: env.API_DOCS }))
+  .plugin(todoRoutes);
 
 export type App = typeof app;
 ```
+
+`health()` answers `GET /health` (liveness) and `GET /ready` (readiness),
+and `apiDocs` serves a Scalar page at `/docs` with the document at
+`/docs/openapi.yaml` and `/docs/openapi.json`. `matchesSpec` leaves both
+out: no operation of `openapi.yaml` describes them. The document is public
+wherever `/docs` is on.
 
 ```ts
 route(operation, ...middlewares, handler)
@@ -567,7 +595,7 @@ The scripts:
 
 | script | runs |
 | --- | --- |
-| `bun dev` | `bun --watch src/server.ts`: restarted on every change, on `PORT` or 3000 |
+| `bun dev` | `NODE_ENV=development bun --watch src/server.ts`: restarted on every change, on `PORT` or 3000, with alxia's dev helps and `/docs` on |
 | `bun test` | the spec |
 | `bun run generate` | `nxgt-openapi generate`: `src/generated/` from `openapi.yaml`. `bun run generate --check` writes nothing and exits 1 when a file is stale |
 | `bun run typecheck` | `tsc --noEmit` |
@@ -590,10 +618,14 @@ is linked from it: Bun reads the map, so a stack trace names the lines of
 `src/`. `bun dev` and `bun test` run the TypeScript as it is, with no
 build.
 
-Bun loads `.env` on every command. `.env.example` names the two variables
-`src/env.ts` reads, `PORT` (3000 by default) and `API_KEY` (`dev-key` by
-default, for development only): copy it to `.env`, which `.gitignore`
-keeps out of git and `.dockerignore` out of the image.
+Bun loads `.env` on every command. `.env.example` names the variables
+`src/env.ts` reads, `PORT` (3000 by default), `API_KEY` (`dev-key` by
+default in development and test alone, required elsewhere) and `API_DOCS`:
+copy it to `.env`, which `.gitignore` keeps out of git and `.dockerignore`
+out of the image. Its `API_KEY` and `API_DOCS` are commented out: Bun
+loads `.env` on `bun start` too, where a development key or a public
+`/docs` would defeat the defaults; set them for a deployment in its own
+environment.
 
 `tsconfig.json` holds the settings alxia's own packages are checked under:
 `strict`, and past it `exactOptionalPropertyTypes`,
@@ -617,22 +649,22 @@ my-graphql-api/
 ├── codegen.ts              how `bun run generate` reads it
 ├── src/
 │   ├── generated/resolvers.ts  what `bun run generate` writes: committed, never edited
-│   ├── env.ts              defineEnv: PORT and NODE_ENV
+│   ├── env.ts              defineEnv: PORT
 │   ├── store.ts            in-memory users, tokens and notes, and the pub/sub
 │   ├── context.ts          the base, the viewerOf middleware, and Context
 │   ├── resolvers.ts        const resolvers: Resolvers
 │   ├── schema.ts           createSchema from schema.graphql and the resolvers
-│   ├── app.ts              graphql(app, { schema }) mounted on the base
+│   ├── app.ts              health() and graphql(app, { schema }) mounted on the base
 │   ├── graphql.d.ts        declares the *.graphql module
 │   ├── app.spec.ts         bun test: POST /graphql through app.request()
-│   └── server.ts           app.listen on env.PORT, stopped on SIGINT and SIGTERM
+│   └── server.ts           app.listen on env.PORT, which stops on SIGINT and SIGTERM
 ├── package.json
 ├── tsconfig.json
 ├── biome.json              Biome; skips dist/ and src/generated/
 ├── .vscode/
 ├── Dockerfile              bun run build, then dist/ alone, on oven/bun:1-alpine
 ├── .dockerignore
-├── .env.example            PORT and NODE_ENV, for a .env Bun loads
+├── .env.example            PORT, for a .env Bun loads
 ├── .gitignore
 └── README.md
 ```
@@ -739,16 +771,14 @@ A field the schema lacks, or a value its type refuses, is a compile error.
 ### `src/app.ts` and the subscription
 
 ```ts
-export const app = base.plugin((app) =>
-  graphql(app, {
-    schema,
-    ide: env.NODE_ENV === "production" ? false : "graphiql",
-  }),
-);
+export const app = base
+  .plugin(health())
+  .plugin((app) => graphql(app, { schema }));
 ```
 
-GraphiQL is for development: `NODE_ENV=production`, which the image sets,
-turns it off. `noteAdded` is served over server-sent events, Yoga's default,
+`health()` answers `GET /health` and `GET /ready`. GraphiQL follows the
+app's dev switch, `graphql()`'s default: on under `bun dev`, which sets
+`NODE_ENV=development`, off under `bun start` and in the image. `noteAdded` is served over server-sent events, Yoga's default,
 so no WebSockets: a request with `Accept: text/event-stream` gets a result
 each time `addNote` publishes to the `createPubSub` of `src/store.ts`:
 
@@ -762,11 +792,10 @@ That pub/sub lives in one process: across several, back it with a broker.
 
 ### `src/env.ts`
 
-`defineEnv` from `@alxia/env` reads `PORT` (3000 by default) and `NODE_ENV`
-(`development`, `test` or `production`; development by default), checked
-once, when the module is first imported: a malformed one stops the process
-with every issue, before it listens. Bun loads `.env`; copy `.env.example`
-to `.env` to set them.
+`defineEnv` from `@alxia/env` reads `PORT` (3000 by default), checked once,
+when the module is first imported: a malformed one stops the process with
+every issue, before it listens. Bun loads `.env`; copy `.env.example` to
+`.env` to set it.
 
 ### Adding a field
 
@@ -1014,8 +1043,8 @@ copied in: see
 
 Two stages, as `api`'s below: every dependency and `bun run build`, which
 writes `dist/index.js`, then an image with `dist/` alone, running
-`bun --no-install dist/index.js`. `src/index.ts` stops the app on
-`SIGTERM`, only when it is the entry file.
+`bun --no-install dist/index.js`. `listen`, called only when
+`src/index.ts` is the entry file, stops the app on `SIGTERM` and exits.
 
 ```sh
 cd my-app
@@ -1031,8 +1060,9 @@ Two stages: every dependency, installed with
 running `bun --no-install dist/server.js`, `start`'s command with
 Bun's `--no-install` (not create-alxia's option of the same name), so that a package missing from the bundle fails at
 startup rather than being fetched from npm, written out so that Bun
-is the container's process. `src/server.ts` stops the app on `SIGINT` and `SIGTERM`:
-as process 1, Bun would otherwise ignore it, and `docker stop` would wait.
+is the container's process. `listen` stops the app on `SIGINT` and `SIGTERM`,
+then exits: as process 1, Bun would otherwise ignore them, and `docker stop`
+would wait.
 Nothing is generated in the image: `src/generated/` is committed, and
 `COPY . .` brings it with the rest, so the build stage runs no
 `bun run generate` and needs no `openapi.yaml`.
@@ -1063,8 +1093,9 @@ docker build -t my-api .
 docker run -p 3000:3000 -e API_KEY=change-me my-api
 ```
 
-The server listens on `PORT`, 3000 in the image; set `API_KEY`, whose
-default is for development.
+The server listens on `PORT`, 3000 in the image; `API_KEY` is required
+there, and the container exits at once without it. `-e API_DOCS=true`
+serves `/docs` from the image: `openapi.yaml` is inside the bundle.
 
 ### `graphql`
 
@@ -1072,8 +1103,8 @@ The same two stages as `api`'s, `Dockerfile` and all but the file name:
 `bun run build` writes `dist/server.js`, with `schema.graphql` bundled in
 as text, and the image holds `dist/` alone and runs
 `bun --no-install dist/server.js`. `src/generated/` is committed, so the
-build generates nothing. The image sets `NODE_ENV=production`, which turns
-GraphiQL off. `src/server.ts` stops the app on `SIGINT` and `SIGTERM`.
+build generates nothing. The image sets `NODE_ENV=production`, under which
+GraphiQL is off. `listen` stops the app on `SIGINT` and `SIGTERM`.
 
 ```sh
 cd my-graphql-api

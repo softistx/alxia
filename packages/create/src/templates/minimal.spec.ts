@@ -20,7 +20,7 @@ describe('the minimal template', () => {
 			await alxiaRanges(),
 		);
 		expect(manifest['scripts']).toEqual({
-			dev: 'bun --hot src/index.ts',
+			dev: 'NODE_ENV=development bun --hot src/index.ts',
 			build:
 				'bun build src/index.ts --target=bun --outdir=dist --minify --sourcemap=linked',
 			start: 'NODE_ENV=production bun dist/index.js',

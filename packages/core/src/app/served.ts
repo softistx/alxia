@@ -45,6 +45,20 @@ export function errorFormat(ctx: object): ErrorFormat {
 }
 
 /**
+ * Whether the app that serves the request is in dev — `alxia({ dev })`,
+ * else `NODE_ENV=development` (`dev/mode.ts`): what a plugin reads to
+ * help the developer there alone, as `graphql()`'s GraphiQL and
+ * `health()`'s details do. `false` for a context no app serves.
+ *
+ * ```ts
+ * if (isDev(ctx)) console.debug('cache miss', ctx.url.pathname);
+ * ```
+ */
+export function isDev(ctx: object): boolean {
+	return servedOf(ctx)?.dev === true;
+}
+
+/**
  * Aborted as soon as the app that serves the request starts shutting
  * down — on `SIGTERM`, `SIGINT` or `stop()`: what a long response, a
  * stream or a subscription, listens to, so it ends and the drain does not

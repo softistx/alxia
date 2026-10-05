@@ -21,6 +21,35 @@ const Stored = z.object({
 /** What a Redis older than 7 answers to `EXPIRE … NX`. */
 const REFUSED_ARGUMENTS = /wrong number of arguments|syntax error/i;
 
+type Client = ReturnType<typeof nameUnder>['client'];
+
+/**
+ * Keeps a tag's set as long as its longest-kept response: `NX` gives a
+ * new set its first expiry — `GT` alone never would, a key without one
+ * counting as kept forever — and `GT` then only ever lengthens it. A
+ * Redis older than 7 refuses both arguments: it gets the plain `EXPIRE`,
+ * from then on. Any other error is the caller's.
+ */
+function tagKeeper(
+	client: Client,
+): (key: string, seconds: number) => Promise<void> {
+	let flagsKnown = true;
+	return async (key, seconds) => {
+		const ttl = String(seconds);
+		if (flagsKnown) {
+			try {
+				await client.send('EXPIRE', [key, ttl, 'NX']);
+				await client.send('EXPIRE', [key, ttl, 'GT']);
+				return;
+			} catch (error) {
+				if (!REFUSED_ARGUMENTS.test(String(error))) throw error;
+				flagsKnown = false;
+			}
+		}
+		await client.send('EXPIRE', [key, ttl]);
+	};
+}
+
 /**
  * An `@alxia/cache` store in Redis, on `@nxgt/redis`'s typed caches: every
  * process sharing the Redis serves what one of them kept. A record that no
@@ -51,28 +80,7 @@ export function redisCacheStore(
 		}),
 	);
 	const tagKey = (tag: string) => `${name}:tag:${tag}`;
-	/**
-	 * Keeps a tag's set as long as its longest-kept response: `NX` gives a
-	 * new set its first expiry — `GT` alone never would, a key without one
-	 * counting as kept forever — and `GT` then only ever lengthens it. A
-	 * Redis older than 7 refuses both arguments: it gets the plain `EXPIRE`,
-	 * from then on. Any other error is the caller's.
-	 */
-	let flagsKnown = true;
-	const keepTag = async (key: string, seconds: number) => {
-		const ttl = String(seconds);
-		if (flagsKnown) {
-			try {
-				await client.send('EXPIRE', [key, ttl, 'NX']);
-				await client.send('EXPIRE', [key, ttl, 'GT']);
-				return;
-			} catch (error) {
-				if (!REFUSED_ARGUMENTS.test(String(error))) throw error;
-				flagsKnown = false;
-			}
-		}
-		await client.send('EXPIRE', [key, ttl]);
-	};
+	const keepTag = tagKeeper(client);
 
 	return {
 		async get(key) {

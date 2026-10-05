@@ -60,11 +60,14 @@ retired. The releases below are this package's, under its former name,
 
 ### `@alxia/openapi` 0.5.0
 
-- **API docs, with no configuration.** `app.plugin(apiDocs({ spec:
-  'openapi.yaml' }))` serves an interactive page (Scalar, or Swagger UI) at
-  `/docs` and the document at `/docs/openapi.yaml` and `.json`. The page
-  loads from a pinned CDN version with an integrity hash, sets its own
-  `Content-Security-Policy`, and `matchesSpec` leaves its routes out.
+- **API docs, with no configuration.** `import spec from
+  '../openapi.yaml'`, then `app.plugin(apiDocs({ spec }))`, serves an
+  interactive page (Scalar, or Swagger UI) at `/docs` and the document at
+  `/docs/openapi.yaml` and `.json`. The page loads from a pinned CDN
+  version with an integrity hash, sets its own `Content-Security-Policy` —
+  that version's folder alone, requests to the app and the document's
+  servers alone — with Scalar's AI agent, MCP, developer tools and
+  telemetry off, and `matchesSpec` leaves its routes out.
 
 ### `@alxia/openapi-routes` 0.2.0
 

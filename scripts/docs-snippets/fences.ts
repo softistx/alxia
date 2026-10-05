@@ -45,16 +45,21 @@ export function snippetsOf(markdown: string): Snippet[] {
 	return snippets;
 }
 
-/** What is wrong with a doc's snippets before any is written. */
+/**
+ * What is wrong with a doc's snippets before any is written. `strict`: a
+ * `ts` fence must name its file, or be an excerpt or `no-check`.
+ */
 export function problemsOf(
 	doc: string,
 	snippets: readonly Snippet[],
+	strict = true,
 ): string[] {
 	const problems: string[] = [];
 	const seen = new Set<string>();
 	for (const snippet of snippets) {
 		const where = `${doc}:${snippet.line}`;
 		if (
+			strict &&
 			['ts', 'typescript', 'tsx'].includes(snippet.lang) &&
 			snippet.file === null &&
 			!snippet.skipped &&

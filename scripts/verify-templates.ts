@@ -6,8 +6,9 @@
  * committed `src/generated/` is what the generator they installed writes,
  * then `check:ci` and `typecheck` and `test`; `typecheck` and `build` for
  * `react-router`, plus `build` for all), then `check:ci` (Biome) with no
- * error, warning or info, over what they generated, its production server answers, and
- * so does the image its `Dockerfile` builds (`templates/docker.ts`): skipped
+ * error, warning or info, over what they generated, its production server answers —
+ * the route a client calls first, `/health` for `api` and `graphql`, `/docs`
+ * for `api` — and so does the image its `Dockerfile` builds (`templates/docker.ts`): skipped
  * locally with no Docker daemon, a failure on CI.
  *
  * Every package is packed, and served by a registry on localhost that passes
@@ -97,7 +98,7 @@ async function templateWorks(
 		);
 	}
 	ok = (await biomeClean(check.template, dir, env)) && ok;
-	const status = await served(dir, env, check.request);
+	const status = await served(dir, env, check.request, check.env);
 	ok =
 		report(
 			status === check.expected,
@@ -110,6 +111,7 @@ async function templateWorks(
 		`alxia-template-${check.template}`,
 		registryUrl,
 		check.request,
+		check.env,
 	);
 	return (
 		report(

@@ -57,6 +57,15 @@ export const app = alxia()
 ```
 
 ```json
+{ "status": "down", "checks": {} }
+```
+
+Outside dev, `/ready` says `ok` or `down` and nothing more: a probe is often
+reachable from outside, and the names and durations of your dependencies are
+not its business. In dev, or with `health({ checks, details: true })`, it
+shows each check:
+
+```json
 {
 	"status": "down",
 	"checks": {
@@ -66,7 +75,8 @@ export const app = alxia()
 ```
 
 The `reason` is `timeout` or `failed`, never the error's message, which may
-name a host: a probe is often reachable from outside. The report is kept for
+name a host. A check still running from an earlier probe is not started
+again: the next probe waits for the same run. The report is kept for
 a second (`cache`) so three load balancers asking every second run each check
 once. Keep `timeout` under the probe's own.
 
@@ -81,6 +91,7 @@ import { app } from './app';
 app.listen({
 	port: Number(Bun.env['PORT'] ?? 3000),
 	shutdownTimeout: 25_000, // how long requests in flight have; default 10 s
+	stopTimeout: 5_000, // how long the onStop hooks have, in all; the default
 	onListen: ({ url }) => console.log(`listening on ${url}`),
 });
 ```
@@ -91,8 +102,14 @@ On the signal, in order:
 2. Every stream of server-sent events, and every GraphQL subscription, ends.
 3. New connections are refused. Open sockets are closed with 1001, going away.
 4. **The requests in flight finish**, for `shutdownTimeout` at most.
-5. Every `onStop` hook runs, awaited in turn.
+5. Every `onStop` hook runs, awaited in turn, within `stopTimeout`: past
+   it, the hung hook is logged by name and the process exits 1.
 6. The process exits 0, or 1 when a hook threw. A second signal exits at once.
+
+A process with a `SIGTERM` handler of its own is left to it: `listen` shuts
+its apps down and lets that handler exit. `exit: false` does the same with
+no handler, for a host that exits elsewhere. `listen` twice on one app
+throws, and the `onStop` hooks run once per `listen`.
 
 A response that never ends by itself, a long poll or a body streamed by
 hand, holds step 4 until the timeout: end it on `shutdownSignal(ctx)`, an
@@ -137,7 +154,7 @@ test('a failing check turns readiness 503, and liveness stays 200', async () => 
 	try {
 		const ready = await app.request('/ready');
 		expect(ready.status).toBe(503);
-		expect(await ready.json()).toMatchObject({ status: 'down', checks: { database: { reason: 'failed' } } });
+		expect(await ready.json()).toEqual({ status: 'down', checks: {} }); // no details outside dev
 		expect((await app.request('/health')).status).toBe(200);
 	} finally {
 		database.up = true;
@@ -148,7 +165,8 @@ test('a failing check turns readiness 503, and liveness stays 200', async () => 
 ## Docker and Kubernetes
 
 `docker stop` sends `SIGTERM`, and `SIGKILL` after ten seconds by default.
-The 25 seconds of `shutdownTimeout` above need `docker stop -t 30` (or a
+The 25 seconds of `shutdownTimeout` above, plus the 5 of `stopTimeout`,
+need `docker stop -t 35` (or a
 smaller `shutdownTimeout`), and under Kubernetes a
 `terminationGracePeriodSeconds` above it. The container's process 1 must be
 the server, not a shell around it, or the signal never arrives: the

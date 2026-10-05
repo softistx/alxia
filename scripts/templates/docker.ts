@@ -24,6 +24,7 @@ export async function dockerServed(
 	tag: string,
 	registryUrl: string,
 	request: (base: string) => Promise<Response>,
+	env: Readonly<Record<string, string>> = {},
 ): Promise<number> {
 	const lock = Bun.file(join(dir, 'bun.lock'));
 	const host = registryUrl.replace('//localhost:', '//host.docker.internal:');
@@ -38,8 +39,12 @@ export async function dockerServed(
 	const port = freePort();
 	const name = `${tag}-${port}`;
 	try {
+		const flags = Object.entries(env).flatMap(([key, value]) => [
+			'-e',
+			`${key}=${value}`,
+		]);
 		const ran =
-			await $`docker run -d --rm --name ${name} -p ${port}:3000 ${tag}`.nothrow();
+			await $`docker run -d --rm --name ${name} -p ${port}:3000 ${flags} ${tag}`.nothrow();
 		if (ran.exitCode !== 0) return -1;
 		return await answered(port, request);
 	} finally {

@@ -3,7 +3,12 @@
  * many routes as read it.
  */
 import type { RegisteredContext } from './register';
-import type { Middleware, MiddlewareReturn, NoMiddlewareYet } from './types';
+import type {
+	Empty,
+	Middleware,
+	MiddlewareReturn,
+	NoMiddlewareYet,
+} from './types';
 
 /**
  * A middleware: `(ctx, next) => …`, given to a route after its path, or
@@ -45,12 +50,10 @@ import type { Middleware, MiddlewareReturn, NoMiddlewareYet } from './types';
  * );
  * ```
  *
- * Given a middleware alone, it reads the `Register`ed context — the `db`,
- * the `env`, the `user` the registered base gives — as `defineRoutes` and
- * `AppContext` do, and is refused on a route whose context does not give
- * it; nothing registered, the base context alone. `Requires`, given, is
- * read instead: `defineMiddleware<Empty>()(fn)` for one that reads nothing
- * of it, such as one the registered base itself is built with.
+ * Given a middleware alone, it reads the base context and nothing more,
+ * as a middleware written inline does: what it reads beyond it is given
+ * as `Requires`. One that reads the `Register`ed context — the `db`, the
+ * `env`, the `user` the registered base gives — is `defineAppMiddleware`'s.
  *
  * The middleware is the function itself: `use`, a route and `ws` take a
  * plain `(ctx, next)` function as well, written inline, its additions
@@ -58,7 +61,7 @@ import type { Middleware, MiddlewareReturn, NoMiddlewareYet } from './types';
  * type: what it reads and what it returns.
  */
 export function defineMiddleware<
-	Requires extends object = RegisteredContext,
+	Requires extends object = Empty,
 	Result extends MiddlewareReturn | NoMiddlewareYet = NoMiddlewareYet,
 >(
 	middleware?: Middleware<Requires, Result>,
@@ -75,6 +78,29 @@ export function defineMiddleware<
 > {
 	if (middleware === undefined) return checked as never;
 	return checked(middleware) as never;
+}
+
+/**
+ * A middleware that reads the `Register`ed context — the `db`, the `env`,
+ * the `user` the registered base gives — as `defineRoutes` and
+ * `AppContext` do, with no import of the app; a route or a `use` whose
+ * context does not give it is a compile error. Nothing registered, the
+ * base context alone.
+ *
+ * ```ts
+ * // middlewares/profile.ts
+ * export const profile = defineAppMiddleware(async ({ db, user }, next) =>
+ *   next({ profile: await db.profiles.find(user.id) }),
+ * );
+ * ```
+ *
+ * Not for a middleware the registered base is itself built with: that
+ * one is `defineMiddleware`'s, or the base's type would read itself.
+ */
+export function defineAppMiddleware<Result extends MiddlewareReturn>(
+	middleware: Middleware<RegisteredContext, Result>,
+): Middleware<RegisteredContext, Result> {
+	return checked(middleware);
 }
 
 function checked<Fn>(middleware: Fn): Fn {

@@ -52,7 +52,7 @@ describe("copyTemplate('react-router')", () => {
 		expect(manifest['name']).toBe('web');
 		expect(manifest['scripts']).toEqual({
 			build: 'react-router build',
-			dev: 'react-router dev',
+			dev: 'NODE_ENV=development react-router dev',
 			start: 'NODE_ENV=production bun build/server/index.js',
 			typecheck: 'react-router typegen && tsc',
 			lint: 'biome lint',

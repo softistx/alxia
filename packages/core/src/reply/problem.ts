@@ -2,6 +2,8 @@
  * Problem details for HTTP APIs (RFC 9457, which obsoletes RFC 7807): a
  * JSON body sent as `application/problem+json`.
  */
+
+import { PROBLEM } from '../errors/problems';
 import type { ClientErrorStatus, ServerErrorStatus } from '../types/status';
 import { Reply, type ReplyInit } from './reply';
 
@@ -41,7 +43,7 @@ export function problem<const Body extends ProblemDetails>(
 ): Reply<Body['status'], Body> {
 	const headers = new Headers(init?.headers);
 	if (!headers.has('content-type')) {
-		headers.set('content-type', 'application/problem+json');
+		headers.set('content-type', PROBLEM);
 	}
 	return new Reply(body.status, body, { ...init, headers });
 }

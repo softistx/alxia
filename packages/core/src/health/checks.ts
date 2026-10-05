@@ -1,7 +1,10 @@
 /**
  * The readiness checks `health()` runs: each with a timeout, all at once,
  * their report kept for a short while and shared by the probes that ask
- * meanwhile, so that probes do not hammer the dependencies.
+ * meanwhile, so that probes do not hammer the dependencies. A check that
+ * outlasted its timeout is not started again while it still runs: the
+ * probes after it wait on the same run, so a hung dependency gathers no
+ * pile of calls.
  */
 
 /**
@@ -53,6 +56,29 @@ export function readiness(
 	};
 }
 
+/** The run of each check still pending, by check: reused rather than started again. */
+const pending = new WeakMap<HealthCheck, Promise<'ok' | 'failed'>>();
+
+/** `check` run, or its run still pending joined: `ok`, or `failed` when it throws, rejects or returns `false`. */
+function runOf(check: HealthCheck): Promise<'ok' | 'failed'> {
+	let run = pending.get(check);
+	if (run !== undefined) return run;
+	const settled = (async () => {
+		try {
+			return (await check()) === false ? 'failed' : 'ok';
+		} catch {
+			return 'failed';
+		}
+	})();
+	// Cleared once settled, a tick later at least: a check that throws
+	// before its first `await` settles at once, and must not stay joined.
+	run = settled.finally(() => {
+		if (pending.get(check) === run) pending.delete(check);
+	});
+	pending.set(check, run);
+	return run;
+}
+
 async function runAll(
 	checks: Readonly<Record<string, HealthCheck>>,
 	timeout: number,
@@ -78,14 +104,7 @@ async function runOne(
 	const late = new Promise<'timeout'>((resolve) => {
 		timer = setTimeout(() => resolve('timeout'), timeout);
 	});
-	const done = (async () => {
-		try {
-			return (await check()) === false ? 'failed' : 'ok';
-		} catch {
-			return 'failed';
-		}
-	})();
-	const outcome = await Promise.race([done, late]);
+	const outcome = await Promise.race([runOf(check), late]);
 	clearTimeout(timer);
 	const duration = Math.round(performance.now() - start);
 	return outcome === 'ok'

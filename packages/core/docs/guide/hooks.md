@@ -120,8 +120,13 @@ type StopHook = () => MaybePromise<void>;
 `onStart` runs once `listen` has started the server; it is not awaited, and
 an error it throws is logged. `onStop` runs once the server has shut down —
 on `SIGTERM` or `SIGINT`, or `stop()` — after the requests in flight
-finished, each hook awaited in turn: close a pool, flush a log. One that
-throws on a signal ends the process with 1. Both apply to the whole app
+finished, each hook awaited in turn: close a pool, flush a log, all of
+them within `listen`'s `stopTimeout` (5 s): past it, the hook still
+running is named, the hooks after it are skipped, and the shutdown fails.
+On a signal, one that throws or hangs ends the process with 1 — unless
+the exit is not alxia's (`exit: false`, or a listener of the signal of the
+process's own), and then `process.exitCode` is 1; under `stop()` the
+promise rejects. Both apply to the whole app
 wherever they are declared.
 
 ```ts

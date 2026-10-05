@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import { $ } from 'bun';
 import {
 	distAnswers,
+	distRefuses,
 	expectBiomeClean,
 	expectDockerfile,
 	expectSpecPasses,
@@ -23,7 +24,7 @@ describe('the api template', () => {
 		);
 		expect(manifest['scripts']).toEqual({
 			generate: 'nxgt-openapi generate',
-			dev: 'bun --watch src/server.ts',
+			dev: 'NODE_ENV=development bun --watch src/server.ts',
 			build:
 				'bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked',
 			start: 'NODE_ENV=production bun dist/server.js',
@@ -39,10 +40,10 @@ describe('the api template', () => {
 		expect(Object.keys(manifest.dependencies ?? {})).toEqual([
 			'@alxia/core',
 			'@alxia/env',
+			'@alxia/openapi',
 			'zod',
 		]);
 		expect(Object.keys(manifest.devDependencies ?? {})).toEqual([
-			'@alxia/openapi',
 			'@biomejs/biome',
 			'@nxgt/openapi-codegen',
 			'@types/bun',
@@ -64,15 +65,33 @@ describe('the api template', () => {
 		);
 	});
 
-	test('bun run build makes a dist/ that answers alone, with no node_modules', async () => {
-		const status = await distAnswers(dir, 'dist/server.js', (base) =>
-			fetch(new URL('/todos', base), {
-				method: 'POST',
-				headers: { 'content-type': 'application/json', 'x-api-key': 'dev-key' },
-				body: JSON.stringify({ title: 'From dist alone' }),
-			}),
+	test('bun run build makes a dist/ that answers alone, with no node_modules: its routes, /health, and /docs from the bundled openapi.yaml', async () => {
+		const answers: number[] = [];
+		const status = await distAnswers(
+			dir,
+			'dist/server.js',
+			async (base) => {
+				for (const path of ['/health', '/docs', '/docs/openapi.json']) {
+					answers.push((await fetch(new URL(path, base))).status);
+				}
+				return fetch(new URL('/todos', base), {
+					method: 'POST',
+					headers: { 'content-type': 'application/json', 'x-api-key': 'k' },
+					body: JSON.stringify({ title: 'From dist alone' }),
+				});
+			},
+			{ API_KEY: 'k', API_DOCS: 'true' },
 		);
 		expect(status).toBe(201);
+		expect(answers).toEqual([200, 200, 200]);
+	}, 30_000);
+
+	test('dist/ refuses to start without API_KEY outside development and test', async () => {
+		const exit = await distRefuses(dir, 'dist/server.js', {
+			NODE_ENV: 'production',
+		});
+		expect(exit.code).not.toBe(0);
+		expect(exit.output).toContain('API_KEY');
 	}, 30_000);
 
 	test('bun run check:ci passes on the project and its build: no error, warning or info', () =>
@@ -110,16 +129,18 @@ describe('the api template', () => {
 		const { files } = await copyTemplate('api', 'my-api', await alxiaRanges());
 		const example = (await files['.env.example']?.text()) ?? '';
 		const source = (await files['src/env.ts']?.text()) ?? '';
-		const read = [...source.matchAll(/^\s+(\w+): z\b/gm)].map(
+		const read = [...source.matchAll(/^\s+([A-Z_]+): /gm)].map(
 			([, name]) => name,
 		);
-		expect(read.sort()).toEqual(['API_KEY', 'PORT']);
+		expect(read.sort()).toEqual(['API_DOCS', 'API_KEY', 'PORT']);
+		// API_KEY and API_DOCS commented out: `bun start` loads `.env` too.
 		for (const name of read)
-			expect(example).toMatch(new RegExp(`^${name}=`, 'm'));
+			expect(example).toMatch(new RegExp(`^(# )?${name}=`, 'm'));
+		expect(example).not.toMatch(/^(API_KEY|API_DOCS)=/m);
 	});
 
 	test("typechecks under this repository's strictest settings", () =>
 		expectTypechecks(dir));
 
-	test('its spec passes', () => expectSpecPasses(dir, 7), 30_000);
+	test('its spec passes', () => expectSpecPasses(dir, 8), 30_000);
 });

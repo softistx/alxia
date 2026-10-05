@@ -265,8 +265,9 @@ import { todoRoutes } from './routes/todos';
 
 export const app = base
 	.plugin(todoRoutes)
-	// GET /docs, /docs/openapi.yaml and /docs/openapi.json: off in production
-	.plugin(apiDocs({ spec, enabled: Bun.env['NODE_ENV'] !== 'production' }));
+	// GET /docs, /docs/openapi.yaml and /docs/openapi.json: in development and
+	// under test alone, off wherever it is deployed (NODE_ENV unset included)
+	.plugin(apiDocs({ spec, enabled: ['development', 'test'].includes(Bun.env['NODE_ENV'] ?? '') }));
 ```
 
 ```ts
