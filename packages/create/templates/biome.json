@@ -1,6 +1,11 @@
 {
   "root": false,
-  "extends": ["./api/_biome.json", "./react-router/_biome.json"],
+  "extends": [
+    "./minimal/_biome.json",
+    "./api/_biome.json",
+    "./graphql/_biome.json",
+    "./react-router/_biome.json"
+  ],
   "files": {
     "includes": ["!!**/src/generated"]
   }

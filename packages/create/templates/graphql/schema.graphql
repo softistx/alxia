@@ -1,0 +1,26 @@
+type Query {
+  "The signed-in user, or null with no valid token."
+  me: User
+  notes: [Note!]!
+}
+
+type Mutation {
+  "Needs a token: `Authorization: Bearer ada-token`."
+  addNote(text: String!): Note!
+}
+
+type Subscription {
+  "Each note added, as it is added, over server-sent events."
+  noteAdded: Note!
+}
+
+type User {
+  id: ID!
+  name: String!
+}
+
+type Note {
+  id: ID!
+  text: String!
+  author: User!
+}

@@ -1,11 +1,11 @@
 import { defineMiddleware, defineRoutes } from "@alxia/core";
-import { apiKey } from "../context";
+import { env } from "../env";
 import { operations } from "../generated/alxia";
 
 // A middleware of the routes it is given to: it answers 401 without the key,
 // before the body is read. openapi.yaml declares that 401.
 const requireKey = defineMiddleware(({ request, reply }, next) =>
-  request.headers.get("x-api-key") === apiKey
+  request.headers.get("x-api-key") === env.API_KEY
     ? next()
     : reply(401, { error: "unauthorized" as const }),
 );

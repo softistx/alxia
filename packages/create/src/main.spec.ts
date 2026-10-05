@@ -19,7 +19,7 @@ describe('create-alxia', () => {
 		const { io, err } = ask();
 		expect(await main(['app', '--template', 'vue'], project.root, io)).toBe(1);
 		expect(err).toEqual([
-			`create-alxia: unknown template vue: use api or react-router.\n\n${USAGE}`,
+			`create-alxia: unknown template vue: use minimal, api, graphql or react-router.\n\n${USAGE}`,
 		]);
 	});
 
@@ -77,7 +77,7 @@ describe('create-alxia', () => {
 		const { io, err } = ask({ answers: ['my-api', 'vue'] });
 		expect(await main([], project.root, io)).toBe(1);
 		expect(err[0]).toStartWith(
-			'create-alxia: unknown template vue: use api or react-router.',
+			'create-alxia: unknown template vue: use minimal, api, graphql or react-router.',
 		);
 	});
 });

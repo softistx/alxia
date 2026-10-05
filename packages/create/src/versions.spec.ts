@@ -15,14 +15,17 @@ describe('PEER_RANGES', () => {
 	// sibling's manifest. A widened peer fails here until it is widened there.
 	test("is each package's own peer range", async () => {
 		const reactRouter = await peersOf('react-router');
+		const graphqlPeers = await peersOf('graphql');
 		const ranges: Record<string, string> = { ...PEER_RANGES };
 		expect(ranges).toEqual({
 			typescript: (await peersOf('core'))['typescript'] as string,
 			zod: (await peersOf('zod'))['zod'] as string,
 			'react-router': reactRouter['react-router'] as string,
 			vite: reactRouter['vite'] as string,
+			graphql: graphqlPeers['graphql'] as string,
+			'graphql-yoga': graphqlPeers['graphql-yoga'] as string,
 		});
-		for (const dir of ['react-router', 'zod']) {
+		for (const dir of ['react-router', 'zod', 'graphql']) {
 			expect((await peersOf(dir))['typescript']).toBe(PEER_RANGES.typescript);
 		}
 	});
@@ -37,6 +40,8 @@ describe('alxiaRanges', () => {
 	test("in the workspace, workspace:^ reads as ^ and the sibling's version, as bun publish writes it", async () => {
 		expect(await alxiaRanges()).toEqual({
 			'@alxia/core': `^${await versionOf('core')}`,
+			'@alxia/env': `^${await versionOf('env')}`,
+			'@alxia/graphql': `^${await versionOf('graphql')}`,
 			'@alxia/openapi': `^${await versionOf('openapi')}`,
 			'@alxia/react-router': `^${await versionOf('react-router')}`,
 		});
@@ -51,6 +56,8 @@ describe('alxiaRanges', () => {
 			JSON.stringify({
 				devDependencies: {
 					'@alxia/core': '^0.3.0',
+					'@alxia/env': '^0.1.0',
+					'@alxia/graphql': '^0.2.0',
 					'@alxia/openapi': '^0.4.0',
 					'@alxia/react-router': '^0.2.0',
 				},
@@ -58,6 +65,8 @@ describe('alxiaRanges', () => {
 		);
 		expect(await alxiaRanges(new URL(`file://${file}`))).toEqual({
 			'@alxia/core': '^0.3.0',
+			'@alxia/env': '^0.1.0',
+			'@alxia/graphql': '^0.2.0',
 			'@alxia/openapi': '^0.4.0',
 			'@alxia/react-router': '^0.2.0',
 		});

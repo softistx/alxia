@@ -89,9 +89,14 @@ export function isExact(range: string): boolean {
  * patch of its minor: a project's `bun run verify` runs `generate --check`
  * over the committed `src/generated/`, so a generator patch that writes the
  * files differently would fail a fresh project on files it never touched.
+ * The `api` template's is `@nxgt/openapi-codegen`; the `graphql` one's are
+ * GraphQL Code Generator's CLI and the two plugins that write its types.
  */
 export const KEPT_EXACT: ReadonlySet<string> = new Set([
 	'@nxgt/openapi-codegen',
+	'@graphql-codegen/cli',
+	'@graphql-codegen/typescript',
+	'@graphql-codegen/typescript-resolvers',
 ]);
 
 /**
