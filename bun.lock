@@ -15,11 +15,11 @@
     "examples/react-router": {
       "name": "react-router-example",
       "dependencies": {
-        "@alxia/compress": "^0.3.4",
-        "@alxia/core": "^0.9.0",
-        "@alxia/logger": "^0.6.1",
-        "@alxia/react-router": "^0.7.0",
-        "@alxia/secure-headers": "^0.4.4",
+        "@alxia/compress": "^0.3.5",
+        "@alxia/core": "^0.10.1",
+        "@alxia/logger": "^0.6.2",
+        "@alxia/react-router": "^0.7.1",
+        "@alxia/secure-headers": "^0.4.5",
         "@react-router/node": "^8.4.0",
         "@react-router/serve": "^8.4.0",
         "isbot": "^5.2.2",
@@ -80,7 +80,7 @@
     },
     "packages/core": {
       "name": "@alxia/core",
-      "version": "0.10.0",
+      "version": "0.10.1",
       "devDependencies": {
         "@types/bun": "^1.4.2",
         "zod": "^4.1.0",
@@ -273,7 +273,7 @@
     },
     "packages/rate-limit": {
       "name": "@alxia/rate-limit",
-      "version": "0.4.6",
+      "version": "0.4.7",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
