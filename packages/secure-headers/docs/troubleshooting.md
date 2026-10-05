@@ -18,7 +18,7 @@ or a header in the wrong place.
 **Runtime**
 
 - [`TypeError: secureHeaders: … is empty; give false to leave the … header out`](#typeerror-secureheaders--is-empty-give-false-to-leave-the--header-out)
-- [`TypeError: use(): the plugin function returned function, not an app: …`](#typeerror-use-the-plugin-function-returned-function-not-an-app-)
+- [`GET /: a middleware (secureHeaders) returned function: return next(), a reply or a Response`](#get--a-middleware-secureheaders-returned-function-return-next-a-reply-or-a-response)
 - [`TypeError: secureHeaders: nonce is on, but the content-security-policy has no script-src to add it to: …`](#typeerror-secureheaders-nonce-is-on-but-the-content-security-policy-has-no-script-src-to-add-it-to-)
 - [`TypeError: secureHeaders: nonce is on, but contentSecurityPolicy is false: …`](#typeerror-secureheaders-nonce-is-on-but-contentsecuritypolicy-is-false-)
 - [`TypeError: secureHeaders: contentSecurityPolicy names NONCE, but nonce is off: give nonce: true`](#typeerror-secureheaders-contentsecuritypolicy-names-nonce-but-nonce-is-off-give-nonce-true)
@@ -237,20 +237,16 @@ Only `false` leaves a header out.
 app.use(secureHeaders({ xFrameOptions: false }));
 ```
 
-### `TypeError: use(): the plugin function returned function, not an app: …`
+### `GET /: a middleware (secureHeaders) returned function: return next(), a reply or a Response`
 
 **When:** the same mistake as above in JavaScript, or past a cast:
-`alxia().use(secureHeaders)`, the factory given uncalled. It throws at
-startup:
+`alxia().use(secureHeaders)`, the factory given uncalled. Each request
+is answered with a 500, and this error is logged.
 
-```text
-TypeError: use(): the plugin function returned function, not an app: a plugin returns the app it is given; a middleware is made with defineMiddleware() and given to use()
-```
-
-**Why:** `app.use` takes a function that is not a middleware for a plugin:
-it calls it with the app, and expects the app back. Uncalled,
-`secureHeaders` reads the app as its options and returns a middleware, a
-function, not the app.
+**Why:** `use` takes a middleware, a `(ctx, next)` function. Uncalled,
+`secureHeaders` runs as one, reads the context as its options, and
+returns a middleware — a function, not `next()`, a reply or a
+`Response`.
 
 **Fix:**
 

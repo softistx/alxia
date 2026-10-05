@@ -191,7 +191,7 @@ anything but an app (a promise it returned is left handled), and for more
 than one argument, or a value that is neither an app nor a function: a
 middleware goes to `use`. `use` throws, in turn, when it is given an app
 ([Troubleshooting](../troubleshooting.md#building-the-app)). Both were
-accepted, deprecated, until 0.5 ([Upgrading](../upgrading.md#050)).
+accepted, deprecated, in 0.4 ([Upgrading](../upgrading.md#050)).
 
 The app's own `bodyLimit()` does not reach an app plugin's routes: they
 keep the limit they were declared with ([Routes](routes.md#body-size-bodylimit)).
