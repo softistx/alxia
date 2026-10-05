@@ -104,6 +104,8 @@ describe('the route table', () => {
 				});
 				expect(info.routes[4]).toMatchObject({ method: 'WS', handler: 'ws' });
 				expect(info.table).toContain('/todos');
+				// The table's head says dev only in dev.
+				expect(info.table.split('\n')[0]?.endsWith(' (dev)')).toBe(dev);
 			}
 			expect(log).not.toHaveBeenCalled();
 		} finally {

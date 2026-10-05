@@ -578,7 +578,8 @@ const app = alxia({ dev: false }); // or NODE_ENV=production, as every template'
 
 **Can it break your code.** Yes, for a process run without `NODE_ENV`
 where it serves real clients: it would send its stacks and its routes. Set
-`NODE_ENV=production` there, or `dev: false`. A test that compares a whole
+`NODE_ENV=production` there, or `dev: false`; the templates' `start`
+scripts now set it. A test that compares a whole
 404, 405 or 500 body runs with `NODE_ENV=test` under `bun test`, so it is
 unchanged; one run otherwise gets the `hint` and the `stack`. A test that
 asserted the 500 of an uncalled factory now sees the declaration throw

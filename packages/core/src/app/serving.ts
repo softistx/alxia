@@ -90,13 +90,13 @@ function announce(
 ): void {
 	if (onListen === undefined && runtime.served.dev !== true) return;
 	const routes = routeRows(runtime);
-	const table = formatRoutes(server.url, routes);
+	const dev = runtime.served.dev === true;
+	const table = formatRoutes(server.url, routes, dev);
 	if (onListen === undefined) {
 		console.log(table);
 		return;
 	}
 	try {
-		const dev = runtime.served.dev === true;
 		onListen({ server, url: server.url, routes, table, dev });
 	} catch (error) {
 		console.error(error);

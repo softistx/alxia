@@ -44,3 +44,36 @@ test('read when the app is made, and anything but a boolean throws', async () =>
 		'alxia(): dev must be true or false, not "yes"',
 	);
 });
+
+test('a bundle built without NODE_ENV still reads it when it runs', async () => {
+	// `bun build` inlines `process.env.NODE_ENV`: the switch must not be
+	// decided by the build's mode.
+	const dir = `${import.meta.dir}/../../.bundle-probe`;
+	const entry = `${dir}/entry.ts`;
+	await Bun.write(
+		entry,
+		`import { devOf } from '${import.meta.dir}/mode';\nconsole.log(devOf(undefined));\n`,
+	);
+	try {
+		const env = { ...process.env };
+		delete env['NODE_ENV'];
+		const built = Bun.spawnSync(
+			[
+				process.execPath,
+				'build',
+				entry,
+				'--target=bun',
+				'--minify',
+				`--outdir=${dir}/dist`,
+			],
+			{ env },
+		);
+		expect(built.exitCode).toBe(0);
+		const run = Bun.spawnSync([process.execPath, `${dir}/dist/entry.js`], {
+			env: { ...env, NODE_ENV: 'production' },
+		});
+		expect(run.stdout.toString().trim()).toBe('false');
+	} finally {
+		await Bun.$`rm -rf ${dir}`.quiet();
+	}
+});

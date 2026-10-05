@@ -113,7 +113,7 @@ if (import.meta.main) {
 ```
 
 `bun dev` runs `bun --hot src/index.ts`, which prints the route table
-`@alxia/core` writes in dev; `bun start` runs `bun dist/index.js`, what
+`@alxia/core` writes in dev; `bun start` runs `NODE_ENV=production bun dist/index.js`, what
 `bun run build` wrote, and the image sets `NODE_ENV=production`, under
 which it prints the URL alone. `import.meta.main` is why
 the spec can import `app` without opening a port, and why the one file is
@@ -572,7 +572,7 @@ The scripts:
 | `bun run generate` | `nxgt-openapi generate`: `src/generated/` from `openapi.yaml`. `bun run generate --check` writes nothing and exits 1 when a file is stale |
 | `bun run typecheck` | `tsc --noEmit` |
 | `bun run build` | `bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked`: one file, its dependencies bundled |
-| `bun start` | `bun dist/server.js`: the build, after `bun run build` |
+| `bun start` | `NODE_ENV=production bun dist/server.js`: the build, after `bun run build` |
 | `bun run check` | `biome check --write`: lint, format, sort imports, fixing what it can |
 | `bun run lint`, `bun run format` | `biome lint`, `biome format --write` |
 | `bun run check:ci` | `biome ci`: read-only, for CI |
@@ -809,7 +809,7 @@ src/generated`, then `bun run verify`
 ([troubleshooting](troubleshooting.md#srcgenerated-changes-after-moving-graphql-codegen)).
 
 The scripts are those of the [`api`](#the-rest) project, with `generate` as
-`graphql-codegen --config codegen.ts` and `start` as `bun dist/server.js`.
+`graphql-codegen --config codegen.ts` and `start` as `NODE_ENV=production bun dist/server.js`.
 For Yoga's plugins, the IDE and the typed context, see
 [`@alxia/graphql`'s guide](https://github.com/softistx/alxia/tree/develop/packages/graphql/docs).
 
@@ -826,7 +826,7 @@ before `bun install`. The change, against React Router's files:
  // package.json
    "scripts": {
 -    "start": "react-router-serve ./build/server/index.js",
-+    "start": "bun build/server/index.js",
++    "start": "NODE_ENV=production bun build/server/index.js",
    },
    "dependencies": {
 +    "@alxia/core": "^0.3.1",

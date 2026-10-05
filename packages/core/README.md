@@ -823,14 +823,17 @@ page to a browser, its `stack` to any other client. Outside dev, each is
 off and costs nothing.
 
 ```ts
-import { alxia } from '@alxia/core';
+import { alxia, defineMiddleware } from '@alxia/core';
 import { cors } from '@alxia/cors';
 import { logger } from '@alxia/logger';
+
+const todos = new Map([['7', { id: '7', title: 'Write the docs' }]]);
+const auth = defineMiddleware((_ctx, next) => next({ user: 'ada' }));
 
 const app = alxia() // dev: NODE_ENV is neither production nor test
 	.use(cors(), logger())
 	.get('/todos/:id', auth, function getTodo({ params, reply }) {
-		return reply(200, find(params.id));
+		return reply(200, todos.get(params.id) ?? null);
 	});
 
 app.listen(3000);

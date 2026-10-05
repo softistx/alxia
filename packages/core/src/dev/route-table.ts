@@ -69,6 +69,7 @@ function nameOf(hook: ChainHook): string[] {
 export function formatRoutes(
 	url: URL | string,
 	rows: readonly RouteRow[],
+	dev = true,
 ): string {
 	const method = Math.max(0, ...rows.map((row) => row.method.length));
 	const path = Math.max(0, ...rows.map((row) => row.path.length));
@@ -78,7 +79,7 @@ export function formatRoutes(
 		const rest = [chain, tail].filter((part) => part !== '').join(' ');
 		return `  ${row.method.padEnd(method)}  ${row.path.padEnd(path)}  ${rest}`.trimEnd();
 	});
-	const head = `alxia listening on ${String(url)} (dev)`;
+	const head = `alxia listening on ${String(url)}${dev ? ' (dev)' : ''}`;
 	return rows.length === 0
 		? `${head}\n  no route declared`
 		: [head, ...lines].join('\n');

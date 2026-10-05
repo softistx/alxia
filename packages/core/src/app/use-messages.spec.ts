@@ -52,13 +52,14 @@ const factory =
 
 test('a ninth middleware, a validate() given to use(), an uncalled factory: one error each, naming it', async () => {
 	const errors = await typecheck('limits');
-	expect(errors).toHaveLength(7);
+	expect(errors).toHaveLength(9);
 	for (const error of errors) {
 		expect(error).toContain('error TS2345');
 		expect(error).not.toContain('No overload matches');
 	}
-	const [route, options, socket, validated, responded, used, given] = errors;
-	for (const error of [route, options, socket])
+	const [route, options, socket, validated, responded, used, given, ...rest] =
+		errors;
+	for (const error of [route, options, socket, ...rest])
 		expect(error).toContain(tooMany);
 	for (const error of [validated, responded]) expect(error).toContain(builtin);
 	for (const error of [used, given]) expect(error).toContain(factory);

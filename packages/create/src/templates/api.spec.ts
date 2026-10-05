@@ -26,7 +26,7 @@ describe('the api template', () => {
 			dev: 'bun --watch src/server.ts',
 			build:
 				'bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked',
-			start: 'bun dist/server.js',
+			start: 'NODE_ENV=production bun dist/server.js',
 			test: 'bun test',
 			typecheck: 'tsc --noEmit',
 			lint: 'biome lint',

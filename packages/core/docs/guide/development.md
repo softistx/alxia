@@ -20,7 +20,10 @@ const app = alxia({ dev: process.env['APP_DEV'] === '1' });
 `Dockerfile`) and `bun test`, which sets `NODE_ENV=test`, do not. `true` or
 `false` decides, whatever `NODE_ENV` says; anything else throws
 `alxia(): dev must be true or false, not …`. `NODE_ENV` is read when
-`alxia()` is called.
+`alxia()` is called, from `Bun.env`: a bundle `bun build` made reads it
+when it runs, not when it was built. Each template's `bun start` runs
+`NODE_ENV=production bun dist/…`; a process started otherwise, on a VM or
+a platform, sets it or passes `dev: false`.
 
 | `dev` | on | off |
 | --- | --- | --- |
@@ -204,7 +207,7 @@ markFactory(audit);
 Name the middleware it returns, as above, and the route table shows it.
 A factory nobody marked is still told on its first request, in the log:
 `a middleware (audit) returned function: it looks like a factory given
-uncalled, call it, use(audit())`.
+uncalled, call it: audit()`.
 
 TypeScript refuses it too, on any factory, marked or not: a function that
 returns a function is no middleware.

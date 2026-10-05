@@ -175,7 +175,7 @@ export class Call {
 		const name = this.#hook.name ? ` (${this.#hook.name})` : '';
 		const factory =
 			typeof result === 'function'
-				? `: it looks like a factory given uncalled, call it, use(${this.#hook.name || 'factory'}())`
+				? `: it looks like a factory given uncalled, call it: ${this.#hook.name || 'factory'}()`
 				: ': return next(), a reply or a Response';
 		throw failure(
 			this.#definition,

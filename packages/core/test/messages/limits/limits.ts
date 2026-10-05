@@ -29,3 +29,10 @@ alxia().use(responds({ 200: z.string() }));
 alxia().use(audit);
 // 7: a route, a factory given uncalled.
 alxia().get('/d', audit, ok);
+// 8: a socket route with options, a ninth middleware.
+alxia().ws('/e', { detail: {} }, m, m, m, m, m, m, m, m, m, {
+	message: () => {},
+});
+// 9: route(operation), a ninth middleware.
+const op = { method: 'GET', path: '/f', schema: {} } as const;
+alxia().route(op, m, m, m, m, m, m, m, m, m, ok);

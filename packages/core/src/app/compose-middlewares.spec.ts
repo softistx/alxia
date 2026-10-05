@@ -9,6 +9,7 @@ import { z } from 'zod';
 import { alxia } from './alxia';
 import { compose } from './compose-middlewares';
 import { defineMiddleware } from './define-middleware';
+import { markFactory } from './factory';
 import type { ContextOf } from './signatures';
 import type { Empty } from './types';
 import { validate } from './validate';
@@ -71,7 +72,21 @@ describe('compose at runtime', () => {
 				// @ts-expect-error validate() and responds() belong to a route
 				compose(auth, validate({ params: id })),
 			),
-		).toThrow('use(): argument 2 is a validate() or responds()');
+		).toThrow(
+			'use(): argument 1 (compose member 2) is a validate() or responds()',
+		);
+		const audit = () => step('audit');
+		markFactory(audit);
+		expect(() =>
+			alxia().get(
+				'/',
+				step('a'),
+				(compose as (...m: unknown[]) => never)(auth, audit),
+				({ reply }) => reply(200, 'ok'),
+			),
+		).toThrow(
+			'GET /: middleware 2 (compose member 2) looks like a factory (audit)',
+		);
 		const alone = compose(auth) as unknown as () => unknown;
 		expect(() => alone()).toThrow('compose() runs among a route');
 		expect(() => (compose as (...args: unknown[]) => unknown)()).toThrow(

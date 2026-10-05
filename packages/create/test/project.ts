@@ -126,9 +126,11 @@ export async function expectDockerfile(
 ): Promise<void> {
 	const cmd = JSON.parse(/^CMD (.+)$/m.exec(dockerfile)?.[1] ?? 'null');
 	// start's command, and --no-install: no package is fetched at startup.
-	expect(cmd.join(' ')).toBe(
-		scripts['start']?.replace(/^bun /, 'bun --no-install '),
-	);
+	// Its NODE_ENV=production is the image's ENV.
+	const start = scripts['start']?.replace(/^NODE_ENV=production /, '');
+	expect(scripts['start']).toStartWith('NODE_ENV=production ');
+	expect(dockerfile).toContain('\nENV NODE_ENV=production\n');
+	expect(cmd.join(' ')).toBe(start?.replace(/^bun /, 'bun --no-install '));
 	const [build, final] = dockerfile.split(/^(?=FROM )/m).slice(1);
 	expect(build, template).toStartWith('FROM oven/bun:1 AS build\n');
 	expect(build).toContain('RUN bun install --frozen-lockfile\n');

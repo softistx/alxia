@@ -96,7 +96,7 @@ middleware must come after alxia's.
 "scripts": {
 	"build": "react-router build",
 	"dev": "react-router dev",
-	"start": "bun build/server/index.js",
+	"start": "NODE_ENV=production bun build/server/index.js",
 	"typecheck": "react-router typegen && tsc"
 }
 ```
@@ -174,7 +174,7 @@ server build inside it, into one file:
 - **Run, it listens**: `bun build/server/index.js` listens on `PORT`
   (3000 by default) and `HOST` (`0.0.0.0`). It prints
   `alxia listening on <url>`, and in dev — `NODE_ENV` neither `production`
-  nor `test`, or `alxia({ dev: true })` — the route table
+  nor `test` — the route table
   ([`@alxia/core`'s Development](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/development.md#the-route-table)). On `SIGINT` or `SIGTERM` it shuts the app
   down as `@alxia/core`'s `listen` does: readiness turns 503, new
   connections are refused, the requests in flight finish within

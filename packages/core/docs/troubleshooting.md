@@ -127,7 +127,7 @@ a trap that prints nothing is headed by its symptom.
 - [`ResponseValidationError: … the 200 reply does not match its schema`](#responsevalidationerror--the-200-reply-does-not-match-its-schema)
 - [`ResponseValidationError: … declares no 201 reply`](#responsevalidationerror--declares-no-201-reply)
 - [`TypeError: … a middleware (…) returned nothing: return next(), a reply or a Response`](#typeerror--a-middleware--returned-nothing-return-next-a-reply-or-a-response)
-- [`TypeError: … a middleware (…) returned function: it looks like a factory given uncalled, …`](#typeerror--a-middleware--returned-function-it-looks-like-a-factory-given-uncalled-call-it-use)
+- [`TypeError: … a middleware (…) returned function: it looks like a factory given uncalled, …`](#typeerror--a-middleware--returned-function-it-looks-like-a-factory-given-uncalled-call-it-)
 - [`TypeError: compose() runs among a route's middlewares or in use(), not called on its own`](#typeerror-compose-runs-among-a-routes-middlewares-or-in-use-not-called-on-its-own)
 - [`TypeError: … a middleware called next() twice`](#typeerror--a-middleware-called-next-twice)
 - [`TypeError: … a middleware called next() after it returned`](#typeerror--a-middleware-called-next-after-it-returned)
@@ -2692,10 +2692,10 @@ const audit = defineMiddleware(async ({ request }, next) => {
 });
 ```
 
-### `TypeError: … a middleware (…) returned function: it looks like a factory given uncalled, call it, use(…())`
+### `TypeError: … a middleware (…) returned function: it looks like a factory given uncalled, call it: …()`
 
 ```text
-TypeError: GET /: a middleware (audit) returned function: it looks like a factory given uncalled, call it, use(audit())
+TypeError: GET /: a middleware (audit) returned function: it looks like a factory given uncalled, call it: audit()
 ```
 
 **When:** a factory nobody marked is given uncalled, `use(audit)`, past

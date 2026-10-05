@@ -71,7 +71,7 @@ server stops at startup with
 
 ```diff
 -    "start": "react-router-serve ./build/server/index.js",
-+    "start": "bun build/server/index.js",
++    "start": "NODE_ENV=production bun build/server/index.js",
 ```
 
 With the `bunfig.toml` in place, the template's `dev`, `build` and

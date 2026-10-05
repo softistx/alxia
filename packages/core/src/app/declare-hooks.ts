@@ -5,7 +5,7 @@
  */
 import type { BodyParser } from '../request/read';
 import type { AppState } from './app-state';
-import { membersOf } from './compose-middlewares';
+import { membersOf, placesOf } from './compose-middlewares';
 import type { DeriveHook, Globals } from './definition';
 import { uncalledFactory } from './factory';
 import { warnLate } from './late-use';
@@ -36,12 +36,14 @@ export function useMiddlewares(
 	const [first, ...rest] = args;
 	const scoped = typeof first === 'string';
 	const label = scoped ? `use("${first}")` : 'use()';
-	const middlewares = membersOf(scoped ? rest : args);
+	const given = scoped ? rest : args;
+	const middlewares = membersOf(given);
 	if (middlewares.length === 0) {
 		throw new TypeError(`${label}: no middleware is given`);
 	}
+	const places = placesOf(given, 'argument');
 	middlewares.forEach((middleware, index) => {
-		checkMiddleware(label, middleware, index, isApp);
+		checkMiddleware(`${label}: ${places[index]}`, middleware, isApp);
 	});
 	const path = scoped ? scopePath(state.prefix, first) : undefined;
 	warnLate(state, label, path);
@@ -52,12 +54,10 @@ export function useMiddlewares(
 
 /** A `(ctx, next)` function: not an app, nor a `validate` or a `responds`. */
 function checkMiddleware(
-	label: string,
+	at: string,
 	middleware: unknown,
-	index: number,
 	isApp: (value: unknown) => boolean,
 ): void {
-	const at = `${label}: argument ${index + 1}`;
 	if (isApp(middleware)) {
 		throw new TypeError(
 			`${at} is an app: a plugin is given to app.plugin(), use() takes middlewares`,

@@ -8,7 +8,7 @@ import { reach, type ScopePath } from './scope-path';
 
 /** Whether the process is a developer's: neither `production` nor `test`. */
 export function developing(): boolean {
-	const mode = process.env.NODE_ENV;
+	const mode = Bun.env.NODE_ENV; // not process.env, which `bun build` inlines
 	return mode !== 'production' && mode !== 'test';
 }
 

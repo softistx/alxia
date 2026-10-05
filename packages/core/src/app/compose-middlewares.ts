@@ -57,3 +57,21 @@ export function membersOf(middlewares: readonly unknown[]): unknown[] {
 			] ?? [middleware],
 	);
 }
+
+/**
+ * Where each of `membersOf(middlewares)` was given, for an error to name:
+ * `argument 2`, or `argument 2 (compose member 1)` for a member of the
+ * `compose(...)` given second. `word` is `argument` or `middleware`.
+ */
+export function placesOf(
+	middlewares: readonly unknown[],
+	word: string,
+): string[] {
+	return middlewares.flatMap((middleware, index) => {
+		const members = membersOf([middleware]);
+		const at = `${word} ${index + 1}`;
+		return members[0] === middleware
+			? [at]
+			: members.map((_, member) => `${at} (compose member ${member + 1})`);
+	});
+}

@@ -83,7 +83,7 @@ test('a factory nobody marked is told on its first request what it looks like', 
 			.get('/', ({ reply }) => reply(200, 'ok'));
 		expect((await app.request('/')).status).toBe(500);
 		expect(String(error.mock.calls[0]?.[0])).toContain(
-			'a middleware (unmarked) returned function: it looks like a factory given uncalled, call it, use(unmarked())',
+			'a middleware (unmarked) returned function: it looks like a factory given uncalled, call it: unmarked()',
 		);
 	} finally {
 		error.mockRestore();

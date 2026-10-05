@@ -13,7 +13,10 @@ const QUIET = new Set(['production', 'test']);
  * `NODE_ENV=production` and under `bun test`. Anything but a boolean throws.
  */
 export function devOf(dev: unknown): boolean {
-	if (dev === undefined) return !QUIET.has(process.env['NODE_ENV'] ?? '');
+	// `Bun.env`, not `process.env.NODE_ENV`, which `bun build` replaces with
+	// the mode of the build: a bundle built without `NODE_ENV` would stay in
+	// dev under `NODE_ENV=production`.
+	if (dev === undefined) return !QUIET.has(Bun.env['NODE_ENV'] ?? '');
 	if (typeof dev !== 'boolean') {
 		throw new TypeError(
 			`alxia(): dev must be true or false, not ${JSON.stringify(dev)}`,
