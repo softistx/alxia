@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/janus",
-	"version": "0.3.4",
+	"version": "0.3.5",
 	"description": "Identities and sessions for alxia on @nxgt/janus: the user typed in the context, the session cookie kept and renewed, a typed 401",
 	"license": "MIT",
 	"type": "module",

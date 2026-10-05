@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.3.5
+
+### Patch Changes
+
+- [#192](https://github.com/softistx/alxia/pull/192) [`3385725`](https://github.com/softistx/alxia/commit/33857253e8a67fc33f39884d58bdd55377ae2915) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects install a core whose `ctx.ip` is canonical and whose `trustProxy` has `untrusted: 'refuse-all'`; the templates are unchanged.
+
 ## 0.3.4
 
 ### Patch Changes

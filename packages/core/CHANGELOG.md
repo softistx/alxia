@@ -1,5 +1,15 @@
 # @alxia/core
 
+## 0.10.0
+
+### Minor Changes
+
+- [#192](https://github.com/softistx/alxia/pull/192) [`3385725`](https://github.com/softistx/alxia/commit/33857253e8a67fc33f39884d58bdd55377ae2915) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Give `ctx.ip` one text per address, and add `trustProxy({ untrusted: 'refuse-all', allow? })`. Every address core reads for `ctx.ip` — the connection's by default, `forwardedIp`'s and `trustProxy`'s from a header or the socket — is canonical: an IPv4-mapped address as IPv4, IPv6 as RFC 5952 writes it (lowercase, no leading zeros, the longest zero run as `::`), brackets and a port dropped, a zone id kept after the address; a `trusted` function is given the same text (one that denies by the mapped form, `a !== '::ffff:…'`, now sees the IPv4 form: rewrite it with `canonicalIp`), `canonical: false` keeps the address as written, a custom `ip` function is read as it returns, and `canonicalIp(address)` gives an app's own values the same form. `untrusted: 'refuse-all'` answers 403, in the app's error format, every request from a connection `trusted` does not name, forwarding headers or not, but for what `allow` lets through — peers by CIDR range, or a `(request, peer) => boolean` such as the probes' paths; an `allow` that throws refuses; with a hop count it is a compile error (`StrictProxyOptions`) and throws, and `listen` throws on an app with a `page()`, which Bun serves past the refusal.
+
+### Patch Changes
+
+- [#194](https://github.com/softistx/alxia/pull/194) [`da95f24`](https://github.com/softistx/alxia/commit/da95f24391b942db81c082c253aeeaa5fcade07b) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Upgrading: the 0.10.0 section lists every change of the release, the canonical `ctx.ip`, `untrusted: 'refuse-all'` and `allow`, the peers, `@alxia/rate-limit`'s key and the create release included.
+
 ## 0.9.0
 
 ### Minor Changes
