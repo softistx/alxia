@@ -181,12 +181,8 @@ export function graphql<
 	route.get(path, handler);
 	route.post(path, handler);
 	if (ws !== false) {
-		const socket = graphqlSocket(yogaAt, ws === true ? {} : ws);
-		route.ws(
-			(ws === true ? undefined : ws.path) ?? path,
-			socket.middleware,
-			socket.handlers,
-		);
+		const socket = graphqlSocket(yogaAt, path, ws === true ? {} : ws);
+		route.ws(socket.path, socket.middleware, socket.handlers);
 	}
 	return app as never;
 }

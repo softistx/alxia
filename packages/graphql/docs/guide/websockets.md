@@ -50,14 +50,16 @@ of each kind works against one deployment.
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `path` | `string` | the endpoint's `path` | where a client opens its socket, under the app's prefix |
-| `keepAlive` | `number \| false` | `12_000` | milliseconds between the WebSocket pings the server sends each socket, so a proxy does not close an idle subscription; `false` for none |
+| `path` | `` `/${string}` `` | the endpoint's `path` | where a client opens its socket, under the app's prefix |
+| `keepAlive` | `number \| false` | `12_000` | milliseconds between the WebSocket pings the server sends each socket, so a proxy does not close an idle subscription; `false` for none. Anything but a positive number throws where `graphql()` is declared |
 
 ```ts no-check
 graphql(app, { schema, ws: { path: '/graphql/ws', keepAlive: 30_000 } });
 ```
 
-Queries, mutations and subscriptions all run over a socket. The socket
+A socket at a path of its own runs the endpoint's Yoga: its plugins are
+set up once, for both. Queries, mutations and subscriptions all run over a
+socket. The socket
 route shows in the route table `listen` prints in dev, as `WS /graphql`.
 
 ## The upgrade runs the app's middlewares

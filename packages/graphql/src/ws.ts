@@ -4,7 +4,7 @@
  * middlewares, each operation runs through Yoga's envelop — its plugins,
  * its `context` — and the app's shutdown closes the sockets with 1001.
  */
-import type { BaseContext, NextFunction, Socket } from '@alxia/core';
+import type { BaseContext, NextFunction, RoutePath, Socket } from '@alxia/core';
 import type { Server, ServerOptions, SubscribePayload } from 'graphql-ws';
 import type { YogaInitialContext, YogaServerInstance } from 'graphql-yoga';
 import { serverContext, type YogaContext } from './handler';
@@ -16,7 +16,7 @@ export interface GraphQLWsOptions {
 	 * endpoint's own path by default: one URL, `http(s)://` for queries and
 	 * server-sent events, `ws(s)://` for the socket.
 	 */
-	readonly path?: string;
+	readonly path?: RoutePath;
 	/**
 	 * Milliseconds between the WebSocket pings the server sends each open
 	 * socket, so a proxy does not close an idle subscription. `12_000` by
@@ -57,6 +57,21 @@ interface Enveloped {
 	readonly subscribe: (args: never) => unknown;
 }
 
+/** Where the socket route is, and the endpoint whose Yoga it runs. */
+interface Paths {
+	readonly endpoint: string;
+	readonly socket: string;
+}
+
+/**
+ * The Yoga of the endpoint a socket route serves: the HTTP one, so its
+ * plugins are set up once. The socket's route is its full path, the
+ * prefix of each app it is mounted into included, then its own `path`.
+ */
+function endpointOf(route: string, paths: Paths): string {
+	return route.slice(0, route.length - paths.socket.length) + paths.endpoint;
+}
+
 /**
  * `graphql-ws`'s options: each operation parsed, validated, executed and
  * subscribed through Yoga's envelop, with the context the upgrade built,
@@ -64,12 +79,16 @@ interface Enveloped {
  */
 function serverOptions<UserCtx extends YogaContext>(
 	yogaAt: (endpoint: string) => YogaServerInstance<YogaContext, UserCtx>,
+	paths: Paths,
 ): ServerOptions<Record<string, unknown> | undefined, Extra> {
+	// Each operation's envelop, found by its context: one object per
+	// operation, which the root resolvers' `parent` is not.
+	const enveloped = new WeakMap<object, Enveloped>();
+	const of = (args: { contextValue?: unknown }) =>
+		enveloped.get(args.contextValue as object) as Enveloped;
 	return {
-		execute: (args) =>
-			(args.rootValue as Enveloped).execute(args as never) as never,
-		subscribe: (args) =>
-			(args.rootValue as Enveloped).subscribe(args as never) as never,
+		execute: (args) => of(args).execute(args as never) as never,
+		subscribe: (args) => of(args).subscribe(args as never) as never,
 		async onSubscribe(context, _id, params: SubscribePayload) {
 			const { ctx, request } = context.extra;
 			const initial = {
@@ -79,7 +98,7 @@ function serverOptions<UserCtx extends YogaContext>(
 				connectionParams: context.connectionParams,
 			} as unknown as YogaInitialContext & YogaContext;
 			const { schema, execute, subscribe, contextFactory, parse, validate } =
-				yogaAt(ctx.route as string).getEnveloped(initial);
+				yogaAt(endpointOf(ctx.route as string, paths)).getEnveloped(initial);
 			let document: ReturnType<typeof parse>;
 			try {
 				document = parse(params.query);
@@ -88,13 +107,14 @@ function serverOptions<UserCtx extends YogaContext>(
 			}
 			const errors = validate(schema, document);
 			if (errors.length > 0) return errors;
+			const contextValue = await contextFactory();
+			enveloped.set(contextValue, { execute, subscribe });
 			return {
 				schema,
 				document,
 				operationName: params.operationName,
 				variableValues: params.variables,
-				contextValue: await contextFactory(),
-				rootValue: { execute, subscribe } satisfies Enveloped,
+				contextValue,
 			};
 		},
 	};
@@ -120,6 +140,16 @@ function operationRequest(upgrade: Request, signal: AbortSignal): Request {
 	});
 }
 
+/** `keepAlive` checked where `graphql()` is declared: a positive number of milliseconds, or `false`. */
+function pingEvery(keepAlive: number | false | undefined): number | false {
+	if (keepAlive === undefined) return 12_000;
+	if (keepAlive === false) return false;
+	if (Number.isFinite(keepAlive) && keepAlive > 0) return keepAlive;
+	throw new TypeError(
+		`graphql(app, { ws: { keepAlive: ${keepAlive} } }): keepAlive is the milliseconds between pings, a positive number, or false for none`,
+	);
+}
+
 /** What one socket holds: the message handler `graphql-ws` registered, its end, its pings. */
 interface Client {
 	onMessage?: (data: string) => Promise<void>;
@@ -135,18 +165,20 @@ interface Client {
  */
 export function graphqlSocket<UserCtx extends YogaContext>(
 	yogaAt: (endpoint: string) => YogaServerInstance<YogaContext, UserCtx>,
+	endpoint: string,
 	options: GraphQLWsOptions,
 ) {
+	const paths: Paths = { endpoint, socket: options.path ?? endpoint };
+	const keepAlive = pingEvery(options.keepAlive);
 	const load = loader();
 	let module: Module | undefined;
 	let server: Server<Extra> | undefined;
 	const clients = new WeakMap<object, Client>();
-	const keepAlive = options.keepAlive ?? 12_000;
 
 	// Named `graphqlWs`, the name the route table shows.
 	async function graphqlWs(ctx: BaseContext, next: NextFunction) {
 		module ??= await load();
-		server ??= module.makeServer(serverOptions(yogaAt));
+		server ??= module.makeServer(serverOptions(yogaAt, paths));
 		const protocol = chosen(module, ctx.request);
 		if (protocol !== '')
 			ctx.set.headers.set('sec-websocket-protocol', protocol);
@@ -198,5 +230,5 @@ export function graphqlSocket<UserCtx extends YogaContext>(
 			await client.closed?.(code, reason);
 		},
 	};
-	return { middleware: graphqlWs, handlers };
+	return { path: paths.socket, middleware: graphqlWs, handlers };
 }

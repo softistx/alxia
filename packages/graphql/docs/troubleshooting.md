@@ -23,6 +23,7 @@ symptom.
 **Startup**
 
 - [`TypeError: GET /graphql is declared twice`](#typeerror-get-graphql-is-declared-twice)
+- [`TypeError: graphql(app, { ws: { keepAlive: 0 } }): keepAlive is the milliseconds between pings, a positive number, or false for none`](#typeerror-graphqlapp--ws--keepalive-0---keepalive-is-the-milliseconds-between-pings-a-positive-number-or-false-for-none)
 
 **Responses**
 
@@ -236,6 +237,20 @@ same `base` — for two variants of an app — declares them twice there.
 const app = alxia()
 	.plugin((app) => graphql(app, { schema }))
 	.plugin((app) => graphql(app, { schema: admin, path: '/admin/graphql' }));
+```
+
+### `TypeError: graphql(app, { ws: { keepAlive: 0 } }): keepAlive is the milliseconds between pings, a positive number, or false for none`
+
+**When:** declaring `graphql(app, { ws: { keepAlive } })` with `0`, a
+negative number or `NaN`; the message names the value given.
+
+**Why:** `keepAlive` is the interval of each socket's pings: `0` would
+ping in a loop.
+
+**Fix:** give the milliseconds between pings, or `false` for none:
+
+```ts
+graphql(app, { schema, ws: { keepAlive: 30_000 } });
 ```
 
 ## Responses
