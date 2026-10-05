@@ -49,6 +49,14 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### `@alxia/openapi` 0.5.0
+
+- **API docs, with no configuration.** `app.plugin(apiDocs({ spec:
+  'openapi.yaml' }))` serves an interactive page (Scalar, or Swagger UI) at
+  `/docs` and the document at `/docs/openapi.yaml` and `.json`. The page
+  loads from a pinned CDN version with an integrity hash, sets its own
+  `Content-Security-Policy`, and `matchesSpec` leaves its routes out.
+
 Before 0.4.0, the name `@alxia/openapi` (0.1.0 to 0.3.0) belonged to a
 different package, which wrote a document from the app's routes; it is
 retired. The releases below are this package's, under its former name,
