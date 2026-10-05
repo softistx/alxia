@@ -10,6 +10,7 @@ import type { Socket, SocketHandlers } from '@alxia/core';
 import type { ProxyOptions } from './options';
 import { type Plan, type ProxyContext, planOf } from './options';
 import { openUpstream } from './socket-upstream';
+
 /** What `proxy.ws` takes: the request side of `ProxyOptions`. */
 export type SocketProxyOptions<Ctx = unknown> = Omit<
 	ProxyOptions<Ctx>,
@@ -25,7 +26,10 @@ export type SocketProxy<Ctx = unknown> = SocketHandlers<
 	string | Uint8Array
 >;
 
-/** The frames the upstream may send before the client's socket opens; past them, a close with 1013. */
+/**
+ * The frames the upstream may send before the client's socket opens — a
+ * count, not bytes; past them, a close with 1013.
+ */
 const PENDING = 1024;
 
 /**

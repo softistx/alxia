@@ -47,7 +47,7 @@ describe('proxy.ws, the upstream opened before the upgrade', () => {
 	});
 
 	test('what the upstream sends as it opens reaches the client', async () => {
-		const { up } = socketUpstream({ greeting: 'welcome' });
+		const { up } = socketUpstream({ greeting: ['welcome'] });
 		const url = serve(alxia().ws('/live', proxy.ws(up.url)));
 		const { socket, received } = await client(url, '/live');
 		socket.send('x');

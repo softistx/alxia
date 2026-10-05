@@ -1,7 +1,8 @@
 /**
  * A socket route: the upgrade request, run through the route's hooks and
- * validated as a route's, then each message checked by its schema and each
- * one sent checked by its own.
+ * validated as a route's, its `upgrade` handler awaited before the `101`,
+ * then each message checked by its schema and each one sent checked by its
+ * own.
  */
 import {
 	ResponseValidationError,
@@ -53,7 +54,9 @@ export async function upgradeSocket(
 		};
 		(ctx as { [RUN]?: typeof run })[RUN] = run;
 		return await chain<typeof UPGRADED>(run, ctx, async (validated) => {
-			if (server === undefined) {
+			// A handshake Bun would refuse is a 426 before `upgrade` runs, so
+			// what that handler opens is only opened for a `101` to follow.
+			if (server === undefined || !isHandshake(request.request)) {
 				return routingError(request, 426);
 			}
 			const headers = new Headers(set.headers);
@@ -71,6 +74,14 @@ export async function upgradeSocket(
 		(request as { error: unknown }).error = error;
 		return fail(error, ctx);
 	}
+}
+
+/** A WebSocket handshake as RFC 6455 has it: a key, and version 13. */
+function isHandshake(request: Request): boolean {
+	return (
+		request.headers.has('sec-websocket-key') &&
+		request.headers.get('sec-websocket-version') === '13'
+	);
 }
 
 /** The `websocket` handler `Bun.serve` runs every open socket through. */

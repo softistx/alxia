@@ -16,7 +16,9 @@ export interface SocketUpstreamOptions {
 	/** Awaited before the upstream answers the upgrade: a slow upstream. */
 	readonly before?: (request: Request) => Promise<void>;
 	/** Sent the moment the upstream's socket opens, before the client's may have. */
-	readonly greeting?: string;
+	readonly greeting?: readonly string[];
+	/** Closes the upstream's socket with this code right after its greeting. */
+	readonly hangUp?: number;
 }
 
 /**
@@ -52,7 +54,8 @@ export function socketUpstream(options: SocketUpstreamOptions = {}) {
 		},
 		{
 			open(ws) {
-				if (options.greeting !== undefined) ws.send(options.greeting);
+				for (const frame of options.greeting ?? []) ws.send(frame);
+				if (options.hangUp !== undefined) ws.close(options.hangUp, 'hung up');
 			},
 			message(ws, message) {
 				if (message === 'bye') ws.close(4001, 'upstream says bye');

@@ -65,8 +65,10 @@ socket.addEventListener('open', () => {
 });
 ```
 
-A client that goes away while the upstream is connecting closes the
-upstream, and no socket opens.
+A client that goes away while the upstream is connecting, or before its
+own socket opens, closes the upstream (with 1001 once it is open), and no
+socket opens. Should the upgrade fail with the client still there, the
+upstream is closed with 1001 past `timeout`.
 
 ## What is relayed
 

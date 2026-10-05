@@ -23,6 +23,9 @@ const app = alxia({ errors: 'problem' }).use(
 | body over `bodyLimit` | 413 | the app's own format (`ContentTooLargeError`) | |
 | `rewrite` climbs out of the target's path | 400 | `{"error":"bad_request"}` | `proxy: the path "<path>" rewrites outside the target's path "<base>"` |
 
+A socket route's upgrade gets the same 502 and 504, before any `101`:
+see [WebSockets](websockets.md#an-upstream-that-cannot-be-reached).
+
 Under `alxia({ errors: 'problem' })` they are RFC 9457 problems
 (`application/problem+json`): `Bad Gateway`, detail `The upstream server could not be reached`;
 `Gateway Timeout`, detail `The upstream server did not answer in time`; and for the 400,

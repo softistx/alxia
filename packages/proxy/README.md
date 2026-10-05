@@ -11,7 +11,8 @@ bun add @alxia/proxy @alxia/core
 bun add -d typescript
 ```
 
-`@alxia/core` and `typescript` are required peers.
+`@alxia/core` and `typescript` are required peers. `proxy.ws` needs
+`@alxia/core` 0.8 or later, whose socket routes run an `upgrade` handler.
 
 ## Usage
 
@@ -102,7 +103,7 @@ app whose context does not give it.
 | `trustForwarded` | `false` | keep the incoming `X-Forwarded-Proto` and `-Host` |
 | `forwarded` | `false` | add an RFC 7239 `Forwarded` element |
 | `headers` | none | `{ request?, response? }`: a record, or a function `(headers, ctx) => void` |
-| `timeout` | `30_000` | milliseconds of silence allowed until the upstream's response headers, counted again from each body chunk sent; past it, a 504 |
+| `timeout` | `30_000` | milliseconds of silence allowed until the upstream's response headers, counted again from each body chunk sent; past it, a 504. For `proxy.ws`, the milliseconds the upstream socket has to open |
 | `bodyLimit` | none | bytes of request body; past it, a 413 |
 
 ## API

@@ -590,9 +590,10 @@ issues, the socket kept open); each one sent is checked by `send`.
 `socket.data` holds what the middlewares added and `validate` gave back. A
 middleware that awaits `next()` gets an empty `200` stand-in once the socket
 is open; what it returns after is ignored (a header set on the stand-in is
-lost: set `set.headers` before). An `upgrade(data, headers)` handler is
-awaited after the middlewares, before the `101`: a connection the socket
-needs first, its throw answered in the app's error format. `responds` has no
+lost: set `set.headers` before). An `upgrade(data, headers)` handler runs
+after the middlewares and is awaited before the `101`; a throw from it
+answers the upgrade request in the app's error format, and no socket opens.
+`responds` has no
 reply to check on a socket, and is refused there. Sockets need a
 server: `listen`, or `Bun.serve({ fetch: app.fetch, websocket: app.websocket })`.
 

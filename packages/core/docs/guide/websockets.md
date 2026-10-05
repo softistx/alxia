@@ -163,8 +163,10 @@ const app = alxia().ws('/feed', {
 - A throw answers the upgrade request instead of the `101` — an `HttpError`
   with its status, anything else a 500 — in the app's error format, and a
   middleware that awaits `next()` sees it rejected. No socket opens.
-- Without a server (`app.request`), the `426` comes first: `upgrade` is not
-  run.
+- Without a server (`app.request`), or for a handshake Bun would refuse —
+  no `Sec-WebSocket-Key`, or a version other than 13 — the `426` comes
+  first: `upgrade` is not run, so what it opens is only opened for a `101`
+  to follow.
 - The client may go away while it is awaited: `data.request.signal` aborts
   then, and the socket never opens, so `open` and `close` are not called.
   Undo there what `upgrade` opened.

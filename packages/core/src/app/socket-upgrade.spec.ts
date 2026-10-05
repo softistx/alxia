@@ -93,4 +93,27 @@ describe("a socket's upgrade handler", () => {
 		expect(response.status).toBe(426);
 		expect(ran).toEqual([]);
 	});
+
+	test('is not run for a handshake Bun would refuse: a 426, and nothing opened', async () => {
+		const ran: string[] = [];
+		const app = alxia().ws('/', {
+			upgrade: () => {
+				ran.push('upgrade');
+			},
+			message: () => {},
+		});
+		const server = app.listen({ port: 0 });
+		try {
+			const { 'sec-websocket-key': _key, ...keyless } = UPGRADE;
+			const response = await fetch(server.url, { headers: keyless });
+			expect(response.status).toBe(426);
+			const old = await fetch(server.url, {
+				headers: { ...UPGRADE, 'sec-websocket-version': '8' },
+			});
+			expect(old.status).toBe(426);
+			expect(ran).toEqual([]);
+		} finally {
+			await server.stop(true);
+		}
+	});
 });
