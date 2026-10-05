@@ -17,6 +17,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 | `@alxia/rate-limit`, `@alxia/jwt`, `@alxia/logger` | middlewares given to `use`: typed context, typed replies | core |
 | `@alxia/env` | environment variables through any Standard Schema: `defineEnv(shape, { secret, source })`, each variable by its own schema, typed, one `EnvError` listing every issue, secrets printed as `***` (`toJSON`, `inspect`, `toString`), `envExample(env)` and the `alxia-env example` bin writing a `.env.example` (which import the module in a mode where `defineEnv` refuses nothing), and the earlier `parseEnv` | — (dev: core, for the `Register` spec) |
 | `@alxia/cache` | HTTP response caching, a store contract and a memory store | core |
+| `@alxia/proxy` | a reverse proxy to an upstream fixed at declaration: `proxy(target)`, a middleware given to `use(path?, …)` that never calls `next`, `proxy.mount(prefix, target)`, a plugin forwarding everything under a prefix with `Location` and cookies rebased, `proxy.ws(target)`, a socket route's relay handlers; bodies streamed both ways on Bun's `fetch` (`decompress: false`, `redirect: 'manual'`), hop-by-hop headers stripped, `X-Forwarded-*` set, a 502 or 504 thrown as an `HttpError`, the upstream fetch aborted with the client's request. The path is set on a copy of the target and its origin checked before the fetch, so no request chooses the host (`ssrf.spec.ts`) | core (dev: jwt, rate-limit, for its specs) |
 | `@alxia/language` | the request's language, typed by the supported ones | core |
 | `@alxia/i18n` | translations on `@nxgt/i18n`, the language from `@alxia/language` | core, language, @nxgt/i18n |
 | `@alxia/context-storage` | the request's context through `AsyncLocalStorage`, as nxgt-core reads Hono's with `hono/context-storage`; typed by an app, by default the one core's `Register` names, and required of the app that uses it | core |
@@ -181,10 +182,11 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
 
 ```
 core ◄── openapi, graphql, cors, secure-headers, compress, rate-limit, jwt, logger,
-         telemetry, janus, context-storage, cache, language
+         telemetry, janus, context-storage, cache, language, proxy
          i18n ◄── language
          openapi (dev: secure-headers, for the apiDocs spec)
          janus   (dev: i18n, language, @nxgt/i18n for its specs)
+         proxy   (dev: jwt, rate-limit for its specs)
          redis ◄── rate-limit, cache (optional peers: the stores' contracts)
          react-router   (peers: react-router; vite, optional, for /vite; dev: openapi, compress for its specs)
 zod             (peer: zod; dev: core for its specs)

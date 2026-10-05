@@ -17,6 +17,7 @@ of their own, type-checked and, where they have a spec, run by
 | answer every error in one format, keep the 500s private | [Answer errors consistently](errors.md) | `core` |
 | tell a supervisor I am alive, ready, and stopping | [Health checks and graceful shutdown](health-and-shutdown.md) | `core` |
 | share a rate limit and a response cache between processes | [Caching and rate limiting with Redis](caching-and-rate-limiting.md) | `rate-limit`, `cache`, `redis` |
+| forward requests to another service, behind the app's guard and limits | [Put an app in front of other services](proxy.md) | `core`, `proxy`, `jwt`, `rate-limit` |
 | ship a small image that stops cleanly | [Deploy with Docker](deploying.md) | `create` |
 
 Each recipe's code is also meant to be copied whole: a file starts with its

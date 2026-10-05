@@ -155,7 +155,7 @@ describe('proxy.ws', () => {
 
 	test('refuses a target that is no ws, wss, http or https URL', () => {
 		expect(() => proxy.ws('ftp://up.internal')).toThrow(
-			'proxy.ws(): the target must be an absolute URL, ws:// or wss:// or http:// or https://; got "ftp://up.internal"',
+			'proxy.ws(): the target must be an absolute URL, ws://, wss://, http:// or https://; got "ftp://up.internal"',
 		);
 	});
 });

@@ -134,19 +134,17 @@ function targetOf(
 	target: string | URL,
 	schemes: readonly string[],
 ): URL {
+	const names = schemes.map((scheme) => `${scheme}//`);
+	const refused = new TypeError(
+		`${where}: the target must be an absolute URL, ${names.slice(0, -1).join(', ')} or ${names.at(-1)}; got "${String(target)}"`,
+	);
 	let url: URL;
 	try {
 		url = new URL(target);
 	} catch {
-		throw new TypeError(
-			`${where}: the target must be an absolute URL, ${schemes.map((s) => `${s}//`).join(' or ')}; got "${String(target)}"`,
-		);
+		throw refused;
 	}
-	if (!schemes.includes(url.protocol)) {
-		throw new TypeError(
-			`${where}: the target must be an absolute URL, ${schemes.map((s) => `${s}//`).join(' or ')}; got "${String(target)}"`,
-		);
-	}
+	if (!schemes.includes(url.protocol)) throw refused;
 	if (url.search !== '' || url.hash !== '' || url.username || url.password) {
 		throw new TypeError(
 			`${where}: the target "${String(target)}" carries a query, a fragment or credentials: give its origin and path alone, and credentials through headers`,

@@ -75,6 +75,7 @@ app.listen(3000); // in a test, in process: await app.request('/users/1')
 | [`@alxia/secure-headers`](packages/secure-headers) | HSTS, CSP, nosniff and the rest |
 | [`@alxia/rate-limit`](packages/rate-limit) | a rate limit: a 429 past it, with its headers; pluggable stores |
 | [`@alxia/cache`](packages/cache) | HTTP response caching: TTL, stale-while-revalidate, one load per miss, tags, ETags; in memory or Redis |
+| [`@alxia/proxy`](packages/proxy) | a reverse proxy to a fixed upstream, behind the app's middlewares: a path or a prefix forwarded, streamed both ways, WebSockets relayed, a 502 or 504 in the app's error format |
 | [`@alxia/language`](packages/language) | the request's language, typed: query, cookie, path, `Accept-Language` |
 | [`@alxia/compress`](packages/compress) | zstd, Brotli, gzip, deflate: negotiated and streamed |
 | [`@alxia/jwt`](packages/jwt) | JWTs on Web Crypto, and a typed bearer guard |
