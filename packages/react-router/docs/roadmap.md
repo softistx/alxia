@@ -58,6 +58,14 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### Next release
+
+- **The public URL behind a proxy.** `createServer({ proxy: trustProxy({ trusted }) })`,
+  or `alxia({ proxy })` for a server of your own: React Router's
+  `request.url` is the URL the client asked for, the scheme and host the
+  trusted proxy said, and `ctx.ip` the client's; a direct client's
+  forwarded headers are ignored.
+
 ### 0.4.0
 
 - **A self-contained build.** `react-router build` bundles every package

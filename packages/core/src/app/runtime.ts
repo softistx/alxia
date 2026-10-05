@@ -45,7 +45,20 @@ export function createRuntime(
 		ip:
 			options.ip ??
 			((request, server) => server?.requestIP(request)?.address ?? undefined),
+		proxy: proxyOf(options),
 	};
+}
+
+/** The `proxy` option; given with `ip`, which it replaces, it throws. */
+function proxyOf(options: AlxiaOptions<string>): Runtime['proxy'] {
+	if (options.proxy === undefined) return undefined;
+	if (options.ip !== undefined)
+		throw new TypeError(
+			'alxia(): give ip or proxy, not both: proxy reads ctx.ip itself',
+		);
+	if (typeof options.proxy !== 'function')
+		throw new TypeError('alxia(): proxy must be trustProxy({ trusted })');
+	return options.proxy;
 }
 
 /**

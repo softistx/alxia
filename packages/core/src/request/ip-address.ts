@@ -54,11 +54,14 @@ export function parseIp(entry: string): ParsedIp | undefined {
 }
 
 /** A CIDR range, or one address: `10.0.0.0/8`, `fd00::/8`, `192.168.1.1`. Throws on anything else. */
-export function parseCidr(range: string): (address: ParsedIp) => boolean {
+export function parseCidr(
+	range: string,
+	who = 'forwardedIp',
+): (address: ParsedIp) => boolean {
 	const [base = '', bits, extra] = range.split('/');
 	const network = parseIp(base);
 	const bad = () =>
-		new Error(`forwardedIp: "${range}" is not an IP address or a CIDR range`);
+		new Error(`${who}: "${range}" is not an IP address or a CIDR range`);
 	if (network === undefined || extra !== undefined || base.includes(']'))
 		throw bad();
 	// A range written as an IPv4-mapped IPv6 address counts its prefix in IPv6 bits.

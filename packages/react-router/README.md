@@ -254,6 +254,7 @@ edit to the server is used from the next connection.
 
 ```ts
 // app/server.ts
+import { trustProxy } from '@alxia/core';
 import { logger } from '@alxia/logger';
 import { createServer } from '@alxia/react-router';
 import { greetingContext } from './context'; // createContext<string>('unset'), in app/context.ts
@@ -262,10 +263,17 @@ export default createServer({
 	beforeAll: (app) => app.use(logger()), // runs before the client's files too
 	configure: (app) => app.get('/api/health', ({ reply }) => reply.ok({ ok: true })),
 	getLoadContext: (_ctx, context) => context.set(greetingContext, 'hello'),
+	proxy: trustProxy({ trusted: ['10.0.0.0/8'] }), // behind a TLS proxy: request.url is the public URL
 	listen: { idleTimeout: 30 }, // its port and hostname, if given, win over PORT and HOST
 	onListen: (server) => console.log(`up on ${server.url}`),
 });
 ```
+
+`proxy` is `alxia({ proxy })`'s option: behind the proxies it names,
+`ctx.ip` is the client's and React Router's `request.url` the URL the
+client asked for, `https://` and the public host, so a loader can build an
+absolute link from it; from any other connection the forwarded headers are
+ignored. A server of your own gives `alxia({ proxy })` the same option. [More](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#behind-a-proxy-proxy)
 
 `build`, `mode` and `client` override what the plugin wires;
 `client: false` serves no client files, so you can serve them yourself.
@@ -420,7 +428,7 @@ has the commented file, and what to copy for a package left external.
 
 | export | |
 | --- | --- |
-| `createServer(options?)` | the server of `app/server.ts`. `beforeAll`, `configure`, `getLoadContext`, `build`, `mode`, `client`, `listen`, `onListen` |
+| `createServer(options?)` | the server of `app/server.ts`. `beforeAll`, `configure`, `getLoadContext`, `proxy` (`alxia({ proxy })`'s, `trustProxy(…)` from `@alxia/core`), `build`, `mode`, `client`, `listen`, `onListen` |
 | `ServerOptions<Before, App>` | its options |
 | `ReactRouterServer<App>` | what it returns: `create(wiring)` makes the app, `start(app)` listens |
 | `ServerWiring` | what `create` takes: `build`, `mode`, `client` |

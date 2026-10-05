@@ -540,6 +540,44 @@ export default createServer({
 is a compile error. A middleware that needs something an earlier one
 derived is typed by the app it is given, as anywhere in alxia.
 
+### Behind a proxy
+
+A proxy or a load balancer that terminates TLS asks the server over plain
+HTTP, at an address of its own, so React Router's `request.url` reads
+`http://10.0.0.5:3000/…`. Name the proxies with `proxy`, `@alxia/core`'s
+`trustProxy`:
+
+```ts
+// app/server.ts
+import { trustProxy } from '@alxia/core';
+import { createServer } from '@alxia/react-router';
+
+export default createServer({
+	proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }),
+});
+```
+
+```tsx
+// app/routes/login.tsx
+import type { LoaderFunctionArgs } from 'react-router';
+
+export function loader({ request }: LoaderFunctionArgs) {
+	// https://example.com/auth/callback behind the proxy
+	return { callback: new URL('/auth/callback', request.url).href };
+}
+```
+
+Every request through the catch-all is handed to React Router at
+`originalUrl(ctx)`: the scheme and host the trusted proxy wrote in
+`X-Forwarded-Proto` and `X-Forwarded-Host` (or `Forwarded`, with
+`header: 'forwarded'`), each checked, and the request's own for any it did
+not. A direct client's forwarded headers are ignored, or, with
+`untrusted: 'refuse'`, answered 403 before the pages. `ctx.url` and what
+alxia's middlewares read stay the request as it reached the server. With a
+server of your own, give `alxia({ proxy })` the same option. See
+[Behind a proxy](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#behind-a-proxy-proxy)
+for what is believed and what is valid.
+
 ## Typing the loaders
 
 Every request through the catch-all sets `alxiaContext`, this package's

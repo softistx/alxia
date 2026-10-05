@@ -6,9 +6,11 @@
 import { failed } from './answers';
 import { handle, unmatched } from './boundary';
 import type { Definition, Runtime } from './definition';
+import { ORIGIN } from './original-url';
 import { SERVED } from './served';
 import { UPGRADED, upgradeSocket } from './socket';
 import type { RequestContext } from './types';
+import { untrustedProxy } from './untrusted-proxy';
 
 /**
  * The whole of a request: the route it reaches, or the answer to one that
@@ -21,15 +23,18 @@ export async function serve(
 	server: Bun.Server<unknown> | undefined,
 	path: string | undefined,
 ): Promise<Response> {
+	const forwarded = runtime.proxy?.(request, server);
 	const ctx: RequestContext = {
 		request,
 		url: new URL(request.url),
 		server,
-		ip: runtime.ip(request, server),
+		ip: forwarded === undefined ? runtime.ip(request, server) : forwarded.ip,
 		route: undefined,
 		error: undefined,
 		[SERVED]: runtime.served,
+		[ORIGIN]: forwarded?.origin,
 	} as RequestContext;
+	if (forwarded?.refused === true) return untrustedProxy(ctx);
 	try {
 		const response = await route(runtime, ctx, path);
 		return response === UPGRADED ? (undefined as never) : response;

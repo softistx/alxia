@@ -13,6 +13,7 @@ import {
 	type ListenInfo,
 	type ListenOptions,
 	type MaybePromise,
+	type ProxyTrust,
 } from '@alxia/core';
 import type { RouterContextProvider, ServerBuild } from 'react-router';
 import { declareClient, reactRouter } from './react-router';
@@ -57,6 +58,12 @@ export interface ServerOptions<Before extends AnyAlxia, App extends AnyAlxia> {
 		ctx: ContextOf<App>,
 		context: RouterContextProvider,
 	) => MaybePromise<void>;
+	/**
+	 * The proxies in front of the app, `trustProxy({ trusted })` from
+	 * `@alxia/core`: `alxia({ proxy })`'s option, so `ctx.ip` is the
+	 * client's and React Router's `request.url` the URL it asked for.
+	 */
+	readonly proxy?: ProxyTrust;
 	/** Overrides the plugin's server build: rarely wanted. */
 	readonly build?: ServerWiring['build'];
 	/** Overrides the plugin's mode, `development` in dev and `production` in a build. */
@@ -132,7 +139,10 @@ export function createServer<
 					: (options.client ?? wiring.client);
 			// The app helps the developer in React Router's dev alone: a production
 			// build is never in dev, whatever NODE_ENV says.
-			const fresh = alxia({ dev: mode === 'development' });
+			const fresh = alxia({
+				dev: mode === 'development',
+				...(options.proxy === undefined ? {} : { proxy: options.proxy }),
+			});
 			// Without beforeAll or configure, Before and App are their defaults,
 			// the app passed through: a type argument given by hand is believed.
 			const before = (options.beforeAll?.(fresh) ?? fresh) as Before;

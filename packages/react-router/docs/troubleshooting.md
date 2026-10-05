@@ -60,6 +60,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`ctx.server` is `undefined` under `react-router dev`](#ctxserver-is-undefined-under-react-router-dev)
 - [A `publish` under `react-router dev` misses the sockets opened before an edit](#a-publish-under-react-router-dev-misses-the-sockets-opened-before-an-edit)
 - [The build has a package's Node variant, not its `bun` one](#the-build-has-a-packages-node-variant-not-its-bun-one)
+- [`request.url` in a loader is `http://` and the internal host behind a proxy](#requesturl-in-a-loader-is-http-and-the-internal-host-behind-a-proxy)
 
 ## Thrown or printed
 
@@ -1093,3 +1094,24 @@ the package's to change. To check which file a condition picks, ask Bun:
 ```sh
 bun -e "console.log(import.meta.resolve('some-package'))"
 ```
+
+### `request.url` in a loader is `http://` and the internal host behind a proxy
+
+**Why:** a proxy that terminates TLS asks the app over plain HTTP, on an
+address of its own, and React Router reads the request as it reached the
+app unless the server trusts the proxy. Without `proxy`, or from a
+connection `trusted` does not name, the forwarded headers are ignored.
+
+**Fix:** give `createServer` (or `alxia()`, for a server of your own) the
+proxies, and have the proxy set `X-Forwarded-Proto` and `X-Forwarded-Host`:
+
+```ts
+// app/server.ts
+import { trustProxy } from '@alxia/core';
+import { createServer } from '@alxia/react-router';
+
+export default createServer({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) });
+```
+
+React Router then gets its request at `originalUrl(ctx)`
+([Behind a proxy](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#behind-a-proxy-proxy)).

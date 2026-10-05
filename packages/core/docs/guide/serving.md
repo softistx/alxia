@@ -172,6 +172,131 @@ and `ctx.ip` is what it returns, in every middleware and handler. A header a
 platform sets, such as `CF-Connecting-IP`, is one such function, safe only
 when the app is reachable through that platform alone.
 
+When the app also needs the scheme and host the client asked for, declare
+the proxies once with the `proxy` option instead: it reads `ctx.ip` the
+same way, and those two besides.
+
+## Behind a proxy: `proxy`
+
+A proxy that terminates TLS talks to the app over plain HTTP, on an address
+of its own: `ctx.url` is `http://10.0.0.5:3000/…`, not the
+`https://example.com/…` the client asked for. `trustProxy` declares the
+proxies in front of the app once, and every value they forward is read
+through that one definition — the client's address, `ctx.ip`, and the
+scheme and host it asked for, `originalUrl(ctx)`:
+
+```ts
+import { alxia, originalUrl, trustProxy } from '@alxia/core';
+
+const app = alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) }).get(
+	'/login',
+	(ctx) => {
+		// https://example.com/callback, behind the proxy; the request's own URL without it
+		const callback = new URL('/callback', originalUrl(ctx)).href;
+		return ctx.reply(200, { ip: ctx.ip ?? null, callback });
+	},
+);
+```
+
+`ctx.ip` is what `forwardedIp` with the same `trusted` and `header` reads,
+so `alxia({ ip: forwardedIp(o) })` and `alxia({ proxy: trustProxy(o) })`
+give the same address: keep `forwardedIp` when the address is all the app
+reads. Give `ip` or `proxy`, not both: the app throws when it is built.
+
+### `trustProxy({ trusted, header, untrusted })`
+
+```ts
+function trustProxy(options: TrustProxyOptions): ProxyTrust;
+```
+
+| Option | Type | Default | Effect |
+| --- | --- | --- | --- |
+| `trusted` | `number \| string \| string[] \| (address: string) => boolean` | required | the proxies in front of the app, as for [`forwardedIp`](#forwardedip-header-trusted-) |
+| `header` | `string` | `'x-forwarded-for'` | `'x-forwarded-for'`: the address from it, the scheme from `X-Forwarded-Proto`, the host from `X-Forwarded-Host`; `'forwarded'`: all three from RFC 7239's `for=`, `proto=` and `host=`; another name: the address from that header, the scheme and host from `X-Forwarded-*` |
+| `untrusted` | `'ignore' \| 'refuse'` | `'ignore'` | what a request whose forwarding headers come from a connection that is no proxy gets (below) |
+
+`originalUrl(ctx)` is a copy of `ctx.url` with the scheme and host the
+proxies said: change it freely, the request's URL stays. `ctx.url` itself
+is never rewritten, so routing, `ctx.url.pathname` and every package
+reading it see the request as it reached the app.
+
+**What is believed.** The scheme and host are read only from a connection
+`trusted` names — under ranges or a function, a peer they hold; under a
+hop count, every connection, which is why a count is safe only when the
+app is reachable through the proxies alone. From any other connection,
+both are the request's own, whatever it sends: a client that reaches the
+app directly with `X-Forwarded-Proto: https` and `X-Forwarded-Host:
+bank.example` gets its own `http://` URL. Among the entries, the one read
+is the one the outermost of your proxies wrote, as for the address: with
+`X-Forwarded-For`, the entry as many places from the right as there are
+proxies (the hop count, or those the ranges found), the leftmost when a
+proxy set the header rather than appending to it; with `Forwarded`, the
+`proto=` and `host=` of the element whose `for=` is the client. What the
+client wrote to the left is never read. Under a hop count, a request whose
+address entry is missing or malformed — fewer entries than hops, the sign
+it did not come through every proxy — has neither read, as its `ctx.ip` is
+the connection's. A `Forwarded` element whose `for=` is an obfuscated
+identifier (`_hidden`, `unknown`) counts as no address there: name the
+proxies by range to read its `proto=` and `host=`.
+
+**What is valid.** The scheme is `http` or `https`, in any case; the host
+is a bare `host[:port]` — a name, an IPv4 address, or an IPv6 address in
+brackets, and a port from 1 to 65535. Anything else — `ftp`, a path
+(`example.com/x`), userinfo (`user@example.com`), a query, a space, a name
+the URL parser would rewrite (`0x7f.1`) — says nothing, and that part of
+the request's URL stands. A `Forwarded` value may be quoted
+(`host="example.com:8443"`); a parameter given twice in one element says
+nothing.
+
+> **Security.** Your outermost proxy must **overwrite**
+> `X-Forwarded-Proto` and `X-Forwarded-Host` (or `Forwarded`) with what it
+> saw, and the proxies behind it pass them on. Appending is safe only when
+> **every** proxy in the chain appends: an outer proxy that appends while
+> an inner one passes the list on hands the app the client's own value
+> (`evil.example, example.com` reads `evil.example`), and one that passes
+> the client's header on unchanged does the same. No reading of the list
+> can tell those apart, and `untrusted: 'refuse'` does not help: the
+> connection is your proxy's. nginx passes the client's header on unless
+> told otherwise: write `proxy_set_header X-Forwarded-Proto $scheme;` and
+> `proxy_set_header X-Forwarded-Host $host;` at the edge. A load balancer
+> such as AWS's overwrites them. Prefer ranges to a hop count, so a
+> connection that bypasses the proxies is never believed.
+
+### Refusing an untrusted peer
+
+With `untrusted: 'refuse'`, a request that carries `Forwarded`,
+`X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` or the `header`
+given, from a connection the ranges or the function do not name, is
+answered 403 — `{ "error": "untrusted_proxy" }`, or a problem under
+`errors: 'problem'` — before routing and before any middleware, so nothing
+the app runs reads what such a request claims, and a logger does not see
+it. A request with none of those headers passes: a load balancer's or an
+orchestrator's health probe, which sends none, reaches `/health` and
+`/ready` from any address. Refusing needs the proxies named by address; with
+a hop count, which cannot tell a proxy, `trustProxy` throws.
+
+```ts
+alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
+```
+
+With no server (`app.request`, `app.fetch` alone), the connection is
+unknown and never a proxy: a spec that sends forwarding headers gives
+`fetch` a server whose `requestIP` names one, or is refused.
+
+### What reads the original URL
+
+`@alxia/react-router` hands React Router a request at `originalUrl(ctx)`,
+so `request.url` in a loader or an action is the public one. In the core,
+`redirect(location)` sends the location as given, which a browser resolves
+against the URL it asked for: a relative one needs nothing; build an
+absolute one from `originalUrl(ctx)`, as for a cookie's `secure` on
+`ctx.set.cookies` when it depends on the scheme. Nothing else in the
+packages reads the scheme: `secureHeaders` sends `Strict-Transport-Security`
+on every response, which a browser ignores over plain HTTP; the cookies
+`@alxia/janus` and `@alxia/language` set are `Secure` by default; `apiDocs`'
+`servers` come from the document, and its `connect-src 'self'` is resolved
+by the browser against the page's own URL.
+
 ## The options of `alxia()`
 
 ```ts
@@ -182,7 +307,8 @@ function alxia<const Prefix extends '' | RoutePath = ''>(options?: AlxiaOptions<
 | --- | --- | --- | --- |
 | `prefix` | `` `/${string}` `` | `''` | prepended to every route ([Groups and plugins](groups-and-plugins.md#prefixes)) |
 | `validateResponses` | `boolean` | `true` | check and strip replies ([Replies](replies.md#validateresponses)) |
-| `ip` | function | the connection's | above |
+| `ip` | function | the connection's | [above](#the-clients-address-ip) |
+| `proxy` | `trustProxy(…)` | none | the proxies in front of the app: `ctx.ip`, in place of `ip`, and `originalUrl(ctx)` ([above](#behind-a-proxy-proxy)) |
 | `errors` | `'json' \| 'problem'` | `'json'` | the format of the errors alxia answers itself: `{ error: … }` bodies, or RFC 9457 problems ([Errors](errors.md)) |
 
 ## Stopping

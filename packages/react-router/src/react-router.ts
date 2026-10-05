@@ -1,11 +1,12 @@
 import { fileURLToPath } from 'node:url';
-import type {
-	Alxia,
-	AnyAlxia,
-	BaseContext,
-	MaybePromise,
-	RouteDefinition,
-	StatusCode,
+import {
+	type Alxia,
+	type AnyAlxia,
+	type BaseContext,
+	type MaybePromise,
+	originalUrl,
+	type RouteDefinition,
+	type StatusCode,
 } from '@alxia/core';
 import {
 	createRequestHandler,
@@ -91,13 +92,7 @@ export function reactRouter<Ctx extends object, Prefix extends string>(
 		const context = new RouterContextProvider();
 		context.set(alxiaContext, ctx);
 		await getLoadContext?.(ctx, context);
-		// React Router answers a HEAD with no headers at all: hand it the GET,
-		// and the core drops the body.
-		const request =
-			ctx.request.method === 'HEAD'
-				? new Request(ctx.request, { method: 'GET' })
-				: ctx.request;
-		const response = await handle(request, context);
+		const response = await handle(routerRequest(ctx), context);
 		return ctx.reply(
 			response.status as StatusCode,
 			response.body ?? undefined,
@@ -113,6 +108,21 @@ export function reactRouter<Ctx extends object, Prefix extends string>(
 		for (const method of METHODS) routes[method]('/*', handler);
 	});
 	return app;
+}
+
+/**
+ * The request React Router reads: at the URL the client asked for, which
+ * `originalUrl` reads behind the app's trusted proxies (`alxia({ proxy })`),
+ * so `request.url` in a loader names the public scheme and host; and a
+ * `HEAD` as its `GET`, since React Router answers a `HEAD` with no headers
+ * at all, and the core drops the body.
+ */
+function routerRequest(ctx: BaseContext): Request {
+	const href = originalUrl(ctx).href;
+	const head = ctx.request.method === 'HEAD';
+	const request =
+		href === ctx.url.href ? ctx.request : new Request(href, ctx.request);
+	return head ? new Request(request, { method: 'GET' }) : request;
 }
 
 /**
