@@ -11,11 +11,6 @@ Nothing scheduled yet.
 
 ## Next
 
-- **The upstream's WebSocket subprotocol answered to the client.** A socket
-  route opens the upstream socket before core upgrades the client, so the
-  subprotocol the upstream picks is the one the client is told, and an
-  upstream that cannot be reached answers a 502 instead of an upgrade that
-  closes at once.
 - **Backpressure between the two sockets.** A slow reader on one side slows
   the sender on the other, instead of frames piling up in memory.
 - **Several upstreams behind one proxy.** Load balancing over a list of
@@ -44,6 +39,16 @@ Nothing scheduled yet.
   each.
 
 ## Shipped
+
+### 0.2.0
+
+- **The upstream's WebSocket subprotocol answered to the client.** A socket
+  route opens the upstream socket before the client is upgraded, offering it
+  the client's subprotocols, so the `101` names the one the upstream chose.
+  An upstream that cannot be reached answers a 502, and one that has not
+  opened within `timeout` a 504, over HTTP in the app's error format,
+  instead of an upgrade closed at once with 1014. A client gone during the
+  connect closes the upstream.
 
 ### 0.1.0
 

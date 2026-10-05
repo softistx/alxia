@@ -96,6 +96,14 @@ export interface Socket<Data, Send> {
 }
 
 export interface SocketHandlers<Data, Send, Message> {
+	/**
+	 * Runs once the route's middlewares let the upgrade through, before the
+	 * `101`, and is awaited: what the socket needs before it opens — a
+	 * connection of its own. `data` is what `socket.data` will be, the same
+	 * object; `headers` are the `101`'s. A throw answers the upgrade request
+	 * instead, in the app's error format, and no socket opens.
+	 */
+	upgrade?(data: Data, headers: Headers): MaybePromise<void>;
 	open?(socket: Socket<Data, Send>): MaybePromise<void>;
 	message(socket: Socket<Data, Send>, message: Message): MaybePromise<void>;
 	close?(
