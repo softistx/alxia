@@ -4,13 +4,15 @@ import {
 	type Middleware,
 	markFactory,
 	type Next,
-	type OperationSummary,
+	onOperation,
 	operationOf,
 	settle,
 	withHeaders,
 } from '@alxia/core';
-import { type Outcome, settled, watched } from './body';
+import { settled, watched } from './body';
+import { type Answered, entryOf, since } from './entry';
 import { ID, safeGenerate, safeSkip, safeWrite } from './guards';
+import { operationLines, upgrading } from './socket';
 
 /** One line of the log: a request answered, or a message logged during one. */
 export interface LogEntry {
@@ -28,8 +30,12 @@ export interface LogEntry {
 	readonly duration?: number;
 	/** A streamed body's: milliseconds from the request to its response's headers. */
 	readonly timeToHeaders?: number;
-	/** A streamed body's: whether it was sent whole, left by its client, or failed. */
-	readonly outcome?: 'completed' | 'aborted' | 'errored';
+	/**
+	 * A streamed body's: whether it was sent whole, left by its client, or
+	 * failed. An operation over a socket's: `ok`, or `errors` when it was
+	 * answered with errors.
+	 */
+	readonly outcome?: 'completed' | 'aborted' | 'errored' | 'ok' | 'errors';
 	readonly ip?: string;
 	/**
 	 * The GraphQL operation's name, when `@alxia/graphql` served it and it has
@@ -83,7 +89,10 @@ export type LoggerMiddleware = Middleware<Empty, Promise<Next<LoggerContext>>>;
  * answered. The routes declared after it read `requestId`, and `log`,
  * whose entries carry the id. Give it to `use` first: its timing then
  * holds everything after it, and a request no route matches — a 404, a
- * 405 — is logged too, wherever it stands.
+ * 405 — is logged too, wherever it stands. A socket's upgrade is logged
+ * as a request, then each operation its plugin reports with core's
+ * `startOperation` (`@alxia/graphql` over `ws` does) gets a line of its
+ * own once it ended, carrying the upgrade's id.
  *
  * ```ts
  * app.use(logger()).get('/', ({ log, reply }) => { log.info('home'); return reply(200); });
@@ -106,6 +115,10 @@ export function logger(options: LoggerOptions = {}): LoggerMiddleware {
 		const id =
 			trust && incoming !== null && ID.test(incoming) ? incoming : generate();
 		const added: LoggerContext = { requestId: id, log: logOf(write, id) };
+		if (upgrading(request) && !skipped(request, url)) {
+			const upgrade = { id, method: request.method, path: url.pathname, ip };
+			onOperation(ctx, operationLines(write, upgrade));
+		}
 		const response = await settle(ctx, next(added));
 		const duration = since(start);
 		const sent = withHeaders(response, (headers) => {
@@ -160,67 +173,6 @@ function logOf(write: (entry: LogEntry) => void, id: string): RequestLog {
 				message,
 			});
 	return { info: entry('info'), warn: entry('warn'), error: entry('error') };
-}
-
-/** What the request's entry says of it, whenever it is written. */
-interface Answered {
-	readonly id: string;
-	readonly method: string;
-	readonly path: string;
-	readonly status: number;
-	readonly ip: string | undefined;
-	readonly operation: OperationSummary | undefined;
-}
-
-/** What a streamed body's entry says beside the rest. */
-interface Streamed {
-	readonly timeToHeaders: number;
-	readonly outcome: Outcome;
-}
-
-/** The request's entry. */
-function entryOf(
-	answered: Answered,
-	duration: number,
-	streamed?: Streamed,
-): LogEntry {
-	const { id, method, path, status, ip, operation } = answered;
-	const outcome =
-		streamed === undefined || streamed.outcome === 'completed'
-			? ''
-			: ` ${streamed.outcome}`;
-	return {
-		time: new Date().toISOString(),
-		level: levelOf(status, streamed?.outcome),
-		requestId: id,
-		message: `${method} ${path} ${status}${outcome}`,
-		method,
-		path,
-		status,
-		duration,
-		...streamed,
-		...(ip === undefined ? {} : { ip }),
-		...(operation === undefined
-			? {}
-			: {
-					...(operation.name === undefined
-						? {}
-						: { operationName: operation.name }),
-					operationType: operation.type,
-				}),
-	};
-}
-
-/** Milliseconds since `start`, to two decimals. */
-function since(start: number): number {
-	return Math.round((performance.now() - start) * 100) / 100;
-}
-
-/** By the status, then raised by a body that did not end well. */
-function levelOf(status: number, outcome?: Outcome): LogEntry['level'] {
-	if (status >= 500 || outcome === 'errored') return 'error';
-	if (status >= 400 || outcome === 'aborted') return 'warn';
-	return 'info';
 }
 
 markFactory(logger);

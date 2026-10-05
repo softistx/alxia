@@ -91,7 +91,10 @@ Because a `use()` on the app runs on every request, a route declared before
 `use(telemetry(...))` is traced too; it only cannot read `span` and
 `telemetry` from its context, and a request no route matches is traced as
 well. A middleware declared **before** `telemetry()` is outside the span.
-A WebSocket upgrade is not traced: there is no response to time.
+A WebSocket upgrade gets a span that ends with its answer: the `101`, read
+by the middlewares as the `200` of a stand-in response, or the refusal
+that kept the socket closed. Each operation over a `ws: true` GraphQL
+socket gets a span of its own ([The operations of a socket](#the-operations-of-a-socket)).
 
 ### A streamed body
 
@@ -157,13 +160,37 @@ OpenTelemetry's GraphQL conventions once the response is answered:
 | a named query | `query GetNotes` | `graphql.operation.name`: `GetNotes`, `graphql.operation.type`: `query` |
 | an anonymous mutation | `mutation` | `graphql.operation.type`: `mutation` |
 | a batched body | `batch GetNotes,AddNote` | `graphql.operation.name`: `GetNotes,AddNote`, and no type: `batch` is not one of the convention's |
-| refused before it executes (a syntax error), or over a socket | `POST /graphql`, as above | none |
+| refused before it executes (a syntax error) | `POST /graphql`, as above | none |
 
 `http.route` is kept, so the HTTP row of the route is still one query
 away. The name replaces a `spanName` too. A subscription over server-sent
 events is a streamed body: its span stays open until the stream ends.
-Over `ws: true`, only the upgrade happens in the request, and it gets no
-span: the socket's operations are on the roadmap.
+Over `ws: true`, the operations run after the request, on the socket:
+see below.
+
+### The operations of a socket
+
+A socket can stay open for hours, so no span lasts as long as it, as
+OpenTelemetry advises for a long-lived connection: the upgrade's span ends
+with its answer, and each operation `@alxia/graphql` runs on the socket
+is a span of its own, in the upgrade's trace.
+
+| | The upgrade | Each operation |
+| --- | --- | --- |
+| name | `GET /graphql` | `query GetNotes`, `subscription OnNote`, `mutation` when anonymous |
+| parent | the inbound `traceparent`'s span, or none | the upgrade's span |
+| kind | `server` | `server` |
+| attributes | the HTTP ones, `http.response.status_code` `200` (the stand-in) | `graphql.operation.name`, `graphql.operation.type` |
+| ends | with the upgrade's answer | once the operation ended: its result sent, a subscription completed, stopped by its client or cut by the socket's close |
+| status | by the upgrade's answer | `error` when answered with errors: a resolver that threw, a document that fails validation, a subscription that failed |
+
+`@nxgt/telemetry` has no span links, so each operation is a child of the
+upgrade's span rather than linked to it: its trace holds the connection's
+operations, each with its own duration. An upgrade `traced` leaves out
+has no span, nor have its operations, and an unsampled upgrade's
+operations are unsampled too. No configuration: `telemetry()` subscribes
+during the upgrade with core's `onOperation`, and `@alxia/graphql` tells
+it of each operation with `startOperation`; neither imports the other.
 
 ### Its status, and the route's error
 

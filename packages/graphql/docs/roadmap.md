@@ -30,7 +30,7 @@ number on it. Every release, with each change it made, is in
 
 ## Next
 
-- **Each operation over a socket.** A `ws: true` connection is logged or spanned at its upgrade alone: its operations — a query, a mutation, a subscription's stream — name no operation yet, because the request is answered before they run.
+Nothing scheduled yet.
 
 ## Later
 
@@ -40,6 +40,7 @@ Nothing scheduled yet.
 
 ### Next release
 
+- **Each operation over a socket.** Over `ws: true`, every query, mutation and subscription on a socket is told to the observers around its upgrade, from its `subscribe` message to its end, with whether it was answered with errors: `@alxia/logger` writes a line for each, `@alxia/telemetry` a span, a child of the upgrade's, named `subscription OnNote` ([WebSocket guide](guide/websockets.md#logging-and-tracing)).
 - **The operation, told to the observers.** Each operation the endpoint executes is reported to the middlewares around it: `@alxia/logger` writes `operationName` and `operationType` on the request's line, `@alxia/telemetry` names its span `query GetNotes` with `graphql.operation.name` and `graphql.operation.type`. A batched body is one line and one span, `batch`, with every name ([endpoint guide](guide/endpoint.md#the-operation-in-the-log-and-the-trace)).
 
 ### 0.1.0

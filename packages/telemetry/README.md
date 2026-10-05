@@ -83,6 +83,13 @@ array) is named `batch GetNotes,AddNote`: its `graphql.operation.name`
 lists every operation, and it has no type, `batch` not being one of the
 convention's. `http.route` stays.
 
+Over `@alxia/graphql`'s `ws: true`, the upgrade gets a span that ends with
+its answer, and each operation on the socket a span of its own, a child of
+the upgrade's in its trace: `subscription OnNote`, `kind: 'server'`, the
+same `graphql.operation.*`, from its `subscribe` message to its end — a
+subscription's to its last event — and an error when it was answered with
+errors. No span lasts as long as the socket.
+
 ## Options
 
 The usual `@nxgt/telemetry` options and a `service`, or an existing
