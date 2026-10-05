@@ -62,6 +62,7 @@ export async function upgradeSocket(
 					headers.append('set-cookie', cookie);
 				}
 			}
+			await definition.handlers.upgrade?.(validated as never, headers);
 			const data: SocketData = { definition, ctx: validated };
 			const upgraded = server.upgrade(request.request, { headers, data });
 			return upgraded ? UPGRADED : routingError(request, 426);
