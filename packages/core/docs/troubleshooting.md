@@ -1555,10 +1555,25 @@ app.get('/users/:id', getUser).patch('/users/:id', updateUser);
 
 **When:** the same method and path are declared twice, often once directly
 and once through `plugin(app)` or a `group`, or as `static` beside a
-`GET /…/*`.
+`GET /…/*`. Or two apps are built on one shared base: the message then
+goes on `…, by the same route: two apps built on one base each mounted it
+on the base itself; build each on base.fork()` when the very route was
+mounted twice, and `…: keep one; if two apps are built on one base, build
+each on base.fork()` otherwise.
+
+**Why:** every method declares on the app it is called on and returns it.
+`base.use(x).plugin(todos)` adds to `base` itself, so a second
+`base.plugin(todos)` — a spec's app, a variant — declares the routes on the
+same app again.
 
 **Fix:** keep one. `HEAD` runs the `GET` route, so you do not need to
-declare it.
+declare it. For several apps on one base, build each on a fork
+([Several apps on one base](guide/groups-and-plugins.md#several-apps-on-one-base-fork)):
+
+```ts
+export const app = base.fork().plugin(todos);
+const testApp = base.fork().use(fakeSession).plugin(todos);
+```
 
 ### `GET /…: middleware 1 is not a function: a middleware is (ctx, next) => …, or a validate() or responds()`
 

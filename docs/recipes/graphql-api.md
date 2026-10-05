@@ -177,16 +177,14 @@ const hops = Number(Bun.env['PROXY_HOPS'] ?? 0);
 if (!Number.isInteger(hops) || hops < 0) throw new Error('PROXY_HOPS is a number of proxies: 0 or more');
 
 // The base: what every resolver reads. The probes come first, so they run
-// no middleware and need no token; then `db` and `viewer` for the rest. A
-// function, because an app is built on once: a second entry point or a spec
-// that needs its own ([section 7](#7-harden-it-for-production)) calls it again.
-export const newBase = () =>
-	alxia({ errors: 'problem', ...(hops > 0 && { ip: forwardedIp({ trusted: hops }) }) })
-		.plugin(health())
-		.decorate({ db })
-		.use(viewerOf);
-
-export const base = newBase();
+// no middleware and need no token; then `db` and `viewer` for the rest. Each
+// app builds on `base.fork()`, its own copy: the app, a second entry point
+// and a spec ([section 7](#7-harden-it-for-production)) share the base, and
+// none declares on it.
+export const base = alxia({ errors: 'problem', ...(hops > 0 && { ip: forwardedIp({ trusted: hops }) }) })
+	.plugin(health())
+	.decorate({ db })
+	.use(viewerOf);
 
 // A resolver's context: Yoga's, the base's (`db`, `viewer`) and the
 // per-request `loaders` that `src/app.ts`'s `context` option builds
@@ -321,7 +319,7 @@ import { schema } from './schema';
 // served over server-sent events. GraphiQL answers a browser's GET in the
 // app's dev alone (NODE_ENV=development, the dev script's); deployed, none.
 // `logger()` goes first: one line per request, naming the operation.
-export const app = base.use(logger()).plugin((app) =>
+export const app = base.fork().use(logger()).plugin((app) =>
 	graphql(app, {
 		schema,
 		// The loaders, anew for each request: never share their cache.
@@ -368,7 +366,7 @@ OpenTelemetry's `graphql.operation.name` and `graphql.operation.type`.
 ```ts no-check
 // Tracing is one more middleware, given first, beside the logger.
 const tracing = telemetry({ service: 'notes', exporters: [otlpExporter({ endpoint })] });
-const app = base.use(tracing).use(logger()).plugin((app) => graphql(app, { schema }));
+const app = base.fork().use(tracing).use(logger()).plugin((app) => graphql(app, { schema }));
 ```
 
 - A batched body (`batching: true`, an array) is one line and one span: the
@@ -727,7 +725,7 @@ export const persisted: Plugin = usePersistedOperations({
 ```ts
 // file: src/production.ts
 import { logger } from '@alxia/logger';
-import { newBase } from './context';
+import { base } from './context';
 import { csrf, jsonOnly } from './csrf';
 import { depthLimit } from './depth';
 import { introspectionOnlyInDev } from './introspection';
@@ -736,7 +734,7 @@ import { createLoaders } from './loaders';
 import { schema } from './schema';
 import { graphql } from '@alxia/graphql';
 
-export const production = newBase()
+export const production = base.fork()
 	.use(logger())
 	.use(limitTo(120)) // the probes above it are not counted
 	.use(jsonOnly)
@@ -761,7 +759,7 @@ import { describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { graphql } from '@alxia/graphql';
 import { createSchema } from 'graphql-yoga';
-import { newBase } from './context';
+import { base } from './context';
 import { invalid, notFound } from './errors';
 import { introspectionOnlyInDev } from './introspection';
 import { depthLimit } from './depth';
@@ -803,7 +801,7 @@ const tiny = createSchema({
 
 describe('rate limit', () => {
 	test('a viewer and an address each have an allowance, and a batch is one request', async () => {
-		const app = newBase().use(limitTo(2)).plugin((app) =>
+		const app = base.fork().use(limitTo(2)).plugin((app) =>
 			graphql(app, {
 				schema,
 				context: () => ({ loaders: createLoaders() }),
@@ -904,7 +902,7 @@ describe('the body, and CSRF', () => {
 
 describe('persisted operations', () => {
 	test('a registered hash runs on alxia, an arbitrary document does not', async () => {
-		const app = newBase().plugin((app) =>
+		const app = base.fork().plugin((app) =>
 			graphql(app, { schema, context: () => ({ loaders: createLoaders() }), logging: false, plugins: [persisted] }),
 		);
 		const [hash] = [...operations.keys()];

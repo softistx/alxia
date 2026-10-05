@@ -757,6 +757,18 @@ export const audit = defineAppMiddleware(async ({ db, user }, next) => {
 });
 ```
 
+**Several apps on one base: `fork()`.** Every method declares on the app
+it is called on, `base` included: `base.plugin(todos)` mounts the routes
+on `base` itself, so a second app built on it — a spec's, a variant —
+declares them again and throws `GET /todos is declared twice`. Build each
+app on a fork: a copy of the base, typed as it is, that shares nothing
+declared next.
+
+```ts
+export const app = base.fork().plugin(todos);
+const testApp = base.fork().use(fakeSession).plugin(todos); // its own routes, middlewares and hooks
+```
+
 A tool that reads `app.routes` — a route check, a document — finds a path
 as the core declares and matches it with `joinPath` and `shapeOf`:
 
@@ -884,7 +896,7 @@ joins middlewares past the 8 a call types:
 | --- | --- |
 | `forwardedIp({ header?, trusted })`, `ForwardedIpOptions`, `TrustedProxies` | the `ip` option for an app behind proxies: the client from `X-Forwarded-For` or `Forwarded`, read from the right past `trusted` hops or CIDR ranges, never the first entry the client writes; the connection's address when the header does not name it |
 | `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip`, `errors`, `dev` (on only when `NODE_ENV` is `development`: the route table, the 404 hint, the dev error page) |
-| `Alxia<Ctx, Prefix>` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `use` `derive` `decorate` `bodyLimit` `onStart` `onStop` `parser`, `group` `plugin`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server`; `Ctx` is what a route declared next reads, `Prefix` the app's prefix |
+| `Alxia<Ctx, Prefix>` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `use` `derive` `decorate` `bodyLimit` `onStart` `onStop` `parser`, `group` `plugin` `fork`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server`; `Ctx` is what a route declared next reads, `Prefix` the app's prefix |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream(schema)` made |
 | `eventStream({ name: schema })`, `NamedEventStreamSchema`, `EventSchemas` | the response schema of a stream of named events, its `event(name, data, fields?)` builder, its schemas by name under `~events` |

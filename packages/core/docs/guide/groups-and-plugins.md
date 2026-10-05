@@ -85,6 +85,51 @@ export const app = base.plugin(todos); // GET /todos, POST /todos
   `Register`: registered, `app` would be typed by itself, `TS7022`
   ([The app's type](types.md#register-and-appcontext)).
 
+### Several apps on one base: `fork()`
+
+Every method of an app declares on that app and returns it: `use`,
+`derive`, `decorate`, `plugin`, `group`, a route, a lifecycle hook. So
+`base.use(x).plugin(todos)` is `base` with `x` and the routes added, not a
+new app. Built on twice — the real app and a spec's, or two variants — the
+base gets both builds, and the second `plugin(todos)` throws
+[`GET /todos is declared twice`](../troubleshooting.md#get--is-declared-twice).
+
+Build each app on `base.fork()`: a copy of the base — its routes, its
+middlewares and `derive`s in force, its lifecycle hooks and parsers, its
+options — typed as the base is, so `Register`'s `typeof base` and
+`defineRoutes` read it unchanged. What a fork declares next is its own: a
+route, a middleware, a plugin or an `onStop` added to one fork is not on
+the base nor on another fork, and each app runs the base's `onStart` and
+`onStop` once, as its own.
+
+```ts
+// src/app.ts
+import { base } from './context';
+import { todos } from './routes/todos';
+
+export const app = base.fork().plugin(todos);
+```
+
+```ts
+// src/todos.spec.ts
+import { expect, test } from 'bun:test';
+import { defineMiddleware } from '@alxia/core';
+import { base } from './context';
+import { todos } from './routes/todos';
+
+const fakeSession = defineMiddleware((_ctx, next) => next({ user: { id: 'ada' } }));
+const testApp = base.fork().use(fakeSession).plugin(todos); // app is untouched
+
+test('lists the todos', async () => {
+	expect((await testApp.request('/todos')).status).toBe(200);
+});
+```
+
+An app built once needs no fork: `export const app = base.plugin(todos)`
+is the app. A fork copies what the base holds when it is called; what the
+base declares after it does not reach the fork. Forking an app of 50 routes
+takes about as long as declaring them.
+
 Without `Register`, `defineRoutes` starts from `BaseContext` and requires
 nothing, and a file of routes can still export an app of its own, as
 `posts` above, or a [`definePlugin`](writing-a-plugin.md#a-plugin-that-needs-an-earlier-one)
