@@ -11,10 +11,13 @@ const base = alxia()
 	.derive(({ request }) => ({ viewer: request.headers.get('x-user') }));
 
 const schema = createSchema<GraphQLContext<typeof base>>({
-	typeDefs: 'type Query { me: String, user(id: ID!): String }',
+	typeDefs: 'type Query { me: String, client: String, user(id: ID!): String }',
 	resolvers: {
 		Query: {
 			me: (_, __, context) => context.viewer,
+			// Over WebSocket, what the client sent when it connected.
+			client: (_, __, context) =>
+				String(context.connectionParams?.['client'] ?? ''),
 			user: (_, args: { id: string }, context) =>
 				context.users.get(args.id) ?? null,
 		},
@@ -61,4 +64,15 @@ export function guarded() {
 			return { viewer };
 		})
 		.plugin((app) => graphql(app, { schema }));
+}
+
+// GraphQL over WebSocket beside the endpoint, at its path and at one of its own.
+export function servedOverWs() {
+	return base.plugin((app) => graphql(app, { schema, ws: true }));
+}
+
+export function servedOverWsAt() {
+	return base.plugin((app) =>
+		graphql(app, { schema, ws: { path: '/graphql/ws', keepAlive: false } }),
+	);
 }

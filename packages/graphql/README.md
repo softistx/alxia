@@ -12,6 +12,7 @@ bun add -d typescript
 ```
 
 `graphql-yoga` and `graphql` are peers: the package declares no dependency.
+`graphql-ws` is an optional one, for [`ws`](#websocket) alone.
 `graphql` 16 and 17 both work; with 17, `graphql-yoga` must be 5.22 or
 later, the first to accept it.
 
@@ -62,6 +63,39 @@ what the app does not build is a compile error:
 the schema's resolvers read a context the app does not build: missing user
 ```
 
+## Batching (N+1)
+
+A field that loads a record per parent — `Note.author` over 50 notes — is
+51 queries. Build [DataLoaders](https://github.com/graphql/dataloader) in
+the `context` option and type them through `GraphQLContext`'s second
+argument. (Yoga's `batching` option, below, is another thing: several
+operations in one HTTP request.)
+
+```sh
+bun add dataloader
+```
+
+```ts
+import DataLoader from 'dataloader';
+
+const createLoaders = () => ({
+	user: new DataLoader(async (ids: readonly string[]) => findUsers(ids)), // one query for all ids
+});
+type Loaders = ReturnType<typeof createLoaders>;
+
+const schema = createSchema<GraphQLContext<typeof base, { loaders: Loaders }>>({
+	typeDefs,
+	resolvers: { Note: { author: (note: { authorId: string }, _, { loaders }) => loaders.user.load(note.authorId) } },
+});
+
+const app = base.plugin((app) => graphql(app, { schema, context: () => ({ loaders: createLoaders() }) }));
+```
+
+Per request, never once for the process: a DataLoader caches what it
+loads, so a shared one would serve stale records and hand one user's data
+to the next. Over WebSocket, `context` runs for each operation. See
+[Batching with DataLoader](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/context.md#batching-with-dataloader-n1).
+
 ## Yoga's plugins
 
 Every Yoga option passes through, but `graphqlEndpoint`, which `path`
@@ -82,7 +116,7 @@ graphql(app, {
 
 - **Subscriptions** are served over server-sent events, Yoga's default:
   `async *subscribe` in a resolver, `Accept: text/event-stream` on the
-  request. `@alxia/compress` leaves an event stream alone by default.
+  request; over WebSocket too with [`ws: true`](#websocket). `@alxia/compress` leaves an event stream alone by default.
 - **An IDE** answers a `GET` from a browser at the endpoint, with a
   `Content-Security-Policy` that lets it load — its pinned files on unpkg
   alone, framed by no one — which `@alxia/secure-headers` keeps. By
@@ -102,6 +136,32 @@ graphql(app, {
   | `false` | none |
 - **CORS** is `@alxia/cors`'s for the whole app: Yoga's own is off unless
   `cors` is given.
+
+## WebSocket
+
+`ws: true` serves the endpoint over WebSocket too, with the
+`graphql-transport-ws` protocol of [`graphql-ws`](https://the-guild.dev/graphql/ws),
+the default of Apollo Client's `GraphQLWsLink` and urql's
+`subscriptionExchange`. `graphql-ws` is an optional peer; server-sent
+events stay served at the same path. Install it with `bun add graphql-ws`.
+
+```ts
+const app = base.plugin((app) => graphql(app, { schema, ws: true })); // ws://…/graphql too
+```
+
+```ts
+import { createClient } from 'graphql-ws';
+
+const client = createClient({ url: 'wss://api.example.com/graphql', connectionParams: { device: 'web' } });
+```
+
+The upgrade runs the app's middlewares — a guard's `401` refuses the
+socket, what they add is in the context, beside the `connectionParams`
+the client sent — each operation runs through
+Yoga's plugins, and a shutdown closes the sockets with `1001`, completing
+their subscriptions. `ws: { path, keepAlive }` moves the socket or spaces
+its pings. See [the WebSocket guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/websockets.md),
+Apollo Client's and urql's setup included.
 
 ## Errors, health and shutdown
 
@@ -127,7 +187,9 @@ See [the endpoint guide](https://github.com/softistx/alxia/blob/develop/packages
 
 | export | |
 | --- | --- |
-| `graphql(app, options)` | the endpoint: `schema`, `path`, `ide`, `sandbox`, and every Yoga option |
+| `graphql(app, options)` | the endpoint: `schema`, `path`, `ide`, `sandbox`, `ws`, and every Yoga option |
+| `GraphQLWsOptions` | `ws`'s options: `path`, `keepAlive` |
+| `GraphQLWsContext` | what an operation over WebSocket adds to the context: `connectionParams` |
 | `renderSandbox(endpoint, options?)`, `SANDBOX_POLICY` | the Sandbox page, and the policy it loads under |
 | `SandboxOptions` | its options: `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
 | `GraphQLContext<App, UserContext?>` | what a resolver reads |
@@ -135,7 +197,7 @@ See [the endpoint guide](https://github.com/softistx/alxia/blob/develop/packages
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/graphql/docs): a page per area — mounting the endpoint, the typed context, Yoga's plugins and options, and GraphiQL and Apollo Sandbox.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/graphql/docs): a page per area — mounting the endpoint, the typed context, Yoga's plugins and options, GraphQL over WebSocket, and GraphiQL and Apollo Sandbox.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/troubleshooting.md): an error message, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/roadmap.md): what is coming, and what is not planned.
 - [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [A GraphQL API](https://github.com/softistx/alxia/blob/develop/docs/recipes/graphql-api.md), [Authenticate requests](https://github.com/softistx/alxia/blob/develop/docs/recipes/authentication.md), [Test an alxia app](https://github.com/softistx/alxia/blob/develop/docs/recipes/testing.md), [Health checks and graceful shutdown](https://github.com/softistx/alxia/blob/develop/docs/recipes/health-and-shutdown.md), and more.

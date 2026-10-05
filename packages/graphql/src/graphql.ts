@@ -12,6 +12,7 @@ import type {
 } from 'graphql-yoga';
 import { graphqlHandler, type YogaContext, yogaServers } from './handler';
 import type { SandboxOptions } from './sandbox';
+import { type GraphQLWsOptions, graphqlSocket } from './ws';
 
 /** The parts of a route's context Yoga owns, or that mean nothing to a resolver. */
 type RouteOnly =
@@ -31,8 +32,17 @@ type RouteOnly =
 export type ServerContext<Ctx> = Omit<BaseContext & Ctx, RouteOnly>;
 
 /**
- * What a resolver reads as its context: Yoga's own, the app's, and what
- * the `context` option adds. Type a schema with it:
+ * What an operation over WebSocket adds to its context (`ws` on): the
+ * `connectionParams` the client sent when it connected. `undefined` over
+ * HTTP, and for a client that sent none.
+ */
+export interface GraphQLWsContext {
+	readonly connectionParams?: Readonly<Record<string, unknown>>;
+}
+
+/**
+ * What a resolver reads as its context: Yoga's own, the app's, what
+ * the `context` option adds, and over WebSocket the `connectionParams`. Type a schema with it:
  *
  * ```ts
  * const base = alxia().use(bearer({ jwt }));
@@ -42,7 +52,7 @@ export type ServerContext<Ctx> = Omit<BaseContext & Ctx, RouteOnly>;
 export type GraphQLContext<App, UserContext = Empty> = App extends {
 	readonly '~context': infer Ctx;
 }
-	? YogaInitialContext & ServerContext<Ctx> & UserContext
+	? YogaInitialContext & ServerContext<Ctx> & GraphQLWsContext & UserContext
 	: // Not `never`: a schema typed with `never` would let every resolver
 		// read anything until `graphql()` refused it.
 		{
@@ -85,6 +95,14 @@ export interface GraphQLOptions<
 	 * app, this endpoint included.
 	 */
 	readonly cors?: YogaServerOptions<ServerCtx, UserCtx>['cors'];
+	/**
+	 * GraphQL over WebSocket too, the `graphql-transport-ws` protocol of
+	 * Apollo Client's and urql's default link, served by the optional peer
+	 * `graphql-ws` at the endpoint's path: `true`, or where and how often it
+	 * pings. Off by default: subscriptions are served over server-sent
+	 * events, which stay served beside it.
+	 */
+	readonly ws?: boolean | GraphQLWsOptions;
 }
 
 /**
@@ -108,7 +126,8 @@ type ProvidesContext<Provided, Required> = Provided extends Required
  * before it. A guard before it guards it; what the middlewares added is in each
  * resolver's context, typed. Yoga's options pass through — `plugins`
  * (Envelop's and Yoga's), `graphiql`, `maskedErrors`, `batching`… —
- * and subscriptions are served over server-sent events.
+ * and subscriptions are served over server-sent events, and over
+ * WebSocket too with `ws: true`.
  *
  * ```ts
  * const app = alxia()
@@ -136,6 +155,7 @@ export function graphql<
 		ide,
 		graphiql,
 		sandbox,
+		ws = false,
 		...yogaOptions
 	} = options;
 	const page = graphiql ?? true;
@@ -156,8 +176,13 @@ export function graphql<
 	const route = app as unknown as {
 		get(path: string, handler: unknown): unknown;
 		post(path: string, handler: unknown): unknown;
+		ws(path: string, ...rest: unknown[]): unknown;
 	};
 	route.get(path, handler);
 	route.post(path, handler);
+	if (ws !== false) {
+		const socket = graphqlSocket(yogaAt, path, ws === true ? {} : ws);
+		route.ws(socket.path, socket.middleware, socket.handlers);
+	}
 	return app as never;
 }

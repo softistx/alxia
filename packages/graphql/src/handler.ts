@@ -62,6 +62,26 @@ export function yogaServers<UserCtx extends YogaContext>(
 }
 
 /**
+ * What Yoga is handed as its server context: the route's context — the
+ * middlewares' work — minus what a resolver has no use for.
+ */
+export function serverContext(
+	ctx: Record<string, unknown>,
+): Record<string, unknown> {
+	const {
+		params: _params,
+		query: _query,
+		headers: _headers,
+		cookies: _cookies,
+		body: _body,
+		reply: _reply,
+		redirect: _redirect,
+		...server
+	} = ctx;
+	return server;
+}
+
+/**
  * The handler of the endpoint's `GET` and `POST`: Apollo Sandbox's page to
  * a browser when `sandbox` is not `false`, else the request to Yoga, with
  * the route's context — the middlewares' work, minus what a resolver has no use
@@ -76,16 +96,8 @@ export function graphqlHandler<UserCtx extends YogaContext>(
 	return async function graphql(
 		ctx: Record<string, unknown> & BaseContext & { readonly route: string },
 	) {
-		const {
-			params: _params,
-			query: _query,
-			headers: _headers,
-			cookies: _cookies,
-			body: _body,
-			reply,
-			redirect: _redirect,
-			...server
-		} = ctx;
+		const { reply } = ctx;
+		const server = serverContext(ctx);
 		if (
 			sandbox !== false &&
 			ctx.request.method === 'GET' &&

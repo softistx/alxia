@@ -8,6 +8,7 @@ symptom.
 **Install**
 
 - [`Cannot find package 'graphql-yoga' from '…/@alxia/graphql/dist/index.js'`](#cannot-find-package-graphql-yoga-from-alxiagraphqldistindexjs)
+- [`@alxia/graphql: graphql(app, { ws }) serves GraphQL over WebSocket with the optional peer graphql-ws, which is not installed: bun add graphql-ws`](#alxiagraphql-graphqlapp--ws--serves-graphql-over-websocket-with-the-optional-peer-graphql-ws-which-is-not-installed-bun-add-graphql-ws)
 
 **Types**
 
@@ -22,6 +23,7 @@ symptom.
 **Startup**
 
 - [`TypeError: GET /graphql is declared twice`](#typeerror-get-graphql-is-declared-twice)
+- [`TypeError: graphql(app, { ws: { keepAlive: 0 } }): keepAlive is the milliseconds between pings, a positive number, or false for none`](#typeerror-graphqlapp--ws--keepalive-0---keepalive-is-the-milliseconds-between-pings-a-positive-number-or-false-for-none)
 
 **Responses**
 
@@ -30,6 +32,7 @@ symptom.
 - [`405 {"errors":[{"message":"Can only perform a mutation operation from a POST request."}]}`](#405-errorsmessagecan-only-perform-a-mutation-operation-from-a-post-request)
 - [`406` with an empty body](#406-with-an-empty-body)
 - [`{"errors":[{"message":"Must provide query string."}]}`](#errorsmessagemust-provide-query-string)
+- [`4406 Subprotocol not acceptable`](#4406-subprotocol-not-acceptable)
 
 **Traps**
 
@@ -61,6 +64,22 @@ bun add @alxia/graphql graphql-yoga graphql
 With `graphql` 17, `graphql-yoga` must be 5.22 or later: an older Yoga
 declares `graphql ^15.2.0 || ^16.0.0`, and `bun install` warns about an
 incorrect peer. `bun add graphql-yoga@latest` updates it.
+
+### `@alxia/graphql: graphql(app, { ws }) serves GraphQL over WebSocket with the optional peer graphql-ws, which is not installed: bun add graphql-ws`
+
+**When:** a client opens a socket on an endpoint mounted with `ws` on. The
+upgrade is answered with a `500`, and the server logs this error; the
+client sees its socket fail to open (`Expected 101 status code` in Bun).
+
+**Why:** `graphql-ws` is an optional peer, loaded on the first upgrade: an
+app that leaves `ws` off never needs it, so it is not installed with
+`@alxia/graphql`.
+
+**Fix:**
+
+```sh
+bun add graphql-ws
+```
 
 ## Types
 
@@ -220,6 +239,20 @@ const app = alxia()
 	.plugin((app) => graphql(app, { schema: admin, path: '/admin/graphql' }));
 ```
 
+### `TypeError: graphql(app, { ws: { keepAlive: 0 } }): keepAlive is the milliseconds between pings, a positive number, or false for none`
+
+**When:** declaring `graphql(app, { ws: { keepAlive } })` with `0`, a
+negative number, `NaN` or `Infinity` — anything but a finite positive number; the message names the value given.
+
+**Why:** `keepAlive` is the interval of each socket's pings: `0` would
+ping in a loop.
+
+**Fix:** give the milliseconds between pings, or `false` for none:
+
+```ts
+graphql(app, { schema, ws: { keepAlive: 30_000 } });
+```
+
 ## Responses
 
 ### `200 {"errors":[{"message":"Unexpected error.", … "code":"INTERNAL_SERVER_ERROR"}}]}`
@@ -328,6 +361,26 @@ await app.request(`/graphql?query=${encodeURIComponent('{ me }')}`, {
 });
 ```
 
+### `4406 Subprotocol not acceptable`
+
+**When:** a socket opens on an endpoint with `ws` on, then closes at once
+with this code and reason.
+
+**Why:** the client offered no subprotocol, or only one the endpoint does
+not serve. `ws` serves `graphql-transport-ws`, the protocol of
+`graphql-ws`; the legacy `subscriptions-transport-ws` client
+offers `graphql-ws`, its own, older protocol, and a bare `new WebSocket(url)`
+offers none.
+
+**Fix:** connect with `graphql-ws`'s `createClient`, or with a client built
+on it (Apollo Client's `GraphQLWsLink` from
+`@apollo/client/link/subscriptions`, urql's `subscriptionExchange` given a
+`graphql-ws` client). A hand-written socket names the protocol:
+
+```ts
+const socket = new WebSocket('ws://localhost:3000/graphql', 'graphql-transport-ws');
+```
+
 ## Traps
 
 ### The endpoint answers without a guard declared after it
@@ -391,17 +444,30 @@ const app = alxia()
 
 ### A WebSocket client cannot connect: `Expected 101 status code`
 
-**When:** a `graphql-ws` client, or GraphiQL with
-`subscriptionsProtocol: 'WS'`, opens `ws://…/graphql`. Bun's client prints
-`Expected 101 status code`; a browser reports the WebSocket connection as
-failed.
+**When:** a `graphql-ws` client — Apollo Client's `GraphQLWsLink`, urql's
+`subscriptionExchange`, GraphiQL with `subscriptionsProtocol: 'WS'` — opens
+`ws://…/graphql`. Bun's client prints `Expected 101 status code`; a browser
+reports the WebSocket connection as failed.
 
-**Why:** the endpoint serves subscriptions over server-sent events only;
-it never upgrades to a WebSocket.
+**Why:** `ws` is off, the default: the endpoint serves subscriptions over
+server-sent events, and never upgrades to a WebSocket. With `ws` on, the
+same message means the upgrade was answered otherwise: a guard's `401`, a
+`500` naming [the missing peer](#alxiagraphql-graphqlapp--ws--serves-graphql-over-websocket-with-the-optional-peer-graphql-ws-which-is-not-installed-bun-add-graphql-ws),
+or a socket `path` other than the one the client opens.
 
-**Fix:** subscribe over SSE, with `Accept: text/event-stream`
-([Subscriptions](guide/yoga.md#subscriptions)), and leave GraphiQL's
-protocol at SSE:
+**Fix:** serve WebSocket too ([GraphQL over WebSocket](guide/websockets.md)):
+
+```sh
+bun add graphql-ws
+```
+
+```ts
+graphql(app, { schema, ws: true });
+```
+
+Or leave `ws` off, and subscribe over SSE, with `Accept: text/event-stream`
+([Subscriptions](guide/yoga.md#subscriptions)), GraphiQL's protocol left at
+SSE:
 
 ```ts
 graphql(app, { schema, graphiql: { subscriptionsProtocol: 'SSE' } });

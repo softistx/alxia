@@ -15,11 +15,11 @@
     "examples/react-router": {
       "name": "react-router-example",
       "dependencies": {
-        "@alxia/compress": "^0.3.0",
-        "@alxia/core": "^0.5.0",
-        "@alxia/logger": "^0.4.0",
-        "@alxia/react-router": "^0.6.0",
-        "@alxia/secure-headers": "^0.4.0",
+        "@alxia/compress": "^0.3.1",
+        "@alxia/core": "^0.6.0",
+        "@alxia/logger": "^0.4.1",
+        "@alxia/react-router": "^0.6.1",
+        "@alxia/secure-headers": "^0.4.1",
         "@react-router/node": "^8.4.0",
         "@react-router/serve": "^8.4.0",
         "isbot": "^5.2.2",
@@ -151,14 +151,19 @@
         "@types/bun": "^1.4.2",
         "dataloader": "^2.2.3",
         "graphql": "^16.11.0",
+        "graphql-ws": "^6.3.0",
         "graphql-yoga": "^5.16.0",
       },
       "peerDependencies": {
         "@alxia/core": "workspace:^",
         "graphql": "^16.11.0 || ^17.0.0",
+        "graphql-ws": "^6.1.0",
         "graphql-yoga": "^5.16.0",
         "typescript": "^6.0.3 || ^7.0.0",
       },
+      "optionalPeers": [
+        "graphql-ws",
+      ],
     },
     "packages/i18n": {
       "name": "@alxia/i18n",
