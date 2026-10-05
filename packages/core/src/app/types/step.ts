@@ -3,7 +3,7 @@
  * where it is given, with a message, not an overload's assignability,
  * when that context lacks what it reads.
  */
-import type { NextFunction } from './middleware';
+import type { MiddlewareReturn, NextFunction } from './middleware';
 
 /**
  * A middleware given where `Given` is in force, reading `Reads` and
@@ -18,11 +18,22 @@ import type { NextFunction } from './middleware';
  *
  * `Reads` is the middleware's own `ctx` type when it is annotated — a
  * middleware of `defineMiddleware<Requires>()` — and `Given` otherwise.
+ * A function that returns a function is a factory given uncalled —
+ * `use(cors)` — and is told so; anything else a middleware returns that
+ * is not `next()`, a reply or a `Response` is told what it may return.
+ * `Refused` is what the form refuses, joined to the function: `use`'s
+ * refuses a `validate` or a `responds` (`FormSlots['refuses']`).
  */
-export type Step<Given, Reads, Result> = (
-	ctx: Reads,
-	next: NextFunction,
-) => Result & Missing<Given, Reads>;
+export type Step<Given, Reads, Result, Refused = unknown> = Refused &
+	((
+		ctx: Reads,
+		next: NextFunction,
+	) => Result &
+		([Result] extends [MiddlewareReturn]
+			? Missing<Given, Reads>
+			: Result extends FunctionLike
+				? 'this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)'
+				: 'a middleware returns next(), a reply or a Response'));
 
 /**
  * `unknown` when `Given` gives what `Reads` names; else why not, one

@@ -47,7 +47,9 @@ describe('addPlugin', () => {
 describe('addAlxia', () => {
 	test("adds alxia's packages, sorted, and starts the build on Bun", () => {
 		const manifest = addAlxia(SCAFFOLD_MANIFEST);
-		expect(manifest.scripts['start']).toBe('bun build/server/index.js');
+		expect(manifest.scripts['start']).toBe(
+			'NODE_ENV=production bun build/server/index.js',
+		);
 		expect(Object.keys(manifest.dependencies)).toEqual([
 			'@alxia/core',
 			'@alxia/react-router',

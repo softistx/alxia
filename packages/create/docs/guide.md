@@ -102,14 +102,20 @@ export const app = alxia().get("/", ({ reply }) =>
 // Only when this file is the entry: the test imports `app` and listens on
 // no port.
 if (import.meta.main) {
-  const server = app.listen(Number(Bun.env["PORT"] ?? 3000));
-  console.log(`listening on ${server.url}`);
+  // In dev, the URL and the route table; in production, the URL alone.
+  app.listen({
+    port: Number(Bun.env["PORT"] ?? 3000),
+    onListen: ({ dev, table, url }) =>
+      console.log(dev ? table : `listening on ${url}`),
+  });
   process.once("SIGTERM", () => void app.stop().then(() => process.exit(0)));
 }
 ```
 
-`bun dev` runs `bun --hot src/index.ts`; `bun start` runs
-`bun dist/index.js`, what `bun run build` wrote. `import.meta.main` is why
+`bun dev` runs `bun --hot src/index.ts`, which prints the route table
+`@alxia/core` writes in dev; `bun start` runs `NODE_ENV=production bun dist/index.js`, what
+`bun run build` wrote, and the image sets `NODE_ENV=production`, under
+which it prints the URL alone. `import.meta.main` is why
 the spec can import `app` without opening a port, and why the one file is
 both the app and its server. `SIGTERM` stops the app, since as a
 container's process 1 Bun would otherwise ignore it and `docker stop` would
@@ -150,7 +156,7 @@ my-api/
 │   ├── routes/todos.ts        defineRoutes(): one route per operation
 │   ├── app.ts                 the app: the base, then the routes, and its type
 │   ├── app.spec.ts            bun test: the typed client over app.fetch, and matchesSpec
-│   └── server.ts              app.listen(env.PORT), stopped on SIGINT and SIGTERM
+│   └── server.ts              app.listen on env.PORT, stopped on SIGINT and SIGTERM
 ├── package.json
 ├── tsconfig.json
 ├── biome.json                 Biome: lint, format, imports sorted
@@ -566,7 +572,7 @@ The scripts:
 | `bun run generate` | `nxgt-openapi generate`: `src/generated/` from `openapi.yaml`. `bun run generate --check` writes nothing and exits 1 when a file is stale |
 | `bun run typecheck` | `tsc --noEmit` |
 | `bun run build` | `bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked`: one file, its dependencies bundled |
-| `bun start` | `bun dist/server.js`: the build, after `bun run build` |
+| `bun start` | `NODE_ENV=production bun dist/server.js`: the build, after `bun run build` |
 | `bun run check` | `biome check --write`: lint, format, sort imports, fixing what it can |
 | `bun run lint`, `bun run format` | `biome lint`, `biome format --write` |
 | `bun run check:ci` | `biome ci`: read-only, for CI |
@@ -619,7 +625,7 @@ my-graphql-api/
 │   ├── app.ts              graphql(app, { schema }) mounted on the base
 │   ├── graphql.d.ts        declares the *.graphql module
 │   ├── app.spec.ts         bun test: POST /graphql through app.request()
-│   └── server.ts           app.listen(env.PORT), stopped on SIGINT and SIGTERM
+│   └── server.ts           app.listen on env.PORT, stopped on SIGINT and SIGTERM
 ├── package.json
 ├── tsconfig.json
 ├── biome.json              Biome; skips dist/ and src/generated/
@@ -803,7 +809,7 @@ src/generated`, then `bun run verify`
 ([troubleshooting](troubleshooting.md#srcgenerated-changes-after-moving-graphql-codegen)).
 
 The scripts are those of the [`api`](#the-rest) project, with `generate` as
-`graphql-codegen --config codegen.ts` and `start` as `bun dist/server.js`.
+`graphql-codegen --config codegen.ts` and `start` as `NODE_ENV=production bun dist/server.js`.
 For Yoga's plugins, the IDE and the typed context, see
 [`@alxia/graphql`'s guide](https://github.com/softistx/alxia/tree/develop/packages/graphql/docs).
 
@@ -820,7 +826,7 @@ before `bun install`. The change, against React Router's files:
  // package.json
    "scripts": {
 -    "start": "react-router-serve ./build/server/index.js",
-+    "start": "bun build/server/index.js",
++    "start": "NODE_ENV=production bun build/server/index.js",
    },
    "dependencies": {
 +    "@alxia/core": "^0.3.1",

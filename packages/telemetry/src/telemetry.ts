@@ -2,6 +2,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
+	markFactory,
 	type Next,
 	type RequestContext,
 	settle,
@@ -101,7 +102,7 @@ export function telemetry(
 	const traced = guarded(options.traced ?? (() => true), () => true);
 	const spanName = guarded(options.spanName ?? defaultName, defaultName);
 
-	const middleware = defineMiddleware(async (ctx, next) => {
+	const middleware = defineMiddleware(async function telemetry(ctx, next) {
 		const untraced: TelemetryContext = { span: undefined, telemetry: instance };
 		const upgrade =
 			ctx.request.headers.get('upgrade')?.toLowerCase() === 'websocket';
@@ -228,3 +229,5 @@ function guarded<T>(
 		}
 	};
 }
+
+markFactory(telemetry);

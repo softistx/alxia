@@ -139,7 +139,7 @@ into one file, `dist/server.js`, minified, with its source map beside it, and
 
 ```sh
 bun run build    # dist/server.js and dist/server.js.map
-bun start        # bun dist/server.js
+bun start        # NODE_ENV=production bun dist/server.js
 ```
 
 `bun start` before any build fails with `Module not found

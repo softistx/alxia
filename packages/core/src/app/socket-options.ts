@@ -11,6 +11,7 @@ import type {
 	SocketOptions,
 	SocketOptionsOnly,
 } from './socket-forms';
+import type { TooMany } from './too-many';
 import type { FunctionLike } from './types';
 
 declare module './forms' {
@@ -47,4 +48,5 @@ export interface SocketOptionsForm<
 /** `app.ws(path, options, ...middlewares, handlers)`: see `SocketForms`. */
 export interface SocketOptionsForms<App extends AppTypes>
 	extends Bare<'socketOptions', App>,
-		Ladder<'socketOptions', App> {}
+		Ladder<'socketOptions', App>,
+		TooMany<'socketOptions', App> {}

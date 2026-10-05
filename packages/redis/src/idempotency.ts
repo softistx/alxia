@@ -3,6 +3,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
+	markFactory,
 	type Reply,
 	settle,
 } from '@alxia/core';
@@ -135,7 +136,7 @@ export function idempotency(
 		return body;
 	};
 
-	return defineMiddleware(async (ctx, next) => {
+	return defineMiddleware(async function idempotency(ctx, next) {
 		const { request, reply, route } = ctx;
 		if (route === undefined || !methods.has(request.method)) return next();
 		const key = request.headers.get(header);
@@ -228,3 +229,5 @@ function restore(stored: Stored, replayed: boolean): Response {
 		{ status: stored.status, headers },
 	);
 }
+
+markFactory(idempotency);

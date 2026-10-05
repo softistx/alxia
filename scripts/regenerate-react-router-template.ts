@@ -110,7 +110,10 @@ export function addAlxia(manifest: Manifest): Manifest {
 	);
 	return {
 		...manifest,
-		scripts: { ...manifest.scripts, start: 'bun build/server/index.js' },
+		scripts: {
+			...manifest.scripts,
+			start: 'NODE_ENV=production bun build/server/index.js',
+		},
 		dependencies,
 	};
 }

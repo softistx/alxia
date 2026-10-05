@@ -3,6 +3,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
+	markFactory,
 	type Next,
 } from '@alxia/core';
 import { requestControls } from './control';
@@ -143,31 +144,33 @@ export function cache<Requires extends object = Empty>(
 
 	const label = (says: 'HIT' | 'STALE' | 'MISS') => (debug ? says : undefined);
 
-	const middleware = defineMiddleware<Requires>()(async (ctx, next) => {
-		const { request } = ctx;
-		const added: { cache: CacheControls } = { cache: controls.open(request) };
-		// A request no route matches is never kept: there is no route to answer it again.
-		const key =
-			ctx.route === undefined || bypasses(request, honorNoCache)
-				? undefined
-				: keyOf(ctx);
-		if (key === undefined) return next(added);
-		const found = await attempt(() => store.get(key), undefined);
-		const worth = found === undefined ? undefined : freshness(found);
-		if (found !== undefined && worth === 'fresh') {
-			return respond(request, found, label('HIT'));
-		}
-		if (found !== undefined && worth === 'stale') {
-			// Served at once; the route runs behind it, unless a refresh already does.
-			if (!flight.has(key)) {
-				refreshBehind(load(key, ctx, () => next.behind(added)));
+	const middleware = defineMiddleware<Requires>()(
+		async function cache(ctx, next) {
+			const { request } = ctx;
+			const added: { cache: CacheControls } = { cache: controls.open(request) };
+			// A request no route matches is never kept: there is no route to answer it again.
+			const key =
+				ctx.route === undefined || bypasses(request, honorNoCache)
+					? undefined
+					: keyOf(ctx);
+			if (key === undefined) return next(added);
+			const found = await attempt(() => store.get(key), undefined);
+			const worth = found === undefined ? undefined : freshness(found);
+			if (found !== undefined && worth === 'fresh') {
+				return respond(request, found, label('HIT'));
 			}
-			return respond(request, found, label('STALE'));
-		}
-		const loaded = await load(key, ctx, () => next(added));
-		if (loaded instanceof Response) return loaded;
-		return respond(request, loaded, label('MISS'));
-	});
+			if (found !== undefined && worth === 'stale') {
+				// Served at once; the route runs behind it, unless a refresh already does.
+				if (!flight.has(key)) {
+					refreshBehind(load(key, ctx, () => next.behind(added)));
+				}
+				return respond(request, found, label('STALE'));
+			}
+			const loaded = await load(key, ctx, () => next(added));
+			if (loaded instanceof Response) return loaded;
+			return respond(request, loaded, label('MISS'));
+		},
+	);
 
 	return Object.assign(middleware, handlesOf(store));
 }
@@ -211,3 +214,5 @@ function handlesOf(store: CacheStore): Cache {
 		},
 	};
 }
+
+markFactory(cache);

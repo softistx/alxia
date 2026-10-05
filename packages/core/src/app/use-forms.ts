@@ -9,6 +9,7 @@ import type { Alxia } from './alxia';
 import type { FormSlots } from './forms';
 import type { Ladder } from './ladder';
 import type { AppTypes } from './route-forms';
+import type { TooMany } from './too-many';
 import type {
 	AddedOf,
 	BaseContext,
@@ -100,6 +101,11 @@ export interface UseForm<
 	readonly reads: BaseContext & ThreadContext<App['ctx'], Results>;
 	readonly tail: [];
 	readonly out: AppAfterUse<App['ctx'], App['prefix'], Results>;
+	readonly refuses: {
+		readonly '~builtin'?: {
+			readonly refused: 'validate() and responds() belong to a route: give them among its middlewares, not to use()';
+		};
+	};
 }
 
 /**
@@ -117,6 +123,7 @@ export interface UseForm<
  */
 export interface UseForms<Ctx extends object, Prefix extends string>
 	extends Ladder<'use', UseApp<Ctx, Prefix>>,
+		TooMany<'use', UseApp<Ctx, Prefix>>,
 		UsePathForm<Ctx, Prefix> {}
 
 /** `app.use(path, ...middlewares)`. */

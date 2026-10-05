@@ -3,6 +3,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
+	markFactory,
 	type Next,
 	type RequiresOf,
 } from '@alxia/core';
@@ -103,9 +104,13 @@ export function language<
 			`language(): the fallback "${settings.fallback}" is not supported`,
 		);
 	}
-	return defineMiddleware<RequiresOf<Ctx, 'resolve'>>()((ctx, next) => {
-		const found: LanguageContext<L> = decide(settings, ctx);
-		respond(settings, ctx, found);
-		return next(found);
-	});
+	return defineMiddleware<RequiresOf<Ctx, 'resolve'>>()(
+		function language(ctx, next) {
+			const found: LanguageContext<L> = decide(settings, ctx);
+			respond(settings, ctx, found);
+			return next(found);
+		},
+	);
 }
+
+markFactory(language);

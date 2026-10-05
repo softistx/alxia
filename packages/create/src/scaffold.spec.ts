@@ -110,7 +110,9 @@ describe('create-alxia: the project written', () => {
 		expect(ran).toEqual([{ command: [process.execPath, 'install'], cwd: dir }]);
 		const manifest = await json(join(dir, 'package.json'));
 		expect(manifest.name).toBe('web');
-		expect(manifest.scripts.start).toBe('bun build/server/index.js');
+		expect(manifest.scripts.start).toBe(
+			'NODE_ENV=production bun build/server/index.js',
+		);
 		expect(manifest.dependencies).toEqual({
 			'@alxia/core': ALXIA['@alxia/core'],
 			'@alxia/react-router': ALXIA['@alxia/react-router'],

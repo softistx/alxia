@@ -3,6 +3,7 @@
  * pages served by Bun, its `onStart` hooks run once it listens, and its
  * graceful shutdown — on `SIGINT` and `SIGTERM`, or `stop()` — run once.
  */
+import { formatRoutes, routeRows } from '../dev/route-table';
 import type { Runtime } from './definition';
 import { serve } from './pipeline';
 import { onSignals, SIGNALS } from './signals';
@@ -32,6 +33,7 @@ export function startServer(
 	const {
 		signals = SIGNALS,
 		shutdownTimeout = SHUTDOWN_TIMEOUT,
+		onListen,
 		...settings
 	} = typeof options === 'number' ? { port: options } : options;
 	if (!(Number.isFinite(shutdownTimeout) && shutdownTimeout >= 0)) {
@@ -67,12 +69,38 @@ export function startServer(
 	if (signals !== false) {
 		release = onSignals(signals, () => serving.stop(false));
 	}
+	announce(runtime, server, onListen);
 	for (const hook of runtime.globals.onStart) {
 		Promise.resolve()
 			.then(() => hook(server))
 			.catch((error) => console.error(error));
 	}
 	return serving;
+}
+
+/**
+ * What `listen` says once the app listens: `onListen`, given, is told
+ * the URL and the routes, in every mode; else, in dev alone, the route
+ * table is printed.
+ */
+function announce(
+	runtime: Runtime,
+	server: Bun.Server<unknown>,
+	onListen: ListenOptions['onListen'],
+): void {
+	if (onListen === undefined && runtime.served.dev !== true) return;
+	const routes = routeRows(runtime);
+	const dev = runtime.served.dev === true;
+	const table = formatRoutes(server.url, routes, dev);
+	if (onListen === undefined) {
+		console.log(table);
+		return;
+	}
+	try {
+		onListen({ server, url: server.url, routes, table, dev });
+	} catch (error) {
+		console.error(error);
+	}
 }
 
 /**

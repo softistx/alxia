@@ -23,6 +23,8 @@ and keeps one: a middleware is a plain `(ctx, next)` function.
 | [Probes: `health()`](#probes-health) | core | no: new |
 | [A graceful shutdown on `SIGTERM`](#a-graceful-shutdown-on-sigterm) | core, react-router, graphql | yes, for a process with signal handlers of its own: `listen` installs its own |
 | [What behaves differently](#what-behaves-differently) | core | yes, for a middleware that relied on a hook answering an error or a refusal first |
+| [Dev comfort, on in dev](#dev-comfort-on-in-dev) | core, every package middleware, graphql, react-router, create | yes, for a process run without `NODE_ENV`: `listen` prints its routes, a 404 carries a `hint`, a 500 its stack; a factory given uncalled throws where it is declared |
+| [More than 8 middlewares: `compose`](#more-than-8-middlewares-compose) | core | no: new; a ninth middleware's error now names the limit |
 
 ### One middleware form
 
@@ -546,6 +548,59 @@ indefinitely, and closes the open sockets with 1001
   the router a `use()` middleware runs after it, with `ctx.route` set; a
   request no route matches still runs every top-level `use()` middleware,
   then its 404, 405 or 426.
+
+### Dev comfort, on in dev
+
+**What changed.** `alxia({ dev })` turns on what helps the developer
+running the app; left out, it is on unless `NODE_ENV` is `production` or
+`test`. In dev:
+
+- `listen` prints its URL and the route table, every route with its
+  middlewares; `listen({ onListen })` is told them instead, in every mode;
+- the router's 404 and 405 carry a `hint`: `"did you mean GET
+  /todos/:id?"`, `"/todos/1 allows GET, DELETE"`;
+- a 500 sends its error: an HTML page to a browser, a `stack` member (an
+  extension under `errors: 'problem'`) to any other client.
+
+In every mode, a factory given uncalled — `use(cors)`, a route's `logger`,
+`plugin(health)` — throws where it is declared, `use(): argument 1 looks
+like a factory (cors): call it, use(cors())`, where it answered every
+request with a 500; and TypeScript refuses it,
+`"this looks like a factory given uncalled: …"`. `use(validate(…))` is a
+compile error again, as it throws. `@alxia/react-router`'s `start` prints
+the table in dev, and the `bun create @alxia` templates print it through
+`onListen`.
+
+```ts
+// a deployed app says nothing of its routes nor its errors
+const app = alxia({ dev: false }); // or NODE_ENV=production, as every template's Dockerfile sets
+```
+
+**Can it break your code.** Yes, for a process run without `NODE_ENV`
+where it serves real clients: it would send its stacks and its routes. Set
+`NODE_ENV=production` there, or `dev: false`; the templates' `start`
+scripts now set it. A test that compares a whole
+404, 405 or 500 body runs with `NODE_ENV=test` under `bun test`, so it is
+unchanged; one run otherwise gets the `hint` and the `stack`. A test that
+asserted the 500 of an uncalled factory now sees the declaration throw
+([Development](guide/development.md)).
+
+### More than 8 middlewares: `compose`
+
+**What changed.** A ninth middleware is one error on it, `"at most 8
+middlewares per route: group them with compose(...)"`, where it read
+`Expected 20 arguments, but got 11` or a mismatch on the first argument.
+`compose(...middlewares)` is one middleware typed for any number of them,
+its members spliced into the chain where it stands, with no cost per
+request ([Development](guide/development.md#more-than-8-middlewares-compose)).
+
+```ts
+const guarded = compose(session, csrf, auth, tenant, audit);
+app.patch('/posts/:id', guarded, canEdit, loadPost, validate({ body: Update }), handler);
+```
+
+**Can it break your code.** No: what compiled still compiles, and a
+`@ts-expect-error` on a ninth middleware stays an error.
 
 ## 0.4.0
 

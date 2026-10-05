@@ -440,7 +440,10 @@ reply(403)` — has started the rest, which runs anyway: its reply is sent
 once the rest has run, `console.warn` says `GET /x: a middleware returned
 before the next() it called settled: …`, and an error the rest throws is
 logged rather than left unhandled. Decide before calling `next()`. A route takes up to 8
-middlewares, `validate` and `responds` included; a ninth does not compile.
+middlewares, `validate` and `responds` included; a ninth does not compile,
+`at most 8 middlewares per route: group them with compose(...)`, and
+`compose(...)` joins any number of them into one, spliced where it stands
+([Development](development.md#more-than-8-middlewares-compose)).
 `ws` takes them on the upgrade ([WebSockets](websockets.md#the-upgrade)),
 and `route(operation, …)` after its operation; `static`, `file` and `page`
 take none.

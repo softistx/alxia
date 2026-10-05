@@ -56,7 +56,7 @@ so `bun add` warns until it is raised; 7 works too.
 ```diff
  // package.json
 -    "start": "react-router-serve ./build/server/index.js",
-+    "start": "bun build/server/index.js",
++    "start": "NODE_ENV=production bun build/server/index.js",
 ```
 
 ```toml
@@ -146,7 +146,7 @@ Then, in `examples/react-router`:
 ```sh
 bun run dev        # Vite with HMR, alxia answering the pages and /api: http://localhost:5173
 bun run build      # build/client, and build/server/index.js
-bun run start      # bun build/server/index.js, on PORT (3000) and HOST (0.0.0.0)
+bun run start      # NODE_ENV=production bun build/server/index.js, on PORT (3000) and HOST (0.0.0.0)
 bun run typecheck  # react-router typegen, then tsc
 bun run test       # the spec
 ```

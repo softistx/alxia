@@ -2,6 +2,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
+	markFactory,
 	type Next,
 	settle,
 	withHeaders,
@@ -125,9 +126,9 @@ export function secureHeaders(
 			);
 		}
 		const set = setter(headers, hide);
-		return defineMiddleware(async (ctx, next) =>
-			set(await settle(ctx, next())),
-		);
+		return defineMiddleware(async function secureHeaders(ctx, next) {
+			return set(await settle(ctx, next()));
+		});
 	}
 	if (policy === undefined) {
 		throw new TypeError(
@@ -137,7 +138,7 @@ export function secureHeaders(
 	headers.delete('content-security-policy');
 	const withNonce = policyWithNonce(policy);
 	const set = setter(headers, hide);
-	return defineMiddleware(async (ctx, next) => {
+	return defineMiddleware(async function secureHeaders(ctx, next) {
 		const added: NonceContext = { nonce: freshNonce() };
 		const response = await settle(ctx, next(added));
 		return set(response, withNonce(added.nonce)) as typeof response;
@@ -180,3 +181,5 @@ function setter(headers: ReadonlyMap<string, string>, hide: boolean) {
 			}
 		});
 }
+
+markFactory(secureHeaders);

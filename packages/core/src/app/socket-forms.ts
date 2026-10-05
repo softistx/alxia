@@ -14,6 +14,7 @@ import type {
 	RouteBase,
 	RouteReads,
 } from './route-forms';
+import type { TooMany } from './too-many';
 import type { Empty, RouteDetail, ThreadContext, ThreadSchema } from './types';
 
 /**
@@ -82,7 +83,8 @@ export type SocketHandlersAfter<
  */
 export interface SocketForms<App extends AppTypes>
 	extends Bare<'socket', App>,
-		Ladder<'socket', App> {}
+		Ladder<'socket', App>,
+		TooMany<'socket', App> {}
 
 declare module './forms' {
 	interface Forms<

@@ -12,8 +12,11 @@
  * annotated — a middleware of `defineMiddleware<Requires>()` — and the
  * context in force otherwise, so that an inline one reads that context.
  * `Step` checks `CI` against that context, and says what is missing;
- * `F1`, the first middleware's type, lets `Rest` refuse a call another
- * form of the method takes.
+ * `RI` is unconstrained, so that `Step` tells a factory given uncalled,
+ * whose result is a function, from a middleware; each is joined to what
+ * the form refuses (`Refuses`: `use` refuses a `validate`). `F1`, the
+ * first middleware's type, lets `Rest` refuse a call another form of the
+ * method takes.
  */
 import type {
 	ABound,
@@ -23,8 +26,10 @@ import type {
 	Head,
 	Out,
 	Reads,
+	Refuses,
 	Rest,
 } from './forms';
+import type { LadderLong } from './ladder-long';
 import type { AppTypes } from './route-forms';
 import type { FunctionLike, MiddlewareReturn, Step } from './types';
 
@@ -43,21 +48,23 @@ export type Bare<K extends FormName, App extends AppTypes> = <
 ) => Out<K, App, A, B, []>;
 
 /**
- * Form `K` with 1 to 8 middlewares: past 8, the call is refused, since
- * each middleware is typed by an overload of its own.
+ * Form `K` with 1 to 8 middlewares, each typed by an overload of its own:
+ * 1 to 4 here, 5 to 8 in `LadderLong` (`ladder-long.ts`), whose overloads
+ * come after these. Past 8, `TooMany` (`too-many.ts`) says so.
  */
-export interface Ladder<K extends FormName, App extends AppTypes> {
+export interface Ladder<K extends FormName, App extends AppTypes>
+	extends LadderLong<K, App> {
 	<
 		const A extends ABound<K, App>,
 		const B extends BBound<K, App>,
 		Handled extends Bound<K, App, A, B, [R1]>,
 		F1 = FunctionLike,
 		C1 = Reads<K, App, A, B, []>,
-		R1 extends R = R,
+		R1 = R,
 	>(
 		...args: [
 			...Head<K, App, A, B>,
-			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1>,
+			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1, Refuses<K, App>>,
 			...Rest<K, App, A, B, [R1], Handled, F1>,
 		]
 	): Out<K, App, A, B, [R1]>;
@@ -67,14 +74,14 @@ export interface Ladder<K extends FormName, App extends AppTypes> {
 		Handled extends Bound<K, App, A, B, [R1, R2]>,
 		F1 = FunctionLike,
 		C1 = Reads<K, App, A, B, []>,
-		R1 extends R = R,
+		R1 = R,
 		C2 = Reads<K, App, A, B, [R1]>,
-		R2 extends R = R,
+		R2 = R,
 	>(
 		...args: [
 			...Head<K, App, A, B>,
-			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1>,
-			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2>,
+			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1, Refuses<K, App>>,
+			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2, Refuses<K, App>>,
 			...Rest<K, App, A, B, [R1, R2], Handled, F1>,
 		]
 	): Out<K, App, A, B, [R1, R2]>;
@@ -84,17 +91,17 @@ export interface Ladder<K extends FormName, App extends AppTypes> {
 		Handled extends Bound<K, App, A, B, [R1, R2, R3]>,
 		F1 = FunctionLike,
 		C1 = Reads<K, App, A, B, []>,
-		R1 extends R = R,
+		R1 = R,
 		C2 = Reads<K, App, A, B, [R1]>,
-		R2 extends R = R,
+		R2 = R,
 		C3 = Reads<K, App, A, B, [R1, R2]>,
-		R3 extends R = R,
+		R3 = R,
 	>(
 		...args: [
 			...Head<K, App, A, B>,
-			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1>,
-			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2>,
-			m3: Step<Reads<K, App, A, B, [R1, R2]>, C3, R3>,
+			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1, Refuses<K, App>>,
+			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2, Refuses<K, App>>,
+			m3: Step<Reads<K, App, A, B, [R1, R2]>, C3, R3, Refuses<K, App>>,
 			...Rest<K, App, A, B, [R1, R2, R3], Handled, F1>,
 		]
 	): Out<K, App, A, B, [R1, R2, R3]>;
@@ -104,143 +111,21 @@ export interface Ladder<K extends FormName, App extends AppTypes> {
 		Handled extends Bound<K, App, A, B, [R1, R2, R3, R4]>,
 		F1 = FunctionLike,
 		C1 = Reads<K, App, A, B, []>,
-		R1 extends R = R,
+		R1 = R,
 		C2 = Reads<K, App, A, B, [R1]>,
-		R2 extends R = R,
+		R2 = R,
 		C3 = Reads<K, App, A, B, [R1, R2]>,
-		R3 extends R = R,
+		R3 = R,
 		C4 = Reads<K, App, A, B, [R1, R2, R3]>,
-		R4 extends R = R,
+		R4 = R,
 	>(
 		...args: [
 			...Head<K, App, A, B>,
-			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1>,
-			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2>,
-			m3: Step<Reads<K, App, A, B, [R1, R2]>, C3, R3>,
-			m4: Step<Reads<K, App, A, B, [R1, R2, R3]>, C4, R4>,
+			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1, Refuses<K, App>>,
+			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2, Refuses<K, App>>,
+			m3: Step<Reads<K, App, A, B, [R1, R2]>, C3, R3, Refuses<K, App>>,
+			m4: Step<Reads<K, App, A, B, [R1, R2, R3]>, C4, R4, Refuses<K, App>>,
 			...Rest<K, App, A, B, [R1, R2, R3, R4], Handled, F1>,
 		]
 	): Out<K, App, A, B, [R1, R2, R3, R4]>;
-	<
-		const A extends ABound<K, App>,
-		const B extends BBound<K, App>,
-		Handled extends Bound<K, App, A, B, [R1, R2, R3, R4, R5]>,
-		F1 = FunctionLike,
-		C1 = Reads<K, App, A, B, []>,
-		R1 extends R = R,
-		C2 = Reads<K, App, A, B, [R1]>,
-		R2 extends R = R,
-		C3 = Reads<K, App, A, B, [R1, R2]>,
-		R3 extends R = R,
-		C4 = Reads<K, App, A, B, [R1, R2, R3]>,
-		R4 extends R = R,
-		C5 = Reads<K, App, A, B, [R1, R2, R3, R4]>,
-		R5 extends R = R,
-	>(
-		...args: [
-			...Head<K, App, A, B>,
-			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1>,
-			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2>,
-			m3: Step<Reads<K, App, A, B, [R1, R2]>, C3, R3>,
-			m4: Step<Reads<K, App, A, B, [R1, R2, R3]>, C4, R4>,
-			m5: Step<Reads<K, App, A, B, [R1, R2, R3, R4]>, C5, R5>,
-			...Rest<K, App, A, B, [R1, R2, R3, R4, R5], Handled, F1>,
-		]
-	): Out<K, App, A, B, [R1, R2, R3, R4, R5]>;
-	<
-		const A extends ABound<K, App>,
-		const B extends BBound<K, App>,
-		Handled extends Bound<K, App, A, B, [R1, R2, R3, R4, R5, R6]>,
-		F1 = FunctionLike,
-		C1 = Reads<K, App, A, B, []>,
-		R1 extends R = R,
-		C2 = Reads<K, App, A, B, [R1]>,
-		R2 extends R = R,
-		C3 = Reads<K, App, A, B, [R1, R2]>,
-		R3 extends R = R,
-		C4 = Reads<K, App, A, B, [R1, R2, R3]>,
-		R4 extends R = R,
-		C5 = Reads<K, App, A, B, [R1, R2, R3, R4]>,
-		R5 extends R = R,
-		C6 = Reads<K, App, A, B, [R1, R2, R3, R4, R5]>,
-		R6 extends R = R,
-	>(
-		...args: [
-			...Head<K, App, A, B>,
-			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1>,
-			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2>,
-			m3: Step<Reads<K, App, A, B, [R1, R2]>, C3, R3>,
-			m4: Step<Reads<K, App, A, B, [R1, R2, R3]>, C4, R4>,
-			m5: Step<Reads<K, App, A, B, [R1, R2, R3, R4]>, C5, R5>,
-			m6: Step<Reads<K, App, A, B, [R1, R2, R3, R4, R5]>, C6, R6>,
-			...Rest<K, App, A, B, [R1, R2, R3, R4, R5, R6], Handled, F1>,
-		]
-	): Out<K, App, A, B, [R1, R2, R3, R4, R5, R6]>;
-	<
-		const A extends ABound<K, App>,
-		const B extends BBound<K, App>,
-		Handled extends Bound<K, App, A, B, [R1, R2, R3, R4, R5, R6, R7]>,
-		F1 = FunctionLike,
-		C1 = Reads<K, App, A, B, []>,
-		R1 extends R = R,
-		C2 = Reads<K, App, A, B, [R1]>,
-		R2 extends R = R,
-		C3 = Reads<K, App, A, B, [R1, R2]>,
-		R3 extends R = R,
-		C4 = Reads<K, App, A, B, [R1, R2, R3]>,
-		R4 extends R = R,
-		C5 = Reads<K, App, A, B, [R1, R2, R3, R4]>,
-		R5 extends R = R,
-		C6 = Reads<K, App, A, B, [R1, R2, R3, R4, R5]>,
-		R6 extends R = R,
-		C7 = Reads<K, App, A, B, [R1, R2, R3, R4, R5, R6]>,
-		R7 extends R = R,
-	>(
-		...args: [
-			...Head<K, App, A, B>,
-			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1>,
-			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2>,
-			m3: Step<Reads<K, App, A, B, [R1, R2]>, C3, R3>,
-			m4: Step<Reads<K, App, A, B, [R1, R2, R3]>, C4, R4>,
-			m5: Step<Reads<K, App, A, B, [R1, R2, R3, R4]>, C5, R5>,
-			m6: Step<Reads<K, App, A, B, [R1, R2, R3, R4, R5]>, C6, R6>,
-			m7: Step<Reads<K, App, A, B, [R1, R2, R3, R4, R5, R6]>, C7, R7>,
-			...Rest<K, App, A, B, [R1, R2, R3, R4, R5, R6, R7], Handled, F1>,
-		]
-	): Out<K, App, A, B, [R1, R2, R3, R4, R5, R6, R7]>;
-	<
-		const A extends ABound<K, App>,
-		const B extends BBound<K, App>,
-		Handled extends Bound<K, App, A, B, [R1, R2, R3, R4, R5, R6, R7, R8]>,
-		F1 = FunctionLike,
-		C1 = Reads<K, App, A, B, []>,
-		R1 extends R = R,
-		C2 = Reads<K, App, A, B, [R1]>,
-		R2 extends R = R,
-		C3 = Reads<K, App, A, B, [R1, R2]>,
-		R3 extends R = R,
-		C4 = Reads<K, App, A, B, [R1, R2, R3]>,
-		R4 extends R = R,
-		C5 = Reads<K, App, A, B, [R1, R2, R3, R4]>,
-		R5 extends R = R,
-		C6 = Reads<K, App, A, B, [R1, R2, R3, R4, R5]>,
-		R6 extends R = R,
-		C7 = Reads<K, App, A, B, [R1, R2, R3, R4, R5, R6]>,
-		R7 extends R = R,
-		C8 = Reads<K, App, A, B, [R1, R2, R3, R4, R5, R6, R7]>,
-		R8 extends R = R,
-	>(
-		...args: [
-			...Head<K, App, A, B>,
-			m1: F1 & Step<Reads<K, App, A, B, []>, C1, R1>,
-			m2: Step<Reads<K, App, A, B, [R1]>, C2, R2>,
-			m3: Step<Reads<K, App, A, B, [R1, R2]>, C3, R3>,
-			m4: Step<Reads<K, App, A, B, [R1, R2, R3]>, C4, R4>,
-			m5: Step<Reads<K, App, A, B, [R1, R2, R3, R4]>, C5, R5>,
-			m6: Step<Reads<K, App, A, B, [R1, R2, R3, R4, R5]>, C6, R6>,
-			m7: Step<Reads<K, App, A, B, [R1, R2, R3, R4, R5, R6]>, C7, R7>,
-			m8: Step<Reads<K, App, A, B, [R1, R2, R3, R4, R5, R6, R7]>, C8, R8>,
-			...Rest<K, App, A, B, [R1, R2, R3, R4, R5, R6, R7, R8], Handled, F1>,
-		]
-	): Out<K, App, A, B, [R1, R2, R3, R4, R5, R6, R7, R8]>;
 }

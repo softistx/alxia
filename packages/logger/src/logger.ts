@@ -2,6 +2,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
+	markFactory,
 	type Next,
 	settle,
 	withHeaders,
@@ -89,7 +90,7 @@ export function logger(options: LoggerOptions = {}): LoggerMiddleware {
 	const trust = options.trustIncomingId ?? true;
 	const timing = options.serverTiming ?? true;
 
-	return defineMiddleware(async (ctx, next) => {
+	return defineMiddleware(async function logger(ctx, next) {
 		const start = performance.now();
 		const { request, url, ip } = ctx;
 		const incoming = request.headers.get(header);
@@ -202,3 +203,5 @@ function levelOf(status: number, outcome?: Outcome): LogEntry['level'] {
 	if (status >= 400 || outcome === 'aborted') return 'warn';
 	return 'info';
 }
+
+markFactory(logger);

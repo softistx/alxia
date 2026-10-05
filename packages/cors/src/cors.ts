@@ -2,6 +2,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
+	markFactory,
 	settle,
 	vary,
 	withHeaders,
@@ -120,7 +121,7 @@ export function cors(options: CorsOptions = {}): CorsMiddleware {
 		return new Response(null, { status: 204, headers });
 	};
 
-	return defineMiddleware(async (ctx, next) => {
+	return defineMiddleware(async function cors(ctx, next) {
 		const { request } = ctx;
 		if (
 			request.method === 'OPTIONS' &&
@@ -151,3 +152,5 @@ function matcher(origin: CorsOrigin): (origin: string) => boolean {
 				: allowed.test(candidate),
 		);
 }
+
+markFactory(cors);

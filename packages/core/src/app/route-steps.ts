@@ -3,7 +3,9 @@
  * its options, its middlewares and what ends it — the handler, or a
  * socket's handlers.
  */
+import { membersOf, placesOf } from './compose-middlewares';
 import type { ChainHook } from './definition';
+import { uncalledFactory } from './factory';
 import type { RouteSchema } from './types';
 import { builtinOf } from './validate';
 
@@ -12,6 +14,8 @@ export interface RouteArgs<Last> {
 	/** Its options: its `bodyLimit` and `detail`, a socket's `message` and `send`. */
 	readonly config: Readonly<Record<string, unknown>>;
 	readonly middlewares: readonly unknown[];
+	/** Where each middleware was given: `middleware 2 (compose member 1)`. */
+	readonly places: readonly string[];
 	readonly last: Last;
 }
 
@@ -44,17 +48,22 @@ export function routeArgs<Last>(
 		args[0] !== null && typeof args[0] === 'object'
 			? (args.shift() as Record<string, unknown>)
 			: {};
-	return { config, middlewares: args, last };
+	return {
+		config,
+		middlewares: membersOf(args),
+		places: placesOf(args, 'middleware'),
+		last,
+	};
 }
 
 /** A route's chain, from its arguments, and the options it declares. */
 export function routeChain(
 	label: string,
-	{ config, middlewares }: RouteArgs<unknown>,
+	{ config, middlewares, places }: RouteArgs<unknown>,
 	socket = false,
 ): { readonly derive: readonly ChainHook[]; readonly schema: RouteSchema } {
 	const steps = middlewares.map((middleware, index) =>
-		stepOf(middleware, index, label),
+		stepOf(middleware, `${label}: ${places[index]}`),
 	);
 	if (socket && steps.some((step) => step.kind === 'responds')) {
 		throw new TypeError(
@@ -71,12 +80,14 @@ export function routeChain(
 }
 
 /** A middleware as a step of the chain: `validate` and `responds` are the chain's own. */
-function stepOf(middleware: unknown, index: number, label: string): ChainHook {
+function stepOf(middleware: unknown, at: string): ChainHook {
 	if (typeof middleware !== 'function') {
 		throw new TypeError(
-			`${label}: middleware ${index + 1} is not a function: a middleware is (ctx, next) => …, or a validate() or responds()`,
+			`${at} is not a function: a middleware is (ctx, next) => …, or a validate() or responds()`,
 		);
 	}
+	const uncalled = uncalledFactory(middleware, at, 'route');
+	if (uncalled !== undefined) throw new TypeError(uncalled);
 	return (
 		builtinOf(middleware) ?? { kind: 'middleware', run: middleware as never }
 	);

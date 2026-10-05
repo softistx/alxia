@@ -3,6 +3,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
+	markFactory,
 	type Next,
 	type Reply,
 } from '@alxia/core';
@@ -86,7 +87,7 @@ export function rateLimit<Requires extends object = Empty>(
 	const store = options.store ?? new MemoryStore();
 	const key = options.key ?? ((ctx: BaseContext & Requires) => ctx.ip);
 	const style = options.headers ?? 'draft';
-	return defineMiddleware<Requires>()(async (ctx, next) => {
+	return defineMiddleware<Requires>()(async function rateLimit(ctx, next) {
 		const counted = options.skip?.(ctx) ? undefined : await key(ctx);
 		if (counted === undefined) {
 			const rateLimit: RateLimitInfo | undefined = undefined;
@@ -140,3 +141,5 @@ function said(
 		);
 	}
 }
+
+markFactory(rateLimit);

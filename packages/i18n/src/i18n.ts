@@ -4,6 +4,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
+	markFactory,
 	type Next,
 	type NextFunction,
 	type RequiresOf,
@@ -198,7 +199,7 @@ export function createI18n<
 	// What the routes after it read, once `@alxia/language` has read it.
 	type Added = LanguageContext<Language> & I18nContext<Key>;
 	const middleware = defineMiddleware<RequiresOf<Ctx, 'resolve'>>()(
-		(ctx, next): Promise<Next<Added>> => {
+		function i18n(ctx, next): Promise<Next<Added>> {
 			const own: { language?: Language } = {};
 			const found = (heard: LanguageContext<Language>) => {
 				own.language = heard.language;
@@ -222,3 +223,5 @@ export function createI18n<
 		supported,
 	});
 }
+
+markFactory(createI18n);

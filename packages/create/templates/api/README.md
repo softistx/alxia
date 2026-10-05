@@ -126,7 +126,7 @@ runs it: what production and the image run.
 
 ```sh
 bun run build    # dist/server.js and dist/server.js.map
-bun start        # bun dist/server.js
+bun start        # NODE_ENV=production bun dist/server.js
 ```
 
 `bun start` before any build fails with `Module not found

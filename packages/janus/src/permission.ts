@@ -1,6 +1,7 @@
 import {
 	type BaseContext,
 	defineMiddleware,
+	markFactory,
 	type Problem,
 	type RequiresOf,
 } from '@alxia/core';
@@ -87,7 +88,7 @@ export function permission<
 			LoadCtx & SubjectCtx & CheckCtx,
 			AnnotatedAny<LoadCtx, SubjectCtx>
 		>
-	>()(async (ctx, next) => {
+	>()(async function permissionGuard(ctx, next) {
 		const who = subject === undefined ? userOf(ctx) : await subject(ctx);
 		if (who === null) {
 			return refuse(ctx, 401, 'unauthenticated', 'The request has no session');
@@ -163,3 +164,5 @@ function userOf(ctx: BaseContext): SubjectRef<ModelConfig> | null {
 	}
 	return user as SubjectRef<ModelConfig> | null;
 }
+
+markFactory(permission);

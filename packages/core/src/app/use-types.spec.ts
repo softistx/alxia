@@ -61,7 +61,8 @@ describe('the types of app.use(...middlewares)', () => {
 			.use(({ x }, next) => next({ y: `${x}` }));
 		expectTypeOf<ContextOf<typeof app>['x']>().toEqualTypeOf<number>();
 		expectTypeOf<ContextOf<typeof app>['y']>().toEqualTypeOf<string>();
-		// validate() belongs to a route, refused when declared.
+		// validate() belongs to a route: a compile error, and refused when declared.
+		// @ts-expect-error validate() and responds() belong to a route
 		expect(() => alxia().use(validate({}))).toThrow(
 			/validate\(\) or responds\(\), which belongs to a route/,
 		);

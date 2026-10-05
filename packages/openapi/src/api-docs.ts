@@ -1,4 +1,9 @@
-import { alxia, type BaseContext, type RouteDefinition } from '@alxia/core';
+import {
+	alxia,
+	type BaseContext,
+	markFactory,
+	type RouteDefinition,
+} from '@alxia/core';
 import { type DocsServer, loadSpec } from './api-docs-spec';
 import { type DocsUi, freshNonce, page, policy } from './api-docs-ui';
 
@@ -80,3 +85,5 @@ function titleOf(json: string): string {
 		? info.title
 		: 'API documentation';
 }
+
+markFactory(apiDocs, 'plugin');

@@ -2,6 +2,7 @@ import {
 	defineMiddleware,
 	type Empty,
 	type Middleware,
+	markFactory,
 	type Next,
 	type Problem,
 	type Reply,
@@ -104,7 +105,7 @@ export function session(
 	options: SessionOptions<string> = {},
 ): unknown {
 	const unauthenticated: UnauthenticatedBody = { error: 'unauthenticated' };
-	return defineMiddleware(async (ctx, next) => {
+	return defineMiddleware(async function session(ctx, next) {
 		const { request } = ctx;
 		const found = await authenticateOnce(auth, request, options.type);
 		if (found === null && options.required === true) {
@@ -159,3 +160,5 @@ function renewed<R extends Response>(
 		),
 	) as R;
 }
+
+markFactory(session);

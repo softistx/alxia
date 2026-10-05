@@ -6,6 +6,7 @@ import {
 	errorFormat,
 	type InferOutput,
 	type Middleware,
+	markFactory,
 	type Next,
 	type Problem,
 	problem,
@@ -72,7 +73,7 @@ export type Bearer<Schema extends StandardSchemaV1 | undefined = undefined> =
 export function bearer<Schema extends StandardSchemaV1 | undefined = undefined>(
 	options: BearerOptions<Schema>,
 ): NoInfer<Bearer<Schema>> {
-	return defineMiddleware(async (ctx, next) => {
+	return defineMiddleware(async function bearer(ctx, next) {
 		const { request } = ctx;
 		const header = request.headers.get('authorization');
 		let token = header?.match(/^Bearer\s+(.+)$/i)?.[1];
@@ -111,3 +112,5 @@ function refuse(
 	}
 	return ctx.reply(401, { error: 'unauthorized', ...why }, challenge);
 }
+
+markFactory(bearer);

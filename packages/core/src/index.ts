@@ -1,5 +1,7 @@
 export { Alxia, alxia } from './app/alxia';
 export { settle } from './app/boundary';
+export { compose } from './app/compose-middlewares';
+export { type FactoryKind, markFactory } from './app/factory';
 export { errorFormat, shutdownSignal } from './app/served';
 export {
 	type RequestSchemas,
@@ -8,6 +10,7 @@ export {
 	type ValidateRequires,
 	validate,
 } from './app/validate';
+export type { RouteRow } from './dev/route-table';
 export {
 	type BodyLimitRefusal,
 	type ContentTooLargeBody,

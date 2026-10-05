@@ -3,6 +3,7 @@ import {
 	defineMiddleware,
 	errorFormat,
 	type Middleware,
+	markFactory,
 	type Next,
 	type Problem,
 	problem,
@@ -93,7 +94,7 @@ export type JanusErrors = Middleware<
  * answer.
  */
 export function janusErrors(options: JanusErrorsOptions = {}): JanusErrors {
-	return defineMiddleware(async (ctx, next) => {
+	return defineMiddleware(async function janusErrors(ctx, next) {
 		try {
 			return await next();
 		} catch (error) {
@@ -129,3 +130,5 @@ function answer(
 }
 
 export { statusOf };
+
+markFactory(janusErrors);

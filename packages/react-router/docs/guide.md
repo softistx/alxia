@@ -42,7 +42,7 @@ of the next section, done.
   moved to the newest release alxia accepts (see
   [`@alxia/create`'s Versions](https://github.com/softistx/alxia/blob/develop/packages/create/docs/guide.md#versions));
 - `alxia()` in `vite.config.ts`, the `bunfig.toml`, and `start` running
-  `bun build/server/index.js`;
+  `NODE_ENV=production bun build/server/index.js`;
 - Biome, with `lint`, `format`, `check`, `check:ci` and `verify` scripts;
 - a `Dockerfile` that builds on `oven/bun:1` and runs `build/` alone on
   `oven/bun:1-alpine`, as [Deploying](#deploying) describes.
@@ -96,7 +96,7 @@ middleware must come after alxia's.
 "scripts": {
 	"build": "react-router build",
 	"dev": "react-router dev",
-	"start": "bun build/server/index.js",
+	"start": "NODE_ENV=production bun build/server/index.js",
 	"typecheck": "react-router typegen && tsc"
 }
 ```
@@ -173,7 +173,9 @@ server build inside it, into one file:
   stay out of it.
 - **Run, it listens**: `bun build/server/index.js` listens on `PORT`
   (3000 by default) and `HOST` (`0.0.0.0`). It prints
-  `alxia listening on <url>`. On `SIGINT` or `SIGTERM` it shuts the app
+  `alxia listening on <url>`, and in dev — `NODE_ENV` neither `production`
+  nor `test` — the route table
+  ([`@alxia/core`'s Development](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/development.md#the-route-table)). On `SIGINT` or `SIGTERM` it shuts the app
   down as `@alxia/core`'s `listen` does: readiness turns 503, new
   connections are refused, the requests in flight finish within
   `shutdownTimeout` (10 s; `listen: { shutdownTimeout }` sets it), the
@@ -497,8 +499,8 @@ Every option is optional:
 | `beforeAll(app)` | runs first, on a new app. What it declares applies to the client's files too: a rate limit, a guard on everything, a logger that should see every asset. It returns the app, which `configure` then receives |
 | `getLoadContext(ctx, context)` | sets the app's own keys on React Router's provider, `ctx` typed by `configure`'s app |
 | `build`, `mode`, `client` | override what the plugin wires; see [Escape hatches](#escape-hatches) |
-| `listen` | `listen`'s options for `bun build/server/index.js`: `port`, `hostname`, `idleTimeout`, `maxRequestBodySize`, `tls`. A `port` or `hostname` given here wins over `PORT` and `HOST` |
-| `onListen(server)` | called once the built server listens and its `SIGINT` and `SIGTERM` handlers are in place, in place of the `alxia listening on …` line; a signal sent from then on runs the `onStop` hooks |
+| `listen` | `listen`'s options for `bun build/server/index.js`: `port`, `hostname`, `idleTimeout`, `maxRequestBodySize`, `tls`, `onListen`. A `port` or `hostname` given here wins over `PORT` and `HOST`; an `onListen` here, told `@alxia/core`'s `ListenInfo` — `url`, `routes`, `table`, `dev` — wins over the option below |
+| `onListen(server)` | called once the built server listens and its `SIGINT` and `SIGTERM` handlers are in place, in place of the `alxia listening on …` line (and, in dev, of the route table); a signal sent from then on runs the `onStop` hooks |
 
 A request goes through four layers, in order:
 

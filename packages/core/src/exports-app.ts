@@ -56,6 +56,7 @@ export type {
 	AlxiaOptions,
 	AnyAlxia,
 	ContextOf,
+	ListenInfo,
 	ListenOptions,
 	Plugin,
 } from './app/signatures';
@@ -70,6 +71,7 @@ export type {
 	PageMethod,
 	StaticMethod,
 } from './app/static-methods';
+export type { TooMany, TooManyMiddlewares } from './app/too-many';
 export type {
 	BaseContext,
 	BuiltinMark,
@@ -101,6 +103,7 @@ export type {
 	TypedShortcuts,
 	ValidSchema,
 } from './app/types';
+export type { Composable, Composed, ComposedReads } from './app/types/composed';
 export type {
 	AddingNothing,
 	AppAfterUse,

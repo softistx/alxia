@@ -62,7 +62,7 @@ class ContextStorageError extends Error {
 type ContextStorageErrorCode = 'OUTSIDE_REQUEST' | 'NOT_ROUTED';
 ```
 
-`contextStorage()` returns a middleware: pass it to `app.use`, called — `use(contextStorage)` fails `tsc` with `TS2345`, and each request it runs on throws a `TypeError`, answered with a 500 ([troubleshooting](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage)). It adds
+`contextStorage()` returns a middleware: pass it to `app.use`, called — `use(contextStorage)` fails `tsc` with `TS2345`, and throws where it is declared ([troubleshooting](troubleshooting.md#use-argument-1-looks-like-a-factory-contextstorage-call-it-usecontextstorage)). It adds
 nothing to the app's type, but it requires `StoredContext<App>` of the app
 that mounts it: `app.use` on an app that does not give that context is a compile
 error. `BaseContext`, `RequestContext`, `ContextOf`, `RegisteredBase`,
@@ -319,7 +319,7 @@ answers needs the context; put it after the observers (`logger`,
 
 `contextStorage()` is a middleware, not an app: declare routes on the app,
 and pass `contextStorage()` to `app.use` called — the uncalled form is
-[refused](troubleshooting.md#typeerror-contextstorage-is-a-factory-usecontextstorage-not-usecontextstorage).
+[refused](troubleshooting.md#use-argument-1-looks-like-a-factory-contextstorage-call-it-usecontextstorage).
 
 ## What `AsyncLocalStorage` carries
 

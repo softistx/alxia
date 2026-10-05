@@ -74,7 +74,7 @@ runs it: what production and the image run.
 
 ```sh
 bun run build    # dist/index.js and dist/index.js.map
-bun start        # bun dist/index.js
+bun start        # NODE_ENV=production bun dist/index.js
 ```
 
 `bun start` before any build fails with `Module not found

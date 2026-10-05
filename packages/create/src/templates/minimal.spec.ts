@@ -23,7 +23,7 @@ describe('the minimal template', () => {
 			dev: 'bun --hot src/index.ts',
 			build:
 				'bun build src/index.ts --target=bun --outdir=dist --minify --sourcemap=linked',
-			start: 'bun dist/index.js',
+			start: 'NODE_ENV=production bun dist/index.js',
 			test: 'bun test',
 			typecheck: 'tsc --noEmit',
 			lint: 'biome lint',

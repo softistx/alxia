@@ -53,6 +53,14 @@ number on it. Every release, with each change it made, is in
   requests in flight drained within `shutdownTimeout`, streams of events
   and GraphQL subscriptions ended, the `onStop` hooks, then the exit
   ([Health and shutdown](guide/health-and-shutdown.md#graceful-shutdown)).
+- **Dev comfort.** In dev — `alxia({ dev })`, on unless `NODE_ENV` is
+  `production` or `test` — `listen` prints the route table, a 404 names the
+  closest route and a 405 the methods allowed, and a 500 shows its error: a
+  page to a browser, under any Content-Security-Policy, its stack to any
+  other client; `onListen` gets the table as data. In every mode, a factory
+  given uncalled throws where it is declared, and `compose(...)` joins
+  middlewares past the 8 a call types
+  ([Development](guide/development.md)).
 
 ## Next
 

@@ -147,6 +147,7 @@ const app = alxia().post(
 | `options` | `bodyLimit` (bytes, a 413 past it) and `detail` (`summary`, `operationId`, `tags`…: read by nothing at run time; a generated operation carries it); a schema there does not compile, and throws where the route is declared |
 | `(ctx, next) => …` | a middleware: what it passes `next` is inferred and read by the middlewares after it and the handler. One that calls `next()` and returns nothing answers with the rest's response, as Koa and Hono do |
 | `defineMiddleware(fn)` | types `fn` and returns it: a middleware kept in a module and shared |
+| `compose(...middlewares)` | several middlewares as one, typed for any number of them: past the 8 a call takes, or to name a set once; spliced into the chain where it stands |
 | `app.use(...middlewares)` | up to 8 middlewares, run on every request in the order declared: a route runs the ones declared before it, then its own, and a request no route matches — a 404 — runs them all; what each adds is typed in the routes after it |
 | `app.use(path, ...middlewares)` | the same for the requests under `path` alone, matched against the request's path; they may add nothing |
 | `defineMiddleware<{ user: User; pathParams: { id: string } }>()(fn)` | a middleware that reads more than the base context; a route that does not give it, where the middleware is placed, does not compile |
@@ -166,6 +167,11 @@ compile error, on that middleware, naming the key:
 ```text
 Type 'Promise<Next<…>>' is not assignable to type '"`user` is missing from the context: add a middleware that gives it before this one"'.
 ```
+
+A ninth middleware is one error on it, `"at most 8 middlewares per route:
+group them with compose(...)"`; a factory given uncalled, `use(cors)`, one
+too, and it throws where it is declared
+([Development](#development)).
 
 0.5 removed the forms of 0.3 — a list of hooks, a schema before the
 handler — and the request hooks: a middleware does what each did.
@@ -808,11 +814,52 @@ response when the shutdown starts; streams of events end by themselves.
 `@alxia/openapi`'s `matchesSpec` leaves the probes out by itself:
 [Health and shutdown](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/health-and-shutdown.md).
 
+## Development
+
+`alxia({ dev })`, on unless `NODE_ENV` is `production` or `test`, helps the
+developer running the app: `listen` prints its URL and its routes, a 404 or
+a 405 the router answers carries a `hint`, and a 500 shows its error — a
+page to a browser, its `stack` to any other client. Outside dev, each is
+off and costs nothing.
+
+```ts
+import { alxia, defineMiddleware } from '@alxia/core';
+import { cors } from '@alxia/cors';
+import { logger } from '@alxia/logger';
+
+const todos = new Map([['7', { id: '7', title: 'Write the docs' }]]);
+const auth = defineMiddleware((_ctx, next) => next({ user: 'ada' }));
+
+const app = alxia() // dev: NODE_ENV is neither production nor test
+	.use(cors(), logger())
+	.get('/todos/:id', auth, function getTodo({ params, reply }) {
+		return reply(200, todos.get(params.id) ?? null);
+	});
+
+app.listen(3000);
+// alxia listening on http://localhost:3000/ (dev)
+//   GET  /todos/:id  cors › logger › auth → getTodo
+
+// GET /todo/7          → 404 { "error": "not_found", "hint": "did you mean GET /todos/:id?" }
+// POST /todos/7        → 405 { "error": "method_not_allowed", "hint": "/todos/7 allows GET" }
+// a throw, to a browser → 500, an HTML page: the error, its stack, the app's own lines marked
+// a throw, to fetch     → 500 { "error": "internal", "stack": "Error: …" }
+```
+
+`listen({ onListen })` is told the URL, the routes and the table in every
+mode, in place of the print. The page loads nothing and brings its own
+Content-Security-Policy, which `@alxia/secure-headers` keeps; a GraphQL
+error stays in Yoga's `errors[]`. Declared on any mode: a factory given
+uncalled throws (`use(): argument 1 looks like a factory (cors): call it,
+use(cors())`) — mark your own with `markFactory(fn)` — and `compose(...)`
+joins middlewares past the 8 a call types:
+[Development](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/development.md).
+
 ## API
 
 | export | |
 | --- | --- |
-| `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip`, `errors` |
+| `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip`, `errors`, `dev` (on unless `NODE_ENV` is `production` or `test`: the route table, the 404 hint, the dev error page) |
 | `Alxia<Ctx, Prefix>` | `get` `post` `put` `patch` `delete` `options` `head` `query` `route` `ws`, `static` `file` `page`, `use` `derive` `decorate` `bodyLimit` `onStart` `onStop` `parser`, `group` `plugin`, `fetch` `websocket` `request` `listen` `stop`, `routes` `sockets` `server`; `Ctx` is what a route declared next reads, `Prefix` the app's prefix |
 | `eventStream(schema)`, `EventStreamSchema` | the response schema of a stream of events |
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream(schema)` made |
@@ -835,6 +882,9 @@ response when the shutdown starts; streams of events end by themselves.
 | `AnyReply`, `FreeReplyFunction`, `TypedReplyFunction`, `DeclaredReply`, `RedirectFunction` | any reply, `reply` without and behind a `responds`, every reply a route with schemas may return, `redirect` |
 | `FreeShortcuts`, `TypedShortcuts`, `SHORTCUTS`, `Shortcuts` | `reply`'s shortcuts without and with schemas, and the status of each |
 | `Plugin`, `AnyAlxia` | a function plugin, any app |
+| `compose(...middlewares)`, `Composed<Ms>`, `Composable`, `ComposedReads<Ms>` | one middleware standing for several, typed for any number: its members spliced into the chain where it stands, what they add passed on, what they read and no member before adds required where it is given (`ComposedReads`); a `validate` or `responds` among them refused by `use` |
+| `markFactory(factory, kind?)`, `FactoryKind` | marks a function that makes a middleware (`'middleware'`, the default) or a plugin (`'plugin'`): given uncalled to `use`, a route, `ws` or `plugin`, it throws at declaration, naming it; every package's factory is marked |
+| `TooMany`, `TooManyMiddlewares` | the overload a call with a ninth middleware meets, and its message: `at most 8 middlewares per route: group them with compose(...)`. Exported so an app's type can be named in a declaration file |
 | `defineMiddleware(fn)`, `defineMiddleware<Requires>()(fn)`, `NoMiddlewareYet` | a middleware, `(ctx, next) => …`, typed and returned, to be shared: `next(added)` adds `added` to the context after it, `next.behind(added?)` runs the rest behind a reply it returns at once, a reply ends the request, a `Response` is sent as it is, nothing once `next()` was called is the rest's response. `defineMiddleware(fn)` reads the registered context (`RegisteredContext`, `Empty` when nothing is registered); `Requires` is what it reads instead, beyond `BaseContext`. Either way the route must give it where the middleware is placed. `NoMiddlewareYet` is what `defineMiddleware<Requires>()` infers before it is given the middleware. A plain `(ctx, next)` function needs none of it: given inline, it reads the context in force |
 | `validate(schemas)`, `validate(operation)`, `RequestSchemas`, `Validated<Schemas>`, `ValidateRequires<Schemas>` | the middleware that validates `params`, `query`, `headers`, `cookies` and `body`, each with any Standard Schema — or the request parts of an operation's `schema`, which its `route` then validates nowhere else; what it takes, what it passes on, the path parameters its `params` schema must read |
 | `responds(responses)`, `responds(operation)` | the middleware that types the handler's `reply` by the statuses it declares, and checks the replies after it of those statuses against their schemas; given an operation, its `schema.response`, which its `route` then checks nowhere else — it throws for an operation that declares none |
@@ -851,7 +901,8 @@ response when the shutdown starts; streams of events end by themselves.
 | `definePlugin<Requires>()(build)` | an app plugin built on an app whose context has `Requires`; `plugin` refuses it on an app that does not give them |
 | `Requiring<Requires>`, `ProvidedBy<Ctx, Requires>` | the marker on a `definePlugin` plugin, and the check `plugin` makes of it |
 | `RequiresOf<Ctx, Callback?>` | what a callback annotated `Ctx` reads beyond `BaseContext` — `{ user: User }` for `BaseContext & { user: User }`, `Empty` for nothing more: the `Requires` of a plugin that infers it from a callback it is given. A callback annotated `any` is refused on every app, with a message naming `Callback` |
-| `ListenOptions` | the options of `listen`: `port`, `hostname`, `development`, `idleTimeout`, `maxRequestBodySize`, `tls`, `shutdownTimeout` (10 000 ms), `signals` (`['SIGINT', 'SIGTERM']`, or `false`) |
+| `ListenOptions` | the options of `listen`: `port`, `hostname`, `development`, `idleTimeout`, `maxRequestBodySize`, `tls`, `shutdownTimeout` (10 000 ms), `signals` (`['SIGINT', 'SIGTERM']`, or `false`), `onListen` |
+| `ListenInfo`, `RouteRow` | what `onListen` is told once the server listens, in every mode: `server`, `url`, `routes`, `table`, `dev`; a route as the table shows it: `method` (`WS`, `PAGE`), `path`, `middlewares`, `handler` (`ws`, `static`, `file`, `page`, or its name) |
 | `StartHook`, `StopHook`, `BodyParser` | the hooks of `onStart` and `onStop`, and a body parser |
 | `joinPath(prefix, path)` | a path under a prefix, as the app joins them: `joinPath('/api', '/')` is `'/api'`; typed `JoinPath` |
 | `shapeOf(path)` | the path with its parameter names erased, as the router compares them: `shapeOf('/pets/:id') === shapeOf('/pets/:petId')`; throws a `TypeError` for a path no route may be declared at |
@@ -867,7 +918,7 @@ response when the shutdown starts; streams of events end by themselves.
 | `StaticMethod`, `FileMethod`, `PageMethod`, `DecorateMethod`, `DeriveMethod`, `BodyLimitMethod`, `StartHookMethod`, `StopHookMethod`, `ParserMethod`, `GroupMethod`, `UseMethod`, `PluginMethod`, `RequestMethod`, `ListenMethod` | the types of the app's other methods, each holding its overloads and their documentation: `static`, `file`, `page`; `decorate`, `derive`, `bodyLimit`; `onStart`, `onStop`, `parser`; `group`, `use` and `plugin`; `request` and `listen`. Exported so an app's type can be named in a declaration file |
 | `SocketMethod`, `SocketSchema`, `SocketContext`, `Socket`, `SocketHandlers`, `SocketSend`, `SocketMessage` | sockets: the type of `ws` (`path, options?, ...middlewares, handlers`), the parts of a socket route as the app reads them, what its handlers read, send and receive |
 | `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferInput`, `InferOutput` | the Standard Schema types |
-| `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426, under `errors: 'json'` |
+| `ValidationErrorBody`, `InternalErrorBody`, `RoutingErrorBody` | the bodies of the 400, 500, 404, 405 and 426, under `errors: 'json'`; in dev alone, the 500's `stack` and the 404's and 405's `hint` |
 | `ValidationIssue`, `ValidationTarget` | one issue of a 400, and where the refused value was read from |
 | `Refusal`, `ValidationRefusal`, `BodyLimitRefusal`, `RequestPart` | what `refusalOf` reads: the refusal by `kind` — `validation`, with the `part` that failed first and its `issues`, or `body_limit`, with the route's `limit` |
 | `RefusalKind`, `RefusalOfKind<Kind>` | the kinds of refusal, `'validation' \| 'body_limit'`, and the refusal of one kind: `refusalOf(error)` narrowed by its `kind` |
@@ -879,7 +930,8 @@ response when the shutdown starts; streams of events end by themselves.
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/core/docs): a page per area — routes and validation, replies, errors and problem details, middleware, lifecycle hooks, groups and plugins, writing a plugin, static files, server-sent events, WebSockets, serving, health and shutdown, and the app's type.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/core/docs): a page per area — routes and validation, replies, errors and problem details, middleware, lifecycle hooks, groups and plugins, writing a plugin, static files, server-sent events, WebSockets, serving, health and shutdown, development, and the app's type.
+- [Development](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/development.md): the dev switch, the route table and `onListen`, the 404 hint, the dev error page, a factory given uncalled, and `compose` past 8 middlewares.
 - [Middleware: which way to use](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md): a route's middlewares, `use`, `derive`, groups and plugins side by side, and the order a request runs them in.
 - [Upgrading](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md): what the next release changes, and what can break.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md): an error message, and what to do about it.

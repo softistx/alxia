@@ -13,6 +13,10 @@ export interface Served {
 	readonly errors: ErrorFormat;
 	/** Aborted once the app starts shutting down; a new one each time it listens again. */
 	closing: AbortController;
+	/** Its `dev` switch: a hint on a 404 or a 405, an error page for a 500. */
+	readonly dev?: boolean;
+	/** In dev, every method and path it declares, a 404's hint chosen among them. */
+	readonly declared?: () => Iterable<readonly [method: string, path: string]>;
 }
 
 /** Where a request's context keeps what it reads of the serving app. */
@@ -21,7 +25,8 @@ export const SERVED: unique symbol = Symbol.for('alxia.served');
 /** A signal no shutdown ever aborts: a context no app serves. */
 const NEVER = new AbortController().signal;
 
-function servedOf(ctx: object): Served | undefined {
+/** What a request's context reads of the app that serves it, if one does. */
+export function servedOf(ctx: object): Served | undefined {
 	return (ctx as { [SERVED]?: Served })[SERVED];
 }
 
