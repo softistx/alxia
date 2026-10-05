@@ -26,9 +26,12 @@ Nothing scheduled yet.
 
 ## Shipped
 
-### Next release
+### 0.6.0
 
 - **Each operation over a socket.** Behind `@alxia/graphql`'s `ws: true`, every query, mutation and subscription on a socket gets a line of its own once it ended — its type and name, its duration, `outcome: 'ok'` or `'errors'` (a `warn`) — carrying the upgrade's `requestId`, beside the upgrade's line ([guide](guide.md#the-operations-of-a-socket)).
+
+### 0.5.0
+
 - **The GraphQL operation on the line.** Behind `@alxia/graphql`, an entry carries `operationName` and `operationType` (`batch` for an array body, with every name), so `POST /graphql` says whether it was `GetNotes` or `AddNote` ([guide](guide.md#a-graphql-operation)).
 
 ### 0.2.0
