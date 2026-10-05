@@ -246,6 +246,20 @@
         "typescript": "^6.0.3 || ^7.0.0",
       },
     },
+    "packages/proxy": {
+      "name": "@alxia/proxy",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@alxia/core": "workspace:^",
+        "@alxia/jwt": "workspace:^",
+        "@alxia/rate-limit": "workspace:^",
+        "@types/bun": "^1.4.2",
+      },
+      "peerDependencies": {
+        "@alxia/core": "workspace:^",
+        "typescript": "^6.0.3 || ^7.0.0",
+      },
+    },
     "packages/rate-limit": {
       "name": "@alxia/rate-limit",
       "version": "0.4.1",
@@ -386,6 +400,8 @@
     "@alxia/logger": ["@alxia/logger@workspace:packages/logger"],
 
     "@alxia/openapi": ["@alxia/openapi@workspace:packages/openapi"],
+
+    "@alxia/proxy": ["@alxia/proxy@workspace:packages/proxy"],
 
     "@alxia/rate-limit": ["@alxia/rate-limit@workspace:packages/rate-limit"],
 
