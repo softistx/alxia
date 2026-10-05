@@ -229,6 +229,8 @@ of one tick and calls your batch function once. Build the loaders in the
 ```ts
 import DataLoader from 'dataloader';
 
+// `findUsers` is your batch query: one result per id, in the order of the ids.
+
 const createLoaders = () => ({
 	user: new DataLoader(async (ids: readonly string[]) => findUsers(ids)), // one query for all ids
 });
