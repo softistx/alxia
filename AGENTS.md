@@ -389,3 +389,18 @@ package is public and MIT, with its own copy of `LICENSE`.
   message, or by its symptom for a trap that prints none) and `roadmap.md`.
   The README ends with a **Documentation** section linking them by full
   GitHub URL on `develop`, since npm does not resolve relative links.
+- The repository's own `docs/` is for what no one package owns, and does not
+  ship: `start.md` ("Start in 5 minutes"), `recipes/` (one task per page: the
+  problem, one complete runnable example, links to the reference) and
+  `design/`. A recipe is a task across packages; what one package does
+  belongs in that package's `docs/`, which ships. A package's README links a
+  recipe by its full GitHub URL on `develop`, as it links its own docs.
+  `bun run check:docs` (CI runs it after the build) fails on a broken
+  relative link or anchor in any Markdown file (`scripts/docs-links.ts`, which
+  also follows this repository's own GitHub URLs) and type-checks, and runs
+  where there is a spec, the code of the README, `start.md` and the recipes
+  (`scripts/docs-snippets.ts`). A fence there begins with `// file: <path>`
+  (`# file:` in YAML), and the fences of one page are the files of one
+  project; `ts excerpt` shows lines of such a file or of a template, each of
+  which must exist, and `ts no-check` is for what is not a program. A recipe
+  that needs a Redis skips its spec without `REDIS_URL`.

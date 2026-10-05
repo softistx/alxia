@@ -7,11 +7,8 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **`idempotency` as a middleware.** `app.use(idempotency(client, { name }))` is
-  the form; `app.plugin(idempotency(…))`, deprecated in 0.4, was removed in 0.5.
-  It skips a
-  request no route matches, and keeps what the route answers, an error's
-  answer included. `redis()` stays a plugin.
+Nothing in progress: `idempotency` as a middleware, the last change planned,
+shipped in 0.2.0 and finished in 0.3.0.
 
 ## Next
 
@@ -33,6 +30,12 @@ Nothing scheduled yet.
 
 ### 0.3.0
 
+- **On `@nxgt/redis` 0.5 alone.** The rate limits and the idempotency that
+  `@nxgt/redis-guard` held live in `@nxgt/redis` now, and `@nxgt/redis-guard`
+  is no longer a peer.
+- **One form for `idempotency`.** The middleware's type is a plain
+  `(ctx, next)` function, and `app.plugin(idempotency(…))`, deprecated in
+  0.2.0, is gone: give it to `use(…)`.
 - **An `@nxgt/redis` handle everywhere.** `redis(handle)` takes the handle
   `openRedis(defineRedis({ … }))` gives: typed `caches` from its scopes, a
   `lock` and every key under its `prefix`, and the handle closed once in
@@ -40,6 +43,17 @@ Nothing scheduled yet.
   `redisCacheStore` and `idempotency` take it where they take a client and
   put its prefix in front of their keys, and `redisCheck` is a readiness
   check for `health()`. The bare `RedisClient` forms are unchanged.
+
+### 0.2.0
+
+- **Middlewares, under the same names.** `app.use(idempotency(client, …))`
+  replaces `app.plugin(idempotency(…))`, which stayed, deprecated, until 0.3.0;
+  `IdempotencyMiddleware` is the type it returns. A request no route matches
+  passes through it, never kept.
+- **A client no one can tell apart is not shared.** A request with no
+  `ctx.ip` and no `scope` runs unguarded, nothing stored or replayed, and
+  the middleware warns once, instead of keying every such client to
+  `anyone`, where one could be replayed another's response.
 
 ### 0.1.0
 

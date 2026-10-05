@@ -23,7 +23,7 @@ each through. It prints one warning of its own, under
 - [`TypeError: connectRedis: this URI is already connected with other options. Pass the same options everywhere, or close the first connection.`](#typeerror-connectredis-this-uri-is-already-connected-with-other-options-pass-the-same-options-everywhere-or-close-the-first-connection)
 
 - [`TypeError: @alxia/redis: this @nxgt/redis handle wires N Redis instances (…), and one is needed.`](#typeerror-alxiaredis-this-nxgtredis-handle-wires-n-redis-instances--and-one-is-needed)
-- [`TypeError: defineRedis: instance "default" wires no cache and no channel.`](#typeerror-defineredis-instance-default-wires-no-cache-and-no-channel)
+- [`TypeError: defineRedis: instance "default" wires no cache and no channel. Pass the module that exports them, or drop the instance.`](#typeerror-defineredis-instance-default-wires-no-cache-and-no-channel-pass-the-module-that-exports-them-or-drop-the-instance)
 
 **Runtime: a 500, with this in the log**
 
@@ -243,7 +243,7 @@ redisStore(handle.clients.cache, { name: 'shop:api' });
 
 or wire one instance per handle.
 
-### `TypeError: defineRedis: instance "default" wires no cache and no channel.`
+### `TypeError: defineRedis: instance "default" wires no cache and no channel. Pass the module that exports them, or drop the instance.`
 
 **When:** `defineRedis({ uri, prefix })` is written only to give the stores
 and `idempotency` a prefix.

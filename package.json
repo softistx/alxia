@@ -19,6 +19,9 @@
 		"changeset:publish": "bun run build && bun run verify:artifacts && bun run scripts/publish.ts",
 		"verify:artifacts": "bun run scripts/verify-artifacts.ts",
 		"verify:templates": "bun run scripts/verify-templates.ts",
+		"check:docs": "bun run scripts/docs-links.ts && bun run scripts/docs-snippets.ts",
+		"check:doc-links": "bun run scripts/docs-links.ts",
+		"check:doc-snippets": "bun run scripts/docs-snippets.ts",
 		"nxgt:outdated": "bun run scripts/check-nxgt-versions.ts",
 		"changeset:status": "changeset status --since=origin/develop"
 	},

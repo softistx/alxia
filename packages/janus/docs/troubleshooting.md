@@ -34,7 +34,7 @@ symptom, under [Traps](#traps).
 - [`503 {"code":"STORE_FAILED"}`](#503-codestore_failed)
 - [`401 {"error":"unauthenticated"}` from the sign-in route](#401-errorunauthenticated-from-the-sign-in-route)
 - [`401 {"error":"unauthenticated"}` on a path that does not exist](#401-errorunauthenticated-on-a-path-that-does-not-exist)
-- [The error is never seen by a `try`/`catch` around `logger()` or `secureHeaders()`](#the-error-is-never-seen-by-a-trycatch-around-logger-or-secureheaders)
+- [`logger()` or `secureHeaders()` never shows the reply of `janusErrors()`](#logger-or-secureheaders-never-shows-the-reply-of-januserrors)
 - [`401 {"code":"CREDENTIALS_INVALID","retryAfter":900}` with the right password](#401-codecredentials_invalidretryafter900-with-the-right-password)
 
 **Traps**

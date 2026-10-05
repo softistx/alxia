@@ -16,3 +16,11 @@ a realistic example for each.
 | [Testing](guide/testing.md) | writing specs against a real Redis, giving `app.request()` a client address, or checking which routes the refusals reach |
 | [Troubleshooting](troubleshooting.md) | something went wrong and you have the message, or a limit, a cache or a replay does not behave as you expected |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |
+
+## Recipes
+
+A task that crosses packages, in [the repository's recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md), each with a complete example:
+
+- [Caching and rate limiting with Redis](https://github.com/softistx/alxia/blob/develop/docs/recipes/caching-and-rate-limiting.md): a limit and a response cache shared by every process
+- [Test an alxia app](https://github.com/softistx/alxia/blob/develop/docs/recipes/testing.md): `app.request`, a middleware alone, the typed client, sockets, Redis
+- [Health checks and graceful shutdown](https://github.com/softistx/alxia/blob/develop/docs/recipes/health-and-shutdown.md): probes, the drain, Docker and Kubernetes

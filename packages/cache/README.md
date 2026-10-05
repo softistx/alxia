@@ -156,3 +156,4 @@ across every process. A store of your own implements `CacheStore`: `get`,
 - [Guide](https://github.com/softistx/alxia/tree/develop/packages/cache/docs): a page per area — caching responses and its options, keys and `Vary`, invalidation by path and by tag, and stores, the memory one, Redis, or your own.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/cache/docs/troubleshooting.md): an error message, or a cache that does not hit, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/cache/docs/roadmap.md): what is coming, and what is not planned.
+- [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [Caching and rate limiting with Redis](https://github.com/softistx/alxia/blob/develop/docs/recipes/caching-and-rate-limiting.md).

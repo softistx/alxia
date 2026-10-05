@@ -14,3 +14,13 @@ a realistic example for each.
 | [GraphiQL and Apollo Sandbox](guide/ide.md) | choosing the IDE a browser gets, configuring it, keeping it working under a strict `Content-Security-Policy`, or turning it off in production |
 | [Troubleshooting](troubleshooting.md) | something went wrong and you have the message |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |
+
+## Recipes
+
+A task that crosses packages, in [the repository's recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md), each with a complete example:
+
+- [A GraphQL API](https://github.com/softistx/alxia/blob/develop/docs/recipes/graphql-api.md): typed resolvers, a viewer, subscriptions, GraphiQL, auth errors and the drain
+- [Authenticate requests](https://github.com/softistx/alxia/blob/develop/docs/recipes/authentication.md): a bearer token or a cookie session, a role check, the user typed in every handler
+- [Test an alxia app](https://github.com/softistx/alxia/blob/develop/docs/recipes/testing.md): `app.request`, a middleware alone, the typed client, sockets, Redis
+- [Health checks and graceful shutdown](https://github.com/softistx/alxia/blob/develop/docs/recipes/health-and-shutdown.md): probes, the drain, Docker and Kubernetes
+- [Deploy with Docker](https://github.com/softistx/alxia/blob/develop/docs/recipes/deploying.md): the build stage, the final image, `NODE_ENV=production`
