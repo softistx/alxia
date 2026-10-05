@@ -30,6 +30,8 @@ export class SocketOperations {
 		document: DocumentNode,
 		operationName: string | null | undefined,
 	): void {
+		// graphql-ws closes a socket that reuses an open id; end it all the same.
+		this.end(id);
 		const operation = getOperationAST(document, operationName);
 		if (operation === undefined || operation === null) return;
 		const end = startOperation(this.#ctx, {

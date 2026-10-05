@@ -372,7 +372,7 @@ export const operations = defineMiddleware((ctx, next) => {
 app.ws('/rpc', {
 	async message(socket, message) {
 		const end = startOperation(socket.data, { type: 'query', name: 'GetNotes' });
-		await socket.send(await run(message));
+		await socket.send({ data: { notes: [] }, for: String(message) });
 		end('ok');
 	},
 });
