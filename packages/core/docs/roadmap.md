@@ -107,7 +107,7 @@ number on it. Every release, with each change it made, is in
 
 ## Shipped
 
-### Next release
+### 0.11.0
 
 - **Every method at a path, as one route.** `app.all(path, …)` takes every
   method its path has no route of its own for, typed and checked as any
@@ -118,7 +118,9 @@ number on it. Every release, with each change it made, is in
   ([Routes](guide/routes.md#every-method-all)).
 - **Cheaper route types.** Every route method shares one set of forms, so
   an app's methods are typed once, not once each: TypeScript instantiates
-  fewer types for the same app.
+  fewer types for the same app. A route's type error names
+  `RouteApp<Method, …>` where it named its own method
+  ([Upgrading](upgrading.md#route-type-errors-name-method)).
 
 ### 0.10.0
 

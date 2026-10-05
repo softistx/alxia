@@ -158,6 +158,7 @@ my-api/
 │   ├── app.ts                 the app: the base, health(), apiDocs, the routes, and its type
 │   ├── app.spec.ts            bun test: the typed client over app.fetch, and matchesSpec
 │   ├── proxy.spec.ts          bun test: the base behind TRUSTED_PROXIES, with a peer
+│   ├── env.spec.ts            bun test: a malformed TRUSTED_PROXIES stops the app
 │   └── server.ts              app.listen on env.PORT, which stops on SIGINT and SIGTERM
 ├── package.json
 ├── tsconfig.json
@@ -700,6 +701,7 @@ my-graphql-api/
 │   ├── graphql.d.ts        declares the *.graphql module
 │   ├── app.spec.ts         bun test: POST /graphql through app.request()
 │   ├── proxy.spec.ts       bun test: the base behind TRUSTED_PROXIES, with a peer
+│   ├── env.spec.ts         bun test: a malformed TRUSTED_PROXIES stops the app
 │   └── server.ts           app.listen on env.PORT, which stops on SIGINT and SIGTERM
 ├── package.json
 ├── tsconfig.json
@@ -1044,7 +1046,8 @@ server)` with a stub whose `requestIP()` names the peer. The proxy must
 overwrite `X-Forwarded-*` itself; core's guide says how
 ([Serving](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#behind-a-proxy-proxy)),
 and the [deploying recipe](https://github.com/softistx/alxia/blob/develop/docs/recipes/deploying.md#on-a-platform)
-shows the whole path.
+shows the whole path. `src/env.spec.ts` imports `src/env.ts` under a
+malformed `TRUSTED_PROXIES` and checks that it throws, naming the entry.
 
 ## Lint and format
 

@@ -58,7 +58,7 @@ Nothing scheduled yet.
 
 ## Shipped
 
-### Next release
+### 0.7.0
 
 - **The public URL behind a proxy.** `createServer({ proxy: trustProxy({ trusted }) })`,
   or `alxia({ proxy })` for a server of your own: React Router's

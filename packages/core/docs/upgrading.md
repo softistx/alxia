@@ -4,30 +4,37 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
-## Next
+## 0.11.0
 
-The next `@alxia/core` minor adds `app.all(path, …)`, one route for every
-method at a path, which a middleware that answers — `@alxia/proxy`'s
-`proxy(url)` — may end. Nothing in its API breaks; the peer range of every
-package moves.
+`@alxia/core` 0.11.0 adds `app.all(path, …)`, one route for every method at
+a path, which a middleware that answers — `@alxia/proxy`'s `proxy(url)` —
+may end. Nothing in its API breaks; the peer range of every package moves.
+It ships with `@alxia/proxy` 0.3.0, `@alxia/telemetry` 0.7.0 and
+`@alxia/create` 0.4.0, each a minor; what each changes in behaviour is in the table below.
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
-| [Peers move to the next minor](#peers-move-to-the-next-minor) | every package | yes, for an install that holds a package of 0.10 beside the new core: update them together |
+| [Peers move to `^0.11.0`](#peers-move-to-0110) | every package | yes, for an install that holds a package of 0.10 beside core 0.11: update them together |
 | [`app.all`, every method at a path](#appall-every-method-at-a-path) | core | no: opt in |
 | [`ALL` among `app.routes`' methods](#all-among-approutes-methods) | core | notice: a tool reading `route.method` sees `ALL` for an `all` route |
-| [Route type errors name no method](#route-type-errors-name-no-method) | core | no: the message's type only |
+| [Route type errors name `Method`](#route-type-errors-name-method) | core | no: the message's type only |
 | [A proxy as a route](#a-proxy-as-a-route) | proxy | no: docs only |
-| [New projects install the new core](#new-projects-install-the-new-core) | create | no: a new project only |
+| [The proxy sends the public scheme and host](#the-proxy-sends-the-public-scheme-and-host) | proxy | notice: only behind `alxia({ proxy })` |
+| [Backpressure and early frames in `proxy.ws`](#backpressure-and-early-frames-in-proxyws) | proxy | notice: a relay past `maxBuffered` closes with 1013 |
+| [Spans record the public URL](#spans-record-the-public-url) | telemetry | notice: only behind `alxia({ proxy })` |
+| [`matchesSpec` reads an `all` route](#matchesspec-reads-an-all-route) | openapi | no: docs only |
+| [A type error's text in secure-headers](#a-type-errors-text-in-secure-headers) | secure-headers | no: docs only |
+| [New projects: `app.all` and `TRUSTED_PROXIES`](#new-projects-appall-and-trusted_proxies) | create | no: a new project only |
 
-### Peers move to the next minor
+### Peers move to `^0.11.0`
 
-Every package's peer on `@alxia/core` moves from `^0.10.0` to the new
-minor's range, which a `^0.10.0` does not accept. Update `@alxia/core` and
-the `@alxia/*` packages you use in one change.
+Every package's peer on `@alxia/core` moves from `^0.10.0` to `^0.11.0`,
+which a `^0.10.0` does not accept. Update `@alxia/core` and the `@alxia/*`
+packages you use in one change, each to its release that names core
+`^0.11.0`.
 
 **Can it break your code.** Only the install, as for
-[0.10](#peers-move-to-0100).
+[0.10](#peers-move-to-0100): a package left behind asks for core `^0.10.0`.
 
 ### `app.all`, every method at a path
 
@@ -62,32 +69,95 @@ route is listed as `ALL`, in `app.routes`, the dev route table and
 `route.method` exhaustively, or passes it where a `Method` is expected,
 meets one more case. An app without an `all` route lists none.
 
-### Route type errors name no method
+### Route type errors name `Method`
 
 **What changed.** Every route method — `get` to `all` — shares one set of
 forms, so an app's methods are typed once rather than once each. An error
 on a route's context reads `RouteBase<RouteApp<Method, Empty, "">, "/posts">`
 where it read `RouteBase<RouteApp<"POST", Empty, "">, "/posts">`. `RouteMethod<M, …>`
-still carries its method, `'~method'`, a type alone.
+still carries its method, `'~method'`, a type alone. A note or a test that
+quotes the old text, as `@alxia/secure-headers`' troubleshooting did, quotes
+the new one now.
 
 **Can it break your code.** No: the same calls compile and fail as before;
-only the text of a message changes.
+only the text of a message changes. A spec that matches a type error's text
+exactly needs the new one.
 
 ### A proxy as a route
 
-`@alxia/proxy` (patch) documents `app.all('/api/*', proxy(url))` beside
+`@alxia/proxy` documents `app.all('/api/*', proxy(url))` beside
 `use('/api', proxy(url))`: `use` shadows the routes declared after it under
 its path, `all` is one route the routes beside it keep their methods
-against. Its code is unchanged.
+against ([The basics](https://github.com/softistx/alxia/blob/develop/packages/proxy/docs/guide/basics.md#as-one-route-all)).
+Its code is unchanged by this.
 
 **Can it break your code.** No.
 
-### New projects install the new core
+### The proxy sends the public scheme and host
 
-`@alxia/create` (patch) makes projects whose `@alxia/core` has `app.all`.
-The templates are unchanged.
+**What changed.** `@alxia/proxy` 0.3.0 sends `X-Forwarded-Proto`,
+`X-Forwarded-Host` and `Forwarded`'s `proto` and `host` from core's
+`originalUrl(ctx)`: behind `alxia({ proxy: trustProxy(…) })`, the upstream
+gets the scheme and host the trusted proxy said, so a chain stays truthful.
 
-**Can it break your code.** No: it changes new projects only.
+**Can it break your code.** Notice it, behind `alxia({ proxy })` only: an
+upstream that read the app's own scheme and host from these headers now
+reads the public ones. Without `proxy`, nothing changes, and
+`trustForwarded` keeps its meaning.
+
+### Backpressure and early frames in `proxy.ws`
+
+**What changed.** `proxy.ws` 0.3.0 pauses the reads of the upstream socket
+while a client that stopped reading catches up, and caps the bytes queued
+for either side with a new `maxBuffered` option (1 MiB by default): a frame
+past it closes both sockets with 1013, exported as `OVERLOADED_CLOSE`. The
+frames an upstream sends the moment its socket opens, which could be dropped
+or reordered, are held and relayed first, in order.
+
+**Can it break your code.** Notice it: a relay that queued more than 1 MiB
+for a slow side now closes with 1013 instead of growing; set `maxBuffered`
+higher if that is expected.
+
+### Spans record the public URL
+
+**What changed.** `@alxia/telemetry` 0.7.0 records `url.scheme`,
+`server.address` and `server.port` from `originalUrl(ctx)`: a request a
+trusted TLS proxy forwarded is traced as `https` and the public host.
+
+**Can it break your code.** Notice it, behind `alxia({ proxy })` only: a
+dashboard that grouped by the app's own host sees the public one. Without
+`proxy`, or from a connection that is not a trusted proxy, nothing changes.
+
+### `matchesSpec` reads an `all` route
+
+`@alxia/openapi` documents that `matchesSpec` reads an `app.all(path, …)`
+route as `ALL` and its path: it serves no operation of the document, so it
+is reported in `extra`, and fails under `strict` unless `exclude` leaves it
+out. Its code is unchanged.
+
+**Can it break your code.** No, but a `strict` check meets the new `extra`
+once you declare an `all` route: add it to `exclude`.
+
+### A type error's text in secure-headers
+
+`@alxia/secure-headers`' troubleshooting quotes the type error core now
+prints, `RouteBase<RouteApp<Method, Empty, "">, "/">`. Its code is
+unchanged.
+
+**Can it break your code.** No.
+
+### New projects: `app.all` and `TRUSTED_PROXIES`
+
+`@alxia/create` 0.4.0 installs a core that has `app.all`, and its `api` and
+`graphql` templates take an optional `TRUSTED_PROXIES`: comma-separated CIDR
+ranges or addresses, validated when the app starts. Set, `src/context.ts`
+declares `trustProxy({ trusted, untrusted: 'refuse' })`, so a trusted
+proxy's `X-Forwarded-For` sets `ctx.ip` and a forwarding header from any
+other connection is refused 403. Unset, nothing changes. Each template
+tests it in `src/proxy.spec.ts`.
+
+**Can it break your code.** No: it changes new projects only. A project
+already created is not touched.
 
 ## 0.10.0
 

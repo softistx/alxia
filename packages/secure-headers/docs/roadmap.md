@@ -29,7 +29,7 @@ Nothing scheduled yet.
 
 ## Shipped
 
-### Next release
+### 0.2.0
 
 - **A nonce per request.** `secureHeaders({ nonce: true })` makes a fresh,
   random nonce for each request, adds it to the policy's `script-src`, or

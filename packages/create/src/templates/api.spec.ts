@@ -147,5 +147,5 @@ describe('the api template', () => {
 	test("typechecks under this repository's strictest settings", () =>
 		expectTypechecks(dir));
 
-	test('its spec passes', () => expectSpecPasses(dir, 12), 30_000);
+	test('its spec passes', () => expectSpecPasses(dir, 14), 30_000);
 });

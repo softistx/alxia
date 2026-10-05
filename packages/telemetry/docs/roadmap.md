@@ -28,9 +28,19 @@ Nothing scheduled yet.
 
 ## Shipped
 
-### Next release
+### 0.7.0
+
+- **The public scheme and host behind a proxy.** `url.scheme`,
+  `server.address` and `server.port` read `originalUrl(ctx)`: behind
+  `alxia({ proxy: trustProxy(…) })`, a request a trusted TLS proxy
+  forwarded is traced as `https` and the public host, not the app's own.
+
+### 0.6.0
 
 - **Each operation over a socket.** A WebSocket upgrade gets a span that ends with its answer, and behind `@alxia/graphql`'s `ws: true` every query, mutation and subscription on the socket a span of its own, a child of the upgrade's: `subscription OnNote`, with `graphql.operation.*`, from its start to its end, an error when answered with errors ([guide](guide.md#the-operations-of-a-socket)).
+
+### 0.5.0
+
 - **The GraphQL operation on the span.** Behind `@alxia/graphql`, the span is named `query GetNotes` and carries `graphql.operation.name` and `graphql.operation.type`, OpenTelemetry's conventions; a batched body is `batch GetNotes,AddNote` ([guide](guide.md#a-graphql-operation)).
 
 ### 0.2.0
@@ -56,9 +66,6 @@ Nothing scheduled yet.
 - **The same names as Hono's.** The attributes are
   `@nxgt/telemetry-hono`'s, exported as constants, so a span from either
   reads the same in a dashboard.
-- **The public scheme and host behind a proxy.** `url.scheme`,
-  `server.address` and `server.port` read `originalUrl(ctx)`: behind
-  `alxia({ proxy: trustProxy(…) })`, what the trusted proxy said.
 - **Your telemetry, or one built for you.** `service` with
   `@nxgt/telemetry`'s options, or an existing `instance`, adopted; `traced`
   and `spanName` to choose and name the spans. Routes read `span` and

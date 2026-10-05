@@ -35,7 +35,7 @@ Nothing scheduled yet.
 
 ## Shipped
 
-### Next release
+### 0.3.0
 
 - **The proxy as one route.** `app.all('/api/*', proxy(url))`, with
   `@alxia/core`'s `all`, declares a proxied path as a route the router, the
@@ -50,6 +50,13 @@ Nothing scheduled yet.
   default), both close with 1013 (`OVERLOADED_CLOSE`), so a reader that
   never reads holds no more than the cap. The frames queued before the
   client's socket opens count toward the same cap.
+- **No frame lost when the upstream opens.** The frames an upstream sends
+  the moment its socket opens are held from its open and relayed first, in
+  order, where they could be dropped or reordered.
+- **The public scheme and host upstream.** `X-Forwarded-Proto`, `-Host` and
+  `Forwarded`'s `proto` and `host` are core's `originalUrl(ctx)`: behind
+  `alxia({ proxy: trustProxy(…) })`, what the trusted proxy said, so a
+  chain stays truthful.
 
 ### 0.2.0
 
@@ -80,9 +87,7 @@ Nothing scheduled yet.
   unreachable upstream closes the client with `BAD_GATEWAY_CLOSE` (1014).
 - **Forwarding headers.** `X-Forwarded-For`, `-Proto` and `-Host` by default,
   an RFC 7239 `Forwarded` header with `forwarded`, `trustForwarded` behind a
-  proxy you trust, and `preserveHost` for virtual hosts. `X-Forwarded-Proto`,
-  `-Host` and `Forwarded`'s `proto` and `host` are core's `originalUrl(ctx)`:
-  behind `alxia({ proxy: trustProxy(…) })`, what the trusted proxy said. Hop-by-hop headers
+  proxy you trust, and `preserveHost` for virtual hosts. Hop-by-hop headers
   are stripped both ways.
 - **Header edits.** `headers.request` and `headers.response` set, remove or
   compute a header, with the typed context of the middlewares before the

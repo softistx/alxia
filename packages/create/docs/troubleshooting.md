@@ -58,6 +58,7 @@ print, or — for a trap that prints nothing — the symptom.
 **The environment**
 
 - [`EnvError: The environment is invalid:`](#enverror-the-environment-is-invalid)
+- [`403 {"error":"untrusted_proxy"}` behind a load balancer](#403-erroruntrusted_proxy-behind-a-load-balancer)
 
 **Biome**
 
@@ -647,7 +648,8 @@ PORT=3000 bun dev
 ```
 
 A malformed `TRUSTED_PROXIES` stops the app the same way, with
-`TRUSTED_PROXIES: not a CIDR range or address`: it is comma-separated CIDR
+`TRUSTED_PROXIES.1: not a CIDR range or address`, the number being the
+position of the bad entry, from 0: it is comma-separated CIDR
 ranges or addresses (`10.0.0.0/8,172.16.0.0/12`), and unset or empty it
 declares no proxy.
 
@@ -657,6 +659,37 @@ A variable the schema gives a default (`PORT`, the `api` project's
 alone: `bun start`, the image and any other `NODE_ENV` require it, so set
 it there (`docker run -e API_KEY=…`). `bun test` sets `NODE_ENV=test`: a
 `.env` that sets `NODE_ENV` to another value overrides it.
+
+### `403 {"error":"untrusted_proxy"}` behind a load balancer
+
+**Symptom:** with `TRUSTED_PROXIES` set, a request is answered 403
+`{"error":"untrusted_proxy"}`: in the `api` project, an
+`application/problem+json` problem with status 403 and the `detail`
+`Forwarding headers from a connection that is no trusted proxy`. The app's
+logger writes no line for it.
+
+**Why:** the request carries `X-Forwarded-For`, `X-Forwarded-Proto`,
+`X-Forwarded-Host` or `Forwarded`, from a connection `TRUSTED_PROXIES` does
+not name. That is either a client going around the proxy, claiming an
+address, or the proxy itself, whose range is missing from the list: behind
+Docker, Kubernetes or a cloud load balancer, the connection's address is the
+proxy's *private* one, not the one the clients see. A request with no
+forwarding header is never refused, so a health probe passes and the symptom
+can look intermittent.
+
+**Fix:** list the range the proxy connects from, which is the address the
+app sees as its peer, not the public one:
+
+```sh
+TRUSTED_PROXIES=10.0.0.0/8,172.16.0.0/12 bun start
+```
+
+If the request should not come through a proxy at all (a local `curl` with
+a copied `X-Forwarded-For`), drop the header. In a spec, `app.request` has
+no connection: give `fetch` a server whose `requestIP` names a proxy, as
+`src/proxy.spec.ts` does. See
+[Behind a proxy](guide.md#behind-a-proxy) and `@alxia/core`'s
+[`403 {"error":"untrusted_proxy"}`](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#403-erroruntrusted_proxy).
 
 ## Biome
 
