@@ -22,6 +22,7 @@ nothing of its own; past the limit it answers a 429.
 **Counting**
 
 - [Every client is refused at once](#every-client-is-refused-at-once)
+- [One client is never refused, whatever it sends](#one-client-is-never-refused-whatever-it-sends)
 - [Nothing is limited, and no `RateLimit-*` header is sent](#nothing-is-limited-and-no-ratelimit--header-is-sent)
 - [A client makes more than `limit` requests](#a-client-makes-more-than-limit-requests)
 - [A client is refused before `limit` requests](#a-client-is-refused-before-limit-requests)
