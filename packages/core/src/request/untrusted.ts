@@ -87,7 +87,14 @@ function allowOf(
 			request: Request,
 			peer: string | undefined,
 		) => unknown;
-		return (request, _, shown) => test(request, shown) === true;
+		// A test that throws lets nothing through: refusing fails closed.
+		return (request, _, shown) => {
+			try {
+				return test(request, shown) === true;
+			} catch {
+				return false;
+			}
+		};
 	}
 	const list = typeof allow === 'string' ? [allow] : allow;
 	if (!Array.isArray(list) || list.some((range) => typeof range !== 'string'))

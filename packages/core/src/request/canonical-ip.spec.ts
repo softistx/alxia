@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { isIP } from 'node:net';
-import { canonicalIp, parseIp } from './ip-address';
+import { canonicalIp, canonicalOf, type ParsedIp, parseIp } from './ip-address';
 import { ipv6Text } from './ip-text';
 
 describe('canonicalIp', () => {
@@ -39,6 +39,7 @@ describe('canonicalIp', () => {
 	test('a zone id is kept, as written, after the canonical address', () => {
 		expect(canonicalIp('FE80:0:0:0:0:0:0:1%en0')).toBe('fe80::1%en0');
 		expect(canonicalIp('[fe80::0001%Eth0]:80')).toBe('fe80::1%Eth0');
+		expect(canonicalIp('::FFFF:1.2.3.4%en0')).toBe('::ffff:1.2.3.4%en0');
 		// In a header, an entry with a zone names no client, as before.
 		expect(parseIp('fe80::1%en0')).toBeUndefined();
 	});
@@ -60,7 +61,7 @@ describe('canonicalIp', () => {
 		for (const given of ['::FFFF:10.0.0.1', '2001:DB8:0:0::1', '10.0.0.1']) {
 			const canonical = canonicalIp(given);
 			expect(canonicalIp(canonical)).toBe(canonical);
-			expect(parseIp(given)?.canonical).toBe(canonical);
+			expect(canonicalOf(parseIp(given) as ParsedIp)).toBe(canonical);
 		}
 	});
 });

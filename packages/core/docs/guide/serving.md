@@ -244,6 +244,7 @@ reads. Give `ip` or `proxy`, not both: the app throws when it is built.
 ### `trustProxy({ trusted, header, untrusted, allow, canonical })`
 
 ```ts
+function trustProxy(options: StrictProxyOptions): ProxyTrust; // untrusted: 'refuse-all', trusted by address, allow
 function trustProxy(options: TrustProxyOptions): ProxyTrust;
 ```
 
@@ -312,8 +313,10 @@ answered 403 — `{ "error": "untrusted_proxy" }`, or a problem under
 the app runs reads what such a request claims, and a logger does not see
 it. A request with none of those headers passes: a load balancer's or an
 orchestrator's health probe, which sends none, reaches `/health` and
-`/ready` from any address. Refusing needs the proxies named by address; with
-a hop count, which cannot tell a proxy, `trustProxy` throws.
+`/ready` from any address; to refuse those too, see
+[`refuse-all`](#only-the-proxies-refuse-all). Refusing needs the proxies
+named by address; with a hop count, which cannot tell a proxy,
+`trustProxy` throws.
 
 ```ts
 alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
@@ -333,8 +336,8 @@ refused too. As with `'refuse'`, a hop count cannot tell a proxy: with
 `allow` is the escape, checked only for a connection `trusted` does not
 name: peers by CIDR range or address, or a test of the request and the
 peer's address as `ctx.ip` shows it (`undefined` with no server), which
-lets the request through when it returns `true`. What it lets through is a
-direct client: its forwarding headers are not read, and its `ctx.ip` is
+lets the request through when it returns `true` — anything else, a
+throw included, refuses it. What it lets through is a direct client: its forwarding headers are not read, and its `ctx.ip` is
 the connection's.
 
 ```ts
@@ -366,6 +369,15 @@ through too, while the exact comparison refuses an encoded or
 differently cased spelling the router would still serve, which fails
 closed. A path predicate lets anyone reach those paths directly, so keep
 what they answer to the probes' needs (`health()`'s `details` off).
+
+**Pages are not gated.** Bun serves a [`page()`](static-files.md) itself,
+before anything the app runs, so `'refuse-all'` could not refuse it:
+`listen` throws when the app has one. Build the pages and serve them with
+`static()`, which runs behind the refusal, or keep `untrusted: 'refuse'`.
+
+`trustProxy`'s two forms are overloads: an `untrusted` typed as a union of
+modes (`'refuse' | 'refuse-all'`) matches neither, so pick the form where
+the options are written, or cast the options to the one you mean.
 
 With no server (`app.request`, `app.fetch` alone), the connection is
 unknown and never a proxy: a spec that sends forwarding headers gives

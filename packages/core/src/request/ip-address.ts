@@ -7,8 +7,11 @@ export interface ParsedIp {
 	readonly value: bigint;
 	/** The address without port or brackets, lowercase. */
 	readonly text: string;
-	/** Its one canonical text: IPv4 dotted, IPv6 as RFC 5952 writes it, a mapped address as IPv4. */
-	readonly canonical: string;
+}
+
+/** Its one canonical text: IPv4 dotted, IPv6 as RFC 5952 writes it, a mapped address as IPv4. */
+export function canonicalOf(ip: ParsedIp): string {
+	return ip.version === 4 ? ipv4Text(ip.value) : ipv6Text(ip.value);
 }
 
 function ipv4(text: string): bigint {
@@ -60,17 +63,14 @@ function unwrapped(entry: string): string {
 function parsed(text: string): ParsedIp | undefined {
 	const family = isIP(text);
 	if (family === 4) {
-		const value = ipv4(text);
-		return { version: 4, value, text, canonical: ipv4Text(value) };
+		return { version: 4, value: ipv4(text), text };
 	}
 	if (family !== 6) return undefined;
 	const value = ipv6(text);
 	const lower = text.toLowerCase();
-	if (value >> 32n === 0xffffn) {
-		const v4 = value & 0xffffffffn;
-		return { version: 4, value: v4, text: lower, canonical: ipv4Text(v4) };
-	}
-	return { version: 6, value, text: lower, canonical: ipv6Text(value) };
+	if (value >> 32n === 0xffffn)
+		return { version: 4, value: value & 0xffffffffn, text: lower };
+	return { version: 6, value, text: lower };
 }
 
 /** IPv4, bare or mapped into IPv6. */
@@ -95,12 +95,16 @@ export function canonicalIp(address: string): string {
 	if (v4 !== undefined && isIP(v4) === 4) return v4;
 	const text = unwrapped(address);
 	const zone = text.indexOf('%');
-	if (zone < 0) return parsed(text)?.canonical ?? address;
+	if (zone < 0) {
+		const ip = parsed(text);
+		return ip === undefined ? address : canonicalOf(ip);
+	}
 	const ip = parsed(text.slice(0, zone));
 	if (ip === undefined || zone === text.length - 1 || !text.includes(':'))
 		return address;
-	const value = ip.version === 4 ? ip.value | (0xffffn << 32n) : ip.value;
-	return `${ipv6Text(value)}${text.slice(zone)}`;
+	const at =
+		ip.version === 4 ? `::ffff:${ipv4Text(ip.value)}` : canonicalOf(ip);
+	return `${at}${text.slice(zone)}`;
 }
 
 /** A CIDR range, or one address: `10.0.0.0/8`, `fd00::/8`, `192.168.1.1`. Throws on anything else. */

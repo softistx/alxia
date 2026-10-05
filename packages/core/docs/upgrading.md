@@ -51,7 +51,9 @@ client once — a client counted under two keys before, by its mapped and
 plain forms, is counted under one. Code that compares `ctx.ip` with a
 string written in another form (`ip === '::ffff:127.0.0.1'`), or a
 `trusted` function that matches the mapped form, needs the canonical form:
-pass your values through `canonicalIp`. Keys stored by the old form, in a
+pass your values through `canonicalIp`. Mind a function that denies: `(a)
+=> a !== '::ffff:203.0.113.9'` now sees `203.0.113.9` and lets it through,
+while one that allows by the mapped form only fails closed. Keys stored by the old form, in a
 Redis rate limit or an idempotency store, expire on their own. To keep the
 written form, `trustProxy({ …, canonical: false })` or
 `forwardedIp({ …, canonical: false })`, and without a proxy an `ip` of your
@@ -64,7 +66,9 @@ own (`ip: (request, server) => server?.requestIP(request)?.address`). See
 answers 403, in the app's error format, every request from a connection
 `trusted` does not name, forwarding headers or not, but for what `allow`
 lets through: peers by CIDR range, or a `(request, peer) => boolean`, such
-as the probes' paths. With a hop count it is a compile error, and throws.
+as the probes' paths; an `allow` that throws refuses. With a hop count it
+is a compile error, and throws; with a `page()`, which Bun serves past
+the refusal, `listen` throws.
 The new `StrictProxyOptions` types it; `TrustProxyOptions` gains
 `canonical` and an `allow?: undefined` that keeps `allow` to the new mode.
 

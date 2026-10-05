@@ -47,10 +47,24 @@ export function createRuntime(
 			options.ip ??
 			((request, server) => {
 				const address = server?.requestIP(request)?.address;
-				return address ? canonicalIp(address) : undefined;
+				return address ? socketIp(address) : undefined;
 			}),
 		proxy: proxyOf(options),
 	};
+}
+
+/** The socket addresses last seen, canonical: a client's next request reads its own. */
+const SEEN = new Map<string, string>();
+
+/** A socket's address in its one text, remembered for the next requests of the same client. */
+function socketIp(address: string): string {
+	let canonical = SEEN.get(address);
+	if (canonical === undefined) {
+		canonical = canonicalIp(address);
+		if (SEEN.size >= 1024) SEEN.clear();
+		SEEN.set(address, canonical);
+	}
+	return canonical;
 }
 
 /** The `proxy` option; given with `ip`, which it replaces, it throws. */

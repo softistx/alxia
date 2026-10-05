@@ -75,6 +75,7 @@ a trap that prints nothing is headed by its symptom.
 - [``alxia(): dev must be true or false, not "…"``](#alxia-dev-must-be-true-or-false-not-)
 - [`listen(): shutdownTimeout must be a number of milliseconds, 0 or more; got …`](#listen-shutdowntimeout-must-be-a-number-of-milliseconds-0-or-more-got-)
 - [`listen(): the app already listens on …; stop() it first`](#listen-the-app-already-listens-on--stop-it-first)
+- [``listen(): trustProxy's untrusted: 'refuse-all' cannot refuse the page() routes, which Bun serves itself: …``](#listen-trustproxys-untrusted-refuse-all-cannot-refuse-the-page-routes-which-bun-serves-itself-)
 - [`onStop hook … (… of …) did not finish within … ms`](#onstop-hook---of--did-not-finish-within--ms)
 - [`health(): timeout must be a number of milliseconds, 0 or more; got …`](#health-timeout-must-be-a-number-of-milliseconds-0-or-more-got-), and `health(): cache …`
 - [`group(): build is missing`](#group-build-is-missing)
@@ -1808,6 +1809,18 @@ app.listen({ port: 3000, shutdownTimeout: 5_000 });
 ```
 
 See [Health and shutdown](guide/health-and-shutdown.md).
+
+### `listen(): trustProxy's untrusted: 'refuse-all' cannot refuse the page() routes, which Bun serves itself: …`
+
+**When:** `listen` on an app with `proxy: trustProxy({ untrusted: 'refuse-all' })` and a `page(path, bundle)`, its own or a plugin's.
+
+**Why:** Bun serves a page itself, before routing and every middleware, so no refusal of the app reaches it: under `'refuse-all'` a client going around the proxies would still get the page. `listen` refuses the pair rather than break that promise silently.
+
+**Fix:** build the pages (`bun build ./index.html --outdir=public`) and serve them with `static()`, which runs behind the refusal; or keep `untrusted: 'refuse'`:
+
+```ts
+alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse-all' }) }).static('/', './public');
+```
 
 ### `listen(): the app already listens on …; stop() it first`
 

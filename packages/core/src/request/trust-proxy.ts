@@ -4,7 +4,7 @@
  * from a connection the one trust definition names.
  */
 import { elementsOf, listOf } from './forwarded-header';
-import { canonicalIp, type ParsedIp, parseIp } from './ip-address';
+import { canonicalIp, canonicalOf, type ParsedIp, parseIp } from './ip-address';
 import { hostOf, type Origin, protocolOf } from './origin';
 import {
 	type ClientAt,
@@ -100,6 +100,9 @@ export type ProxyTrust = (
 
 const NONE: Origin = {};
 
+/** Marks a `ProxyTrust` that refuses every connection but the proxies', which `listen` reads. */
+export const REFUSES_ALL = Symbol.for('alxia.proxy.refusesAll');
+
 type Reader = (
 	headers: Headers,
 	trust: Trust,
@@ -183,14 +186,16 @@ export function proxyReader(
 	const header = (options.header ?? 'x-forwarded-for').toLowerCase();
 	const gate = gateOf(options, trust, header, who);
 	const read = header === 'forwarded' ? fromForwarded : fromLists(header);
-	const shown = (ip: ParsedIp) => (canonical ? ip.canonical : ip.text);
+	const shown = (ip: ParsedIp) => (canonical ? canonicalOf(ip) : ip.text);
 	return (request, server) => {
 		const socket = server?.requestIP(request)?.address ?? undefined;
 		const peer = socket === undefined ? undefined : parseIp(socket);
 		const own =
 			socket === undefined || !canonical
 				? socket
-				: (peer?.canonical ?? canonicalIp(socket));
+				: peer === undefined
+					? canonicalIp(socket)
+					: canonicalOf(peer);
 		if (!peerTrusted(trust, peer)) {
 			const refusal = gate(request, peer, own);
 			if (refusal === undefined)
@@ -226,5 +231,8 @@ export function trustProxy(options: TrustProxyOptions): ProxyTrust;
 export function trustProxy(
 	options: TrustProxyOptions | StrictProxyOptions,
 ): ProxyTrust {
-	return proxyReader(options, 'trustProxy', true);
+	const read = proxyReader(options, 'trustProxy', true);
+	if (options.untrusted === 'refuse-all')
+		Object.defineProperty(read, REFUSES_ALL, { value: true });
+	return read;
 }

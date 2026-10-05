@@ -110,3 +110,26 @@ describe('allow', () => {
 		expect((await get(truthy, '/where', CLIENT)).status).toBe(403);
 	});
 });
+
+describe('what refuse-all cannot gate', () => {
+	test('an allow that throws lets nothing through', async () => {
+		const throwing = app(() => {
+			throw new Error('bad predicate');
+		});
+		expect((await get(throwing, '/where', CLIENT)).status).toBe(403);
+	});
+
+	test('listen refuses page() routes, which Bun serves past the refusal', async () => {
+		const bundle = (await import('../../test/fixtures/page.html')).default;
+		const paged = app().page('/dash', bundle);
+		expect(() => paged.listen({ port: 0, signals: false })).toThrow(
+			"listen(): trustProxy's untrusted: 'refuse-all' cannot refuse the page() routes",
+		);
+		const refusing = alxia({
+			proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }),
+		}).page('/dash', bundle);
+		refusing.listen({ port: 0, signals: false });
+		expect(refusing.server).toBeDefined();
+		await refusing.stop();
+	});
+});
