@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/graphql",
-	"version": "0.3.0",
+	"version": "0.3.1",
 	"description": "GraphQL for alxia with GraphQL Yoga: its plugins, subscriptions over SSE and GraphiQL, behind the app's hooks, its resolvers reading the app's typed context",
 	"license": "MIT",
 	"type": "module",

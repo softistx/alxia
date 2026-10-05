@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.3.0
+
+### Minor Changes
+
+- [#161](https://github.com/softistx/alxia/pull/161) [`4f2daa4`](https://github.com/softistx/alxia/commit/4f2daa4da46fc0f6b50bd4a984ecd6f8a496cced) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `graphql` template batches `Note.author` with a DataLoader built per request in the `context` option, so a list of notes loads its authors in one call instead of one per note. `dataloader` is a new dependency of the generated project, and its spec asserts one batch for N notes.
+
 ## 0.2.0
 
 ### Minor Changes
