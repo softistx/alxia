@@ -5,12 +5,13 @@
 import type { PathAt, RoutePath } from '../types/path';
 import type { FormSlots } from './forms';
 import type { Bare, Ladder } from './ladder';
-import type { AppTypes, AppWithRoute, RouteMiddleware } from './route-forms';
+import type { AppTypes, AppWithRoute, RouteReads } from './route-forms';
 import type {
 	SocketHandlersAfter,
 	SocketOptions,
 	SocketOptionsOnly,
 } from './socket-forms';
+import type { FunctionLike } from './types';
 
 declare module './forms' {
 	interface Forms<
@@ -18,10 +19,9 @@ declare module './forms' {
 		A,
 		B,
 		Results extends readonly unknown[],
-		Result,
 		Handled,
 	> {
-		readonly socketOptions: SocketOptionsForm<App, A, B, Results, Result>;
+		readonly socketOptions: SocketOptionsForm<App, A, B, Results>;
 	}
 }
 
@@ -31,15 +31,15 @@ export interface SocketOptionsForm<
 	A,
 	B,
 	Results extends readonly unknown[],
-	Result,
 > extends FormSlots {
 	readonly aBound: RoutePath;
-	readonly bBound: SocketOptions;
+	readonly bBound: SocketOptions | FunctionLike;
+	readonly excludes: 'function';
 	readonly head: [
 		path: PathAt<App['prefix'], A & string>,
 		options: SocketOptionsOnly<B>,
 	];
-	readonly step: RouteMiddleware<App, A & string, Results, Result>;
+	readonly reads: RouteReads<App, A & string, Results>;
 	readonly tail: [handlers: SocketHandlersAfter<App, A & string, Results, B>];
 	readonly out: AppWithRoute<App>;
 }

@@ -160,7 +160,7 @@ export function toResponse(
 		return new Response(body, { status, headers });
 	}
 	if (BINARY(body)) {
-		// Known up front, so `onResponse` (compress's threshold) can read it.
+		// Known up front, so a middleware (compress's threshold) can read it.
 		const length =
 			body instanceof Blob
 				? body.size

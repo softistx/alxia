@@ -1,6 +1,6 @@
 /**
  * The runtime an app is built into: made from its options, and filled with
- * the global hooks of the plugins it uses.
+ * the lifecycle hooks and parsers of the plugins it uses.
  */
 import { joinPath } from '../router/paths';
 import { Router } from '../router/router';
@@ -9,7 +9,7 @@ import { addPage } from './pages';
 import type { AlxiaOptions } from './signatures';
 
 /**
- * A new app's runtime: no route, no global hook; `unmatched` reads the
+ * A new app's runtime: no route, no lifecycle hook; `unmatched` reads the
  * chain of its scope.
  */
 export function createRuntime(
@@ -19,16 +19,7 @@ export function createRuntime(
 	return {
 		router: new Router(),
 		unmatched,
-		globals: {
-			around: [],
-			onRequest: [],
-			onResponse: [],
-			onStart: [],
-			onStop: [],
-			parsers: [],
-			middlewares: [],
-			pages: new Map(),
-		},
+		globals: { onStart: [], onStop: [], parsers: [], pages: new Map() },
 		validateResponses: options.validateResponses ?? true,
 		ip:
 			options.ip ??
@@ -37,7 +28,7 @@ export function createRuntime(
 }
 
 /**
- * A plugin's global hooks, after the app's, and its pages under the app's
+ * A plugin's lifecycle hooks and parsers, after the app's, and its pages under the app's
  * `prefix`. Nothing when the plugin shares the app's globals.
  */
 export function mergeGlobals(
@@ -46,13 +37,9 @@ export function mergeGlobals(
 	prefix: string,
 ): void {
 	if (globals === runtime.globals) return;
-	runtime.globals.around.push(...globals.around);
-	runtime.globals.onRequest.push(...globals.onRequest);
-	runtime.globals.onResponse.push(...globals.onResponse);
 	runtime.globals.onStart.push(...globals.onStart);
 	runtime.globals.onStop.push(...globals.onStop);
 	runtime.globals.parsers.push(...globals.parsers);
-	runtime.globals.middlewares.push(...globals.middlewares);
 	for (const [path, bundle] of globals.pages) {
 		addPage(runtime, joinPath(prefix, path), bundle);
 	}

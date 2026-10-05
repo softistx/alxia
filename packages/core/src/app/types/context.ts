@@ -15,11 +15,10 @@ export interface RequestContext {
 	/**
 	 * The route the request reached, as declared — `/users/:id`: routing
 	 * runs before every middleware, so each one reads it; `undefined` for a
-	 * request that reached none, and in a deprecated `onRequest` or
-	 * `around`, which run before routing.
+	 * request that reached none.
 	 */
 	readonly route: string | undefined;
-	/** The error a route failed with, once it has: what became its 500, or its `onError` reply. */
+	/** The error a route failed with, once it has: what became its 500, or a middleware's reply. */
 	readonly error: unknown;
 }
 

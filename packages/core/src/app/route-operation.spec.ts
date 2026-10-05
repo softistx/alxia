@@ -1,7 +1,6 @@
 import { describe, expect, spyOn, test } from 'bun:test';
 import { z } from 'zod';
 import { alxia } from './alxia';
-import { defineHook } from './define-hook';
 import { defineMiddleware } from './define-middleware';
 import { responds, validate } from './validate';
 
@@ -63,36 +62,29 @@ describe('the implicit responds of route(operation)', () => {
 	});
 });
 
-describe('the forms of 0.3 and the middleware forms', () => {
-	const hook = defineHook(() => ({ a: 1 }));
+describe('a list of middlewares after the path, the form of 0.3', () => {
 	const mw = defineMiddleware((_ctx, next) => next());
+	const list =
+		'a route takes its middlewares after the path, not in a list: drop the brackets';
 
-	test('a list of hooks beside middlewares is refused when the route is declared', () => {
-		expect(() =>
-			alxia().get('/', [hook] as never, mw as never, ({ reply }) =>
-				reply(200, 'x'),
-			),
-		).toThrow(
-			'GET /: a list of hooks and middlewares are two forms, never mixed: give the hooks as middlewares, made by defineMiddleware()',
-		);
-		expect(() =>
-			alxia().get('/', [] as never, {} as never, mw as never, ({ reply }) =>
-				reply(200, 'x'),
-			),
-		).toThrow('GET /: a list of hooks and middlewares are two forms');
+	test('is refused when a route is declared, with or without middlewares after it', () => {
+		const untyped = alxia().get as (...args: unknown[]) => unknown;
+		const ok = ({ reply }: { reply: (status: 200, body: string) => never }) =>
+			reply(200, 'x');
+		expect(() => untyped('/', [mw], ok)).toThrow(`GET /: ${list}`);
+		expect(() => untyped('/', [], {}, mw, ok)).toThrow(`GET /: ${list}`);
 	});
 
-	test('route(operation, [hooks], middleware, handler) is refused, not cut short', () => {
+	test('is refused by route(operation) and ws as well', () => {
+		const route = alxia().route as (...args: unknown[]) => unknown;
 		expect(() =>
-			alxia().route(
-				getPet,
-				[hook] as never,
-				mw as never,
-				(({ reply }: { reply: (status: 200, body: unknown) => never }) =>
-					reply(200, { id: 1, name: 'x' })) as never,
+			route(getPet, [mw], mw, ({ reply }: { reply: (s: 200) => never }) =>
+				reply(200),
 			),
-		).toThrow(
-			'GET /pets/:petId: a list of hooks and middlewares are two forms, never mixed',
+		).toThrow(`GET /pets/:petId: ${list}`);
+		const ws = alxia().ws as (...args: unknown[]) => unknown;
+		expect(() => ws('/live', [mw], { message: () => {} })).toThrow(
+			`WS /live: ${list}`,
 		);
 	});
 });

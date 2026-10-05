@@ -1,5 +1,5 @@
 /**
- * The context a route's hooks and handler read: the request, bounded by
+ * The context a route's middlewares and handler read: the request, bounded by
  * the route's `bodyLimit`, its path parameters as they arrived, and what
  * it sets on its response.
  */
@@ -21,7 +21,7 @@ const redirect: RedirectFunction = (location, status) =>
 	}) as never;
 
 /**
- * The context a route's hooks and handler read, and what they set on its
+ * The context a route's middlewares and handler read, and what they set on its
  * response. Under a `bodyLimit`, its `request` is the one whose body is
  * bounded: every reader of the body, core's or the handler's, counts.
  */
@@ -44,7 +44,7 @@ export function routeContext(
 	// The request's cookies, parsed on first read: a route no one reads
 	// them on never parses its `Cookie` header.
 	let received: Readonly<Record<string, string>> | undefined;
-	// The query as it arrived, read on first use: what a route's own hooks
+	// The query as it arrived, read on first use: what a route's middlewares
 	// read before validation replaces it with the schema's output.
 	let query: Readonly<Record<string, string | readonly string[]>> | undefined;
 	// The headers as an object, read on first use: what a middleware reads
@@ -59,7 +59,7 @@ export function routeContext(
 		route,
 		pathParams,
 		// As they arrived, until validation sets the schemas' output: what
-		// the hooks of a route's list read as `params` and `query`.
+		// the middlewares before a `validate` read as `params` and `query`.
 		params: pathParams,
 		get query() {
 			query ??= readQuery(request.url);

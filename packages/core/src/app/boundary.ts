@@ -3,18 +3,12 @@
  * whole chain of a route, or of a request no route matches; and inside a
  * middleware that asks, through `settle`.
  */
-import { HttpError, refusalOf } from '../errors/errors';
+import { HttpError } from '../errors/errors';
 import { Reply, toResponse } from '../reply/reply';
 import { chain } from './chain';
 import { routeContext } from './context';
-import type {
-	Globals,
-	RouteDefinition,
-	Runtime,
-	SocketDefinition,
-} from './definition';
-import { refuse } from './refusal';
-import { clientGone, failed, internalError, routingError, send } from './send';
+import type { Globals, RouteDefinition, Runtime } from './definition';
+import { clientGone, failed, routingError, send } from './send';
 import { RUN, runOf, settledResponse } from './settled';
 import type { BaseContext, Method, RequestContext } from './types';
 import type { ChainRun } from './validation';
@@ -26,7 +20,7 @@ export async function handle(
 	route: RouteDefinition,
 	request: RequestContext,
 	rawParams: Record<string, string>,
-	globals: Pick<Globals, 'parsers' | 'middlewares'>,
+	globals: Pick<Globals, 'parsers'>,
 	validateResponses: boolean,
 	/** Whether a route matched: else `ctx.route` is none, as for the 404 it ends with. */
 	matched = true,
@@ -40,7 +34,6 @@ export async function handle(
 		set,
 		parsers: globals.parsers,
 		validateResponses,
-		appWide: globals.middlewares,
 	};
 	(ctx as { [RUN]?: ChainRun })[RUN] = run;
 	try {
@@ -58,14 +51,12 @@ export async function handle(
 	} catch (error) {
 		(request as { error: unknown }).error = error;
 		// An error the observers settled: the response they made of it.
-		return (
-			settledResponse(run, error) ?? fail(route, error, ctx, validateResponses)
-		);
+		return settledResponse(run, error) ?? fail(error, ctx);
 	}
 }
 
 /**
- * A request no route matches: the 404, 405 or 426, behind every hook and
+ * A request no route matches: the 404, 405 or 426, behind every
  * middleware of the app's chain (`Scope.unmatched`). The router's answer
  * alone when the chain is empty: no request pays for a chain it does not
  * have.
@@ -83,7 +74,7 @@ export function unmatched(
 				? 'method_not_allowed'
 				: 'upgrade_required';
 	const hooks = runtime.unmatched();
-	if (hooks.derive.length === 0 && runtime.globals.middlewares.length === 0) {
+	if (hooks.derive.length === 0) {
 		return routingError(status, error, allowed);
 	}
 	const headers = allowed === undefined ? {} : { allow: allowed.join(', ') };
@@ -105,50 +96,25 @@ export function unmatched(
 }
 
 /**
- * An error a route threw, answered: a refusal — a `ValidationError`, or a
- * body past the route's `bodyLimit` — by the `onRefusal` hooks in force
- * or its default 400 or 413; anything else by the `onError` hooks in
- * order, then an `HttpError` as it says and anything else as a 500.
+ * An error a route threw that no middleware caught, answered at the route
+ * boundary: an `HttpError` — a `ValidationError`'s 400 and a
+ * `ContentTooLargeError`'s 413 among them — with its status and body,
+ * anything else with a logged 500. A client that left gets the 499 nobody
+ * reads, and nothing is logged.
  */
-export async function fail(
-	definition: RouteDefinition | SocketDefinition,
-	error: unknown,
-	ctx: BaseContext,
-	validateResponses = true,
-): Promise<Response> {
-	// The client left: no hook answers a request nobody reads.
+export function fail(error: unknown, ctx: BaseContext): Response {
 	if (clientGone(error, ctx.request)) return failed(error, ctx.request);
-	let thrown = error;
-	const refusal = refusalOf(error);
-	if (refusal !== undefined) {
-		try {
-			return await refuse(definition, refusal, ctx.set, ctx, validateResponses);
-		} catch (hookError) {
-			// The hook threw answering it: what it threw goes on to the
-			// `onError` hooks for a validation, as in 0.3; a 500 otherwise.
-			if (refusal.kind !== 'validation') {
-				console.error(hookError);
-				return internalError();
-			}
-			thrown = hookError;
-		}
+	if (error instanceof HttpError) {
+		return send(new Reply(error.status, error.body), ctx.set);
 	}
-	for (const hook of definition.onError) {
-		let handled = hook(thrown, ctx);
-		if (handled instanceof Promise) handled = await handled;
-		if (handled instanceof Reply) return send(handled, ctx.set);
-	}
-	if (thrown instanceof HttpError) {
-		return send(new Reply(thrown.status, thrown.body), ctx.set);
-	}
-	return failed(thrown, ctx.request);
+	return failed(error, ctx.request);
 }
 
 /**
  * The response `pending` — what `next()` returned — settles to, its
- * rejection answered here as the route would answer it: a refusal by its
- * `onRefusal` hooks or the default 400 or 413, any other error by its
- * `onError` hooks, an `HttpError` as it says, a 500. What a middleware
+ * rejection answered here as the route boundary would answer it: an
+ * `HttpError` as it says — a refusal's 400 or 413 — anything else a 500.
+ * What a middleware
  * that must see every response reads — a logger, a header on errors too:
  *
  * ```ts
@@ -177,13 +143,7 @@ export async function settle<Settled extends Response>(
 		if (run === undefined) return outside(ctx, error) as Settled;
 		(run.request as { error: unknown }).error = error;
 		const response =
-			settledResponse(run, error) ??
-			(await fail(
-				run.definition,
-				error,
-				ctx as BaseContext,
-				run.validateResponses,
-			));
+			settledResponse(run, error) ?? fail(error, ctx as BaseContext);
 		run.settled = { pending, error };
 		return response as Settled;
 	}

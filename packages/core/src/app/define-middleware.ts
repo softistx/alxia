@@ -1,28 +1,13 @@
 /**
- * `defineMiddleware`: a middleware written once and given to as many routes
- * as read it.
+ * `defineMiddleware`: a middleware written once, typed, and given to as
+ * many routes as read it.
  */
 import type {
 	Empty,
 	Middleware,
-	MiddlewareMark,
 	MiddlewareReturn,
-	NoHookYet,
+	NoMiddlewareYet,
 } from './types';
-
-/** Where a function `defineMiddleware` made carries its mark. */
-const MIDDLEWARE: unique symbol = Symbol.for('alxia.middleware');
-
-/**
- * Whether `value` was made by `defineMiddleware`: what `use` reads to tell
- * a middleware from a plugin written as a function.
- */
-export function isMiddleware(value: unknown): boolean {
-	return (
-		typeof value === 'function' &&
-		(value as { [MIDDLEWARE]?: true })[MIDDLEWARE] === true
-	);
-}
 
 /**
  * A middleware: `(ctx, next) => …`, given to a route after its path, or
@@ -64,25 +49,27 @@ export function isMiddleware(value: unknown): boolean {
  * );
  * ```
  *
- * The middleware is the function itself, marked as one: `app.use(auth)`
- * reads the mark to tell it from a plugin written as a function, and runs
- * it on every route declared after it. A route takes a plain function too.
+ * The middleware is the function itself: `use`, a route and `ws` take a
+ * plain `(ctx, next)` function as well, written inline, its additions
+ * read from what it returns. `defineMiddleware` gives a shared one its
+ * type: what it reads — a `Register`ed context, a `user` — and what it
+ * returns.
  */
 export function defineMiddleware<
 	Requires extends object = Empty,
-	Result extends MiddlewareReturn | NoHookYet = NoHookYet,
+	Result extends MiddlewareReturn | NoMiddlewareYet = NoMiddlewareYet,
 >(
 	middleware?: Middleware<Requires, Result>,
 ): NoInfer<
 	0 extends 1 & Result
-		? Middleware<Requires, Result> & MiddlewareMark
-		: [Result] extends [NoHookYet]
-			? [NoHookYet] extends [Result]
+		? Middleware<Requires, Result>
+		: [Result] extends [NoMiddlewareYet]
+			? [NoMiddlewareYet] extends [Result]
 				? <Returned extends MiddlewareReturn>(
 						middleware: Middleware<Requires, Returned>,
-					) => Middleware<Requires, Returned> & MiddlewareMark
-				: Middleware<Requires, Result> & MiddlewareMark
-			: Middleware<Requires, Result> & MiddlewareMark
+					) => Middleware<Requires, Returned>
+				: Middleware<Requires, Result>
+			: Middleware<Requires, Result>
 > {
 	if (middleware === undefined) return checked as never;
 	return checked(middleware) as never;
@@ -92,5 +79,5 @@ function checked<Fn>(middleware: Fn): Fn {
 	if (typeof middleware !== 'function') {
 		throw new TypeError('defineMiddleware(): the middleware is not a function');
 	}
-	return Object.defineProperty(middleware, MIDDLEWARE, { value: true });
+	return middleware;
 }

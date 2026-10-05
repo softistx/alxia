@@ -10,7 +10,7 @@ const Ping = {
 	},
 } as const;
 
-// Middlewares, the model of 0.4: a middleware made once and exported names
+// Middlewares, the model since 0.4: a middleware made once and exported names
 // `Middleware` and `Next`; a route threading them, with its options, a
 // `validate` and a `responds`, names what they add, declare and reply.
 export const authed = defineMiddleware(({ request, reply }, next) =>
@@ -69,7 +69,7 @@ export function operations() {
 }
 
 // Scope middlewares, through `use`: an exported middleware names
-// `MiddlewareMark`, and an app that took them names what they add.
+// `Middleware`, and an app that took them names what they add.
 export const adminOnly = defineMiddleware(({ request, reply }, next) =>
 	request.headers.has('x-admin')
 		? next()

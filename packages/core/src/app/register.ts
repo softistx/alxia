@@ -41,8 +41,7 @@ export type InvalidRegister = Alxia<
 	{
 		readonly 'Register.context must be typeof base, the alxia() chain that decorates and derives the context': never;
 	},
-	'',
-	never
+	''
 >;
 
 /** The app a `Register`-shaped interface names: its `context`, a fresh app, or `InvalidRegister`. */
@@ -50,7 +49,7 @@ export type RegisteredOf<R> = R extends { readonly context: infer App }
 	? App extends AnyAlxia
 		? App
 		: InvalidRegister
-	: Alxia<Empty, '', never>;
+	: Alxia<Empty, ''>;
 
 /** The app `Register` names, or a fresh one: what `AppContext` and `defineRoutes` read. */
 export type RegisteredBase = RegisteredOf<Register>;

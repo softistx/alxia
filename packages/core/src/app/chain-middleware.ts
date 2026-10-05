@@ -1,21 +1,11 @@
 /**
- * How a chain runs a `wrap` hook and a middleware: `next` called once,
+ * How a chain runs a middleware: `next` called once,
  * before the middleware settles, and a socket's upgrade parked behind a
  * stand-in response. The call itself is `Call` (`middleware-call.ts`).
  */
-import type { MiddlewareHook, WrapHook } from './definition';
+import type { MiddlewareHook } from './definition';
 import { Call } from './middleware-call';
 import type { Ctx, Definition } from './middleware-next';
-
-/** A `wrap` hook run around `rest`: its reply, or the response it returns. */
-export async function wrapped(
-	hook: WrapHook,
-	ctx: Ctx,
-	rest: () => Promise<unknown>,
-): Promise<unknown> {
-	const result = hook(ctx, rest as () => Promise<Response>);
-	return result instanceof Promise ? await result : result;
-}
 
 /**
  * A middleware run with `next`, which merges what it is given into the
@@ -34,8 +24,7 @@ export async function wrapped(
  *   rejection could be reported, unless the middleware returned it.
  * - What `rest` resolves to that is not a response — a socket's upgrade —
  *   reaches the middleware as a stand-in response. The socket is open by
- *   then: what the middleware returns after it, or throws, is ignored, as
- *   a `wrap` is skipped.
+ *   then: what the middleware returns after it, or throws, is ignored.
  */
 export function middleware(
 	hook: MiddlewareHook,

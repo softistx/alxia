@@ -18,43 +18,32 @@ const auth = defineMiddleware(({ request, reply }, next) => {
 const Strict = z.object({ id: z.string() });
 
 describe('validate', () => {
-	test('leaves the raw cookies to the hooks, and gives the validated ones to what follows', async () => {
+	test('leaves the raw cookies to the middlewares before it, and gives the validated ones to what follows', async () => {
 		const seen: unknown[] = [];
 		const app = alxia()
-			.onError((_error, { cookies, reply }) => {
-				seen.push(cookies);
-				return reply(500, { error: 'caught' as const });
+			.use(async ({ cookies, reply }, next) => {
+				try {
+					return await next();
+				} catch {
+					seen.push(cookies);
+					return reply(500, { error: 'caught' as const });
+				}
 			})
 			.get(
 				'/',
 				validate({ cookies: z.object({ n: z.coerce.number() }) }),
-				({ cookies }, next) => next({ n: cookies.n }),
+				({ cookies }, next) => {
+					seen.push(cookies);
+					return next({ n: cookies.n });
+				},
 				({ n }) => {
 					throw new Error(`boom ${n}`);
 				},
 			);
 		const response = await app.request('/', { headers: { cookie: 'n=2' } });
 		expect(response.status).toBe(500);
-		expect(seen).toEqual([{ n: '2' }]);
-	});
-
-	test('what a middleware adds after a cookie validate reaches onError too', async () => {
-		const seen: unknown[] = [];
-		const app = alxia()
-			.onError((_error, ctx) => {
-				seen.push((ctx as { user?: unknown }).user);
-				return ctx.reply(500, { error: 'caught' as const });
-			})
-			.get(
-				'/',
-				validate({ cookies: z.object({ n: z.string() }) }),
-				auth,
-				() => {
-					throw new Error('boom');
-				},
-			);
-		await app.request('/', { headers: { cookie: 'n=1', 'x-user': 'ada' } });
-		expect(seen).toEqual([{ id: 'ada' }]);
+		expect(await response.json()).toEqual({ error: 'caught' });
+		expect(seen).toEqual([{ n: 2 }, { n: '2' }]);
 	});
 });
 
@@ -113,8 +102,10 @@ describe('responds', () => {
 			error.mockRestore();
 		}
 	});
+});
 
-	test('around a wrap: the reply is checked where it is made, the wrap sees the result', async () => {
+describe('responds, with the middlewares around it', () => {
+	test('around a middleware that awaits next(): the reply is checked where it is made, the middleware sees the result', async () => {
 		const statuses: number[] = [];
 		const watch = defineMiddleware(async (_ctx, next) => {
 			const response = await next();

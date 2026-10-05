@@ -28,7 +28,7 @@ async function typecheck(name: string): Promise<string> {
 describe('Register, unregistered', () => {
 	test('AppContext is the base context, defineRoutes requires nothing', async () => {
 		expectTypeOf<AppContext>().toEqualTypeOf<BaseContext & Empty>();
-		expectTypeOf<RegisteredBase>().toEqualTypeOf<Alxia<Empty, '', never>>();
+		expectTypeOf<RegisteredBase>().toEqualTypeOf<Alxia<Empty, ''>>();
 		const routes = defineRoutes('/todos').get('/', ({ route, reply }) =>
 			reply(200, route),
 		);
@@ -49,9 +49,7 @@ describe('Register, unregistered', () => {
 		expectTypeOf<RegisteredOf<{ context: typeof base }>>().toEqualTypeOf<
 			typeof base
 		>();
-		expectTypeOf<RegisteredOf<object>>().toEqualTypeOf<
-			Alxia<Empty, '', never>
-		>();
+		expectTypeOf<RegisteredOf<object>>().toEqualTypeOf<Alxia<Empty, ''>>();
 		expectTypeOf<
 			RegisteredOf<{ context: ContextOf<typeof base> }>
 		>().toEqualTypeOf<InvalidRegister>();

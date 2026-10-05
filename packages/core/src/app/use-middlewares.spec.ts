@@ -1,9 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import { alxia } from './alxia';
-import { defineHook } from './define-hook';
 import { defineMiddleware } from './define-middleware';
-import type { Plugin } from './signatures';
 import { validate } from './validate';
 
 /** A `user` from `x-user`, or a 401. */
@@ -90,32 +88,14 @@ describe('app.use(...middlewares)', () => {
 		expect(log).toEqual(['before']);
 	});
 
-	test('a function not made by defineMiddleware is a plugin, as before', async () => {
-		const seen: unknown[] = [];
-		const plugin: Plugin = (app) => {
-			seen.push(app);
-			return app;
-		};
-		const app = alxia().plugin(plugin);
-		expect(seen).toEqual([app]);
-		// A plain `(ctx, next)` arrow is called as a plugin, given the app.
-		const plain = (_ctx: unknown, next: () => unknown) => next();
-		expect(() => alxia().use(plain as never)).toThrow(TypeError);
-	});
-
-	test('refuses what is not a middleware among them', () => {
-		const label = /use\(\): middleware 2 was not made by defineMiddleware\(\)/;
-		expect(() => alxia().use(auth, (() => {}) as never)).toThrow(label);
-		expect(() =>
-			alxia().use(auth, validate({ query: z.object({}) }) as never),
-		).toThrow(/validate\(\) or responds\(\), which belongs to a route/);
-		expect(() => alxia().use(defineHook(() => ({})) as never)).toThrow(
-			/neither an app nor a function/,
-		);
+	test('refuses what is not a middleware among them, naming it', () => {
 		const untyped = alxia().use as (...args: unknown[]) => unknown;
-		expect(() => untyped()).toThrow('use(): nothing is given');
-		expect(() => untyped(null)).toThrow(/neither an app nor a function/);
-		expect(() => untyped(alxia(), alxia())).toThrow(/a plugin is given alone/);
+		expect(() => untyped(auth, 'auth')).toThrow(
+			'use(): argument 2 is not a function: a middleware is (ctx, next) => …',
+		);
+		expect(() => untyped(auth, validate({ query: z.object({}) }))).toThrow(
+			'use(): argument 2 is a validate() or responds(), which belongs to a route',
+		);
 	});
 
 	test('runs on a socket’s upgrade, as its own middlewares do', async () => {

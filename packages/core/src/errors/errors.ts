@@ -18,7 +18,7 @@ export interface ValidationIssue {
 export type RequestPart = Exclude<ValidationTarget, 'message'>;
 
 /**
- * A request the route's schemas refused, as an `onRefusal` hook reads it:
+ * A request the route's schemas refused, as `refusalOf` reads it:
  * the first part that failed, in the order params, query, headers,
  * cookies, body, and every issue, each naming its own part.
  */
@@ -29,8 +29,8 @@ export interface ValidationRefusal {
 }
 
 /**
- * A request body larger than its route's `bodyLimit`, as an `onRefusal`
- * hook reads it: the limit, in bytes. Its default is the 413 of
+ * A request body larger than its route's `bodyLimit`, as `refusalOf`
+ * reads it: the limit, in bytes. Its default answer is the 413 of
  * `ContentTooLargeBody`.
  */
 export interface BodyLimitRefusal {
@@ -39,17 +39,17 @@ export interface BodyLimitRefusal {
 }
 
 /**
- * Why the app refused a request before its handler ran, as an `onRefusal`
- * hook reads it, told apart by `kind`: `validation` or `body_limit`. A
- * kind added later reaches a hook that returns nothing for it as its
- * default.
+ * Why the app refused a request before its handler ran, as `refusalOf`
+ * reads it, told apart by `kind`: `validation` or `body_limit`. A
+ * middleware that answers some kinds throws the others on, so a kind
+ * added later reaches the default answer.
  */
 export type Refusal = ValidationRefusal | BodyLimitRefusal;
 
-/** The kinds of refusal, each of which `onRefusal(kind, hook)` may answer apart: `validation`, `body_limit`. */
+/** The kinds of refusal: `validation`, `body_limit`. */
 export type RefusalKind = Refusal['kind'];
 
-/** The refusal of one `Kind`, as the `onRefusal(kind, hook)` hook of that kind reads it. */
+/** The refusal of one `Kind`: `refusalOf(error)` narrowed by its `kind`. */
 export type RefusalOfKind<Kind extends RefusalKind> = Extract<
 	Refusal,
 	{ readonly kind: Kind }
@@ -103,8 +103,8 @@ export interface ContentTooLargeBody {
 /**
  * A request body larger than its route's `bodyLimit`: what reading it
  * throws, as soon as its `Content-Length` or the bytes counted pass the
- * limit. It is answered as a `body_limit` refusal: by the route's
- * `onRefusal` hook, or with its 413. The `onError` hooks never see it.
+ * limit. A middleware before the read may answer it, reading
+ * `refusalOf(error)`; the route answers its 413 otherwise.
  */
 export class ContentTooLargeError extends HttpError<413, ContentTooLargeBody> {
 	override readonly name = 'ContentTooLargeError';
@@ -125,9 +125,8 @@ export class ContentTooLargeError extends HttpError<413, ContentTooLargeBody> {
  * A request a `validate` refused: what it throws, carrying the refusal.
  * Thrown, so that a middleware before the `validate` answers it in its
  * own format — `try { return await next() } catch (error) { … }`, reading
- * `refusalOf(error)` — before the default does: the route's `onRefusal`
- * hooks, deprecated, then the 400 of `ValidationErrorBody`. The `onError`
- * hooks never see it.
+ * `refusalOf(error)` — before the route answers the 400 of
+ * `ValidationErrorBody`.
  */
 export class ValidationError extends HttpError<400, ValidationErrorBody> {
 	override readonly name = 'ValidationError';
@@ -144,7 +143,7 @@ export class ValidationError extends HttpError<400, ValidationErrorBody> {
 }
 
 /**
- * The refusal `error` is, as an `onRefusal` hook reads it: a
+ * The refusal `error` is: a
  * `ValidationError` a `validate` threw, or the `ContentTooLargeError` a
  * body past its limit throws; `undefined` for any other error. What a
  * middleware reads to answer a refusal itself:

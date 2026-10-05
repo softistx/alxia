@@ -7,7 +7,7 @@ import { ContentTooLargeError } from '../errors/errors';
  * byte; otherwise the bytes are counted as they arrive, and the read fails
  * with a `ContentTooLargeError` once they pass the limit, so a chunked
  * upload is never buffered whole. A request without a body, or whose body
- * a global hook has already read, is returned as it is.
+ * a middleware has already read, is returned as it is.
  */
 export function limitBody(request: Request, limit: number): Request {
 	const source = request.body;

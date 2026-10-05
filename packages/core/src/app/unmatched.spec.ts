@@ -122,18 +122,23 @@ describe('a request no route matches', () => {
 		expect(log).toEqual(['plugin -']);
 	});
 
-	test('an error is answered by the app’s onError hooks, an HttpError as it says', async () => {
+	test('an error is answered by a try/catch middleware around it, else an HttpError as it says, else a 500', async () => {
 		const throws = defineMiddleware(({ request }) => {
 			if (request.headers.has('x-http')) throw new HttpError(418, 'teapot');
 			throw new Error(request.headers.get('x-boom') ?? 'boom');
 		});
 		const app = alxia()
-			.use(throws)
-			.onError((error, { reply }) =>
-				error instanceof Error && error.message === 'handled'
-					? reply(503, 'handled')
-					: undefined,
-			);
+			.use(async ({ reply }, next) => {
+				try {
+					return await next();
+				} catch (error) {
+					if (error instanceof Error && error.message === 'handled') {
+						return reply(503, 'handled');
+					}
+					throw error;
+				}
+			})
+			.use(throws);
 		const handled = await app.request('/x', {
 			headers: { 'x-boom': 'handled' },
 		});

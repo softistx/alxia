@@ -4,7 +4,6 @@
  * it; and `app.use(path, ...middlewares)`, for the routes under `path`,
  * which may add nothing to the context.
  */
-import type { AnyReply } from '../reply/reply';
 import type { PathAt, RoutePath } from '../types/path';
 import type { Alxia } from './alxia';
 import type { FormSlots } from './forms';
@@ -13,37 +12,30 @@ import type { AppTypes } from './route-forms';
 import type {
 	AddedOf,
 	BaseContext,
-	MadeByDefineMiddleware,
 	MiddlewareReturn,
 	NextFunction,
 	ThreadContext,
 } from './types';
 
 /**
- * A middleware `use` takes, after the ones that returned `Before`: made by
- * `defineMiddleware`, it reads the context they built on `Ctx`.
+ * A middleware `use` takes, after the ones that returned `Before`: it
+ * reads the context they built on `Ctx`.
  */
 export type ScopeMiddleware<
 	Ctx extends object,
 	Before extends readonly unknown[],
 	Result,
-> = ((
+> = (
 	ctx: BaseContext & ThreadContext<Ctx, Before>,
 	next: NextFunction,
-) => Result) &
-	MadeByDefineMiddleware;
+) => Result;
 
 /** The app after `use` took the middlewares that returned `Results`. */
 export type AppAfterUse<
 	Ctx extends object,
 	Prefix extends string,
-	Shortcuts extends AnyReply,
 	Results extends readonly unknown[],
-> = Alxia<
-	ThreadContext<Ctx, Results>,
-	Prefix,
-	Shortcuts | Extract<Awaited<Results[number]>, AnyReply>
->;
+> = Alxia<ThreadContext<Ctx, Results>, Prefix>;
 
 /**
  * Each middleware of `Middlewares` when it adds nothing to the context, as
@@ -74,12 +66,11 @@ export type ScopePathAt<
 		: NoInfer<`Invalid path: "${Path}": a path given to use() does not end with "/"`>
 	: PathAt<Prefix, Path>;
 
-/** A middleware `use(path, …)` takes: made by `defineMiddleware`, reading `Ctx`. */
-export type PathMiddleware<Ctx extends object> = ((
+/** A middleware `use(path, …)` takes: reading `Ctx`. */
+export type PathMiddleware<Ctx extends object> = (
 	ctx: BaseContext & Ctx,
 	next: NextFunction,
-) => MiddlewareReturn) &
-	MadeByDefineMiddleware;
+) => MiddlewareReturn;
 
 declare module './forms' {
 	interface Forms<
@@ -87,44 +78,33 @@ declare module './forms' {
 		A,
 		B,
 		Results extends readonly unknown[],
-		Result,
 		Handled,
 	> {
-		readonly use: UseForm<App, Results, Result>;
+		readonly use: UseForm<App, Results>;
 	}
 }
 
 /** The app `use` is called on: a route's `AppTypes`, whose method it does not read. */
-export interface UseApp<
-	Ctx extends object,
-	Prefix extends string,
-	Shortcuts extends AnyReply,
-> extends AppTypes {
+export interface UseApp<Ctx extends object, Prefix extends string>
+	extends AppTypes {
 	readonly ctx: Ctx;
 	readonly prefix: Prefix;
-	readonly shortcuts: Shortcuts;
 }
 
 /** `app.use(...middlewares)`: no head, no tail, the app after them its result. */
 export interface UseForm<
 	App extends AppTypes,
 	Results extends readonly unknown[],
-	Result,
 > extends FormSlots {
 	readonly head: [];
-	readonly step: ScopeMiddleware<App['ctx'], Results, Result>;
+	readonly reads: BaseContext & ThreadContext<App['ctx'], Results>;
 	readonly tail: [];
-	readonly out: AppAfterUse<
-		App['ctx'],
-		App['prefix'],
-		App['shortcuts'],
-		Results
-	>;
+	readonly out: AppAfterUse<App['ctx'], App['prefix'], Results>;
 }
 
 /**
- * `app.use(...middlewares)`: middlewares made by `defineMiddleware`, run
- * on every route declared after this — not before — in this app or group,
+ * `app.use(...middlewares)`: `(ctx, next)` functions, written inline or
+ * made by `defineMiddleware`, run on every route declared after this — not before — in this app or group,
  * before the route's own middlewares, in the order given; on the app, on
  * every request no route matches too — a 404, a 405, a preflight —
  * wherever declared. What each passes `next` is added to the context of
@@ -135,21 +115,14 @@ export interface UseForm<
  * app.use(auth).get('/me', ({ user, reply }) => reply(200, user));
  * ```
  */
-export interface UseForms<
-	Ctx extends object,
-	Prefix extends string,
-	Shortcuts extends AnyReply,
-> extends Ladder<'use', UseApp<Ctx, Prefix, Shortcuts>>,
-		UsePathForm<Ctx, Prefix, Shortcuts> {}
+export interface UseForms<Ctx extends object, Prefix extends string>
+	extends Ladder<'use', UseApp<Ctx, Prefix>>,
+		UsePathForm<Ctx, Prefix> {}
 
 /** `app.use(path, ...middlewares)`. */
-export interface UsePathForm<
-	Ctx extends object,
-	Prefix extends string,
-	Shortcuts extends AnyReply,
-> {
+export interface UsePathForm<Ctx extends object, Prefix extends string> {
 	/**
-	 * Middlewares made by `defineMiddleware`, run on the requests under
+	 * Middlewares, run on the requests under
 	 * `path` that reach a route declared after this — and, on the app, on
 	 * those no route matches. The request's path is matched, compiled once
 	 * here: `/admin` is `/admin` and every path under it, `/admin/*` the
@@ -174,15 +147,5 @@ export interface UsePathForm<
 	>(
 		path: ScopePathAt<Prefix, Path>,
 		...middlewares: Middlewares & AddingNothing<Middlewares>
-	): Alxia<
-		Ctx,
-		Prefix,
-		| Shortcuts
-		| Extract<
-				Awaited<
-					ReturnType<Middlewares[number] & ((...args: never[]) => unknown)>
-				>,
-				AnyReply
-		  >
-	>;
+	): Alxia<Ctx, Prefix>;
 }

@@ -69,5 +69,4 @@ export interface OperationApp<
 	readonly method: Operation['method'];
 	readonly ctx: App['ctx'];
 	readonly prefix: App['prefix'];
-	readonly shortcuts: App['shortcuts'];
 }

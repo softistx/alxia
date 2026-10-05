@@ -68,7 +68,7 @@ export async function upgradeSocket(
 		});
 	} catch (error) {
 		(request as { error: unknown }).error = error;
-		return fail(definition, error, ctx, validateResponses);
+		return fail(error, ctx);
 	}
 }
 

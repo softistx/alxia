@@ -39,7 +39,7 @@ export function clientGone(error: unknown, request: Request): boolean {
 /**
  * What a request that failed with `error` gets. The client hanging up
  * mid-request (`clientGone`) is no app error: nothing is logged, and the
- * 499 nobody reads is only what an `onResponse` hook, a logger's, sees. Any
+ * 499 nobody reads is only what an observer, a logger's, sees. Any
  * other error is logged and answered 500.
  */
 export function failed(error: unknown, request: Request): Response {
@@ -81,8 +81,7 @@ export function send(
 
 /**
  * `reply` checked against the schema `responses` declares for its status,
- * as that schema's output: what a handler's reply and an `onRefusal`
- * hook's go through. A status with no schema, or a body its schema
+ * as that schema's output: what a reply after a `responds` goes through. A status with no schema, or a body its schema
  * refuses, throws a `ResponseValidationError`.
  */
 export async function checkReply(
