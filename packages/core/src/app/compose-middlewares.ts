@@ -39,7 +39,7 @@ export function compose<const Middlewares extends readonly Composable[]>(
 	});
 	const composed = () => {
 		throw new TypeError(
-			'compose() runs among a route’s middlewares or in use(), not called on its own',
+			"compose() runs among a route's middlewares or in use(), not called on its own",
 		);
 	};
 	const members = middlewares.flatMap((middleware) => membersOf([middleware]));

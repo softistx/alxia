@@ -13,7 +13,7 @@ nothing — what the response does that you did not expect.
 - [`Type '"de"' is not assignable to type '"en" | "fr"'`](#type-de-is-not-assignable-to-type-en--fr)
 - [`Argument of type '"cart.itmes"' is not assignable to parameter of type '"cart.items"'`](#argument-of-type-cartitmes-is-not-assignable-to-parameter-of-type-cartitems)
 - [`Property 't' does not exist on type 'Context<Empty, "/", Empty>'`](#property-t-does-not-exist-on-type-contextempty--empty)
-- [`Type 'BaseContext & Empty' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`](#type-basecontext--empty-is-missing-the-following-properties-from-type-i18noptionsreadonlyrecordstring-readonlyrecordstring-unknown-string-basecontext-resources-fallback)
+- [`Type 'I18nMiddleware<string, string, Empty>' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`](#type-i18nmiddlewarestring-string-empty-is-not-assignable-to-type-this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
 - [`Object literal may only specify known properties, and 'supported' does not exist in type 'I18nOptions<…>'`](#object-literal-may-only-specify-known-properties-and-supported-does-not-exist-in-type-i18noptions)
 - [`t()` accepts any key, typos included](#t-accepts-any-key-typos-included)
 - [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
@@ -146,19 +146,25 @@ const app = alxia()
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 ```
 
-### `Type 'BaseContext & Empty' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback`
+### `Type 'I18nMiddleware<string, string, Empty>' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`
 
 ```text
-error TS2345: Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => I18nMiddleware<keyof C & string, KeyOf<C[Fallback]>, RequiresOf<...>>' is not assignable to parameter of type 'FunctionLike & Step<BaseContext & Empty, BaseContext & Empty, MiddlewareReturn>'.
-  Type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => I18nMiddleware<keyof C & string, KeyOf<C[Fallback]>, RequiresOf<...>>' is not assignable to type 'Step<BaseContext & Empty, BaseContext & Empty, MiddlewareReturn>'.
-    Types of parameters 'options' and 'ctx' are incompatible.
-      Type 'BaseContext & Empty' is missing the following properties from type 'I18nOptions<Readonly<Record<string, Readonly<Record<string, unknown>>>>, string, BaseContext>': resources, fallback
+error TS2345: Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => I18nMiddleware<…>' is not assignable to parameter of type '…'.
+  …
+      Type 'I18nMiddleware<string, string, Empty>' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'.
 ```
 
-**When:** `app.use(createI18n)`, without calling it.
+**When:** `app.use(createI18n)`, the factory given uncalled. The message names
+`cors` as its example, whichever factory it is. It also throws where it is
+declared, since alxia 0.5, rather than answering each request with a 500:
 
-**Why:** `createI18n` makes the middleware from its options; it is not the
-middleware.
+```text
+TypeError: use(): argument 1 looks like a factory (createI18n): call it, use(createI18n())
+```
+
+**Why:** `createI18n` makes the middleware; it is not the middleware. A
+function that returns a function is no middleware, and `createI18n` is marked
+as a factory, so `use`, a route and `plugin` refuse it.
 
 **Fix:** call it once, in a module of its own, and use what it returns:
 

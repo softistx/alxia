@@ -47,8 +47,8 @@ Nothing scheduled yet.
 - **A refusal that says why.** Where there is no context, `getContext()`
   throws a `ContextStorageError` coded `OUTSIDE_REQUEST` or `NOT_ROUTED`,
   and `tryGetContext()` returns `undefined`.
-  `use(contextStorage)`, the factory uncalled, fails `tsc` and throws a
-  `TypeError` (on each request since alxia 0.5), rather than leaving the routes after it unserved.
+  `use(contextStorage)`, the factory uncalled, fails `tsc` and throws
+  where it is declared (since alxia 0.5), rather than answering its routes 500.
 - **Ported from `hono/context-storage`.** One store, and `getContext()`
   read wherever it is called, as Hono's is: code written against one ports
   to the other.

@@ -6,7 +6,7 @@ the server log, or, for what prints nothing, what you see in your traces.
 **Types**
 
 - [`Property 'span' does not exist on type 'Context<…>'`](#property-span-does-not-exist-on-type-context)
-- [`Type 'TelemetryMiddleware' is not assignable to type 'MiddlewareReturn & …'`](#type-telemetrymiddleware-is-not-assignable-to-type-middlewarereturn--)
+- [`Type 'TelemetryMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`](#type-telemetrymiddleware-is-not-assignable-to-type-this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
 - [`Property 'service' is missing in type '…' but required in type '{ readonly service: string; readonly instance?: undefined; }'`](#property-service-is-missing-in-type--but-required-in-type--readonly-service-string-readonly-instance-undefined-)
 - [`Type 'Telemetry' is not assignable to type 'undefined'`](#type-telemetry-is-not-assignable-to-type-undefined)
 - [`Object literal may only specify known properties, and 'version' does not exist in type 'Hooks & { readonly instance: Telemetry; … }'`](#object-literal-may-only-specify-known-properties-and-version-does-not-exist-in-type-hooks---readonly-instance-telemetry--)
@@ -60,22 +60,27 @@ const app = alxia()
 	});
 ```
 
-### `Type 'TelemetryMiddleware' is not assignable to type 'MiddlewareReturn & …'`
+### `Type 'TelemetryMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`
 
 ```text
-error TS2345: Argument of type '(options: TelemetryPluginOptions) => TelemetryMiddleware' is not assignable to parameter of type '((options: TelemetryPluginOptions) => TelemetryMiddleware) & Step<BaseContext & Empty, TelemetryPluginOptions, MiddlewareReturn>'.
-  Type '(options: TelemetryPluginOptions) => TelemetryMiddleware' is not assignable to type 'Step<BaseContext & Empty, TelemetryPluginOptions, MiddlewareReturn>'.
-    Type 'TelemetryMiddleware' is not assignable to type 'MiddlewareReturn & ("`traced` is missing from the context: add a middleware that gives it before this one" | "`spanName` is missing from the context: add a middleware that gives it before this one" | … )'.
+error TS2345: Argument of type '(options: TelemetryPluginOptions) => TelemetryMiddleware' is not assignable to parameter of type '…'.
+  …
+      Type 'TelemetryMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'.
 ```
 
-**When:** `app.use(telemetry)`, without calling it.
+**When:** `app.use(telemetry)`, the factory given uncalled. The message names
+`cors` as its example, whichever factory it is. It also throws where it is
+declared, since alxia 0.5, rather than answering each request with a 500:
 
-**Why:** `telemetry` makes the middleware; it is not the middleware, and it
-needs a `service` or an `instance`. Given to `use` as it is, it is read as
-a middleware whose context is its options, hence the keys said missing
-from the context.
+```text
+TypeError: use(): argument 1 looks like a factory (telemetry): call it, use(telemetry())
+```
 
-**Fix:**
+**Why:** `telemetry` makes the middleware; it is not the middleware. A
+function that returns a function is no middleware, and `telemetry` is marked
+as a factory, so `use`, a route and `plugin` refuse it.
+
+**Fix:** call it, with a `service` or an `instance`:
 
 ```ts
 alxia().use(telemetry({ service: 'checkout', exporters: [consoleExporter()] }));

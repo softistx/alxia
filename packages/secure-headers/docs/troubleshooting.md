@@ -18,7 +18,7 @@ or a header in the wrong place.
 **Runtime**
 
 - [`TypeError: secureHeaders: … is empty; give false to leave the … header out`](#typeerror-secureheaders--is-empty-give-false-to-leave-the--header-out)
-- [`GET /: a middleware (secureHeaders) returned function: return next(), a reply or a Response`](#get--a-middleware-secureheaders-returned-function-return-next-a-reply-or-a-response)
+- [`use(): argument 1 looks like a factory (secureHeaders): call it, use(secureHeaders())`](#use-argument-1-looks-like-a-factory-secureheaders-call-it-usesecureheaders)
 - [`TypeError: secureHeaders: nonce is on, but the content-security-policy has no script-src to add it to: …`](#typeerror-secureheaders-nonce-is-on-but-the-content-security-policy-has-no-script-src-to-add-it-to-)
 - [`TypeError: secureHeaders: nonce is on, but contentSecurityPolicy is false: …`](#typeerror-secureheaders-nonce-is-on-but-contentsecuritypolicy-is-false-)
 - [`TypeError: secureHeaders: contentSecurityPolicy names NONCE, but nonce is off: give nonce: true`](#typeerror-secureheaders-contentsecuritypolicy-names-nonce-but-nonce-is-off-give-nonce-true)
@@ -237,16 +237,18 @@ Only `false` leaves a header out.
 app.use(secureHeaders({ xFrameOptions: false }));
 ```
 
-### `GET /: a middleware (secureHeaders) returned function: return next(), a reply or a Response`
+### `use(): argument 1 looks like a factory (secureHeaders): call it, use(secureHeaders())`
 
-**When:** the same mistake as above in JavaScript, or past a cast:
-`alxia().use(secureHeaders)`, the factory given uncalled. Each request
-is answered with a 500, and this error is logged.
+**When:** `alxia().use(secureHeaders)`, the factory given uncalled, in
+JavaScript or past a cast. It throws where the app is declared, since
+alxia 0.5; before, each request was answered with a 500 and the log said
+`GET /: a middleware (secureHeaders) returned function: …`. TypeScript
+refuses it first, with `"this looks like a factory given uncalled: …"` in
+the error.
 
-**Why:** `use` takes a middleware, a `(ctx, next)` function. Uncalled,
-`secureHeaders` runs as one, reads the context as its options, and
-returns a middleware — a function, not `next()`, a reply or a
-`Response`.
+**Why:** `use` takes a middleware, a `(ctx, next)` function; `secureHeaders`
+makes one, and is marked as a factory, so `use`, a route and `plugin`
+refuse it.
 
 **Fix:**
 

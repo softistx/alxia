@@ -9,7 +9,7 @@ header you read in the response.
 
 - [`Type '"identity"' is not assignable to type 'Encoding'`](#type-identity-is-not-assignable-to-type-encoding)
 - [`Type 'RegExp' is not assignable to type '(type: string) => boolean'`](#type-regexp-is-not-assignable-to-type-type-string--boolean)
-- [`Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn & "the context in force here does not give what this middleware reads"'`](#type-compressmiddleware-is-not-assignable-to-type-middlewarereturn--the-context-in-force-here-does-not-give-what-this-middleware-reads)
+- [`Type 'CompressMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`](#type-compressmiddleware-is-not-assignable-to-type-this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
 
 **Responses**
 
@@ -63,21 +63,27 @@ error TS2322: Type 'RegExp' is not assignable to type '(type: string) => boolean
 app.use(compress({ compressible: (type) => /json|text\//.test(type) }));
 ```
 
-### `Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn & "the context in force here does not give what this middleware reads"'`
-
-**When:** passing `compress` to `app.use` without calling it.
+### `Type 'CompressMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`
 
 ```text
-error TS2345: Argument of type '(options?: CompressOptions | undefined) => CompressMiddleware' is not assignable to parameter of type '((options?: CompressOptions | undefined) => CompressMiddleware) & Step<BaseContext & Empty, CompressOptions | undefined, MiddlewareReturn>'.
-  Type '(options?: CompressOptions | undefined) => CompressMiddleware' is not assignable to type 'Step<BaseContext & Empty, CompressOptions | undefined, MiddlewareReturn>'.
-    Type 'CompressMiddleware' is not assignable to type 'MiddlewareReturn & "the context in force here does not give what this middleware reads"'.
+error TS2345: Argument of type '(options?: CompressOptions | undefined) => CompressMiddleware' is not assignable to parameter of type '…'.
+  …
+      Type 'CompressMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'.
 ```
 
-**Why:** `compress` builds the middleware from its options; the middleware
-is what it returns. Given uncalled, `compress` is read as a middleware itself, its
-options as the context it reads, hence the message.
+**When:** `app.use(compress)`, the factory given uncalled. The message names
+`cors` as its example, whichever factory it is. It also throws where it is
+declared, since alxia 0.5, rather than answering each request with a 500:
 
-**Fix:**
+```text
+TypeError: use(): argument 1 looks like a factory (compress): call it, use(compress())
+```
+
+**Why:** `compress` makes the middleware; it is not the middleware. A
+function that returns a function is no middleware, and `compress` is marked
+as a factory, so `use`, a route and `plugin` refuse it.
+
+**Fix:** call it, with no options for the defaults:
 
 ```ts
 app.use(compress());

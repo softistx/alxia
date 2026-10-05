@@ -55,7 +55,14 @@ A problem always carries the five members RFC 9457 defines, typed by
 
 Extension members come after them and never replace one: an extension
 named `status` is dropped. The 500 says `The server failed to answer the
-request` and nothing more: the error is logged, never sent.
+request` and nothing more: the error is logged, never sent — outside dev.
+
+In dev (`alxia({ dev })`, on unless `NODE_ENV` is `production` or `test`)
+both formats say more: the router's 404 and 405 carry a `hint` — `"did you
+mean GET /todos/:id?"`, `"/todos/1 allows GET, DELETE"` — and a 500 its
+`stack`, as a member of the body or an extension of the problem, or, to a
+browser, an HTML page of the error
+([Development](development.md#the-dev-switch)).
 
 The format is the **serving app's**: a plugin's routes, a group's, a
 `defineRoutes` file's, are answered in the format of the app that serves

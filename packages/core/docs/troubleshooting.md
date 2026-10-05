@@ -28,7 +28,10 @@ a trap that prints nothing is headed by its symptom.
 - [`Type 'undefined' is not assignable to type '…'`](#type-undefined-is-not-assignable-to-type--on-routeoperation-), and `'body' is possibly 'undefined'`, on `route(operation, …)`
 - [`Type '…' is not assignable to type 'never'` in a route's options](#type--is-not-assignable-to-type-never-in-a-routes-options)
 - [`Argument of type 'Middleware<…>[]' is not assignable to parameter of type 'OptionsOnly<FunctionLike | RouteOptions>'`](#argument-of-type-middleware-is-not-assignable-to-parameter-of-type-optionsonlyfunctionlike--routeoptions)
-- [`Expected 20 arguments, but got 11`](#expected-20-arguments-but-got-11), and the other errors of nine middlewares
+- [`… is not assignable to parameter of type '"at most 8 middlewares per route: group them with compose(...)"'`](#-is-not-assignable-to-parameter-of-type-at-most-8-middlewares-per-route-group-them-with-compose), a ninth middleware (`Expected 20 arguments, but got 11` before 0.5)
+- [`… is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`](#-is-not-assignable-to-type-this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
+- [`Type 'string' is not assignable to type '"a middleware returns next(), a reply or a Response"'`](#type-string-is-not-assignable-to-type-a-middleware-returns-next-a-reply-or-a-response)
+- [`Type 'string' is not assignable to type '{ readonly refused: "validate() and responds() belong to a route: …"; }'`](#type-string-is-not-assignable-to-type--readonly-refused-validate-and-responds-belong-to-a-route-give-them-among-its-middlewares-not-to-use-), on `use(validate(…))`
 - [`Type 'string' is not assignable to type 'MiddlewareReturn'`](#type-string-is-not-assignable-to-type-middlewarereturn)
 - [`'response' does not exist in type 'RouteOperation | RequestSchemas'`](#response-does-not-exist-in-type-routeoperation--requestschemas)
 - [`route() needs the path as a literal: declare the operation as const`](#route-needs-the-path-as-a-literal-declare-the-operation-as-const)
@@ -68,12 +71,16 @@ a trap that prints nothing is headed by its symptom.
 - [`GET /…: the handler is missing`](#get--the-handler-is-missing)
 - [`POST /…: bodyLimit must be a whole number of bytes, 0 or more; got …`](#post--bodylimit-must-be-a-whole-number-of-bytes-0-or-more-got-)
 - [``alxia(): errors must be 'json' or 'problem', not "…"``](#alxia-errors-must-be-json-or-problem-not-)
+- [``alxia(): dev must be true or false, not "…"``](#alxia-dev-must-be-true-or-false-not-)
 - [`listen(): shutdownTimeout must be a number of milliseconds, 0 or more; got …`](#listen-shutdowntimeout-must-be-a-number-of-milliseconds-0-or-more-got-)
 - [`health(): timeout must be a number of milliseconds, 0 or more; got …`](#health-timeout-must-be-a-number-of-milliseconds-0-or-more-got-), and `health(): cache …`
 - [`group(): build is missing`](#group-build-is-missing)
 - [`use(): argument 1 is an app: a plugin is given to app.plugin(), use() takes middlewares`](#use-argument-1-is-an-app-a-plugin-is-given-to-appplugin-use-takes-middlewares)
 - [`use(): argument 1 is not a function: a middleware is (ctx, next) => …`](#use-argument-1-is-not-a-function-a-middleware-is-ctx-next--)
 - [`use(): argument 1 is a validate() or responds(), which belongs to a route`](#use-argument-1-is-a-validate-or-responds-which-belongs-to-a-route)
+- [`use(): argument 1 looks like a factory (…): call it, use(…())`](#use-argument-1-looks-like-a-factory--call-it-use), and `GET /…: middleware 1 looks like a factory …`, `plugin(): argument 1 looks like a factory …`
+- [`compose(): no middleware is given`](#compose-no-middleware-is-given-and-compose-argument-1-is-not-a-function-a-middleware-is-ctx-next--), and `compose(): argument 1 is not a function …`
+- [`markFactory(): the factory is not a function`](#markfactory-the-factory-is-not-a-function)
 - [`use(): no middleware is given`](#use-no-middleware-is-given), and `use("/a/*/b"): "/a/*/b": "*" may only end a path`
 - [`use("/admin/"): a path given to use() does not end with "/"`](#useadmin-a-path-given-to-use-does-not-end-with-)
 - [`plugin(): a plugin is given alone: an app or a function that returns one; middlewares are given to use()`](#plugin-a-plugin-is-given-alone-an-app-or-a-function-that-returns-one-middlewares-are-given-to-use), and `plugin(): nothing is given: …`
@@ -93,6 +100,7 @@ a trap that prints nothing is headed by its symptom.
 - [`426 {"error":"upgrade_required"}`](#426-errorupgrade_required)
 - [`416 {"error":"range_not_satisfiable"}`](#416-errorrange_not_satisfiable)
 - [`500 {"error":"internal"}`](#500-errorinternal)
+- [A 404 carries a `hint`, a 500 a `stack` or an HTML page](#a-404-carries-a-hint-a-500-a-stack-or-an-html-page)
 - [`503 {"status":"shutting_down","checks":{}}`](#503-statusshutting_downchecks) on `/ready`
 - [`503 {"status":"down",…}`](#503-statusdown) on `/ready`
 - [A client generated with `@nxgt/openapi-codegen` refuses the 400 after `errors: 'problem'`](#a-client-generated-with-nxgtopenapi-codegen-refuses-the-400-after-errors-problem)
@@ -119,6 +127,8 @@ a trap that prints nothing is headed by its symptom.
 - [`ResponseValidationError: … the 200 reply does not match its schema`](#responsevalidationerror--the-200-reply-does-not-match-its-schema)
 - [`ResponseValidationError: … declares no 201 reply`](#responsevalidationerror--declares-no-201-reply)
 - [`TypeError: … a middleware (…) returned nothing: return next(), a reply or a Response`](#typeerror--a-middleware--returned-nothing-return-next-a-reply-or-a-response)
+- [`TypeError: … a middleware (…) returned function: it looks like a factory given uncalled, …`](#typeerror--a-middleware--returned-function-it-looks-like-a-factory-given-uncalled-call-it-use)
+- [`TypeError: compose() runs among a route's middlewares or in use(), not called on its own`](#typeerror-compose-runs-among-a-routes-middlewares-or-in-use-not-called-on-its-own)
 - [`TypeError: … a middleware called next() twice`](#typeerror--a-middleware-called-next-twice)
 - [`TypeError: … a middleware called next() after it returned`](#typeerror--a-middleware-called-next-after-it-returned)
 - [`GET /…: a middleware returned before the next() it called settled: the rest of the route ran anyway; await next(), or return it`](#get--a-middleware-returned-before-the-next-it-called-settled-the-rest-of-the-route-ran-anyway-await-next-or-return-it), a warning
@@ -775,40 +785,84 @@ throws when it is declared:
 app.get('/l', auth, handler);
 ```
 
-### `Expected 20 arguments, but got 11`
+### `… is not assignable to parameter of type '"at most 8 middlewares per route: group them with compose(...)"'`
 
-**When:** a route, `use` or `route(operation, …)` is given nine middlewares
-or more. Each form reports it its own way:
+```text
+error TS2345: Argument of type 'Middleware<Empty, Promise<Next<Empty, Empty>>>' is not assignable to parameter of type '"at most 8 middlewares per route: group them with compose(...)"'.
+```
 
-| call | what TypeScript prints |
-| --- | --- |
-| `app.get('/', m1, …, m9, handler)` | `TS2554: Expected 20 arguments, but got 11.` |
-| `app.get('/', { bodyLimit }, m1, …, m9, handler)` | `TS2345: Argument of type '{ bodyLimit: number; }' is not assignable to parameter of type '… & Step<…>'`, on the options |
-| ten or more, without options | `TS2345: Argument of type 'Middleware<…>' is not assignable to parameter of type 'OptionsOnly<Middleware<…>>'`, on the first |
-| `app.route(op, m1, …, m9, handler)` | `TS2554: Expected 2-10 arguments, but got 11.` |
-| `app.use(m1, …, m9)` | ``TS2345: Argument of type 'Middleware<…>' is not assignable to parameter of type '`/${string}`'``, on the first |
-
-The handler's parameters can then read as `any` (`TS7031`).
+**When:** a route, a route with options, `ws` or `route(operation, …)` is
+given nine middlewares or more: the error is on the ninth. On `use(m1, …,
+m9)`, whose path form takes any number, TypeScript prints `No overload
+matches this call` with this message under the first overload. Before
+0.5 the same call read `Expected 20 arguments, but got 11`.
 
 **Why:** the types thread the context one middleware at a time, through
 eight at most per call, to keep the check cheap and finite.
 
-**Fix:** split them: `use` them in two calls, they accumulate; move what
-every route of a set shares into a `use` in a group around them; or join
-two middlewares into one:
+**Fix:** join some with `compose(...)`, one middleware typed for any
+number of them, spliced into the chain where it stands; or move what
+every route of a set shares into a `use`, which accumulates:
 
 ```ts
-app.group((g) => g.use(authenticate, loadTenant)
-	.patch('/posts/:id', canEdit, loadPost, validate({ body: Update }), handler));
+const guarded = compose(session, csrf, auth, tenant, audit);
+app.patch('/posts/:id', guarded, canEdit, loadPost, validate({ body: Update }), handler);
 ```
+
+### `… is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`
+
+```text
+error TS2345: Argument of type '(options?: CorsOptions | undefined) => CorsMiddleware' is not assignable to parameter of type '…'.
+  …
+    Type 'CorsMiddleware' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'.
+```
+
+**When:** a function that makes a middleware is given in its place,
+uncalled: `use(cors)`, `get('/x', logger, handler)`. The message names
+`cors` as the example, whichever factory it is.
+
+**Why:** a middleware returns `next()`, a reply or a `Response`; a function
+that returns a function is a factory. At runtime a marked factory throws
+where it is declared ([`use(): argument 1 looks like a factory
+(…)`](#use-argument-1-looks-like-a-factory--call-it-use)).
+
+**Fix:** call it, with no options for the defaults: `use(cors())`.
+
+### `Type 'string' is not assignable to type '"a middleware returns next(), a reply or a Response"'`
+
+```text
+error TS2345: Argument of type '() => string' is not assignable to parameter of type '…'.
+    Type 'string' is not assignable to type '"a middleware returns next(), a reply or a Response"'.
+```
+
+**When:** a middleware written inline in a route, `use` or `ws` returns a
+plain value, an object or nothing. One made by `defineMiddleware` is
+refused by its own type, [below](#type-string-is-not-assignable-to-type-middlewarereturn).
+
+**Fix:** return `next()`, a reply or a `Response`.
+
+### `Type 'string' is not assignable to type '{ readonly refused: "validate() and responds() belong to a route: give them among its middlewares, not to use()"; }'`
+
+```text
+error TS2345: Argument of type 'Middleware<Empty, Next<Validated<{}>, {}>> & BuiltinMark<"validate">' is not assignable to parameter of type '…'.
+  Type '…' is not assignable to type '{ readonly '~builtin'?: { readonly refused: "validate() and responds() belong to a route: …"; }; }'.
+    Types of property ''~builtin'' are incompatible.
+```
+
+**When:** `use` is given a `validate(…)` or a `responds(…)`, or a
+`compose(…)` that holds one. It also [throws when
+declared](#use-argument-1-is-a-validate-or-responds-which-belongs-to-a-route).
+
+**Fix:** give the schemas to the route, among its middlewares:
+`app.use(auth).post('/posts', validate({ body: Post }), handler)`.
 
 ### `Type 'string' is not assignable to type 'MiddlewareReturn'`
 
-**When:** a middleware returns something other than what `next()`
-resolves to, a reply or a `Response`: a plain value, an object, or
-nothing. Made by `defineMiddleware`, the message ends in
-`'unique symbol | MiddlewareReturn'`; written inline in a route, in
-`Type 'string' is not assignable to type 'MiddlewareReturn'`:
+**When:** a middleware made by `defineMiddleware` returns something other
+than what `next()` resolves to, a reply or a `Response`: a plain value, an
+object, or nothing. The message ends in `'unique symbol |
+MiddlewareReturn'`; written inline in a route, it reads [`… '"a middleware
+returns next(), a reply or a Response"'`](#type-string-is-not-assignable-to-type-a-middleware-returns-next-a-reply-or-a-response):
 
 ```ts
 defineMiddleware(() => 'nothing');
@@ -1664,6 +1718,15 @@ const app = alxia({ errors: 'problem' }); // RFC 9457 problems, application/prob
 
 See [Errors](guide/errors.md).
 
+### `alxia(): dev must be true or false, not "…"`
+
+**When:** `alxia({ dev })` is given anything but a boolean: `dev:
+process.env.DEV`, a string.
+
+**Fix:** pass a boolean, or leave it out to read `NODE_ENV`:
+`alxia({ dev: process.env['DEV'] === '1' })`
+([Development](guide/development.md#the-dev-switch)).
+
 ### `listen(): shutdownTimeout must be a number of milliseconds, 0 or more; got …`
 
 **When:** `listen({ shutdownTimeout })` is negative, `NaN`, `Infinity`, or
@@ -1754,6 +1817,53 @@ among its middlewares, where they run.
 ```ts
 app.use(auth).post('/posts', validate({ body: Post }), responds({ 201: Post }), handler);
 ```
+
+### `use(): argument 1 looks like a factory (…): call it, use(…())`
+
+```text
+TypeError: use(): argument 1 looks like a factory (cors): call it, use(cors())
+TypeError: GET /x: middleware 1 looks like a factory (logger): call it, logger() among the route's middlewares
+TypeError: plugin(): argument 1 looks like a factory (health): call it, plugin(health())
+TypeError: plugin(): argument 1 looks like a factory (cors): call it, and give the middleware it makes to use(): use(cors())
+TypeError: use(): argument 1 looks like a factory (health): call it, and give the plugin it makes to plugin(): plugin(health())
+```
+
+**When:** a factory is given where what it makes goes, uncalled: `use(cors)`,
+a route's `logger`, `plugin(health)`; or one that makes a middleware is
+given to `plugin`, one that makes a plugin to `use`. Thrown where the app
+is declared, on a route, `ws`, `route(operation, …)`, `use(path, …)` and
+`plugin` alike. Before 0.5, `use(cors)` answered every request with a 500.
+
+**Why:** every factory alxia's packages export is marked with
+`markFactory` — `health`, `apiDocs` and `redis` as making a plugin — so
+the mistake is told where it is written. TypeScript refuses it too
+([`this looks like a factory given
+uncalled`](#-is-not-assignable-to-type-this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)).
+
+**Fix:** call it, and give what it makes where it goes:
+
+```ts
+app.use(cors()).plugin(health());
+```
+
+Mark a factory of your own the same way, `markFactory(audit)`, or
+`markFactory(myPlugin, 'plugin')` ([Development](guide/development.md#a-factory-given-uncalled)).
+
+### `compose(): no middleware is given`, and `compose(): argument 1 is not a function: a middleware is (ctx, next) => …`
+
+**When:** `compose()` is called with nothing, or with something that is
+not a function — a list, a plugin's options.
+
+**Fix:** give it the middlewares, each a `(ctx, next)` function, spread:
+`compose(...guards)`, not `compose(guards)`.
+
+### `markFactory(): the factory is not a function`
+
+**When:** `markFactory` is given anything but a function: the result of a
+factory, `markFactory(cors())`, rather than the factory.
+
+**Fix:** mark the factory itself, once, beside its declaration:
+`markFactory(cors)`.
 
 ### `use(): no middleware is given`
 
@@ -2010,6 +2120,9 @@ A 413 with no JSON body comes from Bun itself. The body passed `listen`'s
 ### `404 {"error":"not_found"}`
 
 Under `alxia({ errors: 'problem' })` the same answer is an `application/problem+json` problem ([Errors](guide/errors.md)).
+In dev, the router's 404 carries a `hint` naming the closest route it
+declares, `"did you mean GET /todos/:id?"`: read it first
+([Development](guide/development.md#the-404-hint)).
 
 **When:** a request matches no route, or a `static` or `file` route finds
 no file.
@@ -2048,7 +2161,8 @@ path: `static('/.well-known', dir)` serves the files in `dir` without it.
 Under `alxia({ errors: 'problem' })` the same answer is an `application/problem+json` problem ([Errors](guide/errors.md)).
 
 **When:** the path matches a route, but not with that method. The `Allow`
-header lists the methods it does take.
+header lists the methods it does take, and in dev the body's `hint` too:
+`"/todos/1 allows GET, DELETE"`.
 
 **Why**, when another route takes that method: the path is chosen before
 the method, as `Bun.serve` chooses it. With `GET /users/:id` and
@@ -2098,7 +2212,10 @@ app.static('/media', join(import.meta.dir, 'media'), { ranges: false });
 Under `alxia({ errors: 'problem' })` the same answer is an `application/problem+json` problem ([Errors](guide/errors.md)).
 
 **When:** a handler or a middleware throws, or a reply breaks its schema. The
-body never says why, by design.
+body never says why outside dev, by design. In dev (`alxia({ dev })`, on
+unless `NODE_ENV` is `production` or `test`) it does: a browser gets a page
+with the error and its stack, any other client a `stack` beside `error`
+([Development](guide/development.md#the-dev-error-page)).
 
 **Why:** the app prints the error with `console.error`, then answers 500.
 The next section lists the messages it prints. An error thrown in a route
@@ -2136,6 +2253,22 @@ app
 Prefer a declared `reply` to `throw new HttpError(…)`: a thrown status is
 not declared, so a client generated from the OpenAPI document does not
 expect it.
+
+### A 404 carries a `hint`, a 500 a `stack` or an HTML page
+
+**When:** the app runs in dev: `NODE_ENV` is neither `production` nor
+`test`, and `alxia({ dev })` is not given. `listen` then prints the route
+table too.
+
+**Why:** dev helps the developer running the app; the deployed one should
+say nothing of its routes nor its errors.
+
+**Fix:** where the app is deployed, set `NODE_ENV=production`, as every
+`bun create @alxia` template's `Dockerfile` does, or say so in the app:
+
+```ts
+const app = alxia({ dev: false });
+```
 
 ### `503 {"status":"shutting_down","checks":{}}`
 
@@ -2558,6 +2691,33 @@ const audit = defineMiddleware(async ({ request }, next) => {
 	return response;
 });
 ```
+
+### `TypeError: … a middleware (…) returned function: it looks like a factory given uncalled, call it, use(…())`
+
+```text
+TypeError: GET /: a middleware (audit) returned function: it looks like a factory given uncalled, call it, use(audit())
+```
+
+**When:** a factory nobody marked is given uncalled, `use(audit)`, past
+the types (JavaScript, a cast): it runs as the middleware, and returns the
+middleware it makes. Each request is answered 500. A marked factory —
+every one of alxia's packages — [throws where it is
+declared](#use-argument-1-looks-like-a-factory--call-it-use) instead.
+
+**Fix:** call it, `use(audit())`, and mark it beside its declaration,
+`markFactory(audit)`.
+
+### `TypeError: compose() runs among a route's middlewares or in use(), not called on its own`
+
+**When:** a middleware `compose(…)` made is called as a function, or given
+to something that is not an alxia route, `use` or `ws`: a wrapper of
+another framework.
+
+**Why:** its members are spliced into the chain where it stands; it does
+not run them itself.
+
+**Fix:** give it to a route, `use`, `ws`, `route(operation, …)` or another
+`compose`.
 
 ### `TypeError: … a middleware called next() twice`
 
