@@ -7,6 +7,7 @@ export {
 export {
 	bodyOf,
 	type JanusErrorBody,
+	type JanusErrorProblem,
 	type JanusErrors,
 	type JanusErrorsOptions,
 	janusErrors,
@@ -15,6 +16,7 @@ export {
 export {
 	byParam,
 	type PermissionRefusedBody,
+	type PermissionRefusedProblem,
 	permission,
 } from './permission';
 export type {
@@ -29,5 +31,6 @@ export {
 	type SessionOptions,
 	session,
 	type UnauthenticatedBody,
+	type UnauthenticatedProblem,
 } from './session';
 export type { Auth, RequestAuth, SessionOpened, UserOfAuth } from './types';

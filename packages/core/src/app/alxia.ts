@@ -19,7 +19,7 @@ import type {
 	DecorateMethod,
 	DeriveMethod,
 } from './scope-methods';
-import { startServer, stopServer } from './serving';
+import { type Serving, startServer, stopServer } from './serving';
 import type { ListenMethod, RequestMethod } from './serving-methods';
 import type { AlxiaOptions } from './signatures';
 import { type SocketData, websocketHandler } from './socket';
@@ -52,7 +52,7 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 
 	/** Its prefix, its runtime, its routes, the chain in force. */
 	readonly #state: AppState;
-	#server: Bun.Server<unknown> | undefined;
+	#serving: Serving | undefined;
 	#websocket: Bun.WebSocketHandler<SocketData> | undefined;
 
 	constructor(options: AlxiaOptions<Prefix> = {}) {
@@ -116,7 +116,7 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 
 	/** The server `listen` started, until `stop`. */
 	get server(): Bun.Server<unknown> | undefined {
-		return this.#server;
+		return this.#serving?.server;
 	}
 
 	/**
@@ -139,7 +139,8 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 	 * ```
 	 */
 	get websocket(): Bun.WebSocketHandler<SocketData> {
-		this.#websocket ??= websocketHandler(this.#state.runtime.validateResponses);
+		const { validateResponses, sockets } = this.#state.runtime;
+		this.#websocket ??= websocketHandler(validateResponses, sockets);
 		return this.#websocket;
 	}
 
@@ -147,15 +148,27 @@ export class Alxia<Ctx extends object = Empty, Prefix extends string = ''> {
 		this.fetch(new Request(new URL(path, 'http://localhost'), init));
 
 	readonly listen: ListenMethod = (options = {}) => {
-		this.#server = startServer(this.#state.runtime, options, this.websocket);
-		return this.#server;
+		this.#serving = startServer(this.#state.runtime, options, this.websocket);
+		return this.#serving.server;
 	};
 
-	/** Stops the server `listen` started, then runs every `onStop` hook. */
+	/**
+	 * Shuts the server `listen` started down, gracefully — what `SIGINT`
+	 * and `SIGTERM` run: readiness turns 503, new connections are refused,
+	 * open sockets close with 1001, the requests in flight finish within
+	 * `shutdownTimeout` — then runs every `onStop` hook. With
+	 * `closeActiveConnections`, the requests in flight are not waited for.
+	 * Called again while it runs, it returns the same promise.
+	 */
 	async stop(closeActiveConnections = false): Promise<void> {
-		const server = this.#server;
-		this.#server = undefined;
-		await stopServer(this.#state.runtime, server, closeActiveConnections);
+		const serving = this.#serving;
+		const stopped = stopServer(
+			this.#state.runtime,
+			serving,
+			closeActiveConnections,
+		);
+		await stopped;
+		if (this.#serving === serving) this.#serving = undefined;
 	}
 
 	/** A route method: its arguments read when it is called, see `RouteMethod`. */

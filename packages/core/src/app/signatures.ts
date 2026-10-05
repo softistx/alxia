@@ -2,6 +2,7 @@
  * The options of an app and of its `listen`, the types its methods are
  * written in, and what a type reads of an app.
  */
+import type { ErrorFormat } from '../errors/problems';
 import type { Alxia } from './alxia';
 import type { BaseContext } from './types';
 
@@ -15,6 +16,14 @@ export interface AlxiaOptions<Prefix extends string> {
 	 * fails is answered with a 500.
 	 */
 	readonly validateResponses?: boolean;
+	/**
+	 * How the app answers the errors it answers itself — an escaped
+	 * `HttpError`, a refusal's 400 and 413, a 500, the router's 404, 405
+	 * and 426: `json`, its `{ error: … }` bodies, by default; `problem`,
+	 * RFC 9457 problem details sent as `application/problem+json`. The app
+	 * that serves the request decides: a plugin's own option is not read.
+	 */
+	readonly errors?: ErrorFormat;
 	/**
 	 * Reads the client's address. By default, the address of the connection;
 	 * behind a proxy you trust, read its header instead.
@@ -32,6 +41,19 @@ export interface ListenOptions {
 	readonly idleTimeout?: number;
 	readonly maxRequestBodySize?: number;
 	readonly tls?: Bun.TLSOptions;
+	/**
+	 * The signals the app shuts down on, gracefully, before the process
+	 * exits — 0 once every `onStop` hook ran, 1 when one threw:
+	 * `['SIGINT', 'SIGTERM']` by default; `false` installs none, for a
+	 * process that handles its signals itself and calls `stop()`.
+	 */
+	readonly signals?: readonly NodeJS.Signals[] | false;
+	/**
+	 * How long, in milliseconds, the requests in flight have to finish once
+	 * shutdown starts, before the server closes their connections: 10 000
+	 * by default.
+	 */
+	readonly shutdownTimeout?: number;
 }
 
 /** Any app, whatever it holds. */

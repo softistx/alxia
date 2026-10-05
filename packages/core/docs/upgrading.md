@@ -19,6 +19,9 @@ and keeps one: a middleware is a plain `(ctx, next)` function.
 | [`use` takes middlewares, `plugin` takes plugins](#use-takes-middlewares-plugin-takes-plugins) | core, and every package middleware | yes: `use(plugin)`, `plugin(middleware)` and `app.plugin(cors())` throw |
 | [Types removed](#types-removed) | core, context-storage, secure-headers, zod | yes: `Alxia<Ctx, Prefix, Shortcuts>`, `MiddlewareMark`, `MadeByDefineMiddleware`, the hook types, `ContextStoragePlugin`, `NoncePlugin`, `zodConverter` |
 | [`@alxia/openapi-routes` leaves the repository](#alxiaopenapi-routes-leaves-the-repository) | openapi, openapi-routes | yes, for an import of `@alxia/openapi-routes` or of `exactly` |
+| [Problem details, opt in](#problem-details-opt-in) | core, jwt, janus | no: `errors: 'json'` stays the default |
+| [Probes: `health()`](#probes-health) | core | no: new |
+| [A graceful shutdown on `SIGTERM`](#a-graceful-shutdown-on-sigterm) | core, react-router, graphql | yes, for a process with signal handlers of its own: `listen` installs its own |
 | [What behaves differently](#what-behaves-differently) | core | yes, for a middleware that relied on a hook answering an error or a refusal first |
 
 ### One middleware form
@@ -436,6 +439,91 @@ import { matchesSpec, type MatchesSpecOptions } from '@alxia/openapi';
 
 `matchesSpec`'s messages start with `matchesSpec():`, where `exactly`'s
 started with `exactly():`.
+
+### Problem details, opt in
+
+**What changed.** `alxia({ errors: 'problem' })` answers what alxia
+answers on its own — an escaped `HttpError`, a refusal's 400 and 413, a
+500, the router's 404, 405 and 426 — as RFC 9457 problems sent as
+`application/problem+json`. `HttpError` takes an options object as its
+third argument — `type`, `title`, `detail`, `extensions`, `message`,
+`cause` — what its problem is made of; a string is still its message.
+`errorFormat(ctx)` and `problemOf(ctx, init)` answer a middleware's own
+error in the app's format; `@alxia/jwt`'s 401 and `@alxia/janus`'s
+answers follow it.
+
+```ts
+// before, and still the default
+alxia().get('/users/:id', () => {
+	throw new HttpError(404, { error: 'no_user' }, 'no user');
+}); // 404 {"error":"no_user"}
+
+// 0.5, opted in
+alxia({ errors: 'problem' }).get('/users/:id', () => {
+	throw new HttpError(404, { error: 'no_user' }, { detail: 'No user 7' });
+}); // 404 application/problem+json {"type":"about:blank","title":"Not Found","status":404,"detail":"No user 7","instance":"/users/7"}
+```
+
+A client generated with `@nxgt/openapi-codegen`'s `validationErrors`
+(on by default) expects the old 400: under `errors: 'problem'`, set it to
+`false` and declare the problems in the document
+([Errors](guide/errors.md#declaring-problems-in-the-openapi-document)).
+
+**Can it break your code.** No: nothing changes until an app sets
+`errors: 'problem'`. A later release may make `problem` the default; an
+app that wants the bodies of today then says `errors: 'json'`
+([Errors](guide/errors.md#making-it-the-default)).
+
+### Probes: `health()`
+
+**What changed.** `app.plugin(health({ checks }))` adds `GET /health`,
+liveness, and `GET /ready`, readiness: the checks run at once, each
+within `timeout`, their report cached for `cache` ms, 503 when one fails
+and from the moment the app starts shutting down. `isHealthRoute` leaves
+them out of `matchesSpec`.
+
+```ts
+// before: a route of your own, which knew nothing of the shutdown
+alxia().get('/health', ({ reply }) => reply(200, 'ok'));
+
+// 0.5
+alxia().plugin(health({ checks: { db: () => sql`select 1` } }));
+```
+
+**Can it break your code.** No.
+
+### A graceful shutdown on `SIGTERM`
+
+**What changed.** `listen` handles `SIGINT` and `SIGTERM`: readiness turns
+503, new connections are refused, open sockets close with 1001, the
+requests in flight finish within `shutdownTimeout` (10 000 ms by
+default), streams of events end, the `onStop` hooks run, then the
+process exits 0 — 1 when a hook throws. `stop()` runs the same shutdown
+without the exit, and returns the same promise when called twice.
+`@alxia/react-router`'s `start` now relies on it rather than on handlers
+of its own, and `@alxia/graphql` ends its subscriptions when the shutdown
+starts. `shutdownSignal(ctx)` ends a long response of your own.
+
+```ts
+// before
+app.listen(3000);
+process.on('SIGTERM', async () => {
+	await app.stop();
+	process.exit(0);
+});
+
+// 0.5: nothing to write; cleanup goes in onStop
+app.onStop(() => pool.end()).listen(3000);
+```
+
+**Can it break your code.** Yes, for a process that handles its signals
+itself: `listen`'s handler runs beside yours and exits once the `onStop`
+hooks ran, so code after `await app.stop()` in your handler may not run.
+Move that code into `onStop`, or keep the signals yours with
+`listen({ signals: false })`. A `stop()` now waits at most
+`shutdownTimeout` for the requests in flight, where it waited for them
+indefinitely, and closes the open sockets with 1001
+([Health and shutdown](guide/health-and-shutdown.md#graceful-shutdown)).
 
 ### What behaves differently
 

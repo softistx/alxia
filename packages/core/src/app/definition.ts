@@ -8,6 +8,7 @@ import type { Router } from '../router/router';
 import type { SocketHandlers, SocketSchema } from '../ws/types';
 import type { ScopedHooks } from './scope';
 import type { ScopePath } from './scope-path';
+import type { Served } from './served';
 import type {
 	MaybePromise,
 	Method,
@@ -103,6 +104,10 @@ export interface Runtime {
 	/** Shared with the app's groups, whose lifecycle hooks and parsers are the app's. */
 	readonly globals: Globals;
 	readonly validateResponses: boolean;
+	/** What its requests read of it: its error format, whether it is shutting down. */
+	readonly served: Served;
+	/** The sockets open on it, closed with 1001 when it shuts down. */
+	readonly sockets: Set<Bun.ServerWebSocket<unknown>>;
 	/** The `ip` option, or the address of the connection. */
 	readonly ip: (
 		request: Request,

@@ -1,3 +1,7 @@
+import { HttpError } from './http-error';
+
+export { HttpError, type HttpErrorOptions } from './http-error';
+
 /** Where a refused value was read from. */
 export type ValidationTarget =
 	| 'params'
@@ -71,28 +75,6 @@ export interface RoutingErrorBody {
 	readonly error: 'not_found' | 'method_not_allowed' | 'upgrade_required';
 }
 
-/**
- * An error a handler or a hook throws to answer with `status` and `body`.
- *
- * Prefer returning `reply(status, body)`: a reply is checked against the
- * route's `responds`, at compile time and at runtime. A thrown `HttpError`
- * is not: it answers a status the route may never have declared.
- */
-export class HttpError<
-	Status extends number = number,
-	Body = unknown,
-> extends Error {
-	override readonly name: string = 'HttpError';
-	readonly status: Status;
-	readonly body: Body;
-
-	constructor(status: Status, body: Body, message?: string) {
-		super(message ?? `HTTP ${status}`);
-		this.status = status;
-		this.body = body;
-	}
-}
-
 /** The body of the 413 a route with a `bodyLimit` answers to a larger body. */
 export interface ContentTooLargeBody {
 	readonly error: 'content_too_large';
@@ -115,7 +97,11 @@ export class ContentTooLargeError extends HttpError<413, ContentTooLargeBody> {
 		super(
 			413,
 			{ error: 'content_too_large', limit },
-			`The request body is larger than the route's limit of ${limit} bytes`,
+			{
+				message: `The request body is larger than the route's limit of ${limit} bytes`,
+				detail: `The request body is larger than the limit of ${limit} bytes`,
+				extensions: { limit },
+			},
 		);
 		this.limit = limit;
 	}
@@ -136,7 +122,11 @@ export class ValidationError extends HttpError<400, ValidationErrorBody> {
 		super(
 			400,
 			{ error: 'validation', issues: refusal.issues },
-			`The request's ${refusal.part} is invalid`,
+			{
+				message: `The request's ${refusal.part} is invalid`,
+				detail: `The request's ${refusal.part} is invalid`,
+				extensions: { issues: refusal.issues },
+			},
 		);
 		this.refusal = refusal;
 	}

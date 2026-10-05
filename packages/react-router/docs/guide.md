@@ -173,8 +173,12 @@ server build inside it, into one file:
   stay out of it.
 - **Run, it listens**: `bun build/server/index.js` listens on `PORT`
   (3000 by default) and `HOST` (`0.0.0.0`). It prints
-  `alxia listening on <url>`. On `SIGINT` or `SIGTERM` it stops the app,
-  runs its `onStop` hooks, and exits.
+  `alxia listening on <url>`. On `SIGINT` or `SIGTERM` it shuts the app
+  down as `@alxia/core`'s `listen` does: readiness turns 503, new
+  connections are refused, the requests in flight finish within
+  `shutdownTimeout` (10 s; `listen: { shutdownTimeout }` sets it), the
+  `onStop` hooks run, and the process exits
+  ([core's guide](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/health-and-shutdown.md)).
 - **Imported, it starts nothing**: prerendering, a test or another server
   can import it safely, since it listens only when it is the process's
   entry point (`import.meta.main`).
@@ -1263,5 +1267,6 @@ startup, where Bun would otherwise fetch it from npm.
   ([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#error-cannot-find-package--from-appbuildserverindexjs)).
 
 `PORT` and `HOST` set where the server listens. The platform's `SIGTERM`
-stops it once the requests in flight are answered, and runs the app's
-`onStop` hooks.
+stops it once the requests in flight are answered, within
+`shutdownTimeout`, and runs the app's `onStop` hooks. Give the platform a
+readiness probe with `@alxia/core`'s `health()`, mounted in `beforeAll`.

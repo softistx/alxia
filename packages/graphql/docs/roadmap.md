@@ -7,7 +7,12 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **Subscriptions drained on shutdown.** When the app starts shutting
+  down — `SIGTERM`, `SIGINT`, `stop()` — a subscription over server-sent
+  events ends, so `@alxia/core`'s drain answers the queries in flight and
+  exits without waiting for it; `health()` probes mount beside the
+  endpoint, and GraphQL errors stay in `errors[]` under core's problem
+  details ([endpoint guide](guide/endpoint.md#errors-health-and-shutdown)).
 
 ## Next
 

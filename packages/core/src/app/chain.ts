@@ -12,6 +12,7 @@ import { middleware } from './chain-middleware';
 import type { ChainHook } from './definition';
 import { matches, type ScopePath } from './scope-path';
 import { checkReply, isRedirect, send } from './send';
+import { streamSignal } from './served';
 import type { BaseContext, ResponseSchemas } from './types';
 import { type ChainRun, validateStep } from './validation';
 
@@ -189,7 +190,7 @@ function sent<Last>(
 ): Settles<Response | Last> {
 	if (!(result instanceof Reply)) return result;
 	const { definition, set } = run;
-	const signal = run.request.request.signal;
+	const signal = streamSignal(run.request, result.body);
 	if (
 		responses === undefined ||
 		isRedirect(result) ||

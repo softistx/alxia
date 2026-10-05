@@ -8,7 +8,7 @@ A type-safe HTTP framework for Bun, published as `@alxia/*`:
 
 | package | what it is | peers |
 | --- | --- | --- |
-| `@alxia/core` | the framework: routes and their middlewares (any `(ctx, next)` function, `defineMiddleware` to share a typed one, `validate`, `responds`, `use(...middlewares)` for the routes after it and every request no route matches, `settle`, `refusalOf`), `derive`, `decorate`, the lifecycle hooks `onStart`, `onStop` and `parser`, groups, plugins (`plugin(…)`), cookies, SSE, WebSockets; `Register`, which an app augments with `context: typeof base`, the chain that builds its context, read by `AppContext` and `defineRoutes(prefix?)`, a plugin built on that context that requires it of the app mounting it | — |
+| `@alxia/core` | the framework: routes and their middlewares (any `(ctx, next)` function, `defineMiddleware` to share a typed one, `validate`, `responds`, `use(...middlewares)` for the routes after it and every request no route matches, `settle`, `refusalOf`), `derive`, `decorate`, the lifecycle hooks `onStart`, `onStop` and `parser`, groups, plugins (`plugin(…)`), cookies, SSE, WebSockets; `alxia({ errors: 'problem' })`, alxia's own answers as RFC 9457 problems (`errorFormat`, `problemOf`, read from the serving app through `SERVED`, `served.ts`); `health()`, the probes as a plugin app; `listen`'s graceful shutdown on `SIGINT` and `SIGTERM` (`serving.ts`, one process handler per signal in `signals.ts`), `shutdownSignal(ctx)`; `Register`, which an app augments with `context: typeof base`, the chain that builds its context, read by `AppContext` and `defineRoutes(prefix?)`, a plugin built on that context that requires it of the app mounting it | — |
 | `@alxia/openapi` | OpenAPI spec first: `implemented` and `matchesSpec`, every operation `@nxgt/openapi-codegen`'s `alxia` option generates from the document has a route, read from `app.routes`, and no other, and `apiDocs`, a plugin serving the document and a Scalar or Swagger UI page (pinned CDN versions with SRI, its own Content-Security-Policy, which `secureHeaders` keeps; `matchesSpec` leaves its routes out). Formerly `@alxia/openapi-routes`, renamed at 0.4.0, after the 0.3.0 of the package that held the name and wrote a document from an app's schemas, retired; the old name was removed from the repository at 0.5. A client generator from the document is on its roadmap | core |
 | `@alxia/zod` | Zod coercions (`zq`) | zod |
 | `@alxia/graphql` | GraphQL Yoga as a route: the app's middlewares and typed context, Yoga's plugins | core, graphql-yoga, graphql |
@@ -107,7 +107,8 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   `validate` and `responds` among them, and what one passes `next` is
   typed only after it. Errors are rejections through `next()`; what no
   middleware catches is answered at the route boundary, outermost — an
-  `HttpError`'s status and body, a 500 —
+  `HttpError`'s status and body, a 500, in the serving app's `errors`
+  format (`answers.ts`) —
   and `settle(ctx, next())` gives an observer that answer early without
   swallowing the error: once the observer returns, the error goes on to
   the middlewares around it (`settled.ts`), and the response it made is

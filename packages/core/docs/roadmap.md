@@ -36,9 +36,28 @@ number on it. Every release, with each change it made, is in
   `try`/`catch` around `await next()` or, uncaught, at the route boundary.
   Each removed form throws or fails to compile with a message naming its
   replacement ([Upgrading](upgrading.md#050)).
+- **Errors as problem details, opt in.** `alxia({ errors: 'problem' })`
+  answers an escaped `HttpError`, a refusal's 400 and 413, a 500 and the
+  router's 404, 405 and 426 as RFC 9457 problems, each with `type`,
+  `title`, `status`, `detail` and `instance`; an `HttpError` carries its
+  own `type`, `detail` and extensions, and a middleware answers in the
+  app's format with `errorFormat` and `problemOf`
+  ([Errors](guide/errors.md)).
+- **Liveness and readiness probes.** `health({ checks })`, a plugin:
+  `GET /health` while the process is up, `GET /ready` from the checks,
+  each timed out and their report cached, 503 as soon as the shutdown
+  starts ([Health and shutdown](guide/health-and-shutdown.md)).
+- **A graceful shutdown.** `listen` handles `SIGTERM` and `SIGINT`:
+  readiness 503, new connections refused, sockets closed with 1001, the
+  requests in flight drained within `shutdownTimeout`, streams of events
+  and GraphQL subscriptions ended, the `onStop` hooks, then the exit
+  ([Health and shutdown](guide/health-and-shutdown.md#graceful-shutdown)).
 
 ## Next
 
+- **The probes left out of `matchesSpec` by themselves.** `@alxia/openapi`
+  skipping `health()`'s routes without an `exclude: isHealthRoute`, as no
+  operation of a document describes them.
 - **The retired client deprecated on npm.** Its last published version
   marked deprecated, pointing at the upgrading guide, once the owner runs
   the command the [upgrading guide](upgrading.md#no-more-client-spec-first)
@@ -51,6 +70,10 @@ number on it. Every release, with each change it made, is in
 
 ## Later
 
+- **Problem details by default.** `errors: 'problem'` the default in a
+  later minor, once apps have declared their problems in their documents;
+  `errors: 'json'` keeps today's bodies for an app that wants them
+  ([Errors](guide/errors.md#making-it-the-default)).
 - **Comments on a stream.** A handler yielding a comment line of its own
   (`: …`), beside the keep-alive the stream already sends while idle.
 

@@ -5,10 +5,17 @@
  */
 import { HttpError } from '../errors/errors';
 import { Reply, toResponse } from '../reply/reply';
+import {
+	clientGone,
+	errorReply,
+	failed,
+	routingError,
+	routingReply,
+} from './answers';
 import { chain } from './chain';
 import { routeContext } from './context';
 import type { Globals, RouteDefinition, Runtime } from './definition';
-import { clientGone, failed, routingError, send } from './send';
+import { send } from './send';
 import { RUN, runOf, settledResponse } from './settled';
 import type { BaseContext, Method, RequestContext } from './types';
 import type { ChainRun } from './validation';
@@ -67,22 +74,15 @@ export function unmatched(
 	status: 404 | 405 | 426,
 	allowed?: readonly string[],
 ): Promise<Response> | Response {
-	const error =
-		status === 404
-			? 'not_found'
-			: status === 405
-				? 'method_not_allowed'
-				: 'upgrade_required';
 	const hooks = runtime.unmatched();
 	if (hooks.derive.length === 0) {
-		return routingError(status, error, allowed);
+		return routingError(request, status, allowed);
 	}
-	const headers = allowed === undefined ? {} : { allow: allowed.join(', ') };
 	const definition: RouteDefinition = {
 		method: request.request.method as Method,
 		path: request.url.pathname,
 		schema: {},
-		handler: () => new Reply(status, { error }, { headers }),
+		handler: () => routingReply(request, status, allowed),
 		...hooks,
 	};
 	return handle(
@@ -103,11 +103,9 @@ export function unmatched(
  * reads, and nothing is logged.
  */
 export function fail(error: unknown, ctx: BaseContext): Response {
-	if (clientGone(error, ctx.request)) return failed(error, ctx.request);
-	if (error instanceof HttpError) {
-		return send(new Reply(error.status, error.body), ctx.set);
-	}
-	return failed(error, ctx.request);
+	if (clientGone(error, ctx.request)) return failed(error, ctx);
+	if (error instanceof HttpError) return send(errorReply(error, ctx), ctx.set);
+	return failed(error, ctx);
 }
 
 /**
@@ -151,9 +149,12 @@ export async function settle<Settled extends Response>(
 
 /** `settle` on a context no route runs: an `HttpError` as it says, a 500. */
 function outside(ctx: object, error: unknown): Response {
-	const { request } = ctx as Partial<BaseContext>;
+	const { request = new Request('http://localhost'), url } =
+		ctx as Partial<BaseContext>;
+	const at = url === undefined ? { request } : { request, url };
 	if (error instanceof HttpError) {
-		return toResponse(error.status, error.body, new Headers());
+		const reply = errorReply(error, { ...ctx, ...at });
+		return toResponse(reply.status, reply.body, new Headers(reply.headers));
 	}
-	return failed(error, request ?? new Request('http://localhost'));
+	return failed(error, { ...ctx, ...at });
 }

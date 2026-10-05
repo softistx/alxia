@@ -3,6 +3,7 @@ import {
 	type Empty,
 	type Middleware,
 	type Next,
+	type Problem,
 	type Reply,
 	settle,
 	withHeaders,
@@ -10,6 +11,7 @@ import {
 import type { Session } from '@nxgt/janus';
 import { type DeviceCookieOptions, deviceOf } from './device';
 import { authenticateOnce, type Found } from './lookup';
+import { refused } from './refused';
 import { sendSession, signOut } from './send';
 import type { Auth, RequestAuth, UserOfAuth } from './types';
 
@@ -31,6 +33,9 @@ export interface SessionOptions<T extends string> {
 export interface UnauthenticatedBody {
 	readonly error: 'unauthenticated';
 }
+
+/** The 401 a required session answers under `alxia({ errors: 'problem' })`. */
+export type UnauthenticatedProblem = Problem<401>;
 
 type UserOf<A, T> = Extract<UserOfAuth<A>, { readonly type: T }>;
 
@@ -75,7 +80,7 @@ export function session<
 	options: SessionOptions<T> & { readonly required: true },
 ): SessionMiddleware<
 	Given<UserOf<A, T>, Session>,
-	Reply<401, UnauthenticatedBody>
+	Reply<401, UnauthenticatedBody | UnauthenticatedProblem>
 >;
 export function session<
 	A extends Auth<{ readonly type: string }>,
@@ -92,7 +97,7 @@ export function session<
 	options?: SessionOptions<T>,
 ): SessionMiddleware<
 	Given<UserOf<A, T> | null, Session | null>,
-	Reply<401, UnauthenticatedBody>
+	Reply<401, UnauthenticatedBody | UnauthenticatedProblem>
 >;
 export function session(
 	auth: Auth<{ readonly type: string }>,
@@ -100,10 +105,10 @@ export function session(
 ): unknown {
 	const unauthenticated: UnauthenticatedBody = { error: 'unauthenticated' };
 	return defineMiddleware(async (ctx, next) => {
-		const { request, reply } = ctx;
+		const { request } = ctx;
 		const found = await authenticateOnce(auth, request, options.type);
 		if (found === null && options.required === true) {
-			return reply(401, unauthenticated);
+			return refused(ctx, 401, unauthenticated, 'The request has no session');
 		}
 		const bound: RequestAuth = {
 			device: deviceOf(ctx, options.device),

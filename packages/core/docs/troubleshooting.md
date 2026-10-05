@@ -67,6 +67,9 @@ a trap that prints nothing is headed by its symptom.
 - [`validate(): the schemas are not an object`](#validate-the-schemas-are-not-an-object), and `responds(): …`
 - [`GET /…: the handler is missing`](#get--the-handler-is-missing)
 - [`POST /…: bodyLimit must be a whole number of bytes, 0 or more; got …`](#post--bodylimit-must-be-a-whole-number-of-bytes-0-or-more-got-)
+- [``alxia(): errors must be 'json' or 'problem', not "…"``](#alxia-errors-must-be-json-or-problem-not-)
+- [`listen(): shutdownTimeout must be a number of milliseconds, 0 or more; got …`](#listen-shutdowntimeout-must-be-a-number-of-milliseconds-0-or-more-got-)
+- [`health(): timeout must be a number of milliseconds, 0 or more; got …`](#health-timeout-must-be-a-number-of-milliseconds-0-or-more-got-), and `health(): cache …`
 - [`group(): build is missing`](#group-build-is-missing)
 - [`use(): argument 1 is an app: a plugin is given to app.plugin(), use() takes middlewares`](#use-argument-1-is-an-app-a-plugin-is-given-to-appplugin-use-takes-middlewares)
 - [`use(): argument 1 is not a function: a middleware is (ctx, next) => …`](#use-argument-1-is-not-a-function-a-middleware-is-ctx-next--)
@@ -90,6 +93,9 @@ a trap that prints nothing is headed by its symptom.
 - [`426 {"error":"upgrade_required"}`](#426-errorupgrade_required)
 - [`416 {"error":"range_not_satisfiable"}`](#416-errorrange_not_satisfiable)
 - [`500 {"error":"internal"}`](#500-errorinternal)
+- [`503 {"status":"shutting_down","checks":{}}`](#503-statusshutting_downchecks) on `/ready`
+- [`503 {"status":"down",…}`](#503-statusdown) on `/ready`
+- [A client generated with `@nxgt/openapi-codegen` refuses the 400 after `errors: 'problem'`](#a-client-generated-with-nxgtopenapi-codegen-refuses-the-400-after-errors-problem)
 - [A plugin's route reads a body past the app's `bodyLimit()`](#a-plugins-route-reads-a-body-past-the-apps-bodylimit)
 
 **Middlewares**
@@ -125,6 +131,11 @@ a trap that prints nothing is headed by its symptom.
 - [`TypeError: The event "…" is not declared: …`](#typeerror-the-event--is-not-declared-), and `An event of a named stream is an object { event, data }`
 - [`TypeError: An event name must not hold a line break or a NUL`](#typeerror-an-event-name-must-not-hold-a-line-break-or-a-nul), and `An event name must not be empty`, `A named event stream declares at least one event`, `The event "…" is not a Standard Schema`
 - [`Type 'string' is not assignable to type '"ping"'` on a named stream](#type-string-is-not-assignable-to-type-ping-on-a-named-stream)
+
+**Shutting down**
+
+- [The process exits before my own `SIGTERM` handler finishes](#the-process-exits-before-my-own-sigterm-handler-finishes)
+- [Shutdown takes 10 seconds](#shutdown-takes-10-seconds)
 
 **WebSockets**
 
@@ -1634,6 +1645,63 @@ the server's:
 app.post('/upload', { bodyLimit: 25 * 1024 * 1024 }, handler);
 ```
 
+### ``alxia(): errors must be 'json' or 'problem', not "…"``
+
+**When:** `alxia({ errors })` is given anything but `'json'` or `'problem'`:
+a misspelt `'problems'`, `true`, or a value read from the environment that
+is unset.
+
+**Why:** the option picks the shape of the app's own answers, and no other
+value names one. The message ends with what was given, as JSON.
+
+**Fix:** give one of the two; `'json'` is the default:
+
+```ts
+import { alxia } from '@alxia/core';
+
+const app = alxia({ errors: 'problem' }); // RFC 9457 problems, application/problem+json
+```
+
+See [Errors](guide/errors.md).
+
+### `listen(): shutdownTimeout must be a number of milliseconds, 0 or more; got …`
+
+**When:** `listen({ shutdownTimeout })` is negative, `NaN`, `Infinity`, or
+not a number, `'10s'` for instance. It is thrown by `listen`, before the
+server starts.
+
+**Why:** the timeout is how long a shutdown waits for the requests in
+flight, in milliseconds.
+
+**Fix:** give a finite number of milliseconds; `0` closes what is open at
+once:
+
+```ts
+app.listen({ port: 3000, shutdownTimeout: 5_000 });
+```
+
+See [Health and shutdown](guide/health-and-shutdown.md).
+
+### `health(): timeout must be a number of milliseconds, 0 or more; got …`
+
+**When:** `health({ timeout })` is negative, `NaN`, `Infinity` or not a
+number. `health({ cache })` throws the same message, `health(): cache must
+be …`. Both are thrown when `health()` is called, before any request.
+
+**Why:** `timeout` bounds each readiness check and `cache` is how long a
+report is kept, both in milliseconds.
+
+**Fix:** give finite numbers of milliseconds; `cache: 0` runs the checks on
+every probe:
+
+```ts
+import { health } from '@alxia/core';
+
+app.plugin(health({ checks, timeout: 1_000, cache: 1_000 }));
+```
+
+See [Health and shutdown](guide/health-and-shutdown.md).
+
 ### `group(): build is missing`
 
 **When:** `group('/admin')` is called without its function.
@@ -1788,6 +1856,8 @@ The app answers these itself. Their bodies are the exported
 
 ### `400 {"error":"validation","issues":[…]}`
 
+Under `alxia({ errors: 'problem' })` the same answer is an `application/problem+json` problem, the `issues` an extension ([Errors](guide/errors.md)).
+
 **When:** a request reaches a `validate(…)` whose `params`, `query`,
 `headers`, `cookies` or `body` schema refuses it, or the schema of an
 operation given to `route()`. Every issue is listed, each with the part it was read
@@ -1884,6 +1954,8 @@ rethrows a `body_limit` refusal. Answer it too to answer it in your format
 
 ### `413 {"error":"content_too_large","limit":…}`
 
+Under `alxia({ errors: 'problem' })` the same answer is an `application/problem+json` problem, the `limit` an extension ([Errors](guide/errors.md)).
+
 **When:** a request's body is larger than its route's `bodyLimit`: the
 route's own, or the one a `bodyLimit(bytes)` before it set. Either its
 `Content-Length` says so, and the body is not read, or the bytes counted as
@@ -1937,6 +2009,8 @@ A 413 with no JSON body comes from Bun itself. The body passed `listen`'s
 
 ### `404 {"error":"not_found"}`
 
+Under `alxia({ errors: 'problem' })` the same answer is an `application/problem+json` problem ([Errors](guide/errors.md)).
+
 **When:** a request matches no route, or a `static` or `file` route finds
 no file.
 
@@ -1971,6 +2045,8 @@ path: `static('/.well-known', dir)` serves the files in `dir` without it.
 
 ### `405 {"error":"method_not_allowed"}`
 
+Under `alxia({ errors: 'problem' })` the same answer is an `application/problem+json` problem ([Errors](guide/errors.md)).
+
 **When:** the path matches a route, but not with that method. The `Allow`
 header lists the methods it does take.
 
@@ -1983,6 +2059,8 @@ method you call at the path that answers. `HEAD` is answered by the `GET`
 route.
 
 ### `426 {"error":"upgrade_required"}`
+
+Under `alxia({ errors: 'problem' })` the same answer is an `application/problem+json` problem ([Errors](guide/errors.md)).
 
 **When:** a request reaches a `ws` route without a WebSocket upgrade, or
 through `app.fetch` / `app.request`, which have no server to upgrade with.
@@ -2016,6 +2094,8 @@ app.static('/media', join(import.meta.dir, 'media'), { ranges: false });
 ```
 
 ### `500 {"error":"internal"}`
+
+Under `alxia({ errors: 'problem' })` the same answer is an `application/problem+json` problem ([Errors](guide/errors.md)).
 
 **When:** a handler or a middleware throws, or a reply breaks its schema. The
 body never says why, by design.
@@ -2056,6 +2136,68 @@ app
 Prefer a declared `reply` to `throw new HttpError(…)`: a thrown status is
 not declared, so a client generated from the OpenAPI document does not
 expect it.
+
+### `503 {"status":"shutting_down","checks":{}}`
+
+**When:** `GET /ready`, the readiness path of `health()`, answers it from
+the moment the app starts to shut down: after a `SIGINT` or `SIGTERM`, or a
+call to `app.stop()`. No check is run.
+
+**Why:** this is expected, not a fault. A shutdown turns readiness to 503
+first, so that a load balancer stops sending traffic while the requests in
+flight finish.
+
+**Fix:** none, for a deploy or a restart. If it shows with no shutdown, look
+for what stopped the app, a signal handler or an `app.stop()` of yours.
+`GET /health`, liveness, keeps answering 200 until the process exits. See
+[Health and shutdown](guide/health-and-shutdown.md).
+
+### `503 {"status":"down",…}`
+
+**When:** `GET /ready` answers it with a check that failed:
+
+```json
+{ "status": "down", "checks": { "redis": { "status": "down", "duration": 1002, "reason": "timeout" } } }
+```
+
+`reason` is `"timeout"` when the check outlasted `timeout`, or `"failed"`
+when it threw, rejected or returned `false`.
+
+**Why:** the dependency is down or slow. The error's message is left out of
+the response on purpose, as a probe may be public; it is not printed
+either.
+
+**Fix:** check the dependency the name points to. For a `timeout`, raise
+`timeout` if the check is only slow, and keep it under the probe's own
+timeout, or the probe gives up first:
+
+```ts
+app.plugin(health({ checks: { redis: () => redis.ping() }, timeout: 2_000 }));
+```
+
+### A client generated with `@nxgt/openapi-codegen` refuses the 400 after `errors: 'problem'`
+
+**When:** the app is switched to `alxia({ errors: 'problem' })`, and a
+client generated from its OpenAPI document throws on a 400, or on any
+other error, though the server answers as it should.
+
+**Why:** with `validationErrors` on, its default, the generated client
+declares the 400 as `{ error: 'validation', issues }` under
+`application/json`. A problem arrives as `application/problem+json` with
+another shape. The server is not at fault: the `alxia` emitter never
+declares the 400.
+
+**Fix:** turn the generated 400 off, and declare the error responses in
+`openapi.yaml` as `application/problem+json`, referencing a `Problem` or
+`ValidationProblem` schema ([Errors](guide/errors.md)):
+
+```ts
+// openapi-codegen.config.ts
+export default {
+	// …
+	validationErrors: false,
+};
+```
 
 ### A plugin's route reads a body past the app's `bodyLimit()`
 
@@ -2676,6 +2818,70 @@ async function* pings(): AsyncGenerator<EventInput<typeof Push>> {
 	yield { event: 'ping', data: { interval: 30 } };
 }
 ```
+
+## Shutting down
+
+What `listen`'s graceful shutdown does on `SIGTERM` and `SIGINT`
+([Health and shutdown](guide/health-and-shutdown.md#graceful-shutdown)).
+
+### The process exits before my own `SIGTERM` handler finishes
+
+**When:** the app is served with `listen`, and your own `process.on('SIGTERM', …)`
+does asynchronous cleanup that never completes: the process exits first.
+
+**Why:** since 0.5, `listen` installs `SIGINT` and `SIGTERM` handlers and
+shuts down gracefully: readiness 503, new connections refused, sockets
+closed with 1001, the requests in flight drained, the `onStop` hooks, then
+`process.exit(0)`, or `process.exit(1)` when an `onStop` hook throws (its
+error is printed). Yours runs beside it, and the exit does not wait for it.
+
+**Fix:** move the cleanup into an `onStop` hook, which the shutdown awaits:
+
+```ts
+app.onStop(async () => {
+	await queue.drain();
+});
+```
+
+Or take the signals yourself, and stop the app from your handler:
+
+```ts
+app.listen({ port: 3000, signals: false });
+process.on('SIGTERM', async () => {
+	await cleanup();
+	await app.stop();
+	process.exit(0);
+});
+```
+
+A second signal during the drain exits at once with 1. See
+[Health and shutdown](guide/health-and-shutdown.md).
+
+### Shutdown takes 10 seconds
+
+**When:** a `SIGTERM` or `SIGINT` does not end the process until
+`shutdownTimeout` has passed, 10 000 ms by default.
+
+**Why:** a request in flight that never ends holds the drain: a long poll,
+or a streamed body that is not an event stream. At the timeout the server
+closes what is left. Streams of events a route replies with, and
+`@alxia/graphql` subscriptions, end by themselves when shutdown starts.
+
+**Fix:** end the request when the shutdown starts, with `shutdownSignal`, an
+`AbortSignal` aborted at that moment:
+
+```ts
+import { shutdownSignal } from '@alxia/core';
+
+app.get('/poll', async (ctx) => {
+	// waitForMessages: your own, resolving with [] once either signal aborts
+	const messages = await waitForMessages(AbortSignal.any([ctx.request.signal, shutdownSignal(ctx)]));
+	return ctx.reply(200, messages);
+});
+```
+
+Or lower the wait, `listen({ shutdownTimeout: 3_000 })`. See
+[Health and shutdown](guide/health-and-shutdown.md).
 
 ## WebSockets
 

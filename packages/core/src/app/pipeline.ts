@@ -2,9 +2,11 @@
  * The whole of a request: routing, then the route's own run or the
  * socket's upgrade.
  */
+
+import { failed } from './answers';
 import { handle, unmatched } from './boundary';
 import type { Definition, Runtime } from './definition';
-import { failed } from './send';
+import { SERVED } from './served';
 import { UPGRADED, upgradeSocket } from './socket';
 import type { RequestContext } from './types';
 
@@ -26,12 +28,13 @@ export async function serve(
 		ip: runtime.ip(request, server),
 		route: undefined,
 		error: undefined,
-	};
+		[SERVED]: runtime.served,
+	} as RequestContext;
 	try {
 		const response = await route(runtime, ctx, path);
 		return response === UPGRADED ? (undefined as never) : response;
 	} catch (error) {
-		return failed(error, ctx.request);
+		return failed(error, ctx);
 	}
 }
 

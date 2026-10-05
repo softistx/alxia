@@ -16,6 +16,11 @@ number on it. Every release, with each change it made, is in
   `@alxia/core`'s `Register` names when this package's names no server, so
   an app that registers its context once types its loaders too. This
   package's `Register` still wins when both are declared.
+- **One graceful shutdown.** `start` relies on `@alxia/core`'s `listen`,
+  which handles `SIGINT` and `SIGTERM` itself, before `onListen` as
+  before: the requests in flight drain within `shutdownTimeout`
+  (`listen: { shutdownTimeout }`), readiness turns 503, the `onStop`
+  hooks run, then the process exits.
 
 ## Next
 

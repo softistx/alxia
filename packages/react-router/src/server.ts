@@ -67,7 +67,8 @@ export interface ServerOptions<Before extends AnyAlxia, App extends AnyAlxia> {
 	 */
 	readonly client?: string | URL | false;
 	/**
-	 * `listen`'s options for `bun build/server/index.js`; a `port` or `hostname` here wins over `PORT` (3000)
+	 * `listen`'s options for `bun build/server/index.js` — `shutdownTimeout`,
+	 * `signals` among them; a `port` or `hostname` here wins over `PORT` (3000)
 	 * and `HOST` (`0.0.0.0`) from the environment.
 	 */
 	readonly listen?: ListenOptions;
@@ -93,9 +94,10 @@ export interface ReactRouterServer<App extends AnyAlxia> {
 	 */
 	create(wiring: ServerWiring): App;
 	/**
-	 * Listens with `app`, on `listen`, `PORT` and `HOST`, and stops it on
-	 * `SIGINT` or `SIGTERM`: its `onStop` hooks run, and the process exits.
-	 * What `bun build/server/index.js` runs.
+	 * Listens with `app`, on `listen`, `PORT` and `HOST`, and shuts it down
+	 * gracefully on `SIGINT` or `SIGTERM`, as `@alxia/core`'s `listen` does:
+	 * the requests in flight finish within `shutdownTimeout`, its `onStop`
+	 * hooks run, and the process exits. What `bun build/server/index.js` runs.
 	 */
 	start(app: App): Bun.Server<unknown>;
 }
@@ -153,20 +155,10 @@ export function createServer<
 				hostname: process.env['HOST'] || '0.0.0.0',
 				...options.listen,
 			});
-			// Stop as the platform asks: the app's onStop hooks run, and the process ends.
-			// Installed before onListen: a supervisor may signal as soon as it reads
-			// that the server listens, and a signal with no handler yet kills the process.
-			for (const signal of ['SIGINT', 'SIGTERM'] as const) {
-				process.once(signal, () => {
-					void app.stop().then(
-						() => process.exit(0),
-						(error: unknown) => {
-							console.error(error);
-							process.exit(1);
-						},
-					);
-				});
-			}
+			// `listen` shuts the app down on SIGINT and SIGTERM — readiness 503,
+			// the requests in flight drained, the onStop hooks, then the exit —
+			// with its handlers in place before it returns, so before onListen:
+			// a supervisor may signal as soon as it reads that the server listens.
 			(options.onListen ?? announce)(server);
 			return server;
 		},
