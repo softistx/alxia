@@ -104,7 +104,7 @@
     },
     "packages/create": {
       "name": "@alxia/create",
-      "version": "0.3.1",
+      "version": "0.3.2",
       "bin": {
         "create-alxia": "./dist/index.js",
       },
@@ -201,7 +201,7 @@
     },
     "packages/jwt": {
       "name": "@alxia/jwt",
-      "version": "0.3.1",
+      "version": "0.4.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
@@ -239,7 +239,7 @@
     },
     "packages/openapi": {
       "name": "@alxia/openapi",
-      "version": "0.5.1",
+      "version": "0.6.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@alxia/secure-headers": "workspace:^",
