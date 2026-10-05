@@ -36,6 +36,25 @@ const RESOLVED_SERVER = `\0${SERVER}`;
 const RESOLVED_DEFAULT = `\0${DEFAULT}`;
 
 /**
+ * Whether there is a server to be: not in the Vite server React Router
+ * compiles route modules in, nor in a single-page app. Throws when the
+ * server build would be split in several.
+ */
+function servesApp(resolved: ResolvedConfig): boolean {
+	// React Router compiles route modules in a Vite server of its own,
+	// with every plugin but its own: there is nothing to serve there.
+	if (isChildCompiler(resolved)) return false;
+	const rr = contextOf(resolved);
+	// A single-page app has no server to be.
+	if (rr.ssr && rr.serverBundles !== undefined) {
+		throw new Error(
+			`${NAME}: serverBundles splits React Router's server build in several, and alxia serves one. Remove serverBundles from react-router.config.ts.`,
+		);
+	}
+	return rr.ssr;
+}
+
+/**
  * The Vite plugin that makes alxia the server of a React Router app,
  * anywhere in `plugins`:
  *
@@ -89,20 +108,7 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 		},
 		configResolved(resolved) {
 			config = resolved;
-			// React Router compiles route modules in a Vite server of its own,
-			// with every plugin but its own: there is nothing to serve there.
-			if (isChildCompiler(resolved)) {
-				enabled = false;
-				return;
-			}
-			const rr = contextOf(resolved);
-			// A single-page app has no server to be.
-			enabled = rr.ssr;
-			if (enabled && rr.serverBundles !== undefined) {
-				throw new Error(
-					`${NAME}: serverBundles splits React Router's server build in several, and alxia serves one. Remove serverBundles from react-router.config.ts.`,
-				);
-			}
+			enabled = servesApp(resolved);
 		},
 		resolveId(id) {
 			if (id === SERVER) return RESOLVED_SERVER;

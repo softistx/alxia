@@ -14,6 +14,12 @@ export const CLIENT = join(FIXTURE, 'build', 'client');
 export const BROWSER =
 	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
 
+/** The headers of a browser's request. */
+export const browser = { 'user-agent': BROWSER };
+
+/** React's server renderer puts a comment between adjacent text nodes. */
+export const text = (html: string) => html.replaceAll('<!-- -->', '');
+
 let built: Promise<ServerBuild> | undefined;
 
 /** The fixture's server build, built on first use. */
