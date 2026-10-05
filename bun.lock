@@ -253,7 +253,7 @@
     },
     "packages/proxy": {
       "name": "@alxia/proxy",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@alxia/jwt": "workspace:^",
