@@ -235,7 +235,9 @@ proxy set the header rather than appending to it; with `Forwarded`, the
 client wrote to the left is never read. Under a hop count, a request whose
 address entry is missing or malformed — fewer entries than hops, the sign
 it did not come through every proxy — has neither read, as its `ctx.ip` is
-the connection's.
+the connection's. A `Forwarded` element whose `for=` is an obfuscated
+identifier (`_hidden`, `unknown`) counts as no address there: name the
+proxies by range to read its `proto=` and `host=`.
 
 **What is valid.** The scheme is `http` or `https`, in any case; the host
 is a bare `host[:port]` — a name, an IPv4 address, or an IPv6 address in
