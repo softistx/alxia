@@ -141,7 +141,11 @@ export function importKey(
 		const spec = SPECS[algorithm];
 		key =
 			jwk.kty === 'RSA' && !modulusFits(jwk)
-				? Promise.reject(new TypeError('RSA key outside 2048 to 8192 bits'))
+				? Promise.reject(
+						new TypeError(
+							'RSA key outside 2048 to 8192 bits, or with an even or trivial exponent',
+						),
+					)
 				: crypto.subtle.importKey(
 						'jwk',
 						publicMembers(jwk),
@@ -154,12 +158,24 @@ export function importKey(
 	return key;
 }
 
+/** An odd public exponent of at least 3, which Web Crypto in Bun does not insist on. */
+function exponentFits(jwk: Jwk): boolean {
+	if (typeof jwk['e'] !== 'string') return false;
+	const bytes = Buffer.from(jwk['e'], 'base64url');
+	const last = bytes.at(-1) ?? 0;
+	return (
+		last % 2 === 1 &&
+		bytes.some((byte, i) => byte > (i === bytes.length - 1 ? 1 : 0))
+	);
+}
+
 function modulusFits(jwk: Jwk): boolean {
 	if (typeof jwk['n'] !== 'string') return false;
 	const bytes = Buffer.from(jwk['n'], 'base64url');
 	// A leading zero byte is padding, not size.
-	const size = bytes.length - bytes.findIndex((byte) => byte !== 0);
-	return size >= MIN_MODULUS && size <= MAX_MODULUS;
+	const first = bytes.findIndex((byte) => byte !== 0);
+	const size = first === -1 ? 0 : bytes.length - first;
+	return size >= MIN_MODULUS && size <= MAX_MODULUS && exponentFits(jwk);
 }
 
 export const verifyParams = (algorithm: JwksAlgorithm) =>

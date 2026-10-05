@@ -26,7 +26,7 @@ imported with Web Crypto.
 | Option | Default | Meaning |
 | --- | --- | --- |
 | `jwks` | | the key set's URL; `https`, or `http` on localhost |
-| `discovery` | | instead of `jwks`, never both: an issuer URL, whose `/.well-known/openid-configuration` names the set (`jwks_uri`, which must be `https`); the document must name that same issuer, compared byte for byte, trailing slash included, and `issuer` defaults to it |
+| `discovery` | | instead of `jwks`, never both: an issuer URL, as a string (not a `URL`), whose `/.well-known/openid-configuration` names the set (`jwks_uri`, which must be `https`); the document must name that same issuer, compared byte for byte, trailing slash included, and `issuer` defaults to it |
 | `issuer`, `audience` | with `jwks`, none; with `discovery`, `issuer` is the discovery URL | checked against `iss` and `aud` |
 | `clockTolerance` | `5` | seconds of skew allowed on `exp` and `nbf` |
 | `cacheMs` | `600_000` | how long a fetched set is used, when the response has no `Cache-Control: max-age` |
@@ -95,8 +95,9 @@ the algorithm-confusion attack has nothing to work with.
 
 The fetch is strict: `https` only (plain `http` on localhost, for a local
 provider), no redirects, at most 256 KiB (counted as the body streams in), `application/json` asked for. An
-RSA key outside 2048 to 8192 bits is refused, and a `jwks_uri` read from a
-discovery document must be `https`, whatever the configured URL allows.
+RSA key outside 2048 to 8192 bits, or with an even or trivial exponent, is
+refused, and a `jwks_uri` read from a discovery document must be `https`,
+unless the issuer itself is on localhost.
 
 ## Keycloak
 

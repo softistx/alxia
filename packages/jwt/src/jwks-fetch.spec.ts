@@ -77,6 +77,24 @@ describe('what is fetched', () => {
 		);
 	});
 
+	test('an all-zero modulus and a trivial exponent are refused', async () => {
+		const server = issuer([key]);
+		servers.push({ stop: () => server.stop() });
+		const n = base64url(new Uint8Array(256));
+		const real = String(key.jwk.n);
+		server.keys = [
+			{ kty: 'RSA', kid: 'zero', n, e: 'AQAB' },
+			{ kty: 'RSA', kid: 'one', n: real, e: 'AQ' },
+		];
+		const jwt = createJwt({ jwks: server.jwksUrl, refetchMs: 0 });
+		for (const kid of ['zero', 'one']) {
+			expect(await jwt.verify(await signWith(key, {}, { kid }))).toEqual({
+				ok: false,
+				reason: 'key',
+			});
+		}
+	});
+
 	test('jwks and discovery together are refused', () => {
 		expect(() =>
 			createJwt({

@@ -115,7 +115,7 @@ export interface Issuer {
 	/** Requests answered, by path. */
 	readonly hits: Record<string, number>;
 	/** What the next JWKS answers: the keys, and the headers. */
-	keys: JsonWebKey[];
+	keys: object[];
 	headers: Record<string, string>;
 	/** Answer 500 on the JWKS while true. */
 	failing: boolean;

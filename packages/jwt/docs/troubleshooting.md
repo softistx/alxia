@@ -522,7 +522,7 @@ const web = createJwt({ secret, audience: 'web' }); // accepts it
 **When:** a verifier created with `jwks` or `discovery` finds no key for
 the token: its `kid` is not in the set (even after a refetch), it has no
 `kid` and the set has no single key that fits, or the key is an RSA key
-outside 2048 to 8192 bits.
+outside 2048 to 8192 bits, or with an even or trivial exponent.
 
 **Why:** the token was signed by a key this issuer does not publish: another
 issuer or realm, a key already removed from the set, or a key added to the
