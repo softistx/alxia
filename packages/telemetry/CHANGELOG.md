@@ -1,5 +1,16 @@
 # @alxia/telemetry
 
+## 0.7.0
+
+### Minor Changes
+
+- [#197](https://github.com/softistx/alxia/pull/197) [`0795c96`](https://github.com/softistx/alxia/commit/0795c966499a5fc5b4b35311a6f65811afc9383d) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Record `url.scheme`, `server.address` and `server.port` from core's `originalUrl(ctx)`: behind `alxia({ proxy: trustProxy(…) })`, a request a trusted TLS proxy forwarded is traced as `https` and the public host, not the app's own. Without `proxy`, or from a connection that is not a trusted proxy, nothing changes.
+
+### Patch Changes
+
+- Updated dependencies [[`79fbd81`](https://github.com/softistx/alxia/commit/79fbd81a9e1d9e72cbd9d733085fbc8d73d3ed72), [`c7c994a`](https://github.com/softistx/alxia/commit/c7c994a48eeaa4b069bc81e0eeb73aa7217dd12e)]:
+  - @alxia/core@0.11.0
+
 ## 0.6.2
 
 ### Patch Changes

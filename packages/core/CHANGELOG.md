@@ -1,5 +1,15 @@
 # @alxia/core
 
+## 0.11.0
+
+### Minor Changes
+
+- [#200](https://github.com/softistx/alxia/pull/200) [`79fbd81`](https://github.com/softistx/alxia/commit/79fbd81a9e1d9e72cbd9d733085fbc8d73d3ed72) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `app.all(path, options?, ...middlewares, handler)` declares one route for every method at a path, typed as `get`'s — the same middlewares, `validate`, `responds`, options, `defineRoutes` and `Register` — and listed in `app.routes`, the dev route table and the 404 hint as `ALL`. `app.all(path, options?, end)` ends it with a middleware that answers in place of a handler, such as `@alxia/proxy`'s `proxy(url)`: its `Response` is sent, its `next()` answers 404. A route of the path's own method wins over it whatever the order declared, a `HEAD` goes to the path's `GET` first, a socket's upgrade needs a `ws` route, and its path never answers 405. `RouteDefinition['method']` gains `'ALL'`. Every route method now shares one set of forms (`RouteApp<Method, …>`), so an app's methods are typed once: a route's type error names `RouteApp<Method, …>` where it named the method.
+
+### Patch Changes
+
+- [#202](https://github.com/softistx/alxia/pull/202) [`c7c994a`](https://github.com/softistx/alxia/commit/c7c994a48eeaa4b069bc81e0eeb73aa7217dd12e) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs: the upgrading guide's 0.11.0 section covers every change of the release a core user may meet — `app.all` and its precedence, `ALL` in `app.routes`, the type-error text `RouteApp<Method, …>`, the peers' move to `^0.11.0`, and what `@alxia/proxy`, `@alxia/telemetry`, `@alxia/openapi`, `@alxia/secure-headers` and `@alxia/create` changed alongside — and the roadmaps' "Next release" headings carry their real versions.
+
 ## 0.10.1
 
 ### Patch Changes

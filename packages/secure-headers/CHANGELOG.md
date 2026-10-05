@@ -1,5 +1,13 @@
 # @alxia/secure-headers
 
+## 0.4.6
+
+### Patch Changes
+
+- [#200](https://github.com/softistx/alxia/pull/200) [`79fbd81`](https://github.com/softistx/alxia/commit/79fbd81a9e1d9e72cbd9d733085fbc8d73d3ed72) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Troubleshooting quotes the type error core now prints, `RouteBase<RouteApp<Method, Empty, "">, "/">`.
+- Updated dependencies [[`79fbd81`](https://github.com/softistx/alxia/commit/79fbd81a9e1d9e72cbd9d733085fbc8d73d3ed72), [`c7c994a`](https://github.com/softistx/alxia/commit/c7c994a48eeaa4b069bc81e0eeb73aa7217dd12e)]:
+  - @alxia/core@0.11.0
+
 ## 0.4.5
 
 ### Patch Changes
