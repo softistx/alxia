@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.3.1
+
+### Patch Changes
+
+- [#165](https://github.com/softistx/alxia/pull/165) [`16c8ff2`](https://github.com/softistx/alxia/commit/16c8ff298cec31d4dded5244f6cadc234cbef30f) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The README and the guide describe the `graphql` template's per-request DataLoader: `src/loaders.ts`, `createLoaders()`, the `Context` with `loaders`, the `Note.author` resolver and `dataloader` among its dependencies.
+
 ## 0.3.0
 
 ### Minor Changes

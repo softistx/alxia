@@ -104,7 +104,7 @@
     },
     "packages/create": {
       "name": "@alxia/create",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "bin": {
         "create-alxia": "./dist/index.js",
       },
@@ -145,7 +145,7 @@
     },
     "packages/graphql": {
       "name": "@alxia/graphql",
-      "version": "0.3.1",
+      "version": "0.4.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@types/bun": "^1.4.2",
