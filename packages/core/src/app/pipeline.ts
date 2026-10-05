@@ -23,20 +23,27 @@ export async function serve(
 	server: Bun.Server<unknown> | undefined,
 	path: string | undefined,
 ): Promise<Response> {
-	const forwarded = runtime.proxy?.(request, server);
-	const ctx: RequestContext = {
+	const ctx = {
 		request,
 		url: new URL(request.url),
 		server,
-		ip: forwarded === undefined ? runtime.ip(request, server) : forwarded.ip,
+		ip: undefined,
 		route: undefined,
 		error: undefined,
 		[SERVED]: runtime.served,
-		[ORIGIN]: forwarded?.origin,
+		[ORIGIN]: undefined,
 	} as RequestContext;
-	if (forwarded?.refused === true)
-		return untrustedProxy(ctx, forwarded.refusal);
 	try {
+		// Reading the address runs the app's code (a `trusted` function, an
+		// `ip` option): a throw there lands at the boundary, on a context that
+		// holds nothing the request said.
+		const forwarded = runtime.proxy?.(request, server);
+		Object.assign(ctx, {
+			ip: forwarded === undefined ? runtime.ip(request, server) : forwarded.ip,
+			[ORIGIN]: forwarded?.origin,
+		});
+		if (forwarded?.refused === true)
+			return untrustedProxy(ctx, forwarded.refusal);
 		const response = await route(runtime, ctx, path);
 		return response === UPGRADED ? (undefined as never) : response;
 	} catch (error) {

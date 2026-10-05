@@ -56,6 +56,10 @@ const app = alxia({ ip: forwardedIp({ trusted: 1 }) }) // one proxy in front
 	.use(rateLimit({ limit: 100, windowMs: 60_000 }));
 ```
 
+With `@alxia/core` 0.10 or later, one client is counted once however its
+address is written (IPv4-mapped, IPv6 in any case or zero run, with a port or
+brackets), since `ctx.ip` is its canonical text.
+
 Never key by the first entry of `X-Forwarded-For` (`split(',')[0]`): the client
 writes it, so a new value in each request is a new allowance. `forwardedIp`
 reads the entry your proxy appended

@@ -1,7 +1,7 @@
-# Upgrading to the next release
+# Upgrading
 
 This page lists what each release changes for an app built on
-`@alxia/core`, the next one first: what changed, the code before and
+`@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
 ## 0.10.0
@@ -2013,9 +2013,8 @@ returned: a middleware written without `defineMiddleware`,
 guarded a request. Now it throws
 `use(): the plugin function returned a promise, not an app: …`; wrap it in
 `defineMiddleware`. Replace each `.use(app)` by `.plugin(app)` and each
-`.plugin(middleware)` by `.use(middleware)`. In the next minor, the plugin
-forms of `use` and the middleware form of `plugin` are removed
-([Roadmap](roadmap.md)).
+`.plugin(middleware)` by `.use(middleware)`. 0.5 removed the plugin forms of
+`use` and the middleware form of `plugin` ([0.5.0](#050)).
 
 New exports: the types `PluginMethod` and `MountedIn`, the context of the
 routes after a plugin. `Mounted` and `RequiredIn` now come
