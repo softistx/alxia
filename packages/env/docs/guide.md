@@ -1,8 +1,11 @@
 # Guide
 
-This page covers how `parseEnv` reads the environment, how a schema turns
-its strings into typed values, what it throws when one is wrong, and how to
-test a module that reads it.
+[`defineEnv`](define-env.md) is the form to start from: one schema per
+variable, secrets redacted, a `.env.example` from the schema. This page covers
+`parseEnv`, which checks one object schema over the whole environment, and
+what both share: how the environment is read, how a schema turns its strings
+into typed values, what is thrown when one is wrong, and how to test a module
+that reads it.
 
 ```ts
 import { parseEnv } from '@alxia/env';

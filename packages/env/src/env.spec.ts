@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { z } from 'zod';
-import { EnvError, parseEnv } from './env';
+import { parseEnv } from './env';
+import { EnvError } from './error';
 
 const Env = z.object({
 	PORT: z.coerce.number().int().default(3000),
