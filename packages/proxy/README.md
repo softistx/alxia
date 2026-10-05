@@ -120,7 +120,7 @@ app whose context does not give it.
 | `rewrite` | none | a prefix to strip, or `(path) => string`; the query is kept |
 | `rebase` | `false` (`proxy.mount`: its prefix) | `true` or a prefix: `Location` and cookie `Domain`/`Path` put back under it |
 | `preserveHost` | `false` | send the client's `Host` |
-| `xForwarded` | `true` | `X-Forwarded-For`, `-Proto`, `-Host` |
+| `xForwarded` | `true` | `X-Forwarded-For`, `-Proto`, `-Host`; the last two are `originalUrl(ctx)`'s scheme and host, so the public ones behind `alxia({ proxy: trustProxy(…) })` |
 | `trustForwarded` | `false` | keep the incoming `X-Forwarded-Proto` and `-Host` |
 | `forwarded` | `false` | add an RFC 7239 `Forwarded` element |
 | `headers` | none | `{ request?, response? }`: a record, or a function `(headers, ctx) => void` |

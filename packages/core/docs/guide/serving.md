@@ -260,6 +260,9 @@ function trustProxy(options: TrustProxyOptions): ProxyTrust;
 proxies said: change it freely, the request's URL stays. `ctx.url` itself
 is never rewritten, so routing, `ctx.url.pathname` and every package
 reading it see the request as it reached the app.
+`@alxia/telemetry`'s `url.scheme`, `server.address` and `server.port`, and the
+`X-Forwarded-Proto` and `-Host` that `@alxia/proxy` sends upstream, read it:
+the public scheme and host behind a trusted proxy.
 
 **What is believed.** The scheme and host are read only from a connection
 `trusted` names — under ranges or a function, a peer they hold; under a

@@ -344,6 +344,22 @@ telemetry({ service: 'checkout', exporters: [consoleExporter()], traceResponse: 
 
 ## Unexpected spans
 
+### `url.scheme` is `http` and `server.address` the internal host behind a TLS proxy
+
+**When:** the app sits behind a TLS-terminating proxy and its spans say `http` and `app.internal`, not `https` and the public host.
+
+**Why:** the span reads `originalUrl(ctx)`, which is the request's own URL until the app declares its proxies: a forwarded header from a connection that is not a trusted proxy is never believed.
+
+**Fix:** declare the proxies, and have the outermost one overwrite `X-Forwarded-Proto` and `X-Forwarded-Host`:
+
+```ts
+import { alxia, trustProxy } from '@alxia/core';
+
+const app = alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) }).use(
+	telemetry({ service: 'orders' }),
+);
+```
+
 ### The span starts a new trace although the caller sent `traceparent`
 
 **When:** the server span has no parent, and a trace id of its own.

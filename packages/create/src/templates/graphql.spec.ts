@@ -121,7 +121,7 @@ describe('the graphql template', () => {
 		const read = [...source.matchAll(/^\s+(\w+): z\b/gm)].map(
 			([, name]) => name,
 		);
-		expect(read.sort()).toEqual(['PORT']);
+		expect(read.sort()).toEqual(['PORT', 'TRUSTED_PROXIES']);
 		for (const name of read)
 			expect(example).toMatch(new RegExp(`^(# )?${name}=`, 'm'));
 	});
@@ -129,5 +129,5 @@ describe('the graphql template', () => {
 	test("typechecks under this repository's strictest settings", () =>
 		expectTypechecks(dir));
 
-	test('its spec passes', () => expectSpecPasses(dir, 8), 30_000);
+	test('its spec passes', () => expectSpecPasses(dir, 12), 30_000);
 });

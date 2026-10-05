@@ -346,6 +346,18 @@ byte, is cut. A slow body after the headers is not (server-sent events
 pass).
 **Fix:** raise `timeout`, or send the headers early from the upstream.
 
+### The upstream's `X-Forwarded-Proto` is `http` behind a TLS proxy
+
+**Why:** the headers are `originalUrl(ctx)`'s, which is the request as the app received it until the app declares its proxies; a forged header from a connection that is not a trusted proxy is never believed.
+**Fix:** declare them, and the upstream gets the scheme and host the outermost proxy said:
+
+```ts
+const app = alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) }).use(
+	'/api',
+	proxy('http://10.0.0.5:3000'),
+);
+```
+
 ### The upstream sees its own `Host`, not the client's
 
 **Why:** by default `Host` is the upstream's, and the client's is in

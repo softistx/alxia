@@ -75,7 +75,9 @@ Nothing scheduled yet.
   unreachable upstream closes the client with `BAD_GATEWAY_CLOSE` (1014).
 - **Forwarding headers.** `X-Forwarded-For`, `-Proto` and `-Host` by default,
   an RFC 7239 `Forwarded` header with `forwarded`, `trustForwarded` behind a
-  proxy you trust, and `preserveHost` for virtual hosts. Hop-by-hop headers
+  proxy you trust, and `preserveHost` for virtual hosts. `X-Forwarded-Proto`,
+  `-Host` and `Forwarded`'s `proto` and `host` are core's `originalUrl(ctx)`:
+  behind `alxia({ proxy: trustProxy(…) })`, what the trusted proxy said. Hop-by-hop headers
   are stripped both ways.
 - **Header edits.** `headers.request` and `headers.response` set, remove or
   compute a header, with the typed context of the middlewares before the
