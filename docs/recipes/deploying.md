@@ -190,6 +190,12 @@ const app = alxia({
 });
 ```
 
+The `api` and `graphql` templates already do the first, behind one opt-in
+variable: set `TRUSTED_PROXIES` to the load balancer's ranges, and the base
+declares `trustProxy({ trusted, untrusted: 'refuse' })`; unset, nothing
+changes, and the Docker and orchestrator probes keep working either way
+([Behind a proxy](../../packages/create/docs/guide.md#behind-a-proxy)).
+
 Either way, `ctx.ip` is the client's address in one canonical text, IPv6
 compressed and an IPv4-mapped address as IPv4, so a rate limit counts one
 client once however the socket or the proxy wrote it
