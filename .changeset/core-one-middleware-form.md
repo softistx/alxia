@@ -1,0 +1,9 @@
+---
+"@alxia/core": minor
+---
+
+One middleware form. Every form deprecated in 0.4 is removed: the request hooks `onRequest`, `onResponse`, `onError`, `onRefusal`, `around` and `wrap`, the `[hooks]` list of a route, `defineHook` and `defineWrap`; the 0.3 route form `(path, schema, handler)` and a schema in a route's options; `use(plugin)` and `plugin(middleware)`; `Alxia`'s third type parameter, `Shortcuts` — the class is `Alxia<Ctx, Prefix>`; `MiddlewareMark` and `MadeByDefineMiddleware`. `docs/upgrading.md` shows what replaces each.
+
+A middleware is any `(ctx, next)` function: `use(...)`, a route's middlewares, `ws(path, ...)` and `route(operation, ...)` take one written inline, what it passes `next` typed into the middlewares and the handler after it. `defineMiddleware` stays, to share a typed middleware. An error that escapes a route is answered where the route ends: an `HttpError` with its status, anything else with a 500; a middleware answers one itself with a `try`/`catch` around `await next()`, and `refusalOf(error)` reads a refused request. `defineMiddleware(fn)`, given no `Requires`, reads the `Register`ed context — the rule `defineRoutes` and `AppContext` follow — instead of the base context alone; `defineMiddleware<Requires>()(fn)` still overrides it, and a middleware the registered base is itself built with says `defineMiddleware<Empty>()(fn)`. `derive`, `decorate`, `onStart`, `onStop`, `parser`, `settle` and its observers are unchanged.
+
+A middleware that reads what the context in force does not give is one TypeScript error on that middleware, on TypeScript 6 as on 7, naming the key: "`user` is missing from the context: add a middleware that gives it before this one", "`user` is in the context with another type than this middleware reads", "the path parameter `id` is not in this route's path" — instead of "No overload matches this call".

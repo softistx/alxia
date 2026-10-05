@@ -2,12 +2,8 @@
  * `defineMiddleware`: a middleware written once, typed, and given to as
  * many routes as read it.
  */
-import type {
-	Empty,
-	Middleware,
-	MiddlewareReturn,
-	NoMiddlewareYet,
-} from './types';
+import type { RegisteredContext } from './register';
+import type { Middleware, MiddlewareReturn, NoMiddlewareYet } from './types';
 
 /**
  * A middleware: `(ctx, next) => …`, given to a route after its path, or
@@ -49,14 +45,20 @@ import type {
  * );
  * ```
  *
+ * Given a middleware alone, it reads the `Register`ed context — the `db`,
+ * the `env`, the `user` the registered base gives — as `defineRoutes` and
+ * `AppContext` do, and is refused on a route whose context does not give
+ * it; nothing registered, the base context alone. `Requires`, given, is
+ * read instead: `defineMiddleware<Empty>()(fn)` for one that reads nothing
+ * of it, such as one the registered base itself is built with.
+ *
  * The middleware is the function itself: `use`, a route and `ws` take a
  * plain `(ctx, next)` function as well, written inline, its additions
  * read from what it returns. `defineMiddleware` gives a shared one its
- * type: what it reads — a `Register`ed context, a `user` — and what it
- * returns.
+ * type: what it reads and what it returns.
  */
 export function defineMiddleware<
-	Requires extends object = Empty,
+	Requires extends object = RegisteredContext,
 	Result extends MiddlewareReturn | NoMiddlewareYet = NoMiddlewareYet,
 >(
 	middleware?: Middleware<Requires, Result>,

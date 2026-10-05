@@ -63,10 +63,17 @@ export type RegisteredBase = RegisteredOf<Register>;
  * export async function listTodos({ db, user }: AppContext) { … }
  * ```
  *
- * A middleware that reads it says so, and is then refused on a route
- * whose context does not give it: `defineMiddleware<AppContext>()(fn)`.
+ * `defineMiddleware(fn)` reads it too, and is then refused on a route
+ * whose context does not give it.
  */
 export type AppContext = ContextOf<RegisteredBase>;
+
+/**
+ * What the registered app adds to the base context: what
+ * `defineMiddleware`, given no `Requires`, reads. `Empty` when nothing is
+ * registered.
+ */
+export type RegisteredContext = RegisteredBase['~context'];
 
 /**
  * What `defineRoutes` starts from: the registered context, with the
