@@ -130,12 +130,13 @@ TypeError: implemented(): 2 operations have no route: GET /pets/:petId (getPet),
 import { matchesSpec } from '@alxia/openapi';
 
 matchesSpec(app, operations, {
-	exclude: (route) => route.path === '/health',
+	exclude: (route) => route.path === '/metrics',
 });
 ```
 
 `matchesSpec` throws as `implemented` does, and also lists each route no
-operation declares, `exclude` aside:
+operation declares, `exclude` aside. The routes of `apiDocs()` and the
+probes of `@alxia/core`'s `health()` are left out already:
 
 ```text
 TypeError: matchesSpec(): 1 operation has no route: GET /pets/:petId (getPet); 1 route has no operation: POST /admin/reset
@@ -238,7 +239,7 @@ The core's side of the move is in its
 | export | |
 | --- | --- |
 | `implemented(app, operations, options?)`, `ImplementedOptions` | throws a `TypeError` listing each operation with no route, or one with the core's reason for an operation path no route may be declared at. `prefix` |
-| `matchesSpec(app, operations, options?)`, `MatchesSpecOptions` | the same, and each route no operation declares. `prefix`, `exclude` |
+| `matchesSpec(app, operations, options?)`, `MatchesSpecOptions` | the same, and each route no operation declares — `apiDocs()`'s and `@alxia/core`'s `health()` probes left out. `prefix`, `exclude` |
 | `apiDocs(options)`, `ApiDocsOptions`, `DocsUi`, `DocsServer` | a plugin: the page at `path`, the document at `path/openapi.yaml` and `.json`. `spec`, `path`, `ui`, `title`, `servers`, `enabled` |
 | `isApiDocsRoute(route)` | whether `apiDocs` declared a route; `matchesSpec` leaves them out already |
 | `Operations` | what both take: an object of core's `RouteOperation`, or a list of them |

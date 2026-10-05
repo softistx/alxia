@@ -805,7 +805,7 @@ app.listen({ port: 3000, shutdownTimeout: 15_000 });
 Each check has a `timeout`, and the report is cached for `cache` ms so
 probes do not hammer the dependencies. `shutdownSignal(ctx)` ends a long
 response when the shutdown starts; streams of events end by themselves.
-`isHealthRoute` leaves the probes out of `matchesSpec`:
+`@alxia/openapi`'s `matchesSpec` leaves the probes out by itself:
 [Health and shutdown](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/health-and-shutdown.md).
 
 ## API
@@ -826,7 +826,7 @@ response when the shutdown starts; streams of events end by themselves.
 | `ErrorFormat`, `errorFormat(ctx)` | `'json' \| 'problem'`, and the format of the app serving the request: what a middleware reads to answer its own error as alxia would |
 | `Problem<Status, Extensions>`, `ValidationProblem`, `ContentTooLargeProblem`, `ProblemInit`, `problemOf(ctx, init)` | a problem as alxia sends it — `type`, `title`, `status`, `detail`, `instance`, then its extensions — the 400's and the 413's, and the problem `init` describes on a request, its defaults filled as alxia fills them |
 | `health(options?)`, `HealthOptions`, `HealthCheck`, `CheckResult`, `ReadinessReport`, `LivenessReport` | the probes as a plugin app: `GET /health`, 200 while the process is up; `GET /ready`, the checks run at once with a `timeout`, cached for `cache` ms, 200 or 503, and 503 from the moment shutdown starts |
-| `isHealthRoute(route)` | whether a route is one of `health()`'s: `matchesSpec`'s `exclude` |
+| `isHealthRoute(route)` | whether a route is one of `health()`'s, wherever mounted: what `@alxia/openapi`'s `matchesSpec` leaves out |
 | `shutdownSignal(ctx)` | an `AbortSignal` aborted as soon as the app serving the request starts shutting down: what a long response ends on |
 | `ValidationError`, `refusalOf(error)` | what `validate` throws — an `HttpError` of the 400, its `refusal` `{ kind: 'validation', part, issues }` and its default `body` — and what reads the `Refusal` of it or of a `ContentTooLargeError`, else `undefined`: how a middleware before a `validate` answers a refusal |
 | `settle(ctx, next())` | for a middleware that must see the final response: resolves to what `next()` resolved to or, when it rejected, to the answer the route boundary would give — an `HttpError` with its status and body, a 500 — with the error on `ctx.error` |

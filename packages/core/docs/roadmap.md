@@ -46,7 +46,8 @@ number on it. Every release, with each change it made, is in
 - **Liveness and readiness probes.** `health({ checks })`, a plugin:
   `GET /health` while the process is up, `GET /ready` from the checks,
   each timed out and their report cached, 503 as soon as the shutdown
-  starts ([Health and shutdown](guide/health-and-shutdown.md)).
+  starts, left out of `@alxia/openapi`'s `matchesSpec` by themselves
+  ([Health and shutdown](guide/health-and-shutdown.md)).
 - **A graceful shutdown.** `listen` handles `SIGTERM` and `SIGINT`:
   readiness 503, new connections refused, sockets closed with 1001, the
   requests in flight drained within `shutdownTimeout`, streams of events
@@ -55,9 +56,6 @@ number on it. Every release, with each change it made, is in
 
 ## Next
 
-- **The probes left out of `matchesSpec` by themselves.** `@alxia/openapi`
-  skipping `health()`'s routes without an `exclude: isHealthRoute`, as no
-  operation of a document describes them.
 - **The retired client deprecated on npm.** Its last published version
   marked deprecated, pointing at the upgrading guide, once the owner runs
   the command the [upgrading guide](upgrading.md#no-more-client-spec-first)

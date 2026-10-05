@@ -19,6 +19,10 @@ number on it. Every release, with each change it made, is in
   aliases of `matchesSpec` and `MatchesSpecOptions`: import
   `implemented` and `matchesSpec` from `@alxia/openapi`, same options and
   messages. Ships as 0.5.0.
+- **The probes left out of `matchesSpec`.** The routes of `@alxia/core`'s
+  `health()` are no operation of a document, and `matchesSpec` skips them
+  as it skips `apiDocs()`'s, with no `exclude`
+  ([the checks](guide/checks.md#matchesspec)).
 
 ## Next
 

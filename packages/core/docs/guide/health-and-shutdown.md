@@ -90,15 +90,16 @@ every second, would be most of it.
 
 ### `matchesSpec` and `isHealthRoute`
 
-The probes are no operation of the OpenAPI document. Leave them out of
-`@alxia/openapi`'s check with `isHealthRoute`, which tells `health()`'s
-routes from any other, whatever their path:
+The probes are no operation of the OpenAPI document, and
+`@alxia/openapi`'s `matchesSpec` leaves them out by itself, wherever they
+are mounted: nothing to `exclude`. It tells them apart with
+`isHealthRoute`, which tells `health()`'s routes from any other, whatever
+their path — for a check of your own over `app.routes`:
 
 ```ts
 import { isHealthRoute } from '@alxia/core';
-import { matchesSpec } from '@alxia/openapi';
 
-matchesSpec(app, operations, { exclude: isHealthRoute });
+const documented = app.routes.filter((route) => !isHealthRoute(route));
 ```
 
 ### Kubernetes
