@@ -56,6 +56,9 @@ Nothing scheduled yet.
 - **The same names as Hono's.** The attributes are
   `@nxgt/telemetry-hono`'s, exported as constants, so a span from either
   reads the same in a dashboard.
+- **The public scheme and host behind a proxy.** `url.scheme`,
+  `server.address` and `server.port` read `originalUrl(ctx)`: behind
+  `alxia({ proxy: trustProxy(…) })`, what the trusted proxy said.
 - **Your telemetry, or one built for you.** `service` with
   `@nxgt/telemetry`'s options, or an existing `instance`, adopted; `traced`
   and `spanName` to choose and name the spans. Routes read `span` and

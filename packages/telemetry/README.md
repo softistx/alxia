@@ -67,13 +67,15 @@ app.listen(3000);
 | attribute | |
 | --- | --- |
 | `http.request.method`, `url.path`, `url.scheme` | the request |
-| `server.address`, `server.port`, `client.address` | where it was addressed, and from |
+| `server.address`, `server.port`, `client.address` | where it was addressed, and from; behind `alxia({ proxy: trustProxy(…) })`, the scheme and host the trusted proxy said (`https`, the public host) |
 | `http.route` | the route, once matched |
 | `http.response.status_code` | the status |
 | `graphql.operation.name`, `graphql.operation.type` | behind `@alxia/graphql`: the operation's name (when it has one) and type, with the span renamed `query GetNotes`; see below |
 
 They are `@nxgt/telemetry-hono`'s names: a span from either reads the same
-in a dashboard.
+in a dashboard. `url.scheme`, `server.address` and `server.port` read core's
+`originalUrl(ctx)`, so they are the public ones behind a trusted proxy and the
+request's own otherwise.
 
 Behind `@alxia/graphql`, the span follows OpenTelemetry's GraphQL
 conventions: it is named `<type> <name>` (`query GetNotes`, or `mutation`

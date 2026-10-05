@@ -68,15 +68,16 @@ const app = alxia()
 
 The upstream gets its own host. `preserveHost: true` sends the client's, for
 an upstream that serves virtual hosts. `X-Forwarded-Host` carries the client's
-host in both cases.
+host in both cases. Behind `alxia({ proxy: trustProxy(…) })`, "the client's" is
+what the trusted proxy said (core's `originalUrl(ctx)`), so a chain stays truthful.
 
 ## Forwarding headers
 
 | Option | Default | Effect |
 | --- | --- | --- |
-| `xForwarded` | `true` | appends the peer to `X-Forwarded-For`, sets `X-Forwarded-Proto` (the scheme the app received) and `X-Forwarded-Host` (the client's `Host`) |
+| `xForwarded` | `true` | appends the peer to `X-Forwarded-For`, sets `X-Forwarded-Proto` (the scheme the client used) and `X-Forwarded-Host` (the host it asked for): the request's own, or, behind `alxia({ proxy: trustProxy(…) })`, what the trusted proxy said |
 | `trustForwarded` | `false` | keeps the incoming `X-Forwarded-Proto` and `-Host` when present: only for an app behind a proxy you trust |
-| `forwarded` | `false` | appends an RFC 7239 element: `for=203.0.113.9;host=api.example.com;proto=https` (an IPv6 address quoted: `"[::1]"`) |
+| `forwarded` | `false` | appends an RFC 7239 element: `for=203.0.113.9;host=api.example.com;proto=https` (an IPv6 address quoted: `"[::1]"`), `host` and `proto` as above |
 
 ```ts
 import { alxia } from '@alxia/core';

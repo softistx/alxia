@@ -240,9 +240,9 @@ await app.request('/range'); // 400; the span is ok, with no exception: the midd
 | --- | --- | --- | --- |
 | `http.request.method` | `HTTP_METHOD` | `GET` | always |
 | `url.path` | `URL_PATH` | `/orders/o-1` | always |
-| `url.scheme` | `URL_SCHEME` | `http` | always |
-| `server.address` | `SERVER_ADDRESS` | the request URL's host name | always |
-| `server.port` | `SERVER_PORT` | `3000`, a number | when the request URL names a port |
+| `url.scheme` | `URL_SCHEME` | `http`; `https` behind a trusted TLS proxy | always |
+| `server.address` | `SERVER_ADDRESS` | the host name the client asked for | always |
+| `server.port` | `SERVER_PORT` | `3000`, a number | when that host names a port |
 | `client.address` | `CLIENT_ADDRESS` | the caller's address, as the app's `ip` option reads it | when there is one: not through `app.request` |
 | `http.route` | `HTTP_ROUTE` | `/orders/:id` | once routing matched |
 | `http.response.status_code` | `HTTP_STATUS` | `200`, a number | always |
@@ -250,7 +250,15 @@ await app.request('/range'); // 400; the span is ok, with no exception: the midd
 | `graphql.operation.type` | `GRAPHQL_TYPE` | `query`, `mutation` or `subscription` | behind `@alxia/graphql`, except for a batch |
 
 They are the names of `@nxgt/telemetry-hono`, so a span from either reads
-the same in a dashboard. The constants are exported for code that reads
+the same in a dashboard. One difference, on purpose: `url.scheme`,
+`server.address` and `server.port` come from core's `originalUrl(ctx)`.
+Behind `alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) })`, a
+request a trusted TLS proxy forwarded is recorded as `https` and the public
+host (`api.example.com`), not the app's own (`http`, `app.internal`); without
+`proxy`, or from a connection `trusted` does not name, they are the request's
+own, as before. A `server.port` is recorded only when the host the client
+asked for names one: the proxy's `X-Forwarded-Host` seldom does, so a port
+the app listens on is never reported as the public one. The constants are exported for code that reads
 spans back, a test for one:
 
 ```ts

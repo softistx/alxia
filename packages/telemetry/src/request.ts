@@ -9,6 +9,7 @@ import {
 	type Next,
 	onOperation,
 	operationOf,
+	originalUrl,
 	settle,
 } from '@alxia/core';
 import type { SpanScope, Telemetry } from '@nxgt/telemetry';
@@ -35,10 +36,10 @@ export async function traceRequest(
 	next: (added: TelemetryContext) => Promise<Next<TelemetryContext>>,
 	tracing: Tracing,
 ): Promise<Response> {
-	const { request, url, ip } = ctx;
+	const { request, ip } = ctx;
 	// The span's own, not `SpanOptions.attributes`: those every span and log
 	// inside inherits, and a database call is not the request.
-	scope.attributes(requestAttributes(url, request.method, ip));
+	scope.attributes(requestAttributes(originalUrl(ctx), request.method, ip));
 	if (request.headers.get('upgrade')?.toLowerCase() === 'websocket') {
 		onOperation(ctx, operationSpans(tracing.instance, scope.traceparent()));
 	}
