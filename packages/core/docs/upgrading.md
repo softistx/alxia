@@ -10,7 +10,7 @@ after, and whether it can break yours.
 a path, which a middleware that answers — `@alxia/proxy`'s `proxy(url)` —
 may end. Nothing in its API breaks; the peer range of every package moves.
 It ships with `@alxia/proxy` 0.3.0, `@alxia/telemetry` 0.7.0 and
-`@alxia/create` 0.4.0, each a minor that changes nothing you already call.
+`@alxia/create` 0.4.0, each a minor; what each changes in behaviour is in the table below.
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
