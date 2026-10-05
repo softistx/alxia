@@ -174,6 +174,7 @@ const viewerOf = defineMiddleware(async ({ request }, next) => {
 // balancer, 0 for none). With some, the client's address is the one they
 // append to `X-Forwarded-For` ([section 7](#7-harden-it-for-production)).
 const hops = Number(Bun.env['PROXY_HOPS'] ?? 0);
+if (!Number.isInteger(hops) || hops < 0) throw new Error('PROXY_HOPS is a number of proxies: 0 or more');
 
 // The base: what every resolver reads. The probes come first, so they run
 // no middleware and need no token; then `db` and `viewer` for the rest. A
@@ -739,7 +740,7 @@ export const production = newBase()
 	.use(logger())
 	.use(limitTo(120)) // the probes above it are not counted
 	.use(jsonOnly)
-	.bodyLimit(100 * 1024) // a 413 past 100 KiB, for the routes below
+	.bodyLimit(100 * 1024) // a body past 100 KiB is refused (Yoga answers 400), for the routes below
 	.plugin((app) =>
 		graphql(app, {
 			schema,

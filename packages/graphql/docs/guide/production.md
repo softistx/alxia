@@ -205,7 +205,7 @@ export const production = newBase()
 	.use(logger())
 	.use(limitTo(120)) // the probes above it are not counted
 	.use(jsonOnly)
-	.bodyLimit(100 * 1024) // a 413 past 100 KiB, for the routes below
+	.bodyLimit(100 * 1024) // a body past 100 KiB is refused (Yoga answers 400), for the routes below
 	.plugin((app) =>
 		graphql(app, {
 			schema,
