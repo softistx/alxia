@@ -4,18 +4,21 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the next one first: what changed, the code before and
 after, and whether it can break yours.
 
-## Next
+## 0.9.0
 
-The next `@alxia/core` minor, 0.9.0, adds the `proxy` option, `trustProxy`
-and `originalUrl`, and changes one status a client can get: a 405 at a
-guarded group's route, which its guard now answers. Nothing in its API
+`@alxia/core` 0.9.0 adds the `proxy` option, `trustProxy` and `originalUrl`,
+and changes one status a client can get: a 405 at a guarded group's route,
+which its guard now answers. `@alxia/react-router` hands React Router the
+proxied URL, and `@alxia/create` installs this core. Nothing in its API
 breaks; the peer range of every package moves.
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
 | [Peers move to `^0.9.0`](#peers-move-to-090) | every package | yes, for an install that holds a package of 0.8 beside core 0.9: update them together |
 | [A guarded group refuses the 405 at its routes](#a-guarded-group-refuses-the-405-at-its-routes) | core | notice: a 401 or a 403 instead of a 405 for a client its guard refuses |
-| [`trustProxy` and `originalUrl`, behind a proxy](#trustproxy-and-originalurl-behind-a-proxy) | core, react-router | no: opt in; `forwardedIp` keeps working |
+| [`trustProxy` and `originalUrl`, behind a proxy](#trustproxy-and-originalurl-behind-a-proxy) | core | no: opt in; `forwardedIp` keeps working; notice: a quoted `for=` has its `\` escapes undone |
+| [React Router receives `originalUrl`, and `proxy`](#react-router-receives-originalurl-and-proxy) | react-router | no: opt in |
+| [New projects install core 0.9](#new-projects-install-core-09) | create | no: a new project only |
 
 ### A guarded group refuses the 405 at its routes
 
@@ -96,6 +99,41 @@ option is set ([Behind a proxy](guide/serving.md#behind-a-proxy-proxy)).
 **Can it break your code.** No: `ctx.url` is unchanged, and nothing reads
 the forwarded scheme or host without the option. `forwardedIp` is not
 deprecated. Giving `ip` and `proxy` together throws when the app is built.
+
+One reading differs, as a notice: `forwardedIp` now reads over the same code
+as `trustProxy`, so a quoted `for=` of `Forwarded` has its `\` escapes
+undone, as RFC 7239 reads it; an address written with escapes reads as
+the address it names, where it was read verbatim. Under a hop count, a
+request whose address entry is missing or malformed has its scheme and host
+ignored, as its address is.
+
+### React Router receives `originalUrl`, and `proxy`
+
+`@alxia/react-router` (minor) hands React Router its request at
+`originalUrl(ctx)`. Behind a proxy the app trusts, `request.url` in a
+loader or an action is the scheme and host the client asked for, where it
+was the proxy's request to the app. `createServer` takes the option and
+passes it to the app it makes:
+
+```ts
+import { trustProxy } from '@alxia/core';
+import { createServer } from '@alxia/react-router';
+
+export default createServer({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) });
+```
+
+**Can it break your code.** No: without `proxy`, `request.url` is what it was.
+A loader that rebuilt the public URL from `X-Forwarded-Proto` can read
+`request.url` once the option is set.
+
+### New projects install core 0.9
+
+`@alxia/create` (patch) makes projects whose `@alxia/core` has the guarded
+group's 405 and `trustProxy` with `originalUrl`: its `Allow` never tells an
+anonymous client what a guard keeps. The templates are unchanged.
+
+**Can it break your code.** No: it changes new projects only; an existing
+one moves with the sections above.
 
 ## 0.8.0
 
