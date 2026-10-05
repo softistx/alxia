@@ -35,7 +35,7 @@ export type {
 	RequiringContext,
 } from './requires';
 export type { ResponseSchemas, RouteDetail, RouteSchema } from './schema';
-export type { FunctionLike, Missing, Step } from './step';
+export type { FunctionLike, Missing, Step, Taken } from './step';
 export type {
 	DeclaredReply,
 	HandlerResult,

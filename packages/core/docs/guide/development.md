@@ -297,17 +297,16 @@ or responds(), which belongs to a route`. Every refusal names a member so,
 `GET /x: middleware 2 (compose member 1) looks like a factory (logger): …`. Called on its own, a composed middleware throws
 `compose() runs among a route's middlewares or in use(), not called on its own`.
 
-`use(m1, …, m9)` is also refused, but `use`'s path form is a candidate
-too, so TypeScript prints "No overload matches this call" with the message
-under the first overload.
+`use(m1, …, m9)` is refused the same way, on the ninth.
 
 ## `validate` and `responds` given to `use`
 
 `use(validate({ … }))` and `use(responds({ … }))` are a compile error, as
-they throw when declared:
+they throw when declared, and so is a `compose(…)` holding one; the first
+line of the error says why:
 
 ```text
-Type 'string' is not assignable to type '{ readonly refused: "validate() and responds() belong to a route: give them among its middlewares, not to use()"; }'.
+error TS2345: Argument of type 'Middleware<Empty, Next<Validated<{}>, {}>> & BuiltinMark<"validate">' is not assignable to parameter of type '"validate() belongs to a route, not to use(): give it among the route's middlewares"'.
 ```
 
 Each declares one route's schemas: give them among that route's
