@@ -4,6 +4,8 @@
  * reading what the ones before it added.
  */
 import type { PathAt, RoutePath } from '../types/path';
+import type { FormSlots } from './forms';
+import type { Bare, Ladder } from './ladder';
 import type {
 	AppTypes,
 	AppWithRoute,
@@ -11,7 +13,39 @@ import type {
 	RouteMiddleware,
 	RouteResult,
 } from './route-forms';
-import type { MiddlewareReturn } from './types';
+
+declare module './forms' {
+	interface Forms<
+		App extends AppTypes,
+		A,
+		B,
+		Results extends readonly unknown[],
+		Result,
+		Handled,
+	> {
+		readonly route: RouteForm<App, A, Results, Result, Handled>;
+	}
+}
+
+/**
+ * `app.get(path, ...middlewares, handler)`: each middleware reads the
+ * context of the route at the path `A`. Its slots are written out, not
+ * inherited: an interface's bases cost each call an instantiation more.
+ */
+export interface RouteForm<
+	App extends AppTypes,
+	A,
+	Results extends readonly unknown[],
+	Result,
+	Handled,
+> extends FormSlots {
+	readonly aBound: RoutePath;
+	readonly handledBound: RouteResult<Results>;
+	readonly head: [path: PathAt<App['prefix'], A & string>];
+	readonly step: RouteMiddleware<App, A & string, Results, Result>;
+	readonly tail: [handler: RouteHandler<App, A & string, Results, Handled>];
+	readonly out: AppWithRoute<App>;
+}
 
 /**
  * `app.get(path, ...middlewares, handler)`: each middleware reads the
@@ -23,138 +57,6 @@ import type { MiddlewareReturn } from './types';
  *   reply(201, { id: create(user, body) }));
  * ```
  */
-export interface MiddlewareForms<App extends AppTypes> {
-	/** A route with its handler alone. */
-	<const Path extends RoutePath, Result extends RouteResult<[]>>(
-		path: PathAt<App['prefix'], Path>,
-		handler: RouteHandler<App, Path, [], Result>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		Result extends RouteResult<[R1]>,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		handler: RouteHandler<App, Path, [R1], Result>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		Result extends RouteResult<[R1, R2]>,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		handler: RouteHandler<App, Path, [R1, R2], Result>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		Result extends RouteResult<[R1, R2, R3]>,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
-		handler: RouteHandler<App, Path, [R1, R2, R3], Result>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		Result extends RouteResult<[R1, R2, R3, R4]>,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
-		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
-		handler: RouteHandler<App, Path, [R1, R2, R3, R4], Result>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		R5 extends MiddlewareReturn,
-		Result extends RouteResult<[R1, R2, R3, R4, R5]>,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
-		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
-		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
-		handler: RouteHandler<App, Path, [R1, R2, R3, R4, R5], Result>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		R5 extends MiddlewareReturn,
-		R6 extends MiddlewareReturn,
-		Result extends RouteResult<[R1, R2, R3, R4, R5, R6]>,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
-		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
-		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
-		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
-		handler: RouteHandler<App, Path, [R1, R2, R3, R4, R5, R6], Result>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		R5 extends MiddlewareReturn,
-		R6 extends MiddlewareReturn,
-		R7 extends MiddlewareReturn,
-		Result extends RouteResult<[R1, R2, R3, R4, R5, R6, R7]>,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
-		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
-		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
-		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
-		m7: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5, R6], R7>,
-		handler: RouteHandler<App, Path, [R1, R2, R3, R4, R5, R6, R7], Result>,
-	): AppWithRoute<App>;
-	<
-		const Path extends RoutePath,
-		R1 extends MiddlewareReturn,
-		R2 extends MiddlewareReturn,
-		R3 extends MiddlewareReturn,
-		R4 extends MiddlewareReturn,
-		R5 extends MiddlewareReturn,
-		R6 extends MiddlewareReturn,
-		R7 extends MiddlewareReturn,
-		R8 extends MiddlewareReturn,
-		Result extends RouteResult<[R1, R2, R3, R4, R5, R6, R7, R8]>,
-	>(
-		path: PathAt<App['prefix'], Path>,
-		m1: RouteMiddleware<App, Path, [], R1>,
-		m2: RouteMiddleware<App, Path, [R1], R2>,
-		m3: RouteMiddleware<App, Path, [R1, R2], R3>,
-		m4: RouteMiddleware<App, Path, [R1, R2, R3], R4>,
-		m5: RouteMiddleware<App, Path, [R1, R2, R3, R4], R5>,
-		m6: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5], R6>,
-		m7: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5, R6], R7>,
-		m8: RouteMiddleware<App, Path, [R1, R2, R3, R4, R5, R6, R7], R8>,
-		handler: RouteHandler<App, Path, [R1, R2, R3, R4, R5, R6, R7, R8], Result>,
-	): AppWithRoute<App>;
-}
+export interface MiddlewareForms<App extends AppTypes>
+	extends Bare<'route', App>,
+		Ladder<'route', App> {}
