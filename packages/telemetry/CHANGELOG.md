@@ -1,5 +1,16 @@
 # @alxia/telemetry
 
+## 0.5.0
+
+### Minor Changes
+
+- [#172](https://github.com/softistx/alxia/pull/172) [`28cdcfe`](https://github.com/softistx/alxia/commit/28cdcfe800ca90cfadacf48662fac0fc99b4f63b) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The span of a GraphQL request follows OpenTelemetry's conventions: named `query GetNotes` (`mutation` for an anonymous one) with `graphql.operation.name` and `graphql.operation.type`, instead of `POST /graphql`. A batched body is `batch GetNotes,AddNote`, its name attribute listing every operation and no type. `http.route` stays. New exports `GRAPHQL_NAME` and `GRAPHQL_TYPE`. Needs `@alxia/core` with `operationOf`.
+
+### Patch Changes
+
+- Updated dependencies [[`28cdcfe`](https://github.com/softistx/alxia/commit/28cdcfe800ca90cfadacf48662fac0fc99b4f63b)]:
+  - @alxia/core@0.7.0
+
 ## 0.4.1
 
 ### Patch Changes

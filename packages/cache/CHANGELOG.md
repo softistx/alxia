@@ -1,5 +1,12 @@
 # @alxia/cache
 
+## 0.3.2
+
+### Patch Changes
+
+- Updated dependencies [[`28cdcfe`](https://github.com/softistx/alxia/commit/28cdcfe800ca90cfadacf48662fac0fc99b4f63b)]:
+  - @alxia/core@0.7.0
+
 ## 0.3.1
 
 ### Patch Changes

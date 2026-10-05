@@ -1,5 +1,16 @@
 # @alxia/graphql
 
+## 0.5.0
+
+### Minor Changes
+
+- [#172](https://github.com/softistx/alxia/pull/172) [`28cdcfe`](https://github.com/softistx/alxia/commit/28cdcfe800ca90cfadacf48662fac0fc99b4f63b) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The endpoint reports each operation it executes or subscribes to, its type and its name, to the middlewares around it, through a Yoga plugin added after the app's own: `@alxia/logger` and `@alxia/telemetry` now say `GetNotes` where every call was an anonymous `POST /graphql`. A batched body reports each operation; a request refused before it executes, and an operation over `ws: true`, report none. Needs `@alxia/core` with `reportOperation`.
+
+### Patch Changes
+
+- Updated dependencies [[`28cdcfe`](https://github.com/softistx/alxia/commit/28cdcfe800ca90cfadacf48662fac0fc99b4f63b)]:
+  - @alxia/core@0.7.0
+
 ## 0.4.0
 
 ### Minor Changes
