@@ -95,20 +95,29 @@ subresource integrity hash, so nothing is added to your dependencies.
 ```ts
 import { alxia } from '@alxia/core';
 import { apiDocs } from '@alxia/openapi';
+import spec from '../openapi.yaml'; // Bun imports YAML, and bundles it
 
-const app = alxia().plugin(apiDocs({ spec: 'openapi.yaml' }));
+const app = alxia().plugin(apiDocs({ spec }));
 // GET /docs                  the page (Scalar)
-// GET /docs/openapi.yaml     the document, as written
+// GET /docs/openapi.yaml     the document
 // GET /docs/openapi.json     the same, as JSON
 ```
 
-`spec` is a YAML or JSON file, read once at startup, or an object. Options:
-`path` (`/docs`), `ui` (`'scalar'` or `'swagger'`), `title`, `servers`
-(replaces the document's) and `enabled`, which a production app turns off:
-`apiDocs({ spec, enabled: process.env.NODE_ENV !== 'production' })`. The
-page sets its own `Content-Security-Policy`, which `secureHeaders` keeps, and
-`matchesSpec` leaves its routes out. The [guide](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/api-docs.md)
-has the options, the policy, and `apiDocs` beside a GraphQL endpoint.
+`spec` is the document as an object — imported, as above, so `bun build`
+bundles it and an image that holds `dist/` alone still serves it — or a
+path to a YAML or JSON file, read once at startup from the working
+directory. Options: `path` (`/docs`), `ui` (`'scalar'` or `'swagger'`),
+`title`, `servers` (replaces the document's) and `enabled`. The document is
+public unless you guard it: to serve it in development alone, read the
+environment at runtime, with `Bun.env` —
+`apiDocs({ spec, enabled: Bun.env.NODE_ENV === 'development' })` —
+never `process.env.NODE_ENV`, which `bun build` replaces with the mode of
+the build; to keep it behind a login, give the guard to `use('/docs', …)`
+before the plugin. The page sets its own `Content-Security-Policy`, which
+`secureHeaders` keeps, and `matchesSpec` leaves its routes out. The
+[guide](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/api-docs.md)
+has the options, the policy, a guarded page, and `apiDocs` beside a GraphQL
+endpoint.
 
 ## Every operation has a route
 
@@ -224,7 +233,7 @@ bun remove @alxia/openapi-routes
 bun add -d @alxia/openapi
 ```
 
-```ts
+```ts no-check
 // before
 import { implemented, matchesSpec } from '@alxia/openapi-routes';
 // after

@@ -1,4 +1,10 @@
-import type { Alxia, BaseContext, Empty, RoutePath } from '@alxia/core';
+import {
+	type Alxia,
+	type BaseContext,
+	type Empty,
+	isDev,
+	type RoutePath,
+} from '@alxia/core';
 import type {
 	GraphQLSchemaWithContext,
 	YogaInitialContext,
@@ -54,7 +60,9 @@ export interface GraphQLOptions<
 	> {
 	/**
 	 * What a browser gets at the endpoint: Yoga's GraphiQL, Apollo Sandbox,
-	 * or nothing. GraphiQL by default; turn both off in production.
+	 * or nothing. By default, GraphiQL in the serving app's dev alone
+	 * (`isDev`: `alxia({ dev })`, else `NODE_ENV=development`), nothing
+	 * otherwise; `graphiql` or `apollo-sandbox` serves one everywhere.
 	 */
 	readonly ide?: 'graphiql' | 'apollo-sandbox' | false;
 	/** GraphiQL's options, Yoga's own, when `ide` is `graphiql`. */
@@ -125,17 +133,20 @@ export function graphql<
 	const {
 		path = '/graphql' as Path,
 		cors = false,
-		ide = 'graphiql',
+		ide,
 		graphiql,
 		sandbox,
 		...yogaOptions
 	} = options;
+	const page = graphiql ?? true;
 	const yogaAt = yogaServers<UserCtx>({
 		...(yogaOptions as YogaServerOptions<YogaContext, UserCtx>),
 		cors,
-		graphiql: (ide === 'graphiql'
-			? (graphiql ?? true)
-			: false) as YogaServerOptions<YogaContext, UserCtx>['graphiql'],
+		graphiql: (ide === undefined
+			? (_request: Request, context: object) => isDev(context) && page
+			: ide === 'graphiql'
+				? page
+				: false) as YogaServerOptions<YogaContext, UserCtx>['graphiql'],
 	});
 	const handler = graphqlHandler(
 		yogaAt,

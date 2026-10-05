@@ -4,7 +4,7 @@
  * where it is given, so a request runs its members as if each were
  * written there.
  */
-import type { Composable, Composed } from './types/composed';
+import type { CheckedMembers, Composable, Composed } from './types/composed';
 
 /** Where a composed middleware keeps its members, shared by every copy of core. */
 const COMPOSED: unique symbol = Symbol.for('alxia.composed');
@@ -25,7 +25,7 @@ const COMPOSED: unique symbol = Symbol.for('alxia.composed');
  * another adds is a `defineMiddleware<Requires>()`.
  */
 export function compose<const Middlewares extends readonly Composable[]>(
-	...middlewares: Middlewares
+	...middlewares: Middlewares & CheckedMembers<Middlewares>
 ): Composed<Middlewares> {
 	if (middlewares.length === 0) {
 		throw new TypeError('compose(): no middleware is given');

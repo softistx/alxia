@@ -312,20 +312,22 @@ defineEnv({ API_KEY: z.string() }, { secret: ['API_KEY'] });
 
 ### `Property 'env' does not exist on type 'BaseContext'.`
 
-**When:** a `defineMiddleware(fn)` reads `env`, and the registered `base` is itself
-built with a `defineMiddleware(fn)` that names nothing it reads.
+**When:** a shared middleware reads `env`, and it is a `defineMiddleware(fn)`, or a
+`defineAppMiddleware(fn)` while the registered `base` is itself built with a
+`defineAppMiddleware(fn)`.
 
-**Why:** `defineMiddleware(fn)` reads the registered context. One that `base` is built
-with would read `base`'s own type, so the registration resolves to nothing, and every
-middleware reads `BaseContext` alone.
+**Why:** `defineMiddleware(fn)` reads the base context alone; `defineAppMiddleware(fn)`
+reads the registered context. One that `base` is built with would read `base`'s own
+type, so the registration resolves to nothing, and every middleware reads `BaseContext`
+alone.
 
-**Fix:** a middleware `base` is built with says it reads nothing of the registered
-context:
+**Fix:** read `env` with `defineAppMiddleware(fn)`, given after `base`; a middleware
+`base` is built with stays a `defineMiddleware(fn)`:
 
 ```ts
-import { alxia, defineMiddleware, type Empty } from '@alxia/core';
+import { alxia, defineMiddleware } from '@alxia/core';
 
-const requestId = defineMiddleware<Empty>()((ctx, next) =>
+const requestId = defineMiddleware((ctx, next) =>
 	next({ requestId: ctx.request.headers.get('x-request-id') ?? 'none' }),
 );
 

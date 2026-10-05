@@ -103,11 +103,11 @@ every request — a header on every response, a timer — write a middleware, no
 a function plugin:
 
 ```ts
-import { alxia, defineMiddleware, type Empty, settle } from '@alxia/core';
+import { alxia, defineMiddleware, settle } from '@alxia/core';
 
-// <Empty>: it reads nothing of an app's registered context, so any app may use it
+// defineMiddleware reads the base context alone, so any app may use it
 export const poweredBy = (name: string) =>
-	defineMiddleware<Empty>()(async (ctx, next) => {
+	defineMiddleware(async (ctx, next) => {
 		const response = await settle(ctx, next());
 		response.headers.set('x-powered-by', name);
 		return response; // a 404 and a 500 carry it too
@@ -303,9 +303,9 @@ That is sound where the key was not, because nothing reads it unchecked:
 - **What reads it requires it.** `defineRoutes()` carries the registered
   context as a requirement, like `definePlugin`'s, so `plugin` refuses it
   on an app that does not give it yet; so does a route or `use` for
-  `contextStorage()` and for `defineMiddleware(fn)`, which reads the
-  registered context when it is given no type argument. A middleware
-  `base` is itself built with says `defineMiddleware<Empty>()(fn)`
+  `contextStorage()` and for `defineAppMiddleware(fn)`, which reads the
+  registered context. A middleware `base` is itself built with is a plain
+  `defineMiddleware(fn)`, which reads the base context alone
   ([Troubleshooting](../troubleshooting.md#property-db-does-not-exist-on-type-basecontext)).
 - **It names a real chain.** The type is `typeof base`, what `decorate`,
   `derive`, `use` and `plugin` built, not a key written by hand that no

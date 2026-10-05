@@ -23,6 +23,9 @@ export interface ListenMethod {
 	 * answers; a request Bun gives to a path with parameters or a wildcard
 	 * is routed again as `fetch` routes it, so both choose alike, at the
 	 * cost of `fetch`'s routing on each such request.
+	 *
+	 * One server at a time: `listen` on an app that listens throws, until
+	 * `stop()`, or a signal, shuts it down.
 	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	(options?: ListenOptions | number): Bun.Server<unknown>;

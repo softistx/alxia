@@ -12,19 +12,32 @@ import { renderSandbox, SANDBOX_POLICY, type SandboxOptions } from './sandbox';
 
 export type YogaContext = Record<string, any>;
 
+/** Where Yoga's GraphiQL page loads its files from: one pinned version on unpkg. */
+const GRAPHIQL_FILES =
+	/https:\/\/unpkg\.com\/@graphql-yoga\/graphiql@[\w.-]+\//;
+
 /**
- * What GraphiQL loads: Yoga's page from unpkg, and queries to this server.
- * `@alxia/secure-headers` keeps a policy a response already has.
+ * What GraphiQL's page may load: its scripts, styles and Monaco's
+ * workers from the exact version of `@graphql-yoga/graphiql` the page
+ * names, fetched and run as blobs; queries to this server alone; framed
+ * by no one. A page that names none (a `renderGraphiQL` of the app's own)
+ * gets this server alone. `@alxia/secure-headers` keeps a policy a
+ * response already has.
  */
-const GRAPHIQL_POLICY = [
-	"default-src 'self'",
-	"script-src 'self' 'unsafe-inline' https://unpkg.com",
-	"style-src 'self' 'unsafe-inline' https://unpkg.com",
-	"img-src 'self' data: https:",
-	"font-src 'self' data: https:",
-	"worker-src 'self' blob:",
-	"connect-src 'self'",
-].join('; ');
+export function graphiqlPolicy(html: string): string {
+	const files = html.match(GRAPHIQL_FILES)?.[0] ?? '';
+	const from = files === '' ? '' : ` ${files}`;
+	return [
+		"default-src 'self'",
+		`script-src 'self' 'unsafe-inline'${from}`,
+		`style-src 'self' 'unsafe-inline'${from}`,
+		"img-src 'self' data: https:",
+		`font-src 'self' data:${from}`,
+		"worker-src 'self' blob:",
+		`connect-src 'self'${from}`,
+		"frame-ancestors 'none'",
+	].join('; ');
+}
 
 /**
  * The Yoga serving `endpoint`, created on first use. One per path: a plugin
@@ -94,7 +107,10 @@ export function graphqlHandler<UserCtx extends YogaContext>(
 			headers.get('content-type')?.startsWith('text/html') &&
 			!headers.has('content-security-policy')
 		) {
-			headers.set('content-security-policy', GRAPHIQL_POLICY);
+			// GraphiQL's page: its policy names the files it loads.
+			const html = await response.text();
+			headers.set('content-security-policy', graphiqlPolicy(html));
+			return reply(response.status as StatusCode, html, { headers });
 		}
 		const body = endedOnShutdown(response, shutdownSignal(ctx));
 		return reply(response.status as StatusCode, body ?? undefined, {

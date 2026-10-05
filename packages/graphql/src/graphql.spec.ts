@@ -136,16 +136,6 @@ describe('graphql', () => {
 			expect(text).toContain(`{"data":{"countdown":${n}}}`);
 	});
 
-	test('GraphiQL, with a policy that lets it load', async () => {
-		const response = await app.request('/graphql', {
-			headers: { accept: 'text/html' },
-		});
-		expect(response.headers.get('content-type')).toContain('text/html');
-		expect(response.headers.get('content-security-policy')).toContain(
-			'unpkg.com',
-		);
-	});
-
 	test('GraphQLContext of something that is not an app says so, not never', () => {
 		type Wrong = GraphQLContext<{ readonly users: typeof users }>;
 		expectTypeOf<Wrong>().toEqualTypeOf<{

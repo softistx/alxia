@@ -1,7 +1,9 @@
 /**
  * The hint of a 404 or a 405 in dev: the declared route closest to the
  * request, by a distance on path segments, and the methods its path
- * allows when only the method was wrong.
+ * allows when only the method was wrong. Chosen among the routes the
+ * request could reach (`declaredOf`, `runtime.ts`): never one behind a
+ * guard it has not passed.
  */
 import { servedOf } from '../app/served';
 

@@ -29,7 +29,7 @@ describe('the graphql template', () => {
 		);
 		expect(manifest['scripts']).toEqual({
 			generate: 'graphql-codegen --config codegen.ts',
-			dev: 'bun --watch src/server.ts',
+			dev: 'NODE_ENV=development bun --watch src/server.ts',
 			build:
 				'bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked',
 			start: 'NODE_ENV=production bun dist/server.js',
@@ -120,7 +120,7 @@ describe('the graphql template', () => {
 		const read = [...source.matchAll(/^\s+(\w+): z\b/gm)].map(
 			([, name]) => name,
 		);
-		expect(read.sort()).toEqual(['NODE_ENV', 'PORT']);
+		expect(read.sort()).toEqual(['PORT']);
 		for (const name of read)
 			expect(example).toMatch(new RegExp(`^(# )?${name}=`, 'm'));
 	});

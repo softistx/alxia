@@ -5,7 +5,4 @@ import { z } from "zod";
 // stops the process, with every issue, before it listens.
 export const env = defineEnv({
   PORT: z.coerce.number().default(3000),
-  NODE_ENV: z
-    .enum(["development", "test", "production"])
-    .default("development"),
 });

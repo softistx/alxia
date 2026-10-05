@@ -26,16 +26,17 @@ export async function answered(
 	return 0;
 }
 
-/** Starts `bun run start` in `dir` and resolves to what `request` answers. */
+/** Starts `bun run start` in `dir`, with `own` beside `env`, and resolves to what `request` answers. */
 export async function served(
 	dir: string,
 	env: Record<string, string>,
 	request: (base: string) => Promise<Response>,
+	own: Readonly<Record<string, string>> = {},
 ): Promise<number> {
 	const port = freePort();
 	const server = Bun.spawn(['bun', 'run', 'start'], {
 		cwd: dir,
-		env: { ...env, PORT: String(port), NODE_ENV: 'production' },
+		env: { ...env, ...own, PORT: String(port), NODE_ENV: 'production' },
 		stdout: 'inherit',
 		stderr: 'inherit',
 	});
@@ -63,4 +64,31 @@ export async function pageAndAsset(base: string): Promise<Response> {
 	const served = await fetch(`${base}${asset}`);
 	if (!served.ok) console.error(`GET ${asset} answered ${served.status}`);
 	return served.ok ? page : served;
+}
+
+/**
+ * Each request in turn, each expected to answer its status: a 200 when
+ * every one did, else the first that did not, said so in the log.
+ */
+export function inTurn(
+	steps: readonly (readonly [
+		request: (base: string) => Promise<Response>,
+		expected: number,
+	])[],
+): (base: string) => Promise<Response> {
+	return async (base) => {
+		for (const [request, expected] of steps) {
+			const response = await request(base);
+			if (response.status !== expected) {
+				console.error(
+					`${response.url} answered ${response.status}, expected ${expected}`,
+				);
+				// Never a 200 the check would take for every step passing.
+				return response.status === 200
+					? new Response(null, { status: 500 })
+					: response;
+			}
+		}
+		return new Response(null, { status: 200 });
+	};
 }

@@ -1,6 +1,6 @@
 // The mistakes a middleware form reports, one per line, in the order
 // `use-messages.spec.ts` reads them: each a single error naming the cause.
-import { alxia, defineMiddleware, validate } from '@alxia/core';
+import { alxia, compose, defineMiddleware, validate } from '@alxia/core';
 import { z } from 'zod';
 
 const needsUser = defineMiddleware<{ user: { id: string } }>()(
@@ -21,3 +21,5 @@ alxia().post('/c', { bodyLimit: 1024 }, needsUser, ok);
 alxia().ws('/d', needsUser, { message: () => {} });
 // 6: a path parameter the path does not have.
 alxia().get('/e', validate({ params: z.object({ id: z.string() }) }), ok);
+// 7: compose, a member reading what one before it adds with another type.
+compose(numericUser, needsUser);

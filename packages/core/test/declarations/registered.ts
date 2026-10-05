@@ -8,6 +8,7 @@
 import {
 	type AppContext,
 	alxia,
+	defineAppMiddleware,
 	defineMiddleware,
 	defineRoutes,
 } from '@alxia/core';
@@ -23,9 +24,12 @@ declare module '@alxia/core' {
 }
 
 // Reads the registered context with no generic.
-export const owner = defineMiddleware(({ user }, next) =>
+export const owner = defineAppMiddleware(({ user }, next) =>
 	next({ owner: user.id }),
 );
+
+// Reads the base context alone, under a registered `Register` too.
+export const stamped = defineMiddleware((_ctx, next) => next({ at: 1 }));
 
 export function todos() {
 	return defineRoutes('/todos')

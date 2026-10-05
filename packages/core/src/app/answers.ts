@@ -6,10 +6,16 @@
 
 import { devFailure } from '../dev/failure';
 import { routingHint } from '../dev/hint';
-import type { InternalErrorBody, RoutingErrorBody } from '../errors/errors';
+import type { RoutingErrorBody } from '../errors/errors';
 import type { HttpError } from '../errors/http-error';
-import { type Problem, problemOf, problemOfError } from '../errors/problems';
+import {
+	PROBLEM,
+	type Problem,
+	problemOf,
+	problemOfError,
+} from '../errors/problems';
 import { Reply, toResponse } from '../reply/reply';
+import { internalError } from './internal-error';
 import { errorFormat, servedOf } from './served';
 
 /** What an answer reads of the request: its URL and method, and the serving app's format. */
@@ -17,9 +23,6 @@ export interface Answered {
 	readonly request: Request;
 	readonly url?: URL;
 }
-
-const PROBLEM = 'application/problem+json';
-const internal: InternalErrorBody = { error: 'internal' };
 
 /** nginx's "client closed request": the status of a request its client left. */
 export const CLIENT_GONE = 499;
@@ -51,14 +54,7 @@ export function failed(error: unknown, ctx: Answered): Response {
 	}
 	console.error(error);
 	if (servedOf(ctx)?.dev === true) return devFailure(error, ctx);
-	if (errorFormat(ctx) === 'json') {
-		return toResponse(500, internal, new Headers());
-	}
-	const body = problemOf(at(ctx), {
-		status: 500,
-		detail: 'The server failed to answer the request',
-	});
-	return toResponse(500, body, new Headers({ 'content-type': PROBLEM }));
+	return internalError(ctx);
 }
 
 /** An escaped `HttpError`, as the reply the route boundary sends: its body, or its problem. */

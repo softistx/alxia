@@ -21,6 +21,11 @@
  * as `bun run generate` does in the template. A doc with a `*.spec.ts` has
  * it run by `bun test`; one that needs Redis is skipped without `REDIS_URL`.
  *
+ * Every package's README (its npm page) and guides (`docs/**`), and the
+ * design notes, are checked too, as fragments: each `ts` fence that names
+ * no file must parse and import only names its `@alxia/*` package
+ * declares (`docs-snippets/syntax.ts`); `ts no-check` leaves one alone.
+ *
  * The fences are read by `docs-snippets/fences.ts`, the project written by
  * `docs-snippets/project.ts`, and one doc checked by `docs-snippets/check.ts`.
  *
@@ -28,25 +33,18 @@
  */
 import { mkdirSync } from 'node:fs';
 import { basename, join } from 'node:path';
-import { ROOT } from './artifacts/packages';
 import { checkDoc } from './docs-snippets/check';
+import { docsToCheck } from './docs-snippets/docs';
 import { linkModules, WORK } from './docs-snippets/project';
 
 async function main(): Promise<void> {
-	const given = Bun.argv.slice(2);
-	const docs =
-		given.length > 0
-			? given.map((doc) => join(process.cwd(), doc))
-			: [
-					join(ROOT, 'README.md'),
-					join(ROOT, 'docs/start.md'),
-					...[...new Bun.Glob('docs/recipes/*.md').scanSync(ROOT)]
-						.sort()
-						.map((doc) => join(ROOT, doc)),
-				];
+	const given = Bun.argv.slice(2).map((doc) => join(process.cwd(), doc));
+	const docs = docsToCheck(given);
 	mkdirSync(WORK, { recursive: true });
 	await linkModules();
-	const results = await Promise.all(docs.map(checkDoc));
+	const results = await Promise.all(
+		docs.map(({ path, strict }) => checkDoc(path, strict)),
+	);
 	const problems = results.flat();
 	if (problems.length > 0) {
 		console.error(problems.join('\n\n'));
@@ -56,7 +54,10 @@ async function main(): Promise<void> {
 		process.exit(1);
 	}
 	console.log(
-		`${docs.length} docs (${docs.map((doc) => basename(doc)).join(', ')}): every snippet type-checks.`,
+		`${docs.length} docs: the snippets of ${docs.filter((doc) => doc.strict).length} (${docs
+			.filter((doc) => doc.strict)
+			.map((doc) => basename(doc.path))
+			.join(', ')}) type-check, and every fragment of the others parses.`,
 	);
 }
 

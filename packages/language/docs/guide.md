@@ -497,7 +497,7 @@ export const app = alxia()
 		language({
 			supported,
 			fallback: 'en',
-			persist: { secure: process.env['NODE_ENV'] === 'production' },
+			persist: { secure: Bun.env.NODE_ENV !== 'development' }, // read at runtime: bun build inlines process.env
 		}),
 	)
 	.get('/', ({ language: current, reply }) => reply(200, messages[current].welcome))

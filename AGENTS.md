@@ -52,7 +52,7 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
 
 | example | what it shows |
 | --- | --- |
-| `examples/react-router` | React Router's official template (`bunx create-react-router@latest`, committed as generated), then `@alxia/react-router` added in four changes (`bun add`, `alxia()` in `vite.config.ts`, `start: NODE_ENV=production bun build/server/index.js`, a `bunfig.toml`), the template's Node `Dockerfile` replaced by a multi-stage one, built on `oven/bun:1` and run on `oven/bun:1-alpine`, whose image holds `build/` alone, then an optional `app/server.ts`. That file holds `createServer()` with logger, compress and secure-headers with a nonce per request and a policy the pages pass, a cookie session deriving `user`, `POST /api/todos` validated by Zod, `getLoadContext` and the `Register` declaration. On top of the template: `app/entry.server.tsx` as `react-router reveal` writes it, plus `nonceOf(loadContext)` in three lines; the home loader reading `alxiaOf(context).user`, a sign-in action, a todo form with a 400, and a page streamed behind `<Await>`. `app/server.spec.ts` builds it, runs `bun build/server/index.js` on a free port, starts `react-router dev` on a free port to check the nonce on every script there and in the build, and builds a copy without `app/server.ts` to check the default server. |
+| `examples/react-router` | React Router's official template (`bunx create-react-router@latest`, committed as generated), then `@alxia/react-router` added in four changes (`bun add`, `alxia()` in `vite.config.ts`, `dev: NODE_ENV=development react-router dev` and `start: NODE_ENV=production bun build/server/index.js`, a `bunfig.toml`), the template's Node `Dockerfile` replaced by a multi-stage one, built on `oven/bun:1` and run on `oven/bun:1-alpine`, whose image holds `build/` alone, then an optional `app/server.ts`. That file holds `createServer()` with logger, compress and secure-headers with a nonce per request and a policy the pages pass, a cookie session deriving `user`, `POST /api/todos` validated by Zod, `getLoadContext` and the `Register` declaration. On top of the template: `app/entry.server.tsx` as `react-router reveal` writes it, plus `nonceOf(loadContext)` in three lines; the home loader reading `alxiaOf(context).user`, a sign-in action, a todo form with a 400, and a page streamed behind `<Await>`. `app/server.spec.ts` builds it, runs `bun build/server/index.js` on a free port, starts `react-router dev` on a free port to check the nonce on every script there and in the build, and builds a copy without `app/server.ts` to check the default server. |
 
 ## Principles
 
@@ -151,7 +151,7 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   `compose` (`compose-middlewares.ts`) is flattened into the chain at
   declaration (`membersOf`), so it costs nothing per request.
 - **Dev helps cost nothing outside dev.** `alxia({ dev })` (`dev/mode.ts`,
-  on unless `NODE_ENV` is `production` or `test`) gates the route table,
+  on only when `NODE_ENV` is `development`: it fails closed) gates the route table,
   the 404 and 405 `hint` and the dev error page (`src/dev/`); the serving
   app's `dev` is read through `servedOf(ctx)`, and production's 404 and 500
   paths read one boolean more, never build what dev adds. Check the chain
@@ -163,11 +163,12 @@ confined to `examples/` needs no changeset. The convention is nxgt-data's.
   requires it: `defineRoutes()` carries the registered context in its own
   as a requirement `plugin` checks (`RequiredIn`, `Mounted` in
   `plugin-method.ts`), and `contextStorage()` marks its plugin with it.
-  `defineMiddleware(fn)` reads it too (`RegisteredContext`), and is
-  refused where the context does not give it; a middleware the registered
-  base is itself built with says `defineMiddleware<Empty>()(fn)`, or the
-  base's type would read itself, and a package's middleware names what it
-  reads (`<Empty>` or `<Requires>`), never the app's registration.
+  `defineAppMiddleware(fn)` reads it too (`RegisteredContext`), and is
+  refused where the context does not give it; `defineMiddleware(fn)` reads
+  `BaseContext` alone (`Requires = Empty`, as an inline middleware), so a
+  middleware the registered base is itself built with stays sound, and a
+  package's middleware names what it reads (`<Requires>`), never the app's
+  registration.
   `alxia()` stays on `BaseContext`. A spec that
   needs `Register` augmented runs `tsc` on a program of its own under
   `test/register/`, which the package's `tsconfig.json` excludes, and

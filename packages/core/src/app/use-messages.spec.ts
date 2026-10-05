@@ -26,18 +26,21 @@ const missing =
 
 test('each mistake is one error on the middleware, naming what is missing', async () => {
 	const errors = await typecheck('context');
-	expect(errors).toHaveLength(6);
+	expect(errors).toHaveLength(7);
 	for (const error of errors) {
 		expect(error).toContain('error TS2345');
 		expect(error).not.toContain('No overload matches');
 	}
-	const [use, route, after, options, socket, path] = errors;
+	const [use, route, after, options, socket, path, composed] = errors;
 	for (const error of [use, route, options, socket]) {
 		expect(error).toContain(missing);
 	}
-	expect(after).toContain(
-		'"`user` is in the context with another type than this middleware reads"',
-	);
+	// A route, and compose, alike: the member after one that adds another type.
+	for (const error of [after, composed]) {
+		expect(error).toContain(
+			'"`user` is in the context with another type than this middleware reads"',
+		);
+	}
 	expect(path).toContain(
 		`"the path parameter \`id\` is not in this route's path"`,
 	);

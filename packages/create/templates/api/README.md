@@ -12,8 +12,10 @@ operations generated from it, and a client is generated from the same file.
   (`openapi-codegen.config.ts`). `alxia.ts` holds each operation as the
   data `app.route()` takes. Never edit it: change `openapi.yaml`, then
   generate.
-- `src/context.ts`: the base, what every route reads (the todos), and
-  its `Register` declaration: a route file reads that context with no
+- `src/context.ts`: the base, what every route reads (the todos), alxia's
+  own errors as RFC 9457 problems (`alxia({ errors: "problem" })`: a 400
+  the schemas refuse is `application/problem+json`, as `openapi.yaml`
+  declares it), and its `Register` declaration: a route file reads that context with no
   import of the app. Register the base, never the app, which mounts the
   route files and would be typed by itself.
 - `src/routes/todos.ts`: the routes, `defineRoutes()`, each bound to an
@@ -22,14 +24,20 @@ operations generated from it, and a client is generated from the same file.
   answers 401 without the `x-api-key` header; the operation's body is
   validated just before the handler, and the handler's reply checked
   against the operation's responses.
-- `src/app.ts`: the app, `base.plugin(todoRoutes)`. Mounting the routes on
-  an app that does not give the base's context is a compile error.
+- `src/app.ts`: the app: the base, `health()`'s probes (`GET /health`,
+  liveness, and `GET /ready`, readiness), `apiDocs` from `@alxia/openapi`
+  (the API reference at `/docs`, `openapi.yaml` at `/docs/openapi.yaml`),
+  then `todoRoutes`. `openapi.yaml` is imported, so the build bundles it.
+  Mounting the routes on an app that does not give the base's context is a
+  compile error.
 - `src/env.ts`: the environment, `defineEnv` from
-  [`@alxia/env`](https://www.npmjs.com/package/@alxia/env): `PORT` and
-  `API_KEY`, each checked by its own Zod schema once, when the module is
-  first imported. A malformed one stops the process with every issue,
-  before it listens, and `API_KEY` prints as `***`.
-- `src/server.ts`: listens on `env.PORT`, 3000 by default.
+  [`@alxia/env`](https://www.npmjs.com/package/@alxia/env): `PORT`,
+  `API_KEY` and `API_DOCS`, each checked by its own Zod schema once, when
+  the module is first imported. A missing or malformed one stops the
+  process with every issue, before it listens, and `API_KEY` prints as
+  `***`.
+- `src/server.ts`: listens on `env.PORT`, 3000 by default, and shuts down
+  gracefully on `SIGINT` and `SIGTERM`, which `listen` handles.
 - `src/app.spec.ts`: a typed client (openapi-fetch over `generated/paths.ts`,
   its `fetch` being `app.fetch`: no server, no port), one `app.request()`
   test, and `matchesSpec` from
@@ -62,9 +70,13 @@ Zod validators and the operations a typed client reads.
 ## Environment
 
 Bun loads `.env` on every command, and `src/env.ts` checks what it finds.
-Copy `.env.example` to `.env` to set `PORT` and `API_KEY`. Outside
-development, set `API_KEY`: its default, `dev-key`, is for development only.
-A variable that fails its schema stops `bun dev` with every issue named,
+Copy `.env.example` to `.env` to set `PORT`, `API_KEY` and `API_DOCS`.
+`API_KEY` defaults to `dev-key` under `NODE_ENV=development` (`bun dev`)
+and `test` (`bun test`) alone: anywhere else, `bun start` and the image
+included, it is required, and the app does not start without it.
+`API_DOCS` serves the API reference at `/docs`: on in development, off
+elsewhere unless set to `true`. The document is public wherever it is on.
+A variable that fails its schema stops the app with every issue named,
 never the secret's value.
 
 ```sh
@@ -74,13 +86,19 @@ cp .env.example .env
 ## Develop
 
 ```sh
-bun dev          # http://localhost:3000, restarted on every change
+bun dev          # NODE_ENV=development: http://localhost:3000, restarted on every change
 ```
+
+`bun dev` sets `NODE_ENV=development`, alxia's dev switch: `listen`
+prints the route table, a 404 hints at the closest route, a 500 shows its
+error, and `/docs` is on. Under any other `NODE_ENV`, none of them is.
 
 ```sh
 curl -X POST localhost:3000/todos \
   -H 'content-type: application/json' -H 'x-api-key: dev-key' \
   -d '{"title":"Write a route"}'
+curl localhost:3000/health   # {"status":"ok"}
+open http://localhost:3000/docs
 ```
 
 ## Test
@@ -148,13 +166,14 @@ that `bun install` wrote (commit it), and runs `bun run build`. The image
 holds `dist/` alone, no `node_modules` and no `src/`, and runs
 `bun --no-install dist/server.js` as its non-root `bun` user: a package
 missing from the bundle fails at startup instead of being fetched from
-npm. `src/server.ts` stops the app on `SIGTERM`, so `docker stop` is
+npm. `listen` drains the app and exits on `SIGTERM`, so `docker stop` is
 immediate. A native addon built for glibc alone does not load on
 Alpine: put the final stage back on `oven/bun:1`.
 
 ```sh
 docker build -t my-api .
 docker run --rm -p 3000:3000 -e API_KEY=change-me my-api
+# with the API reference at /docs: -e API_DOCS=true
 ```
 
 Next: [Getting started](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/getting-started.md)

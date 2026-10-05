@@ -385,7 +385,7 @@ export async function loader({ context }: Route.LoaderArgs) {
 
 *Superseded by [the zero-config revision](#revised-2026-10-03-zero-config): `alxia()` replaced `alxiaServer()`, and `serve.js` is gone.*
 
-```ts
+```ts no-check
 // vite.config.ts
 import { reactRouter } from '@react-router/dev/vite';
 import { alxiaServer } from '@alxia/react-router/vite';

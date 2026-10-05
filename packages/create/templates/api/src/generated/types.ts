@@ -18,8 +18,12 @@ export interface NotFound {
 	error: 'not_found';
 }
 
-export interface ValidationError {
-	error: 'validation';
+export interface ValidationProblem {
+	type: string;
+	title: string;
+	status: number;
+	detail: string;
+	instance: string;
 	issues: {
 		target: 'params' | 'query' | 'headers' | 'cookies' | 'body';
 		path: (string | number)[];
@@ -62,9 +66,9 @@ export interface Operations {
 			201: {
 				'application/json': Todo;
 			};
-			/** alxia's own 400, for a request the schemas refuse */
+			/** alxia's own 400, for a request the schemas refuse, as an RFC 9457 problem */
 			400: {
-				'application/json': ValidationError;
+				'application/problem+json': ValidationProblem;
 			};
 			/** No x-api-key header, or not the key */
 			401: {
@@ -85,9 +89,9 @@ export interface Operations {
 			200: {
 				'application/json': Todo;
 			};
-			/** alxia's own 400, for a request the schemas refuse */
+			/** alxia's own 400, for a request the schemas refuse, as an RFC 9457 problem */
 			400: {
-				'application/json': ValidationError;
+				'application/problem+json': ValidationProblem;
 			};
 			/** No todo has this id */
 			404: {
@@ -116,11 +120,11 @@ export interface ClientOperations {
 		}];
 		reply:
 			| { status: 201; type: 'application/json'; data: Todo }
-			| { status: 400; type: 'application/json'; data: ValidationError }
+			| { status: 400; type: 'application/problem+json'; data: ValidationProblem }
 			| { status: 401; type: 'application/json'; data: Unauthorized };
 		wire:
 			| { status: 201; type: 'application/json'; data: Todo }
-			| { status: 400; type: 'application/json'; data: ValidationError }
+			| { status: 400; type: 'application/problem+json'; data: ValidationProblem }
 			| { status: 401; type: 'application/json'; data: Unauthorized };
 	};
 	/** One todo */
@@ -134,11 +138,11 @@ export interface ClientOperations {
 		}];
 		reply:
 			| { status: 200; type: 'application/json'; data: Todo }
-			| { status: 400; type: 'application/json'; data: ValidationError }
+			| { status: 400; type: 'application/problem+json'; data: ValidationProblem }
 			| { status: 404; type: 'application/json'; data: NotFound };
 		wire:
 			| { status: 200; type: 'application/json'; data: Todo }
-			| { status: 400; type: 'application/json'; data: ValidationError }
+			| { status: 400; type: 'application/problem+json'; data: ValidationProblem }
 			| { status: 404; type: 'application/json'; data: NotFound };
 	};
 }

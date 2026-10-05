@@ -57,7 +57,7 @@ Extension members come after them and never replace one: an extension
 named `status` is dropped. The 500 says `The server failed to answer the
 request` and nothing more: the error is logged, never sent — outside dev.
 
-In dev (`alxia({ dev })`, on unless `NODE_ENV` is `production` or `test`)
+In dev (`alxia({ dev })`, on only when `NODE_ENV` is `development`)
 both formats say more: the router's 404 and 405 carry a `hint` — `"did you
 mean GET /todos/:id?"`, `"/todos/1 allows GET, DELETE"` — and a 500 its
 `stack`, as a member of the body or an extension of the problem, or, to a
@@ -70,7 +70,7 @@ the request, and a plugin app's own `errors` option is not read.
 
 ## `HttpError` and its problem
 
-```ts
+```ts no-check
 new HttpError(status, body, options?: string | HttpErrorOptions)
 ```
 

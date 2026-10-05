@@ -175,11 +175,11 @@ process, not from the file that calls `apiDocs`: `bun run src/server.ts`
 from another folder, or a container whose image holds `dist/` alone, does
 not see `openapi.yaml`.
 
-**Fix:** give a path that holds wherever the app runs, or load the document
-where it can be found and give the object:
+**Fix:** import the document and give the object: `bun build` bundles it,
+so it is there wherever the app runs. Or give a path that holds there:
 
 ```ts
-import spec from '../openapi.json'; // bundled with the app
+import spec from '../openapi.yaml'; // bundled with the app
 apiDocs({ spec });
 // or, from this file's folder:
 apiDocs({ spec: new URL('../openapi.yaml', import.meta.url).pathname });

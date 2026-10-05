@@ -23,11 +23,11 @@ number on it. Every release, with each change it made, is in
   overload matches this call"
   ([Upgrading](upgrading.md#readable-type-errors)).
 - **A shared middleware reads the registered context.**
-  `defineMiddleware(fn)` reads the context `Register` names, as
+  `defineAppMiddleware(fn)` reads the context `Register` names, as
   `defineRoutes` and `AppContext` do, and a route that does not give it
   refuses it: a middleware file needs no import of the app and no type
-  argument
-  ([Upgrading](upgrading.md#definemiddlewarefn-reads-the-registered-context)).
+  argument, while `defineMiddleware(fn)` keeps reading the base context
+  ([Upgrading](upgrading.md#defineappmiddlewarefn-reads-the-registered-context)).
 - **The forms deprecated in 0.4 removed.** The six request hooks of 0.3;
   a route's list of hooks and the two functions that made its hooks; a
   schema before the handler or in a route's options; `use(plugin)` and
@@ -53,8 +53,8 @@ number on it. Every release, with each change it made, is in
   requests in flight drained within `shutdownTimeout`, streams of events
   and GraphQL subscriptions ended, the `onStop` hooks, then the exit
   ([Health and shutdown](guide/health-and-shutdown.md#graceful-shutdown)).
-- **Dev comfort.** In dev — `alxia({ dev })`, on unless `NODE_ENV` is
-  `production` or `test` — `listen` prints the route table, a 404 names the
+- **Dev comfort.** In dev — `alxia({ dev })`, on only when `NODE_ENV` is
+  `development` — `listen` prints the route table, a 404 names the
   closest route and a 405 the methods allowed, and a 500 shows its error: a
   page to a browser, under any Content-Security-Policy, its stack to any
   other client; `onListen` gets the table as data. In every mode, a factory

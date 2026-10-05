@@ -10,7 +10,10 @@ export type {
 	StopHookMethod,
 } from './app/app-hooks';
 export type { GroupMethod, UseMethod } from './app/compose-methods';
-export { defineMiddleware } from './app/define-middleware';
+export {
+	defineAppMiddleware,
+	defineMiddleware,
+} from './app/define-middleware';
 export { definePlugin, defineRoutes } from './app/define-plugin';
 export type {
 	RouteDefinition,

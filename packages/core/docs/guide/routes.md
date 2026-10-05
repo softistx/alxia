@@ -40,7 +40,7 @@ after the path is the route's options.
 the same arguments. `ws` declares a socket ([WebSockets](websockets.md)); `static`,
 `file` and `page` serve files ([Static files](static-files.md)).
 
-```ts
+```ts no-check
 interface RouteMethod<M, Ctx, Prefix>
 	extends MiddlewareForms<RouteApp<M, Ctx, Prefix>>,
 		OptionsForms<RouteApp<M, Ctx, Prefix>> {}
@@ -174,7 +174,7 @@ needs neither. An operation typed `RouteOperation`, or whose method is a union,
 is refused the same way: its route would be typed under every method while
 being served under one.
 
-```ts
+```ts no-check
 interface RouteOperation {
 	readonly method: Method;
 	readonly path: RoutePath;

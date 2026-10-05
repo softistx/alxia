@@ -30,7 +30,7 @@ describe('the page', () => {
 		expect(response.headers.get('content-type')).toContain('text/html');
 		const html = await response.text();
 		expect(html).toContain('<title>Pets</title>');
-		expect(html).toContain('data-url="/docs/openapi.json"');
+		expect(html).toContain('&quot;url&quot;:&quot;/docs/openapi.json&quot;');
 		expect(html).toMatch(/@scalar\/api-reference@\d+\.\d+\.\d+\//);
 		expect(html).toMatch(/integrity="sha384-[A-Za-z0-9+/=]+"/);
 	});
@@ -110,7 +110,9 @@ describe('options', () => {
 		const app = alxia().plugin(apiDocs({ spec, path: '/reference/api' }));
 		expect((await app.request('/docs')).status).toBe(404);
 		const html = await (await app.request('/reference/api')).text();
-		expect(html).toContain('data-url="/reference/api/openapi.json"');
+		expect(html).toContain(
+			'&quot;url&quot;:&quot;/reference/api/openapi.json&quot;',
+		);
 		expect((await app.request('/reference/api/openapi.json')).status).toBe(200);
 	});
 

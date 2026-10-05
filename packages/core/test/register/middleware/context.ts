@@ -1,8 +1,8 @@
-// The base, built with a middleware of its own: one that reads nothing of
-// the registered context says so, or the base's type would read itself.
-import { alxia, defineMiddleware, type Empty } from '@alxia/core';
+// The base, built with a middleware of its own: `defineMiddleware(fn)`
+// reads the base context alone, so the base's type never reads itself.
+import { alxia, defineMiddleware } from '@alxia/core';
 
-const requestId = defineMiddleware<Empty>()((ctx, next) =>
+const requestId = defineMiddleware((ctx, next) =>
 	next({ requestId: ctx.request.headers.get('x-request-id') ?? 'none' }),
 );
 

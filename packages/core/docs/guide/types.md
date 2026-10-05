@@ -12,7 +12,7 @@ table, and no client is typed from it. What the types check is the
 server itself: what each handler reads, the replies `responds` declares,
 the paths and their parameters ([Routes](routes.md#what-the-types-refuse)).
 
-```ts
+```ts no-check
 class Alxia<Ctx extends object = Empty, Prefix extends string = ''>;
 ```
 
@@ -93,16 +93,16 @@ What it types, and what it does not:
   give it cannot mount it.
 - **`alxiaOf(context)`** from `@alxia/react-router`, when that package's
   own `Register` names no server.
-- **`defineMiddleware(fn)`**, with no type argument: a middleware file
-  reads the registered context with no import of the app, and a route or a
-  `use` whose context does not give it refuses it.
-  `defineMiddleware<Requires>()(fn)` reads `Requires` instead.
+- **`defineAppMiddleware(fn)`**: a middleware file reads the registered
+  context with no import of the app, and a route or a `use` whose context
+  does not give it refuses it. `defineMiddleware(fn)` reads the base
+  context alone, and `defineMiddleware<Requires>()(fn)` reads `Requires`.
 
 ```ts
 // src/middlewares/profile.ts
-import { defineMiddleware } from '@alxia/core';
+import { defineAppMiddleware } from '@alxia/core';
 
-export const profile = defineMiddleware(async ({ db, user }, next) =>
+export const profile = defineAppMiddleware(async ({ db, user }, next) =>
 	next({ profile: await db.users.find(user.id) }),
 );
 ```
@@ -113,17 +113,16 @@ TypeScript gives it `any` with `TS7022`. For the same reason the chain you
 register cannot read `Register` either: no `defineRoutes()` in `base`
 itself (`TS7022`), and a `contextStorage()` there reads `BaseContext`
 alone; give them to the app, after it. A middleware `base` is built with
-says it reads nothing of the registered context,
-`defineMiddleware<Empty>()(fn)`: a plain `defineMiddleware(fn)` there would
-read the base's own type, the registration resolves to nothing, and every
-middleware elsewhere fails with
+is a plain `defineMiddleware(fn)`, which reads the base context alone: a
+`defineAppMiddleware(fn)` there would read the base's own type, the
+registration resolves to nothing, and every middleware elsewhere fails with
 [`Property 'db' does not exist on type 'BaseContext'.`](../troubleshooting.md#property-db-does-not-exist-on-type-basecontext)
 
 ```ts
 // src/context.ts
-import { alxia, defineMiddleware, type Empty } from '@alxia/core';
+import { alxia, defineMiddleware } from '@alxia/core';
 
-const requestId = defineMiddleware<Empty>()((ctx, next) =>
+const requestId = defineMiddleware((ctx, next) =>
 	next({ requestId: ctx.request.headers.get('x-request-id') ?? 'none' }),
 );
 

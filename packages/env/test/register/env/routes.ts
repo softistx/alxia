@@ -1,4 +1,4 @@
-import { defineMiddleware, defineRoutes } from '@alxia/core';
+import { defineAppMiddleware, defineRoutes } from '@alxia/core';
 
 // ctx.env, typed, in a route file that imports no app
 export const routes = defineRoutes().get('/port', ({ env, reply }) => {
@@ -9,7 +9,7 @@ export const routes = defineRoutes().get('/port', ({ env, reply }) => {
 	return reply(200, `${port}${dsn}`);
 });
 
-export const around = defineMiddleware(async ({ env }, next) => {
+export const around = defineAppMiddleware(async ({ env }, next) => {
 	const port: number = env.PORT;
 	return next({ port });
 });

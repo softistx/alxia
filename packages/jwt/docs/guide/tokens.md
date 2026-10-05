@@ -110,7 +110,7 @@ publish.
 
 ## `verify`
 
-```ts
+```ts no-check
 verify(token: string): Promise<VerifyResult>;
 
 type VerifyResult =

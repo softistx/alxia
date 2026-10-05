@@ -61,7 +61,7 @@ ${sourceBlock(first, source)}
 <ol>
 ${frames.map(frameItem).join('\n')}
 </ol>
-<footer>alxia in dev: alxia({ dev: false }), or NODE_ENV=production, answers a 500 without it.</footer>
+<footer>alxia in dev (NODE_ENV=development): alxia({ dev: false }), or any other NODE_ENV, answers a 500 without it.</footer>
 </main>
 </body>
 </html>

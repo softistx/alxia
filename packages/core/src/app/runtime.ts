@@ -7,8 +7,9 @@ import { devOf } from '../dev/mode';
 import type { ErrorFormat } from '../errors/problems';
 import { joinPath } from '../router/paths';
 import { Router } from '../router/router';
-import type { Definition, Globals, Runtime } from './definition';
+import type { ChainHook, Definition, Globals, Runtime } from './definition';
 import { addPage } from './pages';
+import type { ScopedHooks } from './scope';
 import type { AlxiaOptions } from './signatures';
 
 /**
@@ -36,7 +37,9 @@ export function createRuntime(
 			errors: errorFormatOf(options),
 			closing: new AbortController(),
 			dev,
-			...(dev ? { declared: () => declaredOf(router, globals) } : {}),
+			...(dev
+				? { declared: () => declaredOf(router, globals, unmatched()) }
+				: {}),
 		},
 		sockets: new Set(),
 		ip:
@@ -74,14 +77,28 @@ function errorFormatOf(options: AlxiaOptions<string>): ErrorFormat {
 	return errors;
 }
 
-/** Every method and path the app declares, its pages as `GET`s: what a 404's hint is chosen among. */
+/**
+ * Every method and path a 404's hint may offer, its pages as `GET`s: the
+ * routes whose chain runs nothing beyond the app-wide middlewares and
+ * `derive`s, which the request already passed on its way to the 404. A
+ * route behind a group's, a prefixed plugin's, a `use(path, …)`'s or its
+ * own middleware is never named: the hint would reveal what that guard
+ * keeps from a client who has not passed it.
+ */
 function* declaredOf(
 	router: Router<Definition>,
 	globals: Globals,
+	unmatched: ScopedHooks,
 ): Generator<readonly [method: string, path: string]> {
+	const passed = new Set<ChainHook>(
+		unmatched.derive.filter((hook) => !('when' in hook && hook.when)),
+	);
+	const open = (hook: ChainHook) =>
+		hook.kind === 'validate' || hook.kind === 'responds' || passed.has(hook);
 	for (const [path, methods] of router.paths()) {
-		for (const method of methods.keys()) {
-			if (method !== 'WS') yield [method, path];
+		for (const [method, definition] of methods) {
+			if (method === 'WS' || !definition.derive.every(open)) continue;
+			yield [method, path];
 		}
 	}
 	for (const path of globals.pages.keys()) yield ['GET', path];

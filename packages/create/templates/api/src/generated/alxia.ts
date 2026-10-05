@@ -11,7 +11,7 @@
  */
 
 import { z } from 'zod';
-import { zNewTodo, zNotFound, zTodo, zUnauthorized, zValidationError } from './zod';
+import { zNewTodo, zNotFound, zTodo, zUnauthorized, zValidationProblem } from './zod';
 
 /** A number in a path, a query, a header or a cookie: digits, where z.coerce.number() would read '' as 0. */
 const numeric = z
@@ -39,7 +39,7 @@ export const createTodo = {
 		body: zNewTodo,
 		response: {
 			201: zTodo,
-			400: zValidationError,
+			400: zValidationProblem,
 			401: zUnauthorized,
 		},
 		detail: { operationId: 'createTodo', summary: 'Add a todo' },
@@ -56,7 +56,7 @@ export const getTodo = {
 		}),
 		response: {
 			200: zTodo,
-			400: zValidationError,
+			400: zValidationProblem,
 			404: zNotFound,
 		},
 		detail: { operationId: 'getTodo', summary: 'One todo' },

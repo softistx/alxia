@@ -75,7 +75,7 @@ graphql(app, {
 	schema,
 	plugins: [useDepthLimit({ maxDepth: 8 }), useResponseCache({ session: ({ request }) => ... })],
 	maskedErrors: true,            // Yoga's default: an error's message never leaks
-	ide: process.env.NODE_ENV === 'production' ? false : 'apollo-sandbox',
+	ide: Bun.env.NODE_ENV === 'development' && 'apollo-sandbox', // at runtime, never process.env: bun build inlines it
 	batching: true,
 });
 ```
@@ -84,17 +84,20 @@ graphql(app, {
   `async *subscribe` in a resolver, `Accept: text/event-stream` on the
   request. `@alxia/compress` leaves an event stream alone by default.
 - **An IDE** answers a `GET` from a browser at the endpoint, with a
-  `Content-Security-Policy` that lets it load — `@alxia/secure-headers`
-  keeps it. `ide` chooses which:
+  `Content-Security-Policy` that lets it load — its pinned files on unpkg
+  alone, framed by no one — which `@alxia/secure-headers` keeps. By
+  default, GraphiQL in the serving app's dev alone (`NODE_ENV=development`,
+  or `alxia({ dev: true })`), none otherwise; `ide` chooses one everywhere:
 
   ```ts
+  graphql(app, { schema }); // GraphiQL in dev, nothing deployed
   graphql(app, { schema, ide: 'apollo-sandbox', sandbox: { initialDocument: '{ me }' } });
-  graphql(app, { schema, ide: Bun.env.NODE_ENV === 'production' ? false : 'graphiql' });
   ```
 
   | `ide` | |
   | --- | --- |
-  | `'graphiql'` (default) | Yoga's GraphiQL; `graphiql` takes its options |
+  | none (default) | Yoga's GraphiQL in dev (`isDev`), nothing otherwise |
+  | `'graphiql'` | Yoga's GraphiQL, everywhere; `graphiql` takes its options |
   | `'apollo-sandbox'` | [Apollo Sandbox](https://www.apollographql.com/docs/graphos/platform/sandbox), embedded, pointed at the address the page was opened at, prefix included — `https` behind a proxy that terminates TLS ([IDE guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/ide.md#apollo-sandbox)). `sandbox` takes `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
   | `false` | none |
 - **CORS** is `@alxia/cors`'s for the whole app: Yoga's own is off unless

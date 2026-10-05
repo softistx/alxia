@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "generate": "graphql-codegen --config codegen.ts",
-    "dev": "bun --watch src/server.ts",
+    "dev": "NODE_ENV=development bun --watch src/server.ts",
     "build": "bun build src/server.ts --target=bun --outdir=dist --minify --sourcemap=linked",
     "start": "NODE_ENV=production bun dist/server.js",
     "test": "bun test",

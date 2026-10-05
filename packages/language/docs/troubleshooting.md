@@ -400,7 +400,7 @@ language({
 	supported: ['en', 'fr'],
 	fallback: 'en',
 	order: ['query', 'cookie', 'header'],
-	persist: { secure: process.env['NODE_ENV'] === 'production' },
+	persist: { secure: Bun.env.NODE_ENV !== 'development' }, // read at runtime: bun build inlines process.env
 });
 ```
 

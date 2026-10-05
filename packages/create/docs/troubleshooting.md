@@ -630,7 +630,7 @@ and `graphql` projects, with every variable that failed:
 ```
 EnvError: The environment is invalid:
   PORT: Invalid input: expected number, received NaN; expected number
-  NODE_ENV: Invalid option: expected one of "development"|"test"|"production"; expected "development" | "test" | "production"
+  API_KEY: Invalid input: expected string, received undefined; expected string
 ```
 
 **Why:** `src/env.ts` calls `defineEnv` from `@alxia/env`, which checks each
@@ -646,8 +646,11 @@ later. A secret's value is never printed: `API_KEY` shows as `***`.
 PORT=3000 bun dev
 ```
 
-A variable the schema gives a default (`PORT`, `NODE_ENV`, the `api`
-project's `API_KEY`) is fine unset. `bun test` sets `NODE_ENV=test`: a
+A variable the schema gives a default (`PORT`, the `api` project's
+`API_DOCS`) is fine unset. The `api` project's `API_KEY` defaults to
+`dev-key` under `NODE_ENV=development` (`bun dev`) and `test` (`bun test`)
+alone: `bun start`, the image and any other `NODE_ENV` require it, so set
+it there (`docker run -e API_KEY=…`). `bun test` sets `NODE_ENV=test`: a
 `.env` that sets `NODE_ENV` to another value overrides it.
 
 ## Biome

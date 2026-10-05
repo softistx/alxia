@@ -14,16 +14,30 @@ import { alxia } from '@alxia/core';
 const app = alxia({ dev: process.env['APP_DEV'] === '1' });
 ```
 
-`dev` is on unless `NODE_ENV` is `production` or `test`: a plain
-`bun run src/server.ts` or `bun --hot` has it, a container built with
-`ENV NODE_ENV=production` (every `bun create @alxia` template's
-`Dockerfile`) and `bun test`, which sets `NODE_ENV=test`, do not. `true` or
-`false` decides, whatever `NODE_ENV` says; anything else throws
+`dev` is on only when `NODE_ENV` is exactly `development`, and fails
+closed: `NODE_ENV` unset, `staging`, `prod`, `Production`, `production` and
+`test` (what `bun test` sets) all leave it off, so an app started on a VM,
+a platform or a container that forgot to set `NODE_ENV` never shows a stack
+to the world. Every `bun create @alxia` template's `dev` script sets it:
+`NODE_ENV=development bun --hot src/server.ts` (`react-router dev` for the
+React Router template), and its `bun start` runs
+`NODE_ENV=production bun dist/…`. Write your own `dev` script the same way:
+
+```json
+{
+	"scripts": {
+		"dev": "NODE_ENV=development bun --hot src/server.ts",
+		"start": "NODE_ENV=production bun dist/server.js"
+	}
+}
+```
+
+`true` or `false` decides, whatever `NODE_ENV` says; anything else throws
 `alxia(): dev must be true or false, not …`. `NODE_ENV` is read when
-`alxia()` is called, from `Bun.env`: a bundle `bun build` made reads it
-when it runs, not when it was built. Each template's `bun start` runs
-`NODE_ENV=production bun dist/…`; a process started otherwise, on a VM or
-a platform, sets it or passes `dev: false`.
+`alxia()` is called, from `Bun.env`: a bundle `bun build` made, or a binary
+`bun build --compile` made, reads it when it runs, not when it was built.
+The warning of a middleware given after routes follows the same switch:
+the app's `dev`, `alxia({ dev })` included.
 
 | `dev` | on | off |
 | --- | --- | --- |
@@ -37,6 +51,18 @@ Under `errors: 'problem'` the `hint` and the `stack` are extension members
 of the problem, and only in dev. The app that serves the request decides,
 as for `errors`: a plugin's own `dev` is not read. Outside dev each of
 these costs nothing: a 404 reads one boolean more, a 500 one more too.
+
+A plugin reads the switch of the app serving the request with
+`isDev(ctx)`, to help the developer there alone — as `graphql()` serves
+GraphiQL and `health()` names its checks only in dev:
+
+```ts
+import { alxia, isDev } from '@alxia/core';
+
+const app = alxia().get('/debug', (ctx) =>
+	isDev(ctx) ? ctx.reply(200, { route: ctx.route }) : ctx.reply(404, 'not here'),
+);
+```
 
 ## The route table
 
@@ -110,9 +136,27 @@ parameter takes any segment and a wildcard the rest, a word costs the
 share of its letters a typo changed (`todo` for `todos`), another word, a
 segment too many or too few costs one, and a route of another method a
 half more. A route none of whose words is close to one asked is never
-suggested: `/orders` on an app with `/todos` gets no hint. A group's and a
-plugin's routes are candidates, socket routes are not. The hint is only
-the router's: an `HttpError(404)` a handler throws keeps its body.
+suggested: `/orders` on an app with `/todos` gets no hint. Socket routes
+are never candidates. The hint is only the router's: an `HttpError(404)` a
+handler throws keeps its body.
+
+A hint never reveals a guarded route. The only candidates are the routes
+whose chain holds nothing beyond the app-wide middlewares, `derive`s and
+`decorate`s — those given to the app's `use()` without a path, which the
+request that reached the 404 has just passed. A route behind a group's
+middleware, a prefixed plugin's, a `use(path, …)` or a middleware of its
+own is never suggested, even in dev, since the request has not passed its
+guard:
+
+```ts
+const app = alxia()
+	.get('/todos', ({ reply }) => reply(200, []))
+	.use('/internal', requireAdmin)
+	.get('/internal/stats', ({ reply }) => reply(200, stats()));
+
+await app.request('/todo'); // 404, hint: did you mean GET /todos?
+await app.request('/internal/stat'); // requireAdmin answers; past it, a 404 with no hint
+```
 
 ## The dev error page
 

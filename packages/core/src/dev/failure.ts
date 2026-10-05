@@ -4,8 +4,7 @@
  * problem otherwise. Outside dev, `failed` (`answers.ts`) says no more
  * than that the server failed.
  */
-import { errorFormat } from '../app/served';
-import { problemOf } from '../errors/problems';
+import { internalError } from '../app/internal-error';
 import { toResponse } from '../reply/reply';
 import { described, errorPage } from './error-page';
 
@@ -33,18 +32,7 @@ export function devFailure(error: unknown, ctx: FailedContext): Response {
 		return toResponse(500, html, headers);
 	}
 	const { stack } = described(error);
-	if (errorFormat(ctx) === 'json') {
-		return toResponse(500, { error: 'internal', stack }, new Headers());
-	}
-	const body = problemOf(
-		{ url },
-		{ status: 500, detail: 'The server failed to answer the request', stack },
-	);
-	return toResponse(
-		500,
-		body,
-		new Headers({ 'content-type': 'application/problem+json' }),
-	);
+	return internalError(ctx, { stack });
 }
 
 /**

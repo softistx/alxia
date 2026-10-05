@@ -6,6 +6,7 @@ import { $ } from 'bun';
 import { ROOT } from '../artifacts/packages';
 import { missingFrom, problemsOf, type Snippet, snippetsOf } from './fences';
 import { binOf, writeProject } from './project';
+import { fragmentProblems, isFragment } from './syntax';
 
 /** The text of every file of every template: what an excerpt may quote besides its own doc. */
 function templateSources(): string[] {
@@ -89,16 +90,28 @@ function runsSpecs(files: readonly Snippet[]): boolean {
 	);
 }
 
-/** Checks one doc; returns what failed, empty when it is sound. */
-export async function checkDoc(path: string): Promise<string[]> {
+/**
+ * Checks one doc; returns what failed, empty when it is sound. `strict`,
+ * a doc whose `ts` fences are an app (the root README, "Start", the
+ * recipes): each names its file, or is an excerpt or `no-check`. Else a
+ * package's README or guide, whose fences are fragments: each parses and
+ * imports only what its package declares (`syntax.ts`); one that names
+ * a file is checked with the doc's project as in a strict doc.
+ */
+export async function checkDoc(path: string, strict = true): Promise<string[]> {
 	const doc = relative(ROOT, path);
 	const snippets = snippetsOf(await Bun.file(path).text());
 	const files = snippets.filter(
 		(snippet) => snippet.file !== null && !snippet.skipped,
 	);
 	const early = [
-		...problemsOf(doc, snippets),
+		...problemsOf(doc, snippets, strict),
 		...excerptProblems(doc, snippets, files),
+		...(strict
+			? []
+			: snippets
+					.filter(isFragment)
+					.flatMap((snippet) => fragmentProblems(doc, snippet))),
 	];
 	if (early.length > 0 || files.length === 0) return early;
 

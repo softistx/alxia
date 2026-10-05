@@ -29,9 +29,10 @@ export interface AlxiaOptions<Prefix extends string> {
 	 * Whether the app helps the developer running it: `listen` prints its
 	 * URL and its routes, a 404 or a 405 it answers carries a `hint` naming
 	 * the closest route, and a 500 shows its error — an HTML page to a
-	 * browser, its `stack` in a JSON body. On unless `NODE_ENV` is
-	 * `production` or `test`; `true` or `false` decides. The app that
-	 * serves the request decides, as for `errors`.
+	 * browser, its `stack` in a JSON body. Off unless `NODE_ENV` is exactly
+	 * `development` (`Bun.env`, read when the app is made) — fail closed:
+	 * unset, `production`, `staging` are off; `true` or `false` decides.
+	 * The app that serves the request decides, as for `errors`.
 	 */
 	readonly dev?: boolean;
 	/**
@@ -59,11 +60,26 @@ export interface ListenOptions {
 	 */
 	readonly signals?: readonly NodeJS.Signals[] | false;
 	/**
+	 * Whether the process exits once a signal shut the app down: `true` by
+	 * default. `false` shuts the app down and calls no `process.exit`, for
+	 * a host that exits itself after its own cleanup. alxia does not exit
+	 * either when the process has another listener of the signal: the
+	 * host's own handler finishes, and exits.
+	 */
+	readonly exit?: boolean;
+	/**
 	 * How long, in milliseconds, the requests in flight have to finish once
 	 * shutdown starts, before the server closes their connections: 10 000
 	 * by default.
 	 */
 	readonly shutdownTimeout?: number;
+	/**
+	 * How long, in milliseconds, the `onStop` hooks have, all of them, once
+	 * the requests drained: 5 000 by default. Past it, the hook still
+	 * running is logged by name and the shutdown fails, so a signal exits
+	 * with 1 rather than hang.
+	 */
+	readonly stopTimeout?: number;
 	/**
 	 * Called once the server listens, in every mode, with its URL, its
 	 * routes and the route table as text: what an app that logs its own

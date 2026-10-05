@@ -55,9 +55,15 @@ so `bun add` warns until it is raised; 7 works too.
 
 ```diff
  // package.json
+-    "dev": "react-router dev",
++    "dev": "NODE_ENV=development react-router dev",
 -    "start": "react-router-serve ./build/server/index.js",
 +    "start": "NODE_ENV=production bun build/server/index.js",
 ```
+
+alxia's dev helps — a 404's hint, a 500's error page — are on only under
+`NODE_ENV=development`, so `dev` sets it; `start` runs the build in
+production.
 
 ```toml
 # bunfig.toml, a new file beside package.json

@@ -1,6 +1,7 @@
 /**
- * How an app takes in the parts it is put together from: a group's routes,
+ * How an app mounts the parts it is put together from: a group's routes,
  * declared in a scope of their own, and a plugin's routes and middlewares.
+ * Not `compose(...)`, the exported middleware (`compose-middlewares.ts`).
  */
 import { joinPath } from '../router/paths';
 import { type AppState, mount, register } from './app-state';
@@ -52,7 +53,7 @@ export function group(
  * returns, mounted. `stateOf` reads an app's state, and tells an app from
  * anything else.
  */
-export function compose(
+export function mountPlugin(
 	state: AppState,
 	args: readonly unknown[],
 	app: AnyAlxia,

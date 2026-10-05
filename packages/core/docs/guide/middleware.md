@@ -439,7 +439,22 @@ reply of its own before the `next()` it called settled — `next(); return
 reply(403)` — has started the rest, which runs anyway: its reply is sent
 once the rest has run, `console.warn` says `GET /x: a middleware returned
 before the next() it called settled: …`, and an error the rest throws is
-logged rather than left unhandled. Decide before calling `next()`. A route takes up to 8
+logged rather than left unhandled. Decide before calling `next()`.
+
+> **A guard that calls `next()` has let the handler run.** Calling
+> `next()` starts the rest of the route, whatever the middleware does
+> after: a guard that calls it without returning it, then refuses —
+> `next(); return reply(401)` — still runs the handler (the request is
+> already through, as in Koa; alxia only warns). Check first, then
+> `return next()`, or return the refusal without calling it:
+>
+> ```ts
+> const auth = defineMiddleware(({ request, reply }, next) =>
+> 	request.headers.has('x-user') ? next() : reply(401, { error: 'unauthorized' as const }),
+> );
+> ```
+
+A route takes up to 8
 middlewares, `validate` and `responds` included; a ninth does not compile,
 `at most 8 middlewares per route: group them with compose(...)`, and
 `compose(...)` joins any number of them into one, spliced where it stands
@@ -448,9 +463,10 @@ middlewares, `validate` and `responds` included; a ninth does not compile,
 and `route(operation, …)` after its operation; `static`, `file` and `page`
 take none.
 
-```ts
-defineMiddleware(middleware: Middleware<RegisteredContext, Result>): Middleware<RegisteredContext, Result>;
+```ts no-check
+defineMiddleware(middleware: Middleware<Empty, Result>): Middleware<Empty, Result>;
 defineMiddleware<Requires>(): (middleware: Middleware<Requires, Result>) => Middleware<Requires, Result>;
+defineAppMiddleware(middleware: Middleware<RegisteredContext, Result>): Middleware<RegisteredContext, Result>;
 
 type Middleware<Requires = Empty, Result = MiddlewareReturn> = (ctx: MiddlewareContext<Requires>, next: NextFunction) => Result;
 type MiddlewareContext<Requires = Empty> = BaseContext & Requires;
@@ -468,9 +484,11 @@ type Next<Added = Empty, Schema = Empty> = Response & { /* a brand, never set: w
 A middleware written inline, `app.get(path, (ctx, next) => next({ a: 1 }), handler)`,
 needs no `defineMiddleware`: its context is the one in force where it
 stands, and what it adds is read from what it returns. `defineMiddleware(fn)`
-reads the context the app [registers](types.md#register-and-appcontext)
-— `BaseContext` when nothing is registered — and a middleware the
-registered base is itself built with says `defineMiddleware<Empty>()(fn)`,
+reads `BaseContext` alone, as an inline middleware does, so the
+registered base itself may be built with it. `defineAppMiddleware(fn)`
+reads the context the app [registers](types.md#register-and-appcontext) —
+`BaseContext` when nothing is registered — and is refused where the
+route's context does not give it; give it after the base, never to it,
 or the base's type would read itself.
 
 <a id="use-for-every-route-after-it"></a>

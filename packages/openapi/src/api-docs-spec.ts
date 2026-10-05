@@ -10,6 +10,8 @@ export interface DocsServer {
 export interface LoadedSpec {
 	readonly json: string;
 	readonly yaml: string;
+	/** The origins of its absolute `servers`: what "Try it out" may call. */
+	readonly origins: readonly string[];
 }
 
 /**
@@ -45,7 +47,29 @@ export function loadSpec(
 		text !== undefined && servers === undefined && !isJson(text)
 			? text
 			: Bun.YAML.stringify(final, null, 2);
-	return { json, yaml };
+	return { json, yaml, origins: originsOf(final) };
+}
+
+/**
+ * The origin of each server whose URL is absolute and plain `http(s)`: a
+ * relative one is the page's own origin, and a template
+ * (`https://{region}.example.com`) names no origin a policy can allow.
+ */
+function originsOf(document: object): string[] {
+	const servers = (document as { servers?: unknown }).servers;
+	if (!Array.isArray(servers)) return [];
+	const origins = new Set<string>();
+	for (const server of servers) {
+		const url = (server as { url?: unknown } | null)?.url;
+		if (typeof url !== 'string' || url.includes('{')) continue;
+		if (!/^https?:\/\//i.test(url)) continue;
+		try {
+			origins.add(new URL(url).origin);
+		} catch {
+			// Not a URL: nothing to allow.
+		}
+	}
+	return [...origins];
 }
 
 function read(path: string): string {

@@ -253,12 +253,11 @@ import { base } from './context';
 import { schema } from './schema';
 
 // GET and POST /graphql, behind the base's middlewares. Subscriptions are
-// served over server-sent events. GraphiQL answers a browser's GET in
-// development; in production there is none.
+// served over server-sent events. GraphiQL answers a browser's GET in the
+// app's dev alone (NODE_ENV=development, the dev script's); deployed, none.
 export const app = base.plugin((app) =>
 	graphql(app, {
 		schema,
-		ide: Bun.env['NODE_ENV'] === 'production' ? false : 'graphiql',
 		logging: false, // Yoga's logger, quiet here
 	}),
 );
@@ -274,8 +273,9 @@ import { app } from './app';
 app.listen({ port: Number(Bun.env['PORT'] ?? 3000), shutdownTimeout: 10_000 });
 ```
 
-- **GraphiQL** answers a `GET` from a browser at `/graphql`. Use
-  `ide: 'apollo-sandbox'` for Apollo's explorer. Either gets a
+- **GraphiQL** answers a `GET` from a browser at `/graphql` in dev
+  (`NODE_ENV=development`), and nowhere else unless `ide: 'graphiql'` says
+  so. Use `ide: 'apollo-sandbox'` for Apollo's explorer. Either gets a
   `Content-Security-Policy` that lets it load, which `@alxia/secure-headers`
   keeps ([the IDE guide](../../packages/graphql/docs/guide/ide.md)).
 - **The drain.** A subscription is a long response, and would hold the
@@ -377,9 +377,10 @@ describe('subscriptions', () => {
 });
 
 describe('the IDE, the probes and the drain', () => {
-	test('GraphiQL answers a browser in development; the probes need no token', async () => {
+	test('GraphiQL answers a browser in development alone; the probes need no token', async () => {
+		// `bun test` sets NODE_ENV=test: the app is not in dev, and serves no page.
 		const page = await app.request('/graphql', { headers: { accept: 'text/html' } });
-		expect(page.headers.get('content-type')).toContain('text/html');
+		expect(page.headers.get('content-type') ?? '').not.toContain('text/html');
 		expect((await app.request('/health')).status).toBe(200);
 		expect((await app.request('/ready')).status).toBe(200);
 	});

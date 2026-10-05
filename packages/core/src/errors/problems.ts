@@ -9,6 +9,9 @@ import type { ValidationIssue } from './errors';
 import type { HttpError } from './http-error';
 import { statusText } from './status-text';
 
+/** The media type of an RFC 9457 problem. */
+export const PROBLEM = 'application/problem+json';
+
 /**
  * How the app answers the errors it answers itself: `json`, its bodies
  * of `{ error: … }` (the default), or `problem`, RFC 9457 problem details.
