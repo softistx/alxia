@@ -39,12 +39,38 @@ describe('proxy.ws, between the upstream open and the client open', () => {
 		expect(closed).toEqual({ code: 4002, reason: 'hung up' });
 	});
 
+	test("an upstream's burst at its open reaches the client whole, in order", async () => {
+		const greeting = Array.from({ length: 200 }, (_, i) => `f${i}`);
+		const { up } = socketUpstream({ greeting });
+		const url = serve(alxia().ws('/live', proxy.ws(up.url)));
+		const { socket, received } = await client(url, '/live');
+		await until(() => received.length === 200);
+		expect(received).toEqual(greeting);
+		socket.close();
+	});
+
 	test('past 1024 frames queued for a client not open yet, the upstream is closed with 1013', async () => {
 		// Bun opens the client's socket within its upgrade, before the upstream
 		// can send a frame: a server whose upgrade fails keeps the queue filling.
 		const greeting = Array.from({ length: 1100 }, (_, i) => `f${i}`);
 		const { up, state } = socketUpstream({ greeting });
 		const app = alxia().ws('/live', proxy.ws(up.url, { timeout: 5_000 }));
+		const response = await app.fetch(
+			handshake(new AbortController()),
+			refusing(),
+		);
+		expect(response.status).toBe(426);
+		await until(() => state.closed.length === 1);
+		expect(state.closed[0]).toEqual([1013, 'client not open yet']);
+	});
+
+	test('past maxBuffered bytes queued for a client not open yet, the upstream is closed with 1013', async () => {
+		const greeting = Array.from({ length: 8 }, () => 'x'.repeat(4096));
+		const { up, state } = socketUpstream({ greeting });
+		const app = alxia().ws(
+			'/live',
+			proxy.ws(up.url, { timeout: 5_000, maxBuffered: 16 * 1024 }),
+		);
 		const response = await app.fetch(
 			handshake(new AbortController()),
 			refusing(),

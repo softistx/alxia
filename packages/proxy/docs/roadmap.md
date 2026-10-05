@@ -11,8 +11,6 @@ Nothing scheduled yet.
 
 ## Next
 
-- **Backpressure between the two sockets.** A slow reader on one side slows
-  the sender on the other, instead of frames piling up in memory.
 - **Several upstreams behind one proxy.** Load balancing over a list of
   targets, and retries of a request that never reached an upstream.
 - **HTTP/2 to the upstream.** A proxy that talks HTTP/2 to an upstream that
@@ -45,6 +43,13 @@ Nothing scheduled yet.
   route keeps its own methods; the guide compares it with `use('/api', …)`,
   which shadows the routes declared after it
   ([The basics](guide/basics.md#as-one-route-all)).
+- **Backpressure between the two sockets of `proxy.ws`.** A client that
+  stops reading pauses the reads of the upstream socket until it catches up,
+  so the upstream slows down instead of frames piling up in the proxy's
+  memory. Past `maxBuffered` bytes queued for either side (1 MiB by
+  default), both close with 1013 (`OVERLOADED_CLOSE`), so a reader that
+  never reads holds no more than the cap. The frames queued before the
+  client's socket opens count toward the same cap.
 
 ### 0.2.0
 

@@ -17,7 +17,8 @@ function ws<Ctx>(target: string | URL, options?: SocketProxyOptions<Ctx>): Socke
 The target is `ws:`, `wss:`, `http:` or `https:` (`http` becomes `ws`, `https`
 becomes `wss`), checked once; a bad one throws a `TypeError`. The options are
 those of `proxy()` except `rebase`, `bodyLimit` and `headers.response`: only
-`headers.request` is left, as there is no response to edit.
+`headers.request` is left, as there is no response to edit. It adds one of
+its own, `maxBuffered`: see [Backpressure](#backpressure).
 
 ## Behind your middlewares
 
@@ -74,8 +75,9 @@ upstream is closed with 1001 past `timeout`.
 
 - Text stays text, binary stays binary.
 - What the upstream sends between its open and the client's is queued, then
-  sent in order: 1024 frames at most, past which the upstream is closed with
-  1013 (try again later), and so is the client as it opens.
+  sent in order: 1024 frames and `maxBuffered` bytes at most, past which the
+  upstream is closed with 1013 (try again later), reason `client not open
+  yet`, and so is the client as it opens.
 - A close on either side closes the other with the same code and reason.
   Codes that a socket only reports are mapped: 1005 to 1000, and any code a
   peer may not send (1004, 1006, 1015, 1016 to 2999, outside 1000 to 4999) to 1011.
@@ -107,9 +109,54 @@ const app = alxia({ errors: 'problem' }).ws('/live', proxy.ws('ws://chat.interna
 `BAD_GATEWAY_CLOSE` (1014), the close code an unreachable upstream used to
 get, is deprecated: nothing sends it any more.
 
-## Limits
+## Backpressure
 
-- **Backpressure.** None between the two sockets: a fast sender and a slow
-  reader buffer in memory.
+A slow reader on one side never makes the proxy hold an unbounded amount of
+what the other side sends. Each direction is bounded by `maxBuffered`, 1 MiB
+by default:
 
-It is on the [roadmap](../roadmap.md).
+```ts
+import { alxia } from '@alxia/core';
+import { proxy } from '@alxia/proxy';
+
+const app = alxia().ws('/live', proxy.ws('ws://chat.internal:8080', { maxBuffered: 256 * 1024 }));
+```
+
+```ts
+// In the browser: 1013 (OVERLOADED_CLOSE on the server) says try again later.
+const socket = new WebSocket('ws://localhost:3000/live');
+socket.addEventListener('close', (event) => {
+	if (event.code === 1013) setTimeout(reconnect, 1_000);
+});
+declare function reconnect(): void;
+```
+
+- **Upstream to client.** When Bun answers a frame sent to the client with
+  -1 — queued behind what the client has not read — the proxy pauses its
+  reads of the upstream socket, so the upstream sees TCP backpressure and
+  its own `send` slows down. When the client's socket drains back under half
+  of `maxBuffered`, reading resumes. Frames Bun had already read still pass,
+  in order.
+- **Client to upstream.** Bun's server socket cannot pause its reads, so
+  what the client sends is queued on the upstream socket (its
+  `bufferedAmount`) while the upstream is slow.
+- **Past the cap.** A frame for a side whose queue already holds more than
+  `maxBuffered` bytes, or a frame Bun dropped (past its own
+  `backpressureLimit`, 16 MiB by default), closes both sides with 1013,
+  `OVERLOADED_CLOSE`, reason `client too slow` or `upstream too slow`,
+  rather than queue it. The slow side reads nothing, so it may never take
+  the close frame queued behind the rest: one second later its connection
+  is cut, and what Bun buffered for it is freed.
+
+What one relay may hold is about the cap plus one frame per direction (a
+frame is at most Bun's `maxPayloadLength`, 16 MiB by default), plus the
+kernel's socket buffers. This bounds each connection, not their number:
+limit how many sockets a client may open — a guard or a rate limit before
+`proxy.ws` — to bound the total.
+
+1013 rather than 1009: 1009 says a message is too big, whatever the
+reader's pace; 1013 says the peer is overloaded and the client may come back
+later. Keep `maxBuffered` above your largest frame: a queue already past it
+when the next frame arrives closes, even for a reader that would have caught
+up. It must be a whole number of bytes above 0, or `proxy.ws()` throws a
+`TypeError` at declaration.
