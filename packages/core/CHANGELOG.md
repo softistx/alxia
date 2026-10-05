@@ -1,5 +1,17 @@
 # @alxia/core
 
+## 0.9.0
+
+### Minor Changes
+
+- [#188](https://github.com/softistx/alxia/pull/188) [`17d28fe`](https://github.com/softistx/alxia/commit/17d28fe08a73e4c549f04b98411364ff5c6715f5) Thanks [@SteveGT96](https://github.com/SteveGT96)! - A 405 or a 426 runs the chain in force of the routes at its path before it answers: a guarded group without a prefix, `group(g => g.use(guard).get('/secret', …))`, now refuses `DELETE /secret` with its guard's 401 or 403 and no `Allow`, as a prefixed group already did, instead of a 405 whose `Allow` told the route and its methods. A request the guard lets through gets the 405 and its `Allow`, unchanged. When several groups own methods at one path, each one's chain runs, in the order declared, on its own copy of the context the app's chain built, and the first refusal is the answer. The app's own chain still runs first, once; one group's two routes run its chain once; a route's own middlewares and its `validate` never run there. A 404 runs the app's chain alone, as before, and a preflight `cors()` answers is still answered before any guard. This applies to a group inside a mounted `plugin(app)` too, and the dev 405 `hint` follows the `Allow`.
+
+- [#190](https://github.com/softistx/alxia/pull/190) [`bc2573c`](https://github.com/softistx/alxia/commit/bc2573c7eb045fcfd954fa5457a340abefc32579) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Add `alxia({ proxy: trustProxy({ trusted, header?, untrusted? }) })` and `originalUrl(ctx)`: the proxies in front of the app, declared once, give `ctx.ip` and the scheme and host the client asked for (`X-Forwarded-Proto` and `X-Forwarded-Host`, or `Forwarded`'s `proto=` and `host=`), read from a trusted connection alone, from what the proxies wrote, and checked (`http` or `https`, a bare `host[:port]`). With `untrusted: 'refuse'`, a request carrying forwarding headers from any other connection is answered 403 in the app's error format; one that carries none, a health probe's, passes. `forwardedIp` keeps working, now over the same reading; the one difference is that a quoted `for=` of `Forwarded` has its `\` escapes undone, as RFC 7239 reads it. Under a hop count, a request whose address entry is missing or malformed has its scheme and host ignored, as its address is.
+
+### Patch Changes
+
+- [#191](https://github.com/softistx/alxia/pull/191) [`86af86e`](https://github.com/softistx/alxia/commit/86af86e9c73dbc5084a468113de1ec98207cfdf0) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Upgrading: the 0.9.0 section lists every change of the release, the `Forwarded` escape change, `createServer({ proxy })` and the create release included.
+
 ## 0.8.0
 
 ### Minor Changes

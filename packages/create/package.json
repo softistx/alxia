@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/create",
-	"version": "0.3.3",
+	"version": "0.3.4",
 	"description": "Start an alxia app: `bun create @alxia` writes a minimal API, a spec-first one, a GraphQL one, or React Router's official template served by alxia",
 	"license": "MIT",
 	"type": "module",

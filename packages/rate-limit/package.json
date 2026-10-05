@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/rate-limit",
-	"version": "0.4.4",
+	"version": "0.4.5",
 	"description": "Rate limiting for alxia: a 429 with Retry-After past the limit, the remaining allowance typed in the context, pluggable stores",
 	"license": "MIT",
 	"type": "module",

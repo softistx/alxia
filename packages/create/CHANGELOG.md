@@ -1,5 +1,13 @@
 # @alxia/create
 
+## 0.3.4
+
+### Patch Changes
+
+- [#188](https://github.com/softistx/alxia/pull/188) [`17d28fe`](https://github.com/softistx/alxia/commit/17d28fe08a73e4c549f04b98411364ff5c6715f5) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects install an `@alxia/core` whose guarded group refuses the 405 at its routes, so its `Allow` never tells an anonymous client what the guard keeps.
+
+- [#190](https://github.com/softistx/alxia/pull/190) [`bc2573c`](https://github.com/softistx/alxia/commit/bc2573c7eb045fcfd954fa5457a340abefc32579) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects install a core that has `trustProxy` and `originalUrl`; the templates are unchanged.
+
 ## 0.3.3
 
 ### Patch Changes
