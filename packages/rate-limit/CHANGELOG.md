@@ -1,5 +1,11 @@
 # @alxia/rate-limit
 
+## 0.4.1
+
+### Patch Changes
+
+- [#158](https://github.com/softistx/alxia/pull/158) [`990ab0b`](https://github.com/softistx/alxia/commit/990ab0ba8fc72d392250d48a1079938320fae3fe) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The README and guides show `redisStore(handle.limits.api)`, the form that reads the policy from the bound limit's definition, in place of the deprecated two-argument one.
+
 ## 0.4.0
 
 ### Minor Changes
