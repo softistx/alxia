@@ -651,7 +651,29 @@ answers the upgrade request in the app's error format, and no socket opens.
 reply to check on a socket, and is refused there. Sockets need a
 server: `listen`, or `Bun.serve({ fetch: app.fetch, websocket: app.websocket })`.
 
+A route that is not a socket reaches the subscribers through `ctx.server`,
+the `Bun.Server` serving the request:
+
+```ts
+app.post('/rooms/:room/notice', async ({ server, params, request, reply }) => {
+	server?.publish(params.room, JSON.stringify({ notice: await request.text() })); // Bun's own: not checked by `send`
+	return reply(202);
+});
+```
+
 ## Context and lifecycle hooks
+
+What every middleware and handler reads, whatever adds to it:
+
+| `ctx.` | |
+| --- | --- |
+| `request`, `url` | the request, and its URL as it arrived (`originalUrl(ctx)` behind a proxy) |
+| `server` | the `Bun.Server` serving it: `listen`'s, or the one given to `app.fetch(request, server)`; `undefined` under `app.request` or `app.fetch(request)` alone. `publish(topic, data)` to the app's sockets, `timeout(request, seconds)` for a long request ([Serving](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#the-server-ctxserver)) |
+| `ip` | the client's address, as `ip` or `proxy` read it; prefer it to `server.requestIP(request)` |
+| `route`, `pathParams` | the route's declared path, `undefined` where no route matched, and the path's parameters as strings |
+| `params`, `query`, `headers`, `cookies`, `body` | the request's parts, as a `validate` gave them back or as they arrived ([Requests](#requests)) |
+| `set`, `reply`, `redirect` | the response's headers and cookies, and the answers |
+| `error` | the error the route failed with, once it has |
 
 A middleware belongs to the routes it is given to; `use` gives it to the
 app. `derive` and `decorate` are the shape of a middleware that only adds to

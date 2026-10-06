@@ -170,6 +170,7 @@ a trap that prints nothing is headed by its symptom.
 
 - [`{"error":"validation", … "code":"invalid_json","message":"The message is not valid JSON"}`](#errorvalidation--codeinvalid_jsonmessagethe-message-is-not-valid-json)
 - [Close code `1011`, `internal error`](#close-code-1011-internal-error)
+- [`ctx.server` is `undefined` in a test](#ctxserver-is-undefined-in-a-test), and `TypeError: undefined is not an object (evaluating 'server.publish')`
 
 ## Types
 
@@ -3538,3 +3539,32 @@ app.ws('/rooms/:room', { message: Chat, send: Chat }, {
 	message: (socket, chat) => socket.publish(socket.data.params.room, chat),
 });
 ```
+
+### `ctx.server` is `undefined` in a test
+
+**When:** a route reads `ctx.server` — to `publish` to the app's sockets, to
+call `timeout` — and, under `app.request(…)`, finds `undefined`; written
+`server!.publish(…)`, it fails with `TypeError: undefined is not an object
+(evaluating 'server.publish')`, a 500.
+
+**Why:** `ctx.server` is the `Bun.Server` that took the request, and
+`app.request` and `app.fetch(request)` alone call the app in process: no
+server took it ([Serving](guide/serving.md#the-server-ctxserver)). Its type,
+`Bun.Server<unknown> | undefined`, says so.
+
+**Fix:** guard it, `server?.publish(…)`, where no socket needs the message,
+and listen on a free port where the test checks it does:
+
+```ts
+const server = app.listen({ port: 0 });
+try {
+	const response = await fetch(new URL('/news', server.url), { method: 'POST', body: 'hi' });
+	// …
+} finally {
+	await app.stop(true);
+}
+```
+
+A server of your own passes its server to the app as
+`app.fetch(request, server)`: Bun gives it to `fetch` as the second
+argument, so `fetch: app.fetch` passes it.

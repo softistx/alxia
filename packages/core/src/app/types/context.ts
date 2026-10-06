@@ -8,7 +8,15 @@ import type { RedirectFunction, TypedReplyFunction } from './typed-reply';
 export interface RequestContext {
 	readonly request: Request;
 	readonly url: URL;
-	/** The server that took the request; none when the app is called through `fetch` alone. */
+	/**
+	 * The `Bun.Server` serving this request: the one `listen` started, or
+	 * the one a server of your own passes as `app.fetch(request, server)`.
+	 * `undefined` when no server took the request — `app.request(…)`, or
+	 * `app.fetch(request)` alone, as in a test. `publish(topic, data)` reaches
+	 * the app's socket subscribers, `timeout(request, seconds)` gives a long
+	 * request more time; for the client's address read `ip`, which honours
+	 * `proxy`, rather than `requestIP(request)`.
+	 */
 	readonly server: Bun.Server<unknown> | undefined;
 	/** The client's address, as the app's `ip` option reads it. */
 	readonly ip: string | undefined;

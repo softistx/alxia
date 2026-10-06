@@ -158,10 +158,19 @@ function refuse(bridge: Bridge, socket: Socket, error: unknown): void {
  * app. Vite's own socket and the sockets its proxy relays are left to
  * Vite. Without an HTTP server (Vite's middleware mode), there is nothing
  * to listen on.
+ *
+ * Returns the side server of an app, for its HTTP requests' `ctx.server`:
+ * the server its sockets are open on, so that a `publish` from a loader or
+ * an action reaches them. `undefined` in middleware mode, and once Vite's
+ * server closed.
  */
-export function bridgeSockets(http: Upgrades | null, bridge: Bridge): void {
-	if (http === null) return;
+export function bridgeSockets(
+	http: Upgrades | null,
+	bridge: Bridge,
+): (app: DevApp) => Bun.Server<unknown> | undefined {
+	if (http === null) return () => undefined;
 	const sides: Sides = { current: undefined, retired: new Set() };
+	let closed = false;
 	http.on('upgrade', (req: IncomingMessage, socket: Socket, bytes: Buffer) => {
 		if (isVites(req) || isProxied(req.url ?? '/', bridge.proxy)) return;
 		socket.on('error', () => socket.destroy());
@@ -173,5 +182,9 @@ export function bridgeSockets(http: Upgrades | null, bridge: Bridge): void {
 			})
 			.catch((error: unknown) => refuse(bridge, socket, error));
 	});
-	http.once('close', () => closeAll(sides));
+	http.once('close', () => {
+		closed = true;
+		closeAll(sides);
+	});
+	return (app) => (closed ? undefined : sideFor(sides, app));
 }

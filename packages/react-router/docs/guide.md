@@ -714,6 +714,36 @@ both folders of a monorepo), their two declarations conflict, and `tsc`
 says so (`Subsequent property declarations must have the same type`).
 Give each app its own tsconfig, or use the type argument in both.
 
+### The server: `server`
+
+`alxiaOf(context).server` is core's `ctx.server`, the `Bun.Server` serving
+the request, `undefined` with none
+([Serving](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#the-server-ctxserver)).
+It is not `Register`'s `server`, which names what `createServer()` returned
+for the types. From an action, its `publish` reaches the app's
+[WebSocket](#websockets) subscribers:
+
+```ts
+// app/routes/todos.tsx
+import { alxiaOf } from '@alxia/react-router';
+import type { Route } from './+types/todos';
+
+export async function action({ request, context }: Route.ActionArgs) {
+	const title = String((await request.formData()).get('title'));
+	// Bun's own publish: the bytes as given, not checked by a socket's `send` schema.
+	alxiaOf(context).server?.publish('todos', JSON.stringify({ added: title }));
+	return { added: title };
+}
+```
+
+What it is, by how the app runs:
+
+| | `alxiaOf(context).server` |
+| --- | --- |
+| `bun build/server/index.js`, `server.start(app)`, `app.listen()` | the server `listen` started |
+| `react-router dev`, `vite preview` | the `Bun.Server` on a loopback port that the plugin relays the app's sockets to (Vite's own server is `node:http`, not a `Bun.Server`): `publish` reaches every socket the app opened, its `url` is that port's, and `requestIP` and `timeout` know nothing of the request Vite took, so `ctx.ip` stays `undefined` there |
+| Vite in middleware mode, a server of your own calling `app.fetch(request)` alone, `app.request(…)` in a test | `undefined` |
+
 ### Outside the catch-all
 
 Without the plugin, under a plain `react-router dev`, or in a unit test
@@ -1083,7 +1113,7 @@ leaves Vite's own socket alone: an upgrade asking for the `vite-hmr` or
 upgrade, except one Vite's `server.proxy` relays itself (an entry with
 `ws: true` or a `ws:` target, matched as Vite matches it), is relayed,
 byte for byte, to a `Bun.serve` of the app on a loopback port of its
-own, started on the first upgrade and given
+own, started on the first upgrade or the first request and given
 `app.fetch` and `app.websocket`, as `listen` gives them. So in dev:
 
 - **The same middlewares, refusals and handlers run** as from the build:
@@ -1096,6 +1126,9 @@ own, started on the first upgrade and given
 - **A `publish` reaches the sockets opened since the same edit**: the
   sockets opened before it are on the previous server. Reload the pages
   after an edit to reconnect them.
+- **A loader's or an action's `alxiaOf(context).server` is that loopback
+  server**, the one the sockets are on, so its `publish` reaches them as
+  from the build: see [The server](#the-server-server).
 - **A socket's `ctx.ip` is the loopback address**, the relay's. The
   browser is local in dev, so that is usually its address anyway.
 - **An upgrade to a path with no `ws` route** gets what the build answers
@@ -1216,6 +1249,12 @@ Send a browser's user agent. `isbot('Bun/1.4.2')` is true, and React
 Router's entry waits for the whole page before it answers a bot, so a test
 with Bun's own user agent never sees a page stream. An index route's action
 is `POST /?index`, not `POST /`.
+
+`app.request` runs without a server, so a loader's `alxiaOf(context).server`
+is `undefined` there, and a `publish` it guards with `?.` sends nothing.
+To test one, listen on a free port, `app.listen({ port: 0 })`, open the
+socket, then post to the action (`/todos.data`, the single-fetch URL, for
+its data rather than the page).
 
 ## Deploying
 

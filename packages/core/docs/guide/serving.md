@@ -84,9 +84,9 @@ test('POST /users', async () => {
 });
 ```
 
-Through `fetch` alone there is no server: `ctx.server` is `undefined`, the
-default `ip` is `undefined`, a socket route answers 426, and a `page`
-answers 404. Use `listen({ port: 0 })` to test those.
+Through `fetch` alone there is no server: [`ctx.server`](#the-server-ctxserver)
+is `undefined`, the default `ip` is `undefined`, a socket route answers 426,
+and a `page` answers 404. Use `listen({ port: 0 })` to test those.
 
 ## `websocket`
 
@@ -105,6 +105,55 @@ const server = Bun.serve({ port: 3000, fetch: app.fetch, websocket: app.websocke
 Such a server is not the app's: `app.server` stays `undefined`, and
 `onStart` and `onStop` do not run. One handler serves every socket the app
 opens, its groups' and plugins' included.
+
+## The server: `ctx.server`
+
+```ts no-check
+readonly server: Bun.Server<unknown> | undefined;
+```
+
+Every middleware and handler reads the `Bun.Server` serving its request as
+`ctx.server`, a plain property of the context:
+
+| How the request came | `ctx.server` |
+| --- | --- |
+| through `listen` | the server `listen` started, `app.server` |
+| through `Bun.serve({ fetch: app.fetch, websocket: app.websocket })` | the server Bun passes `fetch`: `app.fetch(request, server)` |
+| through `app.request(…)`, or `app.fetch(request)` alone | `undefined`: no server took the request |
+
+It is `undefined` without a server because there is none to give: a test
+calling the app in process, or a runtime calling `fetch` with the request
+alone. Guard it with `?.`, or listen in the test
+([Troubleshooting](../troubleshooting.md#ctxserver-is-undefined-in-a-test)).
+What it is good for:
+
+```ts
+import { alxia } from '@alxia/core';
+
+const app = alxia()
+	.ws('/news', { open: (socket) => socket.subscribe('news'), message: () => {} })
+	.post('/news', async ({ server, request, reply }) => {
+		// Every socket subscribed to 'news', from a route that is not a socket.
+		server?.publish('news', JSON.stringify({ said: await request.text() }));
+		return reply(202);
+	})
+	.get('/export', ({ server, request, reply }) => {
+		// A long request: 120 seconds of idle time rather than Bun's default.
+		server?.timeout(request, 120);
+		return reply(200, 'a long export');
+	});
+```
+
+- **`server.publish(topic, data)`** reaches every socket that subscribed
+  to `topic` ([WebSockets](websockets.md)), from a route, an action, a job.
+  It is Bun's own: it sends the bytes as given, which a socket route's
+  `send` schema does not check, unlike `socket.publish`.
+- **`server.timeout(request, seconds)`** gives one request more idle time
+  than the server's `idleTimeout`, or `0` for none.
+- **`server.requestIP(request)`** is the connection's address. Read
+  `ctx.ip` instead: it is the same address, one text per address, and
+  behind a `proxy` the client's rather than the proxy's
+  ([below](#the-clients-address-ip)).
 
 ## The client's address: `ip`
 

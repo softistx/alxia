@@ -43,14 +43,22 @@ export async function loadApp(
 	return module.default;
 }
 
+/** The side server of an app, which its sockets are open on: what `bridgeSockets` returns. */
+export type SideOf = (app: DevApp) => Bun.Server<unknown> | undefined;
+
+/**
+ * One request Vite left, answered by the app as the server file is now,
+ * given the side server its sockets are open on as `ctx.server`.
+ */
 export async function serveFromEntry(
 	server: ViteDevServer,
 	entry: string | undefined,
+	sideOf: SideOf,
 	req: Parameters<typeof toRequest>[0],
 	res: Parameters<typeof toRequest>[1],
 ): Promise<void> {
 	const app = await loadApp(server, entry);
-	await send(res, await app.fetch(toRequest(req, res)));
+	await send(res, await app.fetch(toRequest(req, res), sideOf(app)));
 }
 
 /**
@@ -61,7 +69,7 @@ export function serveDev(
 	server: ViteDevServer,
 	entry: string | undefined,
 ): () => void {
-	bridgeSockets(server.httpServer, {
+	const sideOf = bridgeSockets(server.httpServer, {
 		proxy: server.config.server.proxy,
 		load: () => loadApp(server, entry),
 		logger: server.config.logger,
@@ -69,10 +77,12 @@ export function serveDev(
 	});
 	return () => {
 		server.middlewares.use((req, res, next) => {
-			serveFromEntry(server, entry, req, res).catch((error: unknown) => {
-				if (error instanceof Error) server.ssrFixStacktrace(error);
-				next(error);
-			});
+			serveFromEntry(server, entry, sideOf, req, res).catch(
+				(error: unknown) => {
+					if (error instanceof Error) server.ssrFixStacktrace(error);
+					next(error);
+				},
+			);
 		});
 	};
 }

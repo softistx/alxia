@@ -53,6 +53,11 @@ export function registeredContext() {
 	return alxiaOf<RegisteredOf<{ server: typeof server }>>(context);
 }
 
+// The server serving the request, core's `ctx.server`, through `alxiaOf`.
+export function loaderServer() {
+	return alxiaOf<typeof server>(context).server;
+}
+
 export function behind() {
 	const base = alxia().derive(() => ({ tenant: 't' }));
 	return reactRouter(base, {

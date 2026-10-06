@@ -16,7 +16,10 @@ import { bridgeSockets } from './socket';
 
 /** What the built server's default export is: the alxia app. */
 interface Fetcher {
-	fetch(request: Request): Response | Promise<Response>;
+	fetch(
+		request: Request,
+		server?: Bun.Server<unknown>,
+	): Response | Promise<Response>;
 }
 
 /** The built server's app, or an error saying why there is none. */
@@ -52,7 +55,7 @@ export function servePreview(server: PreviewServer): void {
 		app ??= load(file, label);
 		return app;
 	};
-	bridgeSockets(server.httpServer, {
+	const sideOf = bridgeSockets(server.httpServer, {
 		proxy: server.config.preview.proxy,
 		// The built server's default export is the alxia app, `websocket` and all.
 		load: () =>
@@ -66,7 +69,9 @@ export function servePreview(server: PreviewServer): void {
 		current().then(
 			async (loaded) => {
 				try {
-					await send(res, await loaded.fetch(toRequest(req, res)));
+					// The side server its sockets are open on, as `ctx.server`.
+					const side = sideOf(loaded as DevApp);
+					await send(res, await loaded.fetch(toRequest(req, res), side));
 				} catch (error) {
 					// Mid-body, the response has started: end it rather than answer twice.
 					if (res.headersSent) res.destroy(error as Error);

@@ -175,6 +175,28 @@ How `alxiaOf(context)` is typed:
 This package's `Register` wins over core's: the server's app is the base
 and all `configure` adds after it.
 
+### The server: `server`
+
+`alxiaOf(context).server` is the `Bun.Server` serving the request, core's
+`ctx.server`: its `publish` reaches the app's [WebSocket](#websockets)
+subscribers from an action.
+
+```ts
+export async function action({ context }: Route.ActionArgs) {
+	alxiaOf(context).server?.publish('todos', JSON.stringify({ changed: true }));
+	return { ok: true };
+}
+```
+
+It is the listening server behind `bun build/server/index.js`. Under
+`react-router dev` and `vite preview`, Vite's server is `node:http`, so it is
+the `Bun.Server` the app's sockets are relayed to, on a loopback port:
+`publish` reaches them, but its `url` is that port's, not Vite's, and its
+`requestIP` and `timeout` know nothing of a request Vite took. Through
+`app.request(…)`, as in a test, it is `undefined`.
+It is not `Register`'s `server`, which names what `createServer()` returned
+for the types.
+
 [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#typing-the-loaders)
 
 ## A CSP nonce
@@ -433,7 +455,7 @@ has the commented file, and what to copy for a package left external.
 | `ReactRouterServer<App>` | what it returns: `create(wiring)` makes the app, `start(app)` listens |
 | `ServerWiring` | what `create` takes: `build`, `mode`, `client` |
 | `FreshApp` | the app `beforeAll`, or `configure` without it, receives |
-| `alxiaOf<App>(context)` | what alxia's middlewares built, in a loader, an action or a middleware. Typed by the registered server, by the type argument (a server or an app), or as `BaseContext` |
+| `alxiaOf<App>(context)` | what alxia's middlewares built, in a loader, an action or a middleware. Typed by the registered server, by the type argument (a server or an app), or as `BaseContext`. Its `server` is the `Bun.Server` serving the request |
 | `Register` | the interface to augment with `server: typeof server` |
 | `RegisteredApp` | the app `alxiaOf` reads with no type argument: the registered server's, else the one `@alxia/core`'s `Register` names, else a fresh app |
 | `RegisteredOf<R, Core?>` | the app a `Register`-shaped interface names: its server's, `InvalidRegister`, or with no server `Core`, by default core's `RegisteredBase` |

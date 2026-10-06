@@ -15,9 +15,8 @@ Nothing scheduled yet.
 
 ## Later
 
-- **`ctx.server` under `react-router dev`.** An HTTP request reaches the
-  app through `app.fetch`, so `ctx.server` and `page()` wait for the build;
-  a socket's upgrade already has its server.
+- **`page()` under `react-router dev`.** An HTTP request reaches the app
+  through `app.fetch`, so a Bun HTML bundle waits for the build.
 - **The logger's duration of a streamed page**, to its last byte rather
   than its first.
 - **A React Router `basename`**, the app served under a path.
@@ -44,6 +43,12 @@ Nothing scheduled yet.
   Bun, Deno or Cloudflare with a `runtime` option; alxia is Bun's.
 
 ## Shipped
+
+### Next
+
+- **`ctx.server` in dev.** Under `react-router dev` and `vite preview`, a
+  loader's `alxiaOf(context).server` is the server the app's sockets are
+  relayed to, so an action's `publish` reaches them as from the build.
 
 ### 0.7.0
 

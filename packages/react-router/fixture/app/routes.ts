@@ -6,4 +6,5 @@ export default [
 	route('boom', 'routes/boom.tsx'),
 	route('missing', 'routes/missing.tsx'),
 	route('login', 'routes/login.tsx'),
+	route('live', 'routes/live.tsx'),
 ] satisfies RouteConfig;
