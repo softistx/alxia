@@ -251,19 +251,19 @@ function trustProxy(options: TrustProxyOptions): ProxyTrust;
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `trusted` | `number \| string \| string[] \| (address: string) => boolean` | required | the proxies in front of the app, as for [`forwardedIp`](#forwardedip-header-trusted-) |
-| `header` | `string` | `'x-forwarded-for'` | `'x-forwarded-for'`: the address from it, the scheme from `X-Forwarded-Proto`, the host from `X-Forwarded-Host`; `'forwarded'`: all three from RFC 7239's `for=`, `proto=` and `host=`; another name: the address from that header, the scheme and host from `X-Forwarded-*` |
+| `header` | `string` | `'x-forwarded-for'` | `'x-forwarded-for'`: the address from it, the scheme from `X-Forwarded-Proto`, the host from `X-Forwarded-Host`, its port from `X-Forwarded-Port` ([below](#the-port)); `'forwarded'`: all three from RFC 7239's `for=`, `proto=` and `host=`; another name: the address from that header, the rest from `X-Forwarded-*` |
 | `untrusted` | `'ignore' \| 'refuse' \| 'refuse-all'` | `'ignore'` | what a request from a connection that is no proxy gets: its forwarding headers ignored, refused when it carries one, or refused whatever it carries ([below](#refusing-an-untrusted-peer)) |
 | `refusal` | `(refused: RefusedRequest) => Response \| Promise<Response>` | the default 403 | the app's own answer to a refused request, which must be a 403 ([below](#answering-the-refusal-yourself)) |
 | `allow` | `string \| string[] \| (request: Request, peer: string \| undefined) => boolean` | none | under `'refuse-all'` alone: what passes from another connection ([below](#only-the-proxies-refuse-all)) |
 | `canonical` | `boolean` | `true` | `ctx.ip` in its [one text](#one-text-per-address); `false`, as written |
 
-`originalUrl(ctx)` is a copy of `ctx.url` with the scheme and host the
+`originalUrl(ctx)` is a copy of `ctx.url` with the scheme, host and port the
 proxies said: change it freely, the request's URL stays. `ctx.url` itself
 is never rewritten, so routing, `ctx.url.pathname` and every package
 reading it see the request as it reached the app.
 `@alxia/telemetry`'s `url.scheme`, `server.address` and `server.port`, and the
 `X-Forwarded-Proto` and `-Host` that `@alxia/proxy` sends upstream, read it:
-the public scheme and host behind a trusted proxy.
+the public scheme, host and port behind a trusted proxy.
 
 **What is believed.** The scheme and host are read only from a connection
 `trusted` names — under ranges or a function, a peer they hold; under a
@@ -293,8 +293,34 @@ the request's URL stands. A `Forwarded` value may be quoted
 (`host="example.com:8443"`); a parameter given twice in one element says
 nothing.
 
+#### The port
+
+A port is read from the host or from `X-Forwarded-Port`, the one the same
+hop wrote as the scheme and the host, by the same rule: the entry the
+outermost of your proxies wrote, from a trusted connection alone. A port the
+host carries (`X-Forwarded-Host: api.example.com:8443`) wins: it was written
+with the host it belongs to, while nginx's `$server_port` and an ALB's
+`X-Forwarded-Port` name the port the proxy listened on and say nothing of
+a host that names its own. The header names the port only of a host that
+names none, and only beside a forwarded host: the proxy's port next to the
+app's own internal host would name an address nobody asked for.
+
+```ts
+// X-Forwarded-Proto: https, X-Forwarded-Host: api.example.com, X-Forwarded-Port: 8443
+originalUrl(ctx).href; // https://api.example.com:8443/…
+// X-Forwarded-Port: 443 with https: the default is left out, https://api.example.com/…
+```
+
+The value is digits alone, 1 to 65535, with no sign and no leading zero;
+anything else is ignored, as any malformed entry is, and the host's own
+stands. The scheme's default port (443 for `https`, 80 for `http`) is left
+out. `Forwarded` (RFC 7239) has no port parameter, so with `header:
+'forwarded'` the port is the one in `host=`, and `X-Forwarded-Port` is not
+read. Under `untrusted: 'refuse'`, a request from an untrusted connection
+carrying `X-Forwarded-Port` is refused like one carrying the other headers.
+
 > **Security.** Your outermost proxy must **overwrite**
-> `X-Forwarded-Proto` and `X-Forwarded-Host` (or `Forwarded`) with what it
+> `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Port` (or `Forwarded`) with what it
 > saw, and the proxies behind it pass them on. Appending is safe only when
 > **every** proxy in the chain appends: an outer proxy that appends while
 > an inner one passes the list on hands the app the client's own value
@@ -303,15 +329,17 @@ nothing.
 > can tell those apart, and `untrusted: 'refuse'` does not help: the
 > connection is your proxy's. nginx passes the client's header on unless
 > told otherwise: write `proxy_set_header X-Forwarded-Proto $scheme;` and
-> `proxy_set_header X-Forwarded-Host $host;` at the edge. A load balancer
+> `proxy_set_header X-Forwarded-Host $host;` (`$http_host` when the host has
+> a port of its own) at the edge, and `proxy_set_header X-Forwarded-Port
+> $server_port;` if you send the port. A load balancer
 > such as AWS's overwrites them. Prefer ranges to a hop count, so a
 > connection that bypasses the proxies is never believed.
 
 ### Refusing an untrusted peer
 
 With `untrusted: 'refuse'`, a request that carries `Forwarded`,
-`X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host` or the `header`
-given, from a connection the ranges or the function do not name, is
+`X-Forwarded-For`, `X-Forwarded-Proto`, `X-Forwarded-Host`,
+`X-Forwarded-Port` or the `header` given, from a connection the ranges or the function do not name, is
 answered 403 — `{ "error": "untrusted_proxy" }`, or a problem under
 `errors: 'problem'` — before routing and before any middleware, so nothing
 the app runs reads what such a request claims, and a logger does not see

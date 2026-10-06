@@ -82,8 +82,6 @@ number on it. Every release, with each change it made, is in
   ([Errors](guide/errors.md#making-it-the-default)).
 - **Comments on a stream.** A handler yielding a comment line of its own
   (`: …`), beside the keep-alive the stream already sends while idle.
-- **`X-Forwarded-Port`.** The port a proxy names apart from its host, for
-  `originalUrl(ctx)`; today a port is read from the host alone.
 
 ## Not planned
 

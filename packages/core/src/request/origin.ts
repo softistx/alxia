@@ -20,6 +20,19 @@ export function protocolOf(
 	return scheme === 'http' || scheme === 'https' ? `${scheme}:` : undefined;
 }
 
+const PORT = /^[1-9]\d{0,4}$/;
+
+/**
+ * A forwarded `X-Forwarded-Port`: digits alone, 1 to 65535, no sign, no
+ * leading zero, no space inside. `undefined` for anything else.
+ */
+export function portOf(value: string | undefined): string | undefined {
+	const text = value?.trim();
+	return text !== undefined && PORT.test(text) && Number(text) <= 65535
+		? text
+		: undefined;
+}
+
 const LABEL = '[a-z0-9_](?:[a-z0-9_-]{0,61}[a-z0-9_])?';
 const NAME = new RegExp(`^${LABEL}(?:\\.${LABEL})*$`);
 const HOST = /^(\[[0-9a-f:.]+\]|[^[\]:]+)(?::([1-9]\d{0,4}))?$/;

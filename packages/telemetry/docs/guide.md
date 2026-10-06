@@ -256,9 +256,9 @@ Behind `alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) })`, a
 request a trusted TLS proxy forwarded is recorded as `https` and the public
 host (`api.example.com`), not the app's own (`http`, `app.internal`); without
 `proxy`, or from a connection `trusted` does not name, they are the request's
-own, as before. A `server.port` is recorded only when the host the client
-asked for names one: the proxy's `X-Forwarded-Host` seldom does, so a port
-the app listens on is never reported as the public one. The constants are exported for code that reads
+own, as before. A `server.port` is recorded only when the URL the client
+asked for names one: the host's own, or the `X-Forwarded-Port` of a trusted proxy,
+so a port the app listens on is never reported as the public one. The constants are exported for code that reads
 spans back, a test for one:
 
 ```ts

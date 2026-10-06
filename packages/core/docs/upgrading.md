@@ -4,6 +4,42 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
+## Next
+
+`originalUrl(ctx)` now carries the port a trusted proxy sends in
+`X-Forwarded-Port`. Nothing in the API changes.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [`originalUrl(ctx)` reads `X-Forwarded-Port`](#originalurlctx-reads-x-forwarded-port) | core | only a URL built from `originalUrl` behind a proxy that sends the header |
+
+### `originalUrl(ctx)` reads `X-Forwarded-Port`
+
+Before, a port was read from the forwarded host alone: `X-Forwarded-Host:
+api.example.com` with `X-Forwarded-Port: 8443` gave `https://api.example.com/…`.
+Now:
+
+```ts
+// X-Forwarded-Proto: https, X-Forwarded-Host: api.example.com, X-Forwarded-Port: 8443
+originalUrl(ctx).href;
+// before: https://api.example.com/…
+// after:  https://api.example.com:8443/…
+```
+
+**Notice.** Behind a proxy that sends the header, `originalUrl(ctx)` now
+carries the port, and so do the absolute URLs, redirects and
+`server.port` built from it. A port the host carries wins over the header;
+one that is not digits from 1 to 65535 is ignored; the scheme's default is
+left out; the header is read only beside a forwarded host, from the same
+trusted hop as the scheme and the host. `Forwarded` has no port parameter
+and is unchanged. Under `untrusted: 'refuse'`, a request from an untrusted
+connection that carries only `X-Forwarded-Port` is now refused 403 like one
+carrying `X-Forwarded-Host`.
+
+**Can it break your code.** Only where a proxy sends a port that is not the
+public one (a proxy that writes its internal listening port): have it send
+the public port, or stop sending the header.
+
 ## 0.12.0
 
 `@alxia/core` 0.12.0 lets an app answer the 403 of `trustProxy`'s
