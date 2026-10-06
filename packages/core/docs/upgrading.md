@@ -4,6 +4,35 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
+## Next
+
+The next `@alxia/core` minor lets an app answer the 403 of `trustProxy`'s
+`untrusted: 'refuse'` and `'refuse-all'` itself. Nothing breaks: without the
+new option the body is what it was.
+
+### Your own body for a refused proxy request
+
+Before, the 403 followed the app's error format alone — `{ "error":
+"untrusted_proxy" }`, or a problem — and an app that answered `forbidden`
+before adopting `trustProxy` could not keep it. Now:
+
+```ts
+// before: always { "error": "untrusted_proxy" }
+trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' });
+
+// after: your own 403
+trustProxy({
+	trusted: ['10.0.0.0/8'],
+	untrusted: 'refuse',
+	refusal: ({ refusal }) => new Response('forbidden', { status: 403 }),
+});
+```
+
+The function gets `{ request, url, ip, refusal }` and must answer a
+`Response` with status 403; a throw or another status is the app's 500. The
+refusal comes before routing, so no middleware or hook sees it
+([Serving](guide/serving.md#answering-the-refusal-yourself)).
+
 ## 0.11.0
 
 `@alxia/core` 0.11.0 adds `app.all(path, …)`, one route for every method at

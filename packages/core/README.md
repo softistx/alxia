@@ -389,7 +389,9 @@ alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) }).g
 `untrusted: 'refuse-all'` answers 403 to every request from a connection
 that is no proxy, headers or not, but for what `allow` lets through — a
 probe's path, a loopback peer
-([Only the proxies](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#only-the-proxies-refuse-all)):
+([Only the proxies](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#only-the-proxies-refuse-all)).
+`refusal: () => new Response('forbidden', { status: 403 })` answers either one
+in your own body ([Answering the refusal yourself](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#answering-the-refusal-yourself)):
 
 ```ts
 alxia({

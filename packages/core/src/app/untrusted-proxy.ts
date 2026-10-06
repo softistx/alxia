@@ -7,14 +7,27 @@
  */
 import { PROBLEM, problemOf } from '../errors/problems';
 import { toResponse } from '../reply/reply';
+import { answered, type ProxyRefusalAnswer } from '../request/proxy-refusal';
 import type { ProxyRefusal } from '../request/untrusted';
 import { errorFormat } from './served';
 
-/** `{ error: 'untrusted_proxy' }`, or a problem saying why, with status 403. */
-export function untrustedProxy(
-	ctx: { readonly url: URL },
+/**
+ * The app's own answer, when `trustProxy({ refusal })` gave one, else
+ * `{ error: 'untrusted_proxy' }` or a problem saying why: status 403.
+ */
+export async function untrustedProxy(
+	ctx: {
+		readonly request: Request;
+		readonly url: URL;
+		readonly ip: string | undefined;
+	},
 	refusal: ProxyRefusal = 'headers',
-): Response {
+	answer?: ProxyRefusalAnswer,
+): Promise<Response> {
+	if (answer !== undefined) {
+		const { request, url, ip } = ctx;
+		return answered(answer, { request, url, ip, refusal });
+	}
 	if (errorFormat(ctx) === 'json') {
 		return toResponse(403, { error: 'untrusted_proxy' }, new Headers());
 	}
