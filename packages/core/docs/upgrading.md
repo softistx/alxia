@@ -9,12 +9,37 @@ after, and whether it can break yours.
 `@alxia/core` documents `ctx.server`, the `Bun.Server` serving the request,
 which every context has always held. The next `@alxia/react-router` minor
 gives a loader's `alxiaOf(context).server` a server under `react-router dev`
-and `vite preview`. Nothing breaks.
+and `vite preview`, and adds `context.alxia`, a shorthand for
+`alxiaOf(context)`. Nothing breaks.
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
+| [`context.alxia`, the shorthand](#contextalxia-the-shorthand) | react-router | only an app that declares an `alxia` property of its own on React Router's `RouterContextProvider` |
 | [`ctx.server` under `react-router dev`](#ctxserver-under-react-router-dev) | react-router | no: it was `undefined` there |
 | [`ctx.server`, documented](#ctxserver-documented) | core | no: nothing changes at runtime or in the types |
+
+### `context.alxia`, the shorthand
+
+`@alxia/react-router` augments React Router's `RouterContextProvider` with a
+read-only `alxia`: what `alxiaOf(context)` returns, typed by its `Register`,
+with no import:
+
+```ts
+import type { LoaderFunctionArgs } from 'react-router';
+
+export function loader({ context }: LoaderFunctionArgs) {
+	const { user, server } = context.alxia;
+}
+```
+
+It is typed with `react-router`'s own argument types. With the generated
+`Route.LoaderArgs`, `tsc` reports TS2339 until react-router's generated types
+and its main entry share one declaration: keep `alxiaOf(context)` there.
+Nothing to change: `alxiaOf(context)` returns what it did.
+
+**Notice.** An app that declares `alxia` on `RouterContextProvider` itself,
+in a `declare module 'react-router'` of its own, gets `Subsequent property
+declarations must have the same type`: rename its property.
 
 ### `ctx.server` under `react-router dev`
 

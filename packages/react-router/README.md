@@ -175,6 +175,28 @@ How `alxiaOf(context)` is typed:
 This package's `Register` wins over core's: the server's app is the base
 and all `configure` adds after it.
 
+### The shorthand: `context.alxia`
+
+The same object, with no import and no call, typed by the same `Register`,
+where the arguments are react-router's own types:
+
+```ts
+import type { LoaderFunctionArgs } from 'react-router';
+
+export function loader({ context }: LoaderFunctionArgs) {
+	const { user, server } = context.alxia;
+	return { name: user?.name ?? 'anonymous' };
+}
+```
+
+With the generated `Route.LoaderArgs` it is there at runtime, but `tsc`
+reports `Property 'alxia' does not exist on type
+'Readonly<RouterContextProvider>'` (TS2339): react-router's `./internal`
+types, which the generated route types read, point at its development
+build, a second declaration of `RouterContextProvider` that no package can
+augment. Read `alxiaOf(context)` there until react-router ships one
+declaration. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#property-alxia-does-not-exist-on-type-readonlyroutercontextprovider)
+
 ### The server: `server`
 
 `alxiaOf(context).server` is the `Bun.Server` serving the request, core's
@@ -458,12 +480,15 @@ has the commented file, and what to copy for a package left external.
 | `ServerWiring` | what `create` takes: `build`, `mode`, `client` |
 | `FreshApp` | the app `beforeAll`, or `configure` without it, receives |
 | `alxiaOf<App>(context)` | what alxia's middlewares built, in a loader, an action or a middleware. Typed by the registered server, by the type argument (a server or an app), or as `BaseContext`. Its `server` is the `Bun.Server` serving the request |
+| `context.alxia` | the same object, on React Router's `RouterContextProvider` (this package augments its type, as `alxiaOf(context)` with no type argument): typed with `LoaderFunctionArgs` and `ActionFunctionArgs` from `react-router`, not yet with the generated `Route.LoaderArgs` |
+| `AlxiaContextOf<App>` | what `alxiaOf<App>(context)` returns: the app's context and the catch-all's `route` |
+| `ProviderLike` | what `alxiaOf` and `nonceOf` take: any React Router context provider's `get`, the generated route types' included |
 | `Register` | the interface to augment with `server: typeof server` |
 | `RegisteredApp` | the app `alxiaOf` reads with no type argument: the registered server's, else the one `@alxia/core`'s `Register` names, else a fresh app |
 | `RegisteredOf<R, Core?>` | the app a `Register`-shaped interface names: its server's, `InvalidRegister`, or with no server `Core`, by default core's `RegisteredBase` |
 | `InvalidRegister` | what a `Register` naming neither a server nor an app reads as: every key of the app's own a compile error |
 | `AppOf<Server>` | the app a server makes |
-| `alxiaContext` | the React Router context key `alxiaOf` reads, set on every request |
+| `alxiaContext` | the React Router context key `alxiaOf` and `context.alxia` read, set on every request |
 | `nonceOf(context)` | the request's CSP nonce, for `entry.server.tsx`: the context's `nonce` when a middleware set one, such as `secureHeaders({ nonce: true })`, else `undefined` |
 | `reactRouter(app, options)` | the catch-all and the client's files, for a server of your own. `build`, `mode`, `getLoadContext`, `client` |
 | `ReactRouterOptions<Ctx>` | its options |

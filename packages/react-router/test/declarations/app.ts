@@ -8,6 +8,7 @@
 // is what the augmentation resolves through, so it is named instead.
 import { type AnyAlxia, alxia } from '@alxia/core';
 import {
+	type AlxiaContextOf,
 	alxiaOf,
 	createServer,
 	type FreshApp,
@@ -56,6 +57,16 @@ export function registeredContext() {
 // The server serving the request, core's `ctx.server`, through `alxiaOf`.
 export function loaderServer() {
 	return alxiaOf<typeof server>(context).server;
+}
+
+// `context.alxia`, React Router's provider augmented by this package:
+// unregistered here, `BaseContext` and the catch-all's `route`.
+export function contextAlxia() {
+	return context.alxia;
+}
+
+export function serverContext(): AlxiaContextOf<typeof server> {
+	return alxiaOf<typeof server>(context);
 }
 
 export function behind() {

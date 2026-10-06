@@ -3,7 +3,7 @@
  * middleware the request's alxia context, and the typed way to read it.
  */
 import type { Alxia, AnyAlxia, ContextOf, RegisteredBase } from '@alxia/core';
-import { createContext, type RouterContextProvider } from 'react-router';
+import { createContext, RouterContextProvider } from 'react-router';
 import type { ReactRouterServer } from './server';
 
 /** The default of the key: no catch-all set it. */
@@ -97,17 +97,63 @@ export type RegisteredApp = RegisteredOf<Register>;
  */
 export function alxiaOf<
 	App extends AnyAlxia | ReactRouterServer<AnyAlxia> = RegisteredApp,
->(
-	context: Readonly<RouterContextProvider>,
-): ContextOf<AppOf<App>> & {
-	/** The catch-all's route, which every request reaching React Router matched. */
-	readonly route: string;
-} {
+>(context: ProviderLike): AlxiaContextOf<App> {
 	const value = context.get(alxiaContext);
 	if (value === MISSING) {
 		throw new Error(
 			"alxiaOf(): this request has no alxia context. Serve the React Router app through alxia: add alxia() from @alxia/react-router/vite to vite.config.ts's plugins, or, with a server of your own, serve the build through reactRouter() from @alxia/react-router.",
 		);
 	}
-	return value as ContextOf<AppOf<App>> & { readonly route: string };
+	return value as AlxiaContextOf<App>;
 }
+
+/**
+ * What `alxiaOf` and `nonceOf` read of a provider: its `get`. Not the whole
+ * class, which this package gives an `alxia`: the generated route types'
+ * `context` is another declaration of it, without one, and must still pass.
+ */
+export type ProviderLike = Pick<Readonly<RouterContextProvider>, 'get'>;
+
+/** What `alxiaOf<App>(context)` returns, and `context.alxia` is for the registered app. */
+export type AlxiaContextOf<
+	App extends AnyAlxia | ReactRouterServer<AnyAlxia> = RegisteredApp,
+> = ContextOf<AppOf<App>> & {
+	/** The catch-all's route, which every request reaching React Router matched. */
+	readonly route: string;
+};
+
+declare module 'react-router' {
+	interface RouterContextProvider {
+		/**
+		 * What alxia's middlewares built for this request — `alxiaOf(context)`,
+		 * typed by the app `Register` names (`BaseContext` with none):
+		 *
+		 * ```ts
+		 * export async function loader({ context }: LoaderFunctionArgs) {
+		 *   const { user, server } = context.alxia;
+		 * }
+		 * ```
+		 *
+		 * Typed with `react-router`'s own argument types. The generated
+		 * `Route.LoaderArgs` reads a second declaration of this class (its
+		 * `./internal` types point at react-router's development build), which
+		 * no augmentation reaches: read `alxiaOf(context)` there. Throws as
+		 * `alxiaOf` does on a request that did not come through
+		 * `reactRouter()`. Server-side only: a `clientLoader` has none.
+		 */
+		readonly alxia: AlxiaContextOf;
+	}
+}
+
+// A getter on the prototype rather than a value set on each provider: it
+// reads `alxiaContext`, so it holds exactly when that key is set — a
+// provider React Router copies keeps it — and on a provider no
+// `reactRouter()` filled, a test's, it throws `alxiaOf`'s error rather than
+// reading `undefined`.
+Object.defineProperty(RouterContextProvider.prototype, 'alxia', {
+	configurable: true,
+	enumerable: false,
+	get(this: Readonly<RouterContextProvider>) {
+		return alxiaOf(this);
+	},
+});

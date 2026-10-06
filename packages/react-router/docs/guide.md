@@ -745,11 +745,51 @@ What it is, by how the app runs:
 | `react-router dev`, `vite preview` | the `Bun.Server` on a loopback port that the plugin relays the app's sockets to (Vite's own server is `node:http`, not a `Bun.Server`): `publish` reaches every socket the app opened, its `url` is that port's, and `requestIP` and `timeout` know nothing of the request Vite took, so `ctx.ip` stays `undefined` there |
 | Vite in middleware mode, a server of your own calling `app.fetch(request)` alone, `app.request(…)` in a test | `undefined` |
 
+### The shorthand: `context.alxia`
+
+This package augments React Router's `RouterContextProvider` with a
+read-only `alxia` property: the object `alxiaOf(context)` returns, with no
+import and no call, typed by the same `Register` (core's, then
+`BaseContext`, with none of this package's):
+
+```ts
+import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
+
+export function loader({ context }: LoaderFunctionArgs) {
+	const { user, server } = context.alxia;
+	return { name: user?.name ?? 'anonymous', listening: server !== undefined };
+}
+
+export async function action({ context }: ActionFunctionArgs) {
+	context.alxia.server?.publish('todos', JSON.stringify({ changed: true }));
+	return { ok: true };
+}
+```
+
+**Typed with react-router's own argument types, not yet the generated
+ones.** `LoaderFunctionArgs`, `ActionFunctionArgs`, `MiddlewareFunction` and
+`RouterContextProvider`, imported from `react-router`, see `alxia`. The
+generated `Route.LoaderArgs` does not: the `+types` files import from
+`react-router/internal`, whose types (in react-router 8.4) point at its
+`dist/development` build, while `react-router` itself points at
+`dist/production`. That is a second declaration of `RouterContextProvider`,
+which no exported path reaches, so no package can augment it. With
+`Route.LoaderArgs`, `context.alxia` works at runtime and `tsc` reports
+TS2339 ([Troubleshooting](troubleshooting.md#property-alxia-does-not-exist-on-type-readonlyroutercontextprovider)):
+read `alxiaOf(context)` there, until react-router ships one declaration.
+
+It is a getter on the provider's prototype that reads `alxiaContext`: it
+holds exactly when that key is set, in dev as in production, and on a
+provider no catch-all filled it throws what `alxiaOf` throws. It is the
+server's alone: a `clientLoader` or a `clientAction` has no alxia context.
+
 ### Outside the catch-all
 
 Without the plugin, under a plain `react-router dev`, or in a unit test
 that calls a loader with a bare provider, there is no alxia context, and
-`alxiaOf` throws, saying so: see
+`alxiaOf` and `context.alxia` throw, saying so. The getter is installed
+when `@alxia/react-router` is first imported: a test whose program never
+imports it reads `context.alxia` as `undefined`. See
 [the troubleshooting entry](troubleshooting.md#alxiaof-this-request-has-no-alxia-context-).
 
 ## The app's own context keys

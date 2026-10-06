@@ -10,6 +10,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`alxia-react-router: … is running on Node, and alxia's server runs on Bun. …`](#alxia-react-router--is-running-on-node-and-alxias-server-runs-on-bun-)
 - [`ReferenceError: Bun is not defined`](#referenceerror-bun-is-not-defined)
 - [`alxiaOf(): this request has no alxia context. …`](#alxiaof-this-request-has-no-alxia-context-)
+- [`TypeError: undefined is not an object (evaluating 'context.alxia.user')`](#typeerror-undefined-is-not-an-object-evaluating-contextalxiauser)
 - [`Error: No value found for context`](#error-no-value-found-for-context)
 - [`alxia-react-router: … must export createServer() from @alxia/react-router as its default export: …`](#alxia-react-router--must-export-createserver-from-alxiareact-router-as-its-default-export-)
 - [`alxia-react-router: the entry … does not exist. …`](#alxia-react-router-the-entry--does-not-exist-)
@@ -40,6 +41,7 @@ a loader, a message React Router or the browser prints, or an error from
 
 **Types**
 
+- [`Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`](#property-alxia-does-not-exist-on-type-readonlyroutercontextprovider)
 - [`Property '…' does not exist on type 'BaseContext & …'`](#property--does-not-exist-on-type-basecontext--)
 - [`Type '…' does not satisfy the constraint 'AnyAlxia | ReactRouterServer<AnyAlxia>'`](#type--does-not-satisfy-the-constraint-anyalxia--reactrouterserveranyalxia)
 - [`Type '(app: …) => void' is not assignable to type '(app: …) => AnyAlxia'`](#type-app---void-is-not-assignable-to-type-app---anyalxia)
@@ -109,7 +111,9 @@ with [the entry above](#alxia-react-router--is-running-on-node-and-alxias-server
 Error: alxiaOf(): this request has no alxia context. Serve the React Router app through alxia: add alxia() from @alxia/react-router/vite to vite.config.ts's plugins, or, with a server of your own, serve the build through reactRouter() from @alxia/react-router.
 ```
 
-**When:** a loader calls `alxiaOf` and `alxiaContext` was not set.
+**When:** a loader calls `alxiaOf`, or reads `context.alxia`, and
+`alxiaContext` was not set. `context.alxia` throws the same error: it reads
+that key.
 
 **Why:** one of three:
 
@@ -153,6 +157,34 @@ const context = new RouterContextProvider();
 context.set(alxiaContext, { user: { name: 'Ada' } });
 await loader({ context, request: new Request('http://localhost/'), params: {} } as never);
 ```
+
+### `TypeError: undefined is not an object (evaluating 'context.alxia.user')`
+
+**When:** a unit test calls a loader that reads `context.alxia` with a
+`new RouterContextProvider()`, and nothing in the test imports
+`@alxia/react-router`; destructured, `const { user } = context.alxia` fails
+with `TypeError: Cannot destructure property 'user' from null or undefined
+value`. A `clientLoader` or a `clientAction` reading it fails the same way
+in the browser.
+
+**Why:** `context.alxia` is a getter `@alxia/react-router` defines on React
+Router's provider when it is first imported. The loader's module need not
+import it, and the browser never loads it: the alxia context is the
+server's.
+
+**Fix:** in the test, set the key the getter reads, imported from
+`@alxia/react-router`, which installs the getter:
+
+```ts
+import { alxiaContext } from '@alxia/react-router';
+import { RouterContextProvider } from 'react-router';
+
+const context = new RouterContextProvider();
+context.set(alxiaContext, { user: { name: 'Ada' }, server: undefined });
+await loader({ context, request: new Request('http://localhost/'), params: {} } as never);
+```
+
+On the client, read the data the server's loader returned instead.
 
 ### `Error: No value found for context`
 
@@ -737,6 +769,41 @@ put the final stage back on `oven/bun:1`
 ([`@alxia/create`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md#error--is-linked-against-glibc-dt_needed-libmso6-but-this-bun-build-uses-musl)).
 
 ## Types
+
+### `Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`
+
+```text
+app/routes/home.tsx: error TS2339: Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'.
+```
+
+**When:** a loader or an action typed with the generated `Route.LoaderArgs`
+or `Route.ActionArgs` reads `context.alxia`. At runtime it is there; only
+`tsc` refuses it.
+
+**Why:** this package augments `RouterContextProvider` as `react-router`
+exports it, whose types are `dist/production`'s. The generated `+types`
+files read their argument types from `react-router/internal`, whose types,
+in react-router 8.4, point at `dist/development`: a second declaration of
+the class, which no exported path reaches, so no augmentation can add
+`alxia` to it.
+
+**Fix:** read `alxiaOf(context)` with `Route.LoaderArgs`; it is typed the
+same way:
+
+```ts
+import { alxiaOf } from '@alxia/react-router';
+import type { Route } from './+types/home';
+
+export function loader({ context }: Route.LoaderArgs) {
+	const { user } = alxiaOf(context);
+	return { name: user?.name ?? null };
+}
+```
+
+Or type the arguments with `LoaderFunctionArgs` from `react-router`, which
+sees `context.alxia`, at the cost of the generated `params`. Typing it under
+`Route.LoaderArgs` waits on react-router pointing both entries at the same
+declarations.
 
 ### `Property '…' does not exist on type 'BaseContext & …'`
 

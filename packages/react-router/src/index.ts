@@ -1,8 +1,10 @@
 export {
+	type AlxiaContextOf,
 	type AppOf,
 	alxiaContext,
 	alxiaOf,
 	type InvalidRegister,
+	type ProviderLike,
 	type Register,
 	type RegisteredApp,
 	type RegisteredOf,

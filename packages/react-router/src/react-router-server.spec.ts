@@ -1,10 +1,11 @@
 import { describe, expect, test } from 'bun:test';
+import { alxia } from '@alxia/core';
 // By its published name, as the fixture's build imports it: see react-router.spec.ts.
-import { alxiaOf } from '@alxia/react-router';
-import type { RouterContextProvider } from 'react-router';
+import { alxiaOf, reactRouter } from '@alxia/react-router';
+import { RouterContextProvider } from 'react-router';
 import type { Base } from '../fixture/base';
 import { browser, text } from '../test/fixture';
-import { loadBuild, served } from '../test/react-router-helpers';
+import { build, loadBuild, served } from '../test/react-router-helpers';
 import { open } from '../test/socket';
 
 loadBuild();
@@ -16,8 +17,8 @@ function listening() {
 	return { app, server, base: server.url.href };
 }
 
-describe('alxiaOf(context).server', () => {
-	test('a loader reads the user and the server listen started', async () => {
+describe('alxiaOf(context).server and context.alxia', () => {
+	test('a loader reads context.alxia.user and context.alxia.server: the server listen started', async () => {
 		const { app, server, base } = listening();
 		try {
 			const response = await fetch(new URL('/live', base), {
@@ -69,5 +70,28 @@ describe('alxiaOf(context).server', () => {
 			return { server, bare };
 		};
 		expect(typed).toBeFunction();
+	});
+
+	test('context.alxia is what alxiaOf(context) returns, the same object', async () => {
+		const seen: unknown[] = [];
+		const app = alxia()
+			.derive(() => ({ user: { name: 'Bo' } }))
+			.plugin((app) =>
+				reactRouter(app, {
+					build,
+					getLoadContext: (ctx, context) => {
+						seen.push(context.alxia === ctx, alxiaOf(context) === ctx);
+					},
+				}),
+			);
+		await app.request('/', { headers: browser });
+		expect(seen).toEqual([true, true]);
+	});
+
+	test("outside reactRouter(), context.alxia throws alxiaOf's error", () => {
+		const context = new RouterContextProvider();
+		expect(() => context.alxia).toThrow('this request has no alxia context');
+		// Not an own key: a provider's keys stay React Router's.
+		expect(Object.keys(context)).not.toContain('alxia');
 	});
 });

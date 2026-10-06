@@ -9,10 +9,13 @@ import {
 export const TOPIC = 'live';
 
 export function loader({ context }: LoaderFunctionArgs) {
-	// Typed by the server `app/server.ts` registers: `server` is core's.
-	const { user, server } = alxiaOf(context);
+	// `context.alxia`, typed by the server `app/server.ts` registers, with
+	// react-router's own `LoaderFunctionArgs`: `server` is core's.
+	const { user, server } = context.alxia;
 	const typed: Bun.Server<unknown> | undefined = server;
 	void typed;
+	// @ts-expect-error: nothing in the registered server adds `tenant`
+	context.alxia.tenant;
 	return {
 		name: user?.name ?? 'anonymous',
 		serving: server?.url.href ?? null,
