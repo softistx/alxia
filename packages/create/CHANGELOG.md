@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.4.3
+
+### Patch Changes
+
+- [#229](https://github.com/softistx/alxia/pull/229) [`5970afd`](https://github.com/softistx/alxia/commit/5970afd4c99bf048297077f1ae7ce36590c18a7e) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects get the `@alxia/react-router` minor with `withAlxia(fn)`, `context.alxia`, and `ctx.server` under `react-router dev`.
+
 ## 0.4.2
 
 ### Patch Changes
