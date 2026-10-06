@@ -14,6 +14,7 @@ const GENERATE: Record<JwksAlgorithm, () => Promise<CryptoKeyPair>> = {
 	PS512: () => rsa('RSA-PSS', 'SHA-512'),
 	ES256: () => ec('P-256'),
 	ES384: () => ec('P-384'),
+	ES512: () => ec('P-521'),
 	EdDSA: () => generate({ name: 'Ed25519' }),
 };
 

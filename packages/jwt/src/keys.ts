@@ -7,6 +7,7 @@ export const HASH: Record<Algorithm, string> = {
 	HS512: 'SHA-512',
 	ES256: 'SHA-256',
 	ES384: 'SHA-384',
+	ES512: 'SHA-512',
 	RS256: 'SHA-256',
 	RS384: 'SHA-384',
 	RS512: 'SHA-512',
@@ -27,6 +28,7 @@ export function params(
 const KEY: Record<KeyAlgorithm, { name: string; detail?: string }> = {
 	ES256: { name: 'ECDSA', detail: 'P-256' },
 	ES384: { name: 'ECDSA', detail: 'P-384' },
+	ES512: { name: 'ECDSA', detail: 'P-521' },
 	RS256: { name: 'RSASSA-PKCS1-v1_5', detail: 'SHA-256' },
 	RS384: { name: 'RSASSA-PKCS1-v1_5', detail: 'SHA-384' },
 	RS512: { name: 'RSASSA-PKCS1-v1_5', detail: 'SHA-512' },

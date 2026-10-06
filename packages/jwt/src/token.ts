@@ -1,6 +1,7 @@
 import { base64url, fromBase64url } from './base64url';
 import type { Algorithm, JwtClaims, JwtOptions, VerifyResult } from './jwt';
 import { type Keys, params } from './keys';
+import { signatureFits } from './signature';
 
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
@@ -118,6 +119,7 @@ export async function verifyToken(
 	if (decoded === undefined || decoded.header['crit'] !== undefined)
 		return fail('malformed');
 	if (decoded.header['alg'] !== algorithm) return fail('algorithm');
+	if (!signatureFits(algorithm, decoded.signature)) return fail('signature');
 	// A signature Web Crypto cannot read — the wrong length for the
 	// curve — is a bad signature, not an error to answer with a 500.
 	const valid = await crypto.subtle

@@ -7,6 +7,7 @@ import {
 } from './jwk';
 import { keySource } from './jwks/cache';
 import { keyUrl } from './jwks/url';
+import { signatureFits } from './signature';
 import type { JwksJwt, JwksOptions, VerifyResult } from './jwt';
 import { checkClaims, decodeToken, fail } from './token';
 
@@ -47,6 +48,7 @@ export function createJwksJwt(options: JwksOptions): JwksJwt {
 			return fail('malformed');
 		const { alg, kid } = decoded.header;
 		if (!isJwksAlgorithm(alg) || !allowed.has(alg)) return fail('algorithm');
+		if (!signatureFits(alg, decoded.signature)) return fail('signature');
 		let keys = await source.keys();
 		if (keys === undefined) return fail('keys_unavailable');
 		let found = selectKey(keys, alg, kid);

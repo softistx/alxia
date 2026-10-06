@@ -252,13 +252,17 @@ the key it needs, which option is wrong, and what that key is:
 
 ```text
 TypeError: createJwt: ES384 needs an ECDSA P-384 key; the publicKey is ECDSA P-256
+TypeError: createJwt: ES512 needs an ECDSA P-521 key; the publicKey is ECDSA P-256
+TypeError: createJwt: ES512 needs an ECDSA P-521 key; the privateKey is ECDSA P-384
+TypeError: createJwt: ES256 needs an ECDSA P-256 key; the publicKey is ECDSA P-521
 TypeError: createJwt: RS256 needs an RSASSA-PKCS1-v1_5 SHA-256 key; the publicKey is RSASSA-PKCS1-v1_5 SHA-512
 TypeError: createJwt: RS256 needs an RSASSA-PKCS1-v1_5 SHA-256 key; the publicKey is RSA-PSS SHA-256
 TypeError: createJwt: EdDSA needs an Ed25519 key; the publicKey is ECDSA P-256
 ```
 
 **Why:** each algorithm signs with one exact key — `ES256` with P-256,
-`RS256` with a SHA-256 RSASSA-PKCS1-v1_5 key. Web Crypto would sign with a
+`ES512` with P-521 (not "P-512": its hash is SHA-512), `RS256` with a
+SHA-256 RSASSA-PKCS1-v1_5 key. Web Crypto would sign with a
 P-384 key under `ES256`, and every other JWT library would then refuse the
 token, so `createJwt` checks both keys when it is called and the app fails
 at startup. The `publicKey` is checked first, then the `privateKey`.
@@ -431,7 +435,8 @@ const verifier = createJwt(options);
 
 With `jwks` or `discovery`, the algorithm is the key's: the token's `alg`
 must be an asymmetric one the set's key for its `kid` can verify (an RSA
-key verifies `RS*` and `PS*`, an EC key `ES256`/`ES384`, an Ed25519 key
+key verifies `RS*` and `PS*`, an EC key `ES256`/`ES384`/`ES512` by its
+`crv` (a P-521 key never verifies an `ES256` token), an Ed25519 key
 `EdDSA`), and one of `algorithms` when you list them. A token signed `HS256`
 is always refused there, which is what stops an RSA public key from being
 used as an HMAC secret. Check the token's header against the issuer's
@@ -445,14 +450,19 @@ createJwt({ jwks: Bun.env['JWKS_URL']!, algorithms: ['RS256'] });
 
 **When:** the token was signed with another secret or private key than the
 one the verifier checks against, or was altered after signing — its
-signature cut short or replaced included.
+signature cut short or replaced included. With `ES256`, `ES384` or
+`ES512`, also a signature that is not the JWS `r‖s` of its curve: 64, 96
+or 132 bytes. A DER signature (starting `0x30`, about 70, 103 or 139
+bytes), the default of OpenSSL and `node:crypto`, is refused this way.
 
 **Why:** common causes are a secret that differs between two services or
 two environments, a secret rotated while tokens signed with the old one
 are still in use, or a public key that is not the private key's pair.
 
 **Fix:** verify with the signer's secret, or the public key paired with its
-private key. During a rotation, accept both
+private key. A signer that writes DER must write `r‖s` instead —
+`node:crypto`'s `sign` with `dsaEncoding: 'ieee-p1363'`
+([ECDSA signatures](guide/algorithms-and-keys.md#ecdsa-signatures)). During a rotation, accept both
 ([Rotating a key](guide/algorithms-and-keys.md#rotating-a-key)):
 
 ```ts
@@ -529,7 +539,8 @@ the token: its `kid` is not in the set (even after a refetch), it has no
 RSA key whose modulus is outside 2048 to 8192 bits, or with an even or
 trivial exponent, an Ed25519 key that is not 32 bytes or is a point of
 small order (with which a signature anyone can make verifies), an EC key
-whose coordinates are not its curve's size, or a key whose `n`, `e`, `x` or
+whose coordinates are not its curve's size (32, 48 or 66 bytes for P-256,
+P-384 or P-521, leading zeros kept), or a key whose `n`, `e`, `x` or
 `y` is not strict, unpadded base64url.
 
 **Why:** the token was signed by a key this issuer does not publish: another

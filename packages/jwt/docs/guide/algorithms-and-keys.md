@@ -26,7 +26,7 @@ const verifier = createJwt({ algorithm: 'ES256', publicKey }); // cannot sign
 | Algorithm | Options | Key | Choose it when |
 | --- | --- | --- | --- |
 | `HS256` (default), `HS384`, `HS512` | `secret` | a secret of at least 32 bytes | the same service signs and verifies |
-| `ES256`, `ES384` | `publicKey`, `privateKey?` | ECDSA, P-256 / P-384 | other services verify; short signatures |
+| `ES256`, `ES384`, `ES512` | `publicKey`, `privateKey?` | ECDSA, P-256 / P-384 / P-521 | other services verify; short signatures |
 | `RS256`, `RS384`, `RS512` | `publicKey`, `privateKey?` | RSA PKCS#1 v1.5, SHA-256 / 384 / 512 | a verifier only speaks RSA |
 | `EdDSA` | `publicKey`, `privateKey?` | Ed25519 | other services verify; fast, with nothing to tune |
 
@@ -72,6 +72,7 @@ algorithm you name. Each algorithm takes these parameters, for
 | --- | --- |
 | `ES256` | `{ name: 'ECDSA', namedCurve: 'P-256' }` |
 | `ES384` | `{ name: 'ECDSA', namedCurve: 'P-384' }` |
+| `ES512` | `{ name: 'ECDSA', namedCurve: 'P-521' }` (P-521, not P-512: the hash is SHA-512) |
 | `RS256` | `{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }` (plus `modulusLength` and `publicExponent` to generate) |
 | `RS384` | `{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-384' }` |
 | `RS512` | `{ name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-512' }` |
@@ -82,7 +83,7 @@ One pair per family, generated with Web Crypto:
 ```ts
 import { createJwt } from '@alxia/jwt';
 
-// ES256 (P-384 for ES384)
+// ES256 (P-384 for ES384, P-521 for ES512)
 const ec = await crypto.subtle.generateKey({ name: 'ECDSA', namedCurve: 'P-256' }, true, ['sign', 'verify']);
 createJwt({ algorithm: 'ES256', ...ec });
 
@@ -110,7 +111,30 @@ TypeError: createJwt: ES256 needs an ECDSA P-256 key; the publicKey is ECDSA P-3
 
 ([Troubleshooting](../troubleshooting.md#typeerror-createjwt-es256-needs-an-ecdsa-p-256-key-the-publickey-is-ecdsa-p-384)).
 The curve or hash matters even though Web Crypto would sign with it: a
-standard verifier refuses an `ES256` token signed on P-384.
+standard verifier refuses an `ES256` token signed on P-384. The check runs
+both ways: a P-256 key under `ES512` and a P-521 key under `ES256` are
+refused alike:
+
+```text
+TypeError: createJwt: ES512 needs an ECDSA P-521 key; the publicKey is ECDSA P-256
+TypeError: createJwt: ES256 needs an ECDSA P-256 key; the publicKey is ECDSA P-521
+```
+
+### ECDSA signatures
+
+A JWS carries an ECDSA signature as `r` and `s`, each padded to the curve's
+size and concatenated (RFC 7518, 3.4): 64 bytes for `ES256`, 96 for
+`ES384`, 132 for `ES512` (66 and 66). `sign` writes that form, and `verify`
+refuses any other length — a DER signature, as OpenSSL or `node:crypto`
+write by default, included — with `reason: 'signature'`, before Web Crypto
+reads it. A signer that produces DER must convert it, or sign with
+`dsaEncoding: 'ieee-p1363'`:
+
+```ts
+import { sign } from 'node:crypto';
+
+const signature = sign('sha512', Buffer.from(signingInput), { key: privateKeyPem, dsaEncoding: 'ieee-p1363' });
+```
 
 ### Loading a PEM key
 
@@ -118,7 +142,7 @@ A key pair made with OpenSSL is PEM: PKCS#8 for the private key, SPKI for
 the public one.
 
 ```sh
-# ES256 (P-384 for ES384)
+# ES256 (P-384 for ES384, P-521 for ES512)
 openssl genpkey -algorithm EC -pkeyopt ec_paramgen_curve:P-256 -pkeyopt ec_param_enc:named_curve -out private.pem
 # RS256, RS384, RS512
 openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 -out private.pem
