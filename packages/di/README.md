@@ -86,9 +86,11 @@ app.listen(3000);
   threw. A failure goes to `onDisposeError` (by default `console.error`)
   and never replaces the response. A streamed body must not use scoped
   values once its route has answered.
-- **`deps.lifecycle`** disposes of the Container when the last app it was
-  given to that started stops: forks of one base share it safely, and a
-  `stop()` of an app that never listened disposes of nothing
+- **`deps.lifecycle`** disposes of the Container when the last app that
+  started under it stops. The count is per Container, across every `di()`
+  over it: forks of one base, or two apps each with their own
+  `di(services)`, share it safely, and a `stop()` of an app that never
+  listened disposes of nothing
   ([Lifecycle](https://github.com/softistx/alxia/blob/develop/packages/di/docs/guide/lifecycle.md#forks)).
   Without it, the Container is yours to dispose of.
 

@@ -132,7 +132,7 @@ export function di<Singletons, Scoped, Slots, Reads = Empty>(
 
 	return Object.assign(di, {
 		expose,
-		lifecycle: lifecycleOf(async () => {
+		lifecycle: lifecycleOf(container, async () => {
 			await runtime[Symbol.asyncDispose]();
 		}),
 	}) as never;

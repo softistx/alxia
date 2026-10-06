@@ -231,13 +231,16 @@ below records what is kept twice.
   its own, so a base whose `onStop` disposes of a Container breaks every
   other fork still serving from it: their next request rejects with
   `DI_CONTAINER_DISPOSED`. `@alxia/di`'s `deps.lifecycle` keeps the server
-  each app started (`onStart`'s argument) in a Set, and disposes of the
-  Container when the server `onStop` is given empties it; `undefined`, a
-  `stop()` of an app that never listened, or a server not in the Set, stops
-  nothing (`lifecycle.spec.ts`: an unstarted fork stopped while another
-  serves, two started forks stopped in either order, a stop before listen, a
-  restart). Never dispose of a shared Container in a plain `onStop`. `init()` is the app's,
-  before `listen()`, never in `onStart`, which is not awaited.
+  each app started (`onStart`'s argument) in a Set held per Container (a
+  module-level WeakMap, so every `di()` over one Container shares it), and
+  disposes of the Container when the server `onStop` is given empties it;
+  `undefined`, a `stop()` of an app that never listened, or a server not in
+  the Set, stops nothing (`lifecycle.spec.ts`: an unstarted fork stopped
+  while another serves, two started forks stopped in either order, two
+  `di()` over one Container, the plugin given twice, a stop before listen, a
+  restart). Never dispose of a shared Container in a plain `onStop`.
+  `init()` is the app's, before `listen()`, never in `onStart`, which is not
+  awaited.
 - **Redis in the specs.** `@alxia/redis`'s run against `$REDIS_URL`, or a
   `redis-server` from `$PATH` they start on a free port. CI runs a Redis
   service container and sets `REDIS_URL`. A spec never skips for want of

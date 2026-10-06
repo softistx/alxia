@@ -10,20 +10,31 @@ import { di } from './di';
 
 const Pool = token<{ query(): string }>()('pool');
 
+function servicesOf(closed: () => void) {
+	return container().provide(Pool, () => ({ query: () => 'row' }), {
+		dispose: closed,
+	});
+}
+
+function depsOf(services: ReturnType<typeof servicesOf>) {
+	return di(services);
+}
+
 function setup() {
 	const closed = mock(() => {});
-	const deps = di(
-		container().provide(Pool, () => ({ query: () => 'row' }), {
-			dispose: closed,
-		}),
-	);
-	const base = alxia()
+	const services = servicesOf(closed);
+	const deps = depsOf(services);
+	return { closed, services, deps, base: appOf(deps) };
+}
+
+/** An app given `deps.lifecycle` and `deps`, answering with the Pool. */
+function appOf(deps: ReturnType<typeof depsOf>) {
+	return alxia()
 		.plugin(deps.lifecycle)
 		.use(deps)
 		.get('/', async ({ scope, reply }) =>
 			reply(200, (await scope.resolve(Pool)).query()),
 		);
-	return { closed, base };
 }
 
 describe('deps.lifecycle', () => {
@@ -85,6 +96,32 @@ describe('deps.lifecycle', () => {
 			expect(closed).toHaveBeenCalledTimes(1);
 		});
 	}
+
+	test('two di() over one Container count together: disposed of by the last stop', async () => {
+		const { closed, services, base: a } = setup();
+		const b = appOf(depsOf(services));
+		const urlA = a.listen({ port: 0, signals: false }).url;
+		const urlB = b.listen({ port: 0, signals: false }).url;
+		await Promise.all([fetch(urlA), fetch(urlB)]);
+
+		await a.stop();
+
+		expect(closed).not.toHaveBeenCalled();
+		expect(await (await fetch(urlB)).text()).toBe('row');
+		await b.stop();
+		expect(closed).toHaveBeenCalledTimes(1);
+	});
+
+	test('the plugin given twice to one app disposes once', async () => {
+		const { closed, deps, base } = setup();
+		const app = base.plugin(deps.lifecycle);
+		const server = app.listen({ port: 0, signals: false });
+		expect(await (await fetch(server.url)).text()).toBe('row');
+
+		await app.stop();
+
+		expect(closed).toHaveBeenCalledTimes(1);
+	});
 
 	test('a restart: the first stop disposes of the Container, which stays disposed', async () => {
 		const { closed, base } = setup();

@@ -42,8 +42,12 @@ finished, within `listen`'s `stopTimeout`. Disposing runs every value's
 
 It keeps the server each app it was given to started (`onStart` is given
 it), and disposes of the Container when the last of them stops (`onStop`
-is given the server that stopped). That is what makes forks safe. Requires
-`@alxia/core` 0.14 or later, where `onStop` receives the server.
+is given the server that stopped). The count is per Container, across
+every `di()` over it: two apps each with their own `di(services)` over one
+`services` share it, and the Container is disposed of when the last of the
+two stops, not the first. Giving `deps.lifecycle` twice to one app still
+disposes once. That is what makes forks safe. Requires `@alxia/core` 0.14 or
+later, where `onStop` receives the server.
 
 ## Forks
 
