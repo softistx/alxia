@@ -126,6 +126,20 @@
         "zod": "^4.6.5",
       },
     },
+    "packages/di": {
+      "name": "@alxia/di",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@alxia/core": "workspace:^",
+        "@nxgt/di": "^0.2.0",
+        "@types/bun": "^1.4.2",
+      },
+      "peerDependencies": {
+        "@alxia/core": "workspace:^",
+        "@nxgt/di": "^0.2.0",
+        "typescript": "^6.0.3 || ^7.0.0",
+      },
+    },
     "packages/env": {
       "name": "@alxia/env",
       "version": "0.2.0",
@@ -395,6 +409,8 @@
     "@alxia/cors": ["@alxia/cors@workspace:packages/cors"],
 
     "@alxia/create": ["@alxia/create@workspace:packages/create"],
+
+    "@alxia/di": ["@alxia/di@workspace:packages/di"],
 
     "@alxia/env": ["@alxia/env@workspace:packages/env"],
 
@@ -733,6 +749,8 @@
     "@nodelib/fs.stat": ["@nodelib/fs.stat@2.0.5", "", {}, "sha512-RkhPPp2zrqDAQA/2jNhnztcPAlv64XdhIp7a7454A5ovI7Bukxgt7MX7udwAu3zg1DcpPU0rz3VV1SeaqvY4+A=="],
 
     "@nodelib/fs.walk": ["@nodelib/fs.walk@1.2.8", "", { "dependencies": { "@nodelib/fs.scandir": "2.1.5", "fastq": "^1.6.0" } }, "sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg=="],
+
+    "@nxgt/di": ["@nxgt/di@0.2.0", "", { "peerDependencies": { "typescript": "^6.0.3" } }, "sha512-YMahwd8FoLRtVRm/RTtCTMRffGNk8swaRPuop/ysphLJcZ0WG8wFH0bFlhImGywL226fcMEdwfcFhE4FylfMXw=="],
 
     "@nxgt/i18n": ["@nxgt/i18n@2.0.0", "", { "dependencies": { "intl-messageformat": "^12.1.2", "lodash": "^4.18.1" }, "peerDependencies": { "typescript": "^6.0.3" } }, "sha512-IBFiwB9NrbbwmRTSrxu7mAa3pqo+xCsk8zG7bEMDJWtNZGbwDRFjglrojRwcq9LYsHbBU0gd7VKQIkkJ8TsWKQ=="],
 

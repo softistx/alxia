@@ -1,0 +1,5 @@
+---
+"@alxia/di": minor
+---
+
+Dependency injection for alxia on `@nxgt/di`. `di(container, { slots })` is a middleware: the routes after it read `scope`, a Scope of the Container created on its first `resolve` and disposed of once the route has answered, replied or thrown; `slots` is required exactly when the Container has Slots, and what it reads beyond the base context is required where the middleware stands. `deps.expose({ key: Token })` adds resolved values to the context of a group or a route, each Token checked against the Container, and must stand after its `di`. `app.plugin(deps.lifecycle)` disposes of the Container when the last app it was given to stops, so forks of one base share it safely. `ScopeNotMountedError` (`DI_SCOPE_NOT_MOUNTED`) extends `DiError`.
