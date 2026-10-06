@@ -425,28 +425,26 @@ they are in each resolver's context. A shutdown closes the sockets with
 
 ## 6. Test it, in process
 
+`graphqlClient` from `@alxia/graphql/testing` POSTs to the endpoint through
+`app.fetch`, with no port, and hands back `status`, `data`, `errors` and the
+`response` ([the testing guide](../../packages/graphql/docs/guide/testing.md)).
+
 ```ts
 // file: src/app.spec.ts
 import { describe, expect, spyOn, test } from 'bun:test';
+import { graphqlClient } from '@alxia/graphql/testing';
 import { app } from './app';
 import { jwt } from './jwt';
 import { db, pubsub } from './store';
 
-interface Result {
-	data?: Record<string, unknown> | null;
-	errors?: { message: string; extensions?: { code?: string } }[];
-}
+type Data = Record<string, unknown>;
 
-// POST /graphql in process, as a client would: no port.
-async function query(source: string, options: { as?: string; variables?: Record<string, unknown> } = {}): Promise<Result> {
-	const headers: Record<string, string> = { 'content-type': 'application/json' };
-	if (options.as) headers['authorization'] = `Bearer ${await jwt.sign({ sub: options.as })}`;
-	const response = await app.request('/graphql', {
-		method: 'POST',
-		headers,
-		body: JSON.stringify({ query: source, variables: options.variables }),
+// POST /graphql in process, as a client would: no port, no server.
+async function query(source: string, options: { as?: string; variables?: Data } = {}) {
+	const token = options.as && (await jwt.sign({ sub: options.as }));
+	return graphqlClient(app, { headers: token ? { authorization: `Bearer ${token}` } : {} }).query<Data>(source, {
+		...(options.variables && { variables: options.variables }),
 	});
-	return response.json();
 }
 
 const ADD = 'mutation ($text: String!) { addNote(text: $text) { id text author { name } } }';
@@ -765,6 +763,7 @@ nests itself shows what the real one has no field for.
 import { describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { graphql } from '@alxia/graphql';
+import { graphqlClient } from '@alxia/graphql/testing';
 import { createSchema } from 'graphql-yoga';
 import { base } from './context';
 import { invalid, notFound } from './errors';
@@ -777,15 +776,8 @@ import { operations, persisted } from './persisted';
 import { production } from './production';
 import { schema } from './schema';
 
-type Answer = { data?: unknown; errors?: { message: string; extensions?: Record<string, unknown> }[] };
-
-function post(app: { request: typeof production.request }, body: unknown, headers: Record<string, string> = {}) {
-	return app.request('/graphql', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json', 'x-csrf': '1', ...headers },
-		body: typeof body === 'string' ? body : JSON.stringify(body),
-	});
-}
+// The CSRF header the production app asks of every request.
+const client = (app: { fetch: typeof production.fetch }) => graphqlClient(app, { headers: { 'x-csrf': '1' } });
 
 // A schema with what the real one lacks: a field that throws, a refusal for
 // the client, and a type that contains itself.
@@ -846,9 +838,9 @@ describe('rate limit', () => {
 describe('depth', () => {
 	test('a document nested deeper than the limit is refused before it runs', async () => {
 		const app = alxia().plugin((app) => graphql(app, { schema: tiny, logging: false, plugins: [depthLimit(2)] }));
-		const deep = (await (await post(app, { query: '{ tree { child { child { child { name } } } } }' })).json()) as Answer;
+		const deep = await client(app).query('{ tree { child { child { child { name } } } } }');
 		expect(deep.errors?.[0]?.message).toContain('exceeds maximum operation depth');
-		const shallow = (await (await post(app, { query: '{ tree { name } }' })).json()) as Answer;
+		const shallow = await client(app).query('{ tree { name } }');
 		expect(shallow.data).toEqual({ tree: { name: 'root' } });
 	});
 });
@@ -859,21 +851,21 @@ describe('introspection', () => {
 	test('is refused outside development, and answers in it', async () => {
 		const plugins = [introspectionOnlyInDev];
 		const deployed = alxia().plugin((app) => graphql(app, { schema: tiny, logging: false, plugins }));
-		const refused = (await (await post(deployed, { query })).json()) as Answer;
+		const refused = await client(deployed).query(query);
 		expect(refused.errors?.[0]?.message).toContain('introspection');
 		const dev = alxia({ dev: true }).plugin((app) => graphql(app, { schema: tiny, logging: false, plugins }));
-		expect(((await (await post(dev, { query })).json()) as Answer).data).toEqual({ __schema: { queryType: { name: 'Query' } } });
+		expect((await client(dev).query(query)).data).toEqual({ __schema: { queryType: { name: 'Query' } } });
 	});
 
 	test('the real app refuses it too', async () => {
-		const refused = (await (await post(production, { query })).json()) as Answer;
+		const refused = await client(production).query(query);
 		expect(refused.errors?.[0]?.message).toContain('introspection');
 	});
 });
 
 describe('errors', () => {
 	const app = alxia().plugin((app) => graphql(app, { schema: tiny, logging: false }));
-	const ask = async (field: string) => (await (await post(app, { query: `{ ${field} }` })).json()) as Answer;
+	const ask = (field: string) => client(app).query(`{ ${field} }`);
 
 	test('an Error is masked, a GraphQLError reaches the client with its extensions', async () => {
 		const masked = await ask('boom');
@@ -886,24 +878,28 @@ describe('errors', () => {
 	});
 
 	test('extensions.http.status is the HTTP status too', async () => {
-		const response = await post(app, { query: '{ missing }' });
-		expect(response.status).toBe(404);
-		expect(((await response.json()) as Answer).errors?.[0]?.extensions?.['code']).toBe('NOT_FOUND');
+		const { status, errors } = await ask('missing');
+		expect(status).toBe(404);
+		expect(errors?.[0]?.extensions?.['code']).toBe('NOT_FOUND');
 	});
 });
 
 describe('the body, and CSRF', () => {
 	test('a body past the limit is refused, and no operation runs', async () => {
-		const response = await post(production, { query: `{ me { name } } # ${'x'.repeat(200 * 1024)}` });
-		expect(response.status).toBe(413); // core's answer, as on any route
-		expect(((await response.json()) as Answer).data).toBeUndefined();
+		const { status, data } = await client(production).query(`{ me { name } } # ${'x'.repeat(200 * 1024)}`);
+		expect(status).toBe(413); // core's answer, as on any route
+		expect(data).toBeUndefined();
 	});
 
 	test('a request with no CSRF header is refused, a form is a 415, JSON with the header runs', async () => {
 		expect((await production.request('/graphql?query={me{name}}')).status).toBe(403);
-		const form = await post(production, 'query=%7Bme%7Bname%7D%7D', { 'content-type': 'application/x-www-form-urlencoded' });
+		const form = await production.request('/graphql', {
+			method: 'POST',
+			headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-csrf': '1' },
+			body: 'query=%7Bme%7Bname%7D%7D',
+		});
 		expect(form.status).toBe(415);
-		expect(((await (await post(production, { query: '{ me { name } }' })).json()) as Answer).data).toEqual({ me: null });
+		expect((await client(production).query('{ me { name } }')).data).toEqual({ me: null });
 	});
 });
 
@@ -913,9 +909,13 @@ describe('persisted operations', () => {
 			graphql(app, { schema, context: () => ({ loaders: createLoaders() }), logging: false, plugins: [persisted] }),
 		);
 		const [hash] = [...operations.keys()];
-		const known = (await (await post(app, { extensions: { persistedQuery: { version: 1, sha256Hash: hash } } })).json()) as Answer;
-		expect(known.data).toEqual({ notes: [] });
-		const arbitrary = (await (await post(app, { query: '{ notes { text } }' })).json()) as Answer;
+		const known = await app.request('/graphql', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', 'x-csrf': '1' },
+			body: JSON.stringify({ extensions: { persistedQuery: { version: 1, sha256Hash: hash } } }),
+		});
+		expect(((await known.json()) as { data: unknown }).data).toEqual({ notes: [] });
+		const arbitrary = await client(app).query('{ notes { text } }');
 		expect(arbitrary.errors?.[0]?.message).toMatch(/persisted/i);
 	});
 });

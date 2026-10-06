@@ -19,6 +19,11 @@
 			"import": "./dist/index.js",
 			"default": "./dist/index.js"
 		},
+		"./testing": {
+			"types": "./dist/testing/index.d.ts",
+			"import": "./dist/testing/index.js",
+			"default": "./dist/testing/index.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"repository": {
@@ -37,7 +42,8 @@
 	},
 	"alxia": {
 		"entrypoints": [
-			"src/index.ts"
+			"src/index.ts",
+			"src/testing/index.ts"
 		]
 	},
 	"devDependencies": {
