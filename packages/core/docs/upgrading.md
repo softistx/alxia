@@ -4,13 +4,30 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
-## Next
+## 0.14.0
 
-The next `@alxia/core` minor gives every `onStop` hook the server that
-stopped. A hook written as an arrow or a function that takes no argument
-runs as before. One kind of hook stops compiling: a function passed by
-reference whose first parameter is optional (below). The peer range of every
-package moves with the minor.
+`@alxia/core` 0.14.0 gives every `onStop` hook the server that stopped. A
+hook written as an arrow or a function that takes no argument runs as before.
+One kind of hook stops compiling: a function passed by reference whose first
+parameter is optional (below). It ships with `@alxia/redis` 0.5.9, a patch
+that uses it to close its handle when the last fork serving stops, and every
+other package moves to a release whose peer on core is `^0.14.0`.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [Peers move to `^0.14.0`](#peers-move-to-0140) | every package | yes, for an install that holds a package of 0.13 beside core 0.14: update them together |
+| [`onStop` is given the server that stopped](#onstop-is-given-the-server-that-stopped) | core | yes, to compile: `onStop(sql.end)`, a function by reference whose first parameter is optional |
+| [`redis(handle)` closes the handle with the last fork](#redishandle-closes-the-handle-with-the-last-fork) | redis | notice: a fork stopped early, or never started, no longer closes the handle under a sibling |
+
+### Peers move to `^0.14.0`
+
+Every package's peer on `@alxia/core` moves from `^0.13.0` to `^0.14.0`,
+which a `^0.13.0` does not accept. Update `@alxia/core` and the `@alxia/*`
+packages you use in one change, each to its release that names core
+`^0.14.0`.
+
+**Can it break your code.** Only the install, as for
+[0.13](#peers-move-to-0130): a package left behind asks for core `^0.13.0`.
 
 ### `onStop` is given the server that stopped
 
@@ -51,6 +68,28 @@ app.onStop(() => sql.end());
 A hook annotated `(server: Bun.Server<unknown>) => …` still does not
 compile, as before. It must accept `undefined` now
 ([Hooks](guide/hooks.md#onstart-and-onstop)).
+
+### `redis(handle)` closes the handle with the last fork
+
+Before, `redis(handle)` closed the shared client in the first `onStop` that
+ran, so stopping one fork of an app, or a fork that never listened, closed
+the client under a sibling still serving. Now it counts the servers that
+started and closes the handle when none remains serving:
+
+```ts
+const base = alxia().plugin(redis(handle));
+const a = base.fork();
+const b = base.fork();
+a.listen({ port: 3000 });
+b.listen({ port: 3001 });
+await a.stop(); // the handle stays open: b serves
+await b.stop(); // closed
+```
+
+**Notice.** One app behaves as before, a `stop()` before `listen` included:
+it closes the handle while no app serves it. `redis(handle, { close: false })`
+is unchanged. It needs `@alxia/core` 0.14, whose `onStop` is given the server
+([Connecting](https://github.com/softistx/alxia/blob/develop/packages/redis/docs/guide/connecting.md#with-an-nxgtredis-handle)).
 
 ## 0.13.0
 
