@@ -18,7 +18,7 @@ Nothing scheduled yet.
 - **`context.alxia` typed under `Route.LoaderArgs`.** Once react-router's
   `./internal` types and its main entry share one `RouterContextProvider`
   declaration, the generated route types see the shorthand too; today
-  they read `alxiaOf(context)`.
+  they use `withAlxia` or `alxiaOf(context)`.
 - **`page()` under `react-router dev`.** An HTTP request reaches the app
   through `app.fetch`, so a Bun HTML bundle waits for the build.
 - **The logger's duration of a streamed page**, to its last byte rather
@@ -50,6 +50,9 @@ Nothing scheduled yet.
 
 ### Next
 
+- **`withAlxia(fn)`.** A loader, an action or a middleware given `alxia`,
+  typed by `Register`, under the generated `Route.LoaderArgs`, with the
+  page's `loaderData` still inferred from what it returns.
 - **`context.alxia`.** The object `alxiaOf(context)` returns, on React
   Router's provider with no import, typed by `Register` with
   `LoaderFunctionArgs` and `ActionFunctionArgs` from `react-router`;

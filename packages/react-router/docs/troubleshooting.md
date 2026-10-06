@@ -113,7 +113,9 @@ Error: alxiaOf(): this request has no alxia context. Serve the React Router app 
 
 **When:** a loader calls `alxiaOf`, or reads `context.alxia`, and
 `alxiaContext` was not set. `context.alxia` throws the same error: it reads
-that key.
+that key. With two copies of `@alxia/react-router` in one process (the
+third case below), the getter is the copy loaded last, which reads its own
+key: one copy is the fix for both.
 
 **Why:** one of three:
 
@@ -787,18 +789,19 @@ in react-router 8.4, point at `dist/development`: a second declaration of
 the class, which no exported path reaches, so no augmentation can add
 `alxia` to it.
 
-**Fix:** read `alxiaOf(context)` with `Route.LoaderArgs`; it is typed the
-same way:
+**Fix:** wrap the loader in `withAlxia`, which hands it `alxia` typed the
+same way, and keeps the generated `loaderData`:
 
 ```ts
-import { alxiaOf } from '@alxia/react-router';
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
 import type { Route } from './+types/home';
 
-export function loader({ context }: Route.LoaderArgs) {
-	const { user } = alxiaOf(context);
-	return { name: user?.name ?? null };
-}
+export const loader = withAlxia(({ alxia }: Route.LoaderArgs & AlxiaArgs) => {
+	return { name: alxia.user?.name ?? null };
+});
 ```
+
+Or read `alxiaOf(context)` inside the plain function.
 
 Or type the arguments with `LoaderFunctionArgs` from `react-router`, which
 sees `context.alxia`, at the cost of the generated `params`. Typing it under

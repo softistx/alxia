@@ -9,11 +9,13 @@ after, and whether it can break yours.
 `@alxia/core` documents `ctx.server`, the `Bun.Server` serving the request,
 which every context has always held. The next `@alxia/react-router` minor
 gives a loader's `alxiaOf(context).server` a server under `react-router dev`
-and `vite preview`, and adds `context.alxia`, a shorthand for
-`alxiaOf(context)`. Nothing breaks.
+and `vite preview`, and adds `withAlxia(fn)`, a loader given `alxia` under the generated
+`Route.LoaderArgs`, and `context.alxia`, a shorthand for `alxiaOf(context)`.
+Nothing breaks.
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
+| [`withAlxia(fn)` under the generated types](#contextalxia-the-shorthand) | react-router | no: a new export |
 | [`context.alxia`, the shorthand](#contextalxia-the-shorthand) | react-router | only an app that declares an `alxia` property of its own on React Router's `RouterContextProvider` |
 | [`ctx.server` under `react-router dev`](#ctxserver-under-react-router-dev) | react-router | no: it was `undefined` there |
 | [`ctx.server`, documented](#ctxserver-documented) | core | no: nothing changes at runtime or in the types |
@@ -34,7 +36,16 @@ export function loader({ context }: LoaderFunctionArgs) {
 
 It is typed with `react-router`'s own argument types. With the generated
 `Route.LoaderArgs`, `tsc` reports TS2339 until react-router's generated types
-and its main entry share one declaration: keep `alxiaOf(context)` there.
+and its main entry share one declaration: use `withAlxia` there, which hands
+the function `alxia` beside the generated arguments:
+
+```ts
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
+
+export const loader = withAlxia(({ alxia }: Route.LoaderArgs & AlxiaArgs) => ({
+	name: alxia.user?.name ?? null,
+}));
+```
 Nothing to change: `alxiaOf(context)` returns what it did.
 
 **Notice.** An app that declares `alxia` on `RouterContextProvider` itself,

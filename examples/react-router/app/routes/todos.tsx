@@ -1,3 +1,4 @@
+import { alxiaOf } from "@alxia/react-router";
 import { data, Form } from "react-router";
 import type { Route } from "./+types/todos";
 import { userContext } from "../context";
@@ -17,6 +18,8 @@ export async function action({ request, context }: Route.ActionArgs) {
   // React Router's own key, which app/server.ts's getLoadContext set.
   const user = context.get(userContext);
   addTodo(parsed.data.title, user?.name ?? "guest");
+  // alxia's own context, read in a plain action with alxiaOf.
+  alxiaOf(context).log.info("todo added", { by: user?.name ?? "guest" });
   return { error: undefined };
 }
 

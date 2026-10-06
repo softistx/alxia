@@ -1,4 +1,4 @@
-import { alxiaOf } from '@alxia/react-router';
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
 import {
 	type ActionFunctionArgs,
 	type LoaderFunctionArgs,
@@ -22,13 +22,15 @@ export function loader({ context }: LoaderFunctionArgs) {
 	};
 }
 
-export async function action({ request, context }: ActionFunctionArgs) {
-	const said = String((await request.formData()).get('said'));
-	// Bun's own publish, to every socket `/api/live` subscribed.
-	const sent =
-		alxiaOf(context).server?.publish(TOPIC, JSON.stringify({ said })) ?? null;
-	return { sent };
-}
+// `withAlxia`: `alxia` beside the arguments, `server` and all.
+export const action = withAlxia(
+	async ({ request, alxia }: ActionFunctionArgs & AlxiaArgs) => {
+		const said = String((await request.formData()).get('said'));
+		// Bun's own publish, to every socket `/api/live` subscribed.
+		const sent = alxia.server?.publish(TOPIC, JSON.stringify({ said })) ?? null;
+		return { sent };
+	},
+);
 
 export default function Live() {
 	const { name, serving } = useLoaderData<typeof loader>();

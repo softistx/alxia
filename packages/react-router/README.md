@@ -151,34 +151,61 @@ login page's JavaScript.
 
 ## Reading the context in a loader
 
+What alxia's middlewares built for a request reaches a loader, an action or
+a middleware in three forms, each the same object, typed by the `Register`
+declaration above:
+
+| Form | Use it |
+| --- | --- |
+| `withAlxia(fn)` | with the generated `Route.LoaderArgs` and `Route.ActionArgs`: `alxia` beside the arguments |
+| `alxiaOf(context)` | inside a plain function, or with a type argument where nothing is registered |
+| `context.alxia` | with `LoaderFunctionArgs` and `ActionFunctionArgs` from `react-router` |
+
 ```ts
 // app/routes/home.tsx
-import { alxiaOf } from '@alxia/react-router';
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
 import type { Route } from './+types/home';
 
-export function loader({ context }: Route.LoaderArgs) {
-	const { user, log } = alxiaOf(context); // typed: what configure built
-	log.info('home');
-	return { name: user?.name ?? 'anonymous' };
+export const loader = withAlxia(({ alxia, params }: Route.LoaderArgs & AlxiaArgs) => {
+	alxia.log.info('home'); // typed: what configure built
+	return { name: alxia.user?.name ?? 'anonymous' };
+});
+```
+
+`withAlxia` returns a function of React Router's arguments alone, with
+`fn`'s return type: `Route.ComponentProps['loaderData']` and
+`useLoaderData<typeof loader>` read what `fn` returns. It works for an
+action, and for a middleware, whose `next` it passes on.
+
+`alxiaOf(context)`, in a plain function:
+
+```ts
+import { alxiaOf } from '@alxia/react-router';
+
+export async function action({ context }: Route.ActionArgs) {
+	const { user, log } = alxiaOf(context);
+	log.info('saved', { by: user?.name });
+	return { ok: true };
 }
 ```
 
-How `alxiaOf(context)` is typed:
+How each is typed:
 
 - with the `Register` declaration above, by that server: reading something
   no middleware derives is a compile error;
-- without it, `alxiaOf<typeof server>(context)` names the server;
+- without it, `AlxiaArgs<typeof server>` or `alxiaOf<typeof server>(context)`
+  names the server;
 - with neither, by the base `@alxia/core`'s own `Register` names
   (`context: typeof base`), when the app has one;
-- with none of them, `alxiaOf(context)` is `BaseContext`.
+- with none of them, `BaseContext`.
 
 This package's `Register` wins over core's: the server's app is the base
 and all `configure` adds after it.
 
 ### The shorthand: `context.alxia`
 
-The same object, with no import and no call, typed by the same `Register`,
-where the arguments are react-router's own types:
+The same object, with no import and no call, where the arguments are
+react-router's own types:
 
 ```ts
 import type { LoaderFunctionArgs } from 'react-router';
@@ -194,8 +221,8 @@ reports `Property 'alxia' does not exist on type
 'Readonly<RouterContextProvider>'` (TS2339): react-router's `./internal`
 types, which the generated route types read, point at its development
 build, a second declaration of `RouterContextProvider` that no package can
-augment. Read `alxiaOf(context)` there until react-router ships one
-declaration. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#property-alxia-does-not-exist-on-type-readonlyroutercontextprovider)
+augment. Use `withAlxia` there until react-router ships one declaration.
+[More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#property-alxia-does-not-exist-on-type-readonlyroutercontextprovider)
 
 ### The server: `server`
 
@@ -480,7 +507,9 @@ has the commented file, and what to copy for a package left external.
 | `ServerWiring` | what `create` takes: `build`, `mode`, `client` |
 | `FreshApp` | the app `beforeAll`, or `configure` without it, receives |
 | `alxiaOf<App>(context)` | what alxia's middlewares built, in a loader, an action or a middleware. Typed by the registered server, by the type argument (a server or an app), or as `BaseContext`. Its `server` is the `Bun.Server` serving the request |
-| `context.alxia` | the same object, on React Router's `RouterContextProvider` (this package augments its type, as `alxiaOf(context)` with no type argument): typed with `LoaderFunctionArgs` and `ActionFunctionArgs` from `react-router`, not yet with the generated `Route.LoaderArgs` |
+| `context.alxia` | the same object, on React Router's `RouterContextProvider` (this package augments its type, as `alxiaOf(context)` with no type argument): typed with `LoaderFunctionArgs` and `ActionFunctionArgs` from `react-router`, not yet with the generated `Route.LoaderArgs`: use `withAlxia` there |
+| `withAlxia(fn)` | a loader, an action or a middleware given `alxia`, the alxia context, beside React Router's arguments: annotate `Route.LoaderArgs & AlxiaArgs`. Returns a function of the arguments alone, with `fn`'s return type |
+| `AlxiaArgs<App>` | what `withAlxia` adds: `{ alxia }`, typed by `Register`, or by the server it names |
 | `AlxiaContextOf<App>` | what `alxiaOf<App>(context)` returns: the app's context and the catch-all's `route` |
 | `ProviderLike` | what `alxiaOf` and `nonceOf` take: any React Router context provider's `get`, the generated route types' included |
 | `Register` | the interface to augment with `server: typeof server` |

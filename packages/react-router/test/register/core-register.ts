@@ -27,5 +27,8 @@ export function shorthand(context: Readonly<RouterContextProvider>) {
 	const { tenant, server } = context.alxia;
 	// @ts-expect-error: the base derives no `user`
 	context.alxia.user;
+	const same = context.alxia;
+	// @ts-expect-error: read-only, as the provider's own keys
+	context.alxia = same;
 	return { tenant, port: server?.port };
 }

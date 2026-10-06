@@ -22,3 +22,4 @@ export {
 	type ServerOptions,
 	type ServerWiring,
 } from './server';
+export { type AlxiaArgs, withAlxia } from './with-alxia';

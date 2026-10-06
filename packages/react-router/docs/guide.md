@@ -583,7 +583,57 @@ for what is believed and what is valid.
 
 Every request through the catch-all sets `alxiaContext`, this package's
 key, on React Router's context provider, to what alxia's middlewares built for
-that request. `alxiaOf(context)` reads it.
+that request. Three forms read it, each the same object:
+
+- **`withAlxia(fn)`**, for a route typed by the generated `Route.*Args`:
+  `fn` gets `alxia` beside React Router's arguments;
+- **`alxiaOf(context)`**, inside a plain function, and with a type argument;
+- **`context.alxia`**, where the arguments are typed with `react-router`'s
+  own `LoaderFunctionArgs` and `ActionFunctionArgs`
+  ([below](#the-shorthand-contextalxia)).
+
+### `withAlxia(fn)`
+
+```ts
+// app/routes/account.tsx
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
+import { redirect } from 'react-router';
+import type { Route } from './+types/account';
+
+export const loader = withAlxia(({ alxia, params }: Route.LoaderArgs & AlxiaArgs) => {
+	if (alxia.user === null) throw redirect('/login');
+	return { name: alxia.user.name, tab: params.tab ?? 'profile' };
+});
+// The page's Route.ComponentProps['loaderData']: { name: string; tab: string }
+```
+
+Annotate `fn`'s parameter as the generated arguments and `AlxiaArgs`:
+`AlxiaArgs` is `{ alxia }`, typed by `Register`, and `AlxiaArgs<typeof server>`
+names a server where nothing is registered. `withAlxia` returns a function of
+React Router's arguments alone, with `fn`'s return type, so the generated
+`loaderData` and `actionData`, and `useLoaderData<typeof loader>`, read what
+`fn` returns. An action is written the same way; a middleware too, and its
+`next` is passed on:
+
+```ts
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
+import type { Route } from './+types/admin';
+
+export const middleware: Route.MiddlewareFunction[] = [
+	withAlxia(async ({ alxia }: Parameters<Route.MiddlewareFunction>[0] & AlxiaArgs, next) => {
+		alxia.log.info('admin');
+		return next();
+	}),
+];
+```
+
+Why a wrapper: `context.alxia` cannot be typed under the generated
+arguments ([below](#the-shorthand-contextalxia)), and a wrapper that adds a
+key is the one form TypeScript infers from the annotation alone. A
+`withAlxia<Route.LoaderArgs>(fn)` type argument would fix `fn`'s return
+type too, since TypeScript infers no type argument once one is given, and
+the page's `loaderData` would be lost. On a request that did not come
+through alxia it throws what `alxiaOf` throws.
 
 ### With `Register`: no type argument
 
@@ -776,7 +826,7 @@ generated `Route.LoaderArgs` does not: the `+types` files import from
 which no exported path reaches, so no package can augment it. With
 `Route.LoaderArgs`, `context.alxia` works at runtime and `tsc` reports
 TS2339 ([Troubleshooting](troubleshooting.md#property-alxia-does-not-exist-on-type-readonlyroutercontextprovider)):
-read `alxiaOf(context)` there, until react-router ships one declaration.
+use `withAlxia` (or `alxiaOf(context)`) there, until react-router ships one declaration.
 
 It is a getter on the provider's prototype that reads `alxiaContext`: it
 holds exactly when that key is set, in dev as in production, and on a
