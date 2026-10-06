@@ -7,60 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **One middleware form.** A middleware is a plain `(ctx, next) => …`
-  function: `use(...)`, a route's middlewares, `ws(path, ...)` and
-  `route(operation, ...)` take one written inline, and what it passes
-  `next({ … })` the middlewares after it and the handler read, typed. Up to
-  8 per call, each reading what the ones before it added.
-  `defineMiddleware` stays, to share a typed middleware
-  ([Upgrading](upgrading.md#one-middleware-form)).
-- **A missing context, named.** A middleware that reads what the context in
-  force does not give is one TypeScript error on that middleware, on
-  TypeScript 6 as on 7, naming the key — `` `user` is missing from the
-  context: add a middleware that gives it before this one ``, `` `user` is
-  in the context with another type than this middleware reads ``, ``the
-  path parameter `id` is not in this route's path`` — instead of "No
-  overload matches this call"
-  ([Upgrading](upgrading.md#readable-type-errors)).
-- **A shared middleware reads the registered context.**
-  `defineAppMiddleware(fn)` reads the context `Register` names, as
-  `defineRoutes` and `AppContext` do, and a route that does not give it
-  refuses it: a middleware file needs no import of the app and no type
-  argument, while `defineMiddleware(fn)` keeps reading the base context
-  ([Upgrading](upgrading.md#defineappmiddlewarefn-reads-the-registered-context)).
-- **The forms deprecated in 0.4 removed.** The six request hooks of 0.3;
-  a route's list of hooks and the two functions that made its hooks; a
-  schema before the handler or in a route's options; `use(plugin)` and
-  `plugin(middleware)`; `Alxia`'s third type parameter. One way is left to
-  run code around a request: a middleware, with an error answered by a
-  `try`/`catch` around `await next()` or, uncaught, at the route boundary.
-  Each removed form throws or fails to compile with a message naming its
-  replacement ([Upgrading](upgrading.md#050)).
-- **Errors as problem details, opt in.** `alxia({ errors: 'problem' })`
-  answers an escaped `HttpError`, a refusal's 400 and 413, a 500 and the
-  router's 404, 405 and 426 as RFC 9457 problems, each with `type`,
-  `title`, `status`, `detail` and `instance`; an `HttpError` carries its
-  own `type`, `detail` and extensions, and a middleware answers in the
-  app's format with `errorFormat` and `problemOf`
-  ([Errors](guide/errors.md)).
-- **Liveness and readiness probes.** `health({ checks })`, a plugin:
-  `GET /health` while the process is up, `GET /ready` from the checks,
-  each timed out and their report cached, 503 as soon as the shutdown
-  starts, left out of `@alxia/openapi`'s `matchesSpec` by themselves
-  ([Health and shutdown](guide/health-and-shutdown.md)).
-- **A graceful shutdown.** `listen` handles `SIGTERM` and `SIGINT`:
-  readiness 503, new connections refused, sockets closed with 1001, the
-  requests in flight drained within `shutdownTimeout`, streams of events
-  and GraphQL subscriptions ended, the `onStop` hooks, then the exit
-  ([Health and shutdown](guide/health-and-shutdown.md#graceful-shutdown)).
-- **Dev comfort.** In dev — `alxia({ dev })`, on only when `NODE_ENV` is
-  `development` — `listen` prints the route table, a 404 names the
-  closest route and a 405 the methods allowed, and a 500 shows its error: a
-  page to a browser, under any Content-Security-Policy, its stack to any
-  other client; `onListen` gets the table as data. In every mode, a factory
-  given uncalled throws where it is declared, and `compose(...)` joins
-  middlewares past the 8 a call types
-  ([Development](guide/development.md)).
+Nothing in progress.
 
 ## Next
 
@@ -200,6 +147,63 @@ number on it. Every release, with each change it made, is in
 ### 0.6.0
 
 - **The client's address behind a proxy.** `forwardedIp({ trusted })`, the `ip` option for an app behind proxies: the client read from the right of `X-Forwarded-For` or `Forwarded`, past a number of hops or a list of CIDR ranges, never the first entry the client writes, so a rate limit keyed by `ip` cannot be bypassed with a header ([Serving](guide/serving.md#the-clients-address-ip)).
+
+### 0.5.0
+
+- **One middleware form.** A middleware is a plain `(ctx, next) => …`
+  function: `use(...)`, a route's middlewares, `ws(path, ...)` and
+  `route(operation, ...)` take one written inline, and what it passes
+  `next({ … })` the middlewares after it and the handler read, typed. Up to
+  8 per call, each reading what the ones before it added.
+  `defineMiddleware` stays, to share a typed middleware
+  ([Upgrading](upgrading.md#one-middleware-form)).
+- **A missing context, named.** A middleware that reads what the context in
+  force does not give is one TypeScript error on that middleware, on
+  TypeScript 6 as on 7, naming the key — `` `user` is missing from the
+  context: add a middleware that gives it before this one ``, `` `user` is
+  in the context with another type than this middleware reads ``, ``the
+  path parameter `id` is not in this route's path`` — instead of "No
+  overload matches this call"
+  ([Upgrading](upgrading.md#readable-type-errors)).
+- **A shared middleware reads the registered context.**
+  `defineAppMiddleware(fn)` reads the context `Register` names, as
+  `defineRoutes` and `AppContext` do, and a route that does not give it
+  refuses it: a middleware file needs no import of the app and no type
+  argument, while `defineMiddleware(fn)` keeps reading the base context
+  ([Upgrading](upgrading.md#defineappmiddlewarefn-reads-the-registered-context)).
+- **The forms deprecated in 0.4 removed.** The six request hooks of 0.3;
+  a route's list of hooks and the two functions that made its hooks; a
+  schema before the handler or in a route's options; `use(plugin)` and
+  `plugin(middleware)`; `Alxia`'s third type parameter. One way is left to
+  run code around a request: a middleware, with an error answered by a
+  `try`/`catch` around `await next()` or, uncaught, at the route boundary.
+  Each removed form throws or fails to compile with a message naming its
+  replacement ([Upgrading](upgrading.md#050)).
+- **Errors as problem details, opt in.** `alxia({ errors: 'problem' })`
+  answers an escaped `HttpError`, a refusal's 400 and 413, a 500 and the
+  router's 404, 405 and 426 as RFC 9457 problems, each with `type`,
+  `title`, `status`, `detail` and `instance`; an `HttpError` carries its
+  own `type`, `detail` and extensions, and a middleware answers in the
+  app's format with `errorFormat` and `problemOf`
+  ([Errors](guide/errors.md)).
+- **Liveness and readiness probes.** `health({ checks })`, a plugin:
+  `GET /health` while the process is up, `GET /ready` from the checks,
+  each timed out and their report cached, 503 as soon as the shutdown
+  starts, left out of `@alxia/openapi`'s `matchesSpec` by themselves
+  ([Health and shutdown](guide/health-and-shutdown.md)).
+- **A graceful shutdown.** `listen` handles `SIGTERM` and `SIGINT`:
+  readiness 503, new connections refused, sockets closed with 1001, the
+  requests in flight drained within `shutdownTimeout`, streams of events
+  and GraphQL subscriptions ended, the `onStop` hooks, then the exit
+  ([Health and shutdown](guide/health-and-shutdown.md#graceful-shutdown)).
+- **Dev comfort.** In dev — `alxia({ dev })`, on only when `NODE_ENV` is
+  `development` — `listen` prints the route table, a 404 names the
+  closest route and a 405 the methods allowed, and a 500 shows its error: a
+  page to a browser, under any Content-Security-Policy, its stack to any
+  other client; `onListen` gets the table as data. In every mode, a factory
+  given uncalled throws where it is declared, and `compose(...)` joins
+  middlewares past the 8 a call types
+  ([Development](guide/development.md)).
 
 ### 0.4.0
 

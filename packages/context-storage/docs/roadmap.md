@@ -7,11 +7,7 @@ only number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **A middleware, not a plugin (0.4).** `app.use(contextStorage())` opens the store on every request, a 404 included: `getRequestContext()` works in every middleware after it, and an error is answered inside it, so a middleware that catches it still reads the context. `app.plugin(contextStorage())`, the deprecated plugin form, was removed with alxia 0.5: give it to `use`.
-- **Typed by `Register`.** With `@alxia/core`'s `Register` naming the
-  base, `contextStorage()` needs no type argument: `context()` reads the
-  registered context. Typed either way, the middleware requires that context
-  of the app that mounts it, a compile error otherwise.
+Nothing in progress.
 
 ## Next
 
@@ -28,6 +24,17 @@ Nothing scheduled yet.
   `@alxia/core`'s public API and the runtime's own `AsyncLocalStorage`.
 
 ## Shipped
+
+### 0.3.0
+
+- **A middleware, not a plugin (0.4).** `app.use(contextStorage())` opens the store on every request, a 404 included: `getRequestContext()` works in every middleware after it, and an error is answered inside it, so a middleware that catches it still reads the context. `app.plugin(contextStorage())`, the deprecated plugin form, was removed with alxia 0.5: give it to `use`.
+
+### 0.2.0
+
+- **Typed by `Register`.** With `@alxia/core`'s `Register` naming the
+  base, `contextStorage()` needs no type argument: `context()` reads the
+  registered context. Typed either way, the middleware requires that context
+  of the app that mounts it, a compile error otherwise.
 
 ### 0.1.0
 

@@ -7,23 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Tokens from an identity provider.** `createJwt({ jwks })` and
-  `createJwt({ discovery })` verify the tokens of Keycloak, Auth0, Ory or
-  Cognito by the keys they publish: found by `kid`, cached by
-  `Cache-Control` or `cacheMs`, refetched once on an unknown `kid` (never
-  more often than `refetchMs`), kept through an outage for `staleMs`, failing
-  closed otherwise. `RS*`, `PS*`, `ES256`, `ES384`, `ES512` and `EdDSA`; `alg: none`,
-  `HS*` and an algorithm the key's type does not allow are refused
-  ([guide](guide/jwks.md)).
-- **`bearer` as a middleware.** `app.use(bearer({ jwt }))` is the form;
-  `app.plugin(bearer(…))`, deprecated in 0.4, was removed in 0.5. Given to the app, the guard
-  also refuses a request no route matches, before its 404, and `Bearer<Schema>`
-  names what `bearer()` returns.
-- **The 401 as a problem.** On an app with `@alxia/core`'s
-  `alxia({ errors: 'problem' })`, `bearer()` answers an RFC 9457 problem,
-  `reason` and `issues` its extensions and the challenge kept
-  (`UnauthorizedProblem`); the default stays `{ error: 'unauthorized' }`
-  ([guide](guide/bearer-guard.md#as-a-problem)).
+Nothing in progress.
 
 ## Next
 
@@ -53,6 +37,26 @@ Nothing scheduled yet.
   `signature` ([guide](guide/algorithms-and-keys.md#ecdsa-signatures)). A
   signature must also be in its one canonical base64url spelling, and a
   `crv` that is no own curve is refused as `key`.
+- **Tokens from an identity provider.** `createJwt({ jwks })` and
+  `createJwt({ discovery })` verify the tokens of Keycloak, Auth0, Ory or
+  Cognito by the keys they publish: found by `kid`, cached by
+  `Cache-Control` or `cacheMs`, refetched once on an unknown `kid` (never
+  more often than `refetchMs`), kept through an outage for `staleMs`, failing
+  closed otherwise. `RS*`, `PS*`, `ES256`, `ES384`, `ES512` and `EdDSA`; `alg: none`,
+  `HS*` and an algorithm the key's type does not allow are refused
+  ([guide](guide/jwks.md)).
+
+### 0.3.0
+
+- **`bearer` as a middleware.** `app.use(bearer({ jwt }))` is the form;
+  `app.plugin(bearer(…))`, deprecated in 0.4, was removed in 0.5. Given to the app, the guard
+  also refuses a request no route matches, before its 404, and `Bearer<Schema>`
+  names what `bearer()` returns.
+- **The 401 as a problem.** On an app with `@alxia/core`'s
+  `alxia({ errors: 'problem' })`, `bearer()` answers an RFC 9457 problem,
+  `reason` and `issues` its extensions and the challenge kept
+  (`UnauthorizedProblem`); the default stays `{ error: 'unauthorized' }`
+  ([guide](guide/bearer-guard.md#as-a-problem)).
 
 ### 0.1.0
 

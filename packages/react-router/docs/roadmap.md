@@ -7,20 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Middlewares around the pages.** `beforeAll` and `configure` take
-  `use(logger())`, `use(secureHeaders())` and the other middlewares of
-  alxia 0.4, which run on the pages, the client's files declared after
-  them, and every request no route matches; the request hooks they replaced,
-  deprecated in 0.4, were removed in 0.5.
-- **Loaders typed by core's `Register`.** `alxiaOf(context)` reads the base
-  `@alxia/core`'s `Register` names when this package's names no server, so
-  an app that registers its context once types its loaders too. This
-  package's `Register` still wins when both are declared.
-- **One graceful shutdown.** `start` relies on `@alxia/core`'s `listen`,
-  which handles `SIGINT` and `SIGTERM` itself, before `onListen` as
-  before: the requests in flight drain within `shutdownTimeout`
-  (`listen: { shutdownTimeout }`), readiness turns 503, the `onStop`
-  hooks run, then the process exits.
+Nothing in progress.
 
 ## Next
 
@@ -65,6 +52,26 @@ Nothing scheduled yet.
   `request.url` is the URL the client asked for, the scheme and host the
   trusted proxy said, and `ctx.ip` the client's; a direct client's
   forwarded headers are ignored.
+
+### 0.6.0
+
+- **Middlewares around the pages.** `beforeAll` and `configure` take
+  `use(logger())`, `use(secureHeaders())` and the other middlewares of
+  alxia 0.4, which run on the pages, the client's files declared after
+  them, and every request no route matches; the request hooks they replaced,
+  deprecated in 0.4, were removed in 0.5.
+- **One graceful shutdown.** `start` relies on `@alxia/core`'s `listen`,
+  which handles `SIGINT` and `SIGTERM` itself, before `onListen` as
+  before: the requests in flight drain within `shutdownTimeout`
+  (`listen: { shutdownTimeout }`), readiness turns 503, the `onStop`
+  hooks run, then the process exits.
+
+### 0.5.0
+
+- **Loaders typed by core's `Register`.** `alxiaOf(context)` reads the base
+  `@alxia/core`'s `Register` names when this package's names no server, so
+  an app that registers its context once types its loaders too. This
+  package's `Register` still wins when both are declared.
 
 ### 0.4.0
 

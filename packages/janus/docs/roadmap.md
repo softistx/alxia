@@ -7,17 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Middlewares, not hooks.** `session()`, `permission()` and `janusErrors()`
-  are middlewares given to `use`. `janusErrors()` is a try/catch: it answers
-  the refusals thrown behind it, so it goes to `use` before `session()`. A
-  required `session()` on the app answers an anonymous request to a missing
-  path with its 401: scope it with a `group`. Lands in 0.4. Their deprecated
-  plugin form, `app.plugin(session(…))`, was removed with alxia 0.5.
-- **Refusals as problems.** On an app with `@alxia/core`'s
-  `alxia({ errors: 'problem' })`, `janusErrors()`, a required `session()`
-  and `permission()` answer RFC 9457 problems — `janusErrors()`'s with its
-  `code` as an extension — and keep their bodies otherwise
-  ([guide](guide/errors.md#as-problems)).
+Nothing in progress.
 
 ## Next
 
@@ -38,6 +28,20 @@ Nothing scheduled yet.
   flow `@nxgt/janus` adds is usable here without a release of this one.
 
 ## Shipped
+
+### 0.3.0
+
+- **Middlewares, not hooks.** `session()`, `permission()` and `janusErrors()`
+  are middlewares given to `use`. `janusErrors()` is a try/catch: it answers
+  the refusals thrown behind it, so it goes to `use` before `session()`. A
+  required `session()` on the app answers an anonymous request to a missing
+  path with its 401: scope it with a `group`. Lands in 0.4. Their deprecated
+  plugin form, `app.plugin(session(…))`, was removed with alxia 0.5.
+- **Refusals as problems.** On an app with `@alxia/core`'s
+  `alxia({ errors: 'problem' })`, `janusErrors()`, a required `session()`
+  and `permission()` answer RFC 9457 problems — `janusErrors()`'s with its
+  `code` as an extension — and keep their bodies otherwise
+  ([guide](guide/errors.md#as-problems)).
 
 ### 0.1.0
 

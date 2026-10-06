@@ -7,11 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Secure headers as a middleware.** `app.use(secureHeaders())`, declared
-  first, sets the headers on every response that comes back through it, a
-  404's, an error's and a 500's included; `NonceMiddleware` gives `nonce` to the
-  routes after it and `SecureHeaders` is the plain one.
-  `app.plugin(secureHeaders())`, the deprecated alias, was removed in 0.5.
+Nothing in progress.
 
 ## Next
 
@@ -28,6 +24,14 @@ Nothing scheduled yet.
   to an app adds no transitive package to audit or update.
 
 ## Shipped
+
+### 0.4.0
+
+- **Secure headers as a middleware.** `app.use(secureHeaders())`, declared
+  first, sets the headers on every response that comes back through it, a
+  404's, an error's and a 500's included; `NonceMiddleware` gives `nonce` to the
+  routes after it and `SecureHeaders` is the plain one.
+  `app.plugin(secureHeaders())`, the deprecated alias, was removed in 0.5.
 
 ### 0.2.0
 

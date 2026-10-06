@@ -7,8 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **`zodConverter` removed in 0.2.** Nothing in alxia read it: Zod's own
-  `z.toJSONSchema(schema)` converts a schema.
+Nothing in progress.
 
 ## Next
 
@@ -27,6 +26,11 @@ Nothing scheduled yet.
   peers: the app's own `zod` is the one used.
 
 ## Shipped
+
+### 0.2.0
+
+- **`zodConverter` removed in 0.2.** Nothing in alxia read it: Zod's own
+  `z.toJSONSchema(schema)` converts a schema.
 
 ### 0.1.0
 

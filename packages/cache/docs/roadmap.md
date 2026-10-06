@@ -7,10 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **A middleware, not a plugin.** `app.use(cache({ ttl }))` is the form;
-  `app.plugin(cache(…))`, deprecated in 0.4, was removed in 0.5. Stale responses are
-  served at once with the refresh run behind them, and `CacheMiddleware<Requires>`
-  names what `cache()` returns.
+Nothing in progress.
 
 ## Next
 
@@ -33,6 +30,13 @@ Nothing scheduled yet.
   knows which store it was given.
 
 ## Shipped
+
+### 0.3.0
+
+- **A middleware, not a plugin.** `app.use(cache({ ttl }))` is the form;
+  `app.plugin(cache(…))`, deprecated in 0.4, was removed in 0.5. Stale responses are
+  served at once with the refresh run behind them, and `CacheMiddleware<Requires>`
+  names what `cache()` returns.
 
 ### 0.1.0
 
