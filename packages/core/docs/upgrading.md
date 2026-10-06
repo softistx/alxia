@@ -4,9 +4,9 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
-## Next
+## 0.14.1
 
-The next `@alxia/core` patch takes, after a `validate({ cookies })`, the
+`@alxia/core` 0.14.1 takes, after a `validate({ cookies })`, the
 shared middlewares it refused there. Nothing breaks: what compiled still
 compiles, and nothing changes at runtime.
 
