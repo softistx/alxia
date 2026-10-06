@@ -147,7 +147,8 @@ describe('sseComment', () => {
 		expectTypeOf(items).toExtend<Input>();
 		const named = Push['~standard'].types?.input;
 		expectTypeOf(named).not.toBeNever();
-		expect(() => sseComment(1 as never)).toThrow(TypeError);
+		// @ts-expect-error a comment is a string
+		expect(() => sseComment(1)).toThrow(TypeError);
 	});
 });
 
