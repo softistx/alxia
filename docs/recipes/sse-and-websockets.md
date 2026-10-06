@@ -82,6 +82,17 @@ buffer it, and a `: keep-alive` comment every eight seconds, because Bun
 closes a silent connection. Named events (`event: state`), ids and
 `retry:` are in [the guide](../../packages/core/docs/guide/server-sent-events.md#named-events).
 
+To add a comment line of your own (a marker, padding against a buffering
+proxy), yield `sseComment(text)` beside the events: a client skips it, the
+schema never checks it, and the `: keep-alive` is unchanged
+([Comments](../../packages/core/docs/guide/server-sent-events.md#comments)).
+
+```ts no-check
+import { sseComment } from '@alxia/core';
+
+yield sseComment('connected'); // `: connected`, then a blank line
+```
+
 A client:
 
 ```ts no-check

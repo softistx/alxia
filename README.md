@@ -57,6 +57,7 @@ app.listen(3000); // in a test, in process: await app.request('/users/1')
   [errors](docs/recipes/errors.md),
   [health and shutdown](docs/recipes/health-and-shutdown.md),
   [caching and rate limiting](docs/recipes/caching-and-rate-limiting.md),
+  [dependency injection](docs/recipes/dependency-injection.md),
   [deploying](docs/recipes/deploying.md).
 - **[The packages](#packages)**: each has a README, and a `docs/` with its
   guide, troubleshooting and roadmap. [`@alxia/core`'s](packages/core/docs/README.md)
@@ -82,6 +83,7 @@ app.listen(3000); // in a test, in process: await app.request('/users/1')
 | [`@alxia/logger`](packages/logger) | a request id, structured logs, `Server-Timing` |
 | [`@alxia/env`](packages/env) | environment variables, validated and typed at startup |
 | [`@alxia/context-storage`](packages/context-storage) | the request's context anywhere it runs, typed by the app: `hono/context-storage` for alxia |
+| [`@alxia/di`](packages/di) | dependency injection on `@nxgt/di`: typed Tokens, a lazy Scope per request disposed when it ends, values exposed by name to the routes that read them |
 | [`@alxia/create`](packages/create) | `bun create @alxia`: a new app from a template (`minimal`, `api`, `graphql` or `react-router`), its dependencies at the newest versions alxia accepts |
 
 Adapters to the [nxgt](https://github.com/softistx) suite:
