@@ -170,8 +170,9 @@ describe('graphqlClient, persisted operations', () => {
 	test('a document and a hash are both sent', async () => {
 		const result = await graphqlClient(open).query(HELLO, {
 			persisted: 'whatever',
+			variables: { name: 'Ada' },
 		});
-		expect(result.data).toEqual({ hello: 'hello world' });
+		expect(result.data).toEqual({ hello: 'hello Ada' });
 	});
 });
 
