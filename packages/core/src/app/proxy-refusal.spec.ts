@@ -98,6 +98,32 @@ describe('trustProxy({ refusal })', () => {
 		log.mockRestore();
 	});
 
+	test("a throwing refusal is the app's 500 problem under errors: 'problem'", async () => {
+		const log = spyOn(console, 'error').mockImplementation(() => {});
+		const served = app(
+			'refuse',
+			() => {
+				throw new Error('boom');
+			},
+			true,
+		);
+		const response = await get(served, CLIENT, {
+			'x-forwarded-for': '203.0.113.9',
+		});
+		expect(response.status).toBe(500);
+		expect(response.headers.get('content-type')).toBe(
+			'application/problem+json',
+		);
+		expect(await response.json()).toEqual({
+			type: 'about:blank',
+			title: 'Internal Server Error',
+			detail: 'The server failed to answer the request',
+			status: 500,
+			instance: '/secret',
+		});
+		log.mockRestore();
+	});
+
 	test('a refusal that is no function is refused at declaration', () => {
 		expect(() =>
 			trustProxy({
