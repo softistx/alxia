@@ -112,7 +112,8 @@ function announce(
 
 /**
  * Stops the server `serving` holds, gracefully; with none, runs every
- * `onStop` hook, as a `stop()` before `listen` always has.
+ * `onStop` hook, as a `stop()` before `listen` always has, given
+ * `undefined`: no server stopped.
  */
 export async function stopServer(
 	runtime: Runtime,
@@ -120,7 +121,7 @@ export async function stopServer(
 	force: boolean,
 ): Promise<void> {
 	if (serving !== undefined) return serving.stop(force);
-	await runStopHooks(runtime.globals.onStop, STOP_TIMEOUT);
+	await runStopHooks(runtime.globals.onStop, undefined, STOP_TIMEOUT);
 }
 
 /**
@@ -147,21 +148,24 @@ async function shutdown(
 		await server.stop(true);
 	}
 	clearTimeout(timer);
-	await runStopHooks(runtime.globals.onStop, timeout.hooks);
+	await runStopHooks(runtime.globals.onStop, server, timeout.hooks);
 }
 
 /**
- * Every `onStop` hook, each awaited in turn, within `timeout`
+ * Every `onStop` hook, each given `server`, the one that stopped or
+ * `undefined`, and awaited in turn, within `timeout`
  * milliseconds for them all: past it, the shutdown fails naming the hook
  * still running, and the hooks after it are not run.
  */
 async function runStopHooks(
 	hooks: readonly StopHook[],
+	server: Bun.Server<unknown> | undefined,
 	timeout: number,
 ): Promise<void> {
 	let index = 0;
 	const run = (async () => {
-		for (; index < hooks.length; index++) await (hooks[index] as StopHook)();
+		for (; index < hooks.length; index++)
+			await (hooks[index] as StopHook)(server);
 	})();
 	let timer: ReturnType<typeof setTimeout> | undefined;
 	const late = new Promise<'late'>((resolve) => {

@@ -101,7 +101,9 @@ options — typed as the base is, so `Register`'s `typeof base` and
 `defineRoutes` read it unchanged. What a fork declares next is its own: a
 route, a middleware, a plugin or an `onStop` added to one fork is not on
 the base nor on another fork, and each app runs the base's `onStart` and
-`onStop` once, as its own.
+`onStop` once, as its own: `onStop` is given that app's server, or
+`undefined` for a fork that never listened, so a hook the forks share can
+tell them apart ([Hooks](hooks.md#onstart-and-onstop)).
 
 ```ts
 // src/app.ts

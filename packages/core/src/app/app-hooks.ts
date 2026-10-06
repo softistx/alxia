@@ -15,7 +15,11 @@ export interface StartHookMethod<App> {
 
 /** `app.onStop(hook)`. */
 export interface StopHookMethod<App> {
-	/** Runs when `stop` stops the server: close a pool, flush a log. */
+	/**
+	 * Runs when `stop` stops the server: close a pool, flush a log. Given the
+	 * server that stopped, the one `onStart` was given; `undefined` on a
+	 * `stop()` before `listen`, which runs the hooks too.
+	 */
 	// biome-ignore lint/style/useShorthandFunctionType: a call signature carries its JSDoc to hover and signature help; a function type does not
 	(hook: StopHook): App;
 }

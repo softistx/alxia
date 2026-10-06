@@ -482,8 +482,8 @@ refused, open sockets close with 1001, the requests in flight finish
 within `shutdownTimeout`, then each `onStop` hook is awaited in turn.
 `closeActiveConnections` closes the requests in flight at once. Called
 again while it runs, or once it ran, `stop()` returns the same promise:
-the `onStop` hooks run once per `listen`. Called before `listen`, it runs
-the `onStop` hooks alone. One server at a time: `listen()` on an app that
+the `onStop` hooks run once per `listen`, each given the stopped server.
+Called before `listen`, it runs the `onStop` hooks alone, given `undefined`. One server at a time: `listen()` on an app that
 already listens throws `listen(): the app already listens on <url>; stop()
 it first` — stop it with `app.stop()`, not the Bun server's own `stop()`,
 which the app does not see.

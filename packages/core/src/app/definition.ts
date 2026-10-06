@@ -50,7 +50,14 @@ export type ChainHook =
 	| { readonly kind: 'responds'; readonly responses: ResponseSchemas };
 
 export type StartHook = (server: Bun.Server<unknown>) => MaybePromise<void>;
-export type StopHook = () => MaybePromise<void>;
+/**
+ * Given the server that stopped, or `undefined` on a `stop()` of an app
+ * that never listened, which still runs every hook: a hook shared by forks
+ * tells which app stopped, and whether it had started.
+ */
+export type StopHook = (
+	server: Bun.Server<unknown> | undefined,
+) => MaybePromise<void>;
 
 /** A route as the app runs it: its options, its handler, and the middlewares declared before it. */
 export interface RouteDefinition {
