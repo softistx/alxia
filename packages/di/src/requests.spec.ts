@@ -68,8 +68,10 @@ describe('ownership on the context', () => {
 					return next();
 				},
 				validate({ cookies: anyCookies }),
-				// Its typed cookies differ from the base context's: the types
-				// refuse it here, the runtime copy is what this spec is about.
+				// A cast around core's typing: after validate({ cookies }), the
+				// context's cookies have another type than the base context's,
+				// and core refuses any middleware reading the base one there. The
+				// runtime copy is what this spec is about.
 				deps as never,
 				async ({ scope, reply }) => {
 					seen.push(scope);
@@ -79,5 +81,53 @@ describe('ownership on the context', () => {
 
 		expect(await (await app.request('/')).text()).toBe('1');
 		expect(seen[0]).toBe(seen[1]);
+	});
+});
+
+describe("a 405's owners", () => {
+	test("each group's Scope stays its own, Slots from its own derive", async () => {
+		const Who = token<string>()('who');
+		const Other = token<string>()('other');
+		const appDeps = di(
+			container().provide(Other, () => 'app', { lifetime: 'scoped' }),
+		);
+		const deps = di(container().slot(Who), {
+			slots: ({ who }: { who: string }) => ({ who }),
+		});
+		const seen: string[] = [];
+		const guard =
+			(name: string) =>
+			async (
+				ctx: { scope: { resolve(token: typeof Who): Promise<string> } },
+				next: () => Promise<Response>,
+			) => {
+				seen.push(`${name} ${await ctx.scope.resolve(Who)}`);
+				return next();
+			};
+		const app = alxia()
+			.use(appDeps)
+			.use(async ({ scope }, next) => {
+				await scope.resolve(Other); // the app's di makes its entry first
+				return next();
+			})
+			.group((g1) =>
+				g1
+					.use((_ctx, next) => next({ who: 'admin' }))
+					.use(deps)
+					.use(guard('g1'))
+					.get('/x', ({ reply }) => reply(200, 'g1')),
+			)
+			.group((g2) =>
+				g2
+					.use((_ctx, next) => next({ who: 'guest' }))
+					.use(deps)
+					.use(guard('g2'))
+					.post('/x', ({ reply }) => reply(200, 'g2')),
+			);
+
+		const res = await app.request('/x', { method: 'DELETE' });
+
+		expect(res.status).toBe(405);
+		expect(seen).toEqual(['g1 admin', 'g2 guest']);
 	});
 });

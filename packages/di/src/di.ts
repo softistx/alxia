@@ -27,8 +27,11 @@ const OWNED = Symbol('@alxia/di owned');
 /** The context as `di` writes to it: `next` merges into this same object. */
 type Writable = BaseContext & {
 	scope?: unknown;
-	[OWNED]?: Map<object, LazyScope>;
+	[OWNED]?: Owned;
 };
+
+/** Each `di` entered on a request, to the Scope it owns there. */
+type Owned = ReadonlyMap<object, LazyScope>;
 
 /**
  * Runs the rest with `scope` on the context, and gives back the Scope that
@@ -37,12 +40,24 @@ type Writable = BaseContext & {
  * nothing before it, this Scope stays, so a late resolve is a
  * ScopeDisposedError rather than an undefined.
  */
-async function within(ctx: Writable, scope: LazyScope, next: NextFunction) {
+async function within(
+	ctx: Writable,
+	scope: LazyScope,
+	owned: Owned | undefined,
+	next: NextFunction,
+) {
 	const outer = ctx.scope;
+	const before = ctx[OWNED];
 	try {
-		return await next({ scope });
+		return await next(
+			owned === undefined ? { scope } : { scope, [OWNED]: owned },
+		);
 	} finally {
 		if (outer !== undefined && ctx.scope === scope) ctx.scope = outer;
+		if (owned !== undefined && ctx[OWNED] === owned) {
+			if (before === undefined) delete ctx[OWNED];
+			else ctx[OWNED] = before;
+		}
 	}
 }
 
@@ -79,12 +94,10 @@ export function di<Singletons, Scoped, Slots, Reads = Empty>(
 		// The Scopes each `di` entered on this request, on the context itself:
 		// made per fetch, so a Request fetched twice gets two, and carried by
 		// core's copies of it (`{ ...ctx }` keeps an own symbol key).
-		ctx[OWNED] ??= new Map();
-		const owned = ctx[OWNED];
-		const entered = owned.get(di);
+		const entered = ctx[OWNED]?.get(di);
 		// Given again on this request, after another `di` maybe: the first one
 		// owns the Scope; this one only puts it back on the context.
-		if (entered !== undefined) return within(ctx, entered, next);
+		if (entered !== undefined) return within(ctx, entered, undefined, next);
 		const scope = new LazyScope(async () =>
 			runtime.createScope(
 				slots
@@ -92,9 +105,12 @@ export function di<Singletons, Scoped, Slots, Reads = Empty>(
 					: undefined,
 			),
 		);
-		owned.set(di, scope);
+		// A new Map, never the one on the context: core runs a 405's owners
+		// each on its own copy of the context, and a Map they shared would
+		// carry one group's Scope, and the Slots its derive gave, to another.
+		const owned: Owned = new Map(ctx[OWNED]).set(di, scope);
 		try {
-			return await within(ctx, scope, next);
+			return await within(ctx, scope, owned, next);
 		} finally {
 			// After `next`: a streamed body still being sent may not use the
 			// Scope's values. See the guide.
