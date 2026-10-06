@@ -348,6 +348,62 @@ sent. The detail, and what a `cookies` schema changes, is on
 [Hooks](hooks.md#reading-the-requests-cookies) and
 [Replies](replies.md#headers-and-cookies-set).
 
+A shared middleware after a `validate({ cookies })` is taken whatever the
+schema gives back — an optional cookie, a coerced number — when it reads
+the cookies as they arrive, `BaseContext`'s: one made by
+`defineMiddleware(fn)` with no context of its own, one typed by
+`BaseContext`, a guard typed by the keys it requires and no `cookies`. At
+runtime it reads the schema's output there, as everything after the
+`validate` does, so a middleware that reads the cookies after one is written
+inline, typed by them, or names their shape in its context: then it is
+checked against what the `validate` gives, and refused when the shape
+differs ([Troubleshooting](../troubleshooting.md#-is-not-assignable-to-type-cookies-is-in-the-context-with-another-type-than-this-middleware-reads)).
+
+```ts
+import { alxia, defineMiddleware, validate } from '@alxia/core';
+import { z } from 'zod';
+
+const timed = defineMiddleware(async (_ctx, next) => next({ start: performance.now() }));
+
+const app = alxia().get(
+	'/visits',
+	validate({ cookies: z.object({ sid: z.string().optional(), visits: z.coerce.number() }) }),
+	timed, // reads no cookies: taken
+	({ cookies }, next) => next({ again: cookies.visits > 0 }), // inline: typed by the schema
+	({ again, reply }) => reply(200, { again }),
+);
+```
+
+## The context after `next()`
+
+A request has one context, built as its chain runs: what a middleware
+passes `next({ … })`, a `derive` returns or a `validate` checks is set on
+it for the steps after. A middleware that reads `ctx` again once `next()`
+has settled reads that same object, as the steps after it left it: a key
+one of them added, a `params`, `query` or `headers` a `validate` after it
+replaced. Its type names none of that — it is the context the middleware
+was given — so reaching an added key takes a cast. The cookies alone are
+kept apart: a `validate({ cookies })` hands what follows a copy, and the
+middlewares before it read the request's cookies after `next()` too.
+
+Read what the middleware needs before calling `next()`, and keep it:
+
+```ts
+import { defineMiddleware } from '@alxia/core';
+
+const audit = defineMiddleware(async ({ query, route }, next) => {
+	const response = await next();
+	console.log(route, query, response.status); // the query as it arrived
+	return response;
+});
+```
+
+A value an inner step added and has already cleaned up — a per-request
+scope it disposed of once the route answered — is not the outer
+middleware's to read: it would read it after its end. One copy of the
+context per middleware would keep each view apart, at a cost the chain
+does not pay on every request ([Troubleshooting](../troubleshooting.md#a-middleware-reads-after-next-what-a-later-step-added)).
+
 ## Each way
 
 ### A route's middlewares

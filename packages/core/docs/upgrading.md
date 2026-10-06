@@ -4,6 +4,42 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
+## Next
+
+The next `@alxia/core` patch takes, after a `validate({ cookies })`, the
+shared middlewares it refused there. Nothing breaks: what compiled still
+compiles, and nothing changes at runtime.
+
+### The middlewares after `validate({ cookies })` compile
+
+Before, when a `cookies` schema gave back anything but a
+`Record<string, string>` — an optional cookie, a coerced number — every
+shared middleware after the `validate` was refused with
+``"`cookies` is in the context with another type than this middleware reads"``:
+one made by `defineMiddleware(fn)` with no context, one typed by
+`BaseContext`, a guard typed by what it requires, a package's middleware.
+Now a middleware that reads the cookies as they arrive is taken; one that
+names a shape of its own is checked against the schema's output, as before:
+
+```ts
+import { alxia, defineMiddleware, validate } from '@alxia/core';
+import { z } from 'zod';
+
+const timed = defineMiddleware(async (_ctx, next) => next({ start: performance.now() }));
+
+alxia().get(
+	'/visits',
+	validate({ cookies: z.object({ sid: z.string().optional() }) }),
+	timed, // refused before, taken now
+	({ start, reply }) => reply(200, { start }),
+);
+```
+
+**Can it break your code.** No. A cast or a `compose` written to get past
+the error can go. Nothing changes at runtime: such a middleware reads the
+schema's output, as everything after the `validate` does
+([Reading cookies](guide/middleware.md#reading-cookies)).
+
 ## 0.14.0
 
 `@alxia/core` 0.14.0 gives every `onStop` hook the server that stopped. A
