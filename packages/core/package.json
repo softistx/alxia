@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/core",
-	"version": "0.12.0",
+	"version": "0.13.0",
 	"description": "A zero-dependency, type-safe HTTP framework for Bun: routes validated with any Standard Schema, typed from the request to the reply, OpenAPI spec first",
 	"license": "MIT",
 	"type": "module",

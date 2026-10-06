@@ -1,5 +1,15 @@
 # @alxia/proxy
 
+## 0.4.2
+
+### Patch Changes
+
+- [#210](https://github.com/softistx/alxia/pull/210) [`5d7438a`](https://github.com/softistx/alxia/commit/5d7438afa0909630611d3f0661bd012834760fb6) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Document that the client's port, read from a trusted proxy's `X-Forwarded-Port` by core's `originalUrl(ctx)`, is part of the `X-Forwarded-Host` sent upstream.
+
+- [#214](https://github.com/softistx/alxia/pull/214) [`b4195c0`](https://github.com/softistx/alxia/commit/b4195c0518ce2c5c8c68181e5cb3de67890c2ae8) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs: the roadmap versions the public port sent in `X-Forwarded-Host` as 0.4.2.
+- Updated dependencies [[`5d7438a`](https://github.com/softistx/alxia/commit/5d7438afa0909630611d3f0661bd012834760fb6), [`9de1c30`](https://github.com/softistx/alxia/commit/9de1c30e0ba8ab4cb20d38a5f5a14293726e9468), [`b4195c0`](https://github.com/softistx/alxia/commit/b4195c0518ce2c5c8c68181e5cb3de67890c2ae8)]:
+  - @alxia/core@0.13.0
+
 ## 0.4.1
 
 ### Patch Changes
