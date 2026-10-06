@@ -84,4 +84,4 @@ const app = alxia().use('/shop', proxy('http://shop.internal:3000/app', {
 `proxy.mount()` declares no route, so `@alxia/openapi`'s `matchesSpec` has
 nothing to match it against. See [The basics](basics.md#spec-first-apps).
 
-Next: [Failures](failures.md).
+Next: [Several upstreams](upstreams.md), [Failures](failures.md).

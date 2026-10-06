@@ -1,6 +1,6 @@
 /**
  * `proxy(target, options)`: a middleware that forwards the requests it runs
- * on to one upstream, fixed here. `proxy.mount(prefix, target)`: a plugin
+ * on to an upstream fixed here — one, or a list taken round-robin. `proxy.mount(prefix, target)`: a plugin
  * forwarding everything under a prefix. `proxy.ws(target)`: the handlers
  * of a socket route relayed to an upstream WebSocket.
  */
@@ -15,12 +15,13 @@ import {
 	type Requiring,
 } from '@alxia/core';
 import { forward } from './forward';
-import { type ProxyContext, type ProxyOptions, planOf } from './options';
+import type { ProxyContext, ProxyOptions } from './options';
 import {
 	type SocketProxy,
 	type SocketProxyOptions,
 	socketProxy,
 } from './socket';
+import { type ProxyTargets, poolOf } from './upstreams';
 
 /**
  * What `proxy()` makes: a middleware that never calls `next`, requiring of
@@ -46,23 +47,28 @@ export type ProxyMount<Prefix extends string, Ctx = unknown> = Alxia<
  * run first. A 502 when the upstream cannot be reached, a 504 past
  * `timeout`, in the app's error format.
  *
+ * `target` may be a list: each request goes to the next upstream, and to
+ * another one when the connect to the first was refused or its host did
+ * not resolve (`retries`), skipping for `cooldown` ms one that failed so.
+ *
  * ```ts
  * app.use(bearer({ jwt })).use('/api', proxy('http://users.internal:8080', { rewrite: '/api' }));
+ * app.use('/api', proxy(['http://users-1:8080', 'http://users-2:8080'], { rewrite: '/api' }));
  * ```
  */
 function proxy<Ctx = unknown>(
-	target: string | URL,
+	target: ProxyTargets,
 	options: ProxyOptions<Ctx> = {},
 ): ProxyMiddleware<Ctx> {
-	const plan = planOf<Ctx>('proxy()', target, options);
+	const pool = poolOf<Ctx>('proxy()', target, options);
 	return async function proxy(ctx) {
-		return forward(plan, ctx as unknown as ProxyContext<Ctx>);
+		return forward(pool, ctx as unknown as ProxyContext<Ctx>);
 	};
 }
 
 /**
  * A plugin forwarding every request under `prefix`, whatever its method or
- * path, to `target`: the prefix stripped, and the upstream's redirects and
+ * path, to `target` (one upstream, or a list as for `proxy()`): the prefix stripped, and the upstream's redirects and
  * cookies rebased under it. Mounted after the app's middlewares, it runs
  * behind them.
  *
@@ -72,7 +78,7 @@ function proxy<Ctx = unknown>(
  */
 function mount<const Prefix extends `/${string}`, Ctx = unknown>(
 	prefix: Prefix,
-	target: string | URL,
+	target: ProxyTargets,
 	options: ProxyOptions<Ctx> = {},
 ): ProxyMount<Prefix, Ctx> {
 	if ((prefix as string) === '/' || prefix.endsWith('/')) {
@@ -96,15 +102,16 @@ function mount<const Prefix extends `/${string}`, Ctx = unknown>(
 
 /**
  * The handlers of a socket route relayed to `target`, a `ws://` or
- * `wss://` URL (`http`, `https` taken as such): each frame both ways, and
- * the close codes.
+ * `wss://` URL (`http`, `https` taken as such), or a list of them taken
+ * round-robin, the connect retried on the next one as for `proxy()`: each
+ * frame both ways, and the close codes.
  *
  * ```ts
  * app.ws('/live', proxy.ws('ws://chat.internal:8080', { rewrite: '/live' }));
  * ```
  */
 function ws<Ctx = unknown>(
-	target: string | URL,
+	target: ProxyTargets,
 	options: SocketProxyOptions<Ctx> = {},
 ): SocketProxy<Ctx> {
 	return socketProxy(target, options);

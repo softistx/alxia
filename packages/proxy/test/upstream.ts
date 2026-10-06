@@ -37,10 +37,12 @@ export function upstream(
 		server: Bun.Server<unknown>,
 	) => Response | Promise<Response>,
 	websocket?: Bun.WebSocketHandler<unknown>,
+	/** The port to listen on, a random one by default. */
+	port = 0,
 ): Upstream {
 	const seen: Seen[] = [];
 	const server = Bun.serve({
-		port: 0,
+		port,
 		idleTimeout: 0,
 		async fetch(request, server) {
 			const url = new URL(request.url);

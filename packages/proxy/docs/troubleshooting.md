@@ -13,6 +13,9 @@ TypeScript error, or a response body. Entries that print nothing are under
 - [`proxy(): timeout must be a number of milliseconds above 0`](#proxy-timeout-must-be-a-number-of-milliseconds-above-0)
 - [`proxy(): bodyLimit must be a whole number of bytes, 0 or more`](#proxy-bodylimit-must-be-a-whole-number-of-bytes-0-or-more)
 - [`proxy.ws(): maxBuffered must be a whole number of bytes above 0`](#proxyws-maxbuffered-must-be-a-whole-number-of-bytes-above-0)
+- [`proxy(): give one upstream URL, or a list of at least one; got an empty list`](#proxy-give-one-upstream-url-or-a-list-of-at-least-one-got-an-empty-list)
+- [`proxy(): retries must be at most the number of upstreams − 1 (…), each tried once per request`](#proxy-retries-must-be-at-most-the-number-of-upstreams--1--each-tried-once-per-request)
+- [`proxy(): retries must be a whole number, 0 or more` (or `cooldown`)](#proxy-retries-must-be-a-whole-number-0-or-more-or-cooldown)
 - [`proxy.mount(): the prefix must start with "/" and not end with one`](#proxymount-the-prefix-must-start-with--and-not-end-with-one)
 - [`use(): argument 1 looks like a factory (proxy): call it, use(proxy())`](#use-argument-1-looks-like-a-factory-proxy-call-it-useproxy)
 - [`plugin(): argument 1 looks like a factory (mount): call it, plugin(mount())`](#plugin-argument-1-looks-like-a-factory-mount-call-it-pluginmount)
@@ -39,6 +42,8 @@ TypeScript error, or a response body. Entries that print nothing are under
 - [A route declared after the proxy is never reached](#a-route-declared-after-the-proxy-is-never-reached)
 - [A 413 that is not in the app's format, before the proxy runs](#a-413-that-is-not-in-the-apps-format-before-the-proxy-runs)
 - [A 504 though the upstream answers](#a-504-though-the-upstream-answers)
+- [A request one upstream failed is not retried on another](#a-request-one-upstream-failed-is-not-retried-on-another)
+- [A restarted upstream gets no request for a few seconds](#a-restarted-upstream-gets-no-request-for-a-few-seconds)
 - [The upstream sees its own `Host`, not the client's](#the-upstream-sees-its-own-host-not-the-clients)
 - [A redirect sends the browser to the upstream's address](#a-redirect-sends-the-browser-to-the-upstreams-address)
 - [A cookie the upstream sets is never sent back](#a-cookie-the-upstream-sets-is-never-sent-back)
@@ -137,6 +142,42 @@ no room for a single byte could relay nothing.
 proxy.ws('ws://chat.internal:8080', { maxBuffered: 2 * 1024 * 1024 });
 ```
 
+### `proxy(): give one upstream URL, or a list of at least one; got an empty list`
+
+**When:** `proxy([])`, `proxy.mount(prefix, [])` or `proxy.ws([])`: a list
+of targets that is empty, often one read from configuration that was not set.
+**Why:** a proxy needs an upstream to forward to.
+**Fix:** check the list where it is built, before the proxy is declared:
+
+```ts
+const upstreams = (process.env.USERS_UPSTREAMS ?? '').split(',').filter(Boolean);
+if (upstreams.length === 0) throw new Error('USERS_UPSTREAMS is not set');
+app.use('/api', proxy(upstreams, { rewrite: '/api' }));
+```
+
+### `proxy(): retries must be at most the number of upstreams − 1 (…), each tried once per request`
+
+**When:** `retries` above the number of upstreams − 1: `retries: 1` with a
+single target, or `retries: 3` with three.
+**Why:** a request tries each upstream at most once. Trying again one that
+just refused the connection only delays the 502.
+**Fix:** leave `retries` out (each upstream is tried once), or lower it:
+
+```ts
+proxy(['http://a.internal', 'http://b.internal', 'http://c.internal'], { retries: 2 });
+```
+
+### `proxy(): retries must be a whole number, 0 or more` (or `cooldown`)
+
+**When:** `retries` or `cooldown` is negative, a fraction, `NaN`, or a
+string like `'5s'`.
+**Why:** `retries` counts upstreams, `cooldown` milliseconds.
+**Fix:**
+
+```ts
+proxy(['http://a.internal', 'http://b.internal'], { retries: 1, cooldown: 10_000 });
+```
+
 ### `proxy.mount(): the prefix must start with "/" and not end with one`
 
 **When:** `proxy.mount('/', …)` or `proxy.mount('/legacy/', …)`.
@@ -232,7 +273,10 @@ could not be reached`.
 **Fix:** read the log line, check that the target is reachable from the app
 and not `localhost` inside a container. An upstream that dies after its
 headers cannot change the status: the client's connection is cut instead.
-See [Failures](guide/failures.md).
+With several upstreams, the 502 is the last one tried: every one refused
+the connection or did not resolve, or the one tried reset it, which is never
+retried. See [Failures](guide/failures.md) and
+[Several upstreams](guide/upstreams.md).
 
 ### `504 {"error":"gateway_timeout"}`
 
@@ -285,8 +329,8 @@ proxy('http://files.internal', { bodyLimit: 50 * 1024 * 1024 });
 `WebSocket` gets `error`, then `close` with 1006, and never `open`; the
 server's log or a logger before the proxy shows the 502 or the 504.
 **Why:** `proxy.ws()` opens the upstream socket before it upgrades the
-client. A 502 is an upstream that refused the connection or answered its
-handshake with anything but a `101`; a 504, one that had not opened within
+client. A 502 is an upstream that refused the connection (every one of
+them, given a list) or answered its handshake with anything but a `101`; a 504, one that had not opened within
 `timeout` (30 s by default). Before `@alxia/proxy` 0.2.0, the client was
 upgraded first and closed at once with `BAD_GATEWAY_CLOSE` (1014): that
 code is no longer sent.
@@ -385,6 +429,32 @@ that sends its headers with its first body chunk, or is slow to the first
 byte, is cut. A slow body after the headers is not (server-sent events
 pass).
 **Fix:** raise `timeout`, or send the headers early from the upstream.
+
+### A request one upstream failed is not retried on another
+
+**Why:** with several upstreams, a request goes on to the next one only when
+the first provably never received it: a refused connection
+(`ConnectionRefused`) or a host that does not resolve (`ENOTFOUND`,
+`EAI_AGAIN`), and, for a request with a body, before the upstream read any of
+it. A reset, a timeout (a 504) or an answer of any status — a `503` from an
+upstream shedding load included — may follow a request the upstream ran, so
+sending it again could run it twice. `retries: 0`, or a single target, never
+retries.
+**Fix:** none in the proxy, by design. For an idempotent request a client may
+retry itself; an upstream that sheds load should close its listener, so its
+connects are refused, rather than answer 503. See
+[Several upstreams](guide/upstreams.md#retries-only-a-request-no-upstream-received).
+
+### A restarted upstream gets no request for a few seconds
+
+**Why:** an upstream whose connect failed is skipped for `cooldown` ms (5 000
+by default), so the requests that follow do not each pay a refused connect.
+It is in the rotation again once the cooldown has passed.
+**Fix:** shorten it, or turn it off:
+
+```ts
+proxy(['http://a.internal', 'http://b.internal'], { cooldown: 1_000 }); // or cooldown: 0
+```
 
 ### The upstream's `X-Forwarded-Proto` is `http` behind a TLS proxy
 

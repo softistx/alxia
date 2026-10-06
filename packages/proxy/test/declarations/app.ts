@@ -3,7 +3,7 @@
 // able to name each one through `@alxia/proxy` and `@alxia/core` alone
 // (TS2883 otherwise).
 import { alxia, type BaseContext } from '@alxia/core';
-import { type ProxyOptions, proxy } from '@alxia/proxy';
+import { type ProxyOptions, type ProxyTargets, proxy } from '@alxia/proxy';
 
 export function gateway() {
 	return alxia()
@@ -34,4 +34,22 @@ export function mounted() {
 
 export function relay() {
 	return proxy.ws('wss://chat.internal');
+}
+
+export function balanced() {
+	return alxia()
+		.use(
+			'/api',
+			proxy(['http://users-1.internal:8080', 'http://users-2.internal:8080'], {
+				rewrite: '/api',
+				retries: 1,
+				cooldown: 10_000,
+			}),
+		)
+		.plugin(proxy.mount('/legacy', ['http://old-1:3000', 'http://old-2:3000']))
+		.ws('/live', proxy.ws(['ws://chat-1.internal', 'ws://chat-2.internal']));
+}
+
+export function targeted(targets: ProxyTargets) {
+	return proxy(targets);
 }

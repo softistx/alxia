@@ -13,26 +13,23 @@ import { badGateway, gatewayTimeout } from './failures';
 import { applyEdit, requestHeaders, stripHopByHop } from './headers';
 import type { Plan, ProxyContext } from './options';
 import { rebaseResponse } from './rebase';
+import { acrossUpstreams, neverReached, Unreached } from './retry';
 import { upstreamUrl } from './upstream-url';
+import type { Pool } from './upstreams';
 
-/** Forwards `ctx`'s request to the upstream `plan` names, and answers with its response. */
+/**
+ * Forwards `ctx`'s request to an upstream of `pool`, and answers with its
+ * response: to the next one when the first never received it
+ * (`retry.ts`), the body read once, by the upstream that asks for it.
+ */
 export async function forward<Ctx>(
-	plan: Plan<Ctx>,
+	pool: Pool<Ctx>,
 	ctx: ProxyContext<Ctx>,
 ): Promise<Response> {
 	const { request } = ctx;
-	const url = upstreamUrl(plan as Plan, ctx.url);
-	const headers = requestHeaders(plan as Plan, ctx, request);
-	applyEdit(headers, plan.headers.request, ctx);
-	const timer = new AbortController();
-	let timeout: ReturnType<typeof setTimeout> | undefined;
-	let answered = false;
-	// Until the headers: a body chunk sent re-arms it. After: never again.
-	const arm = () => {
-		clearTimeout(timeout);
-		if (answered) return;
-		timeout = setTimeout(() => timer.abort(), plan.timeout);
-	};
+	const first = pool.plans[0] as Plan<Ctx>;
+	// The timer of the attempt in flight: each chunk of the body sent re-arms it.
+	let onChunk = () => {};
 	const body =
 		request.body === null ||
 		request.method === 'GET' ||
@@ -40,29 +37,17 @@ export async function forward<Ctx>(
 			? undefined
 			: watchBody(
 					request.body,
-					plan.bodyLimit,
+					first.bodyLimit,
 					request.headers.get('content-length'),
-					arm,
+					() => onChunk(),
 				);
-	arm();
-	let upstream: Response;
-	try {
-		upstream = await fetch(url, {
-			method: request.method,
-			headers,
-			body: body?.stream ?? null,
-			duplex: 'half',
-			redirect: 'manual',
-			decompress: false,
-			signal: AbortSignal.any([request.signal, timer.signal]),
-		} as RequestInit);
-	} catch (error) {
-		throw failureOf(error, { plan, url, body, request, timer });
-	} finally {
-		answered = true;
-		clearTimeout(timeout);
-	}
-	return respond(plan, ctx, upstream);
+	const replayable = () =>
+		body === undefined || !(body.started() || body.stream.locked);
+	return acrossUpstreams(pool, request.signal, replayable, async (plan) => {
+		const attempt = attemptOf(plan, ctx, body);
+		onChunk = attempt.arm;
+		return respond(plan, ctx, await attempt.sent);
+	});
 }
 
 interface Attempt {
@@ -71,6 +56,56 @@ interface Attempt {
 	readonly body: WatchedBody | undefined;
 	readonly request: Request;
 	readonly timer: AbortController;
+}
+
+/**
+ * One fetch to `plan`'s upstream: `sent` resolves to its response, or
+ * rejects with what the request answers — `Unreached` around the 502 when
+ * the connect failed before a byte left. Until the headers arrive, the
+ * `timeout` runs, re-armed by `arm`; after, never again.
+ */
+function attemptOf<Ctx>(
+	plan: Plan<Ctx>,
+	ctx: ProxyContext<Ctx>,
+	body: WatchedBody | undefined,
+): { readonly arm: () => void; readonly sent: Promise<Response> } {
+	const { request } = ctx;
+	const url = upstreamUrl(plan as Plan, ctx.url);
+	const headers = requestHeaders(plan as Plan, ctx, request);
+	applyEdit(headers, plan.headers.request, ctx);
+	const timer = new AbortController();
+	let timeout: ReturnType<typeof setTimeout> | undefined;
+	let answered = false;
+	const arm = () => {
+		clearTimeout(timeout);
+		if (answered) return;
+		timeout = setTimeout(() => timer.abort(), plan.timeout);
+	};
+	arm();
+	const sent = (async () => {
+		try {
+			return await fetch(url, {
+				method: request.method,
+				headers,
+				body: body?.stream ?? null,
+				duplex: 'half',
+				redirect: 'manual',
+				decompress: false,
+				signal: AbortSignal.any([request.signal, timer.signal]),
+			} as RequestInit);
+		} catch (error) {
+			const failure = failureOf(error, { plan, url, body, request, timer });
+			const unreached =
+				neverReached(error) &&
+				failure instanceof HttpError &&
+				failure.status === 502;
+			throw unreached ? new Unreached(failure) : failure;
+		} finally {
+			answered = true;
+			clearTimeout(timeout);
+		}
+	})();
+	return { arm, sent };
 }
 
 /**

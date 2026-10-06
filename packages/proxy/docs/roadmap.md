@@ -11,8 +11,6 @@ Nothing scheduled yet.
 
 ## Next
 
-- **Several upstreams behind one proxy.** Load balancing over a list of
-  targets, and retries of a request that never reached an upstream.
 - **HTTP/2 to the upstream.** A proxy that talks HTTP/2 to an upstream that
   offers it.
 
@@ -30,10 +28,25 @@ Nothing scheduled yet.
   the request, a header, or a callback is a way for a client to make the
   server fetch any address it names (server-side request forgery). The
   target is checked once, when the proxy is declared, and every request is
-  checked against it. To reach several upstreams, declare one proxy for
-  each.
+  checked against it. Several upstreams are a list fixed the same way, each
+  URL checked, the rotation choosing among them: a request never does.
 
 ## Shipped
+
+### Next release
+
+- **Several upstreams behind one proxy.** `proxy()`, `proxy.mount()` and
+  `proxy.ws()` take a list of targets where they took one, each checked as
+  a single target is, and send each request to the next, round-robin. A
+  request goes on to another upstream only when the one it tried never
+  received it: a refused connection or a host that does not resolve, and,
+  with a body, before the upstream read a byte of it; a reset, a timeout or
+  any answer is never retried (`retries`, the number of upstreams − 1 by
+  default). An upstream whose connect failed is skipped for `cooldown` ms
+  (5 s by default), and when every one is cooling down, the one that failed
+  longest ago is tried rather than none. A socket route retries its connect
+  the same way, before the client's `101`
+  ([Several upstreams](guide/upstreams.md)).
 
 ### 0.3.0
 

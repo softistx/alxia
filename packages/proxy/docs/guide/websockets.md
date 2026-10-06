@@ -106,6 +106,20 @@ const app = alxia({ errors: 'problem' }).ws('/live', proxy.ws('ws://chat.interna
 // down: 502 application/problem+json; no 101 within 5 s: 504
 ```
 
+Given a list, `proxy.ws()` takes the upstreams in turn, and while the
+connect itself fails — refused, or a host that does not resolve — it tries
+the next one, before the client is upgraded. An upstream that answered its
+handshake with anything but a `101`, or did not open within `timeout`, was
+reached, and is the 502 or the 504 at once. See
+[Several upstreams](upstreams.md#retries-only-a-request-no-upstream-received).
+
+```ts
+import { alxia } from '@alxia/core';
+import { proxy } from '@alxia/proxy';
+
+const app = alxia().ws('/live', proxy.ws(['ws://chat-1.internal:8080', 'ws://chat-2.internal:8080']));
+```
+
 `BAD_GATEWAY_CLOSE` (1014), the close code an unreachable upstream used to
 get, is deprecated: nothing sends it any more.
 
