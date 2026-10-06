@@ -28,11 +28,6 @@ number on it. Every release, with each change it made, is in
   shutdown closes the sockets with 1001 and completes their subscriptions
   ([WebSocket guide](guide/websockets.md)).
 
-- **A test client.** `graphqlClient(app)` from `@alxia/graphql/testing`
-  sends a query, its variables and headers to the endpoint in process, and
-  returns `{ status, data, errors, response }`; a `TypedDocumentNode` types
-  the answer ([testing guide](guide/testing.md)).
-
 ## Next
 
 - **Persisted operations in the test client.** A `GET` and a hash sent in
@@ -43,6 +38,13 @@ number on it. Every release, with each change it made, is in
 Nothing scheduled yet.
 
 ## Shipped
+
+### 0.7.0
+
+- **A test client.** `graphqlClient(app)` from `@alxia/graphql/testing`
+  sends a query, its variables and headers to the endpoint in process, and
+  returns `{ status, data, errors, response }`; a `TypedDocumentNode` types
+  the answer; `app` is anything with a `fetch(Request)` ([testing guide](guide/testing.md)).
 
 ### 0.6.0
 

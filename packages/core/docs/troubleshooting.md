@@ -156,6 +156,7 @@ a trap that prints nothing is headed by its symptom.
 - [`TypeError: An event retry must be a whole number of milliseconds, 0 or more`](#typeerror-an-event-retry-must-be-a-whole-number-of-milliseconds-0-or-more)
 - [`TypeError: The event "…" is not declared: …`](#typeerror-the-event--is-not-declared-), and `An event of a named stream is an object { event, data }`
 - [`TypeError: An event name must not hold a line break or a NUL`](#typeerror-an-event-name-must-not-hold-a-line-break-or-a-nul), and `An event name must not be empty`, `A named event stream declares at least one event`, `The event "…" is not a Standard Schema`
+- [`TypeError: A comment is a string: …`](#typeerror-a-comment-is-a-string-)
 - [`Type 'string' is not assignable to type '"ping"'` on a named stream](#type-string-is-not-assignable-to-type-ping-on-a-named-stream)
 
 **Shutting down**
@@ -3324,6 +3325,23 @@ app is built, as do `A named event stream declares at least one event` and
 
 ```ts
 const Push = eventStream({ state: StateChange, ping: Ping });
+```
+
+### `TypeError: A comment is a string: …`
+
+**When:** `sseComment(text)` is given something that is not a string: a
+number, an object, `undefined` (`A comment is a string: 42`). It throws where
+it is called, so inside the handler, which ends the stream: the error is the
+app's 500 before the first event, or a closed stream after it.
+
+**Why:** a comment is text, and the function does not turn a value into one;
+an object would otherwise reach the wire as `[object Object]`.
+
+**Fix:** pass a string, and format the value yourself:
+
+```ts
+yield sseComment(`tick ${n}`);
+yield sseComment(JSON.stringify(state));
 ```
 
 ### `Type 'string' is not assignable to type '"ping"'` on a named stream

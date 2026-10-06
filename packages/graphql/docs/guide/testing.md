@@ -22,6 +22,16 @@ test('hello', async () => {
 });
 ```
 
+## What `app` can be
+
+`graphqlClient` calls `app.fetch(request)`, so `app` is an alxia app or anything
+with a `fetch(Request)` that answers a `Response`: a Yoga instance, a
+handler of your own, a stub.
+
+```ts
+const client = graphqlClient({ fetch: (request) => yoga.fetch(request) });
+```
+
 ## The result
 
 `query` resolves to `{ status, data?, errors?, response }`:

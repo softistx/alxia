@@ -28,6 +28,10 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### 0.7.2
+
+- **The public port in a span.** `server.port` is the public port behind a trusted proxy that sends `X-Forwarded-Port`, read through core's `originalUrl(ctx)`.
+
 ### 0.7.0
 
 - **The public scheme and host behind a proxy.** `url.scheme`,

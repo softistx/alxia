@@ -4,16 +4,36 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
-## Next
+## 0.13.0
 
-The next `@alxia/core` minor lets a handler yield a comment on an event
-stream, and `originalUrl(ctx)` now carries the port a trusted proxy sends in
-`X-Forwarded-Port`. Nothing in the API changes.
+`@alxia/core` 0.13.0 lets a handler yield a comment on an event stream, and
+`originalUrl(ctx)` now carries the port a trusted proxy sends in
+`X-Forwarded-Port`. Nothing in its API breaks; the peer range of every
+package moves. It ships with `@alxia/jwt` 0.5.0 and `@alxia/graphql` 0.7.0,
+each a minor, and `@alxia/proxy` 0.4.2, `@alxia/telemetry` 0.7.2 and
+`@alxia/create` 0.4.1, each a patch; what each changes in behaviour is in
+the table below.
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
+| [Peers move to `^0.13.0`](#peers-move-to-0130) | every package | yes, for an install that holds a package of 0.12 beside core 0.13: update them together |
 | [`originalUrl(ctx)` reads `X-Forwarded-Port`](#originalurlctx-reads-x-forwarded-port) | core | only a URL built from `originalUrl` behind a proxy that sends the header |
+| [`untrusted: 'refuse'` refuses `X-Forwarded-Port`](#untrusted-refuse-refuses-x-forwarded-port) | core | notice: a request from an untrusted connection that carries only that header is now a 403 |
 | [Comments on a stream](#comments-on-a-stream) | core | no: a stream that yields none is written as before |
+| [`ES512`, and a stricter ECDSA signature](#es512-and-a-stricter-ecdsa-signature) | jwt | notice: a DER signature or a respelled one is refused, `ES256` and `ES384` included |
+| [A test client for the endpoint](#a-test-client-for-the-endpoint) | graphql | no: a new subpath |
+| [The public port in `X-Forwarded-Host` and `server.port`](#the-public-port-in-x-forwarded-host-and-serverport) | proxy, telemetry | notice: only behind `alxia({ proxy })` and a proxy that sends the header |
+| [New projects: `graphqlClient`](#new-projects-graphqlclient) | create | no: a new project only |
+
+### Peers move to `^0.13.0`
+
+Every package's peer on `@alxia/core` moves from `^0.12.0` to `^0.13.0`,
+which a `^0.12.0` does not accept. Update `@alxia/core` and the `@alxia/*`
+packages you use in one change, each to its release that names core
+`^0.13.0`.
+
+**Can it break your code.** Only the install, as for
+[0.12](#peers-move-to-0120): a package left behind asks for core `^0.12.0`.
 
 ### `originalUrl(ctx)` reads `X-Forwarded-Port`
 
@@ -34,15 +54,34 @@ carries the port, and so do the absolute URLs, redirects and
 one that is not digits from 1 to 65535 is ignored; the scheme's default is
 left out; the header is read only beside a forwarded host, from the same
 trusted hop as the scheme and the host. `Forwarded` has no port parameter
-and is unchanged. Under `untrusted: 'refuse'`, a request from an untrusted
-connection that carries only `X-Forwarded-Port` is now refused 403 like one
-carrying `X-Forwarded-Host`.
+and is unchanged.
 
 **Can it break your code.** Only where a proxy sends a port that is not the
 public one (a proxy that writes its internal listening port): have it send
 the public port, or stop sending the header. And where a proxy sets `X-Forwarded-Proto` and `-Host` but not
 `X-Forwarded-Port`, the client's own header is now believed: overwrite it at
 the edge, or strip it.
+
+### `untrusted: 'refuse'` refuses `X-Forwarded-Port`
+
+Before, `trustProxy({ untrusted: 'refuse' })` refused a request from an
+untrusted connection that carried `X-Forwarded-For`, `-Proto`, `-Host` or
+`Forwarded`, and passed one that carried only `X-Forwarded-Port`. Now:
+
+```ts
+// a request from 203.0.113.9, which is no trusted proxy, with X-Forwarded-Port: 8443
+trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' });
+// before: passed
+// after:  403, like one carrying X-Forwarded-Host (or your own `refusal`)
+```
+
+**Notice.** `X-Forwarded-Port` is now a forwarding header like the others,
+so the refusal reads it too. A request with no forwarding header, a health
+probe's, still passes.
+
+**Can it break your code.** Only a client or a hop that is not a trusted
+proxy and sends the header by itself: it was ignored and is now a 403. Have
+the trusted proxy be the only one to send it, or list that hop in `trusted`.
 
 ### Comments on a stream
 
@@ -60,6 +99,68 @@ A comment is never checked by the stream's schema, and a named stream takes
 it as well. Text on several lines is several `:` lines, and a line break
 cannot end the comment and start an event
 ([Server-sent events](guide/server-sent-events.md#comments)).
+
+### `ES512`, and a stricter ECDSA signature
+
+`@alxia/jwt` 0.5.0 adds `ES512` (ECDSA on P-521 with SHA-512) to
+`createJwt` and to a `jwks` or `discovery` verifier. Nothing you call
+changes, but the verifier is stricter for every ECDSA token:
+
+```ts
+createJwt({ algorithm: 'ES512', privateKey, publicKey }); // a P-521 pair
+```
+
+**Notice.** A key of another curve is refused both ways, a P-256 key under
+`ES512` or a P-521 key under `ES256` (a `TypeError` at `createJwt`, `algorithm`
+from a key set), and so is a JWK whose `x` or `y` is not its curve's size. An
+ECDSA signature must be the JWS `r‖s` of its curve, 64, 96 or 132 bytes for
+`ES256`, `ES384` and `ES512`, so a DER signature, which OpenSSL and
+`node:crypto` write by default, is refused as `signature`. A signature must
+also be spelled in its one canonical base64url: a token respelled with a
+dropped trailing character or unused bits is `malformed`. And an EC key
+whose `crv` names no curve of its own, `constructor` for one, is refused as
+`key` ([Algorithms and keys](https://github.com/softistx/alxia/blob/develop/packages/jwt/docs/guide/algorithms-and-keys.md#ecdsa-signatures)).
+
+**Can it break your code.** Only where a signer writes DER, or a token is
+respelled: sign `r‖s` in the canonical spelling. A token your own
+`createJwt` signed is unchanged.
+
+### A test client for the endpoint
+
+`@alxia/graphql` 0.7.0 adds `graphqlClient` in its `@alxia/graphql/testing`
+subpath, which posts an operation to the endpoint in process through
+`app.fetch`:
+
+```ts
+import { graphqlClient } from '@alxia/graphql/testing';
+
+const { status, data, errors } = await graphqlClient(app).query('{ hello }');
+```
+
+**Can it break your code.** No: a subpath of its own, which the main entry
+and a production bundle do not carry
+([Testing the endpoint](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/testing.md)).
+
+### The public port in `X-Forwarded-Host` and `server.port`
+
+`@alxia/proxy` 0.4.2 and `@alxia/telemetry` 0.7.2 change no code: they read
+`originalUrl(ctx)`, so they follow its
+[port](#originalurlctx-reads-x-forwarded-port). The `X-Forwarded-Host` a
+proxy sends upstream carries the client's port when the trusted proxy in
+front sent `X-Forwarded-Port`, and a span's `server.port` is the public
+one.
+
+**Can it break your code.** Notice it, behind `alxia({ proxy })` and a proxy
+that sends the header: an upstream that matched `X-Forwarded-Host` exactly,
+or a dashboard filtering spans by `server.port`, sees the public port.
+
+### New projects: `graphqlClient`
+
+`@alxia/create` 0.4.1: the `graphql` template's spec calls the app through
+`graphqlClient` from `@alxia/graphql/testing` in place of a helper of its
+own.
+
+**Can it break your code.** No: a new project only.
 
 ## 0.12.0
 

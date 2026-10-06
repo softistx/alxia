@@ -64,6 +64,10 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### 0.4.1
+
+- **`graphqlClient` in the `graphql` template.** Its spec calls the app through `graphqlClient` from `@alxia/graphql/testing`, in place of a helper of its own.
+
 ### 0.4.0
 
 - **`TRUSTED_PROXIES` in the `api` and `graphql` templates.** Optional and
