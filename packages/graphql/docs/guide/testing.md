@@ -98,10 +98,74 @@ data?.hello; // string
 // client.query(Hello, { variables: { name: 1 } }); // compile error
 ```
 
+## GET
+
+`method: 'GET'` puts the operation in the URL instead of a JSON body:
+`query`, `operationName`, and `variables` and `extensions` as JSON. Set it
+per call, or for every call with `graphqlClient(app, { method: 'GET' })`; a
+call's own `method` wins.
+
+```ts
+const { data } = await client.query('query ($name: String) { hello(name: $name) }', {
+	method: 'GET',
+	variables: { name: 'Ada' },
+});
+```
+
+A `GET` has no `Content-Type`.
+
+## Persisted operations
+
+`persisted` is the hash of an operation the app registered. It is sent as
+Apollo's `extensions.persistedQuery: { version: 1, sha256Hash }`, the shape
+`@graphql-yoga/plugin-persisted-operations` reads by default. With no
+document, only the hash is sent, so an app that allows nothing else
+(`allowArbitraryOperations: false`) can be tested; `TData` is yours to name,
+since nothing types it:
+
+```ts
+const result = await client.query<{ notes: { text: string }[] }>({
+	persisted: '5f1bb2a0c2a0',
+	variables: { first: 10 },
+	method: 'GET', // or the default POST
+});
+```
+
+With a document too, both are sent (Apollo's automatic persisted queries
+register one that way). An unknown hash is the server's own answer, not a
+client error: with the plugin's defaults, `errors[0].message` is
+`PersistedQueryNotFound`, with code `PERSISTED_QUERY_NOT_IN_LIST`; a
+document sent to an app that allows only persisted ones is
+`PersistedQueryOnly`.
+
+An app that names an operation by an **id** in an extension of its own
+(a custom `extractPersistedOperationId`) is sent that extension: `extensions`
+is sent as given, and counts as a call with no document.
+
+```ts
+await client.query({ extensions: { documentId: 'abc123' } });
+```
+
+## CSRF
+
+The client sends **no CSRF header of its own**: its name belongs to the app
+(`x-graphql-yoga-csrf` by default in Yoga's `useCSRFPrevention`, `x-csrf` in
+the [recipe](https://github.com/softistx/alxia/blob/develop/docs/recipes/graphql-api.md)),
+and a spec that never sends it could not see the plugin refuse. Put it in the
+client's `headers`, as a browser app does in its own client. Yoga's plugin lets
+a JSON `POST` through with no header, since a browser needs a preflight for
+that content type, but refuses a `GET` (no content type) with a 403
+(`Required CSRF header(s) not present`): test that with a `GET` without the
+header, and the app's real traffic with it.
+
+```ts
+const production = graphqlClient(app, { headers: { 'x-csrf': '1' } });
+expect((await graphqlClient(app).query('{ me { name } }', { method: 'GET' })).status).toBe(403);
+```
+
 ## Not covered
 
-It always POSTs JSON. A subscription over server-sent events or a socket,
-a `GET` and a persisted operation sent by hash are not sent by it; use
-`app.request` for those (the
+A subscription over server-sent events or a socket, a form-encoded `POST`
+and a batch are not sent by it; use `app.request` for those (the
 [recipe](https://github.com/softistx/alxia/blob/develop/docs/recipes/graphql-api.md#6-test-it-in-process)
-reads a stream).
+reads a stream, and checks the 415 a form gets).

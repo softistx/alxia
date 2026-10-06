@@ -30,14 +30,20 @@ number on it. Every release, with each change it made, is in
 
 ## Next
 
-- **Persisted operations in the test client.** A `GET` and a hash sent in
-  place of the document, for an app that allows nothing else.
+Nothing scheduled yet.
 
 ## Later
 
 Nothing scheduled yet.
 
 ## Shipped
+
+### 0.8.0
+
+- **`GET` and persisted operations in the test client.** `graphqlClient`
+  sends `method: 'GET'` with the operation in the URL, and `persisted`, the
+  hash of a registered operation, with no document, so an app that allows
+  nothing else can be tested; it adds no CSRF header of its own ([testing guide](guide/testing.md#persisted-operations)).
 
 ### 0.7.0
 
