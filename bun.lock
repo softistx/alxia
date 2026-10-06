@@ -128,7 +128,7 @@
     },
     "packages/di": {
       "name": "@alxia/di",
-      "version": "0.0.0",
+      "version": "0.1.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@nxgt/di": "^0.2.0",
