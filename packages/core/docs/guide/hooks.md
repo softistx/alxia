@@ -114,7 +114,7 @@ plugin's become the app's when the plugin has no prefix of its own.
 
 ```ts
 type StartHook = (server: Bun.Server<unknown>) => MaybePromise<void>;
-type StopHook = () => MaybePromise<void>;
+type StopHook = (server: Bun.Server<unknown> | undefined) => MaybePromise<void>;
 ```
 
 `onStart` runs once `listen` has started the server; it is not awaited, and
@@ -134,6 +134,30 @@ const app = alxia()
 	.onStart((server) => console.log(`listening on ${server.url}`))
 	.onStop(() => pool.end());
 ```
+
+`onStop` is given the server that stopped, the one `onStart` was given, or
+`undefined` on a `stop()` before `listen`, which runs the hooks too. Forks of
+one base share its hooks, and each runs them once of its own: the argument
+tells a shared hook which app stopped, and whether it had started, so a
+resource the forks share is released when the last one serving stops:
+
+```ts
+const serving = new Set<Bun.Server<unknown>>();
+const base = alxia()
+	.onStart((server) => {
+		serving.add(server);
+	})
+	.onStop(async (server) => {
+		if (server === undefined || !serving.delete(server)) return; // never listened
+		if (serving.size === 0) await pool.end();
+	});
+```
+
+Add the server synchronously, as here: `onStart` is not awaited, so an add
+after an `await` could lose the race against a quick `stop()`. A function
+passed by reference whose first parameter is optional (`onStop(sql.end)`,
+with `end(options?)`) does not compile, since the server is not one of its
+arguments: wrap it, `onStop(() => sql.end())`.
 
 See [Serving](serving.md#stopping) and [Health and shutdown](health-and-shutdown.md#graceful-shutdown).
 

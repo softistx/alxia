@@ -687,7 +687,8 @@ Which one to reach for — a middleware, `derive`, a group, a plugin — where
 each applies and the order a request runs them in:
 [Middleware: which way to use](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/middleware.md).
 
-`onStart(server)`, `onStop()` and `parser(type, parse)` apply to the whole
+`onStart(server)`, `onStop(server)` (the server that stopped, or `undefined`
+before `listen`) and `parser(type, parse)` apply to the whole
 app: they run with `listen` and its shutdown, and a body parser is tried
 before the built-in ones. The request hooks of 0.3 were removed in 0.5: what each
 did is a middleware given to `use`

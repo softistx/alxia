@@ -4,6 +4,54 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
+## Next
+
+The next `@alxia/core` minor gives every `onStop` hook the server that
+stopped. A hook written as an arrow or a function that takes no argument
+runs as before. One kind of hook stops compiling: a function passed by
+reference whose first parameter is optional (below). The peer range of every
+package moves with the minor.
+
+### `onStop` is given the server that stopped
+
+Before, an `onStop` hook was given nothing, and ran the same on a `stop()`
+of an app that never listened, which runs the hooks too. A hook shared by
+forks of one base could not tell which app stopped, nor whether it had
+started. Now it is given the server that stopped, the one `onStart` was
+given, or `undefined` on a `stop()` before `listen`:
+
+```ts
+import { alxia } from '@alxia/core';
+
+const serving = new Set<Bun.Server<unknown>>();
+const base = alxia()
+	.onStart((server) => {
+		serving.add(server);
+	})
+	.onStop(async (server) => {
+		// undefined: an app that never listened; nothing of it to release
+		if (server === undefined || !serving.delete(server)) return;
+		if (serving.size === 0) await pool.end(); // the last app serving
+	});
+```
+
+Add the server to the set synchronously, as above: `onStart` is not awaited,
+so an add after an `await` could lose the race against a quick `stop()`.
+
+A function passed by reference whose first parameter is optional, such as
+`onStop(sql.end)` with `end(options?)` or `onStop(client.close)` with
+`close(force?)`, no longer compiles, because the server is not one of its
+arguments. Run as plain JavaScript, it would be called with the server as
+its options. Wrap it:
+
+```ts
+app.onStop(() => sql.end());
+```
+
+A hook annotated `(server: Bun.Server<unknown>) => …` still does not
+compile, as before. It must accept `undefined` now
+([Hooks](guide/hooks.md#onstart-and-onstop)).
+
 ## 0.13.0
 
 `@alxia/core` 0.13.0 lets a handler yield a comment on an event stream, and
