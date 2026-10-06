@@ -20,7 +20,10 @@ const app = alxia()
 
 Wherever `proxy()`, `proxy.mount()` and `proxy.ws()` take a target, they
 take a list of targets too: the same first argument, one URL or several.
-A single URL is a list of one, and behaves exactly as it always has.
+A single URL is a list of one, never retried. One difference from 0.3:
+the proxy no longer reads a chunk of the request body ahead of the
+upstream, so `bodyLimit` and the `timeout`'s re-arm count each chunk as the
+upstream pulls it.
 
 Each URL in the list is checked as a single target is, at declaration: an
 absolute URL of an allowed scheme, with no query, fragment or credentials.
@@ -80,9 +83,9 @@ import { proxy } from '@alxia/proxy';
 proxy(['http://a.internal', 'http://b.internal', 'http://c.internal'], { retries: 1 }); // at most two of the three
 ```
 
-The `timeout` runs for each attempt. A retry follows a refused connect or a
-failed lookup, which fail at once, so it adds next to nothing to the time a
-request takes.
+The `timeout` runs for each attempt. A refused connect fails at once, so
+its retry adds next to nothing; a failed lookup can take as long as the
+resolver's own timeout before the next upstream is tried.
 
 ## Cooldown
 

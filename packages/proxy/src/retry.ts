@@ -59,8 +59,11 @@ export async function acrossUpstreams<Ctx, T>(
 	attempt: (plan: Plan<Ctx>) => Promise<T>,
 ): Promise<T> {
 	const tried = new Set<number>();
+	let last: unknown;
 	for (;;) {
-		const index = pool.pick(tried) as number;
+		const index = pool.pick(tried);
+		// Not reached while `more` below holds; kept so a change cannot answer a 500.
+		if (index === undefined) throw last;
 		tried.add(index);
 		try {
 			const value = await attempt(pool.plans[index] as Plan<Ctx>);
@@ -69,6 +72,7 @@ export async function acrossUpstreams<Ctx, T>(
 		} catch (error) {
 			if (!(error instanceof Unreached)) throw error;
 			pool.failed(index);
+			last = error.failure;
 			const more = tried.size <= pool.retries && tried.size < pool.plans.length;
 			if (!more || signal.aborted || !replayable()) throw error.failure;
 		}
