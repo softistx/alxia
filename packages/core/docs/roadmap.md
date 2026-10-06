@@ -7,11 +7,6 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Your own body for a refused proxy request.** `trustProxy({ refusal })`
-  answers the 403 of `untrusted: 'refuse'` and `'refuse-all'` as the app
-  says, a `Response` that must stay a 403, in place of the format's
-  default; it runs before routing, so no middleware sees it
-  ([Serving](guide/serving.md#answering-the-refusal-yourself)).
 - **One middleware form.** A middleware is a plain `(ctx, next) => …`
   function: `use(...)`, a route's middlewares, `ws(path, ...)` and
   `route(operation, ...)` take one written inline, and what it passes
@@ -111,6 +106,14 @@ number on it. Every release, with each change it made, is in
   what a client generated from the OpenAPI document never asks.
 
 ## Shipped
+
+### 0.12.0
+
+- **Your own body for a refused proxy request.** `trustProxy({ refusal })`
+  answers the 403 of `untrusted: 'refuse'` and `'refuse-all'` as the app
+  says, a `Response` that must stay a 403, in place of the format's
+  default; it runs before routing, so no middleware sees it
+  ([Serving](guide/serving.md#answering-the-refusal-yourself)).
 
 ### 0.11.0
 

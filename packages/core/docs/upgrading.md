@@ -4,11 +4,27 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
-## Next
+## 0.12.0
 
-The next `@alxia/core` minor lets an app answer the 403 of `trustProxy`'s
-`untrusted: 'refuse'` and `'refuse-all'` itself. Nothing breaks: without the
-new option the body is what it was.
+`@alxia/core` 0.12.0 lets an app answer the 403 of `trustProxy`'s
+`untrusted: 'refuse'` and `'refuse-all'` itself. Nothing in its API breaks:
+without the new option the body is what it was. The peer range of every
+package moves.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [Peers move to `^0.12.0`](#peers-move-to-0120) | every package | yes, for an install that holds a package of 0.11 beside core 0.12: update them together |
+| [Your own body for a refused proxy request](#your-own-body-for-a-refused-proxy-request) | core | no: opt in |
+
+### Peers move to `^0.12.0`
+
+Every package's peer on `@alxia/core` moves from `^0.11.0` to `^0.12.0`,
+which a `^0.11.0` does not accept. Update `@alxia/core` and the `@alxia/*`
+packages you use in one change, each to its release that names core
+`^0.12.0`.
+
+**Can it break your code.** Only the install, as for
+[0.11](#peers-move-to-0110): a package left behind asks for core `^0.11.0`.
 
 ### Your own body for a refused proxy request
 
@@ -32,6 +48,8 @@ The function gets `{ request, url, ip, refusal }` and must answer a
 `Response` with status 403; a throw or another status is the app's 500. The
 refusal comes before routing, so no middleware or hook sees it
 ([Serving](guide/serving.md#answering-the-refusal-yourself)).
+
+**Can it break your code.** No: without `refusal` the body is unchanged.
 
 ## 0.11.0
 

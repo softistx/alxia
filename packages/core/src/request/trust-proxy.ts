@@ -3,18 +3,11 @@
  * the client's address, the scheme and host it asked for — believed only
  * from a connection the one trust definition names.
  */
-import { elementsOf, listOf } from './forwarded-header';
 import { canonicalIp, canonicalOf, type ParsedIp, parseIp } from './ip-address';
-import { hostOf, type Origin, protocolOf } from './origin';
+import type { Origin } from './origin';
+import { fromForwarded, fromLists, NONE } from './proxy-readers';
 import { answering, answerOf, type ProxyRefusalAnswer } from './proxy-refusal';
-import {
-	type ClientAt,
-	clientAt,
-	peerTrusted,
-	type Trust,
-	type TrustedProxies,
-	trustOf,
-} from './trust';
+import { peerTrusted, type TrustedProxies, trustOf } from './trust';
 import { gateOf, type ProxyAllow, type ProxyRefusal } from './untrusted';
 
 export type { ProxyRefusalAnswer, RefusedRequest } from './proxy-refusal';
@@ -108,74 +101,8 @@ export type ProxyTrust = (
 	server: Bun.Server<unknown> | undefined,
 ) => Forwarded;
 
-const NONE: Origin = {};
-
 /** Marks a `ProxyTrust` that refuses every connection but the proxies', which `listen` reads. */
 export const REFUSES_ALL = Symbol.for('alxia.proxy.refusesAll');
-
-type Reader = (
-	headers: Headers,
-	trust: Trust,
-	withOrigin: boolean,
-) => { readonly at: ParsedIp | undefined; readonly origin: Origin };
-
-/** The entry `hops` places from the right, or the leftmost when there are fewer: what the outermost proxy wrote. */
-function written<T>(entries: readonly T[], client: ClientAt): T | undefined {
-	return entries[Math.max(0, entries.length - client.hops)];
-}
-
-/**
- * Whether the entries show the request came through the proxies: under a
- * hop count, which checks no connection, only when the entry it names is
- * an address — fewer entries than hops, or one no proxy would write, is a
- * request that may have bypassed them, whose scheme and host are then not
- * read, as its address is not. Ranges and a function checked the peer.
- */
-function passed(
-	trust: Trust,
-	entries: readonly (ParsedIp | undefined)[],
-	client: ClientAt,
-): boolean {
-	return !('hops' in trust) || entries[client.at] !== undefined;
-}
-
-function originOf(proto: string | undefined, host: string | undefined) {
-	const protocol = protocolOf(proto);
-	const name = hostOf(host);
-	return {
-		...(protocol === undefined ? {} : { protocol }),
-		...(name === undefined ? {} : { host: name }),
-	};
-}
-
-/** `Forwarded`: one element per hop, its `for`, `proto` and `host` together. */
-const fromForwarded: Reader = (headers, trust, withOrigin) => {
-	const elements = elementsOf(headers.get('forwarded'));
-	const entries = elements.map((element) =>
-		element.for === undefined ? undefined : parseIp(element.for),
-	);
-	const client = clientAt(trust, entries);
-	if (!withOrigin || !passed(trust, entries, client))
-		return { at: entries[client.at], origin: NONE };
-	const params = written(elements, client)?.params;
-	return {
-		at: entries[client.at],
-		origin: originOf(params?.get('proto'), params?.get('host')),
-	};
-};
-
-/** `X-Forwarded-For`, or another list of addresses, and `X-Forwarded-Proto` and `X-Forwarded-Host`. */
-function fromLists(header: string): Reader {
-	return (headers, trust, withOrigin) => {
-		const entries = listOf(headers.get(header)).map(parseIp);
-		const client = clientAt(trust, entries);
-		if (!withOrigin || !passed(trust, entries, client))
-			return { at: entries[client.at], origin: NONE };
-		const proto = written(listOf(headers.get('x-forwarded-proto')), client);
-		const host = written(listOf(headers.get('x-forwarded-host')), client);
-		return { at: entries[client.at], origin: originOf(proto, host) };
-	};
-}
 
 /** The options `proxyReader` reads, whichever of `trustProxy`'s forms gave them. */
 type ReaderOptions = Omit<TrustProxyOptions, 'untrusted' | 'allow'> & {
