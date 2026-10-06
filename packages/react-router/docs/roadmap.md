@@ -48,7 +48,7 @@ Nothing scheduled yet.
 
 ## Shipped
 
-### Next
+### 0.8.0
 
 - **`withAlxia(fn)`.** A loader, an action or a middleware given `alxia`,
   typed by `Register`, under the generated `Route.LoaderArgs`, with the
