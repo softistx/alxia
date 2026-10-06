@@ -543,7 +543,8 @@ RSA key whose modulus is outside 2048 to 8192 bits, or with an even or
 trivial exponent, an Ed25519 key that is not 32 bytes or is a point of
 small order (with which a signature anyone can make verifies), an EC key
 whose coordinates are not its curve's size (32, 48 or 66 bytes for P-256,
-P-384 or P-521, leading zeros kept), or a key whose `n`, `e`, `x` or
+P-384 or P-521, leading zeros kept), an EC key whose `crv` is none of those
+curves (an unknown name, or a member such as `constructor`), or a key whose `n`, `e`, `x` or
 `y` is not strict, unpadded base64url.
 
 **Why:** the token was signed by a key this issuer does not publish: another

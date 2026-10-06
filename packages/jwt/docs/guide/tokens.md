@@ -126,7 +126,7 @@ in this order, and stops at the first failure:
 
 | `reason` | The token… |
 | --- | --- |
-| `malformed` | is not three base64url parts, or its header or payload is not JSON, or its header is not an object (`null`, an array, a number, a string or a boolean), or its payload is not an object, or its header has `crit` |
+| `malformed` | is not three base64url parts, or its header or payload is not JSON, or its header is not an object (`null`, an array, a number, a string or a boolean), or its payload is not an object, or its header has `crit`, or its signature is not in its one canonical base64url spelling (a dropped trailing character or unused bits set in the last one) |
 | `algorithm` | names another `alg` than the one configured — `none` included |
 | `signature` | was not signed by this secret or key, or was altered, or its signature is not one the key could produce (the wrong length) |
 | `expired` | has an `exp` at or before now − `clockTolerance` |

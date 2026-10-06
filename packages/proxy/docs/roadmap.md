@@ -33,6 +33,10 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### 0.4.2
+
+- **The public port upstream.** The `X-Forwarded-Host` the proxy sends carries the client's port when a trusted proxy in front sent `X-Forwarded-Port`, read through core's `originalUrl(ctx)`.
+
 ### 0.4.0
 
 - **Several upstreams behind one proxy.** `proxy()`, `proxy.mount()` and

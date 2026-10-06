@@ -7,10 +7,6 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Comments on a stream.** A handler yields `sseComment('text')` between its
-  events: a `: text` line, one per line of the text, beside the keep-alive
-  the stream already sends while idle, on any stream and never checked by
-  its schema ([Server-sent events](guide/server-sent-events.md#comments)).
 - **One middleware form.** A middleware is a plain `(ctx, next) => …`
   function: `use(...)`, a route's middlewares, `ws(path, ...)` and
   `route(operation, ...)` take one written inline, and what it passes
@@ -107,8 +103,12 @@ number on it. Every release, with each change it made, is in
 
 ## Shipped
 
-### Next
+### 0.13.0
 
+- **A comment on an event stream.** `yield sseComment('connected')` writes
+  a `:` line between a stream's events, on a named or an unnamed stream,
+  never checked by its schema ([Server-sent
+  events](guide/server-sent-events.md#comments)).
 - **`X-Forwarded-Port`.** `originalUrl(ctx)` reads the port a trusted proxy
   names apart from its host, from the same hop as the scheme and host.
 
