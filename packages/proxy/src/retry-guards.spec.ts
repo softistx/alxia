@@ -10,7 +10,10 @@ function stubPool(n: number): Pool {
 	return {
 		plans,
 		retries: n - 1,
-		pick: (tried) => plans.findIndex((_, i) => !tried.has(i)),
+		pick: (tried) => {
+			const index = plans.findIndex((_, i) => !tried.has(i));
+			return index === -1 ? undefined : index;
+		},
 		failed: () => {},
 		reached: () => {},
 	};
