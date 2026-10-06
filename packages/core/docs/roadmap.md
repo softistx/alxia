@@ -50,7 +50,7 @@ Nothing in progress.
 
 ## Shipped
 
-### Next
+### 0.14.2
 
 - **`ctx.server`, documented.** The `Bun.Server` serving the request, or
   `undefined` without one: `publish` to the app's sockets from any route,

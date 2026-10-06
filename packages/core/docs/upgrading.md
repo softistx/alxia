@@ -4,10 +4,10 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
-## Next
+## 0.14.2
 
-`@alxia/core` documents `ctx.server`, the `Bun.Server` serving the request,
-which every context has always held. The next `@alxia/react-router` minor
+`@alxia/core` 0.14.2 documents `ctx.server`, the `Bun.Server` serving the request,
+which every context has always held. `@alxia/react-router` 0.8.0
 gives a loader's `alxiaOf(context).server` a server under `react-router dev`
 and `vite preview`, and adds `withAlxia(fn)`, a loader given `alxia` under the generated
 `Route.LoaderArgs`, and `context.alxia`, a shorthand for `alxiaOf(context)`.
