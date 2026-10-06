@@ -1,5 +1,15 @@
 # @alxia/core
 
+## 0.14.0
+
+### Minor Changes
+
+- [#215](https://github.com/softistx/alxia/pull/215) [`3ed7f8e`](https://github.com/softistx/alxia/commit/3ed7f8e7df3dd3e9d97b38e004ee831055ebe163) Thanks [@SteveGT96](https://github.com/SteveGT96)! - An `onStop` hook is given the server that stopped, the one `onStart` was given, or `undefined` on a `stop()` of an app that never listened, which runs the hooks too. A hook forks of one base share can now tell which app stopped and whether it had started, and release a shared resource when the last app serving stops. A hook written as an arrow or a function that takes no argument runs as before. A function passed by reference whose first parameter is optional (`onStop(sql.end)`) no longer compiles; wrap it, `onStop(() => sql.end())`. A hook that takes the server must accept `undefined`.
+
+### Patch Changes
+
+- [#218](https://github.com/softistx/alxia/pull/218) [`71411e2`](https://github.com/softistx/alxia/commit/71411e26dd0d729bf16e10be6f43b1fa6726f6c8) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Upgrading names 0.14.0: `onStop` is given the server that stopped (with its one compile break, `onStop(sql.end)`), `@alxia/redis` closes its handle with the last fork serving, and the peers move to `^0.14.0`. The roadmap lists 0.14.0 as shipped.
+
 ## 0.13.0
 
 ### Minor Changes
