@@ -7,8 +7,8 @@ import {
 } from './jwk';
 import { keySource } from './jwks/cache';
 import { keyUrl } from './jwks/url';
-import { signatureFits } from './signature';
 import type { JwksJwt, JwksOptions, VerifyResult } from './jwt';
+import { signatureFits } from './signature';
 import { checkClaims, decodeToken, fail } from './token';
 
 const encoder = new TextEncoder();

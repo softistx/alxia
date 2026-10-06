@@ -128,6 +128,10 @@ describe('ES512 from a JWKS', () => {
 				refused('key'),
 			);
 		}
+		// A curve named after an inherited member has no size, not Object's.
+		for (const crv of ['constructor', '__proto__', 'toString']) {
+			expect(ecFits(published(es512, { crv }) as Jwk)).toBe(false);
+		}
 	});
 
 	test('use and key_ops are honoured as for the other EC keys', async () => {

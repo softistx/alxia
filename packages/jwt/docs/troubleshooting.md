@@ -397,6 +397,9 @@ app.use(bearer({ jwt, cookie: 'token' }));
 **When:** the token is not three base64url parts separated by dots, its
 header or payload is not JSON, its header is not an object (`null`, an
 array, a number, a string or a boolean), or its payload is not an object.
+The signature must be in its one canonical base64url spelling, without
+padding: a trailing character a lenient decoder would drop, or unused bits
+set in the last one, would let one token be written several ways.
 Every verifier, by a secret, a key pair, `jwks` or `discovery`, also
 refuses a header with a `crit` member, which names extensions it must
 understand: it implements none (RFC 7515, section 4.1.11).

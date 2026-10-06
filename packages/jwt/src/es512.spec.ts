@@ -76,6 +76,29 @@ describe('ES512 with a key pair', () => {
 		}
 	});
 
+	test('a signature spelled any way but its one canonical base64url is malformed', async () => {
+		const token = await jwt.sign({ sub: 'ada' });
+		// 132 bytes are exactly 176 characters: a 177th would be dropped by a lenient decoder.
+		for (const extra of ['A', 'B', '_']) {
+			expect(await jwt.verify(`${token}${extra}`)).toEqual(
+				refused('malformed'),
+			);
+		}
+		// 64 bytes leave 4 unused bits in the last of 86 characters.
+		const es256 = createJwt({ algorithm: 'ES256', ...p256 });
+		const short = await es256.sign({ sub: 'ada' });
+		const alphabet =
+			'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_';
+		const last = alphabet.indexOf(short.at(-1) as string);
+		const respelled = `${short.slice(0, -1)}${alphabet[last ^ 1]}`;
+		const bytes = (t: string) =>
+			Buffer.from(t.split('.')[2] as string, 'base64url');
+		expect(bytes(respelled)).toEqual(bytes(short));
+		expect(await es256.verify(respelled)).toEqual(refused('malformed'));
+		expect((await es256.verify(short)).ok).toBe(true);
+		expect((await jwt.verify(token)).ok).toBe(true);
+	});
+
 	test('a DER signature by the same key is refused', async () => {
 		const token = await jwt.sign({ sub: 'ada' });
 		const input = token.split('.').slice(0, 2).join('.');

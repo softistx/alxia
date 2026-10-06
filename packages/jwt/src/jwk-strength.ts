@@ -100,7 +100,10 @@ const EC_SIZES: Record<string, number> = {
 
 /** An EC key whose `x` and `y` are strict base64url of its curve's size; Web Crypto checks the point is on it. */
 export function ecFits(jwk: Jwk): boolean {
-	const size = typeof jwk.crv === 'string' ? EC_SIZES[jwk.crv] : undefined;
+	const size =
+		typeof jwk.crv === 'string' && Object.hasOwn(EC_SIZES, jwk.crv)
+			? EC_SIZES[jwk.crv]
+			: undefined;
 	return (
 		size !== undefined &&
 		strictBytes(jwk['x'])?.length === size &&

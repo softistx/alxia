@@ -74,6 +74,8 @@ export function decodeToken(token: string): Decoded | undefined {
 	} catch {
 		return undefined;
 	}
+	// One signature, one spelling: unused trailing bits would let a token be respelled.
+	if (base64url(signed) !== signature) return undefined;
 	if (!isObject(claims) || !isObject(header)) return undefined;
 	return {
 		header,
