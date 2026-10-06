@@ -33,7 +33,7 @@ Nothing scheduled yet.
 
 ## Shipped
 
-### Next release
+### 0.4.0
 
 - **Several upstreams behind one proxy.** `proxy()`, `proxy.mount()` and
   `proxy.ws()` take a list of targets where they took one, each checked as
