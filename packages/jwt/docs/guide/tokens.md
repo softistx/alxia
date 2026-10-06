@@ -36,7 +36,7 @@ interface Jwt {
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `algorithm` | `'HS256' \| 'HS384' \| 'HS512'` with `secret`; `'ES256' \| 'ES384' \| 'RS256' \| 'RS384' \| 'RS512' \| 'EdDSA'` with keys | `'HS256'` | The only algorithm signed and accepted. A key algorithm must be named. |
+| `algorithm` | `'HS256' \| 'HS384' \| 'HS512'` with `secret`; `'ES256' \| 'ES384' \| 'ES512' \| 'RS256' \| 'RS384' \| 'RS512' \| 'EdDSA'` with keys | `'HS256'` | The only algorithm signed and accepted. A key algorithm must be named. |
 | `secret` | `string \| Uint8Array` | — | The HMAC secret, at least 32 bytes. Strings are read as UTF-8. |
 | `privateKey` | `CryptoKey` | — | Signs. Leave it out on a service that only verifies. |
 | `publicKey` | `CryptoKey` | — | Verifies. Required with a key algorithm. |

@@ -1,7 +1,7 @@
 # @alxia/jwt
 
 JSON Web Tokens for [alxia](https://www.npmjs.com/package/@alxia/core), on
-Web Crypto, with no dependency: HS256/384/512 with a secret, ES256/384,
+Web Crypto, with no dependency: HS256/384/512 with a secret, ES256/384/512,
 RS256/384/512 and EdDSA with a key pair, tokens from an identity provider's
 JWKS (Keycloak, Auth0, Ory, Cognito), and a typed bearer guard, a middleware.
 
@@ -27,7 +27,17 @@ The algorithm is fixed by the options, never read from the token: `alg:
 none` and algorithm confusion are refused. A secret holds at least 32 bytes.
 With a key pair, a verifier needs only the public key, and `createJwt`
 refuses at once a key that does not fit the algorithm (a P-384 key under
-`ES256`), so a wrong key fails at startup.
+`ES256`, a P-256 one under `ES512`), so a wrong key fails at startup. An
+ECDSA signature must be the JWS `r‖s` of its curve — 64, 96 or 132 bytes
+for `ES256`, `ES384`, `ES512` — and a DER one is refused as `signature`.
+
+| Algorithm | Key | Options |
+| --- | --- | --- |
+| `HS256` (default), `HS384`, `HS512` | a secret of at least 32 bytes | `secret` |
+| `ES256`, `ES384`, `ES512` | ECDSA P-256, P-384, P-521 | `publicKey`, `privateKey?` |
+| `RS256`, `RS384`, `RS512` | RSASSA-PKCS1-v1_5, SHA-256 / 384 / 512 | `publicKey`, `privateKey?` |
+| `EdDSA` | Ed25519 | `publicKey`, `privateKey?` |
+| `PS256`, `PS384`, `PS512` | RSA-PSS, from a JWKS only | `jwks` or `discovery` |
 
 ## An identity provider's tokens
 
@@ -39,7 +49,7 @@ const jwt = createJwt({ discovery: 'https://idp.example.com/realms/acme', audien
 ```
 
 Verifies by the token's `kid` against the keys the provider publishes, with
-Web Crypto: `RS256/384/512`, `PS256/384/512`, `ES256/384`, `EdDSA`. An unknown
+Web Crypto: `RS256/384/512`, `PS256/384/512`, `ES256/384/512`, `EdDSA`. An unknown
 `kid` refetches once (at most every `refetchMs`, 30 s), the set is cached for
 `Cache-Control: max-age` or `cacheMs` (10 min) and kept `staleMs` (a day)
 past its lifetime if the provider is down; with nothing cached the guard fails

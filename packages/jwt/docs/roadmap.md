@@ -12,9 +12,16 @@ number on it. Every release, with each change it made, is in
   Cognito by the keys they publish: found by `kid`, cached by
   `Cache-Control` or `cacheMs`, refetched once on an unknown `kid` (never
   more often than `refetchMs`), kept through an outage for `staleMs`, failing
-  closed otherwise. `RS*`, `PS*`, `ES256`, `ES384` and `EdDSA`; `alg: none`,
+  closed otherwise. `RS*`, `PS*`, `ES256`, `ES384`, `ES512` and `EdDSA`; `alg: none`,
   `HS*` and an algorithm the key's type does not allow are refused
   ([guide](guide/jwks.md)).
+- **`ES512`.** ECDSA on P-521 with SHA-512, to sign and verify with a key
+  pair and to verify from a JWKS (an EC key of `crv: P-521`). A key of
+  another curve is refused both ways — a P-256 key under `ES512`, a P-521
+  one under `ES256` — a JWK whose `x` or `y` is not 66 bytes is refused as
+  `key`, and an ECDSA signature that is not its curve's `r‖s` (132 bytes
+  for `ES512`; 64 and 96 for `ES256` and `ES384`), DER included, as
+  `signature` ([guide](guide/algorithms-and-keys.md#ecdsa-signatures)).
 - **`bearer` as a middleware.** `app.use(bearer({ jwt }))` is the form;
   `app.plugin(bearer(…))`, deprecated in 0.4, was removed in 0.5. Given to the app, the guard
   also refuses a request no route matches, before its 404, and `Bearer<Schema>`
@@ -27,7 +34,7 @@ number on it. Every release, with each change it made, is in
 
 ## Next
 
-- **`ES512`**, once Web Crypto's P-521 is worth a test matrix of its own.
+Nothing scheduled yet.
 
 ## Later
 

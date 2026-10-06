@@ -12,6 +12,7 @@ export type HmacAlgorithm = 'HS256' | 'HS384' | 'HS512';
 export type KeyAlgorithm =
 	| 'ES256'
 	| 'ES384'
+	| 'ES512'
 	| 'RS256'
 	| 'RS384'
 	| 'RS512'

@@ -10,6 +10,7 @@ export type JwksAlgorithm =
 	| 'PS512'
 	| 'ES256'
 	| 'ES384'
+	| 'ES512'
 	| 'EdDSA';
 
 export const JWKS_ALGORITHMS: readonly JwksAlgorithm[] = [
@@ -21,6 +22,7 @@ export const JWKS_ALGORITHMS: readonly JwksAlgorithm[] = [
 	'PS512',
 	'ES256',
 	'ES384',
+	'ES512',
 	'EdDSA',
 ];
 
@@ -67,6 +69,7 @@ const SPECS: Record<JwksAlgorithm, Spec> = {
 	PS512: rsa('RSA-PSS', 'SHA-512', 512),
 	ES256: ec('P-256', 'SHA-256'),
 	ES384: ec('P-384', 'SHA-384'),
+	ES512: ec('P-521', 'SHA-512'),
 	EdDSA: {
 		kty: 'OKP',
 		crv: 'Ed25519',

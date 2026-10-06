@@ -33,7 +33,7 @@ imported with Web Crypto.
 | `staleMs` | `86_400_000` | how long a set past its lifetime stays usable while the issuer cannot be reached |
 | `refetchMs` | `30_000` | the least time between two fetches, failures included |
 | `timeoutMs` | `5_000` | how long a fetch may take |
-| `algorithms` | all nine | the algorithms accepted: `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384`, `EdDSA` |
+| `algorithms` | all ten | the algorithms accepted: `RS256`, `RS384`, `RS512`, `PS256`, `PS384`, `PS512`, `ES256`, `ES384`, `ES512`, `EdDSA` |
 
 `createJwt({ discovery })` is the shortest form for a provider that
 publishes an OpenID configuration:
@@ -50,16 +50,19 @@ accepted: have the provider put one in, or check it in a schema.
 ## How a token is checked
 
 1. The token's header gives `alg` and `kid`. The `alg` must be one of the
-   nine above (and of `algorithms`, if given): `none` and every `HS*` are
+   ten above (and of `algorithms`, if given): `none` and every `HS*` are
    refused with `reason: 'algorithm'`.
 2. The key is the set's, by `kid`. Without a `kid`, the one key that fits
    the algorithm, if there is exactly one.
 3. The key's kind must fit the algorithm: an RSA key verifies `RS*` and
-   `PS*`, an EC key `ES256` (P-256) and `ES384` (P-384), an Ed25519 key
-   `EdDSA`. A key with a `use` other than `sig`, with a `key_ops` that is
+   `PS*`, an EC key `ES256` (P-256), `ES384` (P-384) and `ES512` (P-521), by
+   its `crv`, an Ed25519 key `EdDSA`. A set of several curves is fine:
+   each token is checked by the key of its own curve. A key with a `use` other than `sig`, with a `key_ops` that is
    not an array naming `verify`, or with an `alg` of its own that differs,
    does not fit.
-4. The signature, then `exp`, `nbf`, `iss` and `aud`.
+4. The signature, then `exp`, `nbf`, `iss` and `aud`. An ECDSA signature
+   of another length than its curve's `r‖s` (64, 96 or 132 bytes), a DER
+   one included, is refused as `signature` without reaching Web Crypto.
 
 The token never chooses how it is checked. An attacker who signs an `HS256`
 token with the issuer's RSA public key as the secret is refused at step 1:
@@ -103,7 +106,8 @@ bit), or with an even or trivial exponent; an Ed25519 key whose `x` is not
 exactly 32 bytes, or is a point of small order (the identity, the all-zero
 point, and the rest of libsodium's `has_small_order` list), under which a
 signature anyone can make verifies; an EC key whose `x` and `y` are not
-its curve's size (32 bytes for P-256, 48 for P-384); and any key whose
+its curve's size (32 bytes for P-256, 48 for P-384, 66 for P-521, leading
+zeros kept); and any key whose
 `n`, `e`, `x` or `y` is not strict, unpadded base64url. Only a key's
 public members reach Web Crypto. A `jwks_uri` read from a discovery document must be `https`, unless the
 issuer itself is on localhost. The cache's lifetimes and refetch limit run
