@@ -166,7 +166,7 @@ declaration above:
 import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
 import type { Route } from './+types/home';
 
-export const loader = withAlxia(({ alxia, params }: Route.LoaderArgs & AlxiaArgs) => {
+export const loader = withAlxia(({ alxia }: Route.LoaderArgs & AlxiaArgs) => {
 	alxia.log.info('home'); // typed: what configure built
 	return { name: alxia.user?.name ?? 'anonymous' };
 });

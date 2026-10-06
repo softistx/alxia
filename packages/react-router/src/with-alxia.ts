@@ -39,7 +39,9 @@ export interface AlxiaArgs<
  * on a request that did not come through `reactRouter()`.
  */
 export function withAlxia<
-	Args extends AlxiaArgs<AnyAlxia> & { readonly context: ProviderLike },
+	// `unknown`, not `AlxiaArgs<AnyAlxia>`, whose `alxia` is `any`: an `fn`
+	// left unannotated reads nothing of it.
+	Args extends { readonly alxia: unknown; readonly context: ProviderLike },
 	Rest extends unknown[],
 	Result,
 >(

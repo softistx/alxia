@@ -629,10 +629,10 @@ export const middleware: Route.MiddlewareFunction[] = [
 
 Why a wrapper: `context.alxia` cannot be typed under the generated
 arguments ([below](#the-shorthand-contextalxia)), and a wrapper that adds a
-key is the one form TypeScript infers from the annotation alone. A
-`withAlxia<Route.LoaderArgs>(fn)` type argument would fix `fn`'s return
-type too, since TypeScript infers no type argument once one is given, and
-the page's `loaderData` would be lost. On a request that did not come
+key is the one form TypeScript infers from the annotation alone. A type
+argument, `withAlxia<Route.LoaderArgs>(fn)`, would fix the arguments but
+stop TypeScript inferring `fn`'s return type, since it infers no type
+argument once one is given: the page's `loaderData` would be lost. On a request that did not come
 through alxia it throws what `alxiaOf` throws.
 
 ### With `Register`: no type argument

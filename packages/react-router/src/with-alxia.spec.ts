@@ -87,6 +87,14 @@ describe('withAlxia', () => {
 				// @ts-expect-error: nothing in the fixture's base derives `tenant`
 				return alxia.tenant;
 			});
+			// @ts-expect-error: annotated without AlxiaArgs, fn has no `alxia`
+			withAlxia(({ params }: LoaderFunctionArgs) => params);
+			// @ts-expect-error: the arguments must hold a provider
+			loader({} as Omit<LoaderFunctionArgs, 'context'>);
+			withAlxia(({ alxia }) => {
+				// @ts-expect-error: unannotated, `alxia` is unknown, not any
+				return alxia.user;
+			});
 			return result;
 		};
 		expect(typed).toBeFunction();
