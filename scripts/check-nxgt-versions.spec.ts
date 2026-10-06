@@ -84,18 +84,21 @@ describe('read', () => {
 		const packages: Tracked[] = tracked(found, lockPackages);
 		expect(packages.map(({ name, dirs }) => [name, dirs])).toEqual([
 			['@nxgt/di', ['packages/di']],
+			['@nxgt/httpyz', ['packages/create']],
 			['@nxgt/i18n', ['packages/i18n', 'packages/janus']],
 			['@nxgt/janus', ['packages/janus']],
 			['@nxgt/openapi-codegen', ['packages/create']],
+			['@nxgt/openapi-httpyz', ['packages/create']],
 			['@nxgt/redis', ['packages/redis']],
 			// @alxia/graphql's is a devDependency, for its observed-socket spec.
 			['@nxgt/telemetry', ['packages/graphql', 'packages/telemetry']],
 		]);
 		for (const one of packages) {
 			expect(one.locked.length).toBeGreaterThan(0);
-			// The generator the api template pins is @alxia/create's tool, no peer.
+			// The api template's generator and test client are @alxia/create's
+			// tools, no peer.
 			expect(one.peers.length).toBe(
-				one.name === '@nxgt/openapi-codegen' ? 0 : 1,
+				one.dirs.includes('packages/create') ? 0 : 1,
 			);
 		}
 	});
