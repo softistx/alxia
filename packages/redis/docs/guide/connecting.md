@@ -183,10 +183,16 @@ the context; `caches` is the handle's own `cache` scope, typed by each schema.
 
 **Closing.** `redis(handle)` closes the handle in core's `onStop`, once, after
 the requests in flight drained, so `listen`'s graceful shutdown ends with the
-connection closed. Opt out with `redis(handle, { close: false })` when
-something else owns the handle. The stores and `idempotency` never close it;
-an app that does not mount `redis(handle)` closes the handle itself. A
-`client` that `defineRedis` was given is never closed by `@nxgt/redis`.
+connection closed. Forks of one app (`app.fork()`) share the hook and each
+runs it once of its own, so it counts the servers that started: the handle is
+closed when the last one serving stops, not by the first, and a fork that never
+listened and is stopped while a sibling serves leaves it open. A `stop()`
+before `listen` closes the handle only while no app serves it: one app that
+never listened closes it, as it always did. Opt out with
+`redis(handle, { close: false })` when something else owns the handle. The
+stores and `idempotency` never close it; an app that does not mount
+`redis(handle)` closes the handle itself. A `client` that `defineRedis` was
+given is never closed by `@nxgt/redis`.
 
 **Health.** `redisCheck(handle)` is a check for `health({ checks })`: it
 passes while every instance answers a `PING` and is down when one does not;
