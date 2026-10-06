@@ -105,6 +105,11 @@ number on it. Every release, with each change it made, is in
 
 ## Shipped
 
+### Next
+
+- **`X-Forwarded-Port`.** `originalUrl(ctx)` reads the port a trusted proxy
+  names apart from its host, from the same hop as the scheme and host.
+
 ### 0.12.0
 
 - **Your own body for a refused proxy request.** `trustProxy({ refusal })`

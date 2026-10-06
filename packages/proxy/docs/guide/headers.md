@@ -69,7 +69,8 @@ const app = alxia()
 The upstream gets its own host. `preserveHost: true` sends the client's, for
 an upstream that serves virtual hosts. `X-Forwarded-Host` carries the client's
 host in both cases. Behind `alxia({ proxy: trustProxy(…) })`, "the client's" is
-what the trusted proxy said (core's `originalUrl(ctx)`), so a chain stays truthful.
+what the trusted proxy said (core's `originalUrl(ctx)`), so a chain stays truthful. The client's port, if any, is part of
+`X-Forwarded-Host`; `X-Forwarded-Port` is not sent.
 
 ## Forwarding headers
 

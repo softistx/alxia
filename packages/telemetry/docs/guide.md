@@ -242,7 +242,7 @@ await app.request('/range'); // 400; the span is ok, with no exception: the midd
 | `url.path` | `URL_PATH` | `/orders/o-1` | always |
 | `url.scheme` | `URL_SCHEME` | `http`; `https` behind a trusted TLS proxy | always |
 | `server.address` | `SERVER_ADDRESS` | the host name the client asked for | always |
-| `server.port` | `SERVER_PORT` | `3000`, a number | when that host names a port |
+| `server.port` | `SERVER_PORT` | `3000`, a number | when the URL the client asked for names a port: the host's own, or a trusted proxy's `X-Forwarded-Port` |
 | `client.address` | `CLIENT_ADDRESS` | the caller's address, as the app's `ip` option reads it | when there is one: not through `app.request` |
 | `http.route` | `HTTP_ROUTE` | `/orders/:id` | once routing matched |
 | `http.response.status_code` | `HTTP_STATUS` | `200`, a number | always |

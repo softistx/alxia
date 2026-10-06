@@ -38,7 +38,9 @@ carrying `X-Forwarded-Host`.
 
 **Can it break your code.** Only where a proxy sends a port that is not the
 public one (a proxy that writes its internal listening port): have it send
-the public port, or stop sending the header.
+the public port, or stop sending the header. And where a proxy sets `X-Forwarded-Proto` and `-Host` but not
+`X-Forwarded-Port`, the client's own header is now believed: overwrite it at
+the edge, or strip it.
 
 ## 0.12.0
 

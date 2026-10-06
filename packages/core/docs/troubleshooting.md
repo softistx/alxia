@@ -2220,7 +2220,7 @@ alxia({ proxy: trustProxy({ trusted: 1 }) });
 
 **Why:** the scheme and host are read only from a trusted connection, and only when valid: the app has no `proxy` option (`ip: forwardedIp(…)` reads the address alone), the connection is not one `trusted` names, the proxy does not send `X-Forwarded-Proto` and `X-Forwarded-Host` (or `Forwarded` with `header: 'forwarded'`), or what it sends is not `http`, `https` or a bare `host[:port]`; under a hop count, the address header has fewer entries than hops, or a malformed one where the client stands. With the scheme forwarded and not the host, the request's host and port stay: `https://10.0.0.5:3000/…`. The port is the one in the forwarded host, or `X-Forwarded-Port` when the host names none and only beside a forwarded host; a port that is not digits from 1 to 65535 is ignored, and the scheme's default (443, 80) is left out. `ctx.url` is never rewritten: read `originalUrl(ctx)`.
 
-**Fix:** declare the proxies with `proxy`, and have the outermost proxy overwrite both headers (nginx: `proxy_set_header X-Forwarded-Proto $scheme;` and `proxy_set_header X-Forwarded-Host $host;`):
+**Fix:** declare the proxies with `proxy`, and have the outermost proxy overwrite both headers (nginx: `proxy_set_header X-Forwarded-Proto $scheme;` and `proxy_set_header X-Forwarded-Host $host;`), and `X-Forwarded-Port` (`$server_port`, the public one) when the host names no port; a `:3000` in `originalUrl(ctx)` is a proxy sending its internal port:
 
 ```ts
 alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) });

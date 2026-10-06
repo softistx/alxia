@@ -284,7 +284,7 @@ the connection's. A `Forwarded` element whose `for=` is an obfuscated
 identifier (`_hidden`, `unknown`) counts as no address there: name the
 proxies by range to read its `proto=` and `host=`.
 
-**What is valid.** The scheme is `http` or `https`, in any case; the host
+**What is valid.** (The port has [its own rules](#the-port).) The scheme is `http` or `https`, in any case; the host
 is a bare `host[:port]` — a name, an IPv4 address, or an IPv6 address in
 brackets, and a port from 1 to 65535. Anything else — `ftp`, a path
 (`example.com/x`), userinfo (`user@example.com`), a query, a space, a name
