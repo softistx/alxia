@@ -209,6 +209,8 @@ stream, and `schema['~events']` holds its schemas by name, for a tool reading
   release there what it holds. An event it was still producing is dropped,
   and nothing is logged, unless the generator itself throws: that error is
   still logged.
+- A comment the handler yields is its `: text` lines and a blank line
+  ([Comments](#comments)).
 - When the generator returns, the stream ends.
 
 ```ts
@@ -226,6 +228,43 @@ app.get('/orders/:id/status', responds({ 200: eventStream(Status) }), ({ params,
 	),
 );
 ```
+
+## Comments
+
+A handler may yield a comment between its events with `sseComment(text)`:
+a line starting with `:`, which an `EventSource` reads and drops. It is how
+a stream carries a debug marker, padding against a proxy that buffers, or a
+heartbeat of the app's own.
+
+```ts
+import { sseComment } from '@alxia/core';
+
+app.get('/ticks', responds({ 200: eventStream(Tick) }), ({ reply }) =>
+	reply(
+		200,
+		(async function* () {
+			yield sseComment('connected');
+			yield { n: 1 };
+		})(),
+	),
+);
+// : connected
+//
+// data: {"n":1}
+```
+
+- It is yielded beside the events of any stream, named or not, and with no
+  schema at all; the schema never checks it, and the types accept it.
+- Text on several lines is several `:` lines in one block:
+  `sseComment('a\nb')` is `: a`, `: b`. A line break of any kind (`\n`,
+  `\r`, `\r\n`) starts a new `:` line, so nothing in a comment can end the
+  block or start a field: `sseComment('x\n\ndata: y')` is three comment
+  lines, never an event.
+- It is written by the writer of the keep-alive, which is unchanged: `:
+  keep-alive` every eight seconds while the stream is idle.
+- A comment does not reset the keep-alive timer; it is only a line the
+  client skips.
+- It is not an event: no `id:` moves the client's last event id.
 
 ## Errors
 

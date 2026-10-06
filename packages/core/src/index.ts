@@ -103,6 +103,7 @@ export type {
 	StandardSchemaV1,
 } from './schema/standard-schema';
 export { type Checked, check } from './schema/standard-schema';
+export { type SseComment, sseComment } from './sse/comment';
 export {
 	type EventStreamSchema,
 	eventStream,

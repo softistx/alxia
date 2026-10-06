@@ -3,6 +3,7 @@
  * `id:` and `retry:` fields, then its data as JSON on `data:` lines.
  */
 import type { ValidationIssue } from '../errors/errors';
+import { commentText, SseComment } from './comment';
 
 /**
  * An event with fields of its own, as a named stream's validator gives it
@@ -30,10 +31,12 @@ export class Frame {
 }
 
 /**
- * `value` as the text of one event: a `Frame`'s fields, then its data, each
+ * `value` as the text of one event, or of a comment when it is an
+ * `SseComment`: a `Frame`'s fields, then its data, each
  * line of it on a `data:` line of its own, and the blank line ending it.
  */
 export function frameText(value: unknown): string {
+	if (value instanceof SseComment) return commentText(value);
 	const lines: string[] = [];
 	let data = value;
 	if (value instanceof Frame) {

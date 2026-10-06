@@ -15,11 +15,11 @@
     "examples/react-router": {
       "name": "react-router-example",
       "dependencies": {
-        "@alxia/compress": "^0.3.6",
-        "@alxia/core": "^0.11.0",
-        "@alxia/logger": "^0.6.3",
-        "@alxia/react-router": "^0.7.2",
-        "@alxia/secure-headers": "^0.4.6",
+        "@alxia/compress": "^0.3.7",
+        "@alxia/core": "^0.12.0",
+        "@alxia/logger": "^0.6.4",
+        "@alxia/react-router": "^0.7.3",
+        "@alxia/secure-headers": "^0.4.7",
         "@react-router/node": "^8.4.0",
         "@react-router/serve": "^8.4.0",
         "isbot": "^5.2.2",

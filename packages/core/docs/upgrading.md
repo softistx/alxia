@@ -4,6 +4,28 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
+## Next
+
+The next `@alxia/core` minor lets a handler yield a comment on an event
+stream. Nothing breaks: a stream that yields none is written as before.
+
+### Comments on a stream
+
+Before, a stream wrote events and its own `: keep-alive` while idle; a
+handler had no way to send a comment line. Now:
+
+```ts
+import { sseComment } from '@alxia/core';
+
+yield sseComment('connected'); // : connected
+yield { n: 1 };                // data: {"n":1}
+```
+
+A comment is never checked by the stream's schema, and a named stream takes
+it as well. Text on several lines is several `:` lines, and a line break
+cannot end the comment and start an event
+([Server-sent events](guide/server-sent-events.md#comments)).
+
 ## 0.12.0
 
 `@alxia/core` 0.12.0 lets an app answer the 403 of `trustProxy`'s
