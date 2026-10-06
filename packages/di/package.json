@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/di",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Dependency injection for alxia on @nxgt/di: a lazy Scope per request, disposed when it ends, and typed values exposed to the routes that read them",
 	"license": "MIT",
 	"type": "module",

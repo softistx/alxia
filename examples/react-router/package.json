@@ -11,7 +11,7 @@
   },
   "dependencies": {
     "@alxia/compress": "^0.3.9",
-    "@alxia/core": "^0.14.0",
+    "@alxia/core": "^0.14.1",
     "@alxia/logger": "^0.6.6",
     "@alxia/react-router": "^0.7.5",
     "@alxia/secure-headers": "^0.4.9",

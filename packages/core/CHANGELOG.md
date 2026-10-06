@@ -1,5 +1,13 @@
 # @alxia/core
 
+## 0.14.1
+
+### Patch Changes
+
+- [#227](https://github.com/softistx/alxia/pull/227) [`12952ed`](https://github.com/softistx/alxia/commit/12952ed6915a9aeb616eca6f7fbf1326bbe995da) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The upgrading guide names 0.14.1 for the `validate({ cookies })` fix.
+
+- [#226](https://github.com/softistx/alxia/pull/226) [`264328d`](https://github.com/softistx/alxia/commit/264328da1f909b8f6320ab8f10fdc9fc174f90ff) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Take, after a `validate({ cookies })` whose output is no `Record<string, string>` (an optional cookie, a coerced one), the shared middlewares that read the cookies as they arrive: one made by `defineMiddleware(fn)` with no context, one typed by `BaseContext`, a guard typed by the keys it requires. They were refused with "`cookies` is in the context with another type than this middleware reads"; a middleware that names a cookies shape of its own is still checked against the schema's output. The guide now says what a middleware reads of its context after `next()`.
+
 ## 0.14.0
 
 ### Minor Changes

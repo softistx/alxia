@@ -80,7 +80,7 @@
     },
     "packages/core": {
       "name": "@alxia/core",
-      "version": "0.14.0",
+      "version": "0.14.1",
       "devDependencies": {
         "@types/bun": "^1.4.2",
         "zod": "^4.1.0",
@@ -128,7 +128,7 @@
     },
     "packages/di": {
       "name": "@alxia/di",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@nxgt/di": "^0.2.0",
@@ -159,7 +159,7 @@
     },
     "packages/graphql": {
       "name": "@alxia/graphql",
-      "version": "0.7.1",
+      "version": "0.8.0",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@alxia/logger": "workspace:^",

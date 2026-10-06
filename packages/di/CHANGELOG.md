@@ -1,5 +1,13 @@
 # @alxia/di
 
+## 0.1.1
+
+### Patch Changes
+
+- [#222](https://github.com/softistx/alxia/pull/222) [`7b59591`](https://github.com/softistx/alxia/commit/7b595910d669cffc46317ccc07a6507cbab25f6d) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The roadmap lists the request Scope, `expose` and `deps.lifecycle` as shipped in 0.1.0.
+- Updated dependencies [[`12952ed`](https://github.com/softistx/alxia/commit/12952ed6915a9aeb616eca6f7fbf1326bbe995da), [`264328d`](https://github.com/softistx/alxia/commit/264328da1f909b8f6320ab8f10fdc9fc174f90ff)]:
+  - @alxia/core@0.14.1
+
 ## 0.1.0
 
 ### Minor Changes

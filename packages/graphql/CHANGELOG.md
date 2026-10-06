@@ -1,5 +1,16 @@
 # @alxia/graphql
 
+## 0.8.0
+
+### Minor Changes
+
+- [#225](https://github.com/softistx/alxia/pull/225) [`dfd7814`](https://github.com/softistx/alxia/commit/dfd7814bba5041f0af7519e3a9efdf9eb5d4189c) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `graphqlClient` from `@alxia/graphql/testing` sends a `GET` and a persisted operation. `method: 'GET'` (per call, or on the client) puts `query`, `operationName` and, as JSON, `variables` and `extensions` in the URL. `persisted` is the hash of a registered operation, sent as `extensions.persistedQuery` (the shape `@graphql-yoga/plugin-persisted-operations` reads by default) with the document or, with `query({ persisted })`, alone, so an app that allows only persisted operations can be tested; `extensions` is sent as given, for an app that reads an id of its own. The client adds no CSRF header: put the app's in `headers`.
+
+### Patch Changes
+
+- Updated dependencies [[`12952ed`](https://github.com/softistx/alxia/commit/12952ed6915a9aeb616eca6f7fbf1326bbe995da), [`264328d`](https://github.com/softistx/alxia/commit/264328da1f909b8f6320ab8f10fdc9fc174f90ff)]:
+  - @alxia/core@0.14.1
+
 ## 0.7.1
 
 ### Patch Changes
