@@ -7,26 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **GraphiQL in dev alone, under a pinned policy.** Without `ide`, a
-  browser gets GraphiQL only while the serving app is in dev
-  (`NODE_ENV=development`, or `alxia({ dev: true })`); `ide: 'graphiql'`
-  serves it everywhere. Its `Content-Security-Policy` allows the one
-  pinned `@graphql-yoga/graphiql` folder it loads from, the Monaco workers
-  included, and no frame ([IDE guide](guide/ide.md)).
-- **Subscriptions drained on shutdown.** When the app starts shutting
-  down — `SIGTERM`, `SIGINT`, `stop()` — a subscription over server-sent
-  events ends, so `@alxia/core`'s drain answers the queries in flight and
-  exits without waiting for it; `health()` probes mount beside the
-  endpoint, and GraphQL errors stay in `errors[]` under core's problem
-  details ([endpoint guide](guide/endpoint.md#errors-health-and-shutdown)).
-- **GraphQL over WebSocket.** `ws: true` serves the endpoint over
-  WebSocket too, with the `graphql-transport-ws` protocol of `graphql-ws`
-  — Apollo Client's and urql's default — beside server-sent events: the
-  upgrade runs the app's middlewares, so a guard refuses the socket and a
-  resolver reads what they added; each operation runs through Yoga's
-  plugins, with the client's `connectionParams` in its context; a
-  shutdown closes the sockets with 1001 and completes their subscriptions
-  ([WebSocket guide](guide/websockets.md)).
+Nothing in progress.
 
 ## Next
 
@@ -59,6 +40,32 @@ Nothing scheduled yet.
 ### 0.5.0
 
 - **The operation, told to the observers.** Each operation the endpoint executes is reported to the middlewares around it: `@alxia/logger` writes `operationName` and `operationType` on the request's line, `@alxia/telemetry` names its span `query GetNotes` with `graphql.operation.name` and `graphql.operation.type`. A batched body is one line and one span, `batch`, with every name ([endpoint guide](guide/endpoint.md#the-operation-in-the-log-and-the-trace)).
+
+### 0.4.0
+
+- **GraphQL over WebSocket.** `ws: true` serves the endpoint over
+  WebSocket too, with the `graphql-transport-ws` protocol of `graphql-ws`
+  — Apollo Client's and urql's default — beside server-sent events: the
+  upgrade runs the app's middlewares, so a guard refuses the socket and a
+  resolver reads what they added; each operation runs through Yoga's
+  plugins, with the client's `connectionParams` in its context; a
+  shutdown closes the sockets with 1001 and completes their subscriptions
+  ([WebSocket guide](guide/websockets.md)).
+
+### 0.3.0
+
+- **GraphiQL in dev alone, under a pinned policy.** Without `ide`, a
+  browser gets GraphiQL only while the serving app is in dev
+  (`NODE_ENV=development`, or `alxia({ dev: true })`); `ide: 'graphiql'`
+  serves it everywhere. Its `Content-Security-Policy` allows the one
+  pinned `@graphql-yoga/graphiql` folder it loads from, the Monaco workers
+  included, and no frame ([IDE guide](guide/ide.md)).
+- **Subscriptions drained on shutdown.** When the app starts shutting
+  down — `SIGTERM`, `SIGINT`, `stop()` — a subscription over server-sent
+  events ends, so `@alxia/core`'s drain answers the queries in flight and
+  exits without waiting for it; `health()` probes mount beside the
+  endpoint, and GraphQL errors stay in `errors[]` under core's problem
+  details ([endpoint guide](guide/endpoint.md#errors-health-and-shutdown)).
 
 ### 0.1.0
 

@@ -7,11 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **A middleware, not a plugin.** `app.use(rateLimit({ limit, windowMs }))` is
-  the form; `app.plugin(rateLimit(…))`, deprecated in 0.4, was removed in 0.5.
-  Given to the
-  app, the limit also counts a request no route matches, and `RateLimit<Requires>`
-  names what `rateLimit()` returns.
+Nothing in progress.
 
 ## Next
 
@@ -41,6 +37,14 @@ Nothing scheduled yet.
   differs from the policy throws at declaration. `@alxia/redis`'s
   `redisStore(handle.limits.api)` is such a store. Every existing form
   works as before.
+
+### 0.3.0
+
+- **A middleware, not a plugin.** `app.use(rateLimit({ limit, windowMs }))` is
+  the form; `app.plugin(rateLimit(…))`, deprecated in 0.4, was removed in 0.5.
+  Given to the
+  app, the limit also counts a request no route matches, and `RateLimit<Requires>`
+  names what `rateLimit()` returns.
 
 ### 0.1.0
 

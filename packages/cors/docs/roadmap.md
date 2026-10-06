@@ -7,10 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **CORS as a middleware.** `app.use(cors(options))`, declared first,
-  answers a preflight to any path before routing's `404` or `405`, and adds
-  the headers to every other response, a `404`'s and an error's included;
-  `app.plugin(cors(options))`, its deprecated alias, was removed in 0.5.
+Nothing in progress.
 
 ## Next
 
@@ -27,6 +24,13 @@ Nothing scheduled yet.
   platform's `Headers` and `Response`.
 
 ## Shipped
+
+### 0.3.0
+
+- **CORS as a middleware.** `app.use(cors(options))`, declared first,
+  answers a preflight to any path before routing's `404` or `405`, and adds
+  the headers to every other response, a `404`'s and an error's included;
+  `app.plugin(cors(options))`, its deprecated alias, was removed in 0.5.
 
 ### 0.1.0
 

@@ -7,9 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Compression as a middleware.** `app.use(compress())` compresses every
-  response that comes back through it, a 404's and an error's included;
-  `app.plugin(compress())`, its deprecated alias, was removed in 0.5.
+Nothing in progress.
 
 ## Next
 
@@ -28,6 +26,12 @@ Nothing scheduled yet.
   audit or update.
 
 ## Shipped
+
+### 0.3.0
+
+- **Compression as a middleware.** `app.use(compress())` compresses every
+  response that comes back through it, a 404's and an error's included;
+  `app.plugin(compress())`, its deprecated alias, was removed in 0.5.
 
 ### 0.1.0
 
