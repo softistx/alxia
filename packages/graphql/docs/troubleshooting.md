@@ -28,6 +28,8 @@ symptom.
 **Responses**
 
 - [`200 {"errors":[{"message":"Unexpected error.", … "code":"INTERNAL_SERVER_ERROR"}}]}`](#200-errorsmessageunexpected-error--codeinternal_server_error)
+- [`403 Required CSRF header(s) not present` from the test client](#403-required-csrf-headers-not-present-from-the-test-client)
+- [`PersistedQueryNotFound` or `PersistedQueryOnly`](#persistedquerynotfound-or-persistedqueryonly)
 - [`405 {"error":"method_not_allowed"}` on `OPTIONS /graphql`](#405-errormethod_not_allowed-on-options-graphql)
 - [`405 {"errors":[{"message":"Can only perform a mutation operation from a POST request."}]}`](#405-errorsmessagecan-only-perform-a-mutation-operation-from-a-post-request)
 - [`406` with an empty body](#406-with-an-empty-body)
@@ -308,6 +310,36 @@ alxia()
 	.bodyLimit(512 * 1024) // before graphql(...)
 	.plugin((app) => graphql(app, { schema }));
 ```
+
+### `403 Required CSRF header(s) not present` from the test client
+
+**When:** `graphqlClient(app).query(…, { method: 'GET' })` on an app with
+Yoga's `useCSRFPrevention`.
+
+**Why:** a `GET` has no `Content-Type`, so the plugin asks for its header,
+and the client sends none of its own: its name is the app's. A JSON `POST`
+passes without it.
+
+**Fix:** the app's header, in the client's `headers`:
+
+```ts
+graphqlClient(app, { headers: { 'x-csrf': '1' } });
+```
+
+### `PersistedQueryNotFound` or `PersistedQueryOnly`
+
+**When:** `query({ persisted: hash })` answers `PersistedQueryNotFound`
+(`PERSISTED_QUERY_NOT_IN_LIST`), or a call with a document answers
+`PersistedQueryOnly` (`CANNOT_SEND_PQ_ID_AND_BODY`); `PersistedQueryKeyNotFound`
+when no id was found.
+
+**Why:** the app's `usePersistedOperations` does not know the hash, refuses
+every document (`allowArbitraryOperations: false`), or reads the id from an
+extension other than `persistedQuery.sha256Hash` (its default, which
+`persisted` sends).
+
+**Fix:** register the hash, send no document, or send the app's own extension:
+`query({ extensions: { documentId } })`.
 
 ### `405 {"error":"method_not_allowed"}` on `OPTIONS /graphql`
 

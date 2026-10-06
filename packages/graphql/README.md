@@ -223,9 +223,15 @@ const { status, data, errors } = await client.query(
 ```
 
 A `TypedDocumentNode` types `data` and the variables. `method: 'GET'` sends
-the operation in the URL; `persisted` sends the hash of a persisted operation
-(alone, when the app allows nothing else); the client adds no CSRF header, put
-yours in `headers`. See
+the operation in the URL; `persisted` sends the hash of a persisted operation,
+alone when the app allows nothing else (you name `TData`); the client adds no
+CSRF header, put yours in `headers`:
+
+```ts
+const result = await client.query<{ hello: string }>({ persisted: hash, method: 'GET' });
+```
+
+See
 [the testing guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/testing.md).
 
 ## API
