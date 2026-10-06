@@ -1,5 +1,12 @@
 # @alxia/telemetry
 
+## 0.7.3
+
+### Patch Changes
+
+- Updated dependencies [[`71411e2`](https://github.com/softistx/alxia/commit/71411e26dd0d729bf16e10be6f43b1fa6726f6c8), [`3ed7f8e`](https://github.com/softistx/alxia/commit/3ed7f8e7df3dd3e9d97b38e004ee831055ebe163)]:
+  - @alxia/core@0.14.0
+
 ## 0.7.2
 
 ### Patch Changes

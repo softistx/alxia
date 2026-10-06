@@ -103,6 +103,15 @@ number on it. Every release, with each change it made, is in
 
 ## Shipped
 
+### 0.14.0
+
+- **`onStop` is given the server that stopped.** The one `onStart` was
+  given, or `undefined` on a `stop()` before `listen`, so a hook that forks
+  of one base share releases a resource when the last one serving stops
+  ([Hooks](guide/hooks.md#onstart-and-onstop)). A function passed by
+  reference whose first parameter is optional (`onStop(sql.end)`) no longer
+  compiles ([Upgrading](upgrading.md#onstop-is-given-the-server-that-stopped)).
+
 ### 0.13.0
 
 - **A comment on an event stream.** `yield sseComment('connected')` writes

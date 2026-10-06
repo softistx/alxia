@@ -28,6 +28,15 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### 0.5.9: a handle closed by the last fork serving
+
+- **`redis(handle)` closes the handle when the last fork serving stops.**
+  Forks share the plugin's `onStop`, so the first to stop used to close the
+  client under a sibling still serving, and so did a fork that never listened.
+  It now tracks the servers `onStart` is given (core's `onStop` receives the
+  one that stopped, or `undefined` before `listen`) and closes when none
+  remains. One app behaves as before. It needs `@alxia/core` 0.14.
+
 ### 0.5.0: the definition read from the bound limit
 
 - **`redisStore(handle.limits.api)` alone carries the policy.** On

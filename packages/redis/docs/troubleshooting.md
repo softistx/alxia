@@ -772,8 +772,11 @@ throws `redisStore: the definition "…" is not the rate this limit counts by`.
 **Symptom:** after the app stopped, or in a second app sharing the handle,
 commands fail with `RedisError: Connection closed`.
 
-**Why:** `redis(handle)` closes the handle when its app stops. Two apps
-given one handle close it with the first.
+**Why:** `redis(handle)` closes the handle when its app stops. Forks of one
+app (`app.fork()`) share that hook, and it closes the handle only when the
+last one serving has stopped, so a fork stopping early does not close it
+under a sibling. Two separate apps given one handle each mount their own
+`redis(handle)`, which knows nothing of the other, and the first to stop closes it.
 
 **Fix:** pass `{ close: false }` to every `redis(handle, …)` but the one that
 owns the handle's life, or close it yourself:
