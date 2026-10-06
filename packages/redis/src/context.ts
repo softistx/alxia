@@ -103,14 +103,24 @@ function fromHandle<C>(handle: Redis<C>, options: RedisHandleOptions = {}) {
 		lock: instance.lock,
 		prefix,
 	};
-	let closing: Promise<void> | undefined;
 	const app = alxia().decorate(context);
-	return options.close === false
-		? app
-		: app.onStop(() => {
-				closing ??= handle.close();
-				return closing;
-			});
+	if (options.close === false) return app;
+	// Forks of one app share these hooks and each runs them once of its own,
+	// so the handle is closed when the last app serving stops, not by the first.
+	const serving = new Set<Bun.Server<unknown>>();
+	let closing: Promise<void> | undefined;
+	return app
+		.onStart((server) => {
+			serving.add(server);
+		})
+		.onStop((server) => {
+			// A server that listened leaves the set; closing waits for the last.
+			// A stop before listen (`undefined`) closes only while no app serves.
+			if (server !== undefined) serving.delete(server);
+			if (serving.size > 0) return;
+			closing ??= handle.close();
+			return closing;
+		});
 }
 
 /**
@@ -125,7 +135,8 @@ function fromHandle<C>(handle: Redis<C>, options: RedisHandleOptions = {}) {
  *
  * Given an `@nxgt/redis` handle, the caches are the handle's own, the
  * prefix is in front of every key and lock, and the handle is closed when
- * the app stops, after the drain (`{ close: false }` to close it yourself):
+ * the last app serving it stops, after the drain (`{ close: false }` to
+ * close it yourself):
  *
  * ```ts
  * const handle = await openRedis(defineRedis({ uri, prefix: 'shop', caches }));
