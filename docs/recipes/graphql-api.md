@@ -425,7 +425,7 @@ they are in each resolver's context. A shutdown closes the sockets with
 
 ## 6. Test it, in process
 
-`graphqlClient` from `@alxia/graphql/testing` POSTs to the endpoint through
+`graphqlClient` from `@alxia/graphql/testing` POSTs (or, with `method: 'GET'`, GETs) to the endpoint through
 `app.fetch`, with no port, and hands back `status`, `data`, `errors` and the
 `response` ([the testing guide](../../packages/graphql/docs/guide/testing.md)).
 
@@ -892,7 +892,10 @@ describe('the body, and CSRF', () => {
 	});
 
 	test('a request with no CSRF header is refused, a form is a 415, JSON with the header runs', async () => {
-		expect((await production.request('/graphql?query={me{name}}')).status).toBe(403);
+		// A GET carries no content type, so the CSRF plugin asks for its header: the client sends none of its own.
+		const get = { method: 'GET' } as const;
+		expect((await graphqlClient(production).query('{ me { name } }', get)).status).toBe(403);
+		expect((await client(production).query('{ me { name } }', get)).data).toEqual({ me: null });
 		const form = await production.request('/graphql', {
 			method: 'POST',
 			headers: { 'content-type': 'application/x-www-form-urlencoded', 'x-csrf': '1' },
@@ -909,12 +912,14 @@ describe('persisted operations', () => {
 			graphql(app, { schema, context: () => ({ loaders: createLoaders() }), logging: false, plugins: [persisted] }),
 		);
 		const [hash] = [...operations.keys()];
-		const known = await app.request('/graphql', {
-			method: 'POST',
-			headers: { 'content-type': 'application/json', 'x-csrf': '1' },
-			body: JSON.stringify({ extensions: { persistedQuery: { version: 1, sha256Hash: hash } } }),
-		});
-		expect(((await known.json()) as { data: unknown }).data).toEqual({ notes: [] });
+		if (hash === undefined) throw new Error('no operation');
+		// The hash alone, over POST and over GET: no document is sent.
+		for (const method of ['POST', 'GET'] as const) {
+			const known = await client(app).query<{ notes: unknown[] }>({ persisted: hash, method });
+			expect(known.data).toEqual({ notes: [] });
+		}
+		const unknown = await client(app).query({ persisted: 'not-registered' });
+		expect(unknown.errors?.[0]?.message).toBe('PersistedQueryNotFound');
 		const arbitrary = await client(app).query('{ notes { text } }');
 		expect(arbitrary.errors?.[0]?.message).toMatch(/persisted/i);
 	});

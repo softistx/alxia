@@ -222,7 +222,16 @@ const { status, data, errors } = await client.query(
 );
 ```
 
-A `TypedDocumentNode` types `data` and the variables. See
+A `TypedDocumentNode` types `data` and the variables. `method: 'GET'` sends
+the operation in the URL; `persisted` sends the hash of a persisted operation,
+alone when the app allows nothing else (you name `TData`); the client adds no
+CSRF header, put yours in `headers`:
+
+```ts
+const result = await client.query<{ hello: string }>({ persisted: hash, method: 'GET' });
+```
+
+See
 [the testing guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/testing.md).
 
 ## API
@@ -236,8 +245,8 @@ A `TypedDocumentNode` types `data` and the variables. See
 | `SandboxOptions` | its options: `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
 | `GraphQLContext<App, UserContext?>` | what a resolver reads |
 | `ServerContext<Ctx>`, `GraphQLOptions` | its types |
-| `graphqlClient(app, { path?, headers? })` (`@alxia/graphql/testing`) | `query(document, { variables?, operationName?, headers? })` in process: `{ status, data?, errors?, response }` |
-| `GraphQLClient`, `GraphQLResult`, `QueryDocument`, `QueryOptions`, `GraphQLClientOptions`, `ResponseError` (`@alxia/graphql/testing`) | its types |
+| `graphqlClient(app, { path?, headers?, method? })` (`@alxia/graphql/testing`) | `query(document, { variables?, operationName?, headers?, method?, extensions?, persisted? })`, or `query({ persisted })` with no document, in process: `{ status, data?, errors?, response }` |
+| `GraphQLClient`, `GraphQLResult`, `QueryDocument`, `QueryOptions`, `PersistedQueryOptions`, `HttpMethod`, `GraphQLClientOptions`, `ResponseError` (`@alxia/graphql/testing`) | its types |
 
 ## Documentation
 

@@ -14,7 +14,7 @@ a realistic example for each.
 | [GraphQL over WebSocket](guide/websockets.md) | serving Apollo Client's, urql's or `graphql-ws`'s WebSocket clients with `ws: true`, guarding the upgrade, reading `connectionParams`, the subprotocol, closing the sockets on shutdown, or testing a subscription over a socket |
 | [Harden it for production](guide/production.md) | putting a GraphQL API on the internet: rate limiting the endpoint, depth limits, introspection off outside development, masked errors and the errors a client may read, a body limit, CSRF for a cookie session, persisted operations |
 | [GraphiQL and Apollo Sandbox](guide/ide.md) | choosing the IDE a browser gets, configuring it, keeping it working under a strict `Content-Security-Policy`, or serving it outside dev with `ide: 'graphiql'` |
-| [Testing the endpoint](guide/testing.md) | testing a GraphQL app without a server: `graphqlClient`, an auth header, a custom path, a typed document, the HTTP status of a 400 or a 413 |
+| [Testing the endpoint](guide/testing.md) | testing a GraphQL app without a server: `graphqlClient`, an auth header, a custom path, `GET`, persisted operations, the CSRF header, a typed document, the HTTP status of a 400 or a 413 |
 | [Troubleshooting](troubleshooting.md) | something went wrong and you have the message |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |
 
