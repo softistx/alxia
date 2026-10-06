@@ -44,7 +44,7 @@ export async function serve(
 			[ORIGIN]: forwarded?.origin,
 		});
 		if (forwarded?.refused === true)
-			return untrustedProxy(ctx, forwarded.refusal);
+			return await untrustedProxy(ctx, forwarded.refusal, forwarded.answer);
 		const response = await route(runtime, ctx, path);
 		return response === UPGRADED ? (undefined as never) : response;
 	} catch (error) {

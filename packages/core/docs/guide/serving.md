@@ -241,7 +241,7 @@ so `alxia({ ip: forwardedIp(o) })` and `alxia({ proxy: trustProxy(o) })`
 give the same address: keep `forwardedIp` when the address is all the app
 reads. Give `ip` or `proxy`, not both: the app throws when it is built.
 
-### `trustProxy({ trusted, header, untrusted, allow, canonical })`
+### `trustProxy({ trusted, header, untrusted, allow, refusal, canonical })`
 
 ```ts
 function trustProxy(options: StrictProxyOptions): ProxyTrust; // untrusted: 'refuse-all', trusted by address, allow
@@ -253,6 +253,7 @@ function trustProxy(options: TrustProxyOptions): ProxyTrust;
 | `trusted` | `number \| string \| string[] \| (address: string) => boolean` | required | the proxies in front of the app, as for [`forwardedIp`](#forwardedip-header-trusted-) |
 | `header` | `string` | `'x-forwarded-for'` | `'x-forwarded-for'`: the address from it, the scheme from `X-Forwarded-Proto`, the host from `X-Forwarded-Host`; `'forwarded'`: all three from RFC 7239's `for=`, `proto=` and `host=`; another name: the address from that header, the scheme and host from `X-Forwarded-*` |
 | `untrusted` | `'ignore' \| 'refuse' \| 'refuse-all'` | `'ignore'` | what a request from a connection that is no proxy gets: its forwarding headers ignored, refused when it carries one, or refused whatever it carries ([below](#refusing-an-untrusted-peer)) |
+| `refusal` | `(refused: RefusedRequest) => Response \| Promise<Response>` | the default 403 | the app's own answer to a refused request, which must be a 403 ([below](#answering-the-refusal-yourself)) |
 | `allow` | `string \| string[] \| (request: Request, peer: string \| undefined) => boolean` | none | under `'refuse-all'` alone: what passes from another connection ([below](#only-the-proxies-refuse-all)) |
 | `canonical` | `boolean` | `true` | `ctx.ip` in its [one text](#one-text-per-address); `false`, as written |
 
@@ -324,6 +325,33 @@ named by address; with a hop count, which cannot tell a proxy,
 ```ts
 alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
 ```
+
+### Answering the refusal yourself
+
+The default body is `{ "error": "untrusted_proxy" }`, or a problem under
+`errors: 'problem'`. `refusal` replaces it, under `'refuse'` and
+`'refuse-all'` alike. It is given `{ request, url, ip, refusal }` — the
+request, its URL, the connection's own address (never one a forwarding
+header wrote) and why it is refused, `'headers'` or `'peer'` — and answers
+a `Response`, which may be async and must have status 403: a refusal stays
+one, so any other status, or a throw, is the app's 500.
+
+```ts
+alxia({
+	proxy: trustProxy({
+		trusted: ['10.0.0.0/8'],
+		untrusted: 'refuse-all',
+		refusal: () => new Response('forbidden', { status: 403 }),
+	}),
+});
+```
+
+The refusal comes before routing, so no hook of the app sees it:
+no middleware, `derive`, `decorate`, `settle` or `onError` handler runs,
+and `refusalOf` has nothing to read. `refusal` is the one place that
+answers it, and it runs with no context but those four values. Read
+nothing of `request` into the body unless you mean to: its headers come
+from a connection that is no proxy.
 
 ### Only the proxies: `refuse-all`
 

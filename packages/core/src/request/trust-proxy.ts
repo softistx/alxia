@@ -6,6 +6,7 @@
 import { elementsOf, listOf } from './forwarded-header';
 import { canonicalIp, canonicalOf, type ParsedIp, parseIp } from './ip-address';
 import { hostOf, type Origin, protocolOf } from './origin';
+import { answering, answerOf, type ProxyRefusalAnswer } from './proxy-refusal';
 import {
 	type ClientAt,
 	clientAt,
@@ -16,6 +17,7 @@ import {
 } from './trust';
 import { gateOf, type ProxyAllow, type ProxyRefusal } from './untrusted';
 
+export type { ProxyRefusalAnswer, RefusedRequest } from './proxy-refusal';
 export type { ProxyAllow, ProxyRefusal } from './untrusted';
 
 export interface TrustProxyOptions {
@@ -47,6 +49,12 @@ export interface TrustProxyOptions {
 	readonly untrusted?: 'ignore' | 'refuse';
 	/** `untrusted: 'refuse-all'`'s escape alone: see `StrictProxyOptions`. */
 	readonly allow?: undefined;
+	/**
+	 * The app's own 403 for a refused request, in place of the default
+	 * body: `({ request, url, ip, refusal }) => Response`, run before
+	 * routing, so no middleware sees it; not a 403, or a throw, is a 500.
+	 */
+	readonly refusal?: ProxyRefusalAnswer;
 	/**
 	 * Whether `ctx.ip` is the address's canonical text — IPv6 as RFC 5952
 	 * writes it, an IPv4-mapped address as IPv4, brackets and port dropped —
@@ -90,6 +98,8 @@ export interface Forwarded {
 	readonly refused: boolean;
 	/** Why it is refused, when it is: its forwarding headers (`'headers'`), or its connection (`'peer'`). */
 	readonly refusal?: ProxyRefusal;
+	/** The `refusal` option's answer to it. */
+	readonly answer?: ProxyRefusalAnswer;
 }
 
 /** The `proxy` option: what the proxies say of a request, from its connection. */
@@ -230,7 +240,10 @@ export function trustProxy(options: TrustProxyOptions): ProxyTrust;
 export function trustProxy(
 	options: TrustProxyOptions | StrictProxyOptions,
 ): ProxyTrust {
-	const read = proxyReader(options, 'trustProxy', true);
+	const read = answering(
+		proxyReader(options, 'trustProxy', true),
+		answerOf(options.refusal, options.untrusted, 'trustProxy'),
+	);
 	if (options.untrusted === 'refuse-all')
 		Object.defineProperty(read, REFUSES_ALL, { value: true });
 	return read;
