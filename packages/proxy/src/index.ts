@@ -14,3 +14,4 @@ export {
 	type SocketProxyOptions,
 } from './socket';
 export type { OutsideTargetBody } from './upstream-url';
+export type { ProxyTarget, ProxyTargets } from './upstreams';

@@ -1,14 +1,15 @@
 /**
  * A socket route relayed to an upstream WebSocket: behind the route's
- * middlewares, core's `upgrade` handler opens the upstream first — a 502
- * or a 504 over HTTP when it cannot — and the `101` names the subprotocol
+ * middlewares, core's `upgrade` handler opens the upstream first — the
+ * next of the pool, then another while the connect itself fails, and a
+ * 502 or a 504 over HTTP when none opens — and the `101` names the subprotocol
  * it chose. Then each frame goes across as it came — text as text, binary
  * as binary — with backpressure both ways (`socket-flow.ts`), and a close
  * on either side closes the other with the same code and reason.
  */
 import type { SocketHandlers } from '@alxia/core';
-import type { ProxyOptions } from './options';
-import { type Plan, type ProxyContext, planOf } from './options';
+import type { Plan, ProxyContext, ProxyOptions } from './options';
+import { acrossUpstreams } from './retry';
 import { sendable } from './socket-close';
 import {
 	drained,
@@ -19,6 +20,7 @@ import {
 } from './socket-flow';
 import { type Relay, relay } from './socket-relay';
 import { openUpstream } from './socket-upstream';
+import { type ProxyTargets, poolOf } from './upstreams';
 
 export { BAD_GATEWAY_CLOSE, OVERLOADED_CLOSE } from './socket-close';
 
@@ -45,10 +47,10 @@ export type SocketProxy<Ctx = unknown> = SocketHandlers<
 
 /** The relay handlers for `target`, checked once. */
 export function socketProxy<Ctx>(
-	target: string | URL,
+	target: ProxyTargets,
 	options: SocketProxyOptions<Ctx> = {},
 ): SocketProxy<Ctx> {
-	const plan = planOf<Ctx>('proxy.ws()', target, options, [
+	const pool = poolOf<Ctx>('proxy.ws()', target, options, [
 		'ws:',
 		'wss:',
 		'http:',
@@ -59,7 +61,13 @@ export function socketProxy<Ctx>(
 	const relays = new WeakMap<object, Relay>();
 	return {
 		async upgrade(ctx, headers) {
-			const opened = await openUpstream(plan, ctx);
+			// Only the connect is retried: the client is upgraded once one opened.
+			const [plan, opened] = await acrossUpstreams(
+				pool,
+				ctx.request.signal,
+				() => true,
+				async (plan) => [plan, await openUpstream(plan, ctx)] as const,
+			);
 			const { protocol } = opened.socket;
 			if (protocol !== '') headers.set('sec-websocket-protocol', protocol);
 			relays.set(ctx, relay(plan as Plan, ctx, opened, maxBuffered));

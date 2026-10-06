@@ -11,6 +11,7 @@ a realistic example for each.
 | [The basics](guide/basics.md) | forwarding a path to an upstream, stripping a prefix, ordering routes and the proxy, streaming, or typing what a callback reads |
 | [Headers](guide/headers.md) | adding, removing or computing a header on either side, setting `Host`, or forwarding the client's address and scheme |
 | [Mounting a prefix](guide/mounting.md) | giving a whole prefix to another app, and having its redirects and cookies come back under it |
+| [Several upstreams](guide/upstreams.md) | giving one proxy a list of upstreams: the round-robin, which failures retry on another (`retries`), and the `cooldown` of one that failed to connect |
 | [Failures](guide/failures.md) | a 502, a 504, a 413 or a 400, a client that leaves, a shutdown, or the timeout and the body limit |
 | [WebSockets](guide/websockets.md) | relaying a socket route to an upstream socket, close codes, subprotocols, backpressure and `maxBuffered` |
 | [Security](guide/security.md) | being sure the proxy cannot be pointed elsewhere, trusting forwarded headers, or keeping credentials and internals from crossing |

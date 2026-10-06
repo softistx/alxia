@@ -66,6 +66,18 @@ export interface ProxyOptions<Ctx = unknown> {
 	readonly timeout?: number;
 	/** The most bytes a request body may hold, counted as it streams; past it, a 413. None by default. */
 	readonly bodyLimit?: number;
+	/**
+	 * With several upstreams, how many more of them one request may try
+	 * after a connect that provably never reached one (refused, or a DNS
+	 * failure): the number of upstreams − 1 by default, each tried at most
+	 * once; `0` never retries.
+	 */
+	readonly retries?: number;
+	/**
+	 * Milliseconds an upstream that failed to connect is skipped by the
+	 * rotation: 5 000 by default; `0` never skips one.
+	 */
+	readonly cooldown?: number;
 }
 
 /** The options, checked and resolved once. */

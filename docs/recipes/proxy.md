@@ -161,6 +161,11 @@ test('/health is answered by the gateway itself', async () => {
   response headers take longer than `timeout` (30 s by default), in the
   app's error format. A client that leaves aborts the upstream request, and a
   graceful shutdown lets in-flight requests drain before aborting them.
+- **Several upstreams.** `proxy(['http://users-1:8080', 'http://users-2:8080'])`
+  takes them round-robin; a request whose connect is refused, or whose host
+  does not resolve, goes to the next one, and nothing else is retried. An
+  upstream that failed to connect is skipped for `cooldown` (5 s). The same
+  list goes to `proxy.mount` and `proxy.ws`.
 - **WebSockets.** `app.ws('/live/*', proxy.ws('ws://chat.internal:8080'))`
   relays a socket's frames and close codes, behind the route's middlewares;
   the upstream opens first, so the `101` carries its subprotocol and a dead

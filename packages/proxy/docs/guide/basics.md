@@ -1,6 +1,7 @@
 # The basics
 
-This page covers forwarding requests to one upstream: giving `proxy()` to
+This page covers forwarding requests to one upstream (for a list of them,
+see [Several upstreams](upstreams.md)): giving `proxy()` to
 `use()`, stripping a prefix, what is kept and streamed, and where the proxy
 sits among your routes.
 
@@ -159,4 +160,4 @@ route is one, `all('/api/*', proxy(url))` as `ALL /api/*`: `@alxia/openapi`'s
 reports them under `strict: true`. An `all` route serves no operation of the
 document: an operation under its path needs a route of its own.
 
-Next: [Headers](headers.md), [Mounting a prefix](mounting.md), [Failures](failures.md).
+Next: [Headers](headers.md), [Mounting a prefix](mounting.md), [Several upstreams](upstreams.md), [Failures](failures.md).

@@ -11,6 +11,12 @@ import { ContentTooLargeError } from '@alxia/core';
 export interface WatchedBody {
 	readonly stream: ReadableStream<Uint8Array>;
 	readonly failure: () => unknown;
+	/**
+	 * Whether the upstream has asked for a chunk, or cancelled the body,
+	 * yet: nothing is read before it asks, so a body it never touched is
+	 * still whole, and can go to another upstream.
+	 */
+	readonly started: () => boolean;
 }
 
 /**
@@ -31,29 +37,36 @@ export function watchBody(
 	}
 	const reader = source.getReader();
 	let count = 0;
-	const stream = new ReadableStream<Uint8Array>({
-		async pull(controller) {
-			try {
-				const { done, value } = await reader.read();
-				if (done) {
-					controller.close();
-					return;
+	let started = false;
+	const stream = new ReadableStream<Uint8Array>(
+		{
+			async pull(controller) {
+				started = true;
+				try {
+					const { done, value } = await reader.read();
+					if (done) {
+						controller.close();
+						return;
+					}
+					onChunk();
+					count += value.byteLength;
+					if (limit !== undefined && count > limit) {
+						throw new ContentTooLargeError(limit);
+					}
+					controller.enqueue(value);
+				} catch (error) {
+					failure = error;
+					reader.cancel(error).catch(() => {});
+					controller.error(error);
 				}
-				onChunk();
-				count += value.byteLength;
-				if (limit !== undefined && count > limit) {
-					throw new ContentTooLargeError(limit);
-				}
-				controller.enqueue(value);
-			} catch (error) {
-				failure = error;
-				reader.cancel(error).catch(() => {});
-				controller.error(error);
-			}
+			},
+			cancel(reason) {
+				started = true;
+				return reader.cancel(reason);
+			},
 		},
-		cancel(reason) {
-			return reader.cancel(reason);
-		},
-	});
-	return { stream, failure: () => failure };
+		// No chunk read ahead: the first pull is the upstream's own.
+		{ highWaterMark: 0 },
+	);
+	return { stream, failure: () => failure, started: () => started };
 }

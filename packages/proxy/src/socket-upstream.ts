@@ -9,6 +9,7 @@
 import { badGateway, gatewayTimeout } from './failures';
 import { applyEdit, requestHeaders } from './headers';
 import type { Plan, ProxyContext } from './options';
+import { socketNeverReached, Unreached } from './retry';
 import type { Frame } from './socket-flow';
 import { frameOf } from './socket-relay';
 import { upstreamUrl } from './upstream-url';
@@ -33,7 +34,8 @@ export interface OpenUpstream {
 
 /**
  * Opens the upstream socket for the upgrade request `ctx`, and resolves to
- * it once open. Rejects with the 502 when it closes before opening, the
+ * it once open. Rejects with the 502 when it closes before opening —
+ * wrapped in `Unreached` when the connect itself failed — the
  * 504 past `timeout`, or the client's abort reason when the client goes
  * away first; the upstream is closed in each case.
  */
@@ -76,8 +78,13 @@ export function openUpstream<Ctx>(
 			reject(error);
 		};
 		const opened = () => settle();
-		const refused = (event: CloseEvent) =>
-			settle(badGateway(url, `closed with ${event.code} before opening`));
+		const refused = (event: CloseEvent) => {
+			const failure = badGateway(
+				url,
+				`closed with ${event.code} (${event.reason}) before opening`,
+			);
+			settle(socketNeverReached(event) ? new Unreached(failure) : failure);
+		};
 		const gone = () => settle(signal.reason);
 		const late = setTimeout(
 			() => settle(gatewayTimeout(url, plan.timeout)),

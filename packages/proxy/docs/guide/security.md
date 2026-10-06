@@ -18,7 +18,9 @@ const app = alxia().use('/api', proxy('http://users.internal:8080', {
 
 The target is checked once, at declaration: an absolute `http:` or `https:`
 URL, with no query, fragment or credentials. It is not a function of the
-request, so a request cannot choose it; declare one proxy per upstream. Each
+request, so a request cannot choose it. A list of targets is checked URL by
+URL the same way and fixed too: the rotation picks among them, never a
+request ([Several upstreams](upstreams.md)). Each
 request's path is set as a path on a copy of the target URL, and the result's
 origin is checked against the target before the fetch. A request that tries
 otherwise gets a 400 `{"error":"bad_request"}` or is kept under the target.

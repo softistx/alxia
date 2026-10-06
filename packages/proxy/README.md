@@ -1,8 +1,8 @@
 # @alxia/proxy
 
 A reverse proxy for [alxia](https://www.npmjs.com/package/@alxia/core), as a
-middleware, with no dependency: a path or a prefix forwarded to one fixed
-upstream, streamed both ways, behind your own auth, rate limit and logger.
+middleware, with no dependency: a path or a prefix forwarded to a fixed
+upstream, or to several in turn, streamed both ways, behind your own auth, rate limit and logger.
 Redirects and cookies rebased, failures answered as a 502 or a 504, and
 WebSockets relayed.
 
@@ -61,6 +61,31 @@ const app = alxia().plugin(proxy.mount('/legacy', 'http://old-app:3000'));
 // /legacy and /legacy/... go to the upstream, the prefix stripped,
 // its Location headers and cookies put back under /legacy
 ```
+
+## Several upstreams
+
+```ts
+import { alxia } from '@alxia/core';
+import { proxy } from '@alxia/proxy';
+
+const app = alxia().use(
+	'/api',
+	proxy(['http://users-1.internal:8080', 'http://users-2.internal:8080'], { rewrite: '/api' }),
+);
+// requests alternate between the two; one whose connect is refused goes to the other
+```
+
+Wherever a target goes, a list of targets goes too: `proxy()`,
+`proxy.mount()` and `proxy.ws()`. Each request takes the next upstream,
+round-robin. It goes on to another **only when the one it tried never
+received it**: a refused connection or a host that does not resolve, and,
+for a request with a body, before the upstream read any of it. A reset, a
+timeout or any answer, a `503` included, is never retried: the upstream may
+have run the request. An upstream whose connect failed is skipped for
+`cooldown` ms; when all are cooling down, the one that failed longest ago is
+tried rather than none. A socket route retries its connect the same way,
+before the client's `101`. See
+[Several upstreams](https://github.com/softistx/alxia/blob/develop/packages/proxy/docs/guide/upstreams.md).
 
 ## Relay a WebSocket
 
@@ -139,25 +164,28 @@ app whose context does not give it.
 | `headers` | none | `{ request?, response? }`: a record, or a function `(headers, ctx) => void` |
 | `timeout` | `30_000` | milliseconds of silence allowed until the upstream's response headers, counted again from each body chunk sent; past it, a 504. For `proxy.ws`, the milliseconds the upstream socket has to open |
 | `bodyLimit` | none | bytes of request body; past it, a 413 |
+| `retries` | upstreams − 1 | with several upstreams, how many more one request may try after a refused connect or a failed lookup, each at most once; `0` never retries |
+| `cooldown` | `5_000` | milliseconds an upstream whose connect failed is skipped by the rotation; `0` never skips one |
 | `maxBuffered` | `1_048_576` | `proxy.ws` only: bytes queued for one side, per direction; a frame for a side past it closes both with `1013`. Keep it above your largest frame |
 
 ## API
 
 | export | |
 | --- | --- |
-| `proxy(target, options?)` | the middleware: forwards what it runs on to `target`; given to `use(path?, …)`, a route, or `all(path, …)` as the route's end |
+| `proxy(target, options?)` | the middleware: forwards what it runs on to `target`, one URL or a list taken round-robin; given to `use(path?, …)`, a route, or `all(path, …)` as the route's end |
 | `proxy.mount(prefix, target, options?)` | a plugin forwarding everything under `prefix`, rebased |
 | `proxy.ws(target, options?)` | the handlers of a `ws()` route relayed to an upstream socket, opened before the client's `101` |
 | `OVERLOADED_CLOSE` | `1013`, try again later: the close code of both sides when one is more than `maxBuffered` bytes behind |
 | `BAD_GATEWAY_CLOSE` | deprecated: `1014`, the close code an unreachable upstream socket used to get; it is now a 502 over HTTP |
 | `ProxyOptions<Ctx>`, `SocketProxyOptions<Ctx>` | the options, and those of `proxy.ws` |
+| `ProxyTarget`, `ProxyTargets` | one upstream URL, and what the three functions take: one, or a list |
 | `ProxyHeaders<Ctx>`, `HeaderEdit<Ctx>`, `HeaderValue<Ctx>`, `ProxyContext<Ctx>` | the `headers` option, and what its callbacks read |
 | `ProxyMiddleware<Ctx>`, `ProxyMount<Prefix, Ctx>`, `SocketProxy<Ctx>` | what the three functions return |
 | `BadGatewayBody`, `GatewayTimeoutBody`, `OutsideTargetBody` | the bodies of the 502, the 504 and the 400 |
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/proxy/docs/README.md): a page per area: the basics, headers, mounting a prefix, failures, WebSockets and security.
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/proxy/docs/README.md): a page per area: the basics, headers, mounting a prefix, several upstreams, failures, WebSockets and security.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/proxy/docs/troubleshooting.md): an error message, or a request that does not reach the upstream, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/proxy/docs/roadmap.md): what is coming, and what is not planned.
 - [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [Put an app in front of other services](https://github.com/softistx/alxia/blob/develop/docs/recipes/proxy.md).

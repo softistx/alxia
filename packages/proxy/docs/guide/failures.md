@@ -24,7 +24,10 @@ const app = alxia({ errors: 'problem' }).use(
 | `rewrite` climbs out of the target's path | 400 | `{"error":"bad_request"}` | `proxy: the path "<path>" rewrites outside the target's path "<base>"` |
 
 A socket route's upgrade gets the same 502 and 504, before any `101`:
-see [WebSockets](websockets.md#an-upstream-that-cannot-be-reached).
+see [WebSockets](websockets.md#an-upstream-that-cannot-be-reached). With
+several upstreams, a refused connect or a failed lookup goes to the next one
+first, and the 502 is the answer once none is left; a reset or a 504 is
+never retried: see [Several upstreams](upstreams.md#retries-only-a-request-no-upstream-received).
 
 Under `alxia({ errors: 'problem' })` they are RFC 9457 problems
 (`application/problem+json`): `Bad Gateway`, detail `The upstream server could not be reached`;
