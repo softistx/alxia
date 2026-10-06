@@ -269,7 +269,9 @@ export default createServer({
 In dev, the plugin hands each upgrade Vite does not claim (its HMR, its
 `server.proxy`) to the app, run by `Bun.serve` as `listen` runs it: the
 middlewares before the route, a refusal's status, `socket.data`, `publish`. An
-edit to the server is used from the next connection.
+edit to the server is used from the next connection. An action's
+`alxiaOf(context).server.publish` reaches those sockets too
+([The server](#the-server-server)).
 [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#websockets)
 
 ## Options
@@ -439,9 +441,9 @@ has the commented file, and what to copy for a package left external.
 - **`@alxia/secure-headers`' default policy blocks the page's scripts**
   and forms: give the pages a policy of their own, with `nonce: true` and
   `nonceOf` in `entry.server.tsx` rather than `'unsafe-inline'`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
-- **Under `react-router dev`, `page()` and an HTTP request's
-  `ctx.server` are absent**: requests arrive through `app.fetch`. A
-  socket's upgrade has its server. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#ctxserver-is-undefined-under-react-router-dev)
+- **Under `react-router dev`, `page()` is not served**, and an HTTP
+  request's `ctx.server` is the loopback server the sockets are relayed to:
+  its `publish` reaches them, its `url` and `requestIP` are not Vite's. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-page-is-not-served-under-react-router-dev)
 - **An alxia route whose path covers a page takes it**, wherever it is
   declared: `GET /:slug` answers `/about`. Keep alxia's routes under
   `/api`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-page-answers-alxias-json-404-or-405-instead-of-rendering)

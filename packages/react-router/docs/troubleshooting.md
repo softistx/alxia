@@ -57,7 +57,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [The logger times a streamed page at a few milliseconds](#the-logger-times-a-streamed-page-at-a-few-milliseconds)
 - [A page, or a missing path, answers 401 behind a guard](#a-page-or-a-missing-path-answers-401-behind-a-guard)
 - [The logger, CORS or secure headers miss the client's files](#the-logger-cors-or-secure-headers-miss-the-clients-files)
-- [`ctx.server` is `undefined` under `react-router dev`](#ctxserver-is-undefined-under-react-router-dev)
+- [A `page()` is not served under `react-router dev`](#a-page-is-not-served-under-react-router-dev)
 - [A `publish` under `react-router dev` misses the sockets opened before an edit](#a-publish-under-react-router-dev-misses-the-sockets-opened-before-an-edit)
 - [The build has a package's Node variant, not its `bun` one](#the-build-has-a-packages-node-variant-not-its-bun-one)
 - [`request.url` in a loader is `http://` and the internal host behind a proxy](#requesturl-in-a-loader-is-http-and-the-internal-host-behind-a-proxy)
@@ -1034,22 +1034,25 @@ createServer({
 });
 ```
 
-### `ctx.server` is `undefined` under `react-router dev`
+### A `page()` is not served under `react-router dev`
 
-A middleware or a route reads `ctx.server`, or the app declares a `page()`,
-under `react-router dev` or `vite preview`; the same code works from
-`bun build/server/index.js`.
+The app declares a `page()`, or reads `ctx.server.url`, `requestIP` or
+`timeout`, or `ctx.ip`, under `react-router dev` or `vite preview`; the same
+code works from `bun build/server/index.js`.
 
 **Why:** under `@alxia/react-router/vite`, Vite owns the dev server, and
-the preview server under `vite preview`. An HTTP request reaches the app
-through `app.fetch`, as in a test, not through `listen`: there is no
-`Bun.serve` behind it, so `ctx.server` is `undefined`, the default
-`ctx.ip` too, and a `page()` (Bun's HTML bundle) is not served. A socket's upgrade is the exception: the plugin relays it
-to a `Bun.serve` of the app, so its middlewares read a server
-([WebSockets](guide.md#under-react-router-dev)).
+the preview server under `vite preview`: a `node:http` server, not a
+`Bun.Server`. An HTTP request reaches the app through
+`app.fetch(request, side)`, where `side` is the loopback `Bun.serve` the
+plugin relays the app's sockets to. So `ctx.server` is that side server: its
+`publish` reaches the app's sockets, but its `url` is the loopback port's,
+and its `requestIP` and `timeout` know nothing of a request Vite took, so
+the default `ctx.ip` is `undefined`. A `page()` (Bun's HTML bundle) is not
+served: Vite answers the HTML
+([The server](guide.md#the-server-server)).
 
-**Fix:** read `ctx.server` as optional, and publish to sockets from the
-sockets themselves (`socket.publish`), which works in dev too:
+**Fix:** read `ctx.server` as optional, which also covers `app.request` in
+a test, and take nothing from its `url` or `requestIP` in dev:
 
 ```ts
 // app/server.ts
@@ -1072,7 +1075,7 @@ Two clients in one room; after an edit to `app/server.ts`, a message one
 sends no longer reaches the other.
 
 **Why:** an edit to the server makes a new app, and the plugin starts a
-new `Bun.serve` for it on the next upgrade, so that new connections use
+new `Bun.serve` for it on the next upgrade or request, so that new connections use
 the new handlers. A socket opened before the edit stays on the previous
 server, with the handlers it opened with, and a topic is one server's.
 

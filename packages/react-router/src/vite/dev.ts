@@ -6,7 +6,7 @@ import type { ViteDevServer } from 'vite';
 import { DEFAULT, SERVER, serverFile } from './config';
 import { NAME } from './entry';
 import { send, toRequest } from './node';
-import { bridgeSockets } from './socket';
+import { bridgeSockets, type SideOf } from './socket';
 
 /** What the dev server module exports: the alxia app, as `server.create` made it. */
 export interface DevApp {
@@ -42,9 +42,6 @@ export async function loadApp(
 	)) as { readonly default: DevApp };
 	return module.default;
 }
-
-/** The side server of an app, which its sockets are open on: what `bridgeSockets` returns. */
-export type SideOf = (app: DevApp) => Bun.Server<unknown> | undefined;
 
 /**
  * One request Vite left, answered by the app as the server file is now,

@@ -214,6 +214,11 @@ so stripped keys never leave the server. `validateResponses: false`
 turns that check off ([Replies](replies.md#validateresponses)). Await them:
 a refused message rejects.
 
+A route that is not a socket publishes through
+[`ctx.server`](serving.md#the-server-ctxserver), Bun's own
+`server.publish(topic, data)`: the bytes as given, which `send` does not
+check, and nothing under `app.request`, which has no server.
+
 ## Messages refused
 
 A message that is not JSON, or that `message` refuses, is answered on the

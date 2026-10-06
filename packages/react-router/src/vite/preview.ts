@@ -69,7 +69,8 @@ export function servePreview(server: PreviewServer): void {
 		current().then(
 			async (loaded) => {
 				try {
-					// The side server its sockets are open on, as `ctx.server`.
+					// The side server its sockets are open on, as `ctx.server`:
+					// the built app, `websocket` and all, as `load` above reads it.
 					const side = sideOf(loaded as DevApp);
 					await send(res, await loaded.fetch(toRequest(req, res), side));
 				} catch (error) {

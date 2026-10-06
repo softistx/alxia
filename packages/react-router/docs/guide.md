@@ -157,9 +157,10 @@ routes. The server is loaded through Vite's SSR runner, so:
 - **alxia's `ws` routes connect**: an upgrade Vite's HMR does not claim
   goes to the app, as from the build. See [WebSockets](#websockets).
 
-HTTP requests reach the app through `app.fetch`, as in a test, not
-through `listen`. So `page()` and an HTTP request's `ctx.server` are
-absent in dev; see [the troubleshooting entry](troubleshooting.md#ctxserver-is-undefined-under-react-router-dev).
+HTTP requests reach the app through `app.fetch`, not through `listen`,
+given the loopback server the sockets are relayed to as `ctx.server`
+([The server](#the-server-server)). So `page()` is not served in dev; see
+[the troubleshooting entry](troubleshooting.md#a-page-is-not-served-under-react-router-dev).
 
 ### In a build
 

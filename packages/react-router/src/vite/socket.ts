@@ -119,6 +119,9 @@ function relay(
 	socket.on('close', () => upstream.destroy());
 }
 
+/** The side server of an app, which its sockets are open on: what `bridgeSockets` returns. */
+export type SideOf = (app: DevApp) => Bun.Server<unknown> | undefined;
+
 /** What the relay listens to on Vite's HTTP server, HTTP/1 or HTTP/2 alike. */
 interface Upgrades {
 	on(
@@ -164,10 +167,7 @@ function refuse(bridge: Bridge, socket: Socket, error: unknown): void {
  * an action reaches them. `undefined` in middleware mode, and once Vite's
  * server closed.
  */
-export function bridgeSockets(
-	http: Upgrades | null,
-	bridge: Bridge,
-): (app: DevApp) => Bun.Server<unknown> | undefined {
+export function bridgeSockets(http: Upgrades | null, bridge: Bridge): SideOf {
 	if (http === null) return () => undefined;
 	const sides: Sides = { current: undefined, retired: new Set() };
 	let closed = false;
