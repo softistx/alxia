@@ -29,6 +29,7 @@ const FORWARDING = [
 	'forwarded',
 	'x-forwarded-for',
 	'x-forwarded-host',
+	'x-forwarded-port',
 	'x-forwarded-proto',
 ];
 

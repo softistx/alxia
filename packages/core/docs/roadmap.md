@@ -84,8 +84,6 @@ number on it. Every release, with each change it made, is in
   later minor, once apps have declared their problems in their documents;
   `errors: 'json'` keeps today's bodies for an app that wants them
   ([Errors](guide/errors.md#making-it-the-default)).
-- **`X-Forwarded-Port`.** The port a proxy names apart from its host, for
-  `originalUrl(ctx)`; today a port is read from the host alone.
 
 ## Not planned
 
@@ -108,6 +106,11 @@ number on it. Every release, with each change it made, is in
   what a client generated from the OpenAPI document never asks.
 
 ## Shipped
+
+### Next
+
+- **`X-Forwarded-Port`.** `originalUrl(ctx)` reads the port a trusted proxy
+  names apart from its host, from the same hop as the scheme and host.
 
 ### 0.12.0
 

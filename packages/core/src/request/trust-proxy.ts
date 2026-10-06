@@ -4,13 +4,18 @@
  * from a connection the one trust definition names.
  */
 import { canonicalIp, canonicalOf, type ParsedIp, parseIp } from './ip-address';
-import type { Origin } from './origin';
 import { fromForwarded, fromLists, NONE } from './proxy-readers';
-import { answering, answerOf, type ProxyRefusalAnswer } from './proxy-refusal';
+import { answering, answerOf } from './proxy-refusal';
+import type { ProxyRefusalAnswer, ProxyTrust } from './proxy-types';
 import { peerTrusted, type TrustedProxies, trustOf } from './trust';
-import { gateOf, type ProxyAllow, type ProxyRefusal } from './untrusted';
+import { gateOf, type ProxyAllow } from './untrusted';
 
-export type { ProxyRefusalAnswer, RefusedRequest } from './proxy-refusal';
+export type {
+	Forwarded,
+	ProxyRefusalAnswer,
+	ProxyTrust,
+	RefusedRequest,
+} from './proxy-types';
 export type { ProxyAllow, ProxyRefusal } from './untrusted';
 
 export interface TrustProxyOptions {
@@ -76,30 +81,6 @@ export interface StrictProxyOptions
 	 */
 	readonly allow?: ProxyAllow;
 }
-
-/** What the proxies say of a request, believed. */
-export interface Forwarded {
-	/** The client's address; the connection's when the proxies do not name it. */
-	readonly ip: string | undefined;
-	/** The scheme and host the client asked for, each when a trusted proxy said it and it is valid. */
-	readonly origin: Origin;
-	/**
-	 * Whether the request is answered 403: forwarding headers from an
-	 * untrusted connection, under `untrusted: 'refuse'`, or any request
-	 * from one `allow` does not let through, under `'refuse-all'`.
-	 */
-	readonly refused: boolean;
-	/** Why it is refused, when it is: its forwarding headers (`'headers'`), or its connection (`'peer'`). */
-	readonly refusal?: ProxyRefusal;
-	/** The `refusal` option's answer to it. */
-	readonly answer?: ProxyRefusalAnswer;
-}
-
-/** The `proxy` option: what the proxies say of a request, from its connection. */
-export type ProxyTrust = (
-	request: Request,
-	server: Bun.Server<unknown> | undefined,
-) => Forwarded;
 
 /** Marks a `ProxyTrust` that refuses every connection but the proxies', which `listen` reads. */
 export const REFUSES_ALL = Symbol.for('alxia.proxy.refusesAll');

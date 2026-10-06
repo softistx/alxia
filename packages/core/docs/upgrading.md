@@ -7,7 +7,42 @@ after, and whether it can break yours.
 ## Next
 
 The next `@alxia/core` minor lets a handler yield a comment on an event
-stream. Nothing breaks: a stream that yields none is written as before.
+stream, and `originalUrl(ctx)` now carries the port a trusted proxy sends in
+`X-Forwarded-Port`. Nothing in the API changes.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [`originalUrl(ctx)` reads `X-Forwarded-Port`](#originalurlctx-reads-x-forwarded-port) | core | only a URL built from `originalUrl` behind a proxy that sends the header |
+| [Comments on a stream](#comments-on-a-stream) | core | no: a stream that yields none is written as before |
+
+### `originalUrl(ctx)` reads `X-Forwarded-Port`
+
+Before, a port was read from the forwarded host alone: `X-Forwarded-Host:
+api.example.com` with `X-Forwarded-Port: 8443` gave `https://api.example.com/…`.
+Now:
+
+```ts
+// X-Forwarded-Proto: https, X-Forwarded-Host: api.example.com, X-Forwarded-Port: 8443
+originalUrl(ctx).href;
+// before: https://api.example.com/…
+// after:  https://api.example.com:8443/…
+```
+
+**Notice.** Behind a proxy that sends the header, `originalUrl(ctx)` now
+carries the port, and so do the absolute URLs, redirects and
+`server.port` built from it. A port the host carries wins over the header;
+one that is not digits from 1 to 65535 is ignored; the scheme's default is
+left out; the header is read only beside a forwarded host, from the same
+trusted hop as the scheme and the host. `Forwarded` has no port parameter
+and is unchanged. Under `untrusted: 'refuse'`, a request from an untrusted
+connection that carries only `X-Forwarded-Port` is now refused 403 like one
+carrying `X-Forwarded-Host`.
+
+**Can it break your code.** Only where a proxy sends a port that is not the
+public one (a proxy that writes its internal listening port): have it send
+the public port, or stop sending the header. And where a proxy sets `X-Forwarded-Proto` and `-Host` but not
+`X-Forwarded-Port`, the client's own header is now believed: overwrite it at
+the edge, or strip it.
 
 ### Comments on a stream
 

@@ -7,7 +7,8 @@
  */
 import { PROBLEM, problemOf } from '../errors/problems';
 import { toResponse } from '../reply/reply';
-import { answered, type ProxyRefusalAnswer } from '../request/proxy-refusal';
+import { answered } from '../request/proxy-refusal';
+import type { ProxyRefusalAnswer } from '../request/proxy-types';
 import type { ProxyRefusal } from '../request/untrusted';
 import { errorFormat } from './served';
 

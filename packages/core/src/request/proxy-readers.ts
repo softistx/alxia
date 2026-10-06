@@ -5,7 +5,7 @@
  */
 import { elementsOf, listOf } from './forwarded-header';
 import { type ParsedIp, parseIp } from './ip-address';
-import { hostOf, type Origin, protocolOf } from './origin';
+import { hostOf, type Origin, portOf, protocolOf } from './origin';
 import { type ClientAt, clientAt, type Trust } from './trust';
 
 /** An origin the proxies said nothing of. */
@@ -37,12 +37,26 @@ function passed(
 	return !('hops' in trust) || entries[client.at] !== undefined;
 }
 
-function originOf(proto: string | undefined, host: string | undefined) {
+/**
+ * The origin the entries say. A port the host carries wins over `port`, the
+ * one the same hop wrote in `X-Forwarded-Port`; the port is read only with
+ * a host, since the proxy's port beside the app's own host names nothing.
+ */
+function originOf(
+	proto: string | undefined,
+	host: string | undefined,
+	port?: string,
+) {
 	const protocol = protocolOf(proto);
 	const name = hostOf(host);
+	const extra = portOf(port);
+	const named =
+		name !== undefined && name.port === '' && extra !== undefined
+			? { ...name, port: extra }
+			: name;
 	return {
 		...(protocol === undefined ? {} : { protocol }),
-		...(name === undefined ? {} : { host: name }),
+		...(named === undefined ? {} : { host: named }),
 	};
 }
 
@@ -62,7 +76,7 @@ export const fromForwarded: Reader = (headers, trust, withOrigin) => {
 	};
 };
 
-/** `X-Forwarded-For`, or another list of addresses, and `X-Forwarded-Proto` and `X-Forwarded-Host`. */
+/** `X-Forwarded-For`, or another list of addresses, and `X-Forwarded-Proto`, `-Host` and `-Port`. */
 export function fromLists(header: string): Reader {
 	return (headers, trust, withOrigin) => {
 		const entries = listOf(headers.get(header)).map(parseIp);
@@ -71,6 +85,7 @@ export function fromLists(header: string): Reader {
 			return { at: entries[client.at], origin: NONE };
 		const proto = written(listOf(headers.get('x-forwarded-proto')), client);
 		const host = written(listOf(headers.get('x-forwarded-host')), client);
-		return { at: entries[client.at], origin: originOf(proto, host) };
+		const port = written(listOf(headers.get('x-forwarded-port')), client);
+		return { at: entries[client.at], origin: originOf(proto, host, port) };
 	};
 }

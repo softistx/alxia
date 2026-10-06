@@ -3,25 +3,12 @@
  * gate refuses. The gate runs before routing, so no middleware, `derive`
  * or error handler sees it: this function is the one place that does.
  */
-import type { Forwarded, ProxyTrust } from './trust-proxy';
-import type { ProxyRefusal } from './untrusted';
-
-/**
- * What the `refusal` function is given: the request, its URL, the
- * connection's own address (never one a forwarding header wrote), and why
- * it is refused.
- */
-export interface RefusedRequest {
-	readonly request: Request;
-	readonly url: URL;
-	readonly ip: string | undefined;
-	readonly refusal: ProxyRefusal;
-}
-
-/** An answer to a refused request: a 403 `Response`, sync or async. */
-export type ProxyRefusalAnswer = (
-	refused: RefusedRequest,
-) => Response | Promise<Response>;
+import type {
+	Forwarded,
+	ProxyRefusalAnswer,
+	ProxyTrust,
+	RefusedRequest,
+} from './proxy-types';
 
 /** `refusal`, checked once at declaration. */
 export function answerOf(

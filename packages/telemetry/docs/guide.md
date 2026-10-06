@@ -242,7 +242,7 @@ await app.request('/range'); // 400; the span is ok, with no exception: the midd
 | `url.path` | `URL_PATH` | `/orders/o-1` | always |
 | `url.scheme` | `URL_SCHEME` | `http`; `https` behind a trusted TLS proxy | always |
 | `server.address` | `SERVER_ADDRESS` | the host name the client asked for | always |
-| `server.port` | `SERVER_PORT` | `3000`, a number | when that host names a port |
+| `server.port` | `SERVER_PORT` | `3000`, a number | when the URL the client asked for names a port: the host's own, or a trusted proxy's `X-Forwarded-Port` |
 | `client.address` | `CLIENT_ADDRESS` | the caller's address, as the app's `ip` option reads it | when there is one: not through `app.request` |
 | `http.route` | `HTTP_ROUTE` | `/orders/:id` | once routing matched |
 | `http.response.status_code` | `HTTP_STATUS` | `200`, a number | always |
@@ -256,9 +256,9 @@ Behind `alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) })`, a
 request a trusted TLS proxy forwarded is recorded as `https` and the public
 host (`api.example.com`), not the app's own (`http`, `app.internal`); without
 `proxy`, or from a connection `trusted` does not name, they are the request's
-own, as before. A `server.port` is recorded only when the host the client
-asked for names one: the proxy's `X-Forwarded-Host` seldom does, so a port
-the app listens on is never reported as the public one. The constants are exported for code that reads
+own, as before. A `server.port` is recorded only when the URL the client
+asked for names one: the host's own, or the `X-Forwarded-Port` of a trusted proxy,
+so a port the app listens on is never reported as the public one. The constants are exported for code that reads
 spans back, a test for one:
 
 ```ts
