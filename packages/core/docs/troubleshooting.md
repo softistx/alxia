@@ -16,6 +16,7 @@ a trap that prints nothing is headed by its symptom.
 - [`Property 'user' does not exist on type 'RouteBase<…>'`](#property-user-does-not-exist-on-type-routebase), and `… on type 'BaseContext & Empty'`
 - [``… is not assignable to type '"`user` is missing from the context: add a middleware that gives it before this one"'``](#-is-not-assignable-to-type-user-is-missing-from-the-context-add-a-middleware-that-gives-it-before-this-one)
 - [``… is not assignable to type '"`user` is in the context with another type than this middleware reads"'``](#-is-not-assignable-to-type-user-is-in-the-context-with-another-type-than-this-middleware-reads)
+- [``… is not assignable to type '"`cookies` is in the context with another type than this middleware reads"'``](#-is-not-assignable-to-type-cookies-is-in-the-context-with-another-type-than-this-middleware-reads)
 - [`… is not assignable to type '"the context in force here does not give what this middleware reads"'`](#-is-not-assignable-to-type-the-context-in-force-here-does-not-give-what-this-middleware-reads)
 - [``… is not assignable to type '"the path parameter `id` is not in this route's path"'``](#-is-not-assignable-to-type-the-path-parameter-id-is-not-in-this-routes-path)
 - [`… is not assignable to type '"the path parameters are read with another type than the strings they arrive as"'`](#-is-not-assignable-to-type-the-path-parameters-are-read-with-another-type-than-the-strings-they-arrive-as)
@@ -133,6 +134,7 @@ a trap that prints nothing is headed by its symptom.
 - [A middleware's `try`/`catch` sees an `AbortError` when the client left](#a-middlewares-trycatch-sees-an-aborterror-when-the-client-left)
 - [`Type 'string | undefined' is not assignable to type 'string'` on `ctx.route`](#type-string--undefined-is-not-assignable-to-type-string-on-ctxroute)
 - [A `use()` did not run for a route](#a-use-did-not-run-for-a-route)
+- [A middleware reads, after `next()`, what a later step added](#a-middleware-reads-after-next-what-a-later-step-added)
 
 **Routing**
 
@@ -464,6 +466,45 @@ const auth = defineMiddleware(async ({ request, reply }, next) => {
 	return user ? next({ user }) : reply(401, { error: 'unauthenticated' as const });
 });
 ```
+
+### ``… is not assignable to type '"`cookies` is in the context with another type than this middleware reads"'``
+
+**When:** a middleware after a `validate({ cookies })` names the cookies'
+shape in its context, and the schema gives back another: an optional cookie
+where it reads a required one, a coerced number where it reads a string.
+
+```ts
+const signed = defineMiddleware<{ cookies: { sid: string } }>()(({ cookies }, next) =>
+	next({ sid: cookies.sid }),
+);
+
+app.get('/', validate({ cookies: z.object({ sid: z.string().optional() }) }), signed, handler);
+```
+
+**Why:** after the `validate`, `ctx.cookies` is the schema's output, and
+the middleware would read a `sid` that may be missing. Up to `@alxia/core`
+0.14.0 every shared middleware after such a `validate` got this error — one
+typed by `BaseContext`, one made by `defineMiddleware(fn)` with no context,
+a guard that reads no cookies — when the output was not a
+`Record<string, string>`. Those are taken now: they read the cookies as
+they arrive, and refuse none.
+
+**Fix:** make the middleware read what the schema gives — here
+`{ sid?: string }` — or read the validated cookies inline, after the
+`validate`, where they are typed by the schema:
+
+```ts
+app.get(
+	'/',
+	validate({ cookies: z.object({ sid: z.string().optional() }) }),
+	({ cookies, reply }, next) => (cookies.sid ? next({ sid: cookies.sid }) : reply(401, { error: 'unauthenticated' as const })),
+	handler,
+);
+```
+
+A shape of anything but strings — `{ visits: number }` — cannot be named in
+a middleware's context: it is read beside `BaseContext`'s strings. Read
+such cookies inline.
 
 ### `… is not assignable to type '"the context in force here does not give what this middleware reads"'`
 
@@ -2927,6 +2968,36 @@ const app = alxia()
 	.use(audit)
 	.get('/early', handler);
 ```
+
+### A middleware reads, after `next()`, what a later step added
+
+**When:** a middleware reads `ctx` again once `next()` has settled, and
+finds what a step after it set: a key a later middleware passed `next()` —
+a per-request scope already disposed of — or a `query` a `validate` after
+it replaced. Its type names neither, so the key is reached through a cast:
+
+```ts
+const outer = defineMiddleware(async (ctx, next) => {
+	const response = await next();
+	(ctx as { scope?: Scope }).scope?.resolve(Mailer); // a scope the route disposed of once it answered
+	return response;
+});
+```
+
+**Why:** a request has one context, which each step sets what it adds on
+for the steps after it; the middleware's own `ctx` is that object. This is
+intended: a copy per middleware would keep each view apart at the cost of
+copying the context on every `next()`, some 240 ns a copy, measured, on a
+request of about 1 µs behind three middlewares. The types already keep the
+middleware to what it was given; the cookies alone are copied by a
+`validate({ cookies })`, so that the middlewares before it read them as
+they arrived, after `next()` too.
+
+**Fix:** read what the middleware needs before `next()`, and keep it; leave
+what a later step added to the steps after that one. What the middleware
+needs to learn from inside the route travels on the response — a header the
+route sets — which it reads from what `next()` resolved to
+([The context after `next()`](guide/middleware.md#the-context-after-next)).
 
 ## Routing
 

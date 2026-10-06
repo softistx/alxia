@@ -68,6 +68,12 @@ export type Taken<F, Refused, Checked> = unknown extends Refused
  * `unknown` when `Given` gives what `Reads` names; else why not, one
  * message per key. The messages are written inline, not behind an alias,
  * so that an error prints them.
+ *
+ * `cookies` read as the request's raw ones, `BaseContext`'s — the type of
+ * every middleware that names no `cookies` of its own — is given by any
+ * context, a `validate({ cookies })` before it included: such a
+ * middleware is generic over the cookies and refuses none. One that reads
+ * a shape of its own is still checked against the cookies in force.
  */
 export type Missing<Given, Reads> = Given extends Reads
 	? unknown
@@ -81,13 +87,34 @@ export type Missing<Given, Reads> = Given extends Reads
 								] extends [never]
 								? 'the path parameters are read with another type than the strings they arrive as'
 								: `the path parameter \`${Exclude<NamedKeys<Reads[Key]>, NamedKeys<Given[Key]>> & string}\` is not in this route's path`
-							: `\`${Key & string}\` is in the context with another type than this middleware reads`
+							: Key extends 'cookies'
+								? RawCookies extends Reads[Key]
+									? never
+									: '`cookies` is in the context with another type than this middleware reads'
+								: `\`${Key & string}\` is in the context with another type than this middleware reads`
 					: `\`${Key & string}\` is missing from the context: add a middleware that gives it before this one`;
 			}[keyof Reads] extends infer Message
 		? [Message] extends [never]
-			? 'the context in force here does not give what this middleware reads'
+			? Given extends ReadsBesideCookies<Reads>
+				? unknown
+				: 'the context in force here does not give what this middleware reads'
 			: Message
 		: never;
+
+/** The request's cookies as they arrive: `BaseContext['cookies']`. */
+type RawCookies = Readonly<Record<string, string>>;
+
+/**
+ * What `Reads` names besides cookies read raw, which `Missing` accepts
+ * from any context; `Reads` itself otherwise.
+ */
+type ReadsBesideCookies<Reads> = Reads extends {
+	readonly cookies: infer Cookies;
+}
+	? RawCookies extends Cookies
+		? Omit<Reads, 'cookies'>
+		: Reads
+	: Reads;
 
 /** The keys `T` names, without those of an index signature. */
 type NamedKeys<T> = keyof {
