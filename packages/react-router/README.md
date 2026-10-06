@@ -151,29 +151,100 @@ login page's JavaScript.
 
 ## Reading the context in a loader
 
+What alxia's middlewares built for a request reaches a loader, an action or
+a middleware in three forms, each the same object, typed by the `Register`
+declaration above:
+
+| Form | Use it |
+| --- | --- |
+| `withAlxia(fn)` | with the generated `Route.LoaderArgs` and `Route.ActionArgs`: `alxia` beside the arguments |
+| `alxiaOf(context)` | inside a plain function, or with a type argument where nothing is registered |
+| `context.alxia` | with `LoaderFunctionArgs` and `ActionFunctionArgs` from `react-router` |
+
 ```ts
 // app/routes/home.tsx
-import { alxiaOf } from '@alxia/react-router';
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
 import type { Route } from './+types/home';
 
-export function loader({ context }: Route.LoaderArgs) {
-	const { user, log } = alxiaOf(context); // typed: what configure built
-	log.info('home');
+export const loader = withAlxia(({ alxia }: Route.LoaderArgs & AlxiaArgs) => {
+	alxia.log.info('home'); // typed: what configure built
+	return { name: alxia.user?.name ?? 'anonymous' };
+});
+```
+
+`withAlxia` returns a function of React Router's arguments alone, with
+`fn`'s return type: `Route.ComponentProps['loaderData']` and
+`useLoaderData<typeof loader>` read what `fn` returns. It works for an
+action, and for a middleware, whose `next` it passes on.
+
+`alxiaOf(context)`, in a plain function:
+
+```ts
+import { alxiaOf } from '@alxia/react-router';
+
+export async function action({ context }: Route.ActionArgs) {
+	const { user, log } = alxiaOf(context);
+	log.info('saved', { by: user?.name });
+	return { ok: true };
+}
+```
+
+How each is typed:
+
+- with the `Register` declaration above, by that server: reading something
+  no middleware derives is a compile error;
+- without it, `AlxiaArgs<typeof server>` or `alxiaOf<typeof server>(context)`
+  names the server;
+- with neither, by the base `@alxia/core`'s own `Register` names
+  (`context: typeof base`), when the app has one;
+- with none of them, `BaseContext`.
+
+This package's `Register` wins over core's: the server's app is the base
+and all `configure` adds after it.
+
+### The shorthand: `context.alxia`
+
+The same object, with no import and no call, where the arguments are
+react-router's own types:
+
+```ts
+import type { LoaderFunctionArgs } from 'react-router';
+
+export function loader({ context }: LoaderFunctionArgs) {
+	const { user, server } = context.alxia;
 	return { name: user?.name ?? 'anonymous' };
 }
 ```
 
-How `alxiaOf(context)` is typed:
+With the generated `Route.LoaderArgs` it is there at runtime, but `tsc`
+reports `Property 'alxia' does not exist on type
+'Readonly<RouterContextProvider>'` (TS2339): react-router's `./internal`
+types, which the generated route types read, point at its development
+build, a second declaration of `RouterContextProvider` that no package can
+augment. Use `withAlxia` there until react-router ships one declaration.
+[More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#property-alxia-does-not-exist-on-type-readonlyroutercontextprovider)
 
-- with the `Register` declaration above, by that server: reading something
-  no middleware derives is a compile error;
-- without it, `alxiaOf<typeof server>(context)` names the server;
-- with neither, by the base `@alxia/core`'s own `Register` names
-  (`context: typeof base`), when the app has one;
-- with none of them, `alxiaOf(context)` is `BaseContext`.
+### The server: `server`
 
-This package's `Register` wins over core's: the server's app is the base
-and all `configure` adds after it.
+`alxiaOf(context).server` is the `Bun.Server` serving the request, core's
+`ctx.server`: its `publish` reaches the app's [WebSocket](#websockets)
+subscribers from an action.
+
+```ts
+export async function action({ context }: Route.ActionArgs) {
+	alxiaOf(context).server?.publish('todos', JSON.stringify({ changed: true }));
+	return { ok: true };
+}
+```
+
+It is the listening server behind `bun build/server/index.js`. Under
+`react-router dev` and `vite preview`, Vite's server is `node:http`, so it is
+the `Bun.Server` the app's sockets are relayed to, on a loopback port:
+`publish` reaches them, but its `url` is that port's, not Vite's, and its
+`requestIP` and `timeout` know nothing of a request Vite took. Through
+`app.request(…)`, as in a test, it is `undefined`.
+It is not `Register`'s `server`, which names what `createServer()` returned
+for the types.
 
 [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#typing-the-loaders)
 
@@ -247,7 +318,9 @@ export default createServer({
 In dev, the plugin hands each upgrade Vite does not claim (its HMR, its
 `server.proxy`) to the app, run by `Bun.serve` as `listen` runs it: the
 middlewares before the route, a refusal's status, `socket.data`, `publish`. An
-edit to the server is used from the next connection.
+edit to the server is used from the next connection. An action's
+`alxiaOf(context).server.publish` reaches those sockets too
+([The server](#the-server-server)).
 [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#websockets)
 
 ## Options
@@ -417,9 +490,9 @@ has the commented file, and what to copy for a package left external.
 - **`@alxia/secure-headers`' default policy blocks the page's scripts**
   and forms: give the pages a policy of their own, with `nonce: true` and
   `nonceOf` in `entry.server.tsx` rather than `'unsafe-inline'`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
-- **Under `react-router dev`, `page()` and an HTTP request's
-  `ctx.server` are absent**: requests arrive through `app.fetch`. A
-  socket's upgrade has its server. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#ctxserver-is-undefined-under-react-router-dev)
+- **Under `react-router dev`, `page()` is not served**, and an HTTP
+  request's `ctx.server` is the loopback server the sockets are relayed to:
+  its `publish` reaches them, its `url` and `requestIP` are not Vite's. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-page-is-not-served-under-react-router-dev)
 - **An alxia route whose path covers a page takes it**, wherever it is
   declared: `GET /:slug` answers `/about`. Keep alxia's routes under
   `/api`. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#a-page-answers-alxias-json-404-or-405-instead-of-rendering)
@@ -433,13 +506,18 @@ has the commented file, and what to copy for a package left external.
 | `ReactRouterServer<App>` | what it returns: `create(wiring)` makes the app, `start(app)` listens |
 | `ServerWiring` | what `create` takes: `build`, `mode`, `client` |
 | `FreshApp` | the app `beforeAll`, or `configure` without it, receives |
-| `alxiaOf<App>(context)` | what alxia's middlewares built, in a loader, an action or a middleware. Typed by the registered server, by the type argument (a server or an app), or as `BaseContext` |
+| `alxiaOf<App>(context)` | what alxia's middlewares built, in a loader, an action or a middleware. Typed by the registered server, by the type argument (a server or an app), or as `BaseContext`. Its `server` is the `Bun.Server` serving the request |
+| `context.alxia` | the same object, on React Router's `RouterContextProvider` (this package augments its type, as `alxiaOf(context)` with no type argument): typed with `LoaderFunctionArgs` and `ActionFunctionArgs` from `react-router`, not yet with the generated `Route.LoaderArgs`: use `withAlxia` there |
+| `withAlxia(fn)` | a loader, an action or a middleware given `alxia`, the alxia context, beside React Router's arguments: annotate `Route.LoaderArgs & AlxiaArgs`. Returns a function of the arguments alone, with `fn`'s return type |
+| `AlxiaArgs<App>` | what `withAlxia` adds: `{ alxia }`, typed by `Register`, or by the server it names |
+| `AlxiaContextOf<App>` | what `alxiaOf<App>(context)` returns: the app's context and the catch-all's `route` |
+| `ProviderLike` | what `alxiaOf` and `nonceOf` take: any React Router context provider's `get`, the generated route types' included |
 | `Register` | the interface to augment with `server: typeof server` |
 | `RegisteredApp` | the app `alxiaOf` reads with no type argument: the registered server's, else the one `@alxia/core`'s `Register` names, else a fresh app |
 | `RegisteredOf<R, Core?>` | the app a `Register`-shaped interface names: its server's, `InvalidRegister`, or with no server `Core`, by default core's `RegisteredBase` |
 | `InvalidRegister` | what a `Register` naming neither a server nor an app reads as: every key of the app's own a compile error |
 | `AppOf<Server>` | the app a server makes |
-| `alxiaContext` | the React Router context key `alxiaOf` reads, set on every request |
+| `alxiaContext` | the React Router context key `alxiaOf` and `context.alxia` read, set on every request |
 | `nonceOf(context)` | the request's CSP nonce, for `entry.server.tsx`: the context's `nonce` when a middleware set one, such as `secureHeaders({ nonce: true })`, else `undefined` |
 | `reactRouter(app, options)` | the catch-all and the client's files, for a server of your own. `build`, `mode`, `getLoadContext`, `client` |
 | `ReactRouterOptions<Ctx>` | its options |

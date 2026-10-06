@@ -97,7 +97,7 @@ the build. Here it adds:
 | `app/session.server.ts` | sessions in memory, keyed by the `sid` cookie, which the `derive` reads from the request's `cookies`. Anyone may sign in by name: there is no real authentication |
 | `app/todos.server.ts` | the todos, in memory, and `NewTodo`, the schema both the page's form and the API's body are validated with |
 | `app/context.ts` | `userContext`, a React Router context key, for a route that does not import alxia |
-| `app/routes/home.tsx` | the template's home page. Its loader reads `user` and `log` with `alxiaOf(context)`, typed by `Register` |
+| `app/routes/home.tsx` | the template's home page. Its loader reads `user` and `log` from `alxia`, through `withAlxia` under the generated `Route.LoaderArgs`, typed by `Register`; `todos.tsx`'s action reads `alxiaOf(context)` |
 | `app/routes/login.tsx` | a sign-in action that sets the session cookie and redirects, or returns `data({ error }, { status: 400 })` |
 | `app/routes/todos.tsx` | a todo list: a `<Form>`, the schema's message with a 400, the new todo under the name from `context.get(userContext)` |
 | `app/routes/slow.tsx` | a page streamed behind `<Await>`: the shell and its fallback first, the deferred value 400 ms later |

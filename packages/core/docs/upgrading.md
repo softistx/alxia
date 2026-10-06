@@ -4,6 +4,73 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
+## Next
+
+`@alxia/core` documents `ctx.server`, the `Bun.Server` serving the request,
+which every context has always held. The next `@alxia/react-router` minor
+gives a loader's `alxiaOf(context).server` a server under `react-router dev`
+and `vite preview`, and adds `withAlxia(fn)`, a loader given `alxia` under the generated
+`Route.LoaderArgs`, and `context.alxia`, a shorthand for `alxiaOf(context)`.
+Nothing breaks.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [`withAlxia(fn)` under the generated types](#contextalxia-the-shorthand) | react-router | no: a new export |
+| [`context.alxia`, the shorthand](#contextalxia-the-shorthand) | react-router | only an app that declares an `alxia` property of its own on React Router's `RouterContextProvider` |
+| [`ctx.server` under `react-router dev`](#ctxserver-under-react-router-dev) | react-router | no: it was `undefined` there |
+| [`ctx.server`, documented](#ctxserver-documented) | core | no: nothing changes at runtime or in the types |
+
+### `context.alxia`, the shorthand
+
+`@alxia/react-router` augments React Router's `RouterContextProvider` with a
+read-only `alxia`: what `alxiaOf(context)` returns, typed by its `Register`,
+with no import:
+
+```ts
+import type { LoaderFunctionArgs } from 'react-router';
+
+export function loader({ context }: LoaderFunctionArgs) {
+	const { user, server } = context.alxia;
+}
+```
+
+It is typed with `react-router`'s own argument types. With the generated
+`Route.LoaderArgs`, `tsc` reports TS2339 until react-router's generated types
+and its main entry share one declaration: use `withAlxia` there, which hands
+the function `alxia` beside the generated arguments:
+
+```ts
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
+
+export const loader = withAlxia(({ alxia }: Route.LoaderArgs & AlxiaArgs) => ({
+	name: alxia.user?.name ?? null,
+}));
+```
+Nothing to change: `alxiaOf(context)` returns what it did.
+
+**Notice.** An app that declares `alxia` on `RouterContextProvider` itself,
+in a `declare module 'react-router'` of its own, gets `Subsequent property
+declarations must have the same type`: rename its property.
+
+### `ctx.server` under `react-router dev`
+
+Before, under `react-router dev` and `vite preview`, a loader's or an
+action's `ctx.server` was `undefined`: Vite's server is `node:http`, and the
+plugin called `app.fetch(request)` alone. Now it is the `Bun.Server` on a
+loopback port that the plugin already relays the app's sockets to, so a
+`server.publish(topic, data)` from an action reaches them in dev as from the
+build. Its `url` is that loopback port's, and `requestIP` and `timeout` know
+nothing of a request Vite took; `ctx.ip` stays `undefined` there, as before.
+
+### `ctx.server`, documented
+
+`ctx.server` is in every context, `Bun.Server<unknown> | undefined`: the
+server `listen` started, the one a server of your own passes as
+`app.fetch(request, server)`, or `undefined` under `app.request`
+([Serving](guide/serving.md#the-server-ctxserver)). Nothing changes. A
+`derive` or a `decorate` that returns a `server` key of its own replaces it
+for what follows, as before; no `@alxia/*` package adds one.
+
 ## 0.14.1
 
 `@alxia/core` 0.14.1 takes, after a `validate({ cookies })`, the

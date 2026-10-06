@@ -1,6 +1,5 @@
 /** `nonceOf`: the request's CSP nonce, read from alxia's context if a middleware set one. */
-import type { RouterContextProvider } from 'react-router';
-import { alxiaContext } from './context';
+import { alxiaContext, type ProviderLike } from './context';
 
 /**
  * This request's CSP nonce, for `entry.server.tsx`: the `nonce` alxia's
@@ -14,9 +13,7 @@ import { alxiaContext } from './context';
  * <ServerRouter context={routerContext} url={request.url} nonce={nonce} />
  * ```
  */
-export function nonceOf(
-	context: Readonly<RouterContextProvider>,
-): string | undefined {
+export function nonceOf(context: ProviderLike): string | undefined {
 	const value = context.get(alxiaContext);
 	if (typeof value !== 'object' || value === null || !('nonce' in value)) {
 		return undefined;

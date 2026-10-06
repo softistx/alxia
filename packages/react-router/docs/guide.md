@@ -157,9 +157,10 @@ routes. The server is loaded through Vite's SSR runner, so:
 - **alxia's `ws` routes connect**: an upgrade Vite's HMR does not claim
   goes to the app, as from the build. See [WebSockets](#websockets).
 
-HTTP requests reach the app through `app.fetch`, as in a test, not
-through `listen`. So `page()` and an HTTP request's `ctx.server` are
-absent in dev; see [the troubleshooting entry](troubleshooting.md#ctxserver-is-undefined-under-react-router-dev).
+HTTP requests reach the app through `app.fetch`, not through `listen`,
+given the loopback server the sockets are relayed to as `ctx.server`
+([The server](#the-server-server)). So `page()` is not served in dev; see
+[the troubleshooting entry](troubleshooting.md#a-page-is-not-served-under-react-router-dev).
 
 ### In a build
 
@@ -582,7 +583,57 @@ for what is believed and what is valid.
 
 Every request through the catch-all sets `alxiaContext`, this package's
 key, on React Router's context provider, to what alxia's middlewares built for
-that request. `alxiaOf(context)` reads it.
+that request. Three forms read it, each the same object:
+
+- **`withAlxia(fn)`**, for a route typed by the generated `Route.*Args`:
+  `fn` gets `alxia` beside React Router's arguments;
+- **`alxiaOf(context)`**, inside a plain function, and with a type argument;
+- **`context.alxia`**, where the arguments are typed with `react-router`'s
+  own `LoaderFunctionArgs` and `ActionFunctionArgs`
+  ([below](#the-shorthand-contextalxia)).
+
+### `withAlxia(fn)`
+
+```ts
+// app/routes/account.tsx
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
+import { redirect } from 'react-router';
+import type { Route } from './+types/account';
+
+export const loader = withAlxia(({ alxia, params }: Route.LoaderArgs & AlxiaArgs) => {
+	if (alxia.user === null) throw redirect('/login');
+	return { name: alxia.user.name, tab: params.tab ?? 'profile' };
+});
+// The page's Route.ComponentProps['loaderData']: { name: string; tab: string }
+```
+
+Annotate `fn`'s parameter as the generated arguments and `AlxiaArgs`:
+`AlxiaArgs` is `{ alxia }`, typed by `Register`, and `AlxiaArgs<typeof server>`
+names a server where nothing is registered. `withAlxia` returns a function of
+React Router's arguments alone, with `fn`'s return type, so the generated
+`loaderData` and `actionData`, and `useLoaderData<typeof loader>`, read what
+`fn` returns. An action is written the same way; a middleware too, and its
+`next` is passed on:
+
+```ts
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
+import type { Route } from './+types/admin';
+
+export const middleware: Route.MiddlewareFunction[] = [
+	withAlxia(async ({ alxia }: Parameters<Route.MiddlewareFunction>[0] & AlxiaArgs, next) => {
+		alxia.log.info('admin');
+		return next();
+	}),
+];
+```
+
+Why a wrapper: `context.alxia` cannot be typed under the generated
+arguments ([below](#the-shorthand-contextalxia)), and a wrapper that adds a
+key is the one form TypeScript infers from the annotation alone. A type
+argument, `withAlxia<Route.LoaderArgs>(fn)`, would fix the arguments but
+stop TypeScript inferring `fn`'s return type, since it infers no type
+argument once one is given: the page's `loaderData` would be lost. On a request that did not come
+through alxia it throws what `alxiaOf` throws.
 
 ### With `Register`: no type argument
 
@@ -714,11 +765,81 @@ both folders of a monorepo), their two declarations conflict, and `tsc`
 says so (`Subsequent property declarations must have the same type`).
 Give each app its own tsconfig, or use the type argument in both.
 
+### The server: `server`
+
+`alxiaOf(context).server` is core's `ctx.server`, the `Bun.Server` serving
+the request, `undefined` with none
+([Serving](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#the-server-ctxserver)).
+It is not `Register`'s `server`, which names what `createServer()` returned
+for the types. From an action, its `publish` reaches the app's
+[WebSocket](#websockets) subscribers:
+
+```ts
+// app/routes/todos.tsx
+import { alxiaOf } from '@alxia/react-router';
+import type { Route } from './+types/todos';
+
+export async function action({ request, context }: Route.ActionArgs) {
+	const title = String((await request.formData()).get('title'));
+	// Bun's own publish: the bytes as given, not checked by a socket's `send` schema.
+	alxiaOf(context).server?.publish('todos', JSON.stringify({ added: title }));
+	return { added: title };
+}
+```
+
+What it is, by how the app runs:
+
+| | `alxiaOf(context).server` |
+| --- | --- |
+| `bun build/server/index.js`, `server.start(app)`, `app.listen()` | the server `listen` started |
+| `react-router dev`, `vite preview` | the `Bun.Server` on a loopback port that the plugin relays the app's sockets to (Vite's own server is `node:http`, not a `Bun.Server`): `publish` reaches every socket the app opened, its `url` is that port's, and `requestIP` and `timeout` know nothing of the request Vite took, so `ctx.ip` stays `undefined` there |
+| Vite in middleware mode, a server of your own calling `app.fetch(request)` alone, `app.request(…)` in a test | `undefined` |
+
+### The shorthand: `context.alxia`
+
+This package augments React Router's `RouterContextProvider` with a
+read-only `alxia` property: the object `alxiaOf(context)` returns, with no
+import and no call, typed by the same `Register` (core's, then
+`BaseContext`, with none of this package's):
+
+```ts
+import type { ActionFunctionArgs, LoaderFunctionArgs } from 'react-router';
+
+export function loader({ context }: LoaderFunctionArgs) {
+	const { user, server } = context.alxia;
+	return { name: user?.name ?? 'anonymous', listening: server !== undefined };
+}
+
+export async function action({ context }: ActionFunctionArgs) {
+	context.alxia.server?.publish('todos', JSON.stringify({ changed: true }));
+	return { ok: true };
+}
+```
+
+**Typed with react-router's own argument types, not yet the generated
+ones.** `LoaderFunctionArgs`, `ActionFunctionArgs`, `MiddlewareFunction` and
+`RouterContextProvider`, imported from `react-router`, see `alxia`. The
+generated `Route.LoaderArgs` does not: the `+types` files import from
+`react-router/internal`, whose types (in react-router 8.4) point at its
+`dist/development` build, while `react-router` itself points at
+`dist/production`. That is a second declaration of `RouterContextProvider`,
+which no exported path reaches, so no package can augment it. With
+`Route.LoaderArgs`, `context.alxia` works at runtime and `tsc` reports
+TS2339 ([Troubleshooting](troubleshooting.md#property-alxia-does-not-exist-on-type-readonlyroutercontextprovider)):
+use `withAlxia` (or `alxiaOf(context)`) there, until react-router ships one declaration.
+
+It is a getter on the provider's prototype that reads `alxiaContext`: it
+holds exactly when that key is set, in dev as in production, and on a
+provider no catch-all filled it throws what `alxiaOf` throws. It is the
+server's alone: a `clientLoader` or a `clientAction` has no alxia context.
+
 ### Outside the catch-all
 
 Without the plugin, under a plain `react-router dev`, or in a unit test
 that calls a loader with a bare provider, there is no alxia context, and
-`alxiaOf` throws, saying so: see
+`alxiaOf` and `context.alxia` throw, saying so. The getter is installed
+when `@alxia/react-router` is first imported: a test whose program never
+imports it reads `context.alxia` as `undefined`. See
 [the troubleshooting entry](troubleshooting.md#alxiaof-this-request-has-no-alxia-context-).
 
 ## The app's own context keys
@@ -1083,7 +1204,7 @@ leaves Vite's own socket alone: an upgrade asking for the `vite-hmr` or
 upgrade, except one Vite's `server.proxy` relays itself (an entry with
 `ws: true` or a `ws:` target, matched as Vite matches it), is relayed,
 byte for byte, to a `Bun.serve` of the app on a loopback port of its
-own, started on the first upgrade and given
+own, started on the first upgrade or the first request and given
 `app.fetch` and `app.websocket`, as `listen` gives them. So in dev:
 
 - **The same middlewares, refusals and handlers run** as from the build:
@@ -1096,6 +1217,9 @@ own, started on the first upgrade and given
 - **A `publish` reaches the sockets opened since the same edit**: the
   sockets opened before it are on the previous server. Reload the pages
   after an edit to reconnect them.
+- **A loader's or an action's `alxiaOf(context).server` is that loopback
+  server**, the one the sockets are on, so its `publish` reaches them as
+  from the build: see [The server](#the-server-server).
 - **A socket's `ctx.ip` is the loopback address**, the relay's. The
   browser is local in dev, so that is usually its address anyway.
 - **An upgrade to a path with no `ws` route** gets what the build answers
@@ -1216,6 +1340,12 @@ Send a browser's user agent. `isbot('Bun/1.4.2')` is true, and React
 Router's entry waits for the whole page before it answers a bot, so a test
 with Bun's own user agent never sees a page stream. An index route's action
 is `POST /?index`, not `POST /`.
+
+`app.request` runs without a server, so a loader's `alxiaOf(context).server`
+is `undefined` there, and a `publish` it guards with `?.` sends nothing.
+To test one, listen on a free port, `app.listen({ port: 0 })`, open the
+socket, then post to the action (`/todos.data`, the single-fetch URL, for
+its data rather than the page).
 
 ## Deploying
 

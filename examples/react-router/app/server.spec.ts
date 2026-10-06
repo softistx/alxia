@@ -31,7 +31,7 @@ describe("customised by app/server.ts", () => {
   }, 30_000);
   afterAll(() => server?.stop());
 
-  test("the home page reads the session's user through alxiaOf", async () => {
+  test("the home page reads the session's user through withAlxia", async () => {
     const guest = text(await (await server.get("/")).text());
     expect(guest).toContain(
       '<a href="/login" data-discover="true">Sign in</a>',

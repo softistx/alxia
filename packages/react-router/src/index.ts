@@ -1,8 +1,10 @@
 export {
+	type AlxiaContextOf,
 	type AppOf,
 	alxiaContext,
 	alxiaOf,
 	type InvalidRegister,
+	type ProviderLike,
 	type Register,
 	type RegisteredApp,
 	type RegisteredOf,
@@ -20,3 +22,4 @@ export {
 	type ServerOptions,
 	type ServerWiring,
 } from './server';
+export { type AlxiaArgs, withAlxia } from './with-alxia';

@@ -8,7 +8,8 @@ import type { FreshApp } from '@alxia/react-router';
 
 /**
  * `/api/health`, a `user` from the `x-user` header, and
- * two sockets: `/api/echo`, open to anyone, and `/api/private`, refused
+ * three sockets: `/api/echo`, open to anyone, `/api/live`, subscribed to
+ * what `routes/live.tsx`'s action publishes, and `/api/private`, refused
  * without a user.
  */
 export const configure = (app: FreshApp) =>
@@ -27,6 +28,13 @@ export const configure = (app: FreshApp) =>
 				message: (socket, message) => socket.send({ echo: String(message) }),
 			},
 		)
+		.ws('/api/live', {
+			open: (socket) => {
+				socket.subscribe('live');
+				socket.send({ subscribed: 'live' });
+			},
+			message: () => {},
+		})
 		.group((guarded) =>
 			guarded
 				.derive(({ user, reply }) =>

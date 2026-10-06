@@ -10,6 +10,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`alxia-react-router: … is running on Node, and alxia's server runs on Bun. …`](#alxia-react-router--is-running-on-node-and-alxias-server-runs-on-bun-)
 - [`ReferenceError: Bun is not defined`](#referenceerror-bun-is-not-defined)
 - [`alxiaOf(): this request has no alxia context. …`](#alxiaof-this-request-has-no-alxia-context-)
+- [`TypeError: undefined is not an object (evaluating 'context.alxia.user')`](#typeerror-undefined-is-not-an-object-evaluating-contextalxiauser)
 - [`Error: No value found for context`](#error-no-value-found-for-context)
 - [`alxia-react-router: … must export createServer() from @alxia/react-router as its default export: …`](#alxia-react-router--must-export-createserver-from-alxiareact-router-as-its-default-export-)
 - [`alxia-react-router: the entry … does not exist. …`](#alxia-react-router-the-entry--does-not-exist-)
@@ -40,6 +41,7 @@ a loader, a message React Router or the browser prints, or an error from
 
 **Types**
 
+- [`Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`](#property-alxia-does-not-exist-on-type-readonlyroutercontextprovider)
 - [`Property '…' does not exist on type 'BaseContext & …'`](#property--does-not-exist-on-type-basecontext--)
 - [`Type '…' does not satisfy the constraint 'AnyAlxia | ReactRouterServer<AnyAlxia>'`](#type--does-not-satisfy-the-constraint-anyalxia--reactrouterserveranyalxia)
 - [`Type '(app: …) => void' is not assignable to type '(app: …) => AnyAlxia'`](#type-app---void-is-not-assignable-to-type-app---anyalxia)
@@ -57,7 +59,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [The logger times a streamed page at a few milliseconds](#the-logger-times-a-streamed-page-at-a-few-milliseconds)
 - [A page, or a missing path, answers 401 behind a guard](#a-page-or-a-missing-path-answers-401-behind-a-guard)
 - [The logger, CORS or secure headers miss the client's files](#the-logger-cors-or-secure-headers-miss-the-clients-files)
-- [`ctx.server` is `undefined` under `react-router dev`](#ctxserver-is-undefined-under-react-router-dev)
+- [A `page()` is not served under `react-router dev`](#a-page-is-not-served-under-react-router-dev)
 - [A `publish` under `react-router dev` misses the sockets opened before an edit](#a-publish-under-react-router-dev-misses-the-sockets-opened-before-an-edit)
 - [The build has a package's Node variant, not its `bun` one](#the-build-has-a-packages-node-variant-not-its-bun-one)
 - [`request.url` in a loader is `http://` and the internal host behind a proxy](#requesturl-in-a-loader-is-http-and-the-internal-host-behind-a-proxy)
@@ -109,7 +111,11 @@ with [the entry above](#alxia-react-router--is-running-on-node-and-alxias-server
 Error: alxiaOf(): this request has no alxia context. Serve the React Router app through alxia: add alxia() from @alxia/react-router/vite to vite.config.ts's plugins, or, with a server of your own, serve the build through reactRouter() from @alxia/react-router.
 ```
 
-**When:** a loader calls `alxiaOf` and `alxiaContext` was not set.
+**When:** a loader calls `alxiaOf`, or reads `context.alxia`, and
+`alxiaContext` was not set. `context.alxia` throws the same error: it reads
+that key. With two copies of `@alxia/react-router` in one process (the
+third case below), the getter is the copy loaded last, which reads its own
+key: one copy is the fix for both.
 
 **Why:** one of three:
 
@@ -153,6 +159,34 @@ const context = new RouterContextProvider();
 context.set(alxiaContext, { user: { name: 'Ada' } });
 await loader({ context, request: new Request('http://localhost/'), params: {} } as never);
 ```
+
+### `TypeError: undefined is not an object (evaluating 'context.alxia.user')`
+
+**When:** a unit test calls a loader that reads `context.alxia` with a
+`new RouterContextProvider()`, and nothing in the test imports
+`@alxia/react-router`; destructured, `const { user } = context.alxia` fails
+with `TypeError: Cannot destructure property 'user' from null or undefined
+value`. A `clientLoader` or a `clientAction` reading it fails the same way
+in the browser.
+
+**Why:** `context.alxia` is a getter `@alxia/react-router` defines on React
+Router's provider when it is first imported. The loader's module need not
+import it, and the browser never loads it: the alxia context is the
+server's.
+
+**Fix:** in the test, set the key the getter reads, imported from
+`@alxia/react-router`, which installs the getter:
+
+```ts
+import { alxiaContext } from '@alxia/react-router';
+import { RouterContextProvider } from 'react-router';
+
+const context = new RouterContextProvider();
+context.set(alxiaContext, { user: { name: 'Ada' }, server: undefined });
+await loader({ context, request: new Request('http://localhost/'), params: {} } as never);
+```
+
+On the client, read the data the server's loader returned instead.
 
 ### `Error: No value found for context`
 
@@ -738,6 +772,42 @@ put the final stage back on `oven/bun:1`
 
 ## Types
 
+### `Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`
+
+```text
+app/routes/home.tsx: error TS2339: Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'.
+```
+
+**When:** a loader or an action typed with the generated `Route.LoaderArgs`
+or `Route.ActionArgs` reads `context.alxia`. At runtime it is there; only
+`tsc` refuses it.
+
+**Why:** this package augments `RouterContextProvider` as `react-router`
+exports it, whose types are `dist/production`'s. The generated `+types`
+files read their argument types from `react-router/internal`, whose types,
+in react-router 8.4, point at `dist/development`: a second declaration of
+the class, which no exported path reaches, so no augmentation can add
+`alxia` to it.
+
+**Fix:** wrap the loader in `withAlxia`, which hands it `alxia` typed the
+same way, and keeps the generated `loaderData`:
+
+```ts
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
+import type { Route } from './+types/home';
+
+export const loader = withAlxia(({ alxia }: Route.LoaderArgs & AlxiaArgs) => {
+	return { name: alxia.user?.name ?? null };
+});
+```
+
+Or read `alxiaOf(context)` inside the plain function.
+
+Or type the arguments with `LoaderFunctionArgs` from `react-router`, which
+sees `context.alxia`, at the cost of the generated `params`. Typing it under
+`Route.LoaderArgs` waits on react-router pointing both entries at the same
+declarations.
+
 ### `Property '…' does not exist on type 'BaseContext & …'`
 
 ```text
@@ -1034,22 +1104,25 @@ createServer({
 });
 ```
 
-### `ctx.server` is `undefined` under `react-router dev`
+### A `page()` is not served under `react-router dev`
 
-A middleware or a route reads `ctx.server`, or the app declares a `page()`,
-under `react-router dev` or `vite preview`; the same code works from
-`bun build/server/index.js`.
+The app declares a `page()`, or reads `ctx.server.url`, `requestIP` or
+`timeout`, or `ctx.ip`, under `react-router dev` or `vite preview`; the same
+code works from `bun build/server/index.js`.
 
 **Why:** under `@alxia/react-router/vite`, Vite owns the dev server, and
-the preview server under `vite preview`. An HTTP request reaches the app
-through `app.fetch`, as in a test, not through `listen`: there is no
-`Bun.serve` behind it, so `ctx.server` is `undefined`, the default
-`ctx.ip` too, and a `page()` (Bun's HTML bundle) is not served. A socket's upgrade is the exception: the plugin relays it
-to a `Bun.serve` of the app, so its middlewares read a server
-([WebSockets](guide.md#under-react-router-dev)).
+the preview server under `vite preview`: a `node:http` server, not a
+`Bun.Server`. An HTTP request reaches the app through
+`app.fetch(request, side)`, where `side` is the loopback `Bun.serve` the
+plugin relays the app's sockets to. So `ctx.server` is that side server: its
+`publish` reaches the app's sockets, but its `url` is the loopback port's,
+and its `requestIP` and `timeout` know nothing of a request Vite took, so
+the default `ctx.ip` is `undefined`. A `page()` (Bun's HTML bundle) is not
+served: Vite answers the HTML
+([The server](guide.md#the-server-server)).
 
-**Fix:** read `ctx.server` as optional, and publish to sockets from the
-sockets themselves (`socket.publish`), which works in dev too:
+**Fix:** read `ctx.server` as optional, which also covers `app.request` in
+a test, and take nothing from its `url` or `requestIP` in dev:
 
 ```ts
 // app/server.ts
@@ -1072,7 +1145,7 @@ Two clients in one room; after an edit to `app/server.ts`, a message one
 sends no longer reaches the other.
 
 **Why:** an edit to the server makes a new app, and the plugin starts a
-new `Bun.serve` for it on the next upgrade, so that new connections use
+new `Bun.serve` for it on the next upgrade or request, so that new connections use
 the new handlers. A socket opened before the edit stays on the previous
 server, with the handlers it opened with, and a topic is one server's.
 

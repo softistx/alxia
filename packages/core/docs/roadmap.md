@@ -50,6 +50,13 @@ Nothing in progress.
 
 ## Shipped
 
+### Next
+
+- **`ctx.server`, documented.** The `Bun.Server` serving the request, or
+  `undefined` without one: `publish` to the app's sockets from any route,
+  `timeout` for a long request
+  ([Serving](guide/serving.md#the-server-ctxserver)).
+
 ### 0.14.0
 
 - **`onStop` is given the server that stopped.** The one `onStart` was

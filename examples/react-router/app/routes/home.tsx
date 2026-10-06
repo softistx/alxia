@@ -1,4 +1,4 @@
-import { alxiaOf } from "@alxia/react-router";
+import { type AlxiaArgs, withAlxia } from "@alxia/react-router";
 import { Link } from "react-router";
 import type { Route } from "./+types/home";
 import { Welcome } from "../welcome/welcome";
@@ -10,12 +10,13 @@ export function meta({}: Route.MetaArgs) {
   ];
 }
 
-export function loader({ context }: Route.LoaderArgs) {
-  // What app/server.ts built for this request, typed by its Register.
-  const { user, log } = alxiaOf(context);
+// `alxia`: what app/server.ts built for this request, typed by its Register,
+// beside the generated Route.LoaderArgs.
+export const loader = withAlxia(({ alxia }: Route.LoaderArgs & AlxiaArgs) => {
+  const { user, log } = alxia;
   log.info("home", { signedIn: user !== null });
   return { name: user?.name ?? null };
-}
+});
 
 export default function Home({ loaderData }: Route.ComponentProps) {
   return (
