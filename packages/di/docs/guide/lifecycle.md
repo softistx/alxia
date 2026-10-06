@@ -40,9 +40,10 @@ on `SIGTERM` or `SIGINT`, or `stop()`, after the requests in flight have
 finished, within `listen`'s `stopTimeout`. Disposing runs every value's
 `dispose` in reverse creation order.
 
-It counts the starts of the apps it was given to, and disposes of the
-Container when a stop brings that count back to zero. That is what makes
-forks safe.
+It keeps the server each app it was given to started (`onStart` is given
+it), and disposes of the Container when the last of them stops (`onStop`
+is given the server that stopped). That is what makes forks safe. Requires
+`@alxia/core` 0.14 or later, where `onStop` receives the server.
 
 ## Forks
 
@@ -74,15 +75,10 @@ await adminApi.stop(); // the last one: the Container is disposed of
   Container itself does no harm.
 - A disposed Container stays disposed: an app listening again after its
   stop needs a new Container, and a new `di`.
-- An app that only answers `app.request()`, as a spec does, never starts.
-  Its `stop()`, if it calls one, still runs every `onStop` (core runs them
-  on a stop before `listen` too); with no app started, `deps.lifecycle`
-  ignores it and disposes of nothing.
-- **Known limit: do not `stop()` a fork that never listened while another
-  serves.** An `onStop` hook is told neither which app stops nor whether it
-  started, so that stop counts as the serving app's: it disposes of the
-  Container, and the serving app's next request fails with
-  `ContainerDisposedError`. Stop only the apps you started.
+- An app that never listened, such as one a spec calls with
+  `app.request()`, still runs every `onStop` on `stop()`, given `undefined`:
+  `deps.lifecycle` ignores it. A fork that never listened can be stopped
+  while another serves; the Container stays with the one serving.
 
 ## Without `deps.lifecycle`
 

@@ -12,7 +12,7 @@ bun add @alxia/di @nxgt/di @alxia/core
 bun add -d typescript
 ```
 
-The peers are `@alxia/core`, `@nxgt/di` (`^0.2.0`) and `typescript`
+The peers are `@alxia/core` (`^0.14.0`: `deps.lifecycle` reads the server `onStop` is given), `@nxgt/di` (`^0.2.0`) and `typescript`
 (`^6.0.3 || ^7.0.0`): the Container is the app's own, built with its copy of
 `@nxgt/di`. Your `tsconfig.json` needs:
 
@@ -87,9 +87,8 @@ app.listen(3000);
   and never replaces the response. A streamed body must not use scoped
   values once its route has answered.
 - **`deps.lifecycle`** disposes of the Container when the last app it was
-  given to that started stops: two forks of one base share it safely. Stop
-  only the apps you started: an unstarted fork's `stop()` while another
-  serves disposes of the Container under it
+  given to that started stops: forks of one base share it safely, and a
+  `stop()` of an app that never listened disposes of nothing
   ([Lifecycle](https://github.com/softistx/alxia/blob/develop/packages/di/docs/guide/lifecycle.md#forks)).
   Without it, the Container is yours to dispose of.
 
