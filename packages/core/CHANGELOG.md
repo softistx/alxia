@@ -1,5 +1,17 @@
 # @alxia/core
 
+## 0.13.0
+
+### Minor Changes
+
+- [#210](https://github.com/softistx/alxia/pull/210) [`5d7438a`](https://github.com/softistx/alxia/commit/5d7438afa0909630611d3f0661bd012834760fb6) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Read `X-Forwarded-Port` in `originalUrl(ctx)`, from the same trusted hop as the scheme and the host: `https://api.example.com:8443/…` behind a proxy that sends `X-Forwarded-Host: api.example.com` and `X-Forwarded-Port: 8443`. A port in the host wins, a value that is not digits from 1 to 65535 is ignored, the scheme's default is left out, and `untrusted: 'refuse'` now refuses a request from an untrusted connection that carries the header.
+
+- [#209](https://github.com/softistx/alxia/pull/209) [`9de1c30`](https://github.com/softistx/alxia/commit/9de1c30e0ba8ab4cb20d38a5f5a14293726e9468) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Let a handler yield a comment on an event stream: `yield sseComment('connected')` writes `: connected`, one `:` line per line of the text, on a named or an unnamed stream, never checked by its schema. A line break cannot end the comment and start an event. The keep-alive is unchanged.
+
+### Patch Changes
+
+- [#214](https://github.com/softistx/alxia/pull/214) [`b4195c0`](https://github.com/softistx/alxia/commit/b4195c0518ce2c5c8c68181e5cb3de67890c2ae8) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs: the upgrading guide's 0.13.0 section covers every change of the release a core user may meet (`sseComment`, `X-Forwarded-Port` and its refusal under `untrusted: 'refuse'`, the peers' move to `^0.13.0`, and what jwt, graphql, proxy, telemetry and create changed alongside), the roadmap versions it, and troubleshooting names the `TypeError` of `sseComment` on a non-string.
+
 ## 0.12.0
 
 ### Minor Changes

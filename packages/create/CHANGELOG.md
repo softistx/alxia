@@ -1,5 +1,13 @@
 # @alxia/create
 
+## 0.4.1
+
+### Patch Changes
+
+- [#213](https://github.com/softistx/alxia/pull/213) [`2a77131`](https://github.com/softistx/alxia/commit/2a771316ce53a46d33df0dec11a77568f7990891) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `graphql` template's spec calls the app through `graphqlClient` from `@alxia/graphql/testing` instead of a hand-written helper.
+
+- [#214](https://github.com/softistx/alxia/pull/214) [`b4195c0`](https://github.com/softistx/alxia/commit/b4195c0518ce2c5c8c68181e5cb3de67890c2ae8) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs: the roadmap versions the `graphqlClient` spec of the `graphql` template as 0.4.1.
+
 ## 0.4.0
 
 ### Minor Changes

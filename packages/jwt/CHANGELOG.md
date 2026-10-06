@@ -1,5 +1,17 @@
 # @alxia/jwt
 
+## 0.5.0
+
+### Minor Changes
+
+- [#212](https://github.com/softistx/alxia/pull/212) [`d2bf71a`](https://github.com/softistx/alxia/commit/d2bf71ad7f77db441a6cd156adb58e99ef90a64e) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `ES512` (ECDSA on P-521 with SHA-512): `createJwt({ algorithm: 'ES512', privateKey, publicKey })` signs and verifies with a P-521 key pair, and a `jwks` or `discovery` verifier accepts `ES512` tokens by an EC key of `crv: P-521` (and `algorithms: ['ES512']` names it). A key of another curve is refused in both directions — a P-256 key under `ES512`, a P-521 key under `ES256` — at `createJwt` for a key pair (`createJwt: ES512 needs an ECDSA P-521 key; the publicKey is ECDSA P-256`) and as `algorithm` from a key set; a JWK whose `x` or `y` is not 66 bytes is refused as `key`. Every ECDSA signature must now be the JWS `r‖s` of its curve — 64, 96 or 132 bytes for `ES256`, `ES384`, `ES512` — and any other length, a DER signature included, is refused as `signature` before Web Crypto reads it. A signature must also be spelled in its one canonical base64url, so a token cannot be respelled with a dropped trailing character or unused bits (`malformed`), and an EC key whose `crv` names an inherited member such as `constructor` is refused as `key` by an own-property lookup.
+
+### Patch Changes
+
+- [#214](https://github.com/softistx/alxia/pull/214) [`b4195c0`](https://github.com/softistx/alxia/commit/b4195c0518ce2c5c8c68181e5cb3de67890c2ae8) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs: the tokens guide names the refusal of a signature not in its one canonical base64url spelling, the troubleshooting `key` entry names an EC key of an unknown `crv`, and the roadmap versions ES512 as 0.5.0.
+- Updated dependencies [[`5d7438a`](https://github.com/softistx/alxia/commit/5d7438afa0909630611d3f0661bd012834760fb6), [`9de1c30`](https://github.com/softistx/alxia/commit/9de1c30e0ba8ab4cb20d38a5f5a14293726e9468), [`b4195c0`](https://github.com/softistx/alxia/commit/b4195c0518ce2c5c8c68181e5cb3de67890c2ae8)]:
+  - @alxia/core@0.13.0
+
 ## 0.4.6
 
 ### Patch Changes

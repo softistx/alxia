@@ -1,5 +1,17 @@
 # @alxia/graphql
 
+## 0.7.0
+
+### Minor Changes
+
+- [#213](https://github.com/softistx/alxia/pull/213) [`2a77131`](https://github.com/softistx/alxia/commit/2a771316ce53a46d33df0dec11a77568f7990891) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Add `graphqlClient(app, { path?, headers? })` in `@alxia/graphql/testing`: it POSTs a query, its variables, operation name and headers to the endpoint in process through `app.fetch`, with no server, and resolves to `{ status, data, errors, response }`. A string or a `TypedDocumentNode` (or `graphql`'s `TypedQueryDocumentNode`) is accepted and types the answer. It is a subpath, so the main entry and a production bundle do not carry it.
+
+### Patch Changes
+
+- [#214](https://github.com/softistx/alxia/pull/214) [`b4195c0`](https://github.com/softistx/alxia/commit/b4195c0518ce2c5c8c68181e5cb3de67890c2ae8) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs: the testing guide says `app` can be anything with a `fetch(Request)`, and the roadmap versions the test client as 0.7.0.
+- Updated dependencies [[`5d7438a`](https://github.com/softistx/alxia/commit/5d7438afa0909630611d3f0661bd012834760fb6), [`9de1c30`](https://github.com/softistx/alxia/commit/9de1c30e0ba8ab4cb20d38a5f5a14293726e9468), [`b4195c0`](https://github.com/softistx/alxia/commit/b4195c0518ce2c5c8c68181e5cb3de67890c2ae8)]:
+  - @alxia/core@0.13.0
+
 ## 0.6.4
 
 ### Patch Changes

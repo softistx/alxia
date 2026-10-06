@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/proxy",
-	"version": "0.4.1",
+	"version": "0.4.2",
 	"description": "A reverse proxy for alxia: forward a path or a prefix to a fixed upstream, streamed both ways, behind the app's own middlewares",
 	"license": "MIT",
 	"type": "module",
