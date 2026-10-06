@@ -6,7 +6,7 @@ number on it.
 
 ## Now
 
-- **A Scope per request, and `expose` (0.1).** `use(di(container, { slots }))` gives every route after it a lazy Scope, disposed of when the request ends; `deps.expose({ key: Token })` puts resolved values on the context of a group or a route, each Token checked against the Container; `app.plugin(deps.lifecycle)` disposes of the Container when the last app serving it stops.
+Nothing in progress.
 
 ## Next
 
@@ -23,4 +23,4 @@ Nothing scheduled yet.
 
 ## Shipped
 
-Nothing yet.
+- **A Scope per request, and `expose` (0.1.0).** `use(di(container, { slots }))` gives every route after it a lazy Scope, disposed of when the request ends; `deps.expose({ key: Token })` puts resolved values on the context of a group or a route, each Token checked against the Container; `app.plugin(deps.lifecycle)` disposes of the Container when the last app serving it stops.
