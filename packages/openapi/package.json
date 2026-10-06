@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/openapi",
-	"version": "0.6.5",
+	"version": "0.6.6",
 	"description": "OpenAPI spec first for @alxia/core: the routes of an app bound to the operations generated from its document, and checked against them",
 	"license": "MIT",
 	"type": "module",

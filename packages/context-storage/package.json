@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/context-storage",
-	"version": "0.3.6",
+	"version": "0.3.7",
 	"description": "The request's context anywhere it runs \u2014 a service, a repository, a logger \u2014 through AsyncLocalStorage: alxia's hono/context-storage, typed by the app",
 	"license": "MIT",
 	"type": "module",

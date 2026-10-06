@@ -1,5 +1,12 @@
 # @alxia/context-storage
 
+## 0.3.7
+
+### Patch Changes
+
+- Updated dependencies [[`4eac9ea`](https://github.com/softistx/alxia/commit/4eac9ea56b3ad3eb50a5cec27128ae3fce7c65ff), [`d462fd7`](https://github.com/softistx/alxia/commit/d462fd7bf5ddf4fd4601a5e146fa267d5df74297)]:
+  - @alxia/core@0.12.0
+
 ## 0.3.6
 
 ### Patch Changes

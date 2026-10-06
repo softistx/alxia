@@ -1,5 +1,15 @@
 # @alxia/core
 
+## 0.12.0
+
+### Minor Changes
+
+- [#206](https://github.com/softistx/alxia/pull/206) [`d462fd7`](https://github.com/softistx/alxia/commit/d462fd7bf5ddf4fd4601a5e146fa267d5df74297) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Let an app answer the 403 of `trustProxy({ untrusted: 'refuse' | 'refuse-all' })` itself: `trustProxy({ refusal: ({ request, url, ip, refusal }) => new Response('forbidden', { status: 403 }) })`. The default body is unchanged, and a throw or another status ends in the app's 500.
+
+### Patch Changes
+
+- [#208](https://github.com/softistx/alxia/pull/208) [`4eac9ea`](https://github.com/softistx/alxia/commit/4eac9ea56b3ad3eb50a5cec27128ae3fce7c65ff) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Document the 0.12.0 release in the upgrading guide, the roadmap and the API table, and spec that a throwing `trustProxy({ refusal })` is the app's 500 problem under `errors: 'problem'`. `trustProxy`'s header readers move to their own file; behaviour is unchanged.
+
 ## 0.11.0
 
 ### Minor Changes
