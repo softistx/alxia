@@ -1,5 +1,21 @@
 # @alxia/react-router
 
+## 0.8.0
+
+### Minor Changes
+
+- [#229](https://github.com/softistx/alxia/pull/229) [`5970afd`](https://github.com/softistx/alxia/commit/5970afd4c99bf048297077f1ae7ce36590c18a7e) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Under `react-router dev` and `vite preview`, a loader's or an action's `alxiaOf(context).server` (core's `ctx.server`) is now the `Bun.Server` the plugin relays the app's sockets to, on a loopback port, rather than `undefined`: an action's `server.publish(topic, data)` reaches the app's WebSocket subscribers in dev as from the build. Its `url` is that loopback port's, and `requestIP` and `timeout` know nothing of a request Vite took, so `ctx.ip` stays `undefined` there as before.
+  
+  Add `context.alxia`, the shorthand for `alxiaOf(context)`: the package augments React Router's `RouterContextProvider` with a read-only `alxia`, typed by its `Register` (core's, then `BaseContext`, with none). It is a getter that reads `alxiaContext`, so it is set exactly when that key is, and on a provider no catch-all filled it throws `alxiaOf`'s error. It is typed with `LoaderFunctionArgs` and `ActionFunctionArgs` from `react-router`; with the generated `Route.LoaderArgs` it works at runtime but `tsc` reports TS2339, because react-router's `./internal` types point at a second declaration of the class, so `withAlxia` or `alxiaOf(context)` is the form there. `AlxiaContextOf<App>` names what `alxiaOf<App>(context)` returns.
+  
+  Add `withAlxia(fn)`: a loader, an action or a middleware given `alxia`, the alxia context, beside React Router's arguments, typed by `Register` (or the server `AlxiaArgs<typeof server>` names) even under the generated `Route.LoaderArgs`: `export const loader = withAlxia(({ alxia, params }: Route.LoaderArgs & AlxiaArgs) => …)`. It returns a function of React Router's arguments alone, with `fn`'s return type, so the page's `loaderData` and `actionData` are still inferred; a middleware's `next` is passed on, and outside alxia it throws `alxiaOf`'s error. New types `AlxiaArgs<App>` and `ProviderLike`.
+
+### Patch Changes
+
+- [#231](https://github.com/softistx/alxia/pull/231) [`02421e6`](https://github.com/softistx/alxia/commit/02421e678997db30d65abda5579a361aa5116ab2) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The upgrading guide and the roadmap name 0.14.2 and 0.8.0.
+- Updated dependencies [[`5970afd`](https://github.com/softistx/alxia/commit/5970afd4c99bf048297077f1ae7ce36590c18a7e), [`02421e6`](https://github.com/softistx/alxia/commit/02421e678997db30d65abda5579a361aa5116ab2)]:
+  - @alxia/core@0.14.2
+
 ## 0.7.5
 
 ### Patch Changes

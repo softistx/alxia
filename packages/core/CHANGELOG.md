@@ -1,5 +1,13 @@
 # @alxia/core
 
+## 0.14.2
+
+### Patch Changes
+
+- [#229](https://github.com/softistx/alxia/pull/229) [`5970afd`](https://github.com/softistx/alxia/commit/5970afd4c99bf048297077f1ae7ce36590c18a7e) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Document `ctx.server`, the `Bun.Server` serving the request: `listen`'s, the one given to `app.fetch(request, server)`, or `undefined` under `app.request` and `app.fetch(request)` alone. Its type doc, the README's context table and the serving guide name what it is for (`publish` to the app's sockets from any route, `timeout` for a long request) and point to `ctx.ip` over `requestIP`; troubleshooting covers `ctx.server` being `undefined` in a test. Nothing changes at runtime or in the types.
+
+- [#231](https://github.com/softistx/alxia/pull/231) [`02421e6`](https://github.com/softistx/alxia/commit/02421e678997db30d65abda5579a361aa5116ab2) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The upgrading guide and the roadmap name 0.14.2 and 0.8.0.
+
 ## 0.14.1
 
 ### Patch Changes

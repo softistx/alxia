@@ -80,7 +80,7 @@
     },
     "packages/core": {
       "name": "@alxia/core",
-      "version": "0.14.1",
+      "version": "0.14.2",
       "devDependencies": {
         "@types/bun": "^1.4.2",
         "zod": "^4.1.0",
@@ -104,7 +104,7 @@
     },
     "packages/create": {
       "name": "@alxia/create",
-      "version": "0.4.2",
+      "version": "0.4.3",
       "bin": {
         "create-alxia": "./dist/index.js",
       },
@@ -300,7 +300,7 @@
     },
     "packages/react-router": {
       "name": "@alxia/react-router",
-      "version": "0.7.5",
+      "version": "0.8.0",
       "bin": {
         "alxia-react-router": "./dist/cli/index.js",
       },
