@@ -16,9 +16,9 @@
       "name": "react-router-example",
       "dependencies": {
         "@alxia/compress": "^0.3.9",
-        "@alxia/core": "^0.14.0",
+        "@alxia/core": "^0.14.2",
         "@alxia/logger": "^0.6.6",
-        "@alxia/react-router": "^0.7.5",
+        "@alxia/react-router": "^0.8.0",
         "@alxia/secure-headers": "^0.4.9",
         "@react-router/node": "^8.4.0",
         "@react-router/serve": "^8.4.0",
@@ -117,12 +117,13 @@
         "@graphql-codegen/cli": "7.4.3",
         "@graphql-codegen/typescript": "6.1.0",
         "@graphql-codegen/typescript-resolvers": "6.1.0",
+        "@nxgt/httpyz": "^0.3.3",
         "@nxgt/openapi-codegen": "0.7.0",
+        "@nxgt/openapi-httpyz": "^0.3.1",
         "@types/bun": "^1.4.2",
         "dataloader": "^2.2.3",
         "graphql": "^16.11.0 || ^17.0.0",
         "graphql-yoga": "^5.16.0",
-        "openapi-fetch": "^0.17.0",
         "zod": "^4.6.5",
       },
     },
@@ -752,11 +753,15 @@
 
     "@nxgt/di": ["@nxgt/di@0.2.0", "", { "peerDependencies": { "typescript": "^6.0.3" } }, "sha512-YMahwd8FoLRtVRm/RTtCTMRffGNk8swaRPuop/ysphLJcZ0WG8wFH0bFlhImGywL226fcMEdwfcFhE4FylfMXw=="],
 
+    "@nxgt/httpyz": ["@nxgt/httpyz@0.3.3", "", { "peerDependencies": { "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-wWQPCs9TuFgFewbZsH+jvTGeawzR+ZZAsyZ4LJNXuwmIvw3zCimPDkIKbBLI6genCdz3bcPLvxgY9eJwJar2JA=="],
+
     "@nxgt/i18n": ["@nxgt/i18n@2.0.0", "", { "dependencies": { "intl-messageformat": "^12.1.2", "lodash": "^4.18.1" }, "peerDependencies": { "typescript": "^6.0.3" } }, "sha512-IBFiwB9NrbbwmRTSrxu7mAa3pqo+xCsk8zG7bEMDJWtNZGbwDRFjglrojRwcq9LYsHbBU0gd7VKQIkkJ8TsWKQ=="],
 
     "@nxgt/janus": ["@nxgt/janus@0.17.1", "", { "peerDependencies": { "typescript": "^6.0.3" } }, "sha512-tqXqXXY1FiZy1VRk1OaJcfqaYqPJdy4u6iFtCjS8eEp7QH+YwrB9AtD0o+IMerOHSt4vNGLoTF7F4YUN49SROA=="],
 
     "@nxgt/openapi-codegen": ["@nxgt/openapi-codegen@0.7.0", "", { "peerDependencies": { "@redocly/openapi-core": "^2.52.1", "typescript": "^6.0.3 || ^7.0.0", "zod": "^4.5.4" }, "optionalPeers": ["@redocly/openapi-core"], "bin": { "nxgt-openapi": "dist/cli.js" } }, "sha512-z+cm+8dT6Gbmhfd0XQR3X4o3UiAVZtTFlzJQYGHsugI+2Bsx0zgHPpLXZF07ebo+L/bPZLfj6Pfq6Kb+1xbu6g=="],
+
+    "@nxgt/openapi-httpyz": ["@nxgt/openapi-httpyz@0.3.1", "", { "peerDependencies": { "@nxgt/httpyz": "^0.3.2", "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-uFY5A1f3lyeLdCRzPLDaDFKX6LyS5cja4vsqBiwnl5qcOgIsQjM+T9XttEKJODXeOkqhjBu0h4CKkfgrGYwQzA=="],
 
     "@nxgt/redis": ["@nxgt/redis@0.7.0", "", { "peerDependencies": { "typescript": "^6.0.3", "zod": ">=4.6.5 <5" } }, "sha512-ZDDIzDGbpwZQ6A4h6G6xt4t25K4tJ+vyG7LxKAKEq6siCKwpiqgvS0fABZLm905a+/Nn08eQM6CjH9GK4zV6DA=="],
 
@@ -1299,10 +1304,6 @@
     "once": ["once@1.4.0", "", { "dependencies": { "wrappy": "1" } }, "sha512-lNaJgI+2Q5URQBkccEKHTQOPaXdUxnZZElQTZY0MFUAuaEqe1E+Nyvgdz/aIyNi6Z9MzO5dv1H8n58/GELp3+w=="],
 
     "onetime": ["onetime@7.0.0", "", { "dependencies": { "mimic-function": "^5.0.0" } }, "sha512-VXJjc87FScF88uafS3JllDgvAm+c/Slfz06lorj2uAY34rlUu0Nt+v8wreiImcrgAjjIHp1rXpTDlLOGw29WwQ=="],
-
-    "openapi-fetch": ["openapi-fetch@0.17.0", "", { "dependencies": { "openapi-typescript-helpers": "^0.1.0" } }, "sha512-PsbZR1wAPcG91eEthKhN+Zn92FMHxv+/faECIwjXdxfTODGSGegYv0sc1Olz+HYPvKOuoXfp+0pA2XVt2cI0Ig=="],
-
-    "openapi-typescript-helpers": ["openapi-typescript-helpers@0.1.0", "", {}, "sha512-OKTGPthhivLw/fHz6c3OPtg72vi86qaMlqbJuVJ23qOvQ+53uw1n7HdmkJFibloF7QEjDrDkzJiOJuockM/ljw=="],
 
     "p-limit": ["p-limit@3.1.0", "", { "dependencies": { "yocto-queue": "^0.1.0" } }, "sha512-TYOanM3wGwNGsZN2cVTYPArw454xnXj5qmWF1bEoAc4+cU/ol7GVh7odevjp1FNHduHc3KZMcFduxU5Xc6uJRQ=="],
 

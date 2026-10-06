@@ -12,8 +12,8 @@ Nothing in progress.
 ## Next
 
 - **A client from the document, in this package.** Today you bring your own
-  generator, `@nxgt/openapi-codegen`'s `paths.ts` with openapi-fetch for
-  one ([Spec first](guide/spec-first.md#5-a-client-from-the-same-document)).
+  client: `@nxgt/openapi-httpyz` over the generated `operations.ts`, or any
+  OpenAPI client ([Spec first](guide/spec-first.md#5-a-client-from-the-same-document)).
   A client generated here, from the same document, is the direction; it is
   not designed yet.
 

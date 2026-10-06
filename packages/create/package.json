@@ -49,12 +49,13 @@
 		"@graphql-codegen/cli": "7.4.3",
 		"@graphql-codegen/typescript": "6.1.0",
 		"@graphql-codegen/typescript-resolvers": "6.1.0",
+		"@nxgt/httpyz": "^0.3.3",
 		"@nxgt/openapi-codegen": "0.7.0",
+		"@nxgt/openapi-httpyz": "^0.3.1",
 		"@types/bun": "^1.4.2",
 		"dataloader": "^2.2.3",
 		"graphql": "^16.11.0 || ^17.0.0",
 		"graphql-yoga": "^5.16.0",
-		"openapi-fetch": "^0.17.0",
 		"zod": "^4.6.5"
 	}
 }

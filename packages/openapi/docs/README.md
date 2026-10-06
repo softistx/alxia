@@ -8,7 +8,7 @@ generator print.
 | Page | Read it when |
 | --- | --- |
 | [Spec first](guide/spec-first.md) | starting an API from its OpenAPI document: configuring `@nxgt/openapi-codegen`, declaring alxia's 400, binding the generated operations with middlewares, committing the generated files, checking them in CI, and generating a client from the same document |
-| [Testing with the generated client](guide/testing.md) | calling the app in a test through openapi-fetch and `app.fetch`, with no server, every call typed by the spec, and keeping `app.request` for requests the spec forbids |
+| [Testing with the generated client](guide/testing.md) | calling the app in a test through `@nxgt/openapi-httpyz` and `app.fetch`, with no server, every call typed by the spec, and keeping `app.request` for requests the spec forbids |
 | [API docs](guide/api-docs.md) | serving an interactive page and the document from the app, choosing Scalar or Swagger UI, turning it off in production, using it with `secureHeaders`, or running it beside a GraphQL endpoint |
 | [The checks](guide/checks.md) | calling `implemented` or `matchesSpec` in a test or at startup, checking an app with routes with middlewares, or choosing what `matchesSpec` leaves out |
 | [How routes are matched](guide/matching.md) | understanding how the checks match operations to routes: the path's shape, prefixes, and special cases |

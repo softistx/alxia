@@ -278,22 +278,28 @@ calling the check at startup. Prefixes are in [matching.md](matching.md#under-a-
 
 ## 5. A client from the same document
 
-alxia generates no client: the document is the contract, and a client is
-generated from it by the generator of your choice. The same run of
-`@nxgt/openapi-codegen` already wrote `paths.ts`, in openapi-typescript's
-shape, which openapi-fetch reads:
+alxia generates no client: the document is the contract, and any OpenAPI
+client works against it. The same run of `@nxgt/openapi-codegen` already
+wrote `operations.ts`, the table [`@nxgt/openapi-httpyz`](https://www.npmjs.com/package/@nxgt/openapi-httpyz)
+binds onto an [`@nxgt/httpyz`](https://www.npmjs.com/package/@nxgt/httpyz)
+client, and `paths.ts`, in openapi-typescript's shape, for a client that
+reads it:
 
 ```sh
-bun add openapi-fetch
+bun add @nxgt/httpyz @nxgt/openapi-httpyz
 ```
 
 ```ts
-import createClient from 'openapi-fetch';
-import type { paths } from './generated/paths';
+import { createHttpClient } from '@nxgt/httpyz';
+import { createOpenApiClient } from '@nxgt/openapi-httpyz';
+import { operations } from './generated/operations';
 
-const api = createClient<paths>({ baseUrl: 'http://localhost:3000' });
-const { data, error } = await api.GET('/todos/{id}', { params: { path: { id: 1 } } });
-// data: Todo | undefined; error: the spec's 400 or 404 body
+const api = createOpenApiClient(
+  createHttpClient({ baseUrl: 'http://localhost:3000' }),
+  operations,
+);
+const reply = await api.get('/todos/{id}', { param: { id: 1 } });
+// reply.status: 200 | 400 | 404, and reply.data narrowed by it
 ```
 
 With `validationErrors: false`, the 400 a client is typed by is the one the
