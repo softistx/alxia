@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/logger",
-	"version": "0.6.5",
+	"version": "0.6.6",
 	"description": "Request logging for alxia: a request id, structured log lines, Server-Timing, and a log bound to the request",
 	"license": "MIT",
 	"type": "module",

@@ -1,5 +1,15 @@
 # @alxia/redis
 
+## 0.5.9
+
+### Patch Changes
+
+- [#217](https://github.com/softistx/alxia/pull/217) [`a1e46b9`](https://github.com/softistx/alxia/commit/a1e46b9fcac15a69a60693af8ab7c52297cd60af) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `redis(handle)` closes the handle when the last fork serving it stops, not when the first does. Forks of one app share the plugin's `onStop`, so stopping one fork, or a fork that never listened, closed the client under a sibling still serving; it now counts the servers `onStart` is given and closes once none remains. A `stop()` before `listen` closes the handle only while no app serves it, so one app behaves as before. Needs `@alxia/core` 0.14, whose `onStop` is given the server that stopped.
+- Updated dependencies [[`71411e2`](https://github.com/softistx/alxia/commit/71411e26dd0d729bf16e10be6f43b1fa6726f6c8), [`3ed7f8e`](https://github.com/softistx/alxia/commit/3ed7f8e7df3dd3e9d97b38e004ee831055ebe163)]:
+  - @alxia/core@0.14.0
+  - @alxia/cache@0.3.9
+  - @alxia/rate-limit@0.4.11
+
 ## 0.5.8
 
 ### Patch Changes

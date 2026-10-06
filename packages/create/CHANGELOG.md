@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.4.2
+
+### Patch Changes
+
+- [#220](https://github.com/softistx/alxia/pull/220) [`098daa2`](https://github.com/softistx/alxia/commit/098daa2b1e431298e32be168ce367c583514b28a) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects install `@alxia/core` 0.14, so the templates match the alxia packages that now peer on `^0.14.0`.
+
 ## 0.4.1
 
 ### Patch Changes
