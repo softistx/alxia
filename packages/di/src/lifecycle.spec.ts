@@ -51,6 +51,35 @@ describe('deps.lifecycle', () => {
 		expect(closed).toHaveBeenCalledTimes(1);
 	});
 
+	test('a stop before listen disposes of nothing, and leaves the count right', async () => {
+		const { closed, base } = setup();
+
+		await base.stop();
+		expect(closed).not.toHaveBeenCalled();
+
+		const server = base.listen({ port: 0, signals: false });
+		expect(await (await fetch(server.url)).text()).toBe('row');
+		await base.stop();
+		expect(closed).toHaveBeenCalledTimes(1);
+	});
+
+	// Known limit: an onStop hook is told neither which app stops nor whether
+	// it started, so the unstarted fork's stop counts as the serving one's.
+	// It needs core's StopHook to receive the stopped server, or undefined.
+	test.todo('an unstarted fork stopped while another serves leaves the Container to it', async () => {
+		const { closed, base } = setup();
+		const serving = base.fork();
+		const idle = base.fork();
+		const server = serving.listen({ port: 0, signals: false });
+		await fetch(server.url);
+
+		await idle.stop();
+
+		expect(closed).not.toHaveBeenCalled();
+		expect(await (await fetch(server.url)).text()).toBe('row');
+		await serving.stop();
+	});
+
 	test('without it, the Container is left to the application', async () => {
 		const closed = mock(() => {});
 		const deps = di(

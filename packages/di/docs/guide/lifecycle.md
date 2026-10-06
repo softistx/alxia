@@ -40,8 +40,9 @@ on `SIGTERM` or `SIGINT`, or `stop()`, after the requests in flight have
 finished, within `listen`'s `stopTimeout`. Disposing runs every value's
 `dispose` in reverse creation order.
 
-It counts the apps it was given to that are serving, and disposes of the
-Container when the last one stops. That is what makes forks safe.
+It counts the starts of the apps it was given to, and disposes of the
+Container when a stop brings that count back to zero. That is what makes
+forks safe.
 
 ## Forks
 
@@ -73,8 +74,15 @@ await adminApi.stop(); // the last one: the Container is disposed of
   Container itself does no harm.
 - A disposed Container stays disposed: an app listening again after its
   stop needs a new Container, and a new `di`.
-- An app that only answers `app.request()`, as a spec does, never starts,
-  and `deps.lifecycle` never disposes of anything there.
+- An app that only answers `app.request()`, as a spec does, never starts.
+  Its `stop()`, if it calls one, still runs every `onStop` (core runs them
+  on a stop before `listen` too); with no app started, `deps.lifecycle`
+  ignores it and disposes of nothing.
+- **Known limit: do not `stop()` a fork that never listened while another
+  serves.** An `onStop` hook is told neither which app stops nor whether it
+  started, so that stop counts as the serving app's: it disposes of the
+  Container, and the serving app's next request fails with
+  `ContainerDisposedError`. Stop only the apps you started.
 
 ## Without `deps.lifecycle`
 

@@ -24,6 +24,22 @@ interface RuntimeOptions {
 /** The context as `di` writes to it: `next` merges into this same object. */
 type Writable = BaseContext & { scope?: unknown };
 
+/**
+ * Runs the rest with `scope` on the context, and gives back the Scope that
+ * was there before (another `di`'s), so what that one runs after its own
+ * `next` reads its Scope again. Unless something later replaced it; with
+ * nothing before it, this Scope stays, so a late resolve is a
+ * ScopeDisposedError rather than an undefined.
+ */
+async function within(ctx: Writable, scope: LazyScope, next: NextFunction) {
+	const outer = ctx.scope;
+	try {
+		return await next({ scope });
+	} finally {
+		if (outer !== undefined && ctx.scope === scope) ctx.scope = outer;
+	}
+}
+
 function logDisposeError(error: unknown, ctx: BaseContext): void {
 	console.error(
 		`@alxia/di: disposing the Scope of ${ctx.request.method} ${ctx.url.pathname} failed`,
@@ -53,11 +69,16 @@ export function di<Singletons, Scoped, Slots, Reads = Empty>(
 	const runtime = container as unknown as RuntimeContainer;
 	const { slots, onDisposeError = logDisposeError }: RuntimeOptions =
 		(args[0] as RuntimeOptions | undefined) ?? {};
-	const own = new WeakSet<LazyScope>();
+	// Keyed by the request, the one object every middleware of it shares:
+	// the context is copied (after a `validate`, for a 405's owners), the
+	// request never is.
+	const scopes = new WeakMap<Request, LazyScope>();
 
 	async function di(ctx: Writable, next: NextFunction) {
-		// Given twice on one route: the outer one owns the Scope.
-		if (ctx.scope instanceof LazyScope && own.has(ctx.scope)) return next();
+		const entered = scopes.get(ctx.request);
+		// Given again on this request, after another `di` maybe: the first one
+		// owns the Scope; this one only puts it back on the context.
+		if (entered !== undefined) return within(ctx, entered, next);
 		const scope = new LazyScope(async () =>
 			runtime.createScope(
 				slots
@@ -65,17 +86,10 @@ export function di<Singletons, Scoped, Slots, Reads = Empty>(
 					: undefined,
 			),
 		);
-		own.add(scope);
-		// Under another `di`, whose Scope this one hides until `next`
-		// settles: what that one runs after its own `next` must read its
-		// Scope again, not this one, disposed of below.
-		const outer = ctx.scope;
+		scopes.set(ctx.request, scope);
 		try {
-			return await next({ scope });
+			return await within(ctx, scope, next);
 		} finally {
-			// Unless something later replaced it; with nothing before it, the
-			// disposed Scope stays, so a late resolve is a ScopeDisposedError.
-			if (outer !== undefined && ctx.scope === scope) ctx.scope = outer;
 			// After `next`: a streamed body still being sent may not use the
 			// Scope's values. See the guide.
 			await scope[Symbol.asyncDispose]().catch((error: unknown) => {

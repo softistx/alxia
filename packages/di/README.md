@@ -12,7 +12,18 @@ bun add @alxia/di @nxgt/di @alxia/core
 bun add -d typescript
 ```
 
-`@nxgt/di` is a peer: the Container is the app's own, built with it.
+The peers are `@alxia/core`, `@nxgt/di` (`^0.2.0`) and `typescript`
+(`^6.0.3 || ^7.0.0`): the Container is the app's own, built with its copy of
+`@nxgt/di`. Your `tsconfig.json` needs:
+
+```jsonc
+{
+	"compilerOptions": {
+		"moduleResolution": "bundler", // `nodenext` is not supported
+		"strict": true // the provide-order checks of @nxgt/di need strictFunctionTypes
+	}
+}
+```
 
 ## Usage
 
@@ -76,8 +87,11 @@ app.listen(3000);
   and never replaces the response. A streamed body must not use scoped
   values once its route has answered.
 - **`deps.lifecycle`** disposes of the Container when the last app it was
-  given to stops: two forks of one base share it safely. Without it, the
-  Container is yours to dispose of.
+  given to that started stops: two forks of one base share it safely. Stop
+  only the apps you started: an unstarted fork's `stop()` while another
+  serves disposes of the Container under it
+  ([Lifecycle](https://github.com/softistx/alxia/blob/develop/packages/di/docs/guide/lifecycle.md#forks)).
+  Without it, the Container is yours to dispose of.
 
 There is no `app.services` and no registry: a route reads the Scope, or
 what an `expose` before it put on its context by name.
@@ -94,6 +108,19 @@ what an `expose` before it put on its context by name.
 | `Exposed` | what an `expose` map adds to the context |
 | `SlotsReadAny` | what `di` returns when `slots` reads its context as `any`: refused by `use` |
 | `ScopeNotMountedError` | an `expose` that ran with no Scope on its context; code `DI_SCOPE_NOT_MOUNTED`, a `DiError` |
+
+## Errors
+
+The runtime errors carry a stable `code`: match on it or on the class,
+never on the message. Each message, its cause and its fix are in
+[Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/di/docs/troubleshooting.md).
+
+| class | `code` | meaning |
+| --- | --- | --- |
+| `ScopeNotMountedError` (this package, a `DiError`) | `DI_SCOPE_NOT_MOUNTED` | an `expose` ran with no Scope on its context, past the types |
+| `ScopeDisposedError` (`@nxgt/di`) | `DI_SCOPE_DISPOSED` | a `resolve` after the request's route had answered: a streamed body, a promise left running |
+| `ContainerDisposedError` (`@nxgt/di`) | `DI_CONTAINER_DISPOSED` | the Container was disposed of while an app still serves from it |
+| `DisposeError` (`@nxgt/di`) | `DI_DISPOSE_FAILED` | a `dispose` threw; handed to `onDisposeError`, never answered |
 
 ## Documentation
 

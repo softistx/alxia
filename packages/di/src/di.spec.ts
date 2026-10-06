@@ -176,4 +176,36 @@ describe('di', () => {
 		expect(await (await app.request('/')).text()).toBe('inner');
 		expect(after).toBe('hello anonymous');
 	});
+
+	test('A, then B, then A again: one A Scope, given back after B', async () => {
+		const { deps: a, slots } = setup();
+		const Inner = token<string>()('inner');
+		const b = di(
+			container().provide(Inner, () => 'inner', { lifetime: 'scoped' }),
+		);
+		const seen: unknown[] = [];
+		let afterSecondA: unknown;
+		const app = alxia()
+			.use(a)
+			.use((ctx, next) => {
+				seen.push(ctx.scope);
+				return next();
+			})
+			.use(b)
+			.use(async (ctx, next) => {
+				const response = await next();
+				afterSecondA = await ctx.scope.resolve(Inner).catch((e: Error) => e);
+				return response;
+			})
+			.use(a)
+			.get('/', async ({ scope, reply }) => {
+				seen.push(scope);
+				return reply(200, await scope.resolve(Greeting));
+			});
+
+		expect(await (await app.request('/')).text()).toBe('hello anonymous');
+		expect(seen[0]).toBe(seen[1]);
+		expect(slots).toHaveBeenCalledTimes(1);
+		expect(afterSecondA).toBe('inner');
+	});
 });

@@ -107,8 +107,9 @@ usually a streamed body, or a promise left running after the route.
 a request's first `resolve`.
 
 **When:** the Container was disposed of while an app still serves from it:
-an `onStop` of yours disposed of it on a base that is forked, or the app
-listened again after a stop.
+an `onStop` of yours disposed of it on a base that is forked, a fork that
+never listened was stopped while another served (a known limit of
+`deps.lifecycle`), or the app listened again after a stop.
 
 **Fix:** dispose of it through `app.plugin(deps.lifecycle)`, which waits for
 the last app to stop, and build a new Container for an app that listens

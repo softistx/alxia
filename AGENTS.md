@@ -230,10 +230,15 @@ below records what is kept twice.
 - **A Container shared by forks.** A fork runs its base's `onStop` once of
   its own, so a base whose `onStop` disposes of a Container breaks every
   other fork still serving from it: their next request rejects with
-  `DI_CONTAINER_DISPOSED`. `@alxia/di`'s `deps.lifecycle` counts the apps
-  that started and disposes of the Container when the last one stops
-  (`lifecycle.spec.ts` stops one of two forks and requests the other). Never
-  dispose of a shared Container in a plain `onStop`. `init()` is the app's,
+  `DI_CONTAINER_DISPOSED`. `@alxia/di`'s `deps.lifecycle` counts starts and
+  disposes of the Container when a stop brings the count back to zero
+  (`lifecycle.spec.ts` stops one of two forks and requests the other). Core
+  runs every `onStop` on a `stop()` before `listen` too, and a hook is told
+  neither the app nor whether it started: a stop with nothing started is
+  ignored, but an unstarted fork stopped while another serves still
+  disposes of the Container under it (a `test.todo`; it needs `StopHook` to
+  receive the stopped server, or `undefined`). Never dispose of a shared
+  Container in a plain `onStop`. `init()` is the app's,
   before `listen()`, never in `onStart`, which is not awaited.
 - **Redis in the specs.** `@alxia/redis`'s run against `$REDIS_URL`, or a
   `redis-server` from `$PATH` they start on a free port. CI runs a Redis
