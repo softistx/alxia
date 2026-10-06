@@ -153,6 +153,12 @@ const base = alxia()
 	});
 ```
 
+Add the server synchronously, as here: `onStart` is not awaited, so an add
+after an `await` could lose the race against a quick `stop()`. A function
+passed by reference whose first parameter is optional (`onStop(sql.end)`,
+with `end(options?)`) does not compile, since the server is not one of its
+arguments: wrap it, `onStop(() => sql.end())`.
+
 See [Serving](serving.md#stopping) and [Health and shutdown](health-and-shutdown.md#graceful-shutdown).
 
 ## `parser`

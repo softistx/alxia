@@ -7,8 +7,10 @@ after, and whether it can break yours.
 ## Next
 
 The next `@alxia/core` minor gives every `onStop` hook the server that
-stopped. Nothing breaks: a hook that takes no argument runs as before. The
-peer range of every package moves with the minor.
+stopped. A hook written as an arrow or a function that takes no argument
+runs as before. One kind of hook stops compiling: a function passed by
+reference whose first parameter is optional (below). The peer range of every
+package moves with the minor.
 
 ### `onStop` is given the server that stopped
 
@@ -33,8 +35,21 @@ const base = alxia()
 	});
 ```
 
-A hook annotated `(server: Bun.Server<unknown>) => …` no longer compiles:
-the server may be `undefined`
+Add the server to the set synchronously, as above: `onStart` is not awaited,
+so an add after an `await` could lose the race against a quick `stop()`.
+
+A function passed by reference whose first parameter is optional, such as
+`onStop(sql.end)` with `end(options?)` or `onStop(client.close)` with
+`close(force?)`, no longer compiles, because the server is not one of its
+arguments. Run as plain JavaScript, it would be called with the server as
+its options. Wrap it:
+
+```ts
+app.onStop(() => sql.end());
+```
+
+A hook annotated `(server: Bun.Server<unknown>) => …` still does not
+compile, as before. It must accept `undefined` now
 ([Hooks](guide/hooks.md#onstart-and-onstop)).
 
 ## 0.13.0
