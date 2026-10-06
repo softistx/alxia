@@ -262,9 +262,12 @@ test('a reply is typed by responds', () => {
 
 ## GraphQL
 
-A GraphQL endpoint is a route: POST to `/graphql` through `app.request`.
-The [GraphQL recipe](graphql-api.md#6-test-it-in-process) has a helper
-for it, and a subscription read over server-sent events.
+A GraphQL endpoint is a route: `graphqlClient(app)` from
+`@alxia/graphql/testing` POSTs to `/graphql` through `app.fetch` and returns
+`{ status, data, errors, response }`
+([the guide](../../packages/graphql/docs/guide/testing.md)). The
+[GraphQL recipe](graphql-api.md#6-test-it-in-process) uses it, and reads a
+subscription over server-sent events.
 
 ## Reference
 

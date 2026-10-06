@@ -206,6 +206,25 @@ app.listen({ port: 4000 });
 
 See [the endpoint guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/endpoint.md#errors-health-and-shutdown).
 
+## Testing
+
+`graphqlClient` from `@alxia/graphql/testing` sends operations to the app
+in process, through `app.fetch`: no port. It is a subpath, so the main entry
+and a production bundle never carry it.
+
+```ts
+import { graphqlClient } from '@alxia/graphql/testing';
+
+const client = graphqlClient(app, { headers: { authorization: `Bearer ${token}` } });
+const { status, data, errors } = await client.query(
+	'query ($name: String!) { hello(name: $name) }',
+	{ variables: { name: 'Ada' } },
+);
+```
+
+A `TypedDocumentNode` types `data` and the variables. See
+[the testing guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/testing.md).
+
 ## API
 
 | export | |
@@ -217,6 +236,8 @@ See [the endpoint guide](https://github.com/softistx/alxia/blob/develop/packages
 | `SandboxOptions` | its options: `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
 | `GraphQLContext<App, UserContext?>` | what a resolver reads |
 | `ServerContext<Ctx>`, `GraphQLOptions` | its types |
+| `graphqlClient(app, { path?, headers? })` (`@alxia/graphql/testing`) | `query(document, { variables?, operationName?, headers? })` in process: `{ status, data?, errors?, response }` |
+| `GraphQLClient`, `GraphQLResult`, `QueryDocument`, `QueryOptions`, `GraphQLClientOptions`, `ResponseError` (`@alxia/graphql/testing`) | its types |
 
 ## Documentation
 

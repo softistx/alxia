@@ -228,14 +228,16 @@ app.listen({ port: 4000 }); // SIGTERM: /ready 503, queries answered, subscripti
 
 ## Testing it
 
-The endpoint runs in process through `app.request` or `app.fetch`, like
-every alxia route: no server, no port. `logging: false` keeps Yoga's
-logger quiet in the test output.
+The endpoint runs in process through `app.fetch`, like every alxia route:
+no server, no port. `graphqlClient` from `@alxia/graphql/testing` sends the
+operation and reads the answer; `logging: false` keeps Yoga's logger quiet
+in the test output.
 
 ```ts
 import { describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { graphql } from '@alxia/graphql';
+import { graphqlClient } from '@alxia/graphql/testing';
 import { createSchema } from 'graphql-yoga';
 
 const schema = createSchema({
@@ -245,20 +247,19 @@ const schema = createSchema({
 
 const app = alxia().plugin((app) => graphql(app, { schema, logging: false }));
 
-const execute = (query: string, variables?: Record<string, unknown>) =>
-	app.request('/graphql', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body: JSON.stringify({ query, variables }),
-	});
-
 describe('graphql', () => {
 	test('hello', async () => {
-		const response = await execute('query ($name: String!) { hello(name: $name) }', { name: 'Ada' });
-		expect(await response.json()).toEqual({ data: { hello: 'hello Ada' } });
+		const { data } = await graphqlClient(app).query(
+			'query ($name: String!) { hello(name: $name) }',
+			{ variables: { name: 'Ada' } },
+		);
+		expect(data).toEqual({ hello: 'hello Ada' });
 	});
 });
 ```
+
+Headers, a custom path, typed documents and the HTTP status are in
+[Testing the endpoint](testing.md).
 
 ## See also
 

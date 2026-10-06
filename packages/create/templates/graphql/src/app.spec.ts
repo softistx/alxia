@@ -1,35 +1,28 @@
 import { describe, expect, test } from "bun:test";
+import { graphqlClient } from "@alxia/graphql/testing";
 import { app } from "./app";
 import { db, pubsub, queries } from "./store";
 
-interface Result {
-  data?: Record<string, unknown>;
-  errors?: { message: string; extensions?: { code?: string } }[];
-}
-
 // POST /graphql in process, as a client would: no port.
-async function query(
+const client = graphqlClient(app);
+const query = (
   source: string,
   options: { token?: string; variables?: Record<string, unknown> } = {},
-): Promise<Result> {
-  const response = await app.request("/graphql", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      ...(options.token && { authorization: `Bearer ${options.token}` }),
-    },
-    body: JSON.stringify({ query: source, variables: options.variables }),
+) =>
+  client.query<Record<string, unknown>>(source, {
+    ...(options.variables && { variables: options.variables }),
+    ...(options.token && {
+      headers: { authorization: `Bearer ${options.token}` },
+    }),
   });
-  return response.json();
-}
 
 const ADD =
   "mutation ($text: String!) { addNote(text: $text) { id text author { name } } }";
 
 describe("queries", () => {
   test("answers { __typename }", async () => {
-    expect(await query("{ __typename }")).toEqual({
-      data: { __typename: "Query" },
+    expect((await query("{ __typename }")).data).toEqual({
+      __typename: "Query",
     });
   });
 
