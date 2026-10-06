@@ -604,7 +604,8 @@ app.get('/ticks', responds({ 200: eventStream(Tick) }), ({ reply }) =>
 
 Each value is checked by the event's schema and sent as one `data:` line of
 JSON; a comment keeps an idle stream open, and the generator is closed when
-the client leaves.
+the client leaves. `yield sseComment('text')` sends a comment of your own
+(`: text`) between events: a marker, padding against a proxy, a heartbeat.
 
 Name the events, each with its schema, and each is sent with its `event:`
 line, plus `id:` and `retry:` when given:
@@ -962,6 +963,7 @@ joins middlewares past the 8 a call types:
 | `isEventStreamSchema(schema)` | whether a schema is one `eventStream(schema)` made |
 | `eventStream({ name: schema })`, `NamedEventStreamSchema`, `EventSchemas` | the response schema of a stream of named events, its `event(name, data, fields?)` builder, its schemas by name under `~events` |
 | `EventInput<Of>`, `EventOutput<Of>`, `EventFields` | what a handler yields on a named stream, what is sent of it, and an event's `id` and `retry` |
+| `sseComment(text)`, `SseComment` | a comment line to yield between a stream's events, as `: text` (one `:` line per line of the text, no line break can start an event), unchecked by the schema |
 | `isNamedEventStreamSchema(schema)` | whether a schema is one `eventStream({ … })` made |
 | `FileSource`, `StaticOptions`, `FileOptions`, `StaticReply`, `parseRange` | static files |
 | `Precompressed`, `FileNotFoundBody`, `RangeNotSatisfiableBody` | a coding stored beside a file, the bodies of the 404 and 416 |

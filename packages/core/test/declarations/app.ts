@@ -18,6 +18,7 @@ import {
 	responds,
 	type StandardSchemaV1,
 	type StaticPath,
+	sseComment,
 	validate,
 } from '@alxia/core';
 
@@ -67,6 +68,7 @@ export function streaming() {
 		reply(
 			200,
 			(async function* () {
+				yield sseComment('connected');
 				yield Push.event('ping', { interval: 1 });
 			})(),
 		),

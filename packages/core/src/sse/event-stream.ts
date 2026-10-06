@@ -10,6 +10,7 @@ import {
 	type StandardSchemaV1,
 } from '../schema/standard-schema';
 import { isAsyncIterable } from './async-iterable';
+import { commentText, SseComment } from './comment';
 import { frameText, mismatch } from './frame';
 import {
 	type EventSchemas,
@@ -20,7 +21,7 @@ import {
 /** A response schema whose body is a stream of events, each one checked by `item`. */
 export interface EventStreamSchema<Item extends StandardSchemaV1>
 	extends StandardSchemaV1<
-		AsyncIterable<InferInput<Item>>,
+		AsyncIterable<InferInput<Item> | SseComment>,
 		AsyncIterable<InferOutput<Item>>
 	> {
 	readonly '~eventStream': Item;
@@ -46,6 +47,9 @@ export interface EventStreamSchema<Item extends StandardSchemaV1>
  * app.get('/push', { response: { 200: Push } }, ({ reply }) =>
  *   reply(200, (async function* () { yield { event: 'ping', data: { interval: 30 } }; })()));
  * ```
+ *
+ * A handler may also yield `sseComment('text')` between its events: a `:`
+ * line, never checked by the schema.
  *
  * An event name that is empty or holds a line break throws a `TypeError`.
  */
@@ -85,6 +89,10 @@ async function* checkEach(
 	values: AsyncIterable<unknown>,
 ): AsyncGenerator<unknown> {
 	for await (const value of values) {
+		if (value instanceof SseComment) {
+			yield value;
+			continue;
+		}
 		const checked = await check(item, value, 'body');
 		if (!checked.ok) throw mismatch(checked.issues);
 		yield checked.value;
@@ -119,6 +127,8 @@ export function isEventStreamSchema(
 /** How often a comment keeps an idle stream open: Bun closes a silent one. */
 export const KEEP_ALIVE_MS = 8_000;
 
+const KEEP_ALIVE = commentText(new SseComment('keep-alive'));
+
 /**
  * The events of `values` as a `text/event-stream` body: each value as
  * `data:` lines of JSON, after its `event:`, `id:` and `retry:` lines on a
@@ -143,7 +153,7 @@ export function toEventStream(
 		start(controller) {
 			timer = setInterval(() => {
 				try {
-					controller.enqueue(encoder.encode(': keep-alive\n\n'));
+					controller.enqueue(encoder.encode(KEEP_ALIVE));
 				} catch {
 					stop();
 				}
