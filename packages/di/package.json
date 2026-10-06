@@ -1,0 +1,53 @@
+{
+	"name": "@alxia/di",
+	"version": "0.0.0",
+	"description": "Dependency injection for alxia on @nxgt/di: a lazy Scope per request, disposed when it ends, and typed values exposed to the routes that read them",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"docs",
+		"README.md",
+		"package.json",
+		"LICENSE"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/softistx/alxia.git",
+		"directory": "packages/di"
+	},
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org",
+		"access": "public"
+	},
+	"scripts": {
+		"build": "bun run ../../build.ts",
+		"test": "bun test src",
+		"typecheck": "tsc --noEmit"
+	},
+	"alxia": {
+		"entrypoints": [
+			"src/index.ts"
+		]
+	},
+	"devDependencies": {
+		"@alxia/core": "workspace:^",
+		"@nxgt/di": "^0.2.0",
+		"@types/bun": "^1.4.2"
+	},
+	"peerDependencies": {
+		"@alxia/core": "workspace:^",
+		"@nxgt/di": "^0.2.0",
+		"typescript": "^6.0.3 || ^7.0.0"
+	}
+}

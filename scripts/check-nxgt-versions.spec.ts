@@ -83,6 +83,7 @@ describe('read', () => {
 		const { manifests: found, lockPackages } = await read();
 		const packages: Tracked[] = tracked(found, lockPackages);
 		expect(packages.map(({ name, dirs }) => [name, dirs])).toEqual([
+			['@nxgt/di', ['packages/di']],
 			['@nxgt/i18n', ['packages/i18n', 'packages/janus']],
 			['@nxgt/janus', ['packages/janus']],
 			['@nxgt/openapi-codegen', ['packages/create']],
