@@ -8,7 +8,7 @@ a realistic example for each.
 
 | Page | Read it when |
 | --- | --- |
-| [Mounting the endpoint](guide/endpoint.md) | adding GraphQL to an app, choosing its path under a prefix, putting it behind a guard, reading what it answers, telling GraphQL errors from the problem details of the HTTP layer around it, adding `health()` probes and draining it on `SIGTERM`, or reading the first test |
+| [Mounting the endpoint](guide/endpoint.md) | adding GraphQL to an app, choosing its path under a prefix, putting it behind a guard, reading what it answers, telling GraphQL errors from the problem details of the HTTP layer around it, adding `health()` probes and draining it on `SIGTERM`, or its first spec |
 | [The typed context](guide/context.md) | typing a schema with the app's context, reading `user` or a database handle in a resolver, setting a cookie, adding per-request loaders, or reading the `missing …` compile error |
 | [Yoga's plugins and options](guide/yoga.md) | adding Yoga or Envelop plugins, exposing or masking errors, batching, serving subscriptions, or calling the endpoint from another origin |
 | [GraphQL over WebSocket](guide/websockets.md) | serving Apollo Client's, urql's or `graphql-ws`'s WebSocket clients with `ws: true`, guarding the upgrade, reading `connectionParams`, the subprotocol, closing the sockets on shutdown, or testing a subscription over a socket |
