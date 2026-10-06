@@ -144,7 +144,8 @@ proxy.ws('ws://chat.internal:8080', { maxBuffered: 2 * 1024 * 1024 });
 
 ### `proxy(): give one upstream URL, or a list of at least one; got an empty list`
 
-**When:** `proxy([])`, `proxy.mount(prefix, [])` or `proxy.ws([])`: a list
+**When:** `proxy([])`, `proxy.mount(prefix, [])` or `proxy.ws([])` (the
+message starts with the call's own name, `proxy.ws():` for a socket route): a list
 of targets that is empty, often one read from configuration that was not set.
 **Why:** a proxy needs an upstream to forward to.
 **Fix:** check the list where it is built, before the proxy is declared:
@@ -158,7 +159,8 @@ app.use('/api', proxy(upstreams, { rewrite: '/api' }));
 ### `proxy(): retries must be at most the number of upstreams − 1 (…), each tried once per request`
 
 **When:** `retries` above the number of upstreams − 1: `retries: 1` with a
-single target, or `retries: 3` with three.
+single target, or `retries: 3` with three, given to `proxy()`,
+`proxy.mount()` or `proxy.ws()` (whose name starts the message).
 **Why:** a request tries each upstream at most once. Trying again one that
 just refused the connection only delays the 502.
 **Fix:** leave `retries` out (each upstream is tried once), or lower it:
@@ -169,8 +171,9 @@ proxy(['http://a.internal', 'http://b.internal', 'http://c.internal'], { retries
 
 ### `proxy(): retries must be a whole number, 0 or more` (or `cooldown`)
 
-**When:** `retries` or `cooldown` is negative, a fraction, `NaN`, or a
-string like `'5s'`.
+**When:** `retries` or `cooldown`, given to `proxy()`, `proxy.mount()` or
+`proxy.ws()` (whose name starts the message), is negative, a fraction,
+`NaN`, or a string like `'5s'`.
 **Why:** `retries` counts upstreams, `cooldown` milliseconds.
 **Fix:**
 

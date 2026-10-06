@@ -84,8 +84,10 @@ timeout or any answer, a `503` included, is never retried: the upstream may
 have run the request. An upstream whose connect failed is skipped for
 `cooldown` ms; when all are cooling down, the one that failed longest ago is
 tried rather than none. A socket route retries its connect the same way,
-before the client's `101`.
+before the client's `101`. See
+[Several upstreams](https://github.com/softistx/alxia/blob/develop/packages/proxy/docs/guide/upstreams.md).
 
+## Relay a WebSocket
 
 ```ts
 import { alxia } from '@alxia/core';
