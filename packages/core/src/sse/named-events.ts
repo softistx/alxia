@@ -11,6 +11,7 @@ import {
 	type StandardSchemaV1,
 } from '../schema/standard-schema';
 import { isAsyncIterable } from './async-iterable';
+import { SseComment } from './comment';
 import { Frame, mismatch, refuseId, refuseName, refuseRetry } from './frame';
 
 /** The schema of each event's data, by event name. */
@@ -59,7 +60,7 @@ export interface EventFields {
 /** A response schema whose body is a stream of named events, each one's data checked by the schema of its name. */
 export interface NamedEventStreamSchema<Events extends EventSchemas>
 	extends StandardSchemaV1<
-		AsyncIterable<EventInput<Events>>,
+		AsyncIterable<EventInput<Events> | SseComment>,
 		AsyncIterable<EventOutput<Events>>
 	> {
 	readonly '~events': Events;
@@ -131,7 +132,7 @@ export function isNamedEventStreamSchema(
 }
 
 /**
- * Each value of `values` as a `Frame`: its name declared, its id and retry
+ * Each value of `values` as a `Frame`, a comment left as it is: its name declared, its id and retry
  * safe to write, and, when `validate`, its data checked by its schema. The
  * fields are checked even when responses are not validated: a line break in
  * one would write a frame the handler never yielded.
@@ -140,8 +141,12 @@ export async function* toFrames(
 	events: EventSchemas,
 	values: AsyncIterable<unknown>,
 	validate: boolean,
-): AsyncGenerator<Frame> {
+): AsyncGenerator<Frame | SseComment> {
 	for await (const value of values) {
+		if (value instanceof SseComment) {
+			yield value;
+			continue;
+		}
 		if (value === null || typeof value !== 'object' || !('event' in value)) {
 			throw new TypeError(
 				'An event of a named stream is an object { event, data }',

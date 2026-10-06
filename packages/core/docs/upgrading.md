@@ -6,12 +6,14 @@ after, and whether it can break yours.
 
 ## Next
 
-`originalUrl(ctx)` now carries the port a trusted proxy sends in
+The next `@alxia/core` minor lets a handler yield a comment on an event
+stream, and `originalUrl(ctx)` now carries the port a trusted proxy sends in
 `X-Forwarded-Port`. Nothing in the API changes.
 
 | Change | Package | Can it break your code |
 | --- | --- | --- |
 | [`originalUrl(ctx)` reads `X-Forwarded-Port`](#originalurlctx-reads-x-forwarded-port) | core | only a URL built from `originalUrl` behind a proxy that sends the header |
+| [Comments on a stream](#comments-on-a-stream) | core | no: a stream that yields none is written as before |
 
 ### `originalUrl(ctx)` reads `X-Forwarded-Port`
 
@@ -41,6 +43,23 @@ public one (a proxy that writes its internal listening port): have it send
 the public port, or stop sending the header. And where a proxy sets `X-Forwarded-Proto` and `-Host` but not
 `X-Forwarded-Port`, the client's own header is now believed: overwrite it at
 the edge, or strip it.
+
+### Comments on a stream
+
+Before, a stream wrote events and its own `: keep-alive` while idle; a
+handler had no way to send a comment line. Now:
+
+```ts
+import { sseComment } from '@alxia/core';
+
+yield sseComment('connected'); // : connected
+yield { n: 1 };                // data: {"n":1}
+```
+
+A comment is never checked by the stream's schema, and a named stream takes
+it as well. Text on several lines is several `:` lines, and a line break
+cannot end the comment and start an event
+([Server-sent events](guide/server-sent-events.md#comments)).
 
 ## 0.12.0
 

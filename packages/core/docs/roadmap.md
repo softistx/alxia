@@ -7,6 +7,10 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
+- **Comments on a stream.** A handler yields `sseComment('text')` between its
+  events: a `: text` line, one per line of the text, beside the keep-alive
+  the stream already sends while idle, on any stream and never checked by
+  its schema ([Server-sent events](guide/server-sent-events.md#comments)).
 - **One middleware form.** A middleware is a plain `(ctx, next) => …`
   function: `use(...)`, a route's middlewares, `ws(path, ...)` and
   `route(operation, ...)` take one written inline, and what it passes
@@ -80,8 +84,6 @@ number on it. Every release, with each change it made, is in
   later minor, once apps have declared their problems in their documents;
   `errors: 'json'` keeps today's bodies for an app that wants them
   ([Errors](guide/errors.md#making-it-the-default)).
-- **Comments on a stream.** A handler yielding a comment line of its own
-  (`: …`), beside the keep-alive the stream already sends while idle.
 
 ## Not planned
 
