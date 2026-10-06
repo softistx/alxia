@@ -21,8 +21,14 @@ interface RuntimeOptions {
 	readonly onDisposeError?: (error: unknown, ctx: BaseContext) => void;
 }
 
+/** Where the context keeps the Scope each `di` entered on it. */
+const OWNED = Symbol('@alxia/di owned');
+
 /** The context as `di` writes to it: `next` merges into this same object. */
-type Writable = BaseContext & { scope?: unknown };
+type Writable = BaseContext & {
+	scope?: unknown;
+	[OWNED]?: Map<object, LazyScope>;
+};
 
 /**
  * Runs the rest with `scope` on the context, and gives back the Scope that
@@ -69,13 +75,13 @@ export function di<Singletons, Scoped, Slots, Reads = Empty>(
 	const runtime = container as unknown as RuntimeContainer;
 	const { slots, onDisposeError = logDisposeError }: RuntimeOptions =
 		(args[0] as RuntimeOptions | undefined) ?? {};
-	// Keyed by the request, the one object every middleware of it shares:
-	// the context is copied (after a `validate`, for a 405's owners), the
-	// request never is.
-	const scopes = new WeakMap<Request, LazyScope>();
-
 	async function di(ctx: Writable, next: NextFunction) {
-		const entered = scopes.get(ctx.request);
+		// The Scopes each `di` entered on this request, on the context itself:
+		// made per fetch, so a Request fetched twice gets two, and carried by
+		// core's copies of it (`{ ...ctx }` keeps an own symbol key).
+		ctx[OWNED] ??= new Map();
+		const owned = ctx[OWNED];
+		const entered = owned.get(di);
 		// Given again on this request, after another `di` maybe: the first one
 		// owns the Scope; this one only puts it back on the context.
 		if (entered !== undefined) return within(ctx, entered, next);
@@ -86,7 +92,7 @@ export function di<Singletons, Scoped, Slots, Reads = Empty>(
 					: undefined,
 			),
 		);
-		scopes.set(ctx.request, scope);
+		owned.set(di, scope);
 		try {
 			return await within(ctx, scope, next);
 		} finally {
