@@ -126,6 +126,17 @@ describe('the api template', () => {
 		expect(pinned).toBe(installed.version);
 	});
 
+	test("api's @nxgt/httpyz and @nxgt/openapi-httpyz ranges are @alxia/create's own devDependencies, which this spec runs with", async () => {
+		const read = (file: string) =>
+			Bun.file(join(import.meta.dir, '..', '..', file)).json();
+		const template = (await read('templates/api/package.json')).devDependencies;
+		const own = (await read('package.json')).devDependencies;
+		for (const name of ['@nxgt/httpyz', '@nxgt/openapi-httpyz']) {
+			expect(template[name]).toBeString();
+			expect(`${name} ${template[name]}`).toBe(`${name} ${own[name]}`);
+		}
+	});
+
 	test('its .env.example names each variable src/env.ts declares', async () => {
 		const { files } = await copyTemplate('api', 'my-api', await alxiaRanges());
 		const example = (await files['.env.example']?.text()) ?? '';

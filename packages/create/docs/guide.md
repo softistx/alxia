@@ -570,6 +570,8 @@ request against the spec before it sends it, so the 400 and the 401 tests
 use a second client built with `validate: { request: false }`, and a request
 the types forbid (`/todos/first`) goes through `app.request`. See
 [Testing with the generated client](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/testing.md).
+A test that throws `ValidationError` or `UndeclaredStatusError` is in
+[troubleshooting](troubleshooting.md#validationerror-createtodo-post-todos-too-small-expected-string-to-have-1-characters) ([the other](troubleshooting.md#undeclaredstatuserror-gettodo-get-todosid-no-418-reply-is-declared)).
 
 ### Adding an operation
 

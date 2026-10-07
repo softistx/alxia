@@ -47,6 +47,8 @@ print, or — for a trap that prints nothing — the symptom.
 - [`src/generated/` changes after moving `@nxgt/openapi-codegen`](#srcgenerated-changes-after-moving-nxgtopenapi-codegen)
 - [`TypeError: matchesSpec(): 1 operation has no route: DELETE /todos/:id (deleteTodo)`](#typeerror-matchesspec-1-operation-has-no-route-delete-todosid-deletetodo)
 - [`ResponseValidationError: POST /todos: the 201 reply does not match its schema`](#responsevalidationerror-post-todos-the-201-reply-does-not-match-its-schema)
+- [`ValidationError: createTodo (POST /todos): Too small: expected string to have >=1 characters`](#validationerror-createtodo-post-todos-too-small-expected-string-to-have-1-characters)
+- [`UndeclaredStatusError: getTodo (GET /todos/{id}): no 418 reply is declared`](#undeclaredstatuserror-gettodo-get-todosid-no-418-reply-is-declared)
 
 **The `graphql` project's schema**
 
@@ -522,6 +524,67 @@ reply.created({ id: todo.id, title: todo.title, done: todo.done }) // Todo: { id
 
 The other forms of the error, and how to turn the check off, are in
 [`@alxia/core`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/core/docs/troubleshooting.md#responsevalidationerror--the-200-reply-does-not-match-its-schema).
+
+### `ValidationError: createTodo (POST /todos): Too small: expected string to have >=1 characters`
+
+A test of the app's own 400 or 401 throws in the test, before any request
+reaches the app:
+
+```text
+ValidationError: createTodo (POST /todos): Too small: expected string to have >=1 characters
+```
+
+The operation, method and path are the call's, and the text after the colon is
+the first issue's message (several are joined with `; `). The same class
+also throws for a reply the spec does not describe (a body that is not valid
+JSON, a value its schema refuses), whose `failure.kind` is `'response'`;
+`'request'` is the one here.
+
+**When:** the test sends what `openapi.yaml` refuses (an empty `title`, a
+missing key) to see the app answer 400 or 401.
+
+**Why:** the client checks every request against the spec before it sends
+it, by default, and throws what the server would refuse. Nothing was sent.
+
+**Fix:** build a second client that does not check requests, and use it for
+the tests of a refusal. Keep the first one for the calls that must pass:
+
+```ts
+const api = createOpenApiClient(http, operations);
+const raw = createOpenApiClient(http, operations, {
+  validate: { request: false },
+});
+
+const reply = await raw.op("createTodo", { json: { title: "" } });
+expect(reply.status).toBe(400);
+```
+
+A request the types forbid (`/todos/first`) goes through `app.request()`.
+See [Testing with the generated client](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/testing.md#keep-one-apprequest-test).
+
+### `UndeclaredStatusError: getTodo (GET /todos/{id}): no 418 reply is declared`
+
+A test through the client throws, naming the status the app answered:
+
+```text
+UndeclaredStatusError: getTodo (GET /todos/{id}): no 418 reply is declared
+```
+
+The error's `status` is the status and its `response` the unread `Response`,
+so a test can read the body to see what the app sent.
+
+**When:** the app answers a status `openapi.yaml` does not declare for that
+operation: a 500 from a handler that threw, a 404 or 403 the spec never
+mentioned, a status a middleware sent.
+
+**Why:** the client reads a reply by the statuses the operation declares, so
+a client generated from the spec never returns a body it was not told about.
+
+**Fix:** if the status is right, declare it under the operation's
+`responses` in `openapi.yaml`, then `bun run generate`; if the app should not
+send it, fix the route (a 500 is usually the handler's bug, so read
+`error.response`). A test of a status the spec leaves out on purpose goes through
+`app.request()`, which reads whatever comes back.
 
 ## The `graphql` project's schema
 
