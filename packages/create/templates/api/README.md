@@ -139,6 +139,11 @@ bun run typecheck
 bun run generate # src/generated/, from openapi.yaml
 ```
 
+A test that throws `ValidationError` (the client refused a request the spec
+forbids before sending it) or `UndeclaredStatusError` (the app answered a
+status `openapi.yaml` does not declare) is in
+[troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md#validationerror-createtodo-post-todos-too-small-expected-string-to-have-1-characters).
+
 ## Lint and format
 
 [Biome](https://biomejs.dev) lints and formats the project, as `biome.json`

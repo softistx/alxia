@@ -25,6 +25,8 @@ it to fail prints nothing; those are under [Traps](#traps), by symptom.
 - [A cookie parameter is missing from `types.ts` and the client files](#a-cookie-parameter-is-missing-from-typests-and-the-client-files)
 - [A client refuses alxia's 400, or types it `{ status, message, timestamp, issues }`](#a-client-refuses-alxias-400-or-types-it--status-message-timestamp-issues-)
 - [A test through the client sends a request to a real address](#a-test-through-the-client-sends-a-request-to-a-real-address)
+- [`ValidationError: createTodo (POST /todos): …`, thrown by a test of the app's 400 or 401](#validationerror-createtodo-post-todos--thrown-by-a-test-of-the-apps-400-or-401)
+- [`UndeclaredStatusError: getTodo (GET /todos/{id}): no 418 reply is declared`](#undeclaredstatuserror-gettodo-get-todosid-no-418-reply-is-declared)
 
 **Types**
 
@@ -333,6 +335,38 @@ const http = createHttpClient({
 ```
 
 See [Testing with the generated client](guide/testing.md).
+
+### `ValidationError: createTodo (POST /todos): …`, thrown by a test of the app's 400 or 401
+
+**Symptom:** a test through the client throws before the app answers:
+`ValidationError: createTodo (POST /todos): Too small: expected string to
+have >=1 characters`.
+
+**Why:** the client checks each request against the spec before it sends it,
+so a request the server would refuse never leaves the test.
+
+**Fix:** a second client with `validate: { request: false }` sends it:
+
+```ts
+const raw = createOpenApiClient(http, operations, {
+  validate: { request: false },
+});
+expect((await raw.op('createTodo', { json: { title: '' } })).status).toBe(400);
+```
+
+See [Testing with the generated client](guide/testing.md#keep-one-apprequest-test).
+
+### `UndeclaredStatusError: getTodo (GET /todos/{id}): no 418 reply is declared`
+
+**Symptom:** a test through the client throws, naming a status.
+
+**Why:** the app answered a status the operation's `responses` in the
+document do not declare. `error.response` is the unread `Response`.
+
+**Fix:** declare the status in the document and generate again, or fix the
+route so it does not send it. The entry in `@alxia/create`'s
+[troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md#undeclaredstatuserror-gettodo-get-todosid-no-418-reply-is-declared)
+has the whole of it.
 
 ## Types
 
