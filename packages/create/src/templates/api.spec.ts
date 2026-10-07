@@ -45,9 +45,10 @@ describe('the api template', () => {
 		]);
 		expect(Object.keys(manifest.devDependencies ?? {})).toEqual([
 			'@biomejs/biome',
+			'@nxgt/httpyz',
 			'@nxgt/openapi-codegen',
+			'@nxgt/openapi-httpyz',
 			'@types/bun',
-			'openapi-fetch',
 			'typescript',
 		]);
 	});

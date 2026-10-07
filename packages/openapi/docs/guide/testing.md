@@ -1,52 +1,55 @@
 # Testing with the generated client
 
 The same run of `@nxgt/openapi-codegen` that writes `alxia.ts` writes
-`paths.ts`, the document's types in the shape
-[openapi-fetch](https://openapi-ts.dev/openapi-fetch/) reads. Its client
-takes a `fetch`: give it `app.fetch`, and a test calls the app in process,
-with no server and no port, and every path, parameter, body and reply typed
-by `openapi.yaml`.
+`operations.ts`, the table [`@nxgt/openapi-httpyz`](https://www.npmjs.com/package/@nxgt/openapi-httpyz)
+binds onto an [`@nxgt/httpyz`](https://www.npmjs.com/package/@nxgt/httpyz)
+client. The client takes a `fetch`: give it `app.fetch`, and a test calls the
+app in process, with no server and no port, and every path, parameter, body
+and reply typed by `openapi.yaml`. Any OpenAPI client works the same way,
+since the document is the contract.
 
 ```sh
-bun add -d openapi-fetch
+bun add -d @nxgt/httpyz @nxgt/openapi-httpyz
 ```
 
 ```ts
 import { expect, test } from 'bun:test';
-import createClient from 'openapi-fetch';
+import { createHttpClient } from '@nxgt/httpyz';
+import { createOpenApiClient } from '@nxgt/openapi-httpyz';
 import { app } from './app';
-import type { paths } from './generated/paths';
+import { operations } from './generated/operations';
 
-const api = createClient<paths>({
+const http = createHttpClient({
   baseUrl: 'http://alxia.test',
   fetch: (request) => app.fetch(request),
 });
+const api = createOpenApiClient(http, operations);
 
 test('creates a todo', async () => {
-  const { data, response } = await api.POST('/todos', {
-    body: { title: 'Write a route' },
-  });
-  expect(response.status).toBe(201);
-  expect(data?.title).toBe('Write a route'); // data: Todo | undefined
+  const reply = await api.op('createTodo', { json: { title: 'Write a route' } });
+  expect(reply.status).toBe(201);
+  if (reply.status === 201) expect(reply.data.title).toBe('Write a route');
 });
 ```
 
-`baseUrl` only has to be a valid URL: nothing is sent to it. openapi-fetch
-calls `fetch` with a `Request`, which `app.fetch` takes as is.
+`baseUrl` only has to be a valid URL: nothing is sent to it. The client calls
+`fetch` with a `Request`, which `app.fetch` takes as is.
 
 ## What the types catch
 
 A test that no longer matches the document stops compiling, before it runs:
 
 ```ts
-await api.GET('/todos/{id}', { params: { path: { id: 'first' } } }); // id is a number
-await api.POST('/todos', { body: { name: 'x' } }); // no such field
-await api.GET('/todo'); // no such path
+await api.get('/todos/{id}', { param: { id: 'first' } }); // id is a number
+await api.op('createTodo', { json: { name: 'x' } }); // no such field
+await api.get('/todo'); // no such path
 ```
 
-`data` is the success reply, `error` the other statuses the spec declares
-(`NotFound`, `Unauthorized`, alxia's 400), and `response` the `Response`,
-for its status and headers.
+A reply is a union narrowed on its status: `reply.data` is the success body
+when `reply.status` is 200 or 201, and `NotFound`, `Unauthorized` or alxia's
+400 for those statuses. `reply.response` is the `Response`, for its headers.
+A status the spec does not declare for the operation throws
+`UndeclaredStatusError`.
 
 ## Headers the spec does not list
 
@@ -54,20 +57,23 @@ An API key declared under `security` is not a parameter, so pass it as a
 header of the client, or of one call:
 
 ```ts
-const api = createClient<paths>({
+const http = createHttpClient({
   baseUrl: 'http://alxia.test',
   fetch: (request) => app.fetch(request),
   headers: { 'x-api-key': 'test-key' },
 });
 
-await api.POST('/todos', { body: { title: 'x' }, headers: { 'x-api-key': 'wrong' } });
+await api.op('createTodo', { json: { title: 'x' } }, { headers: { 'x-api-key': 'wrong' } });
 ```
 
 ## Keep one `app.request` test
 
-The client sends only what the spec allows. A request the spec forbids, an
-id that is not a number, a malformed body or a missing header, needs
-`app.request`, which sends what it is told:
+The client checks a request against the spec before it sends it, and throws
+a `ValidationError` for one the server would refuse. To see the server
+refuse it, bind a client with `createOpenApiClient(http, operations, {
+validate: { request: false } })`. A request the types forbid, an id that is
+not a number or a missing header, needs `app.request`, which sends what it
+is told:
 
 ```ts
 test('refuses an id that is not a number', async () => {

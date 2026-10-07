@@ -263,7 +263,7 @@ openapi.yaml → src/generated: 5 written, 0 unchanged
 | `alxia.ts` | one `as const` constant per operation, `{ method, path, schema }`, with the path in alxia's form (`/todos/:id`), the request's Zod schemas, a schema per response status and the `operationId`; and `operations`, all of them by `operationId` |
 | `zod.ts` | a Zod schema per component schema: `zTodo`, `zNewTodo`, … |
 | `types.ts` | a TypeScript type per component schema: `Todo`, `NewTodo`, … |
-| `operations.ts`, `paths.ts` | the operations and paths as types, for a typed client |
+| `operations.ts`, `paths.ts` | `operations.ts` is the table `@nxgt/openapi-httpyz` binds onto a client, which the template's spec uses; `paths.ts` is the same document in openapi-typescript's shape, for a client that reads it, and the template does not use it |
 
 ```ts
 // src/generated/alxia.ts, in part
@@ -524,47 +524,51 @@ route(operation, ...middlewares, handler)
 
 ### `src/app.spec.ts`
 
-The spec calls the app through the client the generated `paths.ts`
-describes, [openapi-fetch](https://openapi-ts.dev/openapi-fetch/) (a dev
-dependency), whose `fetch` is `app.fetch`: in process, no server, no port,
-and every path, parameter, body and reply typed by `openapi.yaml`.
+The spec calls the app through [`@nxgt/openapi-httpyz`](https://www.npmjs.com/package/@nxgt/openapi-httpyz),
+bound to the generated `operations.ts` over an
+[`@nxgt/httpyz`](https://www.npmjs.com/package/@nxgt/httpyz) client (both dev
+dependencies), whose `fetch` is `app.fetch`: in process, no server, no port,
+and every path, parameter, body and reply typed by `openapi.yaml`. A reply is
+a union narrowed on its status. (Any OpenAPI client would work: the spec is
+the contract. The generator still writes `paths.ts`, which nothing here uses.)
 
 ```ts
 import { expect, test } from "bun:test";
 import { matchesSpec } from "@alxia/openapi";
-import createClient from "openapi-fetch";
+import { createHttpClient } from "@nxgt/httpyz";
+import { createOpenApiClient } from "@nxgt/openapi-httpyz";
 import { app } from "./app";
 import { env } from "./env";
-import { operations } from "./generated/alxia";
-import type { paths } from "./generated/paths";
+import { operations as routes } from "./generated/alxia";
+import { operations } from "./generated/operations";
 
-const api = createClient<paths>({
+const http = createHttpClient({
   baseUrl: "http://alxia.test",
   fetch: (request) => app.fetch(request),
   headers: { "x-api-key": env.API_KEY },
 });
+const api = createOpenApiClient(http, operations);
 
 test("routes every operation of openapi.yaml", () => {
-  matchesSpec(app, operations);
+  matchesSpec(app, routes);
 });
 
 test("creates a todo from JSON", async () => {
-  const { data, response } = await api.POST("/todos", {
-    body: { title: "Write a route" },
-  });
-  expect(response.status).toBe(201);
-  expect(data?.title).toBe("Write a route");
+  const reply = await api.op("createTodo", { json: { title: "Write a route" } });
+  expect(reply.status).toBe(201);
+  expect(reply.data).toMatchObject({ title: "Write a route" });
 });
 ```
 
-`matchesSpec(app, operations)`, from
+`matchesSpec(app, routes)`, from
 [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi), throws
 when an operation has no route, naming each; `strict: true` also throws on
 a route with no operation.
 The spec also checks the 400, the 401 before the body and the 404 through
-the client, and keeps one test on `app.request()`: the client sends only
-what the spec allows, so a request it forbids (`/todos/first`) goes
-through `app.request`. See
+the client, and keeps one test on `app.request()`. The client checks a
+request against the spec before it sends it, so the 400 and the 401 tests
+use a second client built with `validate: { request: false }`, and a request
+the types forbid (`/todos/first`) goes through `app.request`. See
 [Testing with the generated client](https://github.com/softistx/alxia/blob/develop/packages/openapi/docs/guide/testing.md).
 
 ### Adding an operation

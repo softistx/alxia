@@ -315,18 +315,18 @@ export default defineConfig({
 
 ### A test through the client sends a request to a real address
 
-**Symptom:** a test using `createClient<paths>({ baseUrl })` fails with
+**Symptom:** a test using `createHttpClient({ baseUrl })` fails with
 `ConnectionRefused` or `Unable to connect`, or reaches a server that is
 running.
 
-**Why:** no `fetch` was given, so openapi-fetch uses the global one and sends
+**Why:** no `fetch` was given, so the client uses the global one and sends
 the request over the network. The app is called in process only when the
 client's `fetch` is `app.fetch`.
 
 **Fix:** pass it, and `baseUrl` stays a name nothing answers to:
 
 ```ts
-const api = createClient<paths>({
+const http = createHttpClient({
   baseUrl: 'http://alxia.test',
   fetch: (request) => app.fetch(request),
 });

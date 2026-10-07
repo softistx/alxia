@@ -38,9 +38,9 @@ operations generated from it, and a client is generated from the same file.
   `***`.
 - `src/server.ts`: listens on `env.PORT`, 3000 by default, and shuts down
   gracefully on `SIGINT` and `SIGTERM`, which `listen` handles.
-- `src/app.spec.ts`: a typed client (openapi-fetch over `generated/paths.ts`,
-  its `fetch` being `app.fetch`: no server, no port), one `app.request()`
-  test, and `matchesSpec` from
+- `src/app.spec.ts`: a typed client (`@nxgt/openapi-httpyz` over
+  `generated/operations.ts`, its `fetch` being `app.fetch`: no server, no
+  port; each reply narrowed on its status), one `app.request()` test, and `matchesSpec` from
   [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi): every
   operation of `openapi.yaml` has its route (`strict: true` also fails on a
   route outside it).

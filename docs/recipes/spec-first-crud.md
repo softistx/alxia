@@ -12,14 +12,14 @@ taken one step further, with every operation of a CRUD. The shape:
 ```text
 openapi.yaml ──generate──▶ src/generated/  ──▶ route(operation, handler)
      │                       alxia.ts: operations     │
-     │                       paths.ts:  the client's types
+     │                       operations.ts: the client's table
      ├──▶ matchesSpec(app, operations)   a test: no operation without a route
      └──▶ apiDocs({ spec })              the page and the document, served
 ```
 
 ```sh
 bun add @alxia/core @alxia/env zod
-bun add -d @alxia/openapi @nxgt/openapi-codegen openapi-fetch typescript
+bun add -d @alxia/openapi @nxgt/openapi-codegen @nxgt/httpyz @nxgt/openapi-httpyz typescript
 ```
 
 ## 1. The contract
@@ -284,45 +284,55 @@ app.listen({ port: Number(Bun.env['PORT'] ?? 3000) });
 method or path than its operation. A route the document lacks does not fail,
 and comes back as `extra`; pass `{ strict: true }` to fail on it too, where
 `apiDocs`'s routes and `health()`'s are left out by themselves.
-The client is typed from the same document, and its `fetch` is the app's:
-every call is in process, no server, and a test that no longer matches the
-document stops compiling.
+The client is [`@nxgt/openapi-httpyz`](https://www.npmjs.com/package/@nxgt/openapi-httpyz)
+over [`@nxgt/httpyz`](https://www.npmjs.com/package/@nxgt/httpyz), bound to
+the generated `operations.ts`, and its `fetch` is the app's: every call is in
+process, no server, and a test that no longer matches the document stops
+compiling. A reply is a union narrowed on its status, so `reply.data` is the
+`Todo` once the status is 201, and a status the document does not declare
+for the operation throws. Any OpenAPI client works here, since the document
+is the contract.
 
 ```ts
 // file: src/app.spec.ts
 import { expect, test } from 'bun:test';
 import { matchesSpec } from '@alxia/openapi';
-import createClient from 'openapi-fetch';
+import { createHttpClient } from '@nxgt/httpyz';
+import { createOpenApiClient } from '@nxgt/openapi-httpyz';
 import { app } from './app';
-import { operations } from './generated/alxia';
-import type { paths } from './generated/paths';
+import { operations as routes } from './generated/alxia';
+import { operations } from './generated/operations';
 
-const api = createClient<paths>({
+const http = createHttpClient({
 	baseUrl: 'http://alxia.test', // only has to be a URL: nothing is sent to it
 	fetch: (request) => app.fetch(request),
 	headers: { 'x-api-key': 'dev-key' },
 });
+const api = createOpenApiClient(http, operations);
+// The client checks a request against the document before it sends it; this
+// one does not, to see the server refuse what the document forbids.
+const raw = createOpenApiClient(http, operations, { validate: { request: false } });
 
 test('routes every operation of openapi.yaml', () => {
-	matchesSpec(app, operations);
+	matchesSpec(app, routes);
 });
 
 test('creates, reads, changes and deletes a todo', async () => {
-	const created = await api.POST('/todos', { body: { title: 'Write a route' } });
-	expect(created.response.status).toBe(201);
-	const id = created.data?.id ?? 0; // data: Todo | undefined
-	const changed = await api.PATCH('/todos/{id}', { params: { path: { id } }, body: { done: true } });
+	const created = await api.op('createTodo', { json: { title: 'Write a route' } });
+	if (created.status !== 201) throw new Error(`got a ${created.status}`);
+	const id = created.data.id; // narrowed: data is the Todo
+	const changed = await api.op('updateTodo', { param: { id }, json: { done: true } });
 	expect(changed.data).toEqual({ id, title: 'Write a route', done: true });
-	const found = await api.GET('/todos/{id}', { params: { path: { id } } });
-	expect(found.data?.done).toBe(true);
-	expect((await api.DELETE('/todos/{id}', { params: { path: { id } } })).response.status).toBe(204);
-	expect((await api.GET('/todos/{id}', { params: { path: { id } } })).response.status).toBe(404);
+	const found = await api.get('/todos/{id}', { param: { id } });
+	expect(found.data).toMatchObject({ done: true });
+	expect((await api.delete('/todos/{id}', { param: { id } })).status).toBe(204);
+	expect((await api.get('/todos/{id}', { param: { id } })).status).toBe(404);
 });
 
 test('a write without the key is a 401, before the body is read', async () => {
-	const { error, response } = await api.POST('/todos', { body: { title: '' }, headers: { 'x-api-key': 'wrong' } });
-	expect(response.status).toBe(401);
-	expect(error).toEqual({ error: 'unauthorized' });
+	const reply = await raw.op('createTodo', { json: { title: '' } }, { headers: { 'x-api-key': 'wrong' } });
+	expect(reply.status).toBe(401);
+	expect(reply.data).toEqual({ error: 'unauthorized' });
 });
 
 test('what the client cannot send needs app.request', async () => {

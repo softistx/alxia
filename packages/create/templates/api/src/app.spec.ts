@@ -1,29 +1,38 @@
 import { expect, test } from "bun:test";
 import { matchesSpec } from "@alxia/openapi";
-import createClient from "openapi-fetch";
+import { createHttpClient } from "@nxgt/httpyz";
+import { createOpenApiClient } from "@nxgt/openapi-httpyz";
 import { app } from "./app";
 import { env } from "./env";
-import { operations } from "./generated/alxia";
-import type { paths } from "./generated/paths";
+import { operations as routes } from "./generated/alxia";
+import { operations } from "./generated/operations";
 
-// The client types every call from openapi.yaml (generated/paths.ts) and
-// sends it to the app in-process: no server, no port.
-const api = createClient<paths>({
+// The client types every call from openapi.yaml (the generated operations
+// table) and sends it to the app in-process: no server, no port. A reply is a
+// union narrowed on its status; a status the spec does not declare throws.
+const http = createHttpClient({
   baseUrl: "http://alxia.test",
   fetch: (request) => app.fetch(request),
   headers: { "x-api-key": env.API_KEY },
 });
+const api = createOpenApiClient(http, operations);
+
+// The client checks a request against the spec before it sends it. The tests
+// that send what the spec refuses turn that off, to see the server refuse it.
+const raw = createOpenApiClient(http, operations, {
+  validate: { request: false },
+});
 
 test("routes every operation of openapi.yaml", () => {
-  matchesSpec(app, operations);
+  matchesSpec(app, routes);
 });
 
 test("creates a todo from JSON", async () => {
-  const { data, response } = await api.POST("/todos", {
-    body: { title: "Write a route" },
+  const reply = await api.op("createTodo", {
+    json: { title: "Write a route" },
   });
-  expect(response.status).toBe(201);
-  expect(data).toEqual({
+  expect(reply.status).toBe(201);
+  expect(reply.data).toEqual({
     id: expect.any(Number),
     title: "Write a route",
     done: false,
@@ -31,40 +40,49 @@ test("creates a todo from JSON", async () => {
 });
 
 test("refuses an empty title with a 400 problem naming it", async () => {
-  const { error, response } = await api.POST("/todos", {
-    body: { title: "" },
+  const reply = await raw.op("createTodo", { json: { title: "" } });
+  expect(reply.status).toBe(400);
+  expect(reply.response.headers.get("content-type")).toBe(
+    "application/problem+json",
+  );
+  // reply.data is the 201, 400 or 401 body until the status is checked
+  if (reply.status !== 400)
+    throw new Error(`expected a 400, got ${reply.status}`);
+  expect(reply.data).toMatchObject({
+    status: 400,
+    issues: [{ path: ["title"] }],
   });
-  expect(response.status).toBe(400);
-  expect(response.headers.get("content-type")).toBe("application/problem+json");
-  // error is the 400 or the 401 body: a match, not a property read
-  expect(error).toMatchObject({ status: 400, issues: [{ path: ["title"] }] });
 });
 
 test("asks for the key before it reads the body", async () => {
-  const { error, response } = await api.POST("/todos", {
-    body: { title: "" },
-    headers: { "x-api-key": "wrong" },
-  });
-  expect(response.status).toBe(401); // requireKey stands before the validation
-  expect(error).toEqual({ error: "unauthorized" });
+  const reply = await raw.op(
+    "createTodo",
+    { json: { title: "" } },
+    { headers: { "x-api-key": "wrong" } },
+  );
+  expect(reply.status).toBe(401); // requireKey stands before the validation
+  expect(reply.data).toEqual({ error: "unauthorized" });
 });
 
 test("reads the id from the path as a number, as the spec types it", async () => {
-  const created = await api.POST("/todos", { body: { title: "Find me" } });
-  const id = created.data?.id ?? 0;
-  const found = await api.GET("/todos/{id}", { params: { path: { id } } });
-  expect(found.data?.title).toBe("Find me");
-  const missing = await api.GET("/todos/{id}", {
-    params: { path: { id: 9999 } },
+  const created = await api.op("createTodo", { json: { title: "Find me" } });
+  if (created.status !== 201) throw new Error("the todo was not created");
+  const found = await api.get("/todos/{id}", {
+    param: { id: created.data.id },
   });
-  expect(missing.response.status).toBe(404);
+  if (found.status !== 200) throw new Error("the todo was not found");
+  expect(found.data.title).toBe("Find me");
+  const missing = await api.get("/todos/{id}", { param: { id: 9999 } });
+  expect(missing.status).toBe(404);
+  expect(missing.data).toEqual({ error: "not_found" });
   // `id: "first"` is a compile error here; app.request sends what it is told.
   expect((await app.request("/todos/first")).status).toBe(400);
 });
 
 test("lists the todos", async () => {
-  const { data } = await api.GET("/todos");
-  expect(Array.isArray(data)).toBe(true);
+  const reply = await api.get("/todos");
+  if (reply.status !== 200) throw new Error(`got a ${reply.status}`);
+  expect(Array.isArray(reply.data)).toBe(true);
 });
 
 test("answers the liveness probe", async () => {

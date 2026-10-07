@@ -75,8 +75,9 @@ Nothing scheduled yet.
   `openapi.yaml`; no template installs signal handlers of its own, as
   `listen` drains and exits on `SIGINT` and `SIGTERM`.
 - **The `api` template's tests use a typed client.** `src/app.spec.ts` calls
-  the app through openapi-fetch over the generated `paths.ts`, with
-  `app.fetch` as its `fetch`: in process, typed by `openapi.yaml`.
+  the app through a client typed by the generated spec, with `app.fetch`
+  as its `fetch`: in process, typed by `openapi.yaml` (today
+  `@nxgt/openapi-httpyz` over `operations.ts`).
 
 ### 0.1.6
 

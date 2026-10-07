@@ -146,16 +146,22 @@ test('a missing variable stops the process, with the issue', () => {
 ## A typed client, from the OpenAPI document
 
 For a [spec-first](spec-first-crud.md) app, the generator also writes
-`paths.ts`, and `openapi-fetch` gives a client whose every call is typed by
-the document. Its `fetch` is the app's: still in process, no port. A test
-that no longer matches the document stops compiling.
+`operations.ts`, and [`@nxgt/openapi-httpyz`](https://www.npmjs.com/package/@nxgt/openapi-httpyz)
+binds it onto an [`@nxgt/httpyz`](https://www.npmjs.com/package/@nxgt/httpyz)
+client, so every call is typed by the document and a reply is a union
+narrowed on its status. Its `fetch` is the app's: still in process, no port.
+A test that no longer matches the document stops compiling. Any OpenAPI
+client would do: the document is the contract.
 
 ```ts excerpt
-import createClient from "openapi-fetch";
-const api = createClient<paths>({
+import { createHttpClient } from "@nxgt/httpyz";
+import { createOpenApiClient } from "@nxgt/openapi-httpyz";
+const http = createHttpClient({
   baseUrl: "http://alxia.test",
   fetch: (request) => app.fetch(request),
+  headers: { "x-api-key": env.API_KEY },
 });
+const api = createOpenApiClient(http, operations);
 ```
 
 The whole test, with `matchesSpec` beside it, is in
