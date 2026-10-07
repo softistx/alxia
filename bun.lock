@@ -104,7 +104,7 @@
     },
     "packages/create": {
       "name": "@alxia/create",
-      "version": "0.5.0",
+      "version": "0.5.1",
       "bin": {
         "create-alxia": "./dist/index.js",
       },
