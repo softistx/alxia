@@ -1,5 +1,13 @@
 # @alxia/create
 
+## 0.5.1
+
+### Patch Changes
+
+- [#235](https://github.com/softistx/alxia/pull/235) [`9d85fc8`](https://github.com/softistx/alxia/commit/9d85fc8817514d47776b7e29675b750dff7a002d) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The roadmap ships the `api` template's client errors under 0.5.1, and the docs index names them.
+
+- [#234](https://github.com/softistx/alxia/pull/234) [`153ce3c`](https://github.com/softistx/alxia/commit/153ce3ceaac2bfb5be2619e0d28bd087cfb46247) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Troubleshooting for the two errors an `api` project's tests can meet through the typed client, `ValidationError` and `UndeclaredStatusError`, linked from the template's README and the guide, and a spec that holds the template's `@nxgt/httpyz` and `@nxgt/openapi-httpyz` ranges equal to `@alxia/create`'s own.
+
 ## 0.5.0
 
 ### Minor Changes
