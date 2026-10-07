@@ -263,7 +263,7 @@ openapi.yaml → src/generated: 5 written, 0 unchanged
 | `alxia.ts` | one `as const` constant per operation, `{ method, path, schema }`, with the path in alxia's form (`/todos/:id`), the request's Zod schemas, a schema per response status and the `operationId`; and `operations`, all of them by `operationId` |
 | `zod.ts` | a Zod schema per component schema: `zTodo`, `zNewTodo`, … |
 | `types.ts` | a TypeScript type per component schema: `Todo`, `NewTodo`, … |
-| `operations.ts`, `paths.ts` | the operations and paths as types, for a typed client |
+| `operations.ts`, `paths.ts` | `operations.ts` is the table `@nxgt/openapi-httpyz` binds onto a client, which the template's spec uses; `paths.ts` is the same document in openapi-typescript's shape, for a client that reads it, and the template does not use it |
 
 ```ts
 // src/generated/alxia.ts, in part

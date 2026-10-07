@@ -20,10 +20,10 @@ export const app = alxia().route(operations.getTodo, ({ params, reply }) =>
 | [2. Generate](#2-generate-the-operations) | `@nxgt/openapi-codegen` 0.7.0, `alxia: true` | `src/generated/alxia.ts`: each operation as `{ method, path, schema }` |
 | [3. Bind the routes](#3-bind-the-routes) | `@alxia/core`'s `app.route()` | the handlers, typed by the spec, with their middlewares |
 | [4. Check](#4-check-the-app-against-the-spec) | `@alxia/openapi`'s `matchesSpec` | a failing test while an operation has no route |
-| [5. A client](#5-a-client-from-the-same-document) | the generator of your choice | the other side of the contract |
+| [5. A client](#5-a-client-from-the-same-document) | `@nxgt/openapi-httpyz`, or any OpenAPI client | the other side of the contract |
 
 `bun create @alxia my-api --template api` does the first four, and its
-generated `paths.ts` is ready for step 5; this page is what that project
+generated `operations.ts` is ready for step 5; this page is what that project
 holds, explained.
 
 ## 1. Write the document
