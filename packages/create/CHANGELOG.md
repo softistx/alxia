@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.5.0
+
+### Minor Changes
+
+- [#232](https://github.com/softistx/alxia/pull/232) [`3465ac2`](https://github.com/softistx/alxia/commit/3465ac2f67458858388662afcf385ecdeb8d2283) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `api` template's tests call the app through `@nxgt/openapi-httpyz` over the generated `operations.ts`, with `@nxgt/httpyz`'s `fetch` being `app.fetch`, instead of `openapi-fetch`: each reply is a union narrowed on its status. A new project's devDependencies hold `@nxgt/httpyz` and `@nxgt/openapi-httpyz` in place of `openapi-fetch`.
+
 ## 0.4.3
 
 ### Patch Changes
