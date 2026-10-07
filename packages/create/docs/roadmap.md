@@ -7,14 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **The `api` template's client errors, documented and held in step.**
-  [Troubleshooting](troubleshooting.md#validationerror-createtodo-post-todos-too-small-expected-string-to-have-1-characters)
-  names the two errors a new project's tests can meet through the typed
-  client, `ValidationError` (a request the spec refuses never leaves the
-  test: use a second client with `validate: { request: false }`) and
-  `UndeclaredStatusError` (the app answered a status the spec does not
-  declare), and a spec of `@alxia/create` fails when the template's
-  `@nxgt/httpyz` and `@nxgt/openapi-httpyz` ranges differ from its own.
+Nothing in progress.
 
 ## Next
 
@@ -45,6 +38,17 @@ Nothing scheduled yet.
   is the contract, and the resolvers are typed from it.
 
 ## Shipped
+
+### 0.5.1
+
+- **The `api` template's client errors, documented and held in step.**
+  [Troubleshooting](troubleshooting.md#validationerror-createtodo-post-todos-too-small-expected-string-to-have-1-characters)
+  names the two errors a new project's tests can meet through the typed
+  client, `ValidationError` (a request the spec refuses never leaves the
+  test: use a second client with `validate: { request: false }`) and
+  `UndeclaredStatusError` (the app answered a status the spec does not
+  declare), and a spec of `@alxia/create` fails when the template's
+  `@nxgt/httpyz` and `@nxgt/openapi-httpyz` ranges differ from its own.
 
 ### 0.4.1
 
