@@ -1,5 +1,13 @@
 # @alxia/i18n
 
+## 0.4.0
+
+### Minor Changes
+
+- [#238](https://github.com/softistx/alxia/pull/238) [`57fdaa5`](https://github.com/softistx/alxia/commit/57fdaa5e2123a64674aeb308416ab72fe355817e) Thanks [@SteveGT96](https://github.com/SteveGT96)! - A key-level fallback chain and catalogues loaded at runtime. The `fallbacks` option, `i18n.fallBackTo(language)` (a step for the request running) and `i18n.chain()`: `t()` tries the request's language, its steps, `fallbacks(language)` then `fallback`, and answers the key only when all miss; nothing changes while they are unused. `createI18n<Key>({ languages?, fallback, resources? })` types the keys by name, `i18n.setResources(resources)` swaps the catalogues atomically with `supported` following, and a request keeps the catalogues it started with.
+
+- [#240](https://github.com/softistx/alxia/pull/240) [`a3c704a`](https://github.com/softistx/alxia/commit/a3c704afe90982759ad2420c55ffa28740ce25c1) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Requires `@nxgt/i18n` `^3.0.0` (peer and dev dependency; it was `^2.0.0`). This is a breaking change for consumers, released as a minor while the package is 0.x: bump `@nxgt/i18n` to 3 (`bun add @nxgt/i18n@^3`); a 2.x copy does not share 3.x's catalogue state, so every package of the app that registers catalogues or reads `translate` must be on 3 too. `t()` now finds the language that holds a key itself, in the chain's order, and hands it to `@nxgt/i18n`, whose new global fallback lookup (`getFallbackLanguage()`, `'en'` unless `setFallbackLanguage()` changed it) therefore never answers in place of the chain: a key no language of the chain holds still answers itself, and without `fallbacks` or `fallBackTo()` a key the request's language lacks still answers itself, as documented. `@nxgt/i18n`'s own `translate` and `createTranslator` do look up its fallback language now, and a language added to your catalogues speaks there once registered with `registerCatalogue()`.
+
 ## 0.3.9
 
 ### Patch Changes

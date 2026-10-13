@@ -1,5 +1,0 @@
----
-"@alxia/i18n": minor
----
-
-Requires `@nxgt/i18n` `^3.0.0` (peer and dev dependency; it was `^2.0.0`). This is a breaking change for consumers, released as a minor while the package is 0.x: bump `@nxgt/i18n` to 3 (`bun add @nxgt/i18n@^3`); a 2.x copy does not share 3.x's catalogue state, so every package of the app that registers catalogues or reads `translate` must be on 3 too. `t()` now finds the language that holds a key itself, in the chain's order, and hands it to `@nxgt/i18n`, whose new global fallback lookup (`getFallbackLanguage()`, `'en'` unless `setFallbackLanguage()` changed it) therefore never answers in place of the chain: a key no language of the chain holds still answers itself, and without `fallbacks` or `fallBackTo()` a key the request's language lacks still answers itself, as documented. `@nxgt/i18n`'s own `translate` and `createTranslator` do look up its fallback language now, and a language added to your catalogues speaks there once registered with `registerCatalogue()`.
