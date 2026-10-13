@@ -40,12 +40,29 @@ function createI18n<
 	t: Translate<KeyOf<C[Fallback]>>;
 	language: () => keyof C & string;
 	supported: (keyof C & string)[];
+	fallBackTo: (language: string) => void;
+	chain: () => string[];
+	setResources: (resources: Catalogues) => void;
 };
+
+// With an explicit Key: the keys are named, the catalogues may come later.
+function createI18n<Key extends string = never, Language extends string = string, Ctx extends object = BaseContext>(
+	options: RuntimeI18nOptions<Language, Ctx>, // without a Key, the options are refused with a message
+): I18nMiddleware<Language, Key, RequiresOf<Ctx, 'resolve'>>;
 
 interface I18nOptions<C extends Catalogues, Fallback extends keyof C & string, Ctx extends object = BaseContext>
 	extends Omit<LanguageOptions<keyof C & string, Ctx>, 'supported' | 'fallback'> {
 	readonly resources: C;
 	readonly fallback: Fallback;
+	readonly fallbacks?: (language: keyof C & string) => readonly string[];
+}
+
+interface RuntimeI18nOptions<Language extends string = string, Ctx extends object = BaseContext>
+	extends Omit<LanguageOptions<Language, Ctx>, 'supported' | 'fallback'> {
+	readonly languages?: readonly Language[];
+	readonly resources?: Catalogues;
+	readonly fallback: Language;
+	readonly fallbacks?: (language: Language) => readonly string[];
 }
 
 type Catalogues = Readonly<Record<string, Readonly<Record<string, unknown>>>>;
@@ -71,6 +88,9 @@ when `resolve` is absent or not annotated. See
   to their context;
 - **`t()`, `language()` and `supported`**, to call where no context is at
   hand: a service, a model, a job. See [Outside a route](#outside-a-route).
+  **`fallBackTo()`, `chain()` and `setResources()`** are covered by
+  [The fallback chain](#the-fallback-chain) and
+  [Catalogues loaded at runtime](#catalogues-loaded-at-runtime).
 
 It also registers the request's language with `@nxgt/i18n` — one source,
 however many times `createI18n()` is called, so building an app per test
@@ -80,8 +100,10 @@ does not grow `@nxgt/i18n`'s list; see [`@nxgt/i18n`'s own `translate`](#nxgti18
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
-| `resources` | `Catalogues` | required | one catalogue per language; its keys are the languages the app supports |
+| `resources` | `Catalogues` | required (optional with an explicit `Key`) | one catalogue per language; its keys are the languages the app supports |
 | `fallback` | one of `resources`' keys | required | the language when no source names a supported one, and the catalogue whose keys type `t` |
+| `fallbacks` | `(language) => readonly string[]` | none | the languages `t()` tries after the request's own and before `fallback`; see [The fallback chain](#the-fallback-chain) |
+| `languages` | `readonly string[]` | `resources`' keys, else `[fallback]` | with an explicit `Key` only: the languages supported until `setResources()` gives catalogues |
 | `order` | `readonly LanguageSource[]` | `['query', 'cookie', 'header']` | the sources read, in this order |
 | `query` | `string` | `'lang'` | the query parameter: `?lang=fr` |
 | `cookie` | `string` | `'language'` | the cookie read, and written by `persist` |
@@ -90,7 +112,7 @@ does not grow `@nxgt/i18n`'s list; see [`@nxgt/i18n`'s own `translate`](#nxgti18
 | `contentLanguage` | `boolean` | `true` | `Content-Language` on every response the middleware runs for |
 | `resolve` | `(ctx: BaseContext & Ctx) => string \| undefined` | none | decides after every source, before `fallback`; annotate `ctx` to read what an earlier middleware adds |
 
-Every option but `resources` and `fallback` is `@alxia/language`'s, passed
+Every option but `resources`, `fallback`, `fallbacks` and `languages` is `@alxia/language`'s, passed
 through as it is; its [guide](https://github.com/softistx/alxia/blob/develop/packages/language/docs/guide.md)
 details each one, how `Accept-Language` is negotiated, and the `Vary` the
 middleware adds. `supported` is not an option here: it is `resources`' keys.
@@ -154,14 +176,16 @@ The language of every request that names none the catalogues have, of
 must be one of `resources`' keys; anything else is a compile error:
 
 ```text
-error TS2322: Type '"de"' is not assignable to type '"en" | "fr"'.
+error TS2769: No overload matches this call.
+  Overload 1 of 2, '(options: I18nOptions<…>): I18nMiddleware<…>', gave the following error.
+    Type '"de"' is not assignable to type '"en" | "fr"'.
 ```
 
 and, when a cast hides it from the compiler, an error when `createI18n()`
 is called:
 
 ```text
-TypeError: language(): the fallback "de" is not supported
+TypeError: createI18n(): there is no catalogue for the fallback "de"
 ```
 
 ### The language options
@@ -215,7 +239,7 @@ export const app = alxia()
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 
 alxia().use(i18n);
-// error: Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'
+// error TS2345: … `user` is missing from the context: add a middleware that gives it before this one
 ```
 
 This is `@alxia/language`'s check, carried through; its
@@ -352,8 +376,9 @@ error TS2345: Argument of type '"cart.itmes"' is not assignable to parameter of 
 
 The keys are read from the catalogue's type. A catalogue typed
 `Record<string, …>` — built at runtime, or annotated so — has no keys to
-read, and `t` then takes any string. Declare catalogues as literals, or
-import them from JSON.
+read, and `t` then takes any string. Declare catalogues as literals, import
+them from JSON, or name the keys yourself:
+[Catalogues loaded at runtime](#catalogues-loaded-at-runtime).
 
 To type a function that receives `t`, or a key it is given, name the types
 from the catalogue:
@@ -386,6 +411,121 @@ export function translatedWith<const C extends Catalogues, const Fallback extend
 		.get('/', ({ language, reply }) => reply(200, language));
 }
 ```
+
+## The fallback chain
+
+By default a key the request's catalogue lacks answers **itself**. Give
+`t()` a chain of languages to try instead, with the `fallbacks` option and
+`fallBackTo()`:
+
+```ts
+import { alxia } from '@alxia/core';
+import { createI18n } from '@alxia/i18n';
+
+const en = { home: { title: 'Welcome', soon: 'Coming soon' } };
+const fr = { home: { title: 'Bienvenue' } };
+const pt = { home: { title: 'Bem-vindo' } };
+const ptBR = {};
+
+export const i18n = createI18n({
+	resources: { en, fr, pt, 'pt-BR': ptBR },
+	fallback: 'en',
+	fallbacks: (language) => (language === 'pt-BR' ? ['pt'] : []),
+});
+
+const app = alxia()
+	.use(i18n)
+	// the app knows more once the school is read: add its language for this request
+	.derive(({ request }) => {
+		i18n.fallBackTo(request.headers.get('x-tenant-language') ?? 'fr');
+		return {};
+	})
+	.get('/', ({ t, reply }) =>
+		reply(200, { title: t('home.title'), soon: t('home.soon'), chain: i18n.chain() }),
+	);
+
+// GET /?lang=pt-BR with x-tenant-language: fr
+// → { "title": "Bienvenue", "soon": "Coming soon", "chain": ["pt-BR", "fr", "pt", "en"] }
+```
+
+`t(key)` tries, in this order and each language once:
+
+1. the request's language;
+2. the steps `fallBackTo()` added to this request, in the order added;
+3. `fallbacks(language)`;
+4. `fallback`.
+
+It answers the key itself only when all of them miss. A step can be a
+language with no catalogue (the school's, say): it simply misses, and still
+appears in `chain()`.
+
+- **`fallBackTo(language)`** is kept in the request's frame, so concurrent
+  requests never see each other's steps. It does nothing outside a request.
+  Call it as soon as the app knows — in a `derive` or Yoga's `context` — and
+  before the `t()` calls it should affect.
+- **`chain()`** returns that list for the request running (`[fallback]` plus
+  `fallbacks(fallback)` outside one), for data the app labels itself: pick
+  the first language of the chain a stored label has.
+- **Without `fallbacks` and without a `fallBackTo` call**, `t()` reads the
+  request's language alone, as it always did; `chain()` still lists the
+  language then `fallback`. `fallback` joins `t()`'s lookup as soon as the
+  `fallbacks` option is given (even returning `[]`), or from the first
+  `fallBackTo()` call of a request.
+
+## Catalogues loaded at runtime
+
+Catalogues read from a database or a file are typed `Record<string, …>`, so
+`t` would take any string. Name the keys with a type argument instead, and
+give the catalogues when you have them:
+
+```ts
+import { alxia } from '@alxia/core';
+import { createI18n } from '@alxia/i18n';
+
+type Key = 'home.title' | 'cart.items';
+
+export const i18n = createI18n<Key>({ fallback: 'en' });
+
+// at start-up, or whenever the catalogues change: all at once
+export function load(rows: Record<string, Record<string, unknown>>) {
+	i18n.setResources(rows);
+}
+
+load({
+	en: { home: { title: 'Welcome' }, cart: { items: '{count} items' } },
+	fr: { home: { title: 'Bienvenue' }, cart: { items: '{count} articles' } },
+});
+
+i18n.supported; // ['en', 'fr']
+
+alxia()
+	.use(i18n)
+	.get('/', ({ t, reply }) => reply(200, t('cart.items', { count: 2 })));
+// t('cart.itmes') does not compile: not a Key
+```
+
+- **`Key`** replaces the keys inferred from a literal catalogue. A literal
+  `resources` with no type argument still infers them, as before. Name the
+  languages too with a second type argument,
+  `createI18n<Key, 'en' | 'fr'>(…)`; the third, `Ctx`, is `resolve`'s
+  context (inference does not reach it once a type argument is given).
+- **`languages`** seeds `supported` until the first `setResources()`; it
+  defaults to `resources`' keys, else `[fallback]`.
+- **`setResources(resources)`** replaces the catalogues atomically. The
+  languages supported become its keys: `supported` is updated **in place**
+  (the same array) and `@alxia/language` reads it for the next request. It
+  throws a `TypeError`, changing nothing, when `resources` has no catalogue
+  for `fallback` (so does `createI18n()` given such `resources`). On a literal
+  catalogue its parameter is typed by the known languages, so `language`
+  keeps its type.
+- **Only the language-to-catalogue map is copied** (shallow), when given to
+  `createI18n()` or `setResources()`: adding, replacing or removing a language
+  in the object you passed changes nothing. Mutating a message inside a
+  catalogue in place reaches the requests running; give new objects instead.
+- **A request keeps the snapshot it started with**: one in flight when
+  `setResources()` runs translates, `t` and `i18n.t()` alike, with the
+  catalogues it began with; the next request gets the new ones. Outside a
+  request, `i18n.t()` reads the current ones.
 
 ## Outside a route
 

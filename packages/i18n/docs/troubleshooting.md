@@ -6,19 +6,20 @@ nothing — what the response does that you did not expect.
 
 **At start-up**
 
-- [`TypeError: language(): the fallback "de" is not supported`](#typeerror-language-the-fallback-de-is-not-supported)
+- [`TypeError: setResources(): there is no catalogue for the fallback "en"`](#typeerror-setresources-there-is-no-catalogue-for-the-fallback-en)
+- [`TypeError: createI18n(): there is no catalogue for the fallback "de"`](#typeerror-createi18n-there-is-no-catalogue-for-the-fallback-de)
 
 **Types**
 
-- [`Type '"de"' is not assignable to type '"en" | "fr"'`](#type-de-is-not-assignable-to-type-en--fr)
+- [`Type '"de"' is not assignable to type '"en" | "fr"'`](#type-de-is-not-assignable-to-type-en--fr-ts2769)
 - [`Argument of type '"cart.itmes"' is not assignable to parameter of type '"cart.items"'`](#argument-of-type-cartitmes-is-not-assignable-to-parameter-of-type-cartitems)
 - [`Property 't' does not exist on type 'Context<Empty, "/", Empty>'`](#property-t-does-not-exist-on-type-contextempty--empty)
-- [`Type 'I18nMiddleware<string, string, Empty>' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`](#type-i18nmiddlewarestring-string-empty-is-not-assignable-to-type-this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
+- [`this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)`](#this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
 - [`Object literal may only specify known properties, and 'supported' does not exist in type 'I18nOptions<…>'`](#object-literal-may-only-specify-known-properties-and-supported-does-not-exist-in-type-i18noptions)
 - [`t()` accepts any key, typos included](#t-accepts-any-key-typos-included)
 - [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
-- [`Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'`](#property-user-is-missing-in-type-basecontext--empty-but-required-in-type--user-user--null-)
-- [`Types of property 'user' are incompatible`](#types-of-property-user-are-incompatible)
+- [`user` is missing from the context: add a middleware that gives it before this one](#user-is-missing-from-the-context-add-a-middleware-that-gives-it-before-this-one)
+- [`user` is in the context with another type than this middleware reads](#user-is-in-the-context-with-another-type-than-this-middleware-reads)
 - [`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
 **Messages**
@@ -26,6 +27,8 @@ nothing — what the response does that you did not expect.
 - [`The intl string context variable "name" was not provided to the string "Hello {name}"`](#the-intl-string-context-variable-name-was-not-provided-to-the-string-hello-name)
 - [`SyntaxError: MISSING_OTHER_CLAUSE`](#syntaxerror-missing_other_clause)
 - [The page shows `home.title` instead of a message](#the-page-shows-hometitle-instead-of-a-message)
+- [`fallBackTo()` changes nothing](#fallbackto-changes-nothing)
+- [A request still speaks the old catalogues after `setResources()`](#a-request-still-speaks-the-old-catalogues-after-setresources)
 
 **Language**
 
@@ -36,7 +39,7 @@ nothing — what the response does that you did not expect.
 
 ## At start-up
 
-### `TypeError: language(): the fallback "de" is not supported`
+### `TypeError: createI18n(): there is no catalogue for the fallback "de"`
 
 **When:** `createI18n()` is called — when the module that builds it is
 imported — with a `fallback` that is not one of `resources`' keys.
@@ -45,7 +48,9 @@ imported — with a `fallback` that is not one of `resources`' keys.
 catalogues have, so it needs a catalogue. The types refuse it when they can
 see the keys of `resources`; they cannot when `fallback` comes from the
 environment through a cast, or `resources` is typed `Record<string, …>`.
-The message is `@alxia/language`'s, which `createI18n()` calls.
+With `languages` and no `resources` (`createI18n<Key>({ languages, fallback })`),
+the message is `@alxia/language`'s instead, `language(): the fallback "de" is not supported`:
+add the fallback to `languages`.
 
 **Fix:** give the fallback a catalogue, and keep `resources` a literal so
 the compiler checks it next time:
@@ -59,18 +64,42 @@ const de = { home: { title: 'Willkommen' } };
 createI18n({ resources: { en, de }, fallback: 'de' });
 ```
 
+### `TypeError: setResources(): there is no catalogue for the fallback "en"`
+
+**When:** `i18n.setResources({ fr })` is called with catalogues that lack
+the `fallback` language.
+
+**Why:** the fallback is the language of every request that names none, so
+it must stay supported. Nothing changed: the previous catalogues are still
+in force.
+
+**Fix:** include the fallback's catalogue, or build the instance with the
+fallback you will keep:
+
+```ts
+import { createI18n } from '@alxia/i18n';
+
+const i18n = createI18n<'home.title'>({ fallback: 'en' });
+
+i18n.setResources({ en: { home: { title: 'Welcome' } }, fr: { home: { title: 'Bienvenue' } } });
+```
+
 ## Types
 
-### `Type '"de"' is not assignable to type '"en" | "fr"'`
+### `Type '"de"' is not assignable to type '"en" | "fr"'` (TS2769)
 
 ```text
-error TS2322: Type '"de"' is not assignable to type '"en" | "fr"'.
+error TS2769: No overload matches this call.
+  Overload 1 of 2, '(options: I18nOptions<…>): I18nMiddleware<…>', gave the following error.
+    Type '"de"' is not assignable to type '"en" | "fr"'.
+  Overload 2 of 2, '(options: "name the keys with createI18n<Key>(…), or give resources whose fallback is one of their languages"): …', gave the following error.
+    Argument of type '{ resources: { … }; fallback: string; }' is not assignable to parameter of type '"name the keys with createI18n<Key>(…), or give resources whose fallback is one of their languages"'.
 ```
 
 **When:** `createI18n({ resources: { en, fr }, fallback: 'de' })`.
 
 **Why:** `fallback` is typed as one of `resources`' keys. This is the
-compile-time form of [the start-up error](#typeerror-language-the-fallback-de-is-not-supported).
+compile-time form of [the start-up error](#typeerror-createi18n-there-is-no-catalogue-for-the-fallback-de).
 
 **Fix:** a fallback with a catalogue:
 
@@ -146,12 +175,11 @@ const app = alxia()
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 ```
 
-### `Type 'I18nMiddleware<string, string, Empty>' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`
+### `this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)`
 
 ```text
-error TS2345: Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => I18nMiddleware<…>' is not assignable to parameter of type '…'.
+error TS2345: Argument of type '{ <const C extends Catalogues, …>(options: I18nOptions<C, Fallback, Ctx>): I18nMiddleware<…>; <Key extends string = never, …>(options: …): I18nMiddleware<…>; }' is not assignable to parameter of type '{ … } & ((ctx: …, next: NextFunction) => … & "this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)")'.
   …
-      Type 'I18nMiddleware<string, string, Empty>' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'.
 ```
 
 **When:** `app.use(createI18n)`, the factory given uncalled. The message names
@@ -205,7 +233,8 @@ a wrong one [answers itself](#the-page-shows-hometitle-instead-of-a-message).
 
 **Fix:** declare the catalogues as literals, or import them from JSON
 files, which keeps their keys in the type (`resolveJsonModule` in your
-`tsconfig.json`):
+`tsconfig.json`), or name the keys yourself with
+[`createI18n<Key>()`](guide.md#catalogues-loaded-at-runtime):
 
 ```ts
 import en from './locales/en.json';
@@ -244,13 +273,12 @@ alxia().plugin(auth).use(i18n); // auth derives user
 
 See [Reading the app's context](guide.md#reading-the-apps-context).
 
-### `Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'`
+### `user` is missing from the context: add a middleware that gives it before this one
 
 ```text
-error TS2769: No overload matches this call.
+error TS2345: Argument of type 'I18nMiddleware<"en" | "fr", "home.title", { user: User | null; }>' is not assignable to parameter of type 'Middleware<{ user: User | null; }, …> & { … } & ((ctx: MiddlewareContext<…>, next: NextFunction) => … & "`user` is missing from the context: add a middleware that gives it before this one")'.
   …
-          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ user: User | null; }>'.
-            Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'.
+      Type 'Promise<…>' is not assignable to type '"`user` is missing from the context: add a middleware that gives it before this one"'.
 ```
 
 **When:** `resolve` is annotated to read `user` —
@@ -261,7 +289,7 @@ used on an app, or in a group, whose context has no `user` at that point:
 **Why:** an annotated `resolve` makes the middleware require what it reads, and
 `app.use` checks the app's context against it, so `resolve` never runs without
 it. An app whose `user` has another type is refused too, with
-`Types of property 'user' are incompatible`.
+`user` is in the context with another type than this middleware reads.
 
 **Fix:** mount what adds `user` first, with the type `resolve`
 reads:
@@ -273,16 +301,12 @@ alxia().plugin(auth).use(i18n);
 More on this message in
 [`@alxia/language`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#property-user-is-missing-in-type-basecontext--empty-but-required-in-type--user-user--null-).
 
-### `Types of property 'user' are incompatible`
+### `user` is in the context with another type than this middleware reads
 
 ```text
-error TS2769: No overload matches this call.
+error TS2345: Argument of type 'I18nMiddleware<"en" | "fr", "home.title", { user: User; }>' is not assignable to parameter of type 'Middleware<{ user: User; }, …> & { … } & ((ctx: MiddlewareContext<…>, next: NextFunction) => … & "`user` is in the context with another type than this middleware reads")'.
   …
-          Type 'BaseContext & Empty & { user: User | null; }' is not assignable to type 'MiddlewareContext<{ user: User; }>'.
-            Type 'BaseContext & Empty & { user: User | null; }' is not assignable to type '{ user: User; }'.
-              Types of property 'user' are incompatible.
-                Type 'User | null' is not assignable to type 'User'.
-                  Type 'null' is not assignable to type 'User'.
+      Type 'Promise<…>' is not assignable to type '"`user` is in the context with another type than this middleware reads"'.
 ```
 
 **When:** the app gives a `user`, but of a type that does not fit the one
@@ -372,11 +396,14 @@ fallback's message. Either that catalogue is partial — a language added
 before every message was translated — or it lacks `@nxgt/i18n`'s shared
 keys, which exist only in English and French.
 
-**Fix:** fill a partial catalogue from the fallback's, nested
+**Fix:** give `t()` a [chain](guide.md#the-fallback-chain) —
+`fallbacks: () => ['en']` — so that a missing key answers the next
+language's message; or fill a partial catalogue from the fallback's, nested
 ([Guide](guide.md#messages) shows a `fill` helper), and give a language
 `@nxgt/i18n` lacks the English shared keys:
 
 ```ts
+import { createI18n } from '@alxia/i18n';
 import { resources as shared } from '@nxgt/i18n';
 
 const en = { ...shared.en, home: { title: 'Welcome' } };
@@ -384,6 +411,51 @@ const de = { ...shared.en, home: { title: 'Willkommen' } }; // shared messages i
 
 export const i18n = createI18n({ resources: { en, de }, fallback: 'en' });
 ```
+
+### `fallBackTo()` changes nothing
+
+**When:** `i18n.fallBackTo('fr')` is called and `t()` still answers the key,
+or `i18n.chain()` lacks the language.
+
+**Why:** the step lives in the frame of the request running, opened by
+`use(i18n)`. Called outside a request — at start-up, in a job — or in a
+request that `use(i18n)` did not run on (a route declared before it), it
+does nothing. It also affects only the `t()` calls after it, and only the
+instance it is called on: two `createI18n()` have two chains.
+
+**Fix:** call it from a middleware, a `derive` or Yoga's `context` declared
+after `app.use(i18n)`, before the `t()` it should affect:
+
+```ts
+import { alxia } from '@alxia/core';
+import { createI18n } from '@alxia/i18n';
+
+const en = { home: { title: 'Welcome' } };
+const fr = { home: { soon: 'Bientôt' } };
+const i18n = createI18n({ resources: { en, fr }, fallback: 'en' });
+
+alxia()
+	.use(i18n)
+	.use((_ctx, next) => {
+		i18n.fallBackTo('fr');
+		return next();
+	})
+	.get('/', ({ t, reply }) => reply(200, t('home.soon')));
+```
+
+### A request still speaks the old catalogues after `setResources()`
+
+**When:** `i18n.setResources(next)` ran, and a response still holds the
+previous messages.
+
+**Why:** a request keeps the catalogues it started with; only the requests
+that start after the call read the new ones. `supported` and
+`i18n.t()` outside a request change at once.
+
+**Fix:** nothing to fix for a request in flight; it ends with the messages it
+began with. If requests that started after the call are stale, the call
+ran on another `createI18n()` instance than the one the app uses, or
+a cache serves the old response ([cache](#a-cache-serves-one-language-to-every-visitor)).
 
 ## Language
 

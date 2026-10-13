@@ -32,10 +32,75 @@ app.listen(3000);
 - **The language** is `@alxia/language`'s, among the catalogues' languages:
   the query, a cookie, `Accept-Language`, then `fallback`. Its options pass
   through: `createI18n({ resources, fallback, order: ['path', 'header'] })`.
-- **Keys** are typed by the fallback's catalogue: `t('cart.itmes')` is a
-  compile error. A key a language lacks answers itself.
+- **Keys** are typed by the fallback's catalogue in the `resources` form, and by
+  the type argument with an explicit `Key` (below): `t('cart.itmes')` is a
+  compile error. A key a language lacks answers itself, unless you give it a [chain](#a-key-missing-in-the-requests-language).
 - **`@nxgt/i18n`'s shared keys** — `errors.not-found`, `zod.*` — are yours by
   spreading its `resources` into your catalogues.
+
+## A key missing in the request's language
+
+Give `t()` more languages to try, so that a key a catalogue lacks answers
+in the next one instead of answering itself:
+
+```ts
+import { alxia } from '@alxia/core';
+import { createI18n } from '@alxia/i18n';
+
+const en = { home: { title: 'Welcome', soon: 'Coming soon' } };
+const fr = { home: { title: 'Bienvenue' } };
+const pt = { home: { title: 'Bem-vindo' } };
+const ptBR = {};
+
+export const i18n = createI18n({
+	resources: { en, fr, pt, 'pt-BR': ptBR },
+	fallback: 'en',
+	fallbacks: (language) => (language === 'pt-BR' ? ['pt'] : []), // pt-BR, then pt
+});
+
+alxia()
+	.use(i18n)
+	.derive(({ request }) => {
+		// once the app knows more, for one request: the school's language
+		i18n.fallBackTo(request.headers.get('x-tenant-language') ?? 'fr');
+		return {};
+	})
+	.get('/', ({ t, reply }) => reply(200, [t('home.title'), t('home.soon'), i18n.chain()]));
+// ?lang=pt-BR, x-tenant-language: fr → ['Bienvenue', 'Coming soon', ['pt-BR', 'fr', 'pt', 'en']]
+```
+
+`t(key)` tries `[language, ...fallBackTo steps, ...fallbacks(language),
+fallback]`, each once, and answers the key only when all miss.
+`i18n.chain()` is that list, for data the app labels itself. Without
+`fallbacks` and `fallBackTo`, `t()` reads the request's language alone, as
+before; once `fallbacks` is given, or `fallBackTo()` called, `fallback` joins its lookup.
+
+## Catalogues loaded at runtime
+
+Name the keys with a type argument, and give the catalogues when you have
+them; a request keeps the catalogues it started with:
+
+```ts
+import { createI18n } from '@alxia/i18n';
+
+type Key = 'home.title' | 'cart.items';
+
+export const i18n = createI18n<Key>({ fallback: 'en' });
+// later, from a database or a file: all at once, `supported` follows
+i18n.setResources({
+	en: { home: { title: 'Welcome' }, cart: { items: '{count} items' } },
+	fr: { home: { title: 'Bienvenue' }, cart: { items: '{count} articles' } },
+});
+
+i18n.supported; // ['en', 'fr']
+i18n.t('home.title'); // 'Welcome'
+i18n.t('home.titel'); // a compile error: not a Key
+```
+
+With a type argument, `Ctx` — what `resolve` reads — is no longer inferred:
+name it third, `createI18n<Key, 'en' | 'fr', BaseContext & { user: User }>(…)`.
+A `fallback` with no catalogue throws at start-up
+([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/troubleshooting.md#typeerror-createi18n-there-is-no-catalogue-for-the-fallback-de)).
 
 ## Reading the app's context
 
@@ -98,11 +163,14 @@ A response in the request's language varies by what decided it: give
 
 | export | |
 | --- | --- |
-| `createI18n({ resources, fallback, …languageOptions })` | the middleware, given to `app.use` — what is after it reads `t` and `language` — with `t()`, `language()` and `supported` |
-| `I18nOptions` | its options: `resources`, `fallback`, and every `@alxia/language` option but `supported`; `resolve` may be annotated to read the app's context |
+| `createI18n({ resources, fallback, fallbacks?, …languageOptions })` | the middleware, given to `app.use` — what is after it reads `t` and `language` — with `t()`, `language()`, `supported`, `fallBackTo()`, `chain()` and `setResources()` |
+| `createI18n<Key>({ languages?, fallback, resources?, … })` | the same with an explicit `Key` for the keys (and, third, `Ctx` when `resolve` reads the app's context), and catalogues that may come later, from `setResources()` |
+| `i18n.fallBackTo(language)`, `i18n.chain()` | add a step to the current request's fallback chain; list the chain |
+| `i18n.setResources(resources)` | swaps the catalogues at once; `supported` follows; a request running keeps its own |
+| `I18nOptions`, `RuntimeI18nOptions` | its options: `resources`, `fallback`, `fallbacks`, and every `@alxia/language` option but `supported`; `resolve` may be annotated to read the app's context |
 | `KeyOf<Catalogue>` | a catalogue's dotted keys, nine levels deep; a deeper section gives `section.${string}` |
 | `Translate<Key>`, `Catalogues`, `I18nContext<Key>` | its types |
-| `I18nMiddleware<Language, Key, Requires>` | what `createI18n()` returns: a middleware adding `language` and `t`, with `t()`, `language()` and `supported` |
+| `I18nMiddleware<Language, Key, Requires>` | what `createI18n()` returns: a middleware adding `language` and `t`, with `t()`, `language()`, `supported`, `fallBackTo()`, `chain()` and `setResources()` |
 
 ## Documentation
 
