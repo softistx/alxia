@@ -11,7 +11,12 @@ Nothing in progress.
 
 ## Next
 
-Nothing scheduled yet.
+- **Hot reload of the catalogues.** `@nxgt/i18n` gets a `CatalogueSource`,
+  `load()` for the catalogues and `version()` for a cheap version string,
+  and a watcher that polls `version()` and calls `onChange` when it moves;
+  `@alxia/i18n` then feeds the result to `setResources()`, so an app picks
+  up edited catalogues without a restart and a request in flight keeps the
+  ones it started with. Needs the `setResources()` of 0.4.0.
 
 ## Later
 
@@ -24,6 +29,16 @@ Nothing scheduled yet.
   it is built on their public APIs and Node's `AsyncLocalStorage`.
 
 ## Shipped
+
+### 0.4.0
+
+- **A key-level fallback chain.** The `fallbacks` option, `i18n.fallBackTo()`
+  for one request and `i18n.chain()`: `t()` tries the request's language, the
+  request's steps, `fallbacks(language)`, then `fallback`, and answers the key
+  only when all miss.
+- **Catalogues loaded at runtime, keys typed.** `createI18n<Key>({ fallback })`
+  names the keys, `i18n.setResources()` swaps the catalogues atomically,
+  `supported` follows, and a request keeps the ones it started with.
 
 ### 0.3.0
 

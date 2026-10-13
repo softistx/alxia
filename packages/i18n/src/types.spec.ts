@@ -2,12 +2,8 @@ import { describe, expect, expectTypeOf, test } from 'bun:test';
 import { alxia, type BaseContext, type Empty } from '@alxia/core';
 import type { Path } from '@nxgt/i18n';
 import { en, fr, i18n, reads } from '../test/catalogues';
-import {
-	type Catalogues,
-	createI18n,
-	type I18nContext,
-	type KeyOf,
-} from './i18n';
+import { createI18n } from './i18n';
+import type { Catalogues, I18nContext, KeyOf } from './types';
 
 describe('KeyOf', () => {
 	test("gives Path's keys, the shared catalogue's included", () => {

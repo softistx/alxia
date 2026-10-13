@@ -2,90 +2,30 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 import {
 	type BaseContext,
 	defineMiddleware,
-	type Empty,
-	type Middleware,
 	markFactory,
 	type Next,
 	type NextFunction,
 	type RequiresOf,
 	settle,
 } from '@alxia/core';
+import { type LanguageContext, language } from '@alxia/language';
+import { registerLanguageSource } from '@nxgt/i18n';
 import {
-	type LanguageContext,
-	type LanguageOptions,
-	language,
-} from '@alxia/language';
-import {
-	createTranslator,
-	registerLanguageSource,
-	type TranslationContext,
-} from '@nxgt/i18n';
-
-/** Catalogues by language: `{ en: { greeting: 'Hello {name}' }, fr: … }`. */
-export type Catalogues = Readonly<
-	Record<string, Readonly<Record<string, unknown>>>
->;
-
-/**
- * Every key of a catalogue, dotted: `users.greeting`. The keys of
- * `@nxgt/i18n`'s `Path`, nine levels deep: a section nested deeper gives
- * `${section}.${string}`, any key under it.
- *
- * `Path` recurses without a bound. A catalogue that is a type parameter —
- * a function generic over the catalogues it hands to `createI18n` — leaves
- * it deferred, and some checks then unfold it forever (TS2589, "Type
- * instantiation is excessively deep and possibly infinite"). The depth
- * stops them.
- */
-export type KeyOf<Catalogue> = KeysOf<Catalogue, 8> & string;
-
-/** One level shallower: `Shallower[8]` is `7`, and `Shallower[0]` is `never`. */
-type Shallower = [never, 0, 1, 2, 3, 4, 5, 6, 7];
-
-/**
- * The dotted keys of `T`, `Depth` more levels down at most. `Path`'s own
- * test, `Record<string, any>`, kept so that the keys stay `Path`'s.
- */
-type KeysOf<
-	T,
-	Depth extends number,
-	K extends keyof T = keyof T,
-> = K extends string
-	? T[K] extends Record<string, any>
-		? [Shallower[Depth]] extends [never]
-			? `${K}.${string}`
-			: `${K}.${KeysOf<T[K], Shallower[Depth]>}`
-		: K
-	: never;
-
-/** A translation of a key, in a language, formatted with ICU's `context`. */
-export type Translate<Key extends string> = (
-	key: Key,
-	context?: TranslationContext,
-) => string;
-
-/**
- * `Ctx` is the type `resolve`'s parameter is annotated with —
- * `BaseContext & { user: User }`, or `{ user: User }` alone — and
- * `BaseContext` when it is not: what the plugin then requires of the app.
- */
-export interface I18nOptions<
-	C extends Catalogues,
-	Fallback extends keyof C & string,
-	Ctx extends object = BaseContext,
-> extends Omit<
-		LanguageOptions<keyof C & string, Ctx>,
-		'supported' | 'fallback'
-	> {
-	/**
-	 * The catalogues, one per language: their keys are the languages
-	 * supported. Spread `@nxgt/i18n`'s `resources` into them for its shared
-	 * keys — `errors.not-found`, `zod.*`.
-	 */
-	readonly resources: C;
-	/** The language spoken when the request names none, and whose keys type `t`. */
-	readonly fallback: Fallback;
-}
+	chainOf,
+	type Frame,
+	type Snapshot,
+	type Steps,
+	snapshotOf,
+	translateFor,
+} from './chain';
+import type {
+	Catalogues,
+	I18nContext,
+	I18nMiddleware,
+	I18nOptions,
+	KeyOf,
+	RuntimeI18nOptions,
+} from './types';
 
 /**
  * The request's language as `@nxgt/i18n` hears it: the first an i18n
@@ -104,39 +44,46 @@ function hearing<T>(url: URL, work: () => T): T {
 /** `@nxgt/i18n`'s source: one function, so registering it again keeps one. */
 const requestLanguage = () => requests.getStore()?.language;
 
-/** What the routes behind the plugin read. */
-export interface I18nContext<Key extends string> {
-	/** Translates into the request's language. */
-	readonly t: Translate<Key>;
+/** What the middleware of one `createI18n()` works with. */
+interface Parts {
+	readonly current: AsyncLocalStorage<Frame>;
+	readonly detected: ReturnType<typeof language<string>>;
+	readonly steps: Steps;
+	readonly live: () => Snapshot;
 }
 
-/**
- * What `createI18n()` makes: a middleware that gives `language`, one of
- * `Language`, and `t`, typed by `Key`, and requires `Requires` of the app —
- * what `resolve` reads — with a `t` and a `language` of its own for the
- * request running.
- */
-export type I18nMiddleware<
-	Language extends string,
-	Key extends string,
-	Requires extends object = Empty,
-> = Middleware<
-	Requires,
-	Promise<Next<LanguageContext<Language> & I18nContext<Key>>>
-> & {
-	/** Translates into the current request's language, or the fallback outside one. */
-	t: Translate<Key>;
-	/** The current request's language, or the fallback outside one. */
-	language: () => Language;
-	supported: Language[];
-};
+type Added = LanguageContext<string> & I18nContext<string>;
+
+/** The middleware: opens a request's frame around everything after it. */
+function perRequest({ current, detected, steps, live }: Parts) {
+	return defineMiddleware<object>()(function i18n(ctx, next): Promise<
+		Next<Added>
+	> {
+		const own: Frame = { snapshot: live(), steps: [] };
+		const bound = translateFor(steps, () => own, live);
+		const found = (heard: LanguageContext<string>) => {
+			own.language = heard.language;
+			const store = requests.getStore();
+			if (store !== undefined) store.language ??= heard.language;
+			return settle(ctx, next({ ...heard, t: bound }));
+		};
+		// `language()`'s middleware, run inline: its `next` is this one's.
+		const detecting = Object.assign(found, {
+			behind: next.behind,
+		}) as unknown as NextFunction;
+		return current.run(own, () =>
+			hearing(ctx.url, () => detected(ctx as never, detecting)),
+		) as Promise<Next<Added>>;
+	});
+}
 
 /**
  * Translations, as a middleware, on [`@nxgt/i18n`](https://www.npmjs.com/package/@nxgt/i18n):
  * `@alxia/language` reads the request's language among the catalogues', and
  * the routes declared after it read `language` and `t`, bound to it. Keys
  * are typed by the fallback's catalogue; messages are ICU — plurals,
- * selects, numbers — and a missing key answers itself.
+ * selects, numbers — and a key missing in every language of the chain
+ * answers itself.
  *
  * Its own `t()` translates anywhere a request runs after it — a service,
  * the answer to an error, a try/catch middleware's included — in that
@@ -146,6 +93,9 @@ export type I18nMiddleware<
  * const i18n = createI18n({ resources: { en, fr }, fallback: 'en' });
  * app.use(i18n).get('/', ({ t, reply }) => reply(200, t('home.title')));
  * ```
+ *
+ * Catalogues that load at runtime take their keys as a type argument:
+ * `createI18n<Key>({ fallback: 'en' })`, then `i18n.setResources(loaded)`.
  *
  * It registers the request's language as one of `@nxgt/i18n`'s language
  * sources, so its own `getLanguage()` and `translate` — and every nxgt
@@ -161,26 +111,48 @@ export function createI18n<
 	keyof C & string,
 	KeyOf<C[Fallback]>,
 	RequiresOf<Ctx, 'resolve'>
-> {
-	type Language = keyof C & string;
-	type Key = KeyOf<C[Fallback]>;
-	const { resources, fallback, resolve, ...detect } = options;
-	const supported = Object.keys(resources) as Language[];
-	const translator = createTranslator<Key>(
-		resources as Record<string, unknown>,
-	);
+>;
+export function createI18n<
+	Key extends string = never,
+	Language extends string = string,
+	Ctx extends object = BaseContext,
+>(
+	options: [Key] extends [never]
+		? 'name the keys with createI18n<Key>(…), or give resources whose fallback is one of their languages'
+		: RuntimeI18nOptions<Language, Ctx>,
+): I18nMiddleware<Language, Key, RequiresOf<Ctx, 'resolve'>>;
+export function createI18n(
+	options: RuntimeI18nOptions<string, object>,
+): I18nMiddleware<string, string, any> {
+	const {
+		resources: initial = {},
+		languages,
+		fallback,
+		fallbacks,
+		resolve,
+		...detect
+	} = options;
+	if (
+		options.resources !== undefined &&
+		!Object.hasOwn(options.resources, fallback)
+	) {
+		throw new TypeError(
+			`createI18n(): there is no catalogue for the fallback "${fallback}"`,
+		);
+	}
+	const supported = [...(languages ?? Object.keys(initial))];
+	if (languages === undefined && !supported.includes(fallback)) {
+		supported.push(fallback);
+	}
+	let live: Snapshot = snapshotOf({ ...initial });
+	const steps = { fallback, fallbacks };
 	/**
-	 * This middleware's language for the request running, once
-	 * `@alxia/language` has read it. Opened fresh for each request — one
-	 * made from inside another included — around everything after it, the
-	 * answer to an error included: `settle` answers it inside.
+	 * This middleware's frame for the request running, opened fresh for each
+	 * request — one made from inside another included — around everything
+	 * after it, the answer to an error included: `settle` answers it inside.
 	 */
-	const current = new AsyncLocalStorage<{ language?: Language }>();
-	const spoken = (): Language => current.getStore()?.language ?? fallback;
-	const translate =
-		(lang: Language): Translate<Key> =>
-		(key, context) =>
-			translator(key, context, lang as never);
+	const current = new AsyncLocalStorage<Frame>();
+	const spoken = (): string => current.getStore()?.language ?? fallback;
 
 	// nxgt's own getLanguage() and translate speak the request's language too.
 	registerLanguageSource(requestLanguage);
@@ -188,7 +160,7 @@ export function createI18n<
 	// The plugin requires what `resolve` reads, and `app.plugin` checks the app gives
 	// it; the `language()` inside is then handed `resolve` as reading only
 	// `BaseContext`, since a context that is a type parameter defers the check.
-	const detected = language<Language>({
+	const detected = language<string>({
 		...detect,
 		supported,
 		fallback,
@@ -196,32 +168,35 @@ export function createI18n<
 			? {}
 			: { resolve: resolve as (ctx: BaseContext) => string | undefined }),
 	});
-	// What the routes after it read, once `@alxia/language` has read it.
-	type Added = LanguageContext<Language> & I18nContext<Key>;
-	const middleware = defineMiddleware<RequiresOf<Ctx, 'resolve'>>()(
-		function i18n(ctx, next): Promise<Next<Added>> {
-			const own: { language?: Language } = {};
-			const found = (heard: LanguageContext<Language>) => {
-				own.language = heard.language;
-				const store = requests.getStore();
-				if (store !== undefined) store.language ??= heard.language;
-				return settle(ctx, next({ ...heard, t: translate(heard.language) }));
-			};
-			// `language()`'s middleware, run inline: its `next` is this one's.
-			const detecting = Object.assign(found, {
-				behind: next.behind,
-			}) as unknown as NextFunction;
-			return current.run(own, () =>
-				hearing(ctx.url, () => detected(ctx as never, detecting)),
-			) as Promise<Next<Added>>;
-		},
-	);
+	const middleware = perRequest({
+		current,
+		detected,
+		steps,
+		live: () => live,
+	});
 
 	return Object.assign(middleware, {
-		t: ((key, context) => translate(spoken())(key, context)) as Translate<Key>,
+		t: translateFor(
+			steps,
+			() => current.getStore(),
+			() => live,
+		),
 		language: spoken,
 		supported,
-	});
+		chain: () => chainOf(steps, current.getStore()),
+		fallBackTo(language: string) {
+			current.getStore()?.steps.push(language);
+		},
+		setResources(resources: Catalogues) {
+			if (!Object.hasOwn(resources, fallback)) {
+				throw new TypeError(
+					`setResources(): there is no catalogue for the fallback "${fallback}"`,
+				);
+			}
+			live = snapshotOf({ ...resources });
+			supported.splice(0, supported.length, ...Object.keys(resources));
+		},
+	}) as unknown as I18nMiddleware<string, string, any>;
 }
 
 markFactory(createI18n);

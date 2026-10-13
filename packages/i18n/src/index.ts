@@ -1,9 +1,10 @@
-export {
-	type Catalogues,
-	createI18n,
-	type I18nContext,
-	type I18nMiddleware,
-	type I18nOptions,
-	type KeyOf,
-	type Translate,
-} from './i18n';
+export { createI18n } from './i18n';
+export type {
+	Catalogues,
+	I18nContext,
+	I18nMiddleware,
+	I18nOptions,
+	KeyOf,
+	RuntimeI18nOptions,
+	Translate,
+} from './types';
