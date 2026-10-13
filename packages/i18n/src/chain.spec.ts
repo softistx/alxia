@@ -127,20 +127,24 @@ describe('without fallbacks or fallBackTo', () => {
 });
 
 describe('the order of the chain', () => {
-	test("is kept whatever @nxgt/i18n's own fallback language holds", async () => {
-		// `en` holds `ping` too, and is @nxgt/i18n's own fallback: the chain
-		// (pt, then de, then fr) is walked first, so `de` answers.
-		const i18n = createI18n<Key | 'ping'>({
-			resources: { en, fr, pt: { hello: 'Olá' }, de: { ping: 'Pong' } },
+	test('a value that is no message does not hand the key to the next fallback', async () => {
+		// pt holds a number and a section at the keys; fr holds the messages.
+		// @nxgt/i18n would answer them from its own fallback, `en`.
+		const i18n = createI18n<'a' | 'g'>({
+			resources: {
+				en: { a: 'EN', g: 'EN-g' },
+				fr: { a: 'FR', g: 'FR-g' },
+				pt: { a: 5, g: { sub: 'x' } },
+			},
 			fallback: 'fr',
-			fallbacks: () => ['de'],
+			fallbacks: () => [],
 		});
 		const app = alxia()
 			.use(i18n)
-			.get('/', ({ t, reply }) => reply(200, [t('ping'), i18n.chain()]));
+			.get('/', ({ t, reply }) => reply(200, [t('a'), t('g')]));
 		expect(await (await app.request('/?lang=pt')).json()).toEqual([
-			'Pong',
-			['pt', 'de', 'fr'],
+			'FR',
+			'FR-g',
 		]);
 	});
 });

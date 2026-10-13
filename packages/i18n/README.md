@@ -155,7 +155,12 @@ read: in a middleware declared before it, or a route declared before it
 `createI18n()` registers the request's language as one of `@nxgt/i18n`'s
 language sources: its `getLanguage()` and `translate` — and every nxgt
 package that translates through them, an error's message — speak the alxia
-request's language too.
+request's language too, for a language `@nxgt/i18n` has a catalogue for
+(`en`, `fr`, and what `registerCatalogue()` adds).
+
+Upgrading from `@nxgt/i18n` 2: bump it to `^3` in every package of the app; a
+2.x copy does not share 3.x's catalogue state
+([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/troubleshooting.md#a-catalogue-registered-with-nxgti18n-is-not-seen-by-translate)).
 
 ## Cached responses
 

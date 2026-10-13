@@ -32,7 +32,7 @@ Nothing scheduled yet.
 
 ### 0.4.0
 
-- **On `@nxgt/i18n` 3.** The peer range is `^3.0.0`. `t()` walks the chain
+- **On `@nxgt/i18n` 3 (breaking: bump it to `^3.0.0` everywhere).** The peer range is `^3.0.0`. `t()` walks the chain
   alone and hands `@nxgt/i18n` the language that holds the key, so its new
   global fallback lookup (`setFallbackLanguage()`) never answers in place of
   the chain, and a key no language holds still answers itself. A language is

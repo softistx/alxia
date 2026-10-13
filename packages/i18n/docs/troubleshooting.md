@@ -34,6 +34,7 @@ nothing — what the response does that you did not expect.
 
 - [`i18n.t()` answers in the fallback before the language is read](#i18nt-answers-in-the-fallback-before-the-language-is-read)
 - [`@nxgt/i18n`'s `translate` answers in English on a German request](#nxgti18ns-translate-answers-in-english-on-a-german-request)
+- [A catalogue registered with `@nxgt/i18n` is not seen by `translate`](#a-catalogue-registered-with-nxgti18n-is-not-seen-by-translate)
 - [`getLanguage()` answers `en` although the fallback is `fr`](#getlanguage-answers-en-although-the-fallback-is-fr)
 - [A cache serves one language to every visitor](#a-cache-serves-one-language-to-every-visitor)
 
@@ -511,6 +512,18 @@ alxia()
 	.use(i18n)
 	.get('/', ({ t, reply }) => reply(404, { error: t('errors.not-found') })); // ?lang=de → 'Nicht gefunden.'
 ```
+
+### A catalogue registered with `@nxgt/i18n` is not seen by `translate`
+
+**When:** after upgrading, `registerCatalogue()` messages or a language it
+added are missing from `translate`, with no error.
+
+**Why:** `@nxgt/i18n` 3 keeps its catalogue state under its own key
+(`@nxgt/i18n/catalogues@3`); a 2.x copy installed beside it, by a package that
+still asks for `^2`, registers into a different state.
+
+**Fix:** one copy, on 3: `bun pm ls @nxgt/i18n`, then bump every package that
+depends on it to `^3.0.0`.
 
 ### `getLanguage()` answers `en` although the fallback is `fr`
 

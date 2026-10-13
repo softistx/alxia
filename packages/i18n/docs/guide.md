@@ -636,8 +636,8 @@ before answering the key.
 
 `createI18n()` registers the request's language as a language source of
 `@nxgt/i18n`. Its `getLanguage()` and `translate` — and every package that
-translates through them — answer in the alxia request's language, wherever
-`i18n.t()` would:
+translates through them — answer in the alxia request's language, for a language `@nxgt/i18n` has a
+catalogue for:
 
 ```ts
 import { alxia } from '@alxia/core';
