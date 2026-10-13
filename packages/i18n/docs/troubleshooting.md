@@ -34,6 +34,7 @@ nothing — what the response does that you did not expect.
 
 - [`i18n.t()` answers in the fallback before the language is read](#i18nt-answers-in-the-fallback-before-the-language-is-read)
 - [`@nxgt/i18n`'s `translate` answers in English on a German request](#nxgti18ns-translate-answers-in-english-on-a-german-request)
+- [A catalogue registered with `@nxgt/i18n` is not seen by `translate`](#a-catalogue-registered-with-nxgti18n-is-not-seen-by-translate)
 - [`getLanguage()` answers `en` although the fallback is `fr`](#getlanguage-answers-en-although-the-fallback-is-fr)
 - [A cache serves one language to every visitor](#a-cache-serves-one-language-to-every-visitor)
 
@@ -493,12 +494,14 @@ alxia()
 `getLanguage()` answers `'en'` on a request in it, and its `translate` and
 the packages that translate through it answer in English.
 
-**Why:** `@nxgt/i18n` only speaks the languages of its own catalogues,
-`en` and `fr`. It skips a source that answers another, and falls back to
-`'en'`.
+**Why:** `@nxgt/i18n` only speaks the languages it has a catalogue for: `en`
+and `fr`, and what `registerCatalogue()` added. It skips a source that
+answers another, and falls back to its own fallback language, `'en'` unless
+`setFallbackLanguage()` changed it.
 
-**Fix:** translate what the response shows with `t`, whose catalogues are
-yours:
+**Fix:** register the language with `@nxgt/i18n` (`registerCatalogue('de',
+catalogue)`, deep-merged over what it has), or translate what the response
+shows with `t`, whose catalogues are yours:
 
 ```ts
 const de = { ...shared.en, errors: { ...shared.en.errors, 'not-found': 'Nicht gefunden.' } };
@@ -509,6 +512,18 @@ alxia()
 	.use(i18n)
 	.get('/', ({ t, reply }) => reply(404, { error: t('errors.not-found') })); // ?lang=de → 'Nicht gefunden.'
 ```
+
+### A catalogue registered with `@nxgt/i18n` is not seen by `translate`
+
+**When:** after upgrading, `registerCatalogue()` messages or a language it
+added are missing from `translate`, with no error.
+
+**Why:** `@nxgt/i18n` 3 keeps its catalogue state under its own key
+(`@nxgt/i18n/catalogues@3`); a 2.x copy installed beside it, by a package that
+still asks for `^2`, registers into a different state.
+
+**Fix:** one copy, on 3: `bun pm ls @nxgt/i18n`, then bump every package that
+depends on it to `^3.0.0`.
 
 ### `getLanguage()` answers `en` although the fallback is `fr`
 
@@ -522,7 +537,8 @@ fallback, `'en'`. Your `fallback` is `createI18n()`'s, and only
 `i18n.t()` and `i18n.language()` use it.
 
 **Fix:** call `i18n.t()` rather than `translate` where there is no request,
-or pass `translate` the language:
+pass `translate` the language, or set `@nxgt/i18n`'s fallback to yours
+(`setFallbackLanguage('fr')`, which needs a catalogue for `fr`):
 
 ```ts
 import { translate } from '@nxgt/i18n';

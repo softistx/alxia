@@ -8,7 +8,7 @@ export interface Snapshot {
 	readonly translator: (
 		key: string,
 		context?: TranslationContext,
-		language?: never,
+		language?: string,
 	) => string;
 }
 
@@ -19,6 +19,15 @@ export interface Frame {
 	readonly steps: string[];
 	language?: string;
 }
+
+/**
+ * A translator over no catalogue: it answers the key, formatted as ICU as
+ * `@nxgt/i18n` does. `@nxgt/i18n` 3 looks a missing key up in its own global
+ * fallback language (`getFallbackLanguage()`, `'en'` unless set), which is not
+ * this package's `fallback`; a key no language of the chain holds therefore
+ * never reaches the catalogues' translator.
+ */
+const unanswered = createTranslator<string>({});
 
 /** The catalogues, ready to translate. */
 export const snapshotOf = (resources: Catalogues): Snapshot => ({
@@ -48,9 +57,11 @@ export function chainOf(
 
 /**
  * `t` for the frame `of` answers (none: outside a request, the `live`
- * catalogues): its snapshot's catalogues, its chain. Until the chain is
- * used — no `fallbacks`, no step — a key the request's language lacks
- * answers itself.
+ * catalogues): its snapshot's catalogues, its chain. The language that holds
+ * the key is found here, in the chain's order, and handed to `@nxgt/i18n`,
+ * whose own fallback lookup therefore never runs. Until the chain is used —
+ * no `fallbacks`, no step — only the request's language is tried, and a key it
+ * lacks answers itself.
  */
 export function translateFor(
 	steps: Steps,
@@ -63,9 +74,13 @@ export function translateFor(
 		const language = frame?.language ?? steps.fallback;
 		const chained =
 			steps.fallbacks !== undefined || (frame?.steps.length ?? 0) > 0;
-		const found = chained
-			? holder(resources, chainOf(steps, frame), key)
-			: undefined;
-		return translator(key, context, (found ?? language) as never);
+		const found = holder(
+			resources,
+			chained ? chainOf(steps, frame) : [language],
+			key,
+		);
+		return found === undefined
+			? unanswered(key, context, language)
+			: translator(key, context, found);
 	};
 }

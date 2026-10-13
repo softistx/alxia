@@ -466,6 +466,11 @@ appears in `chain()`.
 - **`chain()`** returns that list for the request running (`[fallback]` plus
   `fallbacks(fallback)` outside one), for data the app labels itself: pick
   the first language of the chain a stored label has.
+- **`@nxgt/i18n`'s own fallback is never part of it.** `@nxgt/i18n` 3 looks a
+  missing key up in its global fallback language (`getFallbackLanguage()`);
+  `t()` finds the language that holds the key itself, in the chain's order,
+  and hands it over, so that fallback is neither tried first nor tried at all:
+  a key that every language of the chain lacks answers itself.
 - **Without `fallbacks` and without a `fallBackTo` call**, `t()` reads the
   request's language alone, as it always did; `chain()` still lists the
   language then `fallback`. `fallback` joins `t()`'s lookup as soon as the
@@ -621,15 +626,18 @@ const translator = createTranslator<KeyOf<typeof en>>(resources);
 translator('mail.subject', { id: 42 }, 'fr'); // 'Votre commande 42'
 ```
 
-`createTranslator`'s third argument is typed with `@nxgt/i18n`'s own
-languages, `'en' | 'fr'`.
+`createTranslator`'s third argument is any language string (`@nxgt/i18n` 3's
+`Language` is `string`). Unlike `t()`, that translator looks a missing key, or a
+language with no catalogue, up in `@nxgt/i18n`'s own fallback language
+(`getFallbackLanguage()`, `'en'` unless `setFallbackLanguage()` changed it)
+before answering the key.
 
 ## `@nxgt/i18n`'s own `translate`
 
 `createI18n()` registers the request's language as a language source of
 `@nxgt/i18n`. Its `getLanguage()` and `translate` — and every package that
-translates through them — answer in the alxia request's language, wherever
-`i18n.t()` would:
+translates through them — answer in the alxia request's language, for a language `@nxgt/i18n` has a
+catalogue for:
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -646,12 +654,16 @@ export const app = alxia()
 
 Its limits are `@nxgt/i18n`'s:
 
-- **It speaks `en` and `fr` only.** A request in a language your
-  catalogues add — `de` — is not one of them, and `getLanguage()` answers
-  as if no source had: `'en'`.
-- **Its fallback is `'en'`, not yours.** Outside a request, or before the
-  language is read, `getLanguage()` answers `'en'` even when your
-  `fallback` is `'fr'`.
+- **It speaks the languages it has a catalogue for.** `en` and `fr`, and any
+  you give it with `registerCatalogue('de', catalogue)`. A request in `de`
+  with no registered catalogue is not one of them, and `getLanguage()` answers
+  as if no source had: its fallback language.
+- **Its fallback is `'en'`, not yours**, until `setFallbackLanguage()` says
+  otherwise (it throws a `RangeError` for a language with no catalogue).
+  Outside a request, or before the language is read, `getLanguage()` answers
+  that language even when your `fallback` is `'fr'`. Its `translate` also
+  looks a key the language lacks up there; `i18n.t()` does not, it follows
+  [your chain](#the-fallback-chain) and answers the key.
 - **It hears one middleware.** With two `createI18n()` on one app, it follows
   the language the first one read — its fallback included, when the
   request named a language only the second supports.

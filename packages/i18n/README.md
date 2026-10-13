@@ -6,7 +6,7 @@ request's language, keys typed by your catalogue, ICU messages — plurals,
 selects, numbers.
 
 ```sh
-bun add @alxia/i18n @alxia/language @nxgt/i18n@^2 @alxia/core
+bun add @alxia/i18n @alxia/language @nxgt/i18n@^3 @alxia/core
 bun add -d typescript
 ```
 
@@ -74,6 +74,9 @@ fallback]`, each once, and answers the key only when all miss.
 `i18n.chain()` is that list, for data the app labels itself. Without
 `fallbacks` and `fallBackTo`, `t()` reads the request's language alone, as
 before; once `fallbacks` is given, or `fallBackTo()` called, `fallback` joins its lookup.
+The chain is walked by `@alxia/i18n` alone: `@nxgt/i18n` 3's own fallback
+language (`getFallbackLanguage()`, `'en'` unless set) is never tried for `t()`,
+so a key no language of the chain holds answers itself.
 
 ## Catalogues loaded at runtime
 
@@ -152,7 +155,12 @@ read: in a middleware declared before it, or a route declared before it
 `createI18n()` registers the request's language as one of `@nxgt/i18n`'s
 language sources: its `getLanguage()` and `translate` — and every nxgt
 package that translates through them, an error's message — speak the alxia
-request's language too.
+request's language too, for a language `@nxgt/i18n` has a catalogue for
+(`en`, `fr`, and what `registerCatalogue()` adds).
+
+Upgrading from `@nxgt/i18n` 2: bump it to `^3` in every package of the app; a
+2.x copy does not share 3.x's catalogue state
+([troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/i18n/docs/troubleshooting.md#a-catalogue-registered-with-nxgti18n-is-not-seen-by-translate)).
 
 ## Cached responses
 
