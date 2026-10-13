@@ -46,8 +46,8 @@ function createI18n<
 };
 
 // With an explicit Key: the keys are named, the catalogues may come later.
-function createI18n<Key extends string, Language extends string = string, Ctx extends object = BaseContext>(
-	options: RuntimeI18nOptions<Language, Ctx>,
+function createI18n<Key extends string = never, Language extends string = string, Ctx extends object = BaseContext>(
+	options: RuntimeI18nOptions<Language, Ctx>, // without a Key, the options are refused with a message
 ): I18nMiddleware<Language, Key, RequiresOf<Ctx, 'resolve'>>;
 
 interface I18nOptions<C extends Catalogues, Fallback extends keyof C & string, Ctx extends object = BaseContext>
@@ -176,7 +176,9 @@ The language of every request that names none the catalogues have, of
 must be one of `resources`' keys; anything else is a compile error:
 
 ```text
-error TS2322: Type '"de"' is not assignable to type '"en" | "fr"'.
+error TS2769: No overload matches this call.
+  Overload 1 of 2, '(options: I18nOptions<…>): I18nMiddleware<…>', gave the following error.
+    Type '"de"' is not assignable to type '"en" | "fr"'.
 ```
 
 and, when a cast hides it from the compiler, an error when `createI18n()`
@@ -237,7 +239,7 @@ export const app = alxia()
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 
 alxia().use(i18n);
-// error: Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'
+// error TS2345: … `user` is missing from the context: add a middleware that gives it before this one
 ```
 
 This is `@alxia/language`'s check, carried through; its
@@ -516,6 +518,10 @@ alxia()
   for `fallback` (so does `createI18n()` given such `resources`). On a literal
   catalogue its parameter is typed by the known languages, so `language`
   keeps its type.
+- **Only the language-to-catalogue map is copied** (shallow), when given to
+  `createI18n()` or `setResources()`: adding, replacing or removing a language
+  in the object you passed changes nothing. Mutating a message inside a
+  catalogue in place reaches the requests running; give new objects instead.
 - **A request keeps the snapshot it started with**: one in flight when
   `setResources()` runs translates, `t` and `i18n.t()` alike, with the
   catalogues it began with; the next request gets the new ones. Outside a

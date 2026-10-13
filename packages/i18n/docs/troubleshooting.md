@@ -11,15 +11,15 @@ nothing — what the response does that you did not expect.
 
 **Types**
 
-- [`Type '"de"' is not assignable to type '"en" | "fr"'`](#type-de-is-not-assignable-to-type-en--fr)
+- [`Type '"de"' is not assignable to type '"en" | "fr"'`](#type-de-is-not-assignable-to-type-en--fr-ts2769)
 - [`Argument of type '"cart.itmes"' is not assignable to parameter of type '"cart.items"'`](#argument-of-type-cartitmes-is-not-assignable-to-parameter-of-type-cartitems)
 - [`Property 't' does not exist on type 'Context<Empty, "/", Empty>'`](#property-t-does-not-exist-on-type-contextempty--empty)
-- [`Type 'I18nMiddleware<string, string, Empty>' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`](#type-i18nmiddlewarestring-string-empty-is-not-assignable-to-type-this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
+- [`this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)`](#this-looks-like-a-factory-given-uncalled-call-it-as-usecors-and-not-usecors)
 - [`Object literal may only specify known properties, and 'supported' does not exist in type 'I18nOptions<…>'`](#object-literal-may-only-specify-known-properties-and-supported-does-not-exist-in-type-i18noptions)
 - [`t()` accepts any key, typos included](#t-accepts-any-key-typos-included)
 - [`Property 'user' does not exist on type 'BaseContext'`](#property-user-does-not-exist-on-type-basecontext)
-- [`Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'`](#property-user-is-missing-in-type-basecontext--empty-but-required-in-type--user-user--null-)
-- [`Types of property 'user' are incompatible`](#types-of-property-user-are-incompatible)
+- [`user` is missing from the context: add a middleware that gives it before this one](#user-is-missing-from-the-context-add-a-middleware-that-gives-it-before-this-one)
+- [`user` is in the context with another type than this middleware reads](#user-is-in-the-context-with-another-type-than-this-middleware-reads)
 - [`the plugin's resolve reads its context as any: annotate what it reads, or leave it unannotated`](#the-plugins-resolve-reads-its-context-as-any-annotate-what-it-reads-or-leave-it-unannotated)
 
 **Messages**
@@ -86,10 +86,14 @@ i18n.setResources({ en: { home: { title: 'Welcome' } }, fr: { home: { title: 'Bi
 
 ## Types
 
-### `Type '"de"' is not assignable to type '"en" | "fr"'`
+### `Type '"de"' is not assignable to type '"en" | "fr"'` (TS2769)
 
 ```text
-error TS2322: Type '"de"' is not assignable to type '"en" | "fr"'.
+error TS2769: No overload matches this call.
+  Overload 1 of 2, '(options: I18nOptions<…>): I18nMiddleware<…>', gave the following error.
+    Type '"de"' is not assignable to type '"en" | "fr"'.
+  Overload 2 of 2, '(options: "name the keys with createI18n<Key>(…), or give resources whose fallback is one of their languages"): …', gave the following error.
+    Argument of type '{ resources: { … }; fallback: string; }' is not assignable to parameter of type '"name the keys with createI18n<Key>(…), or give resources whose fallback is one of their languages"'.
 ```
 
 **When:** `createI18n({ resources: { en, fr }, fallback: 'de' })`.
@@ -171,12 +175,11 @@ const app = alxia()
 	.get('/', ({ t, reply }) => reply(200, t('home.title')));
 ```
 
-### `Type 'I18nMiddleware<string, string, Empty>' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'`
+### `this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)`
 
 ```text
-error TS2345: Argument of type '<const C extends Catalogues, const Fallback extends keyof C & string, Ctx extends object = BaseContext>(options: I18nOptions<C, Fallback, Ctx>) => I18nMiddleware<…>' is not assignable to parameter of type '…'.
+error TS2345: Argument of type '{ <const C extends Catalogues, …>(options: I18nOptions<C, Fallback, Ctx>): I18nMiddleware<…>; <Key extends string = never, …>(options: …): I18nMiddleware<…>; }' is not assignable to parameter of type '{ … } & ((ctx: …, next: NextFunction) => … & "this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)")'.
   …
-      Type 'I18nMiddleware<string, string, Empty>' is not assignable to type '"this looks like a factory given uncalled: call it, as use(cors()) and not use(cors)"'.
 ```
 
 **When:** `app.use(createI18n)`, the factory given uncalled. The message names
@@ -270,13 +273,12 @@ alxia().plugin(auth).use(i18n); // auth derives user
 
 See [Reading the app's context](guide.md#reading-the-apps-context).
 
-### `Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'`
+### `user` is missing from the context: add a middleware that gives it before this one
 
 ```text
-error TS2769: No overload matches this call.
+error TS2345: Argument of type 'I18nMiddleware<"en" | "fr", "home.title", { user: User | null; }>' is not assignable to parameter of type 'Middleware<{ user: User | null; }, …> & { … } & ((ctx: MiddlewareContext<…>, next: NextFunction) => … & "`user` is missing from the context: add a middleware that gives it before this one")'.
   …
-          Type 'BaseContext & Empty' is not assignable to type 'MiddlewareContext<{ user: User | null; }>'.
-            Property 'user' is missing in type 'BaseContext & Empty' but required in type '{ user: User | null; }'.
+      Type 'Promise<…>' is not assignable to type '"`user` is missing from the context: add a middleware that gives it before this one"'.
 ```
 
 **When:** `resolve` is annotated to read `user` —
@@ -287,7 +289,7 @@ used on an app, or in a group, whose context has no `user` at that point:
 **Why:** an annotated `resolve` makes the middleware require what it reads, and
 `app.use` checks the app's context against it, so `resolve` never runs without
 it. An app whose `user` has another type is refused too, with
-`Types of property 'user' are incompatible`.
+`user` is in the context with another type than this middleware reads.
 
 **Fix:** mount what adds `user` first, with the type `resolve`
 reads:
@@ -299,16 +301,12 @@ alxia().plugin(auth).use(i18n);
 More on this message in
 [`@alxia/language`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/language/docs/troubleshooting.md#property-user-is-missing-in-type-basecontext--empty-but-required-in-type--user-user--null-).
 
-### `Types of property 'user' are incompatible`
+### `user` is in the context with another type than this middleware reads
 
 ```text
-error TS2769: No overload matches this call.
+error TS2345: Argument of type 'I18nMiddleware<"en" | "fr", "home.title", { user: User; }>' is not assignable to parameter of type 'Middleware<{ user: User; }, …> & { … } & ((ctx: MiddlewareContext<…>, next: NextFunction) => … & "`user` is in the context with another type than this middleware reads")'.
   …
-          Type 'BaseContext & Empty & { user: User | null; }' is not assignable to type 'MiddlewareContext<{ user: User; }>'.
-            Type 'BaseContext & Empty & { user: User | null; }' is not assignable to type '{ user: User; }'.
-              Types of property 'user' are incompatible.
-                Type 'User | null' is not assignable to type 'User'.
-                  Type 'null' is not assignable to type 'User'.
+      Type 'Promise<…>' is not assignable to type '"`user` is in the context with another type than this middleware reads"'.
 ```
 
 **When:** the app gives a `user`, but of a type that does not fit the one

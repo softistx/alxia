@@ -4,7 +4,9 @@ import type { Catalogues } from './types';
  * Whether `catalogue` has a message at the dotted `key`: the lookup
  * `@nxgt/i18n`'s translator makes, a value that is neither `undefined` nor
  * `null` — so that a language which lacks a key can be told from one whose
- * message happens to be the key itself.
+ * message happens to be the key itself. A key is a dotted path, or a flat
+ * key of the catalogue; bracket paths (`a[0]`) are not supported, unlike
+ * lodash's `_.get`.
  */
 export function has(
 	catalogue: Readonly<Record<string, unknown>> | undefined,

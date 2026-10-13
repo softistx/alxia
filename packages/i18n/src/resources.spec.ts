@@ -68,9 +68,12 @@ describe('runtime resources', () => {
 		expect(i18n.t('hello')).toBe('Hi');
 	});
 
-	test('the resources given are copied: mutating them later changes nothing', () => {
+	test('the catalogue map is copied: replacing a language later changes nothing', () => {
 		const given: Record<string, Record<string, string>> = { en, fr };
 		const i18n = createI18n<Key>({ resources: given, fallback: 'en' });
+		Reflect.set(given, 'en', { hello: 'Changed' });
+		Reflect.deleteProperty(given, 'fr');
+		expect(i18n.t('hello')).toBe('Hello');
 		const next: Record<string, Record<string, string>> = { en, de };
 		i18n.setResources(next);
 		Reflect.deleteProperty(next, 'de');
