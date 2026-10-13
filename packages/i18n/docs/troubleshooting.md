@@ -493,12 +493,14 @@ alxia()
 `getLanguage()` answers `'en'` on a request in it, and its `translate` and
 the packages that translate through it answer in English.
 
-**Why:** `@nxgt/i18n` only speaks the languages of its own catalogues,
-`en` and `fr`. It skips a source that answers another, and falls back to
-`'en'`.
+**Why:** `@nxgt/i18n` only speaks the languages it has a catalogue for: `en`
+and `fr`, and what `registerCatalogue()` added. It skips a source that
+answers another, and falls back to its own fallback language, `'en'` unless
+`setFallbackLanguage()` changed it.
 
-**Fix:** translate what the response shows with `t`, whose catalogues are
-yours:
+**Fix:** register the language with `@nxgt/i18n` (`registerCatalogue('de',
+catalogue)`, deep-merged over what it has), or translate what the response
+shows with `t`, whose catalogues are yours:
 
 ```ts
 const de = { ...shared.en, errors: { ...shared.en.errors, 'not-found': 'Nicht gefunden.' } };
@@ -522,7 +524,8 @@ fallback, `'en'`. Your `fallback` is `createI18n()`'s, and only
 `i18n.t()` and `i18n.language()` use it.
 
 **Fix:** call `i18n.t()` rather than `translate` where there is no request,
-or pass `translate` the language:
+pass `translate` the language, or set `@nxgt/i18n`'s fallback to yours
+(`setFallbackLanguage('fr')`, which needs a catalogue for `fr`):
 
 ```ts
 import { translate } from '@nxgt/i18n';

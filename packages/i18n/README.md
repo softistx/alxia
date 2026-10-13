@@ -6,7 +6,7 @@ request's language, keys typed by your catalogue, ICU messages — plurals,
 selects, numbers.
 
 ```sh
-bun add @alxia/i18n @alxia/language @nxgt/i18n@^2 @alxia/core
+bun add @alxia/i18n @alxia/language @nxgt/i18n@^3 @alxia/core
 bun add -d typescript
 ```
 
@@ -74,6 +74,9 @@ fallback]`, each once, and answers the key only when all miss.
 `i18n.chain()` is that list, for data the app labels itself. Without
 `fallbacks` and `fallBackTo`, `t()` reads the request's language alone, as
 before; once `fallbacks` is given, or `fallBackTo()` called, `fallback` joins its lookup.
+The chain is walked by `@alxia/i18n` alone: `@nxgt/i18n` 3's own fallback
+language (`getFallbackLanguage()`, `'en'` unless set) is never tried for `t()`,
+so a key no language of the chain holds answers itself.
 
 ## Catalogues loaded at runtime
 

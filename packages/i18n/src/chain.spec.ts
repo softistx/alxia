@@ -104,12 +104,44 @@ describe('without fallbacks or fallBackTo', () => {
 		expect(i18n.chain()).toEqual(['fr']);
 	});
 
+	test("a missing key does not reach @nxgt/i18n's own fallback language", async () => {
+		// @nxgt/i18n 3 looks a missing key up in its global fallback ('en'),
+		// which is not the fallback given here.
+		const i18n = createI18n<Key>({ resources, fallback: 'fr' });
+		const app = alxia()
+			.use(i18n)
+			.get('/', ({ t, reply }) => reply(200, [t('ping'), t('rare')]));
+		expect(await (await app.request('/?lang=fr')).json()).toEqual([
+			'ping',
+			'rare',
+		]);
+	});
+
 	test('the chain of a request is its language, then the fallback', async () => {
 		const i18n = createI18n<Key>({ resources, fallback: 'fr' });
 		const app = alxia()
 			.use(i18n)
 			.get('/', ({ reply }) => reply(200, i18n.chain()));
 		expect(await (await app.request('/?lang=en')).json()).toEqual(['en', 'fr']);
+	});
+});
+
+describe('the order of the chain', () => {
+	test("is kept whatever @nxgt/i18n's own fallback language holds", async () => {
+		// `en` holds `ping` too, and is @nxgt/i18n's own fallback: the chain
+		// (pt, then de, then fr) is walked first, so `de` answers.
+		const i18n = createI18n<Key | 'ping'>({
+			resources: { en, fr, pt: { hello: 'Olá' }, de: { ping: 'Pong' } },
+			fallback: 'fr',
+			fallbacks: () => ['de'],
+		});
+		const app = alxia()
+			.use(i18n)
+			.get('/', ({ t, reply }) => reply(200, [t('ping'), i18n.chain()]));
+		expect(await (await app.request('/?lang=pt')).json()).toEqual([
+			'Pong',
+			['pt', 'de', 'fr'],
+		]);
 	});
 });
 
