@@ -226,7 +226,7 @@ nxgt package is a peer. Where the suite has a Hono adapter, the alxia one
 mirrors it — `@nxgt/telemetry-hono`, `@nxgt/janus-hono`, `@nxgt/di-hono` — and the table
 below records what is kept twice.
 
-- **Bun 1.4.2.** `@nxgt/redis` needs Bun 1.4's `RedisClient`; the
+- **Bun 1.4.3.** `@nxgt/redis` needs Bun 1.4's `RedisClient`; the
   repository pins the version nxgt does.
 - **A Container shared by forks.** A fork runs its base's `onStop` once of
   its own, so a base whose `onStop` disposes of a Container breaks every
@@ -370,6 +370,23 @@ in place; never commit what they write.
 `noUnusedLocals` and the rest. An app's own tsconfig may hold any of them,
 so the published declarations must compile under all of them. Only
 `scripts/`, copied from nxgt-http, relaxes two.
+
+- **`tsc` stays; `bun check` (Bun 1.4.3) replaces none of it.** Measured on
+  every tsconfig the typecheck covers plus the `test/register` and
+  `test/messages` programs (38 projects, from a clean build): the same
+  error lines, planted or real (10 seeded errors in `core`, TS2322, TS2345,
+  TS6133, TS2339, TS4111, TS2304), 0.1-0.4 s against 0.5-1.5 s (`core` 6.0 s
+  with tsc, 0.4 s with `bun check`). What rules it out: it embeds TypeScript
+  6.0.3, so the Newest peers and Newest majors jobs (TypeScript 7) would lose
+  their coverage; it emits nothing, so the declarations of the build still
+  need `tsc -p tsconfig.build.json`; the root `check` script (Biome) shadows
+  it in `scripts/`, which has no `package.json` of its own, so that project
+  is reachable only from outside the repository; it exits 1 where `tsc`
+  exits 2 and appends a `Found N errors` summary, and the specs that read
+  `tsc`'s output (`register.spec.ts`, `create/test/project.ts`) run
+  `bun --bun tsc`, which `bun check` is not. There is no `bun tsc`: it runs
+  `node_modules`' tsc. `bun check -b` takes `tsconfig.build.json` too (this
+  repository has no project references) and also emits nothing.
 
 ## Releasing
 
