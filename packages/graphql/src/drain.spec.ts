@@ -83,7 +83,10 @@ describe('graphql(), health and the drain', () => {
 		);
 		// Refused at the connect, or reset when fetch reused a pooled connection
 		// the server then closed: either way, no answer. Never 'answered'.
-		expect(['ConnectionRefused', 'ECONNRESET']).toContain(refused);
+		// Bun 1.4.2 names a refusal `ConnectionRefused`, 1.4.3 `ECONNREFUSED`.
+		expect(['ConnectionRefused', 'ECONNREFUSED', 'ECONNRESET']).toContain(
+			refused,
+		);
 		expect(await slow).toEqual({ data: { slow: 'answered' } });
 		expect(await events).toContain('{"data":{"ticks":0}}');
 		await stopping;

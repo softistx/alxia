@@ -33,7 +33,8 @@ describe('stop(): a graceful shutdown', () => {
 			() => 'answered',
 			(error: { code?: string }) => error.code ?? 'refused',
 		);
-		expect(refused).toBe('ConnectionRefused');
+		// Bun 1.4.2 names the refusal `ConnectionRefused`, 1.4.3 `ECONNREFUSED`.
+		expect(['ConnectionRefused', 'ECONNREFUSED']).toContain(refused);
 		expect(await slow).toBe('done');
 		await stopped;
 		expect(order).toEqual(['slow answered', 'onStop']);
