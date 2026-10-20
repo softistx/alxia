@@ -51,7 +51,8 @@ describe("the default server, with no app/server.ts", () => {
     const page = await server.get("/");
     expect(page.status).toBe(200);
     const html = await page.text();
-    expect(html).toContain("<h1>Plain</h1>");
+    // The root's <ViewTransition> marks its child: <h1 vt-update="auto">.
+    expect(html).toMatch(/<h1[^>]*>Plain<\/h1>/);
     expect(page.headers.get("content-security-policy")).toBeNull();
     expect(page.headers.get("x-request-id")).toBeNull();
 
