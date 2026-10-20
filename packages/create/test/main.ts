@@ -20,7 +20,7 @@ export const VERSIONS = {
 	'@nxgt/httpyz': ['0.3.3', '0.4.1'],
 	'@nxgt/openapi-httpyz': ['0.3.1', '0.3.2'],
 	'@biomejs/biome': ['2.5.15', '2.5.16', '2.6.0', '3.0.0'],
-	'@nxgt/openapi-codegen': ['0.10.0', '0.11.0'],
+	'@nxgt/openapi-codegen': ['0.10.0', '0.11.0', '0.11.1', '0.12.0'],
 	dataloader: ['2.2.2', '2.2.3'],
 	graphql: ['16.11.0', '17.0.2'],
 	'graphql-yoga': ['5.16.0', '5.24.1'],
