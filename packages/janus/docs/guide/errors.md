@@ -85,6 +85,7 @@ const app = alxia()
 | 403 | `USER_INACTIVE`, `STEP_UP_REQUIRED` |
 | 404 | `NOT_FOUND` |
 | 409 | `LOGIN_TAKEN`, `VERSION_CONFLICT`, `SECOND_FACTOR_NOT_ENROLLED`, `SECOND_FACTOR_ACTIVE` |
+| 429 | `MAIL_THROTTLED` — too many e-mails asked for one address or user (`@nxgt/janus` 0.18 or later) |
 | 500 | `PERMISSION_DEPTH` — a permission check walked past `maxDepth`: not a denial |
 | 501 | `UNSUPPORTED` — a wiring mistake: a store lacks a method a flow needs |
 | 503 | `STORE_FAILED` — **an outage, never a 401 or a 404** |
@@ -108,6 +109,7 @@ your logs, and stay on the `JanusError`.
 | `PASSWORD_TOO_SHORT` | `{ code, minLength? }` |
 | `CODE_INVALID` | `{ code, attemptsLeft? }` |
 | `CREDENTIALS_INVALID` | `{ code, retryAfter? }` — seconds; also sent as `Retry-After` |
+| `MAIL_THROTTLED` | `{ code, retryAfter? }` — seconds; also sent as `Retry-After` (needs `@nxgt/janus` 0.18 or later, which adds the code) |
 | every other code | `{ code }` |
 
 ```ts

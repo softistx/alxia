@@ -31,6 +31,13 @@ export interface JanusErrorBody {
 }
 
 export function bodyOf(error: JanusError): JanusErrorBody {
+	// `MAIL_THROTTLED` (429) exists from @nxgt/janus 0.18: compared as a
+	// string so that the range still admits 0.17, where the code is not typed.
+	if ((error.code as string) === 'MAIL_THROTTLED') {
+		return error.retryAfter === undefined
+			? { code: error.code }
+			: { code: error.code, retryAfter: error.retryAfter };
+	}
 	switch (error.code) {
 		case 'USER_INVALID':
 			return { code: error.code, issues: error.issues ?? [] };
