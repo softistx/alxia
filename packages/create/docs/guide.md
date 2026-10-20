@@ -1025,20 +1025,21 @@ export default function App() {
 }
 ```
 
-`update` is `"none"` unless the pathname changes. A transition holds the
-page's rendering until its animation ends, so animating every update would
-fade a fetcher's answer, or a search writing `?q=` as the reader types, and
-drop the keys typed meanwhile. `app/app.css` ends with a
+`update` is `"none"` unless the pathname changes. Animating every update
+would also fade a fetcher's answer, or a search writing `?q=` as the reader
+types, and in an app measured with the plain `<ViewTransition>` the keys
+typed during that fade were lost. `app/app.css` ends with a
 `prefers-reduced-motion` rule that turns every view transition's animation
 off. Keep React Router's transitions on: never `useTransitions={false}`, nor
-`flushSync` around a navigation, since only an update React runs as a
-transition animates. An element shared by two pages animates between them
+`flushSync` around a navigation, since React animates a `<ViewTransition>`
+for an update it runs as a transition
+([React's reference](https://react.dev/reference/react/ViewTransition)). An element shared by two pages animates between them
 with `<ViewTransition name="…">`, the same unique name on both.
 
 Under `<ViewTransition>`, React's server render marks the element it wraps
-with `vt-*` attributes (`<h1 vt-update="auto">`): a test that matches a
-page's exact tag, such as `toContain("<h1>Title</h1>")`, matches
-`/<h1[^>]*>Title<\/h1>/` instead.
+with a `vt-*` attribute (`<main class="p-4" vt-update="none">`), which breaks
+a test matching a page's exact tag
+([troubleshooting](troubleshooting.md#a-page-test-no-longer-finds-its-exact-tag)).
 
 The template follows React Router's majors, not its every release: it is
 written again from `create-react-router` when React Router ships one that
