@@ -1004,7 +1004,7 @@ The template follows React Router's majors, not its every release: it is
 written again from `create-react-router` when React Router ships one that
 `@alxia/react-router` accepts, in a new `@alxia/create`. Between two, the
 files are what `create-react-router` wrote when the template was last
-generated (React Router 8.4.0 in this release, with that `<ViewTransition>` added for 8.5), and the versions are the newest of that major.
+generated (React Router 8.5.0 in this release; `react` and `react-dom` start at 19.3, the first React with `<ViewTransition>`, where the scaffold may still ask for an older one), and the versions are the newest of that major.
 
 There is no `app/server.ts`: the plugin's default server serves the pages
 in `bun dev` and from the build. To put alxia's middlewares or `/api` routes in

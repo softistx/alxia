@@ -4,6 +4,7 @@ import {
 	addAlxia,
 	addPlugin,
 	addViewTransition,
+	atViewTransitionReact,
 	toBun,
 } from './regenerate-react-router-template';
 
@@ -74,6 +75,32 @@ describe('addViewTransition', () => {
 		expect(() =>
 			addViewTransition('export default function App() {}\n'),
 		).toThrow('expected return <Outlet />; exactly once');
+	});
+});
+
+describe('atViewTransitionReact', () => {
+	test('raises an older React and its types to 19.3.0, and keeps a newer one', () => {
+		const manifest = atViewTransitionReact({
+			scripts: {},
+			dependencies: {
+				react: '^19.2.8',
+				'react-dom': '^19.3.1',
+				isbot: '^5.1.36',
+			},
+			devDependencies: {
+				'@types/react': '^19.2.18',
+				'@types/react-dom': '^19.2.7',
+			},
+		});
+		expect(manifest.dependencies).toEqual({
+			react: '^19.3.0',
+			'react-dom': '^19.3.1',
+			isbot: '^5.1.36',
+		});
+		expect(manifest.devDependencies).toEqual({
+			'@types/react': '^19.3.0',
+			'@types/react-dom': '^19.3.0',
+		});
 	});
 });
 

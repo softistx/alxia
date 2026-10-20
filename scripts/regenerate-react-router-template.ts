@@ -75,6 +75,40 @@ export function addViewTransition(root: string): string {
 	)}`;
 }
 
+/** The React that exports `<ViewTransition>`, which `app/root.tsx` imports. */
+const VIEW_TRANSITION_REACT = '19.3.0';
+
+/**
+ * The manifest with `react`, `react-dom` and their types starting at
+ * `VIEW_TRANSITION_REACT` at least: the scaffold may still ask for an older
+ * React than `addViewTransition`'s root runs on.
+ */
+export function atViewTransitionReact(manifest: Manifest): Manifest {
+	const raise = (
+		ranges: Record<string, string> | undefined,
+		names: string[],
+	) => {
+		if (ranges === undefined) return ranges;
+		const raised = { ...ranges };
+		for (const name of names) {
+			const range = raised[name];
+			const floor = range?.replace(/^[\^~]/, '');
+			if (floor && Bun.semver.order(floor, VIEW_TRANSITION_REACT) < 0) {
+				raised[name] = `^${VIEW_TRANSITION_REACT}`;
+			}
+		}
+		return raised;
+	};
+	return {
+		...manifest,
+		dependencies: raise(manifest.dependencies, ['react', 'react-dom']) ?? {},
+		devDependencies: raise(manifest.devDependencies, [
+			'@types/react',
+			'@types/react-dom',
+		]),
+	};
+}
+
 /** The commands of another package manager, which `toBun` leaves none of. */
 export const OTHER_MANAGER = /(^|[\s`(])(npm|npx|pnpm|yarn) /m;
 
@@ -151,7 +185,9 @@ async function main(): Promise<void> {
 			work,
 		);
 		const manifest = addBiome(
-			addAlxia(await Bun.file(join(out, 'package.json')).json()),
+			atViewTransitionReact(
+				addAlxia(await Bun.file(join(out, 'package.json')).json()),
+			),
 			await biomeVersion(ROOT),
 		);
 		const config = addPlugin(
