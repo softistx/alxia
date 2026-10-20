@@ -6,7 +6,9 @@
  * the dependencies (as `workspace:^`, which `@alxia/create` replaces with
  * the versions it was published beside), `dev` under
  * `NODE_ENV=development` (alxia's dev switch), `start` running the build on Bun,
- * `alxia()` after `reactRouter()` in `vite.config.ts`; plus
+ * `alxia()` after `reactRouter()` in `vite.config.ts`; `app/root.tsx`'s
+ * `<Outlet />` wrapped in React's `<ViewTransition>`, as React Router 8.5
+ * recommends in place of its own view transition options; plus
  * `examples/react-router`'s `bunfig.toml`, and its `Dockerfile` in place of
  * the scaffold's, which builds and runs the app on Node; and its
  * `README.md`'s commands on Bun, the package manager alxia uses (`toBun`).
@@ -27,7 +29,7 @@
  *
  *   bun scripts/regenerate-react-router-template.ts
  *
- * It refuses a scaffold whose `vite.config.ts` or scripts it does not
+ * It refuses a scaffold whose `vite.config.ts`, `app/root.tsx` or scripts it does not
  * recognise, writing nothing. `react-router.spec.ts` in `packages/create`
  * then checks the result against `examples/react-router`.
  */
@@ -52,6 +54,25 @@ export function addPlugin(config: string): string {
 		throw new Error('vite.config.ts: expected reactRouter() exactly once');
 	}
 	return IMPORT + config.replace(/\breactRouter\(\)/, 'reactRouter(), alxia()');
+}
+
+const OUTLET = '  return <Outlet />;\n';
+
+/**
+ * `app/root.tsx` with its `<Outlet />` wrapped in React's `<ViewTransition>`,
+ * so a navigation between two pages animates. A root that already imports
+ * `ViewTransition` is kept as it is; one without exactly one
+ * `return <Outlet />;` is refused.
+ */
+export function addViewTransition(root: string): string {
+	if (/\bViewTransition\b/.test(root)) return root;
+	if (root.split(OUTLET).length !== 2) {
+		throw new Error('app/root.tsx: expected return <Outlet />; exactly once');
+	}
+	return `import { ViewTransition } from "react";\n${root.replace(
+		OUTLET,
+		'  return (\n    <ViewTransition>\n      <Outlet />\n    </ViewTransition>\n  );\n',
+	)}`;
 }
 
 /** The commands of another package manager, which `toBun` leaves none of. */
@@ -136,11 +157,15 @@ async function main(): Promise<void> {
 		const config = addPlugin(
 			await Bun.file(join(out, 'vite.config.ts')).text(),
 		);
+		const root = addViewTransition(
+			await Bun.file(join(out, 'app/root.tsx')).text(),
+		);
 		await Bun.write(
 			join(out, 'package.json'),
 			`${JSON.stringify(manifest, null, 2)}\n`,
 		);
 		await Bun.write(join(out, 'vite.config.ts'), config);
+		await Bun.write(join(out, 'app/root.tsx'), root);
 		await Bun.write(
 			join(out, 'README.md'),
 			addLintSection(toBun(await Bun.file(join(out, 'README.md')).text())),

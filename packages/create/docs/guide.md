@@ -993,7 +993,7 @@ and the README gains a Lint and format section
 ([Lint and format](#lint-and-format)); Biome formatted the scaffold once,
 which changed three of its files: `app/app.css`'s font list wraps
 differently, and `app/routes.ts` and `app/routes/home.tsx` have their
-imports sorted. Every other file is React Router's:
+imports sorted. `app/root.tsx` wraps its `<Outlet />` in React's `<ViewTransition>`, as React Router 8.5 recommends in place of its own view transition options, now deprecated: a navigation between two pages animates with no further code. Every other file is React Router's:
 `app/`, `public/`, `tsconfig.json`, `react-router.config.ts`, its
 `README.md` (with Bun's commands where it wrote npm's: `bun install`,
 `bun dev`, `bun run build`), `.gitignore` and `.dockerignore`. `package.json` takes the directory's name, and its
@@ -1004,7 +1004,7 @@ The template follows React Router's majors, not its every release: it is
 written again from `create-react-router` when React Router ships one that
 `@alxia/react-router` accepts, in a new `@alxia/create`. Between two, the
 files are what `create-react-router` wrote when the template was last
-generated (React Router 8.4.0 in this release), and the versions are the newest of that major.
+generated (React Router 8.4.0 in this release, with that `<ViewTransition>` added for 8.5), and the versions are the newest of that major.
 
 There is no `app/server.ts`: the plugin's default server serves the pages
 in `bun dev` and from the build. To put alxia's middlewares or `/api` routes in
