@@ -87,7 +87,7 @@ export type JanusErrors = Middleware<
  * refused, a login taken, a store down — is answered with janus's status
  * and `bodyOf(error)` — under `alxia({ errors: 'problem' })`, a problem
  * whose extensions are that body — typed on the routes declared after it. A throttled
- * sign-in carries `Retry-After`. Anything else goes on, thrown, to the
+ * sign-in or e-mail (`MAIL_THROTTLED`) carries `Retry-After`. Anything else goes on, thrown, to the
  * middlewares before it, or to the route boundary's 500.
  *
  * Give it to `use` before `session()`, so that a store down while the

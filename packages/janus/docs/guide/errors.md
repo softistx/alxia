@@ -123,7 +123,8 @@ bodyOf(new NotFoundError('user')); // { code: 'NOT_FOUND' }
 a login throttled for too many attempts: a client cannot tell a login exists
 from it. `retryAfter` is set only once `janus()`'s throttle trips — ten
 passwords in fifteen minutes by default — and the middleware then adds the
-`Retry-After` header.
+`Retry-After` header. It does so for any refusal that carries `retryAfter`: a
+throttled sign-in, and `MAIL_THROTTLED`.
 
 ## Reporting the 5xx
 
