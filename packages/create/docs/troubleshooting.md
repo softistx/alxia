@@ -481,7 +481,7 @@ bun run verify
 The diff is what the new release writes differently; `bun run verify`
 tells whether the app still compiles and passes against it. To stay
 where you were, pin the previous version again, `0.7.0` after a move to `0.8.0`:
-`bun add --dev --exact @nxgt/openapi-codegen@0.7.0`.
+`bun add --dev --exact @nxgt/openapi-codegen@0.11.0`.
 
 ### `TypeError: matchesSpec(): 1 operation has no route: DELETE /todos/:id (deleteTodo)`
 

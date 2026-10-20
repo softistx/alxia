@@ -117,9 +117,9 @@
         "@graphql-codegen/cli": "7.4.3",
         "@graphql-codegen/typescript": "6.1.0",
         "@graphql-codegen/typescript-resolvers": "6.1.0",
-        "@nxgt/httpyz": "^0.3.3",
-        "@nxgt/openapi-codegen": "0.7.0",
-        "@nxgt/openapi-httpyz": "^0.3.1",
+        "@nxgt/httpyz": "^0.4.1",
+        "@nxgt/openapi-codegen": "0.11.0",
+        "@nxgt/openapi-httpyz": "^0.3.2",
         "@types/bun": "^1.4.2",
         "dataloader": "^2.2.3",
         "graphql": "^16.11.0 || ^17.0.0",
@@ -753,15 +753,15 @@
 
     "@nxgt/di": ["@nxgt/di@0.2.0", "", { "peerDependencies": { "typescript": "^6.0.3" } }, "sha512-YMahwd8FoLRtVRm/RTtCTMRffGNk8swaRPuop/ysphLJcZ0WG8wFH0bFlhImGywL226fcMEdwfcFhE4FylfMXw=="],
 
-    "@nxgt/httpyz": ["@nxgt/httpyz@0.3.3", "", { "peerDependencies": { "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-wWQPCs9TuFgFewbZsH+jvTGeawzR+ZZAsyZ4LJNXuwmIvw3zCimPDkIKbBLI6genCdz3bcPLvxgY9eJwJar2JA=="],
+    "@nxgt/httpyz": ["@nxgt/httpyz@0.4.1", "", { "peerDependencies": { "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-M6D6v6MznKDhM6eObKK+LsPoOYoJwRbJKRSvB2ONDV7lC0xWAe7grHH7C8qELCoNndVAYD94iyUTRVp7wrkQzw=="],
 
     "@nxgt/i18n": ["@nxgt/i18n@3.1.0", "", { "dependencies": { "@formatjs/icu-messageformat-parser": "^3.5.20", "intl-messageformat": "^12.1.2", "lodash": "^4.18.1" }, "peerDependencies": { "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-viE8jtmJpBAbdRD/XP7ohDs2YF5eIKUAHeV9xvPBKc0W1+FjFNS7XAIL6uj8te7ou1q5QbnB5vhus8E3gIXeQQ=="],
 
     "@nxgt/janus": ["@nxgt/janus@0.27.0", "", { "peerDependencies": { "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-kfFIyhnT2KcnyVMbMfR3BpjTtR9KTYwqVNpwzT/X1bpj0k0l1KIkDAKK5dM5SaiCPyweIZfdXnQGbGB2V14Hrg=="],
 
-    "@nxgt/openapi-codegen": ["@nxgt/openapi-codegen@0.7.0", "", { "peerDependencies": { "@redocly/openapi-core": "^2.52.1", "typescript": "^6.0.3 || ^7.0.0", "zod": "^4.5.4" }, "optionalPeers": ["@redocly/openapi-core"], "bin": { "nxgt-openapi": "dist/cli.js" } }, "sha512-z+cm+8dT6Gbmhfd0XQR3X4o3UiAVZtTFlzJQYGHsugI+2Bsx0zgHPpLXZF07ebo+L/bPZLfj6Pfq6Kb+1xbu6g=="],
+    "@nxgt/openapi-codegen": ["@nxgt/openapi-codegen@0.11.0", "", { "peerDependencies": { "@nxgt/zod": "^0.1.3", "@redocly/openapi-core": "^2.52.1", "typescript": "^6.0.3 || ^7.0.0", "zod": "^4.5.4" }, "optionalPeers": ["@nxgt/zod", "@redocly/openapi-core"], "bin": { "nxgt-openapi": "dist/cli.js" } }, "sha512-/WwsXNkKO3QxEP6hAWk+mcnh3eIqG88xqO5UU8a+6j3gFTwnbNHzPRS8SuwpyVc6YWqo/zg5oshtQ7iNsO4FGg=="],
 
-    "@nxgt/openapi-httpyz": ["@nxgt/openapi-httpyz@0.3.1", "", { "peerDependencies": { "@nxgt/httpyz": "^0.3.2", "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-uFY5A1f3lyeLdCRzPLDaDFKX6LyS5cja4vsqBiwnl5qcOgIsQjM+T9XttEKJODXeOkqhjBu0h4CKkfgrGYwQzA=="],
+    "@nxgt/openapi-httpyz": ["@nxgt/openapi-httpyz@0.3.2", "", { "peerDependencies": { "@nxgt/httpyz": "^0.4.0", "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-lfNqnvL2EkbTd98334tbnVYqyDs1zNyhyah1vbiaLvgB3AIXuYz5FtfoGHRZQ2Bf4PsHhttGvdrgkgYMv/uu9A=="],
 
     "@nxgt/redis": ["@nxgt/redis@0.9.2", "", { "peerDependencies": { "redis-memory-server": ">=0.17.1 <0.18", "typescript": "^6.0.3 || ^7.0.0", "zod": ">=4.6.5 <5" }, "optionalPeers": ["redis-memory-server"] }, "sha512-kP4+RfI4FBxpMIGLEf6m8WnkO4ih8PEVpABxwR8qIsSx5UwU3Xkv8sAAiaLZQ/pAhLTAZtqhGGNrBTQf+Gb3yg=="],
 
