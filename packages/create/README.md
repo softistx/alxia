@@ -223,7 +223,7 @@ or CI.
   rules the template was not checked against.
 - **The code generators** are pinned exactly and kept at the template's
   versions, never moved to a newer patch: `@nxgt/openapi-codegen` (`api`,
-  `0.7.0`) and GraphQL Code Generator's `@graphql-codegen/cli`,
+  `0.11.0`) and GraphQL Code Generator's `@graphql-codegen/cli`,
   `typescript` and `typescript-resolvers` (`graphql`). `bun run verify` runs
   `generate --check` over the committed `src/generated/`, which a release
   that writes the files differently would fail in a fresh project.

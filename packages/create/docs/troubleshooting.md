@@ -461,7 +461,7 @@ A change made by hand in `src/generated/` is lost: make it in
 right after `bun add --dev --exact @nxgt/openapi-codegen@…`, with no
 change to `openapi.yaml`.
 
-**When:** the generator moved to another minor, `0.7.x` to `0.8.0`. A new
+**When:** the generator moved to another minor, `0.11.x` to `0.12.0`. A new
 project never hits it: the command keeps the template's version
 ([Versions](guide.md#versions)).
 
@@ -480,7 +480,7 @@ bun run verify
 
 The diff is what the new release writes differently; `bun run verify`
 tells whether the app still compiles and passes against it. To stay
-where you were, pin the previous version again, `0.7.0` after a move to `0.8.0`:
+where you were, pin the previous version again, `0.11.0` after a move to `0.12.0`:
 `bun add --dev --exact @nxgt/openapi-codegen@0.11.0`.
 
 ### `TypeError: matchesSpec(): 1 operation has no route: DELETE /todos/:id (deleteTodo)`
