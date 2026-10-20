@@ -117,12 +117,12 @@ describe('create-alxia: the project written', () => {
 		expect(manifest.dependencies).toEqual({
 			'@alxia/core': ALXIA['@alxia/core'],
 			'@alxia/react-router': ALXIA['@alxia/react-router'],
-			'@react-router/node': '^8.4.0',
-			'@react-router/serve': '^8.4.0',
+			'@react-router/node': '^8.5.0',
+			'@react-router/serve': '^8.5.0',
 			isbot: '^5.2.2',
-			react: '^19.3.0',
-			'react-dom': '^19.3.0',
-			'react-router': '^8.4.0',
+			react: '^19.3.1',
+			'react-dom': '^19.3.1',
+			'react-router': '^8.5.0',
 		});
 		expect(manifest.devDependencies.typescript).toBe('^7.0.2');
 		for (const [file, stored] of [

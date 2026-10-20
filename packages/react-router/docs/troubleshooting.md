@@ -785,7 +785,7 @@ or `Route.ActionArgs` reads `context.alxia`. At runtime it is there; only
 **Why:** this package augments `RouterContextProvider` as `react-router`
 exports it, whose types are `dist/production`'s. The generated `+types`
 files read their argument types from `react-router/internal`, whose types,
-in react-router 8.4, point at `dist/development`: a second declaration of
+in react-router 8.4 and 8.5, point at `dist/development`: a second declaration of
 the class, which no exported path reaches, so no augmentation can add
 `alxia` to it.
 

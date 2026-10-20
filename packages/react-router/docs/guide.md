@@ -820,7 +820,7 @@ export async function action({ context }: ActionFunctionArgs) {
 ones.** `LoaderFunctionArgs`, `ActionFunctionArgs`, `MiddlewareFunction` and
 `RouterContextProvider`, imported from `react-router`, see `alxia`. The
 generated `Route.LoaderArgs` does not: the `+types` files import from
-`react-router/internal`, whose types (in react-router 8.4) point at its
+`react-router/internal`, whose types (in react-router 8.4 and 8.5) point at its
 `dist/development` build, while `react-router` itself points at
 `dist/production`. That is a second declaration of `RouterContextProvider`,
 which no exported path reaches, so no package can augment it. With

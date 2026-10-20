@@ -1,6 +1,12 @@
 import { describe, expect, test } from 'bun:test';
 import { join } from 'node:path';
-import { addAlxia, addPlugin, toBun } from './regenerate-react-router-template';
+import {
+	addAlxia,
+	addPlugin,
+	addViewTransition,
+	atViewTransitionReact,
+	toBun,
+} from './regenerate-react-router-template';
 
 const ROOT = join(import.meta.dir, '..');
 
@@ -41,6 +47,60 @@ describe('addPlugin', () => {
 		expect(() => addPlugin('export default {};\n')).toThrow(
 			'expected reactRouter() exactly once',
 		);
+	});
+});
+
+describe('addViewTransition', () => {
+	const example = join(ROOT, 'examples/react-router/app/root.tsx');
+
+	test("gives examples/react-router's root.tsx from the scaffold's", async () => {
+		const wrapped = await Bun.file(example).text();
+		// The scaffold's root.tsx is the example's without the wrap.
+		const scaffold = wrapped
+			.replace('import { ViewTransition } from "react";\n', '')
+			.replace(
+				'  return (\n    <ViewTransition>\n      <Outlet />\n    </ViewTransition>\n  );\n',
+				'  return <Outlet />;\n',
+			);
+		expect(scaffold).not.toContain('ViewTransition');
+		expect(addViewTransition(scaffold)).toBe(wrapped);
+	});
+
+	test('keeps a root that already has it', async () => {
+		const wrapped = await Bun.file(example).text();
+		expect(addViewTransition(wrapped)).toBe(wrapped);
+	});
+
+	test('refuses a root without exactly one return <Outlet />;', () => {
+		expect(() =>
+			addViewTransition('export default function App() {}\n'),
+		).toThrow('expected return <Outlet />; exactly once');
+	});
+});
+
+describe('atViewTransitionReact', () => {
+	test('raises an older React and its types to 19.3.0, and keeps a newer one', () => {
+		const manifest = atViewTransitionReact({
+			scripts: {},
+			dependencies: {
+				react: '^19.2.8',
+				'react-dom': '^19.3.1',
+				isbot: '^5.1.36',
+			},
+			devDependencies: {
+				'@types/react': '^19.2.18',
+				'@types/react-dom': '^19.2.7',
+			},
+		});
+		expect(manifest.dependencies).toEqual({
+			react: '^19.3.0',
+			'react-dom': '^19.3.1',
+			isbot: '^5.1.36',
+		});
+		expect(manifest.devDependencies).toEqual({
+			'@types/react': '^19.3.0',
+			'@types/react-dom': '^19.3.0',
+		});
 	});
 });
 
