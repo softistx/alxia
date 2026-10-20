@@ -32,6 +32,9 @@ jobs:
     # on, and the concurrency group above never cancels one under way — this
     # only stops a run that has hung.
     timeout-minutes: 10
+    # NPM_TOKEN lives in the `npm` environment, whose only deployment branch is
+    # develop: a workflow edited on any other branch cannot read it.
+    environment: npm
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
