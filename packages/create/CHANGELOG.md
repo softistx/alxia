@@ -1,5 +1,13 @@
 # @alxia/create
 
+## 0.5.2
+
+### Patch Changes
+
+- [#242](https://github.com/softistx/alxia/pull/242) [`75dd048`](https://github.com/softistx/alxia/commit/75dd048dd419c7b593689b69567f9ab4a0590768) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `react-router` template starts on React 19.3.1 and React Router 8.5.0, and its `app/root.tsx` wraps `<Outlet />` in React's `<ViewTransition>`, as React Router 8.5 recommends in place of its own view transition options, now deprecated: a navigation between two pages animates with no further code.
+
+- [#244](https://github.com/softistx/alxia/pull/244) [`b45f897`](https://github.com/softistx/alxia/commit/b45f8977c53c1a85da31dbac7a939217c79c9502) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `react-router` template's `<ViewTransition>` animates a navigation to another pathname only: its `update` is `"none"` otherwise, so a fetcher's answer or a search writing `?q=` updates the page in place instead of holding it for an animation and dropping the keys typed meanwhile. `app/app.css` gains a `prefers-reduced-motion` rule that turns view transition animations off.
+
 ## 0.5.1
 
 ### Patch Changes
