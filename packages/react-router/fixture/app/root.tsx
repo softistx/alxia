@@ -1,4 +1,4 @@
-import { type ReactNode, ViewTransition } from 'react';
+import { type ReactNode, useEffect, useRef, ViewTransition } from 'react';
 import {
 	isRouteErrorResponse,
 	Links,
@@ -6,6 +6,7 @@ import {
 	Outlet,
 	Scripts,
 	ScrollRestoration,
+	useLocation,
 	useRouteError,
 } from 'react-router';
 
@@ -27,8 +28,13 @@ export function Layout({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+	const { pathname } = useLocation();
+	const shown = useRef(pathname);
+	useEffect(() => {
+		shown.current = pathname;
+	}, [pathname]);
 	return (
-		<ViewTransition>
+		<ViewTransition update={shown.current === pathname ? 'none' : 'auto'}>
 			<Outlet />
 		</ViewTransition>
 	);

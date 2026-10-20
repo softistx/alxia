@@ -8,7 +8,9 @@
  * `NODE_ENV=development` (alxia's dev switch), `start` running the build on Bun,
  * `alxia()` after `reactRouter()` in `vite.config.ts`; `app/root.tsx`'s
  * `<Outlet />` wrapped in React's `<ViewTransition>`, as React Router 8.5
- * recommends in place of its own view transition options; plus
+ * recommends in place of its own view transition options, animating a change
+ * of pathname only, and `app/app.css`'s reduced-motion rule for it
+ * (`templates/view-transition.ts`); plus
  * `examples/react-router`'s `bunfig.toml`, and its `Dockerfile` in place of
  * the scaffold's, which builds and runs the app on Node; and its
  * `README.md`'s commands on Bun, the package manager alxia uses (`toBun`).
@@ -43,6 +45,11 @@ import {
 	BIOME_CONFIG,
 	biomeVersion,
 } from './templates/biome';
+import {
+	addReducedMotion,
+	addViewTransition,
+	atViewTransitionReact,
+} from './templates/view-transition';
 
 const ROOT = join(import.meta.dir, '..');
 const TEMPLATE = join(ROOT, 'packages/create/templates/react-router');
@@ -54,59 +61,6 @@ export function addPlugin(config: string): string {
 		throw new Error('vite.config.ts: expected reactRouter() exactly once');
 	}
 	return IMPORT + config.replace(/\breactRouter\(\)/, 'reactRouter(), alxia()');
-}
-
-const OUTLET = '  return <Outlet />;\n';
-
-/**
- * `app/root.tsx` with its `<Outlet />` wrapped in React's `<ViewTransition>`,
- * so a navigation between two pages animates. A root that already imports
- * `ViewTransition` is kept as it is; one without exactly one
- * `return <Outlet />;` is refused.
- */
-export function addViewTransition(root: string): string {
-	if (/\bViewTransition\b/.test(root)) return root;
-	if (root.split(OUTLET).length !== 2) {
-		throw new Error('app/root.tsx: expected return <Outlet />; exactly once');
-	}
-	return `import { ViewTransition } from "react";\n${root.replace(
-		OUTLET,
-		'  return (\n    <ViewTransition>\n      <Outlet />\n    </ViewTransition>\n  );\n',
-	)}`;
-}
-
-/** The React that exports `<ViewTransition>`, which `app/root.tsx` imports. */
-const VIEW_TRANSITION_REACT = '19.3.0';
-
-/**
- * The manifest with `react`, `react-dom` and their types starting at
- * `VIEW_TRANSITION_REACT` at least: the scaffold may still ask for an older
- * React than `addViewTransition`'s root runs on.
- */
-export function atViewTransitionReact(manifest: Manifest): Manifest {
-	const raise = (
-		ranges: Record<string, string> | undefined,
-		names: string[],
-	) => {
-		if (ranges === undefined) return ranges;
-		const raised = { ...ranges };
-		for (const name of names) {
-			const range = raised[name];
-			const floor = range?.replace(/^[\^~]/, '');
-			if (floor && Bun.semver.order(floor, VIEW_TRANSITION_REACT) < 0) {
-				raised[name] = `^${VIEW_TRANSITION_REACT}`;
-			}
-		}
-		return raised;
-	};
-	return {
-		...manifest,
-		dependencies: raise(manifest.dependencies, ['react', 'react-dom']) ?? {},
-		devDependencies: raise(manifest.devDependencies, [
-			'@types/react',
-			'@types/react-dom',
-		]),
-	};
 }
 
 /** The commands of another package manager, which `toBun` leaves none of. */
@@ -202,6 +156,10 @@ async function main(): Promise<void> {
 		);
 		await Bun.write(join(out, 'vite.config.ts'), config);
 		await Bun.write(join(out, 'app/root.tsx'), root);
+		await Bun.write(
+			join(out, 'app/app.css'),
+			addReducedMotion(await Bun.file(join(out, 'app/app.css')).text()),
+		);
 		await Bun.write(
 			join(out, 'README.md'),
 			addLintSection(toBun(await Bun.file(join(out, 'README.md')).text())),

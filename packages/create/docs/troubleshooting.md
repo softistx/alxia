@@ -401,6 +401,26 @@ an existing project
 [`@alxia/core`'s upgrading page](https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md)
 for what a minor changed.
 
+### A page test no longer finds its exact tag
+
+`expect(received).toContain(expected)`, with `Expected to contain:
+"<h1>Title</h1>"` and the page's HTML holding `<h1 vt-update="none">Title</h1>`.
+
+**When:** a `react-router` project's test reads a page's HTML from the
+server and matches the first element of a route's page by its exact tag.
+
+**Why:** the root's `<Outlet />` is inside React's `<ViewTransition>`
+([Page transitions](guide.md#page-transitions)), and React's server render
+marks the element it wraps with a `vt-*` attribute, such as
+`vt-update="none"`.
+
+**Fix:** match the tag whatever its attributes, or query the page by role
+and accessible name:
+
+```ts
+expect(html).toMatch(/<h1[^>]*>Title<\/h1>/);
+```
+
 ## The `api` project's spec
 
 ### `openapi.yaml → src/generated: out of date, run nxgt-openapi generate`

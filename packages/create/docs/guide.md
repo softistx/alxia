@@ -993,12 +993,53 @@ and the README gains a Lint and format section
 ([Lint and format](#lint-and-format)); Biome formatted the scaffold once,
 which changed three of its files: `app/app.css`'s font list wraps
 differently, and `app/routes.ts` and `app/routes/home.tsx` have their
-imports sorted. `app/root.tsx` wraps its `<Outlet />` in React's `<ViewTransition>`, as React Router 8.5 recommends in place of its own view transition options, now deprecated: a navigation between two pages animates with no further code. Every other file is React Router's:
+imports sorted. `app/root.tsx` and `app/app.css` gain a page transition
+([below](#page-transitions)). Every other file is React Router's:
 `app/`, `public/`, `tsconfig.json`, `react-router.config.ts`, its
 `README.md` (with Bun's commands where it wrote npm's: `bun install`,
 `bun dev`, `bun run build`), `.gitignore` and `.dockerignore`. `package.json` takes the directory's name, and its
 versions are moved to the newest the registry has ([Versions](#versions)):
 the template's own are where they start.
+
+### Page transitions
+
+React Router 8.5 deprecates its own view transition options (`viewTransition`
+on `<Link>`, `<Form>` and `navigate`, `useViewTransitionState`) in favour of
+React's `<ViewTransition>`, stable in React 19.3. The template puts one
+boundary around the root's `<Outlet />`, never around the `Layout` that holds
+`<html>` and `<body>`, so the page fades from one route to the next and the
+document around it stays still:
+
+```tsx
+export default function App() {
+  const { pathname } = useLocation();
+  const shown = useRef(pathname);
+  useEffect(() => {
+    shown.current = pathname;
+  }, [pathname]);
+  return (
+    <ViewTransition update={shown.current === pathname ? "none" : "auto"}>
+      <Outlet />
+    </ViewTransition>
+  );
+}
+```
+
+`update` is `"none"` unless the pathname changes. Animating every update
+would also fade a fetcher's answer, or a search writing `?q=` as the reader
+types, and in an app measured with the plain `<ViewTransition>` the keys
+typed during that fade were lost. `app/app.css` ends with a
+`prefers-reduced-motion` rule that turns every view transition's animation
+off. Keep React Router's transitions on: never `useTransitions={false}`, nor
+`flushSync` around a navigation, since React animates a `<ViewTransition>`
+for an update it runs as a transition
+([React's reference](https://react.dev/reference/react/ViewTransition)). An element shared by two pages animates between them
+with `<ViewTransition name="…">`, the same unique name on both.
+
+Under `<ViewTransition>`, React's server render marks the element it wraps
+with a `vt-*` attribute (`<main class="p-4" vt-update="none">`), which breaks
+a test matching a page's exact tag
+([troubleshooting](troubleshooting.md#a-page-test-no-longer-finds-its-exact-tag)).
 
 The template follows React Router's majors, not its every release: it is
 written again from `create-react-router` when React Router ships one that
