@@ -1,4 +1,4 @@
-import { ViewTransition } from "react";
+import { useEffect, useRef, ViewTransition } from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -6,6 +6,7 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
 } from "react-router";
 
 import type { Route } from "./+types/root";
@@ -43,8 +44,15 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
+  // One boundary for the pages: a navigation to another pathname
+  // animates, while a fetcher's answer or a new ?q= updates in place.
+  const { pathname } = useLocation();
+  const shown = useRef(pathname);
+  useEffect(() => {
+    shown.current = pathname;
+  }, [pathname]);
   return (
-    <ViewTransition>
+    <ViewTransition update={shown.current === pathname ? "none" : "auto"}>
       <Outlet />
     </ViewTransition>
   );

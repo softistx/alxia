@@ -8,7 +8,8 @@
  * `NODE_ENV=development` (alxia's dev switch), `start` running the build on Bun,
  * `alxia()` after `reactRouter()` in `vite.config.ts`; `app/root.tsx`'s
  * `<Outlet />` wrapped in React's `<ViewTransition>`, as React Router 8.5
- * recommends in place of its own view transition options; plus
+ * recommends in place of its own view transition options, animating a change
+ * of pathname only, and `app/app.css`'s reduced-motion rule for it; plus
  * `examples/react-router`'s `bunfig.toml`, and its `Dockerfile` in place of
  * the scaffold's, which builds and runs the app on Node; and its
  * `README.md`'s commands on Bun, the package manager alxia uses (`toBun`).
@@ -56,23 +57,76 @@ export function addPlugin(config: string): string {
 	return IMPORT + config.replace(/\breactRouter\(\)/, 'reactRouter(), alxia()');
 }
 
-const OUTLET = '  return <Outlet />;\n';
+/**
+ * The edits `addViewTransition` makes to the scaffold's `app/root.tsx`, each
+ * a text it expects exactly once and its replacement: React's hooks and
+ * `<ViewTransition>`, `useLocation`, and the `<Outlet />` wrapped in one
+ * boundary that animates a navigation to another pathname only, so a
+ * fetcher's answer or a new `?q=` updates the page in place.
+ */
+export const VIEW_TRANSITION_EDITS: ReadonlyArray<readonly [string, string]> = [
+	[
+		'import {\n',
+		'import { useEffect, useRef, ViewTransition } from "react";\nimport {\n',
+	],
+	[
+		'  ScrollRestoration,\n} from "react-router";\n',
+		'  ScrollRestoration,\n  useLocation,\n} from "react-router";\n',
+	],
+	[
+		'  return <Outlet />;\n',
+		[
+			'  // One boundary for the pages: a navigation to another pathname',
+			"  // animates, while a fetcher's answer or a new ?q= updates in place.",
+			'  const { pathname } = useLocation();',
+			'  const shown = useRef(pathname);',
+			'  useEffect(() => {',
+			'    shown.current = pathname;',
+			'  }, [pathname]);',
+			'  return (',
+			'    <ViewTransition update={shown.current === pathname ? "none" : "auto"}>',
+			'      <Outlet />',
+			'    </ViewTransition>',
+			'  );',
+			'',
+		].join('\n'),
+	],
+];
 
 /**
- * `app/root.tsx` with its `<Outlet />` wrapped in React's `<ViewTransition>`,
- * so a navigation between two pages animates. A root that already imports
- * `ViewTransition` is kept as it is; one without exactly one
- * `return <Outlet />;` is refused.
+ * `app/root.tsx` with its `<Outlet />` in React's `<ViewTransition>`
+ * (`VIEW_TRANSITION_EDITS`). A root that already names `ViewTransition` is
+ * kept as it is; one where an edit's text is not found exactly once is
+ * refused.
  */
 export function addViewTransition(root: string): string {
 	if (/\bViewTransition\b/.test(root)) return root;
-	if (root.split(OUTLET).length !== 2) {
-		throw new Error('app/root.tsx: expected return <Outlet />; exactly once');
+	let edited = root;
+	for (const [from, to] of VIEW_TRANSITION_EDITS) {
+		if (edited.split(from).length !== 2) {
+			throw new Error(
+				`app/root.tsx: expected ${JSON.stringify(from)} exactly once`,
+			);
+		}
+		edited = edited.replace(from, () => to);
 	}
-	return `import { ViewTransition } from "react";\n${root.replace(
-		OUTLET,
-		'  return (\n    <ViewTransition>\n      <Outlet />\n    </ViewTransition>\n  );\n',
-	)}`;
+	return edited;
+}
+
+/** The rule that stills every view transition for a reader who asks for less motion. */
+export const REDUCED_MOTION = `
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none;
+  }
+}
+`;
+
+/** `app/app.css` ending with `REDUCED_MOTION`, unless it already has one. */
+export function addReducedMotion(css: string): string {
+	return css.includes('prefers-reduced-motion') ? css : css + REDUCED_MOTION;
 }
 
 /** The React that exports `<ViewTransition>`, which `app/root.tsx` imports. */
@@ -202,6 +256,10 @@ async function main(): Promise<void> {
 		);
 		await Bun.write(join(out, 'vite.config.ts'), config);
 		await Bun.write(join(out, 'app/root.tsx'), root);
+		await Bun.write(
+			join(out, 'app/app.css'),
+			addReducedMotion(await Bun.file(join(out, 'app/app.css')).text()),
+		);
 		await Bun.write(
 			join(out, 'README.md'),
 			addLintSection(toBun(await Bun.file(join(out, 'README.md')).text())),

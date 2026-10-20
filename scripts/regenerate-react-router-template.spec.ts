@@ -3,9 +3,12 @@ import { join } from 'node:path';
 import {
 	addAlxia,
 	addPlugin,
+	addReducedMotion,
 	addViewTransition,
 	atViewTransitionReact,
+	REDUCED_MOTION,
 	toBun,
+	VIEW_TRANSITION_EDITS,
 } from './regenerate-react-router-template';
 
 const ROOT = join(import.meta.dir, '..');
@@ -55,14 +58,13 @@ describe('addViewTransition', () => {
 
 	test("gives examples/react-router's root.tsx from the scaffold's", async () => {
 		const wrapped = await Bun.file(example).text();
-		// The scaffold's root.tsx is the example's without the wrap.
-		const scaffold = wrapped
-			.replace('import { ViewTransition } from "react";\n', '')
-			.replace(
-				'  return (\n    <ViewTransition>\n      <Outlet />\n    </ViewTransition>\n  );\n',
-				'  return <Outlet />;\n',
-			);
+		// The scaffold's root.tsx is the example's with every edit undone.
+		const scaffold = VIEW_TRANSITION_EDITS.reduceRight(
+			(text, [from, to]) => text.replace(to, () => from),
+			wrapped,
+		);
 		expect(scaffold).not.toContain('ViewTransition');
+		expect(scaffold).toContain('  return <Outlet />;\n');
 		expect(addViewTransition(scaffold)).toBe(wrapped);
 	});
 
@@ -71,10 +73,21 @@ describe('addViewTransition', () => {
 		expect(addViewTransition(wrapped)).toBe(wrapped);
 	});
 
-	test('refuses a root without exactly one return <Outlet />;', () => {
+	test('refuses a root it does not recognise', () => {
 		expect(() =>
 			addViewTransition('export default function App() {}\n'),
-		).toThrow('expected return <Outlet />; exactly once');
+		).toThrow('app/root.tsx: expected "import {\\n" exactly once');
+	});
+});
+
+describe('addReducedMotion', () => {
+	test("gives examples/react-router's app.css its rule, once", async () => {
+		const css = await Bun.file(
+			join(ROOT, 'examples/react-router/app/app.css'),
+		).text();
+		expect(css.endsWith(REDUCED_MOTION)).toBe(true);
+		expect(addReducedMotion(css.slice(0, -REDUCED_MOTION.length))).toBe(css);
+		expect(addReducedMotion(css)).toBe(css);
 	});
 });
 
