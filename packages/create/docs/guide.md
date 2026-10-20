@@ -249,6 +249,13 @@ files a client reads (`types.ts`, `zod.ts`, `operations.ts`,
 `paths.ts`). alxia never sends that body. Turned off, the generated files
 declare only the spec's own 400, which is the one alxia sends.
 
+`readOnly` and `writeOnly` are `"omit"` by default (since 0.11): a request
+body uses a `<Name>Write` view of its schema without the `readOnly`
+properties, a reply a `<Name>Read` view without the `writeOnly` ones, and a
+schema used in one direction only is stripped in place, with no copy. The
+template's `openapi.yaml` marks none, so nothing changes here; `"keep"`
+restores the schema as written.
+
 ### `src/generated/`
 
 `bun run generate` runs `nxgt-openapi generate`, the bin of
@@ -263,7 +270,7 @@ openapi.yaml → src/generated: 5 written, 0 unchanged
 | `alxia.ts` | one `as const` constant per operation, `{ method, path, schema }`, with the path in alxia's form (`/todos/:id`), the request's Zod schemas, a schema per response status and the `operationId`; and `operations`, all of them by `operationId` |
 | `zod.ts` | a Zod schema per component schema: `zTodo`, `zNewTodo`, … |
 | `types.ts` | a TypeScript type per component schema: `Todo`, `NewTodo`, … |
-| `operations.ts`, `paths.ts` | `operations.ts` is the table `@nxgt/openapi-httpyz` binds onto a client, which the template's spec uses; `paths.ts` is the same document in openapi-typescript's shape, for a client that reads it, and the template does not use it |
+| `operations.ts`, `paths.ts` | `operations.ts` is the table `@nxgt/openapi-httpyz` binds onto a client, which the template's spec uses; an operation sent as a `QUERY` over `POST` (`x-nxgt-method: query`) has `queryMethod: true`; `paths.ts` is the same document in openapi-typescript's shape, for a client that reads it, and the template does not use it |
 
 ```ts
 // src/generated/alxia.ts, in part
@@ -310,7 +317,7 @@ bun run generate
 git diff src/generated
 ```
 
-What the generator does not write, in 0.7.0, and how the app does it
+What the generator does not write, in 0.11.0, and how the app does it
 instead:
 
 - **`security`**: no middleware is generated from it. Authentication is
@@ -1327,7 +1334,7 @@ template pins exactly:
 | `graphql` | `^16.11.0 \|\| ^17.0.0`, `@alxia/graphql`'s; so a new project may declare `^17` where the template ships `^16.11.0` |
 | `graphql-yoga` | `^5.16.0`, `@alxia/graphql`'s |
 | `@graphql-codegen/cli`, `@graphql-codegen/typescript`, `@graphql-codegen/typescript-resolvers` | none: the template's exact versions, 7.4.3, 6.1.0 and 6.1.0, are kept, for the reason `@nxgt/openapi-codegen`'s are: `generate --check` |
-| `@nxgt/openapi-codegen` | none: the template's exact version, `0.7.0`, is kept. Any release may write `src/generated/` differently, and `bun run verify` checks it with `generate --check` |
+| `@nxgt/openapi-codegen` | none: the template's exact version, `0.11.0`, is kept. Any release may write `src/generated/` differently, and `bun run verify` checks it with `generate --check` |
 | anything else: `react`, `isbot`, Tailwind, `@types/*` | no alxia range: npm's `latest` |
 
 The command prints each move, and each newer major it left out:

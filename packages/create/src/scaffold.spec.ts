@@ -42,8 +42,8 @@ describe('create-alxia: the project written', () => {
 			devDependencies: {
 				// Pinned exactly, as its output is committed: never moved, so
 				// `verify` still passes when a newer patch writes differently.
-				'@nxgt/httpyz': '^0.3.3',
-				'@nxgt/openapi-codegen': '0.7.0',
+				'@nxgt/httpyz': '^0.4.1',
+				'@nxgt/openapi-codegen': '0.11.0',
 				'@nxgt/openapi-httpyz': '^0.3.2',
 				'@types/bun': '^1.4.2',
 				typescript: '^7.0.2',
