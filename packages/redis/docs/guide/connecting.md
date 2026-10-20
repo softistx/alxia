@@ -205,7 +205,7 @@ several is refused with a `TypeError` naming them. Give a bare client,
 `handle.clients.<name>`, to the factory that lives on one of them, with the
 prefix in its `name`.
 
-**Defined once.** With `@nxgt/redis` 0.7 the rate limit and the idempotent
+**Defined once.** Since `@nxgt/redis` 0.7 the rate limit and the idempotent
 operation can be wired by `defineRedis` too, and `redisStore` and `idempotency`
 take what it wired: [Defined once, in `defineRedis`](#defined-once-in-defineredis).
 

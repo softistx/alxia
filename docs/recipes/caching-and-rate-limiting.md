@@ -12,7 +12,7 @@ one process at a time.
 [`@alxia/cache`](../../packages/cache) already take: the plugin never knows
 which store it was given, so you can start with the in-memory defaults and
 switch by one option. Everything runs on Bun's own Redis client, through
-[`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) 0.7.
+[`@nxgt/redis`](https://www.npmjs.com/package/@nxgt/redis) 0.7 to 0.9.
 
 ```sh
 bun add @alxia/core @alxia/rate-limit @alxia/cache @alxia/redis @nxgt/redis zod
