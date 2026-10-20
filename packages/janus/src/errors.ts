@@ -31,6 +31,13 @@ export interface JanusErrorBody {
 }
 
 export function bodyOf(error: JanusError): JanusErrorBody {
+	// `MAIL_THROTTLED` (429) exists from @nxgt/janus 0.18: compared as a
+	// string so that the range still admits 0.17, where the code is not typed.
+	if ((error.code as string) === 'MAIL_THROTTLED') {
+		return error.retryAfter === undefined
+			? { code: error.code }
+			: { code: error.code, retryAfter: error.retryAfter };
+	}
 	switch (error.code) {
 		case 'USER_INVALID':
 			return { code: error.code, issues: error.issues ?? [] };
@@ -80,7 +87,7 @@ export type JanusErrors = Middleware<
  * refused, a login taken, a store down — is answered with janus's status
  * and `bodyOf(error)` — under `alxia({ errors: 'problem' })`, a problem
  * whose extensions are that body — typed on the routes declared after it. A throttled
- * sign-in carries `Retry-After`. Anything else goes on, thrown, to the
+ * sign-in or e-mail (`MAIL_THROTTLED`) carries `Retry-After`. Anything else goes on, thrown, to the
  * middlewares before it, or to the route boundary's 500.
  *
  * Give it to `use` before `session()`, so that a store down while the

@@ -36,6 +36,7 @@ symptom, under [Traps](#traps).
 - [`401 {"error":"unauthenticated"}` on a path that does not exist](#401-errorunauthenticated-on-a-path-that-does-not-exist)
 - [`logger()` or `secureHeaders()` never shows the reply of `janusErrors()`](#logger-or-secureheaders-never-shows-the-reply-of-januserrors)
 - [`401 {"code":"CREDENTIALS_INVALID","retryAfter":900}` with the right password](#401-codecredentials_invalidretryafter900-with-the-right-password)
+- [`429 {"code":"MAIL_THROTTLED","retryAfter":600}`](#429-codemail_throttledretryafter600)
 
 **Traps**
 
@@ -552,6 +553,21 @@ next window, the right password included. Nothing is locked.
 
 **Fix:** wait `retryAfter` seconds, and show it to the user. The throttle is
 `janus({ signIn: { throttle } })`'s, in `@nxgt/janus`.
+
+### `429 {"code":"MAIL_THROTTLED","retryAfter":600}`
+
+**When:** asking for too many e-mails for one address or one user: a magic
+link, a sign-in code, a password reset, an address verification or a step-up
+code. The response carries `Retry-After: 600`.
+
+**Why:** `@nxgt/janus` 0.18 and later throttles the requests that send
+e-mail, on by default: past five in ten minutes for one address or user, it
+refuses until the next window. The last e-mail sent still works.
+
+**Fix:** wait `retryAfter` seconds, which `Retry-After` carries too, and tell
+the visitor to use the last e-mail they received or to wait. To tune it, pass
+`janus({ mail: { throttle: { attempts, window } } })`, in `@nxgt/janus`;
+`mail: { throttle: false }` turns it off. Needs `@nxgt/janus` 0.18 or later.
 
 ## Traps
 
