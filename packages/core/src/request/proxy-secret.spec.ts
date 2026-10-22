@@ -92,6 +92,24 @@ describe('declaration', () => {
 		expect(make({ header: 'x-secret', value: 'a'.repeat(16) })).not.toThrow();
 	});
 
+	test('a value with a space at either end is refused, unquoted', () => {
+		for (const bad of [
+			` ${value}`,
+			`${value} `,
+			`${value}\n`,
+			[value, ` ${value}`],
+		])
+			expect(make({ header: 'x-secret', value: bad })).toThrow(
+				'secret.value must not start or end with a space',
+			);
+		expect(message({ header: 'x-secret', value: ` ${value}` })).not.toContain(
+			value,
+		);
+		expect(
+			make({ header: 'x-secret', value: `in ${value} side` }),
+		).not.toThrow();
+	});
+
 	test('a missing option is refused', () => {
 		expect(make(undefined)).toThrow(TypeError);
 		expect(make('x-secret')).toThrow(TypeError);

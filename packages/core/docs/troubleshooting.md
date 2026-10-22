@@ -98,7 +98,7 @@ a trap that prints nothing is headed by its symptom.
 - [`ctx.ip` is the proxy's address, or one a client chose](#ctxip-is-the-proxys-address-or-one-a-client-chose)
 - [``trustProxy: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function) or a secret, not a bare hop count``](#trustproxy-untrusted-refuse-needs-the-proxies-named-by-address-cidr-ranges-or-a-function-or-a-secret-not-a-bare-hop-count), ``… untrusted: 'refuse-all' needs …``, and ``trustProxy: untrusted must be 'ignore', 'refuse' or 'refuse-all', not "…"``
 - [``trustProxy: allow is for untrusted: 'refuse-all' alone; under '…' a request with no forwarding header passes already``](#trustproxy-allow-is-for-untrusted-refuse-all-alone-under--a-request-with-no-forwarding-header-passes-already), and ``trustProxy: allow must be CIDR ranges or a function (request, peer) => boolean``
-- [`trustProxy: secret must be { header, value }, …`](#trustproxy-secret-must-be--header-value--the-header-the-proxy-sets-and-its-value), `secret.header must be a valid header name`, `secret.header must not be host, forwarded, …` and `secret.value must be a string, … of 16 characters or more`
+- [`trustProxy: secret must be { header, value }, …`](#trustproxy-secret-must-be--header-value--the-header-the-proxy-sets-and-its-value), `secret.header must be a valid header name`, `secret.header must not be host, forwarded, …` and `secret.value must be a string, … of 16 characters or more`, [`secret.value must not start or end with a space`](#trustproxy-secretvalue-must-not-start-or-end-with-a-space-a-header-value-is-trimmed-so-it-could-never-match)
 - [`403 {"error":"untrusted_proxy"}` with the right secret](#403-erroruntrusted_proxy-with-the-right-secret)
 - [A `trusted` function that throws answers 500](#a-trusted-function-that-throws-answers-500), and an `allow` that throws refuses
 - [`trustProxy: canonical must be true or false`](#trustproxy-canonical-must-be-true-or-false), and `forwardedIp: canonical must be true or false`
@@ -2209,13 +2209,30 @@ alxia({
 ```ts
 alxia({
 	proxy: trustProxy({
-		trusted: 2,
+		trusted: 1,
 		secret: { header: 'x-app-proxy-secret', value: env.PROXY_SECRET },
 	}),
 });
 ```
 
 An empty `PROXY_SECRET` (a variable the platform did not set) is this error: declare it with `@alxia/env`, `secret: true`, so the app does not start without it.
+
+### `trustProxy: secret.value must not start or end with a space: a header value is trimmed, so it could never match`
+
+**When:** a `trustProxy({ secret })` value (or one of a rotation's list) has a space, tab or newline at either end, typically a secret read from a file or set with `echo`. The message never quotes the value.
+
+**Why:** a header value is trimmed on the way in, so the proxy's copy could never equal one with spaces at its ends: every request would be `wrong`. It is refused when the option is made, not on the first request.
+
+**Fix:** trim it where it is read:
+
+```ts
+alxia({
+	proxy: trustProxy({
+		trusted: 1,
+		secret: { header: 'x-app-proxy-secret', value: env.PROXY_SECRET.trim() },
+	}),
+});
+```
 
 ### `403 {"error":"untrusted_proxy"}` with the right secret
 

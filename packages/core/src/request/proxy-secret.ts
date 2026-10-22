@@ -60,6 +60,10 @@ export function secretOf(
 		throw new TypeError(
 			`${who}: secret.value must be a string, or a non-empty list of them, of ${MIN_LENGTH} characters or more`,
 		);
+	if (values.some((one) => one !== one.trim()))
+		throw new TypeError(
+			`${who}: secret.value must not start or end with a space: a header value is trimmed, so it could never match`,
+		);
 	const accepted = values.map(digest);
 	return {
 		header,

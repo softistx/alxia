@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import {
+	type SecretStrictProxyOptions,
 	type StrictProxyOptions,
 	type TrustProxyOptions,
 	trustProxy,
@@ -11,7 +12,7 @@ const secret = {
 };
 
 function read(
-	options: TrustProxyOptions | StrictProxyOptions,
+	options: TrustProxyOptions | StrictProxyOptions | SecretStrictProxyOptions,
 	headers: Record<string, string>,
 	peer: string | null = '10.0.0.1',
 ) {
@@ -48,6 +49,19 @@ describe('the right secret', () => {
 			refused: false,
 			secretHeader: secret.header,
 		});
+	});
+
+	test('one hop: a BFF alone, its fresh entry, gives the client', () => {
+		const alone = { trusted: 1, secret } as const;
+		expect(read(alone, { ...right, 'x-forwarded-for': '203.0.113.9' }).ip).toBe(
+			'203.0.113.9',
+		);
+	});
+
+	test('two hops: a BFF and a load balancer that appends, give the client', () => {
+		expect(
+			read(behind, { ...right, 'x-forwarded-for': '203.0.113.9, 10.0.0.2' }).ip,
+		).toBe('203.0.113.9');
 	});
 
 	test('the secret header is named even when the secret is wrong or absent', () => {
@@ -141,7 +155,7 @@ describe('ranges and a secret', () => {
 });
 
 describe('types', () => {
-	test('a hop count refuses only with a secret', () => {
+	test('a hop count may refuse with a secret', () => {
 		const types = () => [
 			trustProxy({ trusted: 2, secret, untrusted: 'refuse' }),
 			trustProxy({
@@ -150,10 +164,6 @@ describe('types', () => {
 				untrusted: 'refuse-all',
 				allow: '127.0.0.1',
 			}),
-			// @ts-expect-error a hop count cannot tell a proxy: no refusing without a secret
-			trustProxy({ trusted: 2, untrusted: 'refuse' }),
-			// @ts-expect-error a hop count cannot tell a proxy: no refusing without a secret
-			trustProxy({ trusted: 2, untrusted: 'refuse-all' }),
 		];
 		expect(types).toBeFunction();
 	});
@@ -162,8 +172,11 @@ describe('types', () => {
 		expect(() =>
 			trustProxy({ trusted: 2, secret, untrusted: 'refuse' }),
 		).not.toThrow();
+		expect(() => trustProxy({ trusted: 2, untrusted: 'refuse' })).toThrow(
+			TypeError,
+		);
 		expect(() =>
-			trustProxy({ trusted: 2, untrusted: 'refuse' } as never),
+			trustProxy({ trusted: 2, untrusted: 'refuse-all' } as never),
 		).toThrow(TypeError);
 	});
 
