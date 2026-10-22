@@ -301,7 +301,7 @@ installed tarball with `--help`.
 
 ## CI
 
-`.github/workflows/ci.yml` runs four jobs on every pull request:
+`.github/workflows/ci.yml` runs five jobs on every pull request:
 
 - **CI**, the required one: lint, build, typecheck, tests, `verify:artifacts`
   and the changeset check, on the lockfile's toolchain — the first
@@ -311,10 +311,12 @@ installed tarball with `--help`.
 - **Newest peers**: `scripts/newest-peers.ts` pins each peer to the last
   alternative of its range, then the same build, typecheck, tests and
   `verify:artifacts`. Widening a range is all it takes for this to test it.
-  An `@nxgt/*` peer written `>=a <b` (as `@alxia/janus`'s) is not seen by
-  Newest peers nor Newest majors, which read `||` alternatives: the weekly
-  `nxgt-versions` check alone watches it, until the queued floor-peers job
-  settles one form.
+- **Floor peers**: `scripts/floor-peers.ts` pins each `@nxgt/*` peer to its
+  floor, the lowest published version its range admits, in either form
+  (`||` alternatives or `>=a <b`), in every package that installs it, then
+  the same build, typecheck, tests and `verify:artifacts`. The lock and the
+  weekly `nxgt-versions` check hold the top of those ranges. Informational
+  like its siblings; never commit what it writes.
 - **Newest majors**: `scripts/newest-majors.ts` pins each widened peer to
   npm's `latest`, without `bun.lock`, then build, typecheck and
   `verify:artifacts`, no tests. It tries a new major before any range
@@ -343,10 +345,10 @@ installed tarball with `--help`.
   newest versions `@alxia/create` resolves. A few minutes measured
   locally, most of it the four image builds; kept out of `bun run test`.
 
-The last three resolve without a lockfile, so an upstream release can turn
+The last four resolve without a lockfile, so an upstream release can turn
 them red with no change here. They are informational: read them, never make
-them required. `newest-peers.ts` and `newest-majors.ts` rewrite manifests
-in place; never commit what they write.
+them required. `newest-peers.ts`, `floor-peers.ts` and `newest-majors.ts`
+rewrite manifests in place; never commit what they write.
 
 `.github/workflows/nxgt-versions.yml` runs one more, every Monday and on
 `workflow_dispatch`, not on pull requests:
