@@ -305,7 +305,9 @@ installed tarball with `--help`.
 
 - **CI**, the required one: lint, build, typecheck, tests, `verify:artifacts`
   and the changeset check, on the lockfile's toolchain — the first
-  alternative of each peer range (`typescript: ^6.0.3 || ^7.0.0` installs 6).
+  alternative of each peer range (`typescript: ^6.0.3 || ^7.0.0` installs 6),
+  except the `@nxgt/*` peers: `nxgt:outdated` keeps their devDependencies at
+  npm `latest`, the top of the range.
 - **Newest peers**: `scripts/newest-peers.ts` pins each peer to the last
   alternative of its range, then the same build, typecheck, tests and
   `verify:artifacts`. Widening a range is all it takes for this to test it.

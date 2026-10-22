@@ -5,8 +5,8 @@
  *
  * The adapters here — `@alxia/i18n`, `@alxia/janus`, `@alxia/redis`,
  * `@alxia/telemetry` — peer the nxgt package they wrap and install it as a
- * devDependency at the same range, and the specs run only the version
- * `bun.lock` holds. A new release upstream is therefore tested by nobody
+ * devDependency at npm's `latest`, within (or at the top of) a possibly wider
+ * peer range, and the specs run only the version `bun.lock` holds. A new release upstream is therefore tested by nobody
  * here until someone bumps the lock, and a new `0.x` minor is not even
  * admitted by a `^0.x.y` peer until someone widens it. This check is what
  * makes that someone the `nxgt-versions` workflow, weekly, instead of memory.
