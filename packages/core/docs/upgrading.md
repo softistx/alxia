@@ -2681,7 +2681,7 @@ So the server no longer builds a route table in its type for a client to
 read:
 
 - `@alxia/client` is retired: it is no longer released, and its last
-  version is to be deprecated on npm with:
+  version is deprecated on npm, with:
 
   ```sh
   npm deprecate @alxia/client "Retired: alxia is OpenAPI spec first. Generate a client from your OpenAPI document, e.g. with @nxgt/openapi-codegen. See https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md"
@@ -2868,8 +2868,8 @@ That is code first, the opposite of spec first, so it is retired: 0.4.0 of
    none.
 
 **For maintainers.** After the releases — `@alxia/openapi` 0.4.0 for the
-first, `@alxia/openapi-routes` 0.3.0 for the second — the owner deprecates
-the old versions on npm:
+first, `@alxia/openapi-routes` 0.3.0 for the second — the old versions were
+deprecated on npm with:
 
 ```sh
 npm deprecate @alxia/openapi@"<=0.3.0" "Retired: alxia is OpenAPI spec first. @alxia/openapi 0.4.0 and later is the spec-first package that was @alxia/openapi-routes (implemented, matchesSpec): write the OpenAPI document, generate the operations with @nxgt/openapi-codegen, bind them with route(). See https://github.com/softistx/alxia/blob/develop/packages/core/docs/upgrading.md"

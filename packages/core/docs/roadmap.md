@@ -11,15 +11,7 @@ Nothing in progress.
 
 ## Next
 
-- **The retired client deprecated on npm.** Its last published version
-  marked deprecated, pointing at the upgrading guide, once the owner runs
-  the command the [upgrading guide](upgrading.md#no-more-client-spec-first)
-  gives.
-- **The old packages deprecated on npm.** `@alxia/openapi` 0.3.0 and
-  earlier, and the retired package name the checks were published under
-  until 0.4, marked deprecated with the commands the
-  [upgrading guide](upgrading.md#the-old-alxiaopenapi-is-retired) gives,
-  once the owner runs them after the releases.
+Nothing scheduled yet.
 
 ## Later
 
@@ -49,6 +41,16 @@ Nothing in progress.
   what a client generated from the OpenAPI document never asks.
 
 ## Shipped
+
+### On npm, 2026-10
+
+- **The retired client deprecated.** Every published version of
+  `@alxia/client` is marked deprecated, pointing at the
+  [upgrading guide](upgrading.md#no-more-client-spec-first).
+- **The old packages deprecated.** `@alxia/openapi` 0.3.0 and earlier, and
+  every version of the retired name the checks were published under until
+  0.4, are marked deprecated, pointing at the
+  [upgrading guide](upgrading.md#the-old-alxiaopenapi-is-retired).
 
 ### 0.14.2
 
