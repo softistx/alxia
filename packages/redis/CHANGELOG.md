@@ -1,5 +1,11 @@
 # @alxia/redis
 
+## 0.5.10
+
+### Patch Changes
+
+- [#246](https://github.com/softistx/alxia/pull/246) [`72551a6`](https://github.com/softistx/alxia/commit/72551a66561f4d06fb1f2760fa1cf474a3b64088) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `@nxgt/redis` 0.8 and 0.9 are accepted: the peer is `^0.7.0 || ^0.8.0 || ^0.9.0`. Both only add (0.8 its `/testing` entry and per-call deadlines, 0.9 the queue), and every spec passes on 0.7.0 and on 0.9.2.
+
 ## 0.5.9
 
 ### Patch Changes

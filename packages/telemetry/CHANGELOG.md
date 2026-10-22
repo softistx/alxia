@@ -1,5 +1,11 @@
 # @alxia/telemetry
 
+## 0.7.4
+
+### Patch Changes
+
+- [#249](https://github.com/softistx/alxia/pull/249) [`bba20c7`](https://github.com/softistx/alxia/commit/bba20c753670a01f72ce611cd726aa684755203f) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Their specs now run against `@nxgt/telemetry` 0.2.2 and `@nxgt/i18n` 3.1.0, npm's latest. Nothing changes for consumers: the peer ranges are unchanged.
+
 ## 0.7.3
 
 ### Patch Changes

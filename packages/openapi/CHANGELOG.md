@@ -6,6 +6,12 @@ under that name. The `@alxia/openapi` of 0.1.0 to 0.3.0, which wrote an OpenAPI
 document from an app's route schemas, is retired; its changelog is
 [in the repository's history](https://github.com/softistx/alxia/blob/3f80253/packages/openapi/CHANGELOG.md).
 
+## 0.6.9
+
+### Patch Changes
+
+- [#250](https://github.com/softistx/alxia/pull/250) [`cce71d9`](https://github.com/softistx/alxia/commit/cce71d92bca59c681590cde49c3f62d851677652) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs: the generator notes describe `@nxgt/openapi-codegen` 0.11.0, the version the `api` template pins. Cookie parameters, named server-sent events and the `ignored` warnings are unchanged since 0.7.0; the guide adds that `readOnly` and `writeOnly` properties are now left out of request bodies and replies by default (`readOnly` / `writeOnly: 'keep'` restores them).
+
 ## 0.6.8
 
 ### Patch Changes
