@@ -7,12 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Trusting a proxy by secret.** `trustProxy({ secret })`: a proxy that
-  proves itself with a header only it knows, for a platform where a hop
-  count is all an address can say, refusing what does not
-  ([Serving](guide/serving.md#trusting-a-proxy-by-secret)). In the next
-  minor of `@alxia/core`; `@alxia/proxy` strips the header before it
-  forwards.
+Nothing in progress.
 
 ## Next
 
@@ -46,6 +41,14 @@ Nothing scheduled yet.
   what a client generated from the OpenAPI document never asks.
 
 ## Shipped
+
+### 0.15.0
+
+- **Trusting a proxy by secret.** `trustProxy({ secret })`: a proxy that
+  proves itself with a header only it knows, for a platform where a hop
+  count is all an address can say, refusing what does not
+  ([Serving](guide/serving.md#trusting-a-proxy-by-secret)). `@alxia/proxy`
+  0.4.4 strips the header before it forwards.
 
 ### On npm, 2026-10
 
