@@ -92,6 +92,11 @@ export function rewrite(
 		const [floor] = found as Set<string>;
 		let installers = 0;
 		for (const manifest of next.values()) {
+			if (manifest.dependencies?.[name] !== undefined) {
+				throw new Error(
+					`${manifest.name} lists ${name} in dependencies, which this job does not pin: move it to devDependencies.`,
+				);
+			}
 			if (manifest.devDependencies?.[name] === undefined) continue;
 			manifest.devDependencies[name] = floor as string;
 			installers++;
@@ -109,10 +114,31 @@ export function rewrite(
 	return { packages: next, floors };
 }
 
+/**
+ * Refuses a root `package.json` that names a pinned peer: its override or
+ * devDependency would win over the floor and the job would test the top.
+ */
+export function refuseRootPins(root: Manifest, names: Iterable<string>): void {
+	for (const name of names) {
+		for (const field of [
+			'overrides',
+			'dependencies',
+			'devDependencies',
+		] as const) {
+			if (root[field]?.[name] !== undefined) {
+				throw new Error(
+					`The root package.json names ${name} in ${field}, which would win over its floor: remove it.`,
+				);
+			}
+		}
+	}
+}
+
 if (import.meta.main) {
 	try {
-		const { packages } = await readManifests();
+		const { root, packages } = await readManifests();
 		const names = [...peerRanges(packages).keys()];
+		refuseRootPins(root, names);
 		const published = new Map<string, string[]>();
 		for (const name of names)
 			published.set(name, await publishedVersions(name));

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { floorOf, rewrite } from './floor-peers';
+import { floorOf, refuseRootPins, rewrite } from './floor-peers';
 import type { Manifest } from './newest-peers';
 
 const versions = ['0.6.9', '0.7.0-beta.1', '0.7.0', '0.7.1', '0.8.0', '0.9.2'];
@@ -84,6 +84,19 @@ describe('rewrite', () => {
 			),
 		).toThrow(/No package installs/);
 	});
+	test('throws when a package lists the peer in dependencies', () => {
+		expect(() =>
+			rewrite(
+				new Map([
+					manifest('a', {
+						peerDependencies: { '@nxgt/redis': '^0.7.0' },
+						dependencies: { '@nxgt/redis': '^0.7.0' },
+					}),
+				]),
+				published,
+			),
+		).toThrow(/in dependencies/);
+	});
 	test('throws when there is nothing to pin', () => {
 		expect(() =>
 			rewrite(
@@ -91,5 +104,22 @@ describe('rewrite', () => {
 				published,
 			),
 		).toThrow(/nothing to pin/);
+	});
+});
+
+describe('refuseRootPins', () => {
+	test('throws when the root overrides a pinned peer', () => {
+		expect(() =>
+			refuseRootPins({ overrides: { '@nxgt/redis': '0.9.2' } }, [
+				'@nxgt/redis',
+			]),
+		).toThrow(/root package.json names @nxgt\/redis in overrides/);
+	});
+	test('accepts a root that names none of them', () => {
+		expect(() =>
+			refuseRootPins({ devDependencies: { typescript: '^6' } }, [
+				'@nxgt/redis',
+			]),
+		).not.toThrow();
 	});
 });
