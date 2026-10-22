@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.5.3
+
+### Patch Changes
+
+- [#247](https://github.com/softistx/alxia/pull/247) [`c9366a5`](https://github.com/softistx/alxia/commit/c9366a51436202be39b8cb4cb5dfaae4da252240) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `api` template moves to `@nxgt/openapi-codegen` 0.11.0 (still pinned exactly), `@nxgt/httpyz` ^0.4.1 and `@nxgt/openapi-httpyz` ^0.3.2. The regenerated `src/generated/operations.ts` gains one optional field on `OperationSpec`, `queryMethod?: true`; no operation, type or schema changed.
+
 ## 0.5.2
 
 ### Patch Changes
