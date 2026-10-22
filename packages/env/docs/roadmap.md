@@ -7,10 +7,11 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **A description from every validator.** `envExample` reads a variable's
-  type and description from Zod, Valibot and ArkType's definitions, and from
-  the Standard JSON Schema form (`~standard.jsonSchema.input`) of any other
-  validator that implements it, or when those find no description.
+- **A type and a description from every validator.** `envExample` reads a
+  variable's type and description from Zod, Valibot and ArkType's definitions.
+  Any other validator that implements the Standard JSON Schema form
+  (`~standard.jsonSchema.input`) supplies both the type and the description
+  through it, and that form also supplies a description the definitions lack.
 
 ## Next
 
