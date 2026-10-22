@@ -80,7 +80,7 @@
     },
     "packages/core": {
       "name": "@alxia/core",
-      "version": "0.14.2",
+      "version": "0.14.3",
       "devDependencies": {
         "@types/bun": "^1.4.2",
         "zod": "^4.1.0",
@@ -143,7 +143,7 @@
     },
     "packages/env": {
       "name": "@alxia/env",
-      "version": "0.2.0",
+      "version": "0.3.0",
       "bin": {
         "alxia-env": "./dist/cli/index.js",
       },

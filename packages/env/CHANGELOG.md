@@ -1,5 +1,11 @@
 # @alxia/env
 
+## 0.3.0
+
+### Minor Changes
+
+- [#256](https://github.com/softistx/alxia/pull/256) [`039dcdd`](https://github.com/softistx/alxia/commit/039dcdd65dfc373dd2eb0fdab1053475f83da4a6) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `envExample` describes any schema that carries a Standard JSON Schema (`~standard.jsonSchema.input`): its type and `description` are read from it when the Zod, Valibot and ArkType readers do not fit the schema, or find no description. A form that throws is treated as absent; the output for Zod, Valibot and ArkType is unchanged.
+
 ## 0.2.0
 
 ### Minor Changes
