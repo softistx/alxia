@@ -6,9 +6,7 @@ const ranges = { trusted: ['10.0.0.0/8'] };
 
 describe('the options', () => {
 	test("'refuse' and 'refuse-all' need proxies named by address", () => {
-		expect(() =>
-			trustProxy({ trusted: 1, untrusted: 'refuse' } as never),
-		).toThrow(
+		expect(() => trustProxy({ trusted: 1, untrusted: 'refuse' })).toThrow(
 			"trustProxy: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function) or a secret, not a bare hop count",
 		);
 		expect(() =>

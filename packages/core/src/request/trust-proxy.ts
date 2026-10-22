@@ -20,8 +20,15 @@ export type {
 } from './proxy-types';
 export type { ProxyAllow, ProxyRefusal } from './untrusted';
 
-/** What every form of `trustProxy`'s options shares. */
-export interface ProxyOptionsBase {
+export interface TrustProxyOptions {
+	/**
+	 * The proxies in front of the app. A number is how many there are: the
+	 * client is the entry that many places from the right. CIDR ranges or a
+	 * function name the proxies by address: the headers are read only from a
+	 * connection of one, and the client is the first entry from the right
+	 * that is not one.
+	 */
+	readonly trusted: TrustedProxies;
 	/**
 	 * The header the proxies append the client's address to:
 	 * `x-forwarded-for` (the default), with the scheme and host from
@@ -30,6 +37,26 @@ export interface ProxyOptionsBase {
 	 * lists addresses, with the `X-Forwarded-*` scheme and host.
 	 */
 	readonly header?: string;
+	/**
+	 * What a request whose forwarding headers come from a connection the
+	 * ranges or the function do not name gets: `'ignore'` (the default)
+	 * reads none of them; `'refuse'` answers it 403, in the app's error
+	 * format. A request with no such header passes either way. Refusing
+	 * needs proxies named by address or a `secret`: a hop count alone cannot
+	 * tell a proxy.
+	 * `'refuse-all'`, which refuses every such request, headers or not,
+	 * takes `StrictProxyOptions`.
+	 */
+	readonly untrusted?: 'ignore' | 'refuse';
+	/** `untrusted: 'refuse-all'`'s escape alone: see `StrictProxyOptions`. */
+	readonly allow?: undefined;
+	/**
+	 * A header only the proxies can set, and the value it must hold: with it, a
+	 * request is believed only when the connection is a proxy's AND the header
+	 * holds the secret, and a hop count may refuse (`untrusted: 'refuse'`). See
+	 * the serving guide.
+	 */
+	readonly secret?: ProxySecret;
 	/**
 	 * The app's own 403 for a refused request, in place of the default
 	 * body: `({ request, url, ip, refusal }) => Response`, run before
@@ -46,52 +73,16 @@ export interface ProxyOptionsBase {
 }
 
 /**
- * The proxies in front of the app, and what a request they did not sign
- * gets. `trusted` is a number (how many there are: the client is the entry
- * that many places from the right), or CIDR ranges or a function naming
- * them by address: the headers are read only from a connection of one, and
- * the client is the first entry from the right that is not one.
- *
- * `secret` adds a header only the proxies can set: with it, a request is
- * believed only when the connection is a proxy's (`trusted`) AND the header
- * holds the secret. `untrusted: 'ignore'` (the default) reads no header of
- * any other request; `'refuse'` answers 403 one that carries a forwarding
- * header (or the secret's); a request with none passes. A hop count cannot
- * tell a proxy, so it refuses only with a `secret`. `'refuse-all'`, which
- * refuses every such request, headers or not, takes `StrictProxyOptions`.
- */
-export type TrustProxyOptions = ProxyOptionsBase &
-	(
-		| {
-				readonly trusted: Exclude<TrustedProxies, number>;
-				readonly secret?: ProxySecret;
-				readonly untrusted?: 'ignore' | 'refuse';
-				/** `untrusted: 'refuse-all'`'s escape alone: see `StrictProxyOptions`. */
-				readonly allow?: undefined;
-		  }
-		| {
-				readonly trusted: number;
-				readonly secret?: undefined;
-				readonly untrusted?: 'ignore';
-				readonly allow?: undefined;
-		  }
-		| {
-				readonly trusted: TrustedProxies;
-				readonly secret: ProxySecret;
-				readonly untrusted?: 'ignore' | 'refuse';
-				readonly allow?: undefined;
-		  }
-	);
-
-/**
  * `trustProxy` for an app only its proxies may reach: `untrusted:
- * 'refuse-all'` answers 403 every request from a connection the ranges, the
- * function or the secret do not name, forwarding headers or not, but for
- * what `allow` lets through — a health probe's path, a loopback peer —
- * whose headers are not read and whose `ctx.ip` is the connection's. A hop
- * count needs a `secret`: it cannot tell a proxy.
+ * 'refuse-all'` answers 403 every request from a connection the ranges or
+ * the function do not name, forwarding headers or not, but for what
+ * `allow` lets through — a health probe's path, a loopback peer — whose
+ * headers are not read and whose `ctx.ip` is the connection's.
  */
-export type StrictProxyOptions = ProxyOptionsBase & {
+export interface StrictProxyOptions
+	extends Omit<TrustProxyOptions, 'trusted' | 'untrusted' | 'allow'> {
+	/** The proxies, by CIDR range, address or a test of one: a hop count cannot tell a proxy. */
+	readonly trusted: Exclude<TrustedProxies, number>;
 	readonly untrusted: 'refuse-all';
 	/**
 	 * What passes from another connection: peers by CIDR range or address,
@@ -99,20 +90,26 @@ export type StrictProxyOptions = ProxyOptionsBase & {
 	 * server). Nothing by default.
 	 */
 	readonly allow?: ProxyAllow;
-} & (
-		| {
-				readonly trusted: Exclude<TrustedProxies, number>;
-				readonly secret?: ProxySecret;
-		  }
-		| { readonly trusted: TrustedProxies; readonly secret: ProxySecret }
-	);
+}
+
+/**
+ * `StrictProxyOptions` with a `secret`, which tells the proxy a hop count
+ * cannot: `trusted` may be a hop count, or ranges beside the secret.
+ */
+export interface SecretStrictProxyOptions
+	extends Omit<StrictProxyOptions, 'trusted' | 'secret'> {
+	readonly trusted: TrustedProxies;
+	readonly secret: ProxySecret;
+}
 
 /** Marks a `ProxyTrust` that refuses every connection but the proxies', which `listen` reads. */
 export const REFUSES_ALL = Symbol.for('alxia.proxy.refusesAll');
 
 /** The options `proxyReader` reads, whichever of `trustProxy`'s forms gave them. */
-type ReaderOptions = ProxyOptionsBase & {
-	readonly trusted: TrustedProxies;
+type ReaderOptions = Omit<
+	TrustProxyOptions,
+	'untrusted' | 'allow' | 'secret'
+> & {
 	readonly secret?: ProxySecret | undefined;
 	readonly untrusted?: unknown;
 	readonly allow?: unknown;
@@ -173,17 +170,21 @@ export function proxyReader(
  * host that is no bare `host[:port]`, says nothing, and the request's own
  * URL stands.
  *
+ * With a `secret`, count one hop per proxy that appends to the header: a BFF
+ * alone is `trusted: 1`; a load balancer between it and the app makes `2`.
+ *
  * @example
  * alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) });
  * alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
  * alxia({ proxy: trustProxy({ header: 'forwarded', trusted: 1 }) });
  * alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse-all', allow: ['127.0.0.1'] }) });
- * alxia({ proxy: trustProxy({ trusted: 2, secret: { header: 'x-app-proxy-secret', value: env.PROXY_SECRET }, untrusted: 'refuse' }) });
+ * alxia({ proxy: trustProxy({ trusted: 1, secret: { header: 'x-app-proxy-secret', value: env.PROXY_SECRET }, untrusted: 'refuse' }) });
  */
 export function trustProxy(options: StrictProxyOptions): ProxyTrust;
+export function trustProxy(options: SecretStrictProxyOptions): ProxyTrust;
 export function trustProxy(options: TrustProxyOptions): ProxyTrust;
 export function trustProxy(
-	options: TrustProxyOptions | StrictProxyOptions,
+	options: TrustProxyOptions | StrictProxyOptions | SecretStrictProxyOptions,
 ): ProxyTrust {
 	const read = answering(
 		proxyReader(options, 'trustProxy', true),

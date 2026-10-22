@@ -92,6 +92,7 @@ export {
 	type ProxyRefusalAnswer,
 	type ProxyTrust,
 	type RefusedRequest,
+	type SecretStrictProxyOptions,
 	type StrictProxyOptions,
 	type TrustProxyOptions,
 	trustProxy,
