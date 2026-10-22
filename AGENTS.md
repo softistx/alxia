@@ -428,7 +428,9 @@ package is public and MIT, with its own copy of `LICENSE`.
   before committing; `bunx biome ci` must pass. The templates under
   `packages/create/templates/` are in their projects' style, spaces and
   double quotes, from their own `_biome.json`, which
-  `packages/create/templates/biome.json` extends.
+  `packages/create/templates/biome.json` extends. Biome stays on 2.5 (owner,
+  2026-10-22: 2.6 also formats Markdown and YAML, the CHANGELOGs included):
+  the root pins `~2.5`, so a lockfile refresh never pulls 2.6 in.
 - Commit messages and PR titles: Conventional Commits, `type(scope)!:
   lowercase description`, as the owner's global rules have it (since
   2026-10-22). The scope is the package (`janus`, `create`) or the area
