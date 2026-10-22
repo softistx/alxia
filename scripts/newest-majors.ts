@@ -51,7 +51,7 @@ export function rangesOf(
 /**
  * What to warn about for npm's `latest` of a widened peer, or `undefined`:
  * a major beyond every range, a same-major version no range accepts (a 0.x
- * minor) above or below them, or a major below the newest one accepted.
+ * minor) above, below or between them, or a major below the newest one accepted.
  */
 export function warningFor(
 	name: string,
@@ -71,8 +71,14 @@ export function warningFor(
 	const floors = ranges.flatMap((range) =>
 		[...range.matchAll(/\d+\.\d+\.\d+/g)].map((found) => found[0]),
 	);
-	if (floors.every((floor) => Bun.semver.order(version, floor) < 0)) {
+	if (
+		floors.length > 0 &&
+		floors.every((floor) => Bun.semver.order(version, floor) < 0)
+	) {
 		return `${name} ${version} is below every peer range (${ranges.join(' | ')}): this job tests it, the ranges name nothing older; check whether npm's latest was rolled back.`;
+	}
+	if (floors.some((floor) => Bun.semver.order(version, floor) < 0)) {
+		return `${name} ${version} falls between the peer ranges (${ranges.join(' | ')}): this job tests it; add its minor to the ranges, or check why npm's latest skipped back.`;
 	}
 	return `${name} ${version} is newer than any peer range accepts (${ranges.join(' | ')}): it builds and typechecks here; widen the ranges, and Newest peers then runs the specs on it.`;
 }
