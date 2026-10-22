@@ -104,6 +104,7 @@ before `createI18n()`, still answers it.
 | 403 | `USER_INACTIVE`, `STEP_UP_REQUIRED` |
 | 404 | `NOT_FOUND` |
 | 409 | `LOGIN_TAKEN`, `VERSION_CONFLICT`, `SECOND_FACTOR_*` |
+| 429 | `MAIL_THROTTLED` (`@nxgt/janus` 0.18+), with `retryAfter` and `Retry-After` |
 | 500 | `PERMISSION_DEPTH` |
 | 501 | `UNSUPPORTED` |
 | 503 | `STORE_FAILED` |

@@ -305,10 +305,16 @@ installed tarball with `--help`.
 
 - **CI**, the required one: lint, build, typecheck, tests, `verify:artifacts`
   and the changeset check, on the lockfile's toolchain — the first
-  alternative of each peer range (`typescript: ^6.0.3 || ^7.0.0` installs 6).
+  alternative of each peer range (`typescript: ^6.0.3 || ^7.0.0` installs 6),
+  except the `@nxgt/*` peers, whose devDependencies are bumped to npm
+  `latest`, the top of the range, when `nxgt:outdated` reports them behind.
 - **Newest peers**: `scripts/newest-peers.ts` pins each peer to the last
   alternative of its range, then the same build, typecheck, tests and
   `verify:artifacts`. Widening a range is all it takes for this to test it.
+  An `@nxgt/*` peer written `>=a <b` (as `@alxia/janus`'s) is not seen by
+  Newest peers nor Newest majors, which read `||` alternatives: the weekly
+  `nxgt-versions` check alone watches it, until the queued floor-peers job
+  settles one form.
 - **Newest majors**: `scripts/newest-majors.ts` pins each widened peer to
   npm's `latest`, without `bun.lock`, then build, typecheck and
   `verify:artifacts`, no tests. It tries a new major before any range
@@ -420,9 +426,11 @@ package is public and MIT, with its own copy of `LICENSE`.
   `packages/create/templates/` are in their projects' style, spaces and
   double quotes, from their own `_biome.json`, which
   `packages/create/templates/biome.json` extends.
-- Commit messages: `<type>: <Capitalized summary>`, with `feat`, `fix`,
-  `update`, `chore`, `docs`, `typo`, `ci`, `test` (specs and fixtures
-  alone, no change a consumer sees).
+- Commit messages and PR titles: Conventional Commits, `type(scope)!:
+  lowercase description`, as the owner's global rules have it (since
+  2026-10-22). The scope is the package (`janus`, `create`) or the area
+  (`scripts`, `ci`, `release`); `test` is specs and fixtures alone, no change
+  a consumer sees.
 - Dockerfiles build, and the final image holds the build output, not
   `node_modules`: a build stage runs `bun run build`, and the last stage
   copies its output alone, on `oven/bun:1-alpine` (the build stages stay
