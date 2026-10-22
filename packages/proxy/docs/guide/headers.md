@@ -74,7 +74,7 @@ what the trusted proxy said (core's `originalUrl(ctx)`), so a chain stays truthf
 
 ## Forwarding headers
 
-Behind `trustProxy({ secret })`, the secret header the proxy proved itself with is stripped before forwarding: an upstream never receives it.
+Behind `trustProxy({ secret })`, the secret header the proxy proved itself with is stripped before forwarding: an upstream never receives it ([Trusting a proxy by secret](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#trusting-a-proxy-by-secret)).
 
 | Option | Default | Effect |
 | --- | --- | --- |
