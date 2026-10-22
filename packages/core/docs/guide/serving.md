@@ -294,6 +294,7 @@ reads. Give `ip` or `proxy`, not both: the app throws when it is built.
 
 ```ts
 function trustProxy(options: StrictProxyOptions): ProxyTrust; // untrusted: 'refuse-all', trusted by address, allow
+function trustProxy(options: SecretStrictProxyOptions): ProxyTrust; // untrusted: 'refuse-all', any trusted, a secret, allow
 function trustProxy(options: TrustProxyOptions): ProxyTrust;
 ```
 
