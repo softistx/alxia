@@ -1,5 +1,11 @@
 # @alxia/env
 
+## 0.3.1
+
+### Patch Changes
+
+- [#258](https://github.com/softistx/alxia/pull/258) [`82fc065`](https://github.com/softistx/alxia/commit/82fc065a68d4da9d327d9594b19b67047a5f46ef) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The roadmap lists the Standard JSON Schema fallback of `envExample` as shipped in 0.3.0.
+
 ## 0.3.0
 
 ### Minor Changes
