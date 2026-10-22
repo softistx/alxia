@@ -1,5 +1,11 @@
 # @alxia/core
 
+## 0.14.3
+
+### Patch Changes
+
+- [#254](https://github.com/softistx/alxia/pull/254) [`7eaef4e`](https://github.com/softistx/alxia/commit/7eaef4ef129b9064a1e9e9ef26be69b97dca0424) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Docs: the roadmap lists the npm deprecations of the retired packages as shipped.
+
 ## 0.14.2
 
 ### Patch Changes
