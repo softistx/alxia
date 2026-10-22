@@ -159,6 +159,9 @@ A container that exits at once with an `EnvError` is that list in
 `envExample(env)` writes the file from the schema: each name, the
 expected type, whether it is required, its default, and the description when
 the schema carries one (Zod's `.describe()`, Valibot's `v.description()`). A
+validator none of those fits is read through its Standard JSON Schema form
+(`~standard.jsonSchema.input`), when it has one, for the type and the
+description; if that is missing or throws, the variable is not described. A
 secret's default is never written, and a variable without a default is empty,
 or commented out when it is optional.
 

@@ -3,6 +3,7 @@ import * as v from 'valibot';
 import { z } from 'zod';
 import { defineEnv } from './define';
 import { envExample } from './example';
+import type { StandardSchema } from './standard';
 
 describe('envExample', () => {
 	test('names, expected types, defaults and descriptions; never a secret', () => {
@@ -56,5 +57,50 @@ ORIGINS="a b"
 
 	test('refuses what defineEnv did not make', () => {
 		expect(() => envExample({})).toThrow(TypeError);
+	});
+
+	describe('Standard JSON Schema', () => {
+		const withJson = (
+			input: () => Record<string, unknown>,
+		): StandardSchema<unknown> => ({
+			'~standard': {
+				version: 1,
+				vendor: 'hand-written',
+				validate: (value) =>
+					value === undefined
+						? { issues: [{ message: 'Required' }] }
+						: { value },
+				jsonSchema: { input, output: input },
+			} as StandardSchema<unknown>['~standard'],
+		});
+
+		test('describes a schema the shape readers do not fit', () => {
+			const env = defineEnv(
+				{
+					HOST: withJson(() => ({ type: 'string', description: 'Bind host' })),
+					MODE: withJson(() => ({ enum: ['a', 'b'] })),
+					URL_: withJson(() => ({ type: 'string', format: 'uri' })),
+					PORT: withJson(() => ({ type: 'integer' })),
+				},
+				{ source: { HOST: 'h', MODE: 'a', URL_: 'u', PORT: '1' } },
+			);
+			const text = envExample(env);
+			expect(text).toContain('# Bind host\n# string, required\nHOST=');
+			expect(text).toContain('# "a" | "b", required\nMODE=');
+			expect(text).toContain('# string (uri), required\nURL_=');
+			expect(text).toContain('# integer, required\nPORT=');
+		});
+
+		test('a jsonSchema.input that throws is treated as absent', () => {
+			const env = defineEnv(
+				{
+					BAD: withJson(() => {
+						throw new Error('cannot represent');
+					}),
+				},
+				{ source: { BAD: 'x' } },
+			);
+			expect(envExample(env)).toBe('# required\nBAD=\n');
+		});
 	});
 });

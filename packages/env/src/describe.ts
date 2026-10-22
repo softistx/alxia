@@ -1,7 +1,9 @@
 /**
- * What a variable's schema tells about it, best effort: Standard Schema
- * carries no description, so each validator is read through its own shape,
- * and a schema none of them fits is simply not described.
+ * What a variable's schema tells about it, best effort: Zod, Valibot and
+ * ArkType are read through their own shapes. A schema none of them fits, or
+ * that gives no description, is read through its Standard JSON Schema form
+ * (`~standard.jsonSchema.input`, when it has one); otherwise it is simply not
+ * described.
  */
 import type { StandardSchema } from './standard';
 
@@ -46,10 +48,43 @@ function valibotType(schema: Any): string | undefined {
 	return schema.type;
 }
 
+/** The JSON Schema the schema's Standard JSON Schema form gives, if any. */
+function jsonSchemaOf(schema: StandardSchema<unknown>): Any {
+	try {
+		const form = (schema as Any)?.['~standard']?.jsonSchema;
+		if (typeof form?.input !== 'function') return undefined;
+		const json = form.input({ target: 'draft-2020-12' });
+		return typeof json === 'object' && json !== null ? json : undefined;
+	} catch {
+		return undefined; // a form that cannot express this schema: absent
+	}
+}
+
+function jsonType(json: Any): string | undefined {
+	if (Array.isArray(json.enum)) return list(json.enum);
+	if (json.const !== undefined) return list([json.const]);
+	const alternatives = json.anyOf ?? json.oneOf;
+	if (Array.isArray(alternatives)) {
+		const types = alternatives.map((one: Any) => jsonType(one));
+		return types.every((one: unknown) => typeof one === 'string')
+			? types.join(' | ')
+			: undefined;
+	}
+	if (Array.isArray(json.type)) return json.type.join(' | ');
+	if (typeof json.type !== 'string') return undefined;
+	return typeof json.format === 'string' && json.type === 'string'
+		? `string (${json.format})`
+		: json.type;
+}
+
 /** The type a variable is expected to be: `number`, `string (url)`, `"a" | "b"`. */
 export function expectedOf(
 	schema: StandardSchema<unknown>,
 ): string | undefined {
+	return shapeType(schema) ?? jsonType(jsonSchemaOf(schema) ?? {});
+}
+
+function shapeType(schema: StandardSchema<unknown>): string | undefined {
 	const any = schema as Any;
 	try {
 		if (any?.['~standard']?.vendor === 'arktype') return any.expression;
@@ -61,10 +96,17 @@ export function expectedOf(
 	return undefined;
 }
 
-/** What `.describe()` (Zod) or `v.description()` (Valibot) wrote, if anything. */
+/** What `.describe()` (Zod) or `v.description()` (Valibot) wrote, else the JSON Schema's. */
 export function descriptionOf(
 	schema: StandardSchema<unknown>,
 ): string | undefined {
+	const described = shapeDescription(schema);
+	if (described !== undefined) return described;
+	const json = jsonSchemaOf(schema);
+	return typeof json?.description === 'string' ? json.description : undefined;
+}
+
+function shapeDescription(schema: StandardSchema<unknown>): string | undefined {
 	const any = schema as Any;
 	try {
 		if (typeof any.description === 'string') return any.description;
@@ -73,7 +115,7 @@ export function descriptionOf(
 		);
 		if (typeof piped?.description === 'string') return piped.description;
 		const inner = any._zod?.def?.innerType ?? any.wrapped;
-		return inner === undefined ? undefined : descriptionOf(inner);
+		return inner === undefined ? undefined : shapeDescription(inner);
 	} catch {
 		return undefined;
 	}

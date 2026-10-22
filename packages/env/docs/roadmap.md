@@ -7,14 +7,14 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **A description from every validator.** `envExample` reads a variable's
+  type and description from Zod, Valibot and ArkType's definitions, and from
+  the Standard JSON Schema form (`~standard.jsonSchema.input`) of any other
+  validator that implements it, or when those find no description.
 
 ## Next
 
-- **A description from every validator.** `envExample` reads a variable's
-  type and description from Zod, Valibot and ArkType's definitions. When
-  Standard Schema gets a JSON Schema form, it reads that, and any validator
-  that implements it is described.
+Nothing scheduled yet.
 
 ## Later
 
