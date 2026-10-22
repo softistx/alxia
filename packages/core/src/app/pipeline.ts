@@ -8,6 +8,7 @@ import { failed } from './answers';
 import { handle, unmatched } from './boundary';
 import type { Definition, Runtime } from './definition';
 import { ORIGIN } from './original-url';
+import { SECRET_HEADER } from './secret-header';
 import { SERVED } from './served';
 import { UPGRADED, upgradeSocket } from './socket';
 import type { RequestContext } from './types';
@@ -33,6 +34,7 @@ export async function serve(
 		error: undefined,
 		[SERVED]: runtime.served,
 		[ORIGIN]: undefined,
+		[SECRET_HEADER]: undefined,
 	} as RequestContext;
 	try {
 		// Reading the address runs the app's code (a `trusted` function, an
@@ -42,6 +44,7 @@ export async function serve(
 		Object.assign(ctx, {
 			ip: forwarded === undefined ? runtime.ip(request, server) : forwarded.ip,
 			[ORIGIN]: forwarded?.origin,
+			[SECRET_HEADER]: forwarded?.secretHeader,
 		});
 		if (forwarded?.refused === true)
 			return await untrustedProxy(ctx, forwarded.refusal, forwarded.answer);

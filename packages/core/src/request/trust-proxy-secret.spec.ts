@@ -1,5 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { type TrustProxyOptions, trustProxy } from './trust-proxy';
+import {
+	type StrictProxyOptions,
+	type TrustProxyOptions,
+	trustProxy,
+} from './trust-proxy';
 
 const secret = {
 	header: 'x-app-proxy-secret',
@@ -7,7 +11,7 @@ const secret = {
 };
 
 function read(
-	options: TrustProxyOptions,
+	options: TrustProxyOptions | StrictProxyOptions,
 	headers: Record<string, string>,
 	peer: string | null = '10.0.0.1',
 ) {
@@ -17,7 +21,7 @@ function read(
 			: ({
 					requestIP: () => ({ address: peer }),
 				} as unknown as Bun.Server<unknown>);
-	return trustProxy(options)(
+	return trustProxy(options as TrustProxyOptions)(
 		new Request('http://app.internal:3000/', { headers }),
 		server,
 	);

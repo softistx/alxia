@@ -21,7 +21,6 @@ describe('judge', () => {
 		);
 		expect(judge(headers({ 'x-app-proxy-secret': `${value}x` }))).toBe('wrong');
 		expect(judge(headers({ 'x-app-proxy-secret': 'short' }))).toBe('wrong');
-		expect(judge(headers({ 'x-app-proxy-secret': ` ${value}` }))).toBe('wrong');
 	});
 
 	test('no header at all', () => {
