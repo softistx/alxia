@@ -7,11 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **A type and a description from every validator.** `envExample` reads a
-  variable's type and description from Zod, Valibot and ArkType's definitions.
-  Any other validator that implements the Standard JSON Schema form
-  (`~standard.jsonSchema.input`) supplies both the type and the description
-  through it, and that form also supplies a description the definitions lack.
+Nothing in progress.
 
 ## Next
 
@@ -29,6 +25,14 @@ Nothing scheduled yet.
   `@alxia/core` either, and works in any Bun program.
 
 ## Shipped
+
+### 0.3.0
+
+- **A type and a description from every validator.** `envExample` reads a
+  variable's type and description from Zod, Valibot and ArkType's definitions.
+  Any other validator that implements the Standard JSON Schema form
+  (`~standard.jsonSchema.input`) supplies both the type and the description
+  through it, and that form also supplies a description the definitions lack.
 
 ### 0.2.0
 
