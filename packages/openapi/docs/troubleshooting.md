@@ -249,8 +249,8 @@ warning openapi.yaml#/paths/~1feed/get: watchFeed: alxia.ts leaves it out. Its 2
 whose `itemSchema` names no events, so each event's data is not JSON.
 
 **Why:** the generated `eventStream({ name: schema })` sends each event's
-data as JSON, so 0.7.0 leaves the operation out of `alxia.ts` rather than
-type it wrongly. It is not in `operations`, so `implemented` does not list
+data as JSON, so the generator leaves the operation out of `alxia.ts`
+rather than type it wrongly. It is not in `operations`, so `implemented` does not list
 it either. Named events whose data is JSON are generated.
 
 **Fix:** give each event's data `contentMediaType: application/json` and a

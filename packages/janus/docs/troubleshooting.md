@@ -558,7 +558,8 @@ next window, the right password included. Nothing is locked.
 
 **When:** asking for too many e-mails for one address or one user: a magic
 link, a sign-in code, a password reset, an address verification, a
-change-of-address e-mail (`changeEmail.send`) or a step-up code. The response carries `Retry-After: 600`.
+change-of-address e-mail (`changeEmail.send`) or a step-up code. The
+response carries `Retry-After: 600`.
 
 **Why:** `@nxgt/janus` 0.18 and later throttles the requests that send
 e-mail, on by default: past five in ten minutes for one address or user, it
