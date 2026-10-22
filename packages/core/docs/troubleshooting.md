@@ -96,8 +96,10 @@ a trap that prints nothing is headed by its symptom.
 - [`GET /… is already served by a page`](#get--is-already-served-by-a-page)
 - [`forwardedIp: trusted hops must be an integer of 1 or more`](#forwardedip-trusted-hops-must-be-an-integer-of-1-or-more), and `forwardedIp: "…" is not an IP address or a CIDR range`
 - [`ctx.ip` is the proxy's address, or one a client chose](#ctxip-is-the-proxys-address-or-one-a-client-chose)
-- [``trustProxy: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function), not a hop count``](#trustproxy-untrusted-refuse-needs-the-proxies-named-by-address-cidr-ranges-or-a-function-not-a-hop-count), ``… untrusted: 'refuse-all' needs …``, and ``trustProxy: untrusted must be 'ignore', 'refuse' or 'refuse-all', not "…"``
+- [``trustProxy: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function) or a secret, not a bare hop count``](#trustproxy-untrusted-refuse-needs-the-proxies-named-by-address-cidr-ranges-or-a-function-or-a-secret-not-a-bare-hop-count), ``… untrusted: 'refuse-all' needs …``, and ``trustProxy: untrusted must be 'ignore', 'refuse' or 'refuse-all', not "…"``
 - [``trustProxy: allow is for untrusted: 'refuse-all' alone; under '…' a request with no forwarding header passes already``](#trustproxy-allow-is-for-untrusted-refuse-all-alone-under--a-request-with-no-forwarding-header-passes-already), and ``trustProxy: allow must be CIDR ranges or a function (request, peer) => boolean``
+- [`trustProxy: secret must be { header, value }, …`](#trustproxy-secret-must-be--header-value--the-header-the-proxy-sets-and-its-value), `secret.header must be a valid header name`, `secret.header must not be host, forwarded, …` and `secret.value must be a string, … of 16 characters or more`
+- [`403 {"error":"untrusted_proxy"}` with the right secret](#403-erroruntrusted_proxy-with-the-right-secret)
 - [A `trusted` function that throws answers 500](#a-trusted-function-that-throws-answers-500), and an `allow` that throws refuses
 - [`trustProxy: canonical must be true or false`](#trustproxy-canonical-must-be-true-or-false), and `forwardedIp: canonical must be true or false`
 - [`ctx.ip` reads `192.0.2.1` where it read `::ffff:192.0.2.1`, or IPv6 compressed](#ctxip-reads-192021-where-it-read-ffff192021-or-ipv6-compressed)
@@ -2165,16 +2167,17 @@ alxia({ ip: forwardedIp({ trusted: 1 }) }); // one proxy: the last entry
 
 When it still reads the proxy, `trusted` counts too few hops (two proxies need `2`), or the header differs (`header: 'forwarded'`, or the one your proxy sets). When it falls back to the connection's address, the header is missing or the entry chosen is no address.
 
-### `trustProxy: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function), not a hop count`
+### `trustProxy: untrusted: 'refuse' needs the proxies named by address (CIDR ranges or a function) or a secret, not a bare hop count`
 
-**When:** `trustProxy({ trusted: 1, untrusted: 'refuse' })`, or `untrusted: 'refuse-all'` with a hop count (a compile error too, unless cast); or, as `trustProxy: untrusted must be 'ignore', 'refuse' or 'refuse-all', not "…"`, with another value.
+**When:** `trustProxy({ trusted: 1, untrusted: 'refuse' })`, or `untrusted: 'refuse-all'` with a hop count and no `secret` (a compile error too, unless cast); or, as `trustProxy: untrusted must be 'ignore', 'refuse' or 'refuse-all', not "…"`, with another value.
 
 **Why:** refusing tells a proxy's connection from a client's, and a hop count cannot: it believes every connection. The option throws when it is made, not on a request.
 
-**Fix:** name the proxies by their addresses:
+**Fix:** name the proxies by their addresses, or keep the hop count and have the proxy prove itself with a [secret](guide/serving.md#trusting-a-proxy-by-secret):
 
 ```ts
 alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
+alxia({ proxy: trustProxy({ trusted: 1, secret: { header: 'x-app-proxy-secret', value: env.PROXY_SECRET }, untrusted: 'refuse' }) });
 ```
 
 ### `trustProxy: allow is for untrusted: 'refuse-all' alone; under '…' a request with no forwarding header passes already`
@@ -2194,6 +2197,33 @@ alxia({
 	}),
 });
 ```
+
+### `trustProxy: secret must be { header, value }, the header the proxy sets and its value`
+
+**When:** `trustProxy({ secret })` is declared with something else than `{ header, value }`; or, as `trustProxy: secret.header must be a valid header name`, with a header that is no token; or, as `trustProxy: secret.header must not be host, forwarded, an x-forwarded-* header nor the header option`, with one the proxy contract owns; or, as `trustProxy: secret.value must be a string, or a non-empty list of them, of 16 characters or more`, with a short, empty or missing value. The message never quotes the value.
+
+**Why:** the secret is checked once, when the option is made, so a weak or ambiguous one fails at startup, not on a request. A forwarding header cannot be the secret's, since the proxy reads those.
+
+**Fix:** a header of its own and a long random value, from the environment:
+
+```ts
+alxia({
+	proxy: trustProxy({
+		trusted: 2,
+		secret: { header: 'x-app-proxy-secret', value: env.PROXY_SECRET },
+	}),
+});
+```
+
+An empty `PROXY_SECRET` (a variable the platform did not set) is this error: declare it with `@alxia/env`, `secret: true`, so the app does not start without it.
+
+### `403 {"error":"untrusted_proxy"}` with the right secret
+
+**When:** the proxy sets the secret header, and `untrusted: 'refuse'` or `'refuse-all'` still answers its requests 403.
+
+**Why:** the secret is compared exactly. A value with a trailing newline or space (a secret copied from a file, or a variable set with `echo`), a different header name, or, during a [rotation](guide/serving.md#trusting-a-proxy-by-secret), the proxy still sending a value the app no longer lists, is `wrong`. With ranges or a function beside it, the connection must be a trusted proxy's too: both must hold.
+
+**Fix:** compare the two values byte for byte (`printf %s "$PROXY_SECRET" | wc -c` on each side), trim what the platform added, and during a rotation list the new value and the old one (`value: [env.PROXY_SECRET, env.PROXY_SECRET_OLD]`) until the proxy has switched.
 
 ### A `trusted` function that throws answers 500
 
@@ -2434,7 +2464,7 @@ A 413 with no JSON body comes from Bun itself. The body passed `listen`'s
 
 With `trustProxy({ refusal })` the body is the app's own, not this one. That function must answer a `Response` with status 403: `trustProxy: refusal must answer a Response with status 403, the refusal's own` is the logged error of one that threw or answered another status, and the request gets the app's 500; `trustProxy: refusal must be a function (refused) => Response` is thrown at declaration by anything else, and `trustProxy: refusal is for untrusted: 'refuse' or 'refuse-all', which alone refuse a request` by a `refusal` with `untrusted` left out or `'ignore'`, which would never run.
 
-**Why:** such a request claims an address, a scheme or a host from a peer that is not your proxy, or, under `'refuse-all'`, reaches the app around the proxies: a client going around them, a proxy missing from `trusted`, or an orchestrator's probe from a node's address. In a spec, `app.request` has no connection, which is never a proxy, so under `'refuse-all'` every `app.request` is refused.
+**Why:** such a request claims an address, a scheme or a host from a peer that is not your proxy (or, with a `secret`, one that did not prove itself: see [403 with the right secret](#403-erroruntrusted_proxy-with-the-right-secret)), or, under `'refuse-all'`, reaches the app around the proxies: a client going around them, a proxy missing from `trusted`, or an orchestrator's probe from a node's address. In a spec, `app.request` has no connection, which is never a proxy, so under `'refuse-all'` every `app.request` is refused.
 
 **Fix:** to change the body, give `trustProxy({ refusal: () => new Response('forbidden', { status: 403 }) })` ([Serving: answering the refusal yourself](guide/serving.md#answering-the-refusal-yourself)); to stop the refusal, add the proxy's address or range to `trusted`; reach the app through the proxy alone; in a spec, give `fetch` a server whose `requestIP` names a proxy. Under `'refuse'`, a probe that sends no forwarding header is never refused; under `'refuse-all'`, let the probes through with `allow`, by their source range or their path (see [Serving: only the proxies](guide/serving.md#only-the-proxies-refuse-all)).
 

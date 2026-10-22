@@ -403,6 +403,12 @@ alxia({
 });
 ```
 
+Where an address cannot name your proxy, have it prove itself with a secret
+header: `trustProxy({ trusted: 2, secret: { header: 'x-app-proxy-secret', value: env.PROXY_SECRET }, untrusted: 'refuse' })`
+believes the forwarding headers only when the secret is right, and
+`@alxia/proxy` never forwards it
+([Trusting a proxy by secret](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#trusting-a-proxy-by-secret)).
+
 `ctx.ip` is one text per address, from the socket or a header alike: an
 IPv4-mapped address as IPv4, IPv6 as RFC 5952 writes it (`2001:db8::1`),
 so a rate limit, a log line or an allow list sees one client once;
@@ -977,7 +983,7 @@ joins middlewares past the 8 a call types:
 | export | |
 | --- | --- |
 | `forwardedIp({ header?, trusted, canonical? })`, `ForwardedIpOptions`, `TrustedProxies` | the `ip` option for an app behind proxies: the client from `X-Forwarded-For` or `Forwarded`, read from the right past `trusted` hops or CIDR ranges, never the first entry the client writes; the connection's address when the header does not name it; canonical unless `canonical: false` |
-| `trustProxy({ trusted, header?, untrusted?, allow?, refusal?, canonical? })`, `TrustProxyOptions`, `StrictProxyOptions`, `ProxyAllow`, `ProxyTrust`, `Forwarded`, `ProxyRefusal`, `ProxyRefusalAnswer`, `RefusedRequest`, `Origin` | the `proxy` option: the proxies in front of the app, declared once, for `ctx.ip` and the scheme, host and port (`X-Forwarded-Port`) the client asked for, read from a trusted connection alone and checked (`http`/`https`, a bare `host[:port]`); `untrusted: 'refuse'` answers 403 to forwarding headers from any other connection, `'refuse-all'` (`StrictProxyOptions`) to every request from one but what `allow` (CIDR ranges or a `(request, peer) => boolean`) lets through; `refusal` (`ProxyRefusalAnswer`, given a `RefusedRequest`) answers that 403 as the app says, a `Response` that stays a 403 |
+| `trustProxy({ trusted, secret?, header?, untrusted?, allow?, refusal?, canonical? })`, `proxySecretHeader(ctx)`, `ProxySecret`, `TrustProxyOptions`, `StrictProxyOptions`, `ProxyAllow`, `ProxyTrust`, `Forwarded`, `ProxyRefusal`, `ProxyRefusalAnswer`, `RefusedRequest`, `Origin` | the `proxy` option: the proxies in front of the app, declared once, for `ctx.ip` and the scheme, host and port (`X-Forwarded-Port`) the client asked for, read from a trusted connection alone and checked (`http`/`https`, a bare `host[:port]`); `untrusted: 'refuse'` answers 403 to forwarding headers from any other connection, `'refuse-all'` (`StrictProxyOptions`) to every request from one but what `allow` (CIDR ranges or a `(request, peer) => boolean`) lets through; `refusal` (`ProxyRefusalAnswer`, given a `RefusedRequest`) answers that 403 as the app says, a `Response` that stays a 403 |
 | `canonicalIp(address)` | an address's one text, as `ctx.ip` gives it: brackets and port dropped, IPv4-mapped as IPv4, IPv6 as RFC 5952 writes it, a zone id kept; what is no address as given |
 | `originalUrl(ctx)` | a copy of `ctx.url` with the scheme and host the trusted proxy said, under `proxy`; `ctx.url`'s own otherwise |
 | `alxia(options?)`, `AlxiaOptions` | a new app: `prefix`, `validateResponses`, `ip`, `proxy`, `errors`, `dev` (on only when `NODE_ENV` is `development`: the route table, the 404 hint, the dev error page) |

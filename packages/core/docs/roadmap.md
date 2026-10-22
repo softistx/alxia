@@ -7,7 +7,12 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing in progress.
+- **Trusting a proxy by secret.** `trustProxy({ secret })`: a proxy that
+  proves itself with a header only it knows, for a platform where a hop
+  count is all an address can say, refusing what does not
+  ([Serving](guide/serving.md#trusting-a-proxy-by-secret)). In the next
+  minor of `@alxia/core`; `@alxia/proxy` strips the header before it
+  forwards.
 
 ## Next
 
