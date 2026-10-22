@@ -130,6 +130,23 @@ let an empty or non-numeric value still fail at startup, as it should:
 app.use(rateLimit({ limit: Number(Bun.env.RATE_LIMIT ?? 100), windowMs: 60_000 }));
 ```
 
+### `TypeError: rateLimit: ipv6Prefix must be a whole number from 0 to 128, not …`
+
+**When:** `rateLimit()` is given an `ipv6Prefix` of -1, 129, a fraction or
+`NaN`, often from an environment variable.
+
+**Fix:** pass a whole number from 0 to 128; `64` on the open Internet.
+
+### `TypeError: rateLimit: ipv6Prefix applies to the default key, and a key of your own was given`
+
+**When:** `rateLimit()` is given both `ipv6Prefix` and `key`.
+
+**Why:** the prefix groups `ctx.ip`, the default key. A `key` of your own
+decides what is counted, so the option would silently do nothing.
+
+**Fix:** drop one. To group addresses in your own key, build it from `ctx.ip`
+yourself.
+
 ### `TypeError: rateLimit: limit … differs from the store's policy of …`
 
 **When:** `rateLimit()` is given a `store` that declares its own `policy`
@@ -192,6 +209,15 @@ const app = alxia({ ip: forwardedIp({ trusted: 1 }) }).use(
 	rateLimit({ limit: 100, windowMs: 60_000 }),
 );
 ```
+
+### One IPv6 client is never refused
+
+**When:** a client on IPv6 keeps getting 200s, each request from a different
+address of the same network.
+
+**Why:** the default key is one address, and a subscriber holds a whole /64.
+
+**Fix:** `rateLimit({ …, ipv6Prefix: 64 })` counts the network.
 
 ### One client is never refused, whatever it sends
 

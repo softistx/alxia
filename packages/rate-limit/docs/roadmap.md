@@ -7,7 +7,10 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing in progress.
+- **An IPv6 client counted by its network.** `ipv6Prefix: 64` makes the
+  default key the /64 of `ctx.ip` (`2001:db8:1:2::/64`), so a subscriber
+  cannot dodge the limit with a new address. Off by default; IPv4 is
+  unchanged.
 
 ## Next
 

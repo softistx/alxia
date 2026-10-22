@@ -61,6 +61,7 @@ type RateLimit<Requires extends object = Empty> = Middleware<
 | `windowMs` | `number` | required, unless the store has a `policy` | the window, in milliseconds: a whole number, 1 or more |
 | `key` | `(ctx: BaseContext & Requires) => string \| undefined \| Promise<…>` | `ctx.ip` | what is counted; `undefined` is not counted |
 | `store` | `RateLimitStore` | a new `MemoryStore` | where the counts are kept; with a `policy`, it gives `limit` and `windowMs` |
+| `ipv6Prefix` | `number` | none: each address is counted | the default key becomes the IPv6 network of `ctx.ip`, its first `ipv6Prefix` bits, a whole number from 0 to 128; throws with a `key` |
 | `skip` | `(ctx: BaseContext & Requires) => boolean` | none | requests not counted at all |
 | `headers` | `'draft' \| 'legacy' \| false` | `'draft'` | which rate-limit headers each counted response carries |
 
@@ -143,6 +144,38 @@ app.use(
 `url`, `ip`, `server`, `route` (`undefined` on a request no route matches) and `pathParams`, and with `Requires`, empty
 by default. To read what an earlier middleware added, see [Reading the app's
 context](#reading-the-apps-context).
+
+### `ipv6Prefix`
+
+One IPv6 subscriber usually holds a whole /64, so a client that counts per
+address can take a new one for each request. `ipv6Prefix` makes the default
+key the network of `ctx.ip` instead: its first `ipv6Prefix` bits, in
+canonical form (RFC 5952), followed by `/` and the prefix.
+
+```ts
+app.use(rateLimit({ limit: 100, windowMs: 60_000, ipv6Prefix: 64 }));
+```
+
+| `ctx.ip` | key with `ipv6Prefix: 64` | key with `ipv6Prefix: 48` |
+| --- | --- | --- |
+| `2001:db8:1:2::1` | `2001:db8:1:2::/64` | `2001:db8:1::/48` |
+| `2001:db8:1:2:aaaa:bbbb:cccc:dddd` | `2001:db8:1:2::/64` | `2001:db8:1::/48` |
+| `2001:db8:1:3::1` | `2001:db8:1:3::/64` | `2001:db8:1::/48` |
+| `203.0.113.9`, or `::ffff:203.0.113.9` | `203.0.113.9` | `203.0.113.9` |
+
+- **Set `64` on the open Internet.** It is the size of a subscriber's
+  network. `128` counts each address, as the default does; `0` puts every
+  IPv6 client in one key (`::/0`).
+- **The default stays per address.** Without the option, every key is
+  `ctx.ip`, as before.
+- **IPv4 is untouched.** An IPv4 address, and an IPv4-mapped IPv6 one (core
+  already gives it as IPv4), keep their key.
+- **A zone id** (`%eth0`) is dropped, and a text that is not an IPv6 address
+  is used as it is.
+- **Default key only.** With a `key` of your own, `ipv6Prefix` would do
+  nothing, so `rateLimit()` throws, as it does for a `limit` that differs
+  from the store's policy. Group the address yourself in that case.
+- A prefix that is not a whole number from 0 to 128 throws at declaration.
 
 ### `skip`
 
