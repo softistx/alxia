@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { health } from '../health/health';
+import { forwardedIp } from '../request/forwarded-ip';
 import { trustProxy } from '../request/trust-proxy';
 import { alxia } from './alxia';
 import { originalUrl } from './original-url';
