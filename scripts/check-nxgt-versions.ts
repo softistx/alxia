@@ -23,6 +23,8 @@
  * it and a changeset must come along, and it stops reading the lock the day the lock
  * is rewritten as version 2, as nxgt-data's already is.
  *
+ * The bottom of each range is run by CI's Floor peers job (floor-peers.ts).
+ *
  * Exits 0 when everything is current, 1 when something is behind, 2 when it
  * could not tell — a registry that does not answer is a failure, never
  * "current".
