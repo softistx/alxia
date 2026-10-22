@@ -11,6 +11,8 @@ function groupsOf(text: string): number[] | undefined {
 	const written = [...head, ...tail];
 	const last = written[written.length - 1];
 	if (last?.includes('.')) {
+		// The dotted form ends the address: `1.2.3.4::` is not one.
+		if (!address.endsWith(last)) return undefined;
 		const octets = last.split('.');
 		const bytes = octets.map((octet) =>
 			/^\d{1,3}$/.test(octet) ? Number(octet) : Number.NaN,
