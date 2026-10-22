@@ -311,6 +311,10 @@ installed tarball with `--help`.
 - **Newest peers**: `scripts/newest-peers.ts` pins each peer to the last
   alternative of its range, then the same build, typecheck, tests and
   `verify:artifacts`. Widening a range is all it takes for this to test it.
+  An `@nxgt/*` peer written `>=a <b` (as `@alxia/janus`'s) is not seen by
+  Newest peers nor Newest majors, which read `||` alternatives: the weekly
+  `nxgt-versions` check alone watches it, until the queued floor-peers job
+  settles one form.
 - **Newest majors**: `scripts/newest-majors.ts` pins each widened peer to
   npm's `latest`, without `bun.lock`, then build, typecheck and
   `verify:artifacts`, no tests. It tries a new major before any range
