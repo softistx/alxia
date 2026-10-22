@@ -30,56 +30,63 @@ describe('bodyOf', () => {
 	});
 });
 
-describe('janusErrors(), a throttled answer', () => {
-	const appThrowing = (error: JanusError, format?: { errors: 'problem' }) =>
-		alxia(format)
-			.use(janusErrors())
-			.get('/ask', () => {
-				throw error;
+const appThrowing = (error: JanusError, format?: { errors: 'problem' }) =>
+	alxia(format)
+		.use(janusErrors())
+		.get('/ask', () => {
+			throw error;
+		});
+
+/** 0.17 has no status for it: it never throws the code, so nothing to answer. */
+const mailThrottleKnown = statusOf(mailThrottled) !== undefined;
+
+describe.skipIf(!mailThrottleKnown)(
+	'janusErrors(), MAIL_THROTTLED (@nxgt/janus 0.18+)',
+	() => {
+		it('answers MAIL_THROTTLED 429 with Retry-After and retryAfter in the body', async () => {
+			const response = await appThrowing(
+				new MailThrottled('too many e-mails', { retryAfter: 600 }),
+			).request('/ask');
+			expect(response.status).toBe(statusOf(mailThrottled));
+			expect(response.headers.get('retry-after')).toBe('600');
+			expect(await response.json()).toEqual({
+				code: 'MAIL_THROTTLED',
+				retryAfter: 600,
 			});
-
-	it('answers MAIL_THROTTLED 429 with Retry-After and retryAfter in the body', async () => {
-		const response = await appThrowing(
-			new MailThrottled('too many e-mails', { retryAfter: 600 }),
-		).request('/ask');
-		expect(response.status).toBe(statusOf(mailThrottled));
-		expect(response.status).toBe(429);
-		expect(response.headers.get('retry-after')).toBe('600');
-		expect(await response.json()).toEqual({
-			code: 'MAIL_THROTTLED',
-			retryAfter: 600,
 		});
-	});
 
-	it('answers MAIL_THROTTLED as a 429 problem under errors: problem', async () => {
-		const response = await appThrowing(
-			new MailThrottled('too many e-mails', { retryAfter: 600 }),
-			{ errors: 'problem' },
-		).request('/ask');
-		expect(response.status).toBe(429);
-		expect(response.headers.get('retry-after')).toBe('600');
-		expect(response.headers.get('content-type')).toBe(
-			'application/problem+json',
-		);
-		expect(await response.json()).toEqual({
-			type: 'about:blank',
-			title: 'Too Many Requests',
-			status: 429,
-			detail: 'Too Many Requests',
-			instance: '/ask',
-			code: 'MAIL_THROTTLED',
-			retryAfter: 600,
+		it('answers MAIL_THROTTLED as a 429 problem under errors: problem', async () => {
+			const response = await appThrowing(
+				new MailThrottled('too many e-mails', { retryAfter: 600 }),
+				{ errors: 'problem' },
+			).request('/ask');
+			expect(response.status).toBe(statusOf(mailThrottled));
+			expect(response.headers.get('retry-after')).toBe('600');
+			expect(response.headers.get('content-type')).toBe(
+				'application/problem+json',
+			);
+			expect(await response.json()).toEqual({
+				type: 'about:blank',
+				title: 'Too Many Requests',
+				status: statusOf(mailThrottled),
+				detail: 'Too Many Requests',
+				instance: '/ask',
+				code: 'MAIL_THROTTLED',
+				retryAfter: 600,
+			});
 		});
-	});
 
-	it('sends no Retry-After when the wait is unknown', async () => {
-		const response = await appThrowing(
-			new MailThrottled('too many e-mails'),
-		).request('/ask');
-		expect(response.status).toBe(429);
-		expect(response.headers.get('retry-after')).toBeNull();
-	});
+		it('sends no Retry-After when the wait is unknown', async () => {
+			const response = await appThrowing(
+				new MailThrottled('too many e-mails'),
+			).request('/ask');
+			expect(response.status).toBe(statusOf(mailThrottled));
+			expect(response.headers.get('retry-after')).toBeNull();
+		});
+	},
+);
 
+describe('janusErrors(), a throttled sign-in', () => {
 	it('carries Retry-After on a throttled CREDENTIALS_INVALID', async () => {
 		const response = await appThrowing(
 			new CredentialsInvalid('throttled', { retryAfter: 30 }),
