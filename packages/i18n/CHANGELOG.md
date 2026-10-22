@@ -1,5 +1,11 @@
 # @alxia/i18n
 
+## 0.4.2
+
+### Patch Changes
+
+- [#261](https://github.com/softistx/alxia/pull/261) [`5c1b852`](https://github.com/softistx/alxia/commit/5c1b8520a355fb5aa06ff4c9e5f85ac8994dd8ce) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The roadmap links the `@nxgt/i18n` issue the hot reload of the catalogues waits on.
+
 ## 0.4.1
 
 ### Patch Changes
