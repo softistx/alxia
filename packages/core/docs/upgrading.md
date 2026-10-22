@@ -2680,7 +2680,7 @@ generator — the examples use
 So the server no longer builds a route table in its type for a client to
 read:
 
-- `@alxia/client` is retired: it is no longer released, and its last
+- `@alxia/client` is retired: it is no longer released, and every
   version is deprecated on npm, with:
 
   ```sh
