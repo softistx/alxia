@@ -3,7 +3,7 @@
  * (RFC 9110 §7.6.1), the forwarding ones set, `Host` chosen, then the
  * app's own edits.
  */
-import { originalUrl } from '@alxia/core';
+import { originalUrl, proxySecretHeader } from '@alxia/core';
 import type { HeaderEdit, Plan, ProxyContext } from './options';
 
 /** Headers that describe one connection, never forwarded. */
@@ -44,6 +44,9 @@ export function requestHeaders(
 ): Headers {
 	const headers = new Headers(request.headers);
 	stripHopByHop(headers);
+	// The secret proves the proxy to this app, never to the upstream.
+	const secret = proxySecretHeader(ctx);
+	if (secret !== undefined) headers.delete(secret);
 	// What the client asked for: what a trusted proxy said, else the request's own.
 	const origin = originalUrl(ctx);
 	const received = request.headers.get('host') ?? ctx.url.host;
