@@ -404,10 +404,11 @@ alxia({
 ```
 
 Where an address cannot name your proxy, have it prove itself with a secret
-header: `trustProxy({ trusted: 2, secret: { header: 'x-app-proxy-secret', value: env.PROXY_SECRET }, untrusted: 'refuse' })`
-believes the forwarding headers only when the secret is right, and
-`@alxia/proxy` never forwards it
+header: `trustProxy({ trusted: 1, secret: { header: 'x-app-proxy-secret', value: env.PROXY_SECRET }, untrusted: 'refuse' })`
+(one hop: a BFF that writes a fresh `X-Forwarded-For`) believes the forwarding
+headers only when the secret is right, and `@alxia/proxy` never forwards it
 ([Trusting a proxy by secret](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#trusting-a-proxy-by-secret)).
+Each proxy in front of the app that appends to `X-Forwarded-For` adds one hop: with a platform's load balancer between the BFF and the app, say, count `trusted: 2`.
 
 `ctx.ip` is one text per address, from the socket or a header alike: an
 IPv4-mapped address as IPv4, IPv6 as RFC 5952 writes it (`2001:db8::1`),

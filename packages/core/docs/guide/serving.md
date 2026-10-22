@@ -506,7 +506,7 @@ import { env } from './env';
 
 const app = alxia({
 	proxy: trustProxy({
-		trusted: 2,
+		trusted: 1,
 		secret: { header: 'x-app-proxy-secret', value: env.PROXY_SECRET },
 		untrusted: 'refuse',
 	}),
@@ -522,7 +522,7 @@ answers 403 (reason `'headers'`) a request that carries a forwarding header
 or the secret header, so a wrong secret is refused and a probe with none
 passes; `'refuse-all'` answers 403 (reason `'peer'`) every one `allow` does
 not let through. A hop count can refuse only with a `secret`: the secret is
-what tells the proxy.
+what tells the proxy. Each proxy in front of the app that appends to `X-Forwarded-For` adds one hop: with a platform's load balancer between the BFF and the app, say, count `trusted: 2`.
 
 The proxy, say a BFF, sets the header on every request it sends, and a
 **fresh** `X-Forwarded-For` of its own, never the client's copy passed through:
