@@ -1,5 +1,14 @@
 # @alxia/redis
 
+## 0.5.11
+
+### Patch Changes
+
+- Updated dependencies [[`6d3ab24`](https://github.com/softistx/alxia/commit/6d3ab24f06ab3d0a9c0febfb2e0507f6f1022421), [`8a80879`](https://github.com/softistx/alxia/commit/8a80879d2dfb84ab56b0f0b9edca822d512f8a3c)]:
+  - @alxia/core@0.15.0
+  - @alxia/rate-limit@0.5.0
+  - @alxia/cache@0.3.10
+
 ## 0.5.10
 
 ### Patch Changes

@@ -1,5 +1,16 @@
 # @alxia/rate-limit
 
+## 0.5.0
+
+### Minor Changes
+
+- [#263](https://github.com/softistx/alxia/pull/263) [`8a80879`](https://github.com/softistx/alxia/commit/8a80879d2dfb84ab56b0f0b9edca822d512f8a3c) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `rateLimit({ ipv6Prefix: 64 })` counts an IPv6 client by its network (`2001:db8:1:2::/64`) instead of its address, so a subscriber holding a whole /64 cannot dodge the limit by changing address. IPv4 and IPv4-mapped addresses keep their key, and without the option every key is the address, as before. The option takes a whole number from 0 to 128 and applies to the default key: `rateLimit()` throws when it is given with a `key` of your own.
+
+### Patch Changes
+
+- Updated dependencies [[`6d3ab24`](https://github.com/softistx/alxia/commit/6d3ab24f06ab3d0a9c0febfb2e0507f6f1022421)]:
+  - @alxia/core@0.15.0
+
 ## 0.4.11
 
 ### Patch Changes

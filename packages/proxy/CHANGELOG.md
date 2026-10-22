@@ -1,5 +1,13 @@
 # @alxia/proxy
 
+## 0.4.4
+
+### Patch Changes
+
+- [#265](https://github.com/softistx/alxia/pull/265) [`6d3ab24`](https://github.com/softistx/alxia/commit/6d3ab24f06ab3d0a9c0febfb2e0507f6f1022421) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Strip the header `trustProxy({ secret })` reads before forwarding a request, so an upstream never receives the proxy secret.
+- Updated dependencies [[`6d3ab24`](https://github.com/softistx/alxia/commit/6d3ab24f06ab3d0a9c0febfb2e0507f6f1022421)]:
+  - @alxia/core@0.15.0
+
 ## 0.4.3
 
 ### Patch Changes

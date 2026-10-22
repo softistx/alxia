@@ -1,5 +1,12 @@
 # @alxia/logger
 
+## 0.6.7
+
+### Patch Changes
+
+- Updated dependencies [[`6d3ab24`](https://github.com/softistx/alxia/commit/6d3ab24f06ab3d0a9c0febfb2e0507f6f1022421)]:
+  - @alxia/core@0.15.0
+
 ## 0.6.6
 
 ### Patch Changes

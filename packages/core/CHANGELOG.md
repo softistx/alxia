@@ -1,5 +1,11 @@
 # @alxia/core
 
+## 0.15.0
+
+### Minor Changes
+
+- [#265](https://github.com/softistx/alxia/pull/265) [`6d3ab24`](https://github.com/softistx/alxia/commit/6d3ab24f06ab3d0a9c0febfb2e0507f6f1022421) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `trustProxy({ secret: { header, value } })`: a proxy that proves itself with a header only it knows. The forwarding headers are believed only when `trusted` AND the secret hold (`value` may be a list, for a rotation); a wrong or missing secret is untrusted, and `untrusted: 'refuse'` or `'refuse-all'` decide what that means, which a hop count can now do with a secret. The header name is on the context, `proxySecretHeader(ctx)`, so a proxy can drop it.
+
 ## 0.14.3
 
 ### Patch Changes
