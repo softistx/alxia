@@ -200,6 +200,9 @@ Either way, `ctx.ip` is the client's address in one canonical text, IPv6
 compressed and an IPv4-mapped address as IPv4, so a rate limit counts one
 client once however the socket or the proxy wrote it
 ([One text per address](../../packages/core/docs/guide/serving.md#one-text-per-address)).
+On the open Internet, one IPv6 subscriber usually holds a whole /64:
+`rateLimit({ ipv6Prefix: 64 })` counts it once
+([`ipv6Prefix`](../../packages/rate-limit/docs/guide.md#ipv6prefix)).
 
 Use [a shared store](caching-and-rate-limiting.md) when there are several
 replicas.

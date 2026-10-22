@@ -7,6 +7,7 @@ import {
 	type Next,
 	type Reply,
 } from '@alxia/core';
+import { ipv6Network } from './ipv6-network';
 import { resolvePolicy } from './policy';
 import {
 	type Decision,
@@ -24,6 +25,16 @@ interface CountingOptions<Requires extends object> {
 	) => string | undefined | Promise<string | undefined>;
 	/** Requests not counted at all. */
 	readonly skip?: (ctx: BaseContext & Requires) => boolean;
+	/**
+	 * Count an IPv6 client by its network: the first `ipv6Prefix` bits of
+	 * `ctx.ip`, keyed as `2001:db8:1:2::/64`. One subscriber usually holds a
+	 * whole /64, so per address it can dodge the limit; `64` is the value for
+	 * the open Internet. A whole number from 0 to 128. IPv4 and IPv4-mapped
+	 * addresses keep their own key. Off by default: each address is counted.
+	 * It applies to the default key alone: given with a `key`, `rateLimit()`
+	 * throws, since the option would silently do nothing.
+	 */
+	readonly ipv6Prefix?: number;
 	/**
 	 * The `RateLimit` headers of the IETF draft on every counted response,
 	 * `X-RateLimit-*` with `legacy`, or none. `draft` by default.
@@ -100,9 +111,10 @@ export type RateLimit<Requires extends object = Empty> = Middleware<
 export function rateLimit<Requires extends object = Empty>(
 	options: RateLimitOptions<Requires>,
 ): NoInfer<RateLimit<Requires>> {
+	checkPrefix(options);
 	const store = options.store ?? new MemoryStore();
 	const policy = resolvePolicy(options);
-	const key = options.key ?? ((ctx: BaseContext & Requires) => ctx.ip);
+	const key = options.key ?? defaultKey<Requires>(options.ipv6Prefix);
 	const style = options.headers ?? 'draft';
 	return defineMiddleware<Requires>()(async function rateLimit(ctx, next) {
 		const counted = options.skip?.(ctx) ? undefined : await key(ctx);
@@ -126,6 +138,33 @@ export function rateLimit<Requires extends object = Empty>(
 		};
 		return next({ rateLimit });
 	});
+}
+
+/** The default key: `ctx.ip`, or its IPv6 network under `prefix` bits. */
+function defaultKey<Requires extends object>(prefix: number | undefined) {
+	return (ctx: BaseContext & Requires): string | undefined =>
+		prefix === undefined || ctx.ip === undefined
+			? ctx.ip
+			: ipv6Network(ctx.ip, prefix);
+}
+
+/** `ipv6Prefix` is a whole number from 0 to 128, and goes with the default key. */
+function checkPrefix(options: {
+	readonly ipv6Prefix?: number | undefined;
+	readonly key?: unknown;
+}): void {
+	const { ipv6Prefix } = options;
+	if (ipv6Prefix === undefined) return;
+	if (!Number.isInteger(ipv6Prefix) || ipv6Prefix < 0 || ipv6Prefix > 128) {
+		throw new TypeError(
+			`rateLimit: ipv6Prefix must be a whole number from 0 to 128, not ${String(ipv6Prefix)}`,
+		);
+	}
+	if (options.key !== undefined) {
+		throw new TypeError(
+			'rateLimit: ipv6Prefix applies to the default key, and a key of your own was given. Drop one, or group the address in your key.',
+		);
+	}
 }
 
 /** The headers that say where the key stands, in the `style` asked for. */

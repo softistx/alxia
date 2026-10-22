@@ -36,8 +36,23 @@ IETF draft's `RateLimit-Limit`, `-Remaining`, `-Reset` and `-Policy`.
 | `windowMs` | required, unless the store has a `policy` | the window, in milliseconds: a whole number, 1 or more |
 | `key` | the client's address | what is counted: `(ctx) => string \| undefined`; `undefined` is not counted. `rateLimit<{ user: User }>(…)` lets it read a `user` an earlier middleware adds |
 | `store` | `MemoryStore` | where: `redisStore` from `@alxia/redis`, or your own `RateLimitStore`. A store with a `policy` gives `limit` and `windowMs` |
+| `ipv6Prefix` | none: each address is counted | count an IPv6 client by its network, the first `ipv6Prefix` bits (0 to 128) of its address; `64` on the open Internet. Default key only: throws with a `key` |
 | `skip` | none | requests not counted |
 | `headers` | `'draft'` | `'legacy'` for `X-RateLimit-*`, or `false` |
+
+### One IPv6 client, one key
+
+A home or mobile subscriber usually holds a whole /64, billions of
+addresses, so counting each address apart lets it dodge the limit. On the
+open Internet, count the network:
+
+```ts
+app.use(rateLimit({ limit: 100, windowMs: 60_000, ipv6Prefix: 64 }));
+// 2001:db8:1:2::1 and 2001:db8:1:2:aaaa::9 are one key: 2001:db8:1:2::/64
+```
+
+IPv4 and IPv4-mapped addresses keep their key. Without the option, each
+address is its own key.
 
 ## Order
 
