@@ -1,30 +1,10 @@
 import { describe, expect, test } from 'bun:test';
+import { behindProxy, from, get } from '../../test/fixtures/proxy';
 import { forwardedIp } from '../request/forwarded-ip';
 import { trustProxy } from '../request/trust-proxy';
 import { alxia } from './alxia';
 
-// A small copy of proxy.spec.ts's setup: a connection from a proxy that
-// forwards a client's headers.
-const PROXY = {
-	requestIP: () => ({ address: '10.0.0.1' }),
-} as unknown as Bun.Server<unknown>;
-
-const behindProxy = {
-	'x-forwarded-for': '203.0.113.9',
-	'x-forwarded-proto': 'https',
-	'x-forwarded-host': 'example.com',
-};
-
-const get = (
-	served: { fetch: (r: Request, s?: Bun.Server<unknown>) => Promise<Response> },
-	path: string,
-	headers: Record<string, string>,
-	server: Bun.Server<unknown>,
-) =>
-	served.fetch(
-		new Request(`http://app.internal:3000${path}`, { headers }),
-		server,
-	);
+const PROXY = from('10.0.0.1');
 
 describe('a trusted function that throws', () => {
 	const boom = () => {

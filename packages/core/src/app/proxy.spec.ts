@@ -1,22 +1,13 @@
 import { describe, expect, test } from 'bun:test';
+import { behindProxy, from, get } from '../../test/fixtures/proxy';
 import { health } from '../health/health';
 import { forwardedIp } from '../request/forwarded-ip';
 import { trustProxy } from '../request/trust-proxy';
 import { alxia } from './alxia';
 import { originalUrl } from './original-url';
 
-/** A server whose every connection comes from `peer`. */
-const from = (peer: string) =>
-	({ requestIP: () => ({ address: peer }) }) as unknown as Bun.Server<unknown>;
-
 const PROXY = from('10.0.0.1');
 const CLIENT = from('198.51.100.4');
-
-const behindProxy = {
-	'x-forwarded-for': '203.0.113.9',
-	'x-forwarded-proto': 'https',
-	'x-forwarded-host': 'example.com',
-};
 
 function app(untrusted: 'ignore' | 'refuse' = 'ignore', problem = false) {
 	return alxia({
@@ -28,17 +19,6 @@ function app(untrusted: 'ignore' | 'refuse' = 'ignore', problem = false) {
 			ctx.reply(200, { ip: ctx.ip ?? null, url: originalUrl(ctx).href }),
 		);
 }
-
-const get = (
-	served: { fetch: (r: Request, s?: Bun.Server<unknown>) => Promise<Response> },
-	path: string,
-	headers: Record<string, string>,
-	server: Bun.Server<unknown>,
-) =>
-	served.fetch(
-		new Request(`http://app.internal:3000${path}`, { headers }),
-		server,
-	);
 
 describe('alxia({ proxy })', () => {
 	test('ctx.ip and originalUrl(ctx) are what the trusted proxy said', async () => {
