@@ -74,6 +74,8 @@ what the trusted proxy said (core's `originalUrl(ctx)`), so a chain stays truthf
 
 ## Forwarding headers
 
+Behind `trustProxy({ secret })`, the secret header the proxy proved itself with is stripped before forwarding: an upstream never receives it ([Trusting a proxy by secret](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#trusting-a-proxy-by-secret)).
+
 | Option | Default | Effect |
 | --- | --- | --- |
 | `xForwarded` | `true` | appends the peer to `X-Forwarded-For`, sets `X-Forwarded-Proto` (the scheme the client used) and `X-Forwarded-Host` (the host it asked for): the request's own, or, behind `alxia({ proxy: trustProxy(…) })`, what the trusted proxy said |

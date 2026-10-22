@@ -290,16 +290,18 @@ so `alxia({ ip: forwardedIp(o) })` and `alxia({ proxy: trustProxy(o) })`
 give the same address: keep `forwardedIp` when the address is all the app
 reads. Give `ip` or `proxy`, not both: the app throws when it is built.
 
-### `trustProxy({ trusted, header, untrusted, allow, refusal, canonical })`
+### `trustProxy({ trusted, secret, header, untrusted, allow, refusal, canonical })`
 
 ```ts
 function trustProxy(options: StrictProxyOptions): ProxyTrust; // untrusted: 'refuse-all', trusted by address, allow
+function trustProxy(options: SecretStrictProxyOptions): ProxyTrust; // untrusted: 'refuse-all', any trusted, a secret, allow
 function trustProxy(options: TrustProxyOptions): ProxyTrust;
 ```
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
 | `trusted` | `number \| string \| string[] \| (address: string) => boolean` | required | the proxies in front of the app, as for [`forwardedIp`](#forwardedip-header-trusted-) |
+| `secret` | `{ header: string; value: string \| string[] }` | none | a header only the proxies set: the proxy is believed only when `trusted` AND the secret hold ([below](#trusting-a-proxy-by-secret)) |
 | `header` | `string` | `'x-forwarded-for'` | `'x-forwarded-for'`: the address from it, the scheme from `X-Forwarded-Proto`, the host from `X-Forwarded-Host`, its port from `X-Forwarded-Port` ([below](#the-port)); `'forwarded'`: all three from RFC 7239's `for=`, `proto=` and `host=`; another name: the address from that header, the rest from `X-Forwarded-*` |
 | `untrusted` | `'ignore' \| 'refuse' \| 'refuse-all'` | `'ignore'` | what a request from a connection that is no proxy gets: its forwarding headers ignored, refused when it carries one, or refused whatever it carries ([below](#refusing-an-untrusted-peer)) |
 | `refusal` | `(refused: RefusedRequest) => Response \| Promise<Response>` | the default 403 | the app's own answer to a refused request, which must be a 403 ([below](#answering-the-refusal-yourself)) |
@@ -396,8 +398,8 @@ it. A request with none of those headers passes: a load balancer's or an
 orchestrator's health probe, which sends none, reaches `/health` and
 `/ready` from any address; to refuse those too, see
 [`refuse-all`](#only-the-proxies-refuse-all). Refusing needs the proxies
-named by address; with a hop count, which cannot tell a proxy,
-`trustProxy` throws.
+named by address or a [secret](#trusting-a-proxy-by-secret); with a bare hop
+count, which cannot tell a proxy, `trustProxy` throws.
 
 ```ts
 alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
@@ -438,8 +440,9 @@ other connection, headers or not, with `untrusted: 'refuse-all'`: the same
 403, in the app's error format (a problem's `detail` reads `A connection
 that is no trusted proxy`), before routing and every middleware. A
 connection of unknown address — `app.request`, with no server — is
-refused too. As with `'refuse'`, a hop count cannot tell a proxy: with
-`trusted` a number, it is a compile error, and `trustProxy` throws.
+refused too. As with `'refuse'`, a bare hop count cannot tell a proxy: with
+`trusted` a number and no `secret`, it is a compile error, and `trustProxy`
+throws.
 
 `allow` is the escape, checked only for a connection `trusted` does not
 name: peers by CIDR range or address, or a test of the request and the
@@ -490,6 +493,81 @@ the options are written, or cast the options to the one you mean.
 With no server (`app.request`, `app.fetch` alone), the connection is
 unknown and never a proxy: a spec that sends forwarding headers gives
 `fetch` a server whose `requestIP` names one, or is refused.
+
+### Trusting a proxy by secret
+
+Addresses name a proxy only when the network lets nothing else claim them.
+On a platform where the proxy's address is not stable, or where a hop count
+is all you can say, have the proxy prove itself: it sets a header to a
+secret only it and the app know.
+
+```ts
+import { alxia, trustProxy } from '@alxia/core';
+import { env } from './env';
+
+const app = alxia({
+	proxy: trustProxy({
+		trusted: 1,
+		secret: { header: 'x-app-proxy-secret', value: env.PROXY_SECRET },
+		untrusted: 'refuse',
+	}),
+});
+```
+
+A request is believed — its address, scheme, host and port read exactly as
+for an address-trusted proxy — only when the connection is a trusted proxy
+(ranges or a function, when given) AND the header holds the secret. A
+request with a wrong or missing secret is untrusted, and `untrusted` decides
+what that means: `'ignore'` reads nothing and refuses nothing; `'refuse'`
+answers 403 (reason `'headers'`) a request that carries a forwarding header
+or the secret header, so a wrong secret is refused and a probe with none
+passes; `'refuse-all'` answers 403 (reason `'peer'`) every one `allow` does
+not let through. A hop count can refuse only with a `secret`: the secret is
+what tells the proxy. Each proxy in front of the app that appends to `X-Forwarded-For` adds one hop: with a platform's load balancer between the BFF and the app, say, count `trusted: 2`.
+
+The proxy, say a BFF, sets the header on every request it sends, and a
+**fresh** `X-Forwarded-For` of its own, never the client's copy passed through:
+
+```ts
+import { proxy } from '@alxia/proxy';
+
+app.use(
+	proxy('http://app.internal:3000', {
+		headers: {
+			request: {
+				'x-app-proxy-secret': () => env.PROXY_SECRET,
+				'x-forwarded-for': (ctx) => ctx.ip,
+			},
+		},
+	}),
+);
+```
+
+**Rotating.** Give the app both values, the new one first, then switch the
+proxy, then drop the old one: deploy `value: [env.PROXY_SECRET, env.PROXY_SECRET_OLD]`,
+switch the BFF to the new value, and remove the old value once nothing sends
+it. Every accepted value is compared on every request, none skipped.
+
+**Checked once.** `trustProxy` throws when it is declared, never on a
+request, and never quotes a value: the header must be a valid header name
+and not `host`, `forwarded`, any `x-forwarded-*` nor the `header` option;
+each value a string of 16 characters or more.
+
+**The header does not travel on.** The name is kept on the request's
+context, `proxySecretHeader(ctx)`, and `@alxia/proxy` deletes it before it
+forwards a request, so an upstream never receives it. `@alxia/logger` and
+`@alxia/telemetry` write no header, so the value reaches no log line nor span.
+
+**Security.** The secret is a bearer credential: whoever holds it is
+believed, whatever address it comes from.
+
+- Use TLS between the proxy and the app, or anyone on the path reads it.
+- Use 32 random characters or more, from a generator, never a word.
+- Never pass the client's copy through: the proxy sets the header itself.
+- `ctx.headers` and the request a `refusal` function is given still hold the
+  header. Do not log or echo them.
+- Keep it in a secret store and in `@alxia/env` with `secret: true`, which
+  prints it as `***`.
 
 ### What reads the original URL
 

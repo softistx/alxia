@@ -38,6 +38,8 @@ export interface Forwarded {
 	readonly refusal?: ProxyRefusal;
 	/** The `refusal` option's answer to it. */
 	readonly answer?: ProxyRefusalAnswer;
+	/** The header the proxy proves itself with, when `secret` is set: a proxy must not forward it. */
+	readonly secretHeader?: string;
 }
 
 /** The `proxy` option: what the proxies say of a request, from its connection. */

@@ -6,10 +6,12 @@
 import { canonicalIp, canonicalOf, type ParsedIp, parseIp } from './ip-address';
 import { fromForwarded, fromLists, NONE } from './proxy-readers';
 import { answering, answerOf } from './proxy-refusal';
+import { type ProxySecret, secretOf } from './proxy-secret';
 import type { ProxyRefusalAnswer, ProxyTrust } from './proxy-types';
 import { peerTrusted, type TrustedProxies, trustOf } from './trust';
 import { gateOf, type ProxyAllow } from './untrusted';
 
+export type { ProxySecret, SecretVerdict } from './proxy-secret';
 export type {
 	Forwarded,
 	ProxyRefusalAnswer,
@@ -40,13 +42,21 @@ export interface TrustProxyOptions {
 	 * ranges or the function do not name gets: `'ignore'` (the default)
 	 * reads none of them; `'refuse'` answers it 403, in the app's error
 	 * format. A request with no such header passes either way. Refusing
-	 * needs proxies named by address: a hop count cannot tell a proxy.
+	 * needs proxies named by address or a `secret`: a hop count alone cannot
+	 * tell a proxy.
 	 * `'refuse-all'`, which refuses every such request, headers or not,
 	 * takes `StrictProxyOptions`.
 	 */
 	readonly untrusted?: 'ignore' | 'refuse';
 	/** `untrusted: 'refuse-all'`'s escape alone: see `StrictProxyOptions`. */
 	readonly allow?: undefined;
+	/**
+	 * A header only the proxies can set, and the value it must hold: with it, a
+	 * request is believed only when the connection is a proxy's AND the header
+	 * holds the secret, and a hop count may refuse (`untrusted: 'refuse'`). See
+	 * the serving guide.
+	 */
+	readonly secret?: ProxySecret;
 	/**
 	 * The app's own 403 for a refused request, in place of the default
 	 * body: `({ request, url, ip, refusal }) => Response`, run before
@@ -82,11 +92,25 @@ export interface StrictProxyOptions
 	readonly allow?: ProxyAllow;
 }
 
+/**
+ * `StrictProxyOptions` with a `secret`, which tells the proxy a hop count
+ * cannot: `trusted` may be a hop count, or ranges beside the secret.
+ */
+export interface SecretStrictProxyOptions
+	extends Omit<StrictProxyOptions, 'trusted' | 'secret'> {
+	readonly trusted: TrustedProxies;
+	readonly secret: ProxySecret;
+}
+
 /** Marks a `ProxyTrust` that refuses every connection but the proxies', which `listen` reads. */
 export const REFUSES_ALL = Symbol.for('alxia.proxy.refusesAll');
 
 /** The options `proxyReader` reads, whichever of `trustProxy`'s forms gave them. */
-type ReaderOptions = Omit<TrustProxyOptions, 'untrusted' | 'allow'> & {
+type ReaderOptions = Omit<
+	TrustProxyOptions,
+	'untrusted' | 'allow' | 'secret'
+> & {
+	readonly secret?: ProxySecret | undefined;
 	readonly untrusted?: unknown;
 	readonly allow?: unknown;
 };
@@ -102,7 +126,12 @@ export function proxyReader(
 		throw new TypeError(`${who}: canonical must be true or false`);
 	const trust = trustOf(options.trusted, who, canonical);
 	const header = (options.header ?? 'x-forwarded-for').toLowerCase();
-	const gate = gateOf(options, trust, header, who);
+	const secret =
+		options.secret === undefined
+			? undefined
+			: secretOf(options.secret, who, header);
+	const gate = gateOf(options, trust, header, secret?.header, who);
+	const named = secret === undefined ? {} : { secretHeader: secret.header };
 	const read = header === 'forwarded' ? fromForwarded : fromLists(header);
 	const shown = (ip: ParsedIp) => (canonical ? canonicalOf(ip) : ip.text);
 	return (request, server) => {
@@ -112,18 +141,22 @@ export function proxyReader(
 			if (socket === undefined || !canonical) return socket;
 			return peer === undefined ? canonicalIp(socket) : canonicalOf(peer);
 		};
-		if (!peerTrusted(trust, peer)) {
+		const believed =
+			peerTrusted(trust, peer) &&
+			(secret === undefined || secret.judge(request.headers) === 'right');
+		if (!believed) {
 			const own = ownOf();
 			const refusal = gate(request, peer, own);
 			if (refusal === undefined)
-				return { ip: own, origin: NONE, refused: false };
-			return { ip: own, origin: NONE, refused: true, refusal };
+				return { ip: own, origin: NONE, refused: false, ...named };
+			return { ip: own, origin: NONE, refused: true, refusal, ...named };
 		}
 		const { at, origin } = read(request.headers, trust, withOrigin);
 		return {
 			ip: at === undefined ? ownOf() : shown(at),
 			origin,
 			refused: false,
+			...named,
 		};
 	};
 }
@@ -137,16 +170,21 @@ export function proxyReader(
  * host that is no bare `host[:port]`, says nothing, and the request's own
  * URL stands.
  *
+ * With a `secret`, count one hop per proxy that appends to the header: a BFF
+ * alone is `trusted: 1`; a load balancer between it and the app makes `2`.
+ *
  * @example
  * alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) });
  * alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
  * alxia({ proxy: trustProxy({ header: 'forwarded', trusted: 1 }) });
  * alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse-all', allow: ['127.0.0.1'] }) });
+ * alxia({ proxy: trustProxy({ trusted: 1, secret: { header: 'x-app-proxy-secret', value: env.PROXY_SECRET }, untrusted: 'refuse' }) });
  */
 export function trustProxy(options: StrictProxyOptions): ProxyTrust;
+export function trustProxy(options: SecretStrictProxyOptions): ProxyTrust;
 export function trustProxy(options: TrustProxyOptions): ProxyTrust;
 export function trustProxy(
-	options: TrustProxyOptions | StrictProxyOptions,
+	options: TrustProxyOptions | StrictProxyOptions | SecretStrictProxyOptions,
 ): ProxyTrust {
 	const read = answering(
 		proxyReader(options, 'trustProxy', true),

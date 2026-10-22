@@ -49,6 +49,7 @@ export type Gate = (
 function untrustedOf(
 	options: GateOptions,
 	trust: Trust,
+	hasSecret: boolean,
 	who: string,
 ): Untrusted {
 	const untrusted = options.untrusted ?? 'ignore';
@@ -60,9 +61,9 @@ function untrustedOf(
 		throw new TypeError(
 			`${who}: untrusted must be 'ignore', 'refuse' or 'refuse-all', not ${JSON.stringify(untrusted)}`,
 		);
-	if (untrusted !== 'ignore' && 'hops' in trust)
+	if (untrusted !== 'ignore' && 'hops' in trust && !hasSecret)
 		throw new TypeError(
-			`${who}: untrusted: '${untrusted}' needs the proxies named by address (CIDR ranges or a function), not a hop count`,
+			`${who}: untrusted: '${untrusted}' needs the proxies named by address (CIDR ranges or a function) or a secret, not a bare hop count`,
 		);
 	return untrusted;
 }
@@ -112,15 +113,25 @@ export function gateOf(
 	options: GateOptions,
 	trust: Trust,
 	header: string,
+	secretHeader: string | undefined,
 	who: string,
 ): Gate {
-	const untrusted = untrustedOf(options, trust, who);
+	const untrusted = untrustedOf(
+		options,
+		trust,
+		secretHeader !== undefined,
+		who,
+	);
 	const allowed = allowOf(options, untrusted, who);
 	if (untrusted === 'ignore') return () => undefined;
 	if (untrusted === 'refuse-all')
 		return (request, peer, shown) =>
 			allowed(request, peer, shown) ? undefined : 'peer';
-	const refusing = [...FORWARDING, header];
+	const refusing = [
+		...FORWARDING,
+		header,
+		...(secretHeader === undefined ? [] : [secretHeader]),
+	];
 	return (request) =>
 		refusing.some((name) => request.headers.has(name)) ? 'headers' : undefined;
 }

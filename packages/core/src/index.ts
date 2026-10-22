@@ -9,6 +9,7 @@ export {
 	reportOperation,
 } from './app/operation';
 export { originalUrl } from './app/original-url';
+export { proxySecretHeader } from './app/secret-header';
 export { errorFormat, isDev, shutdownSignal } from './app/served';
 export {
 	type OperationObserver,
@@ -82,6 +83,7 @@ export {
 } from './request/forwarded-ip';
 export { canonicalIp } from './request/ip-address';
 export type { Origin } from './request/origin';
+export type { ProxySecret } from './request/proxy-secret';
 export type { BodyParser } from './request/read';
 export {
 	type Forwarded,
@@ -90,6 +92,7 @@ export {
 	type ProxyRefusalAnswer,
 	type ProxyTrust,
 	type RefusedRequest,
+	type SecretStrictProxyOptions,
 	type StrictProxyOptions,
 	type TrustProxyOptions,
 	trustProxy,

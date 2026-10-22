@@ -171,6 +171,10 @@ import { alxia, trustProxy } from '@alxia/core';
 const app = alxia({ proxy: trustProxy({ trusted: ['10.0.0.0/8'], untrusted: 'refuse' }) });
 ```
 
+Where the proxies' addresses are not stable (a platform that moves them),
+have the proxy prove itself with a secret header instead of an address
+([Trusting a proxy by secret](../../packages/core/docs/guide/serving.md#trusting-a-proxy-by-secret)).
+
 When nothing but the proxies may reach the app, refuse every other
 connection, headers or not, with `untrusted: 'refuse-all'`, and let the
 platform's probes through with `allow`: a load balancer's own check comes
