@@ -345,8 +345,9 @@ installed tarball with `--help`.
   newest versions `@alxia/create` resolves. A few minutes measured
   locally, most of it the four image builds; kept out of `bun run test`.
 
-The last four resolve without a lockfile, so an upstream release can turn
-them red with no change here. They are informational: read them, never make
+The last four install versions `bun.lock` does not hold (Newest majors and
+Templates resolve without it), so an upstream release can turn them red with
+no change here. They are informational: read them, never make
 them required. `newest-peers.ts`, `floor-peers.ts` and `newest-majors.ts`
 rewrite manifests in place; never commit what they write.
 
