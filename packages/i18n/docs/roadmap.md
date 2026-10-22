@@ -16,7 +16,8 @@ Nothing in progress.
   and a watcher that polls `version()` and calls `onChange` when it moves;
   `@alxia/i18n` then feeds the result to `setResources()`, so an app picks
   up edited catalogues without a restart and a request in flight keeps the
-  ones it started with. Needs the `setResources()` of 0.4.0.
+  ones it started with. Needs the `setResources()` of 0.4.0. Waits on
+  [softistx/nxgt-core#326](https://github.com/softistx/nxgt-core/issues/326).
 
 ## Later
 
