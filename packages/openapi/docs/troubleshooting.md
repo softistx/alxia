@@ -19,7 +19,7 @@ it to fail prints nothing; those are under [Traps](#traps), by symptom.
 - [The page is blank, and the console reports a blocked script](#the-page-is-blank-and-the-console-reports-a-blocked-script)
 - [`matchesSpec(): … routes have no operation: GET /docs, …`](#matchesspec--routes-have-no-operation-get-docs-)
 
-**Generator** (`@nxgt/openapi-codegen` 0.7.0)
+**Generator** (`@nxgt/openapi-codegen` 0.11.0)
 
 - [`alxia.ts leaves it out. … [ignored]`](#alxiats-leaves-it-out--ignored)
 - [A cookie parameter is missing from `types.ts` and the client files](#a-cookie-parameter-is-missing-from-typests-and-the-client-files)
@@ -283,7 +283,7 @@ generator warns `ignored`; the parameter is not in `types.ts`, `zod.ts`,
 `operations.ts` or `paths.ts`.
 
 **Why:** a client does not set cookies, so only `alxia.ts` validates the
-parameter, as `cookies`. Before 0.7.0 the generator refused the whole
+parameter, as `cookies`. Before 0.7 the generator refused the whole
 document instead.
 
 **Fix:** none: the route's handler reads the validated `cookies`.
