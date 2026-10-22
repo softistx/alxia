@@ -88,6 +88,22 @@ describe('rewrite', () => {
 		]);
 	});
 
+	test('a 0.x latest below every range is said to be below, not newer', () => {
+		const redis: Manifest = {
+			name: '@alxia/redis',
+			peerDependencies: { '@nxgt/redis': '^0.7.0 || ^0.8.0 || ^0.9.0' },
+			devDependencies: { '@nxgt/redis': '^0.9.2' },
+		};
+		const result = rewrite(
+			root,
+			new Map([['r', redis]]),
+			new Map([['@nxgt/redis', '0.6.4']]),
+		);
+		expect(result.warnings).toEqual([
+			"@nxgt/redis 0.6.4 is below every peer range (^0.7.0 || ^0.8.0 || ^0.9.0): this job tests it, the ranges name nothing older; check whether npm's latest was rolled back.",
+		]);
+	});
+
 	test('a 0.x latest a range accepts is pinned, and says nothing', () => {
 		const redis = {
 			name: '@alxia/redis',

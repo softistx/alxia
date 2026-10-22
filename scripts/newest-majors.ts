@@ -36,6 +36,47 @@ export function majorOf(version: string): number {
 	return Number(/^\D*(\d+)/.exec(version)?.[1]);
 }
 
+/** The distinct peer ranges of `name` the packages `by` write. */
+export function rangesOf(
+	packages: ReadonlyMap<string, Manifest>,
+	by: readonly string[],
+	name: string,
+): string[] {
+	const ranges = [...packages.values()]
+		.filter((manifest) => by.includes(String(manifest.name)))
+		.flatMap((manifest) => manifest.peerDependencies?.[name] ?? []);
+	return [...new Set(ranges)];
+}
+
+/**
+ * What to warn about for npm's `latest` of a widened peer, or `undefined`:
+ * a major beyond every range, a same-major version no range accepts (a 0.x
+ * minor) above or below them, or a major below the newest one accepted.
+ */
+export function warningFor(
+	name: string,
+	version: string,
+	major: number,
+	ranges: readonly string[],
+): string | undefined {
+	if (majorOf(version) > major) {
+		return `${name} ${version} is newer than any peer range accepts (^${major}): it builds and typechecks here; widen the ranges, and Newest peers then runs the specs on it.`;
+	}
+	if (majorOf(version) < major) {
+		return `npm's latest ${name} is ${version}, below the newest major a range accepts (^${major}): this job tests ${majorOf(version)}, Newest peers tests ${major}.`;
+	}
+	if (ranges.some((range) => Bun.semver.satisfies(version, range))) {
+		return undefined;
+	}
+	const floors = ranges.flatMap((range) =>
+		[...range.matchAll(/\d+\.\d+\.\d+/g)].map((found) => found[0]),
+	);
+	if (floors.every((floor) => Bun.semver.order(version, floor) < 0)) {
+		return `${name} ${version} is below every peer range (${ranges.join(' | ')}): this job tests it, the ranges name nothing older; check whether npm's latest was rolled back.`;
+	}
+	return `${name} ${version} is newer than any peer range accepts (${ranges.join(' | ')}): it builds and typechecks here; widen the ranges, and Newest peers then runs the specs on it.`;
+}
+
 /**
  * What an example's own range of a widened peer becomes, for `followPins`:
  * npm's latest behind the operator the example wrote; `undefined` for a
@@ -145,30 +186,13 @@ export function rewrite(
 				);
 			}
 		}
-		if (majorOf(version) > major) {
-			warnings.push(
-				`${name} ${version} is newer than any peer range accepts (^${major}): it builds and typechecks here; widen the ranges, and Newest peers then runs the specs on it.`,
-			);
-		} else if (majorOf(version) === major) {
-			const ranges = [
-				...new Set(
-					by.flatMap((pkg) => {
-						const range = [...packages.values()].find((m) => m.name === pkg)
-							?.peerDependencies?.[name];
-						return range === undefined ? [] : [range];
-					}),
-				),
-			];
-			if (!ranges.some((range) => Bun.semver.satisfies(version, range))) {
-				warnings.push(
-					`${name} ${version} is newer than any peer range accepts (${ranges.join(' | ')}): it builds and typechecks here; widen the ranges, and Newest peers then runs the specs on it.`,
-				);
-			}
-		} else {
-			warnings.push(
-				`npm's latest ${name} is ${version}, below the newest major a range accepts (^${major}): this job tests ${majorOf(version)}, Newest peers tests ${major}.`,
-			);
-		}
+		const warning = warningFor(
+			name,
+			version,
+			major,
+			rangesOf(packages, by, name),
+		);
+		if (warning !== undefined) warnings.push(warning);
 	}
 
 	for (const [path, manifest] of packages) {
