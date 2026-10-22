@@ -158,7 +158,11 @@ A container that exits at once with an `EnvError` is that list in
 
 `envExample(env)` writes the file from the schema: each name, the
 expected type, whether it is required, its default, and the description when
-the schema carries one (Zod's `.describe()`, Valibot's `v.description()`). A
+the schema carries one (Zod's `.describe()`, ArkType's `.describe()`,
+Valibot's `v.description()`). A validator none of those fits, or one that
+gives no description, is read through its Standard JSON Schema form
+(`~standard.jsonSchema.input`), when it has one, for the type and the
+description; if that is missing or throws, the variable is not described. A
 secret's default is never written, and a variable without a default is empty,
 or commented out when it is optional.
 
@@ -182,6 +186,33 @@ API_KEY=
 # SENTRY_DSN=
 ```
 
+A validator that exposes `~standard.jsonSchema` is described without any
+reader of its own:
+
+```ts
+const url = {
+	'~standard': {
+		version: 1,
+		vendor: 'my-lib',
+		validate: (value: unknown) =>
+			typeof value === 'string'
+				? { value }
+				: { issues: [{ message: 'Expected a string' }] },
+		jsonSchema: {
+			input: () => ({ type: 'string', format: 'uri', description: 'Public base URL' }),
+			output: () => ({ type: 'string', format: 'uri' }),
+		},
+	},
+};
+const env = defineEnv({ PUBLIC_URL: url });
+```
+
+```
+# Public base URL
+# string (uri), required
+PUBLIC_URL=
+```
+
 The bin imports the module only for its schema: nothing has to be set, and it
 refuses nothing. To keep the file from drifting, compare it in a test:
 
@@ -196,8 +227,9 @@ test('.env.example is the schema', async () => {
 ```
 
 The expected type is read from Zod, Valibot and ArkType's own definitions, as
-well as they allow; a schema it cannot read gets no type on its line, and no
-`expected …` in an error.
+well as they allow, else from the schema's Standard JSON Schema form (an
+`enum`, a `type`, a `format`, an `anyOf` of typed members). A schema none of
+those reads gets no type on its line, and no `expected …` in an error.
 
 ## Testing
 

@@ -60,6 +60,8 @@ env.PORT; // 3000
 ```
 
 - **A `.env.example`** from the same schema:
+  A validator none of the readers fits is described from its Standard JSON Schema form
+  (`~standard.jsonSchema.input`), type and description, when it has one.
 
 ```sh
 bunx alxia-env example > .env.example   # reads src/env.ts; or: alxia-env example path/to/env.ts

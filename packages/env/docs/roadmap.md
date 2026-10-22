@@ -7,14 +7,15 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+- **A type and a description from every validator.** `envExample` reads a
+  variable's type and description from Zod, Valibot and ArkType's definitions.
+  Any other validator that implements the Standard JSON Schema form
+  (`~standard.jsonSchema.input`) supplies both the type and the description
+  through it, and that form also supplies a description the definitions lack.
 
 ## Next
 
-- **A description from every validator.** `envExample` reads a variable's
-  type and description from Zod, Valibot and ArkType's definitions. When
-  Standard Schema gets a JSON Schema form, it reads that, and any validator
-  that implements it is described.
+Nothing scheduled yet.
 
 ## Later
 
