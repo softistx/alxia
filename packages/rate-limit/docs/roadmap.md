@@ -7,10 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **An IPv6 client counted by its network.** `ipv6Prefix: 64` makes the
-  default key the /64 of `ctx.ip` (`2001:db8:1:2::/64`), so a subscriber
-  cannot dodge the limit with a new address. Off by default; IPv4 is
-  unchanged.
+Nothing in progress.
 
 ## Next
 
@@ -30,6 +27,13 @@ Nothing scheduled yet.
   that never runs more than one process installs no Redis client.
 
 ## Shipped
+
+### 0.5.0
+
+- **An IPv6 client counted by its network.** `ipv6Prefix: 64` makes the
+  default key the /64 of `ctx.ip` (`2001:db8:1:2::/64`), so a subscriber
+  cannot dodge the limit with a new address. Off by default; IPv4 is
+  unchanged.
 
 ### 0.4.0: a store with a policy
 
