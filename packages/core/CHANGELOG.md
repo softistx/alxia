@@ -1,5 +1,11 @@
 # @alxia/core
 
+## 0.15.1
+
+### Patch Changes
+
+- [#266](https://github.com/softistx/alxia/pull/266) [`ef80a76`](https://github.com/softistx/alxia/commit/ef80a764b9d88910fdeb816e7244c1298d1ee724) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The roadmap lists trusting a proxy by secret as shipped in 0.15.0.
+
 ## 0.15.0
 
 ### Minor Changes
