@@ -149,7 +149,22 @@ export function rewrite(
 			warnings.push(
 				`${name} ${version} is newer than any peer range accepts (^${major}): it builds and typechecks here; widen the ranges, and Newest peers then runs the specs on it.`,
 			);
-		} else if (majorOf(version) < major) {
+		} else if (majorOf(version) === major) {
+			const ranges = [
+				...new Set(
+					by.flatMap((pkg) => {
+						const range = [...packages.values()].find((m) => m.name === pkg)
+							?.peerDependencies?.[name];
+						return range === undefined ? [] : [range];
+					}),
+				),
+			];
+			if (!ranges.some((range) => Bun.semver.satisfies(version, range))) {
+				warnings.push(
+					`${name} ${version} is newer than any peer range accepts (${ranges.join(' | ')}): it builds and typechecks here; widen the ranges, and Newest peers then runs the specs on it.`,
+				);
+			}
+		} else {
 			warnings.push(
 				`npm's latest ${name} is ${version}, below the newest major a range accepts (^${major}): this job tests ${majorOf(version)}, Newest peers tests ${major}.`,
 			);
