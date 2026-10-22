@@ -427,7 +427,7 @@ package is public and MIT, with its own copy of `LICENSE`.
   double quotes, from their own `_biome.json`, which
   `packages/create/templates/biome.json` extends.
 - Commit messages and PR titles: Conventional Commits, `type(scope)!:
-  Capitalized summary`, as the owner's global rules have it (since
+  lowercase description`, as the owner's global rules have it (since
   2026-10-22). The scope is the package (`janus`, `create`) or the area
   (`scripts`, `ci`, `release`); `test` is specs and fixtures alone, no change
   a consumer sees.
