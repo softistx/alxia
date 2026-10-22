@@ -233,6 +233,6 @@ not in `app.routes` yet.
   JSON Lines, server-sent events with text data — with an `ignored` warning,
   and it is not in `operations`. Read the generator's warnings: the check only
   knows the operations it is given
-  ([what the generator leaves out](spec-first.md#what-the-generator-leaves-out-070)).
+  ([what the generator leaves out](spec-first.md#what-the-generator-leaves-out-0110)).
 - **A route that answers 404 on purpose.** A route is served if it is
   declared; what its handler does is the specs' to check.
