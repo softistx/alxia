@@ -1,5 +1,11 @@
 # @alxia/janus
 
+## 0.3.12
+
+### Patch Changes
+
+- [#268](https://github.com/softistx/alxia/pull/268) [`b336c85`](https://github.com/softistx/alxia/commit/b336c851aa36d276f4148f59d30ca7f05e3333eb) Thanks [@SteveGT96](https://github.com/SteveGT96)! - widen the `@nxgt/janus` peer range to admit 0.28.
+
 ## 0.3.11
 
 ### Patch Changes
