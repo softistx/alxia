@@ -204,7 +204,7 @@
     },
     "packages/janus": {
       "name": "@alxia/janus",
-      "version": "0.3.11",
+      "version": "0.3.12",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@alxia/i18n": "workspace:^",
