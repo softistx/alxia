@@ -3,7 +3,7 @@
  * Rewrites the workspace to build against the oldest version of each
  * `@nxgt/*` peer the packages accept: the lowest stable release its range
  * admits, in either form the ranges take (`^0.7.0 || ^0.8.0` and
- * `>=0.17.1 <0.28.0`), asked of npm.
+ * `>=0.17.1 <0.29.0`), asked of npm.
  *
  * The lockfile runs the top of each of those ranges and newest-peers.ts the
  * other peers' newest alternative; nothing ran the bottom of an `@nxgt/*`
