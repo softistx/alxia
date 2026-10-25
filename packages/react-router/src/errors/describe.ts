@@ -1,6 +1,7 @@
-import { isApiErrorLike, valuesOf } from './api-error';
+import { valuesOf } from './api-error';
 import type { ApiErrors, ApiErrorsOptions } from './api-errors';
 import { API_CODE } from './code-resolver';
+import { fieldErrorsOf, refusalOf } from './describe-refusal';
 import { fetcherRefusal, fetcherResult } from './fetcher-result';
 import { submitForm } from './submit-form';
 
@@ -39,31 +40,11 @@ export function describeApiErrors<L extends string>({
 
 	const unavailableMessage = (language: L) => unavailable(language);
 
-	const apiRefusal: ApiErrors<L>['apiRefusal'] = (error, language) => {
-		if (isApiErrorLike(error)) {
-			return {
-				message: apiErrorMessage(error, language),
-				status: error.status,
-			};
-		}
-		if (error instanceof Response && error.status === 503) {
-			return { message: unavailableMessage(language), status: 503 };
-		}
-		return undefined;
-	};
+	const apiRefusal: ApiErrors<L>['apiRefusal'] = (error, language) =>
+		refusalOf({ apiErrorMessage, unavailableMessage }, error, language);
 
-	const fieldErrors: ApiErrors<L>['fieldErrors'] = (error, language) => {
-		const extensions = error.errors[0]?.extensions;
-		if (!extensions?.fields?.length && extensions?.field) {
-			return { [extensions.field]: apiErrorMessage(error, language) };
-		}
-		return Object.fromEntries(
-			(extensions?.fields ?? []).map(({ path, code, message, params }) => [
-				path,
-				translateCode(code, message, language, params),
-			]),
-		);
-	};
+	const fieldErrors: ApiErrors<L>['fieldErrors'] = (error, language) =>
+		fieldErrorsOf({ apiErrorMessage, translateCode }, error, language);
 
 	const parts = { apiRefusal, apiErrorMessage, fieldErrors };
 
