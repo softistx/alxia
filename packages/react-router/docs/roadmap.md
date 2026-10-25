@@ -14,8 +14,8 @@ Nothing in progress.
 - **The service worker and its build.** A worker of Workbox strategies over
   `cachingFor` and `isStorable`, and the build that writes it, reading
   `precacheList` and possibly run by `/vite`'s `alxia()`, with the `workbox-*`
-  packages as optional peers. Taken right after `/pwa` is released; until
-  then the worker and its build stay the app's.
+  packages as optional peers. Until it ships, the worker and its build stay
+  the app's.
 
 ## Later
 
