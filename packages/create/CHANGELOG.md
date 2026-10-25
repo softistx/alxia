@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.5.4
+
+### Patch Changes
+
+- [#276](https://github.com/softistx/alxia/pull/276) [`4baf289`](https://github.com/softistx/alxia/commit/4baf2899614fc4b08e29b13a4227ad4c62fb29a7) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects install `@alxia/react-router` 0.9, which adds `@alxia/react-router/pwa` (see the `@alxia/react-router` release); the version is read from this package's own `package.json`, so nothing in the templates changes. The guide's links to `@alxia/react-router`'s docs follow its split into `docs/guide/`.
+
 ## 0.5.3
 
 ### Patch Changes
