@@ -22,6 +22,10 @@ or a header in the wrong place.
 - [`TypeError: secureHeaders: nonce is on, but the content-security-policy has no script-src to add it to: …`](#typeerror-secureheaders-nonce-is-on-but-the-content-security-policy-has-no-script-src-to-add-it-to-)
 - [`TypeError: secureHeaders: nonce is on, but contentSecurityPolicy is false: …`](#typeerror-secureheaders-nonce-is-on-but-contentsecuritypolicy-is-false-)
 - [`TypeError: secureHeaders: contentSecurityPolicy names NONCE, but nonce is off: give nonce: true`](#typeerror-secureheaders-contentsecuritypolicy-names-nonce-but-nonce-is-off-give-nonce-true)
+- [`TypeError: csp(): <name> has no source: write ["'none'"] to allow nothing, or false to leave it out`](#typeerror-csp-name-has-no-source-write-none-to-allow-nothing-or-false-to-leave-it-out)
+- [`TypeError: csp(): "<name>" is not a directive name: write lowercase letters, digits and hyphens, starting with a letter, as in "script-src"`](#typeerror-csp-name-is-not-a-directive-name-write-lowercase-letters-digits-and-hyphens-starting-with-a-letter-as-in-script-src)
+- [`TypeError: csp(): <name> has the source "<source>", which is empty or holds ";", "," or a space: a source is one token, so split a list into several sources, and write a comma inside a URL as %2C`](#typeerror-csp-name-has-the-source-source-which-is-empty-or-holds---or-a-space-a-source-is-one-token-so-split-a-list-into-several-sources-and-write-a-comma-inside-a-url-as-2c)
+- [`TypeError: csp(): no directive is left: give at least one, such as { "default-src": ["'none'"] }`](#typeerror-csp-no-directive-is-left-give-at-least-one-such-as--default-src-none-)
 
 **In the browser**
 
@@ -65,8 +69,9 @@ place of `'true'`.
 
 **Why:** a header option is the header's value as a string, or `false` to
 leave it out (`Setting`, exported, is `string | false`). There is no
-`true` — leaving the key out is the default — and no object form for a
-policy.
+`true` — leaving the key out is the default. The option takes a string,
+and `csp()` builds that string from directives
+([guide](guide.md#writing-the-policy-as-directives)).
 
 **Fix:** write the header as it goes out, or leave the key out:
 
@@ -315,6 +320,72 @@ browser's console.
 import { NONCE, secureHeaders } from '@alxia/secure-headers';
 
 app.use(secureHeaders({ nonce: true, contentSecurityPolicy: `script-src 'self' ${NONCE}` }));
+```
+
+### `TypeError: csp(): <name> has no source: write ["'none'"] to allow nothing, or false to leave it out`
+
+**When:** `csp()` is given an empty array for a directive. It throws at once, so the app fails at startup:
+
+```text
+TypeError: csp(): <name> has no source: write ["'none'"] to allow nothing, or false to leave it out
+```
+
+**Why:** an empty list says nothing a browser can use, and omitting the directive is not the same as forbidding everything.
+
+**Fix:**
+
+```ts
+csp({ 'img-src': ["'none'"] }); // allow nothing
+csp({ 'img-src': false }); // leave the directive out
+```
+
+### `TypeError: csp(): "<name>" is not a directive name: write lowercase letters, digits and hyphens, starting with a letter, as in "script-src"`
+
+**When:** a key of the object is not lowercase letters, digits and hyphens starting with a letter, such as `scriptSrc`, `Script-Src` or `-x`. It throws at once, so the app fails at startup:
+
+```text
+TypeError: csp(): "<name>" is not a directive name: write lowercase letters, digits and hyphens, starting with a letter, as in "script-src"
+```
+
+**Why:** directive names are written as in the header; a camel-cased key would name a directive no browser knows, so it is refused, not sent.
+
+**Fix:**
+
+```ts
+csp({ 'script-src': ["'self'"] });
+```
+
+### `TypeError: csp(): <name> has the source "<source>", which is empty or holds ";", "," or a space: a source is one token, so split a list into several sources, and write a comma inside a URL as %2C`
+
+**When:** a source is an empty string, or holds `;`, `,` or whitespace, usually a whole list or a second directive in one string. It throws at once, so the app fails at startup:
+
+```text
+TypeError: csp(): <name> has the source "<source>", which is empty or holds ";", "," or a space: a source is one token, so split a list into several sources, and write a comma inside a URL as %2C
+```
+
+**Why:** a `;` would end the directive and start another, so a value could smuggle in a directive; a space would pass two sources as one; a `,` would split the header in two for a proxy. A comma inside a URL is legitimate, so percent-encode it as `%2C`.
+
+**Fix:**
+
+```ts
+csp({ 'img-src': ["'self'", 'data:'] }); // not ["'self' data:"]
+```
+
+### `TypeError: csp(): no directive is left: give at least one, such as { "default-src": ["'none'"] }`
+
+**When:** every directive is `false` or `undefined`, or the object is empty. It throws at once, so the app fails at startup:
+
+```text
+TypeError: csp(): no directive is left: give at least one, such as { "default-src": ["'none'"] }
+```
+
+**Why:** an empty policy is no policy; it would be sent as an empty header.
+
+**Fix:**
+
+```ts
+csp({ 'default-src': ["'none'"] });
+// or leave the header out: secureHeaders({ contentSecurityPolicy: false })
 ```
 
 ## In the browser

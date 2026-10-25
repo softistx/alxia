@@ -284,6 +284,49 @@ Nothing changes: the same headers, the same values, no `nonce` on the
 context. A policy that names `NONCE` without `nonce: true` is refused at
 startup, so the placeholder never reaches a browser.
 
+## Writing the policy as directives
+
+A long policy string hides a typo until a browser refuses a page. `csp()`
+takes the directives as an object and returns the string, so
+`contentSecurityPolicy` still takes a string and nothing else changes.
+
+```ts
+import { csp, NONCE, secureHeaders } from '@alxia/secure-headers';
+
+app.use(
+	secureHeaders({
+		nonce: true,
+		contentSecurityPolicy: csp({
+			'default-src': ["'self'"],
+			'script-src': ["'self'", NONCE],
+			'style-src-elem': ["'self'", NONCE],
+			'frame-ancestors': ["'none'"],
+			'upgrade-insecure-requests': true,
+		}),
+	}),
+);
+```
+
+- **Order.** Directives are written in the order of the object, so the
+  header reads as the code does.
+- **A list is an array.** `'img-src': 'self'` is a type error: write
+  `["'self'"]`. The quotes are part of the source, as in a header.
+- **`true`, `false`, `undefined`.** `true` writes a bare directive
+  (`upgrade-insecure-requests`, `sandbox`): a bare directive takes `true`, not an empty array. `false` and `undefined` leave it
+  out, so `'upgrade-insecure-requests': isProduction` works.
+- **`NONCE`.** It passes through as it is, and `nonce: true` replaces each
+  one with the request's `'nonce-…'` ([above](#where-it-goes-in-the-policy)).
+- **Tokens.** A directive that takes keywords is an array like any other:
+  `sandbox: ['allow-scripts', 'allow-forms']` is written
+  `sandbox allow-scripts allow-forms`.
+- **Any name.** The known directives complete; another lowercase name
+  (`report-uri`) is written as given.
+- **Checked at startup.** An empty source list (write `["'none'"]`), a name
+  that is not lowercase letters, digits and hyphens starting with a letter, a source that holds `;`, `,` or
+  a space, and a policy with no directive left throw a `TypeError` that
+  starts `csp():`, before the first request
+  ([troubleshooting](troubleshooting.md#runtime)).
+
 ## Which responses get the headers
 
 The middleware settles `next()`: it sets the headers on the response the
