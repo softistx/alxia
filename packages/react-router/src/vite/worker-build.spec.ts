@@ -1,7 +1,11 @@
-import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, mock, test } from 'bun:test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { ResolvedConfig } from 'vite';
 import { copyFixture } from '../../test/fixture';
 import { build, configFile, type Fixture, start } from '../../test/vite';
+import * as runtime from './runtime';
 
 const WORKER = `import { defineWorkerContract } from '@alxia/react-router/pwa';
 import { startWorker } from '@alxia/react-router/pwa/worker';
@@ -98,4 +102,86 @@ describe('react-router build, with a worker that is not there', () => {
 			'alxia-react-router: the worker sw/missing.ts does not exist. Create it, or leave worker out to build app/service-worker.ts when it exists.',
 		);
 	}, 60_000);
+});
+
+describe('react-router build, a single-page app with a named worker', () => {
+	let fixture: Fixture;
+
+	beforeAll(async () => {
+		fixture = await copyFixture();
+		await Bun.write(
+			join(fixture.root, 'react-router.config.ts'),
+			"import type { Config } from '@react-router/dev/config';\n\nexport default { ssr: false } satisfies Config;\n",
+		);
+		// Server loaders have no place in a single-page app: one plain route.
+		await Bun.write(
+			join(fixture.root, 'app', 'routes.ts'),
+			"import { index, type RouteConfig } from '@react-router/dev/routes';\n\nexport default [index('routes/plain.tsx')] satisfies RouteConfig;\n",
+		);
+		await Bun.write(
+			join(fixture.root, 'app', 'routes', 'plain.tsx'),
+			'export default function Plain() {\n\treturn <p>plain</p>;\n}\n',
+		);
+		await Bun.write(join(fixture.root, 'sw', 'service-worker.ts'), WORKER);
+		await Bun.write(
+			join(fixture.root, 'public', 'offline.html'),
+			'<h1>offline</h1>',
+		);
+		const named = await configFile(fixture.root, 'named', (source) =>
+			source.replace('alxia()', "alxia({ worker: 'sw/service-worker.ts' })"),
+		);
+		await build(fixture.root, named);
+	}, 90_000);
+	afterAll(async () => {
+		await fixture?.remove();
+	});
+
+	test('ssr: false still builds build/client/service-worker.js, from the named file', async () => {
+		expect(await exists(fixture.root, 'service-worker.js')).toBe(true);
+	});
+});
+
+describe('buildAppWorker, on Node', () => {
+	let buildAppWorker: typeof import('./worker').buildAppWorker;
+	let dir: string;
+	let real: typeof runtime;
+	// Only what the worker reads: React Router's context, and the root.
+	const config = () =>
+		({
+			root: dir,
+			__reactRouterPluginContext: {
+				reactRouterConfig: {
+					appDirectory: join(dir, 'app'),
+					buildDirectory: join(dir, 'build'),
+				},
+			},
+		}) as unknown as ResolvedConfig;
+
+	beforeAll(async () => {
+		dir = await mkdtemp(join(tmpdir(), 'alxia-worker-'));
+		// Bun's global is read-only: run requireBun as if on Node instead.
+		const { requireBun } = runtime;
+		real = { requireBun };
+		mock.module('./runtime', () => ({
+			requireBun: (command: string, hint?: string) =>
+				requireBun(command, hint, false),
+		}));
+		({ buildAppWorker } = await import('./worker'));
+	});
+	afterAll(async () => {
+		// The mock outlives this file otherwise, for runtime.spec.ts.
+		mock.module('./runtime', () => real);
+		await rm(dir, { recursive: true, force: true });
+	});
+
+	test('with no worker file, returns before asking for Bun', async () => {
+		await expect(buildAppWorker(config(), undefined)).resolves.toBeUndefined();
+	});
+
+	test("with a worker file, fails with requireBun's message", async () => {
+		await Bun.write(join(dir, 'app', 'service-worker.ts'), WORKER);
+		await expect(buildAppWorker(config(), undefined)).rejects.toThrow(
+			"alxia-react-router: react-router build with a service worker is running on Node, and alxia's server runs on Bun.",
+		);
+	});
 });
