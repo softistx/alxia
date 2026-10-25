@@ -232,3 +232,28 @@ export default [pwa, worker];
 	test("compile under the app's DOM lib: no WebWorker-only type", () =>
 		probe(['ES2022', 'DOM']));
 });
+
+describe('/errors', () => {
+	test('imports react-router alone: no core, no node: module, no bun', async () => {
+		const imports = await importsOf(join(DIST, 'errors/index.js'));
+		for (const specifier of new Set(imports)) {
+			expect(['react-router']).toContain(specifier);
+		}
+	});
+
+	test('makes no React runtime import: the provider is a function with React types only', async () => {
+		const imports = await importsOf(join(DIST, 'errors/index.js'));
+		expect(imports).not.toContain('react');
+	});
+
+	test('shares no chunk with the main entry, so a page never loads core for it', async () => {
+		const errors = await filesOf(join(DIST, 'errors/index.js'));
+		const main = await filesOf(join(DIST, 'index.js'));
+		expect([...errors].filter((file) => main.has(file))).toEqual([]);
+	});
+
+	test('declares no @alxia/core import, not even as a type', async () => {
+		const dts = await Bun.file(join(DIST, 'errors/index.d.ts')).text();
+		expect(dts).not.toContain('@alxia/core');
+	});
+});

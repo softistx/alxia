@@ -53,6 +53,20 @@ a loader, a message React Router or the browser prints, or an error from
 - [`buildWorker(): build/client/offline.html does not exist`](#buildworker-buildclientofflinehtml-does-not-exist)
 - [`buildWorker(): … is outside ….`](#buildworker--is-outside-)
 - [`buildWorker(): Bun.build failed:`](#buildworker-bunbuild-failed)
+- [`Cross-site request refused`](#cross-site-request-refused)
+- [`Expected a JSON body`](#expected-a-json-body)
+- [`Malformed JSON body`](#malformed-json-body)
+- [`The form sent an input the API would refuse`](#the-form-sent-an-input-the-api-would-refuse)
+- [`alxia-react-router: the error catalogue (…) was not read`](#alxia-react-router-the-error-catalogue--was-not-read)
+- [`alxia-react-router: the error catalogue was not checked, keeping what is held`](#alxia-react-router-the-error-catalogue-was-not-checked-keeping-what-is-held)
+- [`alxia-react-router: the error catalogue was not warmed`](#alxia-react-router-the-error-catalogue-was-not-warmed)
+- [`alxia-react-router: ttlMs threw, using retryMs`](#alxia-react-router-ttlms-threw-using-retryms)
+- [`alxia-react-router: ttlMs is not a duration, using retryMs`](#alxia-react-router-ttlms-is-not-a-duration-using-retryms)
+- [`TypeError: createErrorCatalogue(): needs at least one language.`](#typeerror-createerrorcatalogue-needs-at-least-one-language)
+- [`<api>: <operation> (request <id>) answered <status> <code>`](#api-operation-request-id-answered-status-code)
+- [`<api>: <operation> (request <id>) answered <status> without GraphQL`](#api-operation-request-id-answered-status-without-graphql)
+- [`<api>: <operation> (request <id>) unreachable`, `timeout` or `invalid-response`](#api-operation-request-id-unreachable-timeout-or-invalid-response)
+- [`<api>: <operation> (request <id>) aborted`](#api-operation-request-id-aborted)
 
 **Types**
 
@@ -87,6 +101,14 @@ a loader, a message React Router or the browser prints, or an error from
 - [An update waits an hour](#an-update-waits-an-hour)
 - [The worker cannot fetch another origin](#the-worker-cannot-fetch-another-origin)
 - [The manifest is in the wrong language](#the-manifest-is-in-the-wrong-language)
+- [A form's own check shows the code (`todos.errors.…`) instead of words](#a-forms-own-check-shows-the-code-todoserrors-instead-of-words)
+- [A message shows its `{braces}`](#a-message-shows-its-braces)
+- [A refusal shows the API's raw message](#a-refusal-shows-the-apis-raw-message)
+- [`apiRefusal` returns undefined](#apirefusal-returns-undefined)
+- [The error page shows no request id](#the-error-page-shows-no-request-id)
+- [An action shows the error page](#an-action-shows-the-error-page)
+- [Behind a TLS proxy every action answers 403](#behind-a-tls-proxy-every-action-answers-403)
+- [Right after start, refusals read in the API's words](#right-after-start-refusals-read-in-the-apis-words)
 
 ## Thrown or printed
 
@@ -1032,6 +1054,265 @@ peers, installed as
 [`Could not resolve: "workbox-core"`](#error-could-not-resolve-workbox-core-maybe-you-need-to-bun-install)
 shows.
 
+### `Cross-site request refused`
+
+**When:** an action reads its body with `readJson` or `readInput` (from
+`jsonActions()`), and the page's post answers 403 with this text.
+
+**Why:** the request carried an `Origin` other than the app's own, or a
+`Sec-Fetch-Site` that is neither `same-origin` nor `none`. That is what a
+post from another site looks like, so it is refused before the body is read.
+The usual honest cause is that the app's origin is not the one the request
+reaches: see [Behind a TLS proxy every action answers 403](#behind-a-tls-proxy-every-action-answers-403).
+
+**Fix:** if the post comes from another site, nothing: the refusal is the
+point. If it comes from your own page, give `jsonActions` the origin your
+users see:
+
+```ts
+export const { readJson } = jsonActions({
+	origin: 'https://app.example.com',
+});
+```
+
+### `Expected a JSON body`
+
+**When:** an action answers 415 with this text.
+
+**Why:** `readJson` takes only `application/json`. A native form post
+(`application/x-www-form-urlencoded` or `multipart/form-data`), a
+`text/plain` body and a request with no content type are refused, since only
+JSON needs a preflight from another site.
+
+**Fix:** post from `useJsonFetcher`, which sets the content type
+(`encType: 'application/json'`), or set `Content-Type: application/json` on
+your own `fetch`. For an action that a native form also posts to before the
+page hydrates, call `requireJsonPost(request)` first: it sends that post back
+to its page, which then posts JSON.
+
+```ts
+const { requireJsonPost, readJson } = jsonActions();
+
+export async function action({ request }: Route.ActionArgs) {
+	requireJsonPost(request);
+	const body = await readJson(request);
+	// …
+}
+```
+
+### `Malformed JSON body`
+
+**When:** an action answers 400 with this text.
+
+**Why:** the request declared `application/json`, but `request.json()` could
+not parse the body: it is empty, truncated, or not JSON at all (a form's
+`FormData` posted with the JSON content type, for example).
+
+**Fix:** post an object through `useJsonFetcher`'s `post(body)`, or
+`JSON.stringify` the body of your own `fetch`. Do not set the content type by
+hand on a `FormData` body.
+
+### `The form sent an input the API would refuse`
+
+**When:** an action that reads its body with `readInput(request, schema)`
+answers 400 with this text.
+
+**Why:** the body was JSON, but its `input` field did not pass the schema: it
+is missing, or one of the checks failed. `readInput` reads `{ input }`, not
+the whole body, and it answers a bare 400 on purpose: the schema is the API's
+own input, so a form that passed its own checks never gets here.
+
+**Fix:** post `{ input: … }`, and make the form's checks the schema's. To see
+what the schema refused while you debug, call it yourself:
+
+```ts
+const body = (await readJson(request)) as { input?: unknown };
+const result = await schema['~standard'].validate(body.input);
+console.log(result.issues);
+```
+
+### `alxia-react-router: the error catalogue (…) was not read`
+
+**When:** the server logs this line (with the error after it, at the level of
+`log.error`) while a language's catalogue is read for the first time, and the
+refusals in that language read in the API's own words.
+
+**Why:** the app's `read(language)` threw: the API was down, slow past its own
+timeout, or answered an error. The catalogue keeps no partial result. It tries
+again once `retryMs` (5 seconds by default) has passed since the failure, on
+the next request that asks for that language; one read is in flight at a time.
+
+**Fix:** read the error that follows the line. Once the API answers, the next
+request after the delay reads the catalogue and the refusals are worded; no
+restart is needed. To see the calls, give `createErrorCatalogue` a `log`
+that records them.
+
+### `alxia-react-router: the error catalogue was not checked, keeping what is held`
+
+**When:** the server logs this line (with the error after it) once a held
+catalogue is older than the TTL and the check of the versions failed.
+
+**Why:** `versions()` threw. The catalogue keeps serving the messages it
+holds, which may be stale, and asks again after `retryMs` instead of after a
+whole TTL.
+
+**Fix:** read the error that follows. Nothing to restart: when the API
+answers, the check goes on and re-reads the languages whose version moved.
+If it repeats while the API is up, check that `versions()` returns a version
+for every language in `languages`: a language missing from its answer is read
+again at each check.
+
+### `alxia-react-router: the error catalogue was not warmed`
+
+**When:** the server logs this line at startup, after `warm()`.
+
+**Why:** `warm()` reads every language without holding the boot back, and
+the promise it started rejected. The reads themselves report their failures
+(`the error catalogue (…) was not read`), so this line means something else
+threw.
+
+**Fix:** read the error that follows. The first request that asks for a
+language reads it anyway, so the server is not left without a catalogue.
+
+### `alxia-react-router: ttlMs threw, using retryMs`
+
+**When:** the server logs this line (with the error after it) each time the
+catalogue reads its TTL and the `ttlMs` getter throws.
+
+**Why:** `ttlMs` is a getter of the app's, such as one that reads a setting,
+and it threw. The catalogue does not let it break a request: it uses
+`retryMs` as the TTL for that read, so the held messages are still served
+and the versions are checked again soon.
+
+**Fix:** read the error that follows and fix the getter, or pass a number.
+
+```ts
+const catalogue = createErrorCatalogue({
+	// …
+	ttlMs: () => settings.catalogueTtlMs ?? 60_000,
+});
+```
+
+### `alxia-react-router: ttlMs is not a duration, using retryMs`
+
+**When:** the server logs this line each time the catalogue reads its TTL and
+`ttlMs` is not a finite number of at least 0: `NaN`, `Infinity`, a negative
+number, or a value that is not a number, such as the string a setting
+returned.
+
+**Why:** a TTL that is not a duration would never expire a held catalogue
+(`Infinity`) or make every comparison false (`NaN`). The catalogue treats it
+like a getter that threw: it uses `retryMs` for that read.
+
+**Fix:** pass a number of milliseconds, converted where the setting is read:
+
+```ts
+const catalogue = createErrorCatalogue({
+	// …
+	ttlMs: () => Number(process.env.CATALOGUE_TTL_MS ?? 60_000),
+});
+```
+
+### `TypeError: createErrorCatalogue(): needs at least one language.`
+
+**When:** the server starts, or the module that calls `createErrorCatalogue`
+is imported.
+
+**Why:** `languages` is empty, usually a list built from an environment
+variable or a config that was not set.
+
+**Fix:** pass the languages the app serves, the same list the page's
+translator knows:
+
+```ts
+const catalogue = createErrorCatalogue({
+	messages: apiMessages,
+	languages: ['en', 'fr'],
+	// …
+});
+```
+
+### `<api>: <operation> (request <id>) answered <status> <code>`
+
+Logged by `apiCallFailure` (a warning for a 4xx, an error for a 5xx), after the
+`api` the app gave it, when the
+API refused a call with a GraphQL body, or answered a status that is passed
+through, such as a 404, which has no `<code>`. For example
+`my-api https://api.example.com/graphql: Todos (request r-1) answered 403 todos.errors.forbidden`.
+
+**Why:** the API answered, and refused: `<status>` and `<code>` are the
+`ApiError`'s. A 4xx is expected (a forbidden page, a missing record), which is
+why it is a warning. The `(request …)` part is there only if the API sent an
+`x-request-id` and your code passed it as `requestId`; without it the line
+carries no id and an error page can show none.
+
+**Fix:** nothing to fix in the package. To find the API's own log line, search
+for the id. To get the id in the line, pass `requestId: requestIdOf(response)`
+from the `fetch` the client calls:
+
+```ts
+import { apiCallFailure, requestIdOf } from '@alxia/react-router/errors';
+
+let requestId: string | undefined;
+const send = async (request: Request) => {
+	const response = await fetch(request);
+	requestId = requestIdOf(response);
+	return response;
+};
+
+export const failed = (error: unknown) =>
+	apiCallFailure(error, { api: 'my-api', requestId });
+```
+
+### `<api>: <operation> (request <id>) answered <status> without GraphQL`
+
+Logged as an error by `apiCallFailure`, and the loader gets a 503 `Response`
+with no body (the reason is in the log).
+
+**Why:** the API, or a gateway in front of it, answered a status that is not
+401, 403 or 404 with a body that is not GraphQL (an HTML 502 page, a 429
+from a rate limiter). The log line's second argument is that body.
+
+**Fix:** read the body in the log and fix the gateway. If a status such as 429
+should reach the page as its own, name it:
+
+```ts
+import { apiCallFailure } from '@alxia/react-router/errors';
+
+export const failed = (error: unknown) =>
+	apiCallFailure(error, {
+		api: 'my-api',
+		passedThrough: new Set([401, 403, 404, 429]),
+	});
+```
+
+### `<api>: <operation> (request <id>) unreachable`, `timeout` or `invalid-response`
+
+Logged as an error by `apiCallFailure`, and the loader gets a 503 `Response`
+with no body (the reason is in the log line).
+
+**Why:** `@nxgt/graphql-client` could not get an answer: `unreachable` is a
+refused connection or a DNS failure, `timeout` is a call past the deadline the
+app gave it, and `invalid-response` is an answer that is no GraphQL response
+(a 2xx with no `data`, garbled JSON). The log line's second argument is the
+cause.
+
+**Fix:** check the API's address and that it is up. For a `timeout`, the call's
+`timeout` option is the app's, not the package's. The 503 reaches the error
+page through `routeError`, which words it with the request id when there is
+one.
+
+### `<api>: <operation> (request <id>) aborted`
+
+Logged as an error by `apiCallFailure`, and the loader gets a 503 `Response`.
+
+**Why:** the `signal` you passed was aborted, so the visitor closed the tab or
+navigated away, and the call failed with whatever error that produced. Nobody
+sees the 503.
+
+**Fix:** none. To keep it out of the logs, test `request.signal.aborted` in
+your own `catch` before calling `apiCallFailure`.
+
 ## Types
 
 ### `Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`
@@ -1579,3 +1860,203 @@ cookie never reaches the server. Only the link's query does.
 read it with `manifestLanguage(url, supported, fallback)`; the fallback is a
 supported language the app resolves from the request's `Accept-Language`, not
 from the cookie ([the manifest route](guide/pwa.md#the-web-app-manifest-and-why-the-language-travels-in-lang)).
+
+### A form's own check shows the code (`todos.errors.…`) instead of words
+
+A refinement with `params: { code: 'todos.errors.title-taken' }` shows the
+code itself, or the form library's generic text, where the API's words should
+be.
+
+**Why:** `apiCodeResolver` returns the code unchanged when its `messages`
+store has no text for it in the page's language, and the form library then
+words the issue itself. In the browser the store holds only what the root's
+data brought: the code is not in that list (the app's `clientCodes`), or
+`ApiMessagesProvider` is not around the routes, or it was given another store
+than the resolver's.
+
+**Fix:** add the code to the few the root sends, and wrap the routes with the
+provider on the same instance the resolver reads:
+
+```tsx
+<ApiMessagesProvider messages={apiMessages} value={loaderData.apiMessages}>
+	<Outlet />
+</ApiMessagesProvider>
+```
+
+Check it with `apiMessages.messageOf('fr', code)` in the browser's console
+or a spec ([the catalogue store](guide/errors.md#the-catalogue-store)).
+
+### A message shows its `{braces}`
+
+A refusal reads `{count, plural, one {One item} other {# items}} outside {name}.`
+or `Hello {name}`, braces and all.
+
+**Why:** the `format` given to `createApiMessages` is not an ICU formatter
+(an identity function, a plain `replace`), or a value the message names is
+missing and the formatter handed back the raw message. `apiMessage` returns
+`undefined` for a message the formatter reported to `onError`, but a
+formatter that never calls it returns the text as it found it.
+
+**Fix:** pass the app's ICU formatter, such as `@nxgt/material`'s
+`formatMessage`, and make it call `onError` for a message it cannot format:
+
+```ts
+const apiMessages = createApiMessages<'en' | 'fr'>({ format: formatMessage });
+```
+
+A value is missing when the API's `extensions.params` lacks an argument the
+message names; the same call in a spec shows which.
+
+### A refusal shows the API's raw message
+
+A page shows `Variable "$email" got invalid value …` or another message the
+API worded for developers, instead of the app's words.
+
+**Why:** the error has no API code (a raw `BAD_USER_INPUT`, from a check that
+failed before the API's validation layer), or a code that `isApiCode`
+rejects. Without `refused`, `createApiErrors` says the API's own message for
+such an error.
+
+**Fix:** pass `refused`, the app's generic refusal; it replaces the raw
+message for every error that is not an API code
+([wording a refusal](guide/errors.md#wording-a-refusal)):
+
+```ts
+export const apiErrors = createApiErrors<'en' | 'fr'>({
+	messages: apiMessages,
+	unavailable: (language) => translate('app.error.unavailable', language),
+	refused: (language) => translate('app.error.refused', language),
+});
+```
+
+### `apiRefusal` returns undefined
+
+`apiErrors.apiRefusal(error, language)` gives `undefined` for a call that
+failed, and the action returns nothing useful.
+
+**Why:** the error is neither an API error (`isApiErrorLike`) nor a 503
+`Response`: a network failure, a `TypeError` of the app's own code, a 404.
+`apiRefusal` words only what the API refused or could not be reached for.
+
+**Fix:** rethrow what it does not word, so the route's error boundary shows
+it:
+
+```ts
+const refusal = apiErrors.apiRefusal(error, 'en');
+if (!refusal) throw error;
+```
+
+### The error page shows no request id
+
+The root's `ErrorBoundary` calls `errorRequestId(error)` and gets `undefined`,
+though the API logged the request.
+
+**Why:** `routeError` carries the `requestId` the error already has; it never
+reads it from the network. An `ApiError` has none unless the code that called
+the API set it, and a thrown `Response` is turned into a route error only when
+it has the `x-request-id` header. A loader that returns `routeError(error)`
+instead of throwing it never reaches the boundary at all.
+
+**Fix:** keep the id on the error where the API is called, and `throw` what
+`routeError` gives back
+([loaders and the error page](guide/errors.md#loaders-and-the-error-page)):
+
+```ts
+import { requestIdOf, routeError } from '@alxia/react-router/errors';
+
+// Your own call to the API, declared here as a stub.
+declare function call(): Promise<Response>;
+
+export async function loader() {
+	const response = await call();
+	if (!response.ok) {
+		// A Response of 401, 403, 404 or 503 with the header is a route error.
+		throw routeError(response);
+	}
+	return { requestId: requestIdOf(response) };
+}
+```
+
+### An action shows the error page
+
+An action that calls `fetcherResult`, `fetcherRefusal` or `submitForm` ends on
+the route's error page instead of answering `{ ok: false }` or the form's
+errors.
+
+**Why:** by design, these helpers answer only what the page can word. They
+throw `routeError(error)` for a 401 (the session code redirects to the sign-in
+first), for a failure that is not an API refusal (a network error, a bug of the
+app's own code), and, for `submitForm`, for a 404 that names none of the
+form's fields: the record itself is gone, and no field message could say so.
+
+**Fix:** none is needed for a 401 or a real failure: the error page is the
+right answer. For a 404 that is about a field, name it in `fieldOf`
+(`(path) => (path === 'todo.id' ? 'id' : undefined)`) so it sits under that
+field. For a refusal you would rather word yourself, build on `apiRefusal`,
+which returns `undefined` instead of throwing:
+
+```ts
+const refusal = apiErrors.apiRefusal(error, 'en');
+if (!refusal) throw error;
+return Response.json(
+	{ ok: false, error: refusal.message },
+	{ status: refusal.status },
+);
+```
+
+### Behind a TLS proxy every action answers 403
+
+Every action that reads JSON answers 403 `Cross-site request refused`
+in production, yet works under `react-router dev` and in the specs.
+
+**Why:** `jsonActions()` compares the browser's `Origin` (`https://app.example.com`)
+with the origin of `request.url`. Behind a proxy that terminates TLS the
+app is asked over plain HTTP on an internal host (`http://10.0.0.5:3000`),
+so no post matches. See also
+[`request.url` in a loader is `http://`](#requesturl-in-a-loader-is-http-and-the-internal-host-behind-a-proxy).
+
+**Fix:** name the proxy with `createServer({ proxy: trustProxy(…) })`
+(`trustProxy` is `@alxia/core`'s; see
+[Behind a proxy](guide/customising-the-server.md#behind-a-proxy)). The
+catch-all hands React Router the URL `originalUrl` reads from the trusted
+proxy's `X-Forwarded-Proto` and `X-Forwarded-Host`, so an action's
+`request.url` already carries the public origin and `jsonActions()` needs no
+`origin`. Without a trusted proxy, or when the proxy does not send those
+headers, pass the public origin, as a string or as a getter read at each
+request (so a value set at startup is found):
+
+```ts
+import { jsonActions } from '@alxia/react-router/errors';
+
+export const { readJson, requireJsonPost, readInput } = jsonActions({
+	origin: () => process.env.APP_ORIGIN,
+});
+```
+
+When the getter returns `undefined`, the request's own origin is used, so
+development needs no setting. An empty string is not `undefined`: it is
+kept, and every request with an `Origin` is refused.
+
+### Right after start, refusals read in the API's words
+
+For the first seconds after the server starts, a refusal shows the message
+the API worded (in its default language, say) instead of the page's language.
+It reads right a few seconds later.
+
+**Why:** a language's catalogue is read on first use, and a request waits for
+it only up to `firstReadWaitMs` (1.5 seconds by default), counted from when the
+read started. A slow API, or a failed read, lets the request go on with the
+API's own words; the read carries on in the background (or is retried after
+`retryMs`), and the next request finds it held.
+
+**Fix:** read both languages at startup, so the first request finds them held.
+In `server.ts`:
+
+```ts
+import { catalogue } from './catalogue.server';
+
+catalogue.warm();
+```
+
+Raise `firstReadWaitMs` only if the page should wait longer for the first
+words; it holds every cold request that long when the API hangs.

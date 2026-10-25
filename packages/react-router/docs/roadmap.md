@@ -53,6 +53,25 @@ Nothing planned.
 
 ## Shipped
 
+### 0.11.0
+
+- **`@alxia/react-router/errors`: an API's refusals, worded for the page.**
+  A server's GraphQL refusals (`<module>.errors.<slug>`, `params`, `fields`)
+  are worded from its error catalogue in the page's language, for forms,
+  fetchers, loaders and the error page, with no UI. You get the shape of a
+  refusal, the request id and `nextOf`, the catalogue store
+  (`createApiMessages`), the form checks' resolver (`apiCodeResolver`), the
+  provider (`ApiMessagesProvider`) and the wording of a refusal
+  (`createApiErrors`: message, fields and status), the route helpers
+  (`routeError`, `errorRequestId`) and the actions' helpers (`fetcherResult`,
+  `fetcherRefusal`, `submitForm`), the JSON actions (`jsonActions`:
+  `readJson` with its same-origin CSRF check, `requireJsonPost`, and
+  `readInput` over a Standard Schema) with their fetcher hook
+  (`useJsonFetcher`), the catalogue's refresh (`createErrorCatalogue`: read
+  on first use with a bounded wait, checked against the API's versions once
+  per TTL, `warm()` at startup, `clientMessages()` for the root), and the
+  failures of a call (`apiCallFailure`, `operationName`) ([guide](guide/errors.md)).
+
 ### 0.10.0
 
 - **`@alxia/react-router/pwa/worker`.** `startWorker({ contract })` is the
