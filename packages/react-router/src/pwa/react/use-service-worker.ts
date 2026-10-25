@@ -18,7 +18,8 @@ export interface ServiceWorkerOptions {
 	notice?: UpdateNoticeStore;
 	/**
 	 * Called when registering fails (private mode, a blocked script). The app
-	 * works without a worker, so by default the error is dropped.
+	 * works without a worker, so by default the error is dropped. An `onError`
+	 * that throws becomes an unhandled rejection.
 	 */
 	onError?: (error: unknown) => void;
 }
@@ -31,7 +32,9 @@ export interface ServiceWorkerOptions {
 export function useServiceWorker(options: ServiceWorkerOptions): void {
 	const { enabled, url, scope, notice = updateNotice } = options;
 	const onError = useRef(options.onError);
-	onError.current = options.onError;
+	useEffect(() => {
+		onError.current = options.onError;
+	});
 	useEffect(() => {
 		if (!enabled || !('serviceWorker' in navigator)) return;
 		const container = navigator.serviceWorker;

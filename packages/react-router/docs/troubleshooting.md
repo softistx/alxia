@@ -1290,8 +1290,8 @@ an older one controls the page. A first install controls nothing, so it
 offers nothing; the next visit, with the first worker in control, does. And
 nothing is registered at all where the app does not call
 `registerServiceWorker` (for example while `useServiceWorker({ enabled })`
-is given `false`, as `import.meta.env.PROD` is under `react-router dev`). A tab that chose "Later" stays
-quiet until the next session.
+is given `false`, as `import.meta.env.PROD` is under `react-router dev`). A
+tab that chose "Later" stays quiet until the next session.
 
 **Fix:** build, serve and load the page twice, then deploy a change and load
 it again. In the console, `navigator.serviceWorker.controller` must not be

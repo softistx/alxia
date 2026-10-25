@@ -92,7 +92,7 @@ Vite's preview server, as `bun run start` would: the pages, `/api`, the
 client's files and the app's middlewares. So does React Router's prerendering.
 
 `@alxia/core` and `react-router` 8 are peers, and `vite` 7 or 8 is an
-optional peer, for `/vite`. The package declares no dependency.
+optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react`. The package declares no dependency.
 
 Its `typescript` peer is 6 or 7. The template's TypeScript 5.9 typechecks,
 but `bun add` warns about it; `bun add -d typescript@^6` silences the
