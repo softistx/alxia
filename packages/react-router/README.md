@@ -520,8 +520,19 @@ export default createServer({
 });
 ```
 
+The service worker is one file on Workbox, in `/pwa/worker` (the six
+`workbox-*` packages, optional peers, are its only package imports):
+
+```ts
+// file: app/service-worker.ts
+import { defineWorkerContract } from '@alxia/react-router/pwa';
+import { startWorker } from '@alxia/react-router/pwa/worker';
+
+startWorker({ contract: defineWorkerContract({ cachePrefix: 'my-app' }) });
+```
+
 The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md)
-has the worker's fetch handler, the manifest route, the update banner and the
+has the worker's options, the manifest route, the update banner and the
 rest.
 
 ## Traps
@@ -623,6 +634,14 @@ From `@alxia/react-router/pwa/server` (`@alxia/core` is its only package import)
 | `revalidated(response, policy?)` | a response with those two headers set, on a copy when its headers are immutable; `policy` is `WORKER_POLICY` by default |
 | `WORKER_POLICY` | `default-src 'none'; connect-src 'self'`: the worker runs no other script and fetches this site only |
 
+From `@alxia/react-router/pwa/worker` (the six `workbox-*` packages, optional peers, are its only package imports):
+
+| export | |
+| --- | --- |
+| `startWorker(options)` | the worker's strategies: the precache route, `NetworkOnly` for a page load with the precached offline page as its fallback, `CacheFirst` for hashed bundles, `StaleWhileRevalidate` for other static files (both storing only what `isStorable` accepts), the obsolete caches swept on `activate`, and `SKIP_WAITING` applied |
+| `WorkerOptions` | `contract` (required), `caching`, `assets`, `static`, `navigationPreload`, `precache` |
+| `ExpirationOptions` | `{ maxEntries?, maxAgeSeconds? }` |
+
 The `alxia-react-router` bin, run with `bunx`:
 
 | command | |
@@ -637,7 +656,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Customising the server](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/customising-the-server.md): `createServer()`, and the escape hatches.
 - [Typing the loaders](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/typing-the-loaders.md): `Register`, and the app's own context keys.
 - [A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md), [Beside the pages](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md) (middlewares, routes, WebSockets, the client's files), [OpenAPI](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/openapi.md), [Testing](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/testing.md) and [Deploying](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md), with Docker.
-- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
+- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the worker, the precache list from a build, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.
