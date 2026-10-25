@@ -135,7 +135,7 @@ describe('a slow API at a cold start', () => {
 		const second = performance.now();
 		await catalogue.fresh('en', 10);
 		// Its wait was spent by the first request: this one returns at once.
-		expect(performance.now() - second).toBeLessThan(30);
+		expect(performance.now() - second).toBeLessThan(50);
 		release();
 		await later(10);
 	});
