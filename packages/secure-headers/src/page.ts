@@ -84,8 +84,8 @@ export interface PageHeadersOptions
  * app.use(pageHeaders({ https: import.meta.env.PROD }));
  * ```
  *
- * Throws a `TypeError` when the merged `script-src` lacks `NONCE`: the page
- * would not hydrate.
+ * Throws a `TypeError` when the merged `script-src`, or a `script-src-elem`
+ * given as a list, lacks `NONCE`: the page would not hydrate.
  */
 export function pageHeaders(options: PageHeadersOptions): NonceMiddleware {
 	const { https, directives = {}, ...rest } = options;
@@ -99,6 +99,12 @@ export function pageHeaders(options: PageHeadersOptions): NonceMiddleware {
 	if (!Array.isArray(scripts) || !scripts.includes(NONCE)) {
 		throw new TypeError(
 			"pageHeaders(): script-src has no NONCE: a page script runs only with the response's nonce, so write script-src with NONCE in directives, such as [\"'self'\", NONCE, \"'strict-dynamic'\"]",
+		);
+	}
+	const elements = merged['script-src-elem'];
+	if (Array.isArray(elements) && !elements.includes(NONCE)) {
+		throw new TypeError(
+			'pageHeaders(): script-src-elem has no NONCE: script elements follow it instead of script-src, so add NONCE to it, or give false to remove it',
 		);
 	}
 	return secureHeaders({

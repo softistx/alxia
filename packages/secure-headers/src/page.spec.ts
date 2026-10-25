@@ -216,6 +216,26 @@ describe('directives', () => {
 			pageHeaders({ https: false, directives: { 'script-src': false } }),
 		).toThrow(message);
 	});
+
+	test('a script-src-elem without NONCE is refused, and accepted with it', () => {
+		const message =
+			'pageHeaders(): script-src-elem has no NONCE: script elements follow it instead of script-src, so add NONCE to it, or give false to remove it';
+		expect(() =>
+			pageHeaders({
+				https: false,
+				directives: { 'script-src-elem': ["'self'"] },
+			}),
+		).toThrow(message);
+		expect(() =>
+			pageHeaders({
+				https: false,
+				directives: { 'script-src-elem': ["'self'", NONCE] },
+			}),
+		).not.toThrow();
+		expect(() =>
+			pageHeaders({ https: false, directives: { 'script-src-elem': false } }),
+		).not.toThrow();
+	});
 });
 
 describe('types', () => {

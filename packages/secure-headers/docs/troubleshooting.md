@@ -29,6 +29,7 @@ or a header in the wrong place.
 - [`TypeError: clearSiteData(): no type is given: write at least one, such as ["cache"]`](#typeerror-clearsitedata-no-type-is-given-write-at-least-one-such-as-cache)
 - [`TypeError: clearSiteData(): "<type>" is not a type: write one of "cache", "cookies", "storage", "executionContexts", "clientHints", "prefetchCache", "prerenderCache", "*"`](#typeerror-clearsitedata-type-is-not-a-type-write-one-of-cache-cookies-storage-executioncontexts-clienthints-prefetchcache-prerendercache-)
 - [`TypeError: pageHeaders(): script-src has no NONCE: a page script runs only with the response's nonce, so write script-src with NONCE in directives, such as ["'self'", NONCE, "'strict-dynamic'"]`](#typeerror-pageheaders-script-src-has-no-nonce-a-page-script-runs-only-with-the-responses-nonce-so-write-script-src-with-nonce-in-directives-such-as-self-nonce-strict-dynamic)
+- [`TypeError: pageHeaders(): script-src-elem has no NONCE: script elements follow it instead of script-src, so add NONCE to it, or give false to remove it`](#typeerror-pageheaders-script-src-elem-has-no-nonce-script-elements-follow-it-instead-of-script-src-so-add-nonce-to-it-or-give-false-to-remove-it)
 
 **In the browser**
 
@@ -431,9 +432,28 @@ import { NONCE, pageHeaders } from '@alxia/secure-headers';
 
 pageHeaders({
 	https: true,
-	directives: { 'script-src': ["'self'", NONCE, "'strict-dynamic'", 'https://js.example'] },
+	directives: { 'script-src': ["'self'", NONCE, "'strict-dynamic'"] },
 });
 ```
+
+### `TypeError: pageHeaders(): script-src-elem has no NONCE: script elements follow it instead of script-src, so add NONCE to it, or give false to remove it`
+
+**When:** `pageHeaders({ directives: { 'script-src-elem': [...] } })` gives a `script-src-elem` list without `NONCE`.
+
+**Why:** browsers that support CSP level 3 check `<script>` elements against `script-src-elem` when it is present, and ignore `script-src` for them. A list without `NONCE` would leave every script of the page refused, and the page would not hydrate.
+
+**Fix:** add `NONCE` to the list, or give `false` to remove the directive so `script-src` governs again:
+
+```ts
+import { NONCE, pageHeaders } from '@alxia/secure-headers';
+
+pageHeaders({
+	https: true,
+	directives: { 'script-src-elem': ["'self'", NONCE, "'strict-dynamic'"] },
+});
+```
+
+Under `'strict-dynamic'` a third-party script is loaded by a nonced script, not by allowlisting its host. To allow a host, extend `font-src` or `img-src`, as in `directives: { 'img-src': ["'self'", 'https://img.example'] }`.
 
 ## In the browser
 

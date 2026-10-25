@@ -385,13 +385,15 @@ Never add `'unsafe-eval'`, nor `'unsafe-inline'` to `script-src`.
 `directives` merges over `PAGE_DIRECTIVES`: a list replaces that directive's
 sources (it does not append), `false` removes the directive, and a name the
 preset lacks is added. A source goes in the directive that loads it, never in
-`default-src`.
+`default-src`. Under `'strict-dynamic'` a third-party script is loaded by a
+nonced script, not by allowlisting its host: browsers that support it ignore
+host sources in `script-src`.
 
 ```ts
 pageHeaders({
 	https: true,
 	directives: {
-		'script-src': ["'self'", NONCE, "'strict-dynamic'", 'https://js.example'],
+		'img-src': ["'self'", 'https://img.example'],
 		'font-src': ["'self'", 'https://fonts.example'],
 		'manifest-src': false,
 	},
@@ -399,7 +401,7 @@ pageHeaders({
 ```
 
 An `upgrade-insecure-requests` given in `directives` wins over `https`. A
-`script-src` without `NONCE` throws at startup, a `TypeError` that starts
+`script-src`, or a `script-src-elem` list, without `NONCE` throws at startup, a `TypeError` that starts
 `pageHeaders():`: the nonce would reach no script and the page would not
 hydrate ([troubleshooting](troubleshooting.md#typeerror-pageheaders-script-src-has-no-nonce-a-page-script-runs-only-with-the-responses-nonce-so-write-script-src-with-nonce-in-directives-such-as-self-nonce-strict-dynamic)).
 
