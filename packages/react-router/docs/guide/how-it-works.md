@@ -1,12 +1,14 @@
 # How it works
 
-## How it works
+This page covers what the plugin does in dev, in a build and under
+`vite preview`, and what it sets so the build runs on Bun with no
+`node_modules`.
 
 With no `app/server.ts`, the plugin serves the app with
 `createServer()`, from this package, with no options: a fresh alxia app,
 the client's files, and the pages as a catch-all behind it.
 
-### In dev
+## In dev
 
 `react-router dev` starts Vite's server. Vite answers its own requests
 first: modules, `/@fs/…`, `public/`, the HMR socket. The plugin hands
@@ -30,7 +32,7 @@ given the loopback server the sockets are relayed to as `ctx.server`
 ([The server](typing-the-loaders.md#the-server-server)). So `page()` is not served in dev; see
 [the troubleshooting entry](../troubleshooting.md#a-page-is-not-served-under-react-router-dev).
 
-### In a build
+## In a build
 
 `react-router build` builds the client as usual. It builds the server
 from `app/server.ts`, or from the default server, with React Router's
@@ -74,7 +76,7 @@ React Router's `serverBundles` split the server build in several, and
 alxia serves one: the plugin refuses them. With `ssr: false`, a
 single-page app, the plugin does nothing.
 
-### Under `vite preview`
+## Under `vite preview`
 
 After a build, Vite's preview server serves the built server:
 
@@ -85,7 +87,7 @@ bunx --bun vite preview
 
 `--bun` runs Vite under Bun even where Node is installed, since Vite's bin
 asks for Node: the built server runs inside Vite's process, and it needs
-Bun's APIs. With the [`bunfig.toml`](getting-started.md#setup) (`[run]`,
+Bun's APIs. With the [`bunfig.toml`](getting-started.md#an-existing-react-router-app) (`[run]`,
 `bun = true`), or with no Node installed, a `"preview": "vite preview"`
 script run with `bun run preview` works too, as the template's other
 scripts do.

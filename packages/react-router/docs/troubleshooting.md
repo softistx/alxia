@@ -41,6 +41,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: defineWorkerContract(): cachePrefix must be a non-empty name, …`](#typeerror-defineworkercontract-cacheprefix-must-be-a-non-empty-name-)
 - [`TypeError: defineWorkerContract(): cacheVersion must be a non-empty name without '-', …`](#typeerror-defineworkercontract-cacheversion-must-be-a-non-empty-name-without---)
 - [`parseBrowserManifest(): not React Router's browser manifest …`](#parsebrowsermanifest-not-react-routers-browser-manifest-)
+- [`error: Cannot find package 'react' from '…/@alxia/react-router/dist/pwa/react/index.js'`](#error-cannot-find-package-react-from-alxiareact-routerdistpwareactindexjs)
 
 **Types**
 
@@ -66,8 +67,13 @@ a loader, a message React Router or the browser prints, or an error from
 - [A `publish` under `react-router dev` misses the sockets opened before an edit](#a-publish-under-react-router-dev-misses-the-sockets-opened-before-an-edit)
 - [The build has a package's Node variant, not its `bun` one](#the-build-has-a-packages-node-variant-not-its-bun-one)
 - [`request.url` in a loader is `http://` and the internal host behind a proxy](#requesturl-in-a-loader-is-http-and-the-internal-host-behind-a-proxy)
-- [An unhashed file under public/assets/ is cached for a year](#an-unhashed-file-under-publicassets-is-cached-for-a-year)
+- [An unhashed file under `public/assets/` is cached for a year](#an-unhashed-file-under-publicassets-is-cached-for-a-year)
 - [A cache the contract did not make is swept](#a-cache-the-contract-did-not-make-is-swept)
+- [The update notice never shows](#the-update-notice-never-shows)
+- [The worker registers under `react-router dev`](#the-worker-registers-under-react-router-dev)
+- [An update waits an hour](#an-update-waits-an-hour)
+- [The worker cannot fetch another origin](#the-worker-cannot-fetch-another-origin)
+- [The manifest is in the wrong language](#the-manifest-is-in-the-wrong-language)
 
 ## Thrown or printed
 
@@ -138,7 +144,7 @@ key: one copy is the fix for both.
   sets.
 
 **Fix:** add `alxia()` to `vite.config.ts`, as in the
-[setup](guide/getting-started.md#setup). With a server of your own in a monorepo, tell
+[setup](guide/getting-started.md). With a server of your own in a monorepo, tell
 Vite to leave the package external:
 
 ```ts
@@ -808,8 +814,8 @@ tells a version from the rest of the name by its dashes. A version with a `-`
 import { defineWorkerContract } from '@alxia/react-router/pwa';
 
 export const workerContract = defineWorkerContract({
-  cachePrefix: 'my-app',
-  cacheVersion: 'v2',
+	cachePrefix: 'my-app',
+	cacheVersion: 'v2',
 });
 ```
 
@@ -1263,31 +1269,22 @@ export default createServer({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) });
 React Router then gets its request at `originalUrl(ctx)`
 ([Behind a proxy](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#behind-a-proxy-proxy)).
 
-### An unhashed file under public/assets/ is cached for a year
+### An unhashed file under `public/assets/` is cached for a year
 
 A file you put in `public/assets/` (a sprite, an icon) changes on a deploy,
 and visitors keep the old one.
 
-**Why:** Vite copies `public/` into `build/client/`, and `serveClient` serves
-everything under `build/client/assets/` as `public, max-age=31536000,
+**Why:** Vite copies `public/` into `build/client/`, and the client's files
+under `build/client/assets/` are served `public, max-age=31536000,
 immutable`, hashed or not. The worker's `cachingFor` agrees by default:
 everything under `/assets/` is `immutable`, cache-first.
 
 **Fix:** keep unhashed files out of `assets/`: `public/icons/` is served for
-an hour and is `static` for the worker. If they must stay there, tell the
-worker so it revalidates them, and expect the HTTP cache to hold them for a
-year until the file's name changes:
-
-```ts
-import { cachingFor, type RequestFacts } from '@alxia/react-router/pwa';
-
-export function caching(request: RequestFacts, origin: string) {
-  return cachingFor(request, origin, {
-    immutable: (path) =>
-      path.startsWith('/assets/') && !path.startsWith('/assets/icons/'),
-  });
-}
-```
+an hour and is `static` for the worker. If they must stay there, give
+`cachingFor` an `immutable` option that leaves their folder out, so the worker
+revalidates them ([the option](guide/pwa.md#what-the-worker-caches)),
+and expect the HTTP cache to hold them for a year until the file's name
+changes.
 
 ### A cache the contract did not make is swept
 
@@ -1333,19 +1330,10 @@ version of itself, and `navigator.serviceWorker.controller` is not `null`.
 package does not know the mode: it never reads `import.meta.env`. A worker
 under a dev server caches the code you are editing.
 
-**Fix:** pass the mode from the app, in `app/root.tsx`:
-
-```tsx
-import { useServiceWorker } from '@alxia/react-router/pwa/react';
-
-export default function App() {
-  useServiceWorker({ enabled: import.meta.env.PROD });
-  return null;
-}
-```
-
-Then unregister the worker the dev server already took (DevTools,
-Application, Service Workers, Unregister) and clear its site data.
+**Fix:** pass the mode from the app, `useServiceWorker({ enabled:
+import.meta.env.PROD })` ([the hook](guide/pwa.md#in-react)). Then unregister
+the worker the dev server already took (DevTools, Application, Service
+Workers, Unregister) and clear its site data.
 
 ### An update waits an hour
 
@@ -1357,18 +1345,10 @@ Either `noCache` is not declared, or it is declared in `configure`, which
 runs after the client's files: they answer first and the middleware never
 sees the request.
 
-**Fix:** declare it in `beforeAll`, and check with
-`curl -I https://your.app/service-worker.js` that `cache-control` is `no-cache`:
-
-```ts
-import { createServer } from '@alxia/react-router';
-import { SERVICE_WORKER_URL } from '@alxia/react-router/pwa';
-import { noCache } from '@alxia/react-router/pwa/server';
-
-export default createServer({
-  beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
-});
-```
+**Fix:** declare it in `beforeAll`
+([serving the worker's script](guide/pwa.md#serving-the-workers-script)), and
+check with `curl -I https://your.app/service-worker.js` that `cache-control` is
+`no-cache`.
 
 ### The worker cannot fetch another origin
 
@@ -1379,7 +1359,8 @@ The console reports `Refused to connect to 'https://api.example.com/…' because
 
 **Fix:** if the worker really must reach another origin, serve the script
 with a wider policy through `revalidated(response, policy)` in a middleware of
-your own (see the guide), rather than loosening the pages' policy.
+your own ([serving the worker's script](guide/pwa.md#serving-the-workers-script)),
+rather than loosening the pages' policy.
 
 ### The manifest is in the wrong language
 
@@ -1390,5 +1371,6 @@ whatever the user chose.
 cookie never reaches the server. Only the link's query does.
 
 **Fix:** link `manifestHref(language)` (`/manifest.webmanifest?lang=fr`), and
-read it with `manifestLanguage(url, supported, acceptedLanguage)`; the
-fallback is the request's `Accept-Language`, not the cookie.
+read it with `manifestLanguage(url, supported, fallback)`; the fallback is a
+supported language the app resolves from the request's `Accept-Language`, not
+from the cookie ([the manifest route](guide/pwa.md#the-web-app-manifest-and-why-the-language-travels-in-lang)).

@@ -1062,7 +1062,7 @@ front of the pages, write it out and edit it:
 bunx alxia-react-router reveal
 ```
 
-The [`@alxia/react-router` guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/getting-started.md)
+The [`@alxia/react-router` guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/README.md)
 goes from there.
 
 ## Behind a proxy

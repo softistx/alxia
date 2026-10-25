@@ -1,6 +1,8 @@
 # Typing the loaders
 
-## Typing the loaders
+This page covers reading alxia's context in a loader, an action or a
+middleware, typed with `Register` or a type argument, and the keys an app
+makes for itself.
 
 Every request through the catch-all sets `alxiaContext`, this package's
 key, on React Router's context provider, to what alxia's middlewares built for
@@ -13,7 +15,7 @@ that request. Three forms read it, each the same object:
   own `LoaderFunctionArgs` and `ActionFunctionArgs`
   ([below](#the-shorthand-contextalxia)).
 
-### `withAlxia(fn)`
+## `withAlxia(fn)`
 
 ```ts
 // app/routes/account.tsx
@@ -56,7 +58,7 @@ stop TypeScript inferring `fn`'s return type, since it infers no type
 argument once one is given: the page's `loaderData` would be lost. On a request that did not come
 through alxia it throws what `alxiaOf` throws.
 
-### With `Register`: no type argument
+## With `Register`: no type argument
 
 The `declare module` block in `app/server.ts` names the server once:
 
@@ -102,7 +104,7 @@ ctx.tenant;     // error: no middleware derives `tenant`
 ctx.user.name;  // error: `user` may be null
 ```
 
-### Without `Register`: the type argument
+## Without `Register`: the type argument
 
 Pass the server's type, imported with `import type`, so nothing is
 bundled and the route never imports the server at runtime:
@@ -130,7 +132,7 @@ export function loader({ context }: Route.LoaderArgs) {
 The type argument may also be an alxia app, the app *before* the
 catch-all, for a server of your own. Anything else is a compile error.
 
-### With `@alxia/core`'s `Register`
+## With `@alxia/core`'s `Register`
 
 `@alxia/core` has a `Register` of its own, which names the chain that
 builds an app's context, for its route files
@@ -169,7 +171,7 @@ export default server;
 Declare this package's `Register` when `configure` adds to the context
 after the base, and the loaders read it.
 
-### Why a global augmentation is right here
+## Why a global augmentation is right here
 
 alxia's core refuses a global augmentation of a context key: a plugin
 that added `user` to every route, declared before it or after, would
@@ -186,7 +188,7 @@ both folders of a monorepo), their two declarations conflict, and `tsc`
 says so (`Subsequent property declarations must have the same type`).
 Give each app its own tsconfig, or use the type argument in both.
 
-### The server: `server`
+## The server: `server`
 
 `alxiaOf(context).server` is core's `ctx.server`, the `Bun.Server` serving
 the request, `undefined` with none
@@ -216,7 +218,7 @@ What it is, by how the app runs:
 | `react-router dev`, `vite preview` | the `Bun.Server` on a loopback port that the plugin relays the app's sockets to (Vite's own server is `node:http`, not a `Bun.Server`): `publish` reaches every socket the app opened, its `url` is that port's, and `requestIP` and `timeout` know nothing of the request Vite took, so `ctx.ip` stays `undefined` there |
 | Vite in middleware mode, a server of your own calling `app.fetch(request)` alone, `app.request(…)` in a test | `undefined` |
 
-### The shorthand: `context.alxia`
+## The shorthand: `context.alxia`
 
 This package augments React Router's `RouterContextProvider` with a
 read-only `alxia` property: the object `alxiaOf(context)` returns, with no
@@ -254,7 +256,7 @@ holds exactly when that key is set, in dev as in production, and on a
 provider no catch-all filled it throws what `alxiaOf` throws. It is the
 server's alone: a `clientLoader` or a `clientAction` has no alxia context.
 
-### Outside the catch-all
+## Outside the catch-all
 
 Without the plugin, under a plain `react-router dev`, or in a unit test
 that calls a loader with a bare provider, there is no alxia context, and

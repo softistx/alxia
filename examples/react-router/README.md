@@ -204,6 +204,6 @@ has the commented file.
 ## Read more
 
 - [The `@alxia/react-router` README](https://github.com/softistx/alxia/blob/develop/packages/react-router/README.md): the quick start, `createServer`'s options and the API.
-- [Its guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/getting-started.md): how dev and the build work, customising the server, typing the loaders, the app's own keys, the CSP nonce, escape hatches, testing and deploying.
+- [Its guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/README.md): how dev and the build work, customising the server, typing the loaders, the app's own keys, the CSP nonce, escape hatches, testing and deploying.
 - [Its troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none, the secure-headers policy among them.
 - [`@alxia/logger`](https://github.com/softistx/alxia/tree/develop/packages/logger), [`@alxia/compress`](https://github.com/softistx/alxia/tree/develop/packages/compress) and [`@alxia/secure-headers`](https://github.com/softistx/alxia/tree/develop/packages/secure-headers): the middlewares `app/server.ts` uses.

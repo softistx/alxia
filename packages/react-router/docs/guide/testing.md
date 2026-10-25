@@ -1,5 +1,7 @@
 # Testing
 
+This page covers testing the app in process, with no server.
+
 `server.create(wiring)` makes the app in process, from a build: import
 the server, and pass it React Router's build, which
 `build/server/index.js` holds. The test needs Bun's types:

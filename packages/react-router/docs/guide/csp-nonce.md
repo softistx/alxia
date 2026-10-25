@@ -1,5 +1,9 @@
 # A CSP nonce
 
+This page covers a Content-Security-Policy without `'unsafe-inline'`: the
+policy in `app/server.ts`, the nonce passed on in `app/entry.server.tsx`, and
+why the nonce can stay loose.
+
 React Router renders inline scripts: the hydration data, the module
 loader, the scroll restoration, and with streaming one more per resolved
 `<Await>`. A policy without `'unsafe-inline'` allows them only when each

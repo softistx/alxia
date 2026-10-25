@@ -7,15 +7,15 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Installable and offline: `@alxia/react-router/pwa`.** The code with no UI an installable React Router app needs: the service worker's contract and what it caches, the precache list read from the build, registration and the update notice, the web app manifest, `useOnline` and `useServiceWorker` (`/pwa/react`, `react` an optional peer), `noCache` for the worker's script (`/pwa/server`), each app-specific name an option ([guide](guide/pwa.md)). In the next minor.
+Nothing in progress.
 
 ## Next
 
 - **The service worker and its build.** A worker of Workbox strategies over
   `cachingFor` and `isStorable`, and the build that writes it, reading
   `precacheList` and possibly run by `/vite`'s `alxia()`, with the `workbox-*`
-  packages as optional peers. Taken right after `/pwa` is released; until
-  then the worker and its build stay the app's.
+  packages as optional peers. Until it ships, the worker and its build stay
+  the app's.
 
 ## Later
 
@@ -54,6 +54,23 @@ number on it. Every release, with each change it made, is in
   Bun, Deno or Cloudflare with a `runtime` option; alxia is Bun's.
 
 ## Shipped
+
+### 0.9.0
+
+- **`@alxia/react-router/pwa`.** The code with no UI an installable app
+  shares, importing nothing: the service worker's contract and cache names
+  (`defineWorkerContract`), which requests the worker caches and which
+  responses it may store (`cachingFor`, `isStorable`), the precache list read
+  from the build, registering the worker and the update notice's store, the
+  web app manifest with its language in `?lang=`, and `clearAppCaches` for
+  sign-out. Every app-specific name is an option, so two apps never share a
+  default ([guide](guide/pwa.md)).
+- **`@alxia/react-router/pwa/react`.** `useOnline`, `useServiceWorker({
+  enabled })` and `useUpdateNotice`, with the page's one `updateNotice`;
+  `react` is an optional peer.
+- **`@alxia/react-router/pwa/server`.** `noCache` serves the worker's
+  script revalidated on every update check, with the worker's own policy
+  (`revalidated` and `WORKER_POLICY` beneath it).
 
 ### 0.8.0
 

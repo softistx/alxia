@@ -1,4 +1,9 @@
-# Setup
+# Getting started
+
+`@alxia/react-router` serves a React Router **framework-mode** app with
+server rendering from an alxia app, under Bun. This page covers starting one:
+a new app with `bun create @alxia`, the official template with alxia added
+to it, or an app you already have.
 
 ## A new app: `bun create @alxia`
 
