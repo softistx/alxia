@@ -45,6 +45,11 @@ a loader, a message React Router or the browser prints, or an error from
 - [`startWorker(): no precache list. …`](#startworker-no-precache-list-)
 - [`TypeError: startWorker(): contract is required: …`](#typeerror-startworker-contract-is-required-)
 - [`error: Could not resolve: "workbox-core". Maybe you need to "bun install"?`](#error-could-not-resolve-workbox-core-maybe-you-need-to-bun-install)
+- [`buildWorker() runs on Bun: it is running on Node`](#buildworker-runs-on-bun-it-is-running-on-node)
+- [`buildWorker(): app/service-worker.ts does not exist.`](#buildworker-appservice-workerts-does-not-exist)
+- [`buildWorker(): expected one React Router browser manifest`](#buildworker-expected-one-react-router-browser-manifest)
+- [`buildWorker(): build/client/offline.html does not exist`](#buildworker-buildclientofflinehtml-does-not-exist)
+- [`buildWorker(): Bun.build failed:`](#buildworker-bunbuild-failed)
 
 **Types**
 
@@ -1427,6 +1432,8 @@ rather than loosening the pages' policy.
 
 ### `buildWorker(): app/service-worker.ts does not exist.`
 
+`buildWorker()` throws `buildWorker(): app/service-worker.ts does not exist.`
+
 **Why:** `file` is read from `root` (`process.cwd()` by default), not from the script's folder.
 
 **Fix:** pass the path relative to the project root, or pass `root`.
@@ -1447,7 +1454,7 @@ The full message ends `Add public/offline.html, or pass offline: false.`
 
 **Fix:** add the page to `public/`, or pass `offline: false` for a worker with no offline page. If the contract's `offlineUrl` is another path, pass the same `contract` to `buildWorker`.
 
-### `buildWorker(): Bun.build failed`
+### `buildWorker(): Bun.build failed:`
 
 The message lists Bun's logs after it.
 

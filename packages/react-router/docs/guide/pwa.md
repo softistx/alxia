@@ -5,7 +5,8 @@ UI: the service worker's contract, which requests the worker caches, which
 responses it may store, the precache list read from a build, registering the
 worker and offering an update, the web app manifest, and the cleaning at
 sign-out. The code is in `@alxia/react-router/pwa`, its React hooks in
-`@alxia/react-router/pwa/react`, the server's `noCache` in
+`@alxia/react-router/pwa/react`, the build script's `buildWorker` in
+`@alxia/react-router/pwa/build`, the server's `noCache` in
 `@alxia/react-router/pwa/server`, and every app-specific name (the cache
 prefix, the paths never cached) is an option, so two apps never share a
 default.
@@ -36,7 +37,7 @@ never at load. So each runtime can import it:
 | --- | --- |
 | the service worker | `startWorker` from `/pwa/worker`; or, for a worker of your own, the contract, `cachingFor`, `isStorable` |
 | the page | the contract (the same names), `registerServiceWorker`, `createUpdateNotice`, `manifestHref`, `clearAppCaches` |
-| a build script | `parseBrowserManifest`, `precacheList`, `assetPrecache` |
+| a build script | `buildWorker` from `/pwa/build`; or, for a pipeline of your own, `parseBrowserManifest`, `precacheList`, `assetPrecache` |
 | the server | `SERVICE_WORKER_URL`, to serve the worker under its path; `MANIFEST_PATH`, `MANIFEST_HEADERS`, `manifestLanguage` and `webAppManifest`, to serve the manifest |
 
 `@alxia/react-router/pwa/react` is the page's hooks and needs `react`, an
@@ -55,6 +56,11 @@ the package already has: its only package import is `@alxia/core`
 only package imports, it shares with the main entry and the hooks only chunks
 that import nothing, and it does nothing when imported (`boundary.spec.ts`
 checks all three). It is for a service worker bundle alone.
+
+`@alxia/react-router/pwa/build` is `buildWorker` and needs Bun: Node's
+built-ins are its only imports, and it reads `Bun` only inside the function,
+never at load. It is for a build script alone, never the worker or the page.
+To bundle the worker, the Workbox peers of `/pwa/worker` must be installed.
 
 The main entry, `@alxia/react-router`, is not for those: it imports
 `@alxia/core`, which imports `node:*`, and a client bundle should not carry it.
@@ -262,7 +268,8 @@ Its errors are in [the troubleshooting page](../troubleshooting.md#buildworker-e
 
 A worker precaches the code of every route, so a client navigation offline to
 a route never visited still finds its modules. `react-router build` writes the
-list in `build/client/assets/manifest-*.js`:
+list in `build/client/assets/manifest-*.js`. `buildWorker` does this itself; the parts
+are for a pipeline of your own:
 
 ```ts
 // file: scripts/precache.ts
