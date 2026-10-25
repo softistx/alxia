@@ -42,6 +42,9 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: defineWorkerContract(): cacheVersion must be a non-empty name without '-', …`](#typeerror-defineworkercontract-cacheversion-must-be-a-non-empty-name-without---)
 - [`parseBrowserManifest(): not React Router's browser manifest …`](#parsebrowsermanifest-not-react-routers-browser-manifest-)
 - [`error: Cannot find package 'react' from '…/@alxia/react-router/dist/pwa/react/index.js'`](#error-cannot-find-package-react-from-alxiareact-routerdistpwareactindexjs)
+- [`startWorker(): no precache list. …`](#startworker-no-precache-list-)
+- [`TypeError: startWorker(): contract is required: …`](#typeerror-startworker-contract-is-required-)
+- [`error: Could not resolve: "workbox-core". Maybe you need to "bun install"?`](#error-could-not-resolve-workbox-core-maybe-you-need-to-bun-install)
 
 **Types**
 
@@ -849,6 +852,58 @@ this message too.
 **Fix:** add `react` where the page is built (`bun add react`), and import
 `/pwa/react` from the page alone. The worker and a build script import
 `@alxia/react-router/pwa`, which imports nothing.
+
+### `startWorker(): no precache list. …`
+
+**Why:** the full message ends "Build this worker with `alxia()` from
+`@alxia/react-router/vite` (`app/service-worker.ts`) or `buildWorker()` from
+`@alxia/react-router/pwa/build`, which write it in." `startWorker` precaches
+the list the build defines in the bundle (`globalThis.__ALXIA_PRECACHE__`);
+a worker bundled by anything else has none, and the page would install a
+worker that precaches nothing.
+
+**Fix:** either build the worker with the build that writes the list
+(`alxia()` or `buildWorker()`), or pass the list yourself, which works for a
+worker bundled any other way:
+
+```ts
+startWorker({
+	contract,
+	precache: [{ url: '/offline.html', revision: 'v1' }],
+});
+```
+
+`precache` wins over the list the build wrote. A bundle of your own may
+instead define `globalThis.__ALXIA_PRECACHE__`.
+
+### `TypeError: startWorker(): contract is required: …`
+
+**Why:** the full message continues "pass `defineWorkerContract({ cachePrefix })`
+from `@alxia/react-router/pwa`." The worker's cache names, its offline page
+and its URL come from the contract the page shares, so there is no default.
+
+**Fix:**
+
+```ts
+// file: app/service-worker.ts
+import { defineWorkerContract } from '@alxia/react-router/pwa';
+import { startWorker } from '@alxia/react-router/pwa/worker';
+
+startWorker({ contract: defineWorkerContract({ cachePrefix: 'my-app' }) });
+```
+
+### `error: Could not resolve: "workbox-core". Maybe you need to "bun install"?`
+
+**Why:** `@alxia/react-router/pwa/worker` imports six `workbox-*` packages,
+optional peers of the package, so nothing installs them for you. They are
+bundled into the worker, never loaded at run time.
+
+**Fix:** add them as development dependencies:
+
+```sh
+bun add -d workbox-core workbox-expiration workbox-navigation-preload \
+  workbox-precaching workbox-routing workbox-strategies
+```
 
 ## Types
 

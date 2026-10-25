@@ -10,12 +10,15 @@ sign-out. The code is in `@alxia/react-router/pwa`, its React hooks in
 prefix, the paths never cached) is an option, so two apps never share a
 default.
 
-The worker itself (its Workbox strategies) and the build that writes it stay
-the app's for now: the [roadmap](../roadmap.md#next) lists them.
+The worker's Workbox strategies are in `@alxia/react-router/pwa/worker`. The
+build that writes the precache list into it stays the app's for now: the
+[roadmap](../roadmap.md#now) lists it.
 
 - [What the subpath holds](#what-the-subpath-holds)
 - [The worker's contract](#the-workers-contract)
 - [What the worker caches](#what-the-worker-caches)
+- [The worker](#the-worker)
+- [A worker of your own](#a-worker-of-your-own)
 - [The precache list from a build](#the-precache-list-from-a-build)
 - [Registering the worker and offering an update](#registering-the-worker-and-offering-an-update)
 - [The web app manifest (and why the language travels in `?lang=`)](#the-web-app-manifest-and-why-the-language-travels-in-lang)
@@ -31,7 +34,7 @@ never at load. So each runtime can import it:
 
 | runtime | imports it for |
 | --- | --- |
-| the service worker | the contract, `cachingFor`, `isStorable` |
+| the service worker | `startWorker` from `/pwa/worker`; or, for a worker of your own, the contract, `cachingFor`, `isStorable` |
 | the page | the contract (the same names), `registerServiceWorker`, `createUpdateNotice`, `manifestHref`, `clearAppCaches` |
 | a build script | `parseBrowserManifest`, `precacheList`, `assetPrecache` |
 | the server | `SERVICE_WORKER_URL`, to serve the worker under its path; `MANIFEST_PATH`, `MANIFEST_HEADERS`, `manifestLanguage` and `webAppManifest`, to serve the manifest |
@@ -45,6 +48,13 @@ the build script, which would bundle React.
 `@alxia/react-router/pwa/server` is `noCache` and needs `@alxia/core`, a peer
 the package already has: its only package import is `@alxia/core`
 (`boundary.spec.ts` checks it). It is for the server file alone.
+
+`@alxia/react-router/pwa/worker` is `startWorker` and needs the six
+`workbox-*` packages (`core`, `expiration`, `navigation-preload`,
+`precaching`, `routing`, `strategies`), optional peers (`^7`): they are its
+only package imports, it shares with the main entry and the hooks only chunks
+that import nothing, and it does nothing when imported (`boundary.spec.ts`
+checks all three). It is for a service worker bundle alone.
 
 The main entry, `@alxia/react-router`, is not for those: it imports
 `@alxia/core`, which imports `node:*`, and a client bundle should not carry it.
@@ -113,46 +123,7 @@ the worker's own path, the manifest's, a document or iframe fetch, and any
 path with no static extension. The options add to that, or move the line
 between `immutable` and `static`:
 
-```ts
-// file: sw/strategy.ts
-import { cachingFor, isStorable } from '@alxia/react-router/pwa';
-
-const options = {
-	never: (path: string) => path.startsWith('/api/'),
-	immutable: (path: string) =>
-		path.startsWith('/assets/') && !path.startsWith('/assets/icons/'),
-};
-
-export function strategyOf(request: Request) {
-	return cachingFor(request, self.location.origin, options);
-}
-
-export function mayStore(response: Response) {
-	return isStorable(response);
-}
-```
-
-The worker's fetch handler asks both. A cache-first answer for the
-`immutable` words reads the contract's assets cache and falls back to the
-network:
-
-```ts
-// file: sw/answer.ts
-import { workerContract } from '../app/pwa-contract';
-import { mayStore, strategyOf } from './strategy';
-
-export async function answer(request: Request): Promise<Response> {
-	if (strategyOf(request) === 'immutable') {
-		const cache = await caches.open(workerContract.cacheNames.assets);
-		const cached = await cache.match(request);
-		if (cached) return cached;
-		const response = await fetch(request);
-		if (mayStore(response)) await cache.put(request, response.clone());
-		return response;
-	}
-	return fetch(request);
-}
-```
+The options:
 
 | option | default | |
 | --- | --- | --- |
@@ -172,6 +143,82 @@ same-origin 200 of a script, style, font or image, that the server marked
 `public` (alxia does on every static file it serves, and a route answering an
 image, such as a user's photo, does not), neither `private` nor `no-store`,
 and that does not vary on `Cookie`, `Authorization` or `*`.
+
+## The worker
+
+`startWorker` turns those answers into Workbox routes. The app's worker is
+one file, bundled by the app's build (`app/service-worker.ts` by default):
+
+```ts
+// file: app/service-worker.ts
+import { startWorker } from '@alxia/react-router/pwa/worker';
+import { workerContract } from './pwa-contract';
+
+startWorker({
+	contract: workerContract,
+	caching: { never: (path) => path.startsWith('/api/') },
+	// The build writes the precache list in; a worker built some other way passes it.
+	precache: [{ url: '/offline.html', revision: 'v1' }],
+});
+```
+
+It uses no worker global, so it compiles under the app's DOM `tsconfig`. Add
+the packages it bundles as development dependencies:
+`bun add -d workbox-core workbox-expiration workbox-navigation-preload workbox-precaching workbox-routing workbox-strategies`.
+
+| option | default | |
+| --- | --- | --- |
+| `contract` | required | the app's `WorkerContract`: cache names, offline page, the worker's URL |
+| `caching` | none | `never`, `immutable`, `manifestPath` and `serviceWorkerUrl`, as `cachingFor` takes them |
+| `assets` | `{ maxEntries: 200 }` | how many hashed bundles the cache keeps (`maxEntries`, `maxAgeSeconds`) |
+| `static` | `{ maxEntries: 100, maxAgeSeconds: 2592000 }` | the same for the other static files (30 days) |
+| `navigationPreload` | `true` | the browser starts a page load's request alongside the worker |
+| `precache` | the list the build wrote in | `[{ url, revision }]`; a worker with neither throws at once |
+
+What each answer of `cachingFor` becomes:
+
+| answer | Workbox | stores |
+| --- | --- | --- |
+| `navigation` | `NetworkOnly`; the precached offline page answers when the network fails (not for an HTTP error), if the contract's `offlineUrl` is in the precache list | nothing |
+| `immutable` | `CacheFirst` on `cacheNames.assets`, with `ExpirationPlugin` | what `isStorable` accepts |
+| `static` | `StaleWhileRevalidate` on `cacheNames.static`, with `ExpirationPlugin` | what `isStorable` accepts |
+| `none` | no route: the browser | nothing |
+
+Around them: the precache route is registered first, with exact URLs only
+(`cleanURLs: false`, no directory index), so a page load still goes to the
+network; `clientsClaim()` makes a first install control the open pages at
+once; an update waits until the page posts `SKIP_WAITING`; and on `activate`
+the caches the contract no longer owns (`obsoleteCaches`) are deleted.
+
+The precache list is the `precache` option, or else
+`globalThis.__ALXIA_PRECACHE__`, which the build writes into the bundle (a
+worker bundled some other way passes `precache`, or defines that global in its
+own bundle). Read without the build it is `undefined`, so the
+worker's error is [`startWorker(): no precache list`](../troubleshooting.md#startworker-no-precache-list-)
+instead of a `ReferenceError`.
+
+## A worker of your own
+
+When Workbox does not fit, `cachingFor` and `isStorable` need none: the
+worker asks the first of the request and the second of the answer.
+
+```ts
+// file: sw/answer.ts
+import { cachingFor, isStorable } from '@alxia/react-router/pwa';
+import { workerContract } from '../app/pwa-contract';
+
+export async function answer(request: Request): Promise<Response> {
+	if (cachingFor(request, self.location.origin, { contract: workerContract }) !== 'immutable') {
+		return fetch(request);
+	}
+	const cache = await caches.open(workerContract.cacheNames.assets);
+	const cached = await cache.match(request);
+	if (cached) return cached;
+	const response = await fetch(request);
+	if (isStorable(response)) await cache.put(request, response.clone());
+	return response;
+}
+```
 
 ## The precache list from a build
 
@@ -235,7 +282,7 @@ import {
 
 export const notice = createUpdateNotice(sessionStore);
 
-export function startWorker() {
+export function registerWorker() {
 	if (!('serviceWorker' in navigator)) return;
 	afterLoad(() => {
 		registerServiceWorker(navigator.serviceWorker, (worker, apply) =>

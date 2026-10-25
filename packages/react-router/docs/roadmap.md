@@ -7,15 +7,15 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing in progress.
+- **The service worker and its build.** `startWorker` on Workbox
+  (`/pwa/worker`, the `workbox-*` packages optional peers) is in. Remaining:
+  `buildWorker` (`/pwa/build`), and `alxia()` building `app/service-worker.ts`
+  after `react-router build`, which write the precache list in. In the next
+  minor.
 
 ## Next
 
-- **The service worker and its build.** A worker of Workbox strategies over
-  `cachingFor` and `isStorable`, and the build that writes it, reading
-  `precacheList` and possibly run by `/vite`'s `alxia()`, with the `workbox-*`
-  packages as optional peers. Until it ships, the worker and its build stay
-  the app's.
+Nothing planned.
 
 ## Later
 
