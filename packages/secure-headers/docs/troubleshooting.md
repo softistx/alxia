@@ -572,6 +572,22 @@ const response = await app.request('/the-route');
 console.log(response.headers.get('content-security-policy'));
 ```
 
+### A CDN still caches a page, though `cacheControl` is set
+
+**When:** `cacheControl: 'private, no-store'` is set, and some pages are still
+stored by a cache.
+
+**Why:** a route that sets its own `Cache-Control` (a `reply` with
+`cache-control: public, max-age=…`, or a middleware after `secureHeaders`)
+keeps it: the option only fills a header the response lacks.
+
+**Fix:** drop the route's header, or give it the same value:
+
+```ts
+const response = await app.request('/the-page');
+console.log(response.headers.get('cache-control'));
+```
+
 ### `X-Powered-By` or `Server` is still sent
 
 **When:** `hidePoweredBy` is on (the default), and one of them is on the

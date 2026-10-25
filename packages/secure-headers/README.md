@@ -115,17 +115,22 @@ refused with a `TypeError` that starts `csp():`.
 | `X-DNS-Prefetch-Control` | `off` | `xDnsPrefetchControl` |
 | `X-Permitted-Cross-Domain-Policies` | `none` | `xPermittedCrossDomainPolicies` |
 | `Permissions-Policy` | not sent | `permissionsPolicy` |
+| `Cache-Control` | not sent | `cacheControl` |
 
 Each option takes a value, or `false` to leave the header out; an empty
 value is refused at startup. `nonce` is off by default.
 `X-Powered-By` and `Server` are removed unless `hidePoweredBy: false`.
+
+`cacheControl` is for pages that carry a nonce or a viewer's data:
+`cacheControl: 'private, no-store'` keeps a cache from storing them. A route's
+own `Cache-Control` wins, and a 404 or a thrown error gets it too.
 
 ## API
 
 | export | |
 | --- | --- |
 | `secureHeaders(options?)` | the middleware, for `app.use`: a `SecureHeaders`, or with `nonce: true` a `NonceMiddleware` |
-| `SecureHeadersOptions` | its options: the headers and `hidePoweredBy`; `nonce` is added by each overload |
+| `SecureHeadersOptions` | its options: the headers (`cacheControl` included) and `hidePoweredBy`; `nonce` is added by each overload |
 | `Setting` | a header option's type: its value, or `false` to leave it out |
 | `csp(directives)` | a `Content-Security-Policy` string from directives, checked at startup |
 | `CspDirectives` | its argument: directive names to a `CspValue`, any name allowed |

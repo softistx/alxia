@@ -327,6 +327,28 @@ app.use(
   starts `csp():`, before the first request
   ([troubleshooting](troubleshooting.md#runtime)).
 
+## Pages are not cached
+
+A page that carries a nonce, or a viewer's data, must not be stored: a shared
+cache (a CDN, a proxy) that kept it would hand one viewer's nonce, or
+account, to the next. The nonce also stops protecting anything once it is
+reused, since it is only worth something if an attacker cannot guess it.
+`cacheControl` is off by default, because an API often wants its own caching.
+
+```ts
+app.use(
+	secureHeaders({
+		nonce: true,
+		contentSecurityPolicy: csp({ 'script-src': ["'self'", NONCE] }),
+		cacheControl: 'private, no-store',
+	}),
+);
+```
+
+It is set like every other header: a route's own `Cache-Control` is kept
+(a static asset can stay cacheable), and a 404 or a thrown error gets it too.
+An empty value is refused at startup; give `false` to leave it out.
+
 ## Which responses get the headers
 
 The middleware settles `next()`: it sets the headers on the response the

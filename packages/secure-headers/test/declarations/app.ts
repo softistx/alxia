@@ -21,6 +21,12 @@ export function withNonce() {
 		.get('/', ({ nonce, reply }) => reply(200, { nonce }));
 }
 
+export function withCacheControl() {
+	return alxia()
+		.use(secureHeaders({ cacheControl: 'private, no-store' }))
+		.get('/', ({ reply }) => reply(200, 'ok'));
+}
+
 export function withDirectives() {
 	return alxia()
 		.use(
