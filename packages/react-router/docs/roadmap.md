@@ -11,14 +11,12 @@ Nothing in progress.
 
 ## Next
 
-- **The service worker and its build.** A worker of Workbox strategies over
-  `cachingFor` and `isStorable`, and the build that writes it, reading
-  `precacheList` and possibly run by `/vite`'s `alxia()`, with the `workbox-*`
-  packages as optional peers. Until it ships, the worker and its build stay
-  the app's.
+Nothing planned.
 
 ## Later
 
+- **`service-worker.js` served revalidated with no setup.** Today the app
+  adds `noCache` for `SERVICE_WORKER_URL` itself.
 - **A check of an offline page's policy.** The offline page declares its
   Content-Security-Policy in a `<meta>`; a check would read the page and
   confirm that each inline script and style is allowed by its hash.
@@ -54,6 +52,22 @@ Nothing in progress.
   Bun, Deno or Cloudflare with a `runtime` option; alxia is Bun's.
 
 ## Shipped
+
+### 0.10.0
+
+- **`@alxia/react-router/pwa/worker`.** `startWorker({ contract })` is the
+  whole service worker on Workbox: the precache, a page load always from the
+  network with the offline page when it fails, hashed bundles cache-first,
+  other static files stale-while-revalidate, and the update applied on
+  request. An app's `app/service-worker.ts` is a few lines; the `workbox-*`
+  packages are optional peers ([guide](guide/pwa.md)).
+- **`@alxia/react-router/pwa/build`.** `buildWorker({ file })` bundles the
+  worker after `react-router build`, with the precache list written in: the
+  offline page, every route's code and the fonts you name.
+- **`alxia({ worker })`.** With `app/service-worker.ts` in the app,
+  `react-router build` writes `build/client/service-worker.js` itself, with
+  no script to add; `worker` names another file, tunes the build or turns
+  it off.
 
 ### 0.9.0
 

@@ -92,7 +92,10 @@ Vite's preview server, as `bun run start` would: the pages, `/api`, the
 client's files and the app's middlewares. So does React Router's prerendering.
 
 `@alxia/core` and `react-router` 8 are peers, and `vite` 7 or 8 is an
-optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react`. The package declares no dependency.
+optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react`. The six `workbox-*`
+packages (`workbox-core`, `workbox-expiration`, `workbox-navigation-preload`,
+`workbox-precaching`, `workbox-routing`, `workbox-strategies`) are optional
+peers too, for `/pwa/worker` (the [PWA section](#installable-and-offline-pwa) has the install line). The package declares no dependency.
 
 Its `typescript` peer is 6 or 7. The template's TypeScript 5.9 typechecks,
 but `bun add` warns about it; `bun add -d typescript@^6` silences the
@@ -484,22 +487,50 @@ no UI: the service worker's contract, which requests it caches and which
 responses it may store, the precache list read from a build, the
 registration and update notice, the web app manifest, and the cleaning at
 sign-out. It imports nothing, so the worker, a build script, the page and
-the server can all import it. The hooks are in `/pwa/react`
-(`react`, an optional peer) and `noCache` in `/pwa/server`; this package
-never reads `import.meta.env`, so the app passes `enabled`.
+the server can all import it. The worker itself is `startWorker` in
+`/pwa/worker`, its build `buildWorker` in `/pwa/build`, the hooks are in
+`/pwa/react` (`react`, an optional peer) and `noCache` in `/pwa/server`; this
+package never reads `import.meta.env`, so the app passes `enabled`.
+
+With `app/service-worker.ts` in the app, `react-router build` writes
+`build/client/service-worker.js` itself: `alxia()` bundles the file after the
+client build, with the precache list written in, and there is no script to
+add. It needs Bun (`bun --bun react-router build`, or a `bunfig.toml` with
+`[run] bun = true`). `alxia({ worker: 'app/pwa/worker.ts' })` names another file
+and `alxia({ worker: false })` builds none.
+
+The worker bundles Workbox, whose six packages are optional peers:
+
+```sh
+bun add -d workbox-core workbox-expiration workbox-navigation-preload workbox-precaching workbox-routing workbox-strategies
+```
 
 ```ts
-// file: app/pwa-contract.ts, shared by the worker and the page:
-// every cache is named `my-app-<kind>-<version>`.
+// file: app/pwa-contract.ts
+// Shared by the worker and the page: every cache is named `my-app-<kind>-<version>`.
 import { defineWorkerContract } from '@alxia/react-router/pwa';
 
 export const workerContract = defineWorkerContract({ cachePrefix: 'my-app' });
 ```
 
+```ts
+// file: app/service-worker.ts
+import { startWorker } from '@alxia/react-router/pwa/worker';
+import { workerContract } from './pwa-contract';
+
+startWorker({ contract: workerContract });
+```
+
 ```tsx
 // file: app/root.tsx
+import { manifestHref } from '@alxia/react-router/pwa';
 import { useServiceWorker } from '@alxia/react-router/pwa/react';
 import { Outlet } from 'react-router';
+
+// The browser reads the manifest to offer the install.
+export function links() {
+	return [{ rel: 'manifest', href: manifestHref('en') }];
+}
 
 // A production build only, never under `react-router dev`.
 export default function App() {
@@ -511,18 +542,84 @@ export default function App() {
 ```ts
 // file: app/server.ts
 import { createServer } from '@alxia/react-router';
-import { SERVICE_WORKER_URL } from '@alxia/react-router/pwa';
+import {
+	MANIFEST_HEADERS,
+	MANIFEST_PATH,
+	SERVICE_WORKER_URL,
+	webAppManifest,
+} from '@alxia/react-router/pwa';
 import { noCache } from '@alxia/react-router/pwa/server';
 
-// The worker's script is revalidated; beforeAll runs before the client's files.
+// beforeAll runs before the client's files: the worker's script is
+// revalidated. The manifest is a route, served with its own headers.
 export default createServer({
 	beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
+	configure: (app) =>
+		app.get(MANIFEST_PATH, ({ reply }) => {
+			const manifest = webAppManifest({
+				name: 'My app',
+				description: 'My installable app',
+				lang: 'en',
+				themeColor: '#1e40af',
+				backgroundColor: '#ffffff',
+			});
+			return reply(200, JSON.stringify(manifest), { headers: MANIFEST_HEADERS });
+		}),
 });
 ```
 
+The manifest names four icons (`MINIMAL_2023_ICONS`): put
+`pwa-64x64.png`, `pwa-192x192.png`, `pwa-512x512.png` and
+`maskable-icon-512x512.png` in `public/`, which `@vite-pwa/assets-generator`'s
+`minimal2023Preset` writes from one image. A browser offers the install with
+a 192 and a 512.
+
+The worker serves a page load from `public/offline.html` when the network
+fails, and the build needs the file:
+
+```html
+<!-- file: public/offline.html -->
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta http-equiv="Content-Security-Policy" content="default-src 'none'" />
+		<title>Offline</title>
+	</head>
+	<body>
+		<h1>You are offline</h1>
+		<p>Check your connection and try again.</p>
+	</body>
+</html>
+```
+
+Set `routeDiscovery: { mode: 'initial' }` in `react-router.config.ts`, so a
+client navigation offline to a route never visited finds its modules
+([more](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#offline-a-client-navigation-to-a-route-never-visited-shows-the-offline-page)):
+
+```ts
+import type { Config } from '@react-router/dev/config';
+
+export default { ssr: true, routeDiscovery: { mode: 'initial' } } satisfies Config;
+```
+
+An app that built its worker with a script of its own has steps to drop:
+[moving from a build script of your own](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md#moving-from-a-build-script-of-your-own).
+
+For a build pipeline of your own, `buildWorker` from `/pwa/build` does what
+`alxia()` does. It needs Bun and runs after `react-router build`:
+
+```ts
+// file: scripts/build-worker.ts
+import { buildWorker } from '@alxia/react-router/pwa/build';
+
+await buildWorker({ file: 'app/service-worker.ts' });
+```
+
 The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md)
-has the worker's fetch handler, the manifest route, the update banner and the
-rest.
+has the worker's options, the offline page, the manifest route, the update
+banner and the rest.
 
 ## Traps
 
@@ -574,8 +671,8 @@ From `@alxia/react-router/vite`:
 
 | export | |
 | --- | --- |
-| `alxia(options?)` | the Vite plugin, for `react-router dev`, `react-router build` and `vite preview`, building the server for Bun. `entry` is the server file: `app/server.ts` by default, or the default server when there is none |
-| `AlxiaOptions` | its options |
+| `alxia(options?)` | the Vite plugin, for `react-router dev`, `react-router build` and `vite preview`, building the server for Bun. `entry` is the server file: `app/server.ts` by default, or the default server when there is none. `worker` is the service worker built after `react-router build`: `app/service-worker.ts` by default when it exists, a file, `AlxiaWorkerOptions`, or `false` |
+| `AlxiaOptions`, `AlxiaWorkerOptions` | its options, and the worker's (`buildWorker()`'s but `root`, `client` and `file`, which is optional) |
 
 From `@alxia/react-router/pwa`:
 
@@ -623,6 +720,22 @@ From `@alxia/react-router/pwa/server` (`@alxia/core` is its only package import)
 | `revalidated(response, policy?)` | a response with those two headers set, on a copy when its headers are immutable; `policy` is `WORKER_POLICY` by default |
 | `WORKER_POLICY` | `default-src 'none'; connect-src 'self'`: the worker runs no other script and fetches this site only |
 
+From `@alxia/react-router/pwa/worker` (the six `workbox-*` packages, optional peers, are its only package imports):
+
+| export | |
+| --- | --- |
+| `startWorker(options)` | the worker's strategies: the precache route, `NetworkOnly` for a page load with the precached offline page as its fallback, `CacheFirst` for hashed bundles, `StaleWhileRevalidate` for other static files (both storing only what `isStorable` accepts), the obsolete caches swept on `activate`, and `SKIP_WAITING` applied |
+| `WorkerOptions` | `contract` (required), `caching`, `assets`, `static`, `navigationPreload`, `precache` |
+| `ExpirationOptions` | `{ maxEntries?, maxAgeSeconds? }` |
+
+From `@alxia/react-router/pwa/build` (Bun; Node's built-ins its only imports):
+
+| export | |
+| --- | --- |
+| `buildWorker(options)` | bundles the worker into `build/client/service-worker.js` with its precache list (the offline page by its content, every route's code, `precacheAssets`), after `react-router build` |
+| `BuildWorkerOptions` | `file` (required), `root`, `client`, `contract`, `offline`, `precacheAssets`, `minify` |
+| `WorkerBuild` | `{ file, precache, precacheBytes, bytes }` |
+
 The `alxia-react-router` bin, run with `bunx`:
 
 | command | |
@@ -637,7 +750,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Customising the server](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/customising-the-server.md): `createServer()`, and the escape hatches.
 - [Typing the loaders](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/typing-the-loaders.md): `Register`, and the app's own context keys.
 - [A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md), [Beside the pages](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md) (middlewares, routes, WebSockets, the client's files), [OpenAPI](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/openapi.md), [Testing](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/testing.md) and [Deploying](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md), with Docker.
-- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
+- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what the subpaths hold, the worker's contract, the worker, what it caches, the offline page, building the worker with `alxia()` or `buildWorker`, the hooks in React, registering the worker and offering an update, serving the worker's script, the web app manifest, and clearing at sign-out.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.
