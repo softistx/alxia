@@ -2,7 +2,13 @@
 // types are inferred: a declaration build must be able to name each one
 // through `@alxia/secure-headers` and `@alxia/core` alone (TS2883 otherwise).
 import { alxia } from '@alxia/core';
-import { NONCE, secureHeaders } from '@alxia/secure-headers';
+import {
+	clearSiteData,
+	csp,
+	NONCE,
+	pageHeaders,
+	secureHeaders,
+} from '@alxia/secure-headers';
 
 export function secured() {
 	return alxia()
@@ -19,6 +25,47 @@ export function withNonce() {
 			}),
 		)
 		.get('/', ({ nonce, reply }) => reply(200, { nonce }));
+}
+
+export function withCacheControl() {
+	return alxia()
+		.use(
+			secureHeaders({
+				nonce: true,
+				contentSecurityPolicy: `script-src 'self' ${NONCE}`,
+				cacheControl: 'private, no-store',
+			}),
+		)
+		.get('/', ({ reply }) => reply(200, 'ok'));
+}
+
+export function withDirectives() {
+	return alxia()
+		.use(
+			secureHeaders({
+				nonce: true,
+				contentSecurityPolicy: csp({
+					'default-src': ["'self'"],
+					'script-src': ["'self'", NONCE],
+					'upgrade-insecure-requests': true,
+				}),
+			}),
+		)
+		.get('/', ({ nonce, reply }) => reply(200, { nonce }));
+}
+
+export function pages() {
+	return alxia()
+		.use(pageHeaders({ https: true }))
+		.get('/', ({ nonce, reply }) => reply(200, { nonce }));
+}
+
+export function signOut() {
+	const cleared = clearSiteData(['cache']);
+	return alxia()
+		.use('/sign-out', cleared)
+		.use('/sign-out.data', cleared)
+		.post('/sign-out', ({ reply }) => reply(204));
 }
 
 export function noncePlugin() {

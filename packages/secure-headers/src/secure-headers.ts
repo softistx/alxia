@@ -27,6 +27,11 @@ export interface SecureHeadersOptions {
 	readonly xPermittedCrossDomainPolicies?: Setting;
 	/** Off by default: a policy is the app's to write. */
 	readonly permissionsPolicy?: Setting;
+	/**
+	 * Off by default. `'private, no-store'` for pages that carry a nonce or a
+	 * viewer's data: a cache must never store them.
+	 */
+	readonly cacheControl?: Setting;
 	/** Whether `X-Powered-By` and `Server` are removed. On by default. */
 	readonly hidePoweredBy?: boolean;
 }
@@ -71,6 +76,7 @@ const DEFAULTS = {
 	'x-dns-prefetch-control': 'off',
 	'x-permitted-cross-domain-policies': 'none',
 	'permissions-policy': false,
+	'cache-control': false,
 } as const satisfies Record<string, Setting>;
 
 const OPTION: Record<keyof typeof DEFAULTS, keyof SecureHeadersOptions> = {
@@ -86,6 +92,7 @@ const OPTION: Record<keyof typeof DEFAULTS, keyof SecureHeadersOptions> = {
 	'x-dns-prefetch-control': 'xDnsPrefetchControl',
 	'x-permitted-cross-domain-policies': 'xPermittedCrossDomainPolicies',
 	'permissions-policy': 'permissionsPolicy',
+	'cache-control': 'cacheControl',
 };
 
 /**
