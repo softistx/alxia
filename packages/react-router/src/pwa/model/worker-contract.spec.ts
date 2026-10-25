@@ -105,3 +105,62 @@ describe('two prefixes', () => {
 		);
 	});
 });
+
+describe('prefixes that begin alike', () => {
+	const app = defineWorkerContract({ cachePrefix: 'app' });
+	const admin = defineWorkerContract({ cachePrefix: 'app-admin' });
+	const all = [
+		...Object.values(app.cacheNames),
+		...Object.values(admin.cacheNames),
+		'app-assets-v0',
+		'app-admin-assets-v0',
+	];
+
+	test("app never claims app-admin's caches, in either direction", () => {
+		expect(app.obsoleteCaches(all)).toEqual(['app-assets-v0']);
+		expect(admin.obsoleteCaches(all)).toEqual(['app-admin-assets-v0']);
+		expect(app.clearableCaches(all)).toEqual([
+			'app-assets-v1',
+			'app-static-v1',
+			'app-assets-v0',
+		]);
+		expect(admin.clearableCaches(all)).toEqual([
+			'app-admin-assets-v1',
+			'app-admin-static-v1',
+			'app-admin-assets-v0',
+		]);
+	});
+
+	test('a retired kind of this app is swept', () => {
+		expect(app.obsoleteCaches(['app-pages-v0'])).toEqual(['app-pages-v0']);
+		expect(app.clearableCaches(['app-pages-v0'])).toEqual(['app-pages-v0']);
+	});
+});
+
+describe('cacheVersion', () => {
+	test("refuses an empty one, or one with a '-'", () => {
+		expect(() =>
+			defineWorkerContract({ cachePrefix: 'app', cacheVersion: '' }),
+		).toThrow(
+			new TypeError(
+				"defineWorkerContract(): cacheVersion must be a non-empty name without '-', such as 'v2'; got ''.",
+			),
+		);
+		expect(() =>
+			defineWorkerContract({ cachePrefix: 'app', cacheVersion: 'v1-beta' }),
+		).toThrow(
+			new TypeError(
+				"defineWorkerContract(): cacheVersion must be a non-empty name without '-', such as 'v2'; got 'v1-beta'.",
+			),
+		);
+	});
+});
+
+describe('a prefix with regex characters', () => {
+	test('is matched literally', () => {
+		const dotted = defineWorkerContract({ cachePrefix: 'a.b' });
+		expect(dotted.obsoleteCaches(['axb-assets-v0', 'a.b-assets-v0'])).toEqual([
+			'a.b-assets-v0',
+		]);
+	});
+});

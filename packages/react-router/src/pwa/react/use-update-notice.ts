@@ -22,8 +22,8 @@ export function useUpdateNotice(
 	notice: UpdateNoticeStore = updateNotice,
 ): UpdateNotice | undefined {
 	return useSyncExternalStore(
-		notice.subscribe,
-		notice.current,
+		(listener) => notice.subscribe(listener),
+		() => notice.current(),
 		() => undefined,
 	);
 }

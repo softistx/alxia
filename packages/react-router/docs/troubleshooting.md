@@ -39,6 +39,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`EACCES: permission denied, open '/app/…'`](#eacces-permission-denied-open-app)
 - [`error: Cannot find package '…' from '/app/build/server/index.js'`](#error-cannot-find-package--from-appbuildserverindexjs)
 - [`TypeError: defineWorkerContract(): cachePrefix must be a non-empty name, …`](#typeerror-defineworkercontract-cacheprefix-must-be-a-non-empty-name-)
+- [`TypeError: defineWorkerContract(): cacheVersion must be a non-empty name without '-', …`](#typeerror-defineworkercontract-cacheversion-must-be-a-non-empty-name-without---)
 - [`parseBrowserManifest(): not React Router's browser manifest …`](#parsebrowsermanifest-not-react-routers-browser-manifest-)
 
 **Types**
@@ -66,7 +67,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [The build has a package's Node variant, not its `bun` one](#the-build-has-a-packages-node-variant-not-its-bun-one)
 - [`request.url` in a loader is `http://` and the internal host behind a proxy](#requesturl-in-a-loader-is-http-and-the-internal-host-behind-a-proxy)
 - [An unhashed file under public/assets/ is cached for a year](#an-unhashed-file-under-publicassets-is-cached-for-a-year)
-- [Another app's caches vanish on the same origin](#another-apps-caches-vanish-on-the-same-origin)
+- [A cache the contract did not make is swept](#a-cache-the-contract-did-not-make-is-swept)
 
 ## Thrown or printed
 
@@ -781,7 +782,7 @@ name, such as 'my-app'; got ''.`, or `… must not end with '-', which the
 contract adds; got 'my-app-'. Use 'my-app'.`
 
 **Why:** every cache name is `<prefix>-<kind>-<version>`, and the worker
-deletes the caches that start with `<prefix>-`. An empty prefix would own
+deletes the caches shaped `<prefix>-<kind>-<version>`. An empty prefix would own
 every cache of the origin, and a trailing dash would be doubled.
 
 **Fix:** pass the app's own name, without the dash:
@@ -790,6 +791,26 @@ every cache of the origin, and a trailing dash would be doubled.
 import { defineWorkerContract } from '@alxia/react-router/pwa';
 
 export const workerContract = defineWorkerContract({ cachePrefix: 'my-app' });
+```
+
+### `TypeError: defineWorkerContract(): cacheVersion must be a non-empty name without '-', …`
+
+The full message is `defineWorkerContract(): cacheVersion must be a
+non-empty name without '-', such as 'v2'; got 'v1-beta'.`
+
+**Why:** every cache name is `<prefix>-<kind>-<version>`, and the contract
+tells a version from the rest of the name by its dashes. A version with a `-`
+(or an empty one) would make the name ambiguous.
+
+**Fix:** use a name with no dash, such as `'v2'` or `'2026'`:
+
+```ts
+import { defineWorkerContract } from '@alxia/react-router/pwa';
+
+export const workerContract = defineWorkerContract({
+  cachePrefix: 'my-app',
+  cacheVersion: 'v2',
+});
 ```
 
 ### `parseBrowserManifest(): not React Router's browser manifest …`
@@ -1268,18 +1289,23 @@ export function caching(request: RequestFacts, origin: string) {
 }
 ```
 
-### Another app's caches vanish on the same origin
+### A cache the contract did not make is swept
 
-Signing out, or a new worker activating, empties the caches of another app
-served from the same origin.
+Signing out, or a new worker activating, deletes a cache the app made itself.
 
-**Why:** a contract owns every cache whose name starts with `<prefix>-`.
-With one prefix that is the start of another plus a dash (`app` and
-`app-admin`), `app`'s `obsoleteCaches` and `clearableCaches` take
-`app-admin-…` for their own.
+**Why:** a contract owns every cache named exactly
+`<prefix>-<kind>-<version>`, kind being lowercase letters and digits and
+version having no `-`. That includes a kind the app retired (`my-app-pages-v0` is swept once
+it is not current). It is also why `app` and `app-admin` can share an origin:
+`app-admin-assets-v1` has one segment too many to be `app`'s. Contracts never
+take each other's caches; only a cache made by other code, such as
+`my-app-runtime-v1`, matches the shape and is swept.
 
-**Fix:** give each app a prefix that is not the other's start followed by
-`-`: `app` and `admin`, or `app-web` and `app-admin`.
+**Fix:** name your own caches outside the shape. A name is outside it when it
+has more than `<kind>-<version>` after `<prefix>-`, with the prefix `my-app`:
+`my-app-runtime-v1-x`. A kind with an uppercase letter, `_` or `.`
+(`my-app-Runtime-v1`, `my-app-run_time-v1`), or a different prefix, is outside
+too.
 
 ### The update notice never shows
 

@@ -16,14 +16,16 @@ export const SKIP_WAITING = 'SKIP_WAITING';
 
 export interface WorkerContractOptions {
 	/**
-	 * Every Cache Storage cache the worker owns starts with `<cachePrefix>-`.
+	 * Every Cache Storage cache the worker owns is named
+	 * `<cachePrefix>-<kind>-<version>` (kind: letters and digits; version:
+	 * no `-`); a cache of another shape is never swept.
 	 * Required: two apps on one origin must not share it.
 	 */
 	cachePrefix: string;
 	/**
 	 * Bumped when a cache's content changes shape: the next worker deletes
 	 * every cache of the prefix that has another version when it activates.
-	 * `'v1'` by default.
+	 * `'v1'` by default; not empty, and without a `-`.
 	 */
 	cacheVersion?: string;
 	/** `SERVICE_WORKER_URL` by default. */
@@ -77,13 +79,28 @@ export function defineWorkerContract(
 		);
 	}
 	const cacheVersion = options.cacheVersion ?? 'v1';
+	if (
+		typeof cacheVersion !== 'string' ||
+		cacheVersion === '' ||
+		cacheVersion.includes('-')
+	) {
+		throw new TypeError(
+			`defineWorkerContract(): cacheVersion must be a non-empty name without '-', such as 'v2'; got '${String(cacheVersion)}'.`,
+		);
+	}
 	const cacheNames: CacheNames = Object.freeze({
 		precache: `${cachePrefix}-precache-${cacheVersion}`,
 		assets: `${cachePrefix}-assets-${cacheVersion}`,
 		static: `${cachePrefix}-static-${cacheVersion}`,
 	});
 	const current = new Set<string>(Object.values(cacheNames));
-	const owned = (name: string) => name.startsWith(`${cachePrefix}-`);
+	// Exactly `<prefix>-<kind>-<version>`: the prefix 'app' must not claim
+	// 'app-admin-assets-v1' (one segment too many), but still owns a retired
+	// kind such as 'app-pages-v0'.
+	const shape = new RegExp(
+		`^${cachePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-[a-z0-9]+-[^-]+$`,
+	);
+	const owned = (name: string) => shape.test(name);
 	const contract: WorkerContract = {
 		cachePrefix,
 		cacheVersion,

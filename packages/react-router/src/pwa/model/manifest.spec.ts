@@ -125,3 +125,20 @@ describe('MANIFEST_HEADERS', () => {
 		);
 	});
 });
+
+describe('icons are copied', () => {
+	test('mutating a manifest icon leaves the constant alone', () => {
+		const [icon] = webAppManifest(base).icons;
+		expect(icon).toBeDefined();
+		if (!icon) return;
+		icon.src = '/changed.png';
+		expect(MINIMAL_2023_ICONS[0]?.src).toBe('/pwa-64x64.png');
+		expect(webAppManifest(base).icons[0]?.src).toBe('/pwa-64x64.png');
+	});
+
+	test('the constant is frozen, each icon too', () => {
+		expect(Object.isFrozen(MINIMAL_2023_ICONS)).toBe(true);
+		for (const icon of MINIMAL_2023_ICONS)
+			expect(Object.isFrozen(icon)).toBe(true);
+	});
+});
