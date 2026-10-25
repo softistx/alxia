@@ -1321,6 +1321,40 @@ export default function App() {
 Then unregister the worker the dev server already took (DevTools,
 Application, Service Workers, Unregister) and clear its site data.
 
+### An update waits an hour
+
+A new worker is deployed and tabs still run the old one for up to an hour.
+
+**Why:** the worker's script was served with the client's hour of
+`Cache-Control`, so the browser's update check found the cached script.
+Either `noCache` is not declared, or it is declared in `configure`, which
+runs after the client's files: they answer first and the middleware never
+sees the request.
+
+**Fix:** declare it in `beforeAll`, and check with
+`curl -I https://your.app/service-worker.js` that `cache-control` is `no-cache`:
+
+```ts
+import { createServer } from '@alxia/react-router';
+import { SERVICE_WORKER_URL } from '@alxia/react-router/pwa';
+import { noCache } from '@alxia/react-router/pwa/server';
+
+export default createServer({
+  beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
+});
+```
+
+### The worker cannot fetch another origin
+
+The console reports `Refused to connect to 'https://api.example.com/…' because it violates the following Content Security Policy directive: "connect-src 'self'"` from the worker.
+
+**Why:** `noCache` gives the worker's script `WORKER_POLICY`,
+`default-src 'none'; connect-src 'self'`: the worker fetches this site only.
+
+**Fix:** if the worker really must reach another origin, serve the script
+with a wider policy through `revalidated(response, policy)` in a middleware of
+your own (see the guide), rather than loosening the pages' policy.
+
 ### The manifest is in the wrong language
 
 The installed app's name and description are in the default language,

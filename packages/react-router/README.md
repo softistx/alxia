@@ -574,6 +574,21 @@ function UpdateBanner() {
 }
 ```
 
+The worker's script must be revalidated on every update check, and with its
+own policy. Serve it with `noCache` from `@alxia/react-router/pwa/server`
+(its only import is `@alxia/core`), in `beforeAll`, which runs before the
+client's files:
+
+```ts
+import { createServer } from '@alxia/react-router';
+import { SERVICE_WORKER_URL } from '@alxia/react-router/pwa';
+import { noCache } from '@alxia/react-router/pwa/server';
+
+export default createServer({
+  beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
+});
+```
+
 The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/pwa.md) has the rest.
 
 ## Traps
@@ -666,6 +681,14 @@ From `@alxia/react-router/pwa/react` (`react`, an optional peer, is its only imp
 | `ServiceWorkerOptions` | its options |
 | `useUpdateNotice(notice?)` | the `{ reload, later }` to show while a new version waits and "Later" was not asked, else `undefined`; always `undefined` on the server |
 | `updateNotice` | the page's one `UpdateNoticeStore`, which `useServiceWorker` offers and `useUpdateNotice` reads by default |
+
+From `@alxia/react-router/pwa/server` (`@alxia/core` is its only import):
+
+| export | |
+| --- | --- |
+| `noCache` | a middleware: the response it wraps gets `Cache-Control: no-cache` and the worker's policy. For `use(SERVICE_WORKER_URL, noCache)` in `beforeAll` |
+| `revalidated(response, policy?)` | a response with those two headers set, on a copy when its headers are immutable; `policy` is `WORKER_POLICY` by default |
+| `WORKER_POLICY` | `default-src 'none'; connect-src 'self'`: the worker runs no other script and fetches this site only |
 
 The `alxia-react-router` bin, run with `bunx`:
 

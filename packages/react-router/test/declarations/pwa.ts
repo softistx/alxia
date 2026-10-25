@@ -1,6 +1,8 @@
 // The /pwa model behind exported values whose types are inferred: a
 // declaration build must be able to name each one through
 // `@alxia/react-router/pwa` alone (TS2883 otherwise).
+
+import { alxia } from '@alxia/core';
 import {
 	type BrowserManifest,
 	cachingFor,
@@ -8,6 +10,7 @@ import {
 	defineWorkerContract,
 	precacheList,
 	type RequestFacts,
+	SERVICE_WORKER_URL,
 	sessionStore,
 	webAppManifest,
 } from '@alxia/react-router/pwa';
@@ -17,6 +20,7 @@ import {
 	useServiceWorker,
 	useUpdateNotice,
 } from '@alxia/react-router/pwa/react';
+import { noCache } from '@alxia/react-router/pwa/server';
 
 export const contract = defineWorkerContract({ cachePrefix: 'app' });
 
@@ -54,3 +58,6 @@ export function register() {
 export function banner() {
 	return useUpdateNotice(notice);
 }
+
+// The /pwa/server middleware behind an exported app: its type is core's.
+export const app = alxia().use(SERVICE_WORKER_URL, noCache);
