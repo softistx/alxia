@@ -72,9 +72,15 @@ bun run build
 PORT=8080 bun run start
 ```
 
+After React Router's builder has written the client, the plugin builds the
+service worker when the app has an `app/service-worker.ts` (`worker: false`
+turns it off): `build/client/service-worker.js`, with the precache list read
+from the client build ([the PWA guide](pwa.md#zero-config-alxia-builds-it)).
+
 React Router's `serverBundles` split the server build in several, and
 alxia serves one: the plugin refuses them. With `ssr: false`, a
-single-page app, the plugin does nothing.
+single-page app, the plugin does nothing but build the service worker (when
+`app/service-worker.ts` exists).
 
 ## Under `vite preview`
 

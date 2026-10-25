@@ -5,15 +5,16 @@ UI: the service worker's contract, which requests the worker caches, which
 responses it may store, the precache list read from a build, registering the
 worker and offering an update, the web app manifest, and the cleaning at
 sign-out. The code is in `@alxia/react-router/pwa`, its React hooks in
-`@alxia/react-router/pwa/react`, the build script's `buildWorker` in
-`@alxia/react-router/pwa/build`, the server's `noCache` in
+`@alxia/react-router/pwa/react`, `buildWorker` (for a build pipeline of your
+own) in `@alxia/react-router/pwa/build`, the server's `noCache` in
 `@alxia/react-router/pwa/server`, and every app-specific name (the cache
 prefix, the paths never cached) is an option, so two apps never share a
 default.
 
 The worker's Workbox strategies are in `@alxia/react-router/pwa/worker`, and
-`buildWorker` in `@alxia/react-router/pwa/build` bundles it with the precache
-list ([building the worker](#building-the-worker)).
+`alxia()` builds `app/service-worker.ts` with the precache list, with no
+config ([building the worker](#building-the-worker)); `buildWorker` in
+`@alxia/react-router/pwa/build` does the same from a pipeline of your own.
 
 - [What the subpath holds](#what-the-subpath-holds)
 - [The worker's contract](#the-workers-contract)
@@ -37,7 +38,7 @@ never at load. So each runtime can import it:
 | --- | --- |
 | the service worker | `startWorker` from `/pwa/worker`; or, for a worker of your own, the contract, `cachingFor`, `isStorable` |
 | the page | the contract (the same names), `registerServiceWorker`, `createUpdateNotice`, `manifestHref`, `clearAppCaches` |
-| a build script | `buildWorker` from `/pwa/build`; or, for a pipeline of your own, `parseBrowserManifest`, `precacheList`, `assetPrecache` |
+| a build pipeline of your own | `buildWorker` from `/pwa/build`, or, to go further, `parseBrowserManifest`, `precacheList`, `assetPrecache` (`alxia()` needs none of them: it builds `app/service-worker.ts`) |
 | the server | `SERVICE_WORKER_URL`, to serve the worker under its path; `MANIFEST_PATH`, `MANIFEST_HEADERS`, `manifestLanguage` and `webAppManifest`, to serve the manifest |
 
 `@alxia/react-router/pwa/react` is the page's hooks and needs `react`, an
@@ -59,7 +60,8 @@ checks all three). It is for a service worker bundle alone.
 
 `@alxia/react-router/pwa/build` is `buildWorker` and needs Bun: Node's
 built-ins are its only imports, and it reads `Bun` only inside the function,
-never at load. It is for a build script alone, never the worker or the page.
+never at load. `buildWorker` is for a pipeline of your own, where `alxia()` does not build
+the worker; keep it out of the worker and the page.
 To bundle the worker, the Workbox peers of `/pwa/worker` must be installed.
 
 The main entry, `@alxia/react-router`, is not for those: it imports
@@ -227,6 +229,39 @@ export async function answer(request: Request): Promise<Response> {
 ```
 
 ## Building the worker
+
+### Zero config: `alxia()` builds it
+
+With `app/service-worker.ts` in the app, `react-router build` writes
+`build/client/service-worker.js`: `alxia()` bundles the file after React Router's
+client build, with the precache list written in, and logs how many files it
+precaches. The file is the opt-in, as `app/server.ts` is, so an app without one
+gets nothing. It needs Bun: run `bun --bun react-router build`, or put `[run]`
+and `bun = true` in a `bunfig.toml`. A single-page app (`ssr: false`) gets its
+worker too.
+
+```ts
+// file: vite.config.ts
+import { alxia } from '@alxia/react-router/vite';
+import { reactRouter } from '@react-router/dev/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+	plugins: [
+		reactRouter(),
+		alxia({ worker: { precacheAssets: /^body-latin-[\w-]{8}\.woff2$/ } }),
+	],
+});
+```
+
+| `worker` | |
+| --- | --- |
+| left out | `app/service-worker.ts`, when it exists |
+| a string | another file, relative to Vite's root; the build fails when it is not there |
+| `false` | no worker is built |
+| an object | `file` (as the string), `contract`, `offline`, `precacheAssets` and `minify`, as in the table below |
+
+### With `buildWorker`
 
 `buildWorker` bundles the worker (Workbox included) into the client build, after
 `react-router build`, with the precache list written in. It runs on Bun and

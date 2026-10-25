@@ -57,6 +57,14 @@ describe('alxia-react-router reveal', () => {
 		expect(await Bun.file(file).text()).toBe('// mine\n');
 	});
 
+	test("a worker file in alxia({ worker }) is not the server's entry", async () => {
+		await Bun.write(
+			join(root, 'vite.config.ts'),
+			"import { alxia } from '@alxia/react-router/vite';\nexport default { plugins: [alxia({ worker: { file: 'sw/x.ts' } })] };\n",
+		);
+		expect((await run(root, 'reveal')).out).toBe(WROTE('app/server.ts'));
+	});
+
 	test('--force overwrites it', async () => {
 		const file = join(root, 'app', 'server.ts');
 		await Bun.write(file, '// mine\n');

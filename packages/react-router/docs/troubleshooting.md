@@ -14,6 +14,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`Error: No value found for context`](#error-no-value-found-for-context)
 - [`alxia-react-router: … must export createServer() from @alxia/react-router as its default export: …`](#alxia-react-router--must-export-createserver-from-alxiareact-router-as-its-default-export-)
 - [`alxia-react-router: the entry … does not exist. …`](#alxia-react-router-the-entry--does-not-exist-)
+- [`alxia-react-router: the worker … does not exist. …`](#alxia-react-router-the-worker--does-not-exist-)
 - [`alxia-react-router: React Router's Vite plugin is not in this config. …`](#alxia-react-router-react-routers-vite-plugin-is-not-in-this-config-)
 - [`alxia-react-router: serverBundles splits React Router's server build in several, and alxia serves one. …`](#alxia-react-router-serverbundles-splits-react-routers-server-build-in-several-and-alxia-serves-one-)
 - [`alxia-react-router: Vite's ssr environment does not run modules in this process, so the server cannot be loaded.`](#alxia-react-router-vites-ssr-environment-does-not-run-modules-in-this-process-so-the-server-cannot-be-loaded)
@@ -79,6 +80,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [A cache the contract did not make is swept](#a-cache-the-contract-did-not-make-is-swept)
 - [The update notice never shows](#the-update-notice-never-shows)
 - [The worker registers under `react-router dev`](#the-worker-registers-under-react-router-dev)
+- [The service worker is not built](#the-service-worker-is-not-built)
+- [Offline, a client navigation to a route never visited shows the offline page](#offline-a-client-navigation-to-a-route-never-visited-shows-the-offline-page)
 - [An update waits an hour](#an-update-waits-an-hour)
 - [The worker cannot fetch another origin](#the-worker-cannot-fetch-another-origin)
 - [The manifest is in the wrong language](#the-manifest-is-in-the-wrong-language)
@@ -88,8 +91,8 @@ a loader, a message React Router or the browser prints, or an error from
 ### `alxia-react-router: … is running on Node, and alxia's server runs on Bun. …`
 
 **When:** `bun run dev`, `vite preview`, or a `react-router build` that
-prerenders, on a machine where a node is installed. The full message under
-`react-router dev`:
+prerenders or builds a service worker (`app/service-worker.ts`), on a machine
+where a node is installed. The full message under `react-router dev`:
 
 ```
 alxia-react-router: react-router dev is running on Node, and alxia's server runs on Bun. Add a bunfig.toml beside package.json with "[run]" and "bun = true", so bun run starts it on Bun, or run it as bun --bun react-router dev.
@@ -111,7 +114,10 @@ bun = true
 Or run the one command on Bun: `bun --bun react-router dev`. Under
 `vite preview` or a prerendering build, the message begins
 `alxia-react-router: vite preview, or a react-router build that prerenders, is running on Node`
-and names `bun --bun vite preview` and `bun --bun react-router build`.
+and names `bun --bun vite preview` and `bun --bun react-router build`. A
+build that has a service worker reads
+`alxia-react-router: react-router build with a service worker is running on Node`
+and names the same `bun --bun react-router build`.
 
 ### `ReferenceError: Bun is not defined`
 
@@ -280,6 +286,20 @@ Vite's root. Under `react-router dev` each request is a 500 saying so;
 `entry` you named is taken as meant.
 
 **Fix:** correct the path, or leave `entry` out.
+
+### `alxia-react-router: the worker … does not exist. …`
+
+```text
+Error: alxia-react-router: the worker sw/worker.ts does not exist. Create it, or leave worker out to build app/service-worker.ts when it exists.
+```
+
+**When:** `alxia({ worker })` names a file that is not there, relative to
+Vite's root, and `react-router build` fails.
+
+**Why:** a missing `app/service-worker.ts` just means no worker, but a
+`worker` you named is taken as meant.
+
+**Fix:** correct the path, or leave `worker` out.
 
 ### `alxia-react-router: React Router's Vite plugin is not in this config. …`
 
@@ -1394,6 +1414,29 @@ under a dev server caches the code you are editing.
 import.meta.env.PROD })` ([the hook](guide/pwa.md#in-react)). Then unregister
 the worker the dev server already took (DevTools, Application, Service
 Workers, Unregister) and clear its site data.
+
+### The service worker is not built
+
+`react-router build` ends and there is no `build/client/service-worker.js`.
+
+**Why:** `alxia()` builds the worker only when it finds one: the file is not
+`app/service-worker.ts` (or the `appDirectory` of `react-router.config.ts`
+holds another), `worker: false` is set, or the version of `@alxia/react-router`
+is older than 0.10.
+
+**Fix:** put the file at `app/service-worker.ts`, or name it with
+`alxia({ worker: 'sw/worker.ts' })`, and update the package.
+
+### Offline, a client navigation to a route never visited shows the offline page
+
+The page opens offline, but a link to a route the user never opened leads to
+`/offline.html`.
+
+**Why:** React Router asks `/__manifest` for the routes a link needs, and the
+worker never caches that request.
+
+**Fix:** set `routeDiscovery: { mode: 'initial' }` in `react-router.config.ts`,
+so the client has every route from its first load.
 
 ### An update waits an hour
 
