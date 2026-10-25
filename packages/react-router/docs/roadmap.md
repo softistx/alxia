@@ -59,7 +59,7 @@ Nothing planned.
   whole service worker on Workbox: the precache, a page load always from the
   network with the offline page when it fails, hashed bundles cache-first,
   other static files stale-while-revalidate, and the update applied on
-  request. An app's `app/service-worker.ts` is four lines; the `workbox-*`
+  request. An app's `app/service-worker.ts` is a few lines; the `workbox-*`
   packages are optional peers ([guide](guide/pwa.md)).
 - **`@alxia/react-router/pwa/build`.** `buildWorker({ file })` bundles the
   worker after `react-router build`, with the precache list written in: the

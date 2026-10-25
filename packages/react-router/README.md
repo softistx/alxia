@@ -523,8 +523,14 @@ startWorker({ contract: workerContract });
 
 ```tsx
 // file: app/root.tsx
+import { manifestHref } from '@alxia/react-router/pwa';
 import { useServiceWorker } from '@alxia/react-router/pwa/react';
 import { Outlet } from 'react-router';
+
+// The browser reads the manifest to offer the install.
+export function links() {
+	return [{ rel: 'manifest', href: manifestHref('en') }];
+}
 
 // A production build only, never under `react-router dev`.
 export default function App() {
@@ -536,13 +542,56 @@ export default function App() {
 ```ts
 // file: app/server.ts
 import { createServer } from '@alxia/react-router';
-import { SERVICE_WORKER_URL } from '@alxia/react-router/pwa';
+import {
+	MANIFEST_HEADERS,
+	MANIFEST_PATH,
+	SERVICE_WORKER_URL,
+	webAppManifest,
+} from '@alxia/react-router/pwa';
 import { noCache } from '@alxia/react-router/pwa/server';
 
-// The worker's script is revalidated; beforeAll runs before the client's files.
+// beforeAll runs before the client's files: the worker's script is
+// revalidated. The manifest is a route, served with its own headers.
 export default createServer({
 	beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
+	configure: (app) =>
+		app.get(MANIFEST_PATH, ({ reply }) => {
+			const manifest = webAppManifest({
+				name: 'My app',
+				description: 'My installable app',
+				lang: 'en',
+				themeColor: '#1e40af',
+				backgroundColor: '#ffffff',
+			});
+			return reply(200, JSON.stringify(manifest), { headers: MANIFEST_HEADERS });
+		}),
 });
+```
+
+The manifest names four icons (`MINIMAL_2023_ICONS`): put
+`pwa-64x64.png`, `pwa-192x192.png`, `pwa-512x512.png` and
+`maskable-icon-512x512.png` in `public/`, which `@vite-pwa/assets-generator`'s
+`minimal2023Preset` writes from one image. A browser offers the install with
+a 192 and a 512.
+
+The worker serves a page load from `public/offline.html` when the network
+fails, and the build needs the file:
+
+```html
+<!-- file: public/offline.html -->
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta http-equiv="Content-Security-Policy" content="default-src 'none'" />
+		<title>Offline</title>
+	</head>
+	<body>
+		<h1>You are offline</h1>
+		<p>Check your connection and try again.</p>
+	</body>
+</html>
 ```
 
 For a build pipeline of your own, `buildWorker` from `/pwa/build` does what

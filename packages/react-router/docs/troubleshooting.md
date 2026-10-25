@@ -1419,10 +1419,10 @@ Workers, Unregister) and clear its site data.
 
 `react-router build` ends and there is no `build/client/service-worker.js`.
 
-**Why:** `alxia()` builds the worker only when it finds one: the file is not
-`app/service-worker.ts` (or the `appDirectory` of `react-router.config.ts`
-holds another), `worker: false` is set, or the version of `@alxia/react-router`
-is older than 0.10.
+**Why:** `alxia()` builds no worker when the file is not at
+`app/service-worker.ts` (the `appDirectory` of `react-router.config.ts` may
+hold another) and no `worker` option names it, when `worker: false` is set,
+or when the version of `@alxia/react-router` is older than 0.10.
 
 **Fix:** put the file at `app/service-worker.ts`, or name it with
 `alxia({ worker: 'sw/worker.ts' })`, and update the package.

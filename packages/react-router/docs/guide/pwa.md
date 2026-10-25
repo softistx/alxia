@@ -348,10 +348,16 @@ page's one notice. It needs `react` (`bun add react`, which a React Router app
 has already).
 
 ```tsx
-// file: app/app.tsx
+// file: app/root.tsx
+import { manifestHref } from '@alxia/react-router/pwa';
 import { useServiceWorker } from '@alxia/react-router/pwa/react';
 import { Outlet } from 'react-router';
 import { UpdateBanner } from './update-banner';
+
+// The manifest, below, makes the app installable.
+export function links() {
+	return [{ rel: 'manifest', href: manifestHref('fr') }];
+}
 
 export default function App() {
 	useServiceWorker({
@@ -514,13 +520,13 @@ export const workerScript = defineMiddleware(async (_ctx, next) =>
 
 The offline page is the one other document in `build/client`: its policy is
 [its own `<meta>`](#the-offline-page), and `noCache` does not touch it.
+
 ## The web app manifest (and why the language travels in `?lang=`)
 
 A browser fetches the manifest without cookies, so a `language` cookie never
 reaches it. The page names its language in the query, and the server reads it:
 
-```tsx
-// file: app/root.tsx
+```tsx excerpt
 import { manifestHref } from '@alxia/react-router/pwa';
 
 export function links() {
