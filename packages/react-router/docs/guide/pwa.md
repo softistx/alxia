@@ -1,13 +1,13 @@
 # Installable and offline
 
-This page covers what an installable React Router app shares, that has no UI: the service
-worker's contract, which requests the worker caches, which responses it may
-store, the precache list read from a build, registering the worker and
-offering an update, the web app manifest, and the cleaning at sign-out.
-The code is in `@alxia/react-router/pwa`, its React hooks in
+This page covers what an installable React Router app shares, that has no
+UI: the service worker's contract, which requests the worker caches, which
+responses it may store, the precache list read from a build, registering the
+worker and offering an update, the web app manifest, and the cleaning at
+sign-out. The code is in `@alxia/react-router/pwa`, its React hooks in
 `@alxia/react-router/pwa/react`, the server's `noCache` in
-`@alxia/react-router/pwa/server`, and every app-specific name (the
-cache prefix, the paths never cached) is an option, so two apps never share a
+`@alxia/react-router/pwa/server`, and every app-specific name (the cache
+prefix, the paths never cached) is an option, so two apps never share a
 default.
 
 The worker itself (its Workbox strategies) and the build that writes it stay
@@ -129,6 +129,28 @@ export function strategyOf(request: Request) {
 
 export function mayStore(response: Response) {
 	return isStorable(response);
+}
+```
+
+The worker's fetch handler asks both. A cache-first answer for the
+`immutable` words reads the contract's assets cache and falls back to the
+network:
+
+```ts
+// file: sw/answer.ts
+import { workerContract } from '../app/pwa-contract';
+import { mayStore, strategyOf } from './strategy';
+
+export async function answer(request: Request): Promise<Response> {
+	if (strategyOf(request) === 'immutable') {
+		const cache = await caches.open(workerContract.cacheNames.assets);
+		const cached = await cache.match(request);
+		if (cached) return cached;
+		const response = await fetch(request);
+		if (mayStore(response)) await cache.put(request, response.clone());
+		return response;
+	}
+	return fetch(request);
 }
 ```
 

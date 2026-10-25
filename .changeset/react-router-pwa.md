@@ -8,4 +8,4 @@ Add `@alxia/react-router/pwa/react`, the page's hooks, whose only package import
 
 Add `@alxia/react-router/pwa/server`, whose only package import is `@alxia/core`: `noCache`, the middleware that serves the worker's script with `Cache-Control: no-cache` and the worker's policy (declare it with `createServer({ beforeAll })`, before the client's files), `revalidated(response, policy?)` and `WORKER_POLICY`.
 
-The package's guide moved from `docs/guide.md` to `docs/guide/`, one page per topic, and `docs/guide.md` keeps every old anchor, each pointing to its new page.
+The package's guide moved from `docs/guide.md` to `docs/guide/`, one page per topic, and `docs/guide.md` keeps the old section anchors that links use, each pointing to its new page.

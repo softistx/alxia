@@ -488,28 +488,34 @@ the server can all import it. The hooks are in `/pwa/react`
 (`react`, an optional peer) and `noCache` in `/pwa/server`; this package
 never reads `import.meta.env`, so the app passes `enabled`.
 
+```ts
+// file: app/pwa-contract.ts, shared by the worker and the page:
+// every cache is named `my-app-<kind>-<version>`.
+import { defineWorkerContract } from '@alxia/react-router/pwa';
+
+export const workerContract = defineWorkerContract({ cachePrefix: 'my-app' });
+```
+
 ```tsx
-import { createServer } from '@alxia/react-router';
-import {
-	defineWorkerContract,
-	SERVICE_WORKER_URL,
-} from '@alxia/react-router/pwa';
+// file: app/root.tsx
 import { useServiceWorker } from '@alxia/react-router/pwa/react';
-import { noCache } from '@alxia/react-router/pwa/server';
 import { Outlet } from 'react-router';
 
-// app/pwa-contract.ts, shared by the worker and the page:
-// every cache is named `my-app-<kind>-<version>`.
-export const contract = defineWorkerContract({ cachePrefix: 'my-app' });
-
-// app/root.tsx: a production build only, never under `react-router dev`.
+// A production build only, never under `react-router dev`.
 export default function App() {
 	useServiceWorker({ enabled: import.meta.env.PROD });
 	return <Outlet />;
 }
+```
 
-// app/server.ts: the worker's script is revalidated, before the client's files.
-export const server = createServer({
+```ts
+// file: app/server.ts
+import { createServer } from '@alxia/react-router';
+import { SERVICE_WORKER_URL } from '@alxia/react-router/pwa';
+import { noCache } from '@alxia/react-router/pwa/server';
+
+// The worker's script is revalidated; beforeAll runs before the client's files.
+export default createServer({
 	beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
 });
 ```
