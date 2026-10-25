@@ -63,7 +63,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`alxia-react-router: ttlMs threw, using retryMs`](#alxia-react-router-ttlms-threw-using-retryms)
 - [`alxia-react-router: ttlMs is not a duration, using retryMs`](#alxia-react-router-ttlms-is-not-a-duration-using-retryms)
 - [`TypeError: createErrorCatalogue(): needs at least one language.`](#typeerror-createerrorcatalogue-needs-at-least-one-language)
-- [`<api>: <operation> (request <id>) answered <status> (and <code>)`](#api-operation-request-id-answered-status-and-code)
+- [`<api>: <operation> (request <id>) answered <status> <code>`](#api-operation-request-id-answered-status-code)
 - [`<api>: <operation> (request <id>) answered <status> without GraphQL`](#api-operation-request-id-answered-status-without-graphql)
 - [`<api>: <operation> (request <id>) unreachable`, `timeout` or `invalid-response`](#api-operation-request-id-unreachable-timeout-or-invalid-response)
 - [`<api>: <operation> (request <id>) aborted`](#api-operation-request-id-aborted)
@@ -1232,7 +1232,7 @@ const catalogue = createErrorCatalogue({
 });
 ```
 
-### `<api>: <operation> (request <id>) answered <status> (and <code>)`
+### `<api>: <operation> (request <id>) answered <status> <code>`
 
 Logged by `apiCallFailure` (a warning for a 4xx, an error for a 5xx), after the
 `api` the app gave it, when the

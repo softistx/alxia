@@ -719,7 +719,7 @@ declare const todosQuery: DocumentNode;
 ```
 
 Each log line is in the troubleshooting page:
-[answered 403](../troubleshooting.md#api-operation-request-id-answered-status-and-code),
+[answered 403](../troubleshooting.md#api-operation-request-id-answered-status-code),
 [answered 502 without GraphQL](../troubleshooting.md#api-operation-request-id-answered-status-without-graphql),
 [unreachable, timeout, invalid-response](../troubleshooting.md#api-operation-request-id-unreachable-timeout-or-invalid-response)
 and [aborted](../troubleshooting.md#api-operation-request-id-aborted).
