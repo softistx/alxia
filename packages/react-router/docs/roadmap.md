@@ -21,8 +21,9 @@ number on it. Every release, with each change it made, is in
   `readInput` over a Standard Schema) with their fetcher hook
   (`useJsonFetcher`), and the catalogue's refresh (`createErrorCatalogue`:
   read on first use with a bounded wait, checked against the API's versions
-  once per TTL, `warm()` at startup, `clientMessages()` for the root). The
-  failures still follow.
+  once per TTL, `warm()` at startup, `clientMessages()` for the root), and the
+  failures of a call (`apiCallFailure`, `operationName`). Nothing is left to
+  follow.
 
 ## Next
 

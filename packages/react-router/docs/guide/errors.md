@@ -4,7 +4,7 @@ This page covers how an app that calls a GraphQL API words that API's refusals
 for its pages: the error's shape, the request id it carries, the page a
 request is for, the catalogue store of the API's messages, the form checks in
 the API's words, the provider that fills the catalogue, the wording of a
-refusal, the loaders, the error page and the actions that answer with it, the JSON those actions read and the fetcher hook that posts it, and keeping the API's catalogue fresh.
+refusal, the loaders, the error page and the actions that answer with it, the JSON those actions read and the fetcher hook that posts it, calling the API from a loader, and keeping the API's catalogue fresh.
 The code is in `@alxia/react-router/errors`, which has no UI. Its one runtime
 import is `react-router`, never `@alxia/core`, so a page can import it
 (`boundary.spec.ts` checks the built files).
@@ -19,6 +19,7 @@ import is `react-router`, never `@alxia/core`, so a page can import it
 - [Loaders and the error page](#loaders-and-the-error-page)
 - [Actions](#actions)
 - [JSON actions and CSRF](#json-actions-and-csrf)
+- [Calling the API from a loader](#calling-the-api-from-a-loader)
 - [Keeping the catalogue fresh](#keeping-the-catalogue-fresh)
 
 ## What the subpath holds
@@ -39,6 +40,7 @@ import is `react-router`, never `@alxia/core`, so a page can import it
 | `ApiRefusal` | a refused call as a page says it: `{ message, status }` |
 | `jsonActions({ origin? })`, `JsonActions`, `JsonActionsOptions` | `readJson`, `requireJsonPost` and `readInput` for the actions: JSON only, from this site only |
 | `useJsonFetcher(key?, action?)`, `JsonBody` | a fetcher that posts JSON: `{ fetcher, post(body, to?), busy }` |
+| `apiCallFailure(error, options)`, `CallFailureOptions`, `operationName(document)`, `DocumentLike` | what a failed call to the API becomes for a loader to throw, logged with the request id, and the operation's name for the log |
 | `createErrorCatalogue`, `ErrorCatalogue`, `ErrorCatalogueOptions`, `CatalogueReply` | reads the API's catalogue into the store and keeps it fresh: `fresh`, `freshAll`, `warm`, `clientMessages` |
 | `StandardSchemaV1` | the Standard Schema v1 type `readInput` takes, declared here (type only; `InferOutput` is `@alxia/core`'s) |
 
@@ -617,6 +619,95 @@ The action answers `{ ok, error }`, the shape of `fetcherResult` and `submitForm
 
 `Body` types what `post` takes: `useJsonFetcher<typeof action, { input: { title: string } }>()`.
 The hook imports `react-router` alone, so a page can import it from `/errors`.
+
+## Calling the API from a loader
+
+The subpath does not send the call: the headers, the caller and the API's
+address are the app's. It holds what happens once a call failed.
+`apiCallFailure(error, options)` returns what the loader or action should
+throw, and logs it:
+
+| the call failed with | `apiCallFailure` returns | log |
+| --- | --- | --- |
+| an `ApiError` (the API refused) | the same error, with `requestId` set when you pass one | a warning for a 4xx, an error for a 5xx, with the status and the API's code |
+| an `ApiStatusError` of 401, 403 or 404 (no GraphQL body) | a `Response` of that status and reason phrase, with an `x-request-id` header | a warning |
+| an `ApiStatusError` of another status | a 503 `Response` | an error |
+| an `ApiUnavailableError` (`unreachable`, `timeout`, `invalid-response`) | a 503 `Response` | an error with the reason |
+| anything else, once `signal` is aborted | a 503 `Response` | an error: `aborted` |
+| anything else | the same error | none |
+
+It recognises the client's errors by their `name`, never with `instanceof`, so
+it imports nothing from `@nxgt/graphql-client` and holds across two copies of
+it. Pass `requestId` from the response (`requestIdOf(response)`), and the id
+rides on the `ApiError` and on the `Response`, where `routeError` reads it.
+`passedThrough` replaces the statuses that keep their own (401, 403 and 404),
+and `log` replaces `console`. Nothing logged holds a header, a variable or a
+token.
+
+An app writes one `execute` that sends the call and ends in `apiCallFailure`.
+The example uses `@nxgt/graphql-client`; `operationName` reads a document
+structurally, so `graphql` is not imported by the subpath.
+
+```ts
+import { createGraphQLClient } from '@nxgt/graphql-client';
+import {
+	apiCallFailure,
+	operationName,
+	requestIdOf,
+	routeError,
+} from '@alxia/react-router/errors';
+import type { DocumentNode } from 'graphql';
+
+const url = 'https://api.example.com/graphql';
+
+export async function execute(
+	document: DocumentNode,
+	variables: Record<string, unknown>,
+	caller: { language: string; token?: string; signal?: AbortSignal },
+) {
+	let requestId: string | undefined;
+	const client = createGraphQLClient({
+		url,
+		dedupe: false,
+		fetch: async (request: Request) => {
+			const response = await fetch(request);
+			requestId = requestIdOf(response); // the client hands none back
+			return response;
+		},
+	});
+	try {
+		return await client.execute(document as never, variables as never, {
+			signal: caller.signal,
+			headers: { 'accept-language': caller.language },
+			timeout: 10_000,
+		});
+	} catch (error) {
+		throw apiCallFailure(error, {
+			api: `my-api ${url}`,
+			operation: operationName(document),
+			requestId,
+			signal: caller.signal,
+		});
+	}
+}
+
+// A loader: throw routeError(error) for what execute() threw.
+export async function loader() {
+	try {
+		return await execute(todosQuery, {}, { language: 'en' });
+	} catch (error) {
+		throw routeError(error);
+	}
+}
+
+declare const todosQuery: DocumentNode;
+```
+
+Each log line is in the troubleshooting page:
+[answered 403](../troubleshooting.md#api-operation-request-id-answered-status-code),
+[answered 502 without GraphQL](../troubleshooting.md#api-operation-request-id-answered-status-without-graphql),
+[unreachable, timeout, invalid-response](../troubleshooting.md#api-operation-request-id-unreachable-timeout-or-invalid-response)
+and [aborted](../troubleshooting.md#api-operation-request-id-aborted).
 
 ## Keeping the catalogue fresh
 

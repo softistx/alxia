@@ -7,6 +7,7 @@ import {
 	type ApiErrorLike,
 	ApiMessagesProvider,
 	type ApiRefusal,
+	apiCallFailure,
 	apiCodeResolver,
 	type CatalogueMessages,
 	type CatalogueReply,
@@ -20,6 +21,7 @@ import {
 	type JsonBody,
 	jsonActions,
 	nextOf,
+	operationName,
 	REQUEST_ID_HEADER,
 	type RouteErrorData,
 	type RouteErrorOptions,
@@ -234,4 +236,11 @@ export const noLanguage = createErrorCatalogue({
 	read: async () => ({ version: '1', messages: [] }),
 	ttlMs: 1,
 	clientCodes: [],
+});
+
+export const failure = apiCallFailure(new Error('x'), {
+	api: 'my-api',
+	operation: operationName({ definitions: [] }),
+	requestId: 'r-1',
+	passedThrough: new Set([404]),
 });

@@ -530,7 +530,7 @@ rest.
 holds the shape of a GraphQL API's refusal, declared structurally (no `@nxgt/graphql-client` at
 runtime), the request id an API echoes, the page a request is for, the
 catalogue of the API's messages an app keeps, the words of a form's checks,
-the provider that fills the catalogue in the browser, the wording of a refusal, the loaders and actions that answer with it, and the JSON actions (CSRF check) with their fetcher hook:
+the provider that fills the catalogue in the browser, the wording of a refusal, the loaders and actions that answer with it, the JSON actions (CSRF check) with their fetcher hook, and what a failed call to the API becomes (`apiCallFailure`):
 
 ```ts
 import { isApiErrorLike, nextOf, requestIdOf } from '@alxia/react-router/errors';
@@ -629,6 +629,9 @@ export async function action({ request }: { request: Request }) {
 
 // In the component: const { post, busy } = useJsonFetcher<typeof action>();
 ```
+
+A call that failed is turned into what a loader throws, and logged with the API's request id, by `apiCallFailure(error, { api, operation: operationName(document), requestId })`
+(your own `execute` calls it in its `catch`).
 
 The API's catalogue is read and kept fresh by `createErrorCatalogue`; the root's
 middleware awaits `freshAll()`, its loader returns `clientMessages()` and
@@ -776,6 +779,8 @@ From `@alxia/react-router/errors` (`react-router` is its only package import, an
 | `apiCodeResolver(messages, { translate, language, codeOf?, isApiCode? })`, `ApiCodeResolver`, `ApiCodeResolverOptions`, `CodeIssueLike` | the `{ translate, codeOf }` a form's `useCodeResolver(schema, resolver)` takes: a check's API code is worded as the API words it, any other key by the app's translator; `CodeIssueLike` is the issue a custom `codeOf` receives |
 | `ApiMessagesProvider({ messages, value, children })`, `ApiMessagesProviderProps` | fills the store in the browser from the root's data before the children render; a server render writes nothing. A function with no JSX, so no React import |
 | `createApiErrors({ messages, unavailable, refused?, byCode?, isApiCode? })`, `ApiErrors`, `ApiErrorsOptions` | what a page says of a refusal, in a language: `apiErrorMessage(error, language)` (the catalogue's text of the code, else the API's message; `refused` replaces it for an error with no API code and `byCode` words given codes, such as a query's limits), `fieldErrors(error, language)` by input path, `translateCode(code, fallback, language, values?)`, `unavailableMessage(language)` and `apiRefusal(error, language)`; for an action, `fetcherResult(language, about, run)` (`{ ok: true, …about, …value }`, or `{ ok: false, …about, error }` with the refusal's status), `fetcherRefusal(error, language)` (the refusal, or the thrown route error) and `submitForm(language, run, fieldOf)` (`{ ok: true, value }`, or a `FormErrors` with the refusal's status) |
+| `apiCallFailure(error, { api, operation?, requestId?, signal?, passedThrough?, log? })`, `CallFailureOptions` | what a failed call to the API becomes, for a loader or an action to throw, logged with the request id: an `ApiError` as it is (with `requestId`), a `Response` of its own status for a 401, 403 or 404 without a GraphQL body, a 503 `Response` for an unreachable, slow, garbled or aborted call, any other error as it is. It recognises `@nxgt/graphql-client`'s errors by `name`, not `instanceof` |
+| `operationName(document)`, `DocumentLike` | the name of the operation a document holds, for the log (else `query`, `mutation` or `subscription`); a structural `{ definitions }`, so `graphql`'s `DocumentNode` fits |
 | `createErrorCatalogue({ messages, languages, read, versions, ttlMs, clientCodes, retryMs?, firstReadWaitMs?, log? })`, `ErrorCatalogue`, `ErrorCatalogueOptions`, `CatalogueReply` | keeps the API's error catalogue in the store: `fresh(language, now?)` and `freshAll(now?)` (a cold language is awaited for `firstReadWaitMs`, 1500 by default, and read once however many requests ask; a held one is served, and its version checked in the background once per `ttlMs`, a number or a getter; only a language whose version moved is read again; a failure is retried after `retryMs`, 5000 by default), `warm()` for startup, `clientMessages()` (the `clientCodes` the browser words itself, by language, for the root's loader), `reset()`, `heldVersion(language)` and `settled()` (for specs). `read` and `versions` are the app's calls to its API |
 | `ApiRefusal` | `{ message, status }`: a failed call as a page says it; what `apiRefusal` returns for an API refusal (its status) or an unreachable API (503), else `undefined` |
 | `jsonActions({ origin? })`, `JsonActions`, `JsonActionsOptions` | the JSON helpers of the actions, bound to the app's origin (a string, or a getter read at each request; the request's own by default): `readJson(request)` (403 `Cross-site request refused` for another origin or a cross-site fetch, 415 `Expected a JSON body`, 400 `Malformed JSON body`), `requireJsonPost(request)` (a native post goes back to its page) and `readInput(request, schema)` (the body's `input` through a Standard Schema, async allowed; 400 `The form sent an input the API would refuse`) |
