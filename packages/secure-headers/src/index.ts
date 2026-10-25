@@ -12,6 +12,11 @@ export {
 } from './csp';
 export { NONCE, type NonceContext } from './nonce';
 export {
+	PAGE_DIRECTIVES,
+	type PageHeadersOptions,
+	pageHeaders,
+} from './page';
+export {
 	type NonceMiddleware,
 	type SecureHeaders,
 	type SecureHeadersOptions,

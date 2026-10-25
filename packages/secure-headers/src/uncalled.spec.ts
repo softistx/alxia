@@ -5,6 +5,7 @@
 import { describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { clearSiteData } from './clear-site-data';
+import { pageHeaders } from './page';
 import { secureHeaders } from './secure-headers';
 
 describe('given uncalled, a factory throws at declaration', () => {
@@ -17,6 +18,12 @@ describe('given uncalled, a factory throws at declaration', () => {
 	test('clearSiteData', () => {
 		expect(() => alxia().use(clearSiteData as never)).toThrow(
 			'use(): argument 1 looks like a factory (clearSiteData): call it, use(clearSiteData())',
+		);
+	});
+
+	test('pageHeaders', () => {
+		expect(() => alxia().use(pageHeaders as never)).toThrow(
+			'use(): argument 1 looks like a factory (pageHeaders): call it, use(pageHeaders())',
 		);
 	});
 });

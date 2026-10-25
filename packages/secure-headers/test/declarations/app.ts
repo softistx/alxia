@@ -6,6 +6,7 @@ import {
 	clearSiteData,
 	csp,
 	NONCE,
+	pageHeaders,
 	secureHeaders,
 } from '@alxia/secure-headers';
 
@@ -50,6 +51,12 @@ export function withDirectives() {
 				}),
 			}),
 		)
+		.get('/', ({ nonce, reply }) => reply(200, { nonce }));
+}
+
+export function pages() {
+	return alxia()
+		.use(pageHeaders({ https: true }))
 		.get('/', ({ nonce, reply }) => reply(200, { nonce }));
 }
 

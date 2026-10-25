@@ -28,6 +28,8 @@ or a header in the wrong place.
 - [`TypeError: csp(): no directive is left: give at least one, such as { "default-src": ["'none'"] }`](#typeerror-csp-no-directive-is-left-give-at-least-one-such-as--default-src-none-)
 - [`TypeError: clearSiteData(): no type is given: write at least one, such as ["cache"]`](#typeerror-clearsitedata-no-type-is-given-write-at-least-one-such-as-cache)
 - [`TypeError: clearSiteData(): "<type>" is not a type: write one of "cache", "cookies", "storage", "executionContexts", "clientHints", "prefetchCache", "prerenderCache", "*"`](#typeerror-clearsitedata-type-is-not-a-type-write-one-of-cache-cookies-storage-executioncontexts-clienthints-prefetchcache-prerendercache-)
+- [`TypeError: pageHeaders(): script-src has no NONCE: a page script runs only with the response's nonce, so write script-src with NONCE in directives, such as ["'self'", NONCE, "'strict-dynamic'"]`](#typeerror-pageheaders-script-src-has-no-nonce-a-page-script-runs-only-with-the-responses-nonce-so-write-script-src-with-nonce-in-directives-such-as-self-nonce-strict-dynamic)
+- [`TypeError: pageHeaders(): script-src-elem has no NONCE: script elements follow it instead of script-src, so add NONCE to it, or give false to remove it`](#typeerror-pageheaders-script-src-elem-has-no-nonce-script-elements-follow-it-instead-of-script-src-so-add-nonce-to-it-or-give-false-to-remove-it)
 
 **In the browser**
 
@@ -35,6 +37,7 @@ or a header in the wrong place.
 - [`Refused to send form data to '…' because it violates the following Content Security Policy directive: "form-action 'none'"`](#refused-to-send-form-data-to--because-it-violates-the-following-content-security-policy-directive-form-action-none)
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self' 'nonce-…'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-script-src-self-nonce-)
 - [Inline style attributes stop applying once `style-src` has the nonce](#inline-style-attributes-stop-applying-once-style-src-has-the-nonce)
+- [A third-party script or font is refused by a page policy](#a-third-party-script-or-font-is-refused-by-a-page-policy)
 - [`Refused to frame '…' because an ancestor violates the following Content Security Policy directive: "frame-ancestors 'none'"`](#refused-to-frame--because-an-ancestor-violates-the-following-content-security-policy-directive-frame-ancestors-none)
 - [`net::ERR_BLOCKED_BY_RESPONSE.NotSameOrigin`](#neterr_blocked_by_responsenotsameorigin)
 - [`window.opener` is `null` in a sign-in popup](#windowopener-is-null-in-a-sign-in-popup)
@@ -416,6 +419,42 @@ app.use('/sign-out', clearSiteData(['cache']));
 app.use('/sign-out', clearSiteData(['cache', 'cookies']));
 ```
 
+### `TypeError: pageHeaders(): script-src has no NONCE: a page script runs only with the response's nonce, so write script-src with NONCE in directives, such as ["'self'", NONCE, "'strict-dynamic'"]`
+
+**When:** `pageHeaders({ directives: { 'script-src': [...] } })` gives a `script-src` without `NONCE`, or `false`, and the app is declared.
+
+**Why:** a page script runs only with the response's nonce. A `script-src` that lacks `NONCE` would leave every script of the page refused, and the page would not hydrate.
+
+**Fix:** keep `NONCE` in the list you give, with `'strict-dynamic'` after it:
+
+```ts
+import { NONCE, pageHeaders } from '@alxia/secure-headers';
+
+pageHeaders({
+	https: true,
+	directives: { 'script-src': ["'self'", NONCE, "'strict-dynamic'"] },
+});
+```
+
+### `TypeError: pageHeaders(): script-src-elem has no NONCE: script elements follow it instead of script-src, so add NONCE to it, or give false to remove it`
+
+**When:** `pageHeaders({ directives: { 'script-src-elem': [...] } })` gives a `script-src-elem` list without `NONCE`.
+
+**Why:** browsers that support CSP level 3 check `<script>` elements against `script-src-elem` when it is present, and ignore `script-src` for them. A list without `NONCE` would leave every script of the page refused, and the page would not hydrate.
+
+**Fix:** add `NONCE` to the list, or give `false` to remove the directive so `script-src` governs again:
+
+```ts
+import { NONCE, pageHeaders } from '@alxia/secure-headers';
+
+pageHeaders({
+	https: true,
+	directives: { 'script-src-elem': ["'self'", NONCE, "'strict-dynamic'"] },
+});
+```
+
+Under `'strict-dynamic'` a third-party script is loaded by a nonced script, not by allowlisting its host. To allow a host, extend `font-src` or `img-src`, as in `directives: { 'img-src': ["'self'", 'https://img.example'] }`.
+
 ## In the browser
 
 These messages are Chrome's wording; Firefox and Safari report the same
@@ -507,6 +546,26 @@ directive of their own:
 ```ts
 contentSecurityPolicy: `default-src 'self'; script-src 'self'; style-src-elem 'self' ${NONCE}; style-src-attr 'unsafe-inline'`,
 ```
+
+### A third-party script or font is refused by a page policy
+
+**When:** a page behind `pageHeaders()` loads a script, a stylesheet or a font from another origin, and the console reads `Refused to load the script 'https://…' because it violates the following Content Security Policy directive: "script-src 'self' 'nonce-…' 'strict-dynamic'"` (or `font-src 'self'`).
+
+**Why:** `PAGE_DIRECTIVES` allows this site only. A script another script adds is allowed through `'strict-dynamic'`; one named in the HTML needs the nonce, and a font needs its origin in `font-src`.
+
+**Fix:** extend the directive that loads it through `directives`, which replaces that directive's list, so repeat what it already holds:
+
+```ts
+pageHeaders({
+	https: true,
+	directives: {
+		'font-src': ["'self'", 'https://fonts.example'],
+		'style-src-elem': ["'self'", NONCE, 'https://fonts.example'],
+	},
+});
+```
+
+Never put the origin in `default-src`. A script tag from another origin takes the page's `nonce` attribute; an allowlisted `script-src` source is ignored by browsers that support `'strict-dynamic'`.
 
 ### `Refused to frame '…' because an ancestor violates the following Content Security Policy directive: "frame-ancestors 'none'"`
 
