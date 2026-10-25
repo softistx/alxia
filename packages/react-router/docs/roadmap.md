@@ -7,7 +7,12 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing in progress.
+- **`@alxia/react-router/errors`: an API's refusals, worded for the page.**
+  A server's GraphQL refusals (`<module>.errors.<slug>`, `params`, `fields`)
+  are worded from its error catalogue in the page's language, for forms,
+  fetchers, loaders and the error page, with no UI. The shape of a refusal,
+  the request id and `nextOf` are in; the catalogue store, the wording, the
+  route and action helpers, JSON actions and the catalogue's refresh follow.
 
 ## Next
 
