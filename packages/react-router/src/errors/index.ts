@@ -36,3 +36,9 @@ export {
 	type ApiMessagesProviderProps,
 } from './provider';
 export { REQUEST_ID_HEADER, requestIdOf } from './request-id';
+export {
+	errorRequestId,
+	type RouteErrorData,
+	type RouteErrorOptions,
+	routeError,
+} from './route-error';

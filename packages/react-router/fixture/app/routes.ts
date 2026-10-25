@@ -7,5 +7,6 @@ export default [
 	route('missing', 'routes/missing.tsx'),
 	route('login', 'routes/login.tsx'),
 	route('live', 'routes/live.tsx'),
+	route('refused', 'routes/refused.tsx'),
 	route('online', 'routes/online.tsx'),
 ] satisfies RouteConfig;

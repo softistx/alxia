@@ -3,10 +3,11 @@
 This page covers how an app that calls a GraphQL API words that API's refusals
 for its pages: the error's shape, the request id it carries, the page a
 request is for, the catalogue store of the API's messages, the form checks in
-the API's words, the provider that fills the catalogue and the wording of a
-refusal. The code is in `@alxia/react-router/errors`, which has no UI.
-It imports nothing at runtime (it may import `react-router`, never
-`@alxia/core`), so a page can import it (`boundary.spec.ts` checks the built files).
+the API's words, the provider that fills the catalogue, the wording of a
+refusal, and the loaders, the error page and the actions that answer with it.
+The code is in `@alxia/react-router/errors`, which has no UI. Its one runtime
+import is `react-router`, never `@alxia/core`, so a page can import it
+(`boundary.spec.ts` checks the built files).
 
 - [What the subpath holds](#what-the-subpath-holds)
 - [Recognising an API error](#recognising-an-api-error)
@@ -15,6 +16,8 @@ It imports nothing at runtime (it may import `react-router`, never
 - [The catalogue store](#the-catalogue-store)
 - [Form checks in the API's words](#form-checks-in-the-apis-words)
 - [Wording a refusal](#wording-a-refusal)
+- [Loaders and the error page](#loaders-and-the-error-page)
+- [Actions](#actions)
 
 ## What the subpath holds
 
@@ -26,6 +29,7 @@ It imports nothing at runtime (it may import `react-router`, never
 | `REQUEST_ID_HEADER`, `requestIdOf(response)` | the header an API echoes on every response, and its value |
 | `nextOf(url)` | the page a request is for, as `next` carries it back after sign-in |
 | `FormErrors` | what a form action answers when the API refused the input |
+| `routeError(error, options?)`, `errorRequestId(error)`, `RouteErrorData`, `RouteErrorOptions` | what a loader throws for the API's error, and the support reference its error page reads |
 | `createApiMessages`, `ApiMessages`, `ApiMessagesOptions`, `CatalogueMessage(s)`, `ParamKind`, `MessageFormat`, `MessageValues` | the catalogue of the API's messages, held by the app |
 | `apiCodeResolver`, `ApiCodeResolver`, `ApiCodeResolverOptions`, `CodeIssueLike` | the words of a form's checks, from that catalogue; `CodeIssueLike` is the issue a custom `codeOf` receives |
 | `ApiMessagesProvider`, `ApiMessagesProviderProps` | fills the catalogue in the browser from the root's data |
@@ -345,3 +349,136 @@ export async function action({ request }: Route.ActionArgs) {
 }
 ```
 
+## Loaders and the error page
+
+A loader that calls the API lets a refusal reach the error page. Throw
+`routeError(error)`: an `ApiError` whose status is 401, 403, 404 or 503
+becomes a route error response of that status, carrying the API's `code` and
+`message` and the call's `requestId`; any other `ApiError` with a request id
+becomes a 500 that carries only the id; anything else is returned as it is,
+so `throw` it too.
+
+```ts
+import { routeError } from '@alxia/react-router/errors';
+import type { Route } from './+types/todo';
+
+// Your own call to the API, declared here as a stub.
+declare function readTodo(id: string): Promise<{ title: string }>;
+
+export async function loader({ params }: Route.LoaderArgs) {
+	try {
+		return await readTodo(params.id);
+	} catch (error) {
+		throw routeError(error);
+	}
+}
+```
+
+The root's `ErrorBoundary` words the error and shows the support reference
+the user can quote, `errorRequestId(error)` (`undefined` for an error that
+carries none):
+
+```tsx
+import { errorRequestId } from '@alxia/react-router/errors';
+import { isRouteErrorResponse, useRouteError } from 'react-router';
+
+export function ErrorBoundary() {
+	const error = useRouteError();
+	const requestId = errorRequestId(error);
+	return (
+		<main>
+			<h1>{isRouteErrorResponse(error) ? error.status : 'Oops'}</h1>
+			{requestId ? <p>Reference: {requestId}</p> : null}
+		</main>
+	);
+}
+```
+
+A thrown `Response` of one of those statuses with an `x-request-id` header
+becomes a route error too (a bare `Response` hands the browser its body
+only). `routeError(error, { statuses, requestIdHeader })` changes the routed
+statuses (a `ReadonlySet<number>`) and the header the id is read from.
+
+An `ApiError` has a `requestId` only if the code that called the API set it
+(read `requestIdOf(response)` and keep it on the error); see
+[the error page shows no request id](../troubleshooting.md#the-error-page-shows-no-request-id).
+
+## Actions
+
+An action that calls the API answers a refusal as data, so the page stays
+where it was. `apiErrors` (from [wording a refusal](#wording-a-refusal)) has
+two helpers; each throws, through `routeError`, what the page cannot word (a
+401, which the session code redirects first, or any failure that is not an
+API refusal), for the error page.
+
+`fetcherResult(language, about, run)` is for a fetcher's action: `{ ok: true }`
+with `about` and the value `run` resolved, or `{ ok: false, error }` with
+`about` and the worded message, answered with the refusal's HTTP status. An
+unreachable API (a 503 `Response`) is worded too.
+
+```ts
+import { apiErrors } from './api-errors';
+import type { Route } from './+types/todos';
+
+// Your own call to the API, declared here as a stub.
+declare function renameTodo(input: unknown): Promise<{ title: string }>;
+
+export async function action({ request }: Route.ActionArgs) {
+	const input = await request.json();
+	return apiErrors.fetcherResult('en', { intent: 'rename' }, () =>
+		renameTodo(input),
+	);
+}
+```
+
+`submitForm(language, run, fieldOf)` is for a form: `{ ok: true, value }`, or
+the form's `FormErrors` with the refusal's status. `fieldOf` names the form
+field of an input path (`undefined` when the form does not show it): a
+placed field's message goes under that field (`fieldErrors`), and any other
+message, with the API's own for the code, joins the `formError`. A 404 that
+names none of the form's fields (the record itself is gone) goes to the error
+page.
+
+```ts
+import { apiErrors } from './api-errors';
+import type { Route } from './+types/todos';
+
+// Your own call to the API, declared here as a stub.
+declare function createTodo(input: unknown): Promise<{ id: string }>;
+
+export async function action({ request }: Route.ActionArgs) {
+	const input = await request.json();
+	return apiErrors.submitForm(
+		'en',
+		() => createTodo(input),
+		(path) => (path === 'todo.title' ? 'title' : undefined),
+	);
+}
+```
+
+`fetcherRefusal(error, language)` is the refusal both build on, for an action
+of your own: it returns `apiRefusal`'s `{ message, status }`, or throws what
+the page cannot word.
+
+```ts
+import { apiErrors } from './api-errors';
+import type { Route } from './+types/todos';
+
+// Your own call to the API, declared here as a stub.
+declare function archiveTodo(id: string): Promise<{ archivedAt: string }>;
+
+export async function action({ request }: Route.ActionArgs) {
+	const { id } = await request.json();
+	try {
+		return { ok: true as const, ...(await archiveTodo(id)) };
+	} catch (error) {
+		// The API's refusal: { message, status }. A 401 or any other failure throws.
+		const { message, status } = apiErrors.fetcherRefusal(error, 'en');
+		return Response.json({ ok: false, error: message }, { status });
+	}
+}
+```
+
+The helpers pass `routeError`'s defaults (401, 403, 404 and 503 routed, the
+`x-request-id` header); `createApiErrors` has no option to change them. An
+action that needs other statuses calls `routeError(error, options)` itself.

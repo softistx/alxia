@@ -10,11 +10,15 @@ import {
 	type CatalogueMessages,
 	createApiErrors,
 	createApiMessages,
+	errorRequestId,
 	type FormErrors,
 	isApiErrorLike,
 	nextOf,
 	REQUEST_ID_HEADER,
+	type RouteErrorData,
+	type RouteErrorOptions,
 	requestIdOf,
+	routeError,
 	waitMinutes,
 } from '@alxia/react-router/errors';
 
@@ -109,3 +113,39 @@ export const noMessages = createApiErrors<'en' | 'fr'>(
 	// @ts-expect-error `messages` is required
 	{ unavailable: () => '' },
 );
+
+export const routed = routeError(new Error('x'), {
+	statuses: new Set([404]),
+	requestIdHeader: 'x-trace',
+});
+
+export function requestOf(error: unknown): string | undefined {
+	return errorRequestId(error);
+}
+
+export const routedData: RouteErrorData = { requestId: 'r-1' };
+
+export const routedOptions: RouteErrorOptions = {};
+
+export async function fetched(todo: string) {
+	const result = await errors.fetcherResult('en', { todo }, async () => ({
+		count: 1,
+	}));
+	return 'ok' in result ? result : result.data;
+}
+
+export function fetchedRefusal(error: unknown): ApiRefusal {
+	return errors.fetcherRefusal(error, 'en');
+}
+
+export async function submitted() {
+	const result = await errors.submitForm(
+		'fr',
+		async () => 1,
+		(path) => (path === 'title' ? 'title' : undefined),
+	);
+	return 'ok' in result ? result.value : result.data;
+}
+
+// @ts-expect-error 'de' is not 'en' | 'fr'
+errors.fetcherResult('de', {}, async () => ({}));
