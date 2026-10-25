@@ -84,6 +84,9 @@ describe('read', () => {
 		const packages: Tracked[] = tracked(found, lockPackages);
 		expect(packages.map(({ name, dirs }) => [name, dirs])).toEqual([
 			['@nxgt/di', ['packages/di']],
+			// @alxia/react-router's is a devDependency: its /errors spec checks
+			// that the client's ApiError fits ApiErrorLike.
+			['@nxgt/graphql-client', ['packages/react-router']],
 			['@nxgt/httpyz', ['packages/create']],
 			['@nxgt/i18n', ['packages/i18n', 'packages/janus']],
 			['@nxgt/janus', ['packages/janus']],
@@ -96,10 +99,11 @@ describe('read', () => {
 		for (const one of packages) {
 			expect(one.locked.length).toBeGreaterThan(0);
 			// The api template's generator and test client are @alxia/create's
-			// tools, no peer.
-			expect(one.peers.length).toBe(
-				one.dirs.includes('packages/create') ? 0 : 1,
-			);
+			// tools, and the GraphQL client only a dev dependency: no peer.
+			const peerless =
+				one.dirs.includes('packages/create') ||
+				one.name === '@nxgt/graphql-client';
+			expect(one.peers.length).toBe(peerless ? 0 : 1);
 		}
 	});
 

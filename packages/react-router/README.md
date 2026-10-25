@@ -524,6 +524,27 @@ The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-ro
 has the worker's fetch handler, the manifest route, the update banner and the
 rest.
 
+## An API's refusals, worded for the page
+
+`@alxia/react-router/errors` has no UI and imports nothing at runtime. It
+holds the shape of a GraphQL API's refusal, declared structurally (no `@nxgt/graphql-client` at
+runtime), the request id an API echoes, and the page a request is for:
+
+```ts
+import { isApiErrorLike, nextOf, requestIdOf } from '@alxia/react-router/errors';
+
+export function describe(error: unknown, request: Request) {
+	return isApiErrorLike(error)
+		? { code: error.code, status: error.status, next: nextOf(request.url) }
+		: undefined;
+}
+
+export const idOf = (response: Response) => requestIdOf(response);
+```
+
+The [errors guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md)
+has the rest.
+
 ## Traps
 
 - **A context key made in `app/` reaches the loaders only through the
@@ -623,6 +644,17 @@ From `@alxia/react-router/pwa/server` (`@alxia/core` is its only package import)
 | `revalidated(response, policy?)` | a response with those two headers set, on a copy when its headers are immutable; `policy` is `WORKER_POLICY` by default |
 | `WORKER_POLICY` | `default-src 'none'; connect-src 'self'`: the worker runs no other script and fetches this site only |
 
+From `@alxia/react-router/errors` (it imports nothing at runtime, and never `@alxia/core`):
+
+| export | |
+| --- | --- |
+| `isApiErrorLike(error)` | whether `error` is an `@nxgt/graphql-client` `ApiError`, like the client's `isApiError`, plus a numeric `status`, which `ApiErrorLike` promises; it holds across two copies of the client |
+| `ApiErrorLike`, `ApiErrorEntryLike`, `ApiErrorExtensionsLike`, `ApiErrorParamsLike`, `ApiFieldErrorLike` | the shape of the refusal: `errors`, `code`, `status`, `requestId?`, and each error's `extensions` (`code`, `params`, `fields`, `field`, `minutes`, `retryAfter`) |
+| `waitMinutes(extensions)` | the minutes of a throttle's wait: `minutes` (at least one), else `retryAfter` rounded up |
+| `REQUEST_ID_HEADER`, `requestIdOf(response)` | `x-request-id`, and the id a response carries, if the API sent one |
+| `nextOf(url)` | the path and search of the page a request is for, without React Router's `.data`, `/_.data`, `_routes` and empty `index` |
+| `FormErrors` | what a form action answers when the API refused the input: `fieldErrors` by field and a `formError`, already translated |
+
 The `alxia-react-router` bin, run with `bunx`:
 
 | command | |
@@ -638,6 +670,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Typing the loaders](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/typing-the-loaders.md): `Register`, and the app's own context keys.
 - [A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md), [Beside the pages](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md) (middlewares, routes, WebSockets, the client's files), [OpenAPI](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/openapi.md), [Testing](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/testing.md) and [Deploying](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md), with Docker.
 - [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
+- [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, and the page a request is for.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.

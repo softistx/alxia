@@ -16,9 +16,9 @@
       "name": "react-router-example",
       "dependencies": {
         "@alxia/compress": "^0.3.10",
-        "@alxia/core": "^0.15.0",
+        "@alxia/core": "^0.15.1",
         "@alxia/logger": "^0.6.7",
-        "@alxia/react-router": "^0.8.1",
+        "@alxia/react-router": "^0.9.0",
         "@alxia/secure-headers": "^0.4.10",
         "@react-router/node": "^8.5.0",
         "@react-router/serve": "^8.5.0",
@@ -309,10 +309,12 @@
         "@alxia/compress": "workspace:^",
         "@alxia/core": "workspace:^",
         "@alxia/openapi": "workspace:^",
+        "@nxgt/graphql-client": "^0.4.0",
         "@react-router/dev": "^8.5.0",
         "@types/bun": "^1.4.2",
         "@types/react": "^19.3.0",
         "@types/react-dom": "^19.3.0",
+        "graphql": "^17.0.2",
         "isbot": "^5.2.2",
         "react": "^19.3.1",
         "react-dom": "^19.3.1",
@@ -754,6 +756,8 @@
     "@nodelib/fs.walk": ["@nodelib/fs.walk@1.2.8", "", { "dependencies": { "@nodelib/fs.scandir": "2.1.5", "fastq": "^1.6.0" } }, "sha512-oGB+UxlgWcgQkgwo8GcEGwemoTFt3FIO9ababBmaGwXIoBKZ+GTy0pP185beGg7Llih/NSHSV2XAs1lnznocSg=="],
 
     "@nxgt/di": ["@nxgt/di@0.2.0", "", { "peerDependencies": { "typescript": "^6.0.3" } }, "sha512-YMahwd8FoLRtVRm/RTtCTMRffGNk8swaRPuop/ysphLJcZ0WG8wFH0bFlhImGywL226fcMEdwfcFhE4FylfMXw=="],
+
+    "@nxgt/graphql-client": ["@nxgt/graphql-client@0.4.0", "", { "dependencies": { "@graphql-typed-document-node/core": "^3.2.0", "@nxgt/httpyz": "^0.4.1" }, "peerDependencies": { "@types/react": "^19.0.0", "graphql": "^16.11.0 || ^17.0.0", "react": "^19.0.0", "typescript": "^6.0.3 || ^7.0.0" }, "optionalPeers": ["@types/react", "react"] }, "sha512-d9jGkB8nFC4VD7EBfLenrk9IsxoBkvamTTyqGLpVKMpRaV6wzwuUZFzvtk5TrJ9+rqoIEgwqu8h/nK0xMMITpQ=="],
 
     "@nxgt/httpyz": ["@nxgt/httpyz@0.4.1", "", { "peerDependencies": { "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-M6D6v6MznKDhM6eObKK+LsPoOYoJwRbJKRSvB2ONDV7lC0xWAe7grHH7C8qELCoNndVAYD94iyUTRVp7wrkQzw=="],
 
@@ -1502,6 +1506,8 @@
     "yoctocolors": ["yoctocolors@2.2.0", "", {}, "sha512-xYqdZFUK/VYazNl/oCDYN+3WloWQwMfZxBoiNt6qNyk+xfOdi598muWE42rNZFp1kNOiqW936q5RhUdnpqElSg=="],
 
     "zod": ["zod@4.6.5", "", {}, "sha512-v5l/aFXZQeai4awLbOpSoHecE9UiMrnfx75tEXLjNonXVARxQ5mOeipTjROUchszUNCqnE+hqAMujRsRHsut2Q=="],
+
+    "@alxia/react-router/graphql": ["graphql@17.0.2", "", {}, "sha512-FRWbddMxfkjiB7z+aQDWIR+E34xo9I8c9mtK2RPv8PmMzKRvrdsreHL/Ui/TmwHJfhHChEtsFPyMHKI+xuarQQ=="],
 
     "@babel/core/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
 

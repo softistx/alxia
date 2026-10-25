@@ -1,7 +1,7 @@
 {
 	"name": "@alxia/react-router",
 	"version": "0.9.0",
-	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served; the code with no UI an installable app shares (`/pwa`), its hooks (`/pwa/react`) and `noCache` for the worker's script (`/pwa/server`)",
+	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served; the code with no UI an installable app shares (`/pwa`), its hooks (`/pwa/react`), `noCache` for the worker's script (`/pwa/server`), and an API's refusals worded for the page (`/errors`)",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -42,6 +42,11 @@
 			"import": "./dist/pwa/server/index.js",
 			"default": "./dist/pwa/server/index.js"
 		},
+		"./errors": {
+			"types": "./dist/errors/index.d.ts",
+			"import": "./dist/errors/index.js",
+			"default": "./dist/errors/index.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"repository": {
@@ -65,6 +70,7 @@
 			"src/pwa/index.ts",
 			"src/pwa/react/index.ts",
 			"src/pwa/server/index.ts",
+			"src/errors/index.ts",
 			"src/cli/index.ts"
 		]
 	},
@@ -72,10 +78,12 @@
 		"@alxia/compress": "workspace:^",
 		"@alxia/core": "workspace:^",
 		"@alxia/openapi": "workspace:^",
+		"@nxgt/graphql-client": "^0.4.0",
 		"@react-router/dev": "^8.5.0",
 		"@types/bun": "^1.4.2",
 		"@types/react": "^19.3.0",
 		"@types/react-dom": "^19.3.0",
+		"graphql": "^17.0.2",
 		"isbot": "^5.2.2",
 		"react": "^19.3.1",
 		"react-dom": "^19.3.1",
