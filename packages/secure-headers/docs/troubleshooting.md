@@ -26,6 +26,8 @@ or a header in the wrong place.
 - [`TypeError: csp(): "<name>" is not a directive name: write lowercase letters, digits and hyphens, starting with a letter, as in "script-src"`](#typeerror-csp-name-is-not-a-directive-name-write-lowercase-letters-digits-and-hyphens-starting-with-a-letter-as-in-script-src)
 - [`TypeError: csp(): <name> has the source "<source>", which is empty or holds ";", "," or a space: a source is one token, so split a list into several sources, and write a comma inside a URL as %2C`](#typeerror-csp-name-has-the-source-source-which-is-empty-or-holds---or-a-space-a-source-is-one-token-so-split-a-list-into-several-sources-and-write-a-comma-inside-a-url-as-2c)
 - [`TypeError: csp(): no directive is left: give at least one, such as { "default-src": ["'none'"] }`](#typeerror-csp-no-directive-is-left-give-at-least-one-such-as--default-src-none-)
+- [`TypeError: clearSiteData(): no type is given: write at least one, such as ["cache"]`](#typeerror-clearsitedata-no-type-is-given-write-at-least-one-such-as-cache)
+- [`TypeError: clearSiteData(): "<type>" is not a type: write one of "cache", "cookies", "storage", "executionContexts", "clientHints", "prefetchCache", "prerenderCache", "*"`](#typeerror-clearsitedata-type-is-not-a-type-write-one-of-cache-cookies-storage-executioncontexts-clienthints-prefetchcache-prerendercache-)
 
 **In the browser**
 
@@ -47,6 +49,7 @@ or a header in the wrong place.
 - [A 404 or a route outside a group has no headers](#a-404-or-a-route-outside-a-group-has-no-headers)
 - [A `try`/`catch` middleware's reply has no headers](#a-trycatch-middlewares-reply-has-no-headers)
 - [A route has no headers, though the others do](#a-route-has-no-headers-though-the-others-do)
+- [`Clear-Site-Data` is missing on a client-side sign-out](#clear-site-data-is-missing-on-a-client-side-sign-out)
 
 ## Types
 
@@ -387,6 +390,30 @@ TypeError: csp(): no directive is left: give at least one, such as { "default-sr
 ```ts
 csp({ 'default-src': ["'none'"] });
 // or leave the header out: secureHeaders({ contentSecurityPolicy: false })
+```
+
+### `TypeError: clearSiteData(): no type is given: write at least one, such as ["cache"]`
+
+**When:** `clearSiteData([])`, called with no type, throws where the app is declared.
+
+**Why:** a `Clear-Site-Data` header with no value tells the browser nothing.
+
+**Fix:** name what to clear:
+
+```ts
+app.use('/sign-out', clearSiteData(['cache']));
+```
+
+### `TypeError: clearSiteData(): "<type>" is not a type: write one of "cache", "cookies", "storage", "executionContexts", "clientHints", "prefetchCache", "prerenderCache", "*"`
+
+**When:** a type is misspelled (`'cash'`) or is not one the header knows, past a cast or in JavaScript. TypeScript refuses it first.
+
+**Why:** the browser ignores a type it does not know, so the cache would stay as it was without a word.
+
+**Fix:** use one of the types the message lists:
+
+```ts
+app.use('/sign-out', clearSiteData(['cache', 'cookies']));
 ```
 
 ## In the browser
@@ -734,4 +761,20 @@ is declared, which is why its `404` is covered.
 const app = alxia()
 	.use(secureHeaders())
 	.get('/early', ({ reply }) => reply(200, 'now covered'));
+```
+
+### `Clear-Site-Data` is missing on a client-side sign-out
+
+**When:** a form sign-out empties the cache, but a client-side one (the button, a navigation) does not. `Clear-Site-Data` is on the response of `POST /sign-out` and absent from `POST /sign-out.data`.
+
+**Why:** React Router's single fetch posts the route's `.data` URL, a path `use('/sign-out', …)` does not cover. A route cannot set the header there either: that answer carries a redirect's cookies, not its other headers.
+
+**Fix:** mount the middleware on both paths:
+
+```ts
+const cleared = clearSiteData(['cache']);
+
+const app = alxia()
+	.use('/sign-out', cleared)
+	.use('/sign-out.data', cleared);
 ```

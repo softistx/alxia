@@ -4,12 +4,19 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
+import { clearSiteData } from './clear-site-data';
 import { secureHeaders } from './secure-headers';
 
 describe('given uncalled, a factory throws at declaration', () => {
 	test('secureHeaders', () => {
 		expect(() => alxia().use(secureHeaders as never)).toThrow(
 			'use(): argument 1 looks like a factory (secureHeaders): call it, use(secureHeaders())',
+		);
+	});
+
+	test('clearSiteData', () => {
+		expect(() => alxia().use(clearSiteData as never)).toThrow(
+			'use(): argument 1 looks like a factory (clearSiteData): call it, use(clearSiteData())',
 		);
 	});
 });

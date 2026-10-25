@@ -2,7 +2,12 @@
 // types are inferred: a declaration build must be able to name each one
 // through `@alxia/secure-headers` and `@alxia/core` alone (TS2883 otherwise).
 import { alxia } from '@alxia/core';
-import { csp, NONCE, secureHeaders } from '@alxia/secure-headers';
+import {
+	clearSiteData,
+	csp,
+	NONCE,
+	secureHeaders,
+} from '@alxia/secure-headers';
 
 export function secured() {
 	return alxia()
@@ -46,6 +51,14 @@ export function withDirectives() {
 			}),
 		)
 		.get('/', ({ nonce, reply }) => reply(200, { nonce }));
+}
+
+export function signOut() {
+	const cleared = clearSiteData(['cache']);
+	return alxia()
+		.use('/sign-out', cleared)
+		.use('/sign-out.data', cleared)
+		.post('/sign-out', ({ reply }) => reply(204));
 }
 
 export function noncePlugin() {

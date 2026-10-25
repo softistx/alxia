@@ -15,3 +15,10 @@ refused at startup with a `TypeError` that names the directive.
 'private, no-store'` keeps a cache from storing a page that carries a nonce or
 a viewer's data. It is set like every other header, so a route's own
 `Cache-Control` wins and a 404 or a thrown error gets it too.
+
+`clearSiteData(['cache'])` is a middleware for the sign-out path: it sends
+`Clear-Site-Data` on a 2xx or 3xx answer to a `POST` (`methods` changes
+that), and nothing on a GET or a refused request. React Router's client-side
+sign-out posts `/sign-out.data`, so mount it on both paths. An empty list or
+an unknown type is refused at startup with a `TypeError` that starts
+`clearSiteData():`.
