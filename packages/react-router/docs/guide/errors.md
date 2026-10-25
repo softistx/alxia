@@ -3,12 +3,8 @@
 This page covers how an app that calls a GraphQL API words that API's refusals
 for its pages: the error's shape, the request id it carries, and the page a
 request is for. The code is in `@alxia/react-router/errors`, which has no UI.
-It imports `react-router` and `react` and nothing else, never `@alxia/core`,
-so a page can import it (`boundary.spec.ts` checks the built files).
-
-More of the subpath ships in the slices of one effort: the catalogue of the
-API's messages, the wording of a refusal, loaders, actions and forms. The
-[roadmap](../roadmap.md#now) lists them. This page grows with each.
+It imports nothing at runtime (it may import `react-router`, never
+`@alxia/core`), so a page can import it (`boundary.spec.ts` checks the built files).
 
 - [What the subpath holds](#what-the-subpath-holds)
 - [Recognising an API error](#recognising-an-api-error)
@@ -20,7 +16,7 @@ API's messages, the wording of a refusal, loaders, actions and forms. The
 | export | what it is |
 | --- | --- |
 | `ApiErrorLike`, `isApiErrorLike(error)` | the shape of `@nxgt/graphql-client`'s `ApiError`, and the test for it |
-| `ApiErrorEntryLike`, `ApiErrorExtensionsLike`, `ApiFieldErrorLike` | one error of the response, its `extensions`, and one refused field |
+| `ApiErrorEntryLike`, `ApiErrorExtensionsLike`, `ApiErrorParamsLike`, `ApiFieldErrorLike` | one error of the response, its `extensions`, their `params`, and one refused field |
 | `waitMinutes(extensions)` | the minutes of a throttle's wait |
 | `REQUEST_ID_HEADER`, `requestIdOf(response)` | the header an API echoes on every response, and its value |
 | `nextOf(url)` | the page a request is for, as `next` carries it back after sign-in |
@@ -29,9 +25,9 @@ API's messages, the wording of a refusal, loaders, actions and forms. The
 ## Recognising an API error
 
 The subpath does not depend on `@nxgt/graphql-client`. `isApiErrorLike` tests
-an `Error` named `ApiError` that has an `errors` array and a numeric `status`,
-the test the client's own `isApiError` makes, so it holds when two copies of
-the client are installed.
+an `Error` named `ApiError` that has an `errors` array, like the client's
+`isApiError`, plus a numeric `status`, which `ApiErrorLike` promises. It holds
+when two copies of the client are installed.
 
 ```ts
 import { isApiErrorLike } from '@alxia/react-router/errors';

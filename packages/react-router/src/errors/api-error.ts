@@ -33,10 +33,10 @@ export interface ApiErrorExtensionsLike {
 	readonly fields?: readonly ApiFieldErrorLike[];
 	/** Any other refusal about one input field, by its path. */
 	readonly field?: string;
-	/** A throttle's wait, in minutes. */
-	readonly minutes?: number;
+	/** A throttle's wait, in minutes (`waitMinutes` coerces a string). */
+	readonly minutes?: unknown;
 	/** A throttle's wait, in seconds. */
-	readonly retryAfter?: number;
+	readonly retryAfter?: unknown;
 	readonly [key: string]: unknown;
 }
 
@@ -59,8 +59,9 @@ export interface ApiErrorLike extends Error {
 
 /**
  * Whether `error` is an `ApiError` of `@nxgt/graphql-client`, by the test
- * that client's own `isApiError` makes: an `Error` named `ApiError` with its
- * `errors` and a numeric `status`. It holds across two copies of the client.
+ * that client's `isApiError` makes (an `Error` named `ApiError` with an
+ * `errors` array), plus a numeric `status`, which `ApiErrorLike` promises.
+ * It holds across two copies of the client.
  */
 export function isApiErrorLike(error: unknown): error is ApiErrorLike {
 	return (

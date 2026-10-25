@@ -1,7 +1,7 @@
 {
 	"name": "@alxia/react-router",
 	"version": "0.9.0",
-	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served; the code with no UI an installable app shares (`/pwa`), its hooks (`/pwa/react`) `noCache` for the worker's script (`/pwa/server`), and an API's refusals worded for the page (`/errors`)",
+	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served; the code with no UI an installable app shares (`/pwa`), its hooks (`/pwa/react`), `noCache` for the worker's script (`/pwa/server`), and an API's refusals worded for the page (`/errors`)",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
