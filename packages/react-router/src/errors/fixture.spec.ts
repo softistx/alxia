@@ -24,6 +24,8 @@ describe('the fixture app through /errors', () => {
 		expect(response.status).toBe(409);
 		const body = await response.text();
 		expect(body).toContain('"ok"');
+		expect(body).toContain('false');
+		expect(body).toContain('Nothing here');
 		expect(body).toContain('rename');
 	});
 });

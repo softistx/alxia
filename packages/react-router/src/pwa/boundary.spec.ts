@@ -136,10 +136,10 @@ describe('/pwa types', () => {
 });
 
 describe('/errors', () => {
-	test('imports react-router and react alone: no core, no node: module, no bun', async () => {
+	test('imports react-router alone: no core, no node: module, no bun', async () => {
 		const imports = await importsOf(join(DIST, 'errors/index.js'));
 		for (const specifier of new Set(imports)) {
-			expect(['react-router', 'react']).toContain(specifier);
+			expect(['react-router']).toContain(specifier);
 		}
 	});
 
