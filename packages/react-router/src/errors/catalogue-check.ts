@@ -1,5 +1,4 @@
 import type { Held } from './catalogue-read';
-import type { ApiMessages, CatalogueMessages } from './messages';
 
 /** What the TTL check needs: the reader's state and the app's own calls. */
 export interface CheckContext<L extends string> {
@@ -42,7 +41,10 @@ export async function checkVersions<L extends string>(
 	}
 }
 
-/** The TTL, whose getter is the app's: one that throws is logged and `fallback` is used. */
+/**
+ * The TTL, whose getter is the app's: one that throws, or that is not a
+ * finite number of at least 0, is logged and `fallback` is used.
+ */
 export function safeTtl(
 	ttlMs: number | (() => number),
 	fallback: number,
@@ -50,41 +52,14 @@ export function safeTtl(
 ) {
 	return () => {
 		try {
-			return typeof ttlMs === 'function' ? ttlMs() : ttlMs;
+			const ttl = typeof ttlMs === 'function' ? ttlMs() : ttlMs;
+			if (typeof ttl === 'number' && Number.isFinite(ttl) && ttl >= 0) {
+				return ttl;
+			}
+			log.error('alxia-react-router: ttlMs is not a duration, using retryMs');
 		} catch (error) {
 			log.error('alxia-react-router: ttlMs threw, using retryMs', error);
-			return fallback;
 		}
+		return fallback;
 	};
-}
-
-/** A log whose `error` can throw without breaking what reports through it. */
-export function quietLog(log: Pick<Console, 'error'>): Pick<Console, 'error'> {
-	return {
-		error: (...args) => {
-			try {
-				log.error(...args);
-			} catch {
-				// A broken log must not turn a handled failure into a rejection.
-			}
-		},
-	};
-}
-
-/** The messages the browser words itself, by language. */
-export function clientMessages<L extends string>(
-	messages: ApiMessages<L>,
-	languages: readonly L[],
-	clientCodes: readonly string[],
-) {
-	const byLanguage = {} as Record<L, CatalogueMessages>;
-	for (const language of languages) {
-		const entries: Record<string, CatalogueMessages[string]> = {};
-		for (const code of clientCodes) {
-			const entry = messages.messageOf(language, code);
-			if (entry) entries[code] = entry;
-		}
-		byLanguage[language] = entries;
-	}
-	return byLanguage;
 }

@@ -2,7 +2,7 @@ import { data } from 'react-router';
 import { isApiErrorLike } from './api-error';
 import type { ApiErrors } from './api-errors';
 import type { FormErrors } from './form-errors';
-import { routeError } from './route-error';
+import { type RouteErrorOptions, routeError } from './route-error';
 
 /**
  * Runs a form's mutation. An `ApiError` becomes the form's errors: each
@@ -16,16 +16,17 @@ export async function submitForm<L extends string, T>(
 	language: L,
 	run: () => Promise<T>,
 	fieldOf: (path: string) => string | undefined,
+	route?: RouteErrorOptions,
 ): Promise<{ ok: true; value: T } | ReturnType<typeof data<FormErrors>>> {
 	try {
 		return { ok: true, value: await run() };
 	} catch (error) {
 		if (!isApiErrorLike(error) || error.status === 401) {
-			throw routeError(error);
+			throw routeError(error, route);
 		}
 		const field = error.errors[0]?.extensions?.field;
 		if (error.status === 404 && !(field && fieldOf(field))) {
-			throw routeError(error);
+			throw routeError(error, route);
 		}
 		const byField: Record<string, string> = {};
 		const unplaced: string[] = [];

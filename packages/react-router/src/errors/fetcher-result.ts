@@ -1,7 +1,7 @@
 import { data } from 'react-router';
 import { isApiErrorLike } from './api-error';
 import type { ApiErrors, ApiRefusal } from './api-errors';
-import { routeError } from './route-error';
+import { type RouteErrorOptions, routeError } from './route-error';
 
 /**
  * A fetcher's refusal: the API's (`apiRefusal`), an unreachable API's too,
@@ -12,12 +12,13 @@ export function fetcherRefusal<L extends string>(
 	errors: Pick<ApiErrors<L>, 'apiRefusal'>,
 	error: unknown,
 	language: L,
+	route?: RouteErrorOptions,
 ): ApiRefusal {
 	const refusal =
 		isApiErrorLike(error) && error.status === 401
 			? undefined
 			: errors.apiRefusal(error, language);
-	if (!refusal) throw routeError(error);
+	if (!refusal) throw routeError(error, route);
 	return refusal;
 }
 
@@ -35,11 +36,12 @@ export async function fetcherResult<
 	language: L,
 	about: About,
 	run: () => Promise<Value>,
+	route?: RouteErrorOptions,
 ) {
 	try {
 		return { ok: true as const, ...about, ...(await run()) };
 	} catch (error) {
-		const { message, status } = fetcherRefusal(errors, error, language);
+		const { message, status } = fetcherRefusal(errors, error, language, route);
 		return data({ ok: false as const, ...about, error: message }, { status });
 	}
 }

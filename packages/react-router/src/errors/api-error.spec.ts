@@ -42,6 +42,12 @@ describe('isApiErrorLike', () => {
 		expect(isApiErrorLike(copy)).toBe(true);
 	});
 
+	test('is false for a plain object that is not an Error, whatever its name and errors', () => {
+		expect(
+			isApiErrorLike({ name: 'ApiError', errors: [{ message: 'x' }] }),
+		).toBe(false);
+	});
+
 	test('is false for anything else', () => {
 		const plain = { name: 'ApiError', errors: [], status: 400 };
 		expect(isApiErrorLike(plain)).toBe(false);

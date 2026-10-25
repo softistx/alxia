@@ -126,8 +126,10 @@ export const noMessages = createApiErrors<'en' | 'fr'>(
 
 export const routed = routeError(new Error('x'), {
 	statuses: new Set([404]),
-	requestIdHeader: 'x-trace',
 });
+
+// @ts-expect-error the request id header is `REQUEST_ID_HEADER`, not an option
+routeError(new Error('x'), { requestIdHeader: 'x-trace' });
 
 export function requestOf(error: unknown): string | undefined {
 	return errorRequestId(error);
@@ -138,14 +140,17 @@ export const routedData: RouteErrorData = { requestId: 'r-1' };
 export const routedOptions: RouteErrorOptions = {};
 
 export async function fetched(todo: string) {
-	const result = await errors.fetcherResult('en', { todo }, async () => ({
-		count: 1,
-	}));
+	const result = await errors.fetcherResult(
+		'en',
+		{ todo },
+		async () => ({ count: 1 }),
+		{ statuses: new Set([404]) },
+	);
 	return 'ok' in result ? result : result.data;
 }
 
 export function fetchedRefusal(error: unknown): ApiRefusal {
-	return errors.fetcherRefusal(error, 'en');
+	return errors.fetcherRefusal(error, 'en', { statuses: new Set([404]) });
 }
 
 export async function submitted() {
@@ -153,6 +158,7 @@ export async function submitted() {
 		'fr',
 		async () => 1,
 		(path) => (path === 'title' ? 'title' : undefined),
+		{ statuses: new Set([404]) },
 	);
 	return 'ok' in result ? result.value : result.data;
 }

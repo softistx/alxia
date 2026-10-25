@@ -92,12 +92,17 @@ export function createApiMessages<L extends string>({
 		// A message that did not format is reported here, not logged: the
 		// caller falls back.
 		let failed = false;
-		const text = format(entry.message, language, worded, {
-			onError: () => {
-				failed = true;
-			},
-		});
-		return failed ? undefined : text;
+		try {
+			const text = format(entry.message, language, worded, {
+				onError: () => {
+					failed = true;
+				},
+			});
+			return failed ? undefined : text;
+		} catch {
+			// An app's formatter that throws is a message that did not format.
+			return undefined;
+		}
 	}
 
 	return {

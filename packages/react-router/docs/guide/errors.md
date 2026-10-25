@@ -28,7 +28,7 @@ import is `react-router`, never `@alxia/core`, so a page can import it
 | --- | --- |
 | `ApiErrorLike`, `isApiErrorLike(error)` | the shape of `@nxgt/graphql-client`'s `ApiError`, and the test for it |
 | `ApiErrorEntryLike`, `ApiErrorExtensionsLike`, `ApiErrorParamsLike`, `ApiFieldErrorLike` | one error of the response, its `extensions`, their `params`, and one refused field |
-| `waitMinutes(extensions)` | the minutes of a throttle's wait |
+| `waitMinutes(extensions)` | the minutes of a throttle's wait: `minutes` (at least one), else `retryAfter` rounded up to minutes |
 | `REQUEST_ID_HEADER`, `requestIdOf(response)` | the header an API echoes on every response, and its value |
 | `nextOf(url)` | the page a request is for, as `next` carries it back after sign-in |
 | `FormErrors` | what a form action answers when the API refused the input |
@@ -41,8 +41,8 @@ import is `react-router`, never `@alxia/core`, so a page can import it
 | `jsonActions({ origin? })`, `JsonActions`, `JsonActionsOptions` | `readJson`, `requireJsonPost` and `readInput` for the actions: JSON only, from this site only |
 | `useJsonFetcher(key?, action?)`, `JsonBody` | a fetcher that posts JSON: `{ fetcher, post(body, to?), busy }` |
 | `apiCallFailure(error, options)`, `CallFailureOptions`, `operationName(document)`, `DocumentLike` | what a failed call to the API becomes for a loader to throw, logged with the request id, and the operation's name for the log |
-| `createErrorCatalogue`, `ErrorCatalogue`, `ErrorCatalogueOptions`, `CatalogueReply` | reads the API's catalogue into the store and keeps it fresh: `fresh`, `freshAll`, `warm`, `clientMessages` |
-| `StandardSchemaV1` | the Standard Schema v1 type `readInput` takes, declared here (type only; `InferOutput` is `@alxia/core`'s) |
+| `createErrorCatalogue`, `ErrorCatalogue`, `ErrorCatalogueOptions`, `CatalogueReply` | reads the API's catalogue into the store and keeps it fresh: `fresh`, `freshAll`, `warm`, `clientMessages`; `reset`, `settled`, `heldVersion` and the `now` parameters are for tests |
+| `StandardSchemaV1` | the Standard Schema v1 type `readInput` takes, declared here (type only; `readInput`'s output is inferred from the schema's `~standard.types`) |
 
 ## Recognising an API error
 
@@ -90,7 +90,11 @@ export function idOf(response: Response) {
 
 On a client navigation, `request.url` is `/todos/list.data?q=a&_routes=…`
 (`/_.data` for `/`), React Router's single-fetch details. `nextOf` returns the
-page itself, for the `next` a sign-in carries back:
+page itself, for the `next` a sign-in carries back. It never starts with two
+slashes (`//evil.com` and `/\evil.com` both read as another site to a
+redirect), but it is not a validation: an app must still check `next` before
+redirecting to it after sign-in.
+
 
 ```ts
 import { nextOf } from '@alxia/react-router/errors';
@@ -149,7 +153,7 @@ with the whole catalogue. `add` merges, which is what the browser does with
 the few messages its forms word. `clear` forgets everything, for specs.
 
 In the browser, `ApiMessagesProvider` adds the messages the root's data
-carries before the children render, since the resolver reads them
+carries (`value` is the root loader's data, `messages` the store to fill) before the children render, since the resolver reads them
 synchronously. It is a plain function with no JSX, and it imports React for its
 types only:
 
@@ -404,8 +408,9 @@ export function ErrorBoundary() {
 
 A thrown `Response` of one of those statuses with an `x-request-id` header
 becomes a route error too (a bare `Response` hands the browser its body
-only). `routeError(error, { statuses, requestIdHeader })` changes the routed
-statuses (a `ReadonlySet<number>`) and the header the id is read from.
+only). `routeError(error, { statuses })` changes the routed statuses (a
+`ReadonlySet<number>`). The id is read from `x-request-id` (`REQUEST_ID_HEADER`,
+through `requestIdOf`), the one header name the subpath knows.
 
 An `ApiError` has a `requestId` only if the code that called the API set it
 (read `requestIdOf(response)` and keep it on the error); see
@@ -487,9 +492,11 @@ export async function action({ request }: Route.ActionArgs) {
 }
 ```
 
-The helpers pass `routeError`'s defaults (401, 403, 404 and 503 routed, the
-`x-request-id` header); `createApiErrors` has no option to change them. An
-action that needs other statuses calls `routeError(error, options)` itself.
+The helpers route with `routeError`'s defaults (401, 403, 404 and 503). Each
+takes an optional last argument, `route?: RouteErrorOptions`, passed to
+`routeError` for what it throws: `apiErrors.fetcherRefusal(error, 'en', {
+statuses })`, `fetcherResult(language, about, run, { statuses })` and
+`submitForm(language, run, fieldOf, { statuses })`.
 
 ## JSON actions and CSRF
 
@@ -522,6 +529,9 @@ export async function action({ request }: Route.ActionArgs) {
 	// …
 }
 ```
+
+The body is limited only by the server's `maxRequestBodySize` (Bun's default
+is 128 MB), so an app should set it to what its largest form needs.
 
 `readInput(request, schema)` reads the body's `input` and checks it against
 a [Standard Schema](https://standardschema.dev) (Zod 4, Valibot, ArkType,
@@ -631,9 +641,9 @@ throw, and logs it:
 | --- | --- | --- |
 | an `ApiError` (the API refused) | the same error, with `requestId` set when you pass one | a warning for a 4xx, an error for a 5xx, with the status and the API's code |
 | an `ApiStatusError` of 401, 403 or 404 (no GraphQL body) | a `Response` of that status and reason phrase, with an `x-request-id` header | a warning |
-| an `ApiStatusError` of another status | a 503 `Response` | an error |
-| an `ApiUnavailableError` (`unreachable`, `timeout`, `invalid-response`) | a 503 `Response` | an error with the reason |
-| anything else, once `signal` is aborted | a 503 `Response` | an error: `aborted` |
+| an `ApiStatusError` of another status | a 503 `Response` with no body | an error |
+| an `ApiUnavailableError` (`unreachable`, `timeout`, `invalid-response`) | a 503 `Response` with no body | an error with the reason |
+| anything else, once `signal` is aborted | a 503 `Response` with no body | an error: `aborted` |
 | anything else | the same error | none |
 
 It recognises the client's errors by their `name`, never with `instanceof`, so
@@ -645,7 +655,9 @@ and `log` replaces `console`. A `passedThrough` status that cannot carry a
 body (204 and the like) is answered with an empty body. The log lines start
 with the `api` name you pass (`<api>: <operation> …`), not
 `alxia-react-router:`, because they describe your app's call, not a package
-diagnostic. Nothing logged holds a header, a variable or a token.
+diagnostic. Nothing logged holds a header, a variable or a token. A `log` that
+throws never replaces the outcome: the error or `Response` is returned as if
+the line had been written.
 
 An app writes one `execute` that sends the call and ends in `apiCallFailure`.
 The example uses `@nxgt/graphql-client`; `operationName` reads a document
@@ -742,7 +754,9 @@ export const catalogue = createErrorCatalogue<'en' | 'fr'>({
 
 `ttlMs` has no default and must be given: a number, or a getter read at each
 check, so a value set at startup or changed by a test is found. A getter that
-throws is logged and `retryMs` is used in its place. `retryMs` (5000 by default) is how soon a
+throws, or a value that is not a finite number of at least 0, is logged and
+`retryMs` is used in its place (see
+[`ttlMs is not a duration`](../troubleshooting.md#alxia-react-router-ttlms-is-not-a-duration-using-retryms)). `retryMs` (5000 by default) is how soon a
 failed read or check is tried again, and `firstReadWaitMs` (1500 by default)
 is how long a request waits for a language's first read. `log` receives the
 failures (`console` by default); its lines start with `alxia-react-router:`.
@@ -812,7 +826,8 @@ export default createServer();
 `fresh(language, now)` and `freshAll(now)` take the time as an argument, in
 milliseconds, so a spec moves the clock instead of sleeping: a call at
 `now = ttl` starts the check, `settled()` waits for it, and `heldVersion`
-says which version is held. `reset()` forgets what is held and empties the
+says which version is held. `reset()`, `settled()`, `heldVersion()`, the `now`
+parameters and the store's `clear()` are for tests. `reset()` forgets what is held and empties the
 store. It is for use between tests, with nothing in flight: a read or check
 still running when it is called finishes and holds its result again.
 

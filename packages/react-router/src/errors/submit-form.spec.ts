@@ -166,3 +166,22 @@ describe('submitForm', () => {
 		expect(data.fieldErrors).toEqual({});
 	});
 });
+
+describe('the route option', () => {
+	test('submitForm passes it to the error page', async () => {
+		const gone = () =>
+			new Response(null, { status: 410, headers: { 'x-request-id': 'r-1' } });
+		const route = { statuses: new Set([410]) };
+		const plain = await errors
+			.submitForm('fr', fail(gone()), fieldOf)
+			.catch((e) => e);
+		expect(plain).toBeInstanceOf(Response);
+		const routed = await errors
+			.submitForm('fr', fail(gone()), fieldOf, route)
+			.catch((e) => e);
+		expect(answer(routed)).toMatchObject({
+			data: { requestId: 'r-1' },
+			init: { status: 410 },
+		});
+	});
+});

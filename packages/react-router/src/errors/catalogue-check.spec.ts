@@ -1,5 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { catalogueOn, fakeApi, TTL } from '../../test/errors/fake-api';
+import { safeTtl } from './catalogue-check';
 
 async function warm(options?: Parameters<typeof catalogueOn>[1]) {
 	const on = catalogueOn(fakeApi(), options);
@@ -153,5 +154,31 @@ describe('a user callback that throws', () => {
 		expect(
 			api.calls.filter((call) => call === 'versions').length,
 		).toBeGreaterThan(1);
+	});
+});
+
+describe('safeTtl', () => {
+	const lines: unknown[][] = [];
+	const log = { error: (...args: unknown[]) => void lines.push(args) };
+
+	test.each([
+		['NaN', Number.NaN],
+		['-1', -1],
+		['Infinity', Number.POSITIVE_INFINITY],
+		['a string', '1000' as unknown as number],
+	])('%s is not a duration: logged, and the fallback is used', (_, value) => {
+		lines.length = 0;
+		expect(safeTtl(() => value, 50, log)()).toBe(50);
+		expect(safeTtl(value, 50, log)()).toBe(50);
+		expect(lines[0]).toEqual([
+			'alxia-react-router: ttlMs is not a duration, using retryMs',
+		]);
+	});
+
+	test('0 and a finite number are served as they are, without a line', () => {
+		lines.length = 0;
+		expect(safeTtl(0, 50, log)()).toBe(0);
+		expect(safeTtl(() => 1_000, 50, log)()).toBe(1_000);
+		expect(lines).toEqual([]);
 	});
 });

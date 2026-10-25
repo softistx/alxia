@@ -72,3 +72,34 @@ describe('fetcherRefusal', () => {
 		expect(() => errors.fetcherRefusal(boom, 'en')).toThrow(boom);
 	});
 });
+
+describe('the route option', () => {
+	const gone = () =>
+		new Response(null, { status: 410, headers: { 'x-request-id': 'r-1' } });
+	const route = { statuses: new Set([410]) };
+
+	test('fetcherRefusal throws what routeError makes of it with the option', () => {
+		const response = gone();
+		expect(() => errors.fetcherRefusal(response, 'en')).toThrow();
+		try {
+			errors.fetcherRefusal(response, 'en', route);
+		} catch (thrown) {
+			expect(body(thrown)).toMatchObject({
+				data: { requestId: 'r-1' },
+				init: { status: 410 },
+			});
+		}
+		expect.assertions(2);
+	});
+
+	test('fetcherResult passes it on', async () => {
+		const thrown = await errors
+			.fetcherResult('en', {}, () => Promise.reject(gone()), route)
+			.catch((error) => error);
+		expect(body(thrown).init.status).toBe(410);
+		const plain = await errors
+			.fetcherResult('en', {}, () => Promise.reject(gone()))
+			.catch((error) => error);
+		expect(plain).toBeInstanceOf(Response);
+	});
+});

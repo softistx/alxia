@@ -54,10 +54,11 @@ export function describeApiErrors<L extends string>({
 		unavailableMessage,
 		fieldErrors,
 		apiRefusal,
-		fetcherRefusal: (error, language) => fetcherRefusal(parts, error, language),
-		fetcherResult: (language, about, run) =>
-			fetcherResult(parts, language, about, run),
-		submitForm: (language, run, fieldOf) =>
-			submitForm(parts, language, run, fieldOf),
+		fetcherRefusal: (error, language, route) =>
+			fetcherRefusal(parts, error, language, route),
+		fetcherResult: (language, about, run, route) =>
+			fetcherResult(parts, language, about, run, route),
+		submitForm: (language, run, fieldOf, route) =>
+			submitForm(parts, language, run, fieldOf, route),
 	};
 }

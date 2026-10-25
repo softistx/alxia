@@ -69,6 +69,18 @@ describe('apiMessage', () => {
 	});
 });
 
+describe('a formatter that throws', () => {
+	test('is a message that did not format, so the caller falls back', () => {
+		const messages = createApiMessages<Lang>({
+			format: () => {
+				throw new Error('formatter broke');
+			},
+		});
+		messages.set('en', { 'a.errors.b': { message: 'B', params: [] } });
+		expect(messages.apiMessage('a.errors.b', {}, 'en')).toBeUndefined();
+	});
+});
+
 describe('the store', () => {
 	const entry = (message: string) => ({ message, params: [] });
 
