@@ -255,7 +255,7 @@ for the types.
 
 With `secureHeaders({ nonce: true })` from `@alxia/secure-headers` in
 `configure`, each request's policy names a fresh nonce, and the context
-carries it. `nonceOf(loadContext)` reads it in `entry.server.tsx`, and React
+carries it. `@alxia/react-router/entry` reads it with `nonceOf(loadContext)`, and React
 Router puts it on every script it renders, so `script-src` needs no
 `'unsafe-inline'`:
 
@@ -271,27 +271,15 @@ configure: (app) =>
 	),
 ```
 
-The template has no `entry.server.tsx`; reveal React Router's, then add
-three lines:
+The template has no `entry.server.tsx`; the package's own is one line:
 
-```sh
-bunx react-router reveal entry.server
+```ts
+// app/entry.server.tsx
+export { handleRequest as default, streamTimeout } from '@alxia/react-router/entry';
 ```
 
-```diff
- // app/entry.server.tsx, as reveal writes it
- import { PassThrough } from "node:stream";
-
-+import { nonceOf } from "@alxia/react-router";
- import type { EntryContext, RouterContextProvider } from "react-router";
- …
-     const { pipe, abort } = renderToPipeableStream(
--      <ServerRouter context={routerContext} url={request.url} />,
-+      <ServerRouter context={routerContext} url={request.url} nonce={nonceOf(loadContext)} />,
-       {
-+        nonce: nonceOf(loadContext),
-         [readyOption]() {
-```
+To customise the entry, reveal React Router's and add the nonce yourself
+([an entry of your own](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md#an-entry-of-your-own)).
 
 `nonceOf` returns `undefined` when no middleware set a nonce, so the entry works
 with or without secure-headers: neither package depends on the other. Any
@@ -346,8 +334,8 @@ export default function App() {
 }
 ```
 
-`THEME_BOOT` is your theme library's own boot script. In the entry, wrap the
-router:
+`THEME_BOOT` is your theme library's own boot script. `/entry` already provides
+the nonce to the page; an entry of your own wraps the router:
 
 ```tsx
 // app/entry.server.tsx (inside handleRequest)
