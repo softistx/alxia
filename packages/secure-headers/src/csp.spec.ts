@@ -26,6 +26,12 @@ describe('csp', () => {
 		).toBe("default-src 'self'; upgrade-insecure-requests");
 	});
 
+	test('a list value is written after the name, as sandbox tokens', () => {
+		expect(csp({ sandbox: ['allow-scripts', 'allow-forms'] })).toBe(
+			'sandbox allow-scripts allow-forms',
+		);
+	});
+
 	test('NONCE passes through, and is replaced for each request', async () => {
 		const policy = csp({
 			'script-src': ["'self'", NONCE],
@@ -57,20 +63,27 @@ describe('csp', () => {
 		);
 	});
 
-	test('refuses a name that is not lowercase letters and hyphens', () => {
+	test('refuses a name that is not lowercase letters, digits and hyphens, starting with a letter', () => {
 		expect(() => csp({ 'Script-Src': ["'self'"] })).toThrow(
 			new TypeError(
-				'csp(): "Script-Src" is not a directive name: write lowercase letters and hyphens, as in "script-src"',
+				'csp(): "Script-Src" is not a directive name: write lowercase letters, digits and hyphens, starting with a letter, as in "script-src"',
 			),
 		);
 		expect(() => csp({ 'img src': ["'self'"] })).toThrow(TypeError);
+		for (const name of ['-', '-x', '9x']) {
+			expect(() => csp({ [name]: ["'self'"] })).toThrow(TypeError);
+		}
+	});
+
+	test('a name may hold digits after its first letter', () => {
+		expect(csp({ x1: ["'self'"] })).toBe("x1 'self'");
 	});
 
 	test('refuses a source that holds ";", "," or whitespace', () => {
 		for (const source of ["'self'; script-src *", 'a,b', 'a b', '']) {
 			expect(() => csp({ 'img-src': [source] })).toThrow(
 				new TypeError(
-					`csp(): img-src has the source "${source}", which is empty or holds ";", "," or a space: a source is one token, so split a list into several sources`,
+					`csp(): img-src has the source "${source}", which is empty or holds ";", "," or a space: a source is one token, so split a list into several sources, and write a comma inside a URL as %2C`,
 				),
 			);
 		}

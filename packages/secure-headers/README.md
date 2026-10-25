@@ -96,7 +96,7 @@ app.use(
 ```
 
 An empty source list, a source holding `;`, `,` or a space, a name that is
-not lowercase letters and hyphens, and a policy with no directive are
+not lowercase letters, digits and hyphens starting with a letter, and a policy with no directive are
 refused with a `TypeError` that starts `csp():`.
 
 ## Defaults

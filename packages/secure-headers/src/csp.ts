@@ -59,9 +59,9 @@ export type CspDirectives = {
 export function csp(directives: CspDirectives): string {
 	const written: string[] = [];
 	for (const [name, value] of Object.entries(directives)) {
-		if (!/^[a-z-]+$/.test(name)) {
+		if (!/^[a-z][a-z0-9-]*$/.test(name)) {
 			throw new TypeError(
-				`csp(): "${name}" is not a directive name: write lowercase letters and hyphens, as in "script-src"`,
+				`csp(): "${name}" is not a directive name: write lowercase letters, digits and hyphens, starting with a letter, as in "script-src"`,
 			);
 		}
 		if (value === undefined || value === false) continue;
@@ -77,7 +77,7 @@ export function csp(directives: CspDirectives): string {
 		for (const source of value) {
 			if (/[;,\s]/.test(source) || source === '') {
 				throw new TypeError(
-					`csp(): ${name} has the source "${source}", which is empty or holds ";", "," or a space: a source is one token, so split a list into several sources`,
+					`csp(): ${name} has the source "${source}", which is empty or holds ";", "," or a space: a source is one token, so split a list into several sources, and write a comma inside a URL as %2C`,
 				);
 			}
 		}
