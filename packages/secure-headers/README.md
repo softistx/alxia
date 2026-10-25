@@ -116,6 +116,44 @@ widens the rule. A route's own `Clear-Site-Data` is kept. React Router's client-
 so mount both paths. An empty list or an unknown type is refused with a
 `TypeError` that starts `clearSiteData():`.
 
+## Pages
+
+`pageHeaders()` is `secureHeaders` for server-rendered pages: a strict policy
+with a nonce per request, HSTS and `upgrade-insecure-requests` only over
+HTTPS, `Referrer-Policy: strict-origin-when-cross-origin`, and
+`Cache-Control: private, no-store`, since a cache must never store a nonce.
+
+```ts
+import { createServer } from '@alxia/react-router';
+import { pageHeaders } from '@alxia/secure-headers';
+
+export default createServer({
+	configure: (app) => app.use(pageHeaders({ https: import.meta.env.PROD })),
+});
+```
+
+`https` is required and never read from the environment. `PAGE_DIRECTIVES`
+is the policy: `'self'` for everything, scripts only with the nonce (and what
+they load, `'strict-dynamic'`), nonced `<style>` elements, no `<base>`, forms
+to this site, no framing. `directives` merges over it: a list replaces a
+directive's sources, `false` removes the directive.
+
+```ts
+app.use(
+	pageHeaders({
+		https: true,
+		directives: {
+			'img-src': ["'self'", 'https://images.example'],
+			'manifest-src': false,
+		},
+	}),
+);
+```
+
+Any other `secureHeaders` option passes through and wins over the preset's;
+`contentSecurityPolicy` and `nonce` are not options here. A `script-src`
+without `NONCE` is refused with a `TypeError` that starts `pageHeaders():`.
+
 ## Defaults
 
 | header | default | option |
@@ -157,6 +195,9 @@ own `Cache-Control` wins, and a 404 or a thrown error gets it too.
 | `ClearSiteDataType` | a value of the header: `'cache'`, `'cookies'`, `'storage'`, `'executionContexts'`, `'clientHints'`, `'prefetchCache'`, `'prerenderCache'` or `'*'` |
 | `ClearSiteDataOptions` | its options: `methods`, `['POST']` by default |
 | `ClearSiteData` | what `clearSiteData()` returns: a middleware that adds nothing to the context |
+| `pageHeaders(options)` | `secureHeaders({ nonce: true, … })` for server-rendered pages: `PAGE_DIRECTIVES` with a nonce, HSTS with `https`, no-store |
+| `PageHeadersOptions` | its options: `https` (required), `directives`, and every `secureHeaders` option but the policy and `nonce` |
+| `PAGE_DIRECTIVES` | the page policy's 13 directives, a `CspDirectives` |
 | `NONCE` | where the nonce goes in `contentSecurityPolicy`, each time it is named |
 | `NonceContext` | what `nonce: true` adds to the context: `nonce`, a string |
 | `SecureHeaders` | what `secureHeaders()` returns: a middleware that adds nothing to the context |

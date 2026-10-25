@@ -277,7 +277,8 @@ header, unless it writes it into its own policy.
 
 `@alxia/react-router` reads the nonce from the context, if one is there,
 with `nonceOf(loadContext)` in `entry.server.tsx`. Neither package depends
-on the other. See
+on the other. `pageHeaders({ https })` is the policy that goes with it
+([below](#pages-pageheaders)). See
 [its guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md#a-csp-nonce).
 
 ### Without `nonce: true`
@@ -328,6 +329,79 @@ app.use(
   a space, and a policy with no directive left throw a `TypeError` that
   starts `csp():`, before the first request
   ([troubleshooting](troubleshooting.md#runtime)).
+
+## Pages: `pageHeaders`
+
+`pageHeaders({ https })` is `secureHeaders` with the settings a
+server-rendered page with a nonce needs, so an app does not write the policy
+itself.
+
+```ts
+import { alxia } from '@alxia/core';
+import { pageHeaders } from '@alxia/secure-headers';
+
+const app = alxia()
+	.use(pageHeaders({ https: true }))
+	.get('/', ({ nonce, reply }) => reply(200, `<script nonce="${nonce}">…</script>`));
+```
+
+What it sets:
+
+- `nonce: true`, and the policy `PAGE_DIRECTIVES` with
+  `upgrade-insecure-requests` when `https` is true.
+- `Strict-Transport-Security` when `https` is true, none otherwise.
+- `Referrer-Policy: strict-origin-when-cross-origin`.
+- `Cache-Control: private, no-store`, since a cache must never store a nonce.
+- Every other `secureHeaders` option, as given: yours win over the preset's.
+  `contentSecurityPolicy` and `nonce` are not options (a type error): the
+  policy goes through `directives`.
+
+`https` is required. Pass `import.meta.env.PROD` or your own flag; the
+package never reads the environment, so a development server on plain HTTP
+gets no HSTS.
+
+### The directives
+
+| directive | holds | why |
+| --- | --- | --- |
+| `default-src` | `'self'` | anything a directive below does not name loads from this site only |
+| `script-src` | `'self'`, `NONCE`, `'strict-dynamic'` | only the scripts this response's nonce marks, and what they load; `'self'` is a fallback for browsers without `'strict-dynamic'` |
+| `style-src-elem` | `'self'`, `NONCE` | this site's stylesheets and the `<style>` elements that carry the nonce (a UI library's nonced style elements, a dev client's); no `'unsafe-inline'`, since an injected `<style>` can read a value out with attribute selectors |
+| `style-src-attr` | `'unsafe-inline'` | `style` attributes (custom properties, positions); no nonce covers an attribute, and this allows no `<style>` element and no script |
+| `img-src` | `'self'` | icons, sprites and logos; no `data:` or `blob:` until a feature needs one |
+| `font-src` | `'self'` | self-hosted fonts |
+| `connect-src` | `'self'` | the framework's data requests, to this site only; a development server's WebSocket on the page's own host |
+| `worker-src` | `'self'` | the service worker |
+| `manifest-src` | `'self'` | the web app manifest |
+| `object-src` | `'none'` | no plugin content |
+| `base-uri` | `'none'` | no `<base>`: a relative URL always means this site |
+| `form-action` | `'self'` | forms post to this site only, a submit before hydration included |
+| `frame-ancestors` | `'none'` | no page frames this one (clickjacking); `X-Frame-Options: DENY` covers older browsers |
+
+Never add `'unsafe-eval'`, nor `'unsafe-inline'` to `script-src`.
+
+### Changing the policy
+
+`directives` merges over `PAGE_DIRECTIVES`: a list replaces that directive's
+sources (it does not append), `false` removes the directive, and a name the
+preset lacks is added. A source goes in the directive that loads it, never in
+`default-src`.
+
+```ts
+pageHeaders({
+	https: true,
+	directives: {
+		'script-src': ["'self'", NONCE, "'strict-dynamic'", 'https://js.example'],
+		'font-src': ["'self'", 'https://fonts.example'],
+		'manifest-src': false,
+	},
+});
+```
+
+An `upgrade-insecure-requests` given in `directives` wins over `https`. A
+`script-src` without `NONCE` throws at startup, a `TypeError` that starts
+`pageHeaders():`: the nonce would reach no script and the page would not
+hydrate ([troubleshooting](troubleshooting.md#typeerror-pageheaders-script-src-has-no-nonce-a-page-script-runs-only-with-the-responses-nonce-so-write-script-src-with-nonce-in-directives-such-as-self-nonce-strict-dynamic)).
 
 ## Pages are not cached
 
@@ -598,6 +672,46 @@ test('a 404 is covered too', async () => {
 	const response = await app.request('/nope');
 	expect(response.status).toBe(404);
 	expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+});
+```
+
+### A server-rendered page
+
+The same app with `pageHeaders`, a font from another origin, and the spec
+that holds the policy in place:
+
+```ts
+// app.ts
+import { alxia } from '@alxia/core';
+import { pageHeaders } from '@alxia/secure-headers';
+
+export const app = alxia()
+	.use(
+		pageHeaders({
+			https: Bun.env.NODE_ENV === 'production',
+			directives: { 'font-src': ["'self'", 'https://fonts.example'] },
+		}),
+	)
+	.get('/', ({ nonce, reply }) =>
+		reply(200, `<script nonce="${nonce}">console.log('hi')</script>`, {
+			headers: { 'content-type': 'text/html; charset=utf-8' },
+		}),
+	);
+```
+
+```ts
+// app.spec.ts
+import { expect, test } from 'bun:test';
+import { app } from './app';
+
+test('a page carries its nonce, is never cached, and may load the font', async () => {
+	const response = await app.request('/');
+	const html = await response.text();
+	const nonce = /nonce="([^"]+)"/.exec(html)?.[1];
+	const policy = response.headers.get('content-security-policy') ?? '';
+	expect(policy).toContain(`'nonce-${nonce}'`);
+	expect(policy).toContain("font-src 'self' https://fonts.example");
+	expect(response.headers.get('cache-control')).toBe('private, no-store');
 });
 ```
 

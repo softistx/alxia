@@ -5,6 +5,7 @@
  */
 import { expect, spyOn, test } from 'bun:test';
 import { alxia } from '@alxia/core';
+import { pageHeaders } from './page';
 import { secureHeaders } from './secure-headers';
 
 test("the page keeps its own policy, its style's nonce in it, behind secureHeaders", async () => {
@@ -24,6 +25,29 @@ test("the page keeps its own policy, its style's nonce in it, behind secureHeade
 		expect(nonce).toBeDefined();
 		expect(await response.text()).toContain(`<style nonce="${nonce}">`);
 		expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+	} finally {
+		error.mockRestore();
+	}
+});
+
+test('the page keeps its own policy behind pageHeaders, its Cache-Control too', async () => {
+	const app = alxia({ dev: true })
+		.use(pageHeaders({ https: false }))
+		.get('/', () => {
+			throw new Error('kaboom');
+		});
+	const error = spyOn(console, 'error').mockImplementation(() => {});
+	try {
+		const response = await app.request('/', {
+			headers: { accept: 'text/html' },
+		});
+		expect(response.status).toBe(500);
+		const policy = response.headers.get('content-security-policy') ?? '';
+		const nonce = /style-src 'nonce-([a-f0-9]+)'/.exec(policy)?.[1];
+		expect(nonce).toBeDefined();
+		expect(policy).not.toContain('strict-dynamic');
+		expect(await response.text()).toContain(`<style nonce="${nonce}">`);
+		expect(response.headers.get('cache-control')).toBe('no-store');
 	} finally {
 		error.mockRestore();
 	}

@@ -22,3 +22,14 @@ that), and nothing on a GET or a refused request. React Router's client-side
 sign-out posts `/sign-out.data`, so mount it on both paths. An empty list or
 an unknown type is refused at startup with a `TypeError` that starts
 `clearSiteData():`.
+
+`pageHeaders({ https })` puts it together for a server-rendered page: it is
+`secureHeaders` with a nonce per request, the strict `PAGE_DIRECTIVES` policy
+(scripts only with the nonce and what they load, nonced `<style>` elements,
+no `<base>`, forms to this site, no framing), HSTS and
+`upgrade-insecure-requests` only when `https` is true,
+`Referrer-Policy: strict-origin-when-cross-origin`, and
+`Cache-Control: private, no-store`. `directives` merges over the policy: a
+list replaces a directive's sources, `false` removes it. Every other option
+passes through and wins over the preset's. A `script-src` without `NONCE` is
+refused at startup with a `TypeError` that starts `pageHeaders():`.
