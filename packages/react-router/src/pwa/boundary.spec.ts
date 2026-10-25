@@ -49,3 +49,10 @@ describe('/pwa/react', () => {
 		expect([...react].filter((file) => main.has(file))).toEqual([]);
 	});
 });
+
+describe('/pwa/server', () => {
+	test('imports @alxia/core alone: no react, no node: module, no bun', async () => {
+		const imports = await importsOf(join(DIST, 'pwa/server/index.js'));
+		expect([...new Set(imports)]).toEqual(['@alxia/core']);
+	});
+});

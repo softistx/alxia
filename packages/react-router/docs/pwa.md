@@ -5,7 +5,8 @@ worker's contract, which requests the worker caches, which responses it may
 store, the precache list read from a build, registering the worker and
 offering an update, the web app manifest, and the cleaning at sign-out.
 The code is in `@alxia/react-router/pwa`, its React hooks in
-`@alxia/react-router/pwa/react`, and every app-specific name (the
+`@alxia/react-router/pwa/react`, the server's `noCache` in
+`@alxia/react-router/pwa/server`, and every app-specific name (the
 cache prefix, the paths never cached) is an option, so two apps never share a
 default.
 
@@ -17,6 +18,7 @@ default.
 - [The web app manifest (and why the language travels in `?lang=`)](#the-web-app-manifest-and-why-the-language-travels-in-lang)
 - [In React](#in-react)
 - [Clearing at sign-out](#clearing-at-sign-out)
+- [Serving the worker's script](#serving-the-workers-script)
 
 ## What the subpath holds
 
@@ -36,6 +38,10 @@ optional peer of the package (`^19`): its built file imports `react` and
 nothing else, and shares no chunk with the main entry, so a page never loads
 core for it (`boundary.spec.ts` checks both). Keep it out of the worker and
 the build script, which would bundle React.
+
+`@alxia/react-router/pwa/server` is `noCache` and needs `@alxia/core`, a peer
+the package already has: its built file imports `@alxia/core` and nothing
+else (`boundary.spec.ts` checks it). It is for the server file alone.
 
 The main entry, `@alxia/react-router`, is not for those: it imports
 `@alxia/core`, which imports `node:*`, and a client bundle should not carry it.
@@ -375,3 +381,45 @@ export async function signOut() {
   await clearAppCaches(workerContract);
 }
 ```
+
+## Serving the worker's script
+
+Two things are true of the worker's script and of no other static file. It
+must be revalidated on every update check: the client's top-level files are
+served for an hour, and an update would wait that long. And it takes the
+policy its own response carries, not the pages': it runs no other script and
+fetches this site only. `noCache` sets `Cache-Control: no-cache` and
+`WORKER_POLICY` (`default-src 'none'; connect-src 'self'`) on the response of
+the path it is declared for.
+
+Declare it in `beforeAll`, which runs before the client's files. A middleware
+declared in `configure` comes after them, and the file answers before it
+runs:
+
+```ts
+// file: app/server.ts
+import { createServer } from '@alxia/react-router';
+import { SERVICE_WORKER_URL } from '@alxia/react-router/pwa';
+import { noCache } from '@alxia/react-router/pwa/server';
+
+export default createServer({
+  beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
+});
+```
+
+A worker that fetches an API of another origin needs a wider policy. Write
+the middleware with `revalidated(response, policy)`:
+
+```ts
+import { defineMiddleware } from '@alxia/core';
+import { revalidated } from '@alxia/react-router/pwa/server';
+
+const POLICY = "default-src 'none'; connect-src 'self' https://api.example.com";
+
+export const workerScript = defineMiddleware(async (_ctx, next) =>
+  revalidated(await next(), POLICY),
+);
+```
+
+Declare the offline page's policy in its own `<meta>`: it is the one other
+document in `build/client`, and `noCache` does not touch it.
