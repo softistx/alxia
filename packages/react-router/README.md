@@ -493,7 +493,7 @@ import {
   isStorable,
 } from '@alxia/react-router/pwa';
 
-// Shared by the worker and the page: every cache starts with `my-app-`.
+// Shared by the worker and the page: every cache is named `my-app-<kind>-<version>`.
 const contract = defineWorkerContract({ cachePrefix: 'my-app' });
 
 // In the worker's fetch handler:
@@ -663,7 +663,7 @@ From `@alxia/react-router/pwa`:
 | `watchForUpdates(registration, container, onWaiting)`, `createUpdater(container, reload?)`, `afterLoad(run)` | its parts: offering waiting workers, the one update path of a page, and running once the page has loaded |
 | `ApplyUpdate`, `RegisterOptions`, `ServiceWorkerContainerLike` | their types |
 | `createUpdateNotice(storage, key?)` | the update notice's store (`offer`, `current`, `subscribe`, as `useSyncExternalStore` takes it): hidden for the session by "Later", kept in `storage()`, which may be missing or throw |
-| `UpdateNotice`, `UpdateNoticeStore`, `NoticeStorage` | its types |
+| `UpdateNotice`, `UpdateNoticeStore`, `NoticeStorage` | its types. `NoticeStorage` is any object with `getItem(key)` and `setItem(key, value)` |
 | `sessionStore`, `UPDATE_LATER_KEY` | `sessionStorage` or nothing, and the default key, `alxia.update-later` |
 | `MANIFEST_PATH`, `MANIFEST_HEADERS` | `/manifest.webmanifest`, and the headers to serve it with: cacheable for an hour, varying on `Accept-Language`, a policy that loads nothing |
 | `webAppManifest(options)` | the web app manifest's JSON from the app's `name`, `description`, `lang`, `themeColor`, `backgroundColor` and the optional rest; `id`, `start_url` and `scope` are `/` in every language |

@@ -242,7 +242,9 @@ notice.current, () => undefined)`. `later()` hides the notice for the tab's
 session: it is written under `key` (`UPDATE_LATER_KEY`, `alxia.update-later`,
 by default) in `storage()`. `sessionStore` is `sessionStorage` or nothing, and
 a storage that is missing or throws (private mode) only hides the notice on
-that page. The notice and the registration touch no global at load, and
+that page. `storage()` may return any object with `getItem(key)` and
+`setItem(key, value)`, such as a fake in a spec or another storage
+(`NoticeStorage`). The notice and the registration touch no global at load, and
 neither imports React.
 
 ## The web app manifest (and why the language travels in `?lang=`)
@@ -361,10 +363,10 @@ export function UpdateBanner() {
   are `registerServiceWorker`'s. `onError` is called when registering fails
   (private mode, a blocked script); the app works without a worker, so by
   default the error is dropped. The effect runs again only when `enabled`,
-  `url`, `scope` or `notice` change, never for a new inline `onError` (the latest one is always called). The
-  options are read when the effect runs, and the listeners it adds (the update
-  check when the tab shows, the reload on a controller change) stay for the
-  page's life: there is no cleanup.
+  `url`, `scope` or `notice` change, never for a new inline `onError` (the
+  latest one is always called). The options are read when the effect runs,
+  and the listeners it adds (the update check when the tab shows, the reload
+  on a controller change) stay for the page's life: there is no cleanup.
 - **`useUpdateNotice(notice?)`** is `useSyncExternalStore` over the store: the
   `{ reload, later }` while a version waits, else `undefined`, and always
   `undefined` on the server and while hydrating.

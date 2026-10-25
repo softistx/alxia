@@ -782,7 +782,7 @@ name, such as 'my-app'; got ''.`, or `… must not end with '-', which the
 contract adds; got 'my-app-'. Use 'my-app'.`
 
 **Why:** every cache name is `<prefix>-<kind>-<version>`, and the worker
-deletes the caches that start with `<prefix>-`. An empty prefix would own
+deletes the caches shaped `<prefix>-<kind>-<version>`. An empty prefix would own
 every cache of the origin, and a trailing dash would be doubled.
 
 **Fix:** pass the app's own name, without the dash:
@@ -1294,15 +1294,18 @@ export function caching(request: RequestFacts, origin: string) {
 Signing out, or a new worker activating, deletes a cache the app made itself.
 
 **Why:** a contract owns every cache named exactly
-`<prefix>-<kind>-<version>`, kind being letters and digits and version having
-no `-`. That includes a kind the app retired (`my-app-pages-v0` is swept once
+`<prefix>-<kind>-<version>`, kind being lowercase letters and digits and
+version having no `-`. That includes a kind the app retired (`my-app-pages-v0` is swept once
 it is not current). It is also why `app` and `app-admin` can share an origin:
 `app-admin-assets-v1` has one segment too many to be `app`'s. Contracts never
 take each other's caches; only a cache made by other code, such as
 `my-app-runtime-v1`, matches the shape and is swept.
 
-**Fix:** name your own caches outside the shape (`my-app.runtime`, or three or
-more dashes), or under another prefix.
+**Fix:** name your own caches outside the shape. A name is outside it when it
+has more than `<kind>-<version>` after `<prefix>-`, with the prefix `my-app`:
+`my-app-runtime-v1-x`. A kind with an uppercase letter, `_` or `.`
+(`my-app-Runtime-v1`, `my-app-run_time-v1`), or a different prefix, is outside
+too.
 
 ### The update notice never shows
 
