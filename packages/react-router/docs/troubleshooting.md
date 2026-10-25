@@ -28,6 +28,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self' 'nonce-…'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-script-src-self-nonce-)
 - [`A tree hydrated but some attributes of the server rendered HTML didn't match the client properties`](#a-tree-hydrated-but-some-attributes-of-the-server-rendered-html-didnt-match-the-client-properties)
+- [`useNonce()` is undefined on the server](#usenonce-is-undefined-on-the-server)
+- [`Error: You must render this element inside a <HydratedRouter> element`](#error-you-must-render-this-element-inside-a-hydratedrouter-element)
 - [`alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`](#alxia-react-router--already-exists-and-reveal-leaves-it-as-it-is-run-alxia-react-router-reveal---force-to-overwrite-it)
 - [`alxia-react-router: no vite.config.ts in …. Run reveal from the app's root, beside vite.config.ts.`](#alxia-react-router-no-viteconfigts-in--run-reveal-from-the-apps-root-beside-viteconfigts)
 - [`alxia-react-router: … gives alxia() an entry reveal cannot read. …`](#alxia-react-router--gives-alxia-an-entry-reveal-cannot-read-)
@@ -46,6 +48,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: defineWorkerContract(): cacheVersion must be a non-empty name without '-', …`](#typeerror-defineworkercontract-cacheversion-must-be-a-non-empty-name-without---)
 - [`parseBrowserManifest(): not React Router's browser manifest …`](#parsebrowsermanifest-not-react-routers-browser-manifest-)
 - [`error: Cannot find package 'react' from '…/@alxia/react-router/dist/pwa/react/index.js'`](#error-cannot-find-package-react-from-alxiareact-routerdistpwareactindexjs)
+- [`error: Cannot find package 'isbot' from '…/@alxia/react-router/dist/entry/index.js'`](#error-cannot-find-package-isbot-from-alxiareact-routerdistentryindexjs)
 - [`startWorker(): no precache list. …`](#startworker-no-precache-list-)
 - [`TypeError: startWorker(): contract is required: …`](#typeerror-startworker-contract-is-required-)
 - [`error: Could not resolve: "workbox-core". Maybe you need to "bun install"?`](#error-could-not-resolve-workbox-core-maybe-you-need-to-bun-install)
@@ -597,6 +600,57 @@ A warning on another element is a real mismatch: a `nonce` the browser hid
 is read by `useNonce()` from the document, so never pass it from loader
 data ([guide](guide/document.md#the-theme-boot-script)).
 
+### `useNonce()` is undefined on the server
+
+**When:** the page's inline scripts or `<CspNonceMeta />` render with no
+`nonce` attribute although `secureHeaders({ nonce: true })` set one, and
+`useNonce()` returns `undefined` in the root.
+
+**Why:** the server render has no `<DocumentNonce>` around the router. The
+entry of `@alxia/react-router/entry` adds it; an entry of your own, such
+as React Router's revealed one, does not, and `ServerRouter`'s own `nonce`
+prop only reaches the scripts React Router writes.
+
+**Fix:** re-export the package's entry, or wrap the router in your own:
+
+```tsx
+// app/entry.server.tsx
+export {
+	handleRequest as default,
+	streamTimeout,
+} from '@alxia/react-router/entry';
+```
+
+```tsx
+// An entry of your own
+import { nonceOf } from '@alxia/react-router';
+import { DocumentNonce } from '@alxia/react-router/document';
+
+<DocumentNonce nonce={nonceOf(loadContext)}>
+	<ServerRouter context={routerContext} url={request.url} />
+</DocumentNonce>;
+```
+
+([guide](guide/document.md#the-entry))
+
+### `Error: You must render this element inside a <HydratedRouter> element`
+
+**When:** under `react-router dev` or after `react-router build`, every page
+answers "Unexpected Server Error" with this message, once
+`entry.server.tsx` re-exports `@alxia/react-router/entry`.
+
+**Why:** the server holds two copies of `react-router`: the one that
+renders `ServerRouter` in the entry, and the one `<Links>` and `<Scripts>`
+in the root read. They share no context. `alxia()` from
+`@alxia/react-router/vite` keeps them to one (it inlines `/entry` and
+`/document`, by an alias in dev and in the build, so they import the app's
+`react-router`), so the message means the plugin is not in use, or the
+package is listed in `ssr.external` without it.
+
+**Fix:** add `alxia()` to `vite.config.ts` beside `reactRouter()`, or list
+`@alxia/react-router` in `ssr.noExternal` and remove it from
+`ssr.external`.
+
 ### `alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`
 
 ```text
@@ -968,6 +1022,29 @@ this message too.
 **Fix:** add `react` where the page is built (`bun add react`), and import
 `/pwa/react` from the page alone. The worker and a build script import
 `@alxia/react-router/pwa`, which imports nothing.
+
+### `error: Cannot find package 'isbot' from '…/@alxia/react-router/dist/entry/index.js'`
+
+**When:** the server starts or builds with `entry.server.tsx` re-exporting
+`@alxia/react-router/entry`.
+
+```text
+error: Cannot find package 'isbot' from '/app/node_modules/@alxia/react-router/dist/entry/index.js'
+```
+
+**Why:** `/entry` asks `isbot` whether a request comes from a crawler, which
+then gets the whole page. `isbot` and `react-dom` are optional peers of the
+package, so nothing installs them for you. React Router's templates
+install both; an app made another way may not.
+
+**Fix:** add them where the server is built and run:
+
+```sh
+bun add isbot react-dom
+```
+
+The `isBot` option replaces the check, not the import: `/entry` loads
+`isbot` for its default whatever the option says.
 
 ### `startWorker(): no precache list. …`
 
@@ -1549,7 +1626,9 @@ error TS2375: Type '{ context: EntryContext; url: string; nonce: string | undefi
 `ServerRouterProps.nonce` is optional without `undefined`. React's
 `nonce` option takes `undefined`, so only the prop complains.
 
-**Fix:** spread the prop in only when there is a nonce:
+**Fix:** use `@alxia/react-router/entry`, whose `handleRequest` does it
+([guide](guide/document.md#the-entry)), or spread the prop in only when
+there is a nonce, in an entry of your own:
 
 ```tsx
 const nonce = nonceOf(loadContext);
