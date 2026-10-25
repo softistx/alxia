@@ -64,9 +64,10 @@ export const workerContract = defineWorkerContract({ cachePrefix: 'my-app' });
 ```
 
 `cachePrefix` is required: the caches the worker owns are named
-`my-app-precache-<version>`, `my-app-assets-<version>` and
-`my-app-static-<version>`, and only those are ever swept. Two apps on one
-origin need two prefixes; `app` and `app-admin` do not claim each other's. The options are:
+`my-app-<kind>-<version>` (the contract makes `precache`, `assets` and
+`static`), and a cache of that shape is swept when it is not current, a
+retired kind included. Two apps on one origin need two prefixes; `app` and
+`app-admin` do not claim each other's. The options are:
 
 | option | default | |
 | --- | --- | --- |

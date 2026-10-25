@@ -67,7 +67,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [The build has a package's Node variant, not its `bun` one](#the-build-has-a-packages-node-variant-not-its-bun-one)
 - [`request.url` in a loader is `http://` and the internal host behind a proxy](#requesturl-in-a-loader-is-http-and-the-internal-host-behind-a-proxy)
 - [An unhashed file under public/assets/ is cached for a year](#an-unhashed-file-under-publicassets-is-cached-for-a-year)
-- [A cache of another kind is never swept](#a-cache-of-another-kind-is-never-swept)
+- [A cache the contract did not make is swept](#a-cache-the-contract-did-not-make-is-swept)
 
 ## Thrown or printed
 
@@ -1289,19 +1289,20 @@ export function caching(request: RequestFacts, origin: string) {
 }
 ```
 
-### A cache of another kind is never swept
+### A cache the contract did not make is swept
 
-An old cache of the app stays in Cache Storage after a new worker activates,
-or after `clearAppCaches()`.
+Signing out, or a new worker activating, deletes a cache the app made itself.
 
-**Why:** a contract owns the caches named `<prefix>-precache-…`,
-`<prefix>-assets-…` and `<prefix>-static-…`, and no others. That is what lets
-the prefixes `app` and `app-admin` share an origin: `app` never takes
-`app-admin-assets-v1` for its own. A cache the app made under a name of its
-own (`app-pages-v1`, or a kind this package renamed) is therefore not swept.
+**Why:** a contract owns every cache named exactly
+`<prefix>-<kind>-<version>`, kind being letters and digits and version having
+no `-`. That includes a kind the app retired (`my-app-pages-v0` is swept once
+it is not current). It is also why `app` and `app-admin` can share an origin:
+`app-admin-assets-v1` has one segment too many to be `app`'s. Contracts never
+take each other's caches; only a cache made by other code, such as
+`my-app-runtime-v1`, matches the shape and is swept.
 
-**Fix:** delete it yourself, once, with `caches.delete(name)`, or give it one
-of the three kinds' names.
+**Fix:** name your own caches outside the shape (`my-app.runtime`, or three or
+more dashes), or under another prefix.
 
 ### The update notice never shows
 

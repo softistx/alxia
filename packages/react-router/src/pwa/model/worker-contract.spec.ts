@@ -63,10 +63,10 @@ describe('obsoleteCaches', () => {
 			contract.obsoleteCaches([
 				...Object.values(contract.cacheNames),
 				'app-assets-v0',
-				'app-precache-v0',
+				'app-pages-v0',
 				...others,
 			]),
-		).toEqual(['app-assets-v0', 'app-precache-v0']);
+		).toEqual(['app-assets-v0', 'app-pages-v0']);
 	});
 });
 
@@ -131,9 +131,9 @@ describe('prefixes that begin alike', () => {
 		]);
 	});
 
-	test('a cache kind the contract does not name is not swept', () => {
-		expect(app.obsoleteCaches(['app-pages-v0'])).toEqual([]);
-		expect(app.clearableCaches(['app-pages-v0'])).toEqual([]);
+	test('a retired kind of this app is swept', () => {
+		expect(app.obsoleteCaches(['app-pages-v0'])).toEqual(['app-pages-v0']);
+		expect(app.clearableCaches(['app-pages-v0'])).toEqual(['app-pages-v0']);
 	});
 });
 
@@ -153,5 +153,14 @@ describe('cacheVersion', () => {
 				"defineWorkerContract(): cacheVersion must be a non-empty name without '-', such as 'v2'; got 'v1-beta'.",
 			),
 		);
+	});
+});
+
+describe('a prefix with regex characters', () => {
+	test('is matched literally', () => {
+		const dotted = defineWorkerContract({ cachePrefix: 'a.b' });
+		expect(dotted.obsoleteCaches(['axb-assets-v0', 'a.b-assets-v0'])).toEqual([
+			'a.b-assets-v0',
+		]);
 	});
 });

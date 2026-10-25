@@ -80,7 +80,9 @@ self.addEventListener('fetch', (e: any) => {
 				format: 'iife',
 			});
 			expect(result.success).toBe(true);
-			const code = await result.outputs[0]!.text();
+			const output = result.outputs[0];
+			expect(output).toBeDefined();
+			const code = (await output?.text()) ?? '';
 			expect(code).toContain('probe');
 			for (const page of [
 				'sessionStorage',

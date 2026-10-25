@@ -17,8 +17,8 @@ export const SKIP_WAITING = 'SKIP_WAITING';
 export interface WorkerContractOptions {
 	/**
 	 * Every Cache Storage cache the worker owns is named
-	 * `<cachePrefix>-<precache|assets|static>-<cacheVersion>`; a cache of
-	 * another name is never swept.
+	 * `<cachePrefix>-<kind>-<version>` (kind: letters and digits; version:
+	 * no `-`); a cache of another shape is never swept.
 	 * Required: two apps on one origin must not share it.
 	 */
 	cachePrefix: string;
@@ -94,12 +94,13 @@ export function defineWorkerContract(
 		static: `${cachePrefix}-static-${cacheVersion}`,
 	});
 	const current = new Set<string>(Object.values(cacheNames));
-	// `<prefix>-<kind>-`, kind being one of ours: the prefix 'app' must not
-	// claim 'app-admin-assets-v1', which belongs to the prefix 'app-admin'.
-	const owned = (name: string) =>
-		['precache', 'assets', 'static'].some((kind) =>
-			name.startsWith(`${cachePrefix}-${kind}-`),
-		);
+	// Exactly `<prefix>-<kind>-<version>`: the prefix 'app' must not claim
+	// 'app-admin-assets-v1' (one segment too many), but still owns a retired
+	// kind such as 'app-pages-v0'.
+	const shape = new RegExp(
+		`^${cachePrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}-[a-z0-9]+-[^-]+$`,
+	);
+	const owned = (name: string) => shape.test(name);
 	const contract: WorkerContract = {
 		cachePrefix,
 		cacheVersion,
