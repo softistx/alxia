@@ -596,10 +596,16 @@ fails, and the build needs the file:
 
 Set `routeDiscovery: { mode: 'initial' }` in `react-router.config.ts`, so a
 client navigation offline to a route never visited finds its modules
-([more](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#offline-a-client-navigation-to-a-route-never-visited-shows-the-offline-page)).
+([more](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#offline-a-client-navigation-to-a-route-never-visited-shows-the-offline-page)):
+
+```ts
+import type { Config } from '@react-router/dev/config';
+
+export default { ssr: true, routeDiscovery: { mode: 'initial' } } satisfies Config;
+```
 
 An app that built its worker with a script of its own has steps to drop:
-[moving from a worker of your own](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md#moving-from-a-worker-of-your-own).
+[moving from a build script of your own](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md#moving-from-a-build-script-of-your-own).
 
 For a build pipeline of your own, `buildWorker` from `/pwa/build` does what
 `alxia()` does. It needs Bun and runs after `react-router build`:

@@ -8,6 +8,7 @@ a loader, a message React Router or the browser prints, or an error from
 **Thrown or printed**
 
 - [`alxia-react-router: … is running on Node, and alxia's server runs on Bun. …`](#alxia-react-router--is-running-on-node-and-alxias-server-runs-on-bun-)
+- [`alxia-react-router: react-router build with a service worker is running on Node, and the worker is bundled by Bun.build`](#alxia-react-router-react-router-build-with-a-service-worker-is-running-on-node-and-the-worker-is-bundled-by-bunbuild)
 - [`ReferenceError: Bun is not defined`](#referenceerror-bun-is-not-defined)
 - [`alxiaOf(): this request has no alxia context. …`](#alxiaof-this-request-has-no-alxia-context-)
 - [`TypeError: undefined is not an object (evaluating 'context.alxia.user')`](#typeerror-undefined-is-not-an-object-evaluating-contextalxiauser)
@@ -119,6 +120,14 @@ and names `bun --bun vite preview` and `bun --bun react-router build`. A
 build that has a service worker reads
 `alxia-react-router: react-router build with a service worker is running on Node, and the worker is bundled by Bun.build`
 and names the same `bun --bun react-router build`.
+
+### `alxia-react-router: react-router build with a service worker is running on Node, and the worker is bundled by Bun.build`
+
+The same cause as
+[the entry above](#alxia-react-router--is-running-on-node-and-alxias-server-runs-on-bun-):
+the build runs on Node, and the worker is bundled with `Bun.build`. Run it as
+`bun --bun react-router build`, or add a `bunfig.toml` beside `package.json`
+with `[run]` and `bun = true`.
 
 ### `ReferenceError: Bun is not defined`
 
@@ -931,6 +940,9 @@ bun add -d workbox-core workbox-expiration workbox-navigation-preload \
   workbox-precaching workbox-routing workbox-strategies
 ```
 
+The `buildWorker()` messages below are the ones a script of your own sees.
+Under `alxia()` each of them begins with `alxia-react-router: `.
+
 ### `buildWorker() runs on Bun: it is running on Node`
 
 ```text
@@ -961,7 +973,7 @@ script's folder. Under `alxia()` the message begins
 ### `buildWorker(): expected one React Router browser manifest`
 
 ```text
-buildWorker(): expected one React Router browser manifest build/client/assets/manifest-*.js, found 0. Run react-router build first.
+buildWorker(): expected one React Router browser manifest, build/client/assets/manifest-*.js, found 0. Run react-router build first.
 ```
 
 The message ends `found 2` when two are left.
@@ -996,11 +1008,13 @@ buildWorker(): /../service-worker.js is outside /app/build/client.
 ```
 
 **Why:** the contract's `serviceWorkerUrl` or `offlineUrl` is joined onto the
-client build, and the result leaves it. The build refuses to write or read a
-file there.
+client build, and the result leaves it, or is the client build itself (`/`).
+The build refuses to write or read a file there. It also refuses an absolute
+URL (`https://example.com/sw.js`), a protocol-relative one (`//host/sw.js`) and
+one that does not start with `/`, since none names a file of the build.
 
-**Fix:** use a URL inside the site, such as `/service-worker.js`, in the
-contract.
+**Fix:** use a root-relative URL inside the site, such as
+`/service-worker.js`, in the contract.
 
 ### `buildWorker(): Bun.build failed:`
 

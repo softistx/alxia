@@ -96,8 +96,8 @@ startWorker({
 ```
 
 It uses no worker global, so it compiles under the app's DOM `tsconfig`. Add
-the packages it bundles as development dependencies:
-`bun add -d workbox-core workbox-expiration workbox-navigation-preload workbox-precaching workbox-routing workbox-strategies`.
+the six `workbox-*` packages it bundles as development dependencies
+([the install command](../../README.md#installable-and-offline-pwa)).
 
 | option | default | |
 | --- | --- | --- |
@@ -256,7 +256,7 @@ The object form takes the options of [`buildWorker`](#with-buildworker), but
 object `startWorker` gets: the build reads the worker's URL and the offline
 page from it, and the worker reads them from its own.
 
-### Moving from a worker of your own
+### Moving from a build script of your own
 
 An app that built its worker with a script of its own (a `sw/` folder with its
 own `tsconfig.json`, a `build:sw` script) moves to `alxia()` in a few steps:
@@ -322,7 +322,15 @@ A worker precaches the code of every route, so a client navigation offline to
 a route never visited still finds its modules. Set
 `routeDiscovery: { mode: 'initial' }` in `react-router.config.ts` as well,
 or the navigation asks `/__manifest` for the route and shows the offline page
-([more](../troubleshooting.md#offline-a-client-navigation-to-a-route-never-visited-shows-the-offline-page)). `react-router build` writes the
+([more](../troubleshooting.md#offline-a-client-navigation-to-a-route-never-visited-shows-the-offline-page)):
+
+```ts
+import type { Config } from '@react-router/dev/config';
+
+export default { ssr: true, routeDiscovery: { mode: 'initial' } } satisfies Config;
+```
+
+`react-router build` writes the
 list in `build/client/assets/manifest-*.js`. `buildWorker` does this itself; the parts
 are for a pipeline of your own:
 
