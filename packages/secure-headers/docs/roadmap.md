@@ -7,7 +7,10 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing in progress.
+- **Headers for server-rendered pages.** A policy written from directives
+  with `csp()` first, then a strict preset for pages with a nonce, a
+  `Cache-Control` for responses that carry one, and `Clear-Site-Data` on
+  sign-out.
 
 ## Next
 

@@ -2,7 +2,7 @@
 // types are inferred: a declaration build must be able to name each one
 // through `@alxia/secure-headers` and `@alxia/core` alone (TS2883 otherwise).
 import { alxia } from '@alxia/core';
-import { NONCE, secureHeaders } from '@alxia/secure-headers';
+import { csp, NONCE, secureHeaders } from '@alxia/secure-headers';
 
 export function secured() {
 	return alxia()
@@ -16,6 +16,21 @@ export function withNonce() {
 			secureHeaders({
 				nonce: true,
 				contentSecurityPolicy: `script-src 'self'; style-src 'self' ${NONCE}`,
+			}),
+		)
+		.get('/', ({ nonce, reply }) => reply(200, { nonce }));
+}
+
+export function withDirectives() {
+	return alxia()
+		.use(
+			secureHeaders({
+				nonce: true,
+				contentSecurityPolicy: csp({
+					'default-src': ["'self'"],
+					'script-src': ["'self'", NONCE],
+					'upgrade-insecure-requests': true,
+				}),
 			}),
 		)
 		.get('/', ({ nonce, reply }) => reply(200, { nonce }));

@@ -71,6 +71,34 @@ with `nonce: true`. Without `nonce: true`, the headers are what they always
 were. With `@alxia/react-router`, `nonceOf(loadContext)` hands it to
 `entry.server.tsx` ([its README](https://github.com/softistx/alxia/tree/develop/packages/react-router#a-csp-nonce)).
 
+## A policy from directives
+
+`csp()` writes the policy from directives, in the order you list them, and
+checks it once at startup. A list of sources is an array, `true` is a bare
+directive and `false` leaves one out; `NONCE` passes through, for
+`nonce: true` to replace on each request.
+
+```ts
+import { csp, NONCE, secureHeaders } from '@alxia/secure-headers';
+
+app.use(
+	secureHeaders({
+		nonce: true,
+		contentSecurityPolicy: csp({
+			'default-src': ["'self'"],
+			'script-src': ["'self'", NONCE],
+			'object-src': ["'none'"],
+			'upgrade-insecure-requests': true,
+		}),
+	}),
+);
+// default-src 'self'; script-src 'self' 'nonce-…'; object-src 'none'; upgrade-insecure-requests
+```
+
+An empty source list, a source holding `;`, `,` or a space, a name that is
+not lowercase letters and hyphens, and a policy with no directive are
+refused with a `TypeError` that starts `csp():`.
+
 ## Defaults
 
 | header | default | option |
@@ -99,6 +127,10 @@ value is refused at startup. `nonce` is off by default.
 | `secureHeaders(options?)` | the middleware, for `app.use`: a `SecureHeaders`, or with `nonce: true` a `NonceMiddleware` |
 | `SecureHeadersOptions` | its options: the headers and `hidePoweredBy`; `nonce` is added by each overload |
 | `Setting` | a header option's type: its value, or `false` to leave it out |
+| `csp(directives)` | a `Content-Security-Policy` string from directives, checked at startup |
+| `CspDirectives` | its argument: directive names to a `CspValue`, any name allowed |
+| `CspDirectiveName` | the directive names it completes |
+| `CspValue` | a directive's value: a list of sources, `true` for a bare directive, `false` to leave it out |
 | `NONCE` | where the nonce goes in `contentSecurityPolicy`, each time it is named |
 | `NonceContext` | what `nonce: true` adds to the context: `nonce`, a string |
 | `SecureHeaders` | what `secureHeaders()` returns: a middleware that adds nothing to the context |
