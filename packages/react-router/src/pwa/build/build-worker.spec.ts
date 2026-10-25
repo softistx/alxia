@@ -65,7 +65,6 @@ describe('buildWorker', () => {
 		]) {
 			expect(code).not.toContain(page);
 		}
-		console.log(`buildWorker bytes: ${built.bytes}`);
 		expect(built.bytes).toBeLessThan(BUDGET);
 	});
 
@@ -118,6 +117,9 @@ describe('buildWorker', () => {
 		await writeFile(join(dir, 'broken.ts'), "import 'does-not-exist-pkg';\n");
 		await expect(worker({ file: 'broken.ts' })).rejects.toThrow(
 			'buildWorker(): Bun.build failed:',
+		);
+		await expect(worker({ file: 'broken.ts' })).rejects.toThrow(
+			'does-not-exist-pkg',
 		);
 	});
 });

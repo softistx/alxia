@@ -40,7 +40,7 @@ export interface WorkerBuild {
 	bytes: number;
 }
 
-function requireBun(): void {
+function assertBun(): void {
 	if ((globalThis as { Bun?: unknown }).Bun !== undefined) return;
 	throw new Error(
 		'buildWorker() runs on Bun: it is running on Node. Run it with bun, or run react-router build with bun --bun.',
@@ -57,7 +57,7 @@ function requireBun(): void {
 export async function buildWorker(
 	options: BuildWorkerOptions,
 ): Promise<WorkerBuild> {
-	requireBun();
+	assertBun();
 	const root = resolve(options.root ?? process.cwd());
 	const client = resolve(root, options.client ?? 'build/client');
 	const source = resolve(root, options.file);
@@ -99,7 +99,11 @@ export async function buildWorker(
 			[PRECACHE_DEFINE]: JSON.stringify(precache),
 		},
 	}).catch((error: unknown) => {
-		throw new Error(`buildWorker(): Bun.build failed:\n${String(error)}`);
+		const detail =
+			error instanceof AggregateError
+				? error.errors.map(String).join('\n')
+				: String(error);
+		throw new Error(`buildWorker(): Bun.build failed:\n${detail}`);
 	});
 	if (!result.success) {
 		throw new Error(
