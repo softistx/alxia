@@ -90,6 +90,10 @@ a loader, a message React Router or the browser prints, or an error from
 - [An action shows the error page](#an-action-shows-the-error-page)
 - [Behind a TLS proxy every action answers 403](#behind-a-tls-proxy-every-action-answers-403)
 - [Right after start, refusals read in the API's words](#right-after-start-refusals-read-in-the-apis-words)
+- [`<api>: <operation> (request <id>) answered <status> <code>`](#api-operation-request-id-answered-status-code)
+- [`<api>: <operation> (request <id>) answered <status> without GraphQL`](#api-operation-request-id-answered-status-without-graphql)
+- [`<api>: <operation> (request <id>) unreachable`, `timeout` or `invalid-response`](#api-operation-request-id-unreachable-timeout-or-invalid-response)
+- [`<api>: <operation> (request <id>) aborted`](#api-operation-request-id-aborted)
 
 ## Thrown or printed
 
@@ -1729,3 +1733,82 @@ catalogue.warm();
 
 Raise `firstReadWaitMs` only if the page should wait longer for the first
 words; it holds every cold request that long when the API hangs.
+
+### `<api>: <operation> (request <id>) answered <status> <code>`
+
+Logged by `apiCallFailure` (a warning for a 4xx, an error for a 5xx) when the
+API refused a call with a GraphQL body, such as
+`my-api https://api.example.com/graphql: Todos (request r-1) answered 403 todos.errors.forbidden`.
+
+**Why:** the API answered, and refused: `<status>` and `<code>` are the
+`ApiError`'s. A 4xx is expected (a forbidden page, a missing record), which is
+why it is a warning. The `(request …)` part is there only if the API sent an
+`x-request-id` and your code passed it as `requestId`; without it the line
+carries no id and an error page can show none.
+
+**Fix:** nothing to fix in the package. To find the API's own log line, search
+for the id. To get the id in the line, pass `requestId: requestIdOf(response)`
+from the `fetch` the client calls:
+
+```ts
+import { apiCallFailure, requestIdOf } from '@alxia/react-router/errors';
+
+let requestId: string | undefined;
+const send = async (request: Request) => {
+	const response = await fetch(request);
+	requestId = requestIdOf(response);
+	return response;
+};
+
+export const failed = (error: unknown) =>
+	apiCallFailure(error, { api: 'my-api', requestId });
+```
+
+### `<api>: <operation> (request <id>) answered <status> without GraphQL`
+
+Logged as an error by `apiCallFailure`, and the loader gets a 503 `Response`
+whose body is `answered <status> without GraphQL`.
+
+**Why:** the API, or a gateway in front of it, answered a status that is not
+401, 403 or 404 with a body that is not GraphQL (an HTML 502 page, a 429
+from a rate limiter). The log line's second argument is that body.
+
+**Fix:** read the body in the log and fix the gateway. If a status such as 429
+should reach the page as its own, name it:
+
+```ts
+import { apiCallFailure } from '@alxia/react-router/errors';
+
+export const failed = (error: unknown) =>
+	apiCallFailure(error, {
+		api: 'my-api',
+		passedThrough: new Set([401, 403, 404, 429]),
+	});
+```
+
+### `<api>: <operation> (request <id>) unreachable`, `timeout` or `invalid-response`
+
+Logged as an error by `apiCallFailure`, and the loader gets a 503 `Response`
+whose body is the reason.
+
+**Why:** `@nxgt/graphql-client` could not get an answer: `unreachable` is a
+refused connection or a DNS failure, `timeout` is a call past the deadline the
+app gave it, and `invalid-response` is an answer that is no GraphQL response
+(a 2xx with no `data`, garbled JSON). The log line's second argument is the
+cause.
+
+**Fix:** check the API's address and that it is up. For a `timeout`, the call's
+`timeout` option is the app's, not the package's. The 503 reaches the error
+page through `routeError`, which words it with the request id when there is
+one.
+
+### `<api>: <operation> (request <id>) aborted`
+
+Logged as an error by `apiCallFailure`, and the loader gets a 503 `Response`.
+
+**Why:** the `signal` you passed was aborted, so the visitor closed the tab or
+navigated away, and the call failed with whatever error that produced. Nobody
+sees the 503.
+
+**Fix:** none. To keep it out of the logs, test `request.signal.aborted` in
+your own `catch` before calling `apiCallFailure`.

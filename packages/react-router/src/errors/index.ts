@@ -14,6 +14,12 @@ export {
 	createApiErrors,
 } from './api-errors';
 export {
+	apiCallFailure,
+	type CallFailureOptions,
+	type DocumentLike,
+	operationName,
+} from './call-failure';
+export {
 	type CatalogueReply,
 	createErrorCatalogue,
 	type ErrorCatalogue,
