@@ -45,13 +45,13 @@
 		"@alxia/i18n": "workspace:^",
 		"@alxia/language": "workspace:^",
 		"@nxgt/i18n": "^3.1.0",
-		"@nxgt/janus": "^0.28.0",
+		"@nxgt/janus": "^0.29.0",
 		"@types/bun": "^1.4.2",
 		"zod": "^4.6.5"
 	},
 	"peerDependencies": {
 		"@alxia/core": "workspace:^",
-		"@nxgt/janus": ">=0.17.1 <0.29.0",
+		"@nxgt/janus": ">=0.17.1 <0.30.0",
 		"typescript": "^6.0.3 || ^7.0.0"
 	}
 }
