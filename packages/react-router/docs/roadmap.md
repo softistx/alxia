@@ -7,9 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **The boot: `/entry` and `/document`.** `/document` gives the root the
-  page's CSP nonce and inline boot scripts and the page's language and text
-  direction; `/entry` is the server entry.
+Nothing planned.
 
 ## Next
 
@@ -58,6 +56,18 @@ Nothing planned.
   Bun, Deno or Cloudflare with a `runtime` option; alxia is Bun's.
 
 ## Shipped
+
+### 0.12.0
+
+- **`@alxia/react-router/document` and `/entry`: the boot of a page.**
+  `DocumentNonce`, `useNonce`, `InlineScript` and `CspNonceMeta` give the
+  root the response's CSP nonce, an inline boot script that carries it and
+  the `csp-nonce` meta; `createPageLanguage` and `textDirection` give the
+  page's language and text direction. `entry.server.tsx` becomes
+  `export { handleRequest as default, streamTimeout } from '@alxia/react-router/entry'`:
+  a streamed shell on Bun's web renderer, the whole page for a bot and in SPA
+  mode, no body for HEAD, and the nonce handed to the router, with no
+  `@react-router/node` and no `node:stream`.
 
 ### 0.11.0
 

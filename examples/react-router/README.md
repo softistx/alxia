@@ -93,7 +93,7 @@ the build. Here it adds:
 | file | |
 | --- | --- |
 | `app/server.ts` | `logger()`, `compress()`, and `secureHeaders()` with `nonce: true` and a policy React Router's scripts, its `<Form>` posts and the template's Google Fonts pass (the default blocks all three); `script-src` has a fresh nonce per request, no `'unsafe-inline'`. Also a session deriving `user`, `POST /api/todos` validated by a Zod schema, `getLoadContext` setting React Router's own `userContext`, and the `Register` declaration that types `alxiaOf(context)` |
-| `app/entry.server.tsx` | React Router's own, from `bunx react-router reveal entry.server`, plus three lines: `nonceOf(loadContext)` from `@alxia/react-router`, given to `<ServerRouter nonce>` and to `renderToPipeableStream` (below) |
+| `app/entry.server.tsx` | re-exports `handleRequest` and `streamTimeout` from `@alxia/react-router/entry`, which hands the router the response's nonce (`nonceOf(loadContext)`) |
 | `app/session.server.ts` | sessions in memory, keyed by the `sid` cookie, which the `derive` reads from the request's `cookies`. Anyone may sign in by name: there is no real authentication |
 | `app/todos.server.ts` | the todos, in memory, and `NewTodo`, the schema both the page's form and the API's body are validated with |
 | `app/context.ts` | `userContext`, a React Router context key, for a route that does not import alxia |
@@ -108,30 +108,14 @@ The added dependencies are `@alxia/logger`, `@alxia/compress`,
 `"bun"` is added to the tsconfig's `types` for the session's
 `Bun.Cookie` and the spec.
 
-The nonce takes three lines in the revealed entry, and every script React
-Router and React render then carries the one the response's policy names:
+The nonce takes one line: the entry re-exports the package's own, which hands
+`<ServerRouter>` and React's renderer the nonce of the response's policy, so
+every script React Router and React render carries it:
 
-```diff
- import { PassThrough } from "node:stream";
-
-+import { nonceOf } from "@alxia/react-router";
- import type { EntryContext, RouterContextProvider } from "react-router";
- …
-     const { pipe, abort } = renderToPipeableStream(
--      <ServerRouter context={routerContext} url={request.url} />,
-+      <ServerRouter
-+        context={routerContext}
-+        url={request.url}
-+        nonce={nonceOf(loadContext)}
-+      />,
-       {
-+        nonce: nonceOf(loadContext),
-         [readyOption]() {
+```tsx
+// app/entry.server.tsx
+export { handleRequest as default, streamTimeout } from "@alxia/react-router/entry";
 ```
-
-The `<ServerRouter>` line is one line made longer; the formatter wraps it.
-`biome.json` turns `useConst` off for that file, so the template's `let`s
-stay as generated.
 
 `app/server.ts` is optional for a new app, but this example's routes read
 what it derives (`user`, `log`), so they need it. Within alxia's
