@@ -55,25 +55,6 @@ function adding<T extends string | RegExp>(
 }
 
 /**
- * React Router's plugin resolves the packages left external with the
- * `development` condition under `react-router dev`, so the app's own
- * `react-router` is the development build. Bun, which imports a package
- * such as this one's `/entry` from `node_modules` at runtime, picks the
- * production build whatever `NODE_ENV` says: two copies of `react-router`,
- * and a `ServerRouter` whose context `<Links>` and `<Scripts>` cannot read
- * ("You must render this element inside a <HydratedRouter> element"). The
- * condition is removed from the resolved config, once every plugin has
- * added its own.
- */
-export function dropDevelopment(conditions: string[] | undefined): void {
-	if (conditions === undefined) return;
-	for (let at = conditions.indexOf('development'); at >= 0; ) {
-		conditions.splice(at, 1);
-		at = conditions.indexOf('development');
-	}
-}
-
-/**
  * What the plugin adds to the `ssr` environment, given its options as the
  * config and every plugin's `config` hook left them. Vite merges the
  * result into them, concatenating arrays, so what the app set is kept:

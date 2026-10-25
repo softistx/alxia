@@ -1,5 +1,8 @@
 import { createElement } from 'react';
-import { renderToReadableStream } from 'react-dom/server';
+import {
+	type ReactDOMServerReadableStream,
+	renderToReadableStream,
+} from 'react-dom/server';
 import {
 	type EntryContext,
 	type RouterContextProvider,
@@ -70,8 +73,9 @@ export function createEntry(options: EntryOptions = {}): {
 		const limit = deadline(timeout + 1_000);
 		let status = responseStatusCode;
 		let shellOut = false;
+		let body: ReactDOMServerReadableStream | undefined;
 		try {
-			const body = await renderToReadableStream(
+			body = await renderToReadableStream(
 				createElement(
 					DocumentNonce,
 					{ nonce },
@@ -101,6 +105,8 @@ export function createEntry(options: EntryOptions = {}): {
 			});
 		} catch (error) {
 			limit.clear();
+			// A throwing isBot or a rejected allReady: stop the render.
+			await body?.cancel().catch(() => {});
 			throw error;
 		}
 	};

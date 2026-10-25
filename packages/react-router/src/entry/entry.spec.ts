@@ -111,12 +111,9 @@ describe('the package entry, on the fixture', () => {
 		expect(html).not.toContain(NONCE);
 	});
 
-	test('isBot and onError are options', async () => {
-		const errors: unknown[] = [];
-		const entry = createEntry({
-			isBot: () => true,
-			onError: (error) => errors.push(error),
-		});
+	/** The fixture served through an entry made with `options`. */
+	const through = (options: Parameters<typeof createEntry>[0]) => {
+		const entry = createEntry(options);
 		const own: ServerBuild = {
 			...build,
 			entry: {
@@ -124,8 +121,54 @@ describe('the package entry, on the fixture', () => {
 				module: { ...build.entry.module, default: entry.handleRequest },
 			},
 		};
-		const response = await app(own).request('/slow', { headers: browser });
+		return { entry, served: app(own) };
+	};
+
+	test('isBot and onError are options', async () => {
+		const errors: unknown[] = [];
+		const { entry, served } = through({
+			isBot: () => true,
+			onError: (error) => errors.push(error),
+		});
+		// A bot gets the whole page at once, deferred value included.
+		const response = await served.request('/slow', { headers: browser });
 		expect((await chunks(response)).first).toContain('deferred-value');
+		expect(errors).toEqual([]);
 		expect(entry.streamTimeout).toBe(5_000);
+	});
+
+	test('streamTimeout is an option, read back from the entry', () => {
+		expect(createEntry({ streamTimeout: 8_000 }).streamTimeout).toBe(8_000);
+	});
+
+	test('an error under a Suspense, after the shell, is reported to onError', async () => {
+		const errors: unknown[] = [];
+		const { served } = through({ onError: (error) => errors.push(error) });
+		const response = await served.request('/late-boom', { headers: browser });
+		expect((await chunks(response)).all).toContain('shell');
+		expect(errors.map(String).join()).toContain('the suspended part exploded');
+	});
+
+	test('an error in the shell rejects handleRequest, and is not reported to onError', async () => {
+		const errors: unknown[] = [];
+		const { entry } = through({ onError: (error) => errors.push(error) });
+		const router = {
+			isSpaMode: false,
+			staticHandlerContext: {
+				loaderData: {},
+				errors: null,
+				matches: [],
+			},
+		};
+		await expect(
+			entry.handleRequest(
+				new Request('http://localhost/shell-boom', { headers: browser }),
+				200,
+				new Headers(),
+				router as never,
+				undefined as never,
+			),
+		).rejects.toThrow();
+		expect(errors).toEqual([]);
 	});
 });

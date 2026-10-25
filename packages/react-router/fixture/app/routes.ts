@@ -4,6 +4,8 @@ export default [
 	index('routes/home.tsx'),
 	route('slow', 'routes/slow.tsx'),
 	route('boom', 'routes/boom.tsx'),
+	route('late-boom', 'routes/late-boom.tsx'),
+	route('shell-boom', 'routes/shell-boom.tsx'),
 	route('missing', 'routes/missing.tsx'),
 	route('login', 'routes/login.tsx'),
 	route('live', 'routes/live.tsx'),

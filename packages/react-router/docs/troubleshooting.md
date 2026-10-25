@@ -642,10 +642,10 @@ answers "Unexpected Server Error" with this message, once
 **Why:** the server holds two copies of `react-router`: the one that
 renders `ServerRouter` in the entry, and the one `<Links>` and `<Scripts>`
 in the root read. They share no context. `alxia()` from
-`@alxia/react-router/vite` keeps them to one (the development condition
-is left off React Router's externals, and a linked workspace package is
-bundled), so the message means the plugin is not in use, or the package
-is listed in `ssr.external` without it.
+`@alxia/react-router/vite` keeps them to one (it inlines `/entry` and
+`/document`, by an alias in dev and in the build, so they import the app's
+`react-router`), so the message means the plugin is not in use, or the
+package is listed in `ssr.external` without it.
 
 **Fix:** add `alxia()` to `vite.config.ts` beside `reactRouter()`, or list
 `@alxia/react-router` in `ssr.noExternal` and remove it from

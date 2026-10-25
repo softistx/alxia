@@ -497,6 +497,9 @@ build, it adds:
 - `build.target: 'esnext'`, where Vite's default targets browsers;
 - in the build only, `resolve.noExternal: true`: every package is bundled
   into `build/server/index.js`, so `build/` runs with no `node_modules`.
+- `/entry` and `/document` inlined, in dev by an alias and in the build, so
+  they share the app's `react-router`, even when the package is listed in
+  `ssr.external`.
 
 ```ts
 // app/server.ts: Bun's modules, bundled as they are

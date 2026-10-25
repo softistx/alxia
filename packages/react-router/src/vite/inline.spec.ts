@@ -1,21 +1,6 @@
 import { describe, expect, test } from 'bun:test';
-import { dropDevelopment } from './bun';
-import { inlinedFile } from './inline';
-
-describe('dropDevelopment', () => {
-	test('removes every development condition, in place', () => {
-		const conditions = ['development', 'node', 'development', 'bun'];
-		dropDevelopment(conditions);
-		expect(conditions).toEqual(['node', 'bun']);
-	});
-
-	test('leaves a list without one, and an unset list, as they are', () => {
-		const conditions = ['node', 'module-sync'];
-		dropDevelopment(conditions);
-		expect(conditions).toEqual(['node', 'module-sync']);
-		expect(() => dropDevelopment(undefined)).not.toThrow();
-	});
-});
+import { alxia } from './index';
+import { inlineAliases, inlinedFile } from './inline';
 
 describe('inlinedFile', () => {
 	test('names the files of /entry and /document', () => {
@@ -30,5 +15,37 @@ describe('inlinedFile', () => {
 	test('nothing else', () => {
 		expect(inlinedFile('@alxia/react-router')).toBeUndefined();
 		expect(inlinedFile('react-router')).toBeUndefined();
+	});
+});
+
+describe('inlineAliases', () => {
+	test('aliases /entry and /document to themselves, nothing else', () => {
+		expect(inlineAliases().resolve.alias).toEqual([
+			{
+				find: '@alxia/react-router/entry',
+				replacement: '@alxia/react-router/entry',
+			},
+			{
+				find: '@alxia/react-router/document',
+				replacement: '@alxia/react-router/document',
+			},
+		]);
+	});
+
+	test('alxia() returns them under serve only', () => {
+		const plugin = alxia();
+		const hook = plugin.config as (
+			config: object,
+			env: { command: string; mode: string },
+		) => { resolve?: { alias?: unknown[] } } | undefined;
+		const meta = { meta: {} };
+		const serve = hook.call(
+			meta,
+			{},
+			{ command: 'serve', mode: 'development' },
+		);
+		expect(serve?.resolve?.alias).toHaveLength(2);
+		const built = hook.call(meta, {}, { command: 'build', mode: 'production' });
+		expect(built?.resolve).toBeUndefined();
 	});
 });

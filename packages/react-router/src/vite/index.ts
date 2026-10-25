@@ -7,7 +7,6 @@ import { relative } from 'node:path';
 // Types only: the plugin runs on whichever Vite the app has, never on a
 // copy of this package's own.
 import type { Plugin, ResolvedConfig } from 'vite';
-import { dropDevelopment } from './bun';
 import { ssrEnvironment } from './bundle';
 import {
 	clientPath,
@@ -20,7 +19,7 @@ import {
 } from './config';
 import { serveDev } from './dev';
 import { NAME, PASS_THROUGH, serverEntry } from './entry';
-import { inlinedFile } from './inline';
+import { inlineAliases, inlinedFile } from './inline';
 import { servePreview } from './preview';
 import { requireBun } from './runtime';
 import { type AlxiaWorkerOptions, buildAppWorker } from './worker';
@@ -106,6 +105,7 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 		// which would render the pages without alxia, comes after this one's.
 		enforce: 'pre',
 		config(_config, env) {
+			if (env.command === 'serve') return inlineAliases();
 			if (env.command !== 'build') return;
 			// Vite 7's types know neither `rolldownVersion` nor `rolldownOptions`.
 			const meta = this.meta as { readonly rolldownVersion?: string };
@@ -121,7 +121,6 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 		},
 		configResolved(resolved) {
 			config = resolved;
-			dropDevelopment(resolved.environments['ssr']?.resolve.externalConditions);
 			enabled = servesApp(resolved);
 		},
 		resolveId(id) {
