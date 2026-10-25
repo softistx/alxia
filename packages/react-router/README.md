@@ -618,7 +618,7 @@ JSON actions refuse a post from another site, and read a Standard Schema's input
 import { jsonActions, useJsonFetcher } from '@alxia/react-router/errors';
 import { z } from 'zod';
 
-// Behind a TLS proxy, pass the public origin: origin: () => process.env.APP_ORIGIN
+// Behind a TLS proxy named with createServer({ proxy }), nothing to set; else: origin: () => process.env.APP_ORIGIN
 export const { readInput } = jsonActions();
 
 const schema = z.object({ title: z.string().min(1) });
@@ -752,7 +752,7 @@ From `@alxia/react-router/errors` (`react-router` is its only package import, an
 | `ApiRefusal` | `{ message, status }`: a failed call as a page says it; what `apiRefusal` returns for an API refusal (its status) or an unreachable API (503), else `undefined` |
 | `jsonActions({ origin? })`, `JsonActions`, `JsonActionsOptions` | the JSON helpers of the actions, bound to the app's origin (a string, or a getter read at each request; the request's own by default): `readJson(request)` (403 `Cross-site request refused` for another origin or a cross-site fetch, 415 `Expected a JSON body`, 400 `Malformed JSON body`), `requireJsonPost(request)` (a native post goes back to its page) and `readInput(request, schema)` (the body's `input` through a Standard Schema, async allowed; 400 `The form sent an input the API would refuse`) |
 | `useJsonFetcher(key?, action?)`, `JsonBody` | a fetcher that posts JSON: `{ fetcher, post(body, to?), busy }`; `to` is the action of one call |
-| `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferOutput` | the Standard Schema v1 types `readInput` takes, declared in `/errors` (type only, so no `@alxia/core`); a Zod 4, Valibot or ArkType schema fits |
+| `StandardSchemaV1` | the Standard Schema v1 type `readInput` takes, declared in `/errors` (type only, so no `@alxia/core`; `InferOutput` is `@alxia/core`'s); a Zod 4, Valibot or ArkType schema fits |
 
 The `alxia-react-router` bin, run with `bunx`:
 

@@ -38,7 +38,7 @@ import is `react-router`, never `@alxia/core`, so a page can import it
 | `ApiRefusal` | a refused call as a page says it: `{ message, status }` |
 | `jsonActions({ origin? })`, `JsonActions`, `JsonActionsOptions` | `readJson`, `requireJsonPost` and `readInput` for the actions: JSON only, from this site only |
 | `useJsonFetcher(key?, action?)`, `JsonBody` | a fetcher that posts JSON: `{ fetcher, post(body, to?), busy }` |
-| `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferOutput` | the Standard Schema v1 types `readInput` takes, declared here (type only) |
+| `StandardSchemaV1` | the Standard Schema v1 type `readInput` takes, declared here (type only; `InferOutput` is `@alxia/core`'s) |
 
 ## Recognising an API error
 
@@ -610,6 +610,8 @@ export function RenameTodo({ id }: { id: string }) {
 	);
 }
 ```
+
+The action answers `{ ok, error }`, the shape of `fetcherResult` and `submitForm`, so `fetcher.data` is read as above.
 
 `Body` types what `post` takes: `useJsonFetcher<typeof action, { input: { title: string } }>()`.
 The hook imports `react-router` alone, so a page can import it from `/errors`.

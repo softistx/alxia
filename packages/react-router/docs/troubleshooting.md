@@ -1617,7 +1617,14 @@ app is asked over plain HTTP on an internal host (`http://10.0.0.5:3000`),
 so no post matches. See also
 [`request.url` in a loader is `http://`](#requesturl-in-a-loader-is-http-and-the-internal-host-behind-a-proxy).
 
-**Fix:** pass the public origin, as a string or as a getter read at each
+**Fix:** name the proxy with `createServer({ proxy: trustProxy(…) })`
+(`trustProxy` is `@alxia/core`'s; see
+[Behind a proxy](guide/customising-the-server.md#behind-a-proxy)). The
+catch-all hands React Router the URL `originalUrl` reads from the trusted
+proxy's `X-Forwarded-Proto` and `X-Forwarded-Host`, so an action's
+`request.url` already carries the public origin and `jsonActions()` needs no
+`origin`. Without a trusted proxy, or when the proxy does not send those
+headers, pass the public origin, as a string or as a getter read at each
 request (so a value set at startup is found):
 
 ```ts
@@ -1629,4 +1636,5 @@ export const { readJson, requireJsonPost, readInput } = jsonActions({
 ```
 
 When the getter returns `undefined`, the request's own origin is used, so
-development needs no setting.
+development needs no setting. An empty string is not `undefined`: it is
+kept, and every request with an `Origin` is refused.
