@@ -23,7 +23,13 @@ export function withNonce() {
 
 export function withCacheControl() {
 	return alxia()
-		.use(secureHeaders({ cacheControl: 'private, no-store' }))
+		.use(
+			secureHeaders({
+				nonce: true,
+				contentSecurityPolicy: `script-src 'self' ${NONCE}`,
+				cacheControl: 'private, no-store',
+			}),
+		)
 		.get('/', ({ reply }) => reply(200, 'ok'));
 }
 

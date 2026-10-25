@@ -41,6 +41,7 @@ or a header in the wrong place.
 **Headers**
 
 - [An option has no effect on a response](#an-option-has-no-effect-on-a-response)
+- [A CDN still caches a page, though `cacheControl` is set](#a-cdn-still-caches-a-page-though-cachecontrol-is-set)
 - [`X-Powered-By` or `Server` is still sent](#x-powered-by-or-server-is-still-sent)
 - [A response arrives without the headers](#a-response-arrives-without-the-headers)
 - [A 404 or a route outside a group has no headers](#a-404-or-a-route-outside-a-group-has-no-headers)
@@ -581,11 +582,23 @@ stored by a cache.
 `cache-control: public, max-age=…`, or a middleware after `secureHeaders`)
 keeps it: the option only fills a header the response lacks.
 
-**Fix:** drop the route's header, or give it the same value:
+**Fix:** drop the route's header, or give it the same value. Before, the
+route's own header wins:
 
 ```ts
+app.get('/the-page', ({ reply }) =>
+	reply(200, html, { headers: { 'cache-control': 'public, max-age=60' } }),
+);
+```
+
+After, the route leaves it to `secureHeaders` (or says `private, no-store`
+itself):
+
+```ts
+app.get('/the-page', ({ reply }) => reply(200, html));
+
 const response = await app.request('/the-page');
-console.log(response.headers.get('cache-control'));
+console.log(response.headers.get('cache-control')); // private, no-store
 ```
 
 ### `X-Powered-By` or `Server` is still sent

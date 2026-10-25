@@ -1,5 +1,6 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { alxia } from '@alxia/core';
+import { NONCE } from './nonce';
 import { secureHeaders } from './secure-headers';
 
 const VALUE = 'private, no-store';
@@ -45,9 +46,47 @@ describe('cacheControl', () => {
 			.get('/boom', () => {
 				throw new Error('boom');
 			});
-		const response = await app.request('/boom');
-		expect(response.status).toBe(500);
-		expect(response.headers.get('cache-control')).toBe(VALUE);
+		const error = spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const response = await app.request('/boom');
+			expect(response.status).toBe(500);
+			expect(response.headers.get('cache-control')).toBe(VALUE);
+			expect(error).toHaveBeenCalled();
+		} finally {
+			error.mockRestore();
+		}
+	});
+
+	test('goes with a nonce, on a 200 and on a 404, fresh each time', async () => {
+		const app = alxia()
+			.use(
+				secureHeaders({
+					nonce: true,
+					contentSecurityPolicy: `script-src 'self' ${NONCE}`,
+					cacheControl: VALUE,
+				}),
+			)
+			.get('/', ({ reply }) => reply(200, 'ok'));
+		const nonceOf = (response: Response) =>
+			response.headers
+				.get('content-security-policy')
+				?.match(/'nonce-([^']+)'/)?.[1];
+		const ok = await app.request('/');
+		const missing = await app.request('/missing');
+		expect(ok.status).toBe(200);
+		expect(missing.status).toBe(404);
+		for (const response of [ok, missing]) {
+			expect(response.headers.get('cache-control')).toBe(VALUE);
+			expect(nonceOf(response)).toBeDefined();
+		}
+		expect(nonceOf(ok)).not.toBe(nonceOf(missing));
+	});
+
+	test('true is not a value', () => {
+		const never = () =>
+			// @ts-expect-error a string, or false: true is neither
+			secureHeaders({ cacheControl: true });
+		expect(never).toBeInstanceOf(Function);
 	});
 
 	test('an empty value is refused, at once', () => {
