@@ -7,10 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Headers for server-rendered pages.** A policy written from directives
-  with `csp()` first, then a strict preset for pages with a nonce, a
-  `Cache-Control` for responses that carry one, and `Clear-Site-Data` on
-  sign-out.
+Nothing scheduled yet.
 
 ## Next
 
@@ -18,7 +15,11 @@ Nothing scheduled yet.
 
 ## Later
 
-Nothing scheduled yet.
+- **Reporting (`report-to` / `Reporting-Endpoints`).** Name an endpoint for
+  policy violations, written as options next to the policy.
+- **One error-message prefix.** `secureHeaders():` for the older
+  `secureHeaders:` messages, so every error of the package starts the same
+  way as `csp():`, `pageHeaders():` and `clearSiteData():`.
 
 ## Not planned
 
@@ -27,6 +28,18 @@ Nothing scheduled yet.
   to an app adds no transitive package to audit or update.
 
 ## Shipped
+
+### 0.5.0
+
+- **Headers for server-rendered pages.** `csp()` writes a policy from
+  directives and refuses one a browser would misread, a keyword without its
+  quotes included. `pageHeaders({ https })` is the strict preset for a page
+  with a nonce (`PAGE_DIRECTIVES`, frozen), with HSTS and
+  `upgrade-insecure-requests` only over HTTPS; it refuses a `script-src`
+  without the nonce and the removal of `default-src`, `base-uri` or
+  `object-src`. `cacheControl` keeps a page out of caches, and
+  `clearSiteData()` empties the browser's cache on a successful sign-out, not
+  on a request another site made.
 
 ### 0.4.0
 

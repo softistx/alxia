@@ -1,20 +1,31 @@
 import { describe, expect, spyOn, test } from 'bun:test';
-import { alxia } from '@alxia/core';
+import { alxia, type StatusCode } from '@alxia/core';
 import { clearSiteData } from './clear-site-data';
 
 /** An app answering `status` on `/sign-out` and `/sign-out.data`. */
-function app(status: number, middleware = clearSiteData(['cache'])) {
-	const answer = ({ reply }: { reply: (s: number, b?: string) => Response }) =>
-		reply(status, 'x');
+function app(status: StatusCode, middleware = clearSiteData(['cache'])) {
 	return alxia()
 		.use('/sign-out', middleware)
 		.use('/sign-out.data', middleware)
-		.all('/sign-out', answer as never)
-		.all('/sign-out.data', answer as never)
-		.all('/sign-outs', answer as never);
+		.all('/sign-out', ({ reply }) => reply(status, 'x'))
+		.all('/sign-out.data', ({ reply }) => reply(status, 'x'))
+		.all('/sign-outs', ({ reply }) => reply(status, 'x'));
 }
 
-async function cleared(method: string, path: string, status = 302) {
+/** The `Clear-Site-Data` of a POST to `/sign-out` sent with `headers`. */
+async function postedWith(
+	headers: Record<string, string>,
+	middleware = clearSiteData(['cache']),
+) {
+	const response = await app(302, middleware).request('/sign-out', {
+		method: 'POST',
+		redirect: 'manual',
+		headers,
+	});
+	return response.headers.get('clear-site-data');
+}
+
+async function cleared(method: string, path: string, status: StatusCode = 302) {
 	const response = await app(status).request(path, {
 		method,
 		redirect: 'manual',
@@ -34,7 +45,7 @@ describe('clearSiteData', () => {
 	});
 
 	test('a refused sign-out clears nothing', async () => {
-		for (const status of [400, 403, 415, 500]) {
+		for (const status of [400, 403, 415, 500] as const) {
 			expect(await cleared('POST', '/sign-out', status)).toBeNull();
 			expect(await cleared('POST', '/sign-out.data', status)).toBeNull();
 		}
@@ -106,5 +117,50 @@ describe('clearSiteData', () => {
 		expect(() => clearSiteData(['cash' as never])).toThrow(
 			'clearSiteData(): "cash" is not a type: write one of "cache", "cookies", "storage", "executionContexts", "clientHints", "prefetchCache", "prerenderCache", "*"',
 		);
+	});
+
+	test('a request from another site clears nothing', async () => {
+		expect(await postedWith({ 'sec-fetch-site': 'cross-site' })).toBeNull();
+		expect(await postedWith({ 'sec-fetch-site': 'same-site' })).toBeNull();
+		expect(await postedWith({ 'sec-fetch-site': 'same-origin' })).toBe(
+			'"cache"',
+		);
+		expect(await postedWith({ 'sec-fetch-site': 'none' })).toBe('"cache"');
+	});
+
+	test('a foreign Origin clears nothing, the same origin does', async () => {
+		expect(await postedWith({ origin: 'https://evil.example' })).toBeNull();
+		expect(await postedWith({ origin: 'null' })).toBeNull();
+		expect(await postedWith({ origin: 'http://localhost' })).toBe('"cache"');
+	});
+
+	test('a request with neither header is cleared, as curl or an old browser', async () => {
+		expect(await postedWith({})).toBe('"cache"');
+	});
+
+	test('crossSite: true clears for another site too', async () => {
+		const open = clearSiteData(['cache'], { crossSite: true });
+		expect(await postedWith({ 'sec-fetch-site': 'cross-site' }, open)).toBe(
+			'"cache"',
+		);
+		expect(await postedWith({ origin: 'https://evil.example' }, open)).toBe(
+			'"cache"',
+		);
+	});
+
+	test('an empty methods, or an empty method, is refused', () => {
+		const message =
+			'clearSiteData(): methods is empty or holds an empty method: write at least one, such as ["POST"], or leave methods out';
+		expect(() => clearSiteData(['cache'], { methods: [] })).toThrow(message);
+		expect(() => clearSiteData(['cache'], { methods: [''] })).toThrow(message);
+	});
+});
+
+describe('types', () => {
+	test('a type is one of ClearSiteDataType, in a list', () => {
+		// @ts-expect-error "cash" is not a type
+		expect(() => clearSiteData(['cash'])).toThrow();
+		// @ts-expect-error types is a list, not a string
+		expect(() => clearSiteData('cache')).toThrow();
 	});
 });
