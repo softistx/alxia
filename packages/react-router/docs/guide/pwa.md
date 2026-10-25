@@ -157,6 +157,8 @@ import { workerContract } from './pwa-contract';
 startWorker({
 	contract: workerContract,
 	caching: { never: (path) => path.startsWith('/api/') },
+	// The build writes the precache list in; a worker built some other way passes it.
+	precache: [{ url: '/offline.html', revision: 'v1' }],
 });
 ```
 
@@ -188,8 +190,10 @@ network; `clientsClaim()` makes a first install control the open pages at
 once; an update waits until the page posts `SKIP_WAITING`; and on `activate`
 the caches the contract no longer owns (`obsoleteCaches`) are deleted.
 
-The precache list comes from `globalThis.__ALXIA_PRECACHE__`, which the
-build defines in the bundle. Read without the build it is `undefined`, so the
+The precache list is the `precache` option, or else
+`globalThis.__ALXIA_PRECACHE__`, which the build writes into the bundle (a
+worker bundled some other way passes `precache`, or defines that global in its
+own bundle). Read without the build it is `undefined`, so the
 worker's error is [`startWorker(): no precache list`](../troubleshooting.md#startworker-no-precache-list-)
 instead of a `ReferenceError`.
 
@@ -278,7 +282,7 @@ import {
 
 export const notice = createUpdateNotice(sessionStore);
 
-export function startWorker() {
+export function registerWorker() {
 	if (!('serviceWorker' in navigator)) return;
 	afterLoad(() => {
 		registerServiceWorker(navigator.serviceWorker, (worker, apply) =>

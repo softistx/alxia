@@ -862,9 +862,19 @@ the list the build defines in the bundle (`globalThis.__ALXIA_PRECACHE__`);
 a worker bundled by anything else has none, and the page would install a
 worker that precaches nothing.
 
-**Fix:** build the worker with the build that writes the list, or pass your
-own: `startWorker({ contract, precache: [{ url: '/offline.html', revision: 'v1' }] })`.
-`precache` wins over the list the build wrote.
+**Fix:** either build the worker with the build that writes the list
+(`alxia()` or `buildWorker()`), or pass the list yourself, which works for a
+worker bundled any other way:
+
+```ts
+startWorker({
+	contract,
+	precache: [{ url: '/offline.html', revision: 'v1' }],
+});
+```
+
+`precache` wins over the list the build wrote. A bundle of your own may
+instead define `globalThis.__ALXIA_PRECACHE__`.
 
 ### `TypeError: startWorker(): contract is required: …`
 

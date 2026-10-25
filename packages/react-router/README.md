@@ -92,7 +92,10 @@ Vite's preview server, as `bun run start` would: the pages, `/api`, the
 client's files and the app's middlewares. So does React Router's prerendering.
 
 `@alxia/core` and `react-router` 8 are peers, and `vite` 7 or 8 is an
-optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react`. The package declares no dependency.
+optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react`. The six `workbox-*`
+packages (`workbox-core`, `workbox-expiration`, `workbox-navigation-preload`,
+`workbox-precaching`, `workbox-routing`, `workbox-strategies`) are optional
+peers too, for `/pwa/worker`: `bun add -d workbox-core workbox-expiration workbox-navigation-preload workbox-precaching workbox-routing workbox-strategies`. The package declares no dependency.
 
 Its `typescript` peer is 6 or 7. The template's TypeScript 5.9 typechecks,
 but `bun add` warns about it; `bun add -d typescript@^6` silences the
@@ -523,12 +526,20 @@ export default createServer({
 The service worker is one file on Workbox, in `/pwa/worker` (the six
 `workbox-*` packages, optional peers, are its only package imports):
 
+```sh
+bun add -d workbox-core workbox-expiration workbox-navigation-preload workbox-precaching workbox-routing workbox-strategies
+```
+
 ```ts
 // file: app/service-worker.ts
 import { defineWorkerContract } from '@alxia/react-router/pwa';
 import { startWorker } from '@alxia/react-router/pwa/worker';
 
-startWorker({ contract: defineWorkerContract({ cachePrefix: 'my-app' }) });
+startWorker({
+	contract: defineWorkerContract({ cachePrefix: 'my-app' }),
+	// The build writes the precache list in; a worker built some other way passes it.
+	precache: [{ url: '/offline.html', revision: 'v1' }],
+});
 ```
 
 The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md)

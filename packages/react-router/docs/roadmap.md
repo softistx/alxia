@@ -8,9 +8,10 @@ number on it. Every release, with each change it made, is in
 ## Now
 
 - **The service worker and its build.** `startWorker` on Workbox
-  (`/pwa/worker`, the `workbox-*` packages optional peers), `buildWorker`
-  (`/pwa/build`), and `alxia()` building `app/service-worker.ts` after
-  `react-router build`. In the next minor.
+  (`/pwa/worker`, the `workbox-*` packages optional peers) is in. Remaining:
+  `buildWorker` (`/pwa/build`), and `alxia()` building `app/service-worker.ts`
+  after `react-router build`, which write the precache list in. In the next
+  minor.
 
 ## Next
 

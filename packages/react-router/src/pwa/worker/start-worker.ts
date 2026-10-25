@@ -73,7 +73,7 @@ export function startWorker(options: WorkerOptions): void {
 					new ExpirationPlugin({
 						...route.expiration,
 						purgeOnQuotaError: true,
-					}) as WorkboxPlugin,
+					}) as WorkboxPlugin, // ExpirationPlugin's optional hooks are not exact-optional under exactOptionalPropertyTypes; this states it is a plugin.
 				],
 			}),
 		);
