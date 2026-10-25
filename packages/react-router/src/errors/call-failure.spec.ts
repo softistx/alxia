@@ -93,6 +93,21 @@ describe('apiCallFailure', () => {
 		);
 	});
 
+	test('a passedThrough status that cannot carry a body is answered with an empty one', async () => {
+		const { log } = logger();
+		const status = new ApiStatusError(204, '', { statusText: 'No Content' });
+		const failed = apiCallFailure(status, {
+			api,
+			requestId: 'req-204',
+			passedThrough: new Set([204]),
+			log,
+		}) as Response;
+		expect(failed).toBeInstanceOf(Response);
+		expect(failed.status).toBe(204);
+		expect(failed.body).toBeNull();
+		expect(failed.headers.get('x-request-id')).toBe('req-204');
+	});
+
 	test('passedThrough replaces the statuses that keep their own', () => {
 		const { log } = logger();
 		const status = new ApiStatusError(429, 'slow down');

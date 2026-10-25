@@ -4,6 +4,9 @@ import { REQUEST_ID_HEADER } from './request-id';
 /** The statuses an API's gateway or auth layer may answer without a GraphQL body. */
 const PASSED_THROUGH: ReadonlySet<number> = new Set([401, 403, 404]);
 
+/** The statuses a `Response` cannot carry a body with. */
+const NO_BODY: ReadonlySet<number> = new Set([101, 204, 205, 304]);
+
 export interface CallFailureOptions {
 	/** What a log line names the API by, such as `my-api https://api.example.com/graphql`. */
 	api: string;
@@ -85,7 +88,15 @@ export function apiCallFailure(
 	if (isStatusError(error)) {
 		if (passedThrough.has(error.status)) {
 			log.warn(`${call} answered ${error.status}`);
-			const statusText = error.statusText ?? '';
+			const statusText =
+				typeof error.statusText === 'string' ? error.statusText : '';
+			if (NO_BODY.has(error.status)) {
+				return new Response(null, {
+					status: error.status,
+					statusText,
+					headers,
+				});
+			}
 			return new Response(statusText, {
 				status: error.status,
 				statusText,

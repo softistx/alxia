@@ -641,8 +641,11 @@ it imports nothing from `@nxgt/graphql-client` and holds across two copies of
 it. Pass `requestId` from the response (`requestIdOf(response)`), and the id
 rides on the `ApiError` and on the `Response`, where `routeError` reads it.
 `passedThrough` replaces the statuses that keep their own (401, 403 and 404),
-and `log` replaces `console`. Nothing logged holds a header, a variable or a
-token.
+and `log` replaces `console`. A `passedThrough` status that cannot carry a
+body (204 and the like) is answered with an empty body. The log lines start
+with the `api` name you pass (`<api>: <operation> …`), not
+`alxia-react-router:`, because they describe your app's call, not a package
+diagnostic. Nothing logged holds a header, a variable or a token.
 
 An app writes one `execute` that sends the call and ends in `apiCallFailure`.
 The example uses `@nxgt/graphql-client`; `operationName` reads a document

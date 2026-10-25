@@ -631,7 +631,17 @@ export async function action({ request }: { request: Request }) {
 ```
 
 A call that failed is turned into what a loader throws, and logged with the API's request id, by `apiCallFailure(error, { api, operation: operationName(document), requestId })`
-(your own `execute` calls it in its `catch`).
+(your own `execute` calls it in its `catch`):
+
+```ts
+import { apiCallFailure, operationName } from '@alxia/react-router/errors';
+import type { DocumentNode } from 'graphql';
+
+export function failed(error: unknown, document: DocumentNode, requestId?: string, signal?: AbortSignal) {
+	return apiCallFailure(error, { api: 'my-api', operation: operationName(document), requestId, signal });
+}
+// In execute(): catch (error) { throw failed(error, document, requestId, signal); }
+```
 
 The API's catalogue is read and kept fresh by `createErrorCatalogue`; the root's
 middleware awaits `freshAll()`, its loader returns `clientMessages()` and
