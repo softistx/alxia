@@ -16,7 +16,7 @@ installable and usable offline, and what to do with each message.
 | [OpenAPI](guide/openapi.md) | writing the API of an app that serves pages spec first: binding its routes to the generated operations, and checking them with `matchesSpec` |
 | [Testing](guide/testing.md) | making the app in process with `server.create(wiring)` from a build, and testing it without a server |
 | [Deploying](guide/deploying.md) | running the build with `bun build/server/index.js`, and the Docker image |
-| [Installable and offline](guide/pwa.md) | making the app installable and usable offline: the subpaths of `@alxia/react-router/pwa`, the service worker (`startWorker`, `/pwa/worker`) and building it with `buildWorker` (`/pwa/build`), its contract and cache names, which requests the worker caches and which responses it stores, the precache list read from a build, or clearing the caches at sign-out |
+| [Installable and offline](guide/pwa.md) | making the app installable and usable offline: the subpaths of `@alxia/react-router/pwa`, the service worker (`startWorker`, `/pwa/worker`), its build by `alxia()` or `buildWorker` (`/pwa/build`), its contract and cache names, which requests the worker caches and which responses it stores, the precache list read from a build, or clearing the caches at sign-out |
 | [Troubleshooting](troubleshooting.md) | something went wrong and you have the message, or a page streams, hydrates or reads its context unlike you expected |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |
 
