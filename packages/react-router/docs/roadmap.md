@@ -7,7 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing in progress.
+- **Installable and offline: `@alxia/react-router/pwa`.** The code with no UI an installable React Router app needs: the service worker's contract and what it caches, the precache list read from the build, registration and the update notice, the web app manifest, `useOnline` and `useServiceWorker` (`/pwa/react`, `react` an optional peer), `noCache` for the worker's script (`/pwa/server`), each app-specific name an option ([guide](pwa.md)). In the next minor.
 
 ## Next
 

@@ -477,6 +477,44 @@ runs as the non-root `bun` user, on `PORT` (3000). The
 [guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#docker)
 has the commented file, and what to copy for a package left external.
 
+## Installable and offline (PWA)
+
+`@alxia/react-router/pwa` holds what an installable app shares and that has
+no UI: the service worker's contract, which requests it caches and which
+responses it may store, the precache list read from a build, and the
+cleaning at sign-out. It imports nothing, so the worker, a build script, the
+page and the server can all import it.
+
+```ts
+import {
+  cachingFor,
+  defineWorkerContract,
+  isStorable,
+} from '@alxia/react-router/pwa';
+
+// Shared by the worker and the page: every cache starts with `my-app-`.
+const contract = defineWorkerContract({ cachePrefix: 'my-app' });
+
+// In the worker's fetch handler:
+function strategy(request: Request) {
+  return cachingFor(request, self.location.origin, {
+    never: (path) => path.startsWith('/api/'),
+  });
+}
+// 'navigation' | 'immutable' | 'static' | 'none'; store a network answer
+// only when `isStorable(response)`.
+async function answer(request: Request) {
+  if (strategy(request) === 'immutable') {
+    // cache-first: answer from the build's asset cache when it has the file
+    const cache = await caches.open(contract.cacheNames.assets);
+    return (await cache.match(request)) ?? fetch(request);
+  }
+  return fetch(request);
+}
+```
+
+The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/pwa.md) has the rest.
+
 ## Traps
 
 - **A context key made in `app/` reaches the loaders only through the
@@ -530,6 +568,22 @@ From `@alxia/react-router/vite`:
 | `alxia(options?)` | the Vite plugin, for `react-router dev`, `react-router build` and `vite preview`, building the server for Bun. `entry` is the server file: `app/server.ts` by default, or the default server when there is none |
 | `AlxiaOptions` | its options |
 
+From `@alxia/react-router/pwa`:
+
+| export | |
+| --- | --- |
+| `defineWorkerContract(options)` | the contract of one app's worker from its `cachePrefix` (required), with `cacheVersion` (`v1`), `serviceWorkerUrl` and `offlineUrl`: its `cacheNames`, `obsoleteCaches(names)` and `clearableCaches(names)`. Throws on an empty prefix or one ending with `-` |
+| `WorkerContract`, `WorkerContractOptions`, `CacheNames` | its types |
+| `SERVICE_WORKER_URL`, `OFFLINE_URL`, `SKIP_WAITING` | `/service-worker.js`, `/offline.html` and the message that applies an update |
+| `cachingFor(request, origin, options?)` | `navigation`, `immutable`, `static` or `none` for a request. `options`: `never(path)`, `immutable(path)` (everything under `/assets/` by default), `serviceWorkerUrl`, `manifestPath` |
+| `Caching`, `RequestFacts`, `CachingOptions` | its types |
+| `isStorable(response)` | whether a response may be stored: a full, same-origin, `public` 200 of a script, style, font or image, not varying on who asks |
+| `parseBrowserManifest(source)` | React Router's browser manifest, read from `build/client/assets/manifest-*.js` |
+| `precacheList(manifest)` | the hashed scripts and stylesheets every route needs, as Workbox precache entries |
+| `assetPrecache(files, include, base?)` | the entries of the files in `build/client/assets` that a regex of yours matches, such as fonts |
+| `BrowserManifest`, `PrecacheEntry` | their types |
+| `clearAppCaches(contract)` | deletes the caches the worker filled but the offline page; for sign-out. Does nothing without Cache Storage |
+
 The `alxia-react-router` bin, run with `bunx`:
 
 | command | |
@@ -539,6 +593,7 @@ The `alxia-react-router` bin, run with `bunx`:
 ## Documentation
 
 - [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev, the build and `vite preview` work, what the build sets for Bun, customising the server, typing the loaders, the app's own keys, a CSP nonce, escape hatches, WebSockets, the client's files, OpenAPI, testing and deploying, with Docker.
+- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, and clearing at sign-out.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.

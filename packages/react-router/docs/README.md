@@ -8,6 +8,7 @@ do with each message.
 | Page | Read it when |
 | --- | --- |
 | [Guide](guide.md) | starting a new app with `bun create @alxia --template react-router`, adding alxia to the official template or an existing app, revealing the default server with `bunx alxia-react-router reveal`, customising the server with `createServer()`, typing the loaders with `Register` or a type argument, the app's own context keys, what `vite preview` and prerendering serve, what the plugin sets so the server is built for Bun, the escape hatches (another entry, overriding the wiring, a server of your own), what runs around the pages, WebSockets in dev, in preview and in the build, the client's files, OpenAPI, testing, or deploying, with the Docker image |
+| [Installable and offline](pwa.md) | making the app installable and usable offline: the subpaths of `@alxia/react-router/pwa`, the service worker's contract and cache names, which requests the worker caches and which responses it stores, the precache list read from a build, or clearing the caches at sign-out |
 | [Troubleshooting](troubleshooting.md) | something went wrong and you have the message, or a page streams, hydrates or reads its context unlike you expected |
 | [Roadmap](roadmap.md) | wondering what is coming, and what is not planned |
 
