@@ -673,7 +673,9 @@ neither, so the fallback shows.
 matches and the root loader runs:
 
 ```ts
-// app/routes.ts
+// app/routes.ts: add it last in your route config
+import { route } from '@react-router/dev/routes';
+
 route('*', 'routes/not-found.tsx');
 ```
 
