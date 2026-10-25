@@ -38,6 +38,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [`error: lockfile had changes, but lockfile is frozen`](#error-lockfile-had-changes-but-lockfile-is-frozen)
 - [`EACCES: permission denied, open '/app/…'`](#eacces-permission-denied-open-app)
 - [`error: Cannot find package '…' from '/app/build/server/index.js'`](#error-cannot-find-package--from-appbuildserverindexjs)
+- [`TypeError: defineWorkerContract(): cachePrefix must be a non-empty name, …`](#typeerror-defineworkercontract-cacheprefix-must-be-a-non-empty-name-)
+- [`parseBrowserManifest(): not React Router's browser manifest …`](#parsebrowsermanifest-not-react-routers-browser-manifest-)
 
 **Types**
 
@@ -63,6 +65,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [A `publish` under `react-router dev` misses the sockets opened before an edit](#a-publish-under-react-router-dev-misses-the-sockets-opened-before-an-edit)
 - [The build has a package's Node variant, not its `bun` one](#the-build-has-a-packages-node-variant-not-its-bun-one)
 - [`request.url` in a loader is `http://` and the internal host behind a proxy](#requesturl-in-a-loader-is-http-and-the-internal-host-behind-a-proxy)
+- [An unhashed file under public/assets/ is cached for a year](#an-unhashed-file-under-publicassets-is-cached-for-a-year)
+- [Another app's caches vanish on the same origin](#another-apps-caches-vanish-on-the-same-origin)
 
 ## Thrown or printed
 
@@ -770,6 +774,44 @@ addon built for glibc alone then stops it with
 put the final stage back on `oven/bun:1`
 ([`@alxia/create`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md#error--is-linked-against-glibc-dt_needed-libmso6-but-this-bun-build-uses-musl)).
 
+### `TypeError: defineWorkerContract(): cachePrefix must be a non-empty name, …`
+
+The full message is `defineWorkerContract(): cachePrefix must be a non-empty
+name, such as 'my-app'; got ''.`, or `… must not end with '-', which the
+contract adds; got 'my-app-'. Use 'my-app'.`
+
+**Why:** every cache name is `<prefix>-<kind>-<version>`, and the worker
+deletes the caches that start with `<prefix>-`. An empty prefix would own
+every cache of the origin, and a trailing dash would be doubled.
+
+**Fix:** pass the app's own name, without the dash:
+
+```ts
+import { defineWorkerContract } from '@alxia/react-router/pwa';
+
+export const workerContract = defineWorkerContract({ cachePrefix: 'my-app' });
+```
+
+### `parseBrowserManifest(): not React Router's browser manifest …`
+
+The full message ends with `(build/client/assets/manifest-*.js).`
+
+**Why:** the source holds no `{ … }` object. The build script read another
+file, an empty one, or the build has not run.
+
+**Fix:** run `react-router build` first, then read the file named
+`manifest-<hash>.js` in `build/client/assets`, not the server's manifest:
+
+```ts
+import { readdirSync, readFileSync } from 'node:fs';
+import { parseBrowserManifest } from '@alxia/react-router/pwa';
+
+const assets = 'build/client/assets';
+const file = readdirSync(assets).find((name) => /^manifest-.*\.js$/.test(name));
+if (!file) throw new Error('Run react-router build first.');
+export const manifest = parseBrowserManifest(readFileSync(`${assets}/${file}`, 'utf8'));
+```
+
 ## Types
 
 ### `Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`
@@ -1188,3 +1230,42 @@ export default createServer({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) });
 
 React Router then gets its request at `originalUrl(ctx)`
 ([Behind a proxy](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#behind-a-proxy-proxy)).
+
+### An unhashed file under public/assets/ is cached for a year
+
+A file you put in `public/assets/` (a sprite, an icon) changes on a deploy,
+and visitors keep the old one.
+
+**Why:** Vite copies `public/` into `build/client/`, and `serveClient` serves
+everything under `build/client/assets/` as `public, max-age=31536000,
+immutable`, hashed or not. The worker's `cachingFor` agrees by default:
+everything under `/assets/` is `immutable`, cache-first.
+
+**Fix:** keep unhashed files out of `assets/`: `public/icons/` is served for
+an hour and is `static` for the worker. If they must stay there, tell the
+worker so it revalidates them, and expect the HTTP cache to hold them for a
+year until the file's name changes:
+
+```ts
+import { cachingFor, type RequestFacts } from '@alxia/react-router/pwa';
+
+export function caching(request: RequestFacts, origin: string) {
+  return cachingFor(request, origin, {
+    immutable: (path) =>
+      path.startsWith('/assets/') && !path.startsWith('/assets/icons/'),
+  });
+}
+```
+
+### Another app's caches vanish on the same origin
+
+Signing out, or a new worker activating, empties the caches of another app
+served from the same origin.
+
+**Why:** a contract owns every cache whose name starts with `<prefix>-`.
+With one prefix that is the start of another plus a dash (`app` and
+`app-admin`), `app`'s `obsoleteCaches` and `clearableCaches` take
+`app-admin-…` for their own.
+
+**Fix:** give each app a prefix that is not the other's start followed by
+`-`: `app` and `admin`, or `app-web` and `app-admin`.

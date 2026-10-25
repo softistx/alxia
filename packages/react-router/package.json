@@ -1,7 +1,7 @@
 {
 	"name": "@alxia/react-router",
 	"version": "0.8.1",
-	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served",
+	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served; the code with no UI an installable app shares (`/pwa`)",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -27,6 +27,11 @@
 			"import": "./dist/vite/index.js",
 			"default": "./dist/vite/index.js"
 		},
+		"./pwa": {
+			"types": "./dist/pwa/index.d.ts",
+			"import": "./dist/pwa/index.js",
+			"default": "./dist/pwa/index.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"repository": {
@@ -47,6 +52,7 @@
 		"entrypoints": [
 			"src/index.ts",
 			"src/vite/index.ts",
+			"src/pwa/index.ts",
 			"src/cli/index.ts"
 		]
 	},
