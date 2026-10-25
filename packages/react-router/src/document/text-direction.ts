@@ -13,6 +13,9 @@ const RTL = new Set([
 	'ckb',
 	'sd',
 	'ug',
+	// Legacy codes of Hebrew and Yiddish.
+	'iw',
+	'ji',
 ]);
 
 /**

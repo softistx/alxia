@@ -11,6 +11,8 @@ test('right-to-left base languages are rtl, whatever the case or region', () => 
 		'ckb',
 		'ur_PK',
 		'ug',
+		'iw',
+		'ji',
 	]) {
 		expect(textDirection(tag)).toBe('rtl');
 	}

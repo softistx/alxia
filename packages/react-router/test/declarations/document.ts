@@ -39,3 +39,14 @@ export const direction = {
 	instance: (instance: PageLanguage<'en' | 'fr'>): PageLanguage<'en' | 'fr'> =>
 		instance,
 };
+
+// The fallback is typed: one outside `languages` is refused.
+createPageLanguage({
+	languages: ['en', 'fr'],
+	// @ts-expect-error 'de' is not 'en' | 'fr'
+	fallback: 'de',
+});
+
+// A picked language is typed too.
+// @ts-expect-error 'de' is not 'en' | 'ar' | 'fr'
+language.chooseLanguage('de');

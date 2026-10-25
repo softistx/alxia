@@ -221,11 +221,16 @@ is [`@alxia/language`](https://github.com/softistx/alxia/blob/develop/packages/l
 ```ts
 // app/server.ts
 import { language } from '@alxia/language';
+import { createServer } from '@alxia/react-router';
 
-export const app = createServer(/* … */).use(
-	language({ supported: ['en', 'fr', 'ar'], fallback: 'en', order: ['cookie', 'header'] }),
-);
-// the root loader returns { language: ctx.language }
+const server = createServer({
+	configure: (app) =>
+		app.use(language({ supported: ['en', 'fr', 'ar'], fallback: 'en', order: ['cookie', 'header'] })),
+});
+export default server;
+declare module '@alxia/react-router' {
+	interface Register { server: typeof server }
+}
 ```
 
 ```ts
@@ -238,7 +243,16 @@ export const { pageLanguage, metaLanguage, chooseLanguage, useChosenLanguage } =
 
 ```tsx
 // app/root.tsx
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
 import { textDirection } from '@alxia/react-router/document';
+import { useRouteLoaderData } from 'react-router';
+import { metaLanguage, pageLanguage, useChosenLanguage } from './language';
+import type { Route } from './+types/root';
+
+const titles = { en: 'Home', fr: 'Accueil', ar: 'الرئيسية' };
+
+// the root loader returns alxia.language, set by the middleware
+export const loader = withAlxia(({ alxia }: Route.LoaderArgs & AlxiaArgs) => ({ language: alxia.language }));
 
 export function Layout({ children }: { children: React.ReactNode }) {
 	const data = useRouteLoaderData<typeof loader>('root');
@@ -259,15 +273,18 @@ export const meta: Route.MetaFunction = ({ matches }) => [
 - `pageLanguage(language)` is the supported language, else the fallback. In
   the browser the one picked with `chooseLanguage(language)` wins, and the
   last one seen stands in when the root's data is gone. On the server it
-  remembers nothing: one module serves every request.
+  remembers nothing: one module serves every request. A server that
+  registers a DOM shim globally (happy-dom or jsdom) is read as a browser:
+  pass `browser: false` there.
 - `metaLanguage(matches)` reads `matches[0].loaderData.language`.
 - `useChosenLanguage()` is the picked language, or `undefined`; it
   re-renders on a pick, and is `undefined` in the server render so
   hydration matches.
 - `textDirection(tag)` is `'rtl'` for `ar`, `fa`, `he`, `ur`, `ps`, `yi`,
-  `dv`, `ckb`, `sd` and `ug`, else `'ltr'`, reading the base tag whatever its
+  `dv`, `ckb`, `sd` and `ug` (and the legacy `iw` and `ji`), else `'ltr'`, reading the base tag whatever its
   case (`ar-EG`, `AR`). A script subtag is not read: `az-Arab` is `'ltr'`.
 - A fallback outside `languages` throws
   ([the message](../troubleshooting.md#createpagelanguage-the-fallback-x-is-not-one-of-the-languages)).
-  An error page without the root's data shows the last language seen, or
-  the fallback ([why](../troubleshooting.md#the-error-page-shows-in-the-fallback-language)).
+  An error page keeps the root's data, so it keeps the language, except
+  for a URL that matches no route or a root loader that threw: there it
+  shows the last language seen in the browser, or the fallback ([why](../troubleshooting.md#the-error-page-shows-in-the-fallback-language)).

@@ -652,19 +652,46 @@ createPageLanguage({ languages: ['en', 'fr'], fallback: 'en' });
 
 ### The error page shows in the fallback language
 
-**When:** an error boundary renders the root's `<html lang>` or its texts in
-the fallback language although the visitor uses another.
+**When:** on an error document, the root's `<html lang>` or text shows the
+fallback language although the visitor uses another.
 
-**Why:** on an error the root loader's data can be missing
-(`useRouteLoaderData('root')` is `undefined`), so `pageLanguage(undefined)`
-has no language to read. In the browser it keeps the last language it saw
-and the one picked with `chooseLanguage`; a document the server renders as
-an error has seen neither, so the fallback shows.
+**Why:** a child route's error keeps the root's loader data. React Router
+keeps `loaderData` for every loader that succeeded, so
+`useRouteLoaderData('root')` still has it in `Layout` and `ErrorBoundary`.
+The data is missing in only two cases:
 
-**Fix:** none is needed for the common case (a failed client navigation
-keeps the last language). For a document the server renders as an error,
-throw from a child route rather than the root's own loader, so the root's
-data is still there.
+- the URL matches no route, which is a 404 that runs no loader at all, the
+  root's included;
+- the root's own loader threw.
+
+With no data, `pageLanguage(undefined)` has no language to read. In the
+browser it keeps the last language it saw and the one picked with
+`chooseLanguage`; a document the server renders as an error has seen
+neither, so the fallback shows.
+
+**Fix, 404:** add a splat route whose loader throws a 404, so the URL
+matches and the root loader runs:
+
+```ts
+// app/routes.ts
+route('*', 'routes/not-found.tsx');
+```
+
+```ts
+// app/routes/not-found.tsx
+import { data } from 'react-router';
+
+export const loader = () => {
+	throw data(null, { status: 404 });
+};
+```
+
+**Fix, root loader:** keep the root loader to `{ language: alxia.language }`,
+with nothing fallible in it. Load fallible data in child routes, or catch it
+and return it as a field.
+
+**Fix, client:** none is needed: a failed client navigation keeps the last
+language through `pageLanguage`.
 
 ### `Error: You must render this element inside a <HydratedRouter> element`
 

@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from 'react';
+import { createLanguageStore } from './language-store';
 
 export interface PageLanguageOptions<L extends string> {
 	/** The languages the app serves. */
@@ -45,21 +46,13 @@ export function createPageLanguage<const L extends string>(
 		);
 	}
 	const isBrowser = options.browser ?? (() => typeof document !== 'undefined');
-	const listeners = new Set<() => void>();
+	const store = createLanguageStore<L>();
 	let last: L | undefined;
-	let chosen: L | undefined;
-
-	const subscribe = (listener: () => void) => {
-		listeners.add(listener);
-		return () => {
-			listeners.delete(listener);
-		};
-	};
 
 	function pageLanguage(language: string | undefined): L {
 		const supported = languages.find((known) => known === language);
 		if (!isBrowser()) return supported ?? fallback;
-		const current = chosen ?? supported;
+		const current = store.getSnapshot() ?? supported;
 		if (current) last = current;
 		return last ?? fallback;
 	}
@@ -72,15 +65,8 @@ export function createPageLanguage<const L extends string>(
 				| undefined;
 			return pageLanguage(root?.loaderData?.language);
 		},
-		chooseLanguage(language) {
-			chosen = language;
-			for (const listener of listeners) listener();
-		},
+		chooseLanguage: store.choose,
 		useChosenLanguage: () =>
-			useSyncExternalStore(
-				subscribe,
-				() => chosen,
-				() => undefined,
-			),
+			useSyncExternalStore(store.subscribe, store.getSnapshot, () => undefined),
 	};
 }

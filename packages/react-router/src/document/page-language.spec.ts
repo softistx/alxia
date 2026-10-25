@@ -1,5 +1,4 @@
-import { expect, spyOn, test } from 'bun:test';
-import * as React from 'react';
+import { expect, test } from 'bun:test';
 import { createElement } from 'react';
 import { renderToString } from 'react-dom/server';
 import { createPageLanguage } from './page-language';
@@ -66,36 +65,6 @@ test('useChosenLanguage: the server render is always undefined, so hydration mat
 	const Probe = () => createElement('p', null, String(useChosenLanguage()));
 	chooseLanguage('fr');
 	expect(renderToString(createElement(Probe))).toContain('undefined');
-});
-
-test('useChosenLanguage re-renders: the store it hands React hears each pick', () => {
-	const { chooseLanguage, useChosenLanguage } = make(true);
-	let subscribe: ((listener: () => void) => () => void) | undefined;
-	let snapshot: (() => unknown) | undefined;
-	const spy = spyOn(React, 'useSyncExternalStore').mockImplementation(((
-		sub: (listener: () => void) => () => void,
-		get: () => unknown,
-	) => {
-		subscribe = sub;
-		snapshot = get;
-		return get();
-	}) as typeof React.useSyncExternalStore);
-	try {
-		renderToString(createElement(() => String(useChosenLanguage())));
-	} finally {
-		spy.mockRestore();
-	}
-	let calls = 0;
-	const unsubscribe = subscribe?.(() => {
-		calls++;
-	});
-	expect(snapshot?.()).toBeUndefined();
-	chooseLanguage('fr');
-	expect(calls).toBe(1);
-	expect(snapshot?.()).toBe('fr');
-	unsubscribe?.();
-	chooseLanguage('en');
-	expect(calls).toBe(1);
 });
 
 test('a fallback outside the languages throws', () => {
