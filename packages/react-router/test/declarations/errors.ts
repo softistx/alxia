@@ -2,6 +2,7 @@
 // declaration build must be able to name each one through
 // `@alxia/react-router/errors` alone (TS2883 otherwise).
 
+import type { StandardSchemaV1 as CoreStandardSchemaV1 } from '@alxia/core';
 import {
 	type ApiErrorLike,
 	ApiMessagesProvider,
@@ -166,6 +167,20 @@ export async function readName(request: Request) {
 	};
 	const input = await json.readInput(request, schema);
 	// The schema's output is what the action reads.
+	const name: string = input.name;
+	return name;
+}
+
+// A schema typed with core's `StandardSchemaV1` is accepted too.
+export async function readCoreName(request: Request) {
+	const schema: CoreStandardSchemaV1<unknown, { name: string }> = {
+		'~standard': {
+			version: 1,
+			vendor: 'test',
+			validate: (value) => ({ value: value as { name: string } }),
+		},
+	};
+	const input = await json.readInput(request, schema);
 	const name: string = input.name;
 	return name;
 }
