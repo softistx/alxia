@@ -22,6 +22,25 @@ export interface CatalogueReaderOptions<L extends string> {
 }
 
 /**
+ * Waits for the read, until `firstReadWaitMs` after it started (not after
+ * this request came: a hung API holds a request at most that long in
+ * all); the read goes on either way.
+ */
+async function boundedWait(
+	pending: { read: Promise<void>; started: number },
+	firstReadWaitMs: number,
+) {
+	const left = firstReadWaitMs - (performance.now() - pending.started);
+	if (left <= 0) return;
+	let timer: ReturnType<typeof setTimeout> | undefined;
+	const limit = new Promise<void>((resolve) => {
+		timer = setTimeout(resolve, left);
+	});
+	await Promise.race([pending.read, limit]);
+	clearTimeout(timer);
+}
+
+/**
  * The reading half of the catalogue: the first read of each language (one in
  * flight, a bounded wait, a retry delay after a failure) and the version
  * each one holds. `createErrorCatalogue` adds the TTL check on top.
@@ -75,25 +94,6 @@ export function createCatalogueReader<L extends string>({
 		return pending;
 	}
 
-	/**
-	 * Waits for the read, until `firstReadWaitMs` after it started (not after
-	 * this request came: a hung API holds a request at most that long in
-	 * all); the read goes on either way.
-	 */
-	async function boundedWait(pending: {
-		read: Promise<void>;
-		started: number;
-	}) {
-		const left = firstReadWaitMs - (performance.now() - pending.started);
-		if (left <= 0) return;
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		const limit = new Promise<void>((resolve) => {
-			timer = setTimeout(resolve, left);
-		});
-		await Promise.race([pending.read, limit]);
-		clearTimeout(timer);
-	}
-
 	return {
 		held,
 		load,
@@ -101,7 +101,7 @@ export function createCatalogueReader<L extends string>({
 		async first(language: L, now: number) {
 			const failed = failedAt.get(language);
 			if (failed === undefined || now - failed >= retryMs) {
-				await boundedWait(loadOnce(language, now));
+				await boundedWait(loadOnce(language, now), firstReadWaitMs);
 			}
 		},
 		reset() {

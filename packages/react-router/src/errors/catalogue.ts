@@ -1,3 +1,9 @@
+import {
+	checkVersions,
+	clientMessages,
+	quietLog,
+	safeTtl,
+} from './catalogue-check';
 import { type CatalogueReply, createCatalogueReader } from './catalogue-read';
 import type { ApiMessages, CatalogueMessages } from './messages';
 
@@ -42,7 +48,11 @@ export interface ErrorCatalogue<L extends string> {
 	warm(): void;
 	/** The messages the browser words itself, by language, for the root's loader. */
 	clientMessages(): Record<L, CatalogueMessages>;
-	/** Forgets everything held and in flight (tests). */
+	/**
+	 * Forgets everything held and in flight. For use between tests, with
+	 * nothing in flight: a read or check still running when it is called
+	 * finishes and holds its result again.
+	 */
 	reset(): void;
 	/** The version held for a language, if any. */
 	heldVersion(language: L): string | undefined;
@@ -64,14 +74,15 @@ export function createErrorCatalogue<L extends string>({
 	retryMs = 5_000,
 	firstReadWaitMs = 1_500,
 	clientCodes,
-	log = console,
+	log: appLog = console,
 }: ErrorCatalogueOptions<L>): ErrorCatalogue<L> {
 	if (languages.length === 0) {
 		throw new TypeError(
 			'alxia-react-router: createErrorCatalogue() needs at least one language.',
 		);
 	}
-	const ttl = () => (typeof ttlMs === 'function' ? ttlMs() : ttlMs);
+	const log = quietLog(appLog);
+	const ttl = safeTtl(ttlMs, retryMs, log);
 	const reader = createCatalogueReader({
 		messages,
 		read,
@@ -79,41 +90,18 @@ export function createErrorCatalogue<L extends string>({
 		firstReadWaitMs,
 		log,
 	});
+	const context = { reader, versions, ttl, retryMs, log };
 	let checking: Promise<void> | undefined;
-
-	/**
-	 * Asks the versions in one call and reads again the messages of each
-	 * language that moved. An API that cannot be reached keeps the messages
-	 * held (stale, still worded) and is asked again after `retryMs`.
-	 */
-	async function check(now: number) {
-		try {
-			const latest = await versions();
-			for (const [language, entry] of [...reader.held]) {
-				if (latest[language] !== entry.version) {
-					await reader.load(language, now);
-				} else {
-					entry.checkedAt = now;
-				}
-			}
-		} catch (error) {
-			log.error(
-				'alxia-react-router: the error catalogue was not checked, keeping what is held',
-				error,
-			);
-			for (const entry of reader.held.values()) {
-				entry.checkedAt = now - ttl() + retryMs;
-			}
-		}
-	}
 
 	async function fresh(language: L, now: number = Date.now()) {
 		const entry = reader.held.get(language);
 		if (!entry) return reader.first(language, now);
 		if (now - entry.checkedAt >= ttl() && !checking) {
-			checking = check(now).finally(() => {
-				checking = undefined;
-			});
+			checking = checkVersions(context, now)
+				.finally(() => {
+					checking = undefined;
+				})
+				.catch(() => {});
 		}
 	}
 
@@ -132,18 +120,7 @@ export function createErrorCatalogue<L extends string>({
 				);
 			});
 		},
-		clientMessages() {
-			const byLanguage = {} as Record<L, CatalogueMessages>;
-			for (const language of languages) {
-				const entries: Record<string, CatalogueMessages[string]> = {};
-				for (const code of clientCodes) {
-					const entry = messages.messageOf(language, code);
-					if (entry) entries[code] = entry;
-				}
-				byLanguage[language] = entries;
-			}
-			return byLanguage;
-		},
+		clientMessages: () => clientMessages(messages, languages, clientCodes),
 		reset() {
 			reader.reset();
 			checking = undefined;
