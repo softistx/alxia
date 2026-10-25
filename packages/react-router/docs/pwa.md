@@ -4,7 +4,8 @@ What an installable React Router app shares, that has no UI: the service
 worker's contract, which requests the worker caches, which responses it may
 store, the precache list read from a build, registering the worker and
 offering an update, the web app manifest, and the cleaning at sign-out.
-Everything is in `@alxia/react-router/pwa`, and every app-specific name (the
+The code is in `@alxia/react-router/pwa`, its React hooks in
+`@alxia/react-router/pwa/react`, and every app-specific name (the
 cache prefix, the paths never cached) is an option, so two apps never share a
 default.
 
@@ -14,6 +15,7 @@ default.
 - [The precache list from a build](#the-precache-list-from-a-build)
 - [Registering the worker and offering an update](#registering-the-worker-and-offering-an-update)
 - [The web app manifest (and why the language travels in `?lang=`)](#the-web-app-manifest-and-why-the-language-travels-in-lang)
+- [In React](#in-react)
 - [Clearing at sign-out](#clearing-at-sign-out)
 
 ## What the subpath holds
@@ -28,6 +30,12 @@ never at load. So each runtime can import it:
 | the page | the contract (the same names), `registerServiceWorker`, `createUpdateNotice`, `manifestHref`, `clearAppCaches` |
 | a build script | `parseBrowserManifest`, `precacheList`, `assetPrecache` |
 | the server | `SERVICE_WORKER_URL`, to serve the worker under its path; `MANIFEST_PATH`, `MANIFEST_HEADERS`, `manifestLanguage` and `webAppManifest`, to serve the manifest |
+
+`@alxia/react-router/pwa/react` is the page's hooks and needs `react`, an
+optional peer of the package (`^19`): its built file imports `react` and
+nothing else, and shares no chunk with the main entry, so a page never loads
+core for it (`boundary.spec.ts` checks both). Keep it out of the worker and
+the build script, which would bundle React.
 
 The main entry, `@alxia/react-router`, is not for those: it imports
 `@alxia/core`, which imports `node:*`, and a client bundle should not carry it.
@@ -277,6 +285,77 @@ never makes a second app:
 Serve the manifest at `MANIFEST_PATH`, or at a path of your own that you give
 both `manifestHref(language, path)` and `cachingFor`'s `manifestPath`. The
 icons' files are yours: test that each `src` exists in `public/`.
+
+## In React
+
+`@alxia/react-router/pwa/react` wraps the page's side in three hooks and the
+page's one notice. It needs `react` (`bun add react`, which a React Router app
+has already).
+
+```tsx
+// file: app/app.tsx
+import { useServiceWorker } from '@alxia/react-router/pwa/react';
+import { Outlet } from 'react-router';
+import { UpdateBanner } from './update-banner';
+
+export default function App() {
+  useServiceWorker({
+    enabled: import.meta.env.PROD,
+    onError: (error) => console.warn('No service worker', error),
+  });
+  return (
+    <>
+      <UpdateBanner />
+      <Outlet />
+    </>
+  );
+}
+```
+
+```tsx
+// file: app/update-banner.tsx
+import { useOnline, useUpdateNotice } from '@alxia/react-router/pwa/react';
+
+export function UpdateBanner() {
+  const notice = useUpdateNotice();
+  const online = useOnline();
+  if (!online) return <p role="status">You are offline.</p>;
+  if (!notice) return null;
+  return (
+    <p role="status">
+      A new version is ready.
+      <button type="button" onClick={notice.reload}>Reload</button>
+      <button type="button" onClick={notice.later}>Later</button>
+    </p>
+  );
+}
+```
+
+- **`useServiceWorker({ enabled })`** registers the worker after the page has
+  loaded, when `enabled` and the browser has `navigator.serviceWorker`. The
+  app passes `enabled`, usually `import.meta.env.PROD`: this package never
+  reads `import.meta.env`, since a bundler replaces it in a dependency only
+  by chance of its pre-bundling, and Bun and tests never do. `url` and `scope`
+  are `registerServiceWorker`'s. `onError` is called when registering fails
+  (private mode, a blocked script); the app works without a worker, so by
+  default the error is dropped. The effect runs again only when `enabled`,
+  `url`, `scope` or `notice` change, never for a new inline `onError`.
+- **`useUpdateNotice(notice?)`** is `useSyncExternalStore` over the store: the
+  `{ reload, later }` while a version waits, else `undefined`, and always
+  `undefined` on the server and while hydrating.
+- **`useOnline()`** is `navigator.onLine`, `true` on the server and while
+  hydrating, so the first client render matches the server's.
+- **`updateNotice`** is the page's one store. It is made in this subpath, not in
+  `/pwa`, so the model a worker bundle imports does nothing at load. Both
+  hooks use it unless given another `notice`; pass the same store to both
+  when you make your own with `createUpdateNotice(storage, key)`.
+
+A banner from a component library takes the notice as a prop, so it depends
+on neither this package nor React Router: `<UpdateBanner notice={useUpdateNotice()} />`.
+A spec or a story passes a notice of its own, made with `createUpdateNotice`
+and `offer(() => {})`, and the quality checks that show the banner in
+development call `updateNotice.offer(() => location.reload())` from an effect
+of the app, which this package leaves out.
 
 ## Clearing at sign-out
 

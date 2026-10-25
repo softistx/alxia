@@ -11,6 +11,12 @@ import {
 	sessionStore,
 	webAppManifest,
 } from '@alxia/react-router/pwa';
+import {
+	updateNotice,
+	useOnline,
+	useServiceWorker,
+	useUpdateNotice,
+} from '@alxia/react-router/pwa/react';
 
 export const contract = defineWorkerContract({ cachePrefix: 'app' });
 
@@ -34,4 +40,17 @@ export function manifest() {
 		themeColor: '#112233',
 		backgroundColor: '#ffffff',
 	});
+}
+
+// The /pwa/react hooks behind exported values whose types are inferred.
+export function online() {
+	return useOnline();
+}
+
+export function register() {
+	useServiceWorker({ enabled: true, url: '/sw.js', notice: updateNotice });
+}
+
+export function banner() {
+	return useUpdateNotice(notice);
 }

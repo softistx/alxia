@@ -812,6 +812,17 @@ if (!file) throw new Error('Run react-router build first.');
 export const manifest = parseBrowserManifest(readFileSync(`${assets}/${file}`, 'utf8'));
 ```
 
+### `error: Cannot find package 'react' from '…/@alxia/react-router/dist/pwa/react/index.js'`
+
+**Why:** `@alxia/react-router/pwa/react` imports `react`, an optional peer of
+the package, so nothing installs it for you. An app with no `react` does not
+need the subpath; a build script or the worker importing it by mistake meets
+this message too.
+
+**Fix:** add `react` where the page is built (`bun add react`), and import
+`/pwa/react` from the page alone. The worker and a build script import
+`@alxia/react-router/pwa`, which imports nothing.
+
 ## Types
 
 ### `Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`
@@ -1278,14 +1289,37 @@ A new version is deployed and the page offers no "Reload".
 an older one controls the page. A first install controls nothing, so it
 offers nothing; the next visit, with the first worker in control, does. And
 nothing is registered at all where the app does not call
-`registerServiceWorker` (for example while its `enabled` flag, such as
-`import.meta.env.PROD`, is false in dev). A tab that chose "Later" stays
+`registerServiceWorker` (for example while `useServiceWorker({ enabled })`
+is given `false`, as `import.meta.env.PROD` is under `react-router dev`). A tab that chose "Later" stays
 quiet until the next session.
 
 **Fix:** build, serve and load the page twice, then deploy a change and load
 it again. In the console, `navigator.serviceWorker.controller` must not be
 `null` and `(await navigator.serviceWorker.getRegistration()).waiting` must
 hold the new worker.
+
+### The worker registers under `react-router dev`
+
+The dev server serves stale code after an edit, or a page keeps an old
+version of itself, and `navigator.serviceWorker.controller` is not `null`.
+
+**Why:** `useServiceWorker` registers whenever `enabled` is `true`, and the
+package does not know the mode: it never reads `import.meta.env`. A worker
+under a dev server caches the code you are editing.
+
+**Fix:** pass the mode from the app, in `app/root.tsx`:
+
+```tsx
+import { useServiceWorker } from '@alxia/react-router/pwa/react';
+
+export default function App() {
+  useServiceWorker({ enabled: import.meta.env.PROD });
+  return null;
+}
+```
+
+Then unregister the worker the dev server already took (DevTools,
+Application, Service Workers, Unregister) and clear its site data.
 
 ### The manifest is in the wrong language
 

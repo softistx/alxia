@@ -1,0 +1,49 @@
+import { useEffect, useRef } from 'react';
+import { afterLoad, registerServiceWorker } from '../model/registration';
+import type { UpdateNoticeStore } from '../model/update-notice';
+import { updateNotice } from './use-update-notice';
+
+export interface ServiceWorkerOptions {
+	/**
+	 * Whether to register at all. The app decides, typically
+	 * `import.meta.env.PROD`: a worker under a dev server caches the code being
+	 * edited. This package never reads `import.meta.env` itself.
+	 */
+	enabled: boolean;
+	/** The worker's path. `SERVICE_WORKER_URL` by default. */
+	url?: string;
+	/** The scope it controls. `'/'` by default. */
+	scope?: string;
+	/** Where a waiting version is offered. The page's `updateNotice` by default. */
+	notice?: UpdateNoticeStore;
+	/**
+	 * Called when registering fails (private mode, a blocked script). The app
+	 * works without a worker, so by default the error is dropped.
+	 */
+	onError?: (error: unknown) => void;
+}
+
+/**
+ * Registers the service worker after `load` when `enabled`, in a browser
+ * that has one. When a new version waits, `notice` offers it (`useUpdateNotice`
+ * reads it); nothing activates it unasked. Does nothing on the server.
+ */
+export function useServiceWorker(options: ServiceWorkerOptions): void {
+	const { enabled, url, scope, notice = updateNotice } = options;
+	const onError = useRef(options.onError);
+	onError.current = options.onError;
+	useEffect(() => {
+		if (!enabled || !('serviceWorker' in navigator)) return;
+		const container = navigator.serviceWorker;
+		afterLoad(() => {
+			registerServiceWorker(
+				container,
+				(worker, apply) => notice.offer(() => apply(worker)),
+				{
+					...(url !== undefined && { url }),
+					...(scope !== undefined && { scope }),
+				},
+			).catch((error: unknown) => onError.current?.(error));
+		});
+	}, [enabled, url, scope, notice]);
+}

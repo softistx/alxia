@@ -546,6 +546,34 @@ export default createServer({
 });
 ```
 
+The page's hooks are in `@alxia/react-router/pwa/react`, which imports
+`react` alone (an optional peer, so an app with no PWA installs nothing for
+it). The app decides where the worker registers; this package never reads
+`import.meta.env`:
+
+```tsx
+import { useOnline, useServiceWorker, useUpdateNotice } from '@alxia/react-router/pwa/react';
+
+// In app/root.tsx: a production build only, never under `react-router dev`.
+export default function App() {
+  useServiceWorker({ enabled: import.meta.env.PROD });
+  return <UpdateBanner />;
+}
+
+function UpdateBanner() {
+  const notice = useUpdateNotice(); // undefined until a new version waits
+  const online = useOnline();
+  if (!notice) return online ? null : <p>You are offline.</p>;
+  return (
+    <p>
+      A new version is ready.
+      <button onClick={notice.reload}>Reload</button>
+      <button onClick={notice.later}>Later</button>
+    </p>
+  );
+}
+```
+
 The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/pwa.md) has the rest.
 
 ## Traps
@@ -629,6 +657,16 @@ From `@alxia/react-router/pwa`:
 | `manifestHref(language, path?)` | the manifest's URL for a page: `/manifest.webmanifest?lang=fr` |
 | `manifestLanguage(url, supported, fallback)` | `?lang=` when it is one of `supported`, else `fallback` |
 
+From `@alxia/react-router/pwa/react` (`react`, an optional peer, is its only import):
+
+| export | |
+| --- | --- |
+| `useOnline()` | whether the browser says it is online; online on the server and while hydrating |
+| `useServiceWorker(options)` | registers the worker after `load` when `options.enabled` (required; the app passes `import.meta.env.PROD`), in a browser that has one. `url`, `scope`, `notice` (where a waiting version is offered), `onError` (registering failed; dropped by default) |
+| `ServiceWorkerOptions` | its options |
+| `useUpdateNotice(notice?)` | the `{ reload, later }` to show while a new version waits and "Later" was not asked, else `undefined`; always `undefined` on the server |
+| `updateNotice` | the page's one `UpdateNoticeStore`, which `useServiceWorker` offers and `useUpdateNotice` reads by default |
+
 The `alxia-react-router` bin, run with `bunx`:
 
 | command | |
@@ -638,7 +676,7 @@ The `alxia-react-router` bin, run with `bunx`:
 ## Documentation
 
 - [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev, the build and `vite preview` work, what the build sets for Bun, customising the server, typing the loaders, the app's own keys, a CSP nonce, escape hatches, WebSockets, the client's files, OpenAPI, testing and deploying, with Docker.
-- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, registering the worker and offering an update, the web app manifest, and clearing at sign-out.
+- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.
