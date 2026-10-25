@@ -79,6 +79,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [A refusal shows the API's raw message](#a-refusal-shows-the-apis-raw-message)
 - [`apiRefusal` returns undefined](#apirefusal-returns-undefined)
 - [The error page shows no request id](#the-error-page-shows-no-request-id)
+- [An action shows the error page](#an-action-shows-the-error-page)
 
 ## Thrown or printed
 
@@ -1494,4 +1495,31 @@ export async function loader() {
 	}
 	return { requestId: requestIdOf(response) };
 }
+```
+
+### An action shows the error page
+
+An action that calls `fetcherResult`, `fetcherRefusal` or `submitForm` ends on
+the route's error page instead of answering `{ ok: false }` or the form's
+errors.
+
+**Why:** by design, these helpers answer only what the page can word. They
+throw `routeError(error)` for a 401 (the session code redirects to the sign-in
+first), for a failure that is not an API refusal (a network error, a bug of the
+app's own code), and, for `submitForm`, for a 404 that names none of the
+form's fields: the record itself is gone, and no field message could say so.
+
+**Fix:** none is needed for a 401 or a real failure: the error page is the
+right answer. For a 404 that is about a field, name it in `fieldOf`
+(`(path) => (path === 'todo.id' ? 'id' : undefined)`) so it sits under that
+field. For a refusal you would rather word yourself, build on `apiRefusal`,
+which returns `undefined` instead of throwing:
+
+```ts
+const refusal = apiErrors.apiRefusal(error, 'en');
+if (!refusal) throw error;
+return Response.json(
+	{ ok: false, error: refusal.message },
+	{ status: refusal.status },
+);
 ```

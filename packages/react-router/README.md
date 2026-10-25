@@ -92,7 +92,7 @@ Vite's preview server, as `bun run start` would: the pages, `/api`, the
 client's files and the app's middlewares. So does React Router's prerendering.
 
 `@alxia/core` and `react-router` 8 are peers, and `vite` 7 or 8 is an
-optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react`. The package declares no dependency.
+optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react`. `/errors` imports `react-router`, a required peer that is already installed. The package declares no dependency.
 
 Its `typescript` peer is 6 or 7. The template's TypeScript 5.9 typechecks,
 but `bun add` warns about it; `bun add -d typescript@^6` silences the
@@ -526,7 +526,7 @@ rest.
 
 ## An API's refusals, worded for the page
 
-`@alxia/react-router/errors` has no UI and imports nothing at runtime. It
+`@alxia/react-router/errors` has no UI; its one runtime import is `react-router`, never `@alxia/core`. It
 holds the shape of a GraphQL API's refusal, declared structurally (no `@nxgt/graphql-client` at
 runtime), the request id an API echoes, the page a request is for, the
 catalogue of the API's messages an app keeps, the words of a form's checks,
@@ -604,6 +604,12 @@ export const reference = (error: unknown) => errorRequestId(error);
 // A fetcher's action: { ok: true, …value }, or { ok: false, error } with a status.
 export const rename = (run: () => Promise<{ title: string }>) =>
 	apiErrors.fetcherResult('en', { intent: 'rename' }, run);
+
+// A form's action: { ok: true, value }, or the form's errors with a status.
+export const create = (run: () => Promise<{ id: string }>) =>
+	apiErrors.submitForm('en', run, (path) =>
+		path === 'todo.title' ? 'title' : undefined,
+	);
 ```
 
 The [errors guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md)
@@ -708,7 +714,7 @@ From `@alxia/react-router/pwa/server` (`@alxia/core` is its only package import)
 | `revalidated(response, policy?)` | a response with those two headers set, on a copy when its headers are immutable; `policy` is `WORKER_POLICY` by default |
 | `WORKER_POLICY` | `default-src 'none'; connect-src 'self'`: the worker runs no other script and fetches this site only |
 
-From `@alxia/react-router/errors` (it imports nothing at runtime, and never `@alxia/core`):
+From `@alxia/react-router/errors` (`react-router` is its only package import, and never `@alxia/core`):
 
 | export | |
 | --- | --- |
@@ -717,7 +723,7 @@ From `@alxia/react-router/errors` (it imports nothing at runtime, and never `@al
 | `waitMinutes(extensions)` | the minutes of a throttle's wait: `minutes` (at least one), else `retryAfter` rounded up |
 | `REQUEST_ID_HEADER`, `requestIdOf(response)` | `x-request-id`, and the id a response carries, if the API sent one |
 | `nextOf(url)` | the path and search of the page a request is for, without React Router's `.data`, `/_.data`, `_routes` and empty `index` |
-| `FormErrors` | what a form action answers when the API refused the input: `fieldErrors` by field and a `formError`, already translated; `submitForm` answers it |
+| `FormErrors` | what a form action answers when the API refused the input: `fieldErrors` by field and a `formError` (`undefined` when every message sits under a field), already translated; `submitForm` answers it |
 | `routeError(error, { statuses?, requestIdHeader? }?)`, `RouteErrorOptions` | what a loader throws for the API's error: an `ApiError` of 401, 403, 404 or 503, or such a `Response` carrying a request id, becomes a route error of that status with the `code`, `message` and `requestId`; any other `ApiError` with an id becomes a 500 carrying the id; anything else is returned as it is |
 | `errorRequestId(error)`, `RouteErrorData` | the support reference an error page shows: the `requestId` a route error carries, else `undefined`; `RouteErrorData` is the data `routeError` carries (`code?`, `message?`, `requestId?`) |
 | `createApiMessages({ format })`, `ApiMessages`, `ApiMessagesOptions` | the catalogue store of an app, an instance (`set`, `add`, `clear`, `messageOf`, `format`, `apiMessage(code, values, language)`); `format` is the app's ICU formatter, such as `@nxgt/material`'s `formatMessage` |

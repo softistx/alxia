@@ -3,10 +3,11 @@
 This page covers how an app that calls a GraphQL API words that API's refusals
 for its pages: the error's shape, the request id it carries, the page a
 request is for, the catalogue store of the API's messages, the form checks in
-the API's words, the provider that fills the catalogue and the wording of a
-refusal. The code is in `@alxia/react-router/errors`, which has no UI.
-It imports nothing at runtime (it may import `react-router`, never
-`@alxia/core`), so a page can import it (`boundary.spec.ts` checks the built files).
+the API's words, the provider that fills the catalogue, the wording of a
+refusal, and the loaders, the error page and the actions that answer with it.
+The code is in `@alxia/react-router/errors`, which has no UI. Its one runtime
+import is `react-router`, never `@alxia/core`, so a page can import it
+(`boundary.spec.ts` checks the built files).
 
 - [What the subpath holds](#what-the-subpath-holds)
 - [Recognising an API error](#recognising-an-api-error)
@@ -458,3 +459,26 @@ export async function action({ request }: Route.ActionArgs) {
 `fetcherRefusal(error, language)` is the refusal both build on, for an action
 of your own: it returns `apiRefusal`'s `{ message, status }`, or throws what
 the page cannot word.
+
+```ts
+import { apiErrors } from './api-errors';
+import type { Route } from './+types/todos';
+
+// Your own call to the API, declared here as a stub.
+declare function archiveTodo(id: string): Promise<{ archivedAt: string }>;
+
+export async function action({ request }: Route.ActionArgs) {
+	const { id } = await request.json();
+	try {
+		return { ok: true as const, ...(await archiveTodo(id)) };
+	} catch (error) {
+		// The API's refusal: { message, status }. A 401 or any other failure throws.
+		const { message, status } = apiErrors.fetcherRefusal(error, 'en');
+		return Response.json({ ok: false, error: message }, { status });
+	}
+}
+```
+
+The helpers pass `routeError`'s defaults (401, 403, 404 and 503 routed, the
+`x-request-id` header); `createApiErrors` has no option to change them. An
+action that needs other statuses calls `routeError(error, options)` itself.
