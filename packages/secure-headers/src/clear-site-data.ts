@@ -73,10 +73,11 @@ export function clearSiteData(
 	);
 	return defineMiddleware(async function clearSiteData(ctx, next) {
 		const response = await settle(ctx, next());
-		if (!methods.has(ctx.request.method.toUpperCase())) return response;
+		if (!methods.has(ctx.request.method)) return response;
 		if (response.status < 200 || response.status >= 400) return response;
 		return withHeaders(response, (headers) => {
-			headers.set('clear-site-data', value);
+			if (!headers.has('clear-site-data'))
+				headers.set('clear-site-data', value);
 		});
 	});
 }

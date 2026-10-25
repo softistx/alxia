@@ -379,6 +379,8 @@ const app = alxia()
   request (another site's post, a 403, a 415, a failure), signed nobody out
   and must not empty their cache. Pass `{ methods: ['POST', 'DELETE'] }` to
   widen the rule.
+- **A route's own header wins.** An answer that already carries
+  `Clear-Site-Data` keeps it, as `secureHeaders` does for its headers.
 - **Several types** are written quoted and comma-separated:
   `clearSiteData(['cache', 'cookies'])` sends `"cache", "cookies"`.
 - **Both paths with React Router.** A form posts `/sign-out`, but the client

@@ -112,7 +112,7 @@ app.use('/sign-out', cleared).use('/sign-out.data', cleared);
 `Clear-Site-Data: "cache"` is sent on a 2xx or 3xx answer to a `POST`, so
 nothing of the visit stays in the browser's HTTP cache on a shared device. A
 GET, a 400, a 403 or a 500 clears nothing. `{ methods: ['POST', 'DELETE'] }`
-widens the rule. React Router's client-side sign-out posts `/sign-out.data`,
+widens the rule. A route's own `Clear-Site-Data` is kept. React Router's client-side sign-out posts `/sign-out.data`,
 so mount both paths. An empty list or an unknown type is refused with a
 `TypeError` that starts `clearSiteData():`.
 

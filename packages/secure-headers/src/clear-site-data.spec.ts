@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'bun:test';
+import { describe, expect, spyOn, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { clearSiteData } from './clear-site-data';
 
@@ -53,6 +53,38 @@ describe('clearSiteData', () => {
 		expect(del.headers.get('clear-site-data')).toBe('"cache"');
 		const get = await wide.request('/sign-out');
 		expect(get.headers.get('clear-site-data')).toBeNull();
+	});
+
+	test("a route's own header wins", async () => {
+		const own = alxia()
+			.use('/sign-out', clearSiteData(['cache']))
+			.post('/sign-out', ({ reply }) =>
+				reply(200, 'x', { headers: { 'Clear-Site-Data': '"cookies"' } }),
+			);
+		const response = await own.request('/sign-out', { method: 'POST' });
+		expect(response.headers.get('clear-site-data')).toBe('"cookies"');
+	});
+
+	test('a POST to a route that throws clears nothing', async () => {
+		const failing = alxia()
+			.use('/sign-out', clearSiteData(['cache']))
+			.post('/sign-out', () => {
+				throw new Error('kaboom');
+			});
+		const error = spyOn(console, 'error').mockImplementation(() => {});
+		try {
+			const response = await failing.request('/sign-out', { method: 'POST' });
+			expect(response.status).toBe(500);
+			expect(response.headers.get('clear-site-data')).toBeNull();
+		} finally {
+			error.mockRestore();
+		}
+	});
+
+	test('a lowercase method in methods works', async () => {
+		const lower = app(302, clearSiteData(['cache'], { methods: ['post'] }));
+		const response = await lower.request('/sign-out', { method: 'POST' });
+		expect(response.headers.get('clear-site-data')).toBe('"cache"');
 	});
 
 	test('several types are quoted and comma-separated', async () => {
