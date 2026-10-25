@@ -34,6 +34,13 @@ export interface ClearSiteDataOptions {
 	 * `Origin` is not the request's own, clears nothing.
 	 */
 	readonly crossSite?: boolean;
+	/**
+	 * The origin a request must come from, such as `https://app.example.com`:
+	 * required behind a TLS-terminating proxy, where the request's own URL
+	 * says `http:`, for a browser that sends no `Sec-Fetch-Site`. A getter is
+	 * read at each request. Else the request's own origin.
+	 */
+	readonly origin?: string | (() => string | undefined);
 }
 
 /**
@@ -47,19 +54,28 @@ function quoted(names: readonly string[]): string {
 	return names.map((name) => `"${name}"`).join(', ');
 }
 
-/** True when the request came from another site, as far as it says. */
-function isCrossSite(request: Request): boolean {
+/**
+ * True when the request came from another site, as far as it says.
+ * `Sec-Fetch-Site`, which the browser sets and a proxy leaves alone, decides
+ * alone when present; else `Origin` is compared with the app's own.
+ */
+function isCrossSite(
+	request: Request,
+	own: string | (() => string | undefined) | undefined,
+): boolean {
 	const site = request.headers.get('sec-fetch-site');
-	if (site !== null && site !== 'same-origin' && site !== 'none') return true;
+	if (site !== null) return site !== 'same-origin' && site !== 'none';
 	const origin = request.headers.get('origin');
-	return origin !== null && origin !== new URL(request.url).origin;
+	if (origin === null) return false;
+	const set = typeof own === 'function' ? own() : own;
+	return origin !== (set ?? new URL(request.url).origin);
 }
 
 /**
  * `Clear-Site-Data` on a 2xx or 3xx answer to one of `methods` (`POST` by
  * default). A request clears nothing when it is refused (a 403, a failure) or
  * when another site made it (`Sec-Fetch-Site` other than `same-origin` or
- * `none`, or a foreign `Origin`), unless `crossSite` is `true`; a request
+ * `none`; without that header, a foreign `Origin`), unless `crossSite` is `true`; a request
  * with neither header, such as curl's, is cleared. Give it to `use(path, …)` for the sign-out path; React Router's
  * single fetch posts `.data` too, so mount both:
  *
@@ -100,7 +116,7 @@ export function clearSiteData(
 		const response = await settle(ctx, next());
 		if (!methods.has(ctx.request.method)) return response;
 		if (response.status < 200 || response.status >= 400) return response;
-		if (!crossSite && isCrossSite(ctx.request)) return response;
+		if (!crossSite && isCrossSite(ctx.request, options.origin)) return response;
 		return withHeaders(response, (headers) => {
 			if (!headers.has('clear-site-data'))
 				headers.set('clear-site-data', value);

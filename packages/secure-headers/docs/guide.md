@@ -468,12 +468,15 @@ const app = alxia()
   their cache. Pass `{ methods: ['POST', 'DELETE'] }` to widen the rule.
 - **Not for another site's request.** A form on another site can post to
   `/sign-out` and get a redirect, which would wipe the viewer's cache or
-  cookies. So it sends nothing when `Sec-Fetch-Site` is present and is
-  neither `same-origin` nor `none`, or when an `Origin` header is present
-  and differs from the request URL's origin. A request with neither header
-  (curl, an old browser) is cleared. Behind a proxy that rewrites the
-  scheme or host, `Origin` can differ from the URL it sees: pass
-  `{ crossSite: true }` to clear whatever the origin.
+  cookies. So when `Sec-Fetch-Site` is present, it alone decides: anything
+  other than `same-origin` or `none` clears nothing, and `Origin` is not
+  read. Only without it (an older browser) is an `Origin` compared with the
+  app's own origin. A request with neither header (curl) is cleared.
+  Modern browsers need nothing more behind a TLS-terminating proxy, since
+  the proxy does not rewrite `Sec-Fetch-Site`. For older browsers behind
+  one, where the request's URL says `http:` and `Origin` says `https:`, set
+  `origin: 'https://app.example.com'` (or a function returning it). Pass
+  `{ crossSite: true }` only to give the protection up.
 - **A route's own header wins.** An answer that already carries
   `Clear-Site-Data` keeps it, as `secureHeaders` does for its headers.
 - **Several types** are written quoted and comma-separated:

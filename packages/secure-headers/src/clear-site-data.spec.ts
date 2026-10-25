@@ -134,6 +134,38 @@ describe('clearSiteData', () => {
 		expect(await postedWith({ origin: 'http://localhost' })).toBe('"cache"');
 	});
 
+	test('Sec-Fetch-Site alone decides: same-origin clears behind a proxy', async () => {
+		expect(
+			await postedWith({
+				'sec-fetch-site': 'same-origin',
+				origin: 'https://app.example',
+			}),
+		).toBe('"cache"');
+		expect(
+			await postedWith({
+				'sec-fetch-site': 'cross-site',
+				origin: 'http://localhost',
+			}),
+		).toBeNull();
+	});
+
+	test('the origin option names the own origin, as a string or a getter', async () => {
+		const headers = { origin: 'https://app.example' };
+		const set = clearSiteData(['cache'], { origin: 'https://app.example' });
+		expect(await postedWith(headers, set)).toBe('"cache"');
+		const getter = clearSiteData(['cache'], {
+			origin: () => 'https://app.example',
+		});
+		expect(await postedWith(headers, getter)).toBe('"cache"');
+		expect(
+			await postedWith({ origin: 'https://evil.example' }, set),
+		).toBeNull();
+		const unset = clearSiteData(['cache'], { origin: () => undefined });
+		expect(await postedWith({ origin: 'http://localhost' }, unset)).toBe(
+			'"cache"',
+		);
+	});
+
 	test('a request with neither header is cleared, as curl or an old browser', async () => {
 		expect(await postedWith({})).toBe('"cache"');
 	});

@@ -20,7 +20,8 @@ a viewer's data. It is set like every other header, so a route's own
 `clearSiteData(['cache'])` is a middleware for the sign-out path: it sends
 `Clear-Site-Data` on a 2xx or 3xx answer to a `POST` (`methods` changes
 that), and nothing on a GET, a refused request, or a request another site made
-(`Sec-Fetch-Site` or `Origin`; `crossSite: true` lifts that). React Router's client-side
+(`Sec-Fetch-Site` decides when present, else `Origin` against the `origin`
+option; `crossSite: true` lifts that). React Router's client-side
 sign-out posts `/sign-out.data`, so mount it on both paths. An empty list or
 an unknown type, or an empty `methods`, is refused at startup with a `TypeError` that starts
 `clearSiteData():`.

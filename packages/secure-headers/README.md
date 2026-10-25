@@ -157,8 +157,9 @@ list, without `NONCE` is refused with a `TypeError` that starts
 `pageHeaders():`; so is removing `default-src`, `base-uri` or `object-src`.
 `csp()` refuses a keyword written without its quotes (`self` for `'self'`) with
 a `TypeError` that starts `csp():`. `clearSiteData()` sends nothing for a
-request another site made (`Sec-Fetch-Site` or `Origin`), unless
-`crossSite: true`.
+request another site made (`Sec-Fetch-Site`, else `Origin` against the
+`origin` option, which a TLS-terminating proxy needs for older browsers),
+unless `crossSite: true`.
 
 ## Defaults
 
