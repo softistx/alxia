@@ -8,6 +8,7 @@ a loader, a message React Router or the browser prints, or an error from
 **Thrown or printed**
 
 - [`alxia-react-router: … is running on Node, and alxia's server runs on Bun. …`](#alxia-react-router--is-running-on-node-and-alxias-server-runs-on-bun-)
+- [`alxia-react-router: react-router build with a service worker is running on Node, and the worker is bundled by Bun.build`](#alxia-react-router-react-router-build-with-a-service-worker-is-running-on-node-and-the-worker-is-bundled-by-bunbuild)
 - [`ReferenceError: Bun is not defined`](#referenceerror-bun-is-not-defined)
 - [`alxiaOf(): this request has no alxia context. …`](#alxiaof-this-request-has-no-alxia-context-)
 - [`TypeError: undefined is not an object (evaluating 'context.alxia.user')`](#typeerror-undefined-is-not-an-object-evaluating-contextalxiauser)
@@ -50,6 +51,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`buildWorker(): app/service-worker.ts does not exist.`](#buildworker-appservice-workerts-does-not-exist)
 - [`buildWorker(): expected one React Router browser manifest`](#buildworker-expected-one-react-router-browser-manifest)
 - [`buildWorker(): build/client/offline.html does not exist`](#buildworker-buildclientofflinehtml-does-not-exist)
+- [`buildWorker(): … is outside ….`](#buildworker--is-outside-)
 - [`buildWorker(): Bun.build failed:`](#buildworker-bunbuild-failed)
 
 **Types**
@@ -116,8 +118,16 @@ Or run the one command on Bun: `bun --bun react-router dev`. Under
 `alxia-react-router: vite preview, or a react-router build that prerenders, is running on Node`
 and names `bun --bun vite preview` and `bun --bun react-router build`. A
 build that has a service worker reads
-`alxia-react-router: react-router build with a service worker is running on Node`
+`alxia-react-router: react-router build with a service worker is running on Node, and the worker is bundled by Bun.build`
 and names the same `bun --bun react-router build`.
+
+### `alxia-react-router: react-router build with a service worker is running on Node, and the worker is bundled by Bun.build`
+
+The same cause as
+[the entry above](#alxia-react-router--is-running-on-node-and-alxias-server-runs-on-bun-):
+the build runs on Node, and the worker is bundled with `Bun.build`. Run it as
+`bun --bun react-router build`, or add a `bunfig.toml` beside `package.json`
+with `[run]` and `bun = true`.
 
 ### `ReferenceError: Bun is not defined`
 
@@ -290,7 +300,7 @@ Vite's root. Under `react-router dev` each request is a 500 saying so;
 ### `alxia-react-router: the worker … does not exist. …`
 
 ```text
-Error: alxia-react-router: the worker sw/worker.ts does not exist. Create it, or leave worker out to build app/service-worker.ts when it exists.
+Error: alxia-react-router: the worker app/pwa/worker.ts does not exist. Create it, or leave worker out to build app/service-worker.ts when it exists.
 ```
 
 **When:** `alxia({ worker })` names a file that is not there, relative to
@@ -930,6 +940,98 @@ bun add -d workbox-core workbox-expiration workbox-navigation-preload \
   workbox-precaching workbox-routing workbox-strategies
 ```
 
+The `buildWorker()` messages below are the ones a script of your own sees.
+Under `alxia()` each of them begins with `alxia-react-router: `.
+
+### `buildWorker() runs on Bun: it is running on Node`
+
+```text
+buildWorker() runs on Bun: it is running on Node. Run it with bun, or run react-router build with bun --bun.
+```
+
+**When:** a script of your own calls `buildWorker()` and runs on Node. Under
+`alxia()` the check comes first and reads
+[`… is running on Node, and the worker is bundled by Bun.build`](#alxia-react-router--is-running-on-node-and-alxias-server-runs-on-bun-).
+
+**Why:** the worker is bundled with `Bun.build`, which Node does not have.
+
+**Fix:** run the script with `bun scripts/build-worker.ts`, or
+`react-router build` as `bun --bun react-router build`.
+
+### `buildWorker(): app/service-worker.ts does not exist.`
+
+```text
+buildWorker(): app/service-worker.ts does not exist.
+```
+
+**Why:** `file` is read from `root` (`process.cwd()` by default), not from the
+script's folder. Under `alxia()` the message begins
+`alxia-react-router: buildWorker(): …`.
+
+**Fix:** pass the path relative to the project root, or pass `root`.
+
+### `buildWorker(): expected one React Router browser manifest`
+
+```text
+buildWorker(): expected one React Router browser manifest, build/client/assets/manifest-*.js, found 0. Run react-router build first.
+```
+
+The message ends `found 2` when two are left.
+
+**Why:** the precache list is read from React Router's browser manifest,
+which `react-router build` writes. None means the build did not run, or
+`client` is wrong. Two mean a stale build folder.
+
+**Fix:** run `react-router build` first, check `client`, and delete `build/`
+when two manifests are left.
+
+### `buildWorker(): build/client/offline.html does not exist`
+
+```text
+buildWorker(): build/client/offline.html does not exist. Add public/offline.html, or pass offline: false (`worker: { offline: false }` in alxia()), or pass the app's contract (`worker: { contract }` in alxia()).
+```
+
+**Why:** the offline page is precached by default and is read from the client
+build, where `public/offline.html` is copied. The build reads the contract's
+`offlineUrl` from the `contract` option, and the worker from the contract it
+is given: two objects can disagree.
+
+**Fix:** add the page to `public/`, or pass `offline: false` for a worker with
+no offline page. If the contract's `offlineUrl` is another path, pass the same
+contract object to the build (`alxia({ worker: { contract } })`, or
+`buildWorker({ contract })`).
+
+### `buildWorker(): … is outside ….`
+
+```text
+buildWorker(): /../service-worker.js is outside /app/build/client.
+```
+
+**Why:** the contract's `serviceWorkerUrl` or `offlineUrl` is joined onto the
+client build, and the result leaves it, or is the client build itself (`/`).
+The build refuses to write or read a file there. It also refuses an absolute
+URL (`https://example.com/sw.js`), a protocol-relative one (`//host/sw.js`) and
+one that does not start with `/`, since none names a file of the build.
+
+**Fix:** use a root-relative URL inside the site, such as
+`/service-worker.js`, in the contract.
+
+### `buildWorker(): Bun.build failed:`
+
+```text
+buildWorker(): Bun.build failed:
+```
+
+Bun's logs follow the message.
+
+**Why:** the worker's source or one of its imports did not bundle: a missing
+`workbox-*` package, a wrong import path.
+
+**Fix:** read the first log line. The six `workbox-*` packages are optional
+peers, installed as
+[`Could not resolve: "workbox-core"`](#error-could-not-resolve-workbox-core-maybe-you-need-to-bun-install)
+shows.
+
 ## Types
 
 ### `Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`
@@ -1425,7 +1527,7 @@ hold another) and no `worker` option names it, when `worker: false` is set,
 or when the version of `@alxia/react-router` is older than 0.10.
 
 **Fix:** put the file at `app/service-worker.ts`, or name it with
-`alxia({ worker: 'sw/worker.ts' })`, and update the package.
+`alxia({ worker: 'app/pwa/worker.ts' })`, and update the package.
 
 ### Offline, a client navigation to a route never visited shows the offline page
 
@@ -1464,46 +1566,6 @@ The console reports `Refused to connect to 'https://api.example.com/…' because
 with a wider policy through `revalidated(response, policy)` in a middleware of
 your own ([serving the worker's script](guide/pwa.md#serving-the-workers-script)),
 rather than loosening the pages' policy.
-
-### `buildWorker() runs on Bun: it is running on Node`
-
-`buildWorker()` throws `buildWorker() runs on Bun: it is running on Node. Run it with bun, or run react-router build with bun --bun.`
-
-**Why:** the worker is bundled with `Bun.build`, which Node does not have.
-
-**Fix:** run the script with `bun scripts/build-worker.ts`, or `react-router build` as `bun --bun react-router build`.
-
-### `buildWorker(): app/service-worker.ts does not exist.`
-
-`buildWorker()` throws `buildWorker(): app/service-worker.ts does not exist.`
-
-**Why:** `file` is read from `root` (`process.cwd()` by default), not from the script's folder.
-
-**Fix:** pass the path relative to the project root, or pass `root`.
-
-### `buildWorker(): expected one React Router browser manifest`
-
-The full message ends `build/client/assets/manifest-*.js, found 0. Run react-router build first.` (or `found 2`).
-
-**Why:** the precache list is read from React Router's browser manifest, which `react-router build` writes. None means the build did not run, or `client` is wrong. Two mean a stale build folder.
-
-**Fix:** run `react-router build` first, check `client`, and delete `build/` when two manifests are left.
-
-### `buildWorker(): build/client/offline.html does not exist`
-
-The full message ends `Add public/offline.html, or pass offline: false.`
-
-**Why:** the offline page is precached by default and is read from the client build, where `public/offline.html` is copied.
-
-**Fix:** add the page to `public/`, or pass `offline: false` for a worker with no offline page. If the contract's `offlineUrl` is another path, pass the same `contract` to `buildWorker`.
-
-### `buildWorker(): Bun.build failed:`
-
-The message lists Bun's logs after it.
-
-**Why:** the worker's source or one of its imports did not bundle: a missing `workbox-*` package, a wrong import path.
-
-**Fix:** read the first log line. The six `workbox-*` packages are optional peers: `bun add -d workbox-core workbox-expiration workbox-navigation-preload workbox-precaching workbox-routing workbox-strategies`.
 
 ### The manifest is in the wrong language
 

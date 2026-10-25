@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import type { PrecacheEntry } from '../model/precache-list';
 import {
 	OFFLINE_URL,
@@ -40,11 +40,32 @@ export interface WorkerBuild {
 	bytes: number;
 }
 
-function assertBun(): void {
-	if ((globalThis as { Bun?: unknown }).Bun !== undefined) return;
+/** Not `requireBun` of `vite/`: `/pwa/build` imports Node's built-ins only. */
+export function assertBun(
+	onBun = (globalThis as { Bun?: unknown }).Bun !== undefined,
+): void {
+	if (onBun) return;
 	throw new Error(
 		'buildWorker() runs on Bun: it is running on Node. Run it with bun, or run react-router build with bun --bun.',
 	);
+}
+
+/**
+ * The file a root-relative URL names inside `client`. It fails closed: a URL
+ * that is absolute, protocol-relative, not rooted at `/`, or that resolves to
+ * `client` itself or outside it, is refused.
+ */
+function urlInClient(client: string, url: string): string {
+	const path = join(client, url);
+	if (
+		!url.startsWith('/') ||
+		/^[a-z][a-z0-9+.-]*:|^\/\//i.test(url) ||
+		!path.startsWith(client + sep) ||
+		path.endsWith(sep)
+	) {
+		throw new Error(`buildWorker(): ${url} is outside ${client}.`);
+	}
+	return path;
 }
 
 /**
@@ -71,10 +92,10 @@ export async function buildWorker(
 	const manifest = browserManifestFile(files);
 	let offline: PrecacheEntry | undefined;
 	if (options.offline !== false) {
-		const page = join(client, offlineUrl);
+		const page = urlInClient(client, offlineUrl);
 		if (!existsSync(page)) {
 			throw new Error(
-				`buildWorker(): ${options.client ?? 'build/client'}${offlineUrl} does not exist. Add public${offlineUrl}, or pass offline: false.`,
+				`buildWorker(): ${options.client ?? 'build/client'}${offlineUrl} does not exist. Add public${offlineUrl}, or pass offline: false (\`worker: { offline: false }\` in alxia()), or pass the app's contract (\`worker: { contract }\` in alxia()).`,
 			);
 		}
 		offline = { url: offlineUrl, revision: revisionOf(await readFile(page)) };
@@ -85,7 +106,7 @@ export async function buildWorker(
 		offline,
 		include: options.precacheAssets,
 	});
-	const out = join(client, workerUrl);
+	const out = urlInClient(client, workerUrl);
 	const result = await Bun.build({
 		entrypoints: [source],
 		outdir: dirname(out),

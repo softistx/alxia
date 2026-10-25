@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { CLIENT, fixtureBuild } from '../../../test/fixture';
 import { parseBrowserManifest, precacheList } from '../model/precache-list';
-import { buildWorker } from './build-worker';
+import { assertBun, buildWorker } from './build-worker';
 
 const DIST = resolve(import.meta.dir, '../../../dist');
 /** Measured at 29.7 kB for the fixture's worker; the limit is about 25 % above. */
@@ -99,7 +99,43 @@ describe('buildWorker', () => {
 		await cp(client, other, { recursive: true });
 		await rm(join(other, 'offline.html'));
 		await expect(worker({ client: 'no-offline' })).rejects.toThrow(
-			'buildWorker(): no-offline/offline.html does not exist. Add public/offline.html, or pass offline: false.',
+			"buildWorker(): no-offline/offline.html does not exist. Add public/offline.html, or pass offline: false (`worker: { offline: false }` in alxia()), or pass the app's contract (`worker: { contract }` in alxia()).",
+		);
+	});
+
+	test('refuses a contract URL outside the client build', async () => {
+		await expect(
+			worker({
+				contract: {
+					serviceWorkerUrl: '/../sw.js',
+					offlineUrl: '/offline.html',
+				},
+			}),
+		).rejects.toThrow(`buildWorker(): /../sw.js is outside ${client}.`);
+		await expect(
+			worker({
+				contract: {
+					serviceWorkerUrl: '/sw.js',
+					offlineUrl: '/../offline.html',
+				},
+			}),
+		).rejects.toThrow(`buildWorker(): /../offline.html is outside ${client}.`);
+	});
+
+	test('refuses a URL that is the client itself, absolute or not rooted', async () => {
+		for (const url of ['/', '/.', 'https://x/y.js', '//host/y.js', 'sw.js']) {
+			await expect(
+				worker({
+					contract: { serviceWorkerUrl: url, offlineUrl: '/offline.html' },
+				}),
+			).rejects.toThrow(`buildWorker(): ${url} is outside ${client}.`);
+		}
+	});
+
+	test('assertBun names Node, and lets Bun through', () => {
+		expect(() => assertBun()).not.toThrow();
+		expect(() => assertBun(false)).toThrow(
+			'buildWorker() runs on Bun: it is running on Node. Run it with bun, or run react-router build with bun --bun.',
 		);
 	});
 

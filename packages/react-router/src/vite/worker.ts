@@ -3,7 +3,7 @@
  * client: `app/service-worker.ts` is the opt-in, as `app/server.ts` is.
  */
 import { existsSync } from 'node:fs';
-import { isAbsolute, join, resolve } from 'node:path';
+import { basename, isAbsolute, join, resolve } from 'node:path';
 import type { ResolvedConfig } from 'vite';
 import { type BuildWorkerOptions, buildWorker } from '../pwa/build';
 import { contextOf } from './config';
@@ -54,6 +54,8 @@ export async function buildAppWorker(
 	requireBun(
 		'react-router build with a service worker',
 		'bun --bun react-router build',
+		undefined,
+		'and the worker is bundled by Bun.build',
 	);
 	const rest = typeof option === 'object' ? option : {};
 	const built = await buildWorker({
@@ -61,8 +63,10 @@ export async function buildAppWorker(
 		file,
 		root: config.root,
 		client: join(contextOf(config).buildDirectory, 'client'),
+	}).catch((error: unknown) => {
+		throw new Error(`${NAME}: ${(error as Error).message}`, { cause: error });
 	});
 	config.logger.info(
-		`✓ service-worker.js: ${built.precache.length} files precached (${MB(built.precacheBytes)} MB), worker ${KB(built.bytes)} kB`,
+		`✓ ${basename(built.file)}: ${built.precache.length} files precached (${MB(built.precacheBytes)} MB), worker ${KB(built.bytes)} kB`,
 	);
 }

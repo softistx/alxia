@@ -32,10 +32,28 @@ describe('react-router build, with app/service-worker.ts', () => {
 
 	beforeAll(async () => {
 		fixture = await workerFixture();
-		await build(fixture.root);
+		await Bun.write(
+			join(fixture.root, 'public', 'assets', 'body-latin-abcdefgh.woff2'),
+			'font',
+		);
+		// The object form, through the plugin: precacheAssets reaches the build.
+		const object = await configFile(fixture.root, 'object', (source) =>
+			source.replace(
+				'alxia()',
+				'alxia({ worker: { precacheAssets: /^body-latin-[\\w-]{8}\\.woff2$/ } })',
+			),
+		);
+		await build(fixture.root, object);
 	}, 90_000);
 	afterAll(async () => {
 		await fixture?.remove();
+	});
+
+	test('precacheAssets of the object form precaches the font', async () => {
+		const code = await Bun.file(
+			join(fixture.root, 'build', 'client', 'service-worker.js'),
+		).text();
+		expect(code).toContain('/assets/body-latin-abcdefgh.woff2');
 	});
 
 	test('writes build/client/service-worker.js, with the routes and the offline page precached', async () => {
@@ -55,6 +73,35 @@ describe('react-router build, with app/service-worker.ts', () => {
 		} finally {
 			child.kill();
 			await child.exited;
+		}
+	});
+});
+
+describe('buildAppWorker, through alxia()', () => {
+	test('names buildWorker() errors under the plugin, keeping the cause', async () => {
+		const fixture = await workerFixture();
+		try {
+			const { buildAppWorker } = await import('./worker');
+			const config = {
+				root: fixture.root,
+				__reactRouterPluginContext: {
+					reactRouterConfig: {
+						appDirectory: join(fixture.root, 'app'),
+						buildDirectory: join(fixture.root, 'build'),
+					},
+				},
+			} as unknown as ResolvedConfig;
+			const error = await buildAppWorker(config, undefined).catch(
+				(e: unknown) => e,
+			);
+			expect((error as Error).message).toStartWith(
+				'alxia-react-router: buildWorker(): ',
+			);
+			expect(((error as Error).cause as Error).message).toStartWith(
+				'buildWorker(): ',
+			);
+		} finally {
+			await fixture.remove();
 		}
 	});
 });
@@ -163,8 +210,12 @@ describe('buildAppWorker, on Node', () => {
 		const { requireBun } = runtime;
 		real = { requireBun };
 		mock.module('./runtime', () => ({
-			requireBun: (command: string, hint?: string) =>
-				requireBun(command, hint, false),
+			requireBun: (
+				command: string,
+				hint?: string,
+				_onBun?: boolean,
+				reason?: string,
+			) => requireBun(command, hint, false, reason),
 		}));
 		({ buildAppWorker } = await import('./worker'));
 	});
@@ -181,7 +232,7 @@ describe('buildAppWorker, on Node', () => {
 	test("with a worker file, fails with requireBun's message", async () => {
 		await Bun.write(join(dir, 'app', 'service-worker.ts'), WORKER);
 		await expect(buildAppWorker(config(), undefined)).rejects.toThrow(
-			"alxia-react-router: react-router build with a service worker is running on Node, and alxia's server runs on Bun.",
+			'alxia-react-router: react-router build with a service worker is running on Node, and the worker is bundled by Bun.build.',
 		);
 	});
 });
