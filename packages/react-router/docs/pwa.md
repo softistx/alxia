@@ -15,9 +15,9 @@ default.
 
 ## What the subpath holds
 
-`@alxia/react-router/pwa` imports nothing: no package, no `node:` module, no
-`bun`, and nothing reads a DOM global when it loads. `boundary.spec.ts` holds
-the built file to that. So each runtime can import it:
+`@alxia/react-router/pwa` imports nothing (`boundary.spec.ts` checks the built
+file), and its code reads `caches` and other globals only inside its functions,
+never at load. So each runtime can import it:
 
 | runtime | imports it for |
 | --- | --- |
@@ -115,6 +115,8 @@ export function mayStore(response: Response) {
 | `immutable(path)` | `path.startsWith('/assets/')` | which static paths are cache-first. This matches how `serveClient` serves `build/client/assets/`, with `immutable` for a year. A file you keep unhashed there is cached for a year by the HTTP cache anyway: [more](troubleshooting.md#an-unhashed-file-under-publicassets-is-cached-for-a-year) |
 | `serviceWorkerUrl` | `SERVICE_WORKER_URL` | never cached. A value here replaces the default |
 | `manifestPath` | `/manifest.webmanifest` | never cached. A value here replaces the default |
+
+An app that gives its contract a custom `serviceWorkerUrl` passes the same value to `cachingFor` (e.g. `{ serviceWorkerUrl: contract.serviceWorkerUrl }`), or the worker's own script is cached like a static file.
 
 The decision is on the request; `isStorable(response)` is on the answer, and
 the worker asks both. A response is stored only when it is a full,

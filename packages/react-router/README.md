@@ -503,7 +503,14 @@ function strategy(request: Request) {
 }
 // 'navigation' | 'immutable' | 'static' | 'none'; store a network answer
 // only when `isStorable(response)`.
-console.log(contract.cacheNames.assets, strategy);
+async function answer(request: Request) {
+  if (strategy(request) === 'immutable') {
+    // cache-first: answer from the build's asset cache when it has the file
+    const cache = await caches.open(contract.cacheNames.assets);
+    return (await cache.match(request)) ?? fetch(request);
+  }
+  return fetch(request);
+}
 ```
 
 The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/pwa.md) has the rest.
