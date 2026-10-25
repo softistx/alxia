@@ -46,6 +46,10 @@ a loader, a message React Router or the browser prints, or an error from
 - [`Expected a JSON body`](#expected-a-json-body)
 - [`Malformed JSON body`](#malformed-json-body)
 - [`The form sent an input the API would refuse`](#the-form-sent-an-input-the-api-would-refuse)
+- [`alxia-react-router: the error catalogue (…) was not read`](#alxia-react-router-the-error-catalogue--was-not-read)
+- [`alxia-react-router: the error catalogue was not checked, keeping what is held`](#alxia-react-router-the-error-catalogue-was-not-checked-keeping-what-is-held)
+- [`alxia-react-router: the error catalogue was not warmed`](#alxia-react-router-the-error-catalogue-was-not-warmed)
+- [`TypeError: alxia-react-router: createErrorCatalogue() needs at least one language.`](#typeerror-alxia-react-router-createerrorcatalogue-needs-at-least-one-language)
 
 **Types**
 
@@ -85,6 +89,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [The error page shows no request id](#the-error-page-shows-no-request-id)
 - [An action shows the error page](#an-action-shows-the-error-page)
 - [Behind a TLS proxy every action answers 403](#behind-a-tls-proxy-every-action-answers-403)
+- [Right after start, refusals read in the API's words](#right-after-start-refusals-read-in-the-apis-words)
 
 ## Thrown or printed
 
@@ -938,6 +943,68 @@ const result = await schema['~standard'].validate(body.input);
 console.log(result.issues);
 ```
 
+### `alxia-react-router: the error catalogue (…) was not read`
+
+**When:** the server logs this line (with the error after it, at the level of
+`log.error`) while a language's catalogue is read for the first time, and the
+refusals in that language read in the API's own words.
+
+**Why:** the app's `read(language)` threw: the API was down, slow past its own
+timeout, or answered an error. The catalogue keeps no partial result. It tries
+again once `retryMs` (5 seconds by default) has passed since the failure, on
+the next request that asks for that language; one read is in flight at a time.
+
+**Fix:** read the error that follows the line. Once the API answers, the next
+request after the delay reads the catalogue and the refusals are worded; no
+restart is needed. To see the calls, give `createErrorCatalogue` a `log`
+that records them.
+
+### `alxia-react-router: the error catalogue was not checked, keeping what is held`
+
+**When:** the server logs this line (with the error after it) once a held
+catalogue is older than the TTL and the check of the versions failed.
+
+**Why:** `versions()` threw. The catalogue keeps serving the messages it
+holds, which may be stale, and asks again after `retryMs` instead of after a
+whole TTL.
+
+**Fix:** read the error that follows. Nothing to restart: when the API
+answers, the check goes on and re-reads the languages whose version moved.
+If it repeats while the API is up, check that `versions()` returns a version
+for every language in `languages`: a language missing from its answer is read
+again at each check.
+
+### `alxia-react-router: the error catalogue was not warmed`
+
+**When:** the server logs this line at startup, after `warm()`.
+
+**Why:** `warm()` reads every language without holding the boot back, and
+the promise it started rejected. The reads themselves report their failures
+(`the error catalogue (…) was not read`), so this line means something else
+threw, such as a `ttlMs` getter or a `languages` entry.
+
+**Fix:** read the error that follows. The first request that asks for a
+language reads it anyway, so the server is not left without a catalogue.
+
+### `TypeError: alxia-react-router: createErrorCatalogue() needs at least one language.`
+
+**When:** the server starts, or the module that calls `createErrorCatalogue`
+is imported.
+
+**Why:** `languages` is empty, usually a list built from an environment
+variable or a config that was not set.
+
+**Fix:** pass the languages the app serves, the same list the page's
+translator knows:
+
+```ts
+const catalogue = createErrorCatalogue({
+	messages: apiMessages,
+	languages: ['en', 'fr'],
+	// …
+});
+```
+
 ## Types
 
 ### `Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`
@@ -1638,3 +1705,27 @@ export const { readJson, requireJsonPost, readInput } = jsonActions({
 When the getter returns `undefined`, the request's own origin is used, so
 development needs no setting. An empty string is not `undefined`: it is
 kept, and every request with an `Origin` is refused.
+
+### Right after start, refusals read in the API's words
+
+For the first seconds after the server starts, a refusal shows the message
+the API worded (in its default language, say) instead of the page's language.
+It reads right a few seconds later.
+
+**Why:** a language's catalogue is read on first use, and a request waits for
+it only up to `firstReadWaitMs` (1.5 seconds by default), counted from when the
+read started. A slow API, or a failed read, lets the request go on with the
+API's own words; the read carries on in the background (or is retried after
+`retryMs`), and the next request finds it held.
+
+**Fix:** read both languages at startup, so the first request finds them held.
+In `server.ts`:
+
+```ts
+import { catalogue } from './catalogue.server';
+
+catalogue.warm();
+```
+
+Raise `firstReadWaitMs` only if the page should wait longer for the first
+words; it holds every cold request that long when the API hangs.

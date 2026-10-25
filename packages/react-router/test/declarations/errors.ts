@@ -9,8 +9,11 @@ import {
 	type ApiRefusal,
 	apiCodeResolver,
 	type CatalogueMessages,
+	type CatalogueReply,
 	createApiErrors,
 	createApiMessages,
+	createErrorCatalogue,
+	type ErrorCatalogue,
 	errorRequestId,
 	type FormErrors,
 	isApiErrorLike,
@@ -201,3 +204,34 @@ export function typedBody() {
 	// @ts-expect-error the body is { name: string }
 	post({ title: 'a' });
 }
+
+export const errorCatalogue: ErrorCatalogue<'en' | 'fr'> = createErrorCatalogue(
+	{
+		messages,
+		languages: ['en', 'fr'],
+		read: async (): Promise<CatalogueReply> => ({ version: '1', messages: [] }),
+		versions: async () => ({ en: '1' }),
+		ttlMs: () => 30_000,
+		clientCodes: ['validation.errors.required'],
+	},
+);
+
+export async function keepFresh() {
+	await errorCatalogue.freshAll();
+	await errorCatalogue.fresh('en', 0);
+	errorCatalogue.warm();
+	return errorCatalogue.clientMessages().fr;
+}
+
+// @ts-expect-error 'de' is not 'en' | 'fr'
+errorCatalogue.fresh('de');
+
+export const noLanguage = createErrorCatalogue({
+	messages,
+	languages: ['en'],
+	// @ts-expect-error a language outside `L` is not a key of the versions
+	versions: async () => ({ de: '1' }),
+	read: async () => ({ version: '1', messages: [] }),
+	ttlMs: 1,
+	clientCodes: [],
+});

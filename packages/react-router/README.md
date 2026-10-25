@@ -630,6 +630,29 @@ export async function action({ request }: { request: Request }) {
 // In the component: const { post, busy } = useJsonFetcher<typeof action>();
 ```
 
+The API's catalogue is read and kept fresh by `createErrorCatalogue`; the root's
+middleware awaits `freshAll()`, its loader returns `clientMessages()` and
+`server.ts` calls `warm()`:
+
+```ts
+import { createErrorCatalogue } from '@alxia/react-router/errors';
+import { apiMessages } from './api-messages';
+
+export const catalogue = createErrorCatalogue<'en' | 'fr'>({
+	messages: apiMessages,
+	languages: ['en', 'fr'],
+	read: async (language) => fetchCatalogue(language), // { version, messages }
+	versions: async () => fetchVersions(), // { en: '…', fr: '…' }
+	ttlMs: () => Number(process.env.CATALOGUE_TTL_MS ?? 60_000),
+	clientCodes: ['validation.errors.required'],
+});
+
+declare function fetchCatalogue(
+	language: string,
+): Promise<{ version: string; messages: { code: string; message: string; params: { name: string; kind: 'TEXT' }[] }[] }>;
+declare function fetchVersions(): Promise<{ en: string; fr: string }>;
+```
+
 The [errors guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md)
 has the rest.
 
@@ -749,6 +772,7 @@ From `@alxia/react-router/errors` (`react-router` is its only package import, an
 | `apiCodeResolver(messages, { translate, language, codeOf?, isApiCode? })`, `ApiCodeResolver`, `ApiCodeResolverOptions`, `CodeIssueLike` | the `{ translate, codeOf }` a form's `useCodeResolver(schema, resolver)` takes: a check's API code is worded as the API words it, any other key by the app's translator; `CodeIssueLike` is the issue a custom `codeOf` receives |
 | `ApiMessagesProvider({ messages, value, children })`, `ApiMessagesProviderProps` | fills the store in the browser from the root's data before the children render; a server render writes nothing. A function with no JSX, so no React import |
 | `createApiErrors({ messages, unavailable, refused?, byCode?, isApiCode? })`, `ApiErrors`, `ApiErrorsOptions` | what a page says of a refusal, in a language: `apiErrorMessage(error, language)` (the catalogue's text of the code, else the API's message; `refused` replaces it for an error with no API code and `byCode` words given codes, such as a query's limits), `fieldErrors(error, language)` by input path, `translateCode(code, fallback, language, values?)`, `unavailableMessage(language)` and `apiRefusal(error, language)`; for an action, `fetcherResult(language, about, run)` (`{ ok: true, …about, …value }`, or `{ ok: false, …about, error }` with the refusal's status), `fetcherRefusal(error, language)` (the refusal, or the thrown route error) and `submitForm(language, run, fieldOf)` (`{ ok: true, value }`, or a `FormErrors` with the refusal's status) |
+| `createErrorCatalogue({ messages, languages, read, versions, ttlMs, clientCodes, retryMs?, firstReadWaitMs?, log? })`, `ErrorCatalogue`, `ErrorCatalogueOptions`, `CatalogueReply` | keeps the API's error catalogue in the store: `fresh(language, now?)` and `freshAll(now?)` (a cold language is awaited for `firstReadWaitMs`, 1500 by default, and read once however many requests ask; a held one is served, and its version checked in the background once per `ttlMs`, a number or a getter; only a language whose version moved is read again; a failure is retried after `retryMs`, 5000 by default), `warm()` for startup, `clientMessages()` (the `clientCodes` the browser words itself, by language, for the root's loader), `reset()`, `heldVersion(language)` and `settled()` (for specs). `read` and `versions` are the app's calls to its API |
 | `ApiRefusal` | `{ message, status }`: a failed call as a page says it; what `apiRefusal` returns for an API refusal (its status) or an unreachable API (503), else `undefined` |
 | `jsonActions({ origin? })`, `JsonActions`, `JsonActionsOptions` | the JSON helpers of the actions, bound to the app's origin (a string, or a getter read at each request; the request's own by default): `readJson(request)` (403 `Cross-site request refused` for another origin or a cross-site fetch, 415 `Expected a JSON body`, 400 `Malformed JSON body`), `requireJsonPost(request)` (a native post goes back to its page) and `readInput(request, schema)` (the body's `input` through a Standard Schema, async allowed; 400 `The form sent an input the API would refuse`) |
 | `useJsonFetcher(key?, action?)`, `JsonBody` | a fetcher that posts JSON: `{ fetcher, post(body, to?), busy }`; `to` is the action of one call |
@@ -769,7 +793,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Typing the loaders](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/typing-the-loaders.md): `Register`, and the app's own context keys.
 - [A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md), [Beside the pages](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md) (middlewares, routes, WebSockets, the client's files), [OpenAPI](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/openapi.md), [Testing](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/testing.md) and [Deploying](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md), with Docker.
 - [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
-- [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, the page a request is for, the catalogue store, the form checks in the API's words, the provider, wording a refusal, loaders and the error page, actions, and JSON actions and CSRF.
+- [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, the page a request is for, the catalogue store, the form checks in the API's words, the provider, wording a refusal, loaders and the error page, actions, JSON actions and CSRF, and keeping the catalogue fresh.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.
