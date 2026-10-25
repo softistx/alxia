@@ -1,5 +1,5 @@
 import { MANIFEST_PATH } from './manifest';
-import { SERVICE_WORKER_URL } from './worker-contract';
+import { SERVICE_WORKER_URL, type WorkerContract } from './worker-contract';
 
 /**
  * Which requests the service worker caches, and how. Pure, so that what is
@@ -27,8 +27,13 @@ export interface RequestFacts {
 }
 
 export interface CachingOptions {
-	/** The worker's own path, never cached. `SERVICE_WORKER_URL` by default. */
+	/**
+	 * The worker's own path, never cached. Wins over `contract`;
+	 * `SERVICE_WORKER_URL` when neither is given.
+	 */
 	serviceWorkerUrl?: string;
+	/** The app's contract, whose `serviceWorkerUrl` is never cached. */
+	contract?: Pick<WorkerContract, 'serviceWorkerUrl'>;
 	/** The web app manifest's path, never cached. `MANIFEST_PATH` by default. */
 	manifestPath?: string;
 	/** Paths of the app answered fresh every time, such as `(p) => p.startsWith('/api/')`. */
@@ -62,7 +67,10 @@ export function cachingFor(
 	if (
 		path.endsWith('.data') || // React Router single fetch: loader data
 		path === '/__manifest' || // React Router route discovery
-		path === (options.serviceWorkerUrl ?? SERVICE_WORKER_URL) ||
+		path ===
+			(options.serviceWorkerUrl ??
+				options.contract?.serviceWorkerUrl ??
+				SERVICE_WORKER_URL) ||
 		path === (options.manifestPath ?? MANIFEST_PATH) ||
 		options.never?.(path)
 	) {

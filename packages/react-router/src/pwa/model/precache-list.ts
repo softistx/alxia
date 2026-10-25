@@ -66,7 +66,10 @@ export function assetPrecache(
 	base = '/assets/',
 ): PrecacheEntry[] {
 	return assetFiles
-		.filter((file) => include.test(file))
+		.filter((file) => {
+			include.lastIndex = 0; // a /g or /y regex remembers its last match
+			return include.test(file);
+		})
 		.sort()
 		.map((file) => ({ url: `${base}${file}`, revision: null }));
 }

@@ -648,10 +648,10 @@ From `@alxia/react-router/pwa`:
 
 | export | |
 | --- | --- |
-| `defineWorkerContract(options)` | the contract of one app's worker from its `cachePrefix` (required), with `cacheVersion` (`v1`), `serviceWorkerUrl` and `offlineUrl`: its `cacheNames`, `obsoleteCaches(names)` and `clearableCaches(names)`. Throws on an empty prefix or one ending with `-` |
+| `defineWorkerContract(options)` | the contract of one app's worker from its `cachePrefix` (required), with `cacheVersion` (`v1`), `serviceWorkerUrl` and `offlineUrl`: its `cacheNames`, `obsoleteCaches(names)` and `clearableCaches(names)`. Throws on an empty prefix or one ending with `-`, and on an empty `cacheVersion` or one with a `-` |
 | `WorkerContract`, `WorkerContractOptions`, `CacheNames` | its types |
 | `SERVICE_WORKER_URL`, `OFFLINE_URL`, `SKIP_WAITING` | `/service-worker.js`, `/offline.html` and the message that applies an update |
-| `cachingFor(request, origin, options?)` | `navigation`, `immutable`, `static` or `none` for a request. `options`: `never(path)`, `immutable(path)` (everything under `/assets/` by default), `serviceWorkerUrl`, `manifestPath` |
+| `cachingFor(request, origin, options?)` | `navigation`, `immutable`, `static` or `none` for a request. `options`: `never(path)`, `immutable(path)` (everything under `/assets/` by default), `serviceWorkerUrl`, `contract` (whose `serviceWorkerUrl` is never cached), `manifestPath` |
 | `Caching`, `RequestFacts`, `CachingOptions` | its types |
 | `isStorable(response)` | whether a response may be stored: a full, same-origin, `public` 200 of a script, style, font or image, not varying on who asks |
 | `parseBrowserManifest(source)` | React Router's browser manifest, read from `build/client/assets/manifest-*.js` |

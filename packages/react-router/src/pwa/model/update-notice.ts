@@ -6,7 +6,10 @@
 export const UPDATE_LATER_KEY = 'alxia.update-later';
 
 /** The part of `Storage` the notice reads and writes. */
-export type NoticeStorage = Pick<Storage, 'getItem' | 'setItem'>;
+export type NoticeStorage = {
+	getItem(key: string): string | null;
+	setItem(key: string, value: string): void;
+};
 
 /** What the notice offers while a new version waits. */
 export type UpdateNotice = {

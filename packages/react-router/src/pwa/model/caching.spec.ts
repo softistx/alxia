@@ -138,3 +138,55 @@ describe('cachingFor: options', () => {
 		expect(caching('/service-worker.js', {}, options)).toBe('static');
 	});
 });
+
+describe('cachingFor: the built-in refusals hold whatever the options say', () => {
+	test('a permissive never and immutable cannot make any of them cacheable', () => {
+		const options: CachingOptions = {
+			never: () => false,
+			immutable: () => true,
+		};
+		const refused: Array<[string, Parameters<typeof request>[1]?]> = [
+			['https://cdn.example.test/x.js'],
+			['/assets/root-abc123.js', { headers: { authorization: 'Bearer x' } }],
+			['/assets/root-abc123.js?q=1'],
+			['/assets/root-abc123.data'],
+			['/__manifest'],
+			['/service-worker.js'],
+			['/manifest.webmanifest'],
+			['/assets/page.js', { destination: 'document' }],
+			['/assets/page.js', { destination: 'iframe' }],
+			['/assets/no-extension'],
+			['/assets/root-abc123.js', { method: 'POST' }],
+		];
+		for (const [path, init] of refused) {
+			expect(caching(path, init, options)).toBe('none');
+		}
+	});
+
+	test('a worker URL named by the contract is never cached', () => {
+		expect(
+			caching('/sw.js', {}, { contract: { serviceWorkerUrl: '/sw.js' } }),
+		).toBe('none');
+		// serviceWorkerUrl wins over the contract.
+		expect(
+			caching(
+				'/other.js',
+				{},
+				{
+					serviceWorkerUrl: '/other.js',
+					contract: { serviceWorkerUrl: '/sw.js' },
+				},
+			),
+		).toBe('none');
+		expect(
+			caching(
+				'/sw.js',
+				{},
+				{
+					serviceWorkerUrl: '/other.js',
+					contract: { serviceWorkerUrl: '/sw.js' },
+				},
+			),
+		).toBe('static');
+	});
+});

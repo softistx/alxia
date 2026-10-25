@@ -63,13 +63,15 @@ import { defineWorkerContract } from '@alxia/react-router/pwa';
 export const workerContract = defineWorkerContract({ cachePrefix: 'my-app' });
 ```
 
-`cachePrefix` is required: every Cache Storage cache the worker owns starts
-with `my-app-`. Two apps on one origin need two prefixes. The options are:
+`cachePrefix` is required: the caches the worker owns are named
+`my-app-precache-<version>`, `my-app-assets-<version>` and
+`my-app-static-<version>`, and only those are ever swept. Two apps on one
+origin need two prefixes; `app` and `app-admin` do not claim each other's. The options are:
 
 | option | default | |
 | --- | --- | --- |
 | `cachePrefix` | none | a non-empty name that does not end with `-` |
-| `cacheVersion` | `'v1'` | bump it when a cache's content changes shape: the next worker deletes the prefix's caches of another version when it activates |
+| `cacheVersion` | `'v1'` | a name without `-`; bump it when a cache's content changes shape: the next worker deletes the prefix's caches of another version when it activates |
 | `serviceWorkerUrl` | `/service-worker.js` | where the build writes the worker |
 | `offlineUrl` | `/offline.html` | the page served when a navigation fails |
 
@@ -135,9 +137,10 @@ export function mayStore(response: Response) {
 | `never(path)` | none | paths of the app always answered fresh |
 | `immutable(path)` | `path.startsWith('/assets/')` | which static paths are cache-first. This matches how `serveClient` serves `build/client/assets/`, with `immutable` for a year. A file you keep unhashed there is cached for a year by the HTTP cache anyway: [more](../troubleshooting.md#an-unhashed-file-under-publicassets-is-cached-for-a-year) |
 | `serviceWorkerUrl` | `SERVICE_WORKER_URL` | never cached. A value here replaces the default |
+| `contract` | none | the app's `WorkerContract`: its `serviceWorkerUrl` is never cached. `serviceWorkerUrl` wins when both are given |
 | `manifestPath` | `/manifest.webmanifest` | never cached. A value here replaces the default |
 
-An app that gives its contract a custom `serviceWorkerUrl` passes the same value to `cachingFor` (e.g. `{ serviceWorkerUrl: contract.serviceWorkerUrl }`), or the worker's own script is cached like a static file.
+An app that gives its contract a custom `serviceWorkerUrl` passes the contract to `cachingFor` (`{ contract }`), or the same value as `serviceWorkerUrl`, or the worker's own script is cached like a static file.
 
 The decision is on the request; `isStorable(response)` is on the answer, and
 the worker asks both. A response is stored only when it is a full,
@@ -357,7 +360,10 @@ export function UpdateBanner() {
   are `registerServiceWorker`'s. `onError` is called when registering fails
   (private mode, a blocked script); the app works without a worker, so by
   default the error is dropped. The effect runs again only when `enabled`,
-  `url`, `scope` or `notice` change, never for a new inline `onError`.
+  `url`, `scope` or `notice` change, never for a new inline `onError` (the latest one is always called). The
+  options are read when the effect runs, and the listeners it adds (the update
+  check when the tab shows, the reload on a controller change) stay for the
+  page's life: there is no cleanup.
 - **`useUpdateNotice(notice?)`** is `useSyncExternalStore` over the store: the
   `{ reload, later }` while a version waits, else `undefined`, and always
   `undefined` on the server and while hydrating.

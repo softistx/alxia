@@ -39,6 +39,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`EACCES: permission denied, open '/app/…'`](#eacces-permission-denied-open-app)
 - [`error: Cannot find package '…' from '/app/build/server/index.js'`](#error-cannot-find-package--from-appbuildserverindexjs)
 - [`TypeError: defineWorkerContract(): cachePrefix must be a non-empty name, …`](#typeerror-defineworkercontract-cacheprefix-must-be-a-non-empty-name-)
+- [`TypeError: defineWorkerContract(): cacheVersion must be a non-empty name without '-', …`](#typeerror-defineworkercontract-cacheversion-must-be-a-non-empty-name-without---)
 - [`parseBrowserManifest(): not React Router's browser manifest …`](#parsebrowsermanifest-not-react-routers-browser-manifest-)
 
 **Types**
@@ -66,7 +67,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [The build has a package's Node variant, not its `bun` one](#the-build-has-a-packages-node-variant-not-its-bun-one)
 - [`request.url` in a loader is `http://` and the internal host behind a proxy](#requesturl-in-a-loader-is-http-and-the-internal-host-behind-a-proxy)
 - [An unhashed file under public/assets/ is cached for a year](#an-unhashed-file-under-publicassets-is-cached-for-a-year)
-- [Another app's caches vanish on the same origin](#another-apps-caches-vanish-on-the-same-origin)
+- [A cache of another kind is never swept](#a-cache-of-another-kind-is-never-swept)
 
 ## Thrown or printed
 
@@ -792,6 +793,26 @@ import { defineWorkerContract } from '@alxia/react-router/pwa';
 export const workerContract = defineWorkerContract({ cachePrefix: 'my-app' });
 ```
 
+### `TypeError: defineWorkerContract(): cacheVersion must be a non-empty name without '-', …`
+
+The full message is `defineWorkerContract(): cacheVersion must be a
+non-empty name without '-', such as 'v2'; got 'v1-beta'.`
+
+**Why:** every cache name is `<prefix>-<kind>-<version>`, and the contract
+tells a version from the rest of the name by its dashes. A version with a `-`
+(or an empty one) would make the name ambiguous.
+
+**Fix:** use a name with no dash, such as `'v2'` or `'2026'`:
+
+```ts
+import { defineWorkerContract } from '@alxia/react-router/pwa';
+
+export const workerContract = defineWorkerContract({
+  cachePrefix: 'my-app',
+  cacheVersion: 'v2',
+});
+```
+
 ### `parseBrowserManifest(): not React Router's browser manifest …`
 
 The full message ends with `(build/client/assets/manifest-*.js).`
@@ -1268,18 +1289,19 @@ export function caching(request: RequestFacts, origin: string) {
 }
 ```
 
-### Another app's caches vanish on the same origin
+### A cache of another kind is never swept
 
-Signing out, or a new worker activating, empties the caches of another app
-served from the same origin.
+An old cache of the app stays in Cache Storage after a new worker activates,
+or after `clearAppCaches()`.
 
-**Why:** a contract owns every cache whose name starts with `<prefix>-`.
-With one prefix that is the start of another plus a dash (`app` and
-`app-admin`), `app`'s `obsoleteCaches` and `clearableCaches` take
-`app-admin-…` for their own.
+**Why:** a contract owns the caches named `<prefix>-precache-…`,
+`<prefix>-assets-…` and `<prefix>-static-…`, and no others. That is what lets
+the prefixes `app` and `app-admin` share an origin: `app` never takes
+`app-admin-assets-v1` for its own. A cache the app made under a name of its
+own (`app-pages-v1`, or a kind this package renamed) is therefore not swept.
 
-**Fix:** give each app a prefix that is not the other's start followed by
-`-`: `app` and `admin`, or `app-web` and `app-admin`.
+**Fix:** delete it yourself, once, with `caches.delete(name)`, or give it one
+of the three kinds' names.
 
 ### The update notice never shows
 

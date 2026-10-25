@@ -99,3 +99,15 @@ describe('assetPrecache', () => {
 		);
 	});
 });
+
+describe('assetPrecache with a global regex', () => {
+	test('keeps every match: lastIndex does not carry over between files', () => {
+		const files = ['a-12345678.woff2', 'b-12345678.woff2', 'c-12345678.woff2'];
+		expect(assetPrecache(files, /\.woff2$/g).map((e) => e.url)).toEqual([
+			'/assets/a-12345678.woff2',
+			'/assets/b-12345678.woff2',
+			'/assets/c-12345678.woff2',
+		]);
+		expect(assetPrecache(files, /\.woff2$/y)).toHaveLength(0);
+	});
+});

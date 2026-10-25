@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { afterLoad, registerServiceWorker } from '../model/registration';
+import { startServiceWorker } from '../model/start-service-worker';
 import type { UpdateNoticeStore } from '../model/update-notice';
 import { updateNotice } from './use-update-notice';
 
@@ -28,6 +28,11 @@ export interface ServiceWorkerOptions {
  * Registers the service worker after `load` when `enabled`, in a browser
  * that has one. When a new version waits, `notice` offers it (`useUpdateNotice`
  * reads it); nothing activates it unasked. Does nothing on the server.
+ *
+ * The options are read when the effect runs, which is on mount and when
+ * `enabled`, `url`, `scope` or `notice` change; `onError` is always the
+ * latest. The listeners it adds (the update check, the controller change)
+ * stay for the page's life: there is no cleanup, a page has one worker.
  */
 export function useServiceWorker(options: ServiceWorkerOptions): void {
 	const { enabled, url, scope, notice = updateNotice } = options;
@@ -36,17 +41,15 @@ export function useServiceWorker(options: ServiceWorkerOptions): void {
 		onError.current = options.onError;
 	});
 	useEffect(() => {
-		if (!enabled || !('serviceWorker' in navigator)) return;
-		const container = navigator.serviceWorker;
-		afterLoad(() => {
-			registerServiceWorker(
-				container,
-				(worker, apply) => notice.offer(() => apply(worker)),
-				{
-					...(url !== undefined && { url }),
-					...(scope !== undefined && { scope }),
-				},
-			).catch((error: unknown) => onError.current?.(error));
-		});
+		startServiceWorker(
+			{ navigator },
+			{
+				enabled,
+				notice,
+				onError: (error) => onError.current?.(error),
+				...(url !== undefined && { url }),
+				...(scope !== undefined && { scope }),
+			},
+		);
 	}, [enabled, url, scope, notice]);
 }

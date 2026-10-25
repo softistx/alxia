@@ -49,17 +49,19 @@ export type ManifestIcon = {
  * The four icons `@vite-pwa/assets-generator`'s `minimal2023Preset` writes
  * to `public/`: 64, 192 and 512 pixels, and a maskable 512.
  */
-export const MINIMAL_2023_ICONS: readonly ManifestIcon[] = [
-	{ src: '/pwa-64x64.png', sizes: '64x64', type: 'image/png' },
-	{ src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
-	{ src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
-	{
-		src: '/maskable-icon-512x512.png',
-		sizes: '512x512',
-		type: 'image/png',
-		purpose: 'maskable',
-	},
-];
+export const MINIMAL_2023_ICONS: readonly ManifestIcon[] = Object.freeze(
+	[
+		{ src: '/pwa-64x64.png', sizes: '64x64', type: 'image/png' },
+		{ src: '/pwa-192x192.png', sizes: '192x192', type: 'image/png' },
+		{ src: '/pwa-512x512.png', sizes: '512x512', type: 'image/png' },
+		{
+			src: '/maskable-icon-512x512.png',
+			sizes: '512x512',
+			type: 'image/png',
+			purpose: 'maskable' as const,
+		},
+	].map((icon) => Object.freeze(icon)),
+);
 
 export interface WebAppManifestOptions {
 	name: string;
@@ -120,6 +122,6 @@ export function webAppManifest(options: WebAppManifestOptions): WebAppManifest {
 		theme_color: options.themeColor,
 		background_color: options.backgroundColor,
 		...(options.categories && { categories: [...options.categories] }),
-		icons: [...(options.icons ?? MINIMAL_2023_ICONS)],
+		icons: (options.icons ?? MINIMAL_2023_ICONS).map((icon) => ({ ...icon })),
 	};
 }
