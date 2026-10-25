@@ -276,7 +276,7 @@ header, unless it writes it into its own policy.
 `@alxia/react-router` reads the nonce from the context, if one is there,
 with `nonceOf(loadContext)` in `entry.server.tsx`. Neither package depends
 on the other. See
-[its guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#a-csp-nonce).
+[its guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md#a-csp-nonce).
 
 ### Without `nonce: true`
 
