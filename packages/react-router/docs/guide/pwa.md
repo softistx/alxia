@@ -1,6 +1,6 @@
 # Installable and offline
 
-What an installable React Router app shares, that has no UI: the service
+This page covers what an installable React Router app shares, that has no UI: the service
 worker's contract, which requests the worker caches, which responses it may
 store, the precache list read from a build, registering the worker and
 offering an update, the web app manifest, and the cleaning at sign-out.
@@ -22,7 +22,6 @@ the app's for now: the [roadmap](../roadmap.md#next) lists them.
 - [In React](#in-react)
 - [Clearing at sign-out](#clearing-at-sign-out)
 - [Serving the worker's script](#serving-the-workers-script)
-- [Adopting from an app's own copy](#adopting-from-an-apps-own-copy)
 
 ## What the subpath holds
 
@@ -38,14 +37,14 @@ never at load. So each runtime can import it:
 | the server | `SERVICE_WORKER_URL`, to serve the worker under its path; `MANIFEST_PATH`, `MANIFEST_HEADERS`, `manifestLanguage` and `webAppManifest`, to serve the manifest |
 
 `@alxia/react-router/pwa/react` is the page's hooks and needs `react`, an
-optional peer of the package (`^19`): its built file imports `react` and
-nothing else, and shares no chunk with the main entry, so a page never loads
+optional peer of the package (`^19`): its only package import is `react`, and
+it shares no chunk with the main entry, so a page never loads
 core for it (`boundary.spec.ts` checks both). Keep it out of the worker and
 the build script, which would bundle React.
 
 `@alxia/react-router/pwa/server` is `noCache` and needs `@alxia/core`, a peer
-the package already has: its built file imports `@alxia/core` and nothing
-else (`boundary.spec.ts` checks it). It is for the server file alone.
+the package already has: its only package import is `@alxia/core`
+(`boundary.spec.ts` checks it). It is for the server file alone.
 
 The main entry, `@alxia/react-router`, is not for those: it imports
 `@alxia/core`, which imports `node:*`, and a client bundle should not carry it.
@@ -87,8 +86,8 @@ The contract gives three cache names, `cacheNames.precache`
 import { workerContract } from '../app/pwa-contract';
 
 export async function deleteObsoleteCaches() {
-  const obsolete = workerContract.obsoleteCaches(await caches.keys());
-  await Promise.all(obsolete.map((name) => caches.delete(name)));
+	const obsolete = workerContract.obsoleteCaches(await caches.keys());
+	await Promise.all(obsolete.map((name) => caches.delete(name)));
 }
 ```
 
@@ -119,29 +118,31 @@ between `immutable` and `static`:
 import { cachingFor, isStorable } from '@alxia/react-router/pwa';
 
 const options = {
-  never: (path: string) => path.startsWith('/api/'),
-  immutable: (path: string) =>
-    path.startsWith('/assets/') && !path.startsWith('/assets/icons/'),
+	never: (path: string) => path.startsWith('/api/'),
+	immutable: (path: string) =>
+		path.startsWith('/assets/') && !path.startsWith('/assets/icons/'),
 };
 
 export function strategyOf(request: Request) {
-  return cachingFor(request, self.location.origin, options);
+	return cachingFor(request, self.location.origin, options);
 }
 
 export function mayStore(response: Response) {
-  return isStorable(response);
+	return isStorable(response);
 }
 ```
 
 | option | default | |
 | --- | --- | --- |
 | `never(path)` | none | paths of the app always answered fresh |
-| `immutable(path)` | `path.startsWith('/assets/')` | which static paths are cache-first. This matches how `serveClient` serves `build/client/assets/`, with `immutable` for a year. A file you keep unhashed there is cached for a year by the HTTP cache anyway: [more](../troubleshooting.md#an-unhashed-file-under-publicassets-is-cached-for-a-year) |
+| `immutable(path)` | `path.startsWith('/assets/')` | which static paths are cache-first. This matches how the client's files under `build/client/assets/` are served, `immutable` for a year. A file you keep unhashed there is cached for a year by the HTTP cache anyway: [more](../troubleshooting.md#an-unhashed-file-under-publicassets-is-cached-for-a-year) |
 | `serviceWorkerUrl` | `SERVICE_WORKER_URL` | never cached. A value here replaces the default |
 | `contract` | none | the app's `WorkerContract`: its `serviceWorkerUrl` is never cached. `serviceWorkerUrl` wins when both are given |
 | `manifestPath` | `/manifest.webmanifest` | never cached. A value here replaces the default |
 
-An app that gives its contract a custom `serviceWorkerUrl` passes the contract to `cachingFor` (`{ contract }`), or the same value as `serviceWorkerUrl`, or the worker's own script is cached like a static file.
+An app that gives its contract a custom `serviceWorkerUrl` passes the
+contract to `cachingFor` (`{ contract }`), or the same value as
+`serviceWorkerUrl`, or the worker's own script is cached like a static file.
 
 The decision is on the request; `isStorable(response)` is on the answer, and
 the worker asks both. A response is stored only when it is a full,
@@ -160,9 +161,9 @@ list in `build/client/assets/manifest-*.js`:
 // file: scripts/precache.ts
 import { readdirSync, readFileSync } from 'node:fs';
 import {
-  assetPrecache,
-  parseBrowserManifest,
-  precacheList,
+	assetPrecache,
+	parseBrowserManifest,
+	precacheList,
 } from '@alxia/react-router/pwa';
 
 const assets = 'build/client/assets';
@@ -171,12 +172,12 @@ const manifestFile = files.find((file) => /^manifest-.*\.js$/.test(file));
 if (!manifestFile) throw new Error('Run react-router build first.');
 
 const manifest = parseBrowserManifest(
-  readFileSync(`${assets}/${manifestFile}`, 'utf8'),
+	readFileSync(`${assets}/${manifestFile}`, 'utf8'),
 );
 
 export const precache = [
-  ...precacheList(manifest),
-  ...assetPrecache(files, /^body-latin-[\w-]{8}\.woff2$/),
+	...precacheList(manifest),
+	...assetPrecache(files, /^body-latin-[\w-]{8}\.woff2$/),
 ];
 ```
 
@@ -204,21 +205,21 @@ page has loaded, so it never competes with it:
 ```ts
 // file: app/register.ts
 import {
-  afterLoad,
-  createUpdateNotice,
-  registerServiceWorker,
-  sessionStore,
+	afterLoad,
+	createUpdateNotice,
+	registerServiceWorker,
+	sessionStore,
 } from '@alxia/react-router/pwa';
 
 export const notice = createUpdateNotice(sessionStore);
 
 export function startWorker() {
-  if (!('serviceWorker' in navigator)) return;
-  afterLoad(() => {
-    registerServiceWorker(navigator.serviceWorker, (worker, apply) =>
-      notice.offer(() => apply(worker)),
-    ).catch(console.error);
-  });
+	if (!('serviceWorker' in navigator)) return;
+	afterLoad(() => {
+		registerServiceWorker(navigator.serviceWorker, (worker, apply) =>
+			notice.offer(() => apply(worker)),
+		).catch(console.error);
+	});
 }
 ```
 
@@ -257,37 +258,44 @@ reaches it. The page names its language in the query, and the server reads it:
 import { manifestHref } from '@alxia/react-router/pwa';
 
 export function links() {
-  return [{ rel: 'manifest', href: manifestHref('fr') }];
+	return [{ rel: 'manifest', href: manifestHref('fr') }];
 }
 ```
 
 ```ts
-// file: app/manifest-route.ts
+// file: app/server.ts
+import { createServer } from '@alxia/react-router';
 import {
-  MANIFEST_HEADERS,
-  manifestLanguage,
-  webAppManifest,
+	MANIFEST_HEADERS,
+	MANIFEST_PATH,
+	manifestLanguage,
+	webAppManifest,
 } from '@alxia/react-router/pwa';
 
 const LANGUAGES = ['en', 'fr'] as const;
 
-export function manifestResponse(request: Request, accepted: 'en' | 'fr') {
-  const lang = manifestLanguage(new URL(request.url), LANGUAGES, accepted);
-  const manifest = webAppManifest({
-    name: 'My app',
-    description: lang === 'fr' ? 'Mon application' : 'My app',
-    lang,
-    themeColor: '#1e40af',
-    backgroundColor: '#ffffff',
-    categories: ['productivity'],
-  });
-  return new Response(JSON.stringify(manifest), { headers: MANIFEST_HEADERS });
-}
+export default createServer({
+	configure: (app) =>
+		app.get(MANIFEST_PATH, ({ request, reply }) => {
+			const lang = manifestLanguage(new URL(request.url), LANGUAGES, 'en');
+			const manifest = webAppManifest({
+				name: 'My app',
+				description: lang === 'fr' ? 'Mon application' : 'My app',
+				lang,
+				themeColor: '#1e40af',
+				backgroundColor: '#ffffff',
+				categories: ['productivity'],
+			});
+			return reply(200, JSON.stringify(manifest), { headers: MANIFEST_HEADERS });
+		}),
+});
 ```
 
 `manifestLanguage(url, supported, fallback)` returns `?lang=` when it is one
-of `supported`, else `fallback`: pass the request's `Accept-Language`, never
-its cookie, because `MANIFEST_HEADERS` says `Vary: Accept-Language`. Those
+of `supported`, else `fallback`. The fallback is a supported language that
+the app resolves from the request's `Accept-Language` (the example passes
+`'en'`; an app with a language negotiator passes its result), never from the
+cookie, because `MANIFEST_HEADERS` says `Vary: Accept-Language`. Those
 headers also make it cacheable for an hour and give it a policy that loads
 nothing: the pages' policy carries a nonce, and a nonce never goes in a
 response a cache may keep.
@@ -323,16 +331,16 @@ import { Outlet } from 'react-router';
 import { UpdateBanner } from './update-banner';
 
 export default function App() {
-  useServiceWorker({
-    enabled: import.meta.env.PROD,
-    onError: (error) => console.warn('No service worker', error),
-  });
-  return (
-    <>
-      <UpdateBanner />
-      <Outlet />
-    </>
-  );
+	useServiceWorker({
+		enabled: import.meta.env.PROD,
+		onError: (error) => console.warn('No service worker', error),
+	});
+	return (
+		<>
+			<UpdateBanner />
+			<Outlet />
+		</>
+	);
 }
 ```
 
@@ -341,17 +349,17 @@ export default function App() {
 import { useOnline, useUpdateNotice } from '@alxia/react-router/pwa/react';
 
 export function UpdateBanner() {
-  const notice = useUpdateNotice();
-  const online = useOnline();
-  if (!online) return <p role="status">You are offline.</p>;
-  if (!notice) return null;
-  return (
-    <p role="status">
-      A new version is ready.
-      <button type="button" onClick={notice.reload}>Reload</button>
-      <button type="button" onClick={notice.later}>Later</button>
-    </p>
-  );
+	const notice = useUpdateNotice();
+	const online = useOnline();
+	if (!online) return <p role="status">You are offline.</p>;
+	if (!notice) return null;
+	return (
+		<p role="status">
+			A new version is ready.
+			<button type="button" onClick={notice.reload}>Reload</button>
+			<button type="button" onClick={notice.later}>Later</button>
+		</p>
+	);
 }
 ```
 
@@ -398,8 +406,8 @@ import { clearAppCaches } from '@alxia/react-router/pwa';
 import { workerContract } from './pwa-contract';
 
 export async function signOut() {
-  await fetch('/sign-out', { method: 'POST' });
-  await clearAppCaches(workerContract);
+	await fetch('/sign-out', { method: 'POST' });
+	await clearAppCaches(workerContract);
 }
 ```
 
@@ -415,16 +423,15 @@ the path it is declared for.
 
 Declare it in `beforeAll`, which runs before the client's files. A middleware
 declared in `configure` comes after them, and the file answers before it
-runs:
+runs. In `app/server.ts`, in the same `createServer` call as the manifest's route:
 
 ```ts
-// file: app/server.ts
 import { createServer } from '@alxia/react-router';
 import { SERVICE_WORKER_URL } from '@alxia/react-router/pwa';
 import { noCache } from '@alxia/react-router/pwa/server';
 
 export default createServer({
-  beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
+	beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
 });
 ```
 
@@ -438,30 +445,9 @@ import { revalidated } from '@alxia/react-router/pwa/server';
 const POLICY = "default-src 'none'; connect-src 'self' https://api.example.com";
 
 export const workerScript = defineMiddleware(async (_ctx, next) =>
-  revalidated(await next(), POLICY),
+	revalidated(await next(), POLICY),
 );
 ```
 
 Declare the offline page's policy in its own `<meta>`: it is the one other
 document in `build/client`, and `noCache` does not touch it.
-
-## Adopting from an app's own copy
-
-An app that grew its own `app/core/pwa/` replaces each local module with the
-package's. The names are the same unless the table says otherwise:
-
-| old local module | now |
-| --- | --- |
-| `model/worker-contract.ts` (cache names, `SERVICE_WORKER_URL`, `OFFLINE_URL`, `SKIP_WAITING`) | `defineWorkerContract({ cachePrefix })` from `@alxia/react-router/pwa`, kept in one module of the app that exports `workerContract`; the three constants are imported from the same subpath |
-| `model/cacheability.ts` (which requests are cached) | `cachingFor(request, origin, options)` and `isStorable(response)` from `@alxia/react-router/pwa`; the app's own paths become the `never` and `immutable` options |
-| `model/precache-list.ts` | `parseBrowserManifest`, `precacheList` and `assetPrecache` from `@alxia/react-router/pwa`; a font filter becomes `assetPrecache(files, /^font-[\w-]{8}\.woff2$/)` |
-| `model/registration.ts` | `registerServiceWorker`, `afterLoad` from `@alxia/react-router/pwa` |
-| `model/update-notice.ts` | `createUpdateNotice` and `sessionStore` from `@alxia/react-router/pwa`, or `updateNotice` from `@alxia/react-router/pwa/react` |
-| `model/manifest.ts` | `webAppManifest(options)`, `manifestHref`, `manifestLanguage`, `MANIFEST_PATH` and `MANIFEST_HEADERS` from `@alxia/react-router/pwa`; the app keeps the texts and colours it passes |
-| `model/clear-app-caches.ts` | `clearAppCaches(contract)` from `@alxia/react-router/pwa` |
-| `hooks/use-online.ts`, `hooks/use-service-worker.ts`, `hooks/use-update-notice.ts` | `useOnline`, `useServiceWorker({ enabled })` and `useUpdateNotice` from `@alxia/react-router/pwa/react` |
-| `server/no-cache.server.ts` | `noCache` from `@alxia/react-router/pwa/server`, declared in `createServer({ beforeAll })` |
-
-What stays in the app: the theme colours, the icons' files and their test,
-the offline page, the banner's markup, and the service worker with the script
-that builds it.

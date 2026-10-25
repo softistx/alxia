@@ -1,5 +1,9 @@
 # OpenAPI
 
+This page covers writing the API of an app that serves pages spec first:
+binding its routes to the generated operations, and checking them with
+`matchesSpec`.
+
 alxia is OpenAPI spec first: the document is written by hand, the API's
 routes are bound to the operations generated from it, and
 [`@alxia/openapi`](https://www.npmjs.com/package/@alxia/openapi)'s

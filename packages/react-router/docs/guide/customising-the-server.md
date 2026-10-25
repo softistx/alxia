@@ -1,11 +1,13 @@
 # Customising the server
 
-## Customising the server
+This page covers changing the default server with `createServer()`, and the
+escape hatches for leaving it: another entry, overriding the wiring, or a
+server of your own.
 
 Write `app/server.ts`, with `createServer()` as its default export, or let
 the package's bin write it for you.
 
-### Revealing the default server
+## Revealing the default server
 
 From the app's root, once `@alxia/react-router` is installed:
 
@@ -71,7 +73,7 @@ React Router's own rendering entries, `app/entry.server.tsx` and
 `app/entry.client.tsx`, are revealed by React Router:
 `bunx react-router reveal`.
 
-### By hand
+## By hand
 
 The example uses `@alxia/logger` and `@alxia/compress`
 (`bun add @alxia/logger @alxia/compress`); any middleware works the same way.
@@ -150,7 +152,7 @@ export default createServer({
 is a compile error. A middleware that needs something an earlier one
 derived is typed by the app it is given, as anywhere in alxia.
 
-### Behind a proxy
+## Behind a proxy
 
 A proxy or a load balancer that terminates TLS asks the server over plain
 HTTP, at an address of its own, so React Router's `request.url` reads

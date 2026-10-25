@@ -1,5 +1,7 @@
 # Deploying
 
+This page covers running the build with Bun, and the Docker image.
+
 Run `bun run build`, then `bun build/server/index.js`. The build is
 [self-contained](how-it-works.md#self-contained): `build/` is all the server needs, with
 no `node_modules`, unless the app keeps a package external with

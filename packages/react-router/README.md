@@ -483,113 +483,40 @@ has the commented file, and what to copy for a package left external.
 no UI: the service worker's contract, which requests it caches and which
 responses it may store, the precache list read from a build, the
 registration and update notice, the web app manifest, and the cleaning at
-sign-out. It imports nothing, so the worker, a build script, the
-page and the server can all import it.
-
-```ts
-import {
-  cachingFor,
-  defineWorkerContract,
-  isStorable,
-} from '@alxia/react-router/pwa';
-
-// Shared by the worker and the page: every cache is named `my-app-<kind>-<version>`.
-const contract = defineWorkerContract({ cachePrefix: 'my-app' });
-
-// In the worker's fetch handler:
-function strategy(request: Request) {
-  return cachingFor(request, self.location.origin, {
-    never: (path) => path.startsWith('/api/'),
-  });
-}
-// 'navigation' | 'immutable' | 'static' | 'none'; store a network answer
-// only when `isStorable(response)`.
-async function answer(request: Request) {
-  if (strategy(request) === 'immutable') {
-    // cache-first: answer from the build's asset cache when it has the file
-    const cache = await caches.open(contract.cacheNames.assets);
-    return (await cache.match(request)) ?? fetch(request);
-  }
-  return fetch(request);
-}
-```
-
-The page's side is in the same entry: the manifest, which the server serves
-with its own headers (the language travels in `?lang=`, a browser fetching it
-without cookies), and the registration and the update notice.
-
-```ts
-// file: app/server.ts
-import {
-  MANIFEST_HEADERS,
-  MANIFEST_PATH,
-  manifestLanguage,
-  webAppManifest,
-} from '@alxia/react-router/pwa';
-import { createServer } from '@alxia/react-router';
-
-const LANGUAGES = ['en', 'fr'] as const;
-
-export default createServer({
-  configure: (app) =>
-    app.get(MANIFEST_PATH, ({ request, reply }) => {
-      const lang = manifestLanguage(new URL(request.url), LANGUAGES, 'en');
-      const manifest = webAppManifest({
-        name: 'My app',
-        description: lang === 'fr' ? 'Mon application' : 'My app',
-        lang,
-        themeColor: '#1e40af',
-        backgroundColor: '#ffffff',
-      });
-      return reply(200, JSON.stringify(manifest), { headers: MANIFEST_HEADERS });
-    }),
-});
-```
-
-The page's hooks are in `@alxia/react-router/pwa/react`, which imports
-`react` alone (an optional peer, so an app with no PWA installs nothing for
-it). The app decides where the worker registers; this package never reads
-`import.meta.env`:
+sign-out. It imports nothing, so the worker, a build script, the page and
+the server can all import it. The hooks are in `/pwa/react`
+(`react`, an optional peer) and `noCache` in `/pwa/server`; this package
+never reads `import.meta.env`, so the app passes `enabled`.
 
 ```tsx
-import { useOnline, useServiceWorker, useUpdateNotice } from '@alxia/react-router/pwa/react';
-
-// In app/root.tsx: a production build only, never under `react-router dev`.
-export default function App() {
-  useServiceWorker({ enabled: import.meta.env.PROD });
-  return <UpdateBanner />;
-}
-
-function UpdateBanner() {
-  const notice = useUpdateNotice(); // undefined until a new version waits
-  const online = useOnline();
-  if (!notice) return online ? null : <p>You are offline.</p>;
-  return (
-    <p>
-      A new version is ready.
-      <button onClick={notice.reload}>Reload</button>
-      <button onClick={notice.later}>Later</button>
-    </p>
-  );
-}
-```
-
-The worker's script must be revalidated on every update check, and with its
-own policy. Serve it with `noCache` from `@alxia/react-router/pwa/server`
-(its only import is `@alxia/core`), in `beforeAll`, which runs before the
-client's files:
-
-```ts
 import { createServer } from '@alxia/react-router';
-import { SERVICE_WORKER_URL } from '@alxia/react-router/pwa';
+import {
+	defineWorkerContract,
+	SERVICE_WORKER_URL,
+} from '@alxia/react-router/pwa';
+import { useServiceWorker } from '@alxia/react-router/pwa/react';
 import { noCache } from '@alxia/react-router/pwa/server';
+import { Outlet } from 'react-router';
 
-export default createServer({
-  beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
+// app/pwa-contract.ts, shared by the worker and the page:
+// every cache is named `my-app-<kind>-<version>`.
+export const contract = defineWorkerContract({ cachePrefix: 'my-app' });
+
+// app/root.tsx: a production build only, never under `react-router dev`.
+export default function App() {
+	useServiceWorker({ enabled: import.meta.env.PROD });
+	return <Outlet />;
+}
+
+// app/server.ts: the worker's script is revalidated, before the client's files.
+export const server = createServer({
+	beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
 });
 ```
 
-The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md) has the rest.
+The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md)
+has the worker's fetch handler, the manifest route, the update banner and the
+rest.
 
 ## Traps
 
@@ -672,7 +599,7 @@ From `@alxia/react-router/pwa`:
 | `manifestHref(language, path?)` | the manifest's URL for a page: `/manifest.webmanifest?lang=fr` |
 | `manifestLanguage(url, supported, fallback)` | `?lang=` when it is one of `supported`, else `fallback` |
 
-From `@alxia/react-router/pwa/react` (`react`, an optional peer, is its only import):
+From `@alxia/react-router/pwa/react` (`react`, an optional peer, is its only package import):
 
 | export | |
 | --- | --- |
@@ -682,7 +609,7 @@ From `@alxia/react-router/pwa/react` (`react`, an optional peer, is its only imp
 | `useUpdateNotice(notice?)` | the `{ reload, later }` to show while a new version waits and "Later" was not asked, else `undefined`; always `undefined` on the server |
 | `updateNotice` | the page's one `UpdateNoticeStore`, which `useServiceWorker` offers and `useUpdateNotice` reads by default |
 
-From `@alxia/react-router/pwa/server` (`@alxia/core` is its only import):
+From `@alxia/react-router/pwa/server` (`@alxia/core` is its only package import):
 
 | export | |
 | --- | --- |

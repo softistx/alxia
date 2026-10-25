@@ -1,5 +1,9 @@
 # Beside the pages
 
+This page covers what runs around and beside the pages: the middlewares
+before the catch-all, routes of the app's own, WebSockets in dev, in preview
+and in the build, and the client's files.
+
 ## Middlewares around the pages
 
 Every middleware declared before the catch-all runs around each page, as around
