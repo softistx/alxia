@@ -54,3 +54,20 @@ export const provided = ApiMessagesProvider({
 	value: { en: catalogue, fr: catalogue },
 	children: null,
 });
+
+// The language is typed: a language outside `L` is refused.
+// @ts-expect-error 'de' is not 'en' | 'fr'
+messages.apiMessage('todos.errors.title-taken', {}, 'de');
+
+export const wrongProvided = ApiMessagesProvider({
+	messages,
+	// @ts-expect-error the value is keyed by 'en' and 'fr'
+	value: { de: catalogue, es: catalogue },
+	children: null,
+});
+
+export const wrongResolver = apiCodeResolver<'en' | 'fr'>(messages, {
+	translate: (key) => key,
+	// @ts-expect-error the language is not 'en' | 'fr'
+	language: () => 'de',
+});

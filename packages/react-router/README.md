@@ -528,7 +528,9 @@ rest.
 
 `@alxia/react-router/errors` has no UI and imports nothing at runtime. It
 holds the shape of a GraphQL API's refusal, declared structurally (no `@nxgt/graphql-client` at
-runtime), the request id an API echoes, and the page a request is for:
+runtime), the request id an API echoes, the page a request is for, the
+catalogue of the API's messages an app keeps, the words of a form's checks
+and the provider that fills the catalogue in the browser:
 
 ```ts
 import { isApiErrorLike, nextOf, requestIdOf } from '@alxia/react-router/errors';
@@ -540,6 +542,35 @@ export function describe(error: unknown, request: Request) {
 }
 
 export const idOf = (response: Response) => requestIdOf(response);
+```
+
+The catalogue is an instance made with the app's ICU formatter. A form's checks
+read it through `apiCodeResolver`, and the provider fills it from the root's data:
+
+```ts
+import {
+	ApiMessagesProvider,
+	apiCodeResolver,
+	createApiMessages,
+} from '@alxia/react-router/errors';
+
+type Language = 'en' | 'fr';
+
+export const apiMessages = createApiMessages<Language>({
+	format: (message) => message, // the app's ICU formatter goes here
+});
+
+export const resolver = apiCodeResolver(apiMessages, {
+	translate: (key) => key,
+	language: () => 'en',
+});
+
+// In the root: <ApiMessagesProvider messages={apiMessages} value={data.catalogue}>…
+export const provider = ApiMessagesProvider({
+	messages: apiMessages,
+	value: { en: {}, fr: {} },
+	children: null,
+});
 ```
 
 The [errors guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md)
@@ -654,10 +685,10 @@ From `@alxia/react-router/errors` (it imports nothing at runtime, and never `@al
 | `REQUEST_ID_HEADER`, `requestIdOf(response)` | `x-request-id`, and the id a response carries, if the API sent one |
 | `nextOf(url)` | the path and search of the page a request is for, without React Router's `.data`, `/_.data`, `_routes` and empty `index` |
 | `FormErrors` | what a form action answers when the API refused the input: `fieldErrors` by field and a `formError`, already translated |
-| `createApiMessages({ format })`, `ApiMessages` | the catalogue store of an app, an instance (`set`, `add`, `clear`, `messageOf`, `format`, `apiMessage(code, values, language)`); `format` is the app's ICU formatter, such as `@nxgt/material`'s `formatMessage` |
+| `createApiMessages({ format })`, `ApiMessages`, `ApiMessagesOptions` | the catalogue store of an app, an instance (`set`, `add`, `clear`, `messageOf`, `format`, `apiMessage(code, values, language)`); `format` is the app's ICU formatter, such as `@nxgt/material`'s `formatMessage` |
 | `CatalogueMessage`, `CatalogueMessages`, `ParamKind`, `MessageFormat`, `MessageValues` | one API message with the kind of each argument (`TEXT`, `NUMBER`, `DATE`, `PLURAL`, `SELECT`), a language's messages by code, and the formatter's type |
-| `apiCodeResolver(messages, { translate, language })` | the `{ translate, codeOf }` a form's `useCodeResolver(schema, resolver)` takes: a check's API code is worded as the API words it, any other key by the app's translator |
-| `ApiMessagesProvider({ messages, value, children })` | fills the store in the browser from the root's data before the children render; a server render writes nothing. A function with no JSX, so no React import |
+| `apiCodeResolver(messages, { translate, language, codeOf?, isApiCode? })`, `ApiCodeResolver`, `ApiCodeResolverOptions`, `CodeIssueLike` | the `{ translate, codeOf }` a form's `useCodeResolver(schema, resolver)` takes: a check's API code is worded as the API words it, any other key by the app's translator; `CodeIssueLike` is the issue a custom `codeOf` receives |
+| `ApiMessagesProvider({ messages, value, children })`, `ApiMessagesProviderProps` | fills the store in the browser from the root's data before the children render; a server render writes nothing. A function with no JSX, so no React import |
 
 The `alxia-react-router` bin, run with `bunx`:
 
@@ -674,7 +705,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Typing the loaders](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/typing-the-loaders.md): `Register`, and the app's own context keys.
 - [A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md), [Beside the pages](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md) (middlewares, routes, WebSockets, the client's files), [OpenAPI](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/openapi.md), [Testing](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/testing.md) and [Deploying](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md), with Docker.
 - [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
-- [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, and the page a request is for.
+- [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, the page a request is for, the catalogue store, the form checks in the API's words and the provider.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.

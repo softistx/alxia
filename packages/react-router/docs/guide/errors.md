@@ -1,8 +1,9 @@
 # An API's refusals, worded for the page
 
 This page covers how an app that calls a GraphQL API words that API's refusals
-for its pages: the error's shape, the request id it carries, and the page a
-request is for. The code is in `@alxia/react-router/errors`, which has no UI.
+for its pages: the error's shape, the request id it carries, the page a
+request is for, the catalogue store of the API's messages, the form checks in
+the API's words and the provider that fills the catalogue. The code is in `@alxia/react-router/errors`, which has no UI.
 It imports nothing at runtime (it may import `react-router`, never
 `@alxia/core`), so a page can import it (`boundary.spec.ts` checks the built files).
 
@@ -23,9 +24,9 @@ It imports nothing at runtime (it may import `react-router`, never
 | `REQUEST_ID_HEADER`, `requestIdOf(response)` | the header an API echoes on every response, and its value |
 | `nextOf(url)` | the page a request is for, as `next` carries it back after sign-in |
 | `FormErrors` | what a form action answers when the API refused the input |
-| `createApiMessages`, `ApiMessages`, `CatalogueMessage(s)`, `ParamKind`, `MessageFormat` | the catalogue of the API's messages, held by the app |
-| `apiCodeResolver` | the words of a form's checks, from that catalogue |
-| `ApiMessagesProvider` | fills the catalogue in the browser from the root's data |
+| `createApiMessages`, `ApiMessages`, `ApiMessagesOptions`, `CatalogueMessage(s)`, `ParamKind`, `MessageFormat`, `MessageValues` | the catalogue of the API's messages, held by the app |
+| `apiCodeResolver`, `ApiCodeResolver`, `ApiCodeResolverOptions`, `CodeIssueLike` | the words of a form's checks, from that catalogue; `CodeIssueLike` is the issue a custom `codeOf` receives |
+| `ApiMessagesProvider`, `ApiMessagesProviderProps` | fills the catalogue in the browser from the root's data |
 
 ## Recognising an API error
 
@@ -194,6 +195,24 @@ Two options adapt it. `codeOf(issue)` says which code an issue carries (the
 refinement's `params.code` by default); an app that also words an empty field
 as the API's `validation.errors.required` passes its own. `isApiCode(key)`
 says which keys are API codes (`<module>.errors.<slug>` by default).
+
+```ts
+import { apiCodeResolver } from '@alxia/react-router/errors';
+import { apiMessages } from './api-messages';
+import { getLanguage, translate } from './i18n';
+
+export const CODE_RESOLVER = apiCodeResolver(apiMessages, {
+	translate,
+	language: getLanguage,
+	// An empty string field is the API's "required" refusal.
+	codeOf: (issue) =>
+		issue.code === 'too_small' && issue.origin === 'string'
+			? 'validation.errors.required'
+			: (issue.params?.code as string | undefined),
+	// Only the API's own modules are worded by the catalogue.
+	isApiCode: (key) => /^(todos|validation)\.errors\./.test(key),
+});
+```
 
 The codes a browser can word are the ones the root's data brought, so the
 app lists the few its forms use. A code missing from that list shows its
