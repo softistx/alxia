@@ -131,9 +131,76 @@ export function Layout({ children }: { children: React.ReactNode }) {
 libraries read to give the scripts and styles they add at runtime the same
 nonce.
 
+## The entry
+
+`@alxia/react-router/entry` is `entry.server.tsx` for an app on Bun. It is
+server only, and it renders with the web stream renderer
+(`renderToReadableStream`), so it needs neither `@react-router/node` nor
+`node:stream`. It imports `react`, `react-dom/server`, `react-router` and
+`isbot`; `react-dom` and `isbot` are optional peers, which React Router's
+templates install.
+
+```tsx
+// app/entry.server.tsx
+export {
+	handleRequest as default,
+	streamTimeout,
+} from '@alxia/react-router/entry';
+```
+
+It does what React Router's revealed entry does:
+
+- **Streams** the shell and the rest as it resolves.
+- **Waits for the whole page** for a bot (`isbot`) and in SPA mode.
+- **Answers HEAD** with the status and the headers, and no body.
+- **Aborts** the render `streamTimeout + 1 000` ms in, and clears the
+  timer when the body ends or the client goes away.
+- **Rejects on a shell error**, so React Router logs it once. An error
+  after the shell is out goes to `onError`; the status is 500 when the shell
+  was not out yet.
+- Sends `Content-Type: text/html`.
+
+And it gives the router the response's nonce: `<ServerRouter nonce>`,
+React's `nonce` option, and `<DocumentNonce>` around the router, so the
+root reads it with `useNonce()`.
+
+To change something, build the entry:
+
+```tsx
+// app/entry.server.tsx
+import { createEntry } from '@alxia/react-router/entry';
+
+const entry = createEntry({
+	streamTimeout: 8_000,
+	// Default: nonceOf(loadContext)
+	nonce: (loadContext, request) => nonceFor(request),
+	// Default: isbot(userAgent)
+	isBot: (userAgent) => /bot|crawl|spider/i.test(userAgent),
+	// Default: console.error
+	onError: (error) => logger.error(error),
+});
+
+export const streamTimeout = entry.streamTimeout;
+export default entry.handleRequest;
+```
+
+| option | default | |
+| --- | --- | --- |
+| `streamTimeout` | `5_000` | ms React Router waits for a pending promise; export it as `streamTimeout` |
+| `nonce` | `nonceOf(loadContext)` | this response's CSP nonce |
+| `isBot` | `isbot` | whether a user agent gets the whole page |
+| `onError` | `console.error` | an error after the shell is out |
+
+The nonce is passed to `ServerRouter` only when there is one, which
+satisfies `exactOptionalPropertyTypes`
+([the message](../troubleshooting.md#type---nonce-string--undefined--is-not-assignable-to-type-serverrouterprops-with-exactoptionalpropertytypes-true)).
+Under `react-router dev`, keep `alxia()` in `vite.config.ts`: it keeps one
+copy of `react-router` for the entry and the root
+([the message](../troubleshooting.md#error-you-must-render-this-element-inside-a-hydratedrouter-element)).
+
 ## An entry of your own
 
-An entry that is not React Router's default wraps `<ServerRouter>` in
+An entry that is not the package's wraps `<ServerRouter>` in
 `<DocumentNonce nonce={nonceOf(loadContext)}>` as shown
 [above](#the-nonce-on-the-server). Without it `useNonce()` is `undefined`
 on the server, and the page's inline scripts render with no nonce

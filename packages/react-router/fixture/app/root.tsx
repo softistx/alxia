@@ -1,3 +1,8 @@
+import {
+	CspNonceMeta,
+	InlineScript,
+	useNonce,
+} from '@alxia/react-router/document';
 import { type ReactNode, useEffect, useRef, ViewTransition } from 'react';
 import {
 	isRouteErrorResponse,
@@ -11,17 +16,20 @@ import {
 } from 'react-router';
 
 export function Layout({ children }: { children: ReactNode }) {
+	const nonce = useNonce();
 	return (
 		<html lang="en">
 			<head>
 				<meta charSet="utf-8" />
+				<InlineScript code="document.documentElement.dataset.booted='1'" />
+				<CspNonceMeta />
 				<Meta />
-				<Links />
+				<Links nonce={nonce} />
 			</head>
 			<body>
 				{children}
-				<ScrollRestoration />
-				<Scripts />
+				<ScrollRestoration nonce={nonce} />
+				<Scripts nonce={nonce} />
 			</body>
 		</html>
 	);

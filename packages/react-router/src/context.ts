@@ -6,6 +6,18 @@ import type { Alxia, AnyAlxia, ContextOf, RegisteredBase } from '@alxia/core';
 import { createContext, RouterContextProvider } from 'react-router';
 import type { ReactRouterServer } from './server';
 
+/**
+ * One value per process, whichever copy of this module asks: the server
+ * build bundles `/entry` and the chunk it shares with `.` (see
+ * `vite/inline.ts`), and the server imports `.` outside the bundle.
+ */
+function singleton<T>(name: string, make: () => T): T {
+	const registry = globalThis as Record<symbol, unknown>;
+	const key = Symbol.for(`@alxia/react-router:${name}`);
+	registry[key] ??= make();
+	return registry[key] as T;
+}
+
 /** The default of the key: no catch-all set it. */
 const MISSING: unique symbol = Symbol('alxia context missing');
 
@@ -16,7 +28,9 @@ const MISSING: unique symbol = Symbol('alxia context missing');
  * in the app's own `app/` folder is copied into React Router's build, and
  * the server that imports it separately sets a different one.
  */
-export const alxiaContext = createContext<unknown>(MISSING);
+export const alxiaContext = singleton('context', () =>
+	createContext<unknown>(MISSING),
+);
 
 /**
  * Names the server whose context `alxiaOf(context)` reads when given no

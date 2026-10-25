@@ -365,6 +365,26 @@ import { ServerRouter } from 'react-router';
 
 [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/document.md)
 
+## The entry
+
+`@alxia/react-router/entry` is `entry.server.tsx` for an app on Bun, server
+only: it streams the shell, waits for the whole page for a bot and in SPA
+mode, answers HEAD with no body, and gives the router the response's CSP
+nonce (`nonceOf`) and `DocumentNonce`. It renders with the web stream
+renderer, so no `@react-router/node` and no `node:stream`. `react-dom` and
+`isbot` are optional peers, which React Router's templates install.
+
+```tsx
+// app/entry.server.tsx
+export { handleRequest as default, streamTimeout } from '@alxia/react-router/entry';
+```
+
+To change `streamTimeout`, the nonce, the bot check or the error report,
+`createEntry({ streamTimeout, nonce, isBot, onError })` returns
+`{ handleRequest, streamTimeout }`.
+
+[More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/document.md#the-entry)
+
 ## WebSockets
 
 A `ws` route in `configure` connects under `react-router dev`, under
@@ -986,6 +1006,13 @@ From `@alxia/react-router/document`:
 | `InlineScript({ code, nonce? })`, `InlineScriptProps` | an inline `<script>` with `nonce ?? useNonce()`; the code is not escaped, so it is a constant of yours; no `nonce` attribute when there is no nonce |
 | `CspNonceMeta()` | `<meta property="csp-nonce" nonce>`, the nonce for what a UI library adds at runtime |
 
+From `@alxia/react-router/entry`:
+
+| export | |
+| --- | --- |
+| `createEntry({ streamTimeout?, nonce?, isBot?, onError? })`, `EntryOptions` | `/entry`: `{ handleRequest, streamTimeout }`, `entry.server.tsx` for Bun on the web stream renderer |
+| `handleRequest`, `streamTimeout`, `HandleRequest` | `/entry`: the default entry (`createEntry()`) and its `5_000` |
+
 The `alxia-react-router` bin, run with `bunx`:
 
 | command | |
@@ -998,7 +1025,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Getting started](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/getting-started.md): a new app, the official template or an existing app.
 - [How it works](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/how-it-works.md): dev, the build and `vite preview`, and what the build sets for Bun.
 - [Customising the server](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/customising-the-server.md): `createServer()`, and the escape hatches.
-- [The document](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/document.md): the CSP nonce in the root, `InlineScript` for a theme's boot script with no flash, and `CspNonceMeta`.
+- [The document](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/document.md): the CSP nonce in the root, `InlineScript` for a theme's boot script with no flash, `CspNonceMeta`, and the entry.
 - [Typing the loaders](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/typing-the-loaders.md): `Register`, and the app's own context keys.
 - [A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md), [Beside the pages](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md) (middlewares, routes, WebSockets, the client's files), [OpenAPI](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/openapi.md), [Testing](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/testing.md) and [Deploying](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md), with Docker.
 - [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what the subpaths hold, the worker's contract, the worker, what it caches, the offline page, building the worker with `alxia()` or `buildWorker`, the hooks in React, registering the worker and offering an update, serving the worker's script, the web app manifest, and clearing at sign-out.
