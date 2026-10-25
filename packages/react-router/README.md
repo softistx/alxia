@@ -653,6 +653,14 @@ From `@alxia/react-router/pwa/worker` (the six `workbox-*` packages, optional pe
 | `WorkerOptions` | `contract` (required), `caching`, `assets`, `static`, `navigationPreload`, `precache` |
 | `ExpirationOptions` | `{ maxEntries?, maxAgeSeconds? }` |
 
+From `@alxia/react-router/pwa/build` (Bun; Node's built-ins its only imports):
+
+| export | |
+| --- | --- |
+| `buildWorker(options)` | bundles the worker into `build/client/service-worker.js` with its precache list (the offline page by its content, every route's code, `precacheAssets`), after `react-router build` |
+| `BuildWorkerOptions` | `file` (required), `root`, `client`, `contract`, `offline`, `precacheAssets`, `minify` |
+| `WorkerBuild` | `{ file, precache, precacheBytes, bytes }` |
+
 The `alxia-react-router` bin, run with `bunx`:
 
 | command | |

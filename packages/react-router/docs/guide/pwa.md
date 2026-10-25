@@ -10,16 +10,16 @@ sign-out. The code is in `@alxia/react-router/pwa`, its React hooks in
 prefix, the paths never cached) is an option, so two apps never share a
 default.
 
-The worker's Workbox strategies are in `@alxia/react-router/pwa/worker`. The
-build that writes the precache list into it stays the app's for now: the
-[roadmap](../roadmap.md#now) lists it.
+The worker's Workbox strategies are in `@alxia/react-router/pwa/worker`, and
+`buildWorker` in `@alxia/react-router/pwa/build` bundles it with the precache
+list ([building the worker](#building-the-worker)).
 
 - [What the subpath holds](#what-the-subpath-holds)
 - [The worker's contract](#the-workers-contract)
 - [What the worker caches](#what-the-worker-caches)
 - [The worker](#the-worker)
 - [A worker of your own](#a-worker-of-your-own)
-- [The precache list from a build](#the-precache-list-from-a-build)
+- [Building the worker](#building-the-worker)
 - [Registering the worker and offering an update](#registering-the-worker-and-offering-an-update)
 - [The web app manifest (and why the language travels in `?lang=`)](#the-web-app-manifest-and-why-the-language-travels-in-lang)
 - [In React](#in-react)
@@ -220,7 +220,45 @@ export async function answer(request: Request): Promise<Response> {
 }
 ```
 
-## The precache list from a build
+## Building the worker
+
+`buildWorker` bundles the worker (Workbox included) into the client build, after
+`react-router build`, with the precache list written in. It runs on Bun and
+writes `build/client/service-worker.js` (the contract's `serviceWorkerUrl`):
+
+```ts
+// file: scripts/build-worker.ts
+import { buildWorker } from '@alxia/react-router/pwa/build';
+
+const { precache, precacheBytes, bytes } = await buildWorker({
+	file: 'app/service-worker.ts',
+	precacheAssets: /^body-latin-[\w-]{8}\.woff2$/,
+});
+console.log(
+	`${precache.length} files precached (${precacheBytes} bytes), worker ${bytes} bytes`,
+);
+```
+
+Run it as `bun scripts/build-worker.ts` after `react-router build`. The list is
+the offline page, revisioned by its content (a changed page installs a new
+worker), then every route's code, then the `precacheAssets` files. A new build
+changes the list, so the worker's bytes, so the browser installs it.
+
+| option | default | |
+| --- | --- | --- |
+| `file` | required | the worker's source, relative to `root` (named `file`, not `entry`, which `reveal` reads from `alxia({ entry })`) |
+| `root` | `process.cwd()` | |
+| `client` | `build/client` | the client build, relative to `root` |
+| `contract` | `SERVICE_WORKER_URL`, `OFFLINE_URL` | `{ serviceWorkerUrl, offlineUrl }`: where the worker is written and which offline page is precached |
+| `offline` | `true` | precache the offline page, which must exist in the client build (`public/offline.html`) |
+| `precacheAssets` | none | a regex over the names in `build/client/assets`, such as fonts |
+| `minify` | `true` | |
+
+The result is `{ file, precache, precacheBytes, bytes }`: the absolute path,
+the list, the precached files' size before compression and the worker's size.
+Its errors are in [the troubleshooting page](../troubleshooting.md#buildworker-expected-one-react-router-browser-manifest).
+
+### The parts
 
 A worker precaches the code of every route, so a client navigation offline to
 a route never visited still finds its modules. `react-router build` writes the

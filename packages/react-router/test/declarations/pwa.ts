@@ -14,6 +14,7 @@ import {
 	sessionStore,
 	webAppManifest,
 } from '@alxia/react-router/pwa';
+import { buildWorker } from '@alxia/react-router/pwa/build';
 import {
 	updateNotice,
 	useOnline,
@@ -73,3 +74,7 @@ export const worker: WorkerOptions = {
 };
 
 export const start = () => startWorker(worker);
+
+// The /pwa/build function: its result type is named from /pwa/build.
+export const built = () =>
+	buildWorker({ file: 'app/service-worker.ts', precacheAssets: /x/ });

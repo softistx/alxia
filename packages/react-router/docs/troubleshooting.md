@@ -1417,6 +1417,44 @@ with a wider policy through `revalidated(response, policy)` in a middleware of
 your own ([serving the worker's script](guide/pwa.md#serving-the-workers-script)),
 rather than loosening the pages' policy.
 
+### `buildWorker() runs on Bun: it is running on Node`
+
+`buildWorker()` throws `buildWorker() runs on Bun: it is running on Node. Run it with bun, or run react-router build with bun --bun.`
+
+**Why:** the worker is bundled with `Bun.build`, which Node does not have.
+
+**Fix:** run the script with `bun scripts/build-worker.ts`, or `react-router build` as `bun --bun react-router build`.
+
+### `buildWorker(): app/service-worker.ts does not exist.`
+
+**Why:** `file` is read from `root` (`process.cwd()` by default), not from the script's folder.
+
+**Fix:** pass the path relative to the project root, or pass `root`.
+
+### `buildWorker(): expected one React Router browser manifest`
+
+The full message ends `build/client/assets/manifest-*.js, found 0. Run react-router build first.` (or `found 2`).
+
+**Why:** the precache list is read from React Router's browser manifest, which `react-router build` writes. None means the build did not run, or `client` is wrong. Two mean a stale build folder.
+
+**Fix:** run `react-router build` first, check `client`, and delete `build/` when two manifests are left.
+
+### `buildWorker(): build/client/offline.html does not exist`
+
+The full message ends `Add public/offline.html, or pass offline: false.`
+
+**Why:** the offline page is precached by default and is read from the client build, where `public/offline.html` is copied.
+
+**Fix:** add the page to `public/`, or pass `offline: false` for a worker with no offline page. If the contract's `offlineUrl` is another path, pass the same `contract` to `buildWorker`.
+
+### `buildWorker(): Bun.build failed`
+
+The message lists Bun's logs after it.
+
+**Why:** the worker's source or one of its imports did not bundle: a missing `workbox-*` package, a wrong import path.
+
+**Fix:** read the first log line. The six `workbox-*` packages are optional peers: `bun add -d workbox-core workbox-expiration workbox-navigation-preload workbox-precaching workbox-routing workbox-strategies`.
+
 ### The manifest is in the wrong language
 
 The installed app's name and description are in the default language,
