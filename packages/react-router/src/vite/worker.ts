@@ -64,10 +64,7 @@ export async function buildAppWorker(
 		root: config.root,
 		client: join(contextOf(config).buildDirectory, 'client'),
 	}).catch((error: unknown) => {
-		throw new Error(
-			`${NAME}: ${error instanceof Error ? error.message : String(error)}`,
-			{ cause: error },
-		);
+		throw new Error(`${NAME}: ${(error as Error).message}`, { cause: error });
 	});
 	config.logger.info(
 		`✓ ${basename(built.file)}: ${built.precache.length} files precached (${MB(built.precacheBytes)} MB), worker ${KB(built.bytes)} kB`,

@@ -51,6 +51,24 @@ export function assertBun(
 }
 
 /**
+ * The file a root-relative URL names inside `client`. It fails closed: a URL
+ * that is absolute, protocol-relative, not rooted at `/`, or that resolves to
+ * `client` itself or outside it, is refused.
+ */
+function urlInClient(client: string, url: string): string {
+	const path = join(client, url);
+	if (
+		!url.startsWith('/') ||
+		/^[a-z][a-z0-9+.-]*:|^\/\//i.test(url) ||
+		!path.startsWith(client + sep) ||
+		path.endsWith(sep)
+	) {
+		throw new Error(`buildWorker(): ${url} is outside ${client}.`);
+	}
+	return path;
+}
+
+/**
  * Bundles the worker (Workbox included) into the client build, after
  * `react-router build`, with the precache list written in: the offline page
  * by its content, every route's code and `precacheAssets`. A new build
@@ -69,19 +87,12 @@ export async function buildWorker(
 	if (!existsSync(source)) {
 		throw new Error(`buildWorker(): ${options.file} does not exist.`);
 	}
-	const inClient = (url: string): string => {
-		const path = join(client, url);
-		if (!path.startsWith(client + sep)) {
-			throw new Error(`buildWorker(): ${url} is outside ${client}.`);
-		}
-		return path;
-	};
 	const assets = join(client, 'assets');
 	const files = await readdir(assets).catch(() => []);
 	const manifest = browserManifestFile(files);
 	let offline: PrecacheEntry | undefined;
 	if (options.offline !== false) {
-		const page = inClient(offlineUrl);
+		const page = urlInClient(client, offlineUrl);
 		if (!existsSync(page)) {
 			throw new Error(
 				`buildWorker(): ${options.client ?? 'build/client'}${offlineUrl} does not exist. Add public${offlineUrl}, or pass offline: false (\`worker: { offline: false }\` in alxia()), or pass the app's contract (\`worker: { contract }\` in alxia()).`,
@@ -95,7 +106,7 @@ export async function buildWorker(
 		offline,
 		include: options.precacheAssets,
 	});
-	const out = inClient(workerUrl);
+	const out = urlInClient(client, workerUrl);
 	const result = await Bun.build({
 		entrypoints: [source],
 		outdir: dirname(out),

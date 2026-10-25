@@ -122,6 +122,16 @@ describe('buildWorker', () => {
 		).rejects.toThrow(`buildWorker(): /../offline.html is outside ${client}.`);
 	});
 
+	test('refuses a URL that is the client itself, absolute or not rooted', async () => {
+		for (const url of ['/', '/.', 'https://x/y.js', '//host/y.js', 'sw.js']) {
+			await expect(
+				worker({
+					contract: { serviceWorkerUrl: url, offlineUrl: '/offline.html' },
+				}),
+			).rejects.toThrow(`buildWorker(): ${url} is outside ${client}.`);
+		}
+	});
+
 	test('assertBun names Node, and lets Bun through', () => {
 		expect(() => assertBun()).not.toThrow();
 		expect(() => assertBun(false)).toThrow(
