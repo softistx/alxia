@@ -99,3 +99,13 @@ export const wrongErrors = createApiErrors<'en' | 'fr'>({
 	// @ts-expect-error the language is not 'en' | 'fr'
 	unavailable: (language: 'de') => language,
 });
+
+export const noUnavailable = createApiErrors<'en' | 'fr'>(
+	// @ts-expect-error `unavailable` is required
+	{ messages },
+);
+
+export const noMessages = createApiErrors<'en' | 'fr'>(
+	// @ts-expect-error `messages` is required
+	{ unavailable: () => '' },
+);

@@ -89,6 +89,46 @@ describe('refused', () => {
 	});
 });
 
+describe('refused and byCode, on a key that is no API code', () => {
+	const own = { BAD_USER_INPUT: () => 'own' };
+
+	test('refused wins over byCode', () => {
+		const errors = createApiErrors<Lang>({
+			messages: filledMessages(),
+			unavailable: () => '',
+			refused: () => 'refused',
+			byCode: own,
+		});
+		expect(errors.apiErrorMessage(refusal('BAD_USER_INPUT', 'Bad'), 'en')).toBe(
+			'refused',
+		);
+	});
+
+	test('without refused, byCode answers', () => {
+		const errors = createApiErrors<Lang>({
+			messages: filledMessages(),
+			unavailable: () => '',
+			byCode: own,
+		});
+		expect(errors.apiErrorMessage(refusal('BAD_USER_INPUT', 'Bad'), 'en')).toBe(
+			'own',
+		);
+	});
+});
+
+describe('isApiCode', () => {
+	test('a catalogue-shaped code the predicate rejects gets refused', () => {
+		const errors = createApiErrors<Lang>({
+			messages: filledMessages(),
+			unavailable: () => '',
+			refused: () => 'refused',
+			isApiCode: (code) => code.startsWith('x.'),
+		});
+		const rejected = refusal('todos.errors.title-taken', 'x');
+		expect(errors.apiErrorMessage(rejected, 'en')).toBe('refused');
+	});
+});
+
 describe('byCode', () => {
 	const errors = strictErrors();
 
