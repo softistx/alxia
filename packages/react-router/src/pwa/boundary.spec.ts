@@ -143,6 +143,11 @@ describe('/errors', () => {
 		}
 	});
 
+	test('makes no React runtime import: the provider is a function with React types only', async () => {
+		const imports = await importsOf(join(DIST, 'errors/index.js'));
+		expect(imports).not.toContain('react');
+	});
+
 	test('shares no chunk with the main entry, so a page never loads core for it', async () => {
 		const errors = await filesOf(join(DIST, 'errors/index.js'));
 		const main = await filesOf(join(DIST, 'index.js'));

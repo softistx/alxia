@@ -4,6 +4,10 @@
 
 import {
 	type ApiErrorLike,
+	ApiMessagesProvider,
+	apiCodeResolver,
+	type CatalogueMessages,
+	createApiMessages,
 	type FormErrors,
 	isApiErrorLike,
 	nextOf,
@@ -31,3 +35,39 @@ export function codeOf(error: ApiErrorLike) {
 }
 
 export const formErrors: FormErrors = { fieldErrors: { title: 'Required' } };
+
+export const messages = createApiMessages<'en' | 'fr'>({
+	format: (message) => message,
+});
+
+export const resolver = apiCodeResolver(messages, {
+	translate: (key) => key,
+	language: () => 'en',
+});
+
+export const catalogue: CatalogueMessages = {
+	'todos.errors.title-taken': { message: 'Taken', params: [] },
+};
+
+export const provided = ApiMessagesProvider({
+	messages,
+	value: { en: catalogue, fr: catalogue },
+	children: null,
+});
+
+// The language is typed: a language outside `L` is refused.
+// @ts-expect-error 'de' is not 'en' | 'fr'
+messages.apiMessage('todos.errors.title-taken', {}, 'de');
+
+export const wrongProvided = ApiMessagesProvider({
+	messages,
+	// @ts-expect-error the value is keyed by 'en' and 'fr'
+	value: { de: catalogue, es: catalogue },
+	children: null,
+});
+
+export const wrongResolver = apiCodeResolver<'en' | 'fr'>(messages, {
+	translate: (key) => key,
+	// @ts-expect-error the language is not 'en' | 'fr'
+	language: () => 'de',
+});

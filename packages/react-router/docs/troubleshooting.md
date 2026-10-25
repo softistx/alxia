@@ -74,6 +74,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [An update waits an hour](#an-update-waits-an-hour)
 - [The worker cannot fetch another origin](#the-worker-cannot-fetch-another-origin)
 - [The manifest is in the wrong language](#the-manifest-is-in-the-wrong-language)
+- [A form's own check shows the code (`todos.errors.…`) instead of words](#a-forms-own-check-shows-the-code-todoserrors-instead-of-words)
+- [A message shows its `{braces}`](#a-message-shows-its-braces)
 
 ## Thrown or printed
 
@@ -1374,3 +1376,49 @@ cookie never reaches the server. Only the link's query does.
 read it with `manifestLanguage(url, supported, fallback)`; the fallback is a
 supported language the app resolves from the request's `Accept-Language`, not
 from the cookie ([the manifest route](guide/pwa.md#the-web-app-manifest-and-why-the-language-travels-in-lang)).
+
+### A form's own check shows the code (`todos.errors.…`) instead of words
+
+A refinement with `params: { code: 'todos.errors.title-taken' }` shows the
+code itself, or the form library's generic text, where the API's words should
+be.
+
+**Why:** `apiCodeResolver` returns the code unchanged when its `messages`
+store has no text for it in the page's language, and the form library then
+words the issue itself. In the browser the store holds only what the root's
+data brought: the code is not in that list (the app's `clientCodes`), or
+`ApiMessagesProvider` is not around the routes, or it was given another store
+than the resolver's.
+
+**Fix:** add the code to the few the root sends, and wrap the routes with the
+provider on the same instance the resolver reads:
+
+```tsx
+<ApiMessagesProvider messages={apiMessages} value={loaderData.apiMessages}>
+	<Outlet />
+</ApiMessagesProvider>
+```
+
+Check it with `apiMessages.messageOf('fr', code)` in the browser's console
+or a spec ([the catalogue store](guide/errors.md#the-catalogue-store)).
+
+### A message shows its `{braces}`
+
+A refusal reads `{count, plural, one {One item} other {# items}} outside {name}.`
+or `Hello {name}`, braces and all.
+
+**Why:** the `format` given to `createApiMessages` is not an ICU formatter
+(an identity function, a plain `replace`), or a value the message names is
+missing and the formatter handed back the raw message. `apiMessage` returns
+`undefined` for a message the formatter reported to `onError`, but a
+formatter that never calls it returns the text as it found it.
+
+**Fix:** pass the app's ICU formatter, such as `@nxgt/material`'s
+`formatMessage`, and make it call `onError` for a message it cannot format:
+
+```ts
+const apiMessages = createApiMessages<'en' | 'fr'>({ format: formatMessage });
+```
+
+A value is missing when the API's `extensions.params` lacks an argument the
+message names; the same call in a spec shows which.
