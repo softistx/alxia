@@ -7,7 +7,9 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing in progress.
+- **The boot: `/entry` and `/document`.** `/document` gives the root the
+  page's CSP nonce and inline boot scripts; the server entry, and the page's
+  language and text direction, follow.
 
 ## Next
 
