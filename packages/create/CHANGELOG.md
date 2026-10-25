@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.5.5
+
+### Patch Changes
+
+- [#289](https://github.com/softistx/alxia/pull/289) [`e22d5a6`](https://github.com/softistx/alxia/commit/e22d5a6ca8736866d0638ef277264d006050763e) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects install `@alxia/react-router` 0.10, which adds the service worker (`/pwa/worker`) and its build (`/pwa/build`, and `alxia()` building `app/service-worker.ts`).
+
 ## 0.5.4
 
 ### Patch Changes
