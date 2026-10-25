@@ -37,6 +37,7 @@ interface SecureHeadersOptions {
 	readonly xDnsPrefetchControl?: string | false;
 	readonly xPermittedCrossDomainPolicies?: string | false;
 	readonly permissionsPolicy?: string | false;
+	readonly cacheControl?: string | false;
 	readonly hidePoweredBy?: boolean;
 }
 ```
@@ -83,6 +84,7 @@ leave the header out. An option left out keeps the default.
 | `xDnsPrefetchControl` | `X-DNS-Prefetch-Control` | `off` | the browser does not resolve the response's links ahead of time |
 | `xPermittedCrossDomainPolicies` | `X-Permitted-Cross-Domain-Policies` | `none` | Adobe clients load no cross-domain policy file |
 | `permissionsPolicy` | `Permissions-Policy` | not sent | — the policy is the app's to write |
+| `cacheControl` | `Cache-Control` | not sent | — an API often wants its own caching; a page with a nonce must not be stored ([below](#pages-are-not-cached)) |
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
@@ -326,6 +328,33 @@ app.use(
   a space, and a policy with no directive left throw a `TypeError` that
   starts `csp():`, before the first request
   ([troubleshooting](troubleshooting.md#runtime)).
+
+## Pages are not cached
+
+A page that carries a nonce, or a viewer's data, must not be stored: a shared
+cache (a CDN, a proxy) that kept it would hand one viewer's nonce, or
+account, to the next. The nonce also stops protecting anything once it is
+reused, since it is only worth something if an attacker cannot guess it.
+`cacheControl` is off by default, because an API often wants its own caching.
+
+```ts
+import { alxia } from '@alxia/core';
+import { csp, NONCE, secureHeaders } from '@alxia/secure-headers';
+
+const app = alxia();
+
+app.use(
+	secureHeaders({
+		nonce: true,
+		contentSecurityPolicy: csp({ 'script-src': ["'self'", NONCE] }),
+		cacheControl: 'private, no-store',
+	}),
+);
+```
+
+It is set like every other header: a route's own `Cache-Control` is kept
+(a static asset can stay cacheable), and a 404 or a thrown error gets it too.
+An empty value is refused at startup; give `false` to leave it out.
 
 ## Which responses get the headers
 

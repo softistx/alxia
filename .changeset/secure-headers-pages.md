@@ -10,3 +10,8 @@ directive such as `upgrade-insecure-requests`, `false` leaves one out, and
 request. A policy a browser would misread (an empty source list, a source
 holding `;`, `,` or a space, a bad directive name, no directive at all) is
 refused at startup with a `TypeError` that names the directive.
+
+`cacheControl` is one more option, off by default: `cacheControl:
+'private, no-store'` keeps a cache from storing a page that carries a nonce or
+a viewer's data. It is set like every other header, so a route's own
+`Cache-Control` wins and a 404 or a thrown error gets it too.
