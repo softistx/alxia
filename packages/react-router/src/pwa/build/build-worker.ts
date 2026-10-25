@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { readdir, readFile, stat } from 'node:fs/promises';
-import { basename, dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve, sep } from 'node:path';
 import type { PrecacheEntry } from '../model/precache-list';
 import {
 	OFFLINE_URL,
@@ -40,8 +40,11 @@ export interface WorkerBuild {
 	bytes: number;
 }
 
-function assertBun(): void {
-	if ((globalThis as { Bun?: unknown }).Bun !== undefined) return;
+/** Not `requireBun` of `vite/`: `/pwa/build` imports Node's built-ins only. */
+export function assertBun(
+	onBun = (globalThis as { Bun?: unknown }).Bun !== undefined,
+): void {
+	if (onBun) return;
 	throw new Error(
 		'buildWorker() runs on Bun: it is running on Node. Run it with bun, or run react-router build with bun --bun.',
 	);
@@ -66,15 +69,22 @@ export async function buildWorker(
 	if (!existsSync(source)) {
 		throw new Error(`buildWorker(): ${options.file} does not exist.`);
 	}
+	const inClient = (url: string): string => {
+		const path = join(client, url);
+		if (!path.startsWith(client + sep)) {
+			throw new Error(`buildWorker(): ${url} is outside ${client}.`);
+		}
+		return path;
+	};
 	const assets = join(client, 'assets');
 	const files = await readdir(assets).catch(() => []);
 	const manifest = browserManifestFile(files);
 	let offline: PrecacheEntry | undefined;
 	if (options.offline !== false) {
-		const page = join(client, offlineUrl);
+		const page = inClient(offlineUrl);
 		if (!existsSync(page)) {
 			throw new Error(
-				`buildWorker(): ${options.client ?? 'build/client'}${offlineUrl} does not exist. Add public${offlineUrl}, or pass offline: false.`,
+				`buildWorker(): ${options.client ?? 'build/client'}${offlineUrl} does not exist. Add public${offlineUrl}, or pass offline: false (\`worker: { offline: false }\` in alxia()), or pass the app's contract (\`worker: { contract }\` in alxia()).`,
 			);
 		}
 		offline = { url: offlineUrl, revision: revisionOf(await readFile(page)) };
@@ -85,7 +95,7 @@ export async function buildWorker(
 		offline,
 		include: options.precacheAssets,
 	});
-	const out = join(client, workerUrl);
+	const out = inClient(workerUrl);
 	const result = await Bun.build({
 		entrypoints: [source],
 		outdir: dirname(out),

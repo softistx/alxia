@@ -11,4 +11,17 @@ describe('requireBun', () => {
 			'alxia-react-router: react-router dev is running on Node, and alxia\'s server runs on Bun. Add a bunfig.toml beside package.json with "[run]" and "bun = true", so bun run starts it on Bun, or run it as bun --bun react-router dev.',
 		);
 	});
+
+	test('takes its reason from the caller', () => {
+		expect(() =>
+			requireBun(
+				'react-router build',
+				undefined,
+				false,
+				'and the worker is bundled by Bun.build',
+			),
+		).toThrow(
+			'alxia-react-router: react-router build is running on Node, and the worker is bundled by Bun.build. Add',
+		);
+	});
 });
