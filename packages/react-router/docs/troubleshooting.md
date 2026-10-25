@@ -1269,3 +1269,32 @@ With one prefix that is the start of another plus a dash (`app` and
 
 **Fix:** give each app a prefix that is not the other's start followed by
 `-`: `app` and `admin`, or `app-web` and `app-admin`.
+
+### The update notice never shows
+
+A new version is deployed and the page offers no "Reload".
+
+**Why:** the notice is offered only when a worker finished installing while
+an older one controls the page. A first install controls nothing, so it
+offers nothing; the next visit, with the first worker in control, does. And
+nothing is registered at all where the app does not call
+`registerServiceWorker` (for example while its `enabled` flag, such as
+`import.meta.env.PROD`, is false in dev). A tab that chose "Later" stays
+quiet until the next session.
+
+**Fix:** build, serve and load the page twice, then deploy a change and load
+it again. In the console, `navigator.serviceWorker.controller` must not be
+`null` and `(await navigator.serviceWorker.getRegistration()).waiting` must
+hold the new worker.
+
+### The manifest is in the wrong language
+
+The installed app's name and description are in the default language,
+whatever the user chose.
+
+**Why:** the browser fetches the manifest without cookies, so the `language`
+cookie never reaches the server. Only the link's query does.
+
+**Fix:** link `manifestHref(language)` (`/manifest.webmanifest?lang=fr`), and
+read it with `manifestLanguage(url, supported, acceptedLanguage)`; the
+fallback is the request's `Accept-Language`, not the cookie.

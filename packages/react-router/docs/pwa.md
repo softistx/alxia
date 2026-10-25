@@ -2,7 +2,8 @@
 
 What an installable React Router app shares, that has no UI: the service
 worker's contract, which requests the worker caches, which responses it may
-store, the precache list read from a build, and the cleaning at sign-out.
+store, the precache list read from a build, registering the worker and
+offering an update, the web app manifest, and the cleaning at sign-out.
 Everything is in `@alxia/react-router/pwa`, and every app-specific name (the
 cache prefix, the paths never cached) is an option, so two apps never share a
 default.
@@ -11,6 +12,8 @@ default.
 - [The worker's contract](#the-workers-contract)
 - [What the worker caches](#what-the-worker-caches)
 - [The precache list from a build](#the-precache-list-from-a-build)
+- [Registering the worker and offering an update](#registering-the-worker-and-offering-an-update)
+- [The web app manifest (and why the language travels in `?lang=`)](#the-web-app-manifest-and-why-the-language-travels-in-lang)
 - [Clearing at sign-out](#clearing-at-sign-out)
 
 ## What the subpath holds
@@ -22,9 +25,9 @@ never at load. So each runtime can import it:
 | runtime | imports it for |
 | --- | --- |
 | the service worker | the contract, `cachingFor`, `isStorable` |
-| the page | the contract (the same names), `clearAppCaches` |
+| the page | the contract (the same names), `registerServiceWorker`, `createUpdateNotice`, `manifestHref`, `clearAppCaches` |
 | a build script | `parseBrowserManifest`, `precacheList`, `assetPrecache` |
-| the server | `SERVICE_WORKER_URL`, to serve the worker under its path |
+| the server | `SERVICE_WORKER_URL`, to serve the worker under its path; `MANIFEST_PATH`, `MANIFEST_HEADERS`, `manifestLanguage` and `webAppManifest`, to serve the manifest |
 
 The main entry, `@alxia/react-router`, is not for those: it imports
 `@alxia/core`, which imports `node:*`, and a client bundle should not carry it.
@@ -163,6 +166,117 @@ an unhashed script is left out. `assetPrecache(files, include, base?)` adds
 the files a regex of yours matches, such as fonts, sorted, under `/assets/`
 or `base`. Chunks only a component loads on demand stay out: the cache-first
 route stores them the first time they load.
+
+## Registering the worker and offering an update
+
+`registerServiceWorker(navigator.serviceWorker, onWaiting, options?)`
+registers the worker (`options.url`, `/service-worker.js` by default, and
+`options.scope`, `'/'`) and calls `onWaiting(worker, apply)` for each new
+version that finished installing while an older one controls the page. A
+first install controls nothing, so it offers nothing. `apply(worker)` posts
+`SKIP_WAITING`, and reloads once when the new worker takes control. When the
+tab comes back to the foreground the registration checks for an update, as a
+long-lived page would otherwise only on its next full load. Run it after the
+page has loaded, so it never competes with it:
+
+```ts
+// file: app/register.ts
+import {
+  afterLoad,
+  createUpdateNotice,
+  registerServiceWorker,
+  sessionStore,
+} from '@alxia/react-router/pwa';
+
+export const notice = createUpdateNotice(sessionStore);
+
+export function startWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  afterLoad(() => {
+    registerServiceWorker(navigator.serviceWorker, (worker, apply) =>
+      notice.offer(() => apply(worker)),
+    ).catch(console.error);
+  });
+}
+```
+
+Call it from a browser-only effect, and only in production: a worker under a
+dev server caches the code you are editing.
+
+`createUpdateNotice(storage, key?)` is the state a banner reads. `offer(apply)`
+says a version waits; `current()` returns `{ reload, later }`, the same object
+until it changes, or `undefined`; `subscribe(listener)` returns the function
+that stops listening. These are the three arguments of React's
+`useSyncExternalStore`, so a hook is `useSyncExternalStore(notice.subscribe,
+notice.current, () => undefined)`. `later()` hides the notice for the tab's
+session: it is written under `key` (`UPDATE_LATER_KEY`, `alxia.update-later`,
+by default) in `storage()`. `sessionStore` is `sessionStorage` or nothing, and
+a storage that is missing or throws (private mode) only hides the notice on
+that page. The notice and the registration touch no global at load, and
+neither imports React.
+
+## The web app manifest (and why the language travels in `?lang=`)
+
+A browser fetches the manifest without cookies, so a `language` cookie never
+reaches it. The page names its language in the query, and the server reads it:
+
+```tsx
+// file: app/root.tsx
+import { manifestHref } from '@alxia/react-router/pwa';
+
+export function links() {
+  return [{ rel: 'manifest', href: manifestHref('fr') }];
+}
+```
+
+```ts
+// file: app/manifest-route.ts
+import {
+  MANIFEST_HEADERS,
+  manifestLanguage,
+  webAppManifest,
+} from '@alxia/react-router/pwa';
+
+const LANGUAGES = ['en', 'fr'] as const;
+
+export function manifestResponse(request: Request, accepted: 'en' | 'fr') {
+  const lang = manifestLanguage(new URL(request.url), LANGUAGES, accepted);
+  const manifest = webAppManifest({
+    name: 'My app',
+    description: lang === 'fr' ? 'Mon application' : 'My app',
+    lang,
+    themeColor: '#1e40af',
+    backgroundColor: '#ffffff',
+    categories: ['productivity'],
+  });
+  return new Response(JSON.stringify(manifest), { headers: MANIFEST_HEADERS });
+}
+```
+
+`manifestLanguage(url, supported, fallback)` returns `?lang=` when it is one
+of `supported`, else `fallback`: pass the request's `Accept-Language`, never
+its cookie, because `MANIFEST_HEADERS` says `Vary: Accept-Language`. Those
+headers also make it cacheable for an hour and give it a policy that loads
+nothing: the pages' policy carries a nonce, and a nonce never goes in a
+response a cache may keep.
+
+`webAppManifest(options)` takes the texts and colours you translate and
+choose, and keeps the rest the same in every language, so switching language
+never makes a second app:
+
+| option | default | |
+| --- | --- | --- |
+| `name`, `description`, `lang`, `themeColor`, `backgroundColor` | none | required |
+| `shortName` | `name` | |
+| `dir` | `'ltr'` | |
+| `categories` | left out | |
+| `icons` | `MINIMAL_2023_ICONS` | the four files `@vite-pwa/assets-generator`'s `minimal2023Preset` writes in `public/`: 64, 192, 512 and a maskable 512. A browser needs a 192 and a 512 to offer the install |
+| `id`, `startUrl`, `scope` | `'/'` | |
+| `display` | `'standalone'` | |
+
+Serve the manifest at `MANIFEST_PATH`, or at a path of your own that you give
+both `manifestHref(language, path)` and `cachingFor`'s `manifestPath`. The
+icons' files are yours: test that each `src` exists in `public/`.
 
 ## Clearing at sign-out
 

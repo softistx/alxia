@@ -481,8 +481,9 @@ has the commented file, and what to copy for a package left external.
 
 `@alxia/react-router/pwa` holds what an installable app shares and that has
 no UI: the service worker's contract, which requests it caches and which
-responses it may store, the precache list read from a build, and the
-cleaning at sign-out. It imports nothing, so the worker, a build script, the
+responses it may store, the precache list read from a build, the
+registration and update notice, the web app manifest, and the cleaning at
+sign-out. It imports nothing, so the worker, a build script, the
 page and the server can all import it.
 
 ```ts
@@ -511,6 +512,38 @@ async function answer(request: Request) {
   }
   return fetch(request);
 }
+```
+
+The page's side is in the same entry: the manifest, which the server serves
+with its own headers (the language travels in `?lang=`, a browser fetching it
+without cookies), and the registration and the update notice.
+
+```ts
+// file: app/server.ts
+import {
+  MANIFEST_HEADERS,
+  MANIFEST_PATH,
+  manifestLanguage,
+  webAppManifest,
+} from '@alxia/react-router/pwa';
+import { createServer } from '@alxia/react-router';
+
+const LANGUAGES = ['en', 'fr'] as const;
+
+export default createServer({
+  configure: (app) =>
+    app.get(MANIFEST_PATH, ({ request, reply }) => {
+      const lang = manifestLanguage(new URL(request.url), LANGUAGES, 'en');
+      const manifest = webAppManifest({
+        name: 'My app',
+        description: lang === 'fr' ? 'Mon application' : 'My app',
+        lang,
+        themeColor: '#1e40af',
+        backgroundColor: '#ffffff',
+      });
+      return reply(200, JSON.stringify(manifest), { headers: MANIFEST_HEADERS });
+    }),
+});
 ```
 
 The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/pwa.md) has the rest.
@@ -583,6 +616,18 @@ From `@alxia/react-router/pwa`:
 | `assetPrecache(files, include, base?)` | the entries of the files in `build/client/assets` that a regex of yours matches, such as fonts |
 | `BrowserManifest`, `PrecacheEntry` | their types |
 | `clearAppCaches(contract)` | deletes the caches the worker filled but the offline page; for sign-out. Does nothing without Cache Storage |
+| `registerServiceWorker(container, onWaiting, options?)` | registers the worker (`url`, `scope` options) and calls `onWaiting(worker, apply)` for each new version waiting behind a controller; checks for an update when the tab shows again. `apply` activates the worker and reloads once |
+| `watchForUpdates(registration, container, onWaiting)`, `createUpdater(container, reload?)`, `afterLoad(run)` | its parts: offering waiting workers, the one update path of a page, and running once the page has loaded |
+| `ApplyUpdate`, `RegisterOptions`, `ServiceWorkerContainerLike` | their types |
+| `createUpdateNotice(storage, key?)` | the update notice's store (`offer`, `current`, `subscribe`, as `useSyncExternalStore` takes it): hidden for the session by "Later", kept in `storage()`, which may be missing or throw |
+| `UpdateNotice`, `UpdateNoticeStore`, `NoticeStorage` | its types |
+| `sessionStore`, `UPDATE_LATER_KEY` | `sessionStorage` or nothing, and the default key, `alxia.update-later` |
+| `MANIFEST_PATH`, `MANIFEST_HEADERS` | `/manifest.webmanifest`, and the headers to serve it with: cacheable for an hour, varying on `Accept-Language`, a policy that loads nothing |
+| `webAppManifest(options)` | the web app manifest's JSON from the app's `name`, `description`, `lang`, `themeColor`, `backgroundColor` and the optional rest; `id`, `start_url` and `scope` are `/` in every language |
+| `WebAppManifest`, `WebAppManifestOptions`, `ManifestIcon` | its types |
+| `MINIMAL_2023_ICONS` | the four icons `@vite-pwa/assets-generator`'s `minimal2023Preset` writes |
+| `manifestHref(language, path?)` | the manifest's URL for a page: `/manifest.webmanifest?lang=fr` |
+| `manifestLanguage(url, supported, fallback)` | `?lang=` when it is one of `supported`, else `fallback` |
 
 The `alxia-react-router` bin, run with `bunx`:
 
@@ -593,7 +638,7 @@ The `alxia-react-router` bin, run with `bunx`:
 ## Documentation
 
 - [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev, the build and `vite preview` work, what the build sets for Bun, customising the server, typing the loaders, the app's own keys, a CSP nonce, escape hatches, WebSockets, the client's files, OpenAPI, testing and deploying, with Docker.
-- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, and clearing at sign-out.
+- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, registering the worker and offering an update, the web app manifest, and clearing at sign-out.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.
