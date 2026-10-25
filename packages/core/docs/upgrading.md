@@ -3290,7 +3290,7 @@ it was. With it, a policy with nowhere to put the nonce,
 `contentSecurityPolicy: false`, or `NONCE` without `nonce: true` are
 refused at startup. See
 [`@alxia/secure-headers`: a nonce per request](https://github.com/softistx/alxia/blob/develop/packages/secure-headers/docs/guide.md#a-nonce-per-request)
-and [`@alxia/react-router`: a CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#a-csp-nonce).
+and [`@alxia/react-router`: a CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md#a-csp-nonce).
 
 ### Other packages in 0.3.0
 

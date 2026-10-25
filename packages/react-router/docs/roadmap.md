@@ -11,10 +11,17 @@ Nothing in progress.
 
 ## Next
 
-Nothing scheduled yet.
+- **The service worker and its build.** A worker of Workbox strategies over
+  `cachingFor` and `isStorable`, and the build that writes it, reading
+  `precacheList` and possibly run by `/vite`'s `alxia()`, with the `workbox-*`
+  packages as optional peers. Until it ships, the worker and its build stay
+  the app's.
 
 ## Later
 
+- **A check of an offline page's policy.** The offline page declares its
+  Content-Security-Policy in a `<meta>`; a check would read the page and
+  confirm that each inline script and style is allowed by its hash.
 - **`context.alxia` typed under `Route.LoaderArgs`.** Once react-router's
   `./internal` types and its main entry share one `RouterContextProvider`
   declaration, the generated route types see the shorthand too; today
@@ -47,6 +54,23 @@ Nothing scheduled yet.
   Bun, Deno or Cloudflare with a `runtime` option; alxia is Bun's.
 
 ## Shipped
+
+### 0.9.0
+
+- **`@alxia/react-router/pwa`.** The code with no UI an installable app
+  shares, importing nothing: the service worker's contract and cache names
+  (`defineWorkerContract`), which requests the worker caches and which
+  responses it may store (`cachingFor`, `isStorable`), the precache list read
+  from the build, registering the worker and the update notice's store, the
+  web app manifest with its language in `?lang=`, and `clearAppCaches` for
+  sign-out. Every app-specific name is an option, so two apps never share a
+  default ([guide](guide/pwa.md)).
+- **`@alxia/react-router/pwa/react`.** `useOnline`, `useServiceWorker({
+  enabled })` and `useUpdateNotice`, with the page's one `updateNotice`;
+  `react` is an optional peer.
+- **`@alxia/react-router/pwa/server`.** `noCache` serves the worker's
+  script revalidated on every update check, with the worker's own policy
+  (`revalidated` and `WORKER_POLICY` beneath it).
 
 ### 0.8.0
 

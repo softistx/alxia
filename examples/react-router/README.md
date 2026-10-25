@@ -79,7 +79,7 @@ server needs Bun. `bun = true` makes `bun run` start it on Bun.
 That is all. The plugin also builds the server for Bun: packages resolve
 their `bun` export condition, and `bun` and `bun:*` stay imports of the
 build
-([Built for Bun](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#built-for-bun)).
+([Built for Bun](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/how-it-works.md#built-for-bun)).
 There is no server file: alxia's default server serves the
 pages in `react-router dev` and from the build, with the client's hashed
 files cached immutable.
@@ -181,7 +181,7 @@ image on `oven/bun:1-alpine`, about 130 MB, holding `build/` alone, no
 user. The
 plugin bundles every package into `build/server/index.js` under
 `react-router build`, so `build/` needs nothing else
-([Self-contained](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#self-contained)).
+([Self-contained](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/how-it-works.md#self-contained)).
 The template's `.dockerignore` is kept.
 
 ```sh
@@ -198,12 +198,12 @@ published, that image's container stops at startup with
 its `build/` still imports the packages the image does not hold. An app of your own commits
 its `bun.lock`, which the image installs from with `--frozen-lockfile`.
 The package's
-[guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#docker)
+[guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md#docker)
 has the commented file.
 
 ## Read more
 
 - [The `@alxia/react-router` README](https://github.com/softistx/alxia/blob/develop/packages/react-router/README.md): the quick start, `createServer`'s options and the API.
-- [Its guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): how dev and the build work, customising the server, typing the loaders, the app's own keys, the CSP nonce, escape hatches, testing and deploying.
+- [Its guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/README.md): how dev and the build work, customising the server, typing the loaders, the app's own keys, the CSP nonce, escape hatches, testing and deploying.
 - [Its troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none, the secure-headers policy among them.
 - [`@alxia/logger`](https://github.com/softistx/alxia/tree/develop/packages/logger), [`@alxia/compress`](https://github.com/softistx/alxia/tree/develop/packages/compress) and [`@alxia/secure-headers`](https://github.com/softistx/alxia/tree/develop/packages/secure-headers): the middlewares `app/server.ts` uses.

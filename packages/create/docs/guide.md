@@ -1062,7 +1062,7 @@ front of the pages, write it out and edit it:
 bunx alxia-react-router reveal
 ```
 
-The [`@alxia/react-router` guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md)
+The [`@alxia/react-router` guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/README.md)
 goes from there.
 
 ## Behind a proxy
@@ -1301,7 +1301,7 @@ Two stages: every dependency and `bun run build`, then an image with
 `@alxia/react-router`'s plugin bundles every package into
 `build/server/index.js` under `react-router build`, so `build/` needs no
 `node_modules`
-([Self-contained](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#self-contained)).
+([Self-contained](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/how-it-works.md#self-contained)).
 `.dockerignore` keeps `node_modules`, `build` and `.react-router` out of
 the context.
 
@@ -1313,7 +1313,7 @@ docker run -p 3000:3000 my-site
 
 The commented file, and what to change to write files from the container,
 are in
-[`@alxia/react-router`'s guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#docker).
+[`@alxia/react-router`'s guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md#docker).
 
 ## Versions
 

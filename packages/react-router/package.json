@@ -1,7 +1,7 @@
 {
 	"name": "@alxia/react-router",
 	"version": "0.8.1",
-	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served",
+	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served; the code with no UI an installable app shares (`/pwa`), its hooks (`/pwa/react`) and `noCache` for the worker's script (`/pwa/server`)",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -27,6 +27,21 @@
 			"import": "./dist/vite/index.js",
 			"default": "./dist/vite/index.js"
 		},
+		"./pwa": {
+			"types": "./dist/pwa/index.d.ts",
+			"import": "./dist/pwa/index.js",
+			"default": "./dist/pwa/index.js"
+		},
+		"./pwa/react": {
+			"types": "./dist/pwa/react/index.d.ts",
+			"import": "./dist/pwa/react/index.js",
+			"default": "./dist/pwa/react/index.js"
+		},
+		"./pwa/server": {
+			"types": "./dist/pwa/server/index.d.ts",
+			"import": "./dist/pwa/server/index.js",
+			"default": "./dist/pwa/server/index.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"repository": {
@@ -47,6 +62,9 @@
 		"entrypoints": [
 			"src/index.ts",
 			"src/vite/index.ts",
+			"src/pwa/index.ts",
+			"src/pwa/react/index.ts",
+			"src/pwa/server/index.ts",
 			"src/cli/index.ts"
 		]
 	},
@@ -66,11 +84,15 @@
 	},
 	"peerDependencies": {
 		"@alxia/core": "workspace:^",
+		"react": "^19.0.0",
 		"react-router": "^8.0.0",
 		"typescript": "^6.0.3 || ^7.0.0",
 		"vite": "^7.0.0 || ^8.0.0"
 	},
 	"peerDependenciesMeta": {
+		"react": {
+			"optional": true
+		},
 		"vite": {
 			"optional": true
 		}

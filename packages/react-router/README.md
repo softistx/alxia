@@ -92,7 +92,7 @@ Vite's preview server, as `bun run start` would: the pages, `/api`, the
 client's files and the app's middlewares. So does React Router's prerendering.
 
 `@alxia/core` and `react-router` 8 are peers, and `vite` 7 or 8 is an
-optional peer, for `/vite`. The package declares no dependency.
+optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react`. The package declares no dependency.
 
 Its `typescript` peer is 6 or 7. The template's TypeScript 5.9 typechecks,
 but `bun add` warns about it; `bun add -d typescript@^6` silences the
@@ -246,7 +246,7 @@ the `Bun.Server` the app's sockets are relayed to, on a loopback port:
 It is not `Register`'s `server`, which names what `createServer()` returned
 for the types.
 
-[More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#typing-the-loaders)
+[More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/typing-the-loaders.md#typing-the-loaders)
 
 ## A CSP nonce
 
@@ -293,7 +293,7 @@ bunx react-router reveal entry.server
 `nonceOf` returns `undefined` when no middleware set a nonce, so the entry works
 with or without secure-headers: neither package depends on the other. Any
 `derive` that returns a string `nonce` works the same.
-[More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#a-csp-nonce)
+[More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md#a-csp-nonce)
 
 ## WebSockets
 
@@ -321,7 +321,7 @@ middlewares before the route, a refusal's status, `socket.data`, `publish`. An
 edit to the server is used from the next connection. An action's
 `alxiaOf(context).server.publish` reaches those sockets too
 ([The server](#the-server-server)).
-[More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#websockets)
+[More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md#websockets)
 
 ## Options
 
@@ -351,7 +351,7 @@ ignored. A server of your own gives `alxia({ proxy })` the same option. [More](h
 `build`, `mode` and `client` override what the plugin wires;
 `client: false` serves no client files, so you can serve them yourself.
 A server of your own, with no plugin, calls `reactRouter(app, { build,
-client })` itself. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#escape-hatches)
+client })` itself. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/customising-the-server.md#escape-hatches)
 
 ## The client's files
 
@@ -439,7 +439,7 @@ export default defineConfig({
 ```
 
 The
-[guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#built-for-bun)
+[guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/how-it-works.md#built-for-bun)
 has each option and why.
 
 ## Docker
@@ -474,8 +474,55 @@ docker run -p 3000:3000 my-app
 
 Keep the template's `.dockerignore`, and commit `bun.lock`. The server
 runs as the non-root `bun` user, on `PORT` (3000). The
-[guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#docker)
+[guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md#docker)
 has the commented file, and what to copy for a package left external.
+
+## Installable and offline (PWA)
+
+`@alxia/react-router/pwa` holds what an installable app shares and that has
+no UI: the service worker's contract, which requests it caches and which
+responses it may store, the precache list read from a build, the
+registration and update notice, the web app manifest, and the cleaning at
+sign-out. It imports nothing, so the worker, a build script, the page and
+the server can all import it. The hooks are in `/pwa/react`
+(`react`, an optional peer) and `noCache` in `/pwa/server`; this package
+never reads `import.meta.env`, so the app passes `enabled`.
+
+```ts
+// file: app/pwa-contract.ts, shared by the worker and the page:
+// every cache is named `my-app-<kind>-<version>`.
+import { defineWorkerContract } from '@alxia/react-router/pwa';
+
+export const workerContract = defineWorkerContract({ cachePrefix: 'my-app' });
+```
+
+```tsx
+// file: app/root.tsx
+import { useServiceWorker } from '@alxia/react-router/pwa/react';
+import { Outlet } from 'react-router';
+
+// A production build only, never under `react-router dev`.
+export default function App() {
+	useServiceWorker({ enabled: import.meta.env.PROD });
+	return <Outlet />;
+}
+```
+
+```ts
+// file: app/server.ts
+import { createServer } from '@alxia/react-router';
+import { SERVICE_WORKER_URL } from '@alxia/react-router/pwa';
+import { noCache } from '@alxia/react-router/pwa/server';
+
+// The worker's script is revalidated; beforeAll runs before the client's files.
+export default createServer({
+	beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
+});
+```
+
+The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md)
+has the worker's fetch handler, the manifest route, the update banner and the
+rest.
 
 ## Traps
 
@@ -530,6 +577,52 @@ From `@alxia/react-router/vite`:
 | `alxia(options?)` | the Vite plugin, for `react-router dev`, `react-router build` and `vite preview`, building the server for Bun. `entry` is the server file: `app/server.ts` by default, or the default server when there is none |
 | `AlxiaOptions` | its options |
 
+From `@alxia/react-router/pwa`:
+
+| export | |
+| --- | --- |
+| `defineWorkerContract(options)` | the contract of one app's worker from its `cachePrefix` (required), with `cacheVersion` (`v1`), `serviceWorkerUrl` and `offlineUrl`: its `cacheNames`, `obsoleteCaches(names)` and `clearableCaches(names)`. Throws on an empty prefix or one ending with `-`, and on an empty `cacheVersion` or one with a `-` |
+| `WorkerContract`, `WorkerContractOptions`, `CacheNames` | its types |
+| `SERVICE_WORKER_URL`, `OFFLINE_URL`, `SKIP_WAITING` | `/service-worker.js`, `/offline.html` and the message that applies an update |
+| `cachingFor(request, origin, options?)` | `navigation`, `immutable`, `static` or `none` for a request. `options`: `never(path)`, `immutable(path)` (everything under `/assets/` by default), `serviceWorkerUrl`, `contract` (whose `serviceWorkerUrl` is never cached), `manifestPath` |
+| `Caching`, `RequestFacts`, `CachingOptions` | its types |
+| `isStorable(response)` | whether a response may be stored: a full, same-origin, `public` 200 of a script, style, font or image, not varying on who asks |
+| `parseBrowserManifest(source)` | React Router's browser manifest, read from `build/client/assets/manifest-*.js` |
+| `precacheList(manifest)` | the hashed scripts and stylesheets every route needs, as Workbox precache entries |
+| `assetPrecache(files, include, base?)` | the entries of the files in `build/client/assets` that a regex of yours matches, such as fonts |
+| `BrowserManifest`, `PrecacheEntry` | their types |
+| `clearAppCaches(contract)` | deletes the caches the worker filled but the offline page; for sign-out. Does nothing without Cache Storage |
+| `registerServiceWorker(container, onWaiting, options?)` | registers the worker (`url`, `scope` options) and calls `onWaiting(worker, apply)` for each new version waiting behind a controller; checks for an update when the tab shows again. `apply` activates the worker and reloads once |
+| `watchForUpdates(registration, container, onWaiting)`, `createUpdater(container, reload?)`, `afterLoad(run)` | its parts: offering waiting workers, the one update path of a page, and running once the page has loaded |
+| `ApplyUpdate`, `RegisterOptions`, `ServiceWorkerContainerLike` | their types |
+| `createUpdateNotice(storage, key?)` | the update notice's store (`offer`, `current`, `subscribe`, as `useSyncExternalStore` takes it): hidden for the session by "Later", kept in `storage()`, which may be missing or throw |
+| `UpdateNotice`, `UpdateNoticeStore`, `NoticeStorage` | its types. `NoticeStorage` is any object with `getItem(key)` and `setItem(key, value)` |
+| `sessionStore`, `UPDATE_LATER_KEY` | `sessionStorage` or nothing, and the default key, `alxia.update-later` |
+| `MANIFEST_PATH`, `MANIFEST_HEADERS` | `/manifest.webmanifest`, and the headers to serve it with: cacheable for an hour, varying on `Accept-Language`, a policy that loads nothing |
+| `webAppManifest(options)` | the web app manifest's JSON from the app's `name`, `description`, `lang`, `themeColor`, `backgroundColor` and the optional rest; `id`, `start_url` and `scope` are `/` in every language |
+| `WebAppManifest`, `WebAppManifestOptions`, `ManifestIcon` | its types |
+| `MINIMAL_2023_ICONS` | the four icons `@vite-pwa/assets-generator`'s `minimal2023Preset` writes |
+| `manifestHref(language, path?)` | the manifest's URL for a page: `/manifest.webmanifest?lang=fr` |
+| `manifestLanguage(url, supported, fallback)` | `?lang=` when it is one of `supported`, else `fallback` |
+
+From `@alxia/react-router/pwa/react` (`react`, an optional peer, is its only package import):
+
+| export | |
+| --- | --- |
+| `useOnline()` | whether the browser says it is online; online on the server and while hydrating |
+| `useServiceWorker(options)` | registers the worker after `load` when `options.enabled` (required; the app passes `import.meta.env.PROD`), in a browser that has one. `url`, `scope`, `notice` (where a waiting version is offered), `onError` (registering failed; dropped by default) |
+| `ServiceWorkerOptions` | its options |
+| `useUpdateNotice(notice?)` | the `{ reload, later }` to show while a new version waits and "Later" was not asked, else `undefined`; always `undefined` on the server |
+| `updateNotice` | the page's one `UpdateNoticeStore`, which `useServiceWorker` offers and `useUpdateNotice` reads by default |
+
+From `@alxia/react-router/pwa/server` (`@alxia/core` is its only package import):
+
+| export | |
+| --- | --- |
+| `noCache` | a middleware: the response it wraps gets `Cache-Control: no-cache` and the worker's policy. For `use(SERVICE_WORKER_URL, noCache)` in `beforeAll` |
+| `revalidated(response, policy?)` | a response with those two headers set, on a copy when its headers are immutable; `policy` is `WORKER_POLICY` by default |
+| `WORKER_POLICY` | `default-src 'none'; connect-src 'self'`: the worker runs no other script and fetches this site only |
+
 The `alxia-react-router` bin, run with `bunx`:
 
 | command | |
@@ -538,7 +631,13 @@ The `alxia-react-router` bin, run with `bunx`:
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md): the setup, how dev, the build and `vite preview` work, what the build sets for Bun, customising the server, typing the loaders, the app's own keys, a CSP nonce, escape hatches, WebSockets, the client's files, OpenAPI, testing and deploying, with Docker.
+- [Documentation index](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/README.md): every page, and when to read it.
+- [Getting started](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/getting-started.md): a new app, the official template or an existing app.
+- [How it works](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/how-it-works.md): dev, the build and `vite preview`, and what the build sets for Bun.
+- [Customising the server](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/customising-the-server.md): `createServer()`, and the escape hatches.
+- [Typing the loaders](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/typing-the-loaders.md): `Register`, and the app's own context keys.
+- [A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md), [Beside the pages](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md) (middlewares, routes, WebSockets, the client's files), [OpenAPI](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/openapi.md), [Testing](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/testing.md) and [Deploying](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md), with Docker.
+- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.

@@ -38,6 +38,10 @@ a loader, a message React Router or the browser prints, or an error from
 - [`error: lockfile had changes, but lockfile is frozen`](#error-lockfile-had-changes-but-lockfile-is-frozen)
 - [`EACCES: permission denied, open '/app/…'`](#eacces-permission-denied-open-app)
 - [`error: Cannot find package '…' from '/app/build/server/index.js'`](#error-cannot-find-package--from-appbuildserverindexjs)
+- [`TypeError: defineWorkerContract(): cachePrefix must be a non-empty name, …`](#typeerror-defineworkercontract-cacheprefix-must-be-a-non-empty-name-)
+- [`TypeError: defineWorkerContract(): cacheVersion must be a non-empty name without '-', …`](#typeerror-defineworkercontract-cacheversion-must-be-a-non-empty-name-without---)
+- [`parseBrowserManifest(): not React Router's browser manifest …`](#parsebrowsermanifest-not-react-routers-browser-manifest-)
+- [`error: Cannot find package 'react' from '…/@alxia/react-router/dist/pwa/react/index.js'`](#error-cannot-find-package-react-from-alxiareact-routerdistpwareactindexjs)
 
 **Types**
 
@@ -63,6 +67,13 @@ a loader, a message React Router or the browser prints, or an error from
 - [A `publish` under `react-router dev` misses the sockets opened before an edit](#a-publish-under-react-router-dev-misses-the-sockets-opened-before-an-edit)
 - [The build has a package's Node variant, not its `bun` one](#the-build-has-a-packages-node-variant-not-its-bun-one)
 - [`request.url` in a loader is `http://` and the internal host behind a proxy](#requesturl-in-a-loader-is-http-and-the-internal-host-behind-a-proxy)
+- [An unhashed file under `public/assets/` is cached for a year](#an-unhashed-file-under-publicassets-is-cached-for-a-year)
+- [A cache the contract did not make is swept](#a-cache-the-contract-did-not-make-is-swept)
+- [The update notice never shows](#the-update-notice-never-shows)
+- [The worker registers under `react-router dev`](#the-worker-registers-under-react-router-dev)
+- [An update waits an hour](#an-update-waits-an-hour)
+- [The worker cannot fetch another origin](#the-worker-cannot-fetch-another-origin)
+- [The manifest is in the wrong language](#the-manifest-is-in-the-wrong-language)
 
 ## Thrown or printed
 
@@ -133,7 +144,7 @@ key: one copy is the fix for both.
   sets.
 
 **Fix:** add `alxia()` to `vite.config.ts`, as in the
-[setup](guide.md#setup). With a server of your own in a monorepo, tell
+[setup](guide/getting-started.md). With a server of your own in a monorepo, tell
 Vite to leave the package external:
 
 ```ts
@@ -210,7 +221,7 @@ reactRouter(app, { build, getLoadContext: ({ user }, context) => context.set(use
 **Fix:** serve the app with the plugin, `alxia()` in `vite.config.ts`: the
 server is then built with the routes, and `app/context.ts` is one module
 for both, in dev and in the build. See
-[the app's own context keys](guide.md#the-apps-own-context-keys).
+[the app's own context keys](guide/typing-the-loaders.md#the-apps-own-context-keys).
 
 Without the plugin, read alxia's context with `alxiaOf`: its key,
 `alxiaContext`, lives in this package under `node_modules`, which Vite
@@ -245,7 +256,7 @@ export default server;
 ```
 
 An alxia app of your own, with `reactRouter()` on it, is served without the
-plugin: see [a server of your own](guide.md#a-server-of-your-own-without-the-plugin).
+plugin: see [a server of your own](guide/customising-the-server.md#a-server-of-your-own-without-the-plugin).
 
 ### `alxia-react-router: the entry … does not exist. …`
 
@@ -465,7 +476,7 @@ export default createServer({
 
 or `contentSecurityPolicy: false`. Better than `'unsafe-inline'`: a nonce
 per request, with `nonce: true` and `nonceOf(loadContext)` in
-`entry.server.tsx` ([guide](guide.md#a-csp-nonce)).
+`entry.server.tsx` ([guide](guide/csp-nonce.md#a-csp-nonce)).
 
 ### `alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`
 
@@ -651,7 +662,7 @@ bun add -d typescript@^6
 and uses it outside its `loader` and `action`, in the component or at the
 module's top level. React Router keeps that code in the client build, for
 the browser, which has no such module. The server build leaves Bun's
-modules external ([Built for Bun](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#built-for-bun));
+modules external ([Built for Bun](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/how-it-works.md#built-for-bun));
 the client build cannot.
 
 **Fix:** use them only in the server's code: in `loader` and `action`, or
@@ -735,7 +746,7 @@ The image runs `bun --no-install`: without the flag, Bun finds no
 whatever version npm has, instead of failing.
 
 **Why:** under `react-router build` the plugin bundles every package into
-`build/server/index.js` ([Self-contained](guide.md#self-contained)), so
+`build/server/index.js` ([Self-contained](guide/how-it-works.md#self-contained)), so
 the image needs no `node_modules`. What stays outside the file must be
 installed beside it.
 
@@ -769,6 +780,75 @@ addon built for glibc alone then stops it with
 `… is linked against glibc (DT_NEEDED …), but this Bun build uses musl.`:
 put the final stage back on `oven/bun:1`
 ([`@alxia/create`'s troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/create/docs/troubleshooting.md#error--is-linked-against-glibc-dt_needed-libmso6-but-this-bun-build-uses-musl)).
+
+### `TypeError: defineWorkerContract(): cachePrefix must be a non-empty name, …`
+
+The full message is `defineWorkerContract(): cachePrefix must be a non-empty
+name, such as 'my-app'; got ''.`, or `… must not end with '-', which the
+contract adds; got 'my-app-'. Use 'my-app'.`
+
+**Why:** every cache name is `<prefix>-<kind>-<version>`, and the worker
+deletes the caches shaped `<prefix>-<kind>-<version>`. An empty prefix would own
+every cache of the origin, and a trailing dash would be doubled.
+
+**Fix:** pass the app's own name, without the dash:
+
+```ts
+import { defineWorkerContract } from '@alxia/react-router/pwa';
+
+export const workerContract = defineWorkerContract({ cachePrefix: 'my-app' });
+```
+
+### `TypeError: defineWorkerContract(): cacheVersion must be a non-empty name without '-', …`
+
+The full message is `defineWorkerContract(): cacheVersion must be a
+non-empty name without '-', such as 'v2'; got 'v1-beta'.`
+
+**Why:** every cache name is `<prefix>-<kind>-<version>`, and the contract
+tells a version from the rest of the name by its dashes. A version with a `-`
+(or an empty one) would make the name ambiguous.
+
+**Fix:** use a name with no dash, such as `'v2'` or `'2026'`:
+
+```ts
+import { defineWorkerContract } from '@alxia/react-router/pwa';
+
+export const workerContract = defineWorkerContract({
+	cachePrefix: 'my-app',
+	cacheVersion: 'v2',
+});
+```
+
+### `parseBrowserManifest(): not React Router's browser manifest …`
+
+The full message ends with `(build/client/assets/manifest-*.js).`
+
+**Why:** the source holds no `{ … }` object. The build script read another
+file, an empty one, or the build has not run.
+
+**Fix:** run `react-router build` first, then read the file named
+`manifest-<hash>.js` in `build/client/assets`, not the server's manifest:
+
+```ts
+import { readdirSync, readFileSync } from 'node:fs';
+import { parseBrowserManifest } from '@alxia/react-router/pwa';
+
+const assets = 'build/client/assets';
+const file = readdirSync(assets).find((name) => /^manifest-.*\.js$/.test(name));
+if (!file) throw new Error('Run react-router build first.');
+export const manifest = parseBrowserManifest(readFileSync(`${assets}/${file}`, 'utf8'));
+```
+
+### `error: Cannot find package 'react' from '…/@alxia/react-router/dist/pwa/react/index.js'`
+
+**Why:** `@alxia/react-router/pwa/react` imports `react`, an optional peer of
+the package, so nothing installs it for you. An app with no `react` does not
+need the subpath; a build script or the worker importing it by mistake meets
+this message too.
+
+**Fix:** add `react` where the page is built (`bun add react`), and import
+`/pwa/react` from the page alone. The worker and a build script import
+`@alxia/react-router/pwa`, which imports nothing.
 
 ## Types
 
@@ -989,7 +1069,7 @@ following Content Security Policy directive: "script-src 'self'
   attribute.
 
 **Fix:** reveal the entry and pass `nonceOf(loadContext)` to both
-([guide](guide.md#a-csp-nonce)). A script of your own reads the nonce
+([guide](guide/csp-nonce.md#a-csp-nonce)). A script of your own reads the nonce
 through a loader, where `nonceOf(context)` works as well:
 
 ```tsx
@@ -1119,7 +1199,7 @@ plugin relays the app's sockets to. So `ctx.server` is that side server: its
 and its `requestIP` and `timeout` know nothing of a request Vite took, so
 the default `ctx.ip` is `undefined`. A `page()` (Bun's HTML bundle) is not
 served: Vite answers the HTML
-([The server](guide.md#the-server-server)).
+([The server](guide/typing-the-loaders.md#the-server-server)).
 
 **Fix:** read `ctx.server` as optional, which also covers `app.request` in
 a test, and take nothing from its `url` or `requestIP` in dev:
@@ -1188,3 +1268,109 @@ export default createServer({ proxy: trustProxy({ trusted: ['10.0.0.0/8'] }) });
 
 React Router then gets its request at `originalUrl(ctx)`
 ([Behind a proxy](https://github.com/softistx/alxia/blob/develop/packages/core/docs/guide/serving.md#behind-a-proxy-proxy)).
+
+### An unhashed file under `public/assets/` is cached for a year
+
+A file you put in `public/assets/` (a sprite, an icon) changes on a deploy,
+and visitors keep the old one.
+
+**Why:** Vite copies `public/` into `build/client/`, and the client's files
+under `build/client/assets/` are served `public, max-age=31536000,
+immutable`, hashed or not. The worker's `cachingFor` agrees by default:
+everything under `/assets/` is `immutable`, cache-first.
+
+**Fix:** keep unhashed files out of `assets/`: `public/icons/` is served for
+an hour and is `static` for the worker. If they must stay there, give
+`cachingFor` an `immutable` option that leaves their folder out, so the worker
+revalidates them ([the option](guide/pwa.md#what-the-worker-caches)),
+and expect the HTTP cache to hold them for a year until the file's name
+changes.
+
+### A cache the contract did not make is swept
+
+Signing out, or a new worker activating, deletes a cache the app made itself.
+
+**Why:** a contract owns every cache named exactly
+`<prefix>-<kind>-<version>`, kind being lowercase letters and digits and
+version having no `-`. That includes a kind the app retired (`my-app-pages-v0` is swept once
+it is not current). It is also why `app` and `app-admin` can share an origin:
+`app-admin-assets-v1` has one segment too many to be `app`'s. Contracts never
+take each other's caches; only a cache made by other code, such as
+`my-app-runtime-v1`, matches the shape and is swept.
+
+**Fix:** name your own caches outside the shape. A name is outside it when it
+has more than `<kind>-<version>` after `<prefix>-`, with the prefix `my-app`:
+`my-app-runtime-v1-x`. A kind with an uppercase letter, `_` or `.`
+(`my-app-Runtime-v1`, `my-app-run_time-v1`), or a different prefix, is outside
+too.
+
+### The update notice never shows
+
+A new version is deployed and the page offers no "Reload".
+
+**Why:** the notice is offered only when a worker finished installing while
+an older one controls the page. A first install controls nothing, so it
+offers nothing; the next visit, with the first worker in control, does. And
+nothing is registered at all where the app does not call
+`registerServiceWorker` (for example while `useServiceWorker({ enabled })`
+is given `false`, as `import.meta.env.PROD` is under `react-router dev`). A
+tab that chose "Later" stays quiet until the next session.
+
+**Fix:** build, serve and load the page twice, then deploy a change and load
+it again. In the console, `navigator.serviceWorker.controller` must not be
+`null` and `(await navigator.serviceWorker.getRegistration()).waiting` must
+hold the new worker.
+
+### The worker registers under `react-router dev`
+
+The dev server serves stale code after an edit, or a page keeps an old
+version of itself, and `navigator.serviceWorker.controller` is not `null`.
+
+**Why:** `useServiceWorker` registers whenever `enabled` is `true`, and the
+package does not know the mode: it never reads `import.meta.env`. A worker
+under a dev server caches the code you are editing.
+
+**Fix:** pass the mode from the app, `useServiceWorker({ enabled:
+import.meta.env.PROD })` ([the hook](guide/pwa.md#in-react)). Then unregister
+the worker the dev server already took (DevTools, Application, Service
+Workers, Unregister) and clear its site data.
+
+### An update waits an hour
+
+A new worker is deployed and tabs still run the old one for up to an hour.
+
+**Why:** the worker's script was served with the client's hour of
+`Cache-Control`, so the browser's update check found the cached script.
+Either `noCache` is not declared, or it is declared in `configure`, which
+runs after the client's files: they answer first and the middleware never
+sees the request.
+
+**Fix:** declare it in `beforeAll`
+([serving the worker's script](guide/pwa.md#serving-the-workers-script)), and
+check with `curl -I https://your.app/service-worker.js` that `cache-control` is
+`no-cache`.
+
+### The worker cannot fetch another origin
+
+The console reports `Refused to connect to 'https://api.example.com/…' because it violates the following Content Security Policy directive: "connect-src 'self'"` from the worker.
+
+**Why:** `noCache` gives the worker's script `WORKER_POLICY`,
+`default-src 'none'; connect-src 'self'`: the worker fetches this site only.
+
+**Fix:** if the worker really must reach another origin, serve the script
+with a wider policy through `revalidated(response, policy)` in a middleware of
+your own ([serving the worker's script](guide/pwa.md#serving-the-workers-script)),
+rather than loosening the pages' policy.
+
+### The manifest is in the wrong language
+
+The installed app's name and description are in the default language,
+whatever the user chose.
+
+**Why:** the browser fetches the manifest without cookies, so the `language`
+cookie never reaches the server. Only the link's query does.
+
+**Fix:** link `manifestHref(language)` (`/manifest.webmanifest?lang=fr`), and
+read it with `manifestLanguage(url, supported, fallback)`; the fallback is a
+supported language the app resolves from the request's `Accept-Language`, not
+from the cookie ([the manifest route](guide/pwa.md#the-web-app-manifest-and-why-the-language-travels-in-lang)).
