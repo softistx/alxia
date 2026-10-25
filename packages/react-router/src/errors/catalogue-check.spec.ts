@@ -90,3 +90,68 @@ describe('the background check', () => {
 		expect(api.calls).toHaveLength(2);
 	});
 });
+
+describe('a user callback that throws', () => {
+	async function unhandledDuring(run: () => Promise<void>) {
+		const seen: unknown[] = [];
+		const on = (reason: unknown) => void seen.push(reason);
+		process.on('unhandledRejection', on);
+		try {
+			await run();
+			await new Promise((done) => setTimeout(done, 20));
+		} finally {
+			process.off('unhandledRejection', on);
+		}
+		return seen;
+	}
+
+	test('a log.error that throws leaves no unhandled rejection, and the catalogue keeps working', async () => {
+		const { api, catalogue, said } = await warm({
+			log: {
+				error: () => {
+					throw new Error('log broke');
+				},
+			},
+		});
+		const seen = await unhandledDuring(async () => {
+			api.down = true;
+			await catalogue.fresh('en', TTL);
+			await catalogue.settled();
+			// A first read that fails goes through the same log.
+			await catalogue.fresh('fr', TTL);
+		});
+		expect(seen).toEqual([]);
+		api.down = false;
+		await catalogue.fresh('en', TTL + 5_000);
+		await catalogue.settled();
+		expect(said()).toBe('Taken.');
+		expect(api.calls.filter((call) => call === 'versions')).toHaveLength(2);
+	});
+
+	test('a ttlMs getter that throws leaves no unhandled rejection, and the catalogue keeps working', async () => {
+		let broken = false;
+		const { api, catalogue, said, logged } = await warm({
+			retryMs: 50,
+			ttlMs: () => {
+				if (broken) throw new Error('ttl broke');
+				return TTL;
+			},
+		});
+		broken = true;
+		api.down = true;
+		const seen = await unhandledDuring(async () => {
+			await catalogue.fresh('en', TTL);
+			await catalogue.settled();
+		});
+		expect(seen).toEqual([]);
+		expect(logged).toContain('alxia-react-router: ttlMs threw, using retryMs');
+		expect(said()).toBe('Taken.');
+		broken = false;
+		api.down = false;
+		await catalogue.fresh('en', 2 * TTL);
+		await catalogue.settled();
+		expect(
+			api.calls.filter((call) => call === 'versions').length,
+		).toBeGreaterThan(1);
+	});
+});
