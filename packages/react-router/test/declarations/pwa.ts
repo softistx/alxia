@@ -14,6 +14,7 @@ import {
 	sessionStore,
 	webAppManifest,
 } from '@alxia/react-router/pwa';
+import { buildWorker } from '@alxia/react-router/pwa/build';
 import {
 	updateNotice,
 	useOnline,
@@ -21,6 +22,10 @@ import {
 	useUpdateNotice,
 } from '@alxia/react-router/pwa/react';
 import { noCache } from '@alxia/react-router/pwa/server';
+import {
+	startWorker,
+	type WorkerOptions,
+} from '@alxia/react-router/pwa/worker';
 
 export const contract = defineWorkerContract({ cachePrefix: 'app' });
 
@@ -61,3 +66,15 @@ export function banner() {
 
 // The /pwa/server middleware behind an exported app: its type is core's.
 export const app = alxia().use(SERVICE_WORKER_URL, noCache);
+
+// The /pwa/worker options behind an exported value, and its start.
+export const worker: WorkerOptions = {
+	contract,
+	caching: { never: (p) => p.startsWith('/x/') },
+};
+
+export const start = () => startWorker(worker);
+
+// The /pwa/build function: its result type is named from /pwa/build.
+export const built = () =>
+	buildWorker({ file: 'app/service-worker.ts', precacheAssets: /x/ });

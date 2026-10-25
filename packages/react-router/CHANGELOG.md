@@ -1,5 +1,15 @@
 # @alxia/react-router
 
+## 0.10.0
+
+### Minor Changes
+
+- [#283](https://github.com/softistx/alxia/pull/283) [`cbd08e3`](https://github.com/softistx/alxia/commit/cbd08e391093319fc86fdf847e798f2389006566) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Add `@alxia/react-router/pwa/worker`, the service worker on Workbox: `startWorker({ contract, caching?, assets?, static?, navigationPreload?, precache? })` registers the precache route, `NetworkOnly` for a page load (the precached offline page answers when the network fails), `CacheFirst` for hashed bundles and `StaleWhileRevalidate` for other static files, both storing only what `isStorable` accepts, sweeps the contract's obsolete caches on `activate` and applies `SKIP_WAITING`. The six `workbox-*` packages (`core`, `expiration`, `navigation-preload`, `precaching`, `routing`, `strategies`, `^7`) are optional peers and the subpath's only package imports; it does nothing when imported, uses no worker global (so it compiles under the app's DOM `tsconfig`), and reads the precache list from `globalThis.__ALXIA_PRECACHE__`, which a build defines, or from `options.precache`.
+  
+  Add `@alxia/react-router/pwa/build`, `buildWorker({ file, root?, client?, contract?, offline?, precacheAssets?, minify? })`: after `react-router build` it bundles the worker (Workbox included) with `Bun.build` into `build/client/service-worker.js`, with the precache list defined in: the offline page revisioned by its content, every route's code from React Router's browser manifest, and the `precacheAssets` files. It runs on Bun, imports only Node's built-ins and reads Bun's global inside the function.
+  
+  Make `alxia()` build the worker: when `app/service-worker.ts` exists, `react-router build` writes `build/client/service-worker.js` after the client build (a `buildApp` hook ordered after React Router's builder), so an app has no script to add. `alxia({ worker })` names another file, passes `buildWorker()`'s options (`file`, `contract`, `offline`, `precacheAssets`, `minify`) or turns it off with `false`; it needs Bun. An app with its own worker build drops that script and its `sw/` tsconfig.
+
 ## 0.9.0
 
 ### Minor Changes

@@ -7,34 +7,16 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **`@alxia/react-router/errors`: an API's refusals, worded for the page.**
-  A server's GraphQL refusals (`<module>.errors.<slug>`, `params`, `fields`)
-  are worded from its error catalogue in the page's language, for forms,
-  fetchers, loaders and the error page, with no UI. In, in this minor: the
-  shape of a refusal, the request id and `nextOf`, the catalogue store
-  (`createApiMessages`), the form checks' resolver (`apiCodeResolver`), the
-  provider (`ApiMessagesProvider`) and the wording of a refusal
-  (`createApiErrors`: message, fields and status), the route helpers
-  (`routeError`, `errorRequestId`) and the actions' helpers (`fetcherResult`,
-  `fetcherRefusal`, `submitForm`), and the JSON actions (`jsonActions`:
-  `readJson` with its same-origin CSRF check, `requireJsonPost`, and
-  `readInput` over a Standard Schema) with their fetcher hook
-  (`useJsonFetcher`), and the catalogue's refresh (`createErrorCatalogue`:
-  read on first use with a bounded wait, checked against the API's versions
-  once per TTL, `warm()` at startup, `clientMessages()` for the root), and the
-  failures of a call (`apiCallFailure`, `operationName`). Nothing is left to
-  follow.
+Nothing in progress.
 
 ## Next
 
-- **The service worker and its build.** A worker of Workbox strategies over
-  `cachingFor` and `isStorable`, and the build that writes it, reading
-  `precacheList` and possibly run by `/vite`'s `alxia()`, with the `workbox-*`
-  packages as optional peers. Until it ships, the worker and its build stay
-  the app's.
+Nothing planned.
 
 ## Later
 
+- **`service-worker.js` served revalidated with no setup.** Today the app
+  adds `noCache` for `SERVICE_WORKER_URL` itself.
 - **A check of an offline page's policy.** The offline page declares its
   Content-Security-Policy in a `<meta>`; a check would read the page and
   confirm that each inline script and style is allowed by its hash.
@@ -70,6 +52,41 @@ number on it. Every release, with each change it made, is in
   Bun, Deno or Cloudflare with a `runtime` option; alxia is Bun's.
 
 ## Shipped
+
+### 0.11.0
+
+- **`@alxia/react-router/errors`: an API's refusals, worded for the page.**
+  A server's GraphQL refusals (`<module>.errors.<slug>`, `params`, `fields`)
+  are worded from its error catalogue in the page's language, for forms,
+  fetchers, loaders and the error page, with no UI. You get the shape of a
+  refusal, the request id and `nextOf`, the catalogue store
+  (`createApiMessages`), the form checks' resolver (`apiCodeResolver`), the
+  provider (`ApiMessagesProvider`) and the wording of a refusal
+  (`createApiErrors`: message, fields and status), the route helpers
+  (`routeError`, `errorRequestId`) and the actions' helpers (`fetcherResult`,
+  `fetcherRefusal`, `submitForm`), the JSON actions (`jsonActions`:
+  `readJson` with its same-origin CSRF check, `requireJsonPost`, and
+  `readInput` over a Standard Schema) with their fetcher hook
+  (`useJsonFetcher`), the catalogue's refresh (`createErrorCatalogue`: read
+  on first use with a bounded wait, checked against the API's versions once
+  per TTL, `warm()` at startup, `clientMessages()` for the root), and the
+  failures of a call (`apiCallFailure`, `operationName`) ([guide](guide/errors.md)).
+
+### 0.10.0
+
+- **`@alxia/react-router/pwa/worker`.** `startWorker({ contract })` is the
+  whole service worker on Workbox: the precache, a page load always from the
+  network with the offline page when it fails, hashed bundles cache-first,
+  other static files stale-while-revalidate, and the update applied on
+  request. An app's `app/service-worker.ts` is a few lines; the `workbox-*`
+  packages are optional peers ([guide](guide/pwa.md)).
+- **`@alxia/react-router/pwa/build`.** `buildWorker({ file })` bundles the
+  worker after `react-router build`, with the precache list written in: the
+  offline page, every route's code and the fonts you name.
+- **`alxia({ worker })`.** With `app/service-worker.ts` in the app,
+  `react-router build` writes `build/client/service-worker.js` itself, with
+  no script to add; `worker` names another file, tunes the build or turns
+  it off.
 
 ### 0.9.0
 
