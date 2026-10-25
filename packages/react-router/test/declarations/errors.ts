@@ -4,6 +4,10 @@
 
 import {
 	type ApiErrorLike,
+	ApiMessagesProvider,
+	apiCodeResolver,
+	type CatalogueMessages,
+	createApiMessages,
 	type FormErrors,
 	isApiErrorLike,
 	nextOf,
@@ -31,3 +35,22 @@ export function codeOf(error: ApiErrorLike) {
 }
 
 export const formErrors: FormErrors = { fieldErrors: { title: 'Required' } };
+
+export const messages = createApiMessages<'en' | 'fr'>({
+	format: (message) => message,
+});
+
+export const resolver = apiCodeResolver(messages, {
+	translate: (key) => key,
+	language: () => 'en',
+});
+
+export const catalogue: CatalogueMessages = {
+	'todos.errors.title-taken': { message: 'Taken', params: [] },
+};
+
+export const provided = ApiMessagesProvider({
+	messages,
+	value: { en: catalogue, fr: catalogue },
+	children: null,
+});

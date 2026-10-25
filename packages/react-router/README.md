@@ -654,6 +654,10 @@ From `@alxia/react-router/errors` (it imports nothing at runtime, and never `@al
 | `REQUEST_ID_HEADER`, `requestIdOf(response)` | `x-request-id`, and the id a response carries, if the API sent one |
 | `nextOf(url)` | the path and search of the page a request is for, without React Router's `.data`, `/_.data`, `_routes` and empty `index` |
 | `FormErrors` | what a form action answers when the API refused the input: `fieldErrors` by field and a `formError`, already translated |
+| `createApiMessages({ format })`, `ApiMessages` | the catalogue store of an app, an instance (`set`, `add`, `clear`, `messageOf`, `format`, `apiMessage(code, values, language)`); `format` is the app's ICU formatter, such as `@nxgt/material`'s `formatMessage` |
+| `CatalogueMessage`, `CatalogueMessages`, `ParamKind`, `MessageFormat`, `MessageValues` | one API message with the kind of each argument (`TEXT`, `NUMBER`, `DATE`, `PLURAL`, `SELECT`), a language's messages by code, and the formatter's type |
+| `apiCodeResolver(messages, { translate, language })` | the `{ translate, codeOf }` a form's `useCodeResolver(schema, resolver)` takes: a check's API code is worded as the API words it, any other key by the app's translator |
+| `ApiMessagesProvider({ messages, value, children })` | fills the store in the browser from the root's data before the children render; a server render writes nothing. A function with no JSX, so no React import |
 
 The `alxia-react-router` bin, run with `bunx`:
 
