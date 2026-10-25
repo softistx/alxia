@@ -99,6 +99,23 @@ An empty source list, a source holding `;`, `,` or a space, a name that is
 not lowercase letters, digits and hyphens starting with a letter, and a policy with no directive are
 refused with a `TypeError` that starts `csp():`.
 
+## Clearing the browser on sign-out
+
+```ts
+import { clearSiteData } from '@alxia/secure-headers';
+
+const cleared = clearSiteData(['cache']);
+
+app.use('/sign-out', cleared).use('/sign-out.data', cleared);
+```
+
+`Clear-Site-Data: "cache"` is sent on a 2xx or 3xx answer to a `POST`, so
+nothing of the visit stays in the browser's HTTP cache on a shared device. A
+GET, a 400, a 403 or a 500 clears nothing. `{ methods: ['POST', 'DELETE'] }`
+widens the rule. A route's own `Clear-Site-Data` is kept. React Router's client-side sign-out posts `/sign-out.data`,
+so mount both paths. An empty list or an unknown type is refused with a
+`TypeError` that starts `clearSiteData():`.
+
 ## Defaults
 
 | header | default | option |
@@ -136,6 +153,10 @@ own `Cache-Control` wins, and a 404 or a thrown error gets it too.
 | `CspDirectives` | its argument: directive names to a `CspValue`, any name allowed |
 | `CspDirectiveName` | the directive names it completes |
 | `CspValue` | a directive's value: a list of sources, `true` for a bare directive, `false` to leave it out |
+| `clearSiteData(types, options?)` | a middleware sending `Clear-Site-Data` on a 2xx or 3xx answer to a `POST` (or `options.methods`) |
+| `ClearSiteDataType` | a value of the header: `'cache'`, `'cookies'`, `'storage'`, `'executionContexts'`, `'clientHints'`, `'prefetchCache'`, `'prerenderCache'` or `'*'` |
+| `ClearSiteDataOptions` | its options: `methods`, `['POST']` by default |
+| `ClearSiteData` | what `clearSiteData()` returns: a middleware that adds nothing to the context |
 | `NONCE` | where the nonce goes in `contentSecurityPolicy`, each time it is named |
 | `NonceContext` | what `nonce: true` adds to the context: `nonce`, a string |
 | `SecureHeaders` | what `secureHeaders()` returns: a middleware that adds nothing to the context |

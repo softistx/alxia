@@ -356,6 +356,42 @@ It is set like every other header: a route's own `Cache-Control` is kept
 (a static asset can stay cacheable), and a 404 or a thrown error gets it too.
 An empty value is refused at startup; give `false` to leave it out.
 
+## Clear-Site-Data
+
+After a sign-out, the browser's HTTP cache can still hold pages the viewer
+saw, which matters on a shared device. `Clear-Site-Data` tells the browser to
+empty it. `clearSiteData(types, options?)` sends the header on a successful
+answer, and only on one:
+
+```ts
+import { alxia } from '@alxia/core';
+import { clearSiteData } from '@alxia/secure-headers';
+
+const cleared = clearSiteData(['cache']);
+
+const app = alxia()
+	.use('/sign-out', cleared)
+	.use('/sign-out.data', cleared);
+```
+
+- **Only a sign-out that went through.** It sends the header on a 2xx or 3xx
+  answer to one of `methods` (`['POST']` by default). A GET, or a refused
+  request (another site's post, a 403, a 415, a failure), signed nobody out
+  and must not empty their cache. Pass `{ methods: ['POST', 'DELETE'] }` to
+  widen the rule.
+- **A route's own header wins.** An answer that already carries
+  `Clear-Site-Data` keeps it, as `secureHeaders` does for its headers.
+- **Several types** are written quoted and comma-separated:
+  `clearSiteData(['cache', 'cookies'])` sends `"cache", "cookies"`.
+- **Both paths with React Router.** A form posts `/sign-out`, but the client
+  navigates with single fetch, which posts `/sign-out.data`. Its answer
+  carries a redirect's cookies, not its other headers, so the route cannot
+  set the header: the middleware does, on the way out. Mount it on both paths.
+  `/sign-outs` matches neither.
+- **Checked at startup.** An empty list or an unknown type throws a
+  `TypeError` that starts `clearSiteData():`
+  ([troubleshooting](troubleshooting.md#runtime)).
+
 ## Which responses get the headers
 
 The middleware settles `next()`: it sets the headers on the response the
