@@ -140,7 +140,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
 > never user input. `InlineScript` throws a `TypeError` when it holds
 > `</script` or `<!--`, which end or confuse the element
 > ([the message](../troubleshooting.md#typeerror-inlinescript-the-code-contains-script-or----which-ends-or-confuses-the-script-element-escape-it-such-as-script-inside-a-string)):
-> escape it in a string, such as `"<\/script"`.
+> escape it in a string: the code must contain `<\/script`, written
+> `"<\\/script"` in source.
 
 
 `CspNonceMeta` renders `<meta property="csp-nonce" nonce>`, which UI

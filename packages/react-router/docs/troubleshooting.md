@@ -648,10 +648,12 @@ attacker chose; a `<!--` makes the HTML parser treat the following
 the script may run. The component refuses the code instead of rendering it.
 
 **Fix:** keep the code a constant of the app and escape the sequence inside
-a string, which a JavaScript parser reads the same:
+a string. The code that reaches `InlineScript` must contain `<\/`, which the
+browser's script reads as `</`, and which is written `"<\\/script"` in a
+source string literal:
 
 ```tsx
-<InlineScript code={'document.title = "<\/script>"'} />
+<InlineScript code={'document.title = "<\\/script>"'} />
 ```
 
 Never build the code from user input; pass such a value through a `data-`

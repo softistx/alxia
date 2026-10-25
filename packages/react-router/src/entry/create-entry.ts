@@ -95,6 +95,8 @@ export function createEntry(options: EntryOptions = {}): Entry {
 					nonce,
 					signal: AbortSignal.any([limit.signal, request.signal]),
 					onError(error: unknown) {
+						// A client that left is not an error of ours.
+						if (request.signal.aborted) return;
 						status = 500;
 						if (shellOut) report(error);
 					},

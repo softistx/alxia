@@ -61,4 +61,54 @@ describe('handleRequest, called directly', () => {
 			.catch(() => undefined);
 		expect(performance.now() - started).toBeLessThan(3_000);
 	}, 10_000);
+
+	/** The fixture's /hang page through an entry made with `options`. */
+	const hang = (
+		options: Parameters<typeof createEntry>[0],
+		signal?: AbortSignal,
+	) => {
+		const entry = createEntry(options);
+		const own: ServerBuild = {
+			...build,
+			entry: {
+				...build.entry,
+				module: { ...build.entry.module, default: entry.handleRequest },
+			},
+		};
+		return makeBase()
+			.plugin((base) => reactRouter(base, { build: own }))
+			.request('/hang', { headers: browser, ...(signal ? { signal } : {}) });
+	};
+
+	/** Reads a body to its end, or its error. */
+	async function drain(response: Response) {
+		const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+		try {
+			while (!(await reader.read()).done);
+		} catch {
+			// An aborted stream may end in an error: it still ended.
+		}
+	}
+
+	test('a client that leaves after the shell is not reported to onError', async () => {
+		const errors: unknown[] = [];
+		const controller = new AbortController();
+		const response = await hang(
+			{ onError: (error) => errors.push(error) },
+			controller.signal,
+		);
+		setTimeout(() => controller.abort(), 100);
+		await drain(response);
+		expect(errors).toEqual([]);
+	}, 10_000);
+
+	test('a timeout abort is still reported to onError', async () => {
+		const errors: unknown[] = [];
+		const response = await hang({
+			streamTimeout: 50,
+			onError: (error) => errors.push(error),
+		});
+		await drain(response);
+		expect(errors.length).toBeGreaterThan(0);
+	}, 10_000);
 });
