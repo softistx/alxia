@@ -46,7 +46,7 @@ export function jsonActions(options: JsonActionsOptions = {}): JsonActions {
 	const ownOrigin = (request: Request) => {
 		const { origin } = options;
 		const set = typeof origin === 'function' ? origin() : origin;
-		return set || new URL(request.url).origin;
+		return set ?? new URL(request.url).origin;
 	};
 	const isJson = (request: Request) =>
 		request.headers.get('content-type')?.startsWith('application/json');

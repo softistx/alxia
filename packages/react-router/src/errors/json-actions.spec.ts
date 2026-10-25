@@ -70,6 +70,11 @@ describe('origin', () => {
 		expect(await from(actions, 'http://ui.test')).toBe(403);
 	});
 
+	test('an empty origin fails closed: no request is believed to be its own', async () => {
+		const actions = jsonActions({ origin: '' });
+		expect(await from(actions, 'http://ui.test')).toBe(403);
+	});
+
 	test('a getter is read at each request, and undefined falls back to the request', async () => {
 		let origin: string | undefined = 'https://app.example.test';
 		const actions = jsonActions({ origin: () => origin });

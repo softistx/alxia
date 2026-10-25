@@ -47,10 +47,5 @@ export {
 	type RouteErrorOptions,
 	routeError,
 } from './route-error';
-export type {
-	InferOutput,
-	StandardIssue,
-	StandardResult,
-	StandardSchemaV1,
-} from './standard-schema';
+export type { StandardSchemaV1 } from './standard-schema';
 export { type JsonBody, useJsonFetcher } from './use-json-fetcher';
