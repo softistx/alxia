@@ -10,6 +10,9 @@ The code is in `@alxia/react-router/pwa`, its React hooks in
 cache prefix, the paths never cached) is an option, so two apps never share a
 default.
 
+The worker itself (its Workbox strategies) and the build that writes it stay
+the app's for now: the [roadmap](../roadmap.md#next) lists them.
+
 - [What the subpath holds](#what-the-subpath-holds)
 - [The worker's contract](#the-workers-contract)
 - [What the worker caches](#what-the-worker-caches)
@@ -19,6 +22,7 @@ default.
 - [In React](#in-react)
 - [Clearing at sign-out](#clearing-at-sign-out)
 - [Serving the worker's script](#serving-the-workers-script)
+- [Adopting from an app's own copy](#adopting-from-an-apps-own-copy)
 
 ## What the subpath holds
 
@@ -129,7 +133,7 @@ export function mayStore(response: Response) {
 | option | default | |
 | --- | --- | --- |
 | `never(path)` | none | paths of the app always answered fresh |
-| `immutable(path)` | `path.startsWith('/assets/')` | which static paths are cache-first. This matches how `serveClient` serves `build/client/assets/`, with `immutable` for a year. A file you keep unhashed there is cached for a year by the HTTP cache anyway: [more](troubleshooting.md#an-unhashed-file-under-publicassets-is-cached-for-a-year) |
+| `immutable(path)` | `path.startsWith('/assets/')` | which static paths are cache-first. This matches how `serveClient` serves `build/client/assets/`, with `immutable` for a year. A file you keep unhashed there is cached for a year by the HTTP cache anyway: [more](../troubleshooting.md#an-unhashed-file-under-publicassets-is-cached-for-a-year) |
 | `serviceWorkerUrl` | `SERVICE_WORKER_URL` | never cached. A value here replaces the default |
 | `manifestPath` | `/manifest.webmanifest` | never cached. A value here replaces the default |
 
@@ -213,6 +217,14 @@ export function startWorker() {
   });
 }
 ```
+
+With several tabs open, a tab that did not click "Reload" never reloads on
+its own (a form may be half filled); once another tab has activated the
+worker, its "Reload" reloads at once, and a double click reloads once.
+`registerServiceWorker` is made of two parts you can use alone:
+`watchForUpdates(registration, container, onWaiting)` finds each waiting
+worker, and `createUpdater(container, reload?)` returns the `apply` that posts
+`SKIP_WAITING` and reloads once.
 
 Call it from a browser-only effect, and only in production: a worker under a
 dev server caches the code you are editing.
@@ -423,3 +435,24 @@ export const workerScript = defineMiddleware(async (_ctx, next) =>
 
 Declare the offline page's policy in its own `<meta>`: it is the one other
 document in `build/client`, and `noCache` does not touch it.
+
+## Adopting from an app's own copy
+
+An app that grew its own `app/core/pwa/` replaces each local module with the
+package's. The names are the same unless the table says otherwise:
+
+| old local module | now |
+| --- | --- |
+| `model/worker-contract.ts` (cache names, `SERVICE_WORKER_URL`, `OFFLINE_URL`, `SKIP_WAITING`) | `defineWorkerContract({ cachePrefix })` from `@alxia/react-router/pwa`, kept in one module of the app that exports `workerContract`; the three constants are imported from the same subpath |
+| `model/cacheability.ts` (which requests are cached) | `cachingFor(request, origin, options)` and `isStorable(response)` from `@alxia/react-router/pwa`; the app's own paths become the `never` and `immutable` options |
+| `model/precache-list.ts` | `parseBrowserManifest`, `precacheList` and `assetPrecache` from `@alxia/react-router/pwa`; a font filter becomes `assetPrecache(files, /^font-[\w-]{8}\.woff2$/)` |
+| `model/registration.ts` | `registerServiceWorker`, `afterLoad` from `@alxia/react-router/pwa` |
+| `model/update-notice.ts` | `createUpdateNotice` and `sessionStore` from `@alxia/react-router/pwa`, or `updateNotice` from `@alxia/react-router/pwa/react` |
+| `model/manifest.ts` | `webAppManifest(options)`, `manifestHref`, `manifestLanguage`, `MANIFEST_PATH` and `MANIFEST_HEADERS` from `@alxia/react-router/pwa`; the app keeps the texts and colours it passes |
+| `model/clear-app-caches.ts` | `clearAppCaches(contract)` from `@alxia/react-router/pwa` |
+| `hooks/use-online.ts`, `hooks/use-service-worker.ts`, `hooks/use-update-notice.ts` | `useOnline`, `useServiceWorker({ enabled })` and `useUpdateNotice` from `@alxia/react-router/pwa/react` |
+| `server/no-cache.server.ts` | `noCache` from `@alxia/react-router/pwa/server`, declared in `createServer({ beforeAll })` |
+
+What stays in the app: the theme colours, the icons' files and their test,
+the offline page, the banner's markup, and the service worker with the script
+that builds it.

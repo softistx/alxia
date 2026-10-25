@@ -7,14 +7,21 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Installable and offline: `@alxia/react-router/pwa`.** The code with no UI an installable React Router app needs: the service worker's contract and what it caches, the precache list read from the build, registration and the update notice, the web app manifest, `useOnline` and `useServiceWorker` (`/pwa/react`, `react` an optional peer), `noCache` for the worker's script (`/pwa/server`), each app-specific name an option ([guide](pwa.md)). In the next minor.
+- **Installable and offline: `@alxia/react-router/pwa`.** The code with no UI an installable React Router app needs: the service worker's contract and what it caches, the precache list read from the build, registration and the update notice, the web app manifest, `useOnline` and `useServiceWorker` (`/pwa/react`, `react` an optional peer), `noCache` for the worker's script (`/pwa/server`), each app-specific name an option ([guide](guide/pwa.md)). In the next minor.
 
 ## Next
 
-Nothing scheduled yet.
+- **The service worker and its build.** A worker of Workbox strategies over
+  `cachingFor` and `isStorable`, and the build that writes it, reading
+  `precacheList` and possibly run by `/vite`'s `alxia()`, with the `workbox-*`
+  packages as optional peers. Taken right after `/pwa` is released; until
+  then the worker and its build stay the app's.
 
 ## Later
 
+- **A check of an offline page's policy.** The offline page declares its
+  Content-Security-Policy in a `<meta>`; a check would read the page and
+  confirm that each inline script and style is allowed by its hash.
 - **`context.alxia` typed under `Route.LoaderArgs`.** Once react-router's
   `./internal` types and its main entry share one `RouterContextProvider`
   declaration, the generated route types see the shorthand too; today

@@ -137,7 +137,7 @@ key: one copy is the fix for both.
   sets.
 
 **Fix:** add `alxia()` to `vite.config.ts`, as in the
-[setup](guide.md#setup). With a server of your own in a monorepo, tell
+[setup](guide/getting-started.md#setup). With a server of your own in a monorepo, tell
 Vite to leave the package external:
 
 ```ts
@@ -214,7 +214,7 @@ reactRouter(app, { build, getLoadContext: ({ user }, context) => context.set(use
 **Fix:** serve the app with the plugin, `alxia()` in `vite.config.ts`: the
 server is then built with the routes, and `app/context.ts` is one module
 for both, in dev and in the build. See
-[the app's own context keys](guide.md#the-apps-own-context-keys).
+[the app's own context keys](guide/typing-the-loaders.md#the-apps-own-context-keys).
 
 Without the plugin, read alxia's context with `alxiaOf`: its key,
 `alxiaContext`, lives in this package under `node_modules`, which Vite
@@ -249,7 +249,7 @@ export default server;
 ```
 
 An alxia app of your own, with `reactRouter()` on it, is served without the
-plugin: see [a server of your own](guide.md#a-server-of-your-own-without-the-plugin).
+plugin: see [a server of your own](guide/customising-the-server.md#a-server-of-your-own-without-the-plugin).
 
 ### `alxia-react-router: the entry … does not exist. …`
 
@@ -469,7 +469,7 @@ export default createServer({
 
 or `contentSecurityPolicy: false`. Better than `'unsafe-inline'`: a nonce
 per request, with `nonce: true` and `nonceOf(loadContext)` in
-`entry.server.tsx` ([guide](guide.md#a-csp-nonce)).
+`entry.server.tsx` ([guide](guide/csp-nonce.md#a-csp-nonce)).
 
 ### `alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`
 
@@ -655,7 +655,7 @@ bun add -d typescript@^6
 and uses it outside its `loader` and `action`, in the component or at the
 module's top level. React Router keeps that code in the client build, for
 the browser, which has no such module. The server build leaves Bun's
-modules external ([Built for Bun](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide.md#built-for-bun));
+modules external ([Built for Bun](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/how-it-works.md#built-for-bun));
 the client build cannot.
 
 **Fix:** use them only in the server's code: in `loader` and `action`, or
@@ -739,7 +739,7 @@ The image runs `bun --no-install`: without the flag, Bun finds no
 whatever version npm has, instead of failing.
 
 **Why:** under `react-router build` the plugin bundles every package into
-`build/server/index.js` ([Self-contained](guide.md#self-contained)), so
+`build/server/index.js` ([Self-contained](guide/how-it-works.md#self-contained)), so
 the image needs no `node_modules`. What stays outside the file must be
 installed beside it.
 
@@ -1042,7 +1042,7 @@ following Content Security Policy directive: "script-src 'self'
   attribute.
 
 **Fix:** reveal the entry and pass `nonceOf(loadContext)` to both
-([guide](guide.md#a-csp-nonce)). A script of your own reads the nonce
+([guide](guide/csp-nonce.md#a-csp-nonce)). A script of your own reads the nonce
 through a loader, where `nonceOf(context)` works as well:
 
 ```tsx
@@ -1172,7 +1172,7 @@ plugin relays the app's sockets to. So `ctx.server` is that side server: its
 and its `requestIP` and `timeout` know nothing of a request Vite took, so
 the default `ctx.ip` is `undefined`. A `page()` (Bun's HTML bundle) is not
 served: Vite answers the HTML
-([The server](guide.md#the-server-server)).
+([The server](guide/typing-the-loaders.md#the-server-server)).
 
 **Fix:** read `ctx.server` as optional, which also covers `app.request` in
 a test, and take nothing from its `url` or `requestIP` in dev:
