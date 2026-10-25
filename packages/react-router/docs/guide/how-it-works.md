@@ -79,7 +79,8 @@ from the client build ([the PWA guide](pwa.md#zero-config-alxia-builds-it)).
 
 React Router's `serverBundles` split the server build in several, and
 alxia serves one: the plugin refuses them. With `ssr: false`, a
-single-page app, the plugin does nothing.
+single-page app, the plugin does nothing but build the service worker (when
+`app/service-worker.ts` exists).
 
 ## Under `vite preview`
 
