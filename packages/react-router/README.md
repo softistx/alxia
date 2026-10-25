@@ -363,6 +363,82 @@ import { ServerRouter } from 'react-router';
 > The `InlineScript` code is written unescaped: keep it a constant of the
 > app, never user input.
 
+### The page's language
+
+`createPageLanguage` gives the root the page's language for `<html lang>` and
+a route's `meta`, and `textDirection` the `dir` that goes with it. The server
+side, negotiating the request's language from a cookie and `Accept-Language`,
+is [`@alxia/language`](https://github.com/softistx/alxia/blob/develop/packages/language/README.md):
+
+```ts
+// app/server.ts
+import { language } from '@alxia/language';
+import { createServer } from '@alxia/react-router';
+
+const server = createServer({
+	configure: (app) =>
+		app.use(language({ supported: ['en', 'fr', 'ar'], fallback: 'en', order: ['cookie', 'header'] })),
+});
+export default server;
+declare module '@alxia/react-router' {
+	interface Register { server: typeof server }
+}
+```
+
+```ts
+// app/language.ts: one instance, imported by the root and the routes
+import { createPageLanguage } from '@alxia/react-router/document';
+
+export const { pageLanguage, metaLanguage, chooseLanguage, useChosenLanguage } =
+	createPageLanguage({ languages: ['en', 'fr', 'ar'], fallback: 'en' });
+```
+
+```tsx
+// app/root.tsx
+import { type AlxiaArgs, withAlxia } from '@alxia/react-router';
+import { textDirection } from '@alxia/react-router/document';
+import { useRouteLoaderData } from 'react-router';
+import { metaLanguage, pageLanguage, useChosenLanguage } from './language';
+import type { Route } from './+types/root';
+
+const titles = { en: 'Home', fr: 'Accueil', ar: 'الرئيسية' };
+
+// the root loader returns alxia.language, set by the middleware
+export const loader = withAlxia(({ alxia }: Route.LoaderArgs & AlxiaArgs) => ({ language: alxia.language }));
+
+export function Layout({ children }: { children: React.ReactNode }) {
+	const data = useRouteLoaderData<typeof loader>('root');
+	const language = pageLanguage(data?.language);
+	useChosenLanguage(); // re-renders the shell when the menu picks a language
+	return (
+		<html lang={language} dir={textDirection(language)} suppressHydrationWarning>
+			{/* … */}
+		</html>
+	);
+}
+
+export const meta: Route.MetaFunction = ({ matches }) => [
+	{ title: titles[metaLanguage(matches)] },
+];
+```
+
+- `pageLanguage(language)` is the supported language, else the fallback. In
+  the browser the one picked with `chooseLanguage(language)` wins, and the
+  last one seen stands in when the root's data is gone. On the server it
+  remembers nothing: one module serves every request.
+- `metaLanguage(matches)` reads `matches[0].loaderData.language`.
+- `useChosenLanguage()` is the picked language, or `undefined`; it
+  re-renders on a pick, and is `undefined` in the server render so
+  hydration matches.
+- `textDirection(tag)` is `'rtl'` for `ar`, `fa`, `he`, `ur`, `ps`, `yi`,
+  `dv`, `ckb`, `sd` and `ug` (and the legacy `iw` and `ji`), else `'ltr'`, reading the base tag whatever its
+  case (`ar-EG`, `AR`). A script subtag is not read: `az-Arab` is `'ltr'`.
+- A fallback outside `languages` throws
+  ([the message](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#createpagelanguage-the-fallback-x-is-not-one-of-the-languages)).
+  An error page keeps the root's data, so it keeps the language, except
+  for a URL that matches no route or a root loader that threw: there it
+  shows the last language seen in the browser, or the fallback ([why](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#the-error-page-shows-in-the-fallback-language)).
+
 [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/document.md)
 
 ## The entry

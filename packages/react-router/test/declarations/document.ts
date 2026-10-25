@@ -4,10 +4,14 @@
 
 import {
 	CspNonceMeta,
+	createPageLanguage,
 	DocumentNonce,
 	type DocumentNonceProps,
 	InlineScript,
 	type InlineScriptProps,
+	type PageLanguage,
+	type PageLanguageOptions,
+	textDirection,
 	useNonce,
 } from '@alxia/react-router/document';
 
@@ -21,3 +25,28 @@ export const root = {
 	element: () =>
 		InlineScript({ code: 'document.documentElement.dataset.booted = "1"' }),
 };
+
+export const language = createPageLanguage({
+	languages: ['en', 'fr', 'ar'],
+	fallback: 'en',
+});
+
+export const direction = {
+	of: (tag: string): 'ltr' | 'rtl' => textDirection(tag),
+	options: (
+		options: PageLanguageOptions<'en' | 'fr'>,
+	): PageLanguageOptions<'en' | 'fr'> => options,
+	instance: (instance: PageLanguage<'en' | 'fr'>): PageLanguage<'en' | 'fr'> =>
+		instance,
+};
+
+// The fallback is typed: one outside `languages` is refused.
+createPageLanguage({
+	languages: ['en', 'fr'],
+	// @ts-expect-error 'de' is not 'en' | 'fr'
+	fallback: 'de',
+});
+
+// A picked language is typed too.
+// @ts-expect-error 'de' is not 'en' | 'ar' | 'fr'
+language.chooseLanguage('de');

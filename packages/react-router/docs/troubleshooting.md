@@ -29,6 +29,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self' 'nonce-…'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-script-src-self-nonce-)
 - [`A tree hydrated but some attributes of the server rendered HTML didn't match the client properties`](#a-tree-hydrated-but-some-attributes-of-the-server-rendered-html-didnt-match-the-client-properties)
 - [`useNonce()` is undefined on the server](#usenonce-is-undefined-on-the-server)
+- [`createPageLanguage(): the fallback "x" is not one of the languages.`](#createpagelanguage-the-fallback-x-is-not-one-of-the-languages)
+- [The error page shows in the fallback language](#the-error-page-shows-in-the-fallback-language)
 - [`Error: You must render this element inside a <HydratedRouter> element`](#error-you-must-render-this-element-inside-a-hydratedrouter-element)
 - [`alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`](#alxia-react-router--already-exists-and-reveal-leaves-it-as-it-is-run-alxia-react-router-reveal---force-to-overwrite-it)
 - [`alxia-react-router: no vite.config.ts in …. Run reveal from the app's root, beside vite.config.ts.`](#alxia-react-router-no-viteconfigts-in--run-reveal-from-the-apps-root-beside-viteconfigts)
@@ -632,6 +634,66 @@ import { DocumentNonce } from '@alxia/react-router/document';
 ```
 
 ([guide](guide/document.md#the-entry))
+
+### `createPageLanguage(): the fallback "x" is not one of the languages.`
+
+**When:** the module that calls `createPageLanguage` loads.
+
+**Why:** `fallback` is the language of a page whose root data gives none, so
+it must be one of `languages`. The usual cause is a fallback in another
+spelling (`en-US` for `en`), or a `languages` list built from a different
+source than the fallback.
+
+**Fix:** name a language of the list:
+
+```ts
+createPageLanguage({ languages: ['en', 'fr'], fallback: 'en' });
+```
+
+### The error page shows in the fallback language
+
+**When:** on an error document, the root's `<html lang>` or text shows the
+fallback language although the visitor uses another.
+
+**Why:** a child route's error keeps the root's loader data. React Router
+keeps `loaderData` for every loader that succeeded, so
+`useRouteLoaderData('root')` still has it in `Layout` and `ErrorBoundary`.
+The data is missing in only two cases:
+
+- the URL matches no route, which is a 404 that runs no loader at all, the
+  root's included;
+- the root's own loader threw.
+
+With no data, `pageLanguage(undefined)` has no language to read. In the
+browser it keeps the last language it saw and the one picked with
+`chooseLanguage`; a document the server renders as an error has seen
+neither, so the fallback shows.
+
+**Fix, 404:** add a splat route whose loader throws a 404, so the URL
+matches and the root loader runs:
+
+```ts
+// app/routes.ts: add it last in your route config
+import { route } from '@react-router/dev/routes';
+
+route('*', 'routes/not-found.tsx');
+```
+
+```ts
+// app/routes/not-found.tsx
+import { data } from 'react-router';
+
+export const loader = () => {
+	throw data(null, { status: 404 });
+};
+```
+
+**Fix, root loader:** keep the root loader to `{ language: alxia.language }`,
+with nothing fallible in it. Load fallible data in child routes, or catch it
+and return it as a field.
+
+**Fix, client:** none is needed: a failed client navigation keeps the last
+language through `pageLanguage`.
 
 ### `Error: You must render this element inside a <HydratedRouter> element`
 

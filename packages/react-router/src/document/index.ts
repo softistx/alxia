@@ -14,3 +14,9 @@ export {
 	type DocumentNonceProps,
 	useNonce,
 } from './nonce';
+export {
+	createPageLanguage,
+	type PageLanguage,
+	type PageLanguageOptions,
+} from './page-language';
+export { textDirection } from './text-direction';
