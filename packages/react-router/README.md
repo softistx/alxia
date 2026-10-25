@@ -530,7 +530,7 @@ rest.
 holds the shape of a GraphQL API's refusal, declared structurally (no `@nxgt/graphql-client` at
 runtime), the request id an API echoes, the page a request is for, the
 catalogue of the API's messages an app keeps, the words of a form's checks,
-the provider that fills the catalogue in the browser, the wording of a refusal, and the loaders and actions that answer with it:
+the provider that fills the catalogue in the browser, the wording of a refusal, the loaders and actions that answer with it, and the JSON actions (CSRF check) with their fetcher hook:
 
 ```ts
 import { isApiErrorLike, nextOf, requestIdOf } from '@alxia/react-router/errors';
@@ -610,6 +610,24 @@ export const create = (run: () => Promise<{ id: string }>) =>
 	apiErrors.submitForm('en', run, (path) =>
 		path === 'todo.title' ? 'title' : undefined,
 	);
+```
+
+JSON actions refuse a post from another site, and read a Standard Schema's input:
+
+```ts
+import { jsonActions, useJsonFetcher } from '@alxia/react-router/errors';
+import { z } from 'zod';
+
+// Behind a TLS proxy named with createServer({ proxy }), nothing to set; else: origin: () => process.env.APP_ORIGIN
+export const { readInput } = jsonActions();
+
+const schema = z.object({ title: z.string().min(1) });
+
+export async function action({ request }: { request: Request }) {
+	return readInput(request, schema); // 400 when the input is refused
+}
+
+// In the component: const { post, busy } = useJsonFetcher<typeof action>();
 ```
 
 The [errors guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md)
@@ -732,6 +750,9 @@ From `@alxia/react-router/errors` (`react-router` is its only package import, an
 | `ApiMessagesProvider({ messages, value, children })`, `ApiMessagesProviderProps` | fills the store in the browser from the root's data before the children render; a server render writes nothing. A function with no JSX, so no React import |
 | `createApiErrors({ messages, unavailable, refused?, byCode?, isApiCode? })`, `ApiErrors`, `ApiErrorsOptions` | what a page says of a refusal, in a language: `apiErrorMessage(error, language)` (the catalogue's text of the code, else the API's message; `refused` replaces it for an error with no API code and `byCode` words given codes, such as a query's limits), `fieldErrors(error, language)` by input path, `translateCode(code, fallback, language, values?)`, `unavailableMessage(language)` and `apiRefusal(error, language)`; for an action, `fetcherResult(language, about, run)` (`{ ok: true, …about, …value }`, or `{ ok: false, …about, error }` with the refusal's status), `fetcherRefusal(error, language)` (the refusal, or the thrown route error) and `submitForm(language, run, fieldOf)` (`{ ok: true, value }`, or a `FormErrors` with the refusal's status) |
 | `ApiRefusal` | `{ message, status }`: a failed call as a page says it; what `apiRefusal` returns for an API refusal (its status) or an unreachable API (503), else `undefined` |
+| `jsonActions({ origin? })`, `JsonActions`, `JsonActionsOptions` | the JSON helpers of the actions, bound to the app's origin (a string, or a getter read at each request; the request's own by default): `readJson(request)` (403 `Cross-site request refused` for another origin or a cross-site fetch, 415 `Expected a JSON body`, 400 `Malformed JSON body`), `requireJsonPost(request)` (a native post goes back to its page) and `readInput(request, schema)` (the body's `input` through a Standard Schema, async allowed; 400 `The form sent an input the API would refuse`) |
+| `useJsonFetcher(key?, action?)`, `JsonBody` | a fetcher that posts JSON: `{ fetcher, post(body, to?), busy }`; `to` is the action of one call |
+| `StandardSchemaV1` | the Standard Schema v1 type `readInput` takes, declared in `/errors` (type only, so no `@alxia/core`; `InferOutput` is `@alxia/core`'s); a Zod 4, Valibot or ArkType schema fits |
 
 The `alxia-react-router` bin, run with `bunx`:
 
@@ -748,7 +769,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Typing the loaders](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/typing-the-loaders.md): `Register`, and the app's own context keys.
 - [A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md), [Beside the pages](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md) (middlewares, routes, WebSockets, the client's files), [OpenAPI](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/openapi.md), [Testing](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/testing.md) and [Deploying](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md), with Docker.
 - [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
-- [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, the page a request is for, the catalogue store, the form checks in the API's words, the provider, wording a refusal, loaders and the error page, and actions.
+- [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, the page a request is for, the catalogue store, the form checks in the API's words, the provider, wording a refusal, loaders and the error page, actions, and JSON actions and CSRF.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.
