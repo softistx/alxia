@@ -38,6 +38,15 @@ describe('InlineScript', () => {
 	});
 });
 
+describe('InlineScript, unescaped output', () => {
+	test('writes a code string as it is, markup characters included', () => {
+		const code = `a("</b>") && x < y; // <!-- "q" 'r' &amp;`;
+		expect(renderToString(createElement(InlineScript, { code }))).toBe(
+			`<script>${code}</script>`,
+		);
+	});
+});
+
 describe('CspNonceMeta', () => {
 	test('renders the csp-nonce meta with the document nonce', () => {
 		expect(within('abc', createElement(CspNonceMeta))).toBe(

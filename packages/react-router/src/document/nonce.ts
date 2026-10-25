@@ -38,7 +38,9 @@ let documentNonce: string | undefined;
  * React would find `nonce` on the server's elements and none in its own (a
  * hydration mismatch). It is read from the first `script[nonce]`'s DOM
  * property (the browser hides the attribute, not the property), once for
- * the document.
+ * the document. That first read is cached per module copy, so a test with a
+ * DOM keeps it across tests: reset modules, or render the server path with
+ * `DocumentNonce`.
  */
 export function useNonce(): string | undefined {
 	const serverNonce = useContext(NonceContext);

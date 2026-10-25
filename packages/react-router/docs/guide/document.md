@@ -4,9 +4,7 @@ This page covers what the root route renders for the page's CSP nonce, from
 `@alxia/react-router/document`: the nonce on the server and in the browser,
 an inline script that carries it, and the theme-boot recipe.
 
-The subpath imports `react` alone (an optional peer of the package), runs
-nothing at the top level but `createContext`, and shares no chunk with the
-main entry, so the browser bundle never loads the server's code for it.
+`/document` is safe to import in the browser and imports only `react`.
 
 | export | |
 | --- | --- |
@@ -48,6 +46,10 @@ browser `useNonce()` reads the `nonce` property of the document's first
 and caches it. `DocumentNonce` is not needed there. With no such script it
 returns `undefined`.
 
+The first read is cached per module copy. A test with a DOM keeps it across
+tests: reset modules between them, or render the server path with
+`DocumentNonce`.
+
 Pass it to what React Router renders:
 
 ```tsx
@@ -83,7 +85,11 @@ kit's `themeBootScript()`), kept as a constant.
 
 ```tsx
 // app/root.tsx
-import { CspNonceMeta, InlineScript } from '@alxia/react-router/document';
+import {
+	CspNonceMeta,
+	InlineScript,
+	useNonce,
+} from '@alxia/react-router/document';
 import { themeBootScript } from '<your theme library>';
 
 const THEME_BOOT = themeBootScript();
@@ -116,8 +122,10 @@ export function Layout({ children }: { children: React.ReactNode }) {
   matches during hydration. `nonce` overrides it for one script.
 - **With no nonce**, the script renders with no `nonce` attribute. The policy
   must then allow it by `'unsafe-inline'` or a hash of the code.
-- **The code is not escaped**: it is written as it is, so it is a constant
-  of the app. Never build it from user input.
+
+> **Warning:** the code is written unescaped. It is a constant of the app,
+> never user input, and it must not contain `</script>` or `<!--`.
+
 
 `CspNonceMeta` renders `<meta property="csp-nonce" nonce>`, which UI
 libraries read to give the scripts and styles they add at runtime the same

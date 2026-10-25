@@ -301,16 +301,25 @@ with or without secure-headers: neither package depends on the other. Any
 ## The document: nonce and boot scripts
 
 `@alxia/react-router/document` renders the CSP nonce in the root, on the
-server and in the browser, with `react` as its only import. The server
-render provides the nonce around the router; `useNonce()` reads it there, and
-in the browser reads the one the document's scripts carry, so hydration
+server and in the browser, with `react` as its only import. The nonce comes
+from `secureHeaders({ nonce: true })` ([A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md)).
+The server render provides it around the router; `useNonce()` reads it there,
+and in the browser reads the one the document's scripts carry, so hydration
 finds the attribute it rendered. `InlineScript` is an inline script with
 that nonce, for a theme's boot script, which must run before the first
 paint:
 
 ```tsx
 // app/root.tsx
-import { CspNonceMeta, InlineScript, useNonce } from '@alxia/react-router/document';
+import { Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
+import {
+	CspNonceMeta,
+	InlineScript,
+	useNonce,
+} from '@alxia/react-router/document';
+import { themeBootScript } from '<your theme library>';
+
+const THEME_BOOT = themeBootScript();
 
 export function Layout({ children }: { children: React.ReactNode }) {
 	const nonce = useNonce();
@@ -320,6 +329,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 				<meta charSet="utf-8" />
 				<InlineScript code={THEME_BOOT} />
 				<CspNonceMeta />
+				<Meta />
 				<Links nonce={nonce} />
 			</head>
 			<body>
@@ -330,10 +340,29 @@ export function Layout({ children }: { children: React.ReactNode }) {
 		</html>
 	);
 }
+
+export default function App() {
+	return <Outlet />;
+}
 ```
 
 `THEME_BOOT` is your theme library's own boot script. In the entry, wrap the
-router: `<DocumentNonce nonce={nonceOf(loadContext)}>`.
+router:
+
+```tsx
+// app/entry.server.tsx (inside handleRequest)
+import { nonceOf } from '@alxia/react-router';
+import { DocumentNonce } from '@alxia/react-router/document';
+import { ServerRouter } from 'react-router';
+
+<DocumentNonce nonce={nonceOf(loadContext)}>
+	<ServerRouter context={routerContext} url={request.url} />
+</DocumentNonce>;
+```
+
+> The `InlineScript` code is written unescaped: keep it a constant of the
+> app, never user input.
+
 [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/document.md)
 
 ## WebSockets
