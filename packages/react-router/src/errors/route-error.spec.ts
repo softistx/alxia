@@ -62,7 +62,7 @@ describe('routeError', () => {
 		expect(routeError(bare)).toBe(bare);
 	});
 
-	test('statuses and requestIdHeader replace the defaults', () => {
+	test('statuses replaces the defaults', () => {
 		const gone = apiError(410);
 		expect(routeError(gone)).toBe(gone);
 		expect(routeError(gone, { statuses: new Set([410]) })).toMatchObject({
@@ -70,13 +70,6 @@ describe('routeError', () => {
 		});
 		const missing = apiError(404);
 		expect(routeError(missing, { statuses: new Set([410]) })).toBe(missing);
-		const response = new Response(null, {
-			status: 404,
-			headers: { 'x-trace': 't-1' },
-		});
-		expect(routeError(response, { requestIdHeader: 'x-trace' })).toMatchObject({
-			data: { requestId: 't-1' },
-		});
 	});
 });
 

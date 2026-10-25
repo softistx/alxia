@@ -25,4 +25,10 @@ describe('nextOf', () => {
 		expect(of('/todos?index=')).toBe('/todos');
 		expect(of('/todos?index=2')).toBe('/todos?index=2');
 	});
+
+	test('never starts with two slashes, which a redirect reads as another site', () => {
+		expect(of('//evil.com/x')).toBe('/evil.com/x');
+		expect(of('/\\evil.com')).toBe('/evil.com');
+		expect(of('///evil.com.data?q=a')).toBe('/evil.com?q=a');
+	});
 });

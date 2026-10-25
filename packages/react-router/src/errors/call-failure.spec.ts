@@ -85,6 +85,7 @@ describe('apiCallFailure', () => {
 			{ api, requestId: 'req-502', log },
 		) as Response;
 		expect(failed.status).toBe(503);
+		expect(failed.body).toBeNull();
 		expect(failed.headers.get('x-request-id')).toBe('req-502');
 		expect(lines).toHaveLength(1);
 		expect(lines[0]?.level).toBe('error');
@@ -141,7 +142,7 @@ describe('apiCallFailure', () => {
 				{ api, operation: 'Todos', log },
 			) as Response;
 			expect(failed.status).toBe(503);
-			expect(await failed.text()).toBe(reason);
+			expect(failed.body).toBeNull();
 			expect(failed.headers.get('x-request-id')).toBeNull();
 			expect(lines).toEqual([
 				{ level: 'error', text: `${api}: Todos ${reason}` },
@@ -205,5 +206,31 @@ describe('operationName', () => {
 			operationName(parse('fragment F on Todo { id } query Q { todos }')),
 		).toBe('Q');
 		expect(operationName(parse('fragment F on Todo { id }'))).toBe('operation');
+	});
+});
+
+describe('a log that throws', () => {
+	const broken = {
+		warn: () => {
+			throw new Error('warn broke');
+		},
+		error: () => {
+			throw new Error('error broke');
+		},
+	};
+
+	test('never replaces the outcome', () => {
+		const refused = refusal('todos.errors.title-taken', 'No', {}, 409);
+		expect(apiCallFailure(refused, { api, log: broken })).toBe(refused);
+		const failed = apiCallFailure(new ApiStatusError(502, 'bad'), {
+			api,
+			log: broken,
+		}) as Response;
+		expect(failed.status).toBe(503);
+		const gone = apiCallFailure(new ApiStatusError(404, ''), {
+			api,
+			log: broken,
+		}) as Response;
+		expect(gone.status).toBe(404);
 	});
 });

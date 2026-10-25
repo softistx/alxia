@@ -26,11 +26,12 @@ export function fieldErrorsOf<L extends string>(
 	language: L,
 ): ReturnType<ApiErrors<L>['fieldErrors']> {
 	const extensions = error.errors[0]?.extensions;
-	if (!extensions?.fields?.length && extensions?.field) {
+	const fields = Array.isArray(extensions?.fields) ? extensions.fields : [];
+	if (!fields.length && extensions?.field) {
 		return { [extensions.field]: errors.apiErrorMessage(error, language) };
 	}
 	return Object.fromEntries(
-		(extensions?.fields ?? []).map(({ path, code, message, params }) => [
+		fields.map(({ path, code, message, params }) => [
 			path,
 			errors.translateCode(code, message, language, params),
 		]),

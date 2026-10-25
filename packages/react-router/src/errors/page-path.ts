@@ -7,9 +7,12 @@
  */
 export function nextOf(url: string): string {
 	const { pathname, searchParams } = new URL(url);
-	const path = pathname.endsWith('/_.data')
+	const trimmed = pathname.endsWith('/_.data')
 		? pathname.slice(0, -'_.data'.length)
 		: pathname.replace(/\.data$/, '');
+	// `new URL('http://h/\\evil.com')` has the path `//evil.com`: never let a
+	// `next` start with two slashes, which a redirect reads as another site.
+	const path = trimmed.replace(/^\/{2,}/, '/');
 	const params = new URLSearchParams(searchParams);
 	params.delete('_routes');
 	// An empty `index` names the index route; a valued one is the page's own.

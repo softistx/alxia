@@ -3,6 +3,7 @@ import type { ApiErrorLike } from './api-error';
 import { describeApiErrors } from './describe';
 import type { FormErrors } from './form-errors';
 import type { ApiMessages } from './messages';
+import type { RouteErrorOptions } from './route-error';
 
 /** A refused call, as a page says it: the message, and the HTTP status to answer. */
 export type ApiRefusal = { message: string; status: number };
@@ -71,7 +72,11 @@ export interface ApiErrors<L extends string> {
 	 * 401 (the session caller redirects first) or any other failure is
 	 * thrown, through `routeError`, for the error page.
 	 */
-	fetcherRefusal(error: unknown, language: L): ApiRefusal;
+	fetcherRefusal(
+		error: unknown,
+		language: L,
+		route?: RouteErrorOptions,
+	): ApiRefusal;
 	/**
 	 * Runs the mutation of an action a fetcher posted to: `{ ok: true }` with
 	 * `about` and the mutation's value, or `{ ok: false, error }` with `about`
@@ -84,6 +89,7 @@ export interface ApiErrors<L extends string> {
 		language: L,
 		about: About,
 		run: () => Promise<Value>,
+		route?: RouteErrorOptions,
 	): Promise<
 		| ({ ok: true } & About & Value)
 		| ReturnType<typeof data<{ ok: false; error: string } & About>>
@@ -93,12 +99,13 @@ export interface ApiErrors<L extends string> {
 	 * (`fieldErrors` under the form field `fieldOf` names an input path by,
 	 * and a `formError` for the rest) with the refusal's status. A 404 about
 	 * none of the form's fields, a 401 and other failures are thrown for the
-	 * error page.
+	 * error page, through `routeError` (with `route`).
 	 */
 	submitForm<T>(
 		language: L,
 		run: () => Promise<T>,
 		fieldOf: (path: string) => string | undefined,
+		route?: RouteErrorOptions,
 	): Promise<{ ok: true; value: T } | ReturnType<typeof data<FormErrors>>>;
 }
 

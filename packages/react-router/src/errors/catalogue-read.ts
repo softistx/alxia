@@ -1,13 +1,9 @@
-import type { ApiMessages, CatalogueMessage, ParamKind } from './messages';
+import type { ApiMessages, CatalogueMessage } from './messages';
 
 /** What the API answers for one language: its version and every message. */
 export type CatalogueReply = {
 	version: string;
-	messages: ReadonlyArray<{
-		code: string;
-		message: string;
-		params: ReadonlyArray<{ name: string; kind: ParamKind }>;
-	}>;
+	messages: ReadonlyArray<CatalogueMessage & { readonly code: string }>;
 };
 
 /** A language's catalogue as held, and when its version was last confirmed. */
@@ -59,7 +55,7 @@ export function createCatalogueReader<L extends string>({
 	/** Reads one language's messages and holds them. */
 	async function load(language: L, now: number) {
 		const reply = await read(language);
-		const entries: Record<string, CatalogueMessage> = {};
+		const entries: Record<string, CatalogueMessage> = Object.create(null);
 		for (const { code, message, params } of reply.messages) {
 			entries[code] = { message, params };
 		}

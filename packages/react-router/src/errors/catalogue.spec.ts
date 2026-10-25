@@ -15,9 +15,7 @@ describe('createErrorCatalogue', () => {
 				clientCodes: [],
 			}),
 		).toThrow(
-			new TypeError(
-				'alxia-react-router: createErrorCatalogue() needs at least one language.',
-			),
+			new TypeError('createErrorCatalogue(): needs at least one language.'),
 		);
 	});
 });

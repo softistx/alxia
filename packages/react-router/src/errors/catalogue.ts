@@ -1,10 +1,6 @@
-import {
-	checkVersions,
-	clientMessages,
-	quietLog,
-	safeTtl,
-} from './catalogue-check';
+import { checkVersions, safeTtl } from './catalogue-check';
 import { type CatalogueReply, createCatalogueReader } from './catalogue-read';
+import { quietLog } from './log';
 import type { ApiMessages, CatalogueMessages } from './messages';
 
 export type { CatalogueReply } from './catalogue-read';
@@ -60,6 +56,25 @@ export interface ErrorCatalogue<L extends string> {
 	settled(): Promise<void>;
 }
 
+/** The messages the browser words itself, by language. */
+function clientMessages<L extends string>(
+	messages: ApiMessages<L>,
+	languages: readonly L[],
+	clientCodes: readonly string[],
+) {
+	const byLanguage = {} as Record<L, CatalogueMessages>;
+	for (const language of languages) {
+		const entries: Record<string, CatalogueMessages[string]> =
+			Object.create(null);
+		for (const code of clientCodes) {
+			const entry = messages.messageOf(language, code);
+			if (entry) entries[code] = entry;
+		}
+		byLanguage[language] = entries;
+	}
+	return byLanguage;
+}
+
 /**
  * Keeps the API's error catalogue in `messages`: read on first use, checked
  * against the API's versions once per TTL, and re-read only for the
@@ -77,11 +92,9 @@ export function createErrorCatalogue<L extends string>({
 	log: appLog = console,
 }: ErrorCatalogueOptions<L>): ErrorCatalogue<L> {
 	if (languages.length === 0) {
-		throw new TypeError(
-			'alxia-react-router: createErrorCatalogue() needs at least one language.',
-		);
+		throw new TypeError('createErrorCatalogue(): needs at least one language.');
 	}
-	const log = quietLog(appLog);
+	const log = quietLog(appLog, ['error']);
 	const ttl = safeTtl(ttlMs, retryMs, log);
 	const reader = createCatalogueReader({
 		messages,

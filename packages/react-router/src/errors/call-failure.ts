@@ -1,4 +1,5 @@
-import { isApiErrorLike } from './api-error';
+import { isApiErrorLike, isStatusError, isUnavailableError } from './api-error';
+import { quietLog } from './log';
 import { REQUEST_ID_HEADER } from './request-id';
 
 /** The statuses an API's gateway or auth layer may answer without a GraphQL body. */
@@ -22,35 +23,12 @@ export interface CallFailureOptions {
 	log?: Pick<Console, 'warn' | 'error'>;
 }
 
-/** `@nxgt/graphql-client`'s `ApiStatusError`, as far as the failure reads it. */
-interface StatusErrorLike extends Error {
-	status: number;
-	statusText?: string | undefined;
-	body?: unknown;
-}
-
-/** `@nxgt/graphql-client`'s `ApiUnavailableError`, as far as the failure reads it. */
-interface UnavailableErrorLike extends Error {
-	reason: string;
-}
-
-const isNamed = (error: unknown, name: string): error is Error =>
-	error instanceof Error && error.name === name;
-
-const isStatusError = (error: unknown): error is StatusErrorLike =>
-	isNamed(error, 'ApiStatusError') &&
-	typeof (error as { status?: unknown }).status === 'number';
-
-const isUnavailableError = (error: unknown): error is UnavailableErrorLike =>
-	isNamed(error, 'ApiUnavailableError') &&
-	typeof (error as { reason?: unknown }).reason === 'string';
-
 /**
  * What a call became once it failed, for a loader or an action to throw: the
  * `ApiError` as it is (carrying `requestId`), a `Response` of the API's own
- * status for a 401, 403 or 404 without a GraphQL body, a 503 `Response` for an
+ * status for a 401, 403 or 404 without a GraphQL body, a 503 `Response` (with no body; the reason is in the log) for an
  * unreachable, slow, garbled or aborted API, and any other error as it is.
- * Every case is logged with the request id, when the API gave one, and never
+ * Every case it recognises is logged with the request id, when the API gave one, and never
  * the headers, the variables nor a token; the id rides on the `ApiError` as
  * `requestId` and on a `Response` as `x-request-id`, where `routeError` reads
  * it.
@@ -67,18 +45,20 @@ export function apiCallFailure(
 		requestId,
 		signal,
 		passedThrough = PASSED_THROUGH,
-		log = console,
+		log: appLog = console,
 	}: CallFailureOptions,
 ): unknown {
+	const log = quietLog(appLog, ['warn', 'error']);
 	const call = `${api}: ${operation}${requestId ? ` (request ${requestId})` : ''}`;
 	const headers: Record<string, string> = requestId
 		? { [REQUEST_ID_HEADER]: requestId }
 		: {};
 	const unavailable = (reason: string, cause?: unknown): Response => {
 		log.error(`${call} ${reason}`, cause ?? '');
-		return new Response(reason, { status: 503, headers });
+		return new Response(null, { status: 503, headers });
 	};
 	if (isApiErrorLike(error)) {
+		// The client's `ApiError.requestId` is writable, though the structural type marks it readonly.
 		if (requestId) (error as { requestId?: string }).requestId = requestId;
 		const line = `${call} answered ${error.status}${error.code ? ` ${error.code}` : ''}`;
 		if (error.status >= 500) log.error(line);

@@ -56,3 +56,12 @@ describe('apiRefusal', () => {
 		expect(errors.apiRefusal(undefined, 'en')).toBeUndefined();
 	});
 });
+
+describe('fieldErrors', () => {
+	test('a `fields` that is not a list is no field', () => {
+		const error = refusal('todos.errors.title-taken', 'Taken', {
+			fields: 'title',
+		});
+		expect(strictErrors().fieldErrors(error, 'en')).toEqual({});
+	});
+});

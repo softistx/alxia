@@ -1,6 +1,6 @@
 import { data } from 'react-router';
 import { isApiErrorLike } from './api-error';
-import { REQUEST_ID_HEADER } from './request-id';
+import { requestIdOf } from './request-id';
 
 /** The statuses an error page words: unauthenticated, forbidden, missing, unavailable. */
 const ROUTED: ReadonlySet<number> = new Set([401, 403, 404, 503]);
@@ -19,8 +19,6 @@ export type RouteErrorData = {
 export interface RouteErrorOptions {
 	/** The statuses that become a route error of their own; 401, 403, 404 and 503 by default. */
 	statuses?: ReadonlySet<number>;
-	/** The header a thrown `Response` carries the request id in; `x-request-id` by default. */
-	requestIdHeader?: string;
 }
 
 /**
@@ -35,10 +33,7 @@ export interface RouteErrorOptions {
  */
 export function routeError(
 	error: unknown,
-	{
-		statuses = ROUTED,
-		requestIdHeader = REQUEST_ID_HEADER,
-	}: RouteErrorOptions = {},
+	{ statuses = ROUTED }: RouteErrorOptions = {},
 ): unknown {
 	if (isApiErrorLike(error)) {
 		const { requestId } = error;
@@ -53,7 +48,7 @@ export function routeError(
 			: error;
 	}
 	if (error instanceof Response && statuses.has(error.status)) {
-		const requestId = error.headers.get(requestIdHeader);
+		const requestId = requestIdOf(error);
 		if (requestId) {
 			return data<RouteErrorData>({ requestId }, { status: error.status });
 		}

@@ -57,6 +57,10 @@ export interface ApiErrorLike extends Error {
 	readonly requestId?: string;
 }
 
+/** Whether `error` is an `Error` of this `name`: the client's errors are told by it, never `instanceof`. */
+export const isNamed = (error: unknown, name: string): error is Error =>
+	error instanceof Error && error.name === name;
+
 /**
  * Whether `error` is an `ApiError` of `@nxgt/graphql-client`, by the test
  * that client's `isApiError` makes (an `Error` named `ApiError` with an
@@ -65,8 +69,7 @@ export interface ApiErrorLike extends Error {
  */
 export function isApiErrorLike(error: unknown): error is ApiErrorLike {
 	return (
-		error instanceof Error &&
-		error.name === 'ApiError' &&
+		isNamed(error, 'ApiError') &&
 		Array.isArray((error as { errors?: unknown }).errors) &&
 		typeof (error as { status?: unknown }).status === 'number'
 	);
@@ -98,3 +101,25 @@ export function valuesOf(
 		? { ...extensions, ...extensions.params }
 		: extensions;
 }
+
+/** `@nxgt/graphql-client`'s `ApiStatusError`, as far as the failure reads it. */
+export interface StatusErrorLike extends Error {
+	status: number;
+	statusText?: string | undefined;
+	body?: unknown;
+}
+
+/** `@nxgt/graphql-client`'s `ApiUnavailableError`, as far as the failure reads it. */
+export interface UnavailableErrorLike extends Error {
+	reason: string;
+}
+
+export const isStatusError = (error: unknown): error is StatusErrorLike =>
+	isNamed(error, 'ApiStatusError') &&
+	typeof (error as { status?: unknown }).status === 'number';
+
+export const isUnavailableError = (
+	error: unknown,
+): error is UnavailableErrorLike =>
+	isNamed(error, 'ApiUnavailableError') &&
+	typeof (error as { reason?: unknown }).reason === 'string';
