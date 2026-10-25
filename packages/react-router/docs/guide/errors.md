@@ -4,7 +4,7 @@ This page covers how an app that calls a GraphQL API words that API's refusals
 for its pages: the error's shape, the request id it carries, the page a
 request is for, the catalogue store of the API's messages, the form checks in
 the API's words, the provider that fills the catalogue, the wording of a
-refusal, and the loaders, the error page and the actions that answer with it.
+refusal, the loaders, the error page and the actions that answer with it, and the JSON those actions read and the fetcher hook that posts it.
 The code is in `@alxia/react-router/errors`, which has no UI. Its one runtime
 import is `react-router`, never `@alxia/core`, so a page can import it
 (`boundary.spec.ts` checks the built files).
@@ -18,6 +18,7 @@ import is `react-router`, never `@alxia/core`, so a page can import it
 - [Wording a refusal](#wording-a-refusal)
 - [Loaders and the error page](#loaders-and-the-error-page)
 - [Actions](#actions)
+- [JSON actions and CSRF](#json-actions-and-csrf)
 
 ## What the subpath holds
 
@@ -35,6 +36,9 @@ import is `react-router`, never `@alxia/core`, so a page can import it
 | `ApiMessagesProvider`, `ApiMessagesProviderProps` | fills the catalogue in the browser from the root's data |
 | `createApiErrors`, `ApiErrors`, `ApiErrorsOptions` | what a page says of a refusal, from that catalogue: the message, the fields, the status |
 | `ApiRefusal` | a refused call as a page says it: `{ message, status }` |
+| `jsonActions({ origin? })`, `JsonActions`, `JsonActionsOptions` | `readJson`, `requireJsonPost` and `readInput` for the actions: JSON only, from this site only |
+| `useJsonFetcher(key?, action?)`, `JsonBody` | a fetcher that posts JSON: `{ fetcher, post(body, to?), busy }` |
+| `StandardSchemaV1`, `StandardResult`, `StandardIssue`, `InferOutput` | the Standard Schema v1 types `readInput` takes, declared here (type only) |
 
 ## Recognising an API error
 
@@ -482,3 +486,130 @@ export async function action({ request }: Route.ActionArgs) {
 The helpers pass `routeError`'s defaults (401, 403, 404 and 503 routed, the
 `x-request-id` header); `createApiErrors` has no option to change them. An
 action that needs other statuses calls `routeError(error, options)` itself.
+
+## JSON actions and CSRF
+
+Every action of the examples above reads JSON. That is a choice: a page of
+another site can post a form, or `text/plain`, to your URL without a
+preflight, and the browser sends the user's cookies with it. Taking
+`application/json` alone, and only from this site, stops that before the
+session cookie's `SameSite` is even consulted. `jsonActions` holds the three
+helpers that do it.
+
+```ts
+// app/json.ts
+import { jsonActions } from '@alxia/react-router/errors';
+
+export const { readJson, requireJsonPost, readInput } = jsonActions();
+```
+
+`readJson(request)` answers the parsed body, or throws a response: 403
+`Cross-site request refused` when the `Origin` is not this site's, or the
+`Sec-Fetch-Site` is neither `same-origin` nor `none`; 415 `Expected a JSON body`
+when the content type is not `application/json`; 400 `Malformed JSON body`
+when the body does not parse.
+
+```ts
+import { readJson } from './json';
+import type { Route } from './+types/todos';
+
+export async function action({ request }: Route.ActionArgs) {
+	const body = (await readJson(request)) as { title?: string };
+	// …
+}
+```
+
+`readInput(request, schema)` reads the body's `input` and checks it against
+a [Standard Schema](https://standardschema.dev) (Zod 4, Valibot, ArkType,
+or one of your own), awaiting the check when it is async. It answers the
+schema's output, typed, or throws a 400 `The form sent an input the API would
+refuse`. It checks the origin the same way, since it reads through `readJson`.
+
+```ts
+import { z } from 'zod';
+import { apiErrors } from './api-errors';
+import { readInput } from './json';
+import type { Route } from './+types/todos';
+
+const createTodo = z.object({ title: z.string().min(1) });
+
+// Your own call to the API, declared here as a stub.
+declare function create(input: { title: string }): Promise<{ id: string }>;
+
+export async function action({ request }: Route.ActionArgs) {
+	const input = await readInput(request, createTodo);
+	return apiErrors.submitForm(
+		'en',
+		() => create(input),
+		(path) => (path === 'title' ? 'title' : undefined),
+	);
+}
+```
+
+The Standard Schema types are declared in `/errors` itself (a few lines,
+the specification's own interface), so the subpath never imports
+`@alxia/core`, not even a type. `@alxia/core`'s `StandardSchemaV1`, and every
+vendor's schema, fit them as they are.
+
+`requireJsonPost(request)` is for an action that a native form also posts to:
+before the page hydrates, a click posts the form natively, and `readJson`
+would answer 415. `requireJsonPost` sends that post back to its page, its
+search kept (`nextOf`), which then posts JSON once hydrated.
+
+```ts
+export async function action({ request }: Route.ActionArgs) {
+	requireJsonPost(request);
+	const body = await readJson(request);
+	// …
+}
+```
+
+### The origin behind a proxy
+
+A request is "this site" when its `Origin` is the origin of `request.url`.
+Behind a proxy that terminates TLS that origin is the internal one, so give
+`jsonActions` the public one. A getter is read at each request, and when it
+answers `undefined` the request's own origin is used:
+
+```ts
+export const { readJson, requireJsonPost, readInput } = jsonActions({
+	origin: () => process.env.APP_ORIGIN,
+});
+```
+
+Without it, every post is refused: see
+[Behind a TLS proxy every action answers 403](../troubleshooting.md#behind-a-tls-proxy-every-action-answers-403).
+
+### Posting from the page
+
+`useJsonFetcher<Action, Body>(key?, action?)` is a React Router fetcher that
+posts its body as JSON to the page's action (or to the `action` it is given):
+`post(body, to?)` sends it, `busy` is true while it is in flight, and
+`fetcher` is the fetcher, whose `data` is what the action answered. `key`
+shares the fetcher between the component that posts and the one that reads
+the answer. `post`'s second argument is the action of one call, for a list
+whose rows each post to their own record.
+
+```tsx
+import { useJsonFetcher } from '@alxia/react-router/errors';
+import type { action } from './todos';
+
+export function RenameTodo({ id }: { id: string }) {
+	const { fetcher, post, busy } = useJsonFetcher<typeof action>();
+	return (
+		<>
+			<button
+				type="button"
+				disabled={busy}
+				onClick={() => post({ input: { title: 'Done' } }, `/todos/${id}`)}
+			>
+				Rename
+			</button>
+			{fetcher.data && !fetcher.data.ok ? <p>{fetcher.data.error}</p> : null}
+		</>
+	);
+}
+```
+
+`Body` types what `post` takes: `useJsonFetcher<typeof action, { input: { title: string } }>()`.
+The hook imports `react-router` alone, so a page can import it from `/errors`.

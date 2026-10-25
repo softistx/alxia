@@ -13,12 +13,16 @@ import {
 	errorRequestId,
 	type FormErrors,
 	isApiErrorLike,
+	type JsonBody,
+	jsonActions,
 	nextOf,
 	REQUEST_ID_HEADER,
 	type RouteErrorData,
 	type RouteErrorOptions,
 	requestIdOf,
 	routeError,
+	type StandardSchemaV1,
+	useJsonFetcher,
 	waitMinutes,
 } from '@alxia/react-router/errors';
 
@@ -149,3 +153,36 @@ export async function submitted() {
 
 // @ts-expect-error 'de' is not 'en' | 'fr'
 errors.fetcherResult('de', {}, async () => ({}));
+
+export const json = jsonActions({ origin: () => undefined });
+
+export async function readName(request: Request) {
+	const schema: StandardSchemaV1<unknown, { name: string }> = {
+		'~standard': {
+			version: 1,
+			vendor: 'test',
+			validate: (value) => ({ value: value as { name: string } }),
+		},
+	};
+	const input = await json.readInput(request, schema);
+	// The schema's output is what the action reads.
+	const name: string = input.name;
+	return name;
+}
+
+// @ts-expect-error a schema is required
+json.readInput(new Request('http://a.test'));
+
+export function rename() {
+	const { fetcher, post, busy } = useJsonFetcher<{ ok: true }>('rename');
+	const body: JsonBody = { name: 'a' };
+	post(body, '/todos/1');
+	return { data: fetcher.data, busy };
+}
+
+export function typedBody() {
+	const { post } = useJsonFetcher<unknown, { name: string }>();
+	post({ name: 'a' });
+	// @ts-expect-error the body is { name: string }
+	post({ title: 'a' });
+}

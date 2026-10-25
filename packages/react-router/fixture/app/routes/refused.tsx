@@ -3,6 +3,7 @@ import {
 	createApiMessages,
 	errorRequestId,
 	routeError,
+	useJsonFetcher,
 } from '@alxia/react-router/errors';
 import { useRouteError } from 'react-router';
 
@@ -38,7 +39,16 @@ export function action() {
 }
 
 export default function Refused() {
-	return <p>never rendered</p>;
+	const { post, busy } = useJsonFetcher<typeof action>('rename');
+	return (
+		<button
+			type="button"
+			disabled={busy}
+			onClick={() => post({ intent: 'rename' })}
+		>
+			never rendered
+		</button>
+	);
 }
 
 export function ErrorBoundary() {

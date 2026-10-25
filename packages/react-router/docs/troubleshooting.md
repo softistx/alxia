@@ -42,6 +42,10 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: defineWorkerContract(): cacheVersion must be a non-empty name without '-', …`](#typeerror-defineworkercontract-cacheversion-must-be-a-non-empty-name-without---)
 - [`parseBrowserManifest(): not React Router's browser manifest …`](#parsebrowsermanifest-not-react-routers-browser-manifest-)
 - [`error: Cannot find package 'react' from '…/@alxia/react-router/dist/pwa/react/index.js'`](#error-cannot-find-package-react-from-alxiareact-routerdistpwareactindexjs)
+- [`Cross-site request refused`](#cross-site-request-refused)
+- [`Expected a JSON body`](#expected-a-json-body)
+- [`Malformed JSON body`](#malformed-json-body)
+- [`The form sent an input the API would refuse`](#the-form-sent-an-input-the-api-would-refuse)
 
 **Types**
 
@@ -80,6 +84,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`apiRefusal` returns undefined](#apirefusal-returns-undefined)
 - [The error page shows no request id](#the-error-page-shows-no-request-id)
 - [An action shows the error page](#an-action-shows-the-error-page)
+- [Behind a TLS proxy every action answers 403](#behind-a-tls-proxy-every-action-answers-403)
 
 ## Thrown or printed
 
@@ -856,6 +861,83 @@ this message too.
 `/pwa/react` from the page alone. The worker and a build script import
 `@alxia/react-router/pwa`, which imports nothing.
 
+### `Cross-site request refused`
+
+**When:** an action reads its body with `readJson` or `readInput` (from
+`jsonActions()`), and the page's post answers 403 with this text.
+
+**Why:** the request carried an `Origin` other than the app's own, or a
+`Sec-Fetch-Site` that is neither `same-origin` nor `none`. That is what a
+post from another site looks like, so it is refused before the body is read.
+The usual honest cause is that the app's origin is not the one the request
+reaches: see [Behind a TLS proxy every action answers 403](#behind-a-tls-proxy-every-action-answers-403).
+
+**Fix:** if the post comes from another site, nothing: the refusal is the
+point. If it comes from your own page, give `jsonActions` the origin your
+users see:
+
+```ts
+export const { readJson } = jsonActions({
+	origin: 'https://app.example.com',
+});
+```
+
+### `Expected a JSON body`
+
+**When:** an action answers 415 with this text.
+
+**Why:** `readJson` takes only `application/json`. A native form post
+(`application/x-www-form-urlencoded` or `multipart/form-data`), a
+`text/plain` body and a request with no content type are refused, since only
+JSON needs a preflight from another site.
+
+**Fix:** post from `useJsonFetcher`, which sets the content type
+(`encType: 'application/json'`), or set `Content-Type: application/json` on
+your own `fetch`. For an action that a native form also posts to before the
+page hydrates, call `requireJsonPost(request)` first: it sends that post back
+to its page, which then posts JSON.
+
+```ts
+const { requireJsonPost, readJson } = jsonActions();
+
+export async function action({ request }: Route.ActionArgs) {
+	requireJsonPost(request);
+	const body = await readJson(request);
+	// …
+}
+```
+
+### `Malformed JSON body`
+
+**When:** an action answers 400 with this text.
+
+**Why:** the request declared `application/json`, but `request.json()` could
+not parse the body: it is empty, truncated, or not JSON at all (a form's
+`FormData` posted with the JSON content type, for example).
+
+**Fix:** post an object through `useJsonFetcher`'s `post(body)`, or
+`JSON.stringify` the body of your own `fetch`. Do not set the content type by
+hand on a `FormData` body.
+
+### `The form sent an input the API would refuse`
+
+**When:** an action that reads its body with `readInput(request, schema)`
+answers 400 with this text.
+
+**Why:** the body was JSON, but its `input` field did not pass the schema: it
+is missing, or one of the checks failed. `readInput` reads `{ input }`, not
+the whole body, and it answers a bare 400 on purpose: the schema is the API's
+own input, so a form that passed its own checks never gets here.
+
+**Fix:** post `{ input: … }`, and make the form's checks the schema's. To see
+what the schema refused while you debug, call it yourself:
+
+```ts
+const body = (await readJson(request)) as { input?: unknown };
+const result = await schema['~standard'].validate(body.input);
+console.log(result.issues);
+```
+
 ## Types
 
 ### `Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`
@@ -1523,3 +1605,28 @@ return Response.json(
 	{ status: refusal.status },
 );
 ```
+
+### Behind a TLS proxy every action answers 403
+
+Every action that reads JSON answers 403 `Cross-site request refused`
+in production, yet works under `react-router dev` and in the specs.
+
+**Why:** `jsonActions()` compares the browser's `Origin` (`https://app.example.com`)
+with the origin of `request.url`. Behind a proxy that terminates TLS the
+app is asked over plain HTTP on an internal host (`http://10.0.0.5:3000`),
+so no post matches. See also
+[`request.url` in a loader is `http://`](#requesturl-in-a-loader-is-http-and-the-internal-host-behind-a-proxy).
+
+**Fix:** pass the public origin, as a string or as a getter read at each
+request (so a value set at startup is found):
+
+```ts
+import { jsonActions } from '@alxia/react-router/errors';
+
+export const { readJson, requireJsonPost, readInput } = jsonActions({
+	origin: () => process.env.APP_ORIGIN,
+});
+```
+
+When the getter returns `undefined`, the request's own origin is used, so
+development needs no setting.
