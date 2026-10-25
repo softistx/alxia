@@ -19,7 +19,10 @@ number on it. Every release, with each change it made, is in
   `fetcherRefusal`, `submitForm`), and the JSON actions (`jsonActions`:
   `readJson` with its same-origin CSRF check, `requireJsonPost`, and
   `readInput` over a Standard Schema) with their fetcher hook
-  (`useJsonFetcher`). The catalogue's refresh and the failures still follow.
+  (`useJsonFetcher`), and the catalogue's refresh (`createErrorCatalogue`:
+  read on first use with a bounded wait, checked against the API's versions
+  once per TTL, `warm()` at startup, `clientMessages()` for the root). The
+  failures still follow.
 
 ## Next
 

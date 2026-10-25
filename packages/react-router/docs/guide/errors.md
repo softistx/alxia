@@ -4,7 +4,7 @@ This page covers how an app that calls a GraphQL API words that API's refusals
 for its pages: the error's shape, the request id it carries, the page a
 request is for, the catalogue store of the API's messages, the form checks in
 the API's words, the provider that fills the catalogue, the wording of a
-refusal, the loaders, the error page and the actions that answer with it, and the JSON those actions read and the fetcher hook that posts it.
+refusal, the loaders, the error page and the actions that answer with it, the JSON those actions read and the fetcher hook that posts it, and keeping the API's catalogue fresh.
 The code is in `@alxia/react-router/errors`, which has no UI. Its one runtime
 import is `react-router`, never `@alxia/core`, so a page can import it
 (`boundary.spec.ts` checks the built files).
@@ -19,6 +19,7 @@ import is `react-router`, never `@alxia/core`, so a page can import it
 - [Loaders and the error page](#loaders-and-the-error-page)
 - [Actions](#actions)
 - [JSON actions and CSRF](#json-actions-and-csrf)
+- [Keeping the catalogue fresh](#keeping-the-catalogue-fresh)
 
 ## What the subpath holds
 
@@ -38,6 +39,7 @@ import is `react-router`, never `@alxia/core`, so a page can import it
 | `ApiRefusal` | a refused call as a page says it: `{ message, status }` |
 | `jsonActions({ origin? })`, `JsonActions`, `JsonActionsOptions` | `readJson`, `requireJsonPost` and `readInput` for the actions: JSON only, from this site only |
 | `useJsonFetcher(key?, action?)`, `JsonBody` | a fetcher that posts JSON: `{ fetcher, post(body, to?), busy }` |
+| `createErrorCatalogue`, `ErrorCatalogue`, `ErrorCatalogueOptions`, `CatalogueReply` | reads the API's catalogue into the store and keeps it fresh: `fresh`, `freshAll`, `warm`, `clientMessages` |
 | `StandardSchemaV1` | the Standard Schema v1 type `readInput` takes, declared here (type only; `InferOutput` is `@alxia/core`'s) |
 
 ## Recognising an API error
@@ -615,3 +617,113 @@ The action answers `{ ok, error }`, the shape of `fetcherResult` and `submitForm
 
 `Body` types what `post` takes: `useJsonFetcher<typeof action, { input: { title: string } }>()`.
 The hook imports `react-router` alone, so a page can import it from `/errors`.
+
+## Keeping the catalogue fresh
+
+The store of [the catalogue](#the-catalogue-store) is empty until something
+fills it. On the server, `createErrorCatalogue` does: it reads each
+language's messages from the API on first use, serves them from memory, and
+checks the API's versions once per TTL, re-reading only the languages whose
+version moved. It is an instance, made once in a module of the app's own, and
+it imports nothing: the app's two calls to its API are options.
+
+```ts
+// app/catalogue.server.ts
+import { createErrorCatalogue } from '@alxia/react-router/errors';
+import { apiMessages } from './api-messages';
+import { api } from './api.server';
+
+export const catalogue = createErrorCatalogue<'en' | 'fr'>({
+	messages: apiMessages,
+	languages: ['en', 'fr'],
+	// { version, messages: [{ code, message, params }] }
+	read: (language) => api.errorCatalogue(language),
+	// { en: 'v7', fr: 'v7' }: one call for every language
+	versions: () => api.errorCatalogueVersions(),
+	ttlMs: () => Number(process.env.CATALOGUE_TTL_MS ?? 60_000),
+	// The codes the browser words itself, such as a form's checks.
+	clientCodes: ['validation.errors.required', 'todos.errors.title-taken'],
+});
+```
+
+`ttlMs` has no default and must be given: a number, or a getter read at each
+check, so a value set at startup or changed by a test is found. A getter that
+throws is logged and `retryMs` is used in its place. `retryMs` (5000 by default) is how soon a
+failed read or check is tried again, and `firstReadWaitMs` (1500 by default)
+is how long a request waits for a language's first read. `log` receives the
+failures (`console` by default); its lines start with `alxia-react-router:`.
+`languages` may not be empty: it throws a `TypeError` otherwise.
+
+### Awaiting it in the root's middleware
+
+`freshAll()` makes every language ready before a loader or an action words a
+refusal. It waits only for a language with no catalogue yet, and only up to
+`firstReadWaitMs`; a held catalogue is served at once, and an old one is
+checked in the background, so a request never waits for a check.
+
+```ts
+// app/root.tsx
+import { catalogue } from './catalogue.server';
+
+export const middleware = [
+	async (_args: unknown, next: () => Promise<unknown>) => {
+		await catalogue.freshAll();
+		return next();
+	},
+];
+```
+
+A language whose first read is slow or failed is not waited for twice: the
+wait is counted from when the read started, one read is in flight however many
+requests ask, and a failure is retried after `retryMs`. Meanwhile the refusals
+of that language read in the API's words: see
+[Right after start](../troubleshooting.md#right-after-start-refusals-read-in-the-apis-words).
+
+### Returning the browser's messages from the root's loader
+
+The browser words a form's checks itself, so it needs the messages of the
+`clientCodes`. `clientMessages()` returns them by language, leaving out a code
+the catalogue does not hold; `ApiMessagesProvider` adds them to the browser's
+store.
+
+```tsx
+// app/root.tsx
+import { catalogue } from './catalogue.server';
+
+export function loader() {
+	return { catalogue: catalogue.clientMessages() };
+}
+
+// In the component:
+// <ApiMessagesProvider messages={apiMessages} value={data.catalogue}>
+```
+
+### Warming it at startup
+
+`warm()` reads every language without holding the boot back, so the first
+request finds the messages held. It never throws: a failure is logged.
+
+```ts
+// app/server.ts
+import { createServer } from '@alxia/react-router';
+import { catalogue } from './catalogue.server';
+
+catalogue.warm();
+
+export default createServer();
+```
+
+### In a spec
+
+`fresh(language, now)` and `freshAll(now)` take the time as an argument, in
+milliseconds, so a spec moves the clock instead of sleeping: a call at
+`now = ttl` starts the check, `settled()` waits for it, and `heldVersion`
+says which version is held. `reset()` forgets what is held and empties the
+store. It is for use between tests, with nothing in flight: a read or check
+still running when it is called finishes and holds its result again.
+
+```ts
+await catalogue.fresh('en', 0);
+await catalogue.fresh('en', 60_000); // past the TTL: checks in the background
+await catalogue.settled();
+```

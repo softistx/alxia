@@ -14,6 +14,12 @@ export {
 	createApiErrors,
 } from './api-errors';
 export {
+	type CatalogueReply,
+	createErrorCatalogue,
+	type ErrorCatalogue,
+	type ErrorCatalogueOptions,
+} from './catalogue';
+export {
 	type ApiCodeResolver,
 	type ApiCodeResolverOptions,
 	apiCodeResolver,
