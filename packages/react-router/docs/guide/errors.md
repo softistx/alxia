@@ -3,7 +3,8 @@
 This page covers how an app that calls a GraphQL API words that API's refusals
 for its pages: the error's shape, the request id it carries, the page a
 request is for, the catalogue store of the API's messages, the form checks in
-the API's words and the provider that fills the catalogue. The code is in `@alxia/react-router/errors`, which has no UI.
+the API's words, the provider that fills the catalogue and the wording of a
+refusal. The code is in `@alxia/react-router/errors`, which has no UI.
 It imports nothing at runtime (it may import `react-router`, never
 `@alxia/core`), so a page can import it (`boundary.spec.ts` checks the built files).
 
@@ -13,6 +14,7 @@ It imports nothing at runtime (it may import `react-router`, never
 - [The page a request is for](#the-page-a-request-is-for)
 - [The catalogue store](#the-catalogue-store)
 - [Form checks in the API's words](#form-checks-in-the-apis-words)
+- [Wording a refusal](#wording-a-refusal)
 
 ## What the subpath holds
 
@@ -27,6 +29,8 @@ It imports nothing at runtime (it may import `react-router`, never
 | `createApiMessages`, `ApiMessages`, `ApiMessagesOptions`, `CatalogueMessage(s)`, `ParamKind`, `MessageFormat`, `MessageValues` | the catalogue of the API's messages, held by the app |
 | `apiCodeResolver`, `ApiCodeResolver`, `ApiCodeResolverOptions`, `CodeIssueLike` | the words of a form's checks, from that catalogue; `CodeIssueLike` is the issue a custom `codeOf` receives |
 | `ApiMessagesProvider`, `ApiMessagesProviderProps` | fills the catalogue in the browser from the root's data |
+| `createApiErrors`, `ApiErrors`, `ApiErrorsOptions` | what a page says of a refusal, from that catalogue: the message, the fields, the status |
+| `ApiRefusal` | a refused call as a page says it: `{ message, status }` |
 
 ## Recognising an API error
 
@@ -217,3 +221,80 @@ export const CODE_RESOLVER = apiCodeResolver(apiMessages, {
 The codes a browser can word are the ones the root's data brought, so the
 app lists the few its forms use. A code missing from that list shows its
 fallback ([troubleshooting](../troubleshooting.md#a-forms-own-check-shows-the-code-todoserrors-instead-of-words)).
+
+## Wording a refusal
+
+An action or a loader that calls the API meets a refusal as an `ApiError`.
+`createApiErrors` says it in the page's language, from the catalogue the app
+keeps. Make one beside the catalogue:
+
+```ts
+// app/api-errors.ts
+import { createApiErrors } from '@alxia/react-router/errors';
+import { apiMessages } from './api-messages';
+import { translate } from './i18n';
+
+export const apiErrors = createApiErrors<'en' | 'fr'>({
+	messages: apiMessages,
+	// The app's own word for an API it cannot reach: never an API code.
+	unavailable: (language) => translate('app.error.unavailable', language),
+});
+```
+
+- `apiErrorMessage(error, language)` is the catalogue's text of the error's
+  code with its `params` filled in (`extensions.params` over the extensions
+  themselves), else the message the API already worded.
+- `fieldErrors(error, language)` is the message of each refused field by
+  input path, from `extensions.fields`; a refusal that names one field
+  (`extensions.field`) gives it the error's message. It is a `FormErrors`'
+  `fieldErrors`.
+- `apiRefusal(error, language)` is what a failed call says to the user, as
+  `{ message, status }` (an `ApiRefusal`): the refusal's message with its
+  status, or `unavailable` with 503 for a 503 `Response` (an API that could
+  not be reached). It is `undefined` for anything else, which the caller
+  rethrows.
+- `translateCode(code, fallback, language, values?)` words one code; use it
+  for a code the app words itself, such as a mail throttle's
+  `notes.errors.too-many-attempts` with `{ minutes: waitMinutes(extensions) }`.
+
+```ts
+import { apiErrors } from './api-errors';
+
+export async function action({ request }: Route.ActionArgs) {
+	try {
+		await createTodo(await request.json());
+		return { ok: true };
+	} catch (error) {
+		const refusal = apiErrors.apiRefusal(error, 'en');
+		if (!refusal) throw error;
+		return data(
+			{ formError: refusal.message },
+			{ status: refusal.status },
+		);
+	}
+}
+```
+
+Two options are for an API that is stricter than the default. An error with
+no API code (a raw `BAD_USER_INPUT`, from a constraint that failed before the
+API's validation layer) says the API's own message unless the app gives
+`refused`, its generic refusal, which then replaces it; the raw message is
+never shown. `byCode` words given codes in the app's own way, for refusals
+whose params differ and name no field, such as a query's depth or cost:
+
+```ts
+export const apiErrors = createApiErrors<'en' | 'fr'>({
+	messages: apiMessages,
+	unavailable: (language) => translate('app.error.unavailable', language),
+	refused: (language) => translate('app.error.refused', language),
+	byCode: {
+		'validation.errors.query-too-deep': (_error, language) =>
+			translate('app.error.too-heavy', language),
+		'validation.errors.query-too-wide': (_error, language) =>
+			translate('app.error.too-heavy', language),
+	},
+});
+```
+
+`refused` is checked first, then `byCode`, then the catalogue. `isApiCode`
+changes what counts as an API code (`<module>.errors.<slug>` by default).

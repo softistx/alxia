@@ -8,6 +8,12 @@ export {
 	waitMinutes,
 } from './api-error';
 export {
+	type ApiErrors,
+	type ApiErrorsOptions,
+	type ApiRefusal,
+	createApiErrors,
+} from './api-errors';
+export {
 	type ApiCodeResolver,
 	type ApiCodeResolverOptions,
 	apiCodeResolver,

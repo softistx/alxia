@@ -5,8 +5,10 @@
 import {
 	type ApiErrorLike,
 	ApiMessagesProvider,
+	type ApiRefusal,
 	apiCodeResolver,
 	type CatalogueMessages,
+	createApiErrors,
 	createApiMessages,
 	type FormErrors,
 	isApiErrorLike,
@@ -70,4 +72,30 @@ export const wrongResolver = apiCodeResolver<'en' | 'fr'>(messages, {
 	translate: (key) => key,
 	// @ts-expect-error the language is not 'en' | 'fr'
 	language: () => 'de',
+});
+
+export const errors = createApiErrors({
+	messages,
+	unavailable: (language) =>
+		language === 'en' ? 'Unavailable' : 'Indisponible',
+	refused: () => 'Refused',
+	byCode: { 'validation.errors.query-too-deep': () => 'Too heavy' },
+});
+
+export function refused(error: unknown): ApiRefusal | undefined {
+	return errors.apiRefusal(error, 'en');
+}
+
+export function fields(error: ApiErrorLike) {
+	return errors.fieldErrors(error, 'fr');
+}
+
+// The language is typed here too: a language outside `L` is refused.
+// @ts-expect-error 'de' is not 'en' | 'fr'
+errors.apiRefusal(new Error('x'), 'de');
+
+export const wrongErrors = createApiErrors<'en' | 'fr'>({
+	messages,
+	// @ts-expect-error the language is not 'en' | 'fr'
+	unavailable: (language: 'de') => language,
 });
