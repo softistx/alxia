@@ -487,22 +487,50 @@ no UI: the service worker's contract, which requests it caches and which
 responses it may store, the precache list read from a build, the
 registration and update notice, the web app manifest, and the cleaning at
 sign-out. It imports nothing, so the worker, a build script, the page and
-the server can all import it. The hooks are in `/pwa/react`
-(`react`, an optional peer) and `noCache` in `/pwa/server`; this package
-never reads `import.meta.env`, so the app passes `enabled`.
+the server can all import it. The worker itself is `startWorker` in
+`/pwa/worker`, its build `buildWorker` in `/pwa/build`, the hooks are in
+`/pwa/react` (`react`, an optional peer) and `noCache` in `/pwa/server`; this
+package never reads `import.meta.env`, so the app passes `enabled`.
+
+With `app/service-worker.ts` in the app, `react-router build` writes
+`build/client/service-worker.js` itself: `alxia()` bundles the file after the
+client build, with the precache list written in, and there is no script to
+add. It needs Bun (`bun --bun react-router build`, or a `bunfig.toml` with
+`[run] bun = true`). `alxia({ worker: 'sw/worker.ts' })` names another file
+and `alxia({ worker: false })` builds none.
+
+The worker bundles Workbox, whose six packages are optional peers:
+
+```sh
+bun add -d workbox-core workbox-expiration workbox-navigation-preload workbox-precaching workbox-routing workbox-strategies
+```
 
 ```ts
-// file: app/pwa-contract.ts, shared by the worker and the page:
-// every cache is named `my-app-<kind>-<version>`.
+// file: app/pwa-contract.ts
+// Shared by the worker and the page: every cache is named `my-app-<kind>-<version>`.
 import { defineWorkerContract } from '@alxia/react-router/pwa';
 
 export const workerContract = defineWorkerContract({ cachePrefix: 'my-app' });
 ```
 
+```ts
+// file: app/service-worker.ts
+import { startWorker } from '@alxia/react-router/pwa/worker';
+import { workerContract } from './pwa-contract';
+
+startWorker({ contract: workerContract });
+```
+
 ```tsx
 // file: app/root.tsx
+import { manifestHref } from '@alxia/react-router/pwa';
 import { useServiceWorker } from '@alxia/react-router/pwa/react';
 import { Outlet } from 'react-router';
+
+// The browser reads the manifest to offer the install.
+export function links() {
+	return [{ rel: 'manifest', href: manifestHref('en') }];
+}
 
 // A production build only, never under `react-router dev`.
 export default function App() {
@@ -514,42 +542,60 @@ export default function App() {
 ```ts
 // file: app/server.ts
 import { createServer } from '@alxia/react-router';
-import { SERVICE_WORKER_URL } from '@alxia/react-router/pwa';
+import {
+	MANIFEST_HEADERS,
+	MANIFEST_PATH,
+	SERVICE_WORKER_URL,
+	webAppManifest,
+} from '@alxia/react-router/pwa';
 import { noCache } from '@alxia/react-router/pwa/server';
 
-// The worker's script is revalidated; beforeAll runs before the client's files.
+// beforeAll runs before the client's files: the worker's script is
+// revalidated. The manifest is a route, served with its own headers.
 export default createServer({
 	beforeAll: (app) => app.use(SERVICE_WORKER_URL, noCache),
+	configure: (app) =>
+		app.get(MANIFEST_PATH, ({ reply }) => {
+			const manifest = webAppManifest({
+				name: 'My app',
+				description: 'My installable app',
+				lang: 'en',
+				themeColor: '#1e40af',
+				backgroundColor: '#ffffff',
+			});
+			return reply(200, JSON.stringify(manifest), { headers: MANIFEST_HEADERS });
+		}),
 });
 ```
 
-The service worker is one file on Workbox, in `/pwa/worker`, and `/pwa/build` bundles it (the six
-`workbox-*` packages, optional peers, are its only package imports):
+The manifest names four icons (`MINIMAL_2023_ICONS`): put
+`pwa-64x64.png`, `pwa-192x192.png`, `pwa-512x512.png` and
+`maskable-icon-512x512.png` in `public/`, which `@vite-pwa/assets-generator`'s
+`minimal2023Preset` writes from one image. A browser offers the install with
+a 192 and a 512.
 
-```sh
-bun add -d workbox-core workbox-expiration workbox-navigation-preload workbox-precaching workbox-routing workbox-strategies
+The worker serves a page load from `public/offline.html` when the network
+fails, and the build needs the file:
+
+```html
+<!-- file: public/offline.html -->
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8" />
+		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<meta http-equiv="Content-Security-Policy" content="default-src 'none'" />
+		<title>Offline</title>
+	</head>
+	<body>
+		<h1>You are offline</h1>
+		<p>Check your connection and try again.</p>
+	</body>
+</html>
 ```
 
-```ts
-// file: app/service-worker.ts
-import { defineWorkerContract } from '@alxia/react-router/pwa';
-import { startWorker } from '@alxia/react-router/pwa/worker';
-
-startWorker({
-	contract: defineWorkerContract({ cachePrefix: 'my-app' }),
-	// buildWorker (or alxia()) writes the precache list in.
-});
-```
-
-With `app/service-worker.ts` in the app, `react-router build` writes
-`build/client/service-worker.js` itself: `alxia()` bundles the file after the
-client build, with the precache list, and there is no script to add. It needs
-Bun (`bun --bun react-router build`, or a `bunfig.toml` with `[run] bun = true`).
-`alxia({ worker: 'sw/worker.ts' })` names another file and `alxia({ worker: false })`
-builds none.
-
-For a pipeline of your own, `buildWorker` from `/pwa/build` does the same. It
-needs Bun and runs after `react-router build`:
+For a build pipeline of your own, `buildWorker` from `/pwa/build` does what
+`alxia()` does. It needs Bun and runs after `react-router build`:
 
 ```ts
 // file: scripts/build-worker.ts
@@ -559,8 +605,8 @@ await buildWorker({ file: 'app/service-worker.ts' });
 ```
 
 The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md)
-has the worker's options, the manifest route, the update banner and the
-rest.
+has the worker's options, the offline page, the manifest route, the update
+banner and the rest.
 
 ## Traps
 
@@ -691,7 +737,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Customising the server](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/customising-the-server.md): `createServer()`, and the escape hatches.
 - [Typing the loaders](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/typing-the-loaders.md): `Register`, and the app's own context keys.
 - [A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md), [Beside the pages](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md) (middlewares, routes, WebSockets, the client's files), [OpenAPI](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/openapi.md), [Testing](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/testing.md) and [Deploying](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md), with Docker.
-- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the worker, the precache list from a build, building the worker with `buildWorker`, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
+- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what the subpaths hold, the worker's contract, the worker, what it caches, the offline page, building the worker with `alxia()` or `buildWorker`, the hooks in React, registering the worker and offering an update, serving the worker's script, the web app manifest, and clearing at sign-out.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.
