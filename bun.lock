@@ -104,7 +104,7 @@
     },
     "packages/create": {
       "name": "@alxia/create",
-      "version": "0.5.5",
+      "version": "0.5.6",
       "bin": {
         "create-alxia": "./dist/index.js",
       },
@@ -301,7 +301,7 @@
     },
     "packages/react-router": {
       "name": "@alxia/react-router",
-      "version": "0.10.0",
+      "version": "0.11.0",
       "bin": {
         "alxia-react-router": "./dist/cli/index.js",
       },
