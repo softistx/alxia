@@ -29,7 +29,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self' 'nonce-…'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-script-src-self-nonce-)
 - [`A tree hydrated but some attributes of the server rendered HTML didn't match the client properties`](#a-tree-hydrated-but-some-attributes-of-the-server-rendered-html-didnt-match-the-client-properties)
 - [`useNonce()` is undefined on the server](#usenonce-is-undefined-on-the-server)
-- [`createPageLanguage(): the fallback "x" is not one of the languages.`](#createpagelanguage-the-fallback-x-is-not-one-of-the-languages)
+- [`TypeError: InlineScript(): the code contains "</script" or "<!--", which ends or confuses the script element; escape it, such as "<\/script" inside a string`](#typeerror-inlinescript-the-code-contains-script-or----which-ends-or-confuses-the-script-element-escape-it-such-as-script-inside-a-string)
+- [`TypeError: createPageLanguage(): the fallback … is not one of the languages; got ….`](#typeerror-createpagelanguage-the-fallback--is-not-one-of-the-languages-got-)
 - [The error page shows in the fallback language](#the-error-page-shows-in-the-fallback-language)
 - [`Error: You must render this element inside a <HydratedRouter> element`](#error-you-must-render-this-element-inside-a-hydratedrouter-element)
 - [`alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`](#alxia-react-router--already-exists-and-reveal-leaves-it-as-it-is-run-alxia-react-router-reveal---force-to-overwrite-it)
@@ -635,7 +636,33 @@ import { DocumentNonce } from '@alxia/react-router/document';
 
 ([guide](guide/document.md#the-entry))
 
-### `createPageLanguage(): the fallback "x" is not one of the languages.`
+### `TypeError: InlineScript(): the code contains "</script" or "<!--", which ends or confuses the script element; escape it, such as "<\/script" inside a string`
+
+**When:** a page renders an `<InlineScript code={…} />` whose code holds
+`</script` (in any case) or `<!--`.
+
+**Why:** the code is written into the page unescaped. A `</script` ends the
+element early, so what follows is HTML, not script, and can be markup an
+attacker chose; a `<!--` makes the HTML parser treat the following
+`<script` as part of the script's text. A nonce does not help: it only says
+the script may run. The component refuses the code instead of rendering it.
+
+**Fix:** keep the code a constant of the app and escape the sequence inside
+a string, which a JavaScript parser reads the same:
+
+```tsx
+<InlineScript code={'document.title = "<\/script>"'} />
+```
+
+Never build the code from user input; pass such a value through a `data-`
+attribute and read it from the script.
+([guide](guide/document.md#the-theme-boot-script))
+
+### `TypeError: createPageLanguage(): the fallback … is not one of the languages; got ….`
+
+```text
+TypeError: createPageLanguage(): the fallback "de" is not one of the languages; got ["en","fr"].
+```
 
 **When:** the module that calls `createPageLanguage` loads.
 
@@ -706,8 +733,8 @@ renders `ServerRouter` in the entry, and the one `<Links>` and `<Scripts>`
 in the root read. They share no context. `alxia()` from
 `@alxia/react-router/vite` keeps them to one (it inlines `/entry` and
 `/document`, by an alias in dev and in the build, so they import the app's
-`react-router`), so the message means the plugin is not in use, or the
-package is listed in `ssr.external` without it.
+`react-router`). The message means `@alxia/react-router` is listed in
+`ssr.external` and `alxia()` is not in use.
 
 **Fix:** add `alxia()` to `vite.config.ts` beside `reactRouter()`, or list
 `@alxia/react-router` in `ssr.noExternal` and remove it from
@@ -1087,16 +1114,17 @@ this message too.
 
 ### `error: Cannot find package 'isbot' from '…/@alxia/react-router/dist/entry/index.js'`
 
-**When:** the server starts or builds with `entry.server.tsx` re-exporting
-`@alxia/react-router/entry`.
+**When:** a request with a user agent reaches `entry.server.tsx` re-exporting
+`@alxia/react-router/entry` (or a `createEntry()` with no `isBot` option).
 
 ```text
 error: Cannot find package 'isbot' from '/app/node_modules/@alxia/react-router/dist/entry/index.js'
 ```
 
-**Why:** `/entry` asks `isbot` whether a request comes from a crawler, which
-then gets the whole page. `isbot` and `react-dom` are optional peers of the
-package, so nothing installs them for you. React Router's templates
+**Why:** with no `isBot` option, `/entry` asks `isbot` whether a request
+comes from a crawler, which then gets the whole page, and imports it on the
+first request that needs it. `isbot` and `react-dom` are optional peers of
+the package, so nothing installs them for you. React Router's templates
 install both; an app made another way may not.
 
 **Fix:** add them where the server is built and run:
@@ -1105,8 +1133,8 @@ install both; an app made another way may not.
 bun add isbot react-dom
 ```
 
-The `isBot` option replaces the check, not the import: `/entry` loads
-`isbot` for its default whatever the option says.
+Or give the `isBot` option, which replaces the check: `isbot` is then never
+imported, and only `react-dom` is needed.
 
 ### `startWorker(): no precache list. …`
 

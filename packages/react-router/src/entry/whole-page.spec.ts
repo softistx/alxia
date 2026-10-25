@@ -12,28 +12,38 @@ const BROWSER =
 	'Mozilla/5.0 (Macintosh; Intel Mac OS X 14_0) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0 Safari/537.36';
 
 describe('wantsWholePage', () => {
-	test('a bot, by isbot', () => {
-		expect(wantsWholePage(request(BOT), false)).toBe(true);
-		expect(wantsWholePage(request(BROWSER), false)).toBe(false);
+	test('a bot, by isbot', async () => {
+		expect(await wantsWholePage(request(BOT), false)).toBe(true);
+		expect(await wantsWholePage(request(BROWSER), false)).toBe(false);
 	});
 
-	test('SPA mode always', () => {
-		expect(wantsWholePage(request(BROWSER), true)).toBe(true);
-		expect(wantsWholePage(request(), true)).toBe(true);
+	test('SPA mode always', async () => {
+		expect(await wantsWholePage(request(BROWSER), true)).toBe(true);
+		expect(await wantsWholePage(request(), true)).toBe(true);
 	});
 
-	test('no user agent is not a bot', () => {
-		expect(wantsWholePage(request(), false)).toBe(false);
+	test('no user agent is not a bot', async () => {
+		expect(await wantsWholePage(request(), false)).toBe(false);
 	});
 
-	test('isBot replaces isbot', () => {
-		expect(wantsWholePage(request(BOT), false, () => false)).toBe(false);
-		expect(wantsWholePage(request(BROWSER), false, () => true)).toBe(true);
+	test('isBot replaces isbot', async () => {
+		expect(await wantsWholePage(request(BOT), false, () => false)).toBe(false);
+		expect(await wantsWholePage(request(BROWSER), false, () => true)).toBe(
+			true,
+		);
 	});
 
-	test('isBot is not asked without a user agent', () => {
+	test('isBot is not asked without a user agent', async () => {
 		const asked: string[] = [];
-		wantsWholePage(request(), false, (agent) => !asked.push(agent));
+		await wantsWholePage(request(), false, (agent) => !asked.push(agent));
 		expect(asked).toEqual([]);
+	});
+});
+
+describe('wantsWholePage, without isBot', () => {
+	test('the default isbot is imported once and reused', async () => {
+		const first = await wantsWholePage(request(BOT), false);
+		const second = await wantsWholePage(request(BOT), false);
+		expect([first, second]).toEqual([true, true]);
 	});
 });

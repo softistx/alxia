@@ -18,16 +18,18 @@ export interface EntryOptions {
 	 * Milliseconds React Router waits for a pending promise; the render itself
 	 * is aborted 1 000 ms later. Export it as `streamTimeout`. Default 5 000.
 	 */
-	readonly streamTimeout?: number;
+	readonly streamTimeout?: number | undefined;
 	/** This response's CSP nonce. Default `nonceOf(loadContext)`. */
-	readonly nonce?: (
-		loadContext: RouterContextProvider,
-		request: Request,
-	) => string | undefined;
-	/** Whether a user agent is a bot, which gets the whole page. Default `isbot`. */
-	readonly isBot?: (userAgent: string) => boolean;
+	readonly nonce?:
+		| ((
+				loadContext: RouterContextProvider,
+				request: Request,
+		  ) => string | undefined)
+		| undefined;
+	/** Whether a user agent is a bot, which gets the whole page. Default `isbot`, which is then needed. */
+	readonly isBot?: ((userAgent: string) => boolean) | undefined;
 	/** An error after the shell is out. Default `console.error`. */
-	readonly onError?: (error: unknown) => void;
+	readonly onError?: ((error: unknown) => void) | undefined;
 }
 
 /** React Router's `handleRequest` export of `entry.server`. */
@@ -39,18 +41,21 @@ export type HandleRequest = (
 	loadContext: RouterContextProvider,
 ) => Promise<Response>;
 
-export const streamTimeout = 5_000;
+/** What `createEntry` returns: the two exports of `entry.server`. */
+export interface Entry {
+	readonly handleRequest: HandleRequest;
+	readonly streamTimeout: number;
+}
+
+export const streamTimeout: number = 5_000;
 
 /**
  * `entry.server`'s `handleRequest` and `streamTimeout`, on the web stream
  * renderer. Streams the shell, waits for the whole page for a bot and in
- * SPA mode, answers HEAD with no body, and gives the router the response's
- * CSP nonce.
+ * SPA mode, answers HEAD with no body, stops rendering when the client goes
+ * away, and gives the router the response's CSP nonce.
  */
-export function createEntry(options: EntryOptions = {}): {
-	readonly handleRequest: HandleRequest;
-	readonly streamTimeout: number;
-} {
+export function createEntry(options: EntryOptions = {}): Entry {
 	const timeout = options.streamTimeout ?? streamTimeout;
 	const nonceFor = options.nonce ?? nonceOf;
 	const report = options.onError ?? console.error;
@@ -88,7 +93,7 @@ export function createEntry(options: EntryOptions = {}): {
 				),
 				{
 					nonce,
-					signal: limit.signal,
+					signal: AbortSignal.any([limit.signal, request.signal]),
 					onError(error: unknown) {
 						status = 500;
 						if (shellOut) report(error);
@@ -96,7 +101,9 @@ export function createEntry(options: EntryOptions = {}): {
 				},
 			);
 			shellOut = true;
-			if (wantsWholePage(request, routerContext.isSpaMode, options.isBot)) {
+			if (
+				await wantsWholePage(request, routerContext.isSpaMode, options.isBot)
+			) {
 				await body.allReady;
 			}
 			return new Response(untilDone(body, limit.clear), {

@@ -50,3 +50,16 @@ createPageLanguage({
 // A picked language is typed too.
 // @ts-expect-error 'de' is not 'en' | 'ar' | 'fr'
 language.chooseLanguage('de');
+
+// useNonce() is `string | undefined`: under exactOptionalPropertyTypes the
+// props and options must accept `undefined` themselves.
+export const forwarded = (): InlineScriptProps => ({
+	code: 'a()',
+	nonce: useNonce(),
+});
+export const forwardedNonce = (): DocumentNonceProps => ({
+	nonce: useNonce(),
+	children: undefined,
+});
+export const forwardedScript = () =>
+	InlineScript({ code: 'a()', nonce: useNonce() });

@@ -33,7 +33,7 @@ async function chunks(response: Response) {
 }
 
 describe('the package entry, on the fixture', () => {
-	test('answers HEAD with the status and no body', async () => {
+	test('under alxia a HEAD is rendered as a GET, and the core drops the body (status and content-type kept)', async () => {
 		for (const [path, status] of [
 			['/', 200],
 			['/boom', 500],

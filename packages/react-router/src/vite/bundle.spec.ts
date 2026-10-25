@@ -193,10 +193,12 @@ describe('react-router build, a package the app keeps external', () => {
 	});
 
 	test('stays an import of the bundle, and the rest is bundled', async () => {
-		const imports = bareImports(
-			await Bun.file(join(fixture.root, 'build', 'server', 'index.js')).text(),
-		);
-		expect(imports).toContain('isbot');
+		const bundle = await Bun.file(
+			join(fixture.root, 'build', 'server', 'index.js'),
+		).text();
+		const imports = bareImports(bundle);
+		// /entry imports isbot lazily, so it stays an import() of the bundle.
+		expect(bundle).toMatch(/import\(\s*["']isbot["']\s*\)/);
 		expect(imports).not.toContain('react');
 		expect(imports).not.toContain('react-router');
 	});

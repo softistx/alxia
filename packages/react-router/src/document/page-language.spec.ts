@@ -75,7 +75,7 @@ test('a fallback outside the languages throws', () => {
 		}),
 	).toThrow(
 		new TypeError(
-			'createPageLanguage(): the fallback "de" is not one of the languages.',
+			'createPageLanguage(): the fallback "de" is not one of the languages; got ["en","fr"].',
 		),
 	);
 });

@@ -62,9 +62,13 @@ export {
 ```
 
 It reads `nonceOf(loadContext)` by default; `createEntry({ nonce })`
-takes another source ([the entry](document.md#the-entry)). The root passes
-the same nonce to `<Links>`, `<ScrollRestoration>` and `<Scripts>` with
-`useNonce()`.
+takes another source ([the entry](document.md#the-entry)).
+
+The root passes nothing: `<Links>`, `<Scripts>` and `<ScrollRestoration>`
+fall back to the nonce `<ServerRouter nonce>` put in React Router's
+framework context, so their `nonce` props are optional with this entry.
+`useNonce()` stays for what the app inserts itself: an `InlineScript`, a
+`CspNonceMeta`, any other script or style.
 
 ### An entry of your own
 
@@ -101,6 +105,12 @@ nonceOf(loadContext), … }`.
 That is all: under `react-router dev` and from the build, every `<script>`
 of a page carries the nonce of its own response's policy, Vite's dev
 scripts included.
+
+## Never cache a nonced page publicly
+
+A page with a nonce is made per response. A route's `headers` export must
+never mark it `public` (or give it a `s-maxage`): a shared cache would hand
+the same nonce to every visitor, and a nonce everyone knows protects nothing.
 
 ## How it stays loose
 
