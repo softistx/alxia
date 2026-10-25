@@ -151,8 +151,15 @@ app.use(
 ```
 
 Any other `secureHeaders` option passes through and wins over the preset's;
-`contentSecurityPolicy` and `nonce` are not options here. A `script-src`
-without `NONCE` is refused with a `TypeError` that starts `pageHeaders():`.
+`contentSecurityPolicy` and `nonce` are not options here, and an explicit
+`undefined` keeps the preset's value. A `script-src`, or a `script-src-elem`
+list, without `NONCE` is refused with a `TypeError` that starts
+`pageHeaders():`; so is removing `default-src`, `base-uri` or `object-src`.
+`csp()` refuses a keyword written without its quotes (`self` for `'self'`) with
+a `TypeError` that starts `csp():`. `clearSiteData()` sends nothing for a
+request another site made (`Sec-Fetch-Site`, else `Origin` against the
+`origin` option, which a TLS-terminating proxy needs for older browsers),
+unless `crossSite: true`.
 
 ## Defaults
 
@@ -218,6 +225,6 @@ const app = alxia().use(secureHeaders()).use(errorHandler).get(...);
 
 ## Documentation
 
-- [Guide](https://github.com/softistx/alxia/tree/develop/packages/secure-headers/docs): every option and its default, the per-request nonce, which responses get the headers, a page's own policy, the order with other middlewares, and recipes.
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/secure-headers/docs): every option and its default, the per-request nonce, `csp()`, `pageHeaders()`, `cacheControl` and `clearSiteData()`, which responses get the headers, a page's own policy, the order with other middlewares, and recipes.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/secure-headers/docs/troubleshooting.md): an error message or a browser refusal, and what to do about it.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/secure-headers/docs/roadmap.md): what is coming, and what is not planned.

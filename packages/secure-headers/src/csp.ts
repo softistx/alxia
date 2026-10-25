@@ -40,10 +40,32 @@ export type CspDirectives = {
 	readonly [name: string]: CspValue | undefined;
 };
 
+const KEYWORDS = new Set([
+	'self',
+	'none',
+	'unsafe-inline',
+	'unsafe-eval',
+	'unsafe-hashes',
+	'strict-dynamic',
+	'wasm-unsafe-eval',
+	'report-sample',
+	'inline-speculation-rules',
+]);
+
+/** A keyword, or a nonce or hash, written without its quotes. */
+function isUnquotedKeyword(source: string): boolean {
+	const lower = source.toLowerCase();
+	return (
+		KEYWORDS.has(lower) ||
+		/^(nonce|sha256|sha384|sha512)-[a-z0-9+/_-]+=*$/.test(lower)
+	);
+}
+
 /**
  * The policy, written in insertion order: `name src src; name src`. `NONCE`
  * passes through as it is, for `secureHeaders({ nonce: true })` to replace.
- * Throws a `TypeError` at startup on a policy a browser would misread.
+ * Throws a `TypeError` at startup on a policy a browser would misread, such
+ * as a keyword written without its quotes (`self` for `'self'`).
  *
  * ```ts
  * secureHeaders({
@@ -78,6 +100,13 @@ export function csp(directives: CspDirectives): string {
 			if (/[;,\s]/.test(source) || source === '') {
 				throw new TypeError(
 					`csp(): ${name} has the source "${source}", which is empty or holds ";", "," or a space: a source is one token, so split a list into several sources, and write a comma inside a URL as %2C`,
+				);
+			}
+		}
+		for (const source of value) {
+			if (isUnquotedKeyword(source)) {
+				throw new TypeError(
+					`csp(): ${source} in ${name} is a keyword: write it quoted, '${source}'`,
 				);
 			}
 		}

@@ -2,8 +2,9 @@
 
 Each entry is headed by the text you see: a TypeScript error, an exception,
 a browser console message, or a header that is or is not on a response.
-`secureHeaders` throws only at startup, on options it cannot send; what
-goes wrong otherwise is a type, a browser refusing what a header forbids,
+`secureHeaders`, `csp()`, `pageHeaders()` and `clearSiteData()` throw only
+at startup, on options they cannot send; `cacheControl` is an option of
+`secureHeaders`. What goes wrong otherwise is a type, a browser refusing what a header forbids,
 or a header in the wrong place.
 
 **Types**
@@ -14,11 +15,15 @@ or a header in the wrong place.
 - [`Type 'undefined' is not assignable to type 'SecureHeadersOptions & { readonly nonce: true; }'`](#type-undefined-is-not-assignable-to-type-secureheadersoptions---readonly-nonce-true-)
 - [`Property 'nonce' does not exist on type 'RouteBase<…>'`](#property-nonce-does-not-exist-on-type-routebase)
 - [`No overload matches this call` … `Type 'boolean' is not assignable to type 'true'`](#no-overload-matches-this-call--type-boolean-is-not-assignable-to-type-true)
+- [`Type 'string' is not assignable to type 'CspValue | undefined'`](#type-string-is-not-assignable-to-type-cspvalue--undefined)
+- [`Object literal may only specify known properties, and 'contentSecurityPolicy' does not exist in type 'PageHeadersOptions'`](#object-literal-may-only-specify-known-properties-and-contentsecuritypolicy-does-not-exist-in-type-pageheadersoptions)
+- [`Property 'https' is missing in type '{}' but required in type 'PageHeadersOptions'`](#property-https-is-missing-in-type--but-required-in-type-pageheadersoptions)
+- [`Type '"cash"' is not assignable to type '"cookies" | "*" | "cache" | "storage" | "executionContexts" | "clientHints" | "prefetchCache" | "prerenderCache"'`](#type-cash-is-not-assignable-to-type-cookies----cache--storage--executioncontexts--clienthints--prefetchcache--prerendercache)
 
 **Runtime**
 
 - [`TypeError: secureHeaders: … is empty; give false to leave the … header out`](#typeerror-secureheaders--is-empty-give-false-to-leave-the--header-out)
-- [`use(): argument 1 looks like a factory (secureHeaders): call it, use(secureHeaders())`](#use-argument-1-looks-like-a-factory-secureheaders-call-it-usesecureheaders)
+- [`use(): argument 1 looks like a factory (<name>): call it, use(<name>())`](#use-argument-1-looks-like-a-factory-name-call-it-usename)
 - [`TypeError: secureHeaders: nonce is on, but the content-security-policy has no script-src to add it to: …`](#typeerror-secureheaders-nonce-is-on-but-the-content-security-policy-has-no-script-src-to-add-it-to-)
 - [`TypeError: secureHeaders: nonce is on, but contentSecurityPolicy is false: …`](#typeerror-secureheaders-nonce-is-on-but-contentsecuritypolicy-is-false-)
 - [`TypeError: secureHeaders: contentSecurityPolicy names NONCE, but nonce is off: give nonce: true`](#typeerror-secureheaders-contentsecuritypolicy-names-nonce-but-nonce-is-off-give-nonce-true)
@@ -30,6 +35,9 @@ or a header in the wrong place.
 - [`TypeError: clearSiteData(): "<type>" is not a type: write one of "cache", "cookies", "storage", "executionContexts", "clientHints", "prefetchCache", "prerenderCache", "*"`](#typeerror-clearsitedata-type-is-not-a-type-write-one-of-cache-cookies-storage-executioncontexts-clienthints-prefetchcache-prerendercache-)
 - [`TypeError: pageHeaders(): script-src has no NONCE: a page script runs only with the response's nonce, so write script-src with NONCE in directives, such as ["'self'", NONCE, "'strict-dynamic'"]`](#typeerror-pageheaders-script-src-has-no-nonce-a-page-script-runs-only-with-the-responses-nonce-so-write-script-src-with-nonce-in-directives-such-as-self-nonce-strict-dynamic)
 - [`TypeError: pageHeaders(): script-src-elem has no NONCE: script elements follow it instead of script-src, so add NONCE to it, or give false to remove it`](#typeerror-pageheaders-script-src-elem-has-no-nonce-script-elements-follow-it-instead-of-script-src-so-add-nonce-to-it-or-give-false-to-remove-it)
+- [`TypeError: pageHeaders(): <name> cannot be removed from a page policy: …`](#typeerror-pageheaders-name-cannot-be-removed-from-a-page-policy-)
+- [`TypeError: csp(): <value> in <directive> is a keyword: write it quoted, '<value>'`](#typeerror-csp-value-in-directive-is-a-keyword-write-it-quoted-value)
+- [`TypeError: clearSiteData(): methods is empty or holds an empty method: write at least one, such as ["POST"], or leave methods out`](#typeerror-clearsitedata-methods-is-empty-or-holds-an-empty-method-write-at-least-one-such-as-post-or-leave-methods-out)
 
 **In the browser**
 
@@ -228,6 +236,75 @@ const app = useNonce
 
 Or keep it on everywhere: the nonce costs one random draw per request.
 
+### `Type 'string' is not assignable to type 'CspValue | undefined'`
+
+**When:** a directive of `csp()`, or of `pageHeaders({ directives })`, is given a bare string instead of a list.
+
+```text
+error TS2322: Type 'string' is not assignable to type 'CspValue | undefined'.
+```
+
+**Why:** a directive's value is a list of sources (`readonly string[]`), `true` for a bare directive, or `false` to leave it out. One string would be one source, and a space inside it is refused at startup.
+
+**Fix:** write a list, even for one source:
+
+```ts
+csp({ 'script-src': ["'self'"] });
+```
+
+### `Object literal may only specify known properties, and 'contentSecurityPolicy' does not exist in type 'PageHeadersOptions'`
+
+**When:** `pageHeaders()` is given `contentSecurityPolicy`. `'nonce'` gives the same message, with the name changed.
+
+```text
+error TS2353: Object literal may only specify known properties, and 'contentSecurityPolicy' does not exist in type 'PageHeadersOptions'.
+```
+
+**Why:** a page policy is written through `directives`, merged over `PAGE_DIRECTIVES`, and always carries a nonce, so neither `contentSecurityPolicy` nor `nonce` is an option of `pageHeaders()`.
+
+**Fix:** use `directives`, and drop `nonce`:
+
+```ts
+pageHeaders({ https: true, directives: { 'img-src': ["'self'", 'https://img.example'] } });
+```
+
+For a whole policy of your own, use `secureHeaders({ nonce: true, contentSecurityPolicy: csp(…) })`.
+
+### `Property 'https' is missing in type '{}' but required in type 'PageHeadersOptions'`
+
+**When:** `pageHeaders({})`, or an options object without `https`.
+
+```text
+error TS2345: Argument of type '{}' is not assignable to parameter of type 'PageHeadersOptions'.
+  Property 'https' is missing in type '{}' but required in type 'PageHeadersOptions'.
+```
+
+**Why:** `https` switches HSTS and `upgrade-insecure-requests`, and the package never reads the environment to guess it.
+
+**Fix:** pass your own flag:
+
+```ts
+pageHeaders({ https: import.meta.env.PROD });
+```
+
+### `Type '"cash"' is not assignable to type '"cookies" | "*" | "cache" | "storage" | "executionContexts" | "clientHints" | "prefetchCache" | "prerenderCache"'`
+
+**When:** `clearSiteData(['cash'])`, a type the header does not know, or a type of `ClearSiteDataType` misspelled.
+
+```text
+error TS2322: Type '"cash"' is not assignable to type '"cookies" | "*" | "cache" | "storage" | "executionContexts" | "clientHints" | "prefetchCache" | "prerenderCache"'.
+```
+
+The union is `ClearSiteDataType`, written out.
+
+**Why:** the browser ignores a type it does not know, so the cache would stay as it was without a word.
+
+**Fix:** use one of the listed types, in a list:
+
+```ts
+clearSiteData(['cache']);
+```
+
 ## Runtime
 
 ### `TypeError: secureHeaders: … is empty; give false to leave the … header out`
@@ -249,20 +326,21 @@ Only `false` leaves a header out.
 app.use(secureHeaders({ xFrameOptions: false }));
 ```
 
-### `use(): argument 1 looks like a factory (secureHeaders): call it, use(secureHeaders())`
+### `use(): argument 1 looks like a factory (<name>): call it, use(<name>())`
 
-**When:** `alxia().use(secureHeaders)`, the factory given uncalled, in
-JavaScript or past a cast. It throws where the app is declared, since
+**When:** `alxia().use(secureHeaders)`, `use(pageHeaders)` or
+`use(clearSiteData)`, a factory given uncalled, in JavaScript or past a
+cast. `<name>` is the factory's. It throws where the app is declared, since
 alxia 0.5; before, each request was answered with a 500 and the log said
 `GET /: a middleware (secureHeaders) returned function: …`. TypeScript
 refuses it first, with `"this looks like a factory given uncalled: …"` in
 the error.
 
-**Why:** `use` takes a middleware, a `(ctx, next)` function; `secureHeaders`
-makes one, and is marked as a factory, so `use`, a route and `plugin`
-refuse it.
+**Why:** `use` takes a middleware, a `(ctx, next)` function; `secureHeaders`,
+`pageHeaders` and `clearSiteData` make one, and are marked as factories, so
+`use`, a route and `plugin` refuse them.
 
-**Fix:**
+**Fix:** call it:
 
 ```ts
 const app = alxia()
@@ -453,7 +531,49 @@ pageHeaders({
 });
 ```
 
-Under `'strict-dynamic'` a third-party script is loaded by a nonced script, not by allowlisting its host. To allow a host, extend `font-src` or `img-src`, as in `directives: { 'img-src': ["'self'", 'https://img.example'] }`.
+### `TypeError: pageHeaders(): <name> cannot be removed from a page policy: …`
+
+**When:** `pageHeaders({ directives: { 'default-src': false } })`, or `false` or `true` for `base-uri` or `object-src`. The app fails where it is declared.
+
+```text
+TypeError: pageHeaders(): base-uri cannot be removed from a page policy: it has no fallback, so an injected <base> would redirect nonced relative scripts, so give it a list of sources
+```
+
+**Why:** `default-src` covers frame, media and child sources, and `base-uri` has no fallback, so without it an injected `<base>` would redirect the nonced relative scripts. `object-src` blocks plugin content.
+
+**Fix:** give the directive a list, or leave it out of `directives` to keep the preset's:
+
+```ts
+pageHeaders({ https: true, directives: { 'base-uri': ["'self'"] } });
+```
+
+### `TypeError: csp(): <value> in <directive> is a keyword: write it quoted, '<value>'`
+
+**When:** a source of `csp()` is `self`, `none`, `unsafe-inline`, `unsafe-eval`, `unsafe-hashes`, `strict-dynamic`, `wasm-unsafe-eval`, `report-sample` or `inline-speculation-rules`, or starts `nonce-`, `sha256-`, `sha384-` or `sha512-`, written without its single quotes (in any case). The same goes for `pageHeaders({ directives })`.
+
+```text
+TypeError: csp(): self in script-src is a keyword: write it quoted, 'self'
+```
+
+**Why:** a browser reads `self` as a host called `self`, not as this site, and ignores the keyword it meant. The policy would be looser or stricter than written, without a word.
+
+**Fix:** quote it inside the string:
+
+```ts
+csp({ 'script-src': ["'self'", NONCE] });
+```
+
+### `TypeError: clearSiteData(): methods is empty or holds an empty method: write at least one, such as ["POST"], or leave methods out`
+
+**When:** `clearSiteData(['cache'], { methods: [] })`, or a `methods` list that holds `''`. It throws where the app is declared.
+
+**Why:** with no method, the middleware would never send the header, and the sign-out would leave the cache as it was.
+
+**Fix:** name the methods, or leave `methods` out for `['POST']`:
+
+```ts
+clearSiteData(['cache'], { methods: ['POST', 'DELETE'] });
+```
 
 ## In the browser
 
@@ -565,7 +685,7 @@ pageHeaders({
 });
 ```
 
-Never put the origin in `default-src`. A script tag from another origin takes the page's `nonce` attribute; an allowlisted `script-src` source is ignored by browsers that support `'strict-dynamic'`.
+Never put the origin in `default-src`. Under `'strict-dynamic'` a third-party script is loaded by a nonced script, not by allowlisting its host: a script tag from another origin takes the page's `nonce` attribute, and a host in `script-src` is ignored by browsers that support `'strict-dynamic'`. To allow a host for images, extend `img-src` the same way, as in `directives: { 'img-src': ["'self'", 'https://img.example'] }`.
 
 ### `Refused to frame '…' because an ancestor violates the following Content Security Policy directive: "frame-ancestors 'none'"`
 

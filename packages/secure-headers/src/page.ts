@@ -17,7 +17,7 @@ import {
  * directive that loads it (through `pageHeaders`' `directives`), never in
  * `default-src`, and never `'unsafe-inline'` or `'unsafe-eval'` in `script-src`.
  */
-export const PAGE_DIRECTIVES: CspDirectives = {
+const PAGE_POLICY = {
 	// Anything a directive below does not name: this site only.
 	'default-src': ["'self'"],
 	// Only the scripts this response's nonce marks (the framework's inline
@@ -54,7 +54,25 @@ export const PAGE_DIRECTIVES: CspDirectives = {
 	// No page frames this one (clickjacking); X-Frame-Options covers older
 	// browsers.
 	'frame-ancestors': ["'none'"],
-};
+} as const satisfies CspDirectives;
+
+/** `PAGE_POLICY`, frozen with each of its lists. */
+export const PAGE_DIRECTIVES: typeof PAGE_POLICY = Object.freeze(
+	Object.fromEntries(
+		Object.entries(PAGE_POLICY).map(([name, sources]) => [
+			name,
+			Object.freeze(sources),
+		]),
+	),
+) as typeof PAGE_POLICY;
+
+/** Directives a page policy cannot do without. */
+const REQUIRED = {
+	'default-src': 'it covers frame, media and child sources',
+	'base-uri':
+		'it has no fallback, so an injected <base> would redirect nonced relative scripts',
+	'object-src': 'it blocks plugin content',
+} as const;
 
 export interface PageHeadersOptions
 	extends Omit<SecureHeadersOptions, 'contentSecurityPolicy'> {
@@ -84,11 +102,26 @@ export interface PageHeadersOptions
  * app.use(pageHeaders({ https: import.meta.env.PROD }));
  * ```
  *
- * Throws a `TypeError` when the merged `script-src`, or a `script-src-elem`
+ * Throws a `TypeError` when `directives` removes `default-src`, `base-uri`
+ * or `object-src`, and when the merged `script-src`, or a `script-src-elem`
  * given as a list, lacks `NONCE`: the page would not hydrate.
  */
 export function pageHeaders(options: PageHeadersOptions): NonceMiddleware {
-	const { https, directives = {}, ...rest } = options;
+	const { https, directives: asGiven = {}, ...given } = options;
+	const defined = (entries: object) =>
+		Object.fromEntries(
+			Object.entries(entries).filter(([, value]) => value !== undefined),
+		);
+	const rest = defined(given) as typeof given;
+	const directives: CspDirectives = defined(asGiven);
+	for (const [name, why] of Object.entries(REQUIRED)) {
+		const value = directives[name];
+		if (value === false || value === true) {
+			throw new TypeError(
+				`pageHeaders(): ${name} cannot be removed from a page policy: ${why}, so give it a list of sources`,
+			);
+		}
+	}
 	const merged: CspDirectives = {
 		...PAGE_DIRECTIVES,
 		...directives,
@@ -108,9 +141,7 @@ export function pageHeaders(options: PageHeadersOptions): NonceMiddleware {
 		);
 	}
 	return secureHeaders({
-		strictTransportSecurity: https
-			? 'max-age=31536000; includeSubDomains'
-			: false,
+		...(https ? {} : { strictTransportSecurity: false }),
 		referrerPolicy: 'strict-origin-when-cross-origin',
 		cacheControl: 'private, no-store',
 		...rest,

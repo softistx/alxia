@@ -2,7 +2,10 @@
 
 This page covers `secureHeaders`: what it sends, how to change or drop each
 header, the per-request nonce, which responses it reaches, and how a page or
-another middleware sets its own policy.
+another middleware sets its own policy. It also covers the four additions for
+server-rendered pages: `csp()` writes the policy from directives,
+`pageHeaders()` is the preset for a page, `cacheControl` keeps pages out of
+caches, and `clearSiteData()` empties the browser's cache on sign-out.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -122,8 +125,10 @@ Use `false` to drop a header.
 ### The defaults, explicitly
 
 With `exactOptionalPropertyTypes` on, an option set to `undefined` is a
-compile error; with it off, `undefined` means the default. To keep the
-default under a condition, leave the key out:
+compile error; with it off, `undefined` means the default (under
+`pageHeaders`, the preset's value: the key is ignored, so `cacheControl:
+undefined` keeps `private, no-store`). To keep the default under a
+condition, leave the key out:
 
 ```ts
 const production = Bun.env.NODE_ENV === 'production';
@@ -383,8 +388,13 @@ Never add `'unsafe-eval'`, nor `'unsafe-inline'` to `script-src`.
 ### Changing the policy
 
 `directives` merges over `PAGE_DIRECTIVES`: a list replaces that directive's
-sources (it does not append), `false` removes the directive, and a name the
-preset lacks is added. A source goes in the directive that loads it, never in
+sources (it does not append), `false` removes the directive, `undefined`
+keeps the preset's value, and a name the preset lacks is added. Three cannot be removed, with `false` or `true`:
+`default-src`, which covers frame, media and child sources, and `base-uri`,
+which has no fallback, so an injected `<base>` would redirect nonced
+relative scripts, and `object-src`, which blocks plugin content. They throw a
+`TypeError` that starts `pageHeaders():`
+([troubleshooting](troubleshooting.md#typeerror-pageheaders-name-cannot-be-removed-from-a-page-policy-)); give a list to change one. A source goes in the directive that loads it, never in
 `default-src`. Under `'strict-dynamic'` a third-party script is loaded by a
 nonced script, not by allowlisting its host: browsers that support it ignore
 host sources in `script-src`.
@@ -430,7 +440,9 @@ app.use(
 
 It is set like every other header: a route's own `Cache-Control` is kept
 (a static asset can stay cacheable), and a 404 or a thrown error gets it too.
-An empty value is refused at startup; give `false` to leave it out.
+An empty value is refused at startup; give `false` to leave it out. A page's
+own `Cache-Control` must stay `private` or `no-store` while it carries a
+nonce, never `public`.
 
 ## Clear-Site-Data
 
@@ -452,9 +464,20 @@ const app = alxia()
 
 - **Only a sign-out that went through.** It sends the header on a 2xx or 3xx
   answer to one of `methods` (`['POST']` by default). A GET, or a refused
-  request (another site's post, a 403, a 415, a failure), signed nobody out
-  and must not empty their cache. Pass `{ methods: ['POST', 'DELETE'] }` to
-  widen the rule.
+  request (a 403, a 415, a failure), signed nobody out and must not empty
+  their cache. Pass `{ methods: ['POST', 'DELETE'] }` to widen the rule.
+- **Not for another site's request.** A form on another site can post to
+  `/sign-out` and get a redirect, which would wipe the viewer's cache or
+  cookies. So when `Sec-Fetch-Site` is present, it alone decides: anything
+  other than `same-origin` or `none` clears nothing (`same-site` too, since a
+  sibling subdomain may be attacker-controlled), and `Origin` is not
+  read. Only without it (an older browser) is an `Origin` compared with the
+  app's own origin. A request with neither header (curl) is cleared.
+  Modern browsers need nothing more behind a TLS-terminating proxy, since
+  the proxy does not rewrite `Sec-Fetch-Site`. For older browsers behind
+  one, where the request's URL says `http:` and `Origin` says `https:`, set
+  `origin: 'https://app.example.com'` (or a function returning it). Pass
+  `{ crossSite: true }` only to give the protection up.
 - **A route's own header wins.** An answer that already carries
   `Clear-Site-Data` keeps it, as `secureHeaders` does for its headers.
 - **Several types** are written quoted and comma-separated:
