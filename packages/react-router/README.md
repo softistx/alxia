@@ -651,6 +651,10 @@ declare function fetchCatalogue(
 	language: string,
 ): Promise<{ version: string; messages: { code: string; message: string; params: { name: string; kind: 'TEXT' }[] }[] }>;
 declare function fetchVersions(): Promise<{ en: string; fr: string }>;
+
+// The root's middleware: await catalogue.freshAll();
+// The root's loader: return { messages: catalogue.clientMessages() };
+// server.ts, at startup: catalogue.warm();
 ```
 
 The [errors guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md)

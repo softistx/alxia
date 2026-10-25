@@ -646,8 +646,9 @@ export const catalogue = createErrorCatalogue<'en' | 'fr'>({
 });
 ```
 
-`ttlMs` is a number or a getter read at each check, so a value set at startup
-or changed by a test is found. `retryMs` (5000 by default) is how soon a
+`ttlMs` has no default and must be given: a number, or a getter read at each
+check, so a value set at startup or changed by a test is found. A getter that
+throws is logged and `retryMs` is used in its place. `retryMs` (5000 by default) is how soon a
 failed read or check is tried again, and `firstReadWaitMs` (1500 by default)
 is how long a request waits for a language's first read. `log` receives the
 failures (`console` by default); its lines start with `alxia-react-router:`.
@@ -718,7 +719,8 @@ export default createServer();
 milliseconds, so a spec moves the clock instead of sleeping: a call at
 `now = ttl` starts the check, `settled()` waits for it, and `heldVersion`
 says which version is held. `reset()` forgets what is held and empties the
-store.
+store. It is for use between tests, with nothing in flight: a read or check
+still running when it is called finishes and holds its result again.
 
 ```ts
 await catalogue.fresh('en', 0);
