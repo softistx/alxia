@@ -258,7 +258,12 @@ export const apiErrors = createApiErrors<'en' | 'fr'>({
   `notes.errors.too-many-attempts` with `{ minutes: waitMinutes(extensions) }`.
 
 ```ts
+import { data } from 'react-router';
 import { apiErrors } from './api-errors';
+import type { Route } from './+types/todos';
+
+// Your own call to the API, declared here as a stub.
+declare function createTodo(input: unknown): Promise<void>;
 
 export async function action({ request }: Route.ActionArgs) {
 	try {
@@ -296,5 +301,47 @@ export const apiErrors = createApiErrors<'en' | 'fr'>({
 });
 ```
 
-`refused` is checked first, then `byCode`, then the catalogue. `isApiCode`
-changes what counts as an API code (`<module>.errors.<slug>` by default).
+The order is exact. `refused` applies only when the error has no API code,
+or a code that `isApiCode` rejects; it outranks `byCode`. Then comes the
+catalogue, then the API's own message. `fieldErrors` uses the same order for
+a single `extensions.field`, while the entries of `extensions.fields` go
+straight to the catalogue.
+
+`isApiCode` changes what counts as an API code (`<module>.errors.<slug>` by
+default). Here only the codes of the `todos` module are the catalogue's; any
+other code, even one shaped like a catalogue code, says `refused`:
+
+```ts
+export const apiErrors = createApiErrors<'en' | 'fr'>({
+	messages: apiMessages,
+	unavailable: (language) => translate('app.error.unavailable', language),
+	refused: (language) => translate('app.error.refused', language),
+	isApiCode: (code) => code.startsWith('todos.errors.'),
+});
+```
+
+`fieldErrors` gives a form its messages by input path:
+
+```ts
+import { data } from 'react-router';
+import { isApiErrorLike } from '@alxia/react-router/errors';
+import { apiErrors } from './api-errors';
+import type { Route } from './+types/todos';
+
+declare function createTodo(input: unknown): Promise<void>;
+
+export async function action({ request }: Route.ActionArgs) {
+	try {
+		await createTodo(await request.json());
+		return { ok: true };
+	} catch (error) {
+		const refusal = apiErrors.apiRefusal(error, 'en');
+		if (!refusal || !isApiErrorLike(error)) throw error;
+		return data(
+			{ fieldErrors: apiErrors.fieldErrors(error, 'en') },
+			{ status: refusal.status },
+		);
+	}
+}
+```
+

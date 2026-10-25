@@ -573,6 +573,21 @@ export const provider = ApiMessagesProvider({
 });
 ```
 
+A failed call is worded in the page's language by `createApiErrors`:
+
+```ts
+import { createApiErrors } from '@alxia/react-router/errors';
+import { apiMessages } from './api-messages';
+
+export const apiErrors = createApiErrors<'en' | 'fr'>({
+	messages: apiMessages,
+	unavailable: (language) => (language === 'en' ? 'Unavailable' : 'Indisponible'),
+});
+
+// In an action's catch: { message, status }, or undefined (rethrow it).
+export const refusal = (error: unknown) => apiErrors.apiRefusal(error, 'en');
+```
+
 The [errors guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md)
 has the rest.
 

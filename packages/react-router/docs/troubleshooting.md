@@ -76,6 +76,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [The manifest is in the wrong language](#the-manifest-is-in-the-wrong-language)
 - [A form's own check shows the code (`todos.errors.…`) instead of words](#a-forms-own-check-shows-the-code-todoserrors-instead-of-words)
 - [A message shows its `{braces}`](#a-message-shows-its-braces)
+- [A refusal shows the API's raw message](#a-refusal-shows-the-apis-raw-message)
+- [`apiRefusal` returns undefined](#apirefusal-returns-undefined)
 
 ## Thrown or printed
 
@@ -1422,3 +1424,42 @@ const apiMessages = createApiMessages<'en' | 'fr'>({ format: formatMessage });
 
 A value is missing when the API's `extensions.params` lacks an argument the
 message names; the same call in a spec shows which.
+
+### A refusal shows the API's raw message
+
+A page shows `Variable "$email" got invalid value …` or another message the
+API worded for developers, instead of the app's words.
+
+**Why:** the error has no API code (a raw `BAD_USER_INPUT`, from a check that
+failed before the API's validation layer), or a code that `isApiCode`
+rejects. Without `refused`, `createApiErrors` says the API's own message for
+such an error.
+
+**Fix:** pass `refused`, the app's generic refusal; it replaces the raw
+message for every error that is not an API code
+([wording a refusal](guide/errors.md#wording-a-refusal)):
+
+```ts
+export const apiErrors = createApiErrors<'en' | 'fr'>({
+	messages: apiMessages,
+	unavailable: (language) => translate('app.error.unavailable', language),
+	refused: (language) => translate('app.error.refused', language),
+});
+```
+
+### `apiRefusal` returns undefined
+
+`apiErrors.apiRefusal(error, language)` gives `undefined` for a call that
+failed, and the action returns nothing useful.
+
+**Why:** the error is neither an API error (`isApiErrorLike`) nor a 503
+`Response`: a network failure, a `TypeError` of the app's own code, a 404.
+`apiRefusal` words only what the API refused or could not be reached for.
+
+**Fix:** rethrow what it does not word, so the route's error boundary shows
+it:
+
+```ts
+const refusal = apiErrors.apiRefusal(error, 'en');
+if (!refusal) throw error;
+```
