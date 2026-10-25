@@ -10,7 +10,7 @@ import {
 } from 'react-router';
 import { DocumentNonce } from '../document';
 import { nonceOf } from '../nonce';
-import { deadline, untilDone } from './abort';
+import { abandon, deadline, untilDone } from './abort';
 import { wantsWholePage } from './whole-page';
 
 export interface EntryOptions {
@@ -104,9 +104,8 @@ export function createEntry(options: EntryOptions = {}): {
 				headers: responseHeaders,
 			});
 		} catch (error) {
-			limit.clear();
 			// A throwing isBot or a rejected allReady: stop the render.
-			await body?.cancel().catch(() => {});
+			await abandon(limit, body);
 			throw error;
 		}
 	};

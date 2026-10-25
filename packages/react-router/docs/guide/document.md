@@ -155,9 +155,9 @@ It does what React Router's revealed entry does:
 - **Answers HEAD** with the status and the headers, and no body.
 - **Aborts** the render `streamTimeout + 1 000` ms in, and clears the
   timer when the body ends or the client goes away.
-- **Rejects on a shell error**, so React Router logs it once. An error
-  after the shell is out goes to `onError`; the status is 500 when the shell
-  was not out yet.
+- **Rejects when the shell fails**, so React Router logs it once and answers
+  with its error boundary. Once the shell is out, an error goes to `onError`
+  and the status stays as it was sent.
 - Sends `Content-Type: text/html`.
 
 And it gives the router the response's nonce: `<ServerRouter nonce>`,
@@ -190,6 +190,8 @@ export default entry.handleRequest;
 | `nonce` | `nonceOf(loadContext)` | this response's CSP nonce |
 | `isBot` | `isbot` | whether a user agent gets the whole page |
 | `onError` | `console.error` | an error after the shell is out |
+
+An error inside a `<Suspense>` that fails during the first render pass, before the shell is out, turns the status into 500 and is not reported to `onError`, as in React Router's own entry; log it in the route's loader or `ErrorBoundary`.
 
 The nonce is passed to `ServerRouter` only when there is one, which
 satisfies `exactOptionalPropertyTypes`

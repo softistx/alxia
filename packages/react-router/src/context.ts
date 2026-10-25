@@ -32,6 +32,7 @@ function singleton<T>(name: string, make: () => T): T {
  * different one.
  */
 const shared = singleton('context', () => {
+	// `as never` gives the `unique symbol` type without a `declare const`.
 	const missing: unique symbol = Symbol('alxia context missing') as never;
 	return { missing, context: createContext<unknown>(missing) };
 });

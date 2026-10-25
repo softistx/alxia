@@ -43,3 +43,16 @@ export function untilDone(
 		},
 	});
 }
+
+/**
+ * Gives up on a render that will not be served: stops its timer and cancels
+ * the body, which aborts React's work. A cancel that itself fails is ignored,
+ * so the error that got us here is the one the caller rethrows.
+ */
+export async function abandon(
+	limit: Pick<Deadline, 'clear'>,
+	body: Pick<ReadableStream, 'cancel'> | undefined,
+): Promise<void> {
+	limit.clear();
+	await body?.cancel().catch(() => {});
+}

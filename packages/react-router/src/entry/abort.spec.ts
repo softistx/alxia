@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from 'bun:test';
-import { deadline, untilDone } from './abort';
+import { abandon, deadline, untilDone } from './abort';
 
 beforeEach(() => jest.useFakeTimers());
 afterEach(() => jest.useRealTimers());
@@ -80,5 +80,29 @@ describe('untilDone', () => {
 		untilDone(new ReadableStream<Uint8Array>({}), clear);
 		jest.advanceTimersByTime(6_000);
 		expect(signal.aborted).toBe(true);
+	});
+});
+
+describe('abandon', () => {
+	test('stops the timer and cancels the body', async () => {
+		let cancelled = 0;
+		const body = new ReadableStream<Uint8Array>({
+			cancel: () => void cancelled++,
+		});
+		const { signal, clear } = deadline(6_000);
+		await abandon({ clear }, body);
+		jest.advanceTimersByTime(60_000);
+		expect(signal.aborted).toBe(false);
+		expect(cancelled).toBe(1);
+	});
+
+	test('ignores a cancel that fails, and a render with no body yet', async () => {
+		let cleared = 0;
+		const failing = {
+			cancel: () => Promise.reject(new Error('cancel failed')),
+		};
+		await abandon({ clear: () => cleared++ }, failing);
+		await abandon({ clear: () => cleared++ }, undefined);
+		expect(cleared).toBe(2);
 	});
 });

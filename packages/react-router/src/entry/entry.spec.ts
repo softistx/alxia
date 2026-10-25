@@ -171,4 +171,60 @@ describe('the package entry, on the fixture', () => {
 		).rejects.toThrow();
 		expect(errors).toEqual([]);
 	});
+
+	/** An entry whose rejections are recorded, serving the fixture. */
+	const recording = (options: Parameters<typeof createEntry>[0]) => {
+		const entry = createEntry(options);
+		const rejections: unknown[] = [];
+		const handleRequest: typeof entry.handleRequest = async (...args) => {
+			try {
+				return await entry.handleRequest(...args);
+			} catch (error) {
+				rejections.push(error);
+				throw error;
+			}
+		};
+		const own: ServerBuild = {
+			...build,
+			entry: {
+				...build.entry,
+				module: { ...build.entry.module, default: handleRequest },
+			},
+		};
+		return { rejections, served: app(own) };
+	};
+
+	test('a throwing isBot rejects handleRequest', async () => {
+		const { rejections, served } = recording({
+			isBot: () => {
+				throw new Error('isBot exploded');
+			},
+		});
+		const response = await served.request('/slow', { headers: browser });
+		expect(response.status).toBe(500);
+		expect(rejections.map(String).join()).toContain('isBot exploded');
+	});
+
+	test('aborts a render that never finishes, about streamTimeout + 1 000 ms in', async () => {
+		const { served } = recording({ streamTimeout: 50 });
+		const started = performance.now();
+		const response = await served.request('/hang', { headers: browser });
+		expect(response.status).toBe(200);
+		const reader = (response.body as ReadableStream<Uint8Array>).getReader();
+		let first = '';
+		const decoder = new TextDecoder();
+		try {
+			for (;;) {
+				const { done, value } = await reader.read();
+				if (done) break;
+				first += decoder.decode(value, { stream: true });
+			}
+		} catch {
+			// An aborted stream may end in an error: it still ended.
+		}
+		const elapsed = performance.now() - started;
+		expect(first).toContain('hang-shell');
+		expect(elapsed).toBeGreaterThanOrEqual(1_000);
+		expect(elapsed).toBeLessThan(50 + 1_000 + 1_000);
+	}, 5_000);
 });
