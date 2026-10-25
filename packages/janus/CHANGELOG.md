@@ -1,5 +1,11 @@
 # @alxia/janus
 
+## 0.3.13
+
+### Patch Changes
+
+- [#270](https://github.com/softistx/alxia/pull/270) [`efbcad2`](https://github.com/softistx/alxia/commit/efbcad2503acc431e8cf510ec2ed6398a8456df7) Thanks [@SteveGT96](https://github.com/SteveGT96)! - widen the `@nxgt/janus` peer range to admit 0.29.
+
 ## 0.3.12
 
 ### Patch Changes
