@@ -78,6 +78,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [A message shows its `{braces}`](#a-message-shows-its-braces)
 - [A refusal shows the API's raw message](#a-refusal-shows-the-apis-raw-message)
 - [`apiRefusal` returns undefined](#apirefusal-returns-undefined)
+- [The error page shows no request id](#the-error-page-shows-no-request-id)
 
 ## Thrown or printed
 
@@ -1462,4 +1463,35 @@ it:
 ```ts
 const refusal = apiErrors.apiRefusal(error, 'en');
 if (!refusal) throw error;
+```
+
+### The error page shows no request id
+
+The root's `ErrorBoundary` calls `errorRequestId(error)` and gets `undefined`,
+though the API logged the request.
+
+**Why:** `routeError` carries the `requestId` the error already has; it never
+reads it from the network. An `ApiError` has none unless the code that called
+the API set it, and a thrown `Response` is turned into a route error only when
+it has the `x-request-id` header. A loader that returns `routeError(error)`
+instead of throwing it never reaches the boundary at all.
+
+**Fix:** keep the id on the error where the API is called, and `throw` what
+`routeError` gives back
+([loaders and the error page](guide/errors.md#loaders-and-the-error-page)):
+
+```ts
+import { requestIdOf, routeError } from '@alxia/react-router/errors';
+
+// Your own call to the API, declared here as a stub.
+declare function call(): Promise<Response>;
+
+export async function loader() {
+	const response = await call();
+	if (!response.ok) {
+		// A Response of 401, 403, 404 or 503 with the header is a route error.
+		throw routeError(response);
+	}
+	return { requestId: requestIdOf(response) };
+}
 ```

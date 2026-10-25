@@ -14,8 +14,10 @@ number on it. Every release, with each change it made, is in
   shape of a refusal, the request id and `nextOf`, the catalogue store
   (`createApiMessages`), the form checks' resolver (`apiCodeResolver`), the
   provider (`ApiMessagesProvider`) and the wording of a refusal
-  (`createApiErrors`: message, fields and status). The route helpers, the
-  JSON actions, the catalogue's refresh and the failures still follow.
+  (`createApiErrors`: message, fields and status), the route helpers
+  (`routeError`, `errorRequestId`) and the actions' helpers (`fetcherResult`,
+  `fetcherRefusal`, `submitForm`). The JSON actions and their fetcher hook,
+  the catalogue's refresh and the failures still follow.
 
 ## Next
 
