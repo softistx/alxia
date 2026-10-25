@@ -95,7 +95,7 @@ client's files and the app's middlewares. So does React Router's prerendering.
 optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react`. The six `workbox-*`
 packages (`workbox-core`, `workbox-expiration`, `workbox-navigation-preload`,
 `workbox-precaching`, `workbox-routing`, `workbox-strategies`) are optional
-peers too, for `/pwa/worker`: `bun add -d workbox-core workbox-expiration workbox-navigation-preload workbox-precaching workbox-routing workbox-strategies`. The package declares no dependency.
+peers too, for `/pwa/worker` (the [PWA section](#installable-and-offline-pwa) has the install line). The package declares no dependency.
 
 Its `typescript` peer is 6 or 7. The template's TypeScript 5.9 typechecks,
 but `bun add` warns about it; `bun add -d typescript@^6` silences the
@@ -496,7 +496,7 @@ With `app/service-worker.ts` in the app, `react-router build` writes
 `build/client/service-worker.js` itself: `alxia()` bundles the file after the
 client build, with the precache list written in, and there is no script to
 add. It needs Bun (`bun --bun react-router build`, or a `bunfig.toml` with
-`[run] bun = true`). `alxia({ worker: 'sw/worker.ts' })` names another file
+`[run] bun = true`). `alxia({ worker: 'app/pwa/worker.ts' })` names another file
 and `alxia({ worker: false })` builds none.
 
 The worker bundles Workbox, whose six packages are optional peers:
@@ -593,6 +593,13 @@ fails, and the build needs the file:
 	</body>
 </html>
 ```
+
+Set `routeDiscovery: { mode: 'initial' }` in `react-router.config.ts`, so a
+client navigation offline to a route never visited finds its modules
+([more](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#offline-a-client-navigation-to-a-route-never-visited-shows-the-offline-page)).
+
+An app that built its worker with a script of its own has steps to drop:
+[moving from a worker of your own](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md#moving-from-a-worker-of-your-own).
 
 For a build pipeline of your own, `buildWorker` from `/pwa/build` does what
 `alxia()` does. It needs Bun and runs after `react-router build`:

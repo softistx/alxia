@@ -70,21 +70,12 @@ The contract gives three cache names, `cacheNames.precache`
 (`my-app-precache-v1`, the name Workbox builds from
 `setCacheNameDetails({ prefix, precache: 'precache', suffix: version })`),
 `cacheNames.assets` and `cacheNames.static`, and two filters over
-`caches.keys()`:
-
-```ts
-// file: sw/activate.ts
-import { workerContract } from '../app/pwa-contract';
-
-export async function deleteObsoleteCaches() {
-	const obsolete = workerContract.obsoleteCaches(await caches.keys());
-	await Promise.all(obsolete.map((name) => caches.delete(name)));
-}
-```
+`caches.keys()`.
 
 `obsoleteCaches(names)` returns the prefix's caches that are not current;
 `clearableCaches(names)` returns all of the prefix's but the current
-precache. The module also exports `SERVICE_WORKER_URL`, `OFFLINE_URL` and
+precache. `startWorker` calls the first when it activates, so the app deletes
+no cache itself. The module also exports `SERVICE_WORKER_URL`, `OFFLINE_URL` and
 `SKIP_WAITING`, the message a page posts to a waiting worker.
 
 ## The worker
@@ -156,8 +147,6 @@ the worker's own path, the manifest's, a document or iframe fetch, and any
 path with no static extension. The options add to that, or move the line
 between `immutable` and `static`:
 
-The options:
-
 | option | default | |
 | --- | --- | --- |
 | `never(path)` | none | paths of the app always answered fresh |
@@ -183,9 +172,9 @@ When Workbox does not fit, `cachingFor` and `isStorable` need none: the
 worker asks the first of the request and the second of the answer.
 
 ```ts
-// file: sw/answer.ts
+// file: app/pwa/answer.ts
 import { cachingFor, isStorable } from '@alxia/react-router/pwa';
-import { workerContract } from '../app/pwa-contract';
+import { workerContract } from '../pwa-contract';
 
 export async function answer(request: Request): Promise<Response> {
 	if (cachingFor(request, self.location.origin, { contract: workerContract }) !== 'immutable') {
@@ -262,6 +251,32 @@ export default defineConfig({
 | `false` | no worker is built |
 | an object | `file` (as the string), `contract`, `offline`, `precacheAssets` and `minify`, as in `buildWorker`'s table below |
 
+The object form takes the options of [`buildWorker`](#with-buildworker), but
+`root` and `client`, which the plugin knows. Its `contract` must be the same
+object `startWorker` gets: the build reads the worker's URL and the offline
+page from it, and the worker reads them from its own.
+
+### Moving from a worker of your own
+
+An app that built its worker with a script of its own (a `sw/` folder with its
+own `tsconfig.json`, a `build:sw` script) moves to `alxia()` in a few steps:
+
+1. Drop `&& bun run build:sw` from the `build` script and delete the `build:sw`
+   script. Otherwise the old script overwrites `build/client/service-worker.js`
+   after `alxia()` has written it.
+2. Delete `sw/` (`service-worker.ts` and `tsconfig.json`) and
+   `scripts/build-sw.ts`. The worker is `app/service-worker.ts`, or the file
+   `alxia({ worker: 'path' })` names.
+3. Drop `&& tsc -p sw` from the `typecheck` script: `app/service-worker.ts`
+   compiles under the app's own `tsconfig`.
+4. Keep the six `workbox-*` development dependencies: the build bundles them.
+5. Keep `routeDiscovery: { mode: 'initial' }` in `react-router.config.ts`
+   ([why](../troubleshooting.md#offline-a-client-navigation-to-a-route-never-visited-shows-the-offline-page)).
+6. Move the regex of the fonts the old script precached into
+   `alxia({ worker: { precacheAssets } })`.
+7. If the contract changes `offlineUrl` or `serviceWorkerUrl`, pass it to the
+   build: `alxia({ worker: { contract: workerContract } })`.
+
 ### With `buildWorker`
 
 `buildWorker` is for a pipeline where `alxia()` does not build the worker. It
@@ -292,7 +307,7 @@ changes the list, so the worker's bytes, so the browser installs it.
 | `file` | required | the worker's source, relative to `root` (named `file`, not `entry`, which `reveal` reads from `alxia({ entry })`) |
 | `root` | `process.cwd()` | |
 | `client` | `build/client` | the client build, relative to `root` |
-| `contract` | `SERVICE_WORKER_URL`, `OFFLINE_URL` | `{ serviceWorkerUrl, offlineUrl }`: where the worker is written and which offline page is precached |
+| `contract` | `SERVICE_WORKER_URL`, `OFFLINE_URL` | `{ serviceWorkerUrl, offlineUrl }`: where the worker is written and which offline page is precached. Pass the same object `startWorker` gets (the app's contract), or the build and the worker can disagree |
 | `offline` | `true` | precache the offline page, which must exist in the client build ([`public/offline.html`](#the-offline-page)) |
 | `precacheAssets` | none | a regex over the names in `build/client/assets`, such as fonts |
 | `minify` | `true` | |
@@ -304,7 +319,10 @@ Its errors are in [the troubleshooting page](../troubleshooting.md#buildworker-e
 ### The parts
 
 A worker precaches the code of every route, so a client navigation offline to
-a route never visited still finds its modules. `react-router build` writes the
+a route never visited still finds its modules. Set
+`routeDiscovery: { mode: 'initial' }` in `react-router.config.ts` as well,
+or the navigation asks `/__manifest` for the route and shows the offline page
+([more](../troubleshooting.md#offline-a-client-navigation-to-a-route-never-visited-shows-the-offline-page)). `react-router build` writes the
 list in `build/client/assets/manifest-*.js`. `buildWorker` does this itself; the parts
 are for a pipeline of your own:
 
