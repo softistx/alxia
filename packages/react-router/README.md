@@ -541,8 +541,15 @@ startWorker({
 });
 ```
 
-`buildWorker` from `/pwa/build` bundles that file into the client build and
-writes the precache list in. It needs Bun and runs after `react-router build`:
+With `app/service-worker.ts` in the app, `react-router build` writes
+`build/client/service-worker.js` itself: `alxia()` bundles the file after the
+client build, with the precache list, and there is no script to add. It needs
+Bun (`bun --bun react-router build`, or a `bunfig.toml` with `[run] bun = true`).
+`alxia({ worker: 'sw/worker.ts' })` names another file and `alxia({ worker: false })`
+builds none.
+
+For a pipeline of your own, `buildWorker` from `/pwa/build` does the same. It
+needs Bun and runs after `react-router build`:
 
 ```ts
 // file: scripts/build-worker.ts
@@ -605,8 +612,8 @@ From `@alxia/react-router/vite`:
 
 | export | |
 | --- | --- |
-| `alxia(options?)` | the Vite plugin, for `react-router dev`, `react-router build` and `vite preview`, building the server for Bun. `entry` is the server file: `app/server.ts` by default, or the default server when there is none |
-| `AlxiaOptions` | its options |
+| `alxia(options?)` | the Vite plugin, for `react-router dev`, `react-router build` and `vite preview`, building the server for Bun. `entry` is the server file: `app/server.ts` by default, or the default server when there is none. `worker` is the service worker built after `react-router build`: `app/service-worker.ts` by default when it exists, a file, `AlxiaWorkerOptions`, or `false` |
+| `AlxiaOptions`, `AlxiaWorkerOptions` | its options, and the worker's (`buildWorker()`'s but `root`, `client` and `file`, which is optional) |
 
 From `@alxia/react-router/pwa`:
 

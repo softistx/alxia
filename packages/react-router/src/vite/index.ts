@@ -21,6 +21,9 @@ import { serveDev } from './dev';
 import { NAME, PASS_THROUGH, serverEntry } from './entry';
 import { servePreview } from './preview';
 import { requireBun } from './runtime';
+import { type AlxiaWorkerOptions, buildAppWorker } from './worker';
+
+export type { AlxiaWorkerOptions } from './worker';
 
 export interface AlxiaOptions {
 	/**
@@ -30,6 +33,14 @@ export interface AlxiaOptions {
 	 * otherwise `createServer()` with no options.
 	 */
 	readonly entry?: string;
+	/**
+	 * The service worker, bundled into `build/client/service-worker.js` after
+	 * `react-router build`, with its precache list: a file relative to Vite's
+	 * root, or options (`file`, `contract`, `offline`, `precacheAssets`,
+	 * `minify`). By default `app/service-worker.ts` when it exists, and
+	 * nothing without it; `false` builds none. Needs Bun.
+	 */
+	readonly worker?: false | string | AlxiaWorkerOptions;
 }
 
 const RESOLVED_SERVER = `\0${SERVER}`;
@@ -130,6 +141,13 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 				dev,
 				client: dev ? undefined : clientPath(config),
 			});
+		},
+		buildApp: {
+			// After React Router's builder: its client build, the one the worker reads.
+			order: 'post',
+			async handler() {
+				if (config !== undefined) await buildAppWorker(config, options.worker);
+			},
 		},
 		configureServer(server) {
 			if (!enabled) return;

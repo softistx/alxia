@@ -228,6 +228,39 @@ export async function answer(request: Request): Promise<Response> {
 
 ## Building the worker
 
+### Zero config: `alxia()` builds it
+
+With `app/service-worker.ts` in the app, `react-router build` writes
+`build/client/service-worker.js`: `alxia()` bundles the file after React Router's
+client build, with the precache list written in, and logs how many files it
+precaches. The file is the opt-in, as `app/server.ts` is, so an app without one
+gets nothing. It needs Bun: run `bun --bun react-router build`, or put `[run]`
+and `bun = true` in a `bunfig.toml`. A single-page app (`ssr: false`) gets its
+worker too.
+
+```ts
+// file: vite.config.ts
+import { alxia } from '@alxia/react-router/vite';
+import { reactRouter } from '@react-router/dev/vite';
+import { defineConfig } from 'vite';
+
+export default defineConfig({
+	plugins: [
+		reactRouter(),
+		alxia({ worker: { precacheAssets: /^body-latin-[\w-]{8}\.woff2$/ } }),
+	],
+});
+```
+
+| `worker` | |
+| --- | --- |
+| left out | `app/service-worker.ts`, when it exists |
+| a string | another file, relative to Vite's root; the build fails when it is not there |
+| `false` | no worker is built |
+| an object | `file` (as the string), `contract`, `offline`, `precacheAssets` and `minify`, as in the table below |
+
+### With `buildWorker`
+
 `buildWorker` bundles the worker (Workbox included) into the client build, after
 `react-router build`, with the precache list written in. It runs on Bun and
 writes `build/client/service-worker.js` (the contract's `serviceWorkerUrl`):

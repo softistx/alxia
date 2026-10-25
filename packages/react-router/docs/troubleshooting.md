@@ -88,7 +88,8 @@ a loader, a message React Router or the browser prints, or an error from
 ### `alxia-react-router: … is running on Node, and alxia's server runs on Bun. …`
 
 **When:** `bun run dev`, `vite preview`, or a `react-router build` that
-prerenders, on a machine where a node is installed. The full message under
+prerenders or builds a service worker (`app/service-worker.ts`: then it reads
+`react-router build with a service worker is running on Node, …`), on a machine where a node is installed. The full message under
 `react-router dev`:
 
 ```
@@ -280,6 +281,20 @@ Vite's root. Under `react-router dev` each request is a 500 saying so;
 `entry` you named is taken as meant.
 
 **Fix:** correct the path, or leave `entry` out.
+
+### `alxia-react-router: the worker … does not exist. …`
+
+```text
+Error: alxia-react-router: the worker sw/worker.ts does not exist. Create it, or leave worker out to build app/service-worker.ts when it exists.
+```
+
+**When:** `alxia({ worker })` names a file that is not there, relative to
+Vite's root, and `react-router build` fails.
+
+**Why:** a missing `app/service-worker.ts` just means no worker, but a
+`worker` you named is taken as meant.
+
+**Fix:** correct the path, or leave `worker` out.
 
 ### `alxia-react-router: React Router's Vite plugin is not in this config. …`
 
@@ -1394,6 +1409,29 @@ under a dev server caches the code you are editing.
 import.meta.env.PROD })` ([the hook](guide/pwa.md#in-react)). Then unregister
 the worker the dev server already took (DevTools, Application, Service
 Workers, Unregister) and clear its site data.
+
+### The service worker is not built
+
+`react-router build` ends and there is no `build/client/service-worker.js`.
+
+**Why:** `alxia()` builds the worker only when it finds one: the file is not
+`app/service-worker.ts` (or the `appDirectory` of `react-router.config.ts`
+holds another), `worker: false` is set, or the version of `@alxia/react-router`
+is older than 0.10.
+
+**Fix:** put the file at `app/service-worker.ts`, or name it with
+`alxia({ worker: 'sw/worker.ts' })`, and update the package.
+
+### Offline, a client navigation to a route never visited shows the offline page
+
+The page opens offline, but a link to a route the user never opened leads to
+`/offline.html`.
+
+**Why:** React Router asks `/__manifest` for the routes a link needs, and the
+worker never caches that request.
+
+**Fix:** set `routeDiscovery: { mode: 'initial' }` in `react-router.config.ts`,
+so the client has every route from its first load.
 
 ### An update waits an hour
 
