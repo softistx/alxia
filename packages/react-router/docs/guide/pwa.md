@@ -5,21 +5,22 @@ UI: the service worker's contract, which requests the worker caches, which
 responses it may store, the precache list read from a build, registering the
 worker and offering an update, the web app manifest, and the cleaning at
 sign-out. The code is in `@alxia/react-router/pwa`, its React hooks in
-`@alxia/react-router/pwa/react`, the server's `noCache` in
+`@alxia/react-router/pwa/react`, the build script's `buildWorker` in
+`@alxia/react-router/pwa/build`, the server's `noCache` in
 `@alxia/react-router/pwa/server`, and every app-specific name (the cache
 prefix, the paths never cached) is an option, so two apps never share a
 default.
 
-The worker's Workbox strategies are in `@alxia/react-router/pwa/worker`. The
-build that writes the precache list into it stays the app's for now: the
-[roadmap](../roadmap.md#now) lists it.
+The worker's Workbox strategies are in `@alxia/react-router/pwa/worker`, and
+`buildWorker` in `@alxia/react-router/pwa/build` bundles it with the precache
+list ([building the worker](#building-the-worker)).
 
 - [What the subpath holds](#what-the-subpath-holds)
 - [The worker's contract](#the-workers-contract)
 - [What the worker caches](#what-the-worker-caches)
 - [The worker](#the-worker)
 - [A worker of your own](#a-worker-of-your-own)
-- [The precache list from a build](#the-precache-list-from-a-build)
+- [Building the worker](#building-the-worker)
 - [Registering the worker and offering an update](#registering-the-worker-and-offering-an-update)
 - [The web app manifest (and why the language travels in `?lang=`)](#the-web-app-manifest-and-why-the-language-travels-in-lang)
 - [In React](#in-react)
@@ -36,7 +37,7 @@ never at load. So each runtime can import it:
 | --- | --- |
 | the service worker | `startWorker` from `/pwa/worker`; or, for a worker of your own, the contract, `cachingFor`, `isStorable` |
 | the page | the contract (the same names), `registerServiceWorker`, `createUpdateNotice`, `manifestHref`, `clearAppCaches` |
-| a build script | `parseBrowserManifest`, `precacheList`, `assetPrecache` |
+| a build script | `buildWorker` from `/pwa/build`; or, for a pipeline of your own, `parseBrowserManifest`, `precacheList`, `assetPrecache` |
 | the server | `SERVICE_WORKER_URL`, to serve the worker under its path; `MANIFEST_PATH`, `MANIFEST_HEADERS`, `manifestLanguage` and `webAppManifest`, to serve the manifest |
 
 `@alxia/react-router/pwa/react` is the page's hooks and needs `react`, an
@@ -55,6 +56,11 @@ the package already has: its only package import is `@alxia/core`
 only package imports, it shares with the main entry and the hooks only chunks
 that import nothing, and it does nothing when imported (`boundary.spec.ts`
 checks all three). It is for a service worker bundle alone.
+
+`@alxia/react-router/pwa/build` is `buildWorker` and needs Bun: Node's
+built-ins are its only imports, and it reads `Bun` only inside the function,
+never at load. It is for a build script alone, never the worker or the page.
+To bundle the worker, the Workbox peers of `/pwa/worker` must be installed.
 
 The main entry, `@alxia/react-router`, is not for those: it imports
 `@alxia/core`, which imports `node:*`, and a client bundle should not carry it.
@@ -220,11 +226,50 @@ export async function answer(request: Request): Promise<Response> {
 }
 ```
 
-## The precache list from a build
+## Building the worker
+
+`buildWorker` bundles the worker (Workbox included) into the client build, after
+`react-router build`, with the precache list written in. It runs on Bun and
+writes `build/client/service-worker.js` (the contract's `serviceWorkerUrl`):
+
+```ts
+// file: scripts/build-worker.ts
+import { buildWorker } from '@alxia/react-router/pwa/build';
+
+const { precache, precacheBytes, bytes } = await buildWorker({
+	file: 'app/service-worker.ts',
+	precacheAssets: /^body-latin-[\w-]{8}\.woff2$/,
+});
+console.log(
+	`${precache.length} files precached (${precacheBytes} bytes), worker ${bytes} bytes`,
+);
+```
+
+Run it as `bun scripts/build-worker.ts` after `react-router build`. The list is
+the offline page, revisioned by its content (a changed page installs a new
+worker), then every route's code, then the `precacheAssets` files. A new build
+changes the list, so the worker's bytes, so the browser installs it.
+
+| option | default | |
+| --- | --- | --- |
+| `file` | required | the worker's source, relative to `root` (named `file`, not `entry`, which `reveal` reads from `alxia({ entry })`) |
+| `root` | `process.cwd()` | |
+| `client` | `build/client` | the client build, relative to `root` |
+| `contract` | `SERVICE_WORKER_URL`, `OFFLINE_URL` | `{ serviceWorkerUrl, offlineUrl }`: where the worker is written and which offline page is precached |
+| `offline` | `true` | precache the offline page, which must exist in the client build (`public/offline.html`) |
+| `precacheAssets` | none | a regex over the names in `build/client/assets`, such as fonts |
+| `minify` | `true` | |
+
+The result is `{ file, precache, precacheBytes, bytes }`: the absolute path,
+the list, the precached files' size before compression and the worker's size.
+Its errors are in [the troubleshooting page](../troubleshooting.md#buildworker-expected-one-react-router-browser-manifest).
+
+### The parts
 
 A worker precaches the code of every route, so a client navigation offline to
 a route never visited still finds its modules. `react-router build` writes the
-list in `build/client/assets/manifest-*.js`:
+list in `build/client/assets/manifest-*.js`. `buildWorker` does this itself; the parts
+are for a pipeline of your own:
 
 ```ts
 // file: scripts/precache.ts

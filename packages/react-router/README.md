@@ -523,7 +523,7 @@ export default createServer({
 });
 ```
 
-The service worker is one file on Workbox, in `/pwa/worker` (the six
+The service worker is one file on Workbox, in `/pwa/worker`, and `/pwa/build` bundles it (the six
 `workbox-*` packages, optional peers, are its only package imports):
 
 ```sh
@@ -537,9 +537,18 @@ import { startWorker } from '@alxia/react-router/pwa/worker';
 
 startWorker({
 	contract: defineWorkerContract({ cachePrefix: 'my-app' }),
-	// The build writes the precache list in; a worker built some other way passes it.
-	precache: [{ url: '/offline.html', revision: 'v1' }],
+	// buildWorker (or alxia()) writes the precache list in.
 });
+```
+
+`buildWorker` from `/pwa/build` bundles that file into the client build and
+writes the precache list in. It needs Bun and runs after `react-router build`:
+
+```ts
+// file: scripts/build-worker.ts
+import { buildWorker } from '@alxia/react-router/pwa/build';
+
+await buildWorker({ file: 'app/service-worker.ts' });
 ```
 
 The [PWA guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md)
@@ -653,6 +662,14 @@ From `@alxia/react-router/pwa/worker` (the six `workbox-*` packages, optional pe
 | `WorkerOptions` | `contract` (required), `caching`, `assets`, `static`, `navigationPreload`, `precache` |
 | `ExpirationOptions` | `{ maxEntries?, maxAgeSeconds? }` |
 
+From `@alxia/react-router/pwa/build` (Bun; Node's built-ins its only imports):
+
+| export | |
+| --- | --- |
+| `buildWorker(options)` | bundles the worker into `build/client/service-worker.js` with its precache list (the offline page by its content, every route's code, `precacheAssets`), after `react-router build` |
+| `BuildWorkerOptions` | `file` (required), `root`, `client`, `contract`, `offline`, `precacheAssets`, `minify` |
+| `WorkerBuild` | `{ file, precache, precacheBytes, bytes }` |
+
 The `alxia-react-router` bin, run with `bunx`:
 
 | command | |
@@ -667,7 +684,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Customising the server](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/customising-the-server.md): `createServer()`, and the escape hatches.
 - [Typing the loaders](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/typing-the-loaders.md): `Register`, and the app's own context keys.
 - [A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md), [Beside the pages](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md) (middlewares, routes, WebSockets, the client's files), [OpenAPI](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/openapi.md), [Testing](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/testing.md) and [Deploying](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md), with Docker.
-- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the worker, the precache list from a build, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
+- [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the worker, the precache list from a build, building the worker with `buildWorker`, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.

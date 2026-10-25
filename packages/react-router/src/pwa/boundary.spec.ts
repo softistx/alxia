@@ -64,6 +64,19 @@ const WORKBOX = [
 	'workbox-strategies',
 ];
 
+describe('/pwa/build', () => {
+	test('imports Node built-ins alone: no package, no workbox, no vite, no react, no core', async () => {
+		const imports = await importsOf(join(DIST, 'pwa/build/index.js'));
+		expect(imports.length).toBeGreaterThan(0);
+		for (const specifier of imports) expect(specifier).toStartWith('node:');
+	});
+
+	test('reads the Bun global inside functions, never at load', async () => {
+		const source = await Bun.file(join(DIST, 'pwa/build/index.js')).text();
+		expect(source).not.toMatch(/^(?:const|let|var) .*\bBun\b/m);
+	});
+});
+
 describe('/pwa/worker', () => {
 	test('imports the six workbox packages alone: no react, no core, no node: module, no bun', async () => {
 		const imports = await importsOf(join(DIST, 'pwa/worker/index.js'));
