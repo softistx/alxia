@@ -2,7 +2,8 @@
 
 This page covers what the root route renders for the page's CSP nonce, from
 `@alxia/react-router/document`: the nonce on the server and in the browser,
-an inline script that carries it, and the theme-boot recipe.
+an inline script that carries it, the theme-boot recipe, and the page's
+language and text direction.
 
 `/document` is safe to import in the browser and imports only `react`.
 
@@ -12,6 +13,8 @@ an inline script that carries it, and the theme-boot recipe.
 | `useNonce()` | the page's nonce, on the server and in the browser |
 | `InlineScript({ code, nonce? })` | an inline `<script>` with the nonce |
 | `CspNonceMeta()` | `<meta property="csp-nonce" nonce>` |
+| `createPageLanguage({ languages, fallback })` | `pageLanguage`, `metaLanguage`, `chooseLanguage`, `useChosenLanguage` |
+| `textDirection(language)` | `'ltr'` or `'rtl'` for `<html dir>` |
 
 ## The nonce on the server
 
@@ -207,3 +210,64 @@ An entry that is not the package's wraps `<ServerRouter>` in
 [above](#the-nonce-on-the-server). Without it `useNonce()` is `undefined`
 on the server, and the page's inline scripts render with no nonce
 ([the message](../troubleshooting.md#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-script-src-self-nonce-)).
+
+## The page's language
+
+`createPageLanguage` gives the root the page's language for `<html lang>` and
+a route's `meta`, and `textDirection` the `dir` that goes with it. The server
+side, negotiating the request's language from a cookie and `Accept-Language`,
+is [`@alxia/language`](https://github.com/softistx/alxia/blob/develop/packages/language/README.md):
+
+```ts
+// app/server.ts
+import { language } from '@alxia/language';
+
+export const app = createServer(/* … */).use(
+	language({ supported: ['en', 'fr', 'ar'], fallback: 'en', order: ['cookie', 'header'] }),
+);
+// the root loader returns { language: ctx.language }
+```
+
+```ts
+// app/language.ts: one instance, imported by the root and the routes
+import { createPageLanguage } from '@alxia/react-router/document';
+
+export const { pageLanguage, metaLanguage, chooseLanguage, useChosenLanguage } =
+	createPageLanguage({ languages: ['en', 'fr', 'ar'], fallback: 'en' });
+```
+
+```tsx
+// app/root.tsx
+import { textDirection } from '@alxia/react-router/document';
+
+export function Layout({ children }: { children: React.ReactNode }) {
+	const data = useRouteLoaderData<typeof loader>('root');
+	const language = pageLanguage(data?.language);
+	useChosenLanguage(); // re-renders the shell when the menu picks a language
+	return (
+		<html lang={language} dir={textDirection(language)} suppressHydrationWarning>
+			{/* … */}
+		</html>
+	);
+}
+
+export const meta: Route.MetaFunction = ({ matches }) => [
+	{ title: titles[metaLanguage(matches)] },
+];
+```
+
+- `pageLanguage(language)` is the supported language, else the fallback. In
+  the browser the one picked with `chooseLanguage(language)` wins, and the
+  last one seen stands in when the root's data is gone. On the server it
+  remembers nothing: one module serves every request.
+- `metaLanguage(matches)` reads `matches[0].loaderData.language`.
+- `useChosenLanguage()` is the picked language, or `undefined`; it
+  re-renders on a pick, and is `undefined` in the server render so
+  hydration matches.
+- `textDirection(tag)` is `'rtl'` for `ar`, `fa`, `he`, `ur`, `ps`, `yi`,
+  `dv`, `ckb`, `sd` and `ug`, else `'ltr'`, reading the base tag whatever its
+  case (`ar-EG`, `AR`). A script subtag is not read: `az-Arab` is `'ltr'`.
+- A fallback outside `languages` throws
+  ([the message](../troubleshooting.md#createpagelanguage-the-fallback-x-is-not-one-of-the-languages)).
+  An error page without the root's data shows the last language seen, or
+  the fallback ([why](../troubleshooting.md#the-error-page-shows-in-the-fallback-language)).

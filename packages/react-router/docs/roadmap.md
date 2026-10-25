@@ -8,8 +8,8 @@ number on it. Every release, with each change it made, is in
 ## Now
 
 - **The boot: `/entry` and `/document`.** `/document` gives the root the
-  page's CSP nonce and inline boot scripts; the server entry, and the page's
-  language and text direction, follow.
+  page's CSP nonce and inline boot scripts and the page's language and text
+  direction; `/entry` is the server entry.
 
 ## Next
 
@@ -17,6 +17,8 @@ Nothing planned.
 
 ## Later
 
+- **Hreflang alternates** for an app with one URL per language. Today the
+  language is negotiated on a single URL, so there is no alternate to link.
 - **`service-worker.js` served revalidated with no setup.** Today the app
   adds `noCache` for `SERVICE_WORKER_URL` itself.
 - **A check of an offline page's policy.** The offline page declares its
@@ -35,6 +37,8 @@ Nothing planned.
 
 ## Not planned
 
+- **The theme's own boot script.** `InlineScript` renders it with the nonce;
+  its text, its storage keys and class names, are the UI library's.
 - **React Router 7.** Its loaders' context is a `RouterContextProvider`
   only behind `future.v8_middleware`, and the line is in maintenance.
 - **Node or Cloudflare.** alxia is a Bun framework; React Router's own
