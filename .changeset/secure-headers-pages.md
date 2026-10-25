@@ -35,6 +35,6 @@ no `<base>`, forms to this site, no framing), HSTS and
 `Cache-Control: private, no-store`. `directives` merges over the policy: a
 list replaces a directive's sources, `false` removes it, except `default-src`,
 `base-uri` and `object-src`, which cannot be removed. Every other option
-passes through and wins over the preset's, and an explicit `undefined` keeps
-the preset's value. A `script-src`, or a `script-src-elem` list, without
+passes through and wins over the preset's, and an explicit `undefined`, in an option or in
+`directives`, keeps the preset's value. A `script-src`, or a `script-src-elem` list, without
 `NONCE` is refused at startup with a `TypeError` that starts `pageHeaders():`.

@@ -388,8 +388,8 @@ Never add `'unsafe-eval'`, nor `'unsafe-inline'` to `script-src`.
 ### Changing the policy
 
 `directives` merges over `PAGE_DIRECTIVES`: a list replaces that directive's
-sources (it does not append), `false` removes the directive, and a name the
-preset lacks is added. Three cannot be removed, with `false` or `true`:
+sources (it does not append), `false` removes the directive, `undefined`
+keeps the preset's value, and a name the preset lacks is added. Three cannot be removed, with `false` or `true`:
 `default-src`, which covers frame, media and child sources, and `base-uri`,
 which has no fallback, so an injected `<base>` would redirect nonced
 relative scripts, and `object-src`, which blocks plugin content. They throw a
@@ -469,7 +469,8 @@ const app = alxia()
 - **Not for another site's request.** A form on another site can post to
   `/sign-out` and get a redirect, which would wipe the viewer's cache or
   cookies. So when `Sec-Fetch-Site` is present, it alone decides: anything
-  other than `same-origin` or `none` clears nothing, and `Origin` is not
+  other than `same-origin` or `none` clears nothing (`same-site` too, since a
+  sibling subdomain may be attacker-controlled), and `Origin` is not
   read. Only without it (an older browser) is an `Origin` compared with the
   app's own origin. A request with neither header (curl) is cleared.
   Modern browsers need nothing more behind a TLS-terminating proxy, since

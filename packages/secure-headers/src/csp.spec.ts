@@ -121,11 +121,20 @@ describe('csp', () => {
 			'Sha256-abc',
 			'sha384-abc',
 			'sha512-abc',
+			'sha512-abc=',
 		]) {
 			expect(() => csp({ 'script-src': [source] })).toThrow(
 				`csp(): ${source} in script-src is a keyword: write it quoted, '${source}'`,
 			);
 		}
+	});
+
+	test('a host that starts like a nonce or a hash is accepted', () => {
+		expect(
+			csp({
+				'script-src': ['nonce-cdn.example.com', 'sha256-cdn.example.com'],
+			}),
+		).toBe('script-src nonce-cdn.example.com sha256-cdn.example.com');
 	});
 
 	test('a quoted keyword, a host and a scheme pass', () => {

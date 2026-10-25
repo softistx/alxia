@@ -295,7 +295,7 @@ pageHeaders({ https: import.meta.env.PROD });
 error TS2322: Type '"cash"' is not assignable to type '"cookies" | "*" | "cache" | "storage" | "executionContexts" | "clientHints" | "prefetchCache" | "prerenderCache"'.
 ```
 
-The union is `ClearSiteDataType`, written out. A string instead of a list gives `Argument of type 'string' is not assignable to parameter of type 'readonly ClearSiteDataType[]'`.
+The union is `ClearSiteDataType`, written out.
 
 **Why:** the browser ignores a type it does not know, so the cache would stay as it was without a word.
 

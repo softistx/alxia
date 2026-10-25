@@ -107,10 +107,13 @@ export interface PageHeadersOptions
  * given as a list, lacks `NONCE`: the page would not hydrate.
  */
 export function pageHeaders(options: PageHeadersOptions): NonceMiddleware {
-	const { https, directives = {}, ...given } = options;
-	const rest = Object.fromEntries(
-		Object.entries(given).filter(([, value]) => value !== undefined),
-	) as typeof given;
+	const { https, directives: asGiven = {}, ...given } = options;
+	const defined = (entries: object) =>
+		Object.fromEntries(
+			Object.entries(entries).filter(([, value]) => value !== undefined),
+		);
+	const rest = defined(given) as typeof given;
+	const directives: CspDirectives = defined(asGiven);
 	for (const [name, why] of Object.entries(REQUIRED)) {
 		const value = directives[name];
 		if (value === false || value === true) {

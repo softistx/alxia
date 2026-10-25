@@ -55,7 +55,10 @@ const KEYWORDS = new Set([
 /** A keyword, or a nonce or hash, written without its quotes. */
 function isUnquotedKeyword(source: string): boolean {
 	const lower = source.toLowerCase();
-	return KEYWORDS.has(lower) || /^(nonce|sha256|sha384|sha512)-/.test(lower);
+	return (
+		KEYWORDS.has(lower) ||
+		/^(nonce|sha256|sha384|sha512)-[a-z0-9+/_-]+=*$/.test(lower)
+	);
 }
 
 /**

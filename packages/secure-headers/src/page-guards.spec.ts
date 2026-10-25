@@ -67,12 +67,33 @@ describe('the directives a page policy cannot lose', () => {
 			}
 		});
 
+		test(`${name} given undefined keeps the preset's list`, async () => {
+			expect(() =>
+				pageHeaders({ https: false, directives: { [name]: undefined } }),
+			).not.toThrow();
+			const headers = await headersOf({
+				https: false,
+				directives: { [name]: undefined },
+			});
+			expect(headers.get('content-security-policy')).toContain(`${name} '`);
+		});
+
 		test(`${name} accepts a list`, () => {
 			expect(() =>
 				pageHeaders({ https: false, directives: { [name]: ["'none'"] } }),
 			).not.toThrow();
 		});
 	}
+});
+
+test('undefined keeps the preset for a directive that may be removed', async () => {
+	const headers = await headersOf({
+		https: false,
+		directives: { 'manifest-src': undefined },
+	});
+	expect(headers.get('content-security-policy')).toContain(
+		"manifest-src 'self'",
+	);
 });
 
 describe('PAGE_DIRECTIVES', () => {
