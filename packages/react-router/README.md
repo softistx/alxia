@@ -529,8 +529,8 @@ rest.
 `@alxia/react-router/errors` has no UI and imports nothing at runtime. It
 holds the shape of a GraphQL API's refusal, declared structurally (no `@nxgt/graphql-client` at
 runtime), the request id an API echoes, the page a request is for, the
-catalogue of the API's messages an app keeps, the words of a form's checks
-and the provider that fills the catalogue in the browser:
+catalogue of the API's messages an app keeps, the words of a form's checks,
+the provider that fills the catalogue in the browser and the wording of a refusal:
 
 ```ts
 import { isApiErrorLike, nextOf, requestIdOf } from '@alxia/react-router/errors';
@@ -571,6 +571,21 @@ export const provider = ApiMessagesProvider({
 	value: { en: {}, fr: {} },
 	children: null,
 });
+```
+
+A failed call is worded in the page's language by `createApiErrors`:
+
+```ts
+import { createApiErrors } from '@alxia/react-router/errors';
+import { apiMessages } from './api-messages';
+
+export const apiErrors = createApiErrors<'en' | 'fr'>({
+	messages: apiMessages,
+	unavailable: (language) => (language === 'en' ? 'Unavailable' : 'Indisponible'),
+});
+
+// In an action's catch: { message, status }, or undefined (rethrow it).
+export const refusal = (error: unknown) => apiErrors.apiRefusal(error, 'en');
 ```
 
 The [errors guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md)
@@ -689,6 +704,8 @@ From `@alxia/react-router/errors` (it imports nothing at runtime, and never `@al
 | `CatalogueMessage`, `CatalogueMessages`, `ParamKind`, `MessageFormat`, `MessageValues` | one API message with the kind of each argument (`TEXT`, `NUMBER`, `DATE`, `PLURAL`, `SELECT`), a language's messages by code, and the formatter's type |
 | `apiCodeResolver(messages, { translate, language, codeOf?, isApiCode? })`, `ApiCodeResolver`, `ApiCodeResolverOptions`, `CodeIssueLike` | the `{ translate, codeOf }` a form's `useCodeResolver(schema, resolver)` takes: a check's API code is worded as the API words it, any other key by the app's translator; `CodeIssueLike` is the issue a custom `codeOf` receives |
 | `ApiMessagesProvider({ messages, value, children })`, `ApiMessagesProviderProps` | fills the store in the browser from the root's data before the children render; a server render writes nothing. A function with no JSX, so no React import |
+| `createApiErrors({ messages, unavailable, refused?, byCode?, isApiCode? })`, `ApiErrors`, `ApiErrorsOptions` | what a page says of a refusal, in a language: `apiErrorMessage(error, language)` (the catalogue's text of the code, else the API's message; `refused` replaces it for an error with no API code and `byCode` words given codes, such as a query's limits), `fieldErrors(error, language)` by input path, `translateCode(code, fallback, language, values?)`, `unavailableMessage(language)` and `apiRefusal(error, language)` |
+| `ApiRefusal` | `{ message, status }`: a failed call as a page says it; what `apiRefusal` returns for an API refusal (its status) or an unreachable API (503), else `undefined` |
 
 The `alxia-react-router` bin, run with `bunx`:
 
@@ -705,7 +722,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Typing the loaders](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/typing-the-loaders.md): `Register`, and the app's own context keys.
 - [A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md), [Beside the pages](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md) (middlewares, routes, WebSockets, the client's files), [OpenAPI](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/openapi.md), [Testing](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/testing.md) and [Deploying](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md), with Docker.
 - [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what `/pwa` holds, the worker's contract, what the worker caches, the precache list from a build, registering the worker and offering an update, the web app manifest, the hooks in React, and clearing at sign-out.
-- [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, the page a request is for, the catalogue store, the form checks in the API's words and the provider.
+- [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, the page a request is for, the catalogue store, the form checks in the API's words, the provider and wording a refusal.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.

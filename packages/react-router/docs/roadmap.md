@@ -12,9 +12,10 @@ number on it. Every release, with each change it made, is in
   are worded from its error catalogue in the page's language, for forms,
   fetchers, loaders and the error page, with no UI. In, in this minor: the
   shape of a refusal, the request id and `nextOf`, the catalogue store
-  (`createApiMessages`), the form checks' resolver (`apiCodeResolver`) and the
-  provider (`ApiMessagesProvider`). The route helpers, the JSON actions, the
-  catalogue's refresh and the failures still follow.
+  (`createApiMessages`), the form checks' resolver (`apiCodeResolver`), the
+  provider (`ApiMessagesProvider`) and the wording of a refusal
+  (`createApiErrors`: message, fields and status). The route helpers, the
+  JSON actions, the catalogue's refresh and the failures still follow.
 
 ## Next
 

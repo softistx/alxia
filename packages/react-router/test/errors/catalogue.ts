@@ -7,6 +7,14 @@ const required = (message: string) => ({ message, params: [] });
 export const CATALOGUE: Record<Lang, CatalogueMessages> = {
 	en: {
 		'validation.errors.required': required('Required.'),
+		'todos.errors.title-taken': required(
+			'Another todo already has this title.',
+		),
+		'notes.errors.too-many-attempts': {
+			message:
+				'Too many attempts. Try again in {minutes, plural, one {# minute} other {# minutes}}.',
+			params: [{ name: 'minutes', kind: 'NUMBER' }],
+		},
 		'todos.errors.items-outside-list': {
 			message:
 				'{count, plural, one {One item is} other {# items are}} outside {name}.',
@@ -32,6 +40,12 @@ export const CATALOGUE: Record<Lang, CatalogueMessages> = {
 	},
 	fr: {
 		'validation.errors.required': required('Obligatoire.'),
+		'todos.errors.title-taken': required('Une autre tâche a déjà ce titre.'),
+		'notes.errors.too-many-attempts': {
+			message:
+				'Trop de tentatives. Réessayez dans {minutes, plural, one {# minute} other {# minutes}}.',
+			params: [{ name: 'minutes', kind: 'NUMBER' }],
+		},
 		'todos.errors.items-outside-list': {
 			message:
 				'{count, plural, one {Un élément est} other {# éléments sont}} hors de {name}.',
