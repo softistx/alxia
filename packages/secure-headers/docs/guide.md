@@ -2,7 +2,10 @@
 
 This page covers `secureHeaders`: what it sends, how to change or drop each
 header, the per-request nonce, which responses it reaches, and how a page or
-another middleware sets its own policy.
+another middleware sets its own policy. It also covers the four additions for
+server-rendered pages: `csp()` writes the policy from directives,
+`pageHeaders()` is the preset for a page, `cacheControl` keeps pages out of
+caches, and `clearSiteData()` empties the browser's cache on sign-out.
 
 ```ts
 import { alxia } from '@alxia/core';
@@ -37,6 +40,7 @@ interface SecureHeadersOptions {
 	readonly xDnsPrefetchControl?: string | false;
 	readonly xPermittedCrossDomainPolicies?: string | false;
 	readonly permissionsPolicy?: string | false;
+	readonly cacheControl?: string | false;
 	readonly hidePoweredBy?: boolean;
 }
 ```
@@ -83,6 +87,7 @@ leave the header out. An option left out keeps the default.
 | `xDnsPrefetchControl` | `X-DNS-Prefetch-Control` | `off` | the browser does not resolve the response's links ahead of time |
 | `xPermittedCrossDomainPolicies` | `X-Permitted-Cross-Domain-Policies` | `none` | Adobe clients load no cross-domain policy file |
 | `permissionsPolicy` | `Permissions-Policy` | not sent | — the policy is the app's to write |
+| `cacheControl` | `Cache-Control` | not sent | — an API often wants its own caching; a page with a nonce must not be stored ([below](#pages-are-not-cached)) |
 
 | Option | Type | Default | Effect |
 | --- | --- | --- | --- |
@@ -120,8 +125,10 @@ Use `false` to drop a header.
 ### The defaults, explicitly
 
 With `exactOptionalPropertyTypes` on, an option set to `undefined` is a
-compile error; with it off, `undefined` means the default. To keep the
-default under a condition, leave the key out:
+compile error; with it off, `undefined` means the default (under
+`pageHeaders`, the preset's value: the key is ignored, so `cacheControl:
+undefined` keeps `private, no-store`). To keep the default under a
+condition, leave the key out:
 
 ```ts
 const production = Bun.env.NODE_ENV === 'production';
@@ -275,7 +282,8 @@ header, unless it writes it into its own policy.
 
 `@alxia/react-router` reads the nonce from the context, if one is there,
 with `nonceOf(loadContext)` in `entry.server.tsx`. Neither package depends
-on the other. See
+on the other. `pageHeaders({ https })` is the policy that goes with it
+([below](#pages-pageheaders)). See
 [its guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md#a-csp-nonce).
 
 ### Without `nonce: true`
@@ -283,6 +291,205 @@ on the other. See
 Nothing changes: the same headers, the same values, no `nonce` on the
 context. A policy that names `NONCE` without `nonce: true` is refused at
 startup, so the placeholder never reaches a browser.
+
+## Writing the policy as directives
+
+A long policy string hides a typo until a browser refuses a page. `csp()`
+takes the directives as an object and returns the string, so
+`contentSecurityPolicy` still takes a string and nothing else changes.
+
+```ts
+import { csp, NONCE, secureHeaders } from '@alxia/secure-headers';
+
+app.use(
+	secureHeaders({
+		nonce: true,
+		contentSecurityPolicy: csp({
+			'default-src': ["'self'"],
+			'script-src': ["'self'", NONCE],
+			'style-src-elem': ["'self'", NONCE],
+			'frame-ancestors': ["'none'"],
+			'upgrade-insecure-requests': true,
+		}),
+	}),
+);
+```
+
+- **Order.** Directives are written in the order of the object, so the
+  header reads as the code does.
+- **A list is an array.** `'img-src': 'self'` is a type error: write
+  `["'self'"]`. The quotes are part of the source, as in a header.
+- **`true`, `false`, `undefined`.** `true` writes a bare directive
+  (`upgrade-insecure-requests`, `sandbox`): a bare directive takes `true`, not an empty array. `false` and `undefined` leave it
+  out, so `'upgrade-insecure-requests': isProduction` works.
+- **`NONCE`.** It passes through as it is, and `nonce: true` replaces each
+  one with the request's `'nonce-…'` ([above](#where-it-goes-in-the-policy)).
+- **Tokens.** A directive that takes keywords is an array like any other:
+  `sandbox: ['allow-scripts', 'allow-forms']` is written
+  `sandbox allow-scripts allow-forms`.
+- **Any name.** The known directives complete; another lowercase name
+  (`report-uri`) is written as given.
+- **Checked at startup.** An empty source list (write `["'none'"]`), a name
+  that is not lowercase letters, digits and hyphens starting with a letter, a source that holds `;`, `,` or
+  a space, and a policy with no directive left throw a `TypeError` that
+  starts `csp():`, before the first request
+  ([troubleshooting](troubleshooting.md#runtime)).
+
+## Pages: `pageHeaders`
+
+`pageHeaders({ https })` is `secureHeaders` with the settings a
+server-rendered page with a nonce needs, so an app does not write the policy
+itself.
+
+```ts
+import { alxia } from '@alxia/core';
+import { pageHeaders } from '@alxia/secure-headers';
+
+const app = alxia()
+	.use(pageHeaders({ https: true }))
+	.get('/', ({ nonce, reply }) => reply(200, `<script nonce="${nonce}">…</script>`));
+```
+
+What it sets:
+
+- `nonce: true`, and the policy `PAGE_DIRECTIVES` with
+  `upgrade-insecure-requests` when `https` is true.
+- `Strict-Transport-Security` when `https` is true, none otherwise.
+- `Referrer-Policy: strict-origin-when-cross-origin`.
+- `Cache-Control: private, no-store`, since a cache must never store a nonce.
+- Every other `secureHeaders` option, as given: yours win over the preset's.
+  `contentSecurityPolicy` and `nonce` are not options (a type error): the
+  policy goes through `directives`.
+
+`https` is required. Pass `import.meta.env.PROD` or your own flag; the
+package never reads the environment, so a development server on plain HTTP
+gets no HSTS.
+
+### The directives
+
+| directive | holds | why |
+| --- | --- | --- |
+| `default-src` | `'self'` | anything a directive below does not name loads from this site only |
+| `script-src` | `'self'`, `NONCE`, `'strict-dynamic'` | only the scripts this response's nonce marks, and what they load; `'self'` is a fallback for browsers without `'strict-dynamic'` |
+| `style-src-elem` | `'self'`, `NONCE` | this site's stylesheets and the `<style>` elements that carry the nonce (a UI library's nonced style elements, a dev client's); no `'unsafe-inline'`, since an injected `<style>` can read a value out with attribute selectors |
+| `style-src-attr` | `'unsafe-inline'` | `style` attributes (custom properties, positions); no nonce covers an attribute, and this allows no `<style>` element and no script |
+| `img-src` | `'self'` | icons, sprites and logos; no `data:` or `blob:` until a feature needs one |
+| `font-src` | `'self'` | self-hosted fonts |
+| `connect-src` | `'self'` | the framework's data requests, to this site only; a development server's WebSocket on the page's own host |
+| `worker-src` | `'self'` | the service worker |
+| `manifest-src` | `'self'` | the web app manifest |
+| `object-src` | `'none'` | no plugin content |
+| `base-uri` | `'none'` | no `<base>`: a relative URL always means this site |
+| `form-action` | `'self'` | forms post to this site only, a submit before hydration included |
+| `frame-ancestors` | `'none'` | no page frames this one (clickjacking); `X-Frame-Options: DENY` covers older browsers |
+
+Never add `'unsafe-eval'`, nor `'unsafe-inline'` to `script-src`.
+
+### Changing the policy
+
+`directives` merges over `PAGE_DIRECTIVES`: a list replaces that directive's
+sources (it does not append), `false` removes the directive, `undefined`
+keeps the preset's value, and a name the preset lacks is added. Three cannot be removed, with `false` or `true`:
+`default-src`, which covers frame, media and child sources, and `base-uri`,
+which has no fallback, so an injected `<base>` would redirect nonced
+relative scripts, and `object-src`, which blocks plugin content. They throw a
+`TypeError` that starts `pageHeaders():`
+([troubleshooting](troubleshooting.md#typeerror-pageheaders-name-cannot-be-removed-from-a-page-policy-)); give a list to change one. A source goes in the directive that loads it, never in
+`default-src`. Under `'strict-dynamic'` a third-party script is loaded by a
+nonced script, not by allowlisting its host: browsers that support it ignore
+host sources in `script-src`.
+
+```ts
+pageHeaders({
+	https: true,
+	directives: {
+		'img-src': ["'self'", 'https://img.example'],
+		'font-src': ["'self'", 'https://fonts.example'],
+		'manifest-src': false,
+	},
+});
+```
+
+An `upgrade-insecure-requests` given in `directives` wins over `https`. A
+`script-src`, or a `script-src-elem` list, without `NONCE` throws at startup, a `TypeError` that starts
+`pageHeaders():`: the nonce would reach no script and the page would not
+hydrate ([troubleshooting](troubleshooting.md#typeerror-pageheaders-script-src-has-no-nonce-a-page-script-runs-only-with-the-responses-nonce-so-write-script-src-with-nonce-in-directives-such-as-self-nonce-strict-dynamic)).
+
+## Pages are not cached
+
+A page that carries a nonce, or a viewer's data, must not be stored: a shared
+cache (a CDN, a proxy) that kept it would hand one viewer's nonce, or
+account, to the next. The nonce also stops protecting anything once it is
+reused, since it is only worth something if an attacker cannot guess it.
+`cacheControl` is off by default, because an API often wants its own caching.
+
+```ts
+import { alxia } from '@alxia/core';
+import { csp, NONCE, secureHeaders } from '@alxia/secure-headers';
+
+const app = alxia();
+
+app.use(
+	secureHeaders({
+		nonce: true,
+		contentSecurityPolicy: csp({ 'script-src': ["'self'", NONCE] }),
+		cacheControl: 'private, no-store',
+	}),
+);
+```
+
+It is set like every other header: a route's own `Cache-Control` is kept
+(a static asset can stay cacheable), and a 404 or a thrown error gets it too.
+An empty value is refused at startup; give `false` to leave it out. A page's
+own `Cache-Control` must stay `private` or `no-store` while it carries a
+nonce, never `public`.
+
+## Clear-Site-Data
+
+After a sign-out, the browser's HTTP cache can still hold pages the viewer
+saw, which matters on a shared device. `Clear-Site-Data` tells the browser to
+empty it. `clearSiteData(types, options?)` sends the header on a successful
+answer, and only on one:
+
+```ts
+import { alxia } from '@alxia/core';
+import { clearSiteData } from '@alxia/secure-headers';
+
+const cleared = clearSiteData(['cache']);
+
+const app = alxia()
+	.use('/sign-out', cleared)
+	.use('/sign-out.data', cleared);
+```
+
+- **Only a sign-out that went through.** It sends the header on a 2xx or 3xx
+  answer to one of `methods` (`['POST']` by default). A GET, or a refused
+  request (a 403, a 415, a failure), signed nobody out and must not empty
+  their cache. Pass `{ methods: ['POST', 'DELETE'] }` to widen the rule.
+- **Not for another site's request.** A form on another site can post to
+  `/sign-out` and get a redirect, which would wipe the viewer's cache or
+  cookies. So when `Sec-Fetch-Site` is present, it alone decides: anything
+  other than `same-origin` or `none` clears nothing (`same-site` too, since a
+  sibling subdomain may be attacker-controlled), and `Origin` is not
+  read. Only without it (an older browser) is an `Origin` compared with the
+  app's own origin. A request with neither header (curl) is cleared.
+  Modern browsers need nothing more behind a TLS-terminating proxy, since
+  the proxy does not rewrite `Sec-Fetch-Site`. For older browsers behind
+  one, where the request's URL says `http:` and `Origin` says `https:`, set
+  `origin: 'https://app.example.com'` (or a function returning it). Pass
+  `{ crossSite: true }` only to give the protection up.
+- **A route's own header wins.** An answer that already carries
+  `Clear-Site-Data` keeps it, as `secureHeaders` does for its headers.
+- **Several types** are written quoted and comma-separated:
+  `clearSiteData(['cache', 'cookies'])` sends `"cache", "cookies"`.
+- **Both paths with React Router.** A form posts `/sign-out`, but the client
+  navigates with single fetch, which posts `/sign-out.data`. Its answer
+  carries a redirect's cookies, not its other headers, so the route cannot
+  set the header: the middleware does, on the way out. Mount it on both paths.
+  `/sign-outs` matches neither.
+- **Checked at startup.** An empty list or an unknown type throws a
+  `TypeError` that starts `clearSiteData():`
+  ([troubleshooting](troubleshooting.md#runtime)).
 
 ## Which responses get the headers
 
@@ -490,6 +697,46 @@ test('a 404 is covered too', async () => {
 	const response = await app.request('/nope');
 	expect(response.status).toBe(404);
 	expect(response.headers.get('x-content-type-options')).toBe('nosniff');
+});
+```
+
+### A server-rendered page
+
+The same app with `pageHeaders`, a font from another origin, and the spec
+that holds the policy in place:
+
+```ts
+// app.ts
+import { alxia } from '@alxia/core';
+import { pageHeaders } from '@alxia/secure-headers';
+
+export const app = alxia()
+	.use(
+		pageHeaders({
+			https: Bun.env.NODE_ENV === 'production',
+			directives: { 'font-src': ["'self'", 'https://fonts.example'] },
+		}),
+	)
+	.get('/', ({ nonce, reply }) =>
+		reply(200, `<script nonce="${nonce}">console.log('hi')</script>`, {
+			headers: { 'content-type': 'text/html; charset=utf-8' },
+		}),
+	);
+```
+
+```ts
+// app.spec.ts
+import { expect, test } from 'bun:test';
+import { app } from './app';
+
+test('a page carries its nonce, is never cached, and may load the font', async () => {
+	const response = await app.request('/');
+	const html = await response.text();
+	const nonce = /nonce="([^"]+)"/.exec(html)?.[1];
+	const policy = response.headers.get('content-security-policy') ?? '';
+	expect(policy).toContain(`'nonce-${nonce}'`);
+	expect(policy).toContain("font-src 'self' https://fonts.example");
+	expect(response.headers.get('cache-control')).toBe('private, no-store');
 });
 ```
 
