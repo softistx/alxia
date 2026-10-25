@@ -26,6 +26,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: reactRouter(): client is …, which is not a directory. …`](#typeerror-reactrouter-client-is--which-is-not-a-directory-)
 - [`TypeError: reactRouter(): … cannot be served at a path of its own name; rename it. …`](#typeerror-reactrouter--cannot-be-served-at-a-path-of-its-own-name-rename-it-)
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
+- [`Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self' 'nonce-…'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-script-src-self-nonce-)
+- [`A tree hydrated but some attributes of the server rendered HTML didn't match the client properties`](#a-tree-hydrated-but-some-attributes-of-the-server-rendered-html-didnt-match-the-client-properties)
 - [`alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`](#alxia-react-router--already-exists-and-reveal-leaves-it-as-it-is-run-alxia-react-router-reveal---force-to-overwrite-it)
 - [`alxia-react-router: no vite.config.ts in …. Run reveal from the app's root, beside vite.config.ts.`](#alxia-react-router-no-viteconfigts-in--run-reveal-from-the-apps-root-beside-viteconfigts)
 - [`alxia-react-router: … gives alxia() an entry reveal cannot read. …`](#alxia-react-router--gives-alxia-an-entry-reveal-cannot-read-)
@@ -537,6 +539,63 @@ export default createServer({
 or `contentSecurityPolicy: false`. Better than `'unsafe-inline'`: a nonce
 per request, with `nonce: true` and `nonceOf(loadContext)` in
 `entry.server.tsx` ([guide](guide/csp-nonce.md#a-csp-nonce)).
+
+### `Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self' 'nonce-…'"`
+
+**When:** the root renders an `<InlineScript>` (a theme's boot script, say)
+and the policy names a nonce.
+
+**Why:** the script rendered with no `nonce` attribute, because
+`useNonce()` found no nonce: the server render has no `<DocumentNonce>`
+around the router (an entry of your own that does not provide it), so
+`InlineScript` renders a bare `<script>`. The browser then refuses it, and
+the page flashes the wrong theme.
+
+**Fix:** wrap the router in the nonce `secureHeaders({ nonce: true })`
+made, in `entry.server.tsx`, or pass one to the script:
+
+```tsx
+// app/entry.server.tsx
+import { nonceOf } from '@alxia/react-router';
+import { DocumentNonce } from '@alxia/react-router/document';
+
+return (
+	<DocumentNonce nonce={nonceOf(loadContext)}>
+		<ServerRouter context={routerContext} url={request.url} />
+	</DocumentNonce>
+);
+```
+
+or, for one script, `<InlineScript code={THEME_BOOT} nonce={nonce} />`.
+
+Check the response: `curl -s -A 'Mozilla/5.0 Chrome/130' http://localhost:5173/ | grep -o '<script[^>]*>'`
+should show `nonce="…"` on the boot script too
+([guide](guide/document.md#the-nonce-on-the-server)).
+
+### `A tree hydrated but some attributes of the server rendered HTML didn't match the client properties`
+
+**When:** the page hydrates, and the warning names `<html>` with a `class`
+or `style` the server did not render.
+
+**Why:** a boot script (a theme's) sets `class` and `style` on `<html>`
+before React hydrates, so the DOM no longer equals the server's HTML.
+
+**Fix:** keep `suppressHydrationWarning` on `<html>`. It silences that
+element's own attributes only, not its children:
+
+```tsx
+// app/root.tsx
+<html lang="en" suppressHydrationWarning>
+	<head>
+		<InlineScript code={THEME_BOOT} />
+	</head>
+	<body>{children}</body>
+</html>
+```
+
+A warning on another element is a real mismatch: a `nonce` the browser hid
+is read by `useNonce()` from the document, so never pass it from loader
+data ([guide](guide/document.md#the-theme-boot-script)).
 
 ### `alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`
 
