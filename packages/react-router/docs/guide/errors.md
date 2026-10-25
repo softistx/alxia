@@ -28,7 +28,7 @@ import is `react-router`, never `@alxia/core`, so a page can import it
 | --- | --- |
 | `ApiErrorLike`, `isApiErrorLike(error)` | the shape of `@nxgt/graphql-client`'s `ApiError`, and the test for it |
 | `ApiErrorEntryLike`, `ApiErrorExtensionsLike`, `ApiErrorParamsLike`, `ApiFieldErrorLike` | one error of the response, its `extensions`, their `params`, and one refused field |
-| `waitMinutes(extensions)` | the minutes of a throttle's wait |
+| `waitMinutes(extensions)` | the minutes of a throttle's wait: `minutes` (at least one), else `retryAfter` rounded up to minutes |
 | `REQUEST_ID_HEADER`, `requestIdOf(response)` | the header an API echoes on every response, and its value |
 | `nextOf(url)` | the page a request is for, as `next` carries it back after sign-in |
 | `FormErrors` | what a form action answers when the API refused the input |
@@ -493,7 +493,7 @@ export async function action({ request }: Route.ActionArgs) {
 ```
 
 The helpers route with `routeError`'s defaults (401, 403, 404 and 503). Each
-takes `RouteErrorOptions` as its last, optional argument, passed to
+takes an optional last argument, `route?: RouteErrorOptions`, passed to
 `routeError` for what it throws: `apiErrors.fetcherRefusal(error, 'en', {
 statuses })`, `fetcherResult(language, about, run, { statuses })` and
 `submitForm(language, run, fieldOf, { statuses })`.
@@ -719,7 +719,7 @@ declare const todosQuery: DocumentNode;
 ```
 
 Each log line is in the troubleshooting page:
-[answered 403](../troubleshooting.md#api-operation-request-id-answered-status-code),
+[answered 403](../troubleshooting.md#api-operation-request-id-answered-status-and-code),
 [answered 502 without GraphQL](../troubleshooting.md#api-operation-request-id-answered-status-without-graphql),
 [unreachable, timeout, invalid-response](../troubleshooting.md#api-operation-request-id-unreachable-timeout-or-invalid-response)
 and [aborted](../troubleshooting.md#api-operation-request-id-aborted).
@@ -754,7 +754,9 @@ export const catalogue = createErrorCatalogue<'en' | 'fr'>({
 
 `ttlMs` has no default and must be given: a number, or a getter read at each
 check, so a value set at startup or changed by a test is found. A getter that
-throws is logged and `retryMs` is used in its place. `retryMs` (5000 by default) is how soon a
+throws, or a value that is not a finite number of at least 0, is logged and
+`retryMs` is used in its place (see
+[`ttlMs is not a duration`](../troubleshooting.md#alxia-react-router-ttlms-is-not-a-duration-using-retryms)). `retryMs` (5000 by default) is how soon a
 failed read or check is tried again, and `firstReadWaitMs` (1500 by default)
 is how long a request waits for a language's first read. `log` receives the
 failures (`console` by default); its lines start with `alxia-react-router:`.

@@ -63,7 +63,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`alxia-react-router: ttlMs threw, using retryMs`](#alxia-react-router-ttlms-threw-using-retryms)
 - [`alxia-react-router: ttlMs is not a duration, using retryMs`](#alxia-react-router-ttlms-is-not-a-duration-using-retryms)
 - [`TypeError: createErrorCatalogue(): needs at least one language.`](#typeerror-createerrorcatalogue-needs-at-least-one-language)
-- [`<api>: <operation> (request <id>) answered <status> <code>`](#api-operation-request-id-answered-status-code)
+- [`<api>: <operation> (request <id>) answered <status> (and <code>)`](#api-operation-request-id-answered-status-and-code)
 - [`<api>: <operation> (request <id>) answered <status> without GraphQL`](#api-operation-request-id-answered-status-without-graphql)
 - [`<api>: <operation> (request <id>) unreachable`, `timeout` or `invalid-response`](#api-operation-request-id-unreachable-timeout-or-invalid-response)
 - [`<api>: <operation> (request <id>) aborted`](#api-operation-request-id-aborted)
@@ -1232,11 +1232,12 @@ const catalogue = createErrorCatalogue({
 });
 ```
 
-### `<api>: <operation> (request <id>) answered <status> <code>`
+### `<api>: <operation> (request <id>) answered <status> (and <code>)`
 
 Logged by `apiCallFailure` (a warning for a 4xx, an error for a 5xx), after the
 `api` the app gave it, when the
-API refused a call with a GraphQL body, such as
+API refused a call with a GraphQL body, or answered a status that is passed
+through, such as a 404, which has no `<code>`. For example
 `my-api https://api.example.com/graphql: Todos (request r-1) answered 403 todos.errors.forbidden`.
 
 **Why:** the API answered, and refused: `<status>` and `<code>` are the

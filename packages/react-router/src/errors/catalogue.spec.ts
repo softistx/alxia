@@ -170,6 +170,39 @@ describe('clientMessages', () => {
 		expect(messages.messageOf('en', CODE)).toBeDefined();
 	});
 
+	test('codes named like Object.prototype members are own entries, and the prototype stays clean', async () => {
+		const api = fakeApi();
+		const read = api.read;
+		api.read = async (language) => {
+			const reply = await read(language);
+			return {
+				...reply,
+				messages: [
+					...reply.messages,
+					{ code: '__proto__', message: 'Proto.', params: [] },
+					{ code: 'constructor', message: 'Ctor.', params: [] },
+				],
+			};
+		};
+		const { catalogue, messages } = catalogueOn(api, {
+			clientCodes: ['__proto__', 'constructor'],
+		});
+		await catalogue.freshAll(0);
+		const held = catalogue.clientMessages().en;
+		expect(Object.keys(held).sort()).toEqual(['__proto__', 'constructor']);
+		expect(Object.hasOwn(held, '__proto__')).toBe(true);
+		expect(held['constructor']?.message).toBe('Ctor.');
+		expect(Object.getOwnPropertyDescriptor(held, '__proto__')?.value).toEqual({
+			message: 'Proto.',
+			params: [],
+		});
+		expect(messages.messageOf('en', '__proto__')?.message).toBe('Proto.');
+		expect(messages.messageOf('en', 'constructor')?.message).toBe('Ctor.');
+		expect(Object.keys(Object.prototype)).toEqual([]);
+		expect(({} as Record<string, unknown>)['message']).toBeUndefined();
+		expect(Object.getPrototypeOf({})).toBe(Object.prototype);
+	});
+
 	test('a language not read yet has no messages', () => {
 		const { catalogue } = catalogueOn();
 		expect(catalogue.clientMessages()).toEqual({ en: {}, fr: {} });
