@@ -11,12 +11,13 @@ import type { ReactRouterServer } from './server';
  * build bundles `/entry` and the chunk it shares with `.` (see
  * `vite/inline.ts`), and the server imports `.` outside the bundle.
  *
- * The key is shared across versions of this package, unversioned: a version
- * that changes what is stored under it must rename the key.
+ * The key is shared across versions of this package. Its name ends in a
+ * shape version (`@1`): a version that changes what is stored under it bumps
+ * the suffix, so two copies of different shapes never read each other's.
  */
 function singleton<T>(name: string, make: () => T): T {
 	const registry = globalThis as Record<symbol, unknown>;
-	const key = Symbol.for(`@alxia/react-router:${name}`);
+	const key = Symbol.for(`@alxia/react-router:${name}@1`);
 	registry[key] ??= make();
 	return registry[key] as T;
 }

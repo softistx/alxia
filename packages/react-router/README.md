@@ -300,17 +300,12 @@ paint:
 ```tsx
 // app/root.tsx
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
-import {
-	CspNonceMeta,
-	InlineScript,
-	useNonce,
-} from '@alxia/react-router/document';
+import { CspNonceMeta, InlineScript } from '@alxia/react-router/document';
 import { themeBootScript } from '<your theme library>';
 
 const THEME_BOOT = themeBootScript();
 
 export function Layout({ children }: { children: React.ReactNode }) {
-	const nonce = useNonce();
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
@@ -318,12 +313,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
 				<InlineScript code={THEME_BOOT} />
 				<CspNonceMeta />
 				<Meta />
-				<Links nonce={nonce} />
+				<Links />
 			</head>
 			<body>
 				{children}
-				<ScrollRestoration nonce={nonce} />
-				<Scripts nonce={nonce} />
+				<ScrollRestoration />
+				<Scripts />
 			</body>
 		</html>
 	);
@@ -334,8 +329,11 @@ export default function App() {
 }
 ```
 
-`THEME_BOOT` is your theme library's own boot script. `/entry` already provides
-the nonce to the page; an entry of your own wraps the router:
+`THEME_BOOT` is your theme library's own boot script. With `/entry`, `<Links>`,
+`<Scripts>` and `<ScrollRestoration>` take the nonce from `<ServerRouter nonce>`,
+so their `nonce` props are optional; `useNonce()` stays for `InlineScript`,
+`CspNonceMeta` and any script or style the app inserts. An entry of your own
+wraps the router:
 
 ```tsx
 // app/entry.server.tsx (inside handleRequest)
@@ -349,7 +347,10 @@ import { ServerRouter } from 'react-router';
 ```
 
 > The `InlineScript` code is written unescaped: keep it a constant of the
-> app, never user input.
+> app, never user input. It throws a `TypeError` on `</script` or `<!--`
+> ([the message](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#typeerror-inlinescript-the-code-contains-script-or----which-ends-or-confuses-the-script-element-escape-it-such-as-script-inside-a-string)).
+> A nonced page must never be made `public` by a route's `headers` export: a
+> shared cache would hand the same nonce to every visitor.
 
 ### The page's language
 
@@ -422,7 +423,7 @@ export const meta: Route.MetaFunction = ({ matches }) => [
   `dv`, `ckb`, `sd` and `ug` (and the legacy `iw` and `ji`), else `'ltr'`, reading the base tag whatever its
   case (`ar-EG`, `AR`). A script subtag is not read: `az-Arab` is `'ltr'`.
 - A fallback outside `languages` throws
-  ([the message](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#createpagelanguage-the-fallback-x-is-not-one-of-the-languages)).
+  ([the message](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#typeerror-createpagelanguage-the-fallback--is-not-one-of-the-languages-got-)).
   An error page keeps the root's data, so it keeps the language, except
   for a URL that matches no route or a root loader that threw: there it
   shows the last language seen in the browser, or the fallback ([why](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md#the-error-page-shows-in-the-fallback-language)).
@@ -436,7 +437,7 @@ only: it streams the shell, waits for the whole page for a bot and in SPA
 mode, answers HEAD with no body, and gives the router the response's CSP
 nonce (`nonceOf`) and `DocumentNonce`. It renders with the web stream
 renderer, so no `@react-router/node` and no `node:stream`. `react-dom` and
-`isbot` are optional peers, which React Router's templates install.
+`isbot` (needed only without an `isBot` option) are optional peers, which React Router's templates install.
 
 ```tsx
 // app/entry.server.tsx
@@ -1069,16 +1070,19 @@ From `@alxia/react-router/document`:
 | export | |
 | --- | --- |
 | `DocumentNonce({ nonce, children })`, `DocumentNonceProps` | the provider of this response's CSP nonce, for the server render: wrap the router with `nonceOf(loadContext)` in `entry.server.tsx` |
-| `useNonce()` | the page's CSP nonce: the provider's on the server, the first `script[nonce]`'s in the browser (read once and cached), `undefined` when there is none |
-| `InlineScript({ code, nonce? })`, `InlineScriptProps` | an inline `<script>` with `nonce ?? useNonce()`; the code is not escaped, so it is a constant of yours; no `nonce` attribute when there is no nonce |
+| `useNonce()` | the page's CSP nonce: the provider's on the server, the first script or `csp-nonce` meta of the `<head>`'s (else the first `script[nonce]`'s) in the browser (read once and cached), `undefined` when there is none |
+| `InlineScript({ code, nonce? })`, `InlineScriptProps` | an inline `<script>` with `nonce ?? useNonce()`; the code is not escaped, so it is a constant of yours, and `</script` or `<!--` in it throws a `TypeError`; no `nonce` attribute when there is no nonce |
 | `CspNonceMeta()` | `<meta property="csp-nonce" nonce>`, the nonce for what a UI library adds at runtime |
+| `createPageLanguage({ languages, fallback, browser? })` | `PageLanguage`: `pageLanguage`, `metaLanguage`, `chooseLanguage`, `useChosenLanguage`, for `<html lang>`, a route's `meta` and a language menu |
+| `PageLanguage`, `PageLanguageOptions` | the types of the instance and of its options |
+| `textDirection(language)` | `'ltr'` or `'rtl'` for `<html dir>`, from the base language |
 
 From `@alxia/react-router/entry`:
 
 | export | |
 | --- | --- |
-| `createEntry({ streamTimeout?, nonce?, isBot?, onError? })`, `EntryOptions` | `/entry`: `{ handleRequest, streamTimeout }`, `entry.server.tsx` for Bun on the web stream renderer |
-| `handleRequest`, `streamTimeout`, `HandleRequest` | `/entry`: the default entry (`createEntry()`) and its `5_000` |
+| `createEntry({ streamTimeout?, nonce?, isBot?, onError? })`, `EntryOptions`, `Entry` | `/entry`: `{ handleRequest, streamTimeout }` (`Entry`), `entry.server.tsx` for Bun on the web stream renderer |
+| `handleRequest`, `streamTimeout`, `HandleRequest` | `/entry`: the default entry (`createEntry()`), its `5_000` and the type of `handleRequest` (assignable to React Router's `ServerEntryModule['default']`) |
 
 The `alxia-react-router` bin, run with `bunx`:
 

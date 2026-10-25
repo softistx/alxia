@@ -11,7 +11,7 @@ language and text direction.
 | --- | --- |
 | `DocumentNonce({ nonce, children })` | provides this response's nonce to the server render |
 | `useNonce()` | the page's nonce, on the server and in the browser |
-| `InlineScript({ code, nonce? })` | an inline `<script>` with the nonce |
+| `InlineScript({ code, nonce? })` | an inline `<script>` with the nonce; refuses `</script` and `<!--` |
 | `CspNonceMeta()` | `<meta property="csp-nonce" nonce>` |
 | `createPageLanguage({ languages, fallback })` | `pageLanguage`, `metaLanguage`, `chooseLanguage`, `useChosenLanguage` |
 | `textDirection(language)` | `'ltr'` or `'rtl'` for `<html dir>` |
@@ -44,38 +44,53 @@ and still reads the nonce, since the provider is above the router.
 
 React Router's client knows no nonce, and React would find `nonce` on the
 server's elements and none in its own: a hydration mismatch. So in the
-browser `useNonce()` reads the `nonce` property of the document's first
-`script[nonce]` once (the browser hides the attribute, not the property),
-and caches it. `DocumentNonce` is not needed there. With no such script it
-returns `undefined`.
+browser `useNonce()` reads the `nonce` property of the first script or
+`csp-nonce` meta in the document's `<head>` (the browser hides the
+attribute, not the property), else of the first `script[nonce]` anywhere,
+once, and caches it. `DocumentNonce` is not needed there. With none of them
+it returns `undefined`.
+
+"The browser" means a global `document`. A server that installs a DOM shim
+on `globalThis` takes the browser path and finds no nonce, so it must not
+render `useNonce()` that way (and passes `browser: () => false` to
+`createPageLanguage`).
 
 The first read is cached per module copy. A test with a DOM keeps it across
 tests: reset modules between them, or render the server path with
 `DocumentNonce`.
 
-Pass it to what React Router renders:
+## What React Router renders
+
+With `@alxia/react-router/entry`, the root passes nothing. `<Links>`,
+`<Scripts>` and `<ScrollRestoration>` fall back to the nonce `<ServerRouter
+nonce>` put in React Router's framework context, so their `nonce` props are
+optional:
 
 ```tsx
 // app/root.tsx
-import { useNonce } from '@alxia/react-router/document';
-
 export function Layout({ children }: { children: React.ReactNode }) {
-	const nonce = useNonce();
 	return (
-		<html lang="en" suppressHydrationWarning>
+		<html lang="en">
 			<head>
 				<meta charSet="utf-8" />
-				<Links nonce={nonce} />
+				<Links />
 			</head>
 			<body>
 				{children}
-				<ScrollRestoration nonce={nonce} />
-				<Scripts nonce={nonce} />
+				<ScrollRestoration />
+				<Scripts />
 			</body>
 		</html>
 	);
 }
 ```
+
+Keep `useNonce()` for what React Router does not render: an `InlineScript`,
+a `CspNonceMeta`, and any script or style the app inserts itself.
+
+A page that carries a nonce is made for one response. A route's `headers`
+export must never make it `public`: a shared cache would hand the same nonce
+to every visitor.
 
 ## The theme-boot script
 
@@ -88,24 +103,19 @@ kit's `themeBootScript()`), kept as a constant.
 
 ```tsx
 // app/root.tsx
-import {
-	CspNonceMeta,
-	InlineScript,
-	useNonce,
-} from '@alxia/react-router/document';
+import { CspNonceMeta, InlineScript } from '@alxia/react-router/document';
 import { themeBootScript } from '<your theme library>';
 
 const THEME_BOOT = themeBootScript();
 
 export function Layout({ children }: { children: React.ReactNode }) {
-	const nonce = useNonce();
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
 				<InlineScript code={THEME_BOOT} />
 				<meta charSet="utf-8" />
 				<CspNonceMeta />
-				<Links nonce={nonce} />
+				<Links />
 			</head>
 			<body>{children}</body>
 		</html>
@@ -127,7 +137,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
   must then allow it by `'unsafe-inline'` or a hash of the code.
 
 > **Warning:** the code is written unescaped. It is a constant of the app,
-> never user input, and it must not contain `</script>` or `<!--`.
+> never user input. `InlineScript` throws a `TypeError` when it holds
+> `</script` or `<!--`, which end or confuse the element
+> ([the message](../troubleshooting.md#typeerror-inlinescript-the-code-contains-script-or----which-ends-or-confuses-the-script-element-escape-it-such-as-script-inside-a-string)):
+> escape it in a string: the code must contain `<\/script`, written
+> `"<\\/script"` in source.
 
 
 `CspNonceMeta` renders `<meta property="csp-nonce" nonce>`, which UI
@@ -140,7 +154,8 @@ nonce.
 server only, and it renders with the web stream renderer
 (`renderToReadableStream`), so it needs neither `@react-router/node` nor
 `node:stream`. It imports `react`, `react-dom/server`, `react-router` and
-`isbot`; `react-dom` and `isbot` are optional peers, which React Router's
+`isbot` only when no `isBot` option is given (it is imported on the first bot
+check); `react-dom` and `isbot` are optional peers, which React Router's
 templates install.
 
 ```tsx
@@ -155,9 +170,12 @@ It does what React Router's revealed entry does:
 
 - **Streams** the shell and the rest as it resolves.
 - **Waits for the whole page** for a bot (`isbot`) and in SPA mode.
-- **Answers HEAD** with the status and the headers, and no body.
-- **Aborts** the render `streamTimeout + 1 000` ms in, and clears the
-  timer when the body ends or the client goes away.
+- **Answers HEAD** with the status and the headers, and no body. Under
+  alxia a HEAD reaches the entry as a GET (the core drops the body), so this
+  is for a server that is not alxia.
+- **Aborts** the render `streamTimeout + 1 000` ms in, or as soon as the
+  client leaves (before the shell, or while a bot waits for the whole
+  page), and clears the timer when the body ends or the client goes away.
 - **Rejects when the shell fails**, so React Router logs it once and answers
   with its error boundary. Once the shell is out, an error goes to `onError`
   and the status stays as it was sent.
@@ -187,11 +205,13 @@ export const streamTimeout = entry.streamTimeout;
 export default entry.handleRequest;
 ```
 
+`createEntry` returns an `Entry`, `{ handleRequest, streamTimeout }`.
+
 | option | default | |
 | --- | --- | --- |
 | `streamTimeout` | `5_000` | ms React Router waits for a pending promise; export it as `streamTimeout` |
 | `nonce` | `nonceOf(loadContext)` | this response's CSP nonce |
-| `isBot` | `isbot` | whether a user agent gets the whole page |
+| `isBot` | `isbot`, imported when no `isBot` is given | whether a user agent gets the whole page |
 | `onError` | `console.error` | an error after the shell is out |
 
 An error inside a `<Suspense>` that fails during the first render pass, before the shell is out, turns the status into 500 and is not reported to `onError`, as in React Router's own entry; log it in the route's loader or `ErrorBoundary`.
@@ -284,7 +304,7 @@ export const meta: Route.MetaFunction = ({ matches }) => [
   `dv`, `ckb`, `sd` and `ug` (and the legacy `iw` and `ji`), else `'ltr'`, reading the base tag whatever its
   case (`ar-EG`, `AR`). A script subtag is not read: `az-Arab` is `'ltr'`.
 - A fallback outside `languages` throws
-  ([the message](../troubleshooting.md#createpagelanguage-the-fallback-x-is-not-one-of-the-languages)).
+  ([the message](../troubleshooting.md#typeerror-createpagelanguage-the-fallback--is-not-one-of-the-languages-got-)).
   An error page keeps the root's data, so it keeps the language, except
   for a URL that matches no route or a root loader that threw: there it
   shows the last language seen in the browser, or the fallback ([why](../troubleshooting.md#the-error-page-shows-in-the-fallback-language)).

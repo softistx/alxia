@@ -38,9 +38,25 @@ describe('InlineScript', () => {
 	});
 });
 
-describe('InlineScript, unescaped output', () => {
-	test('writes a code string as it is, markup characters included', () => {
-		const code = `a("</b>") && x < y; // <!-- "q" 'r' &amp;`;
+describe('InlineScript, code that breaks out of the element', () => {
+	const MESSAGE =
+		'InlineScript(): the code contains "</script" or "<!--", which ends or confuses the script element; escape it, such as "<\\/script" inside a string';
+
+	test.each([
+		'a("</script><script>evil()</script>")',
+		'a("</SCRIPT >")',
+		'a("</Script")',
+		'// <!-- hidden',
+		'x = "<!--"',
+	])('refuses %p with a TypeError', (code) => {
+		const render = () =>
+			renderToString(createElement(InlineScript, { code, nonce: 'abc' }));
+		expect(render).toThrow(TypeError);
+		expect(render).toThrow(MESSAGE);
+	});
+
+	test('accepts the escaped form and other markup characters', () => {
+		const code = `a("<\\/script>") && x < y; // "q" 'r' &amp; </b> <!-`;
 		expect(renderToString(createElement(InlineScript, { code }))).toBe(
 			`<script>${code}</script>`,
 		);

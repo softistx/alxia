@@ -6,8 +6,12 @@ export interface PageLanguageOptions<L extends string> {
 	readonly languages: readonly L[];
 	/** The language of a page whose root data gives none; one of `languages`. */
 	readonly fallback: NoInfer<L>;
-	/** Whether this is a browser. Default: `typeof document !== 'undefined'`. */
-	readonly browser?: () => boolean;
+	/**
+	 * Whether this is a browser. Default: `typeof document !== 'undefined'`,
+	 * a global `document`: a server with a DOM shim on `globalThis` must pass
+	 * `() => false`, or the instance remembers a language across requests.
+	 */
+	readonly browser?: (() => boolean) | undefined;
 }
 
 export interface PageLanguage<L extends string> {
@@ -42,7 +46,7 @@ export function createPageLanguage<const L extends string>(
 	const { languages, fallback } = options;
 	if (!languages.includes(fallback)) {
 		throw new TypeError(
-			`createPageLanguage(): the fallback "${fallback}" is not one of the languages.`,
+			`createPageLanguage(): the fallback "${fallback}" is not one of the languages; got ${JSON.stringify(languages)}.`,
 		);
 	}
 	const isBrowser = options.browser ?? (() => typeof document !== 'undefined');
