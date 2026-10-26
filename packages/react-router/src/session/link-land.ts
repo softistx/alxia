@@ -8,8 +8,8 @@ import type { AuthLinks, LinkStayed, LinksContext } from './link-types';
 import { HOME, safeNext } from './model';
 
 /** Where a new session starts: the app's start page, else `/`; never an unsafe path. */
-async function startOf<L extends string>(
-	{ start }: LinksContext<L>,
+async function startOf<L extends string, C>(
+	{ start }: LinksContext<L, C>,
 	request: Request,
 	token: string,
 ): Promise<string> {
@@ -29,10 +29,15 @@ async function startOf<L extends string>(
  * first: one browser holds one session. Only a JSON post goes on, before
  * anything is revoked or landed.
  */
-export async function landByLink<L extends string>(
-	options: LinksContext<L>,
+export async function landByLink<L extends string, C>(
+	options: LinksContext<L, C>,
 	answer: SignInAnswer,
-	{ request, language, other }: Parameters<AuthLinks<L>['landByLink']>[1],
+	{
+		request,
+		language,
+		other,
+		context,
+	}: Parameters<AuthLinks<L, C>['landByLink']>[1],
 ): Promise<Response | LinkStayed> {
 	samesitePost(options.json, request);
 	if (answer.status === 'other' && other) {
@@ -45,6 +50,7 @@ export async function landByLink<L extends string>(
 	const landed = await options.signIn.landReplacing(answer, next, {
 		request,
 		revokeOn: ['signedIn', 'secondFactor'],
+		context,
 	});
 	if (!landed) {
 		return data<FormErrors>(
@@ -62,13 +68,14 @@ export async function landByLink<L extends string>(
  * cleared (the session's, the challenge's, the flow's `clear()`), then the sign-in page says the password changed. Only a JSON post
  * goes on.
  */
-export async function afterReset<L extends string>(
-	options: LinksContext<L>,
+export async function afterReset<L extends string, C>(
+	options: LinksContext<L, C>,
 	resetDone: string,
 	request: Request,
+	{ context }: { readonly context?: C | undefined } = {},
 ): Promise<Response> {
 	samesitePost(options.json, request);
-	await options.signIn.revokeSession(request);
+	await options.signIn.revokeSession(request, { context });
 	const headers = withTokenHeaders();
 	headers.append('Set-Cookie', options.cookies.destroy());
 	headers.append('Set-Cookie', options.cookies.destroyChallenge());

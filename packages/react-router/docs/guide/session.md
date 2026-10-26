@@ -375,8 +375,9 @@ the form's refusals, the second factor, the viewer and sign-out. Build it once
 ([the example](#a-complete-sign-in) does, in `app/session.server.ts`), over the
 app's `createApiErrors` and `jsonActions` (the same instances its other
 actions use, so every body is read with the same same-origin check).
-`revoke(token, request)` ends a session at the API and receives the request,
-for the caller's language, address or abort signal.
+`revoke(token, request, context)` ends a session at the API and receives the
+request, for its abort signal, and [the caller's context](#the-callers-context),
+for the visitor's address and language.
 
 `toAnswer` maps the API's words to `@nxgt/janus`'s: a
 `SignInAnswer` is `{ status: 'signedIn', token, expiresAt }`,
@@ -439,6 +440,52 @@ answers `true` when the request carried one.
 { request, revokeOn? })` are the same redirects for a step that does not go
 through `signInStep` (a link a mail carries). `revokeOn` lists the statuses
 that end the browser's session; `['signedIn']` by default.
+
+### The caller's context
+
+A bare `Request` carries no socket, so `revoke` cannot resolve the visitor's
+address from it, and reading `X-Forwarded-For` would trust a header the browser
+can forge. The address and the language come from alxia's trusted proxy
+resolution, which your loader or action reads from its `context`, and which
+every other call to the API already carries. Hand that to the flow: every step
+that can revoke takes an optional `context`, and passes it to `revoke` as its
+third argument.
+
+Name its type with the `revoke` parameter's annotation, and `signInFlow` infers
+it (`C`) for every step. Without a context, `revoke` receives `undefined`.
+
+```ts
+// app/session.server.ts
+import type { AlxiaContextOf } from '@alxia/react-router';
+
+// The app's registered context: `ip` is the address alxia resolved
+// (through its `proxy` option), and `language` is there when the app
+// registers `@alxia/language`.
+type Caller = AlxiaContextOf;
+
+export const signIn = signInFlow({
+	cookies,
+	errors,
+	json,
+	revoke: (token, request, caller?: Caller) =>
+		execute(SignOutMutation, {}, { token, signal: request.signal, caller }),
+	attemptsLeft: (count, language) => t('auth.attempts-left', { count }, language),
+});
+
+// app/routes/sign-out.ts
+export async function action({ context, request }: Route.ActionArgs) {
+	return signIn.signOut(request, { context: alxiaOf(context) });
+}
+```
+
+The same `context` is taken by `revokeSession(request, { context })`,
+`landReplacing(answer, next, { request, context })`,
+`signInStep(run, { ..., context })`, and, on `authLinks`, by
+`landByLink(answer, { ..., context })` and `afterReset(request, { context })`.
+A callback written with two parameters keeps working. With an explicit
+`signInFlow<Lang>`, `C` stays `undefined` and a `context` is a type error:
+write both type arguments (`signInFlow<Lang, Caller>`) or none (see
+[the troubleshooting entry](../troubleshooting.md#type--is-not-assignable-to-type-undefined-passing-a-context-to-a-step)).
 
 ### Which steps guard themselves
 

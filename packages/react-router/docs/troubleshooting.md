@@ -90,6 +90,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: linkArgs(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-linkargs-a-token-pages-path-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
 - [`TypeError: spendToken(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-spendtoken-a-token-pages-path-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
 - [`TypeError: authLinks(): resetDone must be a path of this site, starting with a single "/"; got ….`](#typeerror-authlinks-resetdone-must-be-a-path-of-this-site-starting-with-a-single--got-)
+- [`Type '…' is not assignable to type 'undefined'` passing a context to a step](#type--is-not-assignable-to-type-undefined-passing-a-context-to-a-step)
 
 **Types**
 
@@ -2669,6 +2670,33 @@ leading `/` is refused.
 
 ```ts
 authLinks({ signIn, resetDone: '/sign-in?password-reset=1' });
+```
+
+### `Type '…' is not assignable to type 'undefined'` passing a context to a step
+
+`tsc` refuses `signIn.signOut(request, { context: alxiaOf(context) })`, or the
+`context` of `revokeSession`, `landReplacing`, `signInStep`, `landByLink` or
+`afterReset`, with:
+
+```text
+Type 'AlxiaContextOf<…>' is not assignable to type 'undefined'.
+```
+
+**Why.** The flow was built with `signInFlow<Lang>(…)`. Giving one type
+argument stops TypeScript from inferring the second, `C`, the caller context,
+which then keeps its default, `undefined`. Every step's `context` is then
+typed `undefined`.
+
+**Fix.** Write both type arguments, or none, and let `L` and `C` be inferred
+from `errors` and the annotated third parameter of `revoke`:
+
+```ts
+type Caller = AlxiaContextOf;
+
+export const signIn = signInFlow<Lang, Caller>({
+	// …
+	revoke: (token, request, caller) => revokeAtApi(token, caller),
+});
 ```
 
 ### A token page's token shows in a Referer or a search result

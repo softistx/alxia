@@ -10,12 +10,12 @@ export interface AuthLinksCodes {
 	readonly mailThrottled?: string | undefined;
 }
 
-export interface AuthLinksOptions<L extends string> {
+export interface AuthLinksOptions<L extends string, C = undefined> {
 	/**
 	 * The app's sign-in flow: it lands the sessions a link opens, and its
 	 * `cookies`, `errors` and `json` are the ones the links use.
 	 */
-	readonly signIn: SignInFlow<L>;
+	readonly signIn: SignInFlow<L, C>;
 	/** The codes the links tell apart; `@nxgt/janus`'s by default. */
 	readonly codes?: AuthLinksCodes | undefined;
 	/**
@@ -42,8 +42,11 @@ export interface AuthLinksOptions<L extends string> {
 }
 
 /** The options with what they read of the flow: the functions take this. */
-export type LinksContext<L extends string> = AuthLinksOptions<L> &
-	Pick<SignInFlow<L>, 'cookies' | 'errors' | 'json'>;
+export type LinksContext<L extends string, C = undefined> = AuthLinksOptions<
+	L,
+	C
+> &
+	Pick<SignInFlow<L, C>, 'cookies' | 'errors' | 'json'>;
 
 /** What a token page answers when it stays on the page. */
 export type LinkStayed = ReturnType<typeof data<FormErrors>>;
@@ -83,7 +86,7 @@ export interface SpendOptions<L extends string> {
 	readonly fields?: readonly string[] | undefined;
 }
 
-export interface AuthLinks<L extends string> {
+export interface AuthLinks<L extends string, C = undefined> {
 	/** The token page in an end state, without its token: `path?state=…`. */
 	statePath(path: string, state: string): string;
 	/** A redirect to a token page's end state, replacing the token's history entry. */
@@ -124,10 +127,15 @@ export interface AuthLinks<L extends string> {
 			readonly other?:
 				| { readonly path: string; readonly state: string }
 				| undefined;
+			/** The caller context handed to the flow's `revoke`. */
+			readonly context?: C | undefined;
 		},
 	): Promise<Response | LinkStayed>;
 	/** After a password reset: the browser's session revoked and cleared, then the sign-in page. */
-	afterReset(request: Request): Promise<Response>;
+	afterReset(
+		request: Request,
+		options?: { readonly context?: C | undefined },
+	): Promise<Response>;
 	/** Requests a mail's link with `run`; only a same-site JSON post goes on. */
 	requestLink(
 		run: () => Promise<unknown>,

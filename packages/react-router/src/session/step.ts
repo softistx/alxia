@@ -53,8 +53,8 @@ export const unavailableMessage = <L extends string>(
  * message (a wrong password, a lock with its delay); an unreachable API
  * says `unavailable`, with a 503.
  */
-export async function signInStep<L extends string, T extends object>(
-	context: FlowContext<L>,
+export async function signInStep<L extends string, C, T extends object>(
+	flow: FlowContext<L, C>,
 	run: () => Promise<SignInAnswer>,
 	{
 		request,
@@ -62,15 +62,16 @@ export async function signInStep<L extends string, T extends object>(
 		next,
 		extra,
 		refused,
-	}: Parameters<SignInFlow<L>['signInStep']>[1] & { extra: T },
+		context,
+	}: Parameters<SignInFlow<L, C>['signInStep']>[1] & { extra: T },
 ): Promise<Response | SignInStayed<T>> {
-	const { errors, json } = context.options;
+	const { errors, json } = flow.options;
 	// A cross-site post must never sign in or revoke (headers only).
 	samesitePost(json, request);
 	const stay = (formError: string, status: number) =>
 		data<SignInFormError<T>>({ ...extra, formError }, { status });
 	const unreachable = () =>
-		stay(unavailableMessage(context.options, language), 503);
+		stay(unavailableMessage(flow.options, language), 503);
 	let answer: SignInAnswer;
 	try {
 		answer = await run();
@@ -84,6 +85,7 @@ export async function signInStep<L extends string, T extends object>(
 		return stay(own ?? refusal.message, refusal.status);
 	}
 	return (
-		(await landReplacing(context, answer, next, { request })) ?? unreachable()
+		(await landReplacing(flow, answer, next, { request, context })) ??
+		unreachable()
 	);
 }
