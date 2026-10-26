@@ -456,9 +456,12 @@ it (`C`) for every step. Without a context, `revoke` receives `undefined`.
 
 ```ts
 // app/session.server.ts
-import type { alxiaOf } from '@alxia/react-router';
+import type { AlxiaContextOf } from '@alxia/react-router';
 
-type Caller = ReturnType<typeof alxiaOf>;
+// The app's registered context: `ip` is the address alxia resolved
+// (through its `proxy` option), and `language` is there when the app
+// registers `@alxia/language`.
+type Caller = AlxiaContextOf;
 
 export const signIn = signInFlow({
 	cookies,
@@ -480,8 +483,9 @@ The same `context` is taken by `revokeSession(request, { context })`,
 `signInStep(run, { ..., context })`, and, on `authLinks`, by
 `landByLink(answer, { ..., context })` and `afterReset(request, { context })`.
 A callback written with two parameters keeps working. With an explicit
-`signInFlow<Lang>`, TypeScript infers nothing else, so write both type
-arguments (`signInFlow<Lang, Caller>`) to type the context.
+`signInFlow<Lang>`, `C` stays `undefined` and a `context` is a type error:
+write both type arguments (`signInFlow<Lang, Caller>`) or none (see
+[the troubleshooting entry](../troubleshooting.md#type--is-not-assignable-to-type-undefined-passing-a-context-to-a-step)).
 
 ### Which steps guard themselves
 
