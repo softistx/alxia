@@ -106,6 +106,16 @@ describe('graphql({ parseCache })', () => {
 		);
 	});
 
+	for (const bad of [true, null]) {
+		test(`parseCache: ${String(bad)} is refused at declaration`, () => {
+			expect(() => serve({ parseCache: bad as never })).toThrow(
+				new TypeError(
+					`graphql(app, { parseCache }): parseCache is an object of cache sizes, or false for none; got ${String(bad)}`,
+				),
+			);
+		});
+	}
+
 	for (const [name, value] of [
 		['maxBytes', 0],
 		['max', -1],

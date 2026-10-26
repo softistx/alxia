@@ -20,3 +20,5 @@
   `parseCache: { maxBytes, max, ttl }`, or turn it off with `parseCache: false`.
   An app that gives Yoga's `parserAndValidationCache` keeps its own cache;
   giving it together with `parseCache` throws where `graphql()` is declared.
+- **Invalid options throw at declaration.** A `maxTokens` or `parseCache`
+  value of the wrong kind throws a `TypeError` where `graphql()` is declared.

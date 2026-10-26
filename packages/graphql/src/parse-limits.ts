@@ -85,6 +85,14 @@ export function parseCaches(
 	parseCache: false | ParseCacheOptions | undefined,
 ): ParseCaches {
 	if (parseCache === false) return false;
+	if (
+		parseCache !== undefined &&
+		(typeof parseCache !== 'object' || parseCache === null)
+	) {
+		throw new TypeError(
+			`graphql(app, { parseCache }): parseCache is an object of cache sizes, or false for none; got ${String(parseCache)}`,
+		);
+	}
 	const given = parseCache ?? {};
 	const maxBytes = positive(
 		'parseCache.maxBytes',

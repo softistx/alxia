@@ -283,11 +283,12 @@ a fraction, `NaN` or a string; the message names the value given.
 graphql(app, { schema, maxTokens: 30_000 });
 ```
 
-### `TypeError: graphql(app, { parseCache, parserAndValidationCache }): give one: …` or `parseCache.maxBytes … a positive whole number`
+### `TypeError: graphql(app, { parseCache, parserAndValidationCache }): give one: …`, `parseCache.maxBytes`, `parseCache.max` or `parseCache.ttl … a positive whole number`, or `parseCache is an object of cache sizes …`
 
 **When:** declaring `graphql()` with both `parseCache` and Yoga's
 `parserAndValidationCache`, or with a `parseCache.maxBytes`, `max` or `ttl`
-that is not a positive whole number.
+that is not a positive whole number, or with a `parseCache` that is neither
+an object nor `false` (`true`, `null`, a number, a string).
 
 **Why:** `parseCache` sizes alxia's bounded cache and
 `parserAndValidationCache` replaces it with yours, so the two cannot both

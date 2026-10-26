@@ -126,12 +126,13 @@ graphql 16 and 17, a parsed token costs between 178 and 509 bytes of heap
 whatever its shape (4 000 aliases, one-character fields, nested lists,
 directives), where the cost per character swings from 58 to 254. So the
 count of tokens is the weight, and 512 bytes per token the upper estimate: a
-single heavy document parses to about 6 MB.
+document of 15 000 tokens parses to 7.7 MB at most (15 000 × 512 B); a
+measured heavy document of about 12 000 tokens weighs about 6 MB.
 
 - **`maxTokens`, 15 000 by default** (Apollo Router's own limit). The
   introspection query is 163 tokens and a large screen query with its
   fragments a few thousand, so a client written for a federated graph passes.
-  A 15 000-token document is at most about 7.7 MB parsed. A longer one is
+  A longer one is
   refused before it runs, as any document the parser cannot read is:
   `GRAPHQL_PARSE_FAILED`, `Syntax Error: Document contains more than 15000
   tokens. Parsing aborted.` (graphql 16 words it `more that`), HTTP 400 under

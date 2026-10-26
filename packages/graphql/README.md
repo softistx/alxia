@@ -204,6 +204,10 @@ graphql(app, {
 });
 ```
 
+A refused document is a 200 with `errors` under `application/json` (400 under
+`application/graphql-response+json`). A bad option value throws a `TypeError`
+where `graphql()` is declared.
+
 A client query is a few thousand tokens; the introspection query is 163. See
 [Cap what a request costs](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/production.md#cap-what-a-request-costs).
 
