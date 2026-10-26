@@ -2556,11 +2556,5 @@ The user types a wrong code in the step-up dialog and lands on the sign-in page,
 
 **Why:** `@nxgt/janus-graphql` answers `CODE_INVALID` with HTTP 401. A caller that redirects to the sign-in page on any 401 takes the wrong code for a dead session, before `stepUp.confirm` sees the error.
 
-**Fix:** call `requestStepUp` and `confirmStepUp` with a caller that leaves a 401 alone, or that redirects only for the code `UNAUTHENTICATED`:
+**Fix:** in the app's caller, redirect to sign-in only for a session 401 (`UNAUTHENTICATED`), never for a step-up's `CODE_INVALID`. [Step-up](guide/session.md#call-the-step-up-with-a-caller-that-does-not-sign-out-on-a-401) has the full section.
 
-```ts
-const caller = await sessionCaller(request, { onUnauthorized: 'throw' });
-await stepUp.confirm(() => execute(ConfirmStepUpMutation, variables, caller), { via }, language);
-```
-
-[Step-up](guide/session.md#call-the-step-up-with-a-caller-that-does-not-sign-out-on-a-401) says more.

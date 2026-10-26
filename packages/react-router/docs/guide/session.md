@@ -476,6 +476,10 @@ export const stepUp = stepUpSteps({
 });
 ```
 
+`json.readJson`, `toVia`, `execute` and `sessionCaller` below are the app's
+own helpers (its `jsonActions`, its mapping of the API's method to `via`, its
+GraphQL call and its session caller), not this package's.
+
 ```ts
 // app/routes/account.step-up.tsx
 export async function action({ context, request }: Route.ActionArgs) {
@@ -488,10 +492,11 @@ export async function action({ context, request }: Route.ActionArgs) {
 			return { challenge: requestStepUp.challenge, via: toVia(requestStepUp.method) };
 		}, language);
 	}
+	const via = input.via === 'email' || input.via === 'secondFactor' ? input.via : undefined;
 	return stepUp.confirm(
 		() =>
 			execute(ConfirmStepUpMutation, { challenge: input.challenge, code: input.code }, caller),
-		{ via: input.via },
+		via ? { via } : {},
 		language,
 	);
 }
@@ -510,6 +515,13 @@ type StepUpError = 'invalid' | 'expired' | 'failed';
 // confirm, refused
 { ok: false, intent: 'confirm-step-up', error: StepUpError, attemptsLeft?, locked, message }
 ```
+
+The answer must not be cached: `Cache-Control: private, no-store`, which
+`@alxia/secure-headers`' `pageHeaders` sets.
+
+A refused request (`error: 'failed'`) reaches the UI through
+`fetcher.data.message`: a throttled mail's wait is only there, since the
+reducer keeps `error` but not `message`.
 
 The `via` of `confirm` is the one `request` answered, which the page holds
 (the reducer's state has it). The `run` function of `confirm` takes nothing:
@@ -565,7 +577,8 @@ request for a challenge instead of the error page.
 
 `codes` takes `invalidCode` (`'CODE_INVALID'`), `challengeOver` (the table's
 codes that end a challenge; passing a list replaces it) and `stepUpRequired`
-(`'STEP_UP_REQUIRED'`). `invalidCode` in `challengeOver` is a `TypeError`.
+(`'STEP_UP_REQUIRED'`). `invalidCode` in `challengeOver` is a
+[`TypeError`](../troubleshooting.md#typeerror-stepupsteps-the-code--is-both-the-wrong-code-code-codesinvalidcode-and-in-codeschallengeover-a-wrong-code-that-leaves-tries-cannot-end-the-challenge).
 
 ### Call the step-up with a caller that does not sign out on a 401
 
