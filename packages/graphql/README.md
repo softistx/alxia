@@ -210,6 +210,7 @@ alone: a WebSocket `subscribe` message is bounded by Bun's `maxPayloadLength`
 graphql(app, {
 	schema,
 	maxTokens: 20_000, // false: no cap
+	maxNesting: 2_000, // 1 000 by default; false: no cap
 	parseCache: { maxBytes: 32 * 1024 * 1024, max: 512, ttl: 30 * 60_000 }, // false: no cache
 	bodyLimit: 5 * 1024 * 1024, // 1 MiB by default; a multipart upload needs more
 });
