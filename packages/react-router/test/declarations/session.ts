@@ -44,9 +44,7 @@ export const signIn = signInFlow({
 	attemptsLeft: (count) => `${count}`,
 });
 export const stepUp = stepUpSteps({
-	errors,
-	json,
-	attemptsLeft: (count) => `${count}`,
+	signIn,
 	spent: () => 'ask again',
 });
 export const links = authLinks({ signIn });
