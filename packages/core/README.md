@@ -500,11 +500,12 @@ const app = alxia()
 A `Content-Length` over the limit is refused without reading the body, at
 the last `bodyLimit()` in force: the middlewares before it run, the ones
 after it do not, so a middleware that answers a refusal in your own format
-goes before `bodyLimit()`. Without one, the bytes are counted as they arrive, and reading stops once
-they pass the limit, so a chunked upload is never buffered whole. The
-limit applies to JSON, forms, text, an app's own parsers, and a handler
-reading `request.body` as a stream. Either way the answer is a 413, which
-the route's operation in the OpenAPI document declares:
+goes before `bodyLimit()`. Without one, the bytes are counted as they
+arrive, and reading stops once they pass the limit, so a chunked upload is
+never buffered whole. The limit applies to JSON, forms, text, an app's own
+parsers, and a handler reading `request.body` as a stream. Either way the
+answer is a 413, which the route's operation in the OpenAPI document
+declares:
 
 ```json
 { "error": "content_too_large", "limit": 65536 }

@@ -17,7 +17,9 @@ package's `@alxia/core` peer moves to `^0.16.0`.
 | --- | --- | --- |
 | [A declared oversize body is refused where `bodyLimit()` stands](#a-declared-oversize-body-is-refused-where-bodylimit-stands) | core | yes: a middleware after `bodyLimit()` no longer runs on it |
 | [A route that never reads its body answers 413](#a-route-that-never-reads-its-body-answers-413) | core | yes: a webhook or an `all` proxy that ignored an oversize body |
-| [`1e3` and `0x10` are not lengths](#1e3-and-0x10-are-not-lengths) | core | only a client sending such a `Content-Length` |
+| [A route's own catcher under a `bodyLimit` option](#a-declared-oversize-body-is-refused-where-bodylimit-stands) | core | yes: a catcher after the option no longer catches a declared oversize body |
+| [The endpoint's 413 has no Yoga headers](#graphql-a-declared-oversize-post-gets-cores-413) | graphql | yes: a client relying on the headers Yoga's plugins set (`Cache-Control: no-store`) on that 413 |
+| [`1e3` and `0x10` are not lengths](#1e3-and-0x10-are-not-lengths) | core | only a `Request` built in process (`app.request`, `app.fetch`): over the wire Bun's server already answers 400 to such a value |
 
 ### A declared oversize body is refused where `bodyLimit()` stands
 
@@ -31,6 +33,14 @@ could answer in its own format wherever it stood. Now the refusal is a step:
 
 The middlewares before that step run. The ones after it and the handler do
 not. A chunked body is unchanged: it is cut at the read.
+
+- A catcher a route holds itself, among the middlewares after its
+  `bodyLimit` option, no longer catches a declared oversize body: the option's
+  step stands at the head of them. Give the catcher with `use` before the
+  route.
+- A plugin's `bodyLimit()` stands at its own position, applied at the
+  `plugin()` call: for the host's later routes, the host's middlewares
+  between `plugin()` and the route do not run on a declared oversize body.
 
 ```ts
 // before: the catcher stood after bodyLimit() and still caught the refusal
@@ -64,7 +74,16 @@ limit with a `bodyLimit` option on that route, or declare it before the
 `Content-Length` is plain digits. The read used to take `Number()` of the
 header, so `1e3` and `0x10` were refused unread as 1000 and 16 bytes. Both
 are now treated as no declared length: the body is counted as it arrives,
-as a chunked one is. A value that is not digits is not refused early.
+as a chunked one is. A value that is not digits is not refused early. This
+reaches only a `Request` built in process (`app.request`, `app.fetch`): over the wire Bun's server already answers 400 to such a value.
+
+### graphql: a declared oversize POST gets core's 413
+
+`@alxia/graphql` no longer gives its `POST` a limit of its own when the app
+has a `bodyLimit()` before `graphql()`: core refuses a declared oversize body
+there, before Yoga runs. That 413 carries none of the headers Yoga's plugins
+set (for example `Cache-Control: no-store`); a chunked body is still refused
+at the read, with them. Set what every response needs in a middleware.
 
 ## 0.14.2
 

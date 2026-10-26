@@ -629,11 +629,16 @@ How a body is held to it, without reading it whole, in three steps:
    - at the **head of a route's own middlewares** when it has a `bodyLimit`
      option, after everything given to `use`;
    - for a **plugin's route**, where the plugin declared it: the app's
-     `bodyLimit()` never reaches it.
+     `bodyLimit()` never reaches it;
+   - for the **host's routes after `plugin()`**, at the position of the
+     plugin's own `bodyLimit()`, applied at the `plugin()` call: the host's
+     middlewares between `plugin()` and the route do not run.
 
    A request with no body, a `Content-Length` that is not plain digits
    (`-1`, `1e3`, `0x10`, `8, 8`) or a chunked body is not refused there: the
-   count below decides. A length exactly at the limit passes.
+   count below decides (a `Request` built in process, `app.request` or
+   `app.fetch`, is the only one that can carry such a value: Bun's server
+   answers 400 to it over the wire). A length exactly at the limit passes.
 2. **`Content-Length` first.** A declared length over the limit is refused at
    that place without reading a byte: it throws a `ContentTooLargeError`
    there, so a middleware that stands **before** `bodyLimit()` catches it.

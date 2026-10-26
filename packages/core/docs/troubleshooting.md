@@ -2781,7 +2781,11 @@ do not. A catcher after the step has nothing to catch. The route's own
 `bodyLimit` option refuses at the head of its own middlewares, after
 everything given to `use`. A chunked body, or a `Content-Length` that is not
 plain digits (`1e3`, `0x10`, `8, 8`), is still refused at the read, where a
-middleware after the limit does run.
+middleware after the limit does run (such a length reaches a `Request` built
+in process, `app.request` or `app.fetch`, alone: Bun's server answers 400 to it
+over the wire). A plugin's `bodyLimit()` stands at its own position, applied
+at the `plugin()` call, so the host's middlewares between `plugin()` and the
+route do not run either.
 
 **Fix:** give the catcher before `bodyLimit()`, or before a route that has a
 `bodyLimit` option:
