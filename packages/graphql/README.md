@@ -196,7 +196,9 @@ documents Yoga parses are kept in a cache bounded by weight, **64 MiB** per
 endpoint, **1 024** documents, **one hour** (`parseCache`), where Yoga's own
 has no size bound. A `POST` body may hold **1 MiB** (`bodyLimit`) unless the
 app declared its own `bodyLimit()` before `graphql()`, which is kept; a body
-past it is core's 413 and never reaches Yoga:
+past it is core's 413 and never reaches Yoga. `bodyLimit` bounds a `POST`
+alone: a WebSocket `subscribe` message is bounded by Bun's `maxPayloadLength`
+(16 MiB by default):
 
 ```ts
 graphql(app, {

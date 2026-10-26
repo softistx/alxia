@@ -10,13 +10,14 @@ import type {
 	YogaInitialContext,
 	YogaServerOptions,
 } from 'graphql-yoga';
-import { declareEndpoint, resolveLimits } from './endpoint';
+import { declareEndpoint } from './endpoint';
 import { graphqlHandler, type YogaContext, yogaServers } from './handler';
 import { reportsOperations } from './operation';
 import {
 	limitsTokens,
 	type ParseCacheOptions,
 	parseCaches,
+	resolveLimits,
 } from './parse-limits';
 import type { SandboxOptions } from './sandbox';
 import { type GraphQLWsOptions, graphqlSocket } from './ws';

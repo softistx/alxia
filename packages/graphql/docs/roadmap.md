@@ -7,7 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+Nothing in progress.
 
 ## Next
 
@@ -19,7 +19,10 @@ Nothing scheduled yet.
 
 ## Later
 
-Nothing scheduled yet.
+- **A configurable WebSocket message limit.** A `subscribe` message over the
+  socket is bounded by Bun's `maxPayloadLength` (16 MiB by default), not by
+  `bodyLimit`. A `ws` option would set the limit the way `bodyLimit` does
+  for a `POST`.
 
 ## Shipped
 

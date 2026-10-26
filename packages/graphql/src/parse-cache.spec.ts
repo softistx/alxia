@@ -56,6 +56,25 @@ describe('graphql({ parseCache })', () => {
 		expect(heap() - before).toBeLessThan(64 * 1024 * 1024);
 	});
 
+	test('60 distinct comment-heavy documents do not pile up in the cache', async () => {
+		const app = serve();
+		await post(app, '{ ping }');
+		const before = heap();
+		for (let i = 0; i < 60; i++) {
+			// About 750 KB of comments: 250 000 lexed tokens, 4 counted ones; JSON escapes each newline.
+			const response = await post(
+				app,
+				`{ ping }\n#${i}\n${'#\n'.repeat(250_000)}`,
+			);
+			expect(response.status).toBe(200);
+		}
+		const growth = heap() - before;
+		console.log(
+			`comment spec heap growth: ${(growth / 1048576).toFixed(1)} MB`,
+		);
+		expect(growth).toBeLessThan(96 * 1024 * 1024);
+	});
+
 	test('a repeated query is parsed once', async () => {
 		const spy = parses();
 		const app = serve({ plugins: [spy.plugin] });

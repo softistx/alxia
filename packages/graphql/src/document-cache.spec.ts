@@ -81,19 +81,43 @@ describe('boundedCache', () => {
 });
 
 describe('weights', () => {
-	test('a document weighs 512 bytes a token plus twice its source', () => {
+	test('a document weighs 512 bytes a token plus 4 per source character', () => {
 		const source = '{ ping }';
 		const document = parse(source);
-		const tokens = (document as { tokenCount?: number }).tokenCount ?? 0;
+		let tokens = 0;
+		for (let t = document.loc?.startToken; t; t = t.next ?? undefined) tokens++;
 		expect(tokens).toBeGreaterThan(0);
 		expect(documentWeight(source, document)).toBe(
-			512 * tokens + 2 * source.length,
+			512 * tokens + 4 * source.length,
 		);
 	});
 
-	test('without tokenCount the source length stands in', () => {
+	test('comments are weighed: the whole token chain counts', () => {
+		const comments = 2000;
+		const source = `${'#\n'.repeat(comments)}{ ping }`;
+		const document = parse(source);
+		expect((document as { tokenCount?: number }).tokenCount).toBeLessThan(10);
+		expect(documentWeight(source, document)).toBeGreaterThanOrEqual(
+			512 * comments,
+		);
+	});
+
+	test('without loc, tokenCount stands in', () => {
 		const source = '{ ping }';
-		const document = { ...parse(source), tokenCount: undefined };
+		const document = parse(source, { noLocation: true });
+		const tokens = (document as { tokenCount?: number }).tokenCount ?? 0;
+		expect(documentWeight(source, document)).toBe(
+			512 * tokens + 4 * source.length,
+		);
+	});
+
+	test('without loc or tokenCount the source length stands in', () => {
+		const source = '{ ping }';
+		const document = {
+			...parse(source),
+			loc: undefined,
+			tokenCount: undefined,
+		};
 		expect(documentWeight(source, document as never)).toBe(256 * source.length);
 	});
 

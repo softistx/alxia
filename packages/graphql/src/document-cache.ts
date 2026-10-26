@@ -3,7 +3,7 @@
  * by entries, by age and by estimated bytes, since a parsed document costs
  * by its tokens and no count of entries bounds that.
  */
-import type { DocumentNode } from 'graphql';
+import type { DocumentNode, Token } from 'graphql';
 
 /** Yoga's `Cache` contract. */
 export interface Cache<T> {
@@ -75,15 +75,35 @@ export function boundedCache<T>(options: BoundedCacheOptions<T>): Cache<T> {
 /** The measured upper bound of a parsed token's heap cost, in bytes. */
 const BYTES_PER_TOKEN = 512;
 
+/** The bytes counted per source character: the source key, plus a token's value. */
+const BYTES_PER_CHAR = 4;
+
 /**
- * A parsed document's estimated bytes: its tokens, plus the source kept
- * as the key. Without `tokenCount` (older graphql), the source's length
- * stands in.
+ * The tokens the lexer linked for a document, comments included: graphql's
+ * `tokenCount` and `maxTokens` skip comments, yet `loc.startToken` keeps
+ * the whole chain alive. Undefined when the document has no `loc`.
+ */
+function chainLength(document: DocumentNode): number | undefined {
+	const first = document.loc?.startToken;
+	if (first === undefined) return undefined;
+	let count = 0;
+	for (let token: Token | null = first; token !== null; token = token.next) {
+		count++;
+	}
+	return count;
+}
+
+/**
+ * A parsed document's estimated bytes: every token the lexer linked,
+ * comments included, plus the source as the key and as token values. Without
+ * `loc` (`noLocation`), `tokenCount` stands in; without that (older
+ * graphql), the source's length does.
  */
 export function documentWeight(source: string, document: DocumentNode): number {
-	const tokens = (document as { tokenCount?: number }).tokenCount;
+	const tokens =
+		chainLength(document) ?? (document as { tokenCount?: number }).tokenCount;
 	if (typeof tokens !== 'number') return 256 * source.length;
-	return BYTES_PER_TOKEN * tokens + 2 * source.length;
+	return BYTES_PER_TOKEN * tokens + BYTES_PER_CHAR * source.length;
 }
 
 /** A parse error's estimated bytes: its source as the key, and the error. */

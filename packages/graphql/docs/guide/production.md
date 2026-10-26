@@ -129,6 +129,12 @@ count of tokens is the weight, and 512 bytes per token the upper estimate: a
 document of 15 000 tokens parses to 7.7 MB at most (15 000 × 512 B); a
 measured heavy document of about 12 000 tokens weighs about 6 MB.
 
+The cache weighs every token the lexer linked, comments included, plus 4
+bytes per source character. `maxTokens` does not count comments, yet a
+parsed document keeps all of them alive: a 750 KB body of `#` lines holds
+about 19.6 MB, so it weighs more than the cache keeps and is parsed again
+each time instead of cached.
+
 - **`maxTokens`, 15 000 by default** (Apollo Router's own limit). The
   introspection query is 163 tokens and a large screen query with its
   fragments a few thousand, so a client written for a federated graph passes.

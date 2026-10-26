@@ -660,7 +660,9 @@ generated ones or ones built with inline values, holds more and more memory.
 **Why:** Yoga's own parse cache keeps up to 1 024 documents, whatever their
 size, for an hour. `graphql()` replaces it with a cache bounded by weight
 (`parseCache`, 64 MiB by default) unless the app gives Yoga's
-`parserAndValidationCache`: then that cache is the app's to bound.
+`parserAndValidationCache`: then that cache is the app's to bound. Giving
+Yoga's `parserAndValidationCache` in any form, `{ validationCache: false }`
+included, brings back Yoga's unbounded least-recently-used cache.
 
 **Fix:** lower `parseCache.maxBytes`, send variables instead of inline
 values so the documents repeat, or bound your own cache:
