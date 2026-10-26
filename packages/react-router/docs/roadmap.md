@@ -15,6 +15,9 @@ Nothing planned.
 
 ## Later
 
+- **A signed device cookie for BFFs.** A cookie the app signs and the
+  browser keeps across sessions, so a sign-in can tell a known device from a
+  new one.
 - **Hreflang alternates** for an app with one URL per language. Today the
   language is negotiated on a single URL, so there is no alternate to link.
 - **`service-worker.js` served revalidated with no setup.** Today the app
@@ -56,6 +59,30 @@ Nothing planned.
   Bun, Deno or Cloudflare with a `runtime` option; alxia is Bun's.
 
 ## Shipped
+
+### 0.14.0
+
+- **`@alxia/react-router/session` and `/session/model`: a BFF session for a
+  janus API.** An app that is the backend of its own pages and calls a GraphQL
+  API that signs users in with `@nxgt/janus` gets its session from one place:
+  `sessionCookies` (the session and the second-factor challenge, in an
+  HttpOnly cookie), `signInFlow` (where a sign-in lands, the second factor,
+  the viewer, sign-out), `stepUpSteps` (the code asked before a sensitive
+  action), `authLinks` and `TOKEN_PAGE_HEADERS` (the pages a mail's link
+  opens). `/session/model` imports nothing and is safe in a component: `safeNext`
+  and `signInPath` (redirects that stay on the site), `TOTP_CODE`, and the
+  step-up's `stepUpReducer` and `stepUpProps`. Every step that signs in, out, spends or mails refuses a cross-site post. `/errors` gains `attemptsLeftOf`.
+  See the [session guide](guide/session.md).
+
+### 0.13.0
+
+- **`reword` in `createApiErrors`.** An optional
+  `reword(text, error, { code, values, language })` words a whole family of
+  codes once, such as adding a suffix to every `*.errors.referenced` refusal.
+  It runs on the final text of an API error, whatever produced it (the
+  catalogue, the API's message or `byCode`), and does not apply to `refused`,
+  `unavailable` or the entries of `extensions.fields`. See the
+  [errors guide](guide/errors.md).
 
 ### 0.12.0
 

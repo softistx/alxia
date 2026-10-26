@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { ApiError } from '@nxgt/graphql-client';
 import {
 	type ApiErrorLike,
+	attemptsLeftOf,
 	isApiErrorLike,
 	valuesOf,
 	waitMinutes,
@@ -79,5 +80,49 @@ describe('valuesOf', () => {
 		);
 		expect(valuesOf({ retryAfter: 9 })).toEqual({ retryAfter: 9 });
 		expect(valuesOf(undefined)).toBeUndefined();
+	});
+});
+
+describe('attemptsLeftOf', () => {
+	const refused = (extensions: Record<string, unknown> | undefined) =>
+		new ApiError(
+			[{ message: 'Wrong code', ...(extensions && { extensions }) }],
+			null,
+			401,
+		);
+
+	test('reads extensions.attemptsLeft, 0 included', () => {
+		expect(attemptsLeftOf(refused({ attemptsLeft: 3 }))).toBe(3);
+		expect(attemptsLeftOf(refused({ attemptsLeft: 0 }))).toBe(0);
+	});
+
+	test('reads params.attemptsLeft when the extensions carry none', () => {
+		expect(attemptsLeftOf(refused({ params: { attemptsLeft: 2 } }))).toBe(2);
+	});
+
+	test('prefers the extensions over the params', () => {
+		expect(
+			attemptsLeftOf(refused({ attemptsLeft: 4, params: { attemptsLeft: 2 } })),
+		).toBe(4);
+	});
+
+	test('is undefined when nothing is sent', () => {
+		expect(attemptsLeftOf(refused({}))).toBeUndefined();
+		expect(attemptsLeftOf(refused(undefined))).toBeUndefined();
+		expect(attemptsLeftOf(new ApiError([], null, 401))).toBeUndefined();
+	});
+
+	test('is undefined for a value that is not a count', () => {
+		for (const value of ['3', -1, 1.5, Number.NaN, null, true]) {
+			expect(attemptsLeftOf(refused({ attemptsLeft: value }))).toBeUndefined();
+		}
+	});
+
+	test('falls through to the params when the extensions value is not a count', () => {
+		expect(
+			attemptsLeftOf(
+				refused({ attemptsLeft: 'x', params: { attemptsLeft: 1 } }),
+			),
+		).toBe(1);
 	});
 });

@@ -89,7 +89,9 @@ describe('read', () => {
 			['@nxgt/graphql-client', ['packages/react-router']],
 			['@nxgt/httpyz', ['packages/create']],
 			['@nxgt/i18n', ['packages/i18n', 'packages/janus']],
-			['@nxgt/janus', ['packages/janus']],
+			// @alxia/react-router's is a devDependency: its /session spec checks
+			// that the names it speaks are janus's.
+			['@nxgt/janus', ['packages/janus', 'packages/react-router']],
 			['@nxgt/openapi-codegen', ['packages/create']],
 			['@nxgt/openapi-httpyz', ['packages/create']],
 			['@nxgt/redis', ['packages/redis']],

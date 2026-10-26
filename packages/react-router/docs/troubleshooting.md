@@ -76,6 +76,20 @@ a loader, a message React Router or the browser prints, or an error from
 - [`<api>: <operation> (request <id>) answered <status> without GraphQL`](#api-operation-request-id-answered-status-without-graphql)
 - [`<api>: <operation> (request <id>) unreachable`, `timeout` or `invalid-response`](#api-operation-request-id-unreachable-timeout-or-invalid-response)
 - [`<api>: <operation> (request <id>) aborted`](#api-operation-request-id-aborted)
+- [`TypeError: sessionCookies(): the … name "…" is not a cookie name (an RFC 6265 token: …). Pass a name such as "my-app_session".`](#typeerror-sessioncookies-the--name--is-not-a-cookie-name-an-rfc-6265-token--pass-a-name-such-as-my-app_session)
+- [`TypeError: sessionCookies(): the … name "…" already carries a prefix. Pass the base name: the package adds __Host- (session) or __Secure- (challenge) when secure is true.`](#typeerror-sessioncookies-the--name--already-carries-a-prefix-pass-the-base-name-the-package-adds-__host--session-or-__secure--challenge-when-secure-is-true)
+- [`TypeError: sessionCookies(): challengeSeconds must be a positive integer; got ….`](#typeerror-sessioncookies-challengeseconds-must-be-a-positive-integer-got-)
+- [`TypeError: sessionCookies(): challengePath must start with "/" and hold no ";" or control character; got ….`](#typeerror-sessioncookies-challengepath-must-start-with--and-hold-no--or-control-character-got-)
+- [`TypeError: signInFlow(): paths.… must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-signinflow-paths-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
+- [`TypeError: signInPath(): options.path must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-signinpath-optionspath-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
+- [`TypeError: signInFlow(): json must come from jsonActions(), which carries the site check every step runs; this object has none (a hand-made double?). Pass the app's jsonActions({ origin }) instance, or a spread copy of it.`](#typeerror-signinflow-json-must-come-from-jsonactions-which-carries-the-site-check-every-step-runs-this-object-has-none-a-hand-made-double-pass-the-apps-jsonactions-origin--instance-or-a-spread-copy-of-it)
+- [`TypeError: signInFlow(): the code "…" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`](#typeerror-signinflow-the-code--is-both-the-wrong-code-code-codesinvalidcode-and-in-codeschallengeover-a-wrong-code-that-leaves-tries-cannot-end-the-challenge)
+- [`TypeError: serializeCookie(): the name "…" is not a cookie name (an RFC 6265 token).`](#typeerror-serializecookie-the-name--is-not-a-cookie-name-an-rfc-6265-token)
+- [`TypeError: serializeCookie(): the path "…" is not a cookie path: it must start with "/" and hold no ";" or control character.`](#typeerror-serializecookie-the-path--is-not-a-cookie-path-it-must-start-with--and-hold-no--or-control-character)
+- [`TypeError: statePath(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-statepath-a-token-pages-path-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
+- [`TypeError: linkArgs(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-linkargs-a-token-pages-path-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
+- [`TypeError: spendToken(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-spendtoken-a-token-pages-path-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
+- [`TypeError: authLinks(): resetDone must be a path of this site, starting with a single "/"; got ….`](#typeerror-authlinks-resetdone-must-be-a-path-of-this-site-starting-with-a-single--got-)
 
 **Types**
 
@@ -118,6 +132,10 @@ a loader, a message React Router or the browser prints, or an error from
 - [An action shows the error page](#an-action-shows-the-error-page)
 - [Behind a TLS proxy every action answers 403](#behind-a-tls-proxy-every-action-answers-403)
 - [Right after start, refusals read in the API's words](#right-after-start-refusals-read-in-the-apis-words)
+- [`next` is always `/`](#next-is-always-)
+- [Sign-in loops on `http://localhost` in Safari](#sign-in-loops-on-httplocalhost-in-safari)
+- [A `__Host-` cookie is dropped](#a-__host--cookie-is-dropped)
+- [A token page's token shows in a Referer or a search result](#a-token-pages-token-shows-in-a-referer-or-a-search-result)
 
 ## Thrown or printed
 
@@ -1320,7 +1338,11 @@ shows.
 ### `Cross-site request refused`
 
 **When:** an action reads its body with `readJson` or `readInput` (from
-`jsonActions()`), and the page's post answers 403 with this text.
+`jsonActions()`), or runs one of `/session`'s steps (`signInStep`,
+`readCodeInput`, `linkArgs`, `spendToken`, `landByLink`, `afterReset`,
+`requestLink`, the step-up's `request` and `confirm`, `landReplacing`,
+`revokeSession`, `signIn.guard`), and the page's post answers 403 with this
+text. The session steps refuse before they read the body.
 
 **Why:** the request carried an `Origin` other than the app's own, or a
 `Sec-Fetch-Site` that is neither `same-origin` nor `none`. That is what a
@@ -1575,6 +1597,198 @@ sees the 503.
 
 **Fix:** none. To keep it out of the logs, test `request.signal.aborted` in
 your own `catch` before calling `apiCallFailure`.
+
+### `TypeError: sessionCookies(): the … name "…" is not a cookie name (an RFC 6265 token: …). Pass a name such as "my-app_session".`
+
+```
+TypeError: sessionCookies(): the session name "Bad Name" is not a cookie name (an RFC 6265 token: letters, digits and ! # $ % & ' * + - . ^ _ ` | ~). Pass a name such as "my-app_session".
+```
+
+**When:** the server starts, or the module that calls `sessionCookies` is imported.
+
+**Why:** `session` or `challenge` is empty or holds a character a cookie name cannot, such as a space, a semicolon, a comma or `=`. The message says which of the two (`session` or `challenge`) it is. A name from an environment variable that was not set is the usual cause.
+
+**Fix:** pass a plain name, such as the app's name and the role:
+
+```ts
+import { sessionCookies } from '@alxia/react-router/session';
+
+export const cookies = sessionCookies({
+	session: 'my-app_session',
+	challenge: 'my-app_challenge',
+	secure: !import.meta.env.DEV,
+});
+```
+
+### `TypeError: sessionCookies(): the … name "…" already carries a prefix. Pass the base name: the package adds __Host- (session) or __Secure- (challenge) when secure is true.`
+
+```
+TypeError: sessionCookies(): the session name "__Host-my-app_session" already carries a prefix. Pass the base name: the package adds __Host- (session) or __Secure- (challenge) when secure is true.
+```
+
+**When:** the server starts, or the module that calls `sessionCookies` is imported.
+
+**Why:** the name starts with `__Host-` or `__Secure-`. The package adds the prefix itself when `secure` is `true` and drops it when `secure` is `false` (development over plain HTTP, where a prefixed cookie would be refused); a name that carries it would be doubled or stuck in development.
+
+**Fix:** pass the base name: `'my-app_session'`, not `'__Host-my-app_session'`. The name the browser sees is in `cookies.names`. If the app reads or clears the cookie elsewhere by its full name, read it from `cookies.names.session`.
+
+### `TypeError: sessionCookies(): challengeSeconds must be a positive integer; got ….`
+
+```
+TypeError: sessionCookies(): challengeSeconds must be a positive integer; got 0.
+```
+
+**When:** the server starts, or the module that calls `sessionCookies` is imported.
+
+**Why:** `challengeSeconds`, the most the second-factor challenge's cookie lives, is `0`, negative, fractional or `NaN` (a lifetime read from an environment variable that is empty gives `NaN`). With `0` the browser would drop the cookie at once and the code page would never find its challenge.
+
+**Fix:** pass whole seconds above 0, or leave it out for the default of 300, the lifetime of an `@nxgt/janus` challenge. A longer value gains nothing: the cookie also ends with the challenge itself.
+
+### `TypeError: sessionCookies(): challengePath must start with "/" and hold no ";" or control character; got ….`
+
+```
+TypeError: sessionCookies(): challengePath must start with "/" and hold no ";" or control character; got "sign-in".
+```
+
+**When:** the server starts, or the module that calls `sessionCookies` is imported.
+
+**Why:** `challengePath`, where the browser sends the challenge cookie, is a relative path such as `'sign-in'` (a cookie's `Path` must be absolute, or the browser ignores it), or it holds a `;` or a control character, which would open another attribute of the `Set-Cookie` header.
+
+**Fix:** pass the path of the sign-in pages with its leading slash. The default is `'/sign-in'`, which covers `/sign-in` and the pages under it; not `/sign-in/code` alone, since a client navigation fetches `/sign-in/code.data`, which that path would not match.
+
+### `TypeError: signInFlow(): paths.… must be a path of this site with no query or fragment, starting with a single "/"; got ….`
+
+```
+TypeError: signInFlow(): paths.secondFactor must be a path of this site with no query or fragment, starting with a single "/"; got "sign-in/code".
+```
+
+**When:** the server starts, or the module that calls `signInFlow` is imported.
+
+**Why:** `paths.signIn` or `paths.secondFactor` (the message names which) is relative, empty, starts with `//` or `/\`, which a redirect reads as another site, or holds a query (`?`) or a fragment (`#`), which the flow appends to (`?next=`, `?signed-out=1`). The flow redirects to these paths.
+
+**Fix:** pass the page's path with its leading slash, or leave `paths` out for `/sign-in` and `/sign-in/second-factor`:
+
+```ts
+import { signInFlow } from '@alxia/react-router/session';
+
+export const signIn = signInFlow({
+	// …
+	paths: { secondFactor: '/sign-in/code' },
+});
+```
+
+### `TypeError: signInPath(): options.path must be a path of this site with no query or fragment, starting with a single "/"; got ….`
+
+```
+TypeError: signInPath(): options.path must be a path of this site with no query or fragment, starting with a single "/"; got "//evil.test".
+```
+
+**When:** the app calls `signInPath(next, { path })`, in a loader or at startup.
+
+**Why:** `path` replaces `/sign-in` and the function adds `?next=…` to it, so it must be a path of this site: relative, empty, starting with `//` or `/\` (which a redirect reads as another site), or holding a query (`?`) or a fragment (`#`) is refused. The message prints the path only up to its `?` or `#`.
+
+**Fix:** pass the page's path with its leading slash, and put parameters in `query`:
+
+```ts
+import { signInPath } from '@alxia/react-router/session/model';
+
+signInPath('/orders', { path: '/login', query: { expired: '1' } });
+```
+
+### `TypeError: signInFlow(): json must come from jsonActions(), which carries the site check every step runs; this object has none (a hand-made double?). Pass the app's jsonActions({ origin }) instance, or a spread copy of it.`
+
+```
+TypeError: signInFlow(): json must come from jsonActions(), which carries the site check every step runs; this object has none (a hand-made double?). Pass the app's jsonActions({ origin }) instance, or a spread copy of it.
+```
+
+**When:** the server starts, or the module that calls `signInFlow` is imported.
+
+**Why:** every step of the flow runs the same guard first (a native form post goes back to its page, a JSON post from another site is a 403). The guard's rule lives on the instance `jsonActions()` returns, under a registered symbol. A hand-made object with `readJson`, `requireJsonPost` and `readInput` has none, so the steps could not refuse another site.
+
+**Fix:** pass the app's `jsonActions({ origin })` instance, or a spread copy of it, which keeps the rule:
+
+```ts
+import { jsonActions } from '@alxia/react-router/errors';
+
+export const json = jsonActions({ origin: () => process.env.APP_ORIGIN });
+```
+
+### `TypeError: signInFlow(): the code "…" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`
+
+```
+TypeError: signInFlow(): the code "auth.errors.invalid-code" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.
+```
+
+**When:** the server starts, or the module that calls `signInFlow` is imported.
+
+**Why:** `codes.invalidCode`, the refusal of a wrong code, also appears in `codes.challengeOver`, the codes that end the challenge. The flow could not tell whether a refused code leaves tries or sends the user back to the password.
+
+**Fix:** list in `challengeOver` the codes of a challenge that is gone (unknown, spent, expired) and keep the wrong-code code out of it:
+
+```ts
+signInFlow({
+	// …
+	codes: {
+		invalidCode: 'auth.errors.invalid-code',
+		challengeOver: ['auth.errors.invalid-token'],
+	},
+});
+```
+
+### `TypeError: serializeCookie(): the name "…" is not a cookie name (an RFC 6265 token).`
+
+```
+TypeError: serializeCookie(): the name "a b" is not a cookie name (an RFC 6265 token).
+```
+
+**When:** the app calls `serializeCookie` for a cookie of its own (a language, a preference).
+
+**Why:** the name is empty or holds a space, `;`, `=`, a control character or another character a cookie name cannot. Written as it is, it would break the `Set-Cookie` header or open another attribute, so the package refuses it. `sessionCookies` checks its names the same way, with its own messages.
+
+**Fix:** use a plain name, letters, digits and `- _ .`:
+
+```ts
+import { serializeCookie } from '@alxia/react-router/session';
+
+const header = serializeCookie('my-app_language', 'fr', {
+	maxAge: 60 * 60 * 24 * 365,
+	secure: !import.meta.env.DEV,
+});
+```
+
+### `TypeError: serializeCookie(): the path "…" is not a cookie path: it must start with "/" and hold no ";" or control character.`
+
+```
+TypeError: serializeCookie(): the path "sign-in" is not a cookie path: it must start with "/" and hold no ";" or control character.
+```
+
+**When:** the app calls `serializeCookie` with a `path`, or `sessionCookies` builds its challenge cookie (that one reports a `challengePath` error instead).
+
+**Why:** the `path` is relative, or it holds a `;` or a control character such as a line break, which would end the attribute and let the rest of the string set another one. A path built from a request's URL is the usual source.
+
+**Fix:** pass a path of your own with its leading slash, and never one taken from a request. Leave `path` out for the default, `/`.
+
+### `TypeError: stepUpSteps(): the code "…" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`
+
+```
+TypeError: stepUpSteps(): the code "auth.errors.invalid-code" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.
+```
+
+**When:** the server starts, or the module that calls `stepUpSteps` is imported.
+
+**Why:** `codes.invalidCode`, the refusal of a wrong code, also appears in `codes.challengeOver`, the codes that end the challenge. A wrong code leaves tries (`attemptsLeft`) and the step could not tell it from a challenge that is gone. Passing `challengeOver` replaces the default list, so a list copied from a sign-in's codes is the usual cause.
+
+**Fix:** list in `challengeOver` the codes of a challenge that is gone and keep the wrong-code code out of it:
+
+```ts
+stepUpSteps({
+	// …
+	codes: {
+		invalidCode: 'auth.errors.invalid-code',
+		challengeOver: ['auth.errors.invalid-token', 'auth.errors.second-factor-state'],
+	},
+});
+```
 
 ## Types
 
@@ -2325,3 +2539,150 @@ catalogue.warm();
 
 Raise `firstReadWaitMs` only if the page should wait longer for the first
 words; it holds every cold request that long when the API hangs.
+
+### `next` is always `/`
+
+After signing in, the user lands on the home page, whatever page they came
+from, and `signInPath(next)` returns `/sign-in` with no `next`.
+
+**Why:** `safeNext` refuses the value and falls back to `/`. It takes a path
+of this site only, so these are refused: a value that does not start with
+`/`, one that starts with `//` or holds a `\`, a space, a tab or a newline,
+a full URL (`https://…`), a value that resolves to another site once its
+`..` segments are applied, and one over 2000 characters. The usual cause is a
+`next` built from the full URL (`request.url`, `location.href`), or one
+that was percent-decoded twice.
+
+**Fix:** pass the path and search alone:
+
+```ts
+import { signInPath } from '@alxia/react-router/session/model';
+
+const url = new URL(request.url);
+throw redirect(signInPath(`${url.pathname}${url.search}`));
+```
+
+[Redirects that stay on the site](guide/session.md#redirects-that-stay-on-the-site)
+lists what is refused.
+
+### Sign-in loops on `http://localhost` in Safari
+
+Signing in works in Chromium and Firefox. In Safari the app signs in, redirects, and lands back on the sign-in page, with no error.
+
+**Why:** Safari (WebKit) drops a `Secure` cookie set over `http://localhost`, where the other browsers keep it. The session cookie never arrives, so the next request has no session.
+
+**Fix:** pass `secure: false` in development. `secure: !import.meta.env.DEV` does it, and also drops the `__Host-` and `__Secure-` prefixes, which require `Secure`:
+
+```ts
+import { sessionCookies } from '@alxia/react-router/session';
+
+export const cookies = sessionCookies({
+	session: 'my-app_session',
+	challenge: 'my-app_challenge',
+	secure: !import.meta.env.DEV,
+});
+```
+
+Never write `secure: false` for a deployed app: the token would travel over HTTP.
+
+### A `__Host-` cookie is dropped
+
+The browser's cookie panel shows no `__Host-` session cookie after a sign-in, or the response's `Set-Cookie` is ignored.
+
+**Why:** a browser accepts a `__Host-` cookie only when it is `Secure`, has `Path=/` and no `Domain`, and the page is served over HTTPS (or `localhost` in Chromium and Firefox, never in Safari). The cookie the package writes always has `Path=/` and no `Domain`, so one of the others is wrong:
+
+- the app is served over plain HTTP, such as a Docker image or a preview opened by its IP address, while `secure` is `true`;
+- a proxy in front of the app rewrites or strips `Set-Cookie`, or adds a `Domain` attribute;
+- another `Set-Cookie` header of the same name, set by the app, overwrites it.
+
+**Fix:** serve the app over HTTPS, and keep `secure` `true` only there. Read `cookies.names.session` for the exact name, check the response header in the network panel, and make the proxy pass `Set-Cookie` as it is. In development over HTTP, `secure: !import.meta.env.DEV` sets an unprefixed cookie instead.
+
+### A wrong step-up code signs the user out
+
+The user types a wrong code in the step-up dialog and lands on the sign-in page, instead of seeing "wrong code".
+
+**Why:** `@nxgt/janus-graphql` answers `CODE_INVALID` with HTTP 401. A caller that redirects to the sign-in page on any 401 takes the wrong code for a dead session, before `stepUp.confirm` sees the error.
+
+**Fix:** in the app's caller, redirect to sign-in only for a session 401 (`UNAUTHENTICATED`), never for a step-up's `CODE_INVALID`. [Step-up](guide/session.md#call-the-step-up-with-a-caller-that-does-not-sign-out-on-a-401) has the full section.
+
+
+### `TypeError: statePath(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ….`
+
+```
+TypeError: statePath(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got "/auth/magic-link?…".
+```
+
+`statePath` throws it for its own `path`, and so do `ended()` and the `other.path` of `landByLink()`, which build their redirect with `statePath`: their error says `statePath(): …`, not their own name. The message names the call that was made.
+
+**Why:** the page's `path` is the page without its token: the helpers add `?state=…` to it, and a redirect must stay on the site. A path with a query (`/auth/magic-link?token=…`), a fragment, a host or a second leading `/` is refused, which also keeps the token out of the redirect. The message prints the path only up to its `?` or `#`, so the token never reaches a log.
+
+**Fix:** pass the route's own path, as a constant:
+
+```ts
+const PATH = '/auth/magic-link';
+await links.spendToken(run, { request, language, path: PATH, states });
+```
+
+### `TypeError: linkArgs(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ….`
+
+```
+TypeError: linkArgs(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got "/auth/magic-link?…".
+```
+
+`linkArgs` throws it for the `path` it is given, before it reads the body. The message names the call that was made.
+
+**Why:** the page's `path` is the page without its token: the helpers add `?state=…` to it, and a redirect must stay on the site. A path with a query (`/auth/magic-link?token=…`), a fragment, a host or a second leading `/` is refused, which also keeps the token out of the redirect. The message prints the path only up to its `?` or `#`, so the token never reaches a log.
+
+**Fix:** pass the route's own path, as a constant:
+
+```ts
+const PATH = '/auth/magic-link';
+await links.spendToken(run, { request, language, path: PATH, states });
+```
+
+### `TypeError: spendToken(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ….`
+
+```
+TypeError: spendToken(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got "/auth/magic-link?…".
+```
+
+`spendToken` throws it for the `path` of its options, before `run` is called. The message names the call that was made.
+
+**Why:** the page's `path` is the page without its token: the helpers add `?state=…` to it, and a redirect must stay on the site. A path with a query (`/auth/magic-link?token=…`), a fragment, a host or a second leading `/` is refused, which also keeps the token out of the redirect. The message prints the path only up to its `?` or `#`, so the token never reaches a log.
+
+**Fix:** pass the route's own path, as a constant:
+
+```ts
+const PATH = '/auth/magic-link';
+await links.spendToken(run, { request, language, path: PATH, states });
+```
+
+### `TypeError: authLinks(): resetDone must be a path of this site, starting with a single "/"; got ….`
+
+`authLinks` throws when the app starts.
+
+**Why:** `resetDone` is where a password reset leads, so it goes through the
+same check as a sign-in's `next`: a URL, `//host` or a path without its
+leading `/` is refused.
+
+**Fix:** pass a path of the app, with a query if it needs one:
+
+```ts
+authLinks({ signIn, resetDone: '/sign-in?password-reset=1' });
+```
+
+### A token page's token shows in a Referer or a search result
+
+The token page's URL appears in another site's logs, or a search engine lists
+it.
+
+**Why:** the page answered without `TOKEN_PAGE_HEADERS`, or only for its
+document and not its `.data` response.
+
+**Fix:** set the headers on the route:
+
+```ts
+import { TOKEN_PAGE_HEADERS } from '@alxia/react-router/session';
+
+export const headers = () => TOKEN_PAGE_HEADERS;
+```

@@ -29,6 +29,7 @@ import is `react-router`, never `@alxia/core`, so a page can import it
 | `ApiErrorLike`, `isApiErrorLike(error)` | the shape of `@nxgt/graphql-client`'s `ApiError`, and the test for it |
 | `ApiErrorEntryLike`, `ApiErrorExtensionsLike`, `ApiErrorParamsLike`, `ApiFieldErrorLike` | one error of the response, its `extensions`, their `params`, and one refused field |
 | `waitMinutes(extensions)` | the minutes of a throttle's wait: `minutes` (at least one), else `retryAfter` rounded up to minutes |
+| `attemptsLeftOf(error)` | the tries a refused code leaves, as `@nxgt/janus` counts them: `extensions.attemptsLeft` of the first error, else `params.attemptsLeft`; `undefined` when it is not a whole number from 0 up |
 | `REQUEST_ID_HEADER`, `requestIdOf(response)` | the header an API echoes on every response, and its value |
 | `nextOf(url)` | the page a request is for, as `next` carries it back after sign-in |
 | `FormErrors` | what a form action answers when the API refused the input |
@@ -72,6 +73,24 @@ import { waitMinutes } from '@alxia/react-router/errors';
 waitMinutes({ retryAfter: 90 }); // 2
 waitMinutes({ params: { minutes: 4 } }); // 4
 ```
+
+### The tries a code leaves
+
+A wrong second-factor or step-up code is refused with `@nxgt/janus`'s
+`CODE_INVALID` and the tries left in `extensions.attemptsLeft`.
+`attemptsLeftOf(error)` reads that count from the first error, else from its
+`params`, and answers `undefined` for anything that is not a whole number from
+0 up (a string, a negative number, a missing key). `0` is a count: no try is
+left.
+
+```ts
+import { attemptsLeftOf } from '@alxia/react-router/errors';
+
+attemptsLeftOf(error); // 3 after a wrong code, 0 on the last, undefined if uncounted
+```
+
+[`signInFlow`'s `codeRefusal`](session.md#the-second-factor) words it for a
+sign-in's code page.
 
 ## The request id
 

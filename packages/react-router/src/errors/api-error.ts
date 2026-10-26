@@ -18,6 +18,7 @@ export interface ApiFieldErrorLike {
 export interface ApiErrorParamsLike {
 	readonly minutes?: unknown;
 	readonly retryAfter?: unknown;
+	readonly attemptsLeft?: unknown;
 	readonly [key: string]: unknown;
 }
 
@@ -37,6 +38,8 @@ export interface ApiErrorExtensionsLike {
 	readonly minutes?: unknown;
 	/** A throttle's wait, in seconds. */
 	readonly retryAfter?: unknown;
+	/** The tries a refused code leaves, as `@nxgt/janus` counts them. */
+	readonly attemptsLeft?: unknown;
 	readonly [key: string]: unknown;
 }
 
@@ -87,6 +90,53 @@ export function waitMinutes(
 	if (minutes !== undefined) return Math.max(1, Number(minutes) || 1);
 	const seconds = extensions?.params?.retryAfter ?? extensions?.retryAfter;
 	return Math.max(1, Math.ceil(Number(seconds) / 60) || 1);
+}
+
+const MAX_RETRY_AFTER = 86_400;
+
+/** A wait in seconds from one value: a finite number from 0, or a decimal string. */
+function secondsOf(value: unknown): number | undefined {
+	const seconds =
+		typeof value === 'string' && /^\d+(\.\d+)?$/.test(value.trim())
+			? Number(value.trim())
+			: value;
+	return typeof seconds === 'number' && Number.isFinite(seconds) && seconds >= 0
+		? Math.min(MAX_RETRY_AFTER, Math.ceil(seconds)) + 0
+		: undefined;
+}
+
+/**
+ * The seconds a throttle asks to wait: `retryAfter` of the first error's
+ * `extensions.params`, else (when that is unusable) of its `extensions`.
+ * Only a finite number from 0, or a decimal string, counts; it is rounded up
+ * and held at a day (86 400), and `-0` is 0. `undefined` when the API sent
+ * none usable. Internal: `/session` words it as a typed `retryAfter`.
+ */
+export function retryAfterOf(error: ApiErrorLike): number | undefined {
+	const extensions = error.errors[0]?.extensions;
+	return (
+		secondsOf(extensions?.params?.retryAfter) ??
+		secondsOf(extensions?.retryAfter)
+	);
+}
+
+/**
+ * The tries a refused code leaves, as `@nxgt/janus` counts them:
+ * `extensions.attemptsLeft` of the first error, else the same key in its
+ * `params`. A whole number from 0 up; `undefined` when the API sent none or
+ * something that is not a count.
+ */
+export function attemptsLeftOf(error: ApiErrorLike): number | undefined {
+	const extensions = error.errors[0]?.extensions;
+	for (const value of [
+		extensions?.attemptsLeft,
+		extensions?.params?.attemptsLeft,
+	]) {
+		if (typeof value === 'number' && Number.isInteger(value) && value >= 0) {
+			return value;
+		}
+	}
+	return undefined;
 }
 
 /**
