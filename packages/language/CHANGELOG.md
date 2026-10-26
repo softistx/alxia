@@ -1,5 +1,11 @@
 # @alxia/language
 
+## 0.3.11
+
+### Patch Changes
+
+- [#320](https://github.com/softistx/alxia/pull/320) [`b54dcc1`](https://github.com/softistx/alxia/commit/b54dcc1460e911c72e4d640559b088f5e3749040) Thanks [@SteveGT96](https://github.com/SteveGT96)! - A language cookie sent twice (set on two paths or domains) is now read in full: the `cookie` source returns the first supported value among all copies, so an empty or unsupported first copy (`language=; language=fr`) no longer hides a supported second one. A single cookie behaves as before, and when no copy is supported the next source decides.
+
 ## 0.3.10
 
 ### Patch Changes

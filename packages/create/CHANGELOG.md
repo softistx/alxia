@@ -1,5 +1,13 @@
 # @alxia/create
 
+## 0.5.8
+
+### Patch Changes
+
+- [#316](https://github.com/softistx/alxia/pull/316) [`db1c1af`](https://github.com/softistx/alxia/commit/db1c1af4f117df1d5b803bc008d62842989bf837) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New `graphql` projects install `@alxia/graphql` 0.9, whose defaults are breaking: a document may hold at most 15 000 tokens (`maxTokens`), and a `POST` body at most 1 MiB (`bodyLimit`).
+
+- [#321](https://github.com/softistx/alxia/pull/321) [`f4486bb`](https://github.com/softistx/alxia/commit/f4486bb832b4399f0f3aeeaddbd61086605dfe82) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The React Router template's root passes the nonce to `<Links>`, so its critical CSS hydrates without a nonce mismatch in dev.
+
 ## 0.5.7
 
 ### Patch Changes
