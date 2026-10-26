@@ -6,7 +6,7 @@
  */
 
 export interface SerializeOptions {
-	/** Seconds; floored, and never below 0 (0 removes the cookie). */
+	/** Seconds; floored, and never below 0 (0 removes the cookie, and so does a value that is not finite). */
 	readonly maxAge: number;
 	/** `/` by default. */
 	readonly path?: string;
@@ -14,15 +14,40 @@ export interface SerializeOptions {
 	readonly secure: boolean;
 }
 
-/** A `Set-Cookie` value: always `HttpOnly` and `SameSite=Lax`, `Secure` when asked. */
+// RFC 6265 `token`: what a cookie name may be made of.
+const TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
+// A path of the site: no `;` to open another attribute, no control character.
+// biome-ignore lint/suspicious/noControlCharactersInRegex: that is the point
+const PATH = /^\/[^;\x00-\x1f\x7f]*$/;
+
+/** Whether `name` can name a cookie (an RFC 6265 token). */
+export const isCookieName = (name: string): boolean => TOKEN.test(name);
+/** Whether `path` can be a cookie's `Path`: absolute, no `;`, no control character. */
+export const isCookiePath = (path: string): boolean => PATH.test(path);
+
+/**
+ * A `Set-Cookie` value: always `HttpOnly` and `SameSite=Lax`, `Secure` when
+ * asked. A name or a path that could open another attribute throws a
+ * `TypeError`; a `maxAge` that is not finite is 0.
+ */
 export function serializeCookie(
 	name: string,
 	value: string,
 	{ maxAge, path = '/', secure }: SerializeOptions,
 ): string {
+	if (!isCookieName(name)) {
+		throw new TypeError(
+			`serializeCookie(): the name ${JSON.stringify(name)} is not a cookie name (an RFC 6265 token).`,
+		);
+	}
+	if (!isCookiePath(path)) {
+		throw new TypeError(
+			`serializeCookie(): the path ${JSON.stringify(path)} is not a cookie path: it must start with "/" and hold no ";" or control character.`,
+		);
+	}
 	return [
 		`${name}=${encodeURIComponent(value)}`,
-		`Max-Age=${Math.max(0, Math.floor(maxAge))}`,
+		`Max-Age=${Number.isFinite(maxAge) ? Math.max(0, Math.floor(maxAge)) : 0}`,
 		`Path=${path}`,
 		'HttpOnly',
 		...(secure ? ['Secure'] : []),

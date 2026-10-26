@@ -1,4 +1,6 @@
 import {
+	isCookieName,
+	isCookiePath,
 	millisOf,
 	readCookie,
 	secondsUntil,
@@ -45,7 +47,7 @@ export interface SessionCookies {
 	commit(token: string, expiresAt: string | Date, now?: number): string;
 	/** A `Set-Cookie` value removing the session cookie. */
 	destroy(): string;
-	/** The `Set-Cookie` header that keeps the cookie as long as the session lives; empty when the expiry did not move. */
+	/** The `Set-Cookie` header that keeps the cookie as long as the session lives; empty when the expiry did not move, or is absent or not a date. */
 	refreshed(
 		session: CookieSession,
 		expiresAt: string | Date | null,
@@ -69,12 +71,10 @@ export interface SessionCookies {
 	signInPageHeaders(deadSession: boolean): Headers;
 }
 
-// RFC 6265 `token`: what a cookie name may be made of.
-const TOKEN = /^[!#$%&'*+\-.^_`|~0-9A-Za-z]+$/;
 const PREFIX = /^__(?:Host|Secure)-/;
 
 function checkName(label: string, name: string): void {
-	if (!TOKEN.test(name)) {
+	if (!isCookieName(name)) {
 		throw new TypeError(
 			`sessionCookies(): the ${label} name ${JSON.stringify(name)} is not a cookie name (an RFC 6265 token: letters, digits and ! # $ % & ' * + - . ^ _ \` | ~). Pass a name such as "my-app_${label}".`,
 		);
@@ -100,9 +100,9 @@ export function sessionCookies(options: SessionCookiesOptions): SessionCookies {
 			`sessionCookies(): challengeSeconds must be a positive integer; got ${String(challengeSeconds)}.`,
 		);
 	}
-	if (!challengePath.startsWith('/')) {
+	if (!isCookiePath(challengePath)) {
 		throw new TypeError(
-			`sessionCookies(): challengePath must start with "/"; got ${JSON.stringify(challengePath)}.`,
+			`sessionCookies(): challengePath must start with "/" and hold no ";" or control character; got ${JSON.stringify(challengePath)}.`,
 		);
 	}
 	// `__Host-` holds only with `Path=/` and no `Domain`: the session cookie
@@ -118,9 +118,10 @@ export function sessionCookies(options: SessionCookiesOptions): SessionCookies {
 		const value = readCookie(request, session);
 		const dot = value?.indexOf('.') ?? -1;
 		if (!value || dot < 1) return null;
-		const expiresAt = Number(value.slice(0, dot));
+		const digits = value.slice(0, dot);
+		const expiresAt = Number(digits);
 		const token = value.slice(dot + 1);
-		return token && Number.isSafeInteger(expiresAt)
+		return token && /^\d+$/.test(digits) && Number.isSafeInteger(expiresAt)
 			? { token, expiresAt }
 			: null;
 	};
@@ -140,7 +141,9 @@ export function sessionCookies(options: SessionCookiesOptions): SessionCookies {
 		commit,
 		destroy: () => clear(session),
 		refreshed(current, expiresAt) {
-			if (!expiresAt || millisOf(expiresAt) === current.expiresAt) return {};
+			// An expiry that is not a date is garbage, not an end: keep the cookie.
+			const end = expiresAt ? millisOf(expiresAt) : 0;
+			if (!expiresAt || end === 0 || end === current.expiresAt) return {};
 			return { 'Set-Cookie': commit(current.token, expiresAt) };
 		},
 		challengeOf: (request) => readCookie(request, challenge),

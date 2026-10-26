@@ -94,6 +94,11 @@ describe('the session cookie, byte for byte', () => {
 			'__Host-my-app_session=abc.t',
 			'__Host-my-app_session=.t',
 			'__Host-my-app_session=12.',
+			'__Host-my-app_session=-5.t',
+			'__Host-my-app_session=0x10.t',
+			'__Host-my-app_session=1e3.t',
+			'__Host-my-app_session=%2012.t',
+			'__Host-my-app_session=99999999999999999999.t',
 			'my-app_session=12.t',
 			'__Host-my-app_sessionx=12.t',
 		]) {
@@ -127,6 +132,12 @@ describe('refreshed', () => {
 
 	test('sends nothing when the API gives no expiry', () => {
 		expect(cookies.refreshed(held, null)).toEqual({});
+	});
+
+	test('sends nothing when the expiry is not a date: never end a live session on garbage', () => {
+		expect(cookies.refreshed(held, 'soon')).toEqual({});
+		expect(cookies.refreshed(held, '')).toEqual({});
+		expect(cookies.refreshed(held, new Date(Number.NaN))).toEqual({});
 	});
 
 	test('sets the cookie again when the expiry moved', () => {
@@ -263,10 +274,17 @@ describe('what it refuses', () => {
 		}
 	});
 
+	test('a challengePath that could open another attribute', () => {
+		expect(make({ challengePath: '/a; Domain=evil.test' })).toThrow(
+			'hold no ";" or control character',
+		);
+		expect(make({ challengePath: '/a\nb' })).toThrow('control character');
+	});
+
 	test('a challengePath that does not start with /', () => {
 		expect(make({ challengePath: 'sign-in' })).toThrow(
 			new TypeError(
-				'sessionCookies(): challengePath must start with "/"; got "sign-in".',
+				'sessionCookies(): challengePath must start with "/" and hold no ";" or control character; got "sign-in".',
 			),
 		);
 	});

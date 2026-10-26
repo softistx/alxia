@@ -1,5 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import {
+	isCookieName,
+	isCookiePath,
 	millisOf,
 	readCookie,
 	secondsUntil,
@@ -40,6 +42,53 @@ describe('serializeCookie', () => {
 		expect(age(59.9)).toBe('Max-Age=59');
 		expect(age(-5)).toBe('Max-Age=0');
 		expect(age(0.4)).toBe('Max-Age=0');
+	});
+});
+
+describe('serializeCookie refuses what could open another attribute', () => {
+	test('a name that is not an RFC 6265 token', () => {
+		for (const name of ['', 'a b', 'a;b', 'a=b', 'a\nb', 'é']) {
+			expect(() =>
+				serializeCookie(name, 'v', { maxAge: 1, secure: true }),
+			).toThrow(
+				new TypeError(
+					`serializeCookie(): the name ${JSON.stringify(name)} is not a cookie name (an RFC 6265 token).`,
+				),
+			);
+		}
+	});
+
+	test('a path that is relative, holds ";" or a control character', () => {
+		for (const path of [
+			'sign-in',
+			'',
+			'/a; Domain=x',
+			'/a\r\nSet-Cookie: b',
+			'/a\x7f',
+		]) {
+			expect(() =>
+				serializeCookie('s', 'v', { maxAge: 1, path, secure: true }),
+			).toThrow(
+				new TypeError(
+					`serializeCookie(): the path ${JSON.stringify(path)} is not a cookie path: it must start with "/" and hold no ";" or control character.`,
+				),
+			);
+		}
+	});
+
+	test('a maxAge that is not finite is 0', () => {
+		for (const maxAge of [Number.NaN, Infinity, -Infinity]) {
+			expect(serializeCookie('s', 'v', { maxAge, secure: true })).toContain(
+				'Max-Age=0;',
+			);
+		}
+	});
+
+	test('the checks agree with isCookieName and isCookiePath', () => {
+		expect(isCookieName('my-app_session')).toBe(true);
+		expect(isCookieName('a b')).toBe(false);
+		expect(isCookiePath('/sign-in')).toBe(true);
+		expect(isCookiePath('/a;b')).toBe(false);
 	});
 });
 
