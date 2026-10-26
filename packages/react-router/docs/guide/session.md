@@ -478,6 +478,10 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 ```
 
+`stepUpSteps` and `authLinks` take such a flow as it is, with no cast. The
+step-up never calls `revoke`, so it needs no `context` of its own: its
+`request` and `confirm` take none.
+
 The same `context` is taken by `revokeSession(request, { context })`,
 `landReplacing(answer, next, { request, context })`,
 `signInStep(run, { ..., context })`, and, on `authLinks`, by
