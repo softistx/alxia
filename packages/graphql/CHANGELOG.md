@@ -1,5 +1,11 @@
 # @alxia/graphql
 
+## 0.9.1
+
+### Patch Changes
+
+- [#327](https://github.com/softistx/alxia/pull/327) [`cc0bc60`](https://github.com/softistx/alxia/commit/cc0bc60f0418bd50895e54541e591ff4d82fa0e7) Thanks [@SteveGT96](https://github.com/SteveGT96)! - docs: complete the limits docs: the headers of a 413, `maxNesting` in the README, the production guide and the WebSocket guide, and the troubleshooting entry for a document too deeply nested to parse.
+
 ## 0.9.0
 
 ### Minor Changes
