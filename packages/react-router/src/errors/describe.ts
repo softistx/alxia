@@ -9,6 +9,7 @@ export function describeApiErrors<L extends string>({
 	messages,
 	unavailable,
 	refused,
+	reword,
 	byCode = {},
 	isApiCode = (code) => API_CODE.test(code),
 }: ApiErrorsOptions<L>): ApiErrors<L> {
@@ -29,12 +30,13 @@ export function describeApiErrors<L extends string>({
 		const code = error.code;
 		if (refused && (!code || !isApiCode(code))) return refused(language);
 		const own = code && Object.hasOwn(byCode, code) ? byCode[code] : undefined;
-		if (own) return own(error, language);
-		return translateCode(
-			code,
-			error.message,
-			language,
-			valuesOf(error.errors[0]?.extensions),
+		const values = valuesOf(error.errors[0]?.extensions);
+		const text = own
+			? own(error, language)
+			: translateCode(code, error.message, language, values);
+		if (!reword || !code) return text;
+		return (
+			reword(text, error, { code, values: values ?? {}, language }) ?? text
 		);
 	};
 

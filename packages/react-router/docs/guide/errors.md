@@ -323,6 +323,32 @@ catalogue, then the API's own message. `fieldErrors` uses the same order for
 a single `extensions.field`, while the entries of `extensions.fields` go
 straight to the catalogue.
 
+`reword` words a whole family of codes once, after the text is worded, so
+there is no list of codes to keep in step with the catalogue. It receives the
+final text, the error, and `{ code, values, language }`: `values` are the
+merged values the catalogue formats with (`extensions` and
+`extensions.params`, the params winning). Return the text to show, or
+`undefined` to keep it:
+
+```ts
+export const apiErrors = createApiErrors<'en' | 'fr'>({
+	messages: apiMessages,
+	unavailable: (language) => translate('app.error.unavailable', language),
+	reword: (text, error, { code }) =>
+		code.endsWith('.errors.referenced')
+			? `${text} ${stillLinkedTo(error)}`
+			: undefined,
+});
+```
+
+`reword` sees the text `apiErrorMessage` returns for an error with a code,
+whichever produced it: the catalogue, the API's own message, or `byCode`; so
+`apiRefusal`, `fetcherResult`, `fetcherRefusal`, `submitForm` and a single
+`extensions.field` are reworded too. It does not see `refused`'s text (an
+error with no API code), `unavailable`'s (a network failure, which is no API
+code), `translateCode`'s, nor the entries of `extensions.fields`, which go
+straight to the catalogue.
+
 `isApiCode` changes what counts as an API code (`<module>.errors.<slug>` by
 default). Here only the codes of the `todos` module are the catalogue's; any
 other code, even one shaped like a catalogue code, says `refused`:
