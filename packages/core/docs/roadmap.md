@@ -42,6 +42,16 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### 0.16.0
+
+- **A declared oversize body refused where `bodyLimit()` stands.** A
+  `Content-Length` over the limit is refused at the last `bodyLimit()` in
+  force, or at the head of a route's own `bodyLimit` option, before the
+  middlewares after it run and without reading a byte. Breaking: a
+  middleware that answers a refusal in its own format goes before
+  `bodyLimit()` ([Upgrading](upgrading.md#0160),
+  [Body size](guide/routes.md#body-size-bodylimit)).
+
 ### 0.15.0
 
 - **Trusting a proxy by secret.** `trustProxy({ secret })`: a proxy that

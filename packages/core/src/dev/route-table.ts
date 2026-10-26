@@ -50,6 +50,8 @@ function nameOf(hook: ChainHook): string[] {
 			return [];
 		case 'middleware':
 			return [hook.run.name === '' ? 'anonymous' : hook.run.name];
+		case 'limit':
+			return ['bodyLimit'];
 		default:
 			return [hook.kind];
 	}

@@ -23,7 +23,9 @@ import type {
 export interface RouteOptions {
 	/**
 	 * The most bytes the request body may hold, past which it is refused
-	 * with a 413. Overrides a `bodyLimit()` declared before the route.
+	 * with a 413. Overrides a `bodyLimit()` declared before the route. A
+	 * declared `Content-Length` over it is refused at the head of the
+	 * route's own middlewares, after everything given to `use`.
 	 */
 	readonly bodyLimit?: number;
 	/** What OpenAPI says of the route, and nothing at runtime. */

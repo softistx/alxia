@@ -12,9 +12,9 @@ import { ContentTooLargeError } from '../errors/errors';
 export function limitBody(request: Request, limit: number): Request {
 	const source = request.body;
 	if (source === null || request.bodyUsed || source.locked) return request;
-	const declared = Number(request.headers.get('content-length') ?? Number.NaN);
+	const declared = declaredLength(request.headers);
 	let body: ReadableStream<Uint8Array>;
-	if (declared > limit) {
+	if (declared !== undefined && declared > limit) {
 		source.cancel().catch(() => {});
 		body = new ReadableStream({
 			start: (controller) => controller.error(new ContentTooLargeError(limit)),
@@ -43,4 +43,27 @@ export function checkLimit(limit: number, where: string): number {
 		);
 	}
 	return limit;
+}
+
+/**
+ * The `Content-Length` a request declares: digits alone, as the header's
+ * grammar has it. Anything else (`-1`, `1e3`, `0x10`, `8, 8`, or an empty
+ * value) is not a length, so it is counted at read time instead.
+ */
+export function declaredLength(headers: Headers): number | undefined {
+	const value = headers.get('content-length');
+	return value !== null && /^\d+$/.test(value) ? Number(value) : undefined;
+}
+
+/**
+ * Refuses a request whose declared `Content-Length` is over `limit`, with
+ * the `ContentTooLargeError` the read would throw, before any byte is read.
+ * A request without a body, or a length not over the limit, passes.
+ */
+export function refuseDeclared(request: Request, limit: number): void {
+	if (request.body === null) return;
+	const declared = declaredLength(request.headers);
+	if (declared !== undefined && declared > limit) {
+		throw new ContentTooLargeError(limit);
+	}
 }

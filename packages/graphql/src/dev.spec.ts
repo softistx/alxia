@@ -43,7 +43,7 @@ describe('a GraphQL app in dev', () => {
 			const lines = String(log.mock.calls[0]?.[0]).split('\n').slice(1);
 			expect(lines).toEqual([
 				'  GET   /graphql  logger → graphql',
-				'  POST  /graphql  logger → graphql',
+				'  POST  /graphql  logger › bodyLimit → graphql',
 			]);
 		} finally {
 			log.mockRestore();

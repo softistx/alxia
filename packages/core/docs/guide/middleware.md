@@ -147,7 +147,7 @@ Where an observer or an error handler stands in the chain matters, and is
 | Seeing the response a request will get, errors and 404s included | [`settle(ctx, next())`](#settle-see-the-response-the-client-gets) in a middleware | where the middleware stands | yes | no |
 | Answering a refusal or an error in your own format | [a `try`/`catch` around `next()`](#answering-a-refusal-or-an-error), with `refusalOf` and `ValidationError` | what is behind the middleware | yes | no |
 | Answering at once and finishing the work after | [`next.behind()`](#nextbehind-reply-now-finish-after) | where the middleware stands | yes | no |
-| Capping a body | `bodyLimit(bytes)`, or a route's `{ bodyLimit }` | the routes declared after it, or one route | a 413 | the limit, in `app.routes` |
+| Capping a body | `bodyLimit(bytes)`, or a route's `{ bodyLimit }` | the routes declared after it, or one route; a declared oversize body is refused where it stands | a 413 | the limit, in `app.routes`; the step, as `bodyLimit` in the dev route table |
 
 The request hooks of 0.3 were removed in 0.5: what each did, as a
 middleware, is on [Upgrading](../upgrading.md#050).
@@ -209,6 +209,12 @@ sees.
   `decorate`, `bodyLimit` applies to the routes declared after it, at
   runtime and in the types alike. A route declared before a `use(auth)`
   neither runs it nor reads what it adds.
+- **`bodyLimit()` is a step too**: a declared `Content-Length` over the limit
+  is refused where the last `bodyLimit()` in force stands (at the head of a
+  route's own middlewares for its `bodyLimit` option). The middlewares given
+  before it run, the ones after it and the handler do not, so a middleware
+  that answers a refusal in another format goes **before** `bodyLimit()`
+  ([Body size](routes.md#body-size-bodylimit)).
 
 ### Where `validate` stands
 
@@ -977,8 +983,10 @@ const app = alxia()
 
 Caps the body of the routes after it, or of one route with the
 `bodyLimit` of its options. A body past it is a 413: thrown as a
-`ContentTooLargeError`, answered by a middleware that reads
-`refusalOf(error)`, or by the default.
+`ContentTooLargeError`, answered by a middleware **before** `bodyLimit()`
+that reads `refusalOf(error)`, or by the default. A declared
+`Content-Length` over the limit is refused where `bodyLimit()` stands, so the
+middlewares after it do not run on it.
 
 ```ts
 import { alxia, validate } from '@alxia/core';

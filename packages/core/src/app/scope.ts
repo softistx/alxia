@@ -32,6 +32,11 @@ export class Scope {
 	#derive: Scoped[] = [];
 	/** The `bodyLimit` of the routes declared next, unless theirs says otherwise. */
 	#bodyLimit: number | undefined;
+	/**
+	 * The last `bodyLimit()` step: the one place a declared `Content-Length`
+	 * over the limit is refused, whatever earlier ones stood in `#derive`.
+	 */
+	#limitHook: ChainHook | undefined;
 	/** What `unmatched` built, until a hook is added. */
 	#unmatched: ScopedHooks | undefined;
 	/** How many hooks of the chain a group's scope took from the app's: the rest are its own. */
@@ -49,6 +54,8 @@ export class Scope {
 	/** Sets the `bodyLimit` of the routes declared next. */
 	limit(bytes: number): void {
 		this.#bodyLimit = checkLimit(bytes, 'bodyLimit()');
+		this.#limitHook = limitStep();
+		this.#derive.push({ hook: this.#limitHook });
 	}
 
 	/** A group's scope: every hook of this one, which the group adds to apart. */
@@ -56,6 +63,7 @@ export class Scope {
 		const copy = new Scope();
 		copy.#derive = [...this.#derive];
 		copy.#bodyLimit = this.#bodyLimit;
+		copy.#limitHook = this.#limitHook;
 		copy.#inherited = this.#derive.length;
 		return copy;
 	}
@@ -69,10 +77,22 @@ export class Scope {
 
 	/**
 	 * The hooks of a route declared now at `path`, its full path: those in
-	 * force that run on it, in the order declared, then its own.
+	 * force that run on it, in the order declared, then its own. `limit`
+	 * says where a declared oversize body is refused: at the last
+	 * `bodyLimit()` in force (`inherit`), at the head of its own steps when
+	 * it has a `bodyLimit` option (`own`), or nowhere (`none`: a socket).
 	 */
-	hooks(path: string, own: readonly ChainHook[] = []): ScopedHooks {
-		return { derive: [...this.#chainAt(path), ...own] };
+	hooks(
+		path: string,
+		own: readonly ChainHook[] = [],
+		limit: 'inherit' | 'own' | 'none' = 'inherit',
+	): ScopedHooks {
+		const held = this.#chainAt(path);
+		if (limit === 'inherit') return { derive: [...held, ...own] };
+		const kept = held.filter((hook) => hook.kind !== 'limit');
+		return {
+			derive: [...kept, ...(limit === 'own' ? [limitStep()] : []), ...own],
+		};
 	}
 
 	/**
@@ -83,12 +103,14 @@ export class Scope {
 	 */
 	unmatched(): ScopedHooks {
 		this.#unmatched ??= {
-			derive: this.#derive.map(({ hook, path }) =>
-				path === undefined ||
-				(hook.kind !== 'middleware' && hook.kind !== 'derive')
-					? hook
-					: scopedAt(hook, path),
-			),
+			derive: this.#derive
+				.filter(({ hook }) => hook.kind !== 'limit')
+				.map(({ hook, path }) =>
+					path === undefined ||
+					(hook.kind !== 'middleware' && hook.kind !== 'derive')
+						? hook
+						: scopedAt(hook, path),
+				),
 		};
 		return this.#unmatched;
 	}
@@ -121,11 +143,8 @@ export class Scope {
 							? scopedAt(hook, rebase(hook.when, prefix))
 							: hook,
 					);
-		return {
-			...definition,
-			path,
-			derive: [...this.#chainAt(path), ...own],
-		};
+		const app = this.#chainAt(path).filter((hook) => hook.kind !== 'limit');
+		return { ...definition, path, derive: [...app, ...own] };
 	}
 
 	/**
@@ -137,15 +156,27 @@ export class Scope {
 	 */
 	absorb(plugin: Scope, prefix: string, own = ''): void {
 		const at = own === '' ? undefined : prefixPath(own);
-		const taken = plugin.#derive.map(({ hook, path, enclosed }) => {
+		let limitHook: ChainHook | undefined;
+		const taken: Scoped[] = [];
+		for (const { hook, path, enclosed } of plugin.#derive) {
+			if (hook.kind === 'limit') {
+				// Only the plugin's last one stands, at its own position, not
+				// enclosed (as its `#bodyLimit` below is not): the routes declared
+				// after the plugin check it where the plugin put it.
+				if (hook !== plugin.#limitHook) continue;
+				limitHook = limitStep();
+				taken.push({ hook: limitHook });
+				continue;
+			}
 			const scoped = path ?? at;
-			return {
+			taken.push({
 				hook,
 				path: scoped === undefined ? undefined : rebase(scoped, prefix),
 				...(enclosed || at !== undefined ? { enclosed: true as const } : {}),
-			};
-		});
+			});
+		}
 		this.#derive = [...this.#derive, ...taken];
+		if (limitHook !== undefined) this.#limitHook = limitHook;
 		this.#bodyLimit = plugin.#bodyLimit ?? this.#bodyLimit;
 		this.#unmatched = undefined;
 	}
@@ -158,6 +189,7 @@ export class Scope {
 	enclose(group: Scope, prefix: string): void {
 		const at = prefixPath(prefix);
 		for (const { hook, path } of group.#derive.slice(group.#inherited)) {
+			if (hook.kind === 'limit') continue;
 			this.#derive.push({ hook, path: path ?? at, enclosed: true });
 		}
 		this.#unmatched = undefined;
@@ -172,6 +204,10 @@ export class Scope {
 		const chain: ChainHook[] = [];
 		for (const { hook, path: scoped, enclosed } of this.#derive) {
 			if (enclosed) continue;
+			if (hook.kind === 'limit') {
+				if (hook === this.#limitHook) chain.push(hook);
+				continue;
+			}
 			if (scoped === undefined || hook.kind !== 'middleware') {
 				chain.push(hook);
 				continue;
@@ -182,4 +218,9 @@ export class Scope {
 		}
 		return chain;
 	}
+}
+
+/** A `bodyLimit` step: refuses a declared `Content-Length` over the route's limit. */
+function limitStep(): ChainHook {
+	return { kind: 'limit' };
 }

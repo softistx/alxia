@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { createSchema } from 'graphql-yoga';
+import { chunked, send } from '../test/body';
 import { graphql } from './graphql';
 
 const schema = createSchema({
@@ -26,27 +27,6 @@ const app = serve();
 
 const query = (text: string) =>
 	JSON.stringify({ query: `{ echo(text: "${text}") }` });
-const send = (target: { request: typeof app.request }, body: BodyInit) =>
-	target.request('/graphql', {
-		method: 'POST',
-		headers: { 'content-type': 'application/json' },
-		body,
-		duplex: 'half',
-	} as RequestInit);
-
-/** `total` bytes of JSON in 256-byte chunks, with no Content-Length. */
-function chunked(prefix: string, total: number) {
-	const bytes = new TextEncoder().encode(prefix + ' '.repeat(total));
-	let at = 0;
-	return new ReadableStream<Uint8Array>({
-		pull(controller) {
-			if (at >= bytes.length) return controller.close();
-			controller.enqueue(bytes.subarray(at, at + 256));
-			at += 256;
-		},
-	});
-}
-
 describe("graphql(), a body past core's bodyLimit", () => {
 	test("a Content-Length past the limit is core's 413", async () => {
 		const response = await send(app, query('x'.repeat(2 * LIMIT)));
@@ -173,10 +153,10 @@ describe('graphql(), the headers of a 413', () => {
 			plugins: [noStore],
 		});
 
-	test('keep what a Yoga plugin set, with a Content-Length past the limit', async () => {
+	test("a Content-Length past the limit is refused by core before Yoga: none of Yoga's plugins' headers", async () => {
 		const response = await send(marked(), query('x'.repeat(2 * LIMIT)));
 		expect(response.status).toBe(413);
-		expect(response.headers.get('cache-control')).toBe('no-store');
+		expect(response.headers.get('cache-control')).toBeNull();
 		expect(await response.json()).toEqual({
 			error: 'content_too_large',
 			limit: LIMIT,
@@ -192,10 +172,10 @@ describe('graphql(), the headers of a 413', () => {
 		expect(response.headers.get('cache-control')).toBe('no-store');
 	});
 
-	test("the body and content-type stay core's, problem+json included", async () => {
+	test("the body and content-type stay core's, problem+json included, on a chunked body", async () => {
 		const response = await send(
 			marked('problem'),
-			query('x'.repeat(2 * LIMIT)),
+			chunked('{"query":"{ ping }"}', 8 * LIMIT),
 		);
 		expect(response.status).toBe(413);
 		expect(response.headers.get('cache-control')).toBe('no-store');
@@ -336,7 +316,7 @@ describe('graphql(), the bodyLimit option', () => {
 	});
 });
 
-describe('graphql(), Vary and cookies on the 413', () => {
+describe('graphql(), Vary and cookies on a counted 413 (a chunked body)', () => {
 	test("a Vary the app set and one Yoga's plugin set are both kept", async () => {
 		const target = graphql(
 			alxia()
@@ -357,7 +337,10 @@ describe('graphql(), Vary and cookies on the 413', () => {
 				],
 			},
 		);
-		const response = await send(target, query('x'.repeat(2 * LIMIT)));
+		const response = await send(
+			target,
+			chunked('{"query":"{ ping }"}', 8 * LIMIT),
+		);
 		expect(response.status).toBe(413);
 		const names = (response.headers.get('vary') ?? '')
 			.split(',')
@@ -386,7 +369,10 @@ describe('graphql(), Vary and cookies on the 413', () => {
 				],
 			},
 		);
-		const response = await send(target, query('x'.repeat(2 * LIMIT)));
+		const response = await send(
+			target,
+			chunked('{"query":"{ ping }"}', 8 * LIMIT),
+		);
 		expect(response.status).toBe(413);
 		const cookies = response.headers.getSetCookie();
 		expect(cookies).toContain('app=1; Path=/');

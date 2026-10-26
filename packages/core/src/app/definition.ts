@@ -46,6 +46,12 @@ export type ChainHook =
 			/** Given a path by `use`, run only on a request under it. */
 			readonly when?: ScopePath;
 	  }
+	/**
+	 * Where a declared `Content-Length` over the route's `bodyLimit` is
+	 * refused, before the read: the last `bodyLimit()` in force, or the head
+	 * of a route's own steps when it has the option.
+	 */
+	| { readonly kind: 'limit' }
 	| { readonly kind: 'validate'; readonly schemas: RequestSchemas }
 	| { readonly kind: 'responds'; readonly responses: ResponseSchemas };
 
