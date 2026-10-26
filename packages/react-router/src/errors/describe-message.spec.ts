@@ -172,3 +172,92 @@ describe('byCode', () => {
 		);
 	});
 });
+
+describe('reword', () => {
+	const suffix = (error: { errors: readonly { extensions?: unknown }[] }) =>
+		` (${JSON.stringify(error.errors[0]?.extensions)})`;
+	const family = createApiErrors<Lang>({
+		messages: filledMessages(),
+		unavailable: () => 'Unavailable',
+		byCode: { 'validation.errors.query-too-deep': () => 'Too heavy.' },
+		reword: (text, e, { code }) =>
+			code.startsWith('todos.errors.') || code.startsWith('validation.')
+				? `${text}${suffix(e)}`
+				: undefined,
+	});
+
+	test('a code of the family gets the suffix, on the catalogue text', () => {
+		const error = refusal('todos.errors.title-taken', 'x');
+		expect(family.apiErrorMessage(error, 'en')).toBe(
+			`Another todo already has this title. (${JSON.stringify(error.errors[0]?.extensions)})`,
+		);
+	});
+
+	test('applies to the API message when the catalogue has no text', () => {
+		const error = refusal('todos.errors.brand-new', 'Nouveau');
+		expect(family.apiErrorMessage(error, 'en')).toStartWith('Nouveau (');
+	});
+
+	test('applies to the output of byCode', () => {
+		const error = refusal('validation.errors.query-too-deep', 'x');
+		expect(family.apiErrorMessage(error, 'en')).toStartWith('Too heavy. (');
+	});
+
+	test('a code outside the family is untouched when reword returns undefined', () => {
+		const error = refusal('notes.errors.too-many-attempts', 'x', {
+			minutes: 2,
+		});
+		expect(family.apiErrorMessage(error, 'en')).toBe(
+			'Too many attempts. Try again in 2 minutes.',
+		);
+	});
+
+	test('sees the merged values and the language', () => {
+		const seen: unknown[] = [];
+		const errors = createApiErrors<Lang>({
+			messages: filledMessages(),
+			unavailable: () => '',
+			reword: (_text, _e, context) => {
+				seen.push(context);
+				return undefined;
+			},
+		});
+		const error = refusal('notes.errors.too-many-attempts', 'x', {
+			minutes: 99,
+			params: { minutes: 1 },
+		});
+		errors.apiErrorMessage(error, 'fr');
+		expect(seen).toHaveLength(1);
+		const context = seen[0] as {
+			code: string;
+			values: { minutes: number };
+			language: string;
+		};
+		expect(context.code).toBe('notes.errors.too-many-attempts');
+		expect(context.values.minutes).toBe(1);
+		expect(context.language).toBe('fr');
+	});
+
+	test('does not touch refused or unavailable', () => {
+		const errors = createApiErrors<Lang>({
+			messages: filledMessages(),
+			unavailable: () => 'Unavailable',
+			refused: () => 'Refused',
+			reword: (text) => `${text}!`,
+		});
+		expect(errors.apiErrorMessage(refusal(undefined, 'raw'), 'en')).toBe(
+			'Refused',
+		);
+		expect(errors.unavailableMessage('en')).toBe('Unavailable');
+		expect(
+			errors.apiRefusal(new Response(null, { status: 503 }), 'en')?.message,
+		).toBe('Unavailable');
+	});
+
+	test('without reword nothing changes', () => {
+		const error = refusal('todos.errors.title-taken', 'x');
+		expect(strictErrors().apiErrorMessage(error, 'en')).toBe(
+			'Another todo already has this title.',
+		);
+	});
+});
