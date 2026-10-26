@@ -30,6 +30,26 @@ export interface ApiErrorsOptions<L extends string> {
 	byCode?: Readonly<
 		Record<string, (error: ApiErrorLike, language: L) => string>
 	>;
+	/**
+	 * Words a whole family of codes once, after the text is worded. It runs
+	 * on the final text `apiErrorMessage` (so `apiRefusal`, `fetcherResult`,
+	 * `fetcherRefusal`, `submitForm` and a single `extensions.field`) says
+	 * for an error with a code, whichever produced it: the catalogue, the
+	 * API's own message, or `byCode`. It does not run on `refused`'s text, on
+	 * `unavailable`'s (a network failure), on `translateCode` nor on the
+	 * entries of `extensions.fields`. `values` are the merged values the
+	 * catalogue formats with (`extensions` and `extensions.params`, params
+	 * winning). Return the text to show, or `undefined` to keep `text`.
+	 */
+	reword?(
+		text: string,
+		error: ApiErrorLike,
+		context: {
+			code: string;
+			values: Readonly<Record<string, unknown>>;
+			language: L;
+		},
+	): string | undefined;
 	/** Whether a code is an API code; `<module>.errors.<slug>` by default. */
 	isApiCode?(code: string): boolean;
 }
