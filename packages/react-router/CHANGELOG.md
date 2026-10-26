@@ -1,5 +1,12 @@
 # @alxia/react-router
 
+## 0.15.1
+
+### Patch Changes
+
+- Updated dependencies [[`c327cfd`](https://github.com/softistx/alxia/commit/c327cfd802fc87fe6f5405c0531338b3ecff1a61)]:
+  - @alxia/core@0.16.0
+
 ## 0.15.0
 
 ### Minor Changes

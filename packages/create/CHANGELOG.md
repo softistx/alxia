@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.5.10
+
+### Patch Changes
+
+- [#342](https://github.com/softistx/alxia/pull/342) [`e783385`](https://github.com/softistx/alxia/commit/e783385584415a8bce54e8ec5dffd0615ae5a177) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects install `@alxia/core` 0.16.0, which refuses a declared oversize body where `bodyLimit()` stands. No template changes.
+
 ## 0.5.9
 
 ### Patch Changes
