@@ -6,17 +6,39 @@ import type { Alxia, AnyAlxia, ContextOf, RegisteredBase } from '@alxia/core';
 import { createContext, RouterContextProvider } from 'react-router';
 import type { ReactRouterServer } from './server';
 
-/** The default of the key: no catch-all set it. */
-const MISSING: unique symbol = Symbol('alxia context missing');
+/**
+ * One value per process, whichever copy of this module asks: the server
+ * build bundles `/entry` and the chunk it shares with `.` (see
+ * `vite/inline.ts`), and the server imports `.` outside the bundle.
+ *
+ * The key is shared across versions of this package. Its name ends in a
+ * shape version (`@1`): a version that changes what is stored under it bumps
+ * the suffix, so two copies of different shapes never read each other's.
+ */
+function singleton<T>(name: string, make: () => T): T {
+	const registry = globalThis as Record<symbol, unknown>;
+	const key = Symbol.for(`@alxia/react-router:${name}@1`);
+	registry[key] ??= make();
+	return registry[key] as T;
+}
 
 /**
  * The key `reactRouter()` sets on React Router's context provider, on every
- * request, to what alxia's middlewares built for it. It lives in this package, so
- * it is one object whichever way the server was built or loaded: a key made
- * in the app's own `app/` folder is copied into React Router's build, and
- * the server that imports it separately sets a different one.
+ * request, to what alxia's middlewares built for it, and its default, the
+ * "missing" sentinel no catch-all replaced. Both are one pair per process,
+ * so that a second copy's `alxiaOf` compares with the sentinel the key holds.
+ * It lives in this package, so it is one object whichever way the server was
+ * built or loaded: a key made in the app's own `app/` folder is copied into
+ * React Router's build, and the server that imports it separately sets a
+ * different one.
  */
-export const alxiaContext = createContext<unknown>(MISSING);
+const shared = singleton('context', () => {
+	// `as never` gives the `unique symbol` type without a `declare const`.
+	const missing: unique symbol = Symbol('alxia context missing') as never;
+	return { missing, context: createContext<unknown>(missing) };
+});
+const MISSING = shared.missing;
+export const alxiaContext = shared.context;
 
 /**
  * Names the server whose context `alxiaOf(context)` reads when given no

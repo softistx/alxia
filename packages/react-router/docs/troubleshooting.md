@@ -26,6 +26,13 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: reactRouter(): client is …, which is not a directory. …`](#typeerror-reactrouter-client-is--which-is-not-a-directory-)
 - [`TypeError: reactRouter(): … cannot be served at a path of its own name; rename it. …`](#typeerror-reactrouter--cannot-be-served-at-a-path-of-its-own-name-rename-it-)
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
+- [`Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self' 'nonce-…'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-script-src-self-nonce-)
+- [`A tree hydrated but some attributes of the server rendered HTML didn't match the client properties`](#a-tree-hydrated-but-some-attributes-of-the-server-rendered-html-didnt-match-the-client-properties)
+- [`useNonce()` is undefined on the server](#usenonce-is-undefined-on-the-server)
+- [`TypeError: InlineScript(): the code contains "</script" or "<!--", which ends or confuses the script element; escape it, such as "<\/script" inside a string`](#typeerror-inlinescript-the-code-contains-script-or----which-ends-or-confuses-the-script-element-escape-it-such-as-script-inside-a-string)
+- [`TypeError: createPageLanguage(): the fallback … is not one of the languages; got ….`](#typeerror-createpagelanguage-the-fallback--is-not-one-of-the-languages-got-)
+- [The error page shows in the fallback language](#the-error-page-shows-in-the-fallback-language)
+- [`Error: You must render this element inside a <HydratedRouter> element`](#error-you-must-render-this-element-inside-a-hydratedrouter-element)
 - [`alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`](#alxia-react-router--already-exists-and-reveal-leaves-it-as-it-is-run-alxia-react-router-reveal---force-to-overwrite-it)
 - [`alxia-react-router: no vite.config.ts in …. Run reveal from the app's root, beside vite.config.ts.`](#alxia-react-router-no-viteconfigts-in--run-reveal-from-the-apps-root-beside-viteconfigts)
 - [`alxia-react-router: … gives alxia() an entry reveal cannot read. …`](#alxia-react-router--gives-alxia-an-entry-reveal-cannot-read-)
@@ -44,6 +51,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: defineWorkerContract(): cacheVersion must be a non-empty name without '-', …`](#typeerror-defineworkercontract-cacheversion-must-be-a-non-empty-name-without---)
 - [`parseBrowserManifest(): not React Router's browser manifest …`](#parsebrowsermanifest-not-react-routers-browser-manifest-)
 - [`error: Cannot find package 'react' from '…/@alxia/react-router/dist/pwa/react/index.js'`](#error-cannot-find-package-react-from-alxiareact-routerdistpwareactindexjs)
+- [`error: Cannot find package 'isbot' from '…/@alxia/react-router/dist/entry/index.js'`](#error-cannot-find-package-isbot-from-alxiareact-routerdistentryindexjs)
 - [`startWorker(): no precache list. …`](#startworker-no-precache-list-)
 - [`TypeError: startWorker(): contract is required: …`](#typeerror-startworker-contract-is-required-)
 - [`error: Could not resolve: "workbox-core". Maybe you need to "bun install"?`](#error-could-not-resolve-workbox-core-maybe-you-need-to-bun-install)
@@ -538,6 +546,202 @@ or `contentSecurityPolicy: false`. Better than `'unsafe-inline'`: a nonce
 per request, with `nonce: true` and `nonceOf(loadContext)` in
 `entry.server.tsx` ([guide](guide/csp-nonce.md#a-csp-nonce)).
 
+### `Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self' 'nonce-…'"`
+
+**When:** the root renders an `<InlineScript>` (a theme's boot script, say)
+and the policy names a nonce.
+
+**Why:** the script rendered with no `nonce` attribute, because
+`useNonce()` found no nonce: the server render has no `<DocumentNonce>`
+around the router (an entry of your own that does not provide it), so
+`InlineScript` renders a bare `<script>`. The browser then refuses it, and
+the page flashes the wrong theme.
+
+**Fix:** wrap the router in the nonce `secureHeaders({ nonce: true })`
+made, in `entry.server.tsx`, or pass one to the script:
+
+```tsx
+// app/entry.server.tsx
+import { nonceOf } from '@alxia/react-router';
+import { DocumentNonce } from '@alxia/react-router/document';
+
+return (
+	<DocumentNonce nonce={nonceOf(loadContext)}>
+		<ServerRouter context={routerContext} url={request.url} />
+	</DocumentNonce>
+);
+```
+
+or, for one script, `<InlineScript code={THEME_BOOT} nonce={nonce} />`.
+
+Check the response: `curl -s -A 'Mozilla/5.0 Chrome/130' http://localhost:5173/ | grep -o '<script[^>]*>'`
+should show `nonce="…"` on the boot script too
+([guide](guide/document.md#the-nonce-on-the-server)).
+
+### `A tree hydrated but some attributes of the server rendered HTML didn't match the client properties`
+
+**When:** the page hydrates, and the warning names `<html>` with a `class`
+or `style` the server did not render.
+
+**Why:** a boot script (a theme's) sets `class` and `style` on `<html>`
+before React hydrates, so the DOM no longer equals the server's HTML.
+
+**Fix:** keep `suppressHydrationWarning` on `<html>`. It silences that
+element's own attributes only, not its children:
+
+```tsx
+// app/root.tsx
+<html lang="en" suppressHydrationWarning>
+	<head>
+		<InlineScript code={THEME_BOOT} />
+	</head>
+	<body>{children}</body>
+</html>
+```
+
+A warning on another element is a real mismatch: a `nonce` the browser hid
+is read by `useNonce()` from the document, so never pass it from loader
+data ([guide](guide/document.md#the-theme-boot-script)).
+
+### `useNonce()` is undefined on the server
+
+**When:** the page's inline scripts or `<CspNonceMeta />` render with no
+`nonce` attribute although `secureHeaders({ nonce: true })` set one, and
+`useNonce()` returns `undefined` in the root.
+
+**Why:** the server render has no `<DocumentNonce>` around the router. The
+entry of `@alxia/react-router/entry` adds it; an entry of your own, such
+as React Router's revealed one, does not, and `ServerRouter`'s own `nonce`
+prop only reaches the scripts React Router writes.
+
+**Fix:** re-export the package's entry, or wrap the router in your own:
+
+```tsx
+// app/entry.server.tsx
+export {
+	handleRequest as default,
+	streamTimeout,
+} from '@alxia/react-router/entry';
+```
+
+```tsx
+// An entry of your own
+import { nonceOf } from '@alxia/react-router';
+import { DocumentNonce } from '@alxia/react-router/document';
+
+<DocumentNonce nonce={nonceOf(loadContext)}>
+	<ServerRouter context={routerContext} url={request.url} />
+</DocumentNonce>;
+```
+
+([guide](guide/document.md#the-entry))
+
+### `TypeError: InlineScript(): the code contains "</script" or "<!--", which ends or confuses the script element; escape it, such as "<\/script" inside a string`
+
+**When:** a page renders an `<InlineScript code={…} />` whose code holds
+`</script` (in any case) or `<!--`.
+
+**Why:** the code is written into the page unescaped. A `</script` ends the
+element early, so what follows is HTML, not script, and can be markup an
+attacker chose; a `<!--` makes the HTML parser treat the following
+`<script` as part of the script's text. A nonce does not help: it only says
+the script may run. The component refuses the code instead of rendering it.
+
+**Fix:** keep the code a constant of the app and escape the sequence inside
+a string. The code that reaches `InlineScript` must contain `<\/`, which the
+browser's script reads as `</`, and which is written `"<\\/script"` in a
+source string literal:
+
+```tsx
+<InlineScript code={'document.title = "<\\/script>"'} />
+```
+
+Never build the code from user input; pass such a value through a `data-`
+attribute and read it from the script.
+([guide](guide/document.md#the-theme-boot-script))
+
+### `TypeError: createPageLanguage(): the fallback … is not one of the languages; got ….`
+
+```text
+TypeError: createPageLanguage(): the fallback "de" is not one of the languages; got ["en","fr"].
+```
+
+**When:** the module that calls `createPageLanguage` loads.
+
+**Why:** `fallback` is the language of a page whose root data gives none, so
+it must be one of `languages`. The usual cause is a fallback in another
+spelling (`en-US` for `en`), or a `languages` list built from a different
+source than the fallback.
+
+**Fix:** name a language of the list:
+
+```ts
+createPageLanguage({ languages: ['en', 'fr'], fallback: 'en' });
+```
+
+### The error page shows in the fallback language
+
+**When:** on an error document, the root's `<html lang>` or text shows the
+fallback language although the visitor uses another.
+
+**Why:** a child route's error keeps the root's loader data. React Router
+keeps `loaderData` for every loader that succeeded, so
+`useRouteLoaderData('root')` still has it in `Layout` and `ErrorBoundary`.
+The data is missing in only two cases:
+
+- the URL matches no route, which is a 404 that runs no loader at all, the
+  root's included;
+- the root's own loader threw.
+
+With no data, `pageLanguage(undefined)` has no language to read. In the
+browser it keeps the last language it saw and the one picked with
+`chooseLanguage`; a document the server renders as an error has seen
+neither, so the fallback shows.
+
+**Fix, 404:** add a splat route whose loader throws a 404, so the URL
+matches and the root loader runs:
+
+```ts
+// app/routes.ts: add it last in your route config
+import { route } from '@react-router/dev/routes';
+
+route('*', 'routes/not-found.tsx');
+```
+
+```ts
+// app/routes/not-found.tsx
+import { data } from 'react-router';
+
+export const loader = () => {
+	throw data(null, { status: 404 });
+};
+```
+
+**Fix, root loader:** keep the root loader to `{ language: alxia.language }`,
+with nothing fallible in it. Load fallible data in child routes, or catch it
+and return it as a field.
+
+**Fix, client:** none is needed: a failed client navigation keeps the last
+language through `pageLanguage`.
+
+### `Error: You must render this element inside a <HydratedRouter> element`
+
+**When:** under `react-router dev` or after `react-router build`, every page
+answers "Unexpected Server Error" with this message, once
+`entry.server.tsx` re-exports `@alxia/react-router/entry`.
+
+**Why:** the server holds two copies of `react-router`: the one that
+renders `ServerRouter` in the entry, and the one `<Links>` and `<Scripts>`
+in the root read. They share no context. `alxia()` from
+`@alxia/react-router/vite` keeps them to one (it inlines `/entry` and
+`/document`, by an alias in dev and in the build, so they import the app's
+`react-router`). The message means `@alxia/react-router` is listed in
+`ssr.external` and `alxia()` is not in use.
+
+**Fix:** add `alxia()` to `vite.config.ts` beside `reactRouter()`, or list
+`@alxia/react-router` in `ssr.noExternal` and remove it from
+`ssr.external`.
+
 ### `alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`
 
 ```text
@@ -909,6 +1113,30 @@ this message too.
 **Fix:** add `react` where the page is built (`bun add react`), and import
 `/pwa/react` from the page alone. The worker and a build script import
 `@alxia/react-router/pwa`, which imports nothing.
+
+### `error: Cannot find package 'isbot' from '…/@alxia/react-router/dist/entry/index.js'`
+
+**When:** a request with a user agent reaches `entry.server.tsx` re-exporting
+`@alxia/react-router/entry` (or a `createEntry()` with no `isBot` option).
+
+```text
+error: Cannot find package 'isbot' from '/app/node_modules/@alxia/react-router/dist/entry/index.js'
+```
+
+**Why:** with no `isBot` option, `/entry` asks `isbot` whether a request
+comes from a crawler, which then gets the whole page, and imports it on the
+first request that needs it. `isbot` and `react-dom` are optional peers of
+the package, so nothing installs them for you. React Router's templates
+install both; an app made another way may not.
+
+**Fix:** add them where the server is built and run:
+
+```sh
+bun add isbot react-dom
+```
+
+Or give the `isBot` option, which replaces the check: `isbot` is then never
+imported, and only `react-dom` is needed.
 
 ### `startWorker(): no precache list. …`
 
@@ -1490,7 +1718,9 @@ error TS2375: Type '{ context: EntryContext; url: string; nonce: string | undefi
 `ServerRouterProps.nonce` is optional without `undefined`. React's
 `nonce` option takes `undefined`, so only the prop complains.
 
-**Fix:** spread the prop in only when there is a nonce:
+**Fix:** use `@alxia/react-router/entry`, whose `handleRequest` does it
+([guide](guide/document.md#the-entry)), or spread the prop in only when
+there is a nonce, in an entry of your own:
 
 ```tsx
 const nonce = nonceOf(loadContext);

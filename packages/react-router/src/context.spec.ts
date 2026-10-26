@@ -81,3 +81,19 @@ describe('alxiaOf and Register', () => {
 		expect(result.stdout.toString() + result.stderr.toString()).toBe('');
 	}, 30_000);
 });
+
+describe('the context key and its sentinel, one per process', () => {
+	test('a second copy of the module throws the documented error as the first does', async () => {
+		const first = await import('./context');
+		const second = (await import(
+			`./context?copy=${Math.random()}`
+		)) as typeof first;
+		expect(second).not.toBe(first);
+		expect(second.alxiaContext).toBe(first.alxiaContext);
+		for (const copy of [first, second]) {
+			expect(() => copy.alxiaOf(new RouterContextProvider())).toThrow(
+				/this request has no alxia context/,
+			);
+		}
+	});
+});

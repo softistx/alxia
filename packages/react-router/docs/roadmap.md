@@ -7,7 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing in progress.
+Nothing planned.
 
 ## Next
 
@@ -15,6 +15,8 @@ Nothing planned.
 
 ## Later
 
+- **Hreflang alternates** for an app with one URL per language. Today the
+  language is negotiated on a single URL, so there is no alternate to link.
 - **`service-worker.js` served revalidated with no setup.** Today the app
   adds `noCache` for `SERVICE_WORKER_URL` itself.
 - **A check of an offline page's policy.** The offline page declares its
@@ -33,6 +35,8 @@ Nothing planned.
 
 ## Not planned
 
+- **The theme's own boot script.** `InlineScript` renders it with the nonce;
+  its text, its storage keys and class names, are the UI library's.
 - **React Router 7.** Its loaders' context is a `RouterContextProvider`
   only behind `future.v8_middleware`, and the line is in maintenance.
 - **Node or Cloudflare.** alxia is a Bun framework; React Router's own
@@ -52,6 +56,18 @@ Nothing planned.
   Bun, Deno or Cloudflare with a `runtime` option; alxia is Bun's.
 
 ## Shipped
+
+### 0.12.0
+
+- **`@alxia/react-router/document` and `/entry`: the boot of a page.**
+  `DocumentNonce`, `useNonce`, `InlineScript` and `CspNonceMeta` give the
+  root the response's CSP nonce, an inline boot script that carries it and
+  the `csp-nonce` meta; `createPageLanguage` and `textDirection` give the
+  page's language and text direction. `entry.server.tsx` becomes
+  `export { handleRequest as default, streamTimeout } from '@alxia/react-router/entry'`:
+  a streamed shell on Bun's web renderer, the whole page for a bot and in SPA
+  mode, no body for HEAD, and the nonce handed to the router, with no
+  `@react-router/node` and no `node:stream`.
 
 ### 0.11.0
 

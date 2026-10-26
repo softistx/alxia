@@ -103,3 +103,43 @@ describe('react-router build, with no server file', () => {
 		}
 	});
 });
+
+describe('react-router build, with the package in ssr.external', () => {
+	let fixture: Fixture;
+	const NONCE = 'YnVpbGQtbm9uY2Utc3BlYw';
+
+	beforeAll(async () => {
+		fixture = await copyFixture();
+		// A server whose `configure` derives a nonce, as a secure-headers one does.
+		await Bun.write(
+			join(fixture.root, 'app', 'server.ts'),
+			`import { createServer } from '@alxia/react-router';
+import { configure } from '../base';
+
+export default createServer({
+	configure: (app) => configure(app).derive(() => ({ nonce: '${NONCE}' })),
+	onListen: (listening) => console.log(\`fixture listening on \${listening.url}\`),
+});
+`,
+		);
+		await build(fixture.root);
+	}, 60_000);
+	afterAll(async () => {
+		await fixture?.remove();
+	});
+
+	test('the built server hands the nonce to the meta tag and every script: one alxiaContext', async () => {
+		const { child, url } = await start(fixture.root, 'fixture');
+		try {
+			const html = await (await fetch(url, { headers: browser })).text();
+			expect(html).toContain(`<meta property="csp-nonce" nonce="${NONCE}"/>`);
+			const scripts = html.match(/<script\b[^>]*>/g) ?? [];
+			expect(scripts.length).toBeGreaterThan(0);
+			for (const script of scripts) {
+				expect(script).toContain(`nonce="${NONCE}"`);
+			}
+		} finally {
+			child.kill();
+		}
+	});
+});

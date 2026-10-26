@@ -19,6 +19,7 @@ import {
 } from './config';
 import { serveDev } from './dev';
 import { NAME, PASS_THROUGH, serverEntry } from './entry';
+import { inlineAliases, inlinedFile } from './inline';
 import { servePreview } from './preview';
 import { requireBun } from './runtime';
 import { type AlxiaWorkerOptions, buildAppWorker } from './worker';
@@ -104,6 +105,7 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 		// which would render the pages without alxia, comes after this one's.
 		enforce: 'pre',
 		config(_config, env) {
+			if (env.command === 'serve') return inlineAliases();
 			if (env.command !== 'build') return;
 			// Vite 7's types know neither `rolldownVersion` nor `rolldownOptions`.
 			const meta = this.meta as { readonly rolldownVersion?: string };
@@ -124,6 +126,8 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 		resolveId(id) {
 			if (id === SERVER) return RESOLVED_SERVER;
 			if (id === DEFAULT) return RESOLVED_DEFAULT;
+			// An absolute path is never external: see inline.ts.
+			if (this.environment?.name === 'ssr') return inlinedFile(id);
 			return undefined;
 		},
 		load(id) {

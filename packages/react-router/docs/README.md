@@ -12,6 +12,7 @@ installable and usable offline, wording an API's refusals, and what to do with e
 | [Customising the server](guide/customising-the-server.md) | changing the default server with `createServer()`, or leaving it: another entry, overriding the wiring, a server of your own |
 | [Typing the loaders](guide/typing-the-loaders.md) | typing the loaders with `Register` or a type argument, and the app's own context keys |
 | [A CSP nonce](guide/csp-nonce.md) | a Content-Security-Policy without `'unsafe-inline'`: giving the inline scripts React Router renders a per-request nonce |
+| [The document](guide/document.md) | rendering the page's CSP nonce in the root: `DocumentNonce` and `useNonce()`, an `InlineScript` for a theme's boot script with no flash, `CspNonceMeta`, the page's language and text direction (`@alxia/react-router/document`) |
 | [Beside the pages](guide/beside-the-pages.md) | the middlewares that run around the pages, routes beside them, WebSockets in dev, in preview and in the build, and the client's files |
 | [OpenAPI](guide/openapi.md) | writing the API of an app that serves pages spec first: binding its routes to the generated operations, and checking them with `matchesSpec` |
 | [Testing](guide/testing.md) | making the app in process with `server.create(wiring)` from a build, and testing it without a server |

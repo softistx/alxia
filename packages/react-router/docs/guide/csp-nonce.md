@@ -49,8 +49,31 @@ value on every response. `'self'` still allows the bundles under
 
 ## 2. The nonce, in `app/entry.server.tsx`
 
-React Router's template has no entry; reveal the default one, then add an
-import and the nonce in two places:
+React Router's template has no entry. The package's own passes the nonce to
+`<ServerRouter>` and to React's renderer, and provides it to the page
+(`useNonce()`, [the document](document.md)):
+
+```tsx
+// app/entry.server.tsx
+export {
+	handleRequest as default,
+	streamTimeout,
+} from '@alxia/react-router/entry';
+```
+
+It reads `nonceOf(loadContext)` by default; `createEntry({ nonce })`
+takes another source ([the entry](document.md#the-entry)).
+
+The root passes nothing: `<Links>`, `<Scripts>` and `<ScrollRestoration>`
+fall back to the nonce `<ServerRouter nonce>` put in React Router's
+framework context, so their `nonce` props are optional with this entry.
+`useNonce()` stays for what the app inserts itself: an `InlineScript`, a
+`CspNonceMeta`, any other script or style.
+
+### An entry of your own
+
+An entry that is not the package's reveals React Router's, then adds an
+import, the nonce in two places, and `DocumentNonce` around the router:
 
 ```sh
 bunx react-router reveal entry.server
@@ -61,11 +84,14 @@ bunx react-router reveal entry.server
  import { PassThrough } from "node:stream";
 
 +import { nonceOf } from "@alxia/react-router";
++import { DocumentNonce } from "@alxia/react-router/document";
  import type { EntryContext, RouterContextProvider } from "react-router";
  …
      const { pipe, abort } = renderToPipeableStream(
 -      <ServerRouter context={routerContext} url={request.url} />,
-+      <ServerRouter context={routerContext} url={request.url} nonce={nonceOf(loadContext)} />,
++      <DocumentNonce nonce={nonceOf(loadContext)}>
++        <ServerRouter context={routerContext} url={request.url} nonce={nonceOf(loadContext)} />
++      </DocumentNonce>,
        {
 +        nonce: nonceOf(loadContext),
          [readyOption]() {
@@ -79,6 +105,12 @@ nonceOf(loadContext), … }`.
 That is all: under `react-router dev` and from the build, every `<script>`
 of a page carries the nonce of its own response's policy, Vite's dev
 scripts included.
+
+## Never cache a nonced page publicly
+
+A page with a nonce is made per response. A route's `headers` export must
+never mark it `public` (or give it a `s-maxage`): a shared cache would hand
+the same nonce to every visitor, and a nonce everyone knows protects nothing.
 
 ## How it stays loose
 
