@@ -79,7 +79,9 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: sessionCookies(): the … name "…" is not a cookie name (an RFC 6265 token: …). Pass a name such as "my-app_session".`](#typeerror-sessioncookies-the--name--is-not-a-cookie-name-an-rfc-6265-token--pass-a-name-such-as-my-app_session)
 - [`TypeError: sessionCookies(): the … name "…" already carries a prefix. Pass the base name: the package adds __Host- (session) or __Secure- (challenge) when secure is true.`](#typeerror-sessioncookies-the--name--already-carries-a-prefix-pass-the-base-name-the-package-adds-__host--session-or-__secure--challenge-when-secure-is-true)
 - [`TypeError: sessionCookies(): challengeSeconds must be a positive integer; got ….`](#typeerror-sessioncookies-challengeseconds-must-be-a-positive-integer-got-)
-- [`TypeError: sessionCookies(): challengePath must start with "/"; got ….`](#typeerror-sessioncookies-challengepath-must-start-with--got-)
+- [`TypeError: sessionCookies(): challengePath must start with "/" and hold no ";" or control character; got ….`](#typeerror-sessioncookies-challengepath-must-start-with--and-hold-no--or-control-character-got-)
+- [`TypeError: serializeCookie(): the name "…" is not a cookie name (an RFC 6265 token).`](#typeerror-serializecookie-the-name--is-not-a-cookie-name-an-rfc-6265-token)
+- [`TypeError: serializeCookie(): the path "…" is not a cookie path: it must start with "/" and hold no ";" or control character.`](#typeerror-serializecookie-the-path--is-not-a-cookie-path-it-must-start-with--and-hold-no--or-control-character)
 
 **Types**
 
@@ -122,6 +124,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [An action shows the error page](#an-action-shows-the-error-page)
 - [Behind a TLS proxy every action answers 403](#behind-a-tls-proxy-every-action-answers-403)
 - [Right after start, refusals read in the API's words](#right-after-start-refusals-read-in-the-apis-words)
+- [`next` is always `/`](#next-is-always-)
 - [Sign-in loops on `http://localhost` in Safari](#sign-in-loops-on-httplocalhost-in-safari)
 - [A `__Host-` cookie is dropped](#a-__host--cookie-is-dropped)
 
@@ -1628,17 +1631,50 @@ TypeError: sessionCookies(): challengeSeconds must be a positive integer; got 0.
 
 **Fix:** pass whole seconds above 0, or leave it out for the default of 300, the lifetime of an `@nxgt/janus` challenge. A longer value gains nothing: the cookie also ends with the challenge itself.
 
-### `TypeError: sessionCookies(): challengePath must start with "/"; got ….`
+### `TypeError: sessionCookies(): challengePath must start with "/" and hold no ";" or control character; got ….`
 
 ```
-TypeError: sessionCookies(): challengePath must start with "/"; got "sign-in".
+TypeError: sessionCookies(): challengePath must start with "/" and hold no ";" or control character; got "sign-in".
 ```
 
 **When:** the server starts, or the module that calls `sessionCookies` is imported.
 
-**Why:** `challengePath`, where the browser sends the challenge cookie, is a relative path such as `'sign-in'`. A cookie's `Path` must be absolute, or the browser ignores it.
+**Why:** `challengePath`, where the browser sends the challenge cookie, is a relative path such as `'sign-in'` (a cookie's `Path` must be absolute, or the browser ignores it), or it holds a `;` or a control character, which would open another attribute of the `Set-Cookie` header.
 
 **Fix:** pass the path of the sign-in pages with its leading slash. The default is `'/sign-in'`, which covers `/sign-in` and the pages under it; not `/sign-in/code` alone, since a client navigation fetches `/sign-in/code.data`, which that path would not match.
+
+### `TypeError: serializeCookie(): the name "…" is not a cookie name (an RFC 6265 token).`
+
+```
+TypeError: serializeCookie(): the name "a b" is not a cookie name (an RFC 6265 token).
+```
+
+**When:** the app calls `serializeCookie` for a cookie of its own (a language, a preference).
+
+**Why:** the name is empty or holds a space, `;`, `=`, a control character or another character a cookie name cannot. Written as it is, it would break the `Set-Cookie` header or open another attribute, so the package refuses it. `sessionCookies` checks its names the same way, with its own messages.
+
+**Fix:** use a plain name, letters, digits and `- _ .`:
+
+```ts
+import { serializeCookie } from '@alxia/react-router/session';
+
+const header = serializeCookie('my-app_language', 'fr', {
+	maxAge: 60 * 60 * 24 * 365,
+	secure: !import.meta.env.DEV,
+});
+```
+
+### `TypeError: serializeCookie(): the path "…" is not a cookie path: it must start with "/" and hold no ";" or control character.`
+
+```
+TypeError: serializeCookie(): the path "sign-in" is not a cookie path: it must start with "/" and hold no ";" or control character.
+```
+
+**When:** the app calls `serializeCookie` with a `path`, or `sessionCookies` builds its challenge cookie (that one reports a `challengePath` error instead).
+
+**Why:** the `path` is relative, or it holds a `;` or a control character such as a line break, which would end the attribute and let the rest of the string set another one. A path built from a request's URL is the usual source.
+
+**Fix:** pass a path of your own with its leading slash, and never one taken from a request. Leave `path` out for the default, `/`.
 
 ## Types
 
@@ -2389,6 +2425,31 @@ catalogue.warm();
 
 Raise `firstReadWaitMs` only if the page should wait longer for the first
 words; it holds every cold request that long when the API hangs.
+
+### `next` is always `/`
+
+After signing in, the user lands on the home page, whatever page they came
+from, and `signInPath(next)` returns `/sign-in` with no `next`.
+
+**Why:** `safeNext` refuses the value and falls back to `/`. It takes a path
+of this site only, so these are refused: a value that does not start with
+`/`, one that starts with `//` or holds a `\`, a space, a tab or a newline,
+a full URL (`https://…`), a value that resolves to another site once its
+`..` segments are applied, and one over 2000 characters. The usual cause is a
+`next` built from the full URL (`request.url`, `location.href`), or one
+that was percent-decoded twice.
+
+**Fix:** pass the path and search alone:
+
+```ts
+import { signInPath } from '@alxia/react-router/session/model';
+
+const url = new URL(request.url);
+throw redirect(signInPath(`${url.pathname}${url.search}`));
+```
+
+[Redirects that stay on the site](guide/session.md#redirects-that-stay-on-the-site)
+lists what is refused.
 
 ### Sign-in loops on `http://localhost` in Safari
 
