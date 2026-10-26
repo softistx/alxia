@@ -61,19 +61,23 @@ tests: reset modules between them, or render the server path with
 
 ## What React Router renders
 
-With `@alxia/react-router/entry`, the root passes nothing. `<Links>`,
-`<Scripts>` and `<ScrollRestoration>` fall back to the nonce `<ServerRouter
-nonce>` put in React Router's framework context, so their `nonce` props are
-optional:
+With `@alxia/react-router/entry`, `<Scripts>` and `<ScrollRestoration>` need
+no `nonce`: they fall back to the nonce `<ServerRouter nonce>` put in React
+Router's framework context, and they suppress the hydration warning for the
+attribute the browser hides. `<Links>` falls back to it on the server too, but
+does not suppress the warning, so pass it `useNonce()`:
 
 ```tsx
 // app/root.tsx
+import { useNonce } from '@alxia/react-router/document';
+
 export function Layout({ children }: { children: React.ReactNode }) {
+	const nonce = useNonce();
 	return (
 		<html lang="en">
 			<head>
 				<meta charSet="utf-8" />
-				<Links />
+				<Links nonce={nonce} />
 			</head>
 			<body>
 				{children}
@@ -84,6 +88,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
 	);
 }
 ```
+
+Why `<Links>` needs it: in development, React Router renders the critical CSS
+as a `<style nonce>`. The server writes the nonce on it, the browser hides the
+attribute and React Router's client knows none, so without the prop the client
+renders the `<style>` with no nonce and React reports a mismatch
+([Troubleshooting](../troubleshooting.md#a-tree-hydrated-but-some-attributes-of-the-server-rendered-html-didnt-match-the-client-properties-on-a-style-with-a-nonce)).
+`useNonce()` returns the same value on both sides.
 
 Keep `useNonce()` for what React Router does not render: an `InlineScript`,
 a `CspNonceMeta`, and any script or style the app inserts itself.

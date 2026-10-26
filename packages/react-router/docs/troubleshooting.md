@@ -28,6 +28,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self' 'nonce-…'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-script-src-self-nonce-)
 - [`A tree hydrated but some attributes of the server rendered HTML didn't match the client properties`](#a-tree-hydrated-but-some-attributes-of-the-server-rendered-html-didnt-match-the-client-properties)
+- [`A tree hydrated but some attributes of the server rendered HTML didn't match the client properties` on a `<style>` with a `nonce`](#a-tree-hydrated-but-some-attributes-of-the-server-rendered-html-didnt-match-the-client-properties-on-a-style-with-a-nonce)
 - [`useNonce()` is undefined on the server](#usenonce-is-undefined-on-the-server)
 - [`TypeError: InlineScript(): the code contains "</script" or "<!--", which ends or confuses the script element; escape it, such as "<\/script" inside a string`](#typeerror-inlinescript-the-code-contains-script-or----which-ends-or-confuses-the-script-element-escape-it-such-as-script-inside-a-string)
 - [`TypeError: createPageLanguage(): the fallback … is not one of the languages; got ….`](#typeerror-createpagelanguage-the-fallback--is-not-one-of-the-languages-got-)
@@ -602,6 +603,40 @@ element's own attributes only, not its children:
 A warning on another element is a real mismatch: a `nonce` the browser hid
 is read by `useNonce()` from the document, so never pass it from loader
 data ([guide](guide/document.md#the-theme-boot-script)).
+
+### `A tree hydrated but some attributes of the server rendered HTML didn't match the client properties` on a `<style>` with a `nonce`
+
+**When:** in development (`react-router dev`) with a CSP nonce, the console
+warns that a tree hydrated but some attributes did not match, and the diff
+shows `nonce="…"` on the `<style data-react-router-critical-css>` in `<head>`.
+
+**Why:** React Router renders the critical CSS as a `<style nonce>`. The
+server writes the nonce from `<ServerRouter nonce>`, the browser hides the
+attribute, and `<Links />` has no nonce to render on the client. Unlike
+`<Scripts>` and `<ScrollRestoration>`, `<Links>` does not suppress that
+warning.
+
+**Fix:** pass it the nonce `useNonce()` reads, on both sides:
+
+```tsx
+// app/root.tsx
+import { useNonce } from '@alxia/react-router/document';
+
+export function Layout({ children }: { children: React.ReactNode }) {
+	const nonce = useNonce();
+	return (
+		<html lang="en">
+			<head>
+				<Links nonce={nonce} />
+			</head>
+			<body>{children}</body>
+		</html>
+	);
+}
+```
+
+`<Scripts>` and `<ScrollRestoration>` need nothing
+([guide](guide/document.md#what-react-router-renders)).
 
 ### `useNonce()` is undefined on the server
 

@@ -20,6 +20,18 @@ export interface ReactManifest {
  * fetcher's answer or a new `?q=` updates the page in place.
  */
 export const VIEW_TRANSITION_EDITS: ReadonlyArray<readonly [string, string]> = [
+	// Not the transition: React Router's `<Links>` does not suppress the
+	// hydration warning for its critical-CSS `<style nonce>` in development,
+	// so the root hands it the nonce `useNonce()` reads in the browser.
+	[
+		'import type { Route } from "./+types/root";\n',
+		'import { useNonce } from "@alxia/react-router/document";\n\nimport type { Route } from "./+types/root";\n',
+	],
+	[
+		'export function Layout({ children }: { children: React.ReactNode }) {\n',
+		'export function Layout({ children }: { children: React.ReactNode }) {\n  const nonce = useNonce();\n',
+	],
+	['<Links />', '<Links nonce={nonce} />'],
 	[
 		'import {\n',
 		'import { useEffect, useRef, ViewTransition } from "react";\nimport {\n',

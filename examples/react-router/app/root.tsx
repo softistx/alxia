@@ -9,6 +9,8 @@ import {
   useLocation,
 } from "react-router";
 
+import { useNonce } from "@alxia/react-router/document";
+
 import type { Route } from "./+types/root";
 import "./app.css";
 
@@ -26,13 +28,14 @@ export const links: Route.LinksFunction = () => [
 ];
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const nonce = useNonce();
   return (
     <html lang="en">
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
-        <Links />
+        <Links nonce={nonce} />
       </head>
       <body>
         {children}

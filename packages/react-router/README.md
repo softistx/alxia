@@ -300,12 +300,17 @@ paint:
 ```tsx
 // app/root.tsx
 import { Links, Meta, Outlet, Scripts, ScrollRestoration } from 'react-router';
-import { CspNonceMeta, InlineScript } from '@alxia/react-router/document';
+import {
+	CspNonceMeta,
+	InlineScript,
+	useNonce,
+} from '@alxia/react-router/document';
 import { themeBootScript } from '<your theme library>';
 
 const THEME_BOOT = themeBootScript();
 
 export function Layout({ children }: { children: React.ReactNode }) {
+	const nonce = useNonce();
 	return (
 		<html lang="en" suppressHydrationWarning>
 			<head>
@@ -313,7 +318,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 				<InlineScript code={THEME_BOOT} />
 				<CspNonceMeta />
 				<Meta />
-				<Links />
+				<Links nonce={nonce} />
 			</head>
 			<body>
 				{children}
@@ -329,10 +334,12 @@ export default function App() {
 }
 ```
 
-`THEME_BOOT` is your theme library's own boot script. With `/entry`, `<Links>`,
-`<Scripts>` and `<ScrollRestoration>` take the nonce from `<ServerRouter nonce>`,
-so their `nonce` props are optional; `useNonce()` stays for `InlineScript`,
-`CspNonceMeta` and any script or style the app inserts. An entry of your own
+`THEME_BOOT` is your theme library's own boot script. With `/entry`,
+`<Scripts>` and `<ScrollRestoration>` take the nonce from `<ServerRouter nonce>`
+and need no prop. `<Links>` does not suppress the hydration warning for its
+critical-CSS `<style nonce>` in development, so pass it `useNonce()`, as above;
+`useNonce()` also serves `InlineScript`, `CspNonceMeta` and any script or style
+the app inserts. An entry of your own
 wraps the router:
 
 ```tsx
