@@ -119,7 +119,7 @@ export interface GraphQLOptions<
 	 */
 	readonly maxTokens?: number | false;
 	/**
-	 * The cache of parsed documents, one per endpoint, weighed by tokens:
+	 * The cache of parsed documents, one per endpoint, weighed by its tokens and bytes:
 	 * `maxBytes` (64 MiB by default), `max` documents (1 024) and `ttl`
 	 * milliseconds (one hour). `false` parses every request. Yoga's own
 	 * `parserAndValidationCache` replaces it, and cannot be given with it.

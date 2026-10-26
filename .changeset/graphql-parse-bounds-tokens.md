@@ -16,7 +16,7 @@
 - **The parse cache is bounded by weight (`parseCache`).** Yoga's own keeps up
   to 1 024 documents of any size, which holds gigabytes for distinct large
   queries. Each endpoint now keeps 64 MiB of parsed documents (1 024 documents
-  at most, one hour), weighed by tokens. Size it with
+  at most, one hour), weighed by its tokens and bytes. Size it with
   `parseCache: { maxBytes, max, ttl }`, or turn it off with `parseCache: false`.
   An app that gives Yoga's `parserAndValidationCache` keeps its own cache;
   giving it together with `parseCache` throws where `graphql()` is declared.
