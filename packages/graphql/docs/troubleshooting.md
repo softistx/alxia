@@ -270,7 +270,55 @@ ping in a loop.
 graphql(app, { schema, ws: { keepAlive: 30_000 } });
 ```
 
+### `TypeError: graphql(app, { maxTokens }): maxTokens is the most tokens a document may hold, a positive whole number, or false for none; got …`
+
+**When:** declaring `graphql(app, { maxTokens })` with `0`, a negative number,
+a fraction, `NaN` or a string; the message names the value given.
+
+**Why:** `maxTokens` is a count of tokens.
+
+**Fix:** a positive whole number, or `false` for no cap:
+
+```ts
+graphql(app, { schema, maxTokens: 30_000 });
+```
+
+### `TypeError: graphql(app, { parseCache, parserAndValidationCache }): give one: …` or `parseCache.maxBytes … a positive whole number`
+
+**When:** declaring `graphql()` with both `parseCache` and Yoga's
+`parserAndValidationCache`, or with a `parseCache.maxBytes`, `max` or `ttl`
+that is not a positive whole number.
+
+**Why:** `parseCache` sizes alxia's bounded cache and
+`parserAndValidationCache` replaces it with yours, so the two cannot both
+apply.
+
+**Fix:** give one:
+
+```ts
+graphql(app, { schema, parseCache: { maxBytes: 16 * 1024 * 1024 } });
+```
+
 ## Responses
+
+### `Syntax Error: Document contains more than 15000 tokens. Parsing aborted.`
+
+**When:** a query is answered with `GRAPHQL_PARSE_FAILED` (400 under
+`application/graphql-response+json`, 200 under `application/json`) and this
+message. graphql 16 words it `more that`, 17 `more than`.
+
+**Why:** a document may hold 15 000 tokens by default (`maxTokens`),
+so that no request makes the server parse and keep an unbounded one. A
+generated query or a screen with many inlined fragments can pass it; a
+client that worked before is refused.
+
+**Fix:** raise the limit to what your largest real query needs, or turn it
+off. Persisted operations keep clients from sending large documents at all
+([Persisted operations](guide/production.md#persisted-operations-briefly)):
+
+```ts
+graphql(app, { schema, maxTokens: 30_000 }); // or false
+```
 
 ### `200 {"errors":[{"message":"Unexpected error.", … "code":"INTERNAL_SERVER_ERROR"}}]}`
 
@@ -579,6 +627,23 @@ const defaultPolicy = defineMiddleware(async (ctx, next) =>
 );
 
 app.use(defaultPolicy); // before the endpoint, so it wraps it
+```
+
+### The heap grows with distinct queries
+
+**When:** a server that receives many different large queries, such as
+generated ones or ones built with inline values, holds more and more memory.
+
+**Why:** Yoga's own parse cache keeps up to 1 024 documents, whatever their
+size, for an hour. `graphql()` replaces it with a cache bounded by weight
+(`parseCache`, 64 MiB by default) unless the app gives Yoga's
+`parserAndValidationCache`: then that cache is the app's to bound.
+
+**Fix:** lower `parseCache.maxBytes`, send variables instead of inline
+values so the documents repeat, or bound your own cache:
+
+```ts
+graphql(app, { schema, parseCache: { maxBytes: 16 * 1024 * 1024 } });
 ```
 
 ### GraphiQL is served in production

@@ -47,6 +47,10 @@ export function graphiqlPolicy(html: string): string {
  */
 export function yogaServers<UserCtx extends YogaContext>(
 	options: Omit<YogaServerOptions<YogaContext, UserCtx>, 'graphqlEndpoint'>,
+	caches?: () => YogaServerOptions<
+		YogaContext,
+		UserCtx
+	>['parserAndValidationCache'],
 ): (endpoint: string) => YogaServerInstance<YogaContext, UserCtx> {
 	const servers = new Map<string, YogaServerInstance<YogaContext, UserCtx>>();
 	return (endpoint) => {
@@ -54,6 +58,7 @@ export function yogaServers<UserCtx extends YogaContext>(
 		if (yoga === undefined) {
 			yoga = createYoga<YogaContext, UserCtx>({
 				...options,
+				...(caches === undefined ? {} : { parserAndValidationCache: caches() }),
 				graphqlEndpoint: endpoint,
 			});
 			servers.set(endpoint, yoga);
