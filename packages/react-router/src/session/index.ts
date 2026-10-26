@@ -25,3 +25,11 @@ export {
 	serializeCookie,
 } from './serialize';
 export { signInFlow } from './sign-in';
+export { stepUpSteps } from './step-up';
+export { STEP_UP_OVER, STEP_UP_REQUIRED } from './step-up-codes';
+export type {
+	StepUpCodes,
+	StepUpStayed,
+	StepUpSteps,
+	StepUpStepsOptions,
+} from './step-up-types';

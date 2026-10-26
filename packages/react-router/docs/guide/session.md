@@ -14,6 +14,7 @@ nothing and is safe in a component as well as in a loader.
 - [Signing out](#signing-out)
 - [The step-up state](#the-step-up-state)
 - [Codes and types](#codes-and-types)
+- [Step-up](#step-up)
 
 ## Redirects that stay on the site
 
@@ -450,6 +451,133 @@ const via: StepUpVia = 'email';
 - `SecondFactorMethod` is what a second-factor form sends: `'code' | 'recovery'`.
 - `SignInStatus` is how a sign-in ended: `'signedIn' | 'secondFactor'`.
 - `StepUpVia` is how a step-up is confirmed, `'email' | 'secondFactor'`, matching janus's vocabulary.
-- `StepUpRequestAnswer` is what the server answers to a request for a challenge.
-- `StepUpConfirmAnswer` is what the server answers to a code.
+- `StepUpRequestAnswer` is what the server answers to a request for a challenge, with the `message` of a refusal.
+- `StepUpConfirmAnswer` is what the server answers to a code, with the `message` `stepUpSteps` words.
 - `StepUpProps` is the shape `stepUpProps` returns; it spreads onto a step-up dialog's props.
+
+## Step-up
+
+A step-up is a code asked for before a sensitive action: the API refuses the
+mutation with `STEP_UP_REQUIRED`, the page asks for a challenge
+(`requestStepUp`), the user reads the code (in the mail, or in their
+authenticator app) and the page confirms it (`confirmStepUp`). `stepUpSteps`
+is the server half: two steps for the route's action, whose answers
+[`stepUpReducer`](#the-step-up-state) takes as they are.
+
+```ts
+// app/core/session/server/step-up.server.ts
+import { stepUpSteps } from '@alxia/react-router/session';
+
+export const stepUp = stepUpSteps({
+	errors,
+	attemptsLeft: (count, language) => t('code.attempts-left', { count }, language),
+	spent: (language) => t('step-up.spent', {}, language), // "Ask for a new code."
+	locked: (language) => t('step-up.locked', {}, language), // "Wait a few minutes."
+});
+```
+
+```ts
+// app/routes/account.step-up.tsx
+export async function action({ context, request }: Route.ActionArgs) {
+	const { language } = alxiaOf(context);
+	const caller = await sessionCaller(request);
+	const input = await json.readJson(request); // same-origin JSON only
+	if (input.intent === 'request-step-up') {
+		return stepUp.request(async () => {
+			const { requestStepUp } = await execute(RequestStepUpMutation, {}, caller);
+			return { challenge: requestStepUp.challenge, via: toVia(requestStepUp.method) };
+		}, language);
+	}
+	return stepUp.confirm(
+		() =>
+			execute(ConfirmStepUpMutation, { challenge: input.challenge, code: input.code }, caller),
+		{ via: input.via },
+		language,
+	);
+}
+```
+
+`request(run, language)` answers `{ ok: true, intent: 'request-step-up',
+challenge, via }`. `confirm(run, { via }, language)` answers `{ ok: true,
+intent: 'confirm-step-up' }`. A refusal stays on the page, with the API's
+status, as `data(...)`:
+
+```ts no-check
+type StepUpError = 'invalid' | 'expired' | 'failed';
+
+// request, refused
+{ ok: false, intent: 'request-step-up', error: 'failed', message }
+// confirm, refused
+{ ok: false, intent: 'confirm-step-up', error: StepUpError, attemptsLeft?, locked, message }
+```
+
+The `via` of `confirm` is the one `request` answered, which the page holds
+(the reducer's state has it). The `run` function of `confirm` takes nothing:
+bind the challenge and the code in it, as above, and keep the step's `intent`
+out of the API's variables.
+
+**The challenge stays in the fetcher's answer.** It is a secret: never put it
+in a URL, in a cookie, in the loader's data or in a log. The page keeps it in
+the reducer's state and posts it back with the code. A page that carries it in
+the loader would keep it in the browser's history and the caches.
+
+### What each answer leads to
+
+This is the table of `@nxgt/janus-graphql`'s `confirmStepUp`, with what
+`confirm` answers:
+
+| the API says | status | `confirm` answers |
+| --- | --- | --- |
+| accepted | 200 | `{ ok: true }`: send the refused mutation again |
+| `CODE_INVALID`, `attemptsLeft: 3` | 401 | `error: 'invalid'`, `attemptsLeft: 3`, `locked: false`: ask for the code again |
+| `CODE_INVALID`, `attemptsLeft: 0`, `via: 'email'` | 401 | `error: 'expired'`, `locked: false`: ask for a new code |
+| `CODE_INVALID`, `attemptsLeft: 0`, `via: 'secondFactor'` (an app or a recovery code) | 401 | `error: 'invalid'`, `attemptsLeft: 0`, `locked: true`, `message` ends with `locked`'s words: wait, a new code would fail the same way |
+| `TOKEN_SPENT`, `TOKEN_EXPIRED`, `TOKEN_UNKNOWN`, `TOKEN_STALE` | 400 | `error: 'expired'`: ask for a new code |
+| `SECOND_FACTOR_ACTIVE`, `SECOND_FACTOR_NOT_ENROLLED` | 409 | `error: 'expired'`: start over, the way to confirm changed |
+| `USER_INACTIVE`, anything else | 403 or other | `error: 'failed'`, in `wording`'s words or `errors`' |
+| an API it cannot reach | 503 | `error: 'failed'` |
+
+A request that the API refuses is `error: 'failed'`: a mail throttled
+(`MAIL_THROTTLED`, 429) is worded by the `wording` option, which sees the
+error before `errors` does, so it can say the wait:
+
+```ts
+stepUpSteps({
+	// …
+	wording: (error, language) =>
+		error.code === 'MAIL_THROTTLED'
+			? t('mail.wait', { minutes: waitMinutes(error.errors[0]?.extensions) }, language)
+			: undefined,
+});
+```
+
+With no try left, an app's code is the account's shared lockout (janus counts
+the codes of a step-up, of a factor's regeneration and of its disabling
+together): a new challenge would be refused too, so `confirm` says `locked`
+and the form says to wait. A mailed code at that point is over, and asking
+again works. With no `via`, `confirm` reads a mailed code.
+
+`stepUp.isStepUpRequired(error)` is true for the API's `STEP_UP_REQUIRED`
+refusal of a sensitive mutation, so an action can answer the page with the
+request for a challenge instead of the error page.
+
+### The codes it tells apart
+
+`codes` takes `invalidCode` (`'CODE_INVALID'`), `challengeOver` (the table's
+codes that end a challenge; passing a list replaces it) and `stepUpRequired`
+(`'STEP_UP_REQUIRED'`). `invalidCode` in `challengeOver` is a `TypeError`.
+
+### Call the step-up with a caller that does not sign out on a 401
+
+`@nxgt/janus-graphql` answers a wrong code (`CODE_INVALID`) with HTTP 401. A
+caller that treats every 401 as "the session is dead" and redirects to the
+sign-in page would sign the user out on the first typo. Make the caller of the
+step-up's two operations leave a 401 alone, or have it redirect only when the
+error's code is `UNAUTHENTICATED`.
+
+### The step-up's types
+
+- `StepUpStepsOptions` is what `stepUpSteps` takes, `StepUpSteps` what it returns.
+- `StepUpCodes` is the `codes` option.
+- `StepUpStayed<T>` is a step's `data(...)` return for an answer that stays on the page.
+- `STEP_UP_OVER` and `STEP_UP_REQUIRED` are the default codes.

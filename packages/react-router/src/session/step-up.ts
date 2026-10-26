@@ -1,0 +1,177 @@
+import { data } from 'react-router';
+import {
+	type ApiErrorLike,
+	attemptsLeftOf,
+	isApiErrorLike,
+} from '../errors/api-error';
+import { INVALID_CODE } from './codes';
+import type { CodeWording } from './flow-types';
+import type {
+	StepUpConfirmAnswer,
+	StepUpError,
+	StepUpRequestAnswer,
+	StepUpVia,
+} from './model';
+import { codeRefusal } from './step';
+import { STEP_UP_OVER, STEP_UP_REQUIRED } from './step-up-codes';
+import type {
+	StepUpStayed,
+	StepUpSteps,
+	StepUpStepsOptions,
+} from './step-up-types';
+
+type Refused = Extract<StepUpConfirmAnswer, { ok: false }>;
+
+interface StepUpContext<L extends string> extends CodeWording<L> {
+	readonly steps: StepUpStepsOptions<L>;
+	readonly stepUpRequired: string;
+}
+
+function resolve<L extends string>(
+	steps: StepUpStepsOptions<L>,
+): StepUpContext<L> {
+	const invalidCode = steps.codes?.invalidCode ?? INVALID_CODE;
+	const challengeOver = steps.codes?.challengeOver ?? STEP_UP_OVER;
+	if (challengeOver.includes(invalidCode)) {
+		throw new TypeError(
+			`stepUpSteps(): the code ${JSON.stringify(invalidCode)} is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`,
+		);
+	}
+	return {
+		options: steps,
+		steps,
+		invalidCode,
+		challengeOver,
+		stepUpRequired: steps.codes?.stepUpRequired ?? STEP_UP_REQUIRED,
+	};
+}
+
+/** The refusal's message: the app's own wording, else `errors`'. */
+function worded<L extends string>(
+	{ steps }: StepUpContext<L>,
+	error: ApiErrorLike,
+	language: L,
+): string {
+	return (
+		steps.wording?.(error, language) ??
+		steps.errors.apiErrorMessage(error, language)
+	);
+}
+
+/** A code the API refused. With none left, a mailed one is over and an app's is locked. */
+function refusedCode<L extends string>(
+	context: StepUpContext<L>,
+	error: ApiErrorLike,
+	via: StepUpVia | undefined,
+	language: L,
+): Omit<Refused, 'ok' | 'intent'> {
+	const { steps } = context;
+	const attemptsLeft = attemptsLeftOf(error);
+	if (attemptsLeft === 0 && via !== 'secondFactor') {
+		return {
+			error: 'expired',
+			attemptsLeft,
+			locked: false,
+			message: steps.spent(language),
+		};
+	}
+	const locked = attemptsLeft === 0;
+	const message =
+		codeRefusal(
+			context,
+			error,
+			language,
+			locked ? steps.locked?.(language) : undefined,
+		) ?? steps.errors.apiErrorMessage(error, language);
+	return {
+		error: 'invalid',
+		...(attemptsLeft === undefined ? {} : { attemptsLeft }),
+		locked,
+		message,
+	};
+}
+
+async function request<L extends string>(
+	context: StepUpContext<L>,
+	run: Parameters<StepUpSteps<L>['request']>[0],
+	language: L,
+): Promise<StepUpRequestAnswer | StepUpStayed<StepUpRequestAnswer>> {
+	const intent = 'request-step-up';
+	try {
+		const { challenge, via } = await run();
+		return { ok: true, intent, challenge, via };
+	} catch (error) {
+		const refusal = context.steps.errors.apiRefusal(error, language);
+		if (!refusal) throw error;
+		const message = isApiErrorLike(error)
+			? worded(context, error, language)
+			: refusal.message;
+		return data<StepUpRequestAnswer>(
+			{ ok: false, intent, error: 'failed', message },
+			{ status: refusal.status },
+		);
+	}
+}
+
+async function confirm<L extends string>(
+	context: StepUpContext<L>,
+	run: () => Promise<unknown>,
+	via: StepUpVia | undefined,
+	language: L,
+): Promise<StepUpConfirmAnswer | StepUpStayed<StepUpConfirmAnswer>> {
+	const intent = 'confirm-step-up';
+	try {
+		await run();
+		return { ok: true, intent };
+	} catch (error) {
+		const refusal = context.steps.errors.apiRefusal(error, language);
+		if (!refusal) throw error;
+		const stay = (
+			failure: Omit<Refused, 'ok' | 'intent'>,
+		): StepUpStayed<StepUpConfirmAnswer> =>
+			data<StepUpConfirmAnswer>(
+				{ ok: false, intent, ...failure },
+				{ status: refusal.status },
+			);
+		const failed = (message: string) =>
+			stay({ error: 'failed' satisfies StepUpError, locked: false, message });
+		if (!isApiErrorLike(error)) return failed(refusal.message);
+		if (error.code === context.invalidCode) {
+			return stay(refusedCode(context, error, via, language));
+		}
+		if (error.code && context.challengeOver.includes(error.code)) {
+			return stay({
+				error: 'expired',
+				locked: false,
+				message: context.steps.spent(language),
+			});
+		}
+		return failed(worded(context, error, language));
+	}
+}
+
+/**
+ * The server side of a BFF's step-up: `request` and `confirm` answer the
+ * page's fetcher with `StepUpRequestAnswer` and `StepUpConfirmAnswer`, which
+ * `stepUpReducer` takes as they are. It speaks `@nxgt/janus`'s words
+ * (`CODE_INVALID`, `TOKEN_*`, `STEP_UP_REQUIRED`); the app maps the rest.
+ *
+ * @example
+ * const stepUp = stepUpSteps({
+ * 	errors,
+ * 	attemptsLeft: (count, language) => t('code.attempts-left', { count }, language),
+ * 	spent: (language) => t('step-up.spent', {}, language),
+ * 	locked: (language) => t('step-up.locked', {}, language),
+ * });
+ */
+export function stepUpSteps<L extends string>(
+	options: StepUpStepsOptions<L>,
+): StepUpSteps<L> {
+	const context = resolve(options);
+	return {
+		request: (run, language) => request(context, run, language),
+		confirm: (run, o, language) => confirm(context, run, o.via, language),
+		isStepUpRequired: (error) =>
+			isApiErrorLike(error) && error.code === context.stepUpRequired,
+	};
+}
