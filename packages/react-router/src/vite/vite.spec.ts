@@ -7,6 +7,7 @@ import {
 	devServer,
 	eventually,
 	type Fixture,
+	isolatedServer,
 } from '../../test/vite';
 
 describe('react-router dev, with app/server.ts', () => {
@@ -142,18 +143,20 @@ describe('react-router dev, with app/server.ts', () => {
 	});
 
 	test('a server file whose default export is not createServer() is a 500 saying so', async () => {
-		await Bun.write(
-			join(fixture.root, 'app', 'not-a-server.ts'),
-			"import { alxia } from '@alxia/core';\nexport default alxia();\n",
+		const other = await isolatedServer(
+			(source, root) =>
+				// An absolute entry, as a relative one is resolved to.
+				source.replace(
+					'alxia()]',
+					`alxia({ entry: ${JSON.stringify(join(root, 'app', 'not-a-server.ts'))} })]`,
+				),
+			async (root) => {
+				await Bun.write(
+					join(root, 'app', 'not-a-server.ts'),
+					"import { alxia } from '@alxia/core';\nexport default alxia();\n",
+				);
+			},
 		);
-		const config = await configFile(fixture.root, 'not-a-server', (source) =>
-			// An absolute entry, as a relative one is resolved to.
-			source.replace(
-				'alxia()]',
-				`alxia({ entry: ${JSON.stringify(join(fixture.root, 'app', 'not-a-server.ts'))} })]`,
-			),
-		);
-		const other = await devServer(fixture.root, { configFile: config });
 		try {
 			const response = await fetch(`${other.base}/`, { headers: browser });
 			expect(response.status).toBe(500);
@@ -161,15 +164,14 @@ describe('react-router dev, with app/server.ts', () => {
 				'app/not-a-server.ts must export createServer() from @alxia/react-router as its default export',
 			);
 		} finally {
-			await other.server.close();
+			await other.close();
 		}
 	});
 
 	test('an entry that does not exist is a 500 naming it', async () => {
-		const config = await configFile(fixture.root, 'nowhere', (source) =>
+		const other = await isolatedServer((source) =>
 			source.replace('alxia()]', "alxia({ entry: 'app/nowhere.ts' })]"),
 		);
-		const other = await devServer(fixture.root, { configFile: config });
 		try {
 			const response = await fetch(`${other.base}/`, { headers: browser });
 			expect(response.status).toBe(500);
@@ -177,12 +179,12 @@ describe('react-router dev, with app/server.ts', () => {
 				'the entry app/nowhere.ts does not exist',
 			);
 		} finally {
-			await other.server.close();
+			await other.close();
 		}
 	});
 
 	test('an ssr environment that runs elsewhere is a 500 saying so', async () => {
-		const config = await configFile(fixture.root, 'elsewhere', (source) =>
+		const other = await isolatedServer((source) =>
 			source
 				.replace(
 					"import { defineConfig } from 'vite';",
@@ -195,7 +197,6 @@ describe('react-router dev, with app/server.ts', () => {
 					'environments: { ssr: { dev: { createEnvironment: (name, config) => new DevEnvironment(name, config, { hot: false }) } } },\n\tplugins: [',
 				),
 		);
-		const other = await devServer(fixture.root, { configFile: config });
 		try {
 			const response = await fetch(`${other.base}/`, { headers: browser });
 			expect(response.status).toBe(500);
@@ -203,7 +204,7 @@ describe('react-router dev, with app/server.ts', () => {
 				"Vite's ssr environment does not run modules in this process",
 			);
 		} finally {
-			await other.server.close();
+			await other.close();
 		}
 	});
 
