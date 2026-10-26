@@ -52,6 +52,48 @@ describe('language', () => {
 		});
 	});
 
+	test('a repeated cookie gives its first supported value', async () => {
+		const cookie = async (header: string) =>
+			(await get('/', { cookie: header, 'accept-language': 'en' })).body;
+		// empty, then supported
+		expect(await cookie('language=; language=fr')).toEqual({
+			language: 'fr',
+			source: 'cookie',
+		});
+		// unsupported, then supported
+		expect(await cookie('language=xx; language=fr')).toEqual({
+			language: 'fr',
+			source: 'cookie',
+		});
+		// two supported: the first wins
+		expect(await cookie('language=pt-BR; language=fr')).toEqual({
+			language: 'pt-BR',
+			source: 'cookie',
+		});
+		// another cookie in between
+		expect(await cookie('language=xx; theme=dark; language=pt-BR')).toEqual({
+			language: 'pt-BR',
+			source: 'cookie',
+		});
+		// none supported: the next source decides
+		expect(await cookie('language=xx; language=')).toEqual({
+			language: 'en',
+			source: 'header',
+		});
+	});
+
+	test('a single cookie is read as before', async () => {
+		expect(
+			(await get('/', { cookie: 'language=fr', 'accept-language': 'en' })).body,
+		).toEqual({ language: 'fr', source: 'cookie' });
+		expect(
+			(await get('/', { cookie: 'language=xx', 'accept-language': 'fr' })).body,
+		).toEqual({ language: 'fr', source: 'header' });
+		expect(
+			(await get('/', { cookie: 'language=', 'accept-language': 'fr' })).body,
+		).toEqual({ language: 'fr', source: 'header' });
+	});
+
 	test('Content-Language and Vary on the response; a query language kept in the cookie', async () => {
 		const { response } = await get('/?lang=fr');
 		expect(response.headers.get('content-language')).toBe('fr');

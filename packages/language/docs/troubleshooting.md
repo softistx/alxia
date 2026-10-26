@@ -29,6 +29,7 @@ the response does that you did not expect.
 - [`404 {"error":"not_found"}` on `/fr/products`](#404-errornot_found-on-frproducts)
 - [`Accept-Language: *` gets the first supported language, not the fallback](#accept-language--gets-the-first-supported-language-not-the-fallback)
 - [A visitor from Portugal gets `pt-BR`](#a-visitor-from-portugal-gets-pt-br)
+- [A visitor with two language cookies still gets the header's language](#a-visitor-with-two-language-cookies-still-gets-the-headers-language)
 
 ## At start-up
 
@@ -494,3 +495,18 @@ the first one listed:
 ```ts
 language({ supported: ['en', 'pt-PT', 'pt-BR'], fallback: 'en' });
 ```
+
+### A visitor with two language cookies still gets the header's language
+
+**When:** the browser sends the language cookie twice (`language=; language=fr`),
+because it was set on two paths or two domains, and the `cookie` source is
+listed before `header`.
+
+**Why:** `language()` reads every occurrence of the cookie and takes the first
+supported value, so an empty or unsupported copy no longer hides a supported
+one. If none of them is supported, the cookie names no language and the next
+source decides.
+
+**Fix:** check what the browser actually sends (`Cookie` in the request) and
+that one of the values is in `supported`. Set the cookie with the same `path`
+and domain everywhere, so the old copy is replaced rather than kept beside it.

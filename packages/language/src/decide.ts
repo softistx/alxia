@@ -31,10 +31,16 @@ function read<L extends string>(
 			return value === null ? undefined : match(value, supported);
 		}
 		case 'cookie': {
-			const value = new Bun.CookieMap(
-				ctx.request.headers.get('cookie') ?? '',
-			).get(settings.cookie);
-			return value === null ? undefined : match(value, supported);
+			// The name may be sent more than once (set on two paths or domains):
+			// the first supported value wins, an empty or unsupported one does not
+			// hide it. `CookieMap` iterates every occurrence, decoded as `get` is.
+			const header = ctx.request.headers.get('cookie') ?? '';
+			for (const [name, value] of new Bun.CookieMap(header)) {
+				if (name !== settings.cookie) continue;
+				const found = match(value, supported);
+				if (found !== undefined) return found;
+			}
+			return undefined;
 		}
 		case 'path': {
 			const segment = ctx.url.pathname.split('/').filter(Boolean)[
