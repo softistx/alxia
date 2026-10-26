@@ -7,6 +7,7 @@ import type {
 } from '@nxgt/janus';
 import { CHALLENGE_OVER, INVALID_CODE } from './codes';
 import type { SignInStatus, StepUpVia } from './model';
+import { STEP_UP_OVER, STEP_UP_REQUIRED } from './step-up-codes';
 
 // The names this subpath speaks are `@nxgt/janus`'s. The assertions below are
 // checked by `tsc` (the package's `typecheck` runs over the specs): a janus
@@ -25,6 +26,8 @@ same<Equal<StepUpVia, StepUpByEmail<never>['via'] | StepUpByApp<never>['via']>>(
 const codes: readonly JanusErrorCode[] = [
 	INVALID_CODE,
 	...CHALLENGE_OVER,
+	...STEP_UP_OVER,
+	STEP_UP_REQUIRED,
 ] as const;
 
 describe('@nxgt/janus’s names', () => {
@@ -36,11 +39,15 @@ describe('@nxgt/janus’s names', () => {
 	});
 
 	test('the default codes are janus’s error codes', () => {
-		expect(codes).toEqual([
+		expect([...new Set(codes)]).toEqual([
 			'CODE_INVALID',
 			'TOKEN_UNKNOWN',
 			'TOKEN_SPENT',
 			'TOKEN_EXPIRED',
+			'TOKEN_STALE',
+			'SECOND_FACTOR_ACTIVE',
+			'SECOND_FACTOR_NOT_ENROLLED',
+			'STEP_UP_REQUIRED',
 		]);
 	});
 });

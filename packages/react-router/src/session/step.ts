@@ -5,6 +5,7 @@ import {
 	isApiErrorLike,
 } from '../errors/api-error';
 import type {
+	CodeWording,
 	FlowContext,
 	SignInAnswer,
 	SignInFlow,
@@ -19,7 +20,7 @@ import { landReplacing } from './land';
  * `whenNone` to say instead) and the user must sign in again.
  */
 export function codeRefusal<L extends string>(
-	{ options, invalidCode, challengeOver }: FlowContext<L>,
+	{ options, invalidCode, challengeOver }: CodeWording<L>,
 	error: ApiErrorLike,
 	language: L,
 	whenNone?: string,
