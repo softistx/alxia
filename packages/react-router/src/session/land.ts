@@ -21,6 +21,15 @@ export async function revokeSession<L extends string>(
 	return true;
 }
 
+/** The condition a session opens on: a signed-in answer with a token and an end still to come. */
+export const isLive = (
+	answer: SignInAnswer,
+): answer is Extract<SignInAnswer, { status: 'signedIn' }> =>
+	answer.status === 'signedIn' &&
+	Boolean(answer.token) &&
+	Boolean(answer.expiresAt) &&
+	millisOf(answer.expiresAt) > Date.now();
+
 /**
  * Where a sign-in's answer leads: signed in, to `next` with the session
  * cookie (and the challenge cleared); a second factor, to its page with the
@@ -35,12 +44,7 @@ export function landing<L extends string>(
 ): Response | null {
 	const { cookies } = options;
 	// A session with no readable or past end would be set and dead at once.
-	if (
-		answer.status === 'signedIn' &&
-		answer.token &&
-		answer.expiresAt &&
-		millisOf(answer.expiresAt) > Date.now()
-	) {
+	if (isLive(answer)) {
 		const headers = new Headers();
 		headers.append(
 			'Set-Cookie',

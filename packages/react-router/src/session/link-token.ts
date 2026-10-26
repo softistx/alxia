@@ -9,7 +9,7 @@ import type {
 	SpendOptions,
 	Spent,
 } from './link-types';
-import { safeNext } from './model';
+import { sitePath } from './model/site-path';
 
 /**
  * The response headers of a page a mail's link opens, whose URL carries a
@@ -21,20 +21,12 @@ export const TOKEN_PAGE_HEADERS = {
 	'X-Robots-Tag': 'noindex, nofollow',
 } as const;
 
-/** A page's path with no query or fragment, or a `TypeError`. */
-export function pathOf(path: string): string {
-	if (safeNext(path) !== path || /[?#]/.test(path)) {
-		// The part after "?" or "#" may be the token: it is never printed.
-		const shown = path.replace(/[?#].*$/s, '?…');
-		throw new TypeError(
-			`authLinks(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ${JSON.stringify(shown)}.`,
-		);
-	}
-	return path;
-}
+/** A token page's path with no query or fragment, or a `TypeError` naming `call`. */
+const pathOf = (path: string, call: string): string =>
+	sitePath(path, { label: `${call}: a token page's path` });
 
 export const statePath = (path: string, state: string): string =>
-	`${pathOf(path)}?${new URLSearchParams({ state })}`;
+	`${pathOf(path, 'statePath()')}?${new URLSearchParams({ state })}`;
 
 /** `headers`, with the token page's own on top. */
 export function withTokenHeaders(headers?: HeadersInit): Headers {
@@ -70,7 +62,7 @@ export async function linkArgs<S extends StandardSchemaV1>(
 	path: string,
 ): Promise<InferOutput<S>> {
 	samesitePost(json, request);
-	pathOf(path);
+	pathOf(path, 'linkArgs()');
 	const body = await json.readJson(request);
 	const result = await schema['~standard'].validate(body);
 	if (!result.issues) return result.value as InferOutput<S>;
@@ -89,7 +81,7 @@ export async function spendToken<L extends string, T>(
 ): Promise<Spent<T>> {
 	const { errors } = options;
 	samesitePost(options.json, request);
-	pathOf(path);
+	pathOf(path, 'spendToken()');
 	try {
 		return { ok: true, value: await run() };
 	} catch (error) {

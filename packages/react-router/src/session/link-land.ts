@@ -2,10 +2,10 @@ import { data, replace } from 'react-router';
 import type { FormErrors } from '../errors/form-errors';
 import type { SignInAnswer } from './flow-types';
 import { samesitePost } from './guard';
+import { isLive } from './land';
 import { stateRedirect, withTokenHeaders } from './link-token';
 import type { AuthLinks, LinkStayed, LinksContext } from './link-types';
 import { HOME, safeNext } from './model';
-import { millisOf } from './serialize';
 
 /** Where a new session starts: the app's start page, else `/`; never an unsafe path. */
 async function startOf<L extends string>(
@@ -21,13 +21,6 @@ async function startOf<L extends string>(
 		return HOME;
 	}
 }
-
-/** The condition `landing` opens a session on: a token, and an end still to come. */
-const isLive = (answer: SignInAnswer): boolean =>
-	answer.status === 'signedIn' &&
-	Boolean(answer.token) &&
-	Boolean(answer.expiresAt) &&
-	millisOf(answer.expiresAt) > Date.now();
 
 /**
  * Where a link's sign-in leads, replacing the token's history entry. Signed
@@ -46,10 +39,9 @@ export async function landByLink<L extends string>(
 		return stateRedirect(other.path, other.state);
 	}
 	// A dead session would be looked up with a token the API refuses.
-	const next =
-		answer.status === 'signedIn' && isLive(answer)
-			? await startOf(options, request, answer.token)
-			: HOME;
+	const next = isLive(answer)
+		? await startOf(options, request, answer.token)
+		: HOME;
 	const landed = await options.signIn.landReplacing(answer, next, {
 		request,
 		revokeOn: ['signedIn', 'secondFactor'],

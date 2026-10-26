@@ -153,23 +153,48 @@ describe('statePath and ended', () => {
 			})();
 			expect(error).toBeInstanceOf(TypeError);
 			expect(error.message).toBe(
-				`authLinks(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ${JSON.stringify(printed)}.`,
+				`statePath(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ${JSON.stringify(printed)}.`,
 			);
 			expect(error.message).not.toContain('t0k3n');
 		}
 	});
 
-	test('spendToken checks the path before it runs anything', async () => {
+	test('spendToken checks the path before it runs anything, and names itself', async () => {
 		let ran = false;
-		await expect(
+		const error = await thrown(() =>
 			links.spendToken(
 				async () => {
 					ran = true;
 				},
-				{ request: posting(), language: 'en', path: '/a?token=t', states: {} },
+				{
+					request: posting(),
+					language: 'en',
+					path: '/a?token=t0k3n',
+					states: {},
+				},
 			),
-		).rejects.toBeInstanceOf(TypeError);
+		);
+		expect(error).toEqual(
+			new TypeError(
+				`spendToken(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got "/a?…".`,
+			),
+		);
 		expect(ran).toBe(false);
+	});
+
+	test('linkArgs names itself, and prints nothing after ? or #', async () => {
+		const error = await thrown(() =>
+			links.linkArgs(
+				z.object({ token: z.string() }),
+				posting(),
+				'/a?token=t0k3n',
+			),
+		);
+		expect(error).toEqual(
+			new TypeError(
+				`linkArgs(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got "/a?…".`,
+			),
+		);
 	});
 
 	test('a redirect to an end state carries the token page’s headers', () => {

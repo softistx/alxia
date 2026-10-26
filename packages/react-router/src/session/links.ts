@@ -16,7 +16,7 @@ import type {
 	LinksContext,
 	RequestLinkAnswer,
 } from './link-types';
-import { safeNext } from './model';
+import { sitePath } from './model/site-path';
 
 const RESET_DONE = '/sign-in?password-reset=1';
 
@@ -87,11 +87,7 @@ export function authLinks<L extends string>(
 		json: signIn.json,
 	};
 	const resetDone = options.resetDone ?? RESET_DONE;
-	if (safeNext(resetDone) !== resetDone) {
-		throw new TypeError(
-			`authLinks(): resetDone must be a path of this site, starting with a single "/"; got ${JSON.stringify(resetDone)}.`,
-		);
-	}
+	sitePath(resetDone, { label: 'authLinks(): resetDone', query: true });
 	const invalid = options.invalidState ?? 'invalid';
 	return {
 		statePath,
