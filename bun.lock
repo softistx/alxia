@@ -103,7 +103,7 @@
     },
     "packages/create": {
       "name": "@alxia/create",
-      "version": "0.5.8",
+      "version": "0.5.9",
       "bin": {
         "create-alxia": "./dist/index.js",
       },
@@ -203,7 +203,7 @@
     },
     "packages/janus": {
       "name": "@alxia/janus",
-      "version": "0.3.13",
+      "version": "0.3.14",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@alxia/i18n": "workspace:^",
@@ -300,7 +300,7 @@
     },
     "packages/react-router": {
       "name": "@alxia/react-router",
-      "version": "0.13.0",
+      "version": "0.14.0",
       "bin": {
         "alxia-react-router": "./dist/cli/index.js",
       },
