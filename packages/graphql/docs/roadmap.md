@@ -11,13 +11,33 @@ Nothing in progress.
 
 ## Next
 
-Nothing scheduled yet.
+- **A declared oversize body refused where `bodyLimit()` stands.** Today the
+  body is read, and refused, by the endpoint, after every middleware declared
+  before it. Core would answer a `Content-Length` past the limit at the
+  `bodyLimit()` call, so the middlewares after it never run for such a
+  request. It lives in `@alxia/core`.
 
 ## Later
 
-Nothing scheduled yet.
+- **Weighing validation results.** Yoga keeps the validation errors of a
+  cached document (up to about 100) outside the parse cache's weight, at
+  roughly 70 KB per document; the weight could count them.
+- **A configurable WebSocket message limit.** A `subscribe` message over the
+  socket is bounded by Bun's `maxPayloadLength` (16 MiB by default), not by
+  `bodyLimit`. A `ws` option would set the limit the way `bodyLimit` does
+  for a `POST`.
 
 ## Shipped
+
+### 0.9.0
+
+- **Bounded parsing.** A document may hold 15 000 tokens (`maxTokens`, `false`
+  to opt out); a longer one is refused as `GRAPHQL_PARSE_FAILED`. The parse
+  cache is bounded by weight, 64 MiB per endpoint (`parseCache`), in place of
+  Yoga's, which has no size bound. A `POST` body may hold 1 MiB (`bodyLimit`)
+  unless the app declared its own limit; the 413 keeps the headers Yoga's
+  plugins set and logs nothing. A query over 15 000 tokens and an upload past
+  1 MiB need an option ([production guide](guide/production.md#cap-what-a-request-costs)).
 
 ### 0.8.0
 

@@ -186,6 +186,36 @@ their subscriptions. `ws: { path, keepAlive }` moves the socket or spaces
 its pings. See [the WebSocket guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/websockets.md),
 Apollo Client's and urql's setup included.
 
+## Limits
+
+Three limits bound what a request costs before any resolver runs. A document
+may hold at most **15 000 tokens** (`maxTokens`, `false` for no cap): a longer
+one is refused by the parser as `GRAPHQL_PARSE_FAILED`, 400 under
+`application/graphql-response+json`, and never reaches the schema. The
+documents Yoga parses are kept in a cache bounded by weight, **64 MiB** per
+endpoint, **1 024** documents, **one hour** (`parseCache`), where Yoga's own
+has no size bound. A `POST` body may hold **1 MiB** (`bodyLimit`) unless the
+app declared its own `bodyLimit()` before `graphql()`, which is kept; a body
+past it is core's 413 and never reaches Yoga. `bodyLimit` bounds a `POST`
+alone: a WebSocket `subscribe` message is bounded by Bun's `maxPayloadLength`
+(16 MiB by default):
+
+```ts
+graphql(app, {
+	schema,
+	maxTokens: 20_000, // false: no cap
+	parseCache: { maxBytes: 32 * 1024 * 1024, max: 512, ttl: 30 * 60_000 }, // false: no cache
+	bodyLimit: 5 * 1024 * 1024, // 1 MiB by default; a multipart upload needs more
+});
+```
+
+A refused document is a 200 with `errors` under `application/json` (400 under
+`application/graphql-response+json`). A bad option value throws a `TypeError`
+where `graphql()` is declared.
+
+A client query is a few thousand tokens; the introspection query is 163. See
+[Cap what a request costs](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/production.md#cap-what-a-request-costs).
+
 ## Errors, health and shutdown
 
 A GraphQL error stays GraphQL's — an entry of `errors[]`, inside a 200 —
@@ -238,7 +268,7 @@ See
 
 | export | |
 | --- | --- |
-| `graphql(app, options)` | the endpoint: `schema`, `path`, `ide`, `sandbox`, `ws`, and every Yoga option |
+| `graphql(app, options)` | the endpoint: `schema`, `path`, `ide`, `sandbox`, `ws`, `maxTokens`, `parseCache`, `bodyLimit`, and every Yoga option |
 | `GraphQLWsOptions` | `ws`'s options: `path`, `keepAlive` |
 | `GraphQLWsContext` | what an operation over WebSocket adds to the context: `connectionParams` |
 | `renderSandbox(endpoint, options?)`, `SANDBOX_POLICY` | the Sandbox page, and the policy it loads under |

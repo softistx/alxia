@@ -1,11 +1,13 @@
 /**
  * Yoga reads the request body itself, and turns any failure of the read
  * into its own 400. A body past core's `bodyLimit` fails the read with a
- * `ContentTooLargeError`; `watchBody` keeps that error, so the handler
- * can throw it again once Yoga has answered, and the app's own boundary
+ * `ContentTooLargeError`; `watchBody` keeps that error and hands Yoga its
+ * own 413 error in its place, so Yoga logs nothing, and the handler can
+ * throw core's again once Yoga has answered: the app's own boundary
  * answers the 413 in its error format, leaking nothing of Yoga's.
  */
 import type { ContentTooLargeError } from '@alxia/core';
+import { GraphQLError } from 'graphql';
 
 /**
  * By its name and its limit, not `instanceof`: the copy of core that
@@ -41,8 +43,16 @@ export function watchBody(request: Request): WatchedRequest {
 				if (done) controller.close();
 				else controller.enqueue(value);
 			} catch (error) {
-				if (isTooLarge(error)) refused = error;
-				throw error;
+				if (!isTooLarge(error)) throw error;
+				refused = error;
+				// Yoga's own refusal, which it neither masks nor logs, for
+				// every content type: the handler answers core's 413 instead.
+				throw new GraphQLError('Request body too large', {
+					extensions: {
+						code: 'REQUEST_ENTITY_TOO_LARGE',
+						http: { status: 413 },
+					},
+				});
 			}
 		},
 		cancel: (reason) => reader.cancel(reason),
