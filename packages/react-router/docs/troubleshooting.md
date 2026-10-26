@@ -81,6 +81,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: sessionCookies(): challengeSeconds must be a positive integer; got ….`](#typeerror-sessioncookies-challengeseconds-must-be-a-positive-integer-got-)
 - [`TypeError: sessionCookies(): challengePath must start with "/" and hold no ";" or control character; got ….`](#typeerror-sessioncookies-challengepath-must-start-with--and-hold-no--or-control-character-got-)
 - [`TypeError: signInFlow(): paths.… must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-signinflow-paths-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
+- [`TypeError: signInPath(): options.path must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-signinpath-optionspath-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
 - [`TypeError: signInFlow(): the code "…" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`](#typeerror-signinflow-the-code--is-both-the-wrong-code-code-codesinvalidcode-and-in-codeschallengeover-a-wrong-code-that-leaves-tries-cannot-end-the-challenge)
 - [`TypeError: serializeCookie(): the name "…" is not a cookie name (an RFC 6265 token).`](#typeerror-serializecookie-the-name--is-not-a-cookie-name-an-rfc-6265-token)
 - [`TypeError: serializeCookie(): the path "…" is not a cookie path: it must start with "/" and hold no ";" or control character.`](#typeerror-serializecookie-the-path--is-not-a-cookie-path-it-must-start-with--and-hold-no--or-control-character)
@@ -1667,6 +1668,24 @@ export const signIn = signInFlow({
 	// …
 	paths: { secondFactor: '/sign-in/code' },
 });
+```
+
+### `TypeError: signInPath(): options.path must be a path of this site with no query or fragment, starting with a single "/"; got ….`
+
+```
+TypeError: signInPath(): options.path must be a path of this site with no query or fragment, starting with a single "/"; got "//evil.test".
+```
+
+**When:** the app calls `signInPath(next, { path })`, in a loader or at startup.
+
+**Why:** `path` replaces `/sign-in` and the function adds `?next=…` to it, so it must be a path of this site: relative, empty, starting with `//` or `/\` (which a redirect reads as another site), or holding a query (`?`) or a fragment (`#`) is refused. The message prints the path only up to its `?` or `#`.
+
+**Fix:** pass the page's path with its leading slash, and put parameters in `query`:
+
+```ts
+import { signInPath } from '@alxia/react-router/session/model';
+
+signInPath('/orders', { path: '/login', query: { expired: '1' } });
 ```
 
 ### `TypeError: signInFlow(): the code "…" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`

@@ -2,7 +2,12 @@ import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import { refusal } from '../../test/errors/refusal';
 import { body, thrown } from '../../test/session/flow';
-import { crossSite, linksFor, PATH, posting } from '../../test/session/links';
+import {
+	crossSiteJson,
+	linksFor,
+	PATH,
+	posting,
+} from '../../test/session/links';
 import { type Spent, TOKEN_PAGE_HEADERS } from './index';
 
 const { links } = linksFor();
@@ -176,7 +181,7 @@ describe('statePath and ended', () => {
 describe('linkArgs', () => {
 	test('a cross-site post is refused before the schema reads it', async () => {
 		const refusedPost = (await thrown(() =>
-			links.linkArgs(z.object({ token: z.string() }), crossSite(), PATH),
+			links.linkArgs(z.object({ token: z.string() }), crossSiteJson(), PATH),
 		)) as { init: { status: number } };
 		expect(refusedPost.init.status).toBe(403);
 		const text = new Request('http://my-app.test/x', {
@@ -184,10 +189,11 @@ describe('linkArgs', () => {
 			headers: { 'content-type': 'text/plain' },
 			body: '{"token":"t"}',
 		});
-		const unsupported = (await thrown(() =>
+		// Not JSON: a native post, which goes back to its page.
+		const native = await thrown(() =>
 			links.linkArgs(z.object({ token: z.string() }), text, PATH),
-		)) as { init: { status: number } };
-		expect(unsupported.init.status).toBe(415);
+		);
+		expect(native).toBeInstanceOf(Response);
 		const foreign = new Request('http://my-app.test/x', {
 			method: 'POST',
 			headers: {

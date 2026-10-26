@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Lang } from '../../test/errors/format';
 import { refusal } from '../../test/errors/refusal';
-import { body, thrown } from '../../test/session/flow';
+import { body, stepCall, thrown } from '../../test/session/flow';
 import { down, steps, wrong } from '../../test/session/step-up';
 import type { StepUpStepsOptions } from './step-up-types';
 
@@ -12,12 +12,12 @@ describe('confirm', () => {
 		overrides: Partial<StepUpStepsOptions<Lang>> = {},
 	) =>
 		steps(overrides)
-			.confirm(() => Promise.reject(error), via ? { via } : {}, 'en')
+			.confirm(() => Promise.reject(error), { ...stepCall(), via })
 			.then(body);
 
 	test('a code accepted is a plain ok', async () => {
 		expect(
-			await steps().confirm(async () => true, { via: 'email' }, 'en'),
+			await steps().confirm(async () => true, { ...stepCall(), via: 'email' }),
 		).toEqual({ ok: true, intent: 'confirm-step-up' });
 	});
 
@@ -75,7 +75,10 @@ describe('confirm', () => {
 
 	test('locked without a `locked` wording is still locked, with the message alone', async () => {
 		const result = await steps({}, ['locked'])
-			.confirm(() => Promise.reject(wrong(0)), { via: 'secondFactor' }, 'en')
+			.confirm(() => Promise.reject(wrong(0)), {
+				...stepCall(),
+				via: 'secondFactor',
+			})
 			.then(body);
 		expect(result.data).toMatchObject({ locked: true, message: 'Wrong code' });
 	});
@@ -158,8 +161,7 @@ describe('confirm', () => {
 			async (...args: unknown[]) => {
 				received = args;
 			},
-			{ via: 'email' },
-			'en',
+			{ ...stepCall(), via: 'email' },
 		);
 		expect(received).toEqual([]);
 	});

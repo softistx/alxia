@@ -1,7 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import type { Lang } from '../../test/errors/format';
 import { filledMessages, refusal } from '../../test/errors/refusal';
-import { createApiErrors } from '../errors';
+import { stepCall } from '../../test/session/flow';
+import { createApiErrors, jsonActions } from '../errors';
 import {
 	INITIAL_STEP_UP,
 	type StepUpConfirmAnswer,
@@ -22,6 +23,7 @@ const steps = stepUpSteps<Lang>({
 	attemptsLeft: (count) => `${count} left`,
 	spent: () => 'ask again',
 	locked: () => 'wait',
+	json: jsonActions(),
 });
 
 const plain = <T>(answer: T | { data: T }): T =>
@@ -31,7 +33,7 @@ const plain = <T>(answer: T | { data: T }): T =>
 
 async function held(via: 'email' | 'secondFactor'): Promise<StepUpState> {
 	const answer = plain<StepUpRequestAnswer>(
-		await steps.request(async () => ({ challenge: 'c1', via }), 'en'),
+		await steps.request(async () => ({ challenge: 'c1', via }), stepCall()),
 	);
 	return [
 		{ type: 'start' } as const,
@@ -44,8 +46,7 @@ async function refuse(state: StepUpState, attemptsLeft: number) {
 		await steps.confirm(
 			() =>
 				Promise.reject(refusal('CODE_INVALID', 'Wrong code', { attemptsLeft })),
-			state.via ? { via: state.via } : {},
-			'en',
+			{ ...stepCall(), via: state.via },
 		),
 	);
 	return stepUpReducer(stepUpReducer(state, { type: 'submit' }), {
@@ -108,7 +109,7 @@ describe('the step-up answers through stepUpReducer and stepUpProps', () => {
 		const failed = plain<StepUpRequestAnswer>(
 			await steps.request(
 				() => Promise.reject(new Response('', { status: 503 })),
-				'en',
+				stepCall(),
 			),
 		);
 		const idle = [
@@ -119,7 +120,7 @@ describe('the step-up answers through stepUpReducer and stepUpProps', () => {
 
 		const state = await held('email');
 		const ok = plain<StepUpConfirmAnswer>(
-			await steps.confirm(async () => true, { via: 'email' }, 'en'),
+			await steps.confirm(async () => true, { ...stepCall(), via: 'email' }),
 		);
 		expect(stepUpReducer(state, { type: 'confirmed', answer: ok }).phase).toBe(
 			'done',

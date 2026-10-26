@@ -2,6 +2,7 @@ import { data, replace } from 'react-router';
 import { isApiErrorLike } from '../errors/api-error';
 import type { FormErrors } from '../errors/form-errors';
 import type { InferOutput, StandardSchemaV1 } from '../errors/standard-schema';
+import { samesitePost } from './guard';
 import type {
 	AuthLinksOptions,
 	LinkStayed,
@@ -68,6 +69,7 @@ export async function linkArgs<S extends StandardSchemaV1>(
 	request: Request,
 	path: string,
 ): Promise<InferOutput<S>> {
+	samesitePost(json, request);
 	pathOf(path);
 	const body = await json.readJson(request);
 	const result = await schema['~standard'].validate(body);

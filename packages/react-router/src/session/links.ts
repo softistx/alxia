@@ -1,5 +1,6 @@
 import { data } from 'react-router';
 import { isApiErrorLike } from '../errors/api-error';
+import { samesitePost } from './guard';
 import { afterReset, landByLink } from './link-land';
 import {
 	answerOf,
@@ -31,7 +32,7 @@ async function requestLink<L extends string>(
 	language: L,
 ) {
 	const { errors, throttled } = options;
-	options.json.requireJsonPost(request);
+	samesitePost(options.json, request);
 	try {
 		await run();
 		return data<RequestLinkAnswer>({ sent: true });

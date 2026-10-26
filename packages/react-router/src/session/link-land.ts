@@ -1,6 +1,7 @@
 import { data, replace } from 'react-router';
 import type { FormErrors } from '../errors/form-errors';
 import type { SignInAnswer } from './flow-types';
+import { samesitePost } from './guard';
 import { stateRedirect, withTokenHeaders } from './link-token';
 import type { AuthLinks, AuthLinksOptions, LinkStayed } from './link-types';
 import { HOME, safeNext } from './model';
@@ -40,7 +41,7 @@ export async function landByLink<L extends string>(
 	answer: SignInAnswer,
 	{ request, language, other }: Parameters<AuthLinks<L>['landByLink']>[1],
 ): Promise<Response | LinkStayed> {
-	options.json.requireJsonPost(request);
+	samesitePost(options.json, request);
 	if (answer.status === 'other' && other) {
 		return stateRedirect(other.path, other.state);
 	}
@@ -74,7 +75,7 @@ export async function afterReset<L extends string>(
 	resetDone: string,
 	request: Request,
 ): Promise<Response> {
-	options.json.requireJsonPost(request);
+	samesitePost(options.json, request);
 	await options.signIn.revokeSession(request);
 	return replace(resetDone, {
 		headers: withTokenHeaders({ 'Set-Cookie': options.cookies.destroy() }),

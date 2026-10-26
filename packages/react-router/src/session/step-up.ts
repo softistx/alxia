@@ -6,6 +6,7 @@ import {
 } from '../errors/api-error';
 import { INVALID_CODE } from './codes';
 import type { CodeWording } from './flow-types';
+import { samesitePost } from './guard';
 import type {
 	StepUpConfirmAnswer,
 	StepUpError,
@@ -91,11 +92,12 @@ function refusedCode<L extends string>(
 	};
 }
 
-async function request<L extends string>(
+async function requestStep<L extends string>(
 	context: StepUpContext<L>,
 	run: Parameters<StepUpSteps<L>['request']>[0],
-	language: L,
+	{ request, language }: Parameters<StepUpSteps<L>['request']>[1],
 ): Promise<StepUpRequestAnswer | StepUpStayed<StepUpRequestAnswer>> {
+	samesitePost(context.steps.json, request);
 	const intent = 'request-step-up';
 	try {
 		const { challenge, via } = await run();
@@ -113,12 +115,12 @@ async function request<L extends string>(
 	}
 }
 
-async function confirm<L extends string>(
+async function confirmStep<L extends string>(
 	context: StepUpContext<L>,
 	run: () => Promise<unknown>,
-	via: StepUpVia | undefined,
-	language: L,
+	{ request, language, via }: Parameters<StepUpSteps<L>['confirm']>[1],
 ): Promise<StepUpConfirmAnswer | StepUpStayed<StepUpConfirmAnswer>> {
+	samesitePost(context.steps.json, request);
 	const intent = 'confirm-step-up';
 	try {
 		await run();
@@ -169,8 +171,8 @@ export function stepUpSteps<L extends string>(
 ): StepUpSteps<L> {
 	const context = resolve(options);
 	return {
-		request: (run, language) => request(context, run, language),
-		confirm: (run, o, language) => confirm(context, run, o.via, language),
+		request: (run, o) => requestStep(context, run, o),
+		confirm: (run, o) => confirmStep(context, run, o),
 		isStepUpRequired: (error) =>
 			isApiErrorLike(error) && error.code === context.stepUpRequired,
 	};

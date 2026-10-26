@@ -1,13 +1,13 @@
 import { describe, expect, test } from 'bun:test';
 import { refusal } from '../../test/errors/refusal';
-import { body, thrown } from '../../test/session/flow';
+import { body, stepCall, thrown } from '../../test/session/flow';
 import { down, steps } from '../../test/session/step-up';
 
 describe('request', () => {
 	test('a granted request carries the challenge and how it is confirmed, plain', async () => {
 		const answer = await steps().request(
 			async () => ({ challenge: 'c1', via: 'email' }),
-			'en',
+			stepCall(),
 		);
 		expect(answer).toEqual({
 			ok: true,
@@ -20,7 +20,7 @@ describe('request', () => {
 	test('keeps only the challenge and how it is confirmed', async () => {
 		const answer = await steps().request(
 			async () => ({ challenge: 'c1', via: 'secondFactor', code: '1' }),
-			'en',
+			stepCall(),
 		);
 		expect(answer).toEqual({
 			ok: true,
@@ -34,7 +34,7 @@ describe('request', () => {
 		const result = body(
 			await steps().request(
 				() => Promise.reject(refusal('auth.errors.x', 'Not now', {}, 403)),
-				'en',
+				stepCall(),
 			),
 		);
 		expect(result.data).toEqual({
@@ -59,7 +59,7 @@ describe('request', () => {
 					error.code === 'MAIL_THROTTLED'
 						? `wait ${error.errors[0]?.extensions?.['retryAfter']} s (${language})`
 						: undefined,
-			}).request(() => Promise.reject(throttled), 'en'),
+			}).request(() => Promise.reject(throttled), stepCall()),
 		);
 		expect(result.data).toMatchObject({
 			error: 'failed',
@@ -72,7 +72,7 @@ describe('request', () => {
 		const result = body(
 			await steps({ wording: () => undefined }).request(
 				() => Promise.reject(refusal('auth.errors.x', 'Not now')),
-				'en',
+				stepCall(),
 			),
 		);
 		expect(result.data['message']).toBe('Not now');
@@ -80,7 +80,7 @@ describe('request', () => {
 
 	test('an API it cannot reach is “failed” with the unavailable word and a 503', async () => {
 		const result = body(
-			await steps().request(() => Promise.reject(down()), 'en'),
+			await steps().request(() => Promise.reject(down()), stepCall()),
 		);
 		expect(result.data).toEqual({
 			ok: false,
@@ -94,7 +94,9 @@ describe('request', () => {
 	test('a failure that is not the API’s is rethrown', async () => {
 		const bug = new TypeError('bug');
 		expect(
-			await thrown(() => steps().request(() => Promise.reject(bug), 'en')),
+			await thrown(() =>
+				steps().request(() => Promise.reject(bug), stepCall()),
+			),
 		).toBe(bug);
 	});
 });

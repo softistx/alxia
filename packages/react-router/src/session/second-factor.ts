@@ -1,5 +1,6 @@
 import { data } from 'react-router';
 import type { FlowContext, SignInAnswer, SignInFlow } from './flow-types';
+import { samesitePost } from './guard';
 import type { SecondFactorMethod } from './model';
 
 const MAX_CODE = 40;
@@ -18,7 +19,7 @@ export async function readCodeInput<L extends string>(
 	{ options }: FlowContext<L>,
 	request: Request,
 ): Promise<{ kind: SecondFactorMethod; code: string }> {
-	options.json.requireJsonPost(request);
+	samesitePost(options.json, request);
 	const body = (await options.json.readJson(request)) as {
 		kind?: unknown;
 		code?: unknown;

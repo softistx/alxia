@@ -1,4 +1,5 @@
 import { HOME, safeNext } from './safe-next';
+import { sitePath } from './site-path';
 
 /** The two pages of a sign-in. */
 export interface SignInPaths {
@@ -27,7 +28,8 @@ function withNext(
 /**
  * The sign-in page's URL, coming back to `next` (none for the home page, and
  * `next` goes through `safeNext`). `query` adds parameters, such as
- * `{ expired: '1' }`; `path` replaces `/sign-in`.
+ * `{ expired: '1' }`; `path` replaces `/sign-in` and must be a path of this
+ * site with no query or fragment (a `TypeError` otherwise).
  *
  * @example
  * signInPath('/orders'); // '/sign-in?next=%2Forders'
@@ -40,7 +42,11 @@ export function signInPath(
 		readonly path?: string;
 	} = {},
 ): string {
-	return withNext(options.path ?? SIGN_IN_PATHS.signIn, next, options.query);
+	const path =
+		options.path === undefined
+			? SIGN_IN_PATHS.signIn
+			: sitePath(options.path, { label: 'signInPath(): options.path' });
+	return withNext(path, next, options.query);
 }
 
 /** The second-factor page's URL, coming back to `next` as `signInPath` does. */

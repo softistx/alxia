@@ -12,6 +12,7 @@ import type {
 	SignInFormError,
 	SignInStayed,
 } from './flow-types';
+import { samesitePost } from './guard';
 import { landReplacing } from './land';
 
 /**
@@ -57,9 +58,8 @@ export async function signInStep<L extends string, T extends object>(
 	}: Parameters<SignInFlow<L>['signInStep']>[1] & { extra: T },
 ): Promise<Response | SignInStayed<T>> {
 	const { errors, unavailable, json } = context.options;
-	// A cross-site form post must never sign in or revoke: only JSON goes on
-	// (the headers are read, not the body).
-	json.requireJsonPost(request);
+	// A cross-site post must never sign in or revoke (headers only).
+	samesitePost(json, request);
 	const stay = (formError: string, status: number) =>
 		data<SignInFormError<T>>({ ...extra, formError }, { status });
 	const unreachable = () =>

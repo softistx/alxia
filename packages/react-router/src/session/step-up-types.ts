@@ -1,6 +1,7 @@
 import type { data } from 'react-router';
 import type { ApiErrorLike } from '../errors/api-error';
 import type { ApiErrors } from '../errors/api-errors';
+import type { JsonActions } from '../errors/json-actions';
 import type { SignInCodes } from './flow-types';
 import type {
 	StepUpConfirmAnswer,
@@ -17,6 +18,8 @@ export interface StepUpCodes extends SignInCodes {
 export interface StepUpStepsOptions<L extends string> {
 	/** The app's `createApiErrors` instance. */
 	readonly errors: ApiErrors<L>;
+	/** The app's `jsonActions({ origin })`: a step runs only for a same-site JSON post. */
+	readonly json: JsonActions;
 	/** A refused code's tries left, worded ("3 tries left"). */
 	attemptsLeft(count: number, language: L): string;
 	/** A challenge that is over, worded ("ask for a new code"). */
@@ -38,17 +41,27 @@ export interface StepUpStepsOptions<L extends string> {
 /** An answer that stays on the page: the answer, with the API's status. */
 export type StepUpStayed<T> = ReturnType<typeof data<T>>;
 
+/**
+ * What each step takes beside `run`: the request, whose headers must be a
+ * same-site JSON post's (a native form post goes back to its page, another
+ * site is a 403), and the language of the wording.
+ */
+export interface StepUpCall<L extends string> {
+	readonly request: Request;
+	readonly language: L;
+}
+
 export interface StepUpSteps<L extends string> {
 	/**
 	 * Starts a step-up (`requestStepUp`): the challenge and how it is
 	 * confirmed. The challenge goes to the page's fetcher and nowhere else.
 	 * A refusal (a throttled mail included) is `error: 'failed'` with the
 	 * message and the API's status; an API it cannot reach is a 503. Anything
-	 * that is not an API failure is thrown.
+	 * that is not an API failure is thrown. Only a same-site JSON post goes on.
 	 */
 	request(
 		run: () => Promise<{ readonly challenge: string; readonly via: StepUpVia }>,
-		language: L,
+		options: StepUpCall<L>,
 	): Promise<StepUpRequestAnswer | StepUpStayed<StepUpRequestAnswer>>;
 	/**
 	 * Confirms the step-up with the code (`confirmStepUp`). A refusal says
@@ -58,8 +71,7 @@ export interface StepUpSteps<L extends string> {
 	 */
 	confirm(
 		run: () => Promise<unknown>,
-		options: { readonly via?: StepUpVia },
-		language: L,
+		options: StepUpCall<L> & { readonly via?: StepUpVia | undefined },
 	): Promise<StepUpConfirmAnswer | StepUpStayed<StepUpConfirmAnswer>>;
 	/** Whether `error` is the API asking for a step-up first. */
 	isStepUpRequired(error: unknown): boolean;

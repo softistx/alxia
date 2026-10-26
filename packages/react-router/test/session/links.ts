@@ -34,3 +34,15 @@ export const crossSite = (token?: string) =>
 		headers: { 'content-type': 'text/plain', origin: 'http://evil.test' },
 		body: '{}',
 	});
+
+/** A JSON post another site sent: only the headers tell it from the page's own. */
+export const crossSiteJson = (token?: string) =>
+	asking(`${PATH}?token=secret`, token, {
+		method: 'POST',
+		headers: {
+			'content-type': 'application/json',
+			origin: 'http://evil.test',
+			'sec-fetch-site': 'cross-site',
+		},
+		body: '{}',
+	});

@@ -1,4 +1,4 @@
-import { createApiErrors } from '../../src/errors';
+import { createApiErrors, jsonActions } from '../../src/errors';
 import { type StepUpStepsOptions, stepUpSteps } from '../../src/session';
 import type { Lang } from '../errors/format';
 import { filledMessages, refusal } from '../errors/refusal';
@@ -15,6 +15,7 @@ export const steps = (
 ) => {
 	const options: StepUpStepsOptions<Lang> = {
 		errors,
+		json: jsonActions(),
 		attemptsLeft: (count, language) => `${count} left (${language})`,
 		spent: (language) => `ask again (${language})`,
 		locked: (language) => `wait (${language})`,

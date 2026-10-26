@@ -59,3 +59,27 @@ describe('secondFactorPath', () => {
 		);
 	});
 });
+
+describe('signInPath’s options.path', () => {
+	test('a path of this site replaces /sign-in', () => {
+		expect(signInPath('/orders', { path: '/login' })).toBe(
+			'/login?next=%2Forders',
+		);
+	});
+
+	test.each([
+		['//evil.test', '//evil.test'],
+		['https://evil.test/', 'https://evil.test/'],
+		['login', 'login'],
+		['', ''],
+		['/login?x=1', '/login?…'],
+		['/login#top', '/login?…'],
+		['/a/..//evil.test', '/a/..//evil.test'],
+	])('refuses %p with a TypeError', (path, shown) => {
+		expect(() => signInPath('/', { path })).toThrow(
+			new TypeError(
+				`signInPath(): options.path must be a path of this site with no query or fragment, starting with a single "/"; got ${JSON.stringify(shown)}.`,
+			),
+		);
+	});
+});
