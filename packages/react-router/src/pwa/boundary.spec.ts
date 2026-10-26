@@ -232,3 +232,23 @@ describe('/errors', () => {
 		expect(dts).not.toContain('@alxia/core');
 	});
 });
+
+describe('/session', () => {
+	test('imports react-router alone: no core, no node: module, no bun', async () => {
+		const imports = await importsOf(join(DIST, 'session/index.js'));
+		for (const specifier of new Set(imports)) {
+			expect(['react-router']).toContain(specifier);
+		}
+	});
+
+	test('shares no chunk with the main entry, so a page never loads core for it', async () => {
+		const session = await filesOf(join(DIST, 'session/index.js'));
+		const main = await filesOf(join(DIST, 'index.js'));
+		expect([...session].filter((file) => main.has(file))).toEqual([]);
+	});
+
+	test('declares no @alxia/core import, not even as a type', async () => {
+		const dts = await Bun.file(join(DIST, 'session/index.d.ts')).text();
+		expect(dts).not.toContain('@alxia/core');
+	});
+});

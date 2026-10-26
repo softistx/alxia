@@ -76,6 +76,10 @@ a loader, a message React Router or the browser prints, or an error from
 - [`<api>: <operation> (request <id>) answered <status> without GraphQL`](#api-operation-request-id-answered-status-without-graphql)
 - [`<api>: <operation> (request <id>) unreachable`, `timeout` or `invalid-response`](#api-operation-request-id-unreachable-timeout-or-invalid-response)
 - [`<api>: <operation> (request <id>) aborted`](#api-operation-request-id-aborted)
+- [`TypeError: sessionCookies(): the … name "…" is not a cookie name (an RFC 6265 token: …). Pass a name such as "my-app_session".`](#typeerror-sessioncookies-the--name--is-not-a-cookie-name-an-rfc-6265-token--pass-a-name-such-as-my-app_session)
+- [`TypeError: sessionCookies(): the … name "…" already carries a prefix. Pass the base name: the package adds __Host- (session) or __Secure- (challenge) when secure is true.`](#typeerror-sessioncookies-the--name--already-carries-a-prefix-pass-the-base-name-the-package-adds-__host--session-or-__secure--challenge-when-secure-is-true)
+- [`TypeError: sessionCookies(): challengeSeconds must be a positive integer; got ….`](#typeerror-sessioncookies-challengeseconds-must-be-a-positive-integer-got-)
+- [`TypeError: sessionCookies(): challengePath must start with "/"; got ….`](#typeerror-sessioncookies-challengepath-must-start-with--got-)
 
 **Types**
 
@@ -118,6 +122,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [An action shows the error page](#an-action-shows-the-error-page)
 - [Behind a TLS proxy every action answers 403](#behind-a-tls-proxy-every-action-answers-403)
 - [Right after start, refusals read in the API's words](#right-after-start-refusals-read-in-the-apis-words)
+- [Sign-in loops on `http://localhost` in Safari](#sign-in-loops-on-httplocalhost-in-safari)
+- [A `__Host-` cookie is dropped](#a-__host--cookie-is-dropped)
 
 ## Thrown or printed
 
@@ -1576,6 +1582,64 @@ sees the 503.
 **Fix:** none. To keep it out of the logs, test `request.signal.aborted` in
 your own `catch` before calling `apiCallFailure`.
 
+### `TypeError: sessionCookies(): the … name "…" is not a cookie name (an RFC 6265 token: …). Pass a name such as "my-app_session".`
+
+```
+TypeError: sessionCookies(): the session name "Bad Name" is not a cookie name (an RFC 6265 token: letters, digits and ! # $ % & ' * + - . ^ _ ` | ~). Pass a name such as "my-app_session".
+```
+
+**When:** the server starts, or the module that calls `sessionCookies` is imported.
+
+**Why:** `session` or `challenge` is empty or holds a character a cookie name cannot, such as a space, a semicolon, a comma or `=`. The message says which of the two (`session` or `challenge`) it is. A name from an environment variable that was not set is the usual cause.
+
+**Fix:** pass a plain name, such as the app's name and the role:
+
+```ts
+import { sessionCookies } from '@alxia/react-router/session';
+
+export const cookies = sessionCookies({
+	session: 'my-app_session',
+	challenge: 'my-app_challenge',
+	secure: !import.meta.env.DEV,
+});
+```
+
+### `TypeError: sessionCookies(): the … name "…" already carries a prefix. Pass the base name: the package adds __Host- (session) or __Secure- (challenge) when secure is true.`
+
+```
+TypeError: sessionCookies(): the session name "__Host-my-app_session" already carries a prefix. Pass the base name: the package adds __Host- (session) or __Secure- (challenge) when secure is true.
+```
+
+**When:** the server starts, or the module that calls `sessionCookies` is imported.
+
+**Why:** the name starts with `__Host-` or `__Secure-`. The package adds the prefix itself when `secure` is `true` and drops it when `secure` is `false` (development over plain HTTP, where a prefixed cookie would be refused); a name that carries it would be doubled or stuck in development.
+
+**Fix:** pass the base name: `'my-app_session'`, not `'__Host-my-app_session'`. The name the browser sees is in `cookies.names`. If the app reads or clears the cookie elsewhere by its full name, read it from `cookies.names.session`.
+
+### `TypeError: sessionCookies(): challengeSeconds must be a positive integer; got ….`
+
+```
+TypeError: sessionCookies(): challengeSeconds must be a positive integer; got 0.
+```
+
+**When:** the server starts, or the module that calls `sessionCookies` is imported.
+
+**Why:** `challengeSeconds`, the most the second-factor challenge's cookie lives, is `0`, negative, fractional or `NaN` (a lifetime read from an environment variable that is empty gives `NaN`). With `0` the browser would drop the cookie at once and the code page would never find its challenge.
+
+**Fix:** pass whole seconds above 0, or leave it out for the default of 300, the lifetime of an `@nxgt/janus` challenge. A longer value gains nothing: the cookie also ends with the challenge itself.
+
+### `TypeError: sessionCookies(): challengePath must start with "/"; got ….`
+
+```
+TypeError: sessionCookies(): challengePath must start with "/"; got "sign-in".
+```
+
+**When:** the server starts, or the module that calls `sessionCookies` is imported.
+
+**Why:** `challengePath`, where the browser sends the challenge cookie, is a relative path such as `'sign-in'`. A cookie's `Path` must be absolute, or the browser ignores it.
+
+**Fix:** pass the path of the sign-in pages with its leading slash. The default is `'/sign-in'`, which covers `/sign-in` and the pages under it; not `/sign-in/code` alone, since a client navigation fetches `/sign-in/code.data`, which that path would not match.
+
 ## Types
 
 ### `Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`
@@ -2325,3 +2389,35 @@ catalogue.warm();
 
 Raise `firstReadWaitMs` only if the page should wait longer for the first
 words; it holds every cold request that long when the API hangs.
+
+### Sign-in loops on `http://localhost` in Safari
+
+Signing in works in Chromium and Firefox. In Safari the app signs in, redirects, and lands back on the sign-in page, with no error.
+
+**Why:** Safari (WebKit) drops a `Secure` cookie set over `http://localhost`, where the other browsers keep it. The session cookie never arrives, so the next request has no session.
+
+**Fix:** pass `secure: false` in development. `secure: !import.meta.env.DEV` does it, and also drops the `__Host-` and `__Secure-` prefixes, which require `Secure`:
+
+```ts
+import { sessionCookies } from '@alxia/react-router/session';
+
+export const cookies = sessionCookies({
+	session: 'my-app_session',
+	challenge: 'my-app_challenge',
+	secure: !import.meta.env.DEV,
+});
+```
+
+Never write `secure: false` for a deployed app: the token would travel over HTTP.
+
+### A `__Host-` cookie is dropped
+
+The browser's cookie panel shows no `__Host-` session cookie after a sign-in, or the response's `Set-Cookie` is ignored.
+
+**Why:** a browser accepts a `__Host-` cookie only when it is `Secure`, has `Path=/` and no `Domain`, and the page is served over HTTPS (or `localhost` in Chromium and Firefox, never in Safari). The cookie the package writes always has `Path=/` and no `Domain`, so one of the others is wrong:
+
+- the app is served over plain HTTP, such as a Docker image or a preview opened by its IP address, while `secure` is `true`;
+- a proxy in front of the app rewrites or strips `Set-Cookie`, or adds a `Domain` attribute;
+- another `Set-Cookie` header of the same name, set by the app, overwrites it.
+
+**Fix:** serve the app over HTTPS, and keep `secure` `true` only there. Read `cookies.names.session` for the exact name, check the response header in the network panel, and make the proxy pass `Set-Cookie` as it is. In development over HTTP, `secure: !import.meta.env.DEV` sets an unprefixed cookie instead.
