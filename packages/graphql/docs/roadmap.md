@@ -7,7 +7,11 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing in progress.
+- **Bounded parsing.** `maxTokens` (15 000 by default; a longer document is
+  refused as `GRAPHQL_PARSE_FAILED`, `false` to opt out) and a parse cache
+  bounded by weight, 64 MiB per endpoint (`parseCache`), in place of Yoga's
+  cache that has no size bound. The documents above 15 000 tokens that worked
+  before need `maxTokens`.
 
 ## Next
 

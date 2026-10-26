@@ -117,6 +117,46 @@ export function notFound(what: string): GraphQLError {
 }
 ```
 
+## Cap what a request costs
+
+Yoga parses a document before any resolver guard runs, and a parsed
+document stays in a cache. Both are bounded by default, by the document's
+**tokens**: the words, names and punctuation the parser reads. Measured on
+graphql 16 and 17, a parsed token costs between 178 and 509 bytes of heap
+whatever its shape (4 000 aliases, one-character fields, nested lists,
+directives), where the cost per character swings from 58 to 254. So the
+count of tokens is the weight, and 512 bytes per token the upper estimate: a
+document of 15 000 tokens parses to 7.7 MB at most (15 000 × 512 B); a
+measured heavy document of about 12 000 tokens weighs about 6 MB.
+
+- **`maxTokens`, 15 000 by default** (Apollo Router's own limit). The
+  introspection query is 163 tokens and a large screen query with its
+  fragments a few thousand, so a client written for a federated graph passes.
+  A longer one is
+  refused before it runs, as any document the parser cannot read is:
+  `GRAPHQL_PARSE_FAILED`, `Syntax Error: Document contains more than 15000
+  tokens. Parsing aborted.` (graphql 16 words it `more that`), HTTP 400 under
+  `application/graphql-response+json` and 200 under `application/json`,
+  never logged. It applies to `POST`, `GET`, each operation of a batch and
+  each operation over WebSocket. `maxTokens: false` turns it off; a plugin of
+  yours that sets its own parse function replaces it.
+- **`parseCache`**, a least-recently-used cache per endpoint, weighed in
+  bytes: `maxBytes` (64 MiB), `max` documents (1 024) and `ttl` (one hour).
+  A document heavier than an eighth of `maxBytes` is not kept and is parsed
+  again each time. Yoga's own cache holds up to 1 024 documents whatever their
+  size, which is gigabytes for distinct large queries. `parseCache: false`
+  keeps nothing. An app with its own cache store gives Yoga's
+  `parserAndValidationCache`, which replaces this one, and must bound it
+  too; giving both throws where `graphql()` is declared.
+
+```ts
+graphql(app, {
+	schema,
+	maxTokens: 20_000,
+	parseCache: { maxBytes: 32 * 1024 * 1024 },
+});
+```
+
 ## Cap the body
 
 Yoga reads the whole body of a `POST` before it parses it, so a megabyte of
@@ -192,6 +232,8 @@ export const persisted: Plugin = usePersistedOperations({
 ```
 
 ## Together
+
+`maxTokens` and `parseCache` need no line here: their defaults apply.
 
 ```ts no-check
 // file: src/production.ts

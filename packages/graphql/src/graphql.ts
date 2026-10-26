@@ -12,6 +12,12 @@ import type {
 } from 'graphql-yoga';
 import { graphqlHandler, type YogaContext, yogaServers } from './handler';
 import { reportsOperations } from './operation';
+import {
+	limitsTokens,
+	type ParseCacheOptions,
+	parseCaches,
+	tokenLimit,
+} from './parse-limits';
 import type { SandboxOptions } from './sandbox';
 import { type GraphQLWsOptions, graphqlSocket } from './ws';
 
@@ -104,6 +110,20 @@ export interface GraphQLOptions<
 	 * events, which stay served beside it.
 	 */
 	readonly ws?: boolean | GraphQLWsOptions;
+	/**
+	 * The most tokens a document may hold, 15 000 by default (Apollo
+	 * Router's own), or `false` for no cap. A longer document is refused by
+	 * the parser before anything runs, as Yoga refuses any document it
+	 * cannot parse: `GRAPHQL_PARSE_FAILED`.
+	 */
+	readonly maxTokens?: number | false;
+	/**
+	 * The cache of parsed documents, one per endpoint, weighed by tokens:
+	 * `maxBytes` (64 MiB by default), `max` documents (1 024) and `ttl`
+	 * milliseconds (one hour). `false` parses every request. Yoga's own
+	 * `parserAndValidationCache` replaces it, and cannot be given with it.
+	 */
+	readonly parseCache?: false | ParseCacheOptions;
 }
 
 /**
@@ -157,19 +177,41 @@ export function graphql<
 		graphiql,
 		sandbox,
 		ws = false,
+		maxTokens,
+		parseCache,
 		...yogaOptions
 	} = options;
+	const tokens = tokenLimit(maxTokens);
+	if (
+		parseCache !== undefined &&
+		yogaOptions.parserAndValidationCache !== undefined
+	) {
+		throw new TypeError(
+			"graphql(app, { parseCache, parserAndValidationCache }): give one: parseCache sizes alxia's bounded cache, parserAndValidationCache replaces it",
+		);
+	}
+	// Checked here, once; each endpoint's Yoga gets caches of its own.
+	parseCaches(parseCache);
 	const page = graphiql ?? true;
-	const yogaAt = yogaServers<UserCtx>({
-		...(yogaOptions as YogaServerOptions<YogaContext, UserCtx>),
-		plugins: [...(yogaOptions.plugins ?? []), reportsOperations()],
-		cors,
-		graphiql: (ide === undefined
-			? (_request: Request, context: object) => isDev(context) && page
-			: ide === 'graphiql'
-				? page
-				: false) as YogaServerOptions<YogaContext, UserCtx>['graphiql'],
-	});
+	const yogaAt = yogaServers<UserCtx>(
+		{
+			...(yogaOptions as YogaServerOptions<YogaContext, UserCtx>),
+			plugins: [
+				...(tokens === false ? [] : [limitsTokens(tokens)]),
+				...(yogaOptions.plugins ?? []),
+				reportsOperations(),
+			],
+			cors,
+			graphiql: (ide === undefined
+				? (_request: Request, context: object) => isDev(context) && page
+				: ide === 'graphiql'
+					? page
+					: false) as YogaServerOptions<YogaContext, UserCtx>['graphiql'],
+		},
+		yogaOptions.parserAndValidationCache === undefined
+			? () => parseCaches(parseCache)
+			: undefined,
+	);
 	const handler = graphqlHandler(
 		yogaAt,
 		ide === 'apollo-sandbox' ? (sandbox ?? {}) : false,
