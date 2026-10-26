@@ -158,22 +158,31 @@ function endedOnShutdown(
 		return body;
 	}
 	const reader = body.getReader();
+	// The signal lives as long as the process: the listener goes as soon as
+	// the stream is over, however it ended, or each response would leave one.
+	const end = () => {
+		signal.removeEventListener('abort', end);
+		void reader.cancel();
+		try {
+			controller.close();
+		} catch {
+			// Closed already: the stream had ended.
+		}
+	};
+	let controller: ReadableStreamDefaultController<Uint8Array>;
 	return new ReadableStream<Uint8Array>({
-		start(controller) {
-			const end = () => {
-				void reader.cancel();
-				try {
-					controller.close();
-				} catch {
-					// Closed already: the stream had ended.
-				}
-			};
+		start(started) {
+			controller = started;
 			if (signal.aborted) end();
 			else signal.addEventListener('abort', end, { once: true });
 		},
 		async pull(controller) {
-			const { value, done } = await reader.read();
-			if (done) {
+			const result = await reader.read().catch((error: unknown) => {
+				signal.removeEventListener('abort', end);
+				throw error;
+			});
+			if (result.done) {
+				signal.removeEventListener('abort', end);
 				try {
 					controller.close();
 				} catch {
@@ -181,8 +190,11 @@ function endedOnShutdown(
 				}
 				return;
 			}
-			controller.enqueue(value);
+			controller.enqueue(result.value);
 		},
-		cancel: (reason) => reader.cancel(reason),
+		cancel: (reason) => {
+			signal.removeEventListener('abort', end);
+			return reader.cancel(reason);
+		},
 	});
 }
