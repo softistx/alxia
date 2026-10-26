@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.13.0
+
+### Minor Changes
+
+- [#328](https://github.com/softistx/alxia/pull/328) [`0984939`](https://github.com/softistx/alxia/commit/09849396f63f6234ba54aa3f0fbcfe0f98975456) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `createApiErrors` takes an optional `reword(text, error, { code, values, language })` to word a whole family of codes once, such as adding a suffix to every `*.errors.referenced` refusal. It runs on the final text of an API error, whether the catalogue, the API's message or `byCode` produced it, receives the merged values the catalogue formats with, and returns the text to show or `undefined` to keep it. It does not apply to `refused`, `unavailable` or the entries of `extensions.fields`. Without it nothing changes.
+
 ## 0.12.1
 
 ### Patch Changes
