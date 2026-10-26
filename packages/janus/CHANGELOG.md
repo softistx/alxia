@@ -1,5 +1,11 @@
 # @alxia/janus
 
+## 0.3.14
+
+### Patch Changes
+
+- [#335](https://github.com/softistx/alxia/pull/335) [`24e9592`](https://github.com/softistx/alxia/commit/24e959270beac0f9ee994ee135450705f99c0b27) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Point to `@alxia/react-router/session` from the README and the roadmap: a BFF that calls a janus API, rather than running `@nxgt/janus`, takes its session from there.
+
 ## 0.3.13
 
 ### Patch Changes

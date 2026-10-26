@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.5.9
+
+### Patch Changes
+
+- [#335](https://github.com/softistx/alxia/pull/335) [`24e9592`](https://github.com/softistx/alxia/commit/24e959270beac0f9ee994ee135450705f99c0b27) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New `react-router` projects install the `@alxia/react-router` release that adds `/session` and `/session/model`, the session of a BFF. No template changes.
+
 ## 0.5.8
 
 ### Patch Changes
