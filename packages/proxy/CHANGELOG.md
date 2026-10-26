@@ -1,5 +1,11 @@
 # @alxia/proxy
 
+## 0.4.6
+
+### Patch Changes
+
+- [#348](https://github.com/softistx/alxia/pull/348) [`3d46bcd`](https://github.com/softistx/alxia/commit/3d46bcd278e907c34f6b7e2dbf78b6a034a43a9f) Thanks [@SteveGT96](https://github.com/SteveGT96)! - A declared `Content-Length` is read as digits only, as `@alxia/core` 0.16.0 reads it: `1e3` or `0x10` on a `Request` built in process is no longer taken as 1000 or 16 and refused unread; it is counted instead.
+
 ## 0.4.5
 
 ### Patch Changes
