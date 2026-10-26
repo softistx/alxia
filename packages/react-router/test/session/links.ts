@@ -1,10 +1,17 @@
-import { type AuthLinksOptions, authLinks } from '../../src/session';
+import {
+	type AuthLinksOptions,
+	authLinks,
+	type SignInFlowOptions,
+} from '../../src/session';
 import type { Lang } from '../errors/format';
 import { asking, flowFor } from './flow';
 
 /** Auth links over a sign-in flow on development cookies; `revoked` lists the tokens ended. */
-export function linksFor(overrides: Partial<AuthLinksOptions<Lang>> = {}) {
-	const { flow, cookies, revoked } = flowFor();
+export function linksFor(
+	overrides: Partial<AuthLinksOptions<Lang>> = {},
+	flowOverrides: Partial<SignInFlowOptions<Lang>> = {},
+) {
+	const { flow, cookies, revoked } = flowFor(flowOverrides);
 	const links = authLinks<Lang>({
 		signIn: flow,
 		...overrides,

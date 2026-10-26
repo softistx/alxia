@@ -94,6 +94,7 @@ export async function signOut<L extends string>(
 	await revokeSession(context, request);
 	const headers = new Headers();
 	headers.append('Set-Cookie', options.cookies.destroy());
+	headers.append('Set-Cookie', options.cookies.destroyChallenge());
 	for (const cookie of options.clear?.() ?? []) {
 		headers.append('Set-Cookie', cookie);
 	}

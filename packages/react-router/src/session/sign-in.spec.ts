@@ -18,6 +18,7 @@ describe('signOut', () => {
 		expect(response.headers.get('location')).toBe('/sign-in?signed-out=1');
 		expect(setCookies(response)).toEqual([
 			'my-app_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax',
+			'my-app_challenge=; Max-Age=0; Path=/sign-in; HttpOnly; SameSite=Lax',
 			'recent=; Max-Age=0',
 		]);
 	});

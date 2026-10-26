@@ -58,8 +58,8 @@ export async function landByLink<L extends string>(
 
 /**
  * After a password reset, which signs the account out everywhere: the
- * browser's session is revoked (it may be another account's) and its cookie
- * cleared, then the sign-in page says the password changed. Only a JSON post
+ * browser's session is revoked (it may be another account's) and its cookies
+ * cleared (the session's, the challenge's, the flow's `clear()`), then the sign-in page says the password changed. Only a JSON post
  * goes on.
  */
 export async function afterReset<L extends string>(
@@ -69,7 +69,11 @@ export async function afterReset<L extends string>(
 ): Promise<Response> {
 	samesitePost(options.json, request);
 	await options.signIn.revokeSession(request);
-	return replace(resetDone, {
-		headers: withTokenHeaders({ 'Set-Cookie': options.cookies.destroy() }),
-	});
+	const headers = withTokenHeaders();
+	headers.append('Set-Cookie', options.cookies.destroy());
+	headers.append('Set-Cookie', options.cookies.destroyChallenge());
+	for (const cookie of options.signIn.clear()) {
+		headers.append('Set-Cookie', cookie);
+	}
+	return replace(resetDone, { headers });
 }
