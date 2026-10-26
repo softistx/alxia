@@ -35,6 +35,9 @@ symptom.
 - [`405 {"errors":[{"message":"Can only perform a mutation operation from a POST request."}]}`](#405-errorsmessagecan-only-perform-a-mutation-operation-from-a-post-request)
 - [`406` with an empty body](#406-with-an-empty-body)
 - [`413 {"error":"content_too_large", …}`](#413-errorcontent_too_large--on-post-graphql)
+- [`Syntax Error: Document contains more than 15000 tokens. Parsing aborted.`](#syntax-error-document-contains-more-than-15000-tokens-parsing-aborted)
+- [`Syntax Error: Document is nested more than 1000 levels deep. Parsing aborted.`](#syntax-error-document-is-nested-more-than-1000-levels-deep-parsing-aborted)
+- [`Syntax Error: Document is nested too deeply to parse.`](#syntax-error-document-is-nested-too-deeply-to-parse)
 - [`{"errors":[{"message":"Must provide query string."}]}`](#errorsmessagemust-provide-query-string)
 - [`4406 Subprotocol not acceptable`](#4406-subprotocol-not-acceptable)
 
@@ -341,8 +344,8 @@ graphql(app, { schema, maxTokens: 30_000 }); // or false
 
 **When:** a query is answered with `GRAPHQL_PARSE_FAILED` (400 under
 `application/graphql-response+json`, 200 under `application/json`) and this
-message. A document that overflowed the stack anyway is worded `Syntax Error:
-Document is nested too deeply to parse.`
+message. A document that overflowed the stack anyway has
+[its own entry](#syntax-error-document-is-nested-too-deeply-to-parse).
 
 **Why:** a document may nest 1 000 levels of `{`, `(` and `[` by default
 (`maxNesting`). graphql-js parses by recursion and overflows the stack a few
@@ -356,6 +359,24 @@ Bun's main thread, fewer in a Worker), or turn it off:
 
 ```ts
 graphql(app, { schema, maxNesting: 2_000 }); // or false
+```
+
+### `Syntax Error: Document is nested too deeply to parse.`
+
+**When:** a query is answered with `GRAPHQL_PARSE_FAILED` and this message.
+
+**Why:** graphql-js parsed the document by recursion and the call stack
+overflowed, either because `maxNesting` is `false` or raised past what the
+runtime parses. The stack is smaller in a Worker or under load than on Bun's
+main thread, so the depth that fails varies. The overflow is refused as any
+unparsable document is, never a 500.
+
+**Fix:** a real query nests a dozen levels; look for a hostile or generated
+document. If it is legitimate, keep the limit (the default is 1 000) or set
+one your runtime parses:
+
+```ts
+graphql(app, { schema, maxNesting: 500 });
 ```
 
 ### `TypeError: graphql(app, { maxNesting }): maxNesting is the most levels of { ( [ a document may nest, a positive whole number, or false for none; got …`

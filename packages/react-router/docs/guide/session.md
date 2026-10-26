@@ -1,21 +1,206 @@
 # A BFF session
 
-This page is for an app that is the backend of its own pages (a BFF) and
-calls a GraphQL API that signs users in. It grows with
-`@alxia/react-router/session`, whose code imports `react-router` and `/errors`
-alone, and `@alxia/react-router/session/model`, the part that imports
-nothing and is safe in a component as well as in a loader.
+This page is for a React Router app that is the backend of its own pages (a
+BFF) in front of a GraphQL API that signs users in with `@nxgt/janus`, and
+holds the API's session token in an HttpOnly cookie of its own. The browser
+never sees the token; the app sends it to the API as a bearer, on the user's
+behalf.
 
+It covers two subpaths:
+
+- `@alxia/react-router/session`, the server side: the cookies, the sign-in
+  flow, the step-up and the pages a mail's link opens. It imports
+  `react-router` and `/errors`' files, nothing else, knows no API client and
+  adds no peer.
+- `@alxia/react-router/session/model`, the part that imports nothing and is
+  safe in a component as well as in a loader: redirects that stay on the
+  site, the sign-in pages' paths, and the step-up's state.
+
+The flow speaks `@nxgt/janus`'s words (`signedIn`, `secondFactor`,
+`CODE_INVALID`, `via: 'email' | 'secondFactor'`) without importing it; the app
+maps its API's enums once. An app that runs `@nxgt/janus` itself, with its own
+database, wants [`@alxia/janus`](https://www.npmjs.com/package/@alxia/janus)
+instead.
+
+- [A complete sign-in](#a-complete-sign-in)
 - [Redirects that stay on the site](#redirects-that-stay-on-the-site)
 - [The sign-in pages' paths](#the-sign-in-pages-paths)
 - [Cookies](#cookies)
 - [Signing in](#signing-in)
 - [The second factor](#the-second-factor)
 - [Signing out](#signing-out)
-- [The step-up state](#the-step-up-state)
-- [Codes and types](#codes-and-types)
 - [Step-up](#step-up)
 - [Pages a mail's link opens](#pages-a-mails-link-opens)
+- [The types and the rest of `/session/model`](#the-types-and-the-rest-of-sessionmodel)
+
+## A complete sign-in
+
+The app's side is three server files and four routes. `execute`, `t`,
+`toAnswer`, `readViewer`, `apiMessages` and the GraphQL documents
+(`SignInMutation`, `ConfirmMutation`, `RecoverMutation`, `SignOutMutation`,
+`ViewerQuery`) are the app's own: the package knows no API client and no
+wording. `toAnswer` maps the API's result to a `SignInAnswer` (see
+[Signing in](#signing-in)).
+
+```ts
+// app/cookies.server.ts
+import { sessionCookies } from '@alxia/react-router/session';
+
+export const cookies = sessionCookies({
+	session: 'my-app_session',
+	challenge: 'my-app_challenge',
+	secure: !import.meta.env.DEV,
+});
+```
+
+```ts
+// app/errors.server.ts
+import { createApiErrors, jsonActions } from '@alxia/react-router/errors';
+
+export const errors = createApiErrors<'en' | 'fr'>({
+	messages: apiMessages,
+	unavailable: (language) => t('app.error.unavailable', {}, language),
+});
+export const json = jsonActions({ origin: () => process.env.APP_ORIGIN });
+```
+
+```ts
+// app/session.server.ts
+import { signInFlow } from '@alxia/react-router/session';
+import { SignOutMutation, execute } from './api.server';
+import { cookies } from './cookies.server';
+import { errors, json } from './errors.server';
+
+export const signIn = signInFlow({
+	cookies,
+	errors,
+	json,
+	revoke: (token, request) =>
+		execute(SignOutMutation, {}, { token, signal: request.signal }),
+	attemptsLeft: (count, language) => t('auth.attempts-left', { count }, language),
+});
+```
+
+The password page. Its loader sends a live session home and clears what a
+signed-out visit should not keep; its action runs the API's mutation inside
+`signInStep`, which redirects where the answer leads or stays on the form with
+a message:
+
+```tsx
+// app/routes/sign-in.tsx
+import { data, redirect } from 'react-router';
+import { useJsonFetcher } from '@alxia/react-router/errors';
+import { cookies } from '~/cookies.server';
+import { json } from '~/errors.server';
+import { signIn } from '~/session.server';
+
+export async function loader({ request }: Route.LoaderArgs) {
+	const viewer = await signIn.viewer(request, readViewer);
+	if (viewer) throw redirect(signIn.nextParam(request));
+	return data({}, { headers: cookies.signInPageHeaders(viewer === null) });
+}
+
+export async function action({ context, request }: Route.ActionArgs) {
+	const { language } = alxiaOf(context);
+	const input = await json.readInput(request, SignInInput);
+	return signIn.signInStep(
+		async () => toAnswer((await execute(SignInMutation, input)).signIn),
+		{ request, language, next: signIn.nextParam(request), extra: {} },
+	);
+}
+
+export default function SignIn() {
+	const { fetcher, post, busy } = useJsonFetcher<typeof action>();
+	return (
+		<form onSubmit={(event) => { event.preventDefault(); post(formValues(event)); }}>
+			{/* the fields */}
+			{fetcher.data && 'formError' in fetcher.data ? <p>{fetcher.data.formError}</p> : null}
+			<button disabled={busy}>Sign in</button>
+		</form>
+	);
+}
+```
+
+The code page, reached when the answer is `secondFactor`. Its loader needs
+the challenge cookie; its action posts the code against it, a recovery code
+included:
+
+```ts
+// app/routes/sign-in.second-factor.tsx
+import { redirect } from 'react-router';
+import { signInPath } from '@alxia/react-router/session/model';
+import { cookies } from '~/cookies.server';
+import { signIn } from '~/session.server';
+
+export function loader({ request }: Route.LoaderArgs) {
+	if (!cookies.challengeOf(request)) {
+		throw redirect(signInPath(signIn.nextParam(request)));
+	}
+	return null;
+}
+
+export async function action({ context, request }: Route.ActionArgs) {
+	const { language } = alxiaOf(context);
+	const input = await signIn.readCodeInput(request);
+	const challenge = cookies.challengeOf(request);
+	if (!challenge) throw redirect(signInPath(signIn.nextParam(request)));
+	return signIn.signInStep(
+		() =>
+			signIn.codeStep(input, challenge, {
+				confirm: async (challenge, code) =>
+					toAnswer((await execute(ConfirmMutation, { challenge, code })).confirm),
+				recover: async (challenge, recoveryCode) =>
+					toAnswer((await execute(RecoverMutation, { challenge, recoveryCode })).recover),
+			}),
+		{
+			request,
+			language,
+			next: signIn.nextParam(request),
+			extra: { kind: input.kind },
+			// A refused code stays on the form with the tries left; a challenge
+			// that is over goes back to the password page.
+			refused: (error) =>
+				signIn.codeRefusal(error, language) ??
+				redirect(signInPath(signIn.nextParam(request), { query: { expired: '1' } }), {
+					headers: { 'Set-Cookie': cookies.destroyChallenge() },
+				}),
+		},
+	);
+}
+```
+
+Sign-out, and a page that needs a user:
+
+```ts
+// app/routes/sign-out.tsx
+import { redirect } from 'react-router';
+import { signIn } from '~/session.server';
+
+export const loader = () => redirect('/');
+
+export function action({ request }: Route.ActionArgs) {
+	return signIn.signOut(request);
+}
+```
+
+```ts
+// app/routes/orders.tsx
+import { data } from 'react-router';
+import { signIn } from '~/session.server';
+
+export async function loader({ request }: Route.LoaderArgs) {
+	const { viewer, headers } = await signIn.requireViewer(
+		request,
+		(token) => execute(ViewerQuery, {}, { token }).then((r) => r.viewer),
+		(viewer) => viewer.sessionExpiresAt,
+	);
+	return data({ viewer }, { headers });
+}
+```
+
+A request with no session, or one the API refuses, is redirected to
+`/sign-in?next=%2Forders`, and the user comes back to `/orders` once signed in.
+The sections below say what each call does and what it refuses.
 
 ## Redirects that stay on the site
 
@@ -73,7 +258,7 @@ carries a second factor's challenge from the password page to the code page.
 Both are `HttpOnly`, so a script never reads them.
 
 ```ts
-// app/session.server.ts
+// app/cookies.server.ts
 import { sessionCookies } from '@alxia/react-router/session';
 
 export const cookies = sessionCookies({
@@ -121,7 +306,7 @@ is, so adopting the package does not sign anyone out.
 ### Using them
 
 ```ts
-import { cookies } from './session.server';
+import { cookies } from './cookies.server';
 
 // After a sign-in: the API's token and the session's end.
 const headers = new Headers();
@@ -139,7 +324,9 @@ headers.append('Set-Cookie', cookies.destroy());
 const renewed = cookies.refreshed(session, viewer.sessionExpiresAt); // {} or a Set-Cookie
 ```
 
-`refreshed` never ends a session because the API sent an expiry it cannot read: it returns `{}` for a missing or unparseable one, and the API alone decides when a session is over.
+`refreshed` never ends a session because the API sent an expiry it cannot
+read: it returns `{}` for a missing or unparseable one, and the API alone
+decides when a session is over.
 
 `commit` takes the expiry as an ISO string or a `Date`, and sets `Max-Age`
 to the seconds left: floored, and 0 for a past or unreadable date.
@@ -153,9 +340,11 @@ sets. It clears the challenge blind: a client navigation fetches
 request never shows the challenge, yet a `Set-Cookie` with that path removes
 it. With `deadSession`, it also removes a session cookie the API refused.
 
-`serializeCookie(name, value, { maxAge, path?, secure })` (a name that is not an RFC 6265 token, or a path with a `;` or a control character, throws a `TypeError`; a `maxAge` that is not finite is 0), `readCookie(request,
-name)` and `secondsUntil(expiresAt, now?)` are exported for the cookies of your
-own (a language, a preference) that must be written in the same bytes.
+`serializeCookie(name, value, { maxAge, path?, secure })`,
+`readCookie(request, name)` and `secondsUntil(expiresAt, now?)` are exported
+for the cookies of your own (a language, a preference) that must be written in
+the same bytes. A name that is not an RFC 6265 token, or a path with a `;` or a
+control character, throws a `TypeError`; a `maxAge` that is not finite is 0.
 `readCookie` returns the first non-empty cookie of that name, and `null` when
 its value is not valid percent-encoding.
 
@@ -171,35 +360,14 @@ sign-in page. Pass `secure: !import.meta.env.DEV`: development then sets no
 ## Signing in
 
 `signInFlow` is the server side of the sign-in pages: where an answer leads,
-the form's refusals, the second factor, the viewer and sign-out. Build it once,
-beside the cookies, over the app's `createApiErrors` and `jsonActions` (the
-same instances its other actions use, so every body is read with the same
-same-origin check):
+the form's refusals, the second factor, the viewer and sign-out. Build it once
+([the example](#a-complete-sign-in) does, in `app/session.server.ts`), over the
+app's `createApiErrors` and `jsonActions` (the same instances its other
+actions use, so every body is read with the same same-origin check).
+`revoke(token, request)` ends a session at the API and receives the request,
+for the caller's language, address or abort signal.
 
-```ts
-// app/session.server.ts
-import { signInFlow } from '@alxia/react-router/session';
-import { cookies } from './cookies.server';
-import { errors, json } from './errors.server';
-import { SignOutMutation, execute } from './api.server';
-
-export const signIn = signInFlow({
-	cookies,
-	errors,
-	json,
-	revoke: (token, request) =>
-		execute(SignOutMutation, {}, { token, signal: request.signal }),
-	attemptsLeft: (count, language) => t('auth.attempts-left', { count }, language),
-});
-```
-
-`execute`, `t`, `toAnswer` and the mutation and query documents in these
-examples (`SignOutMutation`, `SignInMutation`, `ViewerQuery`, …) are the
-app's own: the package knows no API client and no wording. `toAnswer` maps
-the API's result to a `SignInAnswer`. `revoke(token, request)` receives the
-request, for the caller's language, address or abort signal.
-
-The flow speaks `@nxgt/janus`'s words, and the app maps its API's: a
+`toAnswer` maps the API's words to `@nxgt/janus`'s: a
 `SignInAnswer` is `{ status: 'signedIn', token, expiresAt }`,
 `{ status: 'secondFactor', challenge, expiresAt? }` or `{ status: 'other' }`
 (an API's `LINKED`, say, which opens no session). The default codes are
@@ -212,26 +380,12 @@ that cannot be reached (`errors.unavailableMessage` by default), and
 `endedParam` is a query key, such as `'expired'`, that `signInRedirect` adds
 when the request carried a session cookie, to say the session ended.
 
-A sign-in page's action runs the API's mutation inside `signInStep`. Read
-the body through `json` first (`json.readInput` checks the origin and the
-content type): `signInStep` itself refuses a post that is not JSON, by
-redirecting it back to its page, so a form another site posts can neither
-sign anyone in nor revoke a session. It reads headers only, never the body.
-
-```ts
-// app/routes/sign-in.tsx
-import { json } from '~/errors.server';
-import { signIn } from '~/session.server';
-
-export async function action({ context, request }: Route.ActionArgs) {
-	const { language } = alxiaOf(context);
-	const input = await json.readInput(request, SignInInput);
-	return signIn.signInStep(
-		async () => toAnswer((await execute(SignInMutation, input)).signIn),
-		{ request, language, next: signIn.nextParam(request), extra: {} },
-	);
-}
-```
+A sign-in page's action runs the API's mutation inside `signInStep`, as the
+example does. Read the body through `json` first (`json.readInput` checks the
+origin and the content type): `signInStep` itself refuses a post that is not
+JSON, by redirecting it back to its page, so a form another site posts can
+neither sign anyone in nor revoke a session. It reads headers only, never the
+body. Its outcomes:
 
 - A **signed-in** answer lands only when it has a token and an `expiresAt`
   that is a date still in the future; otherwise it opens no session (see
@@ -268,7 +422,7 @@ that end the browser's session; `['signedIn']` by default.
 ### The viewer
 
 ```ts
-// a page that needs a user
+// a page that needs a user (as in the example)
 const { viewer, headers } = await signIn.requireViewer(
 	request,
 	(token) => execute(ViewerQuery, {}, { token }).then((r) => r.viewer),
@@ -292,37 +446,12 @@ without a cookie or when the API cannot tell.
 
 The sign-in page's answer `secondFactor` leads to the second-factor page,
 whose loader needs the challenge cookie (`cookies.challengeOf(request)`; back
-to the sign-in page without one) and whose action posts the code:
+to the sign-in page without one) and whose action posts the code.
 
-```ts
-// app/routes/sign-in.second-factor.tsx
-export async function action({ context, request }: Route.ActionArgs) {
-	const { language } = alxiaOf(context);
-	const input = await signIn.readCodeInput(request);
-	const challenge = cookies.challengeOf(request);
-	if (!challenge) throw redirect(signInPath(signIn.nextParam(request)));
-	return signIn.signInStep(
-		() =>
-			signIn.codeStep(input, challenge, {
-				confirm: async (challenge, code) =>
-					toAnswer((await execute(ConfirmMutation, { challenge, code })).confirm),
-				recover: async (challenge, recoveryCode) =>
-					toAnswer((await execute(RecoverMutation, { challenge, recoveryCode })).recover),
-			}),
-		{
-			request,
-			language,
-			next: signIn.nextParam(request),
-			extra: { kind: input.kind },
-			refused: (error) =>
-				signIn.codeRefusal(error, language) ??
-				redirect(signInPath(signIn.nextParam(request), { query: { expired: '1' } }), {
-					headers: { 'Set-Cookie': cookies.destroyChallenge() },
-				}),
-		},
-	);
-}
-```
+[The example](#a-complete-sign-in) shows both: `codeStep` runs `confirm` for an
+issued code and `recover` for a recovery code, and `refused` words a refusal
+with the tries left or, when the challenge is over, sends the user back to the
+password page.
 
 `readCodeInput` takes the page's JSON post, `{ kind, code }`: `kind` is
 `'code'` for an issued code (an authenticator app's, or the one mailed) and
@@ -346,115 +475,14 @@ reads janus's `extensions.attemptsLeft`.
 
 ## Signing out
 
-```ts
-// app/routes/sign-out.tsx
-export const loader = () => redirect('/');
-
-export function action({ request }: Route.ActionArgs) {
-	return signIn.signOut(request);
-}
-```
+`signIn.signOut(request)` is the whole action of the example's sign-out route.
 
 `signOut` reads the body as JSON first (same-origin only, a 403 or 415
 otherwise), so another site cannot sign anyone out, and a GET signs nobody
 out. It then ends the session at the API (a failure is ignored: the cookie
 goes anyway), removes the session cookie and the app's `clear()` cookies and
-redirects to `${paths.signIn}?signed-out=1` (`/sign-in?signed-out=1` by default). `signOut(request, { to })` redirects to
-`to` instead, after `safeNext`: a value that leaves the site goes to `/`.
-
-### The flow's types
-
-- `SignInAnswer` is what a step answers: `signedIn`, `secondFactor` or `other`.
-- `SignInFlowOptions` is what `signInFlow` takes.
-- `SignInFlow` is what it returns.
-- `SignInCodes` is the `codes` option: `invalidCode` and `challengeOver`.
-- `SignInFormError<T>` is `T & { formError: string }`, a form step's answer
-  when it stays on the page.
-- `SignInStayed<T>` is `signInStep`'s `data(...)` return for it, with the status.
-
-## The step-up state
-
-A step-up asks for a code before a sensitive action. `stepUpReducer` holds
-its state on the page, with no React: `phase` (`idle`, `requesting`, `code`,
-`confirming`, `done`), the `via` that confirms it (`email` or
-`secondFactor`), the `challenge` held, `attemptsLeft`, `locked`, `error`
-(`invalid`, `expired` or `failed`), `pending` and `resent`.
-
-`stepUpProps(state)` gives the part a code form shows (not the challenge, a
-secret that stays out of the markup):
-
-```ts
-import {
-	INITIAL_STEP_UP,
-	stepUpProps,
-	stepUpReducer,
-} from '@alxia/react-router/session/model';
-
-let state = stepUpReducer(INITIAL_STEP_UP, { type: 'start' });
-state = stepUpReducer(state, {
-	type: 'requested',
-	answer: {
-		ok: true,
-		intent: 'request-step-up',
-		challenge: 'c1',
-		via: 'secondFactor',
-	},
-});
-state = stepUpReducer(state, {
-	type: 'confirmed',
-	answer: {
-		ok: false,
-		intent: 'confirm-step-up',
-		error: 'invalid',
-		attemptsLeft: 0,
-		locked: false,
-	},
-});
-
-stepUpProps(state);
-// { via: 'secondFactor', attemptsLeft: 0, locked: true, error: 'invalid', pending: false, resent: false }
-```
-
-With no try left, a mailed code is over (`error: 'expired'`: ask for a new
-one), and an app or a recovery code is `locked`: asking again would fail
-too, so the form says to wait.
-
-## Codes and types
-
-The rest of `@alxia/react-router/session/model`, one line each:
-
-```ts
-import {
-	HOME,
-	phaseOf,
-	INITIAL_STEP_UP,
-	TOTP_CODE,
-	type SecondFactorMethod,
-	type SignInStatus,
-	type StepUpConfirmAnswer,
-	type StepUpProps,
-	type StepUpRequestAnswer,
-	type StepUpVia,
-} from '@alxia/react-router/session/model';
-
-TOTP_CODE.test('123456'); // true: six digits, nothing else
-HOME; // '/', where `safeNext` falls back to
-phaseOf(INITIAL_STEP_UP); // 'idle'
-
-const method: SecondFactorMethod = 'recovery';
-const status: SignInStatus = 'secondFactor';
-const via: StepUpVia = 'email';
-```
-
-- `TOTP_CODE` is the regular expression of an authenticator app's code: six digits.
-- `HOME` is the path `safeNext` returns when a `next` value is unsafe or missing.
-- `phaseOf(state)` returns the `phase` of a step-up state.
-- `SecondFactorMethod` is what a second-factor form sends: `'code' | 'recovery'`.
-- `SignInStatus` is how a sign-in ended: `'signedIn' | 'secondFactor'`.
-- `StepUpVia` is how a step-up is confirmed, `'email' | 'secondFactor'`, matching janus's vocabulary.
-- `StepUpRequestAnswer` is what the server answers to a request for a challenge, with the `message` of a refusal.
-- `StepUpConfirmAnswer` is what the server answers to a code, with the `message` `stepUpSteps` words.
-- `StepUpProps` is the shape `stepUpProps` returns; it spreads onto a step-up dialog's props.
+redirects to `${paths.signIn}?signed-out=1` (`/sign-in?signed-out=1` by
+default). `signOut(request, { to })` redirects to `to` instead, after `safeNext`: a value that leaves the site goes to `/`.
 
 ## Step-up
 
@@ -463,11 +491,12 @@ mutation with `STEP_UP_REQUIRED`, the page asks for a challenge
 (`requestStepUp`), the user reads the code (in the mail, or in their
 authenticator app) and the page confirms it (`confirmStepUp`). `stepUpSteps`
 is the server half: two steps for the route's action, whose answers
-[`stepUpReducer`](#the-step-up-state) takes as they are.
+[`stepUpReducer`](#the-state-on-the-page) takes as they are.
 
 ```ts
-// app/core/session/server/step-up.server.ts
+// app/step-up.server.ts
 import { stepUpSteps } from '@alxia/react-router/session';
+import { errors } from './errors.server';
 
 export const stepUp = stepUpSteps({
 	errors,
@@ -483,6 +512,8 @@ GraphQL call and its session caller), not this package's.
 
 ```ts
 // app/routes/account.step-up.tsx
+import { stepUp } from '~/step-up.server';
+
 export async function action({ context, request }: Route.ActionArgs) {
 	const { language } = alxiaOf(context);
 	const caller = await sessionCaller(request);
@@ -589,12 +620,52 @@ sign-in page would sign the user out on the first typo. Make the caller of the
 step-up's two operations leave a 401 alone, or have it redirect only when the
 error's code is `UNAUTHENTICATED`.
 
-### The step-up's types
+### The state on the page
 
-- `StepUpStepsOptions` is what `stepUpSteps` takes, `StepUpSteps` what it returns.
-- `StepUpCodes` is the `codes` option.
-- `StepUpStayed<T>` is a step's `data(...)` return for an answer that stays on the page.
-- `STEP_UP_OVER` and `STEP_UP_REQUIRED` are the default codes.
+A step-up asks for a code before a sensitive action. `stepUpReducer` holds
+its state on the page, with no React: `phase` (`idle`, `requesting`, `code`,
+`confirming`, `done`), the `via` that confirms it (`email` or
+`secondFactor`), the `challenge` held, `attemptsLeft`, `locked`, `error`
+(`invalid`, `expired` or `failed`), `pending` and `resent`.
+
+`stepUpProps(state)` gives the part a code form shows (not the challenge, a
+secret that stays out of the markup):
+
+```ts
+import {
+	INITIAL_STEP_UP,
+	stepUpProps,
+	stepUpReducer,
+} from '@alxia/react-router/session/model';
+
+let state = stepUpReducer(INITIAL_STEP_UP, { type: 'start' });
+state = stepUpReducer(state, {
+	type: 'requested',
+	answer: {
+		ok: true,
+		intent: 'request-step-up',
+		challenge: 'c1',
+		via: 'secondFactor',
+	},
+});
+state = stepUpReducer(state, {
+	type: 'confirmed',
+	answer: {
+		ok: false,
+		intent: 'confirm-step-up',
+		error: 'invalid',
+		attemptsLeft: 0,
+		locked: false,
+	},
+});
+
+stepUpProps(state);
+// { via: 'secondFactor', attemptsLeft: 0, locked: true, error: 'invalid', pending: false, resent: false }
+```
+
+With no try left, a mailed code is over (`error: 'expired'`: ask for a new
+one), and an app or a recovery code is `locked`: asking again would fail
+too, so the form says to wait.
 
 ## Pages a mail's link opens
 
@@ -603,14 +674,17 @@ carries a token. `authLinks` is the server side of those pages, built once
 beside the app's `signInFlow`:
 
 ```ts
-// app/session.server.ts
+// app/links.server.ts
 import { authLinks } from '@alxia/react-router/session';
+import { cookies } from './cookies.server';
+import { errors, json } from './errors.server';
+import { signIn } from './session.server';
 
 export const links = authLinks({
 	signIn, // the app's signInFlow
 	cookies, // the same sessionCookies
-	errors, // the app's createApiErrors
-	json, // the app's jsonActions({ origin }): every body is read with its CSRF check
+	errors, // the same createApiErrors
+	json, // the same jsonActions({ origin }): every body is read with its CSRF check
 	start: async (token) => (await homeOf(token)) ?? '/', // optional
 });
 ```
@@ -672,9 +746,6 @@ export async function action({ request }: Route.ActionArgs) {
 }
 ```
 
-- `AuthLinksOptions` is what `authLinks` takes: `signIn`, `cookies`, `errors`,
-  `json`, and the optional `throttled`, `start`, `resetDone` and `invalidState`.
-- `AuthLinks` is what it returns.
 - `TOKEN_PAGE_HEADERS` is `Referrer-Policy: no-referrer` and
   `X-Robots-Tag: noindex, nofollow`: no `Referer` carries the token to another
   site (a font, an image), and no search engine keeps the page. Set them on
@@ -694,8 +765,6 @@ export async function action({ request }: Route.ActionArgs) {
   page shows; any other refusal, a wait or an unreachable API, is the form's
   message with the API's status. `answerOf(spent)` turns the refusal into the
   action's answer. Anything that is not an API refusal is rethrown.
-- `Spent<T>` is what `spendToken` returns, `LinkStayed` is the `data(...)` a
-  refusal answers with, and `SpendOptions` is its second argument.
 - `statePath(path, state)` is `path?state=…`: the token page in an end state,
   with no token. `ended(path, state, headers?)` is the redirect to it, replacing
   the token's history entry (React Router's `replace`), so Back never opens
@@ -742,3 +811,61 @@ alone, and a `TypeError` about a path prints it only up to its `?` or `#`.
 `statePath`, `ended`, `linkArgs` and `spendToken` throw that `TypeError` for a
 page `path` with a query, a fragment or a host, and `authLinks` throws one for
 a `resetDone` that leaves the site.
+
+## The types and the rest of `/session/model`
+
+The rest of `@alxia/react-router/session/model`, beside `safeNext`,
+`signInPath` and the step-up's reducer above:
+
+```ts
+import {
+	HOME,
+	phaseOf,
+	INITIAL_STEP_UP,
+	TOTP_CODE,
+	type SecondFactorMethod,
+	type SignInStatus,
+	type StepUpConfirmAnswer,
+	type StepUpProps,
+	type StepUpRequestAnswer,
+	type StepUpVia,
+} from '@alxia/react-router/session/model';
+
+TOTP_CODE.test('123456'); // true: six digits, nothing else
+HOME; // '/', where `safeNext` falls back to
+phaseOf(INITIAL_STEP_UP); // 'idle'
+
+const method: SecondFactorMethod = 'recovery';
+const status: SignInStatus = 'secondFactor';
+const via: StepUpVia = 'email';
+```
+
+- `TOTP_CODE` is the regular expression of an authenticator app's code: six digits.
+- `HOME` is the path `safeNext` returns when a `next` value is unsafe or missing.
+- `phaseOf(state)` returns the `phase` of a step-up state.
+- `SecondFactorMethod` is what a second-factor form sends: `'code' | 'recovery'`.
+- `SignInStatus` is how a sign-in ended: `'signedIn' | 'secondFactor'`.
+- `StepUpVia` is how a step-up is confirmed, `'email' | 'secondFactor'`, matching janus's vocabulary.
+- `StepUpRequestAnswer` is what the server answers to a request for a challenge, with the `message` of a refusal.
+- `StepUpConfirmAnswer` is what the server answers to a code, with the `message` `stepUpSteps` words.
+- `StepUpProps` is the shape `stepUpProps` returns; it spreads onto a step-up dialog's props.
+
+The types of `/session`:
+
+- `SignInAnswer` is what a step answers: `signedIn`, `secondFactor` or `other`.
+- `SignInFlowOptions` is what `signInFlow` takes, `SignInFlow` what it returns.
+- `SignInCodes` is its `codes` option: `invalidCode` and `challengeOver`.
+- `SignInFormError<T>` is `T & { formError: string }`, a form step's answer
+  when it stays on the page, and `SignInStayed<T>` is `signInStep`'s
+  `data(...)` return for it, with the status.
+- `SessionCookies`, `SessionCookiesOptions` and `CookieSession` are the cookies,
+  their options and a session read from a request (`{ token, expiresAt }`).
+- `StepUpStepsOptions` is what `stepUpSteps` takes, `StepUpSteps` what it returns.
+- `StepUpCodes` is the `codes` option.
+- `StepUpStayed<T>` is a step's `data(...)` return for an answer that stays on the page.
+- `STEP_UP_OVER` and `STEP_UP_REQUIRED` are the default codes.
+- `AuthLinksOptions` is what `authLinks` takes: `signIn`, `cookies`, `errors`,
+  `json`, and the optional `throttled`, `start`, `resetDone` and `invalidState`.
+  `AuthLinks` is what it returns.
+- `Spent<T>` is what `spendToken` returns, `LinkStayed` is the `data(...)` a
+  refusal answers with, and `SpendOptions` is its second argument.

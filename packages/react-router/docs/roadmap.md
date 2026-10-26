@@ -7,14 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **A BFF session for a janus API.** An app that is a backend for its own
-  pages, and calls a GraphQL API that signs users in with `@nxgt/janus`,
-  gets the session's code from one place: `@alxia/react-router/session/model`
-  (redirects that stay on the site, the sign-in paths, the step-up state
-  and its props for the UI; it imports nothing) first, then the cookies, the
-  sign-in flow, the step-up and the pages a mail's link opens
-  (`@alxia/react-router/session`). The
-  [session guide](guide/session.md) grows with each part.
+Nothing planned.
 
 ## Next
 
@@ -22,6 +15,9 @@ Nothing planned.
 
 ## Later
 
+- **A signed device cookie for BFFs.** A cookie the app signs and the
+  browser keeps across sessions, so a sign-in can tell a known device from a
+  new one.
 - **Hreflang alternates** for an app with one URL per language. Today the
   language is negotiated on a single URL, so there is no alternate to link.
 - **`service-worker.js` served revalidated with no setup.** Today the app
@@ -63,6 +59,20 @@ Nothing planned.
   Bun, Deno or Cloudflare with a `runtime` option; alxia is Bun's.
 
 ## Shipped
+
+### 0.14.0
+
+- **`@alxia/react-router/session` and `/session/model`: a BFF session for a
+  janus API.** An app that is the backend of its own pages and calls a GraphQL
+  API that signs users in with `@nxgt/janus` gets its session from one place:
+  `sessionCookies` (the session and the second-factor challenge, in an
+  HttpOnly cookie), `signInFlow` (where a sign-in lands, the second factor,
+  the viewer, sign-out), `stepUpSteps` (the code asked before a sensitive
+  action), `authLinks` and `TOKEN_PAGE_HEADERS` (the pages a mail's link
+  opens). `/session/model` imports nothing and is safe in a component: `safeNext`
+  and `signInPath` (redirects that stay on the site), `TOTP_CODE`, and the
+  step-up's `stepUpReducer` and `stepUpProps`. `/errors` gains `attemptsLeftOf`.
+  See the [session guide](guide/session.md).
 
 ### 0.12.0
 

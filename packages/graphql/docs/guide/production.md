@@ -142,7 +142,8 @@ each) sit outside the weight, bounded at roughly 70 KB per document.
 
 `maxTokens` does not count comments, yet a
 parsed document keeps all of them alive: a 750 KB body of `#` lines holds
-about 19.6 MB, so it weighs more than the cache keeps and is parsed again
+about 19.6 MB (one `#` per line, `#\n`: each comment becomes a token the
+document keeps), so it weighs more than the cache keeps and is parsed again
 each time instead of cached.
 
 - **`maxTokens`, 15 000 by default** (Apollo Router's own limit). The
@@ -206,7 +207,11 @@ as the bytes arrive:
   route answers, in the app's error format (`application/problem+json` under
   `errors: 'problem'`), with a `Content-Length` or without one (a chunked
   body). It carries the headers Yoga's plugins set, such as a
-  `Cache-Control: no-store` from an `onResponse` hook. A form-urlencoded or
+  `Cache-Control: no-store` from an `onResponse` hook. Headers merge by
+  name: `Vary` is merged with the app's own, `Set-Cookie` is appended, and any
+  other header Yoga sets overwrites the app's header of the same name (Yoga's
+  `Content-Type`, `Content-Length`, `Content-Encoding` and `Transfer-Encoding`
+  are never carried). A form-urlencoded or
   `application/graphql` body past the limit is refused the same way and logs
   nothing. Whatever else Yoga cannot parse is still its 400, and its
   parser's own error is never sent (`extensions.originalError` is removed).
@@ -285,7 +290,7 @@ export const persisted: Plugin = usePersistedOperations({
 
 ## Together
 
-`maxTokens` and `parseCache` need no line here: their defaults apply. The
+`maxTokens`, `maxNesting` and `parseCache` need no line here: their defaults apply. The
 `bodyLimit()` below is the app's own and is kept; without it the `POST` takes
 1 MiB.
 

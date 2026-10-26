@@ -26,6 +26,9 @@ Nothing scheduled yet.
   `@nxgt/janus`'s, with your database behind its stores: this package only
   wires them into an app — the context, the cookies, the answers — so a
   flow `@nxgt/janus` adds is usable here without a release of this one.
+- **A BFF that calls a janus API.** An app that renders its pages and holds
+  the session in its own cookie does not run this package: it calls the API.
+  Its session is `@alxia/react-router/session`.
 
 ## Shipped
 
