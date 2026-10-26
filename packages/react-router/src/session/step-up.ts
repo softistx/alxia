@@ -24,15 +24,15 @@ import type {
 
 type Refused = Extract<StepUpConfirmAnswer, { ok: false }>;
 
-interface StepUpContext<L extends string> extends CodeWording<L> {
-	readonly steps: StepUpStepsOptions<L>;
+interface StepUpContext<L extends string, C> extends CodeWording<L> {
+	readonly steps: StepUpStepsOptions<L, C>;
 	readonly stepUpRequired: string;
 	readonly mailThrottled: string;
 }
 
-function resolve<L extends string>(
-	steps: StepUpStepsOptions<L>,
-): StepUpContext<L> {
+function resolve<L extends string, C>(
+	steps: StepUpStepsOptions<L, C>,
+): StepUpContext<L, C> {
 	const invalidCode = steps.codes?.invalidCode ?? INVALID_CODE;
 	const challengeOver = steps.codes?.challengeOver ?? STEP_UP_OVER;
 	if (challengeOver.includes(invalidCode)) {
@@ -51,8 +51,8 @@ function resolve<L extends string>(
 }
 
 /** The refusal's message: the app's own wording, else `errors`'. */
-function worded<L extends string>(
-	{ steps }: StepUpContext<L>,
+function worded<L extends string, C>(
+	{ steps }: StepUpContext<L, C>,
 	error: ApiErrorLike,
 	language: L,
 ): string {
@@ -63,8 +63,8 @@ function worded<L extends string>(
 }
 
 /** A code the API refused. With none left, a mailed one is over and an app's is locked. */
-function refusedCode<L extends string>(
-	context: StepUpContext<L>,
+function refusedCode<L extends string, C>(
+	context: StepUpContext<L, C>,
 	error: ApiErrorLike,
 	via: StepUpVia | undefined,
 	language: L,
@@ -95,8 +95,8 @@ function refusedCode<L extends string>(
 	};
 }
 
-async function requestStep<L extends string>(
-	context: StepUpContext<L>,
+async function requestStep<L extends string, C>(
+	context: StepUpContext<L, C>,
 	run: Parameters<StepUpSteps<L>['request']>[0],
 	{ request, language }: Parameters<StepUpSteps<L>['request']>[1],
 ): Promise<StepUpRequestAnswer | StepUpStayed<StepUpRequestAnswer>> {
@@ -125,8 +125,8 @@ async function requestStep<L extends string>(
 	}
 }
 
-async function confirmStep<L extends string>(
-	context: StepUpContext<L>,
+async function confirmStep<L extends string, C>(
+	context: StepUpContext<L, C>,
 	run: () => Promise<unknown>,
 	{ request, language, via }: Parameters<StepUpSteps<L>['confirm']>[1],
 ): Promise<StepUpConfirmAnswer | StepUpStayed<StepUpConfirmAnswer>> {
@@ -176,8 +176,8 @@ async function confirmStep<L extends string>(
  * 	locked: (language) => t('step-up.locked', {}, language),
  * });
  */
-export function stepUpSteps<L extends string>(
-	options: StepUpStepsOptions<L>,
+export function stepUpSteps<L extends string, C = undefined>(
+	options: StepUpStepsOptions<L, C>,
 ): StepUpSteps<L> {
 	const context = resolve(options);
 	return {

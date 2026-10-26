@@ -15,12 +15,14 @@ export interface StepUpCodes extends SignInCodes {
 	readonly mailThrottled?: string | undefined;
 }
 
-export interface StepUpStepsOptions<L extends string> {
+export interface StepUpStepsOptions<L extends string, C = undefined> {
 	/**
 	 * The app's sign-in flow: the step-up reads its `errors`, its `json` (a
-	 * step runs only for a same-site JSON post) and its `attemptsLeft`.
+	 * step runs only for a same-site JSON post) and its `attemptsLeft`. A flow
+	 * typed with a caller context (`C`) is as good: the step-up never revokes,
+	 * so it never reads one.
 	 */
-	readonly signIn: SignInFlow<L>;
+	readonly signIn: SignInFlow<L, C>;
 	/** A challenge that is over, worded ("ask for a new code"). */
 	spent(language: L): string;
 	/**
