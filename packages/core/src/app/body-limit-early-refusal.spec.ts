@@ -5,35 +5,17 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
+import {
+	declared,
+	echo,
+	note,
+	sized,
+	text,
+	tooLarge,
+} from '../../test/fixtures/declared-body';
 import { ContentTooLargeError, refusalOf } from '../errors/errors';
-import type { AnyReply } from '../reply/reply';
 import { alxia } from './alxia';
-import { defineMiddleware } from './define-middleware';
 import { validate } from './validate';
-
-const tooLarge = (limit: number) => ({ error: 'content_too_large', limit });
-
-/** A request of `body` with `length` declared, as a client sends it. */
-const declared = (body: string | ReadableStream<Uint8Array>, length: string) =>
-	({
-		method: 'POST',
-		body,
-		headers: { 'content-type': 'text/plain', 'content-length': length },
-		duplex: 'half',
-	}) as RequestInit;
-
-const text = (size: number) => 'x'.repeat(size);
-const sized = (size: number) => declared(text(size), String(size));
-
-/** A middleware noting its name in `ran`. */
-const note = (ran: string[], name: string) =>
-	defineMiddleware((_ctx, next) => {
-		ran.push(name);
-		return next();
-	});
-
-const echo = ({ reply }: { reply: (status: 200, body: string) => AnyReply }) =>
-	reply(200, 'ok');
 
 describe('the refusal', () => {
 	test('a catcher before it sees a ContentTooLargeError and refusalOf reads it', async () => {
@@ -102,6 +84,13 @@ describe('a declared length that is not digits', () => {
 		},
 	);
 
+	test('leading zeros are digits: 0009 is refused early', async () => {
+		const ran: string[] = [];
+		const response = await app(ran).request('/x', declared(text(9), '0009'));
+		expect(response.status).toBe(413);
+		expect(ran).toEqual([]);
+	});
+
 	test('a length too big for a safe integer is refused early', async () => {
 		const ran: string[] = [];
 		const response = await app(ran).request(
@@ -114,13 +103,12 @@ describe('a declared length that is not digits', () => {
 });
 
 describe('requests no route serves', () => {
-	test('a 404, a 405 and a socket carry no bodyLimit() step', async () => {
+	test('a 404 and a 405 carry no bodyLimit() step', async () => {
 		const ran: string[] = [];
 		const app = alxia({ dev: true })
 			.bodyLimit(8)
 			.use(note(ran, 'after'))
-			.post('/x', echo)
-			.ws('/chat', { message: () => {} });
+			.post('/x', echo);
 		const missing = await app.request('/nope', sized(99));
 		expect(missing.status).toBe(404);
 		const wrong = await app.request('/x', { ...sized(99), method: 'PUT' });
@@ -128,12 +116,22 @@ describe('requests no route serves', () => {
 		expect(ran).toEqual(['after', 'after']);
 	});
 
-	test('the 404 hint still names a limited route, the table shows bodyLimit', async () => {
+	test('the 404 hint still names a limited route', async () => {
 		const app = alxia({ dev: true }).bodyLimit(8).post('/notes', echo);
 		const missing = await app.request('/note', sized(1));
 		expect(await missing.json()).toEqual({
 			error: 'not_found',
 			hint: 'did you mean POST /notes?',
 		});
+	});
+});
+
+describe('a GET with a Content-Length', () => {
+	test('has no body, so it passes', async () => {
+		const app = alxia().bodyLimit(8).get('/x', echo);
+		const response = await app.request('/x', {
+			headers: { 'content-length': '99' },
+		});
+		expect(response.status).toBe(200);
 	});
 });

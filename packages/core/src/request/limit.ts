@@ -47,8 +47,8 @@ export function checkLimit(limit: number, where: string): number {
 
 /**
  * The `Content-Length` a request declares: digits alone, as the header's
- * grammar has it. Anything else (`-1`, `1e3`, `0x10`, `8, 8`, an empty or
- * padded value) is not a length, so it is counted at read time instead.
+ * grammar has it. Anything else (`-1`, `1e3`, `0x10`, `8, 8`, or an empty
+ * value) is not a length, so it is counted at read time instead.
  */
 export function declaredLength(headers: Headers): number | undefined {
 	const value = headers.get('content-length');

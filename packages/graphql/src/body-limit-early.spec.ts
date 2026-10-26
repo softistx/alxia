@@ -1,39 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { createSchema } from 'graphql-yoga';
+import { chunked, send } from '../test/body';
 import { graphql } from './graphql';
 
 const LIMIT = 1024;
-
-/** A JSON body with its `Content-Length` set, as a client's: Bun's `Request` sets none. */
-const send = (
-	target: { request: ReturnType<typeof alxia>['request'] },
-	body: BodyInit,
-) =>
-	target.request('/graphql', {
-		method: 'POST',
-		headers: {
-			'content-type': 'application/json',
-			...(typeof body === 'string'
-				? { 'content-length': String(new TextEncoder().encode(body).length) }
-				: {}),
-		},
-		body,
-		duplex: 'half',
-	} as RequestInit);
-
-/** `total` bytes of JSON in 256-byte chunks, with no Content-Length. */
-function chunked(prefix: string, total: number) {
-	const bytes = new TextEncoder().encode(prefix + ' '.repeat(total));
-	let at = 0;
-	return new ReadableStream<Uint8Array>({
-		pull(controller) {
-			if (at >= bytes.length) return controller.close();
-			controller.enqueue(bytes.subarray(at, at + 256));
-			at += 256;
-		},
-	});
-}
 
 describe('graphql(), where a declared oversize body is refused', () => {
 	const MIB = 1_048_576;

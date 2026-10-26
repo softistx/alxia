@@ -6,31 +6,16 @@
  */
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
-import type { AnyReply } from '../reply/reply';
+import {
+	declared,
+	echo,
+	note,
+	sized,
+	text,
+	tooLarge,
+} from '../../test/fixtures/declared-body';
 import { alxia } from './alxia';
-import { defineMiddleware } from './define-middleware';
 import { validate } from './validate';
-
-const tooLarge = (limit: number) => ({ error: 'content_too_large', limit });
-
-/** A request of `body` with `length` declared, as a client sends it. */
-const declared = (body: string | ReadableStream<Uint8Array>, length: string) =>
-	({
-		method: 'POST',
-		body,
-		headers: { 'content-type': 'text/plain', 'content-length': length },
-		duplex: 'half',
-	}) as RequestInit;
-
-const text = (size: number) => 'x'.repeat(size);
-const sized = (size: number) => declared(text(size), String(size));
-
-/** A middleware noting its name in `ran`. */
-const note = (ran: string[], name: string) =>
-	defineMiddleware((_ctx, next) => {
-		ran.push(name);
-		return next();
-	});
 
 /** A body of `total` bytes that counts what was pulled, declared as `total`. */
 function counting(total: number) {
@@ -44,9 +29,6 @@ function counting(total: number) {
 	});
 	return { sent, init: declared(body, String(total)) };
 }
-
-const echo = ({ reply }: { reply: (status: 200, body: string) => AnyReply }) =>
-	reply(200, 'ok');
 
 describe('where bodyLimit() stands', () => {
 	test('the middlewares before it run, the ones after it and the handler do not', async () => {
@@ -163,5 +145,64 @@ describe('a plugin', () => {
 		expect((await host.request('/own', sized(9))).status).toBe(413);
 		expect(ran).toEqual(['app']);
 		expect((await host.request('/own', sized(8))).status).toBe(200);
+	});
+});
+
+describe("a plugin's bodyLimit() for the host's later routes", () => {
+	const host = (prefix: '/p' | undefined, ran: string[]) => {
+		const plugin = (prefix === undefined ? alxia() : alxia({ prefix }))
+			.bodyLimit(8)
+			.use(note(ran, 'inside'))
+			.post('/own', echo);
+		return alxia()
+			.use(note(ran, 'a'))
+			.plugin(plugin)
+			.use(note(ran, 'b'))
+			.post('/after', echo);
+	};
+
+	test("unprefixed: the step stands at the plugin's call, before what it declared after", async () => {
+		const ran: string[] = [];
+		const app = host(undefined, ran);
+		expect((await app.request('/own', sized(9))).status).toBe(413);
+		expect(ran).toEqual(['a']);
+		ran.length = 0;
+		expect((await app.request('/after', sized(9))).status).toBe(413);
+		expect(ran).toEqual(['a']);
+		ran.length = 0;
+		expect((await app.request('/after', sized(8))).status).toBe(200);
+		expect(ran).toEqual(['a', 'inside', 'b']);
+	});
+
+	test("prefixed: the same for its own route and the host's later one", async () => {
+		const ran: string[] = [];
+		const app = host('/p', ran);
+		expect((await app.request('/p/own', sized(9))).status).toBe(413);
+		expect(ran).toEqual(['a']);
+		ran.length = 0;
+		expect((await app.request('/after', sized(9))).status).toBe(413);
+		expect(ran).toEqual(['a']);
+	});
+});
+
+describe('a route option', () => {
+	test('a catcher the route itself holds, after its option, no longer catches a declared body', async () => {
+		const caught: unknown[] = [];
+		const app = alxia().post(
+			'/x',
+			{ bodyLimit: 8 },
+			async (_ctx, next) => {
+				try {
+					return await next();
+				} catch (error) {
+					caught.push(error);
+					throw error;
+				}
+			},
+			echo,
+		);
+		const response = await app.request('/x', sized(9));
+		expect(response.status).toBe(413);
+		expect(caught).toEqual([]);
 	});
 });

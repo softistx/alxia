@@ -156,23 +156,27 @@ export class Scope {
 	 */
 	absorb(plugin: Scope, prefix: string, own = ''): void {
 		const at = own === '' ? undefined : prefixPath(own);
-		const taken = plugin.#derive
-			.filter(({ hook }) => hook.kind !== 'limit')
-			.map(({ hook, path, enclosed }) => {
-				const scoped = path ?? at;
-				return {
-					hook,
-					path: scoped === undefined ? undefined : rebase(scoped, prefix),
-					...(enclosed || at !== undefined ? { enclosed: true as const } : {}),
-				};
+		let limitHook: ChainHook | undefined;
+		const taken: Scoped[] = [];
+		for (const { hook, path, enclosed } of plugin.#derive) {
+			if (hook.kind === 'limit') {
+				// Only the plugin's last one stands, at its own position, not
+				// enclosed (as its `#bodyLimit` below is not): the routes declared
+				// after the plugin check it where the plugin put it.
+				if (hook !== plugin.#limitHook) continue;
+				limitHook = limitStep();
+				taken.push({ hook: limitHook });
+				continue;
+			}
+			const scoped = path ?? at;
+			taken.push({
+				hook,
+				path: scoped === undefined ? undefined : rebase(scoped, prefix),
+				...(enclosed || at !== undefined ? { enclosed: true as const } : {}),
 			});
-		this.#derive = [...this.#derive, ...taken];
-		if (plugin.#limitHook !== undefined) {
-			// Not enclosed, as the plugin's `#bodyLimit` below is not: the
-			// routes declared after it read that limit, so they check it here.
-			this.#limitHook = limitStep();
-			this.#derive.push({ hook: this.#limitHook });
 		}
+		this.#derive = [...this.#derive, ...taken];
+		if (limitHook !== undefined) this.#limitHook = limitHook;
 		this.#bodyLimit = plugin.#bodyLimit ?? this.#bodyLimit;
 		this.#unmatched = undefined;
 	}
