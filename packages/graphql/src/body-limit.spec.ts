@@ -309,16 +309,87 @@ describe('graphql(), the bodyLimit option', () => {
 	});
 
 	test("a plugin app under a prefix keeps its own limit, not the outer app's", async () => {
+		const post = (target: { request: typeof app.request }, body: string) =>
+			target.request('/api/graphql', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body,
+			});
 		const inner = graphql(alxia().bodyLimit(LIMIT), {
 			schema,
 			logging: false,
 		});
-		const outer = alxia()
+		const outer = alxia({ prefix: '/api' })
 			.bodyLimit(4 * MIB)
 			.plugin(inner);
-		expect((await send(outer, blank(2 * LIMIT))).status).toBe(413);
+		expect((await post(outer, blank(2 * LIMIT))).status).toBe(413);
 		const bare = graphql(alxia(), { schema, logging: false });
-		const mounted = alxia().bodyLimit(LIMIT).plugin(bare);
-		expect((await send(mounted, blank(2 * LIMIT))).status).toBe(200);
+		const mounted = alxia({ prefix: '/api' }).bodyLimit(LIMIT).plugin(bare);
+		expect((await post(mounted, blank(2 * LIMIT))).status).toBe(200);
+	});
+
+	test('a bodyLimit() declared after graphql() does not apply to it', async () => {
+		const target = graphql(alxia(), { schema, logging: false }).bodyLimit(
+			LIMIT,
+		);
+		expect((await send(target, blank(2 * LIMIT))).status).toBe(200);
+	});
+});
+
+describe('graphql(), Vary and cookies on the 413', () => {
+	test("a Vary the app set and one Yoga's plugin set are both kept", async () => {
+		const target = graphql(
+			alxia()
+				.bodyLimit(LIMIT)
+				.use(async ({ set }, next) => {
+					set.headers.set('vary', 'Accept-Language');
+					return next();
+				}),
+			{
+				schema,
+				logging: false,
+				plugins: [
+					{
+						onResponse: ({ response }: { response: Response }) => {
+							response.headers.set('vary', 'Origin');
+						},
+					},
+				],
+			},
+		);
+		const response = await send(target, query('x'.repeat(2 * LIMIT)));
+		expect(response.status).toBe(413);
+		const names = (response.headers.get('vary') ?? '')
+			.split(',')
+			.map((name) => name.trim());
+		expect(names).toContain('Accept-Language');
+		expect(names).toContain('Origin');
+	});
+
+	test("a Yoga plugin's set-cookie is appended, not lost", async () => {
+		const target = graphql(
+			alxia()
+				.bodyLimit(LIMIT)
+				.use(async ({ set }, next) => {
+					set.headers.append('set-cookie', 'app=1; Path=/');
+					return next();
+				}),
+			{
+				schema,
+				logging: false,
+				plugins: [
+					{
+						onResponse: ({ response }: { response: Response }) => {
+							response.headers.append('set-cookie', 'yoga=2; Path=/');
+						},
+					},
+				],
+			},
+		);
+		const response = await send(target, query('x'.repeat(2 * LIMIT)));
+		expect(response.status).toBe(413);
+		const cookies = response.headers.getSetCookie();
+		expect(cookies).toContain('app=1; Path=/');
+		expect(cookies).toContain('yoga=2; Path=/');
 	});
 });

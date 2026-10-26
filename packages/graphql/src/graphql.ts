@@ -10,13 +10,13 @@ import type {
 	YogaInitialContext,
 	YogaServerOptions,
 } from 'graphql-yoga';
+import { declareEndpoint, resolveLimits } from './endpoint';
 import { graphqlHandler, type YogaContext, yogaServers } from './handler';
 import { reportsOperations } from './operation';
 import {
 	limitsTokens,
 	type ParseCacheOptions,
 	parseCaches,
-	tokenLimit,
 } from './parse-limits';
 import type { SandboxOptions } from './sandbox';
 import { type GraphQLWsOptions, graphqlSocket } from './ws';
@@ -133,9 +133,6 @@ export interface GraphQLOptions<
 	readonly bodyLimit?: number;
 }
 
-/** The body limit of a `POST` when neither the option nor the app gives one: 1 MiB. */
-const DEFAULT_BODY_LIMIT = 1_048_576;
-
 /**
  * The check Yoga's types leave out: the context the app builds must hold
  * what the schema's resolvers read. A mistake comes back as a `schema`
@@ -192,17 +189,7 @@ export function graphql<
 		bodyLimit,
 		...yogaOptions
 	} = options;
-	const tokens = tokenLimit(maxTokens);
-	if (
-		parseCache !== undefined &&
-		yogaOptions.parserAndValidationCache !== undefined
-	) {
-		throw new TypeError(
-			"graphql(app, { parseCache, parserAndValidationCache }): give one: parseCache sizes alxia's bounded cache, parserAndValidationCache replaces it",
-		);
-	}
-	// Checked here, once; each endpoint's Yoga gets caches of its own.
-	parseCaches(parseCache);
+	const tokens = resolveLimits(maxTokens, parseCache, yogaOptions);
 	const page = graphiql ?? true;
 	const yogaAt = yogaServers<UserCtx>(
 		{
@@ -228,23 +215,14 @@ export function graphql<
 		ide === 'apollo-sandbox' ? (sandbox ?? {}) : false,
 	);
 
-	const route = app as unknown as {
-		get(path: string, handler: unknown): unknown;
-		post(path: string, ...rest: unknown[]): unknown;
-		ws(path: string, ...rest: unknown[]): unknown;
-	};
-	route.get(path, handler);
-	// The GET just declared has the POST's scope: the limit an earlier
-	// `bodyLimit()` gives it is the one the POST keeps.
-	const inherited = app.routes.at(-1)?.bodyLimit;
-	route.post(
+	declareEndpoint(
+		app as never,
 		path,
-		{ bodyLimit: bodyLimit ?? inherited ?? DEFAULT_BODY_LIMIT },
 		handler,
+		bodyLimit,
+		ws === false
+			? undefined
+			: graphqlSocket(yogaAt, path, ws === true ? {} : ws),
 	);
-	if (ws !== false) {
-		const socket = graphqlSocket(yogaAt, path, ws === true ? {} : ws);
-		route.ws(socket.path, socket.middleware, socket.handlers);
-	}
 	return app as never;
 }

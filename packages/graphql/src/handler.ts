@@ -2,7 +2,12 @@
  * The endpoint behind `graphql()`: one Yoga per path it is served at, and
  * the route handler that hands each request to it.
  */
-import { type BaseContext, type StatusCode, shutdownSignal } from '@alxia/core';
+import {
+	type BaseContext,
+	type StatusCode,
+	shutdownSignal,
+	vary,
+} from '@alxia/core';
 import {
 	createYoga,
 	type YogaServerInstance,
@@ -139,7 +144,10 @@ export function graphqlHandler<UserCtx extends YogaContext>(
 			for (const [name, value] of answered.headers) {
 				if (REFUSAL_OWN_HEADERS.has(name)) continue;
 				if (name === 'set-cookie') ctx.set.headers.append(name, value);
-				else ctx.set.headers.set(name, value);
+				else if (name === 'vary') {
+					// Added to the app's own, as core's `send` does.
+					for (const part of value.split(',')) vary(ctx.set.headers, part);
+				} else ctx.set.headers.set(name, value);
 			}
 			throw refusal;
 		}

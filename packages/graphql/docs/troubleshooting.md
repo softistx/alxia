@@ -23,6 +23,7 @@ symptom.
 **Startup**
 
 - [`TypeError: GET /graphql is declared twice`](#typeerror-get-graphql-is-declared-twice)
+- [`TypeError: POST /graphql: bodyLimit must be a whole number of bytes, 0 or more; got -1`](#typeerror-post-graphql-bodylimit-must-be-a-whole-number-of-bytes-0-or-more-got--1)
 - [`TypeError: graphql(app, { ws: { keepAlive: 0 } }): keepAlive is the milliseconds between pings, a positive number, or false for none`](#typeerror-graphqlapp--ws--keepalive-0---keepalive-is-the-milliseconds-between-pings-a-positive-number-or-false-for-none)
 
 **Responses**
@@ -268,6 +269,21 @@ ping in a loop.
 
 ```ts
 graphql(app, { schema, ws: { keepAlive: 30_000 } });
+```
+
+### `TypeError: POST /graphql: bodyLimit must be a whole number of bytes, 0 or more; got -1`
+
+**When:** declaring `graphql(app, { bodyLimit })` with a negative number, a
+fraction, `NaN`, `Infinity` or a string; the message names the route (the
+endpoint's `path`) and the value given.
+
+**Why:** `bodyLimit` is a count of bytes, checked by core where the `POST`
+is declared.
+
+**Fix:** a whole number of bytes, 0 or more:
+
+```ts
+graphql(app, { schema, bodyLimit: 5 * 1024 * 1024 });
 ```
 
 ### `TypeError: graphql(app, { maxTokens }): maxTokens is the most tokens a document may hold, a positive whole number, or false for none; got …`
