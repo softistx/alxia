@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.5.7
+
+### Patch Changes
+
+- [#309](https://github.com/softistx/alxia/pull/309) [`4035ae5`](https://github.com/softistx/alxia/commit/4035ae5b9edb11993f0905ad58a66cb0b26bb08c) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New projects install `@alxia/react-router` 0.12.
+
 ## 0.5.6
 
 ### Patch Changes

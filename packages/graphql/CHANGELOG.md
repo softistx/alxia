@@ -1,5 +1,11 @@
 # @alxia/graphql
 
+## 0.8.3
+
+### Patch Changes
+
+- [#313](https://github.com/softistx/alxia/pull/313) [`648ddb8`](https://github.com/softistx/alxia/commit/648ddb8f7423d0b7698737271c84ff204eba6e71) Thanks [@SteveGT96](https://github.com/SteveGT96)! - A streamed response (SSE, multipart) no longer leaves a listener on the server's shutdown signal; a client asking for `text/event-stream` on plain queries could grow the process's memory without bound.
+
 ## 0.8.2
 
 ### Patch Changes
