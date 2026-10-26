@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import { refusal } from '../../test/errors/refusal';
-import { body } from '../../test/session/flow';
-import { linksFor } from '../../test/session/links';
+import { body, thrown } from '../../test/session/flow';
+import { crossSite, linksFor, posting } from '../../test/session/links';
 
 const api = (code: string, status: number, extra = {}) =>
 	refusal(code, 'Wait a little.', { http: { status }, ...extra });
@@ -9,7 +9,9 @@ const api = (code: string, status: number, extra = {}) =>
 describe('requestLink', () => {
 	test('sent, whoever the e-mail is', async () => {
 		const { links } = linksFor();
-		expect(body(await links.requestLink(async () => true, 'en')).data).toEqual({
+		expect(
+			body(await links.requestLink(posting(), async () => true, 'en')).data,
+		).toEqual({
 			sent: true,
 		});
 	});
@@ -18,6 +20,7 @@ describe('requestLink', () => {
 		const { links } = linksFor();
 		const answered = body(
 			await links.requestLink(
+				posting(),
 				() => Promise.reject(api('MAIL_THROTTLED', 429)),
 				'en',
 			),
@@ -35,6 +38,7 @@ describe('requestLink', () => {
 		});
 		const answered = body(
 			await links.requestLink(
+				posting(),
 				() => Promise.reject(api('auth.errors.too-many-attempts', 429)),
 				'fr',
 			),
@@ -49,6 +53,7 @@ describe('requestLink', () => {
 		const { links } = linksFor();
 		const answered = body(
 			await links.requestLink(
+				posting(),
 				() =>
 					Promise.reject(
 						api('validation.errors.invalid-input', 400, {
@@ -72,6 +77,7 @@ describe('requestLink', () => {
 		const { links } = linksFor();
 		const refused = body(
 			await links.requestLink(
+				posting(),
 				() => Promise.reject(api('x.errors.y', 500)),
 				'en',
 			),
@@ -80,6 +86,7 @@ describe('requestLink', () => {
 		expect(refused.data).toEqual({ formError: 'Wait a little.' });
 		const down = body(
 			await links.requestLink(
+				posting(),
 				() => Promise.reject(new Response(null, { status: 503 })),
 				'en',
 			),
@@ -91,9 +98,25 @@ describe('requestLink', () => {
 		const { links } = linksFor();
 		const error = new Error('boom');
 		await expect(
-			links.requestLink(() => Promise.reject(error), 'en'),
+			links.requestLink(posting(), () => Promise.reject(error), 'en'),
 		).rejects.toBe(error);
 	});
+});
+
+test('a cross-site post requests nothing', async () => {
+	const { links } = linksFor();
+	let ran = false;
+	const refused = await thrown(() =>
+		links.requestLink(
+			crossSite(),
+			async () => {
+				ran = true;
+			},
+			'en',
+		),
+	);
+	expect(refused).toBeInstanceOf(Response);
+	expect(ran).toBe(false);
 });
 
 describe('authLinks', () => {

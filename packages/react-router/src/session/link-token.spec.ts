@@ -2,12 +2,17 @@ import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import { refusal } from '../../test/errors/refusal';
 import { body, thrown } from '../../test/session/flow';
-import { linksFor, PATH } from '../../test/session/links';
-import { TOKEN_PAGE_HEADERS } from './index';
+import { crossSite, linksFor, PATH, posting } from '../../test/session/links';
+import { type Spent, TOKEN_PAGE_HEADERS } from './index';
 
 const { links } = linksFor();
 const api = (code: string, status: number, extra = {}) =>
 	refusal(code, code, { http: { status }, ...extra });
+/** A `Spent` known to be a refusal. */
+function refused<T>(spent: Spent<T>) {
+	if (spent.ok) throw new Error('expected a refusal');
+	return spent;
+}
 const spend = (run: () => Promise<unknown>, fields = ['password']) =>
 	links.spendToken(run, {
 		language: 'en',
@@ -81,7 +86,7 @@ describe('spendToken', () => {
 				api('notes.errors.too-many-attempts', 429, { minutes: 1 }),
 			),
 		);
-		const answered = body(links.answerOf(wait as never));
+		const answered = body(links.answerOf(refused(wait)));
 		expect(answered.init.status).toBe(429);
 		expect(answered.data['formError']).toBe(
 			'Too many attempts. Try again in 1 minute.',
@@ -104,7 +109,7 @@ describe('spendToken', () => {
 		const spent = await spend(() =>
 			Promise.reject(api('auth.errors.invalid-token', 400)),
 		);
-		expect(links.answerOf(spent as never)).toBeInstanceOf(Response);
+		expect(links.answerOf(refused(spent))).toBeInstanceOf(Response);
 	});
 });
 
@@ -124,23 +129,79 @@ describe('statePath and ended', () => {
 		expect(response.headers.get('x-a')).toBe('1');
 	});
 
-	test('a path that is not a path of this site is refused, naming the path', () => {
-		for (const path of [
-			'https://evil.test/x',
-			'//evil.test',
-			'/a?token=t',
-			'/a#b',
-		]) {
-			expect(() => links.statePath(path, 'invalid')).toThrow(
-				new TypeError(
-					`authLinks(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ${JSON.stringify(path)}.`,
-				),
+	test('a path that is not a path of this site is refused, without what follows ? or #', () => {
+		const shown: Record<string, string> = {
+			'https://evil.test/x': 'https://evil.test/x',
+			'//evil.test': '//evil.test',
+			'/a?token=t0k3n': '/a?…',
+			'/a#t0k3n': '/a?…',
+		};
+		for (const [path, printed] of Object.entries(shown)) {
+			const error = (() => {
+				try {
+					links.statePath(path, 'invalid');
+				} catch (e) {
+					return e as Error;
+				}
+				throw new Error('expected a throw');
+			})();
+			expect(error).toBeInstanceOf(TypeError);
+			expect(error.message).toBe(
+				`authLinks(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ${JSON.stringify(printed)}.`,
 			);
+			expect(error.message).not.toContain('t0k3n');
 		}
+	});
+
+	test('spendToken checks the path before it runs anything', async () => {
+		let ran = false;
+		await expect(
+			links.spendToken(
+				async () => {
+					ran = true;
+				},
+				{ language: 'en', path: '/a?token=t', states: {} },
+			),
+		).rejects.toBeInstanceOf(TypeError);
+		expect(ran).toBe(false);
+	});
+
+	test('a redirect to an end state carries the token page’s headers', () => {
+		const response = links.ended(PATH, 'invalid');
+		expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+		expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
 	});
 });
 
 describe('linkArgs', () => {
+	test('a cross-site post is refused before the schema reads it', async () => {
+		const refusedPost = (await thrown(() =>
+			links.linkArgs(z.object({ token: z.string() }), crossSite(), PATH),
+		)) as { init: { status: number } };
+		expect(refusedPost.init.status).toBe(403);
+		const text = new Request('http://my-app.test/x', {
+			method: 'POST',
+			headers: { 'content-type': 'text/plain' },
+			body: '{"token":"t"}',
+		});
+		const unsupported = (await thrown(() =>
+			links.linkArgs(z.object({ token: z.string() }), text, PATH),
+		)) as { init: { status: number } };
+		expect(unsupported.init.status).toBe(415);
+		const foreign = new Request('http://my-app.test/x', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				origin: 'http://evil.test',
+			},
+			body: '{"token":"t"}',
+		});
+		const forbidden = (await thrown(() =>
+			links.linkArgs(z.object({ token: z.string() }), foreign, PATH),
+		)) as { init: { status: number } };
+		expect(forbidden.init.status).toBe(403);
+	});
+
 	const schema = z.object({
 		token: z.string().max(200),
 		password: z.string().optional(),
@@ -149,7 +210,7 @@ describe('linkArgs', () => {
 	test('a token too long or missing ends on the invalid state, replaced', async () => {
 		for (const input of [{ token: 't'.repeat(201) }, {}]) {
 			const response = (await thrown(() =>
-				links.linkArgs(schema, input, PATH),
+				links.linkArgs(schema, posting(undefined, input), PATH),
 			)) as Response;
 			expect(response.headers.get('location')).toBe(`${PATH}?state=invalid`);
 			expect(response.headers.get('x-remix-replace')).toBe('true');
@@ -159,17 +220,25 @@ describe('linkArgs', () => {
 
 	test('any other refusal is a 400', async () => {
 		const error = (await thrown(() =>
-			links.linkArgs(schema, { token: 't', password: 1 }, PATH),
+			links.linkArgs(
+				schema,
+				posting(undefined, { token: 't', password: 1 }),
+				PATH,
+			),
 		)) as { init: { status: number } };
 		expect(error.init.status).toBe(400);
 	});
 
 	test('a well-formed token goes on, from an async schema too', async () => {
-		expect(await links.linkArgs(schema, { token: 't' }, PATH)).toEqual({
+		expect(
+			await links.linkArgs(schema, posting(undefined, { token: 't' }), PATH),
+		).toEqual({
 			token: 't',
 		});
 		const later = z.object({ token: z.string() }).refine(async () => true);
-		expect(await links.linkArgs(later, { token: 't' }, PATH)).toEqual({
+		expect(
+			await links.linkArgs(later, posting(undefined, { token: 't' }), PATH),
+		).toEqual({
 			token: 't',
 		});
 	});
@@ -177,7 +246,7 @@ describe('linkArgs', () => {
 	test('the invalid state is the app’s when it names one', async () => {
 		const { links: own } = linksFor({ invalidState: 'expired' });
 		const response = (await thrown(() =>
-			own.linkArgs(schema, {}, PATH),
+			own.linkArgs(schema, posting(), PATH),
 		)) as Response;
 		expect(response.headers.get('location')).toBe(`${PATH}?state=expired`);
 	});

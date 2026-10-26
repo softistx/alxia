@@ -610,8 +610,19 @@ export const links = authLinks({
 	signIn, // the app's signInFlow
 	cookies, // the same sessionCookies
 	errors, // the app's createApiErrors
+	json, // the app's jsonActions({ origin }): every body is read with its CSRF check
 	start: async (token) => (await homeOf(token)) ?? '/', // optional
 });
+```
+
+`homeOf`, `viewerOf`, `confirmMagicLink` and `toAnswer` below are the app's
+own: its GraphQL calls and its mapping of the API's enums to a `SignInAnswer`.
+`ConfirmArgs` is any Standard Schema; a Zod 4 stub:
+
+```ts
+import { z } from 'zod';
+
+const ConfirmArgs = z.object({ token: z.string().max(200) });
 ```
 
 ```tsx
@@ -621,35 +632,61 @@ import { TOKEN_PAGE_HEADERS } from '@alxia/react-router/session';
 
 const PATH = '/auth/magic-link';
 
+export const headers = () => TOKEN_PAGE_HEADERS;
+
 export async function loader({ request }: Route.LoaderArgs) {
 	// Spends nothing: a mail scanner opens links first.
 	return data({ signedInAs: (await viewerOf(request))?.name ?? null }, { headers: TOKEN_PAGE_HEADERS });
 }
 
-export const headers = () => TOKEN_PAGE_HEADERS;
-
 export async function action({ request }: Route.ActionArgs) {
-	const { token } = await links.linkArgs(ConfirmArgs, await json.readJson(request), PATH);
+	const { token } = await links.linkArgs(ConfirmArgs, request, PATH);
 	const spent = await links.spendToken(() => confirmMagicLink(token), {
 		language: 'en',
 		path: PATH,
 		states: { 'auth.errors.invalid-token': 'invalid' },
 	});
 	if (!spent.ok) return links.answerOf(spent);
-	if (spent.value.status === 'LINKED') return links.ended(PATH, 'linked');
-	return links.landByLink(toAnswer(spent.value), { request, language: 'en' });
+	return links.landByLink(toAnswer(spent.value), {
+		request,
+		language: 'en',
+		// The API's LINKED opens no session: end on the page's `linked` state.
+		other: { path: PATH, state: 'linked' },
+	});
 }
 ```
 
+Asking for the mail, and the reset's last step:
+
+```ts
+// app/routes/auth/sign-in-link.tsx
+export async function action({ request }: Route.ActionArgs) {
+	const { email } = await json.readInput(request, EmailArgs);
+	return links.requestLink(request, () => requestMagicLink(email), 'en');
+}
+
+// app/routes/auth/reset-password.tsx, once the new password is set
+export async function action({ request }: Route.ActionArgs) {
+	// ... linkArgs, spendToken ...
+	return links.afterReset(request); // to /sign-in?password-reset=1
+}
+```
+
+- `AuthLinksOptions` is what `authLinks` takes: `signIn`, `cookies`, `errors`,
+  `json`, and the optional `throttled`, `start`, `resetDone` and `invalidState`.
+- `AuthLinks` is what it returns.
 - `TOKEN_PAGE_HEADERS` is `Referrer-Policy: no-referrer` and
   `X-Robots-Tag: noindex, nofollow`: no `Referer` carries the token to another
   site (a font, an image), and no search engine keeps the page. Set them on
-  the page's document and its `.data` responses.
-- `linkArgs(schema, body, path)` checks what the page posted against any
-  Standard Schema (Zod 4, Valibot, ArkType; async is fine). An issue on
-  `token` (missing, or over the API's limit: a link cut or padded on its way)
-  throws the redirect to the `invalid` end state, as an unknown token does;
-  any other issue throws a 400. `invalidState` names another state.
+  the page's document and its `.data` responses. The redirects of `ended`,
+  `landByLink` and `afterReset` carry them already.
+- `linkArgs(schema, request, path)` reads the request as JSON with
+  `json.readJson` (a cross-site post is a 403 and a body that is not JSON a
+  415, before anything is spent) and checks it against any Standard Schema
+  (Zod 4, Valibot, ArkType; async is fine). An issue on `token` (missing, or
+  over the API's limit: a link cut or padded on its way) throws the redirect
+  to the `invalid` end state, as an unknown token does; any other issue throws
+  a 400. `invalidState` names another state.
 - `spendToken(run, { language, path, states, fields })` runs the API call that
   spends the token. It returns `{ ok: true, value }`, or what the page answers:
   an API code in `states` ends the page on that state (the redirect replaces
@@ -657,32 +694,51 @@ export async function action({ request }: Route.ActionArgs) {
   page shows; any other refusal, a wait or an unreachable API, is the form's
   message with the API's status. `answerOf(spent)` turns the refusal into the
   action's answer. Anything that is not an API refusal is rethrown.
+- `Spent<T>` is what `spendToken` returns, `LinkStayed` is the `data(...)` a
+  refusal answers with, and `SpendOptions` is its second argument.
 - `statePath(path, state)` is `path?state=…`: the token page in an end state,
   with no token. `ended(path, state, headers?)` is the redirect to it, replacing
   the token's history entry (React Router's `replace`), so Back never opens
   the token's URL again.
-- `landByLink(answer, { request, language })` signs the link in. The session
-  the browser held, whoever's, is revoked first (one browser holds one
+- `landByLink(answer, { request, language, other? })` signs the link in. The
+  session the browser held, whoever's, is revoked first (one browser holds one
   session), on a `secondFactor` answer as well as a `signedIn` one. A signed-in
-  answer goes to `start(token, request)`'s path (`/` when `start` is missing,
-  throws, or answers a path off the site), so the redirect lands at once
-  instead of pushing a history entry after `/`'s own redirect. An answer that
-  leads nowhere is the form's `unavailable` with a 503. An answer of
-  `other` is one too: an app whose API can answer "linked" (no session
-  opened) tests it first and answers `ended(path, 'linked')`, which keeps the
-  browser's session.
+  answer whose session is still live goes to `start(token, request)`'s path
+  (`/` when `start` is missing, throws, or answers a path off the site), so the
+  redirect lands at once instead of pushing a history entry after `/`'s own
+  redirect. An answer that leads nowhere (a session already ended included)
+  is the form's `unavailable` with a 503. An `other` answer is one too, unless
+  `other: { path, state }` is given: an app whose API can answer "linked" (no
+  session opened) passes the page and its state, and the answer ends there,
+  keeping the browser's session.
 - `afterReset(request)` follows a password reset, which signs the account out
   everywhere: the browser's session is revoked and its cookie cleared, then
   the page replaces the token's entry with `resetDone` (`/sign-in?password-reset=1`
   by default).
-- `requestLink(run, language)` requests the mail. It answers `{ sent: true }`
-  whoever the address is, so the page does not tell which addresses hold an
-  account. A wait (`throttled.code`, `MAIL_THROTTLED` by default, worded by
-  `throttled.wording` or the catalogue) is a 429, and a malformed address is
-  the `email` field's refusal.
+- `requestLink(request, run, language)` requests the mail. It answers
+  `{ sent: true }` whoever the address is, so the page does not tell which
+  addresses hold an account (`RequestLinkAnswer` is its shape). A wait is a
+  429 and a malformed address is the `email` field's refusal.
 
-A token is never logged, worded in an error or put in a redirect: the end
-states and the sign-in's redirects carry a state or a path alone. Every path
-the helpers redirect to is checked first: `statePath` throws a `TypeError` for a
+`landByLink`, `afterReset` and `requestLink` first refuse a post that is not
+JSON (the redirect a native form post gets goes back to its page, which then
+posts JSON), before anything is spent, revoked or landed.
+
+The wait is recognised by the app's own throttle code, so pass it:
+
+```ts
+authLinks({
+	signIn, cookies, errors, json,
+	throttled: {
+		code: 'auth.errors.too-many-attempts', // 'MAIL_THROTTLED' by default
+		wording: (error, language) => waitMessage(error, language), // else the catalogue's
+	},
+});
+```
+
+A token is never logged, worded in an error or put in a redirect built by the
+helpers: the end states and the sign-in's redirects carry a state or a path
+alone, and a `TypeError` about a path prints it only up to its `?` or `#`.
+`statePath`, `ended`, `linkArgs` and `spendToken` throw that `TypeError` for a
 page `path` with a query, a fragment or a host, and `authLinks` throws one for
 a `resetDone` that leaves the site.

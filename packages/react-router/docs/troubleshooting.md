@@ -84,6 +84,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: signInFlow(): the code "…" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`](#typeerror-signinflow-the-code--is-both-the-wrong-code-code-codesinvalidcode-and-in-codeschallengeover-a-wrong-code-that-leaves-tries-cannot-end-the-challenge)
 - [`TypeError: serializeCookie(): the name "…" is not a cookie name (an RFC 6265 token).`](#typeerror-serializecookie-the-name--is-not-a-cookie-name-an-rfc-6265-token)
 - [`TypeError: serializeCookie(): the path "…" is not a cookie path: it must start with "/" and hold no ";" or control character.`](#typeerror-serializecookie-the-path--is-not-a-cookie-path-it-must-start-with--and-hold-no--or-control-character)
+- [`TypeError: authLinks(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-authlinks-a-token-pages-path-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
+- [`TypeError: authLinks(): resetDone must be a path of this site, starting with a single "/"; got ….`](#typeerror-authlinks-resetdone-must-be-a-path-of-this-site-starting-with-a-single--got-)
 
 **Types**
 
@@ -129,6 +131,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`next` is always `/`](#next-is-always-)
 - [Sign-in loops on `http://localhost` in Safari](#sign-in-loops-on-httplocalhost-in-safari)
 - [A `__Host-` cookie is dropped](#a-__host--cookie-is-dropped)
+- [A token page's token shows in a Referer or a search result](#a-token-pages-token-shows-in-a-referer-or-a-search-result)
 
 ## Thrown or printed
 
@@ -2559,7 +2562,7 @@ The user types a wrong code in the step-up dialog and lands on the sign-in page,
 **Fix:** in the app's caller, redirect to sign-in only for a session 401 (`UNAUTHENTICATED`), never for a step-up's `CODE_INVALID`. [Step-up](guide/session.md#call-the-step-up-with-a-caller-that-does-not-sign-out-on-a-401) has the full section.
 
 
-### authLinks(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got …
+### `TypeError: authLinks(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ….`
 
 `statePath`, `ended`, `linkArgs` or `spendToken` throws while a token page
 handles a request.
@@ -2567,7 +2570,9 @@ handles a request.
 **Why:** the page's `path` is the page without its token: the helpers add
 `?state=…` to it, and a redirect must stay on the site. A path with a query
 (`/auth/magic-link?token=…`), a fragment, a host or a second leading `/` is
-refused, which also keeps the token out of the redirect.
+refused, which also keeps the token out of the redirect. The message prints
+the path only up to its `?` or `#` (`got "/auth/magic-link?…"`), so the token
+never reaches a log.
 
 **Fix:** pass the route's own path, as a constant:
 
@@ -2576,7 +2581,7 @@ const PATH = '/auth/magic-link';
 await links.spendToken(run, { language, path: PATH, states });
 ```
 
-### authLinks(): resetDone must be a path of this site, starting with a single "/"; got …
+### `TypeError: authLinks(): resetDone must be a path of this site, starting with a single "/"; got ….`
 
 `authLinks` throws when the app starts.
 

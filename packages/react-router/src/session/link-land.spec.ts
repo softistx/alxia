@@ -1,9 +1,9 @@
 import { describe, expect, test } from 'bun:test';
-import { asking, body, END, setCookies } from '../../test/session/flow';
-import { linksFor, PATH } from '../../test/session/links';
+import { body, END, setCookies, thrown } from '../../test/session/flow';
+import { crossSite, linksFor, posting } from '../../test/session/links';
 
 const signedIn = { status: 'signedIn', token: 'new', expiresAt: END } as const;
-const at = (token?: string) => asking(`${PATH}?token=secret`, token);
+const at = posting;
 const land = (
 	links: ReturnType<typeof linksFor>['links'],
 	answer: Parameters<ReturnType<typeof linksFor>['links']['landByLink']>[0],
@@ -77,6 +77,83 @@ describe('landByLink', () => {
 		expect(response.headers.get('location')).not.toContain('ch');
 	});
 
+	test('a session that ended already never reaches start, and opens nothing', async () => {
+		let called = false;
+		const { links, revoked } = linksFor({
+			start: async () => {
+				called = true;
+				return '/home';
+			},
+		});
+		const answered = body(
+			await links.landByLink(
+				{
+					status: 'signedIn',
+					token: 'new',
+					expiresAt: new Date(Date.now() - 1000),
+				},
+				{ request: at('old'), language: 'en' },
+			),
+		);
+		expect(called).toBe(false);
+		expect(answered.init.status).toBe(503);
+		expect(revoked).toEqual([]);
+	});
+
+	test('the redirect carries the token page’s headers', async () => {
+		const { links } = linksFor();
+		const response = await land(links, signedIn);
+		expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+		expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
+	});
+
+	test('other ends on the state given, keeping the browser’s session', async () => {
+		const { links, revoked } = linksFor();
+		const response = (await links.landByLink(
+			{ status: 'other' },
+			{
+				request: at('old'),
+				language: 'en',
+				other: { path: '/auth/magic-link', state: 'linked' },
+			},
+		)) as Response;
+		expect(response.headers.get('location')).toBe(
+			'/auth/magic-link?state=linked',
+		);
+		expect(response.headers.get('x-remix-replace')).toBe('true');
+		expect(response.headers.get('set-cookie')).toBeNull();
+		expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+		expect(revoked).toEqual([]);
+	});
+
+	test('other without a state is the form’s unavailable', async () => {
+		const { links } = linksFor();
+		const answered = body(
+			await links.landByLink(
+				{ status: 'other' },
+				{ request: at('old'), language: 'en' },
+			),
+		);
+		expect(answered.init.status).toBe(503);
+	});
+
+	test('a cross-site post lands nothing, revokes nothing and starts nothing', async () => {
+		let called = false;
+		const { links, revoked } = linksFor({
+			start: async () => {
+				called = true;
+				return '/home';
+			},
+		});
+		const refused = (await thrown(() =>
+			links.landByLink(signedIn, { request: crossSite('old'), language: 'en' }),
+		)) as Response;
+		expect(refused.headers.get('set-cookie')).toBeNull();
+		expect(refused.status).toBe(302);
+		expect(revoked).toEqual([]);
+		expect(called).toBe(false);
+	});
+
 	test('an answer that leads nowhere is the form’s unavailable, with the session kept', async () => {
 		const { links, revoked } = linksFor();
 		for (const answer of [
@@ -94,6 +171,21 @@ describe('landByLink', () => {
 });
 
 describe('afterReset', () => {
+	test('a cross-site post signs nobody out', async () => {
+		const { links, revoked } = linksFor();
+		const refused = (await thrown(() =>
+			links.afterReset(crossSite('old')),
+		)) as Response;
+		expect(refused.headers.get('set-cookie')).toBeNull();
+		expect(revoked).toEqual([]);
+	});
+
+	test('the redirect carries the token page’s headers', async () => {
+		const { links } = linksFor();
+		const response = await links.afterReset(at('old'));
+		expect(response.headers.get('referrer-policy')).toBe('no-referrer');
+	});
+
 	test('the browser is signed out, to sign-in with its notice, replacing the entry', async () => {
 		const { links, revoked } = linksFor();
 		const response = await links.afterReset(at('old'));

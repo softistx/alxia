@@ -2,6 +2,7 @@ import type { data } from 'react-router';
 import type { ApiErrorLike } from '../errors/api-error';
 import type { ApiErrors } from '../errors/api-errors';
 import type { FormErrors } from '../errors/form-errors';
+import type { JsonActions } from '../errors/json-actions';
 import type { InferOutput, StandardSchemaV1 } from '../errors/standard-schema';
 import type { SessionCookies } from './cookies';
 import type { SignInAnswer, SignInFlow } from './flow-types';
@@ -12,6 +13,8 @@ export interface AuthLinksOptions<L extends string> {
 	/** The same cookies the flow was built with: a reset clears the session's. */
 	readonly cookies: SessionCookies;
 	readonly errors: ApiErrors<L>;
+	/** The app's `jsonActions({ origin })`: every body is read with its CSRF check. */
+	readonly json: JsonActions;
 	/** The API's wait on mailed links. */
 	readonly throttled?: {
 		/** `'MAIL_THROTTLED'`, `@nxgt/janus`'s code, by default. */
@@ -70,13 +73,14 @@ export interface AuthLinks<L extends string> {
 	/** A redirect to a token page's end state, replacing the token's history entry. */
 	ended(path: string, state: string, headers?: HeadersInit): Response;
 	/**
-	 * The arguments a token page posted, checked against a Standard Schema. A
-	 * token the schema refuses ends on the invalid state (thrown); any other
-	 * refusal is a 400.
+	 * The arguments a token page posted, read as JSON (`json.readJson`: a
+	 * cross-site post is a 403, before anything is spent) and checked against
+	 * a Standard Schema. A token the schema refuses ends on the invalid state
+	 * (thrown); any other refusal is a 400.
 	 */
 	linkArgs<S extends StandardSchemaV1>(
 		schema: S,
-		body: unknown,
+		request: Request,
 		path: string,
 	): Promise<InferOutput<S>>;
 	/** Posts a link's token with `run`: its value, else what the page answers. */
@@ -89,20 +93,24 @@ export interface AuthLinks<L extends string> {
 	/**
 	 * Where a link's sign-in leads, replacing the token's history entry. The
 	 * session the browser held is revoked first; an answer that leads nowhere
-	 * (`other` included: the app handles its own `LINKED` with `ended`) is
-	 * the form's "unavailable".
+	 * is the form's "unavailable"; `other` is too, unless `other` names the
+	 * state to end on (an app's own `LINKED`: no session opened, the
+	 * browser's kept). A form post that is not JSON is refused first.
 	 */
 	landByLink(
 		answer: SignInAnswer,
 		options: {
 			readonly request: Request;
 			readonly language: L;
+			/** Where an `other` answer ends instead of failing: a token page and its state. */
+			readonly other?: { readonly path: string; readonly state: string };
 		},
 	): Promise<Response | LinkStayed>;
 	/** After a password reset: the browser's session revoked and cleared, then the sign-in page. */
 	afterReset(request: Request): Promise<Response>;
-	/** Requests a mail's link with `run`. */
+	/** Requests a mail's link with `run`; only a JSON post goes on. */
 	requestLink(
+		request: Request,
 		run: () => Promise<unknown>,
 		language: L,
 	): Promise<ReturnType<typeof data<RequestLinkAnswer>>>;

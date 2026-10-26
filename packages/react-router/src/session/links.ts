@@ -26,10 +26,12 @@ const MAIL_THROTTLED = 'MAIL_THROTTLED';
  */
 async function requestLink<L extends string>(
 	options: AuthLinksOptions<L>,
+	request: Request,
 	run: () => Promise<unknown>,
 	language: L,
 ) {
 	const { errors, throttled } = options;
+	options.json.requireJsonPost(request);
 	try {
 		await run();
 		return data<RequestLinkAnswer>({ sent: true });
@@ -82,11 +84,13 @@ export function authLinks<L extends string>(
 	return {
 		statePath,
 		ended: stateRedirect,
-		linkArgs: (schema, body, path) => linkArgs(invalid, schema, body, path),
+		linkArgs: (schema, request, path) =>
+			linkArgs(options, invalid, schema, request, path),
 		spendToken: (run, o) => spendToken(options, run, o),
 		answerOf,
 		landByLink: (answer, o) => landByLink(options, answer, o),
 		afterReset: (request) => afterReset(options, resetDone, request),
-		requestLink: (run, language) => requestLink(options, run, language),
+		requestLink: (request, run, language) =>
+			requestLink(options, request, run, language),
 	};
 }

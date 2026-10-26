@@ -21,10 +21,12 @@ export const TOKEN_PAGE_HEADERS = {
 } as const;
 
 /** A page's path with no query or fragment, or a `TypeError`. */
-function pathOf(path: string): string {
+export function pathOf(path: string): string {
 	if (safeNext(path) !== path || /[?#]/.test(path)) {
+		// The part after "?" or "#" may be the token: it is never printed.
+		const shown = path.replace(/[?#].*$/s, '?…');
 		throw new TypeError(
-			`authLinks(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ${JSON.stringify(path)}.`,
+			`authLinks(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ${JSON.stringify(shown)}.`,
 		);
 	}
 	return path;
@@ -33,12 +35,22 @@ function pathOf(path: string): string {
 export const statePath = (path: string, state: string): string =>
 	`${pathOf(path)}?${new URLSearchParams({ state })}`;
 
+/** `headers`, with the token page's own on top. */
+export function withTokenHeaders(headers?: HeadersInit): Headers {
+	const merged = new Headers(headers);
+	for (const [name, value] of Object.entries(TOKEN_PAGE_HEADERS)) {
+		merged.set(name, value);
+	}
+	return merged;
+}
+
 /** A redirect replacing the current history entry: the token's, so Back never opens it again. */
 export const stateRedirect = (
 	path: string,
 	state: string,
 	headers?: HeadersInit,
-): Response => replace(statePath(path, state), headers ? { headers } : {});
+): Response =>
+	replace(statePath(path, state), { headers: withTokenHeaders(headers) });
 
 const isTokenIssue = (issue: {
 	readonly path?:
@@ -50,12 +62,14 @@ const isTokenIssue = (issue: {
 };
 
 export async function linkArgs<S extends StandardSchemaV1>(
+	{ json }: Pick<AuthLinksOptions<string>, 'json'>,
 	invalidState: string,
 	schema: S,
-	body: unknown,
+	request: Request,
 	path: string,
 ): Promise<InferOutput<S>> {
 	pathOf(path);
+	const body = await json.readJson(request);
 	const result = await schema['~standard'].validate(body);
 	if (!result.issues) return result.value as InferOutput<S>;
 	// A token the API would refuse anyway (a link cut or padded on its way)
@@ -72,6 +86,7 @@ export async function spendToken<L extends string, T>(
 	{ language, path, states, fields: shown = [] }: SpendOptions<L>,
 ): Promise<Spent<T>> {
 	const { errors } = options;
+	pathOf(path);
 	try {
 		return { ok: true, value: await run() };
 	} catch (error) {
