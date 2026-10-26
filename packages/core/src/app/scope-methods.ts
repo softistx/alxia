@@ -44,9 +44,12 @@ export interface BodyLimitMethod<Ctx extends object, Prefix extends string> {
 	/**
 	 * The most bytes the request body of every route declared after it may
 	 * hold, unless the route's own `bodyLimit` says otherwise. Inside a
-	 * group, only the group's routes. A body past it is refused with a 413
-	 * as soon as its `Content-Length` or the bytes counted pass the limit: a
-	 * `ContentTooLargeError`, which a middleware before the read may answer.
+	 * group, only the group's routes. A body past it is refused with a 413:
+	 * a declared `Content-Length` over it right here, where this call
+	 * stands (the middlewares before it run, the ones after it and the
+	 * handler do not), else as soon as the bytes counted pass the limit. It
+	 * is a `ContentTooLargeError`, which a middleware before this call may
+	 * answer.
 	 *
 	 * ```ts
 	 * alxia()

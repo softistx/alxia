@@ -76,6 +76,30 @@ describe('the route table', () => {
 		}
 	});
 
+	test('a bodyLimit() shows where it stands, and a route option at its head', () => {
+		const log = spyOn(console, 'log').mockImplementation(() => {});
+		try {
+			listen(
+				alxia({ dev: true })
+					.get('/free', ({ reply }) => reply(200, 'ok'))
+					.use(function guard(_ctx, next) {
+						return next();
+					})
+					.bodyLimit(8)
+					.post('/notes', ({ reply }) => reply(200, 'ok'))
+					.post('/up', { bodyLimit: 64 }, ({ reply }) => reply(200, 'ok')),
+			);
+			const lines = String(log.mock.calls[0]?.[0]).split('\n').slice(1);
+			expect(lines).toEqual([
+				'  GET   /free',
+				'  POST  /notes  guard › bodyLimit',
+				'  POST  /up     guard › bodyLimit',
+			]);
+		} finally {
+			log.mockRestore();
+		}
+	});
+
 	test('nothing printed outside dev', () => {
 		const log = spyOn(console, 'log').mockImplementation(() => {});
 		try {

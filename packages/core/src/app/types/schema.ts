@@ -43,7 +43,9 @@ export interface RouteSchema {
 	 * The most bytes the request body may hold, past which it is refused
 	 * with a 413: checked on its `Content-Length`, then counted as it is
 	 * read, by core's parsers or by the handler reading `request.body`.
-	 * Overrides a `bodyLimit()` declared before the route.
+	 * Overrides a `bodyLimit()` declared before the route. A declared
+	 * `Content-Length` over it is refused at the head of the route's own
+	 * middlewares, after everything given to `use`.
 	 */
 	readonly bodyLimit?: number;
 	readonly detail?: RouteDetail;

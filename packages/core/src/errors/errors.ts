@@ -92,9 +92,11 @@ export interface ContentTooLargeBody {
 
 /**
  * A request body larger than its route's `bodyLimit`: what reading it
- * throws, as soon as its `Content-Length` or the bytes counted pass the
- * limit. A middleware before the read may answer it, reading
- * `refusalOf(error)`; the route answers its 413 otherwise.
+ * throws: a declared `Content-Length` over the limit is thrown where the
+ * `bodyLimit()` stands, before any middleware after it; otherwise it is
+ * thrown as soon as the bytes counted pass the limit. A middleware before
+ * that point may answer it, reading `refusalOf(error)`; the route answers
+ * its 413 otherwise.
  */
 export class ContentTooLargeError extends HttpError<413, ContentTooLargeBody> {
 	override readonly name = 'ContentTooLargeError';

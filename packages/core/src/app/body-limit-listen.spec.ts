@@ -61,6 +61,24 @@ describe('bodyLimit under listen', () => {
 		expect(await at.text()).toBe('12345678');
 	});
 
+	test("a real client's Content-Length over the limit does not run what follows bodyLimit()", async () => {
+		const ran: string[] = [];
+		app = alxia()
+			.bodyLimit(8)
+			.use((_ctx, next) => {
+				ran.push('after');
+				return next();
+			})
+			.post('/notes', ({ reply }) => reply(200, 'ok'));
+		const server = app.listen(0);
+		const over = await fetch(
+			new URL('/notes', server.url),
+			post('x'.repeat(4096)),
+		);
+		expect(over.status).toBe(413);
+		expect(ran).toEqual([]);
+	});
+
 	test('a raw upload streamed past 25 MiB is cut off there, its memory flat', async () => {
 		const limit = 25 * 1024 * 1024;
 		let counted = 0;

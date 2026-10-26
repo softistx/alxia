@@ -125,7 +125,10 @@ function* declaredOf(
 		unmatched.derive.filter((hook) => !('when' in hook && hook.when)),
 	);
 	const open = (hook: ChainHook) =>
-		hook.kind === 'validate' || hook.kind === 'responds' || passed.has(hook);
+		hook.kind === 'validate' ||
+		hook.kind === 'responds' ||
+		hook.kind === 'limit' ||
+		passed.has(hook);
 	for (const [path, methods] of router.paths()) {
 		for (const [method, definition] of methods) {
 			if (method === 'WS' || !definition.derive.every(open)) continue;

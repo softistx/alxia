@@ -7,6 +7,7 @@
  * matches it. What any of it throws is answered by `boundary.ts`.
  */
 import { type AnyReply, Reply } from '../reply/reply';
+import { refuseDeclared } from '../request/limit';
 import type { StatusCode } from '../types/status';
 import { middleware } from './chain-middleware';
 import type { ChainHook } from './definition';
@@ -92,6 +93,13 @@ class Runner<Last> {
 					if (added instanceof Reply) return this.#answer(added, responses);
 					if (added !== null && typeof added === 'object') {
 						this.merge(ctx, added);
+					}
+					continue;
+				}
+				case 'limit': {
+					const { definition, request } = this.#run;
+					if ('bodyLimit' in definition && definition.bodyLimit !== undefined) {
+						refuseDeclared(request.request, definition.bodyLimit);
 					}
 					continue;
 				}
