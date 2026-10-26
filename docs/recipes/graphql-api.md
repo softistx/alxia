@@ -655,7 +655,9 @@ export function notFound(what: string): GraphQLError {
 
 Yoga reads the whole body of a `POST` before it parses it, so a megabyte of
 JSON costs a megabyte of memory. Core's `bodyLimit(bytes)` caps every route
-declared after it: the bytes are counted as they arrive, and reading stops
+declared after it. A declared `Content-Length` over the limit is refused right
+where `bodyLimit()` stands, so the middlewares after it (an auth, a logger)
+never run for it; any other body is counted as it arrives, and reading stops
 at the limit. A query is a few kilobytes: 100 KiB is generous. A mutation
 that takes a file by `multipart` needs a larger limit on a route of its own.
 
@@ -664,7 +666,8 @@ the body itself and would report a body it could not read as `400`, `POST
 body sent invalid JSON.`; `@alxia/graphql` throws core's `ContentTooLargeError`
 again instead, so a client gets the 413 a plain route answers, in the app's
 error format (`application/problem+json` under `errors: 'problem'`), with a
-`Content-Length` or without one (a chunked body). Whatever else Yoga cannot
+`Content-Length` or without one (a chunked body). A middleware that formats
+the 413 itself must stand before `bodyLimit()`. Whatever else Yoga cannot
 parse is still its 400, and its parser's own error is never sent
 (`extensions.originalError` is removed).
 

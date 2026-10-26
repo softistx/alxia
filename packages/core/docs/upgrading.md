@@ -75,7 +75,8 @@ limit with a `bodyLimit` option on that route, or declare it before the
 header, so `1e3` and `0x10` were refused unread as 1000 and 16 bytes. Both
 are now treated as no declared length: the body is counted as it arrives,
 as a chunked one is. A value that is not digits is not refused early. This
-reaches only a `Request` built in process (`app.request`, `app.fetch`): over the wire Bun's server already answers 400 to such a value.
+reaches only a `Request` built in process (`app.request`, `app.fetch`):
+over the wire Bun's server already answers 400 to such a value.
 
 ### graphql: a declared oversize POST gets core's 413
 
