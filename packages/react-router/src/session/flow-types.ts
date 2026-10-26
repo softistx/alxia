@@ -170,3 +170,13 @@ export interface FlowContext<L extends string> {
 	readonly invalidCode: string;
 	readonly challengeOver: readonly string[];
 }
+
+/**
+ * What `codeRefusal` reads of the flow: the wording, and the codes it tells
+ * apart. A `FlowContext` is one; so is what `stepUpSteps` builds.
+ */
+export interface CodeWording<L extends string> {
+	readonly options: Pick<SignInFlowOptions<L>, 'errors' | 'attemptsLeft'>;
+	readonly invalidCode: string;
+	readonly challengeOver: readonly string[];
+}

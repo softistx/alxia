@@ -15,6 +15,8 @@ export type StepUpRequestAnswer =
 			readonly ok: false;
 			readonly intent: 'request-step-up';
 			readonly error: StepUpError;
+			/** The refusal worded for the page, in its language. */
+			readonly message?: string;
 	  };
 
 /**
@@ -30,4 +32,6 @@ export type StepUpConfirmAnswer =
 			readonly error: StepUpError;
 			readonly attemptsLeft?: number;
 			readonly locked: boolean;
+			/** The refusal worded for the page, in its language. */
+			readonly message?: string;
 	  };

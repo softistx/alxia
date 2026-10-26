@@ -1721,6 +1721,28 @@ TypeError: serializeCookie(): the path "sign-in" is not a cookie path: it must s
 
 **Fix:** pass a path of your own with its leading slash, and never one taken from a request. Leave `path` out for the default, `/`.
 
+### `TypeError: stepUpSteps(): the code "…" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`
+
+```
+TypeError: stepUpSteps(): the code "auth.errors.invalid-code" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.
+```
+
+**When:** the server starts, or the module that calls `stepUpSteps` is imported.
+
+**Why:** `codes.invalidCode`, the refusal of a wrong code, also appears in `codes.challengeOver`, the codes that end the challenge. A wrong code leaves tries (`attemptsLeft`) and the step could not tell it from a challenge that is gone. Passing `challengeOver` replaces the default list, so a list copied from a sign-in's codes is the usual cause.
+
+**Fix:** list in `challengeOver` the codes of a challenge that is gone and keep the wrong-code code out of it:
+
+```ts
+stepUpSteps({
+	// …
+	codes: {
+		invalidCode: 'auth.errors.invalid-code',
+		challengeOver: ['auth.errors.invalid-token', 'auth.errors.second-factor-state'],
+	},
+});
+```
+
 ## Types
 
 ### `Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`
@@ -2527,3 +2549,12 @@ The browser's cookie panel shows no `__Host-` session cookie after a sign-in, or
 - another `Set-Cookie` header of the same name, set by the app, overwrites it.
 
 **Fix:** serve the app over HTTPS, and keep `secure` `true` only there. Read `cookies.names.session` for the exact name, check the response header in the network panel, and make the proxy pass `Set-Cookie` as it is. In development over HTTP, `secure: !import.meta.env.DEV` sets an unprefixed cookie instead.
+
+### A wrong step-up code signs the user out
+
+The user types a wrong code in the step-up dialog and lands on the sign-in page, instead of seeing "wrong code".
+
+**Why:** `@nxgt/janus-graphql` answers `CODE_INVALID` with HTTP 401. A caller that redirects to the sign-in page on any 401 takes the wrong code for a dead session, before `stepUp.confirm` sees the error.
+
+**Fix:** in the app's caller, redirect to sign-in only for a session 401 (`UNAUTHENTICATED`), never for a step-up's `CODE_INVALID`. [Step-up](guide/session.md#call-the-step-up-with-a-caller-that-does-not-sign-out-on-a-401) has the full section.
+
