@@ -65,4 +65,34 @@ describe('stepUpProps', () => {
 		expect('challenge' in props).toBe(false);
 		expect('phase' in props).toBe(false);
 	});
+
+	test('carries the wait of a throttled request, and drops the message', () => {
+		const state = stepUpReducer(INITIAL_STEP_UP, {
+			type: 'requested',
+			answer: {
+				ok: false,
+				intent: 'request-step-up',
+				error: 'throttled',
+				message: 'Wait 2 minutes.',
+				retryAfter: 120,
+			},
+		});
+		const props = stepUpProps(state);
+		expect(props).toStrictEqual({
+			error: 'throttled',
+			retryAfter: 120,
+			locked: false,
+			pending: false,
+			resent: false,
+		});
+		expect('message' in props).toBe(false);
+	});
+
+	test('a throttle without seconds has no retryAfter key', () => {
+		const state = stepUpReducer(INITIAL_STEP_UP, {
+			type: 'requested',
+			answer: { ok: false, intent: 'request-step-up', error: 'throttled' },
+		});
+		expect('retryAfter' in stepUpProps(state)).toBe(false);
+	});
 });

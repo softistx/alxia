@@ -12,7 +12,9 @@ import type {
 /** The codes the step-up tells apart; `@nxgt/janus`'s by default. */
 export interface StepUpCodes extends SignInCodes {
 	/** The code of a mutation that needs a step-up first (`'STEP_UP_REQUIRED'`). */
-	readonly stepUpRequired?: string;
+	readonly stepUpRequired?: string | undefined;
+	/** The code of a mail the API holds back (`'MAIL_THROTTLED'`): `request` answers `error: 'throttled'`. */
+	readonly mailThrottled?: string | undefined;
 }
 
 export interface StepUpStepsOptions<L extends string> {
@@ -55,8 +57,9 @@ export interface StepUpSteps<L extends string> {
 	/**
 	 * Starts a step-up (`requestStepUp`): the challenge and how it is
 	 * confirmed. The challenge goes to the page's fetcher and nowhere else.
-	 * A refusal (a throttled mail included) is `error: 'failed'` with the
-	 * message and the API's status; an API it cannot reach is a 503. Anything
+	 * A refusal is `error: 'failed'` with the
+	 * message and the API's status, and a throttled mail `error: 'throttled'`,
+	 * with `retryAfter` when the API says how long; an API it cannot reach is a 503. Anything
 	 * that is not an API failure is thrown. Only a same-site JSON post goes on.
 	 */
 	request(

@@ -93,6 +93,22 @@ export function waitMinutes(
 }
 
 /**
+ * The seconds a throttle asks to wait: `retryAfter` of the first error's
+ * `extensions.params`, else of its `extensions`, a number or a numeric string,
+ * rounded up. `undefined` when the API sent none, or none usable (not a number,
+ * negative). Internal: `/session` words it as a typed `retryAfter`.
+ */
+export function retryAfterOf(error: ApiErrorLike): number | undefined {
+	const extensions = error.errors[0]?.extensions;
+	const value = extensions?.params?.retryAfter ?? extensions?.retryAfter;
+	const seconds =
+		typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+	return typeof seconds === 'number' && Number.isFinite(seconds) && seconds >= 0
+		? Math.ceil(seconds)
+		: undefined;
+}
+
+/**
  * The tries a refused code leaves, as `@nxgt/janus` counts them:
  * `extensions.attemptsLeft` of the first error, else the same key in its
  * `params`. A whole number from 0 up; `undefined` when the API sent none or

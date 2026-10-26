@@ -1,7 +1,11 @@
 import type { StepUpVia } from './second-factor';
 
-/** Why a step-up step failed: a wrong code, a challenge gone, or anything else. */
-export type StepUpError = 'invalid' | 'expired' | 'failed';
+/**
+ * Why a step-up step failed: a wrong code, a challenge gone, a mail held back
+ * for asking too often (`throttled`, with `retryAfter` when the API says how
+ * long), or anything else.
+ */
+export type StepUpError = 'invalid' | 'expired' | 'failed' | 'throttled';
 
 /** What the server answers to a request for a challenge. */
 export type StepUpRequestAnswer =
@@ -16,7 +20,9 @@ export type StepUpRequestAnswer =
 			readonly intent: 'request-step-up';
 			readonly error: StepUpError;
 			/** The refusal worded for the page, in its language. */
-			readonly message?: string;
+			readonly message?: string | undefined;
+			/** The seconds to wait before asking again (a whole number from 0), when `error` is `throttled` and the API says. */
+			readonly retryAfter?: number | undefined;
 	  };
 
 /**
@@ -30,8 +36,8 @@ export type StepUpConfirmAnswer =
 			readonly ok: false;
 			readonly intent: 'confirm-step-up';
 			readonly error: StepUpError;
-			readonly attemptsLeft?: number;
+			readonly attemptsLeft?: number | undefined;
 			readonly locked: boolean;
 			/** The refusal worded for the page, in its language. */
-			readonly message?: string;
+			readonly message?: string | undefined;
 	  };

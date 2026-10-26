@@ -3,8 +3,9 @@ import {
 	type ApiErrorLike,
 	attemptsLeftOf,
 	isApiErrorLike,
+	retryAfterOf,
 } from '../errors/api-error';
-import { INVALID_CODE } from './codes';
+import { INVALID_CODE, MAIL_THROTTLED } from './codes';
 import type { CodeWording } from './flow-types';
 import { samesitePost } from './guard';
 import type {
@@ -26,6 +27,7 @@ type Refused = Extract<StepUpConfirmAnswer, { ok: false }>;
 interface StepUpContext<L extends string> extends CodeWording<L> {
 	readonly steps: StepUpStepsOptions<L>;
 	readonly stepUpRequired: string;
+	readonly mailThrottled: string;
 }
 
 function resolve<L extends string>(
@@ -44,6 +46,7 @@ function resolve<L extends string>(
 		invalidCode,
 		challengeOver,
 		stepUpRequired: steps.codes?.stepUpRequired ?? STEP_UP_REQUIRED,
+		mailThrottled: steps.codes?.mailThrottled ?? MAIL_THROTTLED,
 	};
 }
 
@@ -105,11 +108,18 @@ async function requestStep<L extends string>(
 	} catch (error) {
 		const refusal = context.steps.errors.apiRefusal(error, language);
 		if (!refusal) throw error;
-		const message = isApiErrorLike(error)
-			? worded(context, error, language)
-			: refusal.message;
+		const api = isApiErrorLike(error);
+		const message = api ? worded(context, error, language) : refusal.message;
+		const throttled = api && error.code === context.mailThrottled;
+		const retryAfter = throttled ? retryAfterOf(error) : undefined;
 		return data<StepUpRequestAnswer>(
-			{ ok: false, intent, error: 'failed', message },
+			{
+				ok: false,
+				intent,
+				error: throttled ? 'throttled' : 'failed',
+				message,
+				...(retryAfter === undefined ? {} : { retryAfter }),
+			},
 			{ status: refusal.status },
 		);
 	}

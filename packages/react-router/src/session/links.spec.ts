@@ -36,6 +36,20 @@ describe('requestLink', () => {
 		expect(answered.data).toEqual({ formError: 'Wait a little.' });
 	});
 
+	test('a wait with seconds carries them, typed, beside the words', async () => {
+		const { links } = linksFor();
+		const answered = body(
+			await links.requestLink(
+				() => Promise.reject(api('MAIL_THROTTLED', 429, { retryAfter: 120 })),
+				{ request: posting(), language: 'en' },
+			),
+		);
+		expect(answered.data).toEqual({
+			formError: 'Wait a little.',
+			retryAfter: 120,
+		});
+	});
+
 	test('the app names its own throttle code and wording', async () => {
 		const { links } = linksFor({
 			codes: { mailThrottled: 'auth.errors.too-many-attempts' },

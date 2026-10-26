@@ -1,5 +1,5 @@
 import { data } from 'react-router';
-import { isApiErrorLike } from '../errors/api-error';
+import { isApiErrorLike, retryAfterOf } from '../errors/api-error';
 import { MAIL_THROTTLED } from './codes';
 import { samesitePost } from './guard';
 import { afterReset, landByLink } from './link-land';
@@ -42,7 +42,11 @@ async function requestLink<L extends string>(
 				const formError =
 					options.wording?.(error, language) ??
 					errors.apiErrorMessage(error, language);
-				return data<RequestLinkAnswer>({ formError }, { status: 429 });
+				const retryAfter = retryAfterOf(error);
+				return data<RequestLinkAnswer>(
+					{ formError, ...(retryAfter === undefined ? {} : { retryAfter }) },
+					{ status: 429 },
+				);
 			}
 			const email = errors.fieldErrors(error, language)['email'];
 			if (email) {

@@ -3,7 +3,7 @@ import type { ApiErrorLike } from '../errors/api-error';
 import type { ApiErrors } from '../errors/api-errors';
 import type { JsonActions } from '../errors/json-actions';
 import type { SessionCookies } from './cookies';
-import type { SecondFactorMethod, SignInPaths, SignInStatus } from './model';
+import type { SecondFactorKind, SignInPaths, SignInStatus } from './model';
 
 /**
  * What a sign-in step answers, in `@nxgt/janus`'s words. An app maps its
@@ -130,10 +130,10 @@ export interface SignInFlow<L extends string> {
 	/** The code a second-factor page posted, with how it is given; a 400 otherwise. */
 	readCodeInput(
 		request: Request,
-	): Promise<{ kind: SecondFactorMethod; code: string }>;
+	): Promise<{ kind: SecondFactorKind; code: string }>;
 	/** The code against the challenge: `confirm` for an issued code, `recover` for a recovery code. */
 	codeStep(
-		input: { readonly kind: SecondFactorMethod; readonly code: string },
+		input: { readonly kind: SecondFactorKind; readonly code: string },
 		challenge: string,
 		steps: {
 			confirm(challenge: string, code: string): Promise<SignInAnswer>;

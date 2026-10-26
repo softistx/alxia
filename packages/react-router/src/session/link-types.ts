@@ -44,6 +44,8 @@ export type LinkStayed = ReturnType<typeof data<FormErrors>>;
 export type RequestLinkAnswer = {
 	sent?: true;
 	formError?: string;
+	/** A throttled request: the seconds to wait (a whole number from 0), when the API says. */
+	retryAfter?: number;
 	/** The address refused as malformed: under the field. */
 	fieldErrors?: { email?: string };
 };

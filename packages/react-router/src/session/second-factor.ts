@@ -1,11 +1,11 @@
 import { data } from 'react-router';
 import type { FlowContext, SignInAnswer, SignInFlow } from './flow-types';
 import { samesitePost } from './guard';
-import type { SecondFactorMethod } from './model';
+import type { SecondFactorKind } from './model';
 
 const MAX_CODE = 40;
 
-function isMethod(value: unknown): value is SecondFactorMethod {
+function isMethod(value: unknown): value is SecondFactorKind {
 	return value === 'code' || value === 'recovery';
 }
 
@@ -18,7 +18,7 @@ function isMethod(value: unknown): value is SecondFactorMethod {
 export async function readCodeInput<L extends string>(
 	{ options }: FlowContext<L>,
 	request: Request,
-): Promise<{ kind: SecondFactorMethod; code: string }> {
+): Promise<{ kind: SecondFactorKind; code: string }> {
 	samesitePost(options.json, request);
 	const body = (await options.json.readJson(request)) as {
 		kind?: unknown;
@@ -37,7 +37,7 @@ export async function readCodeInput<L extends string>(
  * answers like a sign-in.
  */
 export function codeStep(
-	input: { readonly kind: SecondFactorMethod; readonly code: string },
+	input: { readonly kind: SecondFactorKind; readonly code: string },
 	challenge: string,
 	steps: Parameters<SignInFlow<string>['codeStep']>[2],
 ): Promise<SignInAnswer> {
