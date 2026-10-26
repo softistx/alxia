@@ -1,6 +1,7 @@
 import { redirect } from 'react-router';
 import type { FlowContext, SignInAnswer, SignInFlow } from './flow-types';
 import { safeNext, secondFactorPath } from './model';
+import { millisOf } from './serialize';
 
 /**
  * Ends the request's session at the API, when it carries one; a failure is
@@ -23,8 +24,9 @@ export async function revokeSession<L extends string>(
 /**
  * Where a sign-in's answer leads: signed in, to `next` with the session
  * cookie (and the challenge cleared); a second factor, to its page with the
- * challenge in its own cookie, never in the URL. Any other answer opens no
- * session: `null`, the caller shows its own state.
+ * challenge in its own cookie, never in the URL. Any other answer, or a
+ * signed-in one with no token or an end that is missing, unreadable or past,
+ * opens no session: `null`, the caller shows its own state.
  */
 export function landing<L extends string>(
 	{ options, paths }: FlowContext<L>,
@@ -32,7 +34,13 @@ export function landing<L extends string>(
 	next: string,
 ): Response | null {
 	const { cookies } = options;
-	if (answer.status === 'signedIn' && answer.token) {
+	// A session with no readable or past end would be set and dead at once.
+	if (
+		answer.status === 'signedIn' &&
+		answer.token &&
+		answer.expiresAt &&
+		millisOf(answer.expiresAt) > Date.now()
+	) {
 		const headers = new Headers();
 		headers.append(
 			'Set-Cookie',

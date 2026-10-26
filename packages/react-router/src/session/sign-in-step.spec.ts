@@ -5,6 +5,12 @@ import { asking, body, END, flowFor, thrown } from '../../test/session/flow';
 const signedIn = { status: 'signedIn', token: 'new', expiresAt: END } as const;
 const api = (status: number, message = 'Wrong password') =>
 	refusal('auth.errors.wrong', message, { http: { status } });
+const posting = (url: string, token?: string) =>
+	asking(url, token, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: '{}',
+	});
 const step = { language: 'en', next: '/', extra: { method: 'code' } } as const;
 
 describe('signInStep', () => {
@@ -12,7 +18,7 @@ describe('signInStep', () => {
 		const { flow, revoked } = flowFor();
 		const response = await flow.signInStep(async () => signedIn, {
 			...step,
-			request: asking('/sign-in', 'old'),
+			request: posting('/sign-in', 'old'),
 			next: '/orders',
 		});
 		expect((response as Response).headers.get('location')).toBe('/orders');
@@ -24,7 +30,7 @@ describe('signInStep', () => {
 		const result = body(
 			await flow.signInStep(() => Promise.reject(api(401)), {
 				...step,
-				request: asking('/sign-in'),
+				request: posting('/sign-in'),
 			}),
 		);
 		expect(result.data).toEqual({
@@ -39,7 +45,7 @@ describe('signInStep', () => {
 		const result = body(
 			await flow.signInStep(() => Promise.reject(api(401)), {
 				...step,
-				request: asking('/sign-in'),
+				request: posting('/sign-in'),
 				refused: (error) => `locked (${error.code})`,
 			}),
 		);
@@ -52,7 +58,7 @@ describe('signInStep', () => {
 		const gone = new Response(null, { status: 303 });
 		const response = await flow.signInStep(() => Promise.reject(api(401)), {
 			...step,
-			request: asking('/sign-in'),
+			request: posting('/sign-in'),
 			refused: () => gone,
 		});
 		expect(response).toBe(gone);
@@ -63,7 +69,7 @@ describe('signInStep', () => {
 		const result = body(
 			await flow.signInStep(() => Promise.reject(api(429, 'Slow down')), {
 				...step,
-				request: asking('/sign-in'),
+				request: posting('/sign-in'),
 				refused: () => undefined,
 			}),
 		);
@@ -76,7 +82,7 @@ describe('signInStep', () => {
 		const result = body(
 			await flow.signInStep(
 				() => Promise.reject(new Response('down', { status: 503 })),
-				{ ...step, request: asking('/sign-in') },
+				{ ...step, request: posting('/sign-in') },
 			),
 		);
 		expect(result.data).toEqual({
@@ -96,7 +102,7 @@ describe('signInStep', () => {
 				() => Promise.reject(new Response('down', { status: 503 })),
 				{
 					...step,
-					request: asking('/sign-in'),
+					request: posting('/sign-in'),
 					refused: () => {
 						asked = true;
 						return undefined;
@@ -113,7 +119,7 @@ describe('signInStep', () => {
 		const result = body(
 			await flow.signInStep(async () => ({ status: 'other' }), {
 				...step,
-				request: asking('/sign-in'),
+				request: posting('/sign-in'),
 			}),
 		);
 		expect(result.init.status).toBe(503);
@@ -125,10 +131,69 @@ describe('signInStep', () => {
 		const caught = await thrown(() =>
 			flow.signInStep(() => Promise.reject(error), {
 				...step,
-				request: asking('/sign-in'),
+				request: posting('/sign-in'),
 			}),
 		);
 		expect(caught).toBe(error);
+	});
+});
+
+describe('signInStep and a cross-site post', () => {
+	test('a form post (the only kind another site can send) signs nobody in and revokes nothing', async () => {
+		const { flow, revoked } = flowFor();
+		let ran = false;
+		const forged = asking('/sign-in', 'victim', {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/x-www-form-urlencoded',
+				origin: 'http://evil.test',
+			},
+			body: 'a=1',
+		});
+		const caught = (await thrown(() =>
+			flow.signInStep(
+				async () => {
+					ran = true;
+					return signedIn;
+				},
+				{ ...step, request: forged },
+			),
+		)) as Response;
+		expect(caught).toBeInstanceOf(Response);
+		expect(caught.headers.getSetCookie()).toEqual([]);
+		expect(ran).toBe(false);
+		expect(revoked).toEqual([]);
+	});
+
+	test('the JSON body is left unread for the caller', async () => {
+		const { flow } = flowFor();
+		const request = asking('/sign-in', undefined, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json' },
+			body: '{"a":1}',
+		});
+		await flow.signInStep(async () => signedIn, { ...step, request });
+		expect(request.bodyUsed).toBe(false);
+	});
+});
+
+describe('the types refuse', () => {
+	test('what the flow cannot take', () => {
+		const { flow } = flowFor();
+		const request = asking('/sign-in');
+		const lands = () => {
+			// @ts-expect-error 'other' opens no session: it cannot be in revokeOn
+			flow.landReplacing(signedIn, '/', { request, revokeOn: ['other'] });
+			// @ts-expect-error a signed-in answer carries its token
+			flow.landing({ status: 'signedIn', expiresAt: END }, '/');
+			flow.signInStep(async () => signedIn, {
+				...step,
+				request,
+				// @ts-expect-error refused answers a Response, a string or nothing
+				refused: () => 42,
+			});
+		};
+		expect(lands).toBeInstanceOf(Function);
 	});
 });
 

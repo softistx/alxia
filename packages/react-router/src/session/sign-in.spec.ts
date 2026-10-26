@@ -82,7 +82,7 @@ describe('signInFlow refuses', () => {
 	test('a sign-in path that is not absolute', () => {
 		expect(() => flowFor({ paths: { signIn: 'sign-in' } })).toThrow(
 			new TypeError(
-				'signInFlow(): paths.signIn must be a path of this site, starting with a single "/"; got "sign-in".',
+				'signInFlow(): paths.signIn must be a path of this site with no query or fragment, starting with a single "/"; got "sign-in".',
 			),
 		);
 	});
@@ -90,12 +90,14 @@ describe('signInFlow refuses', () => {
 	test('a second-factor path that is not absolute, or starts with //', () => {
 		expect(() => flowFor({ paths: { secondFactor: 'code' } })).toThrow(
 			new TypeError(
-				'signInFlow(): paths.secondFactor must be a path of this site, starting with a single "/"; got "code".',
+				'signInFlow(): paths.secondFactor must be a path of this site with no query or fragment, starting with a single "/"; got "code".',
 			),
 		);
-		expect(() => flowFor({ paths: { secondFactor: '//evil.test' } })).toThrow(
-			/paths\.secondFactor must be a path of this site/,
-		);
+		for (const path of ['//evil.test', '/\\evil.test', '/a?b', '/a#b']) {
+			expect(() => flowFor({ paths: { secondFactor: path } })).toThrow(
+				/paths\.secondFactor must be a path of this site/,
+			);
+		}
 	});
 
 	test('a wrong-code code that also ends the challenge', () => {

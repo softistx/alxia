@@ -185,10 +185,17 @@ export const signIn = signInFlow({
 	cookies,
 	errors,
 	json,
-	revoke: (token) => execute(SignOutMutation, {}, { token }),
+	revoke: (token, request) =>
+		execute(SignOutMutation, {}, { token, signal: request.signal }),
 	attemptsLeft: (count, language) => t('auth.attempts-left', { count }, language),
 });
 ```
+
+`execute`, `t`, `toAnswer` and the mutation and query documents in these
+examples (`SignOutMutation`, `SignInMutation`, `ViewerQuery`, …) are the
+app's own: the package knows no API client and no wording. `toAnswer` maps
+the API's result to a `SignInAnswer`. `revoke(token, request)` receives the
+request, for the caller's language, address or abort signal.
 
 The flow speaks `@nxgt/janus`'s words, and the app maps its API's: a
 `SignInAnswer` is `{ status: 'signedIn', token, expiresAt }`,
@@ -203,10 +210,15 @@ that cannot be reached (`errors.unavailableMessage` by default), and
 `endedParam` is a query key, such as `'expired'`, that `signInRedirect` adds
 when the request carried a session cookie, to say the session ended.
 
-A sign-in page's action runs the API's mutation inside `signInStep`:
+A sign-in page's action runs the API's mutation inside `signInStep`. Read
+the body through `json` first (`json.readInput` checks the origin and the
+content type): `signInStep` itself refuses a post that is not JSON, by
+redirecting it back to its page, so a form another site posts can neither
+sign anyone in nor revoke a session. It reads headers only, never the body.
 
 ```ts
 // app/routes/sign-in.tsx
+import { json } from '~/errors.server';
 import { signIn } from '~/session.server';
 
 export async function action({ context, request }: Route.ActionArgs) {
@@ -219,6 +231,9 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 ```
 
+- A **signed-in** answer lands only when it has a token and an `expiresAt`
+  that is a date still in the future; otherwise it opens no session (see
+  *other* below). A session set with a dead end would be gone at once.
 - A **signed-in** answer redirects to `next` (through `safeNext`) with the
   session cookie set and the challenge and the app's `clear()` cookies removed.
   The session the browser held is revoked first (`landReplacing`): one browser
@@ -235,6 +250,13 @@ export async function action({ context, request }: Route.ActionArgs) {
 - An **other** answer opens no session, so the step says `unavailable`. Check
   an answer such as `LINKED` yourself, with `landing(answer, next)`, which is
   `null` for it.
+
+`signIn.nextParam(request)` is the `next` the sign-in page was opened with,
+through `safeNext`. `signIn.signInRedirect(request)` is the redirect
+`requireViewer` throws: to the sign-in page, back to this request's page,
+with the session cookie cleared. `signIn.revokeSession(request)` ends the
+request's session at the API (through `revoke`; a failure is ignored) and
+answers `true` when the request carried one.
 
 `signIn.landing(answer, next)` and `signIn.landReplacing(answer, next,
 { request, revokeOn? })` are the same redirects for a step that does not go
@@ -335,8 +357,18 @@ export function action({ request }: Route.ActionArgs) {
 otherwise), so another site cannot sign anyone out, and a GET signs nobody
 out. It then ends the session at the API (a failure is ignored: the cookie
 goes anyway), removes the session cookie and the app's `clear()` cookies and
-redirects to `/sign-in?signed-out=1`. `signOut(request, { to })` redirects to
+redirects to `${paths.signIn}?signed-out=1` (`/sign-in?signed-out=1` by default). `signOut(request, { to })` redirects to
 `to` instead, after `safeNext`: a value that leaves the site goes to `/`.
+
+### The flow's types
+
+- `SignInAnswer` is what a step answers: `signedIn`, `secondFactor` or `other`.
+- `SignInFlowOptions` is what `signInFlow` takes.
+- `SignInFlow` is what it returns.
+- `SignInCodes` is the `codes` option: `invalidCode` and `challengeOver`.
+- `SignInFormError<T>` is `T & { formError: string }`, a form step's answer
+  when it stays on the page.
+- `SignInStayed<T>` is `signInStep`'s `data(...)` return for it, with the status.
 
 ## The step-up state
 

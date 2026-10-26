@@ -141,3 +141,26 @@ describe('revokeSession', () => {
 		expect(seen).toEqual([request]);
 	});
 });
+
+describe('a signed-in answer with no live session to set', () => {
+	const ends: [string, unknown][] = [
+		['an empty expiry', ''],
+		['a null expiry', null],
+		['an unreadable expiry', 'not a date'],
+		['a past expiry', new Date(Date.now() - 1000)],
+		['a past ISO expiry', '2020-01-01T00:00:00.000Z'],
+	];
+
+	for (const [name, expiresAt] of ends) {
+		test(`${name} lands nothing and revokes nothing`, async () => {
+			const { flow, revoked } = flowFor();
+			const answer = { status: 'signedIn', token: 'new', expiresAt } as never;
+			expect(flow.landing(answer, '/')).toBeNull();
+			const landed = await flow.landReplacing(answer, '/', {
+				request: asking('/sign-in', 'old'),
+			});
+			expect(landed).toBeNull();
+			expect(revoked).toEqual([]);
+		});
+	}
+});

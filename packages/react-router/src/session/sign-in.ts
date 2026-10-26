@@ -1,7 +1,7 @@
 import { CHALLENGE_OVER, INVALID_CODE } from './codes';
 import type { FlowContext, SignInFlow, SignInFlowOptions } from './flow-types';
 import { landing, landReplacing, revokeSession } from './land';
-import { SIGN_IN_PATHS, type SignInPaths } from './model';
+import { SIGN_IN_PATHS, type SignInPaths, safeNext } from './model';
 import { codeStep, readCodeInput } from './second-factor';
 import { codeRefusal, signInStep } from './step';
 import {
@@ -18,9 +18,9 @@ function resolve<L extends string>(
 	const paths: SignInPaths = { ...SIGN_IN_PATHS, ...options.paths };
 	for (const key of ['signIn', 'secondFactor'] as const) {
 		const path = paths[key];
-		if (!path.startsWith('/') || path.startsWith('//')) {
+		if (safeNext(path) !== path || /[?#]/.test(path)) {
 			throw new TypeError(
-				`signInFlow(): paths.${key} must be a path of this site, starting with a single "/"; got ${JSON.stringify(path)}.`,
+				`signInFlow(): paths.${key} must be a path of this site with no query or fragment, starting with a single "/"; got ${JSON.stringify(path)}.`,
 			);
 		}
 	}

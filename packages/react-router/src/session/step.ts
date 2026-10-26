@@ -55,7 +55,10 @@ export async function signInStep<L extends string, T extends object>(
 		refused,
 	}: Parameters<SignInFlow<L>['signInStep']>[1] & { extra: T },
 ): Promise<Response | SignInStayed<T>> {
-	const { errors, unavailable } = context.options;
+	const { errors, unavailable, json } = context.options;
+	// A cross-site form post must never sign in or revoke: only JSON goes on
+	// (the headers are read, not the body).
+	json.requireJsonPost(request);
 	const stay = (formError: string, status: number) =>
 		data<SignInFormError<T>>({ ...extra, formError }, { status });
 	const unreachable = () =>
