@@ -9,6 +9,7 @@ import type {
 	FlowContext,
 	SignInAnswer,
 	SignInFlow,
+	SignInFlowOptions,
 	SignInFormError,
 	SignInStayed,
 } from './flow-types';
@@ -40,6 +41,12 @@ export function codeRefusal<L extends string>(
 	return `${message} ${options.attemptsLeft(count, language)}`;
 }
 
+/** What a sign-in says when the API cannot be reached. */
+export const unavailableMessage = <L extends string>(
+	{ unavailable, errors }: Pick<SignInFlowOptions<L>, 'unavailable' | 'errors'>,
+	language: L,
+): string => unavailable?.(language) ?? errors.unavailableMessage(language);
+
 /**
  * Runs a sign-in step and redirects where its answer leads, a new session
  * replacing the browser's (`landReplacing`). A refusal is the form's
@@ -57,16 +64,13 @@ export async function signInStep<L extends string, T extends object>(
 		refused,
 	}: Parameters<SignInFlow<L>['signInStep']>[1] & { extra: T },
 ): Promise<Response | SignInStayed<T>> {
-	const { errors, unavailable, json } = context.options;
+	const { errors, json } = context.options;
 	// A cross-site post must never sign in or revoke (headers only).
 	samesitePost(json, request);
 	const stay = (formError: string, status: number) =>
 		data<SignInFormError<T>>({ ...extra, formError }, { status });
 	const unreachable = () =>
-		stay(
-			unavailable ? unavailable(language) : errors.unavailableMessage(language),
-			503,
-		);
+		stay(unavailableMessage(context.options, language), 503);
 	let answer: SignInAnswer;
 	try {
 		answer = await run();

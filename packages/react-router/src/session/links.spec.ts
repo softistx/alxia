@@ -10,7 +10,12 @@ describe('requestLink', () => {
 	test('sent, whoever the e-mail is', async () => {
 		const { links } = linksFor();
 		expect(
-			body(await links.requestLink(posting(), async () => true, 'en')).data,
+			body(
+				await links.requestLink(async () => true, {
+					request: posting(),
+					language: 'en',
+				}),
+			).data,
 		).toEqual({
 			sent: true,
 		});
@@ -20,9 +25,11 @@ describe('requestLink', () => {
 		const { links } = linksFor();
 		const answered = body(
 			await links.requestLink(
-				posting(),
 				() => Promise.reject(api('MAIL_THROTTLED', 429)),
-				'en',
+				{
+					request: posting(),
+					language: 'en',
+				},
 			),
 		);
 		expect(answered.init.status).toBe(429);
@@ -31,16 +38,13 @@ describe('requestLink', () => {
 
 	test('the app names its own throttle code and wording', async () => {
 		const { links } = linksFor({
-			throttled: {
-				code: 'auth.errors.too-many-attempts',
-				wording: (error, language) => `${language}: ${error.code}`,
-			},
+			codes: { mailThrottled: 'auth.errors.too-many-attempts' },
+			wording: (error, language) => `${language}: ${error.code}`,
 		});
 		const answered = body(
 			await links.requestLink(
-				posting(),
 				() => Promise.reject(api('auth.errors.too-many-attempts', 429)),
-				'fr',
+				{ request: posting(), language: 'fr' },
 			),
 		);
 		expect(answered.init.status).toBe(429);
@@ -53,7 +57,6 @@ describe('requestLink', () => {
 		const { links } = linksFor();
 		const answered = body(
 			await links.requestLink(
-				posting(),
 				() =>
 					Promise.reject(
 						api('validation.errors.invalid-input', 400, {
@@ -66,7 +69,7 @@ describe('requestLink', () => {
 							],
 						}),
 					),
-				'en',
+				{ request: posting(), language: 'en' },
 			),
 		);
 		expect(answered.init.status).toBe(400);
@@ -76,19 +79,17 @@ describe('requestLink', () => {
 	test('another refusal, or an unreachable API, is the form’s message', async () => {
 		const { links } = linksFor();
 		const refused = body(
-			await links.requestLink(
-				posting(),
-				() => Promise.reject(api('x.errors.y', 500)),
-				'en',
-			),
+			await links.requestLink(() => Promise.reject(api('x.errors.y', 500)), {
+				request: posting(),
+				language: 'en',
+			}),
 		);
 		expect(refused.init.status).toBe(500);
 		expect(refused.data).toEqual({ formError: 'Wait a little.' });
 		const down = body(
 			await links.requestLink(
-				posting(),
 				() => Promise.reject(new Response(null, { status: 503 })),
-				'en',
+				{ request: posting(), language: 'en' },
 			),
 		);
 		expect(down.init.status).toBe(503);
@@ -98,7 +99,10 @@ describe('requestLink', () => {
 		const { links } = linksFor();
 		const error = new Error('boom');
 		await expect(
-			links.requestLink(posting(), () => Promise.reject(error), 'en'),
+			links.requestLink(() => Promise.reject(error), {
+				request: posting(),
+				language: 'en',
+			}),
 		).rejects.toBe(error);
 	});
 });
@@ -108,11 +112,10 @@ test('a cross-site post requests nothing', async () => {
 	let ran = false;
 	const refused = await thrown(() =>
 		links.requestLink(
-			crossSite(),
 			async () => {
 				ran = true;
 			},
-			'en',
+			{ request: crossSite(), language: 'en' },
 		),
 	);
 	expect(refused).toBeInstanceOf(Response);

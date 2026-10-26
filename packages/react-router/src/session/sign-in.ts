@@ -3,7 +3,7 @@ import type { FlowContext, SignInFlow, SignInFlowOptions } from './flow-types';
 import { landing, landReplacing, revokeSession } from './land';
 import { SIGN_IN_PATHS, type SignInPaths, safeNext } from './model';
 import { codeStep, readCodeInput } from './second-factor';
-import { codeRefusal, signInStep } from './step';
+import { codeRefusal, signInStep, unavailableMessage } from './step';
 import {
 	nextParam,
 	requireViewer,
@@ -52,7 +52,13 @@ export function signInFlow<L extends string>(
 	options: SignInFlowOptions<L>,
 ): SignInFlow<L> {
 	const context = resolve(options);
+	const { options: o } = context;
 	return {
+		cookies: o.cookies,
+		errors: o.errors,
+		json: o.json,
+		unavailable: (language) => unavailableMessage(o, language),
+		clear: () => o.clear?.() ?? [],
 		nextParam,
 		signInRedirect: (request) => signInRedirect(context, request),
 		landing: (answer, next) => landing(context, answer, next),

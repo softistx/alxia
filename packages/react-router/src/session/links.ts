@@ -1,5 +1,6 @@
 import { data } from 'react-router';
 import { isApiErrorLike } from '../errors/api-error';
+import { MAIL_THROTTLED } from './codes';
 import { samesitePost } from './guard';
 import { afterReset, landByLink } from './link-land';
 import {
@@ -12,12 +13,12 @@ import {
 import type {
 	AuthLinks,
 	AuthLinksOptions,
+	LinksContext,
 	RequestLinkAnswer,
 } from './link-types';
 import { safeNext } from './model';
 
 const RESET_DONE = '/sign-in?password-reset=1';
-const MAIL_THROTTLED = 'MAIL_THROTTLED';
 
 /**
  * Requests a mail's link with `run`. The API answers true whether or not
@@ -26,21 +27,20 @@ const MAIL_THROTTLED = 'MAIL_THROTTLED';
  * address is the `email` field's.
  */
 async function requestLink<L extends string>(
-	options: AuthLinksOptions<L>,
-	request: Request,
+	options: LinksContext<L>,
 	run: () => Promise<unknown>,
-	language: L,
+	{ request, language }: Parameters<AuthLinks<L>['requestLink']>[1],
 ) {
-	const { errors, throttled } = options;
+	const { errors } = options;
 	samesitePost(options.json, request);
 	try {
 		await run();
 		return data<RequestLinkAnswer>({ sent: true });
 	} catch (error) {
 		if (isApiErrorLike(error)) {
-			if (error.code === (throttled?.code ?? MAIL_THROTTLED)) {
+			if (error.code === (options.codes?.mailThrottled ?? MAIL_THROTTLED)) {
 				const formError =
-					throttled?.wording?.(error, language) ??
+					options.wording?.(error, language) ??
 					errors.apiErrorMessage(error, language);
 				return data<RequestLinkAnswer>({ formError }, { status: 429 });
 			}
@@ -69,12 +69,19 @@ async function requestLink<L extends string>(
  * app's `signInFlow`.
  *
  * @example
- * export const links = authLinks({ signIn, cookies, errors });
+ * export const links = authLinks({ signIn });
  * // loader: return data({ ... }, { headers: TOKEN_PAGE_HEADERS });
  */
 export function authLinks<L extends string>(
-	options: AuthLinksOptions<L>,
+	links: AuthLinksOptions<L>,
 ): AuthLinks<L> {
+	const { signIn } = links;
+	const options: LinksContext<L> = {
+		...links,
+		cookies: signIn.cookies,
+		errors: signIn.errors,
+		json: signIn.json,
+	};
 	const resetDone = options.resetDone ?? RESET_DONE;
 	if (safeNext(resetDone) !== resetDone) {
 		throw new TypeError(
@@ -91,7 +98,6 @@ export function authLinks<L extends string>(
 		answerOf,
 		landByLink: (answer, o) => landByLink(options, answer, o),
 		afterReset: (request) => afterReset(options, resetDone, request),
-		requestLink: (request, run, language) =>
-			requestLink(options, request, run, language),
+		requestLink: (run, o) => requestLink(options, run, o),
 	};
 }

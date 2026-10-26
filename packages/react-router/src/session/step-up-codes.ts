@@ -1,3 +1,5 @@
+import { CHALLENGE_OVER } from './codes';
+
 /** `@nxgt/janus`'s code for a mutation that needs a recent step-up. */
 export const STEP_UP_REQUIRED = 'STEP_UP_REQUIRED';
 
@@ -7,9 +9,7 @@ export const STEP_UP_REQUIRED = 'STEP_UP_REQUIRED';
  * `SECOND_FACTOR_NOT_ENROLLED`). The user asks again.
  */
 export const STEP_UP_OVER = [
-	'TOKEN_UNKNOWN',
-	'TOKEN_SPENT',
-	'TOKEN_EXPIRED',
+	...CHALLENGE_OVER,
 	'TOKEN_STALE',
 	'SECOND_FACTOR_ACTIVE',
 	'SECOND_FACTOR_NOT_ENROLLED',

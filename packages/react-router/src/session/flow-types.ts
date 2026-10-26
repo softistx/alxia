@@ -68,6 +68,16 @@ export type SignInStayed<T extends object> = ReturnType<
 >;
 
 export interface SignInFlow<L extends string> {
+	/** The cookies the flow was built with. */
+	readonly cookies: SessionCookies;
+	/** The `createApiErrors` instance the flow was built with. */
+	readonly errors: ApiErrors<L>;
+	/** The `jsonActions` instance the flow was built with. */
+	readonly json: JsonActions;
+	/** What a sign-in says when the API cannot be reached: the `unavailable` option, else `errors.unavailableMessage`. */
+	unavailable(language: L): string;
+	/** The `Set-Cookie` values a new session and a sign-out also clear (the `clear` option); none by default. */
+	clear(): readonly string[];
 	/** The `next` a sign-in page was opened with, safe to redirect to. */
 	nextParam(request: Request): string;
 	/** The sign-in page, coming back to this request's page, with the session cookie cleared. */

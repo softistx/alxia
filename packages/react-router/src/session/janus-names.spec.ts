@@ -5,7 +5,7 @@ import type {
 	StepUpByApp,
 	StepUpByEmail,
 } from '@nxgt/janus';
-import { CHALLENGE_OVER, INVALID_CODE } from './codes';
+import { CHALLENGE_OVER, INVALID_CODE, MAIL_THROTTLED } from './codes';
 import type { SignInStatus, StepUpVia } from './model';
 import { STEP_UP_OVER, STEP_UP_REQUIRED } from './step-up-codes';
 
@@ -28,6 +28,7 @@ const codes: readonly JanusErrorCode[] = [
 	...CHALLENGE_OVER,
 	...STEP_UP_OVER,
 	STEP_UP_REQUIRED,
+	MAIL_THROTTLED,
 ] as const;
 
 describe('@nxgt/janus’s names', () => {
@@ -48,6 +49,7 @@ describe('@nxgt/janus’s names', () => {
 			'SECOND_FACTOR_ACTIVE',
 			'SECOND_FACTOR_NOT_ENROLLED',
 			'STEP_UP_REQUIRED',
+			'MAIL_THROTTLED',
 		]);
 	});
 });

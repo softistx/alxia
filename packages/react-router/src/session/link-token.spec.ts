@@ -20,6 +20,7 @@ function refused<T>(spent: Spent<T>) {
 }
 const spend = (run: () => Promise<unknown>, fields = ['password']) =>
 	links.spendToken(run, {
+		request: posting(),
 		language: 'en',
 		path: PATH,
 		fields,
@@ -165,7 +166,7 @@ describe('statePath and ended', () => {
 				async () => {
 					ran = true;
 				},
-				{ language: 'en', path: '/a?token=t', states: {} },
+				{ request: posting(), language: 'en', path: '/a?token=t', states: {} },
 			),
 		).rejects.toBeInstanceOf(TypeError);
 		expect(ran).toBe(false);

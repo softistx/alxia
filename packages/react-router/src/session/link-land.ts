@@ -3,13 +3,13 @@ import type { FormErrors } from '../errors/form-errors';
 import type { SignInAnswer } from './flow-types';
 import { samesitePost } from './guard';
 import { stateRedirect, withTokenHeaders } from './link-token';
-import type { AuthLinks, AuthLinksOptions, LinkStayed } from './link-types';
+import type { AuthLinks, LinkStayed, LinksContext } from './link-types';
 import { HOME, safeNext } from './model';
 import { millisOf } from './serialize';
 
 /** Where a new session starts: the app's start page, else `/`; never an unsafe path. */
 async function startOf<L extends string>(
-	{ start }: AuthLinksOptions<L>,
+	{ start }: LinksContext<L>,
 	request: Request,
 	token: string,
 ): Promise<string> {
@@ -37,7 +37,7 @@ const isLive = (answer: SignInAnswer): boolean =>
  * anything is revoked or landed.
  */
 export async function landByLink<L extends string>(
-	options: AuthLinksOptions<L>,
+	options: LinksContext<L>,
 	answer: SignInAnswer,
 	{ request, language, other }: Parameters<AuthLinks<L>['landByLink']>[1],
 ): Promise<Response | LinkStayed> {
@@ -56,7 +56,7 @@ export async function landByLink<L extends string>(
 	});
 	if (!landed) {
 		return data<FormErrors>(
-			{ formError: options.errors.unavailableMessage(language) },
+			{ formError: options.signIn.unavailable(language) },
 			{ status: 503 },
 		);
 	}
@@ -71,7 +71,7 @@ export async function landByLink<L extends string>(
  * goes on.
  */
 export async function afterReset<L extends string>(
-	options: AuthLinksOptions<L>,
+	options: LinksContext<L>,
 	resetDone: string,
 	request: Request,
 ): Promise<Response> {

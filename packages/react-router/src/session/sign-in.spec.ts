@@ -124,3 +124,26 @@ describe('signInFlow refuses', () => {
 		).not.toThrow();
 	});
 });
+
+describe('the flow’s properties', () => {
+	test('cookies, errors and json are the ones it was built with', () => {
+		const { flow, cookies } = flowFor();
+		expect(flow.cookies).toBe(cookies);
+		expect(typeof flow.errors.apiErrorMessage).toBe('function');
+		expect(typeof flow.json.readJson).toBe('function');
+	});
+
+	test('unavailable words the option, else errors’', () => {
+		expect(flowFor().flow.unavailable('en')).toBe(
+			'The service is unavailable.',
+		);
+		const own = flowFor({ unavailable: (language) => `down (${language})` });
+		expect(own.flow.unavailable('fr')).toBe('down (fr)');
+	});
+
+	test('clear lists the option’s cookies, none by default', () => {
+		expect(flowFor().flow.clear()).toEqual([]);
+		const own = flowFor({ clear: () => ['theme=; Max-Age=0'] });
+		expect(own.flow.clear()).toEqual(['theme=; Max-Age=0']);
+	});
+});

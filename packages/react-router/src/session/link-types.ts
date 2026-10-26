@@ -1,27 +1,25 @@
 import type { data } from 'react-router';
 import type { ApiErrorLike } from '../errors/api-error';
-import type { ApiErrors } from '../errors/api-errors';
 import type { FormErrors } from '../errors/form-errors';
-import type { JsonActions } from '../errors/json-actions';
 import type { InferOutput, StandardSchemaV1 } from '../errors/standard-schema';
-import type { SessionCookies } from './cookies';
 import type { SignInAnswer, SignInFlow } from './flow-types';
 
 export interface AuthLinksOptions<L extends string> {
-	/** The app's sign-in flow: it lands the sessions a link opens. */
+	/**
+	 * The app's sign-in flow: it lands the sessions a link opens, and its
+	 * `cookies`, `errors` and `json` are the ones the links use.
+	 */
 	readonly signIn: SignInFlow<L>;
-	/** The same cookies the flow was built with: a reset clears the session's. */
-	readonly cookies: SessionCookies;
-	readonly errors: ApiErrors<L>;
-	/** The app's `jsonActions({ origin })`: every body is read with its CSRF check. */
-	readonly json: JsonActions;
-	/** The API's wait on mailed links. */
-	readonly throttled?: {
-		/** `'MAIL_THROTTLED'`, `@nxgt/janus`'s code, by default. */
-		readonly code?: string;
-		/** The wait in the app's words; `errors.apiErrorMessage` by default. */
-		wording?(error: ApiErrorLike, language: L): string;
+	/** The codes the links tell apart; `@nxgt/janus`'s by default. */
+	readonly codes?: {
+		/** The API's wait on mailed links; `MAIL_THROTTLED` by default. */
+		readonly mailThrottled?: string | undefined;
 	};
+	/**
+	 * The wait of a throttled mail in the app's words, before `errors`'
+	 * default; `undefined` keeps the default.
+	 */
+	wording?(error: ApiErrorLike, language: L): string | undefined;
 	/**
 	 * Where a new session starts, from its token (the viewer's own page): read
 	 * after the token is spent, so the sign-in lands there at once instead of
@@ -34,6 +32,10 @@ export interface AuthLinksOptions<L extends string> {
 	/** The state a token the API refuses ends on; `'invalid'` by default. */
 	readonly invalidState?: string;
 }
+
+/** The options with what they read of the flow: the functions take this. */
+export type LinksContext<L extends string> = AuthLinksOptions<L> &
+	Pick<SignInFlow<L>, 'cookies' | 'errors' | 'json'>;
 
 /** What a token page answers when it stays on the page. */
 export type LinkStayed = ReturnType<typeof data<FormErrors>>;
@@ -58,6 +60,8 @@ export type Spent<T> =
 	  };
 
 export interface SpendOptions<L extends string> {
+	/** The post: a same-site JSON one goes on, as for every step that spends. */
+	readonly request: Request;
 	readonly language: L;
 	/** The page's path, without its token. */
 	readonly path: string;
@@ -83,7 +87,7 @@ export interface AuthLinks<L extends string> {
 		request: Request,
 		path: string,
 	): Promise<InferOutput<S>>;
-	/** Posts a link's token with `run`: its value, else what the page answers. */
+	/** Posts a link's token with `run`: its value, else what the page answers. A post that is not a same-site JSON one is refused first. */
 	spendToken<T>(
 		run: () => Promise<T>,
 		options: SpendOptions<L>,
@@ -108,10 +112,9 @@ export interface AuthLinks<L extends string> {
 	): Promise<Response | LinkStayed>;
 	/** After a password reset: the browser's session revoked and cleared, then the sign-in page. */
 	afterReset(request: Request): Promise<Response>;
-	/** Requests a mail's link with `run`; only a JSON post goes on. */
+	/** Requests a mail's link with `run`; only a same-site JSON post goes on. */
 	requestLink(
-		request: Request,
 		run: () => Promise<unknown>,
-		language: L,
+		options: { readonly request: Request; readonly language: L },
 	): Promise<ReturnType<typeof data<RequestLinkAnswer>>>;
 }

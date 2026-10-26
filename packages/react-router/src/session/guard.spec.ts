@@ -127,7 +127,10 @@ describe('a cross-site JSON post does nothing', () => {
 		const { links } = linksFor();
 		let ran = false;
 		const error = await thrown(() =>
-			links.requestLink(evil(), async () => (ran = true), 'en'),
+			links.requestLink(async () => (ran = true), {
+				request: evil(),
+				language: 'en',
+			}),
 		);
 		expect(status(error)).toBe(403);
 		expect(ran).toBe(false);
@@ -141,6 +144,21 @@ describe('a cross-site JSON post does nothing', () => {
 		);
 		expect(status(error)).toBe(403);
 		expect(request.bodyUsed).toBe(false);
+	});
+
+	test('spendToken: no run', async () => {
+		const { links } = linksFor();
+		let ran = false;
+		const error = await thrown(() =>
+			links.spendToken(async () => (ran = true), {
+				request: evil(),
+				language: 'en',
+				path: PATH,
+				states: {},
+			}),
+		);
+		expect(status(error)).toBe(403);
+		expect(ran).toBe(false);
 	});
 
 	test('stepUp.request and stepUp.confirm: no run', async () => {

@@ -4,8 +4,8 @@ import type { FormErrors } from '../errors/form-errors';
 import type { InferOutput, StandardSchemaV1 } from '../errors/standard-schema';
 import { samesitePost } from './guard';
 import type {
-	AuthLinksOptions,
 	LinkStayed,
+	LinksContext,
 	SpendOptions,
 	Spent,
 } from './link-types';
@@ -63,7 +63,7 @@ const isTokenIssue = (issue: {
 };
 
 export async function linkArgs<S extends StandardSchemaV1>(
-	{ json }: Pick<AuthLinksOptions<string>, 'json'>,
+	{ json }: Pick<LinksContext<string>, 'json'>,
 	invalidState: string,
 	schema: S,
 	request: Request,
@@ -83,11 +83,12 @@ export async function linkArgs<S extends StandardSchemaV1>(
 }
 
 export async function spendToken<L extends string, T>(
-	options: AuthLinksOptions<L>,
+	options: LinksContext<L>,
 	run: () => Promise<T>,
-	{ language, path, states, fields: shown = [] }: SpendOptions<L>,
+	{ request, language, path, states, fields: shown = [] }: SpendOptions<L>,
 ): Promise<Spent<T>> {
 	const { errors } = options;
+	samesitePost(options.json, request);
 	pathOf(path);
 	try {
 		return { ok: true, value: await run() };
