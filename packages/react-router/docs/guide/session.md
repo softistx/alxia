@@ -422,9 +422,11 @@ headers only, never the body. Its outcomes:
   `null` for it.
 
 The flow also exposes what it was built with, for the steps built on it:
-`signIn.cookies`, `signIn.errors` and `signIn.json`, `signIn.unavailable(language)`
-(the `unavailable` option, else `errors.unavailableMessage`) and `signIn.clear()`
-(the `clear` option's cookies, none by default).
+`signIn.cookies`, `signIn.errors` and `signIn.json`, `signIn.attemptsLeft`,
+`signIn.unavailable(language)` (the `unavailable` option, else
+`errors.unavailableMessage`) and `signIn.clear()` (the `clear` option's
+cookies, none by default). `stepUpSteps` and `authLinks` take the flow and read
+these, so the app wires `errors`, `json` and the wording once.
 
 `signIn.nextParam(request)` is the `next` the sign-in page was opened with,
 through `safeNext`. `signIn.signInRedirect(request)` is the redirect
@@ -437,6 +439,22 @@ answers `true` when the request carried one.
 { request, revokeOn? })` are the same redirects for a step that does not go
 through `signInStep` (a link a mail carries). `revokeOn` lists the statuses
 that end the browser's session; `['signedIn']` by default.
+
+### Which steps guard themselves
+
+Every step that signs in, out, spends or mails runs the same guard before it
+reads anything: a native form post is redirected back to its page, and a JSON
+post from another site is a 403. These guard themselves: `signInStep`,
+`readCodeInput`, `landReplacing`, `revokeSession`, `signOut` (through
+`readJson`), the step-up's `request` and `confirm`, and `linkArgs`,
+`spendToken`, `landByLink`, `afterReset` and `requestLink`. `landing`,
+`codeStep`, `codeRefusal`, `viewer` and `requireViewer` take no post and do not.
+
+An app's own step (a passkey's registration, say) calls `signIn.guard(request)`
+first, in a POST action, before it reads the body or calls the API. It throws
+the same redirect or 403. Do not call it in a GET callback (an OAuth return, a
+magic link's landing): a GET carries no JSON content type, so the guard would
+redirect it to itself.
 
 ### The viewer
 
@@ -517,12 +535,12 @@ is the server half: two steps for the route's action, whose answers
 ```ts
 // app/step-up.server.ts
 import { stepUpSteps } from '@alxia/react-router/session';
-import { errors, json } from './errors.server';
+import { signIn } from './session.server';
 
 export const stepUp = stepUpSteps({
-	errors,
-	json, // the same jsonActions({ origin }): a step runs for a same-site JSON post only
-	attemptsLeft: (count, language) => t('code.attempts-left', { count }, language),
+	// The app's signInFlow: the step-up reads its errors, its json (a step runs
+	// for a same-site JSON post only) and its attemptsLeft.
+	signIn,
 	spent: (language) => t('step-up.spent', {}, language), // "Ask for a new code."
 	locked: (language) => t('step-up.locked', {}, language), // "Wait a few minutes."
 });
@@ -538,6 +556,7 @@ import { stepUp } from '~/step-up.server';
 
 export async function action({ context, request }: Route.ActionArgs) {
 	const { language } = alxiaOf(context);
+	json.requireJsonPost(request); // a native post goes back to its page
 	const caller = await sessionCaller(request);
 	const input = await json.readJson(request); // same-origin JSON only
 	if (input.intent === 'request-step-up') {
@@ -775,6 +794,7 @@ Asking for the mail, and the reset's last step:
 ```ts
 // app/routes/auth/sign-in-link.tsx
 export async function action({ request }: Route.ActionArgs) {
+	json.requireJsonPost(request); // a native post goes back to its page
 	const { email } = await json.readInput(request, EmailArgs);
 	return links.requestLink(() => requestMagicLink(email), {
 		request,
@@ -832,8 +852,8 @@ export async function action({ request }: Route.ActionArgs) {
 - `requestLink(run, { request, language })` requests the mail. It answers
   `{ sent: true }` whoever the address is, so the page does not tell which
   addresses hold an account (`RequestLinkAnswer` is its shape). A wait is a
-  429 with the `formError` and, when the API gave the seconds, a typed
-  `retryAfter` beside it; a malformed address is the `email` field's refusal.
+  429 with the `formError`, `throttled: true` and, when the API gave the
+  seconds, a typed `retryAfter` beside it; a malformed address is the `email` field's refusal.
 
 `linkArgs`, `spendToken`, `landByLink`, `afterReset` and `requestLink` first
 refuse a post that is not a same-site JSON one: the redirect a native form
@@ -841,7 +861,9 @@ post gets goes back to its page, which then posts JSON, and a JSON post from
 another site is a 403, before anything is read, spent, revoked or landed.
 
 The wait is recognised by the app's own throttle code, so pass it, as the
-step-up's `codes` and `wording` do:
+step-up's `codes` and `wording` do (`AuthLinksCodes` is the type of `codes`).
+`wording` words every refusal of `requestLink` that is not a field's, the
+wait included; returning `undefined` keeps `errors`' words:
 
 ```ts
 authLinks({
@@ -927,7 +949,7 @@ The types of `/session`:
   `MAIL_THROTTLED` are the default codes, so an app can extend a list
   (`challengeOver: [...CHALLENGE_OVER, 'auth.errors.gone']`).
 - `AuthLinksOptions` is what `authLinks` takes: `signIn`, and the optional
-  `codes`, `wording`, `start`, `resetDone` and `invalidState`. `AuthLinks` is
-  what it returns.
+  `codes` (`AuthLinksCodes`: `mailThrottled`), `wording`, `start`, `resetDone`
+  and `invalidState`. `AuthLinks` is what it returns.
 - `Spent<T>` is what `spendToken` returns, `LinkStayed` is the `data(...)` a
   refusal answers with, and `SpendOptions` is its second argument.

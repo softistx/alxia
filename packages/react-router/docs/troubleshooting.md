@@ -82,6 +82,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: sessionCookies(): challengePath must start with "/" and hold no ";" or control character; got ….`](#typeerror-sessioncookies-challengepath-must-start-with--and-hold-no--or-control-character-got-)
 - [`TypeError: signInFlow(): paths.… must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-signinflow-paths-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
 - [`TypeError: signInPath(): options.path must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-signinpath-optionspath-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
+- [`TypeError: signInFlow(): json must come from jsonActions(), which carries the site check every step runs; this object has none (a hand-made double?). Pass the app's jsonActions({ origin }) instance, or a spread copy of it.`](#typeerror-signinflow-json-must-come-from-jsonactions-which-carries-the-site-check-every-step-runs-this-object-has-none-a-hand-made-double-pass-the-apps-jsonactions-origin--instance-or-a-spread-copy-of-it)
 - [`TypeError: signInFlow(): the code "…" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`](#typeerror-signinflow-the-code--is-both-the-wrong-code-code-codesinvalidcode-and-in-codeschallengeover-a-wrong-code-that-leaves-tries-cannot-end-the-challenge)
 - [`TypeError: serializeCookie(): the name "…" is not a cookie name (an RFC 6265 token).`](#typeerror-serializecookie-the-name--is-not-a-cookie-name-an-rfc-6265-token)
 - [`TypeError: serializeCookie(): the path "…" is not a cookie path: it must start with "/" and hold no ";" or control character.`](#typeerror-serializecookie-the-path--is-not-a-cookie-path-it-must-start-with--and-hold-no--or-control-character)
@@ -1337,7 +1338,11 @@ shows.
 ### `Cross-site request refused`
 
 **When:** an action reads its body with `readJson` or `readInput` (from
-`jsonActions()`), and the page's post answers 403 with this text.
+`jsonActions()`), or runs one of `/session`'s steps (`signInStep`,
+`readCodeInput`, `linkArgs`, `spendToken`, `landByLink`, `afterReset`,
+`requestLink`, the step-up's `request` and `confirm`, `landReplacing`,
+`revokeSession`, `signIn.guard`), and the page's post answers 403 with this
+text. The session steps refuse before they read the body.
 
 **Why:** the request carried an `Origin` other than the app's own, or a
 `Sec-Fetch-Site` that is neither `same-origin` nor `none`. That is what a
@@ -1688,6 +1693,24 @@ TypeError: signInPath(): options.path must be a path of this site with no query 
 import { signInPath } from '@alxia/react-router/session/model';
 
 signInPath('/orders', { path: '/login', query: { expired: '1' } });
+```
+
+### `TypeError: signInFlow(): json must come from jsonActions(), which carries the site check every step runs; this object has none (a hand-made double?). Pass the app's jsonActions({ origin }) instance, or a spread copy of it.`
+
+```
+TypeError: signInFlow(): json must come from jsonActions(), which carries the site check every step runs; this object has none (a hand-made double?). Pass the app's jsonActions({ origin }) instance, or a spread copy of it.
+```
+
+**When:** the server starts, or the module that calls `signInFlow` is imported.
+
+**Why:** every step of the flow runs the same guard first (a native form post goes back to its page, a JSON post from another site is a 403). The guard's rule lives on the instance `jsonActions()` returns, under a registered symbol. A hand-made object with `readJson`, `requireJsonPost` and `readInput` has none, so the steps could not refuse another site.
+
+**Fix:** pass the app's `jsonActions({ origin })` instance, or a spread copy of it, which keeps the rule:
+
+```ts
+import { jsonActions } from '@alxia/react-router/errors';
+
+export const json = jsonActions({ origin: () => process.env.APP_ORIGIN });
 ```
 
 ### `TypeError: signInFlow(): the code "…" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`
@@ -2589,7 +2612,7 @@ The user types a wrong code in the step-up dialog and lands on the sign-in page,
 TypeError: statePath(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got "/auth/magic-link?…".
 ```
 
-`statePath` throws it for its own `path`, and so do `ended` and the `other.path` of `landByLink`, which build their redirect with it. The message names the call that was made.
+`statePath` throws it for its own `path`, and so do `ended()` and the `other.path` of `landByLink()`, which build their redirect with `statePath`: their error says `statePath(): …`, not their own name. The message names the call that was made.
 
 **Why:** the page's `path` is the page without its token: the helpers add `?state=…` to it, and a redirect must stay on the site. A path with a query (`/auth/magic-link?token=…`), a fragment, a host or a second leading `/` is refused, which also keeps the token out of the redirect. The message prints the path only up to its `?` or `#`, so the token never reaches a log.
 
@@ -2645,7 +2668,7 @@ leading `/` is refused.
 **Fix:** pass a path of the app, with a query if it needs one:
 
 ```ts
-authLinks({ signIn, cookies, errors, resetDone: '/sign-in?password-reset=1' });
+authLinks({ signIn, resetDone: '/sign-in?password-reset=1' });
 ```
 
 ### A token page's token shows in a Referer or a search result
