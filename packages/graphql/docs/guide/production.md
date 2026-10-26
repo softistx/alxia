@@ -156,6 +156,20 @@ each time instead of cached.
   never logged. It applies to `POST`, `GET`, each operation of a batch and
   each operation over WebSocket. `maxTokens: false` turns it off; a plugin of
   yours that sets its own parse function replaces it.
+- **`maxNesting`, 1 000 by default.** graphql-js parses by recursion, so a
+  document nested a few thousand levels deep (`{ a { a { …`, `[[[…`) overflows
+  the stack while it is still well under `maxTokens`, and would answer a 500
+  `Unexpected error.` and log it. alxia scans the source for the nesting of
+  `{`, `(` and `[` first, linearly and ignoring strings, block strings and
+  comments, and refuses a deeper document as `GRAPHQL_PARSE_FAILED`,
+  `Syntax Error: Document is nested more than 1000 levels deep. Parsing
+  aborted.`, with the same status and no log as `maxTokens`. A document that
+  overflows the stack anyway (`maxNesting: false`, or a limit raised too far)
+  is refused as `Syntax Error: Document is nested too deeply to parse.`
+  `maxNesting: false` turns the scan off; a real query nests a dozen levels.
+  It counts `{`, `(` and `[` together, arguments and lists included, so it
+  is not a selection-depth rule; use a validation rule for that
+  ([Limit depth and complexity](#limit-depth-and-complexity)).
 - **`parseCache`**, a least-recently-used cache per endpoint, weighed in
   bytes: `maxBytes` (64 MiB), `max` documents (1 024) and `ttl` (one hour).
   A document heavier than an eighth of `maxBytes` is not kept and is parsed

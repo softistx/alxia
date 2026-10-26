@@ -2,7 +2,7 @@
  * What `graphql()` bounds about parsing: the tokens a document may hold,
  * and the cache of what was parsed.
  */
-import type { DocumentNode } from 'graphql';
+import { type DocumentNode, Source, syntaxError } from 'graphql';
 import type { Plugin, YogaServerOptions } from 'graphql-yoga';
 import {
 	boundedCache,
@@ -11,6 +11,7 @@ import {
 	errorWeight,
 } from './document-cache';
 import type { YogaContext } from './handler';
+import { nestingLimit, tooDeepAt } from './nesting';
 
 /** The most tokens a document may hold, unless `maxTokens` says otherwise. */
 export const DEFAULT_MAX_TOKENS = 15_000;
@@ -55,18 +56,51 @@ export function tokenLimit(
 	);
 }
 
+/** A `RangeError` about the call stack is the stack overflowing, which parsing a nested document can cause. */
+const overflowed = (error: unknown): boolean =>
+	error instanceof RangeError && /call stack/i.test(error.message);
+
 /**
- * A Yoga plugin capping the tokens of every document Yoga parses. It wraps
- * the parse function Envelop already holds, never graphql's own `parse`: a
- * second copy of graphql would throw errors Yoga does not recognise, masked
- * as a 500.
+ * A Yoga plugin bounding what the parser is given: the tokens of every
+ * document (`maxTokens`) and the levels it nests (`maxNesting`, a scan of the
+ * source before any recursion). A document the parser still overflows the
+ * stack on is refused the same way, never a 500. It wraps the parse function
+ * Envelop already holds, never graphql's own `parse`: a second copy of
+ * graphql would throw errors Yoga does not recognise, masked as a 500.
  */
-export function limitsTokens(maxTokens: number): Plugin {
+export function limitsParsing(
+	maxTokens: number | false,
+	maxNesting: number | false,
+): Plugin {
 	return {
 		onParse({ parseFn, setParseFn }) {
-			setParseFn((source, options) =>
-				parseFn(source, { ...options, maxTokens }),
-			);
+			setParseFn((source, options) => {
+				const body = typeof source === 'string' ? source : source.body;
+				const refuse = (position: number, why: string) =>
+					syntaxError(
+						typeof source === 'string' ? new Source(source) : source,
+						position,
+						why,
+					);
+				if (maxNesting !== false) {
+					const at = tooDeepAt(body, maxNesting);
+					if (at >= 0) {
+						throw refuse(
+							at,
+							`Document is nested more than ${maxNesting} levels deep. Parsing aborted.`,
+						);
+					}
+				}
+				try {
+					return parseFn(
+						source,
+						maxTokens === false ? options : { ...options, maxTokens },
+					);
+				} catch (error) {
+					if (!overflowed(error)) throw error;
+					throw refuse(0, 'Document is nested too deeply to parse.');
+				}
+			});
 		},
 	};
 }
@@ -121,18 +155,20 @@ function cacheSizes(
 
 /**
  * The limits `graphql()` was given, checked once at declaration: the token
- * cap, resolved, and the parse cache, which cannot be given beside Yoga's
+ * cap and the nesting limit, resolved, and the parse cache, which cannot be given beside Yoga's
  * own. Each endpoint's Yoga builds its caches from the same options.
  */
 export function resolveLimits(
 	maxTokens: number | false | undefined,
+	maxNesting: number | false | undefined,
 	parseCache: false | ParseCacheOptions | undefined,
 	yogaOptions: Pick<
 		YogaServerOptions<YogaContext, YogaContext>,
 		'parserAndValidationCache'
 	>,
-): number | false {
+): { readonly tokens: number | false; readonly depth: number | false } {
 	const tokens = tokenLimit(maxTokens);
+	const depth = nestingLimit(maxNesting);
 	if (
 		parseCache !== undefined &&
 		yogaOptions.parserAndValidationCache !== undefined
@@ -142,7 +178,7 @@ export function resolveLimits(
 		);
 	}
 	cacheSizes(parseCache);
-	return tokens;
+	return { tokens, depth };
 }
 
 /**

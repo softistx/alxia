@@ -188,10 +188,16 @@ Apollo Client's and urql's setup included.
 
 ## Limits
 
-Three limits bound what a request costs before any resolver runs. A document
+Four limits bound what a request costs before any resolver runs. A document
 may hold at most **15 000 tokens** (`maxTokens`, `false` for no cap): a longer
 one is refused by the parser as `GRAPHQL_PARSE_FAILED`, 400 under
-`application/graphql-response+json`, and never reaches the schema. The
+`application/graphql-response+json`, and never reaches the schema. It may
+nest at most **1 000 levels** of `{`, `(` and `[` (`maxNesting`, `false` for
+no limit): graphql-js parses by recursion and overflows the stack a few
+thousand levels down, so a deeper document is refused the same way before the
+parser recurses into it, never a 500. It counts `{`, `(` and `[` together,
+arguments and lists included, so it is not a selection-depth rule; use a
+validation rule for that. The
 documents Yoga parses are kept in a cache bounded by weight, **64 MiB** per
 endpoint, **1 024** documents, **one hour** (`parseCache`), where Yoga's own
 has no size bound. A `POST` body may hold **1 MiB** (`bodyLimit`) unless the
@@ -268,7 +274,7 @@ See
 
 | export | |
 | --- | --- |
-| `graphql(app, options)` | the endpoint: `schema`, `path`, `ide`, `sandbox`, `ws`, `maxTokens`, `parseCache`, `bodyLimit`, and every Yoga option |
+| `graphql(app, options)` | the endpoint: `schema`, `path`, `ide`, `sandbox`, `ws`, `maxTokens`, `maxNesting`, `parseCache`, `bodyLimit`, and every Yoga option |
 | `GraphQLWsOptions` | `ws`'s options: `path`, `keepAlive` |
 | `GraphQLWsContext` | what an operation over WebSocket adds to the context: `connectionParams` |
 | `renderSandbox(endpoint, options?)`, `SANDBOX_POLICY` | the Sandbox page, and the policy it loads under |
