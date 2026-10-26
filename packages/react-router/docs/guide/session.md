@@ -482,6 +482,13 @@ export async function action({ context, request }: Route.ActionArgs) {
 step-up never calls `revoke`, so it needs no `context` of its own: its
 `request` and `confirm` take none.
 
+```ts
+export const stepUp = stepUpSteps({
+	signIn, // the flow above, typed with `Caller`
+	spent: (language) => t('step-up.spent', {}, language),
+});
+```
+
 The same `context` is taken by `revokeSession(request, { context })`,
 `landReplacing(answer, next, { request, context })`,
 `signInStep(run, { ..., context })`, and, on `authLinks`, by
