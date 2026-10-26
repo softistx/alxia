@@ -69,9 +69,22 @@ describe('graphql({ parseCache })', () => {
 			expect(response.status).toBe(200);
 		}
 		const growth = heap() - before;
-		console.log(
-			`comment spec heap growth: ${(growth / 1048576).toFixed(1)} MB`,
-		);
+		expect(growth).toBeLessThan(96 * 1024 * 1024);
+	});
+
+	test('60 distinct escape-dense string literals do not pile up in the cache', async () => {
+		const app = serve();
+		await post(app, '{ ping }');
+		const before = heap();
+		for (let i = 0; i < 60; i++) {
+			// About 996 KB once JSON-escaped: 340 000 `\n` escapes, each a rope append in graphql 16.
+			const response = await post(
+				app,
+				`{ ping(t${i}: "${'\\n'.repeat(340_000)}") }`,
+			);
+			expect(response.status).toBeLessThan(500);
+		}
+		const growth = heap() - before;
 		expect(growth).toBeLessThan(96 * 1024 * 1024);
 	});
 

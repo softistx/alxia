@@ -196,7 +196,9 @@ each operation: a `subscribe` message holding a longer document gets that
 
 `bodyLimit` does not reach the socket: a `subscribe` message is bounded by
 Bun's `maxPayloadLength` (16 MiB by default), not by the 1 MiB a `POST` body
-may hold. The parse cache and `maxTokens` still apply to its document. A
+may hold. The parse cache and `maxTokens` still apply to its document, but
+`maxTokens` does not count comments: a large comment-only message still
+costs its parse, and only `maxPayloadLength` bounds it. A
 configurable limit for WebSocket messages is on the
 [roadmap](../roadmap.md).
 

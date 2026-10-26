@@ -130,7 +130,9 @@ document of 15 000 tokens parses to 7.7 MB at most (15 000 × 512 B); a
 measured heavy document of about 12 000 tokens weighs about 6 MB.
 
 The cache weighs every token the lexer linked, comments included, plus 4
-bytes per source character. `maxTokens` does not count comments, yet a
+bytes per source character. String literals are flattened as they are
+weighed, so that their cost stays within those 4 bytes; the weight is an
+estimate by design, not an exact measure. `maxTokens` does not count comments, yet a
 parsed document keeps all of them alive: a 750 KB body of `#` lines holds
 about 19.6 MB, so it weighs more than the cache keeps and is parsed again
 each time instead of cached.

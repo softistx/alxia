@@ -84,12 +84,8 @@ describe('weights', () => {
 	test('a document weighs 512 bytes a token plus 4 per source character', () => {
 		const source = '{ ping }';
 		const document = parse(source);
-		let tokens = 0;
-		for (let t = document.loc?.startToken; t; t = t.next ?? undefined) tokens++;
-		expect(tokens).toBeGreaterThan(0);
-		expect(documentWeight(source, document)).toBe(
-			512 * tokens + 4 * source.length,
-		);
+		// SOF, `{`, `ping`, `}`, EOF.
+		expect(documentWeight(source, document)).toBe(512 * 5 + 4 * 8);
 	});
 
 	test('comments are weighed: the whole token chain counts', () => {
@@ -106,6 +102,7 @@ describe('weights', () => {
 		const source = '{ ping }';
 		const document = parse(source, { noLocation: true });
 		const tokens = (document as { tokenCount?: number }).tokenCount ?? 0;
+		expect(tokens).toBeGreaterThan(0);
 		expect(documentWeight(source, document)).toBe(
 			512 * tokens + 4 * source.length,
 		);
@@ -121,7 +118,7 @@ describe('weights', () => {
 		expect(documentWeight(source, document as never)).toBe(256 * source.length);
 	});
 
-	test('an error weighs twice its source plus 1 024', () => {
-		expect(errorWeight('abc')).toBe(2 * 3 + 1024);
+	test('an error weighs 4 bytes a character plus 1 024', () => {
+		expect(errorWeight('abc')).toBe(4 * 3 + 1024);
 	});
 });
