@@ -38,8 +38,8 @@ function withNext(
 export function signInPath(
 	next: string,
 	options: {
-		readonly query?: Record<string, string>;
-		readonly path?: string;
+		readonly query?: Record<string, string> | undefined;
+		readonly path?: string | undefined;
 	} = {},
 ): string {
 	const path =

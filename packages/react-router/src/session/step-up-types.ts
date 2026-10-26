@@ -30,14 +30,16 @@ export interface StepUpStepsOptions<L extends string> {
 	 * What an app or recovery code with no try left adds to its message: the
 	 * account is locked, wait (asking again would fail too).
 	 */
-	locked?(language: L): string;
+	readonly locked?: ((language: L) => string) | undefined;
 	/**
 	 * The app's own words for a refusal that is not a code's (a mail
 	 * throttle's wait, say), before `errors`' default. `undefined` keeps the
 	 * default.
 	 */
-	wording?(error: ApiErrorLike, language: L): string | undefined;
-	readonly codes?: StepUpCodes;
+	readonly wording?:
+		| ((error: ApiErrorLike, language: L) => string | undefined)
+		| undefined;
+	readonly codes?: StepUpCodes | undefined;
 }
 
 /** An answer that stays on the page: the answer, with the API's status. */

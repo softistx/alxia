@@ -87,7 +87,7 @@ export async function requireViewer<L extends string, V>(
 export async function signOut<L extends string>(
 	context: FlowContext<L>,
 	request: Request,
-	{ to }: { readonly to?: string } = {},
+	{ to }: { readonly to?: string | undefined } = {},
 ): Promise<Response> {
 	const { options, paths } = context;
 	await options.json.readJson(request);

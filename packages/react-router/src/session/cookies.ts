@@ -25,9 +25,9 @@ export interface SessionCookiesOptions {
 	 */
 	readonly secure: boolean;
 	/** Where the browser sends the challenge. `'/sign-in'` by default. */
-	readonly challengePath?: string;
+	readonly challengePath?: string | undefined;
 	/** The most the challenge lives. 300, `@nxgt/janus`'s lifetime, by default. */
-	readonly challengeSeconds?: number;
+	readonly challengeSeconds?: number | undefined;
 }
 
 /** What the session cookie holds: the token, and the expiry (ms) it was last set to. */

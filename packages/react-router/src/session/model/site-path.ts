@@ -10,7 +10,7 @@ export function sitePath(
 	{
 		label,
 		query = false,
-	}: { readonly label: string; readonly query?: boolean },
+	}: { readonly label: string; readonly query?: boolean | undefined },
 ): string {
 	if (safeNext(path) !== path || (!query && /[?#]/.test(path))) {
 		const shown = query ? path : path.replace(/[?#].*$/s, '?…');

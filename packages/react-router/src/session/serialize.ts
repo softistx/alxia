@@ -9,7 +9,7 @@ export interface SerializeOptions {
 	/** Seconds; floored, and never below 0 (0 removes the cookie, and so does a value that is not finite). */
 	readonly maxAge: number;
 	/** `/` by default. */
-	readonly path?: string;
+	readonly path?: string | undefined;
 	/** Adds `Secure`. Required: it is never read from the environment. */
 	readonly secure: boolean;
 }
