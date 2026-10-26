@@ -88,6 +88,28 @@ describe('graphql({ parseCache })', () => {
 		expect(growth).toBeLessThan(96 * 1024 * 1024);
 	});
 
+	test('60 distinct location-less escape-dense documents do not pile up in the cache', async () => {
+		const noLocation: Plugin = {
+			onParse({ parseFn, setParseFn }) {
+				setParseFn((source, options) =>
+					parseFn(source, { ...options, noLocation: true }),
+				);
+			},
+		};
+		const app = serve({ plugins: [noLocation] });
+		await post(app, '{ ping }');
+		const before = heap();
+		for (let i = 0; i < 60; i++) {
+			const response = await post(
+				app,
+				`{ ping(t${i}: "${'\\n'.repeat(340_000)}") }`,
+			);
+			expect(response.status).toBeLessThan(500);
+		}
+		const growth = heap() - before;
+		expect(growth).toBeLessThan(96 * 1024 * 1024);
+	});
+
 	test('a repeated query is parsed once', async () => {
 		const spy = parses();
 		const app = serve({ plugins: [spy.plugin] });

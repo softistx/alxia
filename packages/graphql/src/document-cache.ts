@@ -79,50 +79,77 @@ const BYTES_PER_TOKEN = 512;
 const BYTES_PER_CHAR = 4;
 
 /**
+ * The bytes counted per source character of a string literal with escapes.
+ * graphql 16 builds its value with `+=`, once per escape, which in
+ * JavaScriptCore leaves a rope the token and its node keep alive. Measured
+ * without the flatten: 31.6 B per source char for `\n`, 28 for `Ā\n`, 13.7
+ * for `Ā`; 32 covers them.
+ */
+const BYTES_PER_ESCAPED_CHAR = 32;
+
+/** The bytes counted per source character of a document without `loc`: 4 + 32. */
+const BYTES_PER_CHAR_NO_LOC = BYTES_PER_CHAR + BYTES_PER_ESCAPED_CHAR;
+
+/**
  * The last character read to flatten a string. The JIT removes a read whose
  * result nobody uses, and the flatten with it, so the result is stored.
  */
 let flattened = 0;
 
 /**
- * The tokens the lexer linked for a document, comments included: graphql's
- * `tokenCount` and `maxTokens` skip comments, yet `loc.startToken` keeps
- * the whole chain alive. Undefined when the document has no `loc`.
+ * The tokens the lexer linked for a document, comments included (graphql's
+ * `tokenCount` and `maxTokens` skip comments, yet `loc.startToken` keeps the
+ * whole chain alive), and the extra bytes of its escaped string literals.
+ * Undefined when the document has no `loc`.
  */
-function chainLength(document: DocumentNode): number | undefined {
+function chainWalk(
+	document: DocumentNode,
+): { tokens: number; extra: number } | undefined {
 	const first = document.loc?.startToken;
 	if (first === undefined) return undefined;
-	let count = 0;
+	let tokens = 0;
+	let extra = 0;
 	for (let token: Token | null = first; token !== null; token = token.next) {
-		count++;
-		// graphql 16 builds a string's value with `+=`, once per escape, which in
-		// JavaScriptCore leaves a rope of about 33 B per source character that the
-		// token and its node keep alive. Reading a character flattens it in place
-		// (the token and the node share it), so its cost stays within the 4 B per
-		// character the weight counts. Keep `flattened` used: see above.
+		tokens++;
+		// A string with escapes has a value shorter than its source span (minus
+		// the two quotes). Its rope is charged by the span, and flattened as an
+		// optimisation: reading a character flattens it in place (the token and
+		// the node share it). A raw literal or a block string is already flat or
+		// a substring of the key, and flattening would copy it out. Keep
+		// `flattened` used: see above.
 		if (
-			(token.kind === TokenKind.STRING ||
-				token.kind === TokenKind.BLOCK_STRING) &&
-			token.value.length > 0
+			token.kind === TokenKind.STRING &&
+			token.value.length < token.end - token.start - 2
 		) {
-			flattened = token.value.charCodeAt(0);
+			extra += BYTES_PER_ESCAPED_CHAR * (token.end - token.start);
+			if (token.value.length > 0) flattened = token.value.charCodeAt(0);
 		}
 	}
 	// Read here so the writes above are not dead code.
-	return count + (flattened & 0);
+	return { tokens, extra: extra + (flattened & 0) };
 }
 
 /**
  * A parsed document's estimated bytes: every token the lexer linked,
- * comments included, plus the source as the key and as token values. Without
- * `loc` (`noLocation`), `tokenCount` stands in; without that (older
- * graphql), the source's length does.
+ * comments included, plus the source as the key and as token values, plus
+ * 32 B per char of escaped string literals. Without `loc` (`noLocation`),
+ * nothing tells where the strings are: `tokenCount` and 36 B per char stand
+ * in; without `tokenCount` (older graphql), the source's length does.
  */
 export function documentWeight(source: string, document: DocumentNode): number {
-	const tokens =
-		chainLength(document) ?? (document as { tokenCount?: number }).tokenCount;
-	if (typeof tokens !== 'number') return 256 * source.length;
-	return BYTES_PER_TOKEN * tokens + BYTES_PER_CHAR * source.length;
+	const walk = chainWalk(document);
+	if (walk !== undefined) {
+		return (
+			BYTES_PER_TOKEN * walk.tokens +
+			BYTES_PER_CHAR * source.length +
+			walk.extra
+		);
+	}
+	const tokenCount = (document as { tokenCount?: number }).tokenCount;
+	if (typeof tokenCount !== 'number') {
+		return Math.max(256, BYTES_PER_CHAR_NO_LOC) * source.length;
+	}
+	return BYTES_PER_TOKEN * tokenCount + BYTES_PER_CHAR_NO_LOC * source.length;
 }
 
 /** A parse error's estimated bytes: its source as the key, and the error (1 024 B). */

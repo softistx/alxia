@@ -129,10 +129,18 @@ count of tokens is the weight, and 512 bytes per token the upper estimate: a
 document of 15 000 tokens parses to 7.7 MB at most (15 000 × 512 B); a
 measured heavy document of about 12 000 tokens weighs about 6 MB.
 
-The cache weighs every token the lexer linked, comments included, plus 4
-bytes per source character. String literals are flattened as they are
-weighed, so that their cost stays within those 4 bytes; the weight is an
-estimate by design, not an exact measure. `maxTokens` does not count comments, yet a
+The cache weighs a document as its tokens (comments included) × 512 B, plus
+4 B per source character, plus 32 B per source character of string literals
+with escapes (`\n`, `\u00e9`), whose value graphql 16 builds as a rope; or
+36 B per character in all when the document has no locations (`noLocation`),
+since nothing then tells where the strings are. A location-less document of
+1 MB weighs over 8 MiB and is not cached. The weight is an estimate by
+design, not an exact measure.
+
+Yoga's validation results for a cached document (up to about 100 errors
+each) sit outside the weight, bounded at roughly 70 KB per document.
+
+`maxTokens` does not count comments, yet a
 parsed document keeps all of them alive: a 750 KB body of `#` lines holds
 about 19.6 MB, so it weighs more than the cache keeps and is parsed again
 each time instead of cached.

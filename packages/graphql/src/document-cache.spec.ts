@@ -98,13 +98,28 @@ describe('weights', () => {
 		);
 	});
 
-	test('without loc, tokenCount stands in', () => {
+	test('an escaped string adds 32 bytes a source character of its span', () => {
+		const plain = '{ ping(t: "ab") }';
+		const escaped = '{ ping(t: "a\\n") }';
+		const span = 5;
+		expect(escaped.length).toBe(plain.length + 1);
+		expect(documentWeight(escaped, parse(escaped))).toBe(
+			documentWeight(plain, parse(plain)) + 4 + 32 * span,
+		);
+	});
+
+	test('a raw string and a block string add nothing extra', () => {
+		const raw = '{ ping(t: "abc", u: """x""") }';
+		expect(documentWeight(raw, parse(raw))).toBe(512 * 13 + 4 * raw.length);
+	});
+
+	test('without loc, tokenCount and 36 bytes a character stand in', () => {
 		const source = '{ ping }';
 		const document = parse(source, { noLocation: true });
 		const tokens = (document as { tokenCount?: number }).tokenCount ?? 0;
 		expect(tokens).toBeGreaterThan(0);
 		expect(documentWeight(source, document)).toBe(
-			512 * tokens + 4 * source.length,
+			512 * tokens + 36 * source.length,
 		);
 	});
 
