@@ -18,14 +18,16 @@ export function declareEndpoint(
 		ws(path: string, ...rest: unknown[]): unknown;
 	};
 	route.get(path, handler);
-	// The GET just declared has the POST's scope: the limit an earlier
-	// `bodyLimit()` gives it is the one the POST keeps.
+	// The GET just declared has the POST's scope: a limit an earlier
+	// `bodyLimit()` gives it is the one the POST keeps, and core refuses a
+	// declared oversize body where that `bodyLimit()` stands, so the POST
+	// passes no option of its own then (a route's own option would move the
+	// refusal to the head of its steps).
 	const inherited = app.routes.at(-1)?.bodyLimit;
-	route.post(
-		path,
-		{ bodyLimit: bodyLimit ?? inherited ?? DEFAULT_BODY_LIMIT },
-		handler,
-	);
+	const own =
+		bodyLimit ?? (inherited === undefined ? DEFAULT_BODY_LIMIT : undefined);
+	if (own === undefined) route.post(path, handler);
+	else route.post(path, { bodyLimit: own }, handler);
 	if (socket !== undefined) {
 		route.ws(socket.path, socket.middleware, socket.handlers);
 	}
