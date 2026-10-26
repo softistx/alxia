@@ -1,5 +1,60 @@
 # @alxia/graphql
 
+## 0.9.0
+
+### Minor Changes
+
+- [#325](https://github.com/softistx/alxia/pull/325) [`b887115`](https://github.com/softistx/alxia/commit/b887115c2315090a45058c3059c3844452c643af) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `graphql()` now refuses a document nested too deeply with a GraphQL error, not a 500.
+  
+  - **A document may nest 1 000 levels by default (`maxNesting`).** graphql-js
+    parses by recursion, so a query nested a few thousand levels deep
+    (`{ a { a { …`) overflowed the stack while still under `maxTokens`, and
+    answered a 500 `Unexpected error.` that was logged. It is now refused
+    before the parser recurses into it, as `GRAPHQL_PARSE_FAILED` (400 under
+    `application/graphql-response+json`), over POST, GET, a batch and a
+    WebSocket, and nothing is logged. A document that still overflows the stack
+    is refused the same way.
+  - **A document nested past 1 000 levels worked before on a runtime whose
+    stack allowed it and is refused now.** Raise it with `maxNesting: 2_000`, or
+    turn the check off with `maxNesting: false`. An invalid `maxNesting` throws a
+    `TypeError` where `graphql()` is declared.
+
+- [#316](https://github.com/softistx/alxia/pull/316) [`e4a0cc9`](https://github.com/softistx/alxia/commit/e4a0cc9e5fd84bf33250d696e2ab7d5a56577ce8) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `graphql()` now limits the body of a `POST`, and its 413 keeps Yoga's headers.
+  
+  - **A `POST` body may hold 1 MiB by default (`bodyLimit`).** A bigger body is
+    refused with core's 413 before Yoga reads it. **A body over 1 MiB worked
+    before and is refused now.** An app that declared its own `bodyLimit()`
+    before `graphql()` keeps that limit. To change it, give
+    `graphql(app, { schema, bodyLimit: 5 * 1024 * 1024 })`; a mutation that
+    takes a file by `multipart` needs a larger one. An invalid value throws a
+    `TypeError` where `graphql()` is declared.
+  - **The 413 carries the headers Yoga's plugins set.** A `Cache-Control:
+    no-store` set from an `onResponse` hook was missing from it. Its body and
+    `content-type` stay core's, in the app's error format.
+  - **A form-urlencoded or `application/graphql` body past the limit logs no
+    stack trace.** Yoga used to print the error twice for these content types.
+
+- [#315](https://github.com/softistx/alxia/pull/315) [`8edb1fd`](https://github.com/softistx/alxia/commit/8edb1fd51aaff6d4099ee057ea32bf836ac9ec16) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `graphql()` now bounds what it parses and keeps.
+  
+  - **A document may hold 15 000 tokens by default (`maxTokens`).** A longer
+    query is refused by the parser before anything runs, as `GRAPHQL_PARSE_FAILED`
+    with `Document contains more than 15000 tokens`: HTTP 400 under
+    `application/graphql-response+json`, 200 with `errors` under
+    `application/json`. It covers `POST`, `GET`, each operation of a batch and
+    each operation over WebSocket. **A query over 15 000 tokens worked before
+    and is refused now.** The introspection query is 163 tokens and a large
+    screen query a few thousand, so most clients are unaffected. To opt out, give
+    `maxTokens: false`, or raise it with `maxTokens: 30_000`.
+  - **The parse cache is bounded by weight (`parseCache`).** Yoga's own keeps up
+    to 1 024 documents of any size, which holds gigabytes for distinct large
+    queries. Each endpoint now keeps 64 MiB of parsed documents (1 024 documents
+    at most, one hour), weighed by its tokens and bytes. Size it with
+    `parseCache: { maxBytes, max, ttl }`, or turn it off with `parseCache: false`.
+    An app that gives Yoga's `parserAndValidationCache` keeps its own cache;
+    giving it together with `parseCache` throws where `graphql()` is declared.
+  - **Invalid options throw at declaration.** A `maxTokens` or `parseCache`
+    value of the wrong kind throws a `TypeError` where `graphql()` is declared.
+
 ## 0.8.3
 
 ### Patch Changes

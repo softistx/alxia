@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.12.1
+
+### Patch Changes
+
+- [#321](https://github.com/softistx/alxia/pull/321) [`1496765`](https://github.com/softistx/alxia/commit/149676531f6260a45ab23dec74fcb53b5e29f44a) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Fix the `/document` guide, the README and the `react-router` template: the root passes `<Links nonce={useNonce()} />`. React Router's `<Links>` does not suppress the hydration warning for its development critical-CSS `<style nonce>`, so without the prop React reports a `nonce` mismatch; `<Scripts>` and `<ScrollRestoration>` need nothing. Troubleshooting has an entry for the warning.
+
 ## 0.12.0
 
 ### Minor Changes
