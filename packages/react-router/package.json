@@ -67,6 +67,11 @@
 			"import": "./dist/pwa/worker/index.js",
 			"default": "./dist/pwa/worker/index.js"
 		},
+		"./session/model": {
+			"types": "./dist/session/model/index.d.ts",
+			"import": "./dist/session/model/index.js",
+			"default": "./dist/session/model/index.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"repository": {
@@ -91,6 +96,7 @@
 			"src/pwa/react/index.ts",
 			"src/pwa/server/index.ts",
 			"src/errors/index.ts",
+			"src/session/model/index.ts",
 			"src/document/index.ts",
 			"src/entry/index.ts",
 			"src/pwa/worker/index.ts",

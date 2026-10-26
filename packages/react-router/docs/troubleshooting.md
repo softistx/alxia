@@ -118,6 +118,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [An action shows the error page](#an-action-shows-the-error-page)
 - [Behind a TLS proxy every action answers 403](#behind-a-tls-proxy-every-action-answers-403)
 - [Right after start, refusals read in the API's words](#right-after-start-refusals-read-in-the-apis-words)
+- [`next` is always `/`](#next-is-always-)
 
 ## Thrown or printed
 
@@ -2325,3 +2326,28 @@ catalogue.warm();
 
 Raise `firstReadWaitMs` only if the page should wait longer for the first
 words; it holds every cold request that long when the API hangs.
+
+### `next` is always `/`
+
+After signing in, the user lands on the home page, whatever page they came
+from, and `signInPath(next)` returns `/sign-in` with no `next`.
+
+**Why:** `safeNext` refuses the value and falls back to `/`. It takes a path
+of this site only, so these are refused: a value that does not start with
+`/`, one that starts with `//` or holds a `\`, a space, a tab or a newline,
+a full URL (`https://…`), a value that resolves to another site once its
+`..` segments are applied, and one over 2000 characters. The usual cause is a
+`next` built from the full URL (`request.url`, `location.href`), or one
+that was percent-decoded twice.
+
+**Fix:** pass the path and search alone:
+
+```ts
+import { signInPath } from '@alxia/react-router/session/model';
+
+const url = new URL(request.url);
+throw redirect(signInPath(`${url.pathname}${url.search}`));
+```
+
+[Redirects that stay on the site](guide/session.md#redirects-that-stay-on-the-site)
+lists what is refused.
