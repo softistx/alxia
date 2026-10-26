@@ -14,6 +14,9 @@ bun add -d typescript
 It mirrors [`@nxgt/janus-hono`](https://www.npmjs.com/package/@nxgt/janus-hono):
 the same cookie, the same rules, the same bodies.
 
+A BFF that calls a janus API, rather than running `@nxgt/janus` itself, wants
+[`@alxia/react-router/session`](https://www.npmjs.com/package/@alxia/react-router).
+
 ## Usage
 
 ```ts

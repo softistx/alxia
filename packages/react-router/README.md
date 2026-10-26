@@ -932,6 +932,55 @@ declare function fetchVersions(): Promise<{ en: string; fr: string }>;
 The [errors guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md)
 has the rest.
 
+## Sessions for a BFF
+
+An app that renders its pages and calls a GraphQL API that signs users in
+with `@nxgt/janus` keeps the API's token in its own HttpOnly cookie.
+`@alxia/react-router/session` holds that session's server side, built on
+`/errors` and adding no peer; `/session/model` imports nothing and is safe in
+a component.
+
+```ts
+// app/session.server.ts
+import { sessionCookies, signInFlow } from '@alxia/react-router/session';
+import { errors, json } from './errors.server'; // createApiErrors, jsonActions
+import { SignOutMutation, execute } from './api.server';
+
+export const cookies = sessionCookies({
+	session: 'my-app_session',
+	challenge: 'my-app_challenge',
+	secure: !import.meta.env.DEV,
+});
+
+export const signIn = signInFlow({
+	cookies,
+	errors,
+	json,
+	revoke: (token, request) =>
+		execute(SignOutMutation, {}, { token, signal: request.signal }),
+	attemptsLeft: (count, language) => `${count} tries left`,
+});
+```
+
+```ts
+// app/routes/sign-in.tsx
+export async function action({ context, request }: Route.ActionArgs) {
+	const { language } = alxiaOf(context);
+	const input = await json.readInput(request, SignInInput);
+	return signIn.signInStep(
+		async () => toAnswer((await execute(SignInMutation, input)).signIn),
+		{ request, language, next: signIn.nextParam(request), extra: {} },
+	);
+}
+```
+
+A signed-in answer redirects to `next` (kept on the site by `safeNext`) with
+the session cookie set; a second factor goes to the code page; a refusal stays
+on the form. `stepUpSteps` asks for a code before a sensitive action, and
+`authLinks` serves the pages a mail's link opens. The
+[session guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/session.md)
+has a complete sign-in route and the rest.
+
 ## Traps
 
 - **A context key made in `app/` reaches the loaders only through the
@@ -1073,6 +1122,32 @@ From `@alxia/react-router/errors` (`react-router` is its only package import, an
 | `useJsonFetcher(key?, action?)`, `JsonBody` | a fetcher that posts JSON: `{ fetcher, post(body, to?), busy }`; `to` is the action of one call |
 | `StandardSchemaV1` | the Standard Schema v1 type `readInput` takes, declared in `/errors` (type only, so no `@alxia/core`; `readInput`'s output is inferred from the schema's `~standard.types`); a Zod 4, Valibot or ArkType schema fits |
 
+From `@alxia/react-router/session` (`react-router` and `/errors`' files are its only imports):
+
+| export | |
+| --- | --- |
+| `sessionCookies({ session, challenge, secure, challengePath?, challengeSeconds? })`, `SessionCookies`, `SessionCookiesOptions`, `CookieSession` | the session and second-factor challenge cookies, `HttpOnly; SameSite=Lax`, `__Host-` and `__Secure-` when `secure` (required, never read from the environment): `commit(token, expiresAt)`, `read(request)`, `token(request)`, `destroy()`, `refreshed(session, expiresAt)` (a `Set-Cookie` only when the expiry moved), `commitChallenge`, `challengeOf`, `destroyChallenge` and `signInPageHeaders(deadSession)`; a cookie written by an app's own code in `<expiry ms>.<token>` is read as it is |
+| `serializeCookie(name, value, { maxAge, path?, secure })`, `readCookie(request, name)`, `secondsUntil(expiresAt, now?)`, `SerializeOptions` | the bytes `sessionCookies` writes, for the cookies of your own; a name that is not an RFC 6265 token throws a `TypeError` |
+| `signInFlow({ cookies, errors, json, revoke, attemptsLeft, paths?, clear?, unavailable?, codes?, endedParam? })`, `SignInFlow`, `SignInFlowOptions` | the server side of the sign-in pages: `nextParam`, `signInRedirect`, `landing`, `landReplacing` (revokes the session the browser held), `signInStep` (an API refusal as the form's message and status, an unreachable API as a 503), `readCodeInput`, `codeStep`, `codeRefusal` (with the tries left), `revokeSession`, `signOut` (JSON and same-origin only), `viewer` (`null` for a 401, `undefined` when unknown) and `requireViewer` (throws the sign-in redirect) |
+| `SignInAnswer`, `SignInFormError`, `SignInStayed`, `SignInCodes` | what a step answers (`signedIn`, `secondFactor` or `other`), a form step's answer when it stays on the page, and the `codes` option (`invalidCode`, `challengeOver`) |
+| `stepUpSteps({ errors, attemptsLeft, spent, locked?, wording?, codes? })`, `StepUpSteps`, `StepUpStepsOptions` | a step-up for a route's action: `request(run, language)` answers the challenge and how it is confirmed, `confirm(run, { via }, language)` answers `invalid` with the tries left, `expired`, `locked` or `failed`, and `isStepUpRequired(error)` |
+| `StepUpCodes`, `StepUpStayed`, `STEP_UP_REQUIRED`, `STEP_UP_OVER` | the `codes` option, a step's answer that stays on the page, and the default codes `STEP_UP_REQUIRED` and `STEP_UP_OVER` |
+| `authLinks({ signIn, cookies, errors, json, throttled?, start?, resetDone?, invalidState? })`, `AuthLinks`, `AuthLinksOptions` | the pages a mail's link opens: `linkArgs`, `spendToken`, `answerOf`, `landByLink`, `afterReset`, `requestLink`, `statePath` and `ended` |
+| `Spent`, `SpendOptions`, `LinkStayed`, `RequestLinkAnswer` | their types |
+| `TOKEN_PAGE_HEADERS` | `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex, nofollow`, for a page whose URL carries a token |
+
+From `@alxia/react-router/session/model` (no import at all):
+
+| export | |
+| --- | --- |
+| `safeNext(value)`, `HOME` | `value` when it is a path of this site (search and hash kept), else `/` (`HOME`): a `//`, a scheme, a backslash, a control character, more than 2000 characters or a dot segment that leaves the site |
+| `signInPath(next, { query?, path? }?)`, `secondFactorPath(next)`, `SIGN_IN_PATHS`, `SignInPaths` | the sign-in page's URL coming back to `next`, the second-factor page's, and the default paths `/sign-in` and `/sign-in/second-factor` |
+| `TOTP_CODE` | the regular expression of an authenticator app's code: six digits |
+| `SecondFactorMethod`, `SignInStatus`, `StepUpVia` | `'code' \| 'recovery'`, `'signedIn' \| 'secondFactor'` and `'email' \| 'secondFactor'` |
+| `stepUpReducer`, `INITIAL_STEP_UP`, `phaseOf(state)`, `StepUpState`, `StepUpAction`, `StepUpPhase` | the step-up's state on the page, with no React |
+| `stepUpProps(state)`, `StepUpProps` | what a code form shows (never the challenge), for a step-up dialog's props |
+| `StepUpRequestAnswer`, `StepUpConfirmAnswer`, `StepUpError` | what `stepUpSteps` answers, which the reducer takes as it is |
+
 From `@alxia/react-router/document`:
 
 | export | |
@@ -1109,6 +1184,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [A CSP nonce](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/csp-nonce.md), [Beside the pages](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md) (middlewares, routes, WebSockets, the client's files), [OpenAPI](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/openapi.md), [Testing](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/testing.md) and [Deploying](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/deploying.md), with Docker.
 - [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what the subpaths hold, the worker's contract, the worker, what it caches, the offline page, building the worker with `alxia()` or `buildWorker`, the hooks in React, registering the worker and offering an update, serving the worker's script, the web app manifest, and clearing at sign-out.
 - [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, the page a request is for, the catalogue store, the form checks in the API's words, the provider, wording a refusal, loaders and the error page, actions, JSON actions and CSRF, and keeping the catalogue fresh.
+- [A BFF session](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/session.md): redirects that stay on the site, the cookies, the sign-in route, the second factor, the viewer and sign-out, the step-up, and the pages a mail's link opens.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.
