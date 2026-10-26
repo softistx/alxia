@@ -57,6 +57,7 @@ routes on `base` and returns it.
 | `ws` | `boolean \| { path?, keepAlive? }` | `false` | GraphQL over WebSocket too, with the optional peer `graphql-ws`: see [GraphQL over WebSocket](websockets.md). |
 | `maxTokens` | `number \| false` | `15_000` | The most tokens a document may hold; a longer one is refused as `GRAPHQL_PARSE_FAILED`. `false` for no cap. Anything but a positive whole number throws where `graphql()` is declared: see [Cap what a request costs](production.md#cap-what-a-request-costs). |
 | `parseCache` | `false \| { maxBytes?, max?, ttl? }` | 64 MiB, 1 024 documents, 3 600 000 ms | The cache of parsed documents, one per endpoint, bounded by estimated bytes. `false` parses every request. Cannot be given with Yoga's `parserAndValidationCache`, which replaces it. |
+| `bodyLimit` | `number` | the app's earlier `bodyLimit()`, else `1_048_576` (1 MiB) | The most bytes a `POST` body may hold; past it core answers a 413, in the app's error format. A whole number of bytes, else core's `TypeError` where `graphql()` is declared. A `multipart` upload needs a larger one: see [Cap what a request costs](production.md#cap-what-a-request-costs). |
 | `cors` | Yoga's `cors` | `false` | Yoga's own CORS. Off: use `@alxia/cors` for the whole app instead ([Yoga's plugins and options](yoga.md#cors)). |
 | every other Yoga option | | Yoga's | `plugins`, `context`, `maskedErrors`, `batching`, `logging`… passed to `createYoga` as they are: see [Yoga's plugins and options](yoga.md). |
 

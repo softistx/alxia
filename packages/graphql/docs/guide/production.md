@@ -157,22 +157,44 @@ graphql(app, {
 });
 ```
 
-## Cap the body
+### The body
 
 Yoga reads the whole body of a `POST` before it parses it, so a megabyte of
-JSON costs a megabyte of memory. Core's `bodyLimit(bytes)` caps every route
-declared after it: the bytes are counted as they arrive, and reading stops
-at the limit. A query is a few kilobytes: 100 KiB is generous. A mutation
-that takes a file by `multipart` needs a larger limit on a route of its own.
+JSON costs a megabyte of memory. The `POST` route has a body limit, counted
+as the bytes arrive:
 
-Put the call before `graphql(...)`, as in [Together](#together). Yoga reads
-the body itself and would report a body it could not read as `400`, `POST
-body sent invalid JSON.`; `@alxia/graphql` throws core's `ContentTooLargeError`
-again instead, so a client gets the 413 a plain route answers, in the app's
-error format (`application/problem+json` under `errors: 'problem'`), with a
-`Content-Length` or without one (a chunked body). Whatever else Yoga cannot
-parse is still its 400, and its parser's own error is never sent
-(`extensions.originalError` is removed).
+- **`bodyLimit`, 1 MiB by default.** Give the option to `graphql()`, or
+  declare core's `bodyLimit(bytes)` before it: that limit is kept as it is,
+  and the option wins over it. A query is a few kilobytes, so for an API that
+  takes no uploads, 100 KiB is generous. A mutation that takes a file by
+  `multipart` needs a larger limit, in the option. A plugin app mounted
+  under a prefix keeps the limit of its own scope; the outer app's
+  `bodyLimit()` does not reach it.
+- **The 413.** Yoga would report a body it could not read as `400`, `POST
+  body sent invalid JSON.`; `@alxia/graphql` throws core's
+  `ContentTooLargeError` again instead, so a client gets the 413 a plain
+  route answers, in the app's error format (`application/problem+json` under
+  `errors: 'problem'`), with a `Content-Length` or without one (a chunked
+  body). It carries the headers Yoga's plugins set, such as a
+  `Cache-Control: no-store` from an `onResponse` hook. A form-urlencoded or
+  `application/graphql` body past the limit is refused the same way and logs
+  nothing. Whatever else Yoga cannot parse is still its 400, and its
+  parser's own error is never sent (`extensions.originalError` is removed).
+- **Order.** The body is read by the endpoint, after every middleware
+  declared before it, `bodyLimit()` included: those still run for an
+  oversized body. Declare the cheap observers first and the costly
+  middlewares (a session lookup, a database call) as late as you can. A
+  refusal answered before Yoga runs cannot carry Yoga's headers: set the ones
+  every response needs in a middleware.
+
+```ts
+graphql(app, {
+	schema,
+	maxTokens: 20_000,
+	parseCache: { maxBytes: 32 * 1024 * 1024 },
+	bodyLimit: 100 * 1024,
+});
+```
 
 ## CSRF for a cookie-authenticated API
 
@@ -233,7 +255,9 @@ export const persisted: Plugin = usePersistedOperations({
 
 ## Together
 
-`maxTokens` and `parseCache` need no line here: their defaults apply.
+`maxTokens` and `parseCache` need no line here: their defaults apply. The
+`bodyLimit()` below is the app's own and is kept; without it the `POST` takes
+1 MiB.
 
 ```ts no-check
 // file: src/production.ts
