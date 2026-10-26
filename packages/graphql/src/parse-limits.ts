@@ -3,13 +3,14 @@
  * and the cache of what was parsed.
  */
 import type { DocumentNode } from 'graphql';
-import type { Plugin } from 'graphql-yoga';
+import type { Plugin, YogaServerOptions } from 'graphql-yoga';
 import {
 	boundedCache,
 	type Cache,
 	documentWeight,
 	errorWeight,
 } from './document-cache';
+import type { YogaContext } from './handler';
 
 /** The most tokens a document may hold, unless `maxTokens` says otherwise. */
 export const DEFAULT_MAX_TOKENS = 15_000;
@@ -26,12 +27,17 @@ export interface ParseCacheOptions {
 
 const DEFAULT_BYTES = 64 * 1024 * 1024;
 
-function positive(name: string, value: unknown, what: string): number {
+function positive(
+	name: string,
+	value: unknown,
+	what: string,
+	alternative = '',
+): number {
 	if (typeof value === 'number' && Number.isSafeInteger(value) && value > 0) {
 		return value;
 	}
 	throw new TypeError(
-		`graphql(app, { ${name} }): ${what}, a positive whole number; got ${String(value)}`,
+		`graphql(app, { ${name} }): ${what}, a positive whole number${alternative}; got ${String(value)}`,
 	);
 }
 
@@ -41,15 +47,11 @@ export function tokenLimit(
 ): number | false {
 	if (maxTokens === undefined) return DEFAULT_MAX_TOKENS;
 	if (maxTokens === false) return false;
-	if (
-		typeof maxTokens === 'number' &&
-		Number.isSafeInteger(maxTokens) &&
-		maxTokens > 0
-	) {
-		return maxTokens;
-	}
-	throw new TypeError(
-		`graphql(app, { maxTokens }): maxTokens is the most tokens a document may hold, a positive whole number, or false for none; got ${String(maxTokens)}`,
+	return positive(
+		'maxTokens',
+		maxTokens,
+		'maxTokens is the most tokens a document may hold',
+		', or false for none',
 	);
 }
 
@@ -77,13 +79,17 @@ export type ParseCaches =
 			errorCache: Cache<unknown>;
 	  };
 
-/**
- * The `parserAndValidationCache` of one Yoga: a pair of bounded caches,
- * created per call so each endpoint has its own. `false` gives none.
- */
-export function parseCaches(
+/** The sizes of a parse cache, checked. */
+interface CacheSizes {
+	readonly maxBytes: number;
+	readonly max: number;
+	readonly ttl: number;
+}
+
+/** `parseCache` checked where `graphql()` is declared; allocates nothing. */
+function cacheSizes(
 	parseCache: false | ParseCacheOptions | undefined,
-): ParseCaches {
+): CacheSizes | false {
 	if (parseCache === false) return false;
 	if (
 		parseCache !== undefined &&
@@ -94,21 +100,61 @@ export function parseCaches(
 		);
 	}
 	const given = parseCache ?? {};
-	const maxBytes = positive(
-		'parseCache.maxBytes',
-		given.maxBytes ?? DEFAULT_BYTES,
-		'maxBytes is the most estimated bytes of documents kept',
-	);
-	const max = positive(
-		'parseCache.max',
-		given.max ?? 1024,
-		'max is the most documents kept',
-	);
-	const ttl = positive(
-		'parseCache.ttl',
-		given.ttl ?? 3_600_000,
-		'ttl is the milliseconds a document is kept',
-	);
+	return {
+		maxBytes: positive(
+			'parseCache.maxBytes',
+			given.maxBytes ?? DEFAULT_BYTES,
+			'maxBytes is the most estimated bytes of documents kept',
+		),
+		max: positive(
+			'parseCache.max',
+			given.max ?? 1024,
+			'max is the most documents kept',
+		),
+		ttl: positive(
+			'parseCache.ttl',
+			given.ttl ?? 3_600_000,
+			'ttl is the milliseconds a document is kept',
+		),
+	};
+}
+
+/**
+ * The limits `graphql()` was given, checked once at declaration: the token
+ * cap, resolved, and the parse cache, which cannot be given beside Yoga's
+ * own. Each endpoint's Yoga builds its caches from the same options.
+ */
+export function resolveLimits(
+	maxTokens: number | false | undefined,
+	parseCache: false | ParseCacheOptions | undefined,
+	yogaOptions: Pick<
+		YogaServerOptions<YogaContext, YogaContext>,
+		'parserAndValidationCache'
+	>,
+): number | false {
+	const tokens = tokenLimit(maxTokens);
+	if (
+		parseCache !== undefined &&
+		yogaOptions.parserAndValidationCache !== undefined
+	) {
+		throw new TypeError(
+			"graphql(app, { parseCache, parserAndValidationCache }): give one: parseCache sizes alxia's bounded cache, parserAndValidationCache replaces it",
+		);
+	}
+	cacheSizes(parseCache);
+	return tokens;
+}
+
+/**
+ * The `parserAndValidationCache` of one Yoga: a pair of bounded caches,
+ * created per call so each endpoint has its own. `false` gives none.
+ */
+export function parseCaches(
+	parseCache: false | ParseCacheOptions | undefined,
+): ParseCaches {
+	const sizes = cacheSizes(parseCache);
+	if (sizes === false) return false;
+	const { maxBytes, max, ttl } = sizes;
 	const documentCache = boundedCache<DocumentNode>({
 		max,
 		ttl,

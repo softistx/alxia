@@ -7,7 +7,7 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing scheduled yet.
+Nothing in progress.
 
 ## Next
 
@@ -19,7 +19,13 @@ Nothing scheduled yet.
 
 ## Later
 
-Nothing scheduled yet.
+- **Weighing validation results.** Yoga keeps the validation errors of a
+  cached document (up to about 100) outside the parse cache's weight, at
+  roughly 70 KB per document; the weight could count them.
+- **A configurable WebSocket message limit.** A `subscribe` message over the
+  socket is bounded by Bun's `maxPayloadLength` (16 MiB by default), not by
+  `bodyLimit`. A `ws` option would set the limit the way `bodyLimit` does
+  for a `POST`.
 
 ## Shipped
 
