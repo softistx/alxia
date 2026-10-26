@@ -92,12 +92,18 @@ describe('a cross-site JSON post does nothing', () => {
 		const { flow, revoked } = flowFor();
 		let ran = false;
 		const error = await thrown(() =>
-			flow.signInStep(async () => ((ran = true), signedIn), {
-				request: evil(),
-				language: 'en',
-				next: '/',
-				extra: {},
-			}),
+			flow.signInStep(
+				async () => {
+					ran = true;
+					return signedIn;
+				},
+				{
+					request: evil(),
+					language: 'en',
+					next: '/',
+					extra: {},
+				},
+			),
 		);
 		expect(status(error)).toBe(403);
 		expect([ran, revoked]).toEqual([false, []]);
@@ -127,10 +133,15 @@ describe('a cross-site JSON post does nothing', () => {
 		const { links } = linksFor();
 		let ran = false;
 		const error = await thrown(() =>
-			links.requestLink(async () => (ran = true), {
-				request: evil(),
-				language: 'en',
-			}),
+			links.requestLink(
+				async () => {
+					ran = true;
+				},
+				{
+					request: evil(),
+					language: 'en',
+				},
+			),
 		);
 		expect(status(error)).toBe(403);
 		expect(ran).toBe(false);
@@ -150,12 +161,17 @@ describe('a cross-site JSON post does nothing', () => {
 		const { links } = linksFor();
 		let ran = false;
 		const error = await thrown(() =>
-			links.spendToken(async () => (ran = true), {
-				request: evil(),
-				language: 'en',
-				path: PATH,
-				states: {},
-			}),
+			links.spendToken(
+				async () => {
+					ran = true;
+				},
+				{
+					request: evil(),
+					language: 'en',
+					path: PATH,
+					states: {},
+				},
+			),
 		);
 		expect(status(error)).toBe(403);
 		expect(ran).toBe(false);
@@ -163,7 +179,10 @@ describe('a cross-site JSON post does nothing', () => {
 
 	test('stepUp.request and stepUp.confirm: no run', async () => {
 		let ran = 0;
-		const run = async () => (ran++, { challenge: 'c', via: 'email' as const });
+		const run = async () => {
+			ran++;
+			return { challenge: 'c', via: 'email' as const };
+		};
 		const call = { request: evil(), language: 'en' as const };
 		expect(status(await thrown(() => steps().request(run, call)))).toBe(403);
 		expect(status(await thrown(() => steps().confirm(run, call)))).toBe(403);
