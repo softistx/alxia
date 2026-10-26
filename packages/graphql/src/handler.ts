@@ -87,6 +87,14 @@ export function serverContext(
 	return server;
 }
 
+/** Yoga's headers a 413 does not take: they frame or type Yoga's own body. */
+const REFUSAL_OWN_HEADERS = new Set([
+	'content-type',
+	'content-length',
+	'content-encoding',
+	'transfer-encoding',
+]);
+
 /**
  * The handler of the endpoint's `GET` and `POST`: Apollo Sandbox's page to
  * a browser when `sandbox` is not `false`, else the request to Yoga, with
@@ -126,6 +134,13 @@ export function graphqlHandler<UserCtx extends YogaContext>(
 		const refusal = watched.refusal();
 		if (refusal !== undefined) {
 			void answered.body?.cancel();
+			// What Yoga's plugins set (`cache-control: no-store`…) stays on the
+			// 413; its body and framing are core's.
+			for (const [name, value] of answered.headers) {
+				if (REFUSAL_OWN_HEADERS.has(name)) continue;
+				if (name === 'set-cookie') ctx.set.headers.append(name, value);
+				else ctx.set.headers.set(name, value);
+			}
 			throw refusal;
 		}
 		const response = await withoutOriginalError(answered);

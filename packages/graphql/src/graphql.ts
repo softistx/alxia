@@ -124,7 +124,17 @@ export interface GraphQLOptions<
 	 * `parserAndValidationCache` replaces it, and cannot be given with it.
 	 */
 	readonly parseCache?: false | ParseCacheOptions;
+	/**
+	 * The most bytes a `POST` body may hold, over which core answers a 413.
+	 * Without it, the `bodyLimit()` the app declared before `graphql()`
+	 * applies as it is; without that, 1 MiB. An upload through a
+	 * `multipart` mutation needs a larger one.
+	 */
+	readonly bodyLimit?: number;
 }
+
+/** The body limit of a `POST` when neither the option nor the app gives one: 1 MiB. */
+const DEFAULT_BODY_LIMIT = 1_048_576;
 
 /**
  * The check Yoga's types leave out: the context the app builds must hold
@@ -179,6 +189,7 @@ export function graphql<
 		ws = false,
 		maxTokens,
 		parseCache,
+		bodyLimit,
 		...yogaOptions
 	} = options;
 	const tokens = tokenLimit(maxTokens);
@@ -219,11 +230,18 @@ export function graphql<
 
 	const route = app as unknown as {
 		get(path: string, handler: unknown): unknown;
-		post(path: string, handler: unknown): unknown;
+		post(path: string, ...rest: unknown[]): unknown;
 		ws(path: string, ...rest: unknown[]): unknown;
 	};
 	route.get(path, handler);
-	route.post(path, handler);
+	// The GET just declared has the POST's scope: the limit an earlier
+	// `bodyLimit()` gives it is the one the POST keeps.
+	const inherited = app.routes.at(-1)?.bodyLimit;
+	route.post(
+		path,
+		{ bodyLimit: bodyLimit ?? inherited ?? DEFAULT_BODY_LIMIT },
+		handler,
+	);
 	if (ws !== false) {
 		const socket = graphqlSocket(yogaAt, path, ws === true ? {} : ws);
 		route.ws(socket.path, socket.middleware, socket.handlers);

@@ -7,21 +7,31 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-- **Bounded parsing.** `maxTokens` (15 000 by default; a longer document is
-  refused as `GRAPHQL_PARSE_FAILED`, `false` to opt out) and a parse cache
-  bounded by weight, 64 MiB per endpoint (`parseCache`), in place of Yoga's
-  cache that has no size bound. The documents above 15 000 tokens that worked
-  before need `maxTokens`.
+Nothing scheduled yet.
 
 ## Next
 
-Nothing scheduled yet.
+- **A declared oversize body refused where `bodyLimit()` stands.** Today the
+  body is read, and refused, by the endpoint, after every middleware declared
+  before it. Core would answer a `Content-Length` past the limit at the
+  `bodyLimit()` call, so the middlewares after it never run for such a
+  request. It lives in `@alxia/core`.
 
 ## Later
 
 Nothing scheduled yet.
 
 ## Shipped
+
+### 0.9.0
+
+- **Bounded parsing.** A document may hold 15 000 tokens (`maxTokens`, `false`
+  to opt out); a longer one is refused as `GRAPHQL_PARSE_FAILED`. The parse
+  cache is bounded by weight, 64 MiB per endpoint (`parseCache`), in place of
+  Yoga's, which has no size bound. A `POST` body may hold 1 MiB (`bodyLimit`)
+  unless the app declared its own limit; the 413 keeps the headers Yoga's
+  plugins set and logs nothing. A query over 15 000 tokens and an upload past
+  1 MiB need an option ([production guide](guide/production.md#cap-what-a-request-costs)).
 
 ### 0.8.0
 

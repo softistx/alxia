@@ -345,19 +345,25 @@ throw createGraphQLError('Admins only', {
 
 ### `413 {"error":"content_too_large", …}` on `POST /graphql`
 
-**When:** the body of a `POST` is larger than the `bodyLimit` declared
-before `graphql(...)`, with a `Content-Length` or chunked.
+**When:** the body of a `POST` is larger than its limit, with a
+`Content-Length` or chunked. The limit is **1 MiB** unless the `bodyLimit`
+option or a `bodyLimit()` declared before `graphql(...)` gives another.
 
 **Why:** core counts the bytes as they arrive and fails the read past the
 limit; the endpoint answers it as any route does, in the app's error format
-(`application/problem+json` under `errors: 'problem'`).
+(`application/problem+json` under `errors: 'problem'`). The 413 carries the
+headers Yoga's plugins set (`Cache-Control: no-store`…), and nothing is
+logged, whatever the content type (JSON, form-urlencoded,
+`application/graphql`). The body is read by the endpoint, after the
+middlewares declared before it: they still run for an oversized body, even
+when `bodyLimit()` stands above them. Put the costly ones (a session lookup,
+a database call) late.
 
-**Fix:** a client sends less, or the route takes a larger limit:
+**Fix:** a client sends less, or the endpoint takes a larger limit, for an
+upload by `multipart` for example:
 
 ```ts
-alxia()
-	.bodyLimit(512 * 1024) // before graphql(...)
-	.plugin((app) => graphql(app, { schema }));
+graphql(app, { schema, bodyLimit: 5 * 1024 * 1024 });
 ```
 
 ### `403 Required CSRF header(s) not present` from the test client
