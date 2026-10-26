@@ -92,6 +92,18 @@ function refused(
 			resent: false,
 		};
 	}
+	if (answer.error === 'throttled') {
+		// Asking too often spends nothing: the challenge and its tries stay.
+		return {
+			...state,
+			phase: 'code',
+			error: 'throttled',
+			message: answer.message,
+			retryAfter: answer.retryAfter,
+			pending: false,
+			resent: false,
+		};
+	}
 	return {
 		...state,
 		phase: 'code',

@@ -649,7 +649,7 @@ type StepUpError = 'invalid' | 'expired' | 'failed' | 'throttled';
 // request, refused
 { ok: false, intent: 'request-step-up', error: StepUpError, message, retryAfter? }
 // confirm, refused
-{ ok: false, intent: 'confirm-step-up', error: StepUpError, attemptsLeft?, locked, message }
+{ ok: false, intent: 'confirm-step-up', error: StepUpError, attemptsLeft?, locked, message, retryAfter? }
 ```
 
 The answer must not be cached: `Cache-Control: private, no-store`, which
@@ -685,10 +685,12 @@ This is the table of `@nxgt/janus-graphql`'s `confirmStepUp`, with what
 | `SECOND_FACTOR_ACTIVE`, `SECOND_FACTOR_NOT_ENROLLED` | 409 | `error: 'expired'`: start over, the way to confirm changed |
 | `USER_INACTIVE`, anything else | 403 or other | `error: 'failed'`, in `wording`'s words or `errors`' |
 | an API it cannot reach | 503 | `error: 'failed'` |
-| `request` refused with `MAIL_THROTTLED` | 429 | `error: 'throttled'`, `retryAfter` in seconds when the API sent them, `message` in `wording`'s words or `errors`' |
+| `request` refused with `MAIL_THROTTLED`, or any 429 (a rate limit) | 429 | `error: 'throttled'`, `retryAfter` in seconds when the API sent them, `message` in `wording`'s words or `errors`' |
+| `confirm` refused with a 429 (a rate limit), whatever the code | 429 | `error: 'throttled'`, `locked: false`, `retryAfter` when sent: the challenge and its tries stay, wait and send the code again |
 
 A request that the API refuses is `error: 'failed'`. A mail throttled
-(`MAIL_THROTTLED`, 429) is `error: 'throttled'` instead, with `retryAfter`, the
+(`MAIL_THROTTLED`) or any refusal with the status 429 (a rate limit, under
+whatever code, on `request` or on `confirm`) is `error: 'throttled'` instead, with `retryAfter`, the
 whole seconds to wait, read from `extensions.params.retryAfter` or
 `extensions.retryAfter` (a number or a numeric string, rounded up; with none
 usable the answer is still `throttled`, without `retryAfter`). Its `message`
@@ -741,7 +743,7 @@ its state on the page, with no React: `phase` (`idle`, `requesting`, `code`,
 `confirming`, `done`), the `via` that confirms it (`email` or
 `secondFactor`), the `challenge` held, `attemptsLeft`, `locked`, `error`
 (`invalid`, `expired`, `failed` or `throttled`), `message` (the last refusal
-worded for the page), `retryAfter` (a throttle's seconds), `pending` and
+worded for the page), `retryAfter` (a throttle's seconds, from a request or a code), `pending` and
 `resent`. `start`, `submit`, an accepted answer and `release` clear `message`
 and `retryAfter`.
 
@@ -779,7 +781,8 @@ state = stepUpReducer(state, {
 
 stepUpProps(state);
 // { via: 'secondFactor', attemptsLeft: 0, locked: true, error: 'invalid', pending: false, resent: false }
-// A throttled request adds `retryAfter` (seconds) when the API said how long.
+// A throttled request or code (a 429) adds `error: 'throttled'` and `retryAfter` (seconds) when the API said how long:
+// the challenge and its tries stay, and `VerificationCode` makes Resend wait without locking.
 ```
 
 With no try left, a mailed code is over (`error: 'expired'`: ask for a new

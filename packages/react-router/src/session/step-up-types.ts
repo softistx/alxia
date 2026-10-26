@@ -11,7 +11,7 @@ import type {
 export interface StepUpCodes extends SignInCodes {
 	/** The code of a mutation that needs a step-up first (`'STEP_UP_REQUIRED'`). */
 	readonly stepUpRequired?: string | undefined;
-	/** The code of a mail the API holds back (`'MAIL_THROTTLED'`): `request` answers `error: 'throttled'`. */
+	/** The code of a mail the API holds back (`'MAIL_THROTTLED'`): `request` answers `error: 'throttled'`. Any 429 is throttled too, whatever its code. */
 	readonly mailThrottled?: string | undefined;
 }
 
@@ -59,8 +59,8 @@ export interface StepUpSteps<L extends string> {
 	 * Starts a step-up (`requestStepUp`): the challenge and how it is
 	 * confirmed. The challenge goes to the page's fetcher and nowhere else.
 	 * A refusal is `error: 'failed'` with the
-	 * message and the API's status, and a throttled mail `error: 'throttled'`,
-	 * with `retryAfter` when the API says how long; an API it cannot reach is a 503. Anything
+	 * message and the API's status, and a throttled mail or any 429 (a rate
+	 * limit) `error: 'throttled'`, with `retryAfter` when the API says how long; an API it cannot reach is a 503. Anything
 	 * that is not an API failure is thrown. Only a same-site JSON post goes on.
 	 */
 	request(
@@ -69,7 +69,8 @@ export interface StepUpSteps<L extends string> {
 	): Promise<StepUpRequestAnswer | StepUpStayed<StepUpRequestAnswer>>;
 	/**
 	 * Confirms the step-up with the code (`confirmStepUp`). A refusal says
-	 * why: `invalid` with the tries left, `expired` (ask again), or `failed`;
+	 * why: `invalid` with the tries left, `expired` (ask again), `throttled`
+	 * (a 429: wait `retryAfter`, the challenge and its tries stay), or `failed`;
 	 * with no try left, a mailed code (`via: 'email'`, or not given) is
 	 * `expired` and an app or recovery code is `locked`.
 	 */

@@ -183,4 +183,32 @@ describe('stepUpReducer', () => {
 		stepUpReducer(before, refused({ attemptsLeft: 0 }));
 		expect(before).toEqual(copy);
 	});
+
+	test('a throttled code keeps the challenge, the tries and the form, and holds retryAfter', () => {
+		const state = run(
+			issued('secondFactor'),
+			refused({ attemptsLeft: 2 }),
+			{ type: 'submit' },
+			refused({ error: 'throttled', retryAfter: 20, message: 'Slow down' }),
+		);
+		expect(state).toMatchObject({
+			phase: 'code',
+			challenge: 'c1',
+			attemptsLeft: 2,
+			locked: false,
+			error: 'throttled',
+			retryAfter: 20,
+			message: 'Slow down',
+			pending: false,
+		});
+	});
+
+	test('a refused code with no retryAfter clears an earlier one', () => {
+		const state = run(
+			issued(),
+			refused({ error: 'throttled', retryAfter: 20 }),
+			refused({ attemptsLeft: 1 }),
+		);
+		expect(state.retryAfter).toBeUndefined();
+	});
 });

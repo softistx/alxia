@@ -95,6 +95,14 @@ function refusedCode<L extends string, C>(
 	};
 }
 
+/** The mail throttle's code, or any 429: a rate limit asks to wait, whatever its code. */
+function isThrottle<L extends string, C>(
+	context: StepUpContext<L, C>,
+	error: ApiErrorLike,
+): boolean {
+	return error.status === 429 || error.code === context.mailThrottled;
+}
+
 async function requestStep<L extends string, C>(
 	context: StepUpContext<L, C>,
 	run: Parameters<StepUpSteps<L>['request']>[0],
@@ -110,7 +118,7 @@ async function requestStep<L extends string, C>(
 		if (!refusal) throw error;
 		const api = isApiErrorLike(error);
 		const message = api ? worded(context, error, language) : refusal.message;
-		const throttled = api && error.code === context.mailThrottled;
+		const throttled = api && isThrottle(context, error);
 		const retryAfter = throttled ? retryAfterOf(error) : undefined;
 		return data<StepUpRequestAnswer>(
 			{
@@ -148,6 +156,15 @@ async function confirmStep<L extends string, C>(
 		const failed = (message: string) =>
 			stay({ error: 'failed' satisfies StepUpError, locked: false, message });
 		if (!isApiErrorLike(error)) return failed(refusal.message);
+		if (error.status === 429) {
+			const retryAfter = retryAfterOf(error);
+			return stay({
+				error: 'throttled',
+				locked: false,
+				message: worded(context, error, language),
+				...(retryAfter === undefined ? {} : { retryAfter }),
+			});
+		}
 		if (error.code === context.invalidCode) {
 			return stay(refusedCode(context, error, via, language));
 		}

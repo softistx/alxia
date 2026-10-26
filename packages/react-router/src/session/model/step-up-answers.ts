@@ -1,9 +1,10 @@
 import type { StepUpVia } from './second-factor';
 
 /**
- * Why a step-up step failed: a wrong code, a challenge gone, a mail held back
- * for asking too often (`throttled`, with `retryAfter` when the API says how
- * long), or anything else.
+ * Why a step-up step failed: a wrong code, a challenge gone, a request held
+ * back for asking too often (`throttled`: a mail the API holds back or a rate
+ * limit, a 429, with `retryAfter` when the API says how long), or anything
+ * else.
  */
 export type StepUpError = 'invalid' | 'expired' | 'failed' | 'throttled';
 
@@ -40,4 +41,6 @@ export type StepUpConfirmAnswer =
 			readonly locked: boolean;
 			/** The refusal worded for the page, in its language. */
 			readonly message?: string | undefined;
+			/** The seconds to wait before trying again (a whole number from 0), when `error` is `throttled` and the API says. */
+			readonly retryAfter?: number | undefined;
 	  };
