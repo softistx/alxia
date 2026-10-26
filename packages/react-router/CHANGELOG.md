@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.15.0
+
+### Minor Changes
+
+- [#341](https://github.com/softistx/alxia/pull/341) [`192bbe2`](https://github.com/softistx/alxia/commit/192bbe2ed14dbab3bfd0b275d5cc039ed3b8f3c6) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `signInFlow`'s `revoke` can now receive the caller's context, such as the visitor's resolved address and language, which a bare `Request` cannot carry. `revoke(token, request, context)` gets it as a third argument, and `signOut`, `revokeSession`, `landReplacing`, `signInStep` and `authLinks`' `landByLink` and `afterReset` take an optional `context` to pass along (for example `{ context: alxiaOf(context) }`). Annotate the `revoke` parameter and the type is inferred for every step. Without a context, `revoke` receives `undefined`, and a two-parameter callback keeps working.
+
 ## 0.14.0
 
 ### Minor Changes
