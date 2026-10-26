@@ -69,15 +69,56 @@ describe('request', () => {
 		expect(result.init.status).toBe(429);
 	});
 
+	describe('a rate limit under another code', () => {
+		const limited = async (
+			code: string | undefined,
+			extensions: Record<string, unknown>,
+			status = 429,
+		) =>
+			body(
+				await steps().request(
+					() => Promise.reject(refusal(code, 'Slow down', extensions, status)),
+					stepCall(),
+				),
+			);
+
+		test('a 429 is throttled with retryAfter, whatever its code', async () => {
+			const result = await limited('rate-limit.errors.too-many', {
+				retryAfter: 30,
+			});
+			expect(result.data).toEqual({
+				ok: false,
+				intent: 'request-step-up',
+				error: 'throttled',
+				message: 'Slow down',
+				retryAfter: 30,
+			});
+			expect(result.init.status).toBe(429);
+		});
+
+		test('a 429 with no code or no seconds is throttled without retryAfter', async () => {
+			const result = await limited(undefined, {});
+			expect(result.data['error']).toBe('throttled');
+			expect(result.data).not.toHaveProperty('retryAfter');
+		});
+
+		test('another status under that code stays failed', async () => {
+			expect(
+				(await limited('rate-limit.errors.too-many', {}, 403)).data,
+			).toMatchObject({ error: 'failed' });
+		});
+	});
+
 	describe('a throttled mail', () => {
 		const throttle = async (
 			extensions: Record<string, unknown>,
 			options: Parameters<typeof steps>[0] = {},
 			code = 'MAIL_THROTTLED',
+			status = 429,
 		) =>
 			body(
 				await steps(options).request(
-					() => Promise.reject(refusal(code, 'Slow down', extensions, 429)),
+					() => Promise.reject(refusal(code, 'Slow down', extensions, status)),
 					stepCall(),
 				),
 			);
@@ -128,13 +169,15 @@ describe('request', () => {
 					'error'
 				],
 			).toBe('throttled');
-			expect((await throttle({ retryAfter: 5 }, own)).data['error']).toBe(
-				'failed',
-			);
+			expect(
+				(await throttle({ retryAfter: 5 }, own, 'MAIL_THROTTLED', 403)).data[
+					'error'
+				],
+			).toBe('failed');
 		});
 
-		test('another refusal with a wait is not a throttle', async () => {
-			const result = await throttle({ retryAfter: 5 }, {}, 'x.errors.y');
+		test('another refusal with a wait, that is not a 429, is not a throttle', async () => {
+			const result = await throttle({ retryAfter: 5 }, {}, 'x.errors.y', 403);
 			expect(result.data['error']).toBe('failed');
 			expect('retryAfter' in result.data).toBe(false);
 		});

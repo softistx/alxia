@@ -21,6 +21,33 @@ describe('confirm', () => {
 		).toEqual({ ok: true, intent: 'confirm-step-up' });
 	});
 
+	test('a 429 is throttled with retryAfter and does not end the challenge', async () => {
+		const result = await confirm(
+			refusal(
+				'rate-limit.errors.too-many',
+				'Slow down',
+				{ retryAfter: 20 },
+				429,
+			),
+			'email',
+		);
+		expect(result.data).toEqual({
+			ok: false,
+			intent: 'confirm-step-up',
+			error: 'throttled',
+			locked: false,
+			message: 'Slow down',
+			retryAfter: 20,
+		});
+		expect(result.init.status).toBe(429);
+	});
+
+	test('a 429 on a wrong-code code is throttled too, without retryAfter when none', async () => {
+		const result = await confirm(refusal('CODE_INVALID', 'Slow down', {}, 429));
+		expect(result.data['error']).toBe('throttled');
+		expect(result.data).not.toHaveProperty('retryAfter');
+	});
+
 	test('a wrong code with tries left is invalid, with the count worded', async () => {
 		const result = await confirm(wrong(3), 'email');
 		expect(result.data).toEqual({
