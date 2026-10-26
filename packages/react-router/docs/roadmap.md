@@ -7,7 +7,14 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing planned.
+- **A BFF session for a janus API.** An app that is a backend for its own
+  pages, and calls a GraphQL API that signs users in with `@nxgt/janus`,
+  gets the session's code from one place: `@alxia/react-router/session/model`
+  (redirects that stay on the site, the sign-in paths, the step-up state
+  and its props for the UI; it imports nothing) first, then the cookies, the
+  sign-in flow, the step-up and the pages a mail's link opens
+  (`@alxia/react-router/session`). The
+  [session guide](guide/session.md) grows with each part.
 
 ## Next
 
