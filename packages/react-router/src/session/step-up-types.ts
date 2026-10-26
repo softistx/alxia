@@ -1,8 +1,6 @@
 import type { data } from 'react-router';
 import type { ApiErrorLike } from '../errors/api-error';
-import type { ApiErrors } from '../errors/api-errors';
-import type { JsonActions } from '../errors/json-actions';
-import type { SignInCodes } from './flow-types';
+import type { SignInCodes, SignInFlow } from './flow-types';
 import type {
 	StepUpConfirmAnswer,
 	StepUpRequestAnswer,
@@ -18,12 +16,11 @@ export interface StepUpCodes extends SignInCodes {
 }
 
 export interface StepUpStepsOptions<L extends string> {
-	/** The app's `createApiErrors` instance. */
-	readonly errors: ApiErrors<L>;
-	/** The app's `jsonActions({ origin })`: a step runs only for a same-site JSON post. */
-	readonly json: JsonActions;
-	/** A refused code's tries left, worded ("3 tries left"). */
-	attemptsLeft(count: number, language: L): string;
+	/**
+	 * The app's sign-in flow: the step-up reads its `errors`, its `json` (a
+	 * step runs only for a same-site JSON post) and its `attemptsLeft`.
+	 */
+	readonly signIn: SignInFlow<L>;
 	/** A challenge that is over, worded ("ask for a new code"). */
 	spent(language: L): string;
 	/**

@@ -1,5 +1,9 @@
 import { data } from 'react-router';
-import { isApiErrorLike, retryAfterOf } from '../errors/api-error';
+import {
+	type ApiErrorLike,
+	isApiErrorLike,
+	retryAfterOf,
+} from '../errors/api-error';
 import { MAIL_THROTTLED } from './codes';
 import { samesitePost } from './guard';
 import { afterReset, landByLink } from './link-land';
@@ -26,6 +30,14 @@ const RESET_DONE = '/sign-in?password-reset=1';
  * everyone. A wait or an unreachable API is the form's message; a malformed
  * address is the `email` field's.
  */
+/** The refusal's message: the app's own wording, else `errors`'. */
+const worded = <L extends string>(
+	{ wording, errors }: LinksContext<L>,
+	error: ApiErrorLike,
+	language: L,
+): string =>
+	wording?.(error, language) ?? errors.apiErrorMessage(error, language);
+
 async function requestLink<L extends string>(
 	options: LinksContext<L>,
 	run: () => Promise<unknown>,
@@ -37,17 +49,22 @@ async function requestLink<L extends string>(
 		await run();
 		return data<RequestLinkAnswer>({ sent: true });
 	} catch (error) {
-		if (isApiErrorLike(error)) {
-			if (error.code === (options.codes?.mailThrottled ?? MAIL_THROTTLED)) {
-				const formError =
-					options.wording?.(error, language) ??
-					errors.apiErrorMessage(error, language);
-				const retryAfter = retryAfterOf(error);
-				return data<RequestLinkAnswer>(
-					{ formError, ...(retryAfter === undefined ? {} : { retryAfter }) },
-					{ status: 429 },
-				);
-			}
+		const api = isApiErrorLike(error);
+		if (
+			api &&
+			error.code === (options.codes?.mailThrottled ?? MAIL_THROTTLED)
+		) {
+			const retryAfter = retryAfterOf(error);
+			return data<RequestLinkAnswer>(
+				{
+					formError: worded(options, error, language),
+					throttled: true,
+					...(retryAfter === undefined ? {} : { retryAfter }),
+				},
+				{ status: 429 },
+			);
+		}
+		if (api) {
 			const email = errors.fieldErrors(error, language)['email'];
 			if (email) {
 				return data<RequestLinkAnswer>(
@@ -59,7 +76,7 @@ async function requestLink<L extends string>(
 		const refusal = errors.apiRefusal(error, language);
 		if (!refusal) throw error;
 		return data<RequestLinkAnswer>(
-			{ formError: refusal.message },
+			{ formError: api ? worded(options, error, language) : refusal.message },
 			{ status: refusal.status },
 		);
 	}

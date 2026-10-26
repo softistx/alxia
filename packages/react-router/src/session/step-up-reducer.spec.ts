@@ -1,8 +1,8 @@
 import { describe, expect, test } from 'bun:test';
 import type { Lang } from '../../test/errors/format';
 import { filledMessages, refusal } from '../../test/errors/refusal';
-import { stepCall } from '../../test/session/flow';
-import { createApiErrors, jsonActions } from '../errors';
+import { flowFor, stepCall } from '../../test/session/flow';
+import { createApiErrors } from '../errors';
 import {
 	INITIAL_STEP_UP,
 	type StepUpConfirmAnswer,
@@ -16,14 +16,15 @@ import { stepUpSteps } from './step-up';
 // The answers the server steps give, taken as they are by the page's reducer
 // (what a fetcher's `data` holds: `data()` carries it in `.data`).
 const steps = stepUpSteps<Lang>({
-	errors: createApiErrors<Lang>({
-		messages: filledMessages(),
-		unavailable: () => 'down',
-	}),
-	attemptsLeft: (count) => `${count} left`,
+	signIn: flowFor({
+		errors: createApiErrors<Lang>({
+			messages: filledMessages(),
+			unavailable: () => 'down',
+		}),
+		attemptsLeft: (count) => `${count} left`,
+	}).flow,
 	spent: () => 'ask again',
 	locked: () => 'wait',
-	json: jsonActions(),
 });
 
 const plain = <T>(answer: T | { data: T }): T =>

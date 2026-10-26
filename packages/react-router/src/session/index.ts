@@ -22,6 +22,7 @@ export type {
 export { TOKEN_PAGE_HEADERS } from './link-token';
 export type {
 	AuthLinks,
+	AuthLinksCodes,
 	AuthLinksOptions,
 	LinkStayed,
 	RequestLinkAnswer,

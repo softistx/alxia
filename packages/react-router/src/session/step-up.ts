@@ -41,7 +41,7 @@ function resolve<L extends string>(
 		);
 	}
 	return {
-		options: steps,
+		options: steps.signIn,
 		steps,
 		invalidCode,
 		challengeOver,
@@ -58,7 +58,7 @@ function worded<L extends string>(
 ): string {
 	return (
 		steps.wording?.(error, language) ??
-		steps.errors.apiErrorMessage(error, language)
+		steps.signIn.errors.apiErrorMessage(error, language)
 	);
 }
 
@@ -86,7 +86,7 @@ function refusedCode<L extends string>(
 			error,
 			language,
 			locked ? steps.locked?.(language) : undefined,
-		) ?? steps.errors.apiErrorMessage(error, language);
+		) ?? steps.signIn.errors.apiErrorMessage(error, language);
 	return {
 		error: 'invalid',
 		...(attemptsLeft === undefined ? {} : { attemptsLeft }),
@@ -100,13 +100,13 @@ async function requestStep<L extends string>(
 	run: Parameters<StepUpSteps<L>['request']>[0],
 	{ request, language }: Parameters<StepUpSteps<L>['request']>[1],
 ): Promise<StepUpRequestAnswer | StepUpStayed<StepUpRequestAnswer>> {
-	samesitePost(context.steps.json, request);
+	samesitePost(context.steps.signIn.json, request);
 	const intent = 'request-step-up';
 	try {
 		const { challenge, via } = await run();
 		return { ok: true, intent, challenge, via };
 	} catch (error) {
-		const refusal = context.steps.errors.apiRefusal(error, language);
+		const refusal = context.steps.signIn.errors.apiRefusal(error, language);
 		if (!refusal) throw error;
 		const api = isApiErrorLike(error);
 		const message = api ? worded(context, error, language) : refusal.message;
@@ -130,13 +130,13 @@ async function confirmStep<L extends string>(
 	run: () => Promise<unknown>,
 	{ request, language, via }: Parameters<StepUpSteps<L>['confirm']>[1],
 ): Promise<StepUpConfirmAnswer | StepUpStayed<StepUpConfirmAnswer>> {
-	samesitePost(context.steps.json, request);
+	samesitePost(context.steps.signIn.json, request);
 	const intent = 'confirm-step-up';
 	try {
 		await run();
 		return { ok: true, intent };
 	} catch (error) {
-		const refusal = context.steps.errors.apiRefusal(error, language);
+		const refusal = context.steps.signIn.errors.apiRefusal(error, language);
 		if (!refusal) throw error;
 		const stay = (
 			failure: Omit<Refused, 'ok' | 'intent'>,

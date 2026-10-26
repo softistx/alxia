@@ -1,6 +1,5 @@
 import { describe, expect, test } from 'bun:test';
 import { flowFor, jsonPost } from '../../test/session/flow';
-import { errors } from '../../test/session/step-up';
 import { jsonActions } from '../errors';
 import {
 	type AuthLinksOptions,
@@ -78,9 +77,7 @@ describe('optional inputs accept undefined', () => {
 
 	test('stepUpSteps’ options, and confirm’s via', async () => {
 		const options: StepUpStepsOptions<'en'> = {
-			errors: errors as StepUpStepsOptions<'en'>['errors'],
-			json: jsonActions(),
-			attemptsLeft: (count) => `${count}`,
+			signIn: flowFor().flow as StepUpStepsOptions<'en'>['signIn'],
 			spent: () => 'again',
 			locked: undefined,
 			wording: undefined,

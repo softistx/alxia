@@ -1,5 +1,6 @@
 import { redirect } from 'react-router';
 import type { FlowContext, SignInAnswer, SignInFlow } from './flow-types';
+import { samesitePost } from './guard';
 import { safeNext, secondFactorPath } from './model';
 import { millisOf } from './serialize';
 
@@ -11,6 +12,7 @@ export async function revokeSession<L extends string>(
 	{ options }: FlowContext<L>,
 	request: Request,
 ): Promise<boolean> {
+	samesitePost(options.json, request);
 	const token = options.cookies.token(request);
 	if (!token) return false;
 	try {
@@ -84,6 +86,7 @@ export async function landReplacing<L extends string>(
 		revokeOn = ['signedIn'],
 	}: Parameters<SignInFlow<L>['landReplacing']>[2],
 ): Promise<Response | null> {
+	samesitePost(context.options.json, request);
 	const landed = landing(context, answer, next);
 	if (!landed || answer.status === 'other') return landed;
 	if (!revokeOn.includes(answer.status)) return landed;

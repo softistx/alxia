@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
-import { asking, flowFor, thrown } from '../../test/session/flow';
+import { asking, flowFor, posted, thrown } from '../../test/session/flow';
 import { linksFor, PATH } from '../../test/session/links';
 import { steps } from '../../test/session/step-up';
 import { jsonActions } from '../errors';
@@ -208,5 +208,70 @@ describe('a native form post goes back to its page', () => {
 			steps().request(run, { request: form(), language: 'en' }),
 		);
 		expect(error).toBeInstanceOf(Response);
+	});
+});
+
+describe('the flow’s public steps and guard', () => {
+	test('guard(request) is the same check: a redirect for a native post, a 403 across sites', async () => {
+		const { flow } = flowFor();
+		expect(await thrown(() => flow.guard(form()))).toBeInstanceOf(Response);
+		expect(status(await thrown(() => flow.guard(evil())))).toBe(403);
+		expect(flow.guard(posted('/passkey', 'tok'))).toBeUndefined();
+	});
+
+	test('landReplacing refuses a cross-site post before it lands or revokes', async () => {
+		const { flow, revoked } = flowFor();
+		const error = await thrown(() =>
+			flow.landReplacing(signedIn, '/', { request: evil() }),
+		);
+		expect(status(error)).toBe(403);
+		expect(revoked).toEqual([]);
+	});
+
+	test('revokeSession refuses a cross-site post before it revokes', async () => {
+		const { flow, revoked } = flowFor();
+		expect(status(await thrown(() => flow.revokeSession(evil())))).toBe(403);
+		expect(revoked).toEqual([]);
+	});
+
+	test('a spread copy of jsonActions keeps the configured origin', async () => {
+		const json = { ...jsonActions({ origin: 'https://my-app.test' }) };
+		const { flow } = flowFor({ json });
+		const from = (origin: string) =>
+			asking('/x', undefined, {
+				method: 'POST',
+				headers: { 'content-type': 'application/json', origin },
+				body: '{}',
+			});
+		expect(flow.guard(from('https://my-app.test'))).toBeUndefined();
+		expect(
+			status(await thrown(() => flow.guard(from('http://my-app.test')))),
+		).toBe(403);
+	});
+
+	test('the origin option is read at each request', async () => {
+		let origin = 'https://a.test';
+		const { flow } = flowFor({ json: jsonActions({ origin: () => origin }) });
+		const from = asking('/x', undefined, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', origin: 'https://b.test' },
+			body: '{}',
+		});
+		expect(status(await thrown(() => flow.guard(from)))).toBe(403);
+		origin = 'https://b.test';
+		expect(flow.guard(from)).toBeUndefined();
+	});
+
+	test('signInFlow refuses a json that did not come from jsonActions()', () => {
+		const double = {
+			readJson: async () => ({}),
+			requireJsonPost: () => undefined,
+			readInput: async () => ({}),
+		} as never;
+		expect(() => flowFor({ json: double })).toThrow(
+			new TypeError(
+				"signInFlow(): json must come from jsonActions(), which carries the site check every step runs; this object has none (a hand-made double?). Pass the app's jsonActions({ origin }) instance, or a spread copy of it.",
+			),
+		);
 	});
 });

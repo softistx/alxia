@@ -71,3 +71,11 @@ export const stepCall = () => ({
 	request: jsonPost(),
 	language: 'en' as const,
 });
+
+/** A same-site JSON post with the session cookie of `token`, as an action receives it. */
+export const posted = (url: string, token?: string) =>
+	asking(url, token, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: '{}',
+	});

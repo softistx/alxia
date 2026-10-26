@@ -92,20 +92,32 @@ export function waitMinutes(
 	return Math.max(1, Math.ceil(Number(seconds) / 60) || 1);
 }
 
+const MAX_RETRY_AFTER = 86_400;
+
+/** A wait in seconds from one value: a finite number from 0, or a decimal string. */
+function secondsOf(value: unknown): number | undefined {
+	const seconds =
+		typeof value === 'string' && /^\d+(\.\d+)?$/.test(value.trim())
+			? Number(value.trim())
+			: value;
+	return typeof seconds === 'number' && Number.isFinite(seconds) && seconds >= 0
+		? Math.min(MAX_RETRY_AFTER, Math.ceil(seconds)) + 0
+		: undefined;
+}
+
 /**
  * The seconds a throttle asks to wait: `retryAfter` of the first error's
- * `extensions.params`, else of its `extensions`, a number or a numeric string,
- * rounded up. `undefined` when the API sent none, or none usable (not a number,
- * negative). Internal: `/session` words it as a typed `retryAfter`.
+ * `extensions.params`, else (when that is unusable) of its `extensions`.
+ * Only a finite number from 0, or a decimal string, counts; it is rounded up
+ * and held at a day (86 400), and `-0` is 0. `undefined` when the API sent
+ * none usable. Internal: `/session` words it as a typed `retryAfter`.
  */
 export function retryAfterOf(error: ApiErrorLike): number | undefined {
 	const extensions = error.errors[0]?.extensions;
-	const value = extensions?.params?.retryAfter ?? extensions?.retryAfter;
-	const seconds =
-		typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
-	return typeof seconds === 'number' && Number.isFinite(seconds) && seconds >= 0
-		? Math.ceil(seconds)
-		: undefined;
+	return (
+		secondsOf(extensions?.params?.retryAfter) ??
+		secondsOf(extensions?.retryAfter)
+	);
 }
 
 /**

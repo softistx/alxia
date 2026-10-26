@@ -4,6 +4,12 @@ import type { FormErrors } from '../errors/form-errors';
 import type { InferOutput, StandardSchemaV1 } from '../errors/standard-schema';
 import type { SignInAnswer, SignInFlow } from './flow-types';
 
+/** The codes the links tell apart; `@nxgt/janus`'s by default. */
+export interface AuthLinksCodes {
+	/** The API's wait on mailed links; `MAIL_THROTTLED` by default. */
+	readonly mailThrottled?: string | undefined;
+}
+
 export interface AuthLinksOptions<L extends string> {
 	/**
 	 * The app's sign-in flow: it lands the sessions a link opens, and its
@@ -11,15 +17,11 @@ export interface AuthLinksOptions<L extends string> {
 	 */
 	readonly signIn: SignInFlow<L>;
 	/** The codes the links tell apart; `@nxgt/janus`'s by default. */
-	readonly codes?:
-		| {
-				/** The API's wait on mailed links; `MAIL_THROTTLED` by default. */
-				readonly mailThrottled?: string | undefined;
-		  }
-		| undefined;
+	readonly codes?: AuthLinksCodes | undefined;
 	/**
-	 * The wait of a throttled mail in the app's words, before `errors`'
-	 * default; `undefined` keeps the default.
+	 * The app's own words for a refusal of `requestLink` that is not a field's
+	 * (the wait of a throttled mail, say), before `errors`' default;
+	 * `undefined` keeps the default.
 	 */
 	readonly wording?:
 		| ((error: ApiErrorLike, language: L) => string | undefined)
@@ -50,6 +52,8 @@ export type LinkStayed = ReturnType<typeof data<FormErrors>>;
 export type RequestLinkAnswer = {
 	sent?: true;
 	formError?: string;
+	/** The mail was held back for asking too often: `formError` says so, `retryAfter` how long. */
+	throttled?: true;
 	/** A throttled request: the seconds to wait (a whole number from 0), when the API says. */
 	retryAfter?: number;
 	/** The address refused as malformed: under the field. */
@@ -85,8 +89,9 @@ export interface AuthLinks<L extends string> {
 	/** A redirect to a token page's end state, replacing the token's history entry. */
 	ended(path: string, state: string, headers?: HeadersInit): Response;
 	/**
-	 * The arguments a token page posted, read as JSON (`json.readJson`: a
-	 * cross-site post is a 403, before anything is spent) and checked against
+	 * The arguments a token page posted, read as JSON: a native form post is
+	 * redirected back to its page and a cross-site post is a 403 (before the
+	 * body is read, so before anything is spent), then checked against
 	 * a Standard Schema. A token the schema refuses ends on the invalid state
 	 * (thrown); any other refusal is a 400.
 	 */
@@ -107,7 +112,8 @@ export interface AuthLinks<L extends string> {
 	 * session the browser held is revoked first; an answer that leads nowhere
 	 * is the form's "unavailable"; `other` is too, unless `other` names the
 	 * state to end on (an app's own `LINKED`: no session opened, the
-	 * browser's kept). A form post that is not JSON is refused first.
+	 * browser's kept). A native form post is redirected back to its page and a
+	 * cross-site post is a 403, before anything is revoked or landed.
 	 */
 	landByLink(
 		answer: SignInAnswer,

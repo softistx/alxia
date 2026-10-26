@@ -1,5 +1,7 @@
+import { hasSiteCheck } from '../errors/same-site';
 import { CHALLENGE_OVER, INVALID_CODE } from './codes';
 import type { FlowContext, SignInFlow, SignInFlowOptions } from './flow-types';
+import { samesitePost } from './guard';
 import { landing, landReplacing, revokeSession } from './land';
 import { SIGN_IN_PATHS, type SignInPaths } from './model';
 import { sitePath } from './model/site-path';
@@ -19,6 +21,11 @@ function resolve<L extends string>(
 	const paths: SignInPaths = { ...SIGN_IN_PATHS, ...options.paths };
 	for (const key of ['signIn', 'secondFactor'] as const) {
 		sitePath(paths[key], { label: `signInFlow(): paths.${key}` });
+	}
+	if (!hasSiteCheck(options.json)) {
+		throw new TypeError(
+			"signInFlow(): json must come from jsonActions(), which carries the site check every step runs; this object has none (a hand-made double?). Pass the app's jsonActions({ origin }) instance, or a spread copy of it.",
+		);
 	}
 	const invalidCode = options.codes?.invalidCode ?? INVALID_CODE;
 	const challengeOver = options.codes?.challengeOver ?? CHALLENGE_OVER;
@@ -55,6 +62,8 @@ export function signInFlow<L extends string>(
 		json: o.json,
 		unavailable: (language) => unavailableMessage(o, language),
 		clear: () => o.clear?.() ?? [],
+		attemptsLeft: o.attemptsLeft,
+		guard: (request) => samesitePost(o.json, request),
 		nextParam,
 		signInRedirect: (request) => signInRedirect(context, request),
 		landing: (answer, next) => landing(context, answer, next),

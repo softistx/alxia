@@ -74,6 +74,17 @@ export interface SignInFlow<L extends string> {
 	readonly errors: ApiErrors<L>;
 	/** The `jsonActions` instance the flow was built with. */
 	readonly json: JsonActions;
+	/** A refused code's tries left, worded (the `attemptsLeft` option). */
+	attemptsLeft(count: number, language: L): string;
+	/**
+	 * The guard every step of the flow that signs in, out, spends or mails
+	 * runs first, for an app's own step (a passkey's): a native form post is
+	 * redirected back to its page, and a JSON post from another site is a 403
+	 * (`Origin` and `Sec-Fetch-Site`, as `readJson` reads them). It reads
+	 * headers only. Call it in a POST action, never in a GET callback, which
+	 * carries no JSON content type and would be redirected to itself.
+	 */
+	guard(request: Request): void;
 	/** What a sign-in says when the API cannot be reached: the `unavailable` option, else `errors.unavailableMessage`. */
 	unavailable(language: L): string;
 	/** The `Set-Cookie` values a new session and a sign-out also clear (the `clear` option); none by default. */

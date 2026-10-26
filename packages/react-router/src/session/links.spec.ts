@@ -7,6 +7,37 @@ const api = (code: string, status: number, extra = {}) =>
 	refusal(code, 'Wait a little.', { http: { status }, ...extra });
 
 describe('requestLink', () => {
+	test('wording words every refusal that is not a field’s, the wait included', async () => {
+		const { links } = linksFor({
+			wording: (error, language) => `${language}: ${error.code}`,
+		});
+		const ask = async (code: string, status: number) =>
+			body(
+				await links.requestLink(() => Promise.reject(api(code, status)), {
+					request: posting(),
+					language: 'fr',
+				}),
+			);
+		expect((await ask('x.errors.y', 500)).data).toEqual({
+			formError: 'fr: x.errors.y',
+		});
+		expect((await ask('MAIL_THROTTLED', 429)).data).toEqual({
+			formError: 'fr: MAIL_THROTTLED',
+			throttled: true,
+		});
+	});
+
+	test('wording returning nothing keeps the default words', async () => {
+		const { links } = linksFor({ wording: () => undefined });
+		const answered = body(
+			await links.requestLink(() => Promise.reject(api('x.errors.y', 500)), {
+				request: posting(),
+				language: 'en',
+			}),
+		);
+		expect(answered.data).toEqual({ formError: 'Wait a little.' });
+	});
+
 	test('sent, whoever the e-mail is', async () => {
 		const { links } = linksFor();
 		expect(
@@ -33,7 +64,10 @@ describe('requestLink', () => {
 			),
 		);
 		expect(answered.init.status).toBe(429);
-		expect(answered.data).toEqual({ formError: 'Wait a little.' });
+		expect(answered.data).toEqual({
+			formError: 'Wait a little.',
+			throttled: true,
+		});
 	});
 
 	test('a wait with seconds carries them, typed, beside the words', async () => {
@@ -46,6 +80,7 @@ describe('requestLink', () => {
 		);
 		expect(answered.data).toEqual({
 			formError: 'Wait a little.',
+			throttled: true,
 			retryAfter: 120,
 		});
 	});

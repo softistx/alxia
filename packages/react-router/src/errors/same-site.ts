@@ -25,18 +25,32 @@ export function siteCheck(
 	};
 }
 
-const checks = new WeakMap<object, SiteCheck>();
+/**
+ * Where a `jsonActions` instance keeps its site check: an enumerable property
+ * under a registered symbol, so it survives `{ ...json }` and a second copy of
+ * the package. Not public.
+ */
+export const SITE_CHECK = Symbol.for('@alxia/react-router:site-check@1');
 
-/** Remembers the check a `jsonActions` instance uses, for `/session`'s guard. Not public. */
+/** Puts the check on a `jsonActions` instance. */
 export function rememberSiteCheck(actions: object, check: SiteCheck): void {
-	checks.set(actions, check);
+	Object.defineProperty(actions, SITE_CHECK, {
+		value: check,
+		enumerable: true,
+		writable: false,
+	});
 }
+
+/** Whether `actions` carries a site check, as every `jsonActions()` instance does. */
+export const hasSiteCheck = (actions: object): boolean =>
+	typeof (actions as Record<symbol, unknown>)[SITE_CHECK] === 'function';
 
 /**
  * Refuses a cross-site request with the rule of the `jsonActions` instance
- * (its configured origin); an instance of another make gets the request's own
- * origin. It reads headers only, never the body.
+ * (its configured origin, read at each request); an object without a check
+ * gets the request's own origin. It reads headers only, never the body.
  */
 export function refuseCrossSite(actions: object, request: Request): void {
-	(checks.get(actions) ?? siteCheck())(request);
+	const check = (actions as Record<symbol, unknown>)[SITE_CHECK];
+	(typeof check === 'function' ? (check as SiteCheck) : siteCheck())(request);
 }
