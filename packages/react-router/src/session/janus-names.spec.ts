@@ -5,7 +5,7 @@ import type {
 	StepUpByApp,
 	StepUpByEmail,
 } from '@nxgt/janus';
-import { CHALLENGE_OVER, INVALID_CODE } from './codes';
+import { CHALLENGE_OVER, INVALID_CODE, MAIL_THROTTLED } from './codes';
 import type { SignInStatus, StepUpVia } from './model';
 import { STEP_UP_OVER, STEP_UP_REQUIRED } from './step-up-codes';
 
@@ -23,11 +23,19 @@ same<Equal<StepUpVia, StepUpByEmail<never>['via'] | StepUpByApp<never>['via']>>(
 	true,
 );
 
-const codes: readonly JanusErrorCode[] = [
+// `MAIL_THROTTLED` came after @nxgt/janus 0.17.1, the floor CI's "Floor peers"
+// job installs (the floor of `@alxia/janus`'s peer range): a janus without it is
+// let through here, so this one code is checked by the lock's janus alone.
+type Code =
+	| JanusErrorCode
+	| ('MAIL_THROTTLED' extends JanusErrorCode ? never : 'MAIL_THROTTLED');
+
+const codes: readonly Code[] = [
 	INVALID_CODE,
 	...CHALLENGE_OVER,
 	...STEP_UP_OVER,
 	STEP_UP_REQUIRED,
+	MAIL_THROTTLED,
 ] as const;
 
 describe('@nxgt/janus’s names', () => {
@@ -48,6 +56,7 @@ describe('@nxgt/janus’s names', () => {
 			'SECOND_FACTOR_ACTIVE',
 			'SECOND_FACTOR_NOT_ENROLLED',
 			'STEP_UP_REQUIRED',
+			'MAIL_THROTTLED',
 		]);
 	});
 });

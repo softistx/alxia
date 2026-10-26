@@ -2,7 +2,12 @@ import { describe, expect, test } from 'bun:test';
 import { z } from 'zod';
 import { refusal } from '../../test/errors/refusal';
 import { body, thrown } from '../../test/session/flow';
-import { crossSite, linksFor, PATH, posting } from '../../test/session/links';
+import {
+	crossSiteJson,
+	linksFor,
+	PATH,
+	posting,
+} from '../../test/session/links';
 import { type Spent, TOKEN_PAGE_HEADERS } from './index';
 
 const { links } = linksFor();
@@ -15,6 +20,7 @@ function refused<T>(spent: Spent<T>) {
 }
 const spend = (run: () => Promise<unknown>, fields = ['password']) =>
 	links.spendToken(run, {
+		request: posting(),
 		language: 'en',
 		path: PATH,
 		fields,
@@ -113,70 +119,10 @@ describe('spendToken', () => {
 	});
 });
 
-describe('statePath and ended', () => {
-	test('statePath holds the state alone', () => {
-		expect(links.statePath('/invitations/accept', 'linked')).toBe(
-			'/invitations/accept?state=linked',
-		);
-		expect(links.statePath(PATH, 'a b&c')).toBe(`${PATH}?state=a+b%26c`);
-	});
-
-	test('ended replaces the history entry, with the headers given', () => {
-		const response = links.ended(PATH, 'linked', { 'X-A': '1' });
-		expect(response.status).toBe(302);
-		expect(response.headers.get('location')).toBe(`${PATH}?state=linked`);
-		expect(response.headers.get('x-remix-replace')).toBe('true');
-		expect(response.headers.get('x-a')).toBe('1');
-	});
-
-	test('a path that is not a path of this site is refused, without what follows ? or #', () => {
-		const shown: Record<string, string> = {
-			'https://evil.test/x': 'https://evil.test/x',
-			'//evil.test': '//evil.test',
-			'/a?token=t0k3n': '/a?…',
-			'/a#t0k3n': '/a?…',
-		};
-		for (const [path, printed] of Object.entries(shown)) {
-			const error = (() => {
-				try {
-					links.statePath(path, 'invalid');
-				} catch (e) {
-					return e as Error;
-				}
-				throw new Error('expected a throw');
-			})();
-			expect(error).toBeInstanceOf(TypeError);
-			expect(error.message).toBe(
-				`authLinks(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ${JSON.stringify(printed)}.`,
-			);
-			expect(error.message).not.toContain('t0k3n');
-		}
-	});
-
-	test('spendToken checks the path before it runs anything', async () => {
-		let ran = false;
-		await expect(
-			links.spendToken(
-				async () => {
-					ran = true;
-				},
-				{ language: 'en', path: '/a?token=t', states: {} },
-			),
-		).rejects.toBeInstanceOf(TypeError);
-		expect(ran).toBe(false);
-	});
-
-	test('a redirect to an end state carries the token page’s headers', () => {
-		const response = links.ended(PATH, 'invalid');
-		expect(response.headers.get('referrer-policy')).toBe('no-referrer');
-		expect(response.headers.get('x-robots-tag')).toBe('noindex, nofollow');
-	});
-});
-
 describe('linkArgs', () => {
 	test('a cross-site post is refused before the schema reads it', async () => {
 		const refusedPost = (await thrown(() =>
-			links.linkArgs(z.object({ token: z.string() }), crossSite(), PATH),
+			links.linkArgs(z.object({ token: z.string() }), crossSiteJson(), PATH),
 		)) as { init: { status: number } };
 		expect(refusedPost.init.status).toBe(403);
 		const text = new Request('http://my-app.test/x', {
@@ -184,10 +130,11 @@ describe('linkArgs', () => {
 			headers: { 'content-type': 'text/plain' },
 			body: '{"token":"t"}',
 		});
-		const unsupported = (await thrown(() =>
+		// Not JSON: a native post, which goes back to its page.
+		const native = await thrown(() =>
 			links.linkArgs(z.object({ token: z.string() }), text, PATH),
-		)) as { init: { status: number } };
-		expect(unsupported.init.status).toBe(415);
+		);
+		expect(native).toBeInstanceOf(Response);
 		const foreign = new Request('http://my-app.test/x', {
 			method: 'POST',
 			headers: {

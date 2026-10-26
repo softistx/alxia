@@ -2,13 +2,14 @@ import { data, replace } from 'react-router';
 import { isApiErrorLike } from '../errors/api-error';
 import type { FormErrors } from '../errors/form-errors';
 import type { InferOutput, StandardSchemaV1 } from '../errors/standard-schema';
+import { samesitePost } from './guard';
 import type {
-	AuthLinksOptions,
 	LinkStayed,
+	LinksContext,
 	SpendOptions,
 	Spent,
 } from './link-types';
-import { safeNext } from './model';
+import { sitePath } from './model/site-path';
 
 /**
  * The response headers of a page a mail's link opens, whose URL carries a
@@ -20,20 +21,12 @@ export const TOKEN_PAGE_HEADERS = {
 	'X-Robots-Tag': 'noindex, nofollow',
 } as const;
 
-/** A page's path with no query or fragment, or a `TypeError`. */
-export function pathOf(path: string): string {
-	if (safeNext(path) !== path || /[?#]/.test(path)) {
-		// The part after "?" or "#" may be the token: it is never printed.
-		const shown = path.replace(/[?#].*$/s, '?…');
-		throw new TypeError(
-			`authLinks(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ${JSON.stringify(shown)}.`,
-		);
-	}
-	return path;
-}
+/** A token page's path with no query or fragment, or a `TypeError` naming `call`. */
+const pathOf = (path: string, call: string): string =>
+	sitePath(path, { label: `${call}: a token page's path` });
 
 export const statePath = (path: string, state: string): string =>
-	`${pathOf(path)}?${new URLSearchParams({ state })}`;
+	`${pathOf(path, 'statePath()')}?${new URLSearchParams({ state })}`;
 
 /** `headers`, with the token page's own on top. */
 export function withTokenHeaders(headers?: HeadersInit): Headers {
@@ -62,13 +55,14 @@ const isTokenIssue = (issue: {
 };
 
 export async function linkArgs<S extends StandardSchemaV1>(
-	{ json }: Pick<AuthLinksOptions<string>, 'json'>,
+	{ json }: Pick<LinksContext<string>, 'json'>,
 	invalidState: string,
 	schema: S,
 	request: Request,
 	path: string,
 ): Promise<InferOutput<S>> {
-	pathOf(path);
+	samesitePost(json, request);
+	pathOf(path, 'linkArgs()');
 	const body = await json.readJson(request);
 	const result = await schema['~standard'].validate(body);
 	if (!result.issues) return result.value as InferOutput<S>;
@@ -81,12 +75,13 @@ export async function linkArgs<S extends StandardSchemaV1>(
 }
 
 export async function spendToken<L extends string, T>(
-	options: AuthLinksOptions<L>,
+	options: LinksContext<L>,
 	run: () => Promise<T>,
-	{ language, path, states, fields: shown = [] }: SpendOptions<L>,
+	{ request, language, path, states, fields: shown = [] }: SpendOptions<L>,
 ): Promise<Spent<T>> {
 	const { errors } = options;
-	pathOf(path);
+	samesitePost(options.json, request);
+	pathOf(path, 'spendToken()');
 	try {
 		return { ok: true, value: await run() };
 	} catch (error) {

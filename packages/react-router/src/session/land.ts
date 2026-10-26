@@ -1,5 +1,6 @@
 import { redirect } from 'react-router';
 import type { FlowContext, SignInAnswer, SignInFlow } from './flow-types';
+import { samesitePost } from './guard';
 import { safeNext, secondFactorPath } from './model';
 import { millisOf } from './serialize';
 
@@ -11,6 +12,7 @@ export async function revokeSession<L extends string>(
 	{ options }: FlowContext<L>,
 	request: Request,
 ): Promise<boolean> {
+	samesitePost(options.json, request);
 	const token = options.cookies.token(request);
 	if (!token) return false;
 	try {
@@ -20,6 +22,15 @@ export async function revokeSession<L extends string>(
 	}
 	return true;
 }
+
+/** The condition a session opens on: a signed-in answer with a token and an end still to come. */
+export const isLive = (
+	answer: SignInAnswer,
+): answer is Extract<SignInAnswer, { status: 'signedIn' }> =>
+	answer.status === 'signedIn' &&
+	Boolean(answer.token) &&
+	Boolean(answer.expiresAt) &&
+	millisOf(answer.expiresAt) > Date.now();
 
 /**
  * Where a sign-in's answer leads: signed in, to `next` with the session
@@ -35,12 +46,7 @@ export function landing<L extends string>(
 ): Response | null {
 	const { cookies } = options;
 	// A session with no readable or past end would be set and dead at once.
-	if (
-		answer.status === 'signedIn' &&
-		answer.token &&
-		answer.expiresAt &&
-		millisOf(answer.expiresAt) > Date.now()
-	) {
+	if (isLive(answer)) {
 		const headers = new Headers();
 		headers.append(
 			'Set-Cookie',
@@ -80,6 +86,7 @@ export async function landReplacing<L extends string>(
 		revokeOn = ['signedIn'],
 	}: Parameters<SignInFlow<L>['landReplacing']>[2],
 ): Promise<Response | null> {
+	samesitePost(context.options.json, request);
 	const landed = landing(context, answer, next);
 	if (!landed || answer.status === 'other') return landed;
 	if (!revokeOn.includes(answer.status)) return landed;

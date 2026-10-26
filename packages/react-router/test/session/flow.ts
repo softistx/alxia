@@ -57,3 +57,25 @@ export async function thrown(run: () => unknown): Promise<unknown> {
 /** What `data()` carries: its body and status. */
 export const body = (result: unknown) =>
 	result as { data: Record<string, unknown>; init: { status: number } };
+
+/** A same-site JSON post, as a route action receives it. */
+export const jsonPost = (url = '/account/step-up', body: unknown = {}) =>
+	asking(url, undefined, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: JSON.stringify(body),
+	});
+
+/** What each step-up step takes beside its `run`: a same-site JSON post, in English. */
+export const stepCall = () => ({
+	request: jsonPost(),
+	language: 'en' as const,
+});
+
+/** A same-site JSON post with the session cookie of `token`, as an action receives it. */
+export const posted = (url: string, token?: string) =>
+	asking(url, token, {
+		method: 'POST',
+		headers: { 'content-type': 'application/json' },
+		body: '{}',
+	});

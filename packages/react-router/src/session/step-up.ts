@@ -3,9 +3,11 @@ import {
 	type ApiErrorLike,
 	attemptsLeftOf,
 	isApiErrorLike,
+	retryAfterOf,
 } from '../errors/api-error';
-import { INVALID_CODE } from './codes';
+import { INVALID_CODE, MAIL_THROTTLED } from './codes';
 import type { CodeWording } from './flow-types';
+import { samesitePost } from './guard';
 import type {
 	StepUpConfirmAnswer,
 	StepUpError,
@@ -25,6 +27,7 @@ type Refused = Extract<StepUpConfirmAnswer, { ok: false }>;
 interface StepUpContext<L extends string> extends CodeWording<L> {
 	readonly steps: StepUpStepsOptions<L>;
 	readonly stepUpRequired: string;
+	readonly mailThrottled: string;
 }
 
 function resolve<L extends string>(
@@ -38,11 +41,12 @@ function resolve<L extends string>(
 		);
 	}
 	return {
-		options: steps,
+		options: steps.signIn,
 		steps,
 		invalidCode,
 		challengeOver,
 		stepUpRequired: steps.codes?.stepUpRequired ?? STEP_UP_REQUIRED,
+		mailThrottled: steps.codes?.mailThrottled ?? MAIL_THROTTLED,
 	};
 }
 
@@ -54,7 +58,7 @@ function worded<L extends string>(
 ): string {
 	return (
 		steps.wording?.(error, language) ??
-		steps.errors.apiErrorMessage(error, language)
+		steps.signIn.errors.apiErrorMessage(error, language)
 	);
 }
 
@@ -82,7 +86,7 @@ function refusedCode<L extends string>(
 			error,
 			language,
 			locked ? steps.locked?.(language) : undefined,
-		) ?? steps.errors.apiErrorMessage(error, language);
+		) ?? steps.signIn.errors.apiErrorMessage(error, language);
 	return {
 		error: 'invalid',
 		...(attemptsLeft === undefined ? {} : { attemptsLeft }),
@@ -91,40 +95,48 @@ function refusedCode<L extends string>(
 	};
 }
 
-async function request<L extends string>(
+async function requestStep<L extends string>(
 	context: StepUpContext<L>,
 	run: Parameters<StepUpSteps<L>['request']>[0],
-	language: L,
+	{ request, language }: Parameters<StepUpSteps<L>['request']>[1],
 ): Promise<StepUpRequestAnswer | StepUpStayed<StepUpRequestAnswer>> {
+	samesitePost(context.steps.signIn.json, request);
 	const intent = 'request-step-up';
 	try {
 		const { challenge, via } = await run();
 		return { ok: true, intent, challenge, via };
 	} catch (error) {
-		const refusal = context.steps.errors.apiRefusal(error, language);
+		const refusal = context.steps.signIn.errors.apiRefusal(error, language);
 		if (!refusal) throw error;
-		const message = isApiErrorLike(error)
-			? worded(context, error, language)
-			: refusal.message;
+		const api = isApiErrorLike(error);
+		const message = api ? worded(context, error, language) : refusal.message;
+		const throttled = api && error.code === context.mailThrottled;
+		const retryAfter = throttled ? retryAfterOf(error) : undefined;
 		return data<StepUpRequestAnswer>(
-			{ ok: false, intent, error: 'failed', message },
+			{
+				ok: false,
+				intent,
+				error: throttled ? 'throttled' : 'failed',
+				message,
+				...(retryAfter === undefined ? {} : { retryAfter }),
+			},
 			{ status: refusal.status },
 		);
 	}
 }
 
-async function confirm<L extends string>(
+async function confirmStep<L extends string>(
 	context: StepUpContext<L>,
 	run: () => Promise<unknown>,
-	via: StepUpVia | undefined,
-	language: L,
+	{ request, language, via }: Parameters<StepUpSteps<L>['confirm']>[1],
 ): Promise<StepUpConfirmAnswer | StepUpStayed<StepUpConfirmAnswer>> {
+	samesitePost(context.steps.signIn.json, request);
 	const intent = 'confirm-step-up';
 	try {
 		await run();
 		return { ok: true, intent };
 	} catch (error) {
-		const refusal = context.steps.errors.apiRefusal(error, language);
+		const refusal = context.steps.signIn.errors.apiRefusal(error, language);
 		if (!refusal) throw error;
 		const stay = (
 			failure: Omit<Refused, 'ok' | 'intent'>,
@@ -169,8 +181,8 @@ export function stepUpSteps<L extends string>(
 ): StepUpSteps<L> {
 	const context = resolve(options);
 	return {
-		request: (run, language) => request(context, run, language),
-		confirm: (run, o, language) => confirm(context, run, o.via, language),
+		request: (run, o) => requestStep(context, run, o),
+		confirm: (run, o) => confirmStep(context, run, o),
 		isStepUpRequired: (error) =>
 			isApiErrorLike(error) && error.code === context.stepUpRequired,
 	};

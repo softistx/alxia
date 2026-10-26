@@ -2,7 +2,6 @@ import { describe, expect, test } from 'bun:test';
 import type { StepUpVia } from './second-factor';
 import {
 	INITIAL_STEP_UP,
-	phaseOf,
 	type StepUpAction,
 	type StepUpState,
 	stepUpReducer,
@@ -39,12 +38,12 @@ const accepted: StepUpAction = {
 
 describe('stepUpReducer', () => {
 	test('starts idle; a request in flight is requesting, a challenge granted the code phase', () => {
-		expect(phaseOf(INITIAL_STEP_UP)).toBe('idle');
+		expect(INITIAL_STEP_UP.phase).toBe('idle');
 		const asking = run({ type: 'start' });
-		expect(phaseOf(asking)).toBe('requesting');
+		expect(asking.phase).toBe('requesting');
 		expect(asking.pending).toBe(true);
 		const state = run({ type: 'start' }, issued());
-		expect(phaseOf(state)).toBe('code');
+		expect(state.phase).toBe('code');
 		expect(state).toMatchObject({
 			via: 'email',
 			challenge: 'c1',
@@ -56,21 +55,21 @@ describe('stepUpReducer', () => {
 
 	test('a request refused before any challenge is idle, with its error', () => {
 		const state = run({ type: 'start' }, refusedRequest);
-		expect(phaseOf(state)).toBe('idle');
+		expect(state.phase).toBe('idle');
 		expect(state.error).toBe('failed');
 		expect(state.pending).toBe(false);
 	});
 
 	test('a resend refused keeps the code form and the challenge, and says why', () => {
 		const state = run(issued(), { type: 'start' }, refusedRequest);
-		expect(phaseOf(state)).toBe('code');
+		expect(state.phase).toBe('code');
 		expect(state.error).toBe('failed');
 		expect(state.challenge).toBe('c1');
 	});
 
 	test('a resend in flight keeps the code form', () => {
 		const state = run(issued(), { type: 'start' });
-		expect(phaseOf(state)).toBe('code');
+		expect(state.phase).toBe('code');
 		expect(state.pending).toBe(true);
 	});
 
@@ -103,7 +102,7 @@ describe('stepUpReducer', () => {
 			{ type: 'submit' },
 			refused({ attemptsLeft: 3 }),
 		);
-		expect(phaseOf(state)).toBe('code');
+		expect(state.phase).toBe('code');
 		expect(state).toMatchObject({
 			error: 'invalid',
 			attemptsLeft: 3,
@@ -115,14 +114,14 @@ describe('stepUpReducer', () => {
 
 	test('submitting is confirming and forgets the error', () => {
 		const state = run(issued(), refused(), { type: 'submit' });
-		expect(phaseOf(state)).toBe('confirming');
+		expect(state.phase).toBe('confirming');
 		expect(state.pending).toBe(true);
 		expect(state.error).toBeUndefined();
 	});
 
 	test('a code accepted spends the challenge: done', () => {
 		const state = run(issued(), { type: 'submit' }, accepted);
-		expect(phaseOf(state)).toBe('done');
+		expect(state.phase).toBe('done');
 		expect(state.challenge).toBeUndefined();
 		expect(state.pending).toBe(false);
 		expect(state.error).toBeUndefined();
@@ -130,7 +129,7 @@ describe('stepUpReducer', () => {
 
 	test('an expired or spent challenge is idle with error expired, its via kept', () => {
 		const state = run(issued('secondFactor'), refused({ error: 'expired' }));
-		expect(phaseOf(state)).toBe('idle');
+		expect(state.phase).toBe('idle');
 		expect(state.error).toBe('expired');
 		expect(state.via).toBe('secondFactor');
 		expect(state.challenge).toBeUndefined();
@@ -139,7 +138,7 @@ describe('stepUpReducer', () => {
 	test('ask again leaves the expiry; release forgets everything', () => {
 		const expired = run(issued(), refused({ error: 'expired' }));
 		const again = stepUpReducer(expired, { type: 'start' });
-		expect(phaseOf(again)).toBe('requesting');
+		expect(again.phase).toBe('requesting');
 		expect(again.error).toBeUndefined();
 		expect(stepUpReducer(expired, { type: 'release' })).toEqual(
 			INITIAL_STEP_UP,
@@ -149,7 +148,7 @@ describe('stepUpReducer', () => {
 	describe('no try left (the Q5 rule)', () => {
 		test('a mailed code is expired: ask again', () => {
 			const state = run(issued('email'), refused({ attemptsLeft: 0 }));
-			expect(phaseOf(state)).toBe('idle');
+			expect(state.phase).toBe('idle');
 			expect(state.error).toBe('expired');
 			expect(state.locked).toBe(false);
 			expect(state.challenge).toBeUndefined();
@@ -157,7 +156,7 @@ describe('stepUpReducer', () => {
 
 		test('an app or recovery code is locked: wait', () => {
 			const state = run(issued('secondFactor'), refused({ attemptsLeft: 0 }));
-			expect(phaseOf(state)).toBe('code');
+			expect(state.phase).toBe('code');
 			expect(state).toMatchObject({
 				error: 'invalid',
 				attemptsLeft: 0,
@@ -173,7 +172,7 @@ describe('stepUpReducer', () => {
 
 		test('a mailed code with tries left stays open', () => {
 			const state = run(issued('email'), refused({ attemptsLeft: 1 }));
-			expect(phaseOf(state)).toBe('code');
+			expect(state.phase).toBe('code');
 			expect(state.locked).toBe(false);
 		});
 	});

@@ -1,17 +1,19 @@
-import { jsonActions } from '../../src/errors';
-import { type AuthLinksOptions, authLinks } from '../../src/session';
+import {
+	type AuthLinksOptions,
+	authLinks,
+	type SignInFlowOptions,
+} from '../../src/session';
 import type { Lang } from '../errors/format';
-import { plainErrors } from '../errors/refusal';
 import { asking, flowFor } from './flow';
 
 /** Auth links over a sign-in flow on development cookies; `revoked` lists the tokens ended. */
-export function linksFor(overrides: Partial<AuthLinksOptions<Lang>> = {}) {
-	const { flow, cookies, revoked } = flowFor();
+export function linksFor(
+	overrides: Partial<AuthLinksOptions<Lang>> = {},
+	flowOverrides: Partial<SignInFlowOptions<Lang>> = {},
+) {
+	const { flow, cookies, revoked } = flowFor(flowOverrides);
 	const links = authLinks<Lang>({
 		signIn: flow,
-		cookies,
-		errors: plainErrors(),
-		json: jsonActions(),
 		...overrides,
 	});
 	return { links, flow, cookies, revoked };
@@ -32,5 +34,17 @@ export const crossSite = (token?: string) =>
 	asking(`${PATH}?token=secret`, token, {
 		method: 'POST',
 		headers: { 'content-type': 'text/plain', origin: 'http://evil.test' },
+		body: '{}',
+	});
+
+/** A JSON post another site sent: only the headers tell it from the page's own. */
+export const crossSiteJson = (token?: string) =>
+	asking(`${PATH}?token=secret`, token, {
+		method: 'POST',
+		headers: {
+			'content-type': 'application/json',
+			origin: 'http://evil.test',
+			'sec-fetch-site': 'cross-site',
+		},
 		body: '{}',
 	});

@@ -71,8 +71,18 @@ Nothing planned.
   action), `authLinks` and `TOKEN_PAGE_HEADERS` (the pages a mail's link
   opens). `/session/model` imports nothing and is safe in a component: `safeNext`
   and `signInPath` (redirects that stay on the site), `TOTP_CODE`, and the
-  step-up's `stepUpReducer` and `stepUpProps`. `/errors` gains `attemptsLeftOf`.
+  step-up's `stepUpReducer` and `stepUpProps`. Every step that signs in, out, spends or mails refuses a cross-site post. `/errors` gains `attemptsLeftOf`.
   See the [session guide](guide/session.md).
+
+### 0.13.0
+
+- **`reword` in `createApiErrors`.** An optional
+  `reword(text, error, { code, values, language })` words a whole family of
+  codes once, such as adding a suffix to every `*.errors.referenced` refusal.
+  It runs on the final text of an API error, whatever produced it (the
+  catalogue, the API's message or `byCode`), and does not apply to `refused`,
+  `unavailable` or the entries of `extensions.fields`. See the
+  [errors guide](guide/errors.md).
 
 ### 0.12.0
 

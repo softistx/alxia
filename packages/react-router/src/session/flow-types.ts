@@ -3,7 +3,7 @@ import type { ApiErrorLike } from '../errors/api-error';
 import type { ApiErrors } from '../errors/api-errors';
 import type { JsonActions } from '../errors/json-actions';
 import type { SessionCookies } from './cookies';
-import type { SecondFactorMethod, SignInPaths, SignInStatus } from './model';
+import type { SecondFactorKind, SignInPaths, SignInStatus } from './model';
 
 /**
  * What a sign-in step answers, in `@nxgt/janus`'s words. An app maps its
@@ -20,7 +20,7 @@ export type SignInAnswer =
 			readonly status: 'secondFactor';
 			/** A secret: it goes in the challenge cookie, never in a URL. */
 			readonly challenge: string;
-			readonly expiresAt?: string | Date | null;
+			readonly expiresAt?: string | Date | null | undefined;
 	  }
 	| { readonly status: 'other' };
 
@@ -30,9 +30,9 @@ export type SignInFormError<T = object> = T & { formError: string };
 /** The codes the flow tells apart; `@nxgt/janus`'s by default. */
 export interface SignInCodes {
 	/** A wrong code that may leave tries (`'CODE_INVALID'`). */
-	readonly invalidCode?: string;
+	readonly invalidCode?: string | undefined;
 	/** The codes that end the challenge (`TOKEN_UNKNOWN`, `TOKEN_SPENT`, `TOKEN_EXPIRED`). */
-	readonly challengeOver?: readonly string[];
+	readonly challengeOver?: readonly string[] | undefined;
 }
 
 export interface SignInFlowOptions<L extends string> {
@@ -46,20 +46,20 @@ export interface SignInFlowOptions<L extends string> {
 	/** A refused code's tries left, worded ("3 tries left"). */
 	attemptsLeft(count: number, language: L): string;
 	/** The sign-in pages' paths; `SIGN_IN_PATHS` by default. */
-	readonly paths?: Partial<SignInPaths>;
+	readonly paths?: Partial<SignInPaths> | undefined;
 	/**
 	 * `Set-Cookie` values a new session and a sign-out also clear, such as an
 	 * app's per-account preferences.
 	 */
-	clear?(): readonly string[];
+	readonly clear?: (() => readonly string[]) | undefined;
 	/** What a sign-in says when the API cannot be reached; `errors.unavailableMessage` by default. */
-	unavailable?(language: L): string;
-	readonly codes?: SignInCodes;
+	readonly unavailable?: ((language: L) => string) | undefined;
+	readonly codes?: SignInCodes | undefined;
 	/**
 	 * The query key a sign-in redirect adds (as `?expired=1`) when the request
 	 * carried a session cookie, to say the session ended. Off by default.
 	 */
-	readonly endedParam?: string;
+	readonly endedParam?: string | undefined;
 }
 
 /** A form step's answer when it stays on the page: the form's message, with a status. */
@@ -68,6 +68,27 @@ export type SignInStayed<T extends object> = ReturnType<
 >;
 
 export interface SignInFlow<L extends string> {
+	/** The cookies the flow was built with. */
+	readonly cookies: SessionCookies;
+	/** The `createApiErrors` instance the flow was built with. */
+	readonly errors: ApiErrors<L>;
+	/** The `jsonActions` instance the flow was built with. */
+	readonly json: JsonActions;
+	/** A refused code's tries left, worded (the `attemptsLeft` option). */
+	attemptsLeft(count: number, language: L): string;
+	/**
+	 * The guard every step of the flow that signs in, out, spends or mails
+	 * runs first, for an app's own step (a passkey's): a native form post is
+	 * redirected back to its page, and a JSON post from another site is a 403
+	 * (`Origin` and `Sec-Fetch-Site`, as `readJson` reads them). It reads
+	 * headers only. Call it in a POST action, never in a GET callback, which
+	 * carries no JSON content type and would be redirected to itself.
+	 */
+	guard(request: Request): void;
+	/** What a sign-in says when the API cannot be reached: the `unavailable` option, else `errors.unavailableMessage`. */
+	unavailable(language: L): string;
+	/** The `Set-Cookie` values a new session and a sign-out also clear (the `clear` option); none by default. */
+	clear(): readonly string[];
 	/** The `next` a sign-in page was opened with, safe to redirect to. */
 	nextParam(request: Request): string;
 	/** The sign-in page, coming back to this request's page, with the session cookie cleared. */
@@ -87,7 +108,7 @@ export interface SignInFlow<L extends string> {
 		next: string,
 		options: {
 			readonly request: Request;
-			readonly revokeOn?: readonly SignInStatus[];
+			readonly revokeOn?: readonly SignInStatus[] | undefined;
 		},
 	): Promise<Response | null>;
 	/**
@@ -104,7 +125,9 @@ export interface SignInFlow<L extends string> {
 			/** Fields every refusal carries. */
 			readonly extra: T;
 			/** Answers an error before the default message: a redirect, a richer message. */
-			readonly refused?: (error: ApiErrorLike) => Response | string | undefined;
+			readonly refused?:
+				| ((error: ApiErrorLike) => Response | string | undefined)
+				| undefined;
 		},
 	): Promise<Response | SignInStayed<T>>;
 	/**
@@ -120,10 +143,10 @@ export interface SignInFlow<L extends string> {
 	/** The code a second-factor page posted, with how it is given; a 400 otherwise. */
 	readCodeInput(
 		request: Request,
-	): Promise<{ kind: SecondFactorMethod; code: string }>;
+	): Promise<{ kind: SecondFactorKind; code: string }>;
 	/** The code against the challenge: `confirm` for an issued code, `recover` for a recovery code. */
 	codeStep(
-		input: { readonly kind: SecondFactorMethod; readonly code: string },
+		input: { readonly kind: SecondFactorKind; readonly code: string },
 		challenge: string,
 		steps: {
 			confirm(challenge: string, code: string): Promise<SignInAnswer>;
@@ -139,7 +162,7 @@ export interface SignInFlow<L extends string> {
 	 */
 	signOut(
 		request: Request,
-		options?: { readonly to?: string },
+		options?: { readonly to?: string | undefined },
 	): Promise<Response>;
 	/**
 	 * The viewer `read` finds for the session cookie's token (or `token`):

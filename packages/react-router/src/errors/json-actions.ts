@@ -1,5 +1,6 @@
 import { data, redirect } from 'react-router';
 import { nextOf } from './page-path';
+import { rememberSiteCheck, siteCheck } from './same-site';
 import type { InferOutput, StandardSchemaV1 } from './standard-schema';
 
 export interface JsonActionsOptions {
@@ -43,23 +44,12 @@ export interface JsonActions {
  * cookie's `SameSite` is even consulted.
  */
 export function jsonActions(options: JsonActionsOptions = {}): JsonActions {
-	const ownOrigin = (request: Request) => {
-		const { origin } = options;
-		const set = typeof origin === 'function' ? origin() : origin;
-		return set ?? new URL(request.url).origin;
-	};
+	const crossSite = siteCheck(options.origin);
 	const isJson = (request: Request) =>
 		request.headers.get('content-type')?.startsWith('application/json');
 
 	async function readJson(request: Request): Promise<unknown> {
-		const origin = request.headers.get('origin');
-		const site = request.headers.get('sec-fetch-site');
-		if (
-			(origin && origin !== ownOrigin(request)) ||
-			(site && site !== 'same-origin' && site !== 'none')
-		) {
-			throw data('Cross-site request refused', { status: 403 });
-		}
+		crossSite(request);
 		if (!isJson(request)) {
 			throw data('Expected a JSON body', { status: 415 });
 		}
@@ -68,7 +58,7 @@ export function jsonActions(options: JsonActionsOptions = {}): JsonActions {
 		});
 	}
 
-	return {
+	const actions: JsonActions = {
 		readJson,
 		requireJsonPost(request) {
 			if (!isJson(request)) throw redirect(nextOf(request.url));
@@ -84,4 +74,6 @@ export function jsonActions(options: JsonActionsOptions = {}): JsonActions {
 			return result.value as InferOutput<typeof schema>;
 		},
 	};
+	rememberSiteCheck(actions, crossSite);
+	return actions;
 }

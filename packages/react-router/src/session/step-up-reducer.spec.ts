@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'bun:test';
 import type { Lang } from '../../test/errors/format';
 import { filledMessages, refusal } from '../../test/errors/refusal';
+import { flowFor, stepCall } from '../../test/session/flow';
 import { createApiErrors } from '../errors';
 import {
 	INITIAL_STEP_UP,
@@ -15,11 +16,13 @@ import { stepUpSteps } from './step-up';
 // The answers the server steps give, taken as they are by the page's reducer
 // (what a fetcher's `data` holds: `data()` carries it in `.data`).
 const steps = stepUpSteps<Lang>({
-	errors: createApiErrors<Lang>({
-		messages: filledMessages(),
-		unavailable: () => 'down',
-	}),
-	attemptsLeft: (count) => `${count} left`,
+	signIn: flowFor({
+		errors: createApiErrors<Lang>({
+			messages: filledMessages(),
+			unavailable: () => 'down',
+		}),
+		attemptsLeft: (count) => `${count} left`,
+	}).flow,
 	spent: () => 'ask again',
 	locked: () => 'wait',
 });
@@ -31,7 +34,7 @@ const plain = <T>(answer: T | { data: T }): T =>
 
 async function held(via: 'email' | 'secondFactor'): Promise<StepUpState> {
 	const answer = plain<StepUpRequestAnswer>(
-		await steps.request(async () => ({ challenge: 'c1', via }), 'en'),
+		await steps.request(async () => ({ challenge: 'c1', via }), stepCall()),
 	);
 	return [
 		{ type: 'start' } as const,
@@ -44,8 +47,7 @@ async function refuse(state: StepUpState, attemptsLeft: number) {
 		await steps.confirm(
 			() =>
 				Promise.reject(refusal('CODE_INVALID', 'Wrong code', { attemptsLeft })),
-			state.via ? { via: state.via } : {},
-			'en',
+			{ ...stepCall(), via: state.via },
 		),
 	);
 	return stepUpReducer(stepUpReducer(state, { type: 'submit' }), {
@@ -108,7 +110,7 @@ describe('the step-up answers through stepUpReducer and stepUpProps', () => {
 		const failed = plain<StepUpRequestAnswer>(
 			await steps.request(
 				() => Promise.reject(new Response('', { status: 503 })),
-				'en',
+				stepCall(),
 			),
 		);
 		const idle = [
@@ -119,7 +121,7 @@ describe('the step-up answers through stepUpReducer and stepUpProps', () => {
 
 		const state = await held('email');
 		const ok = plain<StepUpConfirmAnswer>(
-			await steps.confirm(async () => true, { via: 'email' }, 'en'),
+			await steps.confirm(async () => true, { ...stepCall(), via: 'email' }),
 		);
 		expect(stepUpReducer(state, { type: 'confirmed', answer: ok }).phase).toBe(
 			'done',

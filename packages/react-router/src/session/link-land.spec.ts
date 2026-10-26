@@ -191,10 +191,18 @@ describe('afterReset', () => {
 		const response = await links.afterReset(at('old'));
 		expect(response.headers.get('location')).toBe('/sign-in?password-reset=1');
 		expect(response.headers.get('x-remix-replace')).toBe('true');
-		expect(response.headers.get('set-cookie')).toStartWith(
-			'my-app_session=; Max-Age=0',
-		);
+		expect(setCookies(response)[0]).toStartWith('my-app_session=; Max-Age=0');
 		expect(revoked).toEqual(['old']);
+	});
+
+	test('the challenge and the app’s cookies are cleared too', async () => {
+		const { links } = linksFor({}, { clear: () => ['recent=; Max-Age=0'] });
+		const cookies = setCookies(await links.afterReset(at('old')));
+		expect(cookies).toEqual([
+			'my-app_session=; Max-Age=0; Path=/; HttpOnly; SameSite=Lax',
+			'my-app_challenge=; Max-Age=0; Path=/sign-in; HttpOnly; SameSite=Lax',
+			'recent=; Max-Age=0',
+		]);
 	});
 
 	test('resetDone leads elsewhere; with no session nothing is revoked', async () => {

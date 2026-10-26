@@ -6,14 +6,13 @@ export {
 } from './paths';
 export { HOME, safeNext } from './safe-next';
 export {
-	type SecondFactorMethod,
+	type SecondFactorKind,
 	type SignInStatus,
 	type StepUpVia,
 	TOTP_CODE,
 } from './second-factor';
 export {
 	INITIAL_STEP_UP,
-	phaseOf,
 	type StepUpAction,
 	type StepUpPhase,
 	type StepUpState,

@@ -7,3 +7,6 @@ export const CHALLENGE_OVER = [
 	'TOKEN_SPENT',
 	'TOKEN_EXPIRED',
 ] as const;
+
+/** `@nxgt/janus`'s code for a mail the API holds back: a link or a code asked for too often. */
+export const MAIL_THROTTLED = 'MAIL_THROTTLED';

@@ -96,12 +96,19 @@ import { signIn } from '~/session.server';
 
 export async function loader({ request }: Route.LoaderArgs) {
 	const viewer = await signIn.viewer(request, readViewer);
-	if (viewer) throw redirect(signIn.nextParam(request));
+	// A live session goes home; a challenge left by a half-done sign-in goes too.
+	if (viewer) {
+		throw redirect(signIn.nextParam(request), {
+			headers: { 'Set-Cookie': cookies.destroyChallenge() },
+		});
+	}
 	return data({}, { headers: cookies.signInPageHeaders(viewer === null) });
 }
 
 export async function action({ context, request }: Route.ActionArgs) {
 	const { language } = alxiaOf(context);
+	// First, for a form posted before hydration: it goes back to its page.
+	json.requireJsonPost(request);
 	const input = await json.readInput(request, SignInInput);
 	return signIn.signInStep(
 		async () => toAnswer((await execute(SignInMutation, input)).signIn),
@@ -334,6 +341,10 @@ to the seconds left: floored, and 0 for a past or unreadable date.
 The challenge has its own three: `commitChallenge(challenge, expiresAt?)`,
 `challengeOf(request)`, `destroyChallenge()`.
 
+`cookies.names` holds the names as sent, prefixes included
+(`{ session: '__Host-my-app_session', challenge: '__Secure-my-app_challenge' }`
+when `secure`), for a log line, a test or a header that must name the cookie.
+
 `signInPageHeaders(deadSession)` is what a signed-out visit of the sign-in page
 sets. It clears the challenge blind: a client navigation fetches
 `/sign-in.data`, which the cookie's path `/sign-in` does not match, so the
@@ -381,11 +392,14 @@ that cannot be reached (`errors.unavailableMessage` by default), and
 when the request carried a session cookie, to say the session ended.
 
 A sign-in page's action runs the API's mutation inside `signInStep`, as the
-example does. Read the body through `json` first (`json.readInput` checks the
-origin and the content type): `signInStep` itself refuses a post that is not
-JSON, by redirecting it back to its page, so a form another site posts can
-neither sign anyone in nor revoke a session. It reads headers only, never the
-body. Its outcomes:
+example does. The order matters, because `readInput` reads the body:
+`json.requireJsonPost(request)` first (a form posted before hydration goes
+back to its page), then `json.readInput` (it checks the origin and the content
+type, and refuses another site with a 403), then `signInStep`, which runs the
+same two checks again on the headers before it signs anyone in or revokes a
+session: a native post goes back to its page, and a JSON post from another
+site is a 403, even for an action that read its input some other way. It reads
+headers only, never the body. Its outcomes:
 
 - A **signed-in** answer lands only when it has a token and an `expiresAt`
   that is a date still in the future; otherwise it opens no session (see
@@ -407,6 +421,13 @@ body. Its outcomes:
   an answer such as `LINKED` yourself, with `landing(answer, next)`, which is
   `null` for it.
 
+The flow also exposes what it was built with, for the steps built on it:
+`signIn.cookies`, `signIn.errors` and `signIn.json`, `signIn.attemptsLeft`,
+`signIn.unavailable(language)` (the `unavailable` option, else
+`errors.unavailableMessage`) and `signIn.clear()` (the `clear` option's
+cookies, none by default). `stepUpSteps` and `authLinks` take the flow and read
+these, so the app wires `errors`, `json` and the wording once.
+
 `signIn.nextParam(request)` is the `next` the sign-in page was opened with,
 through `safeNext`. `signIn.signInRedirect(request)` is the redirect
 `requireViewer` throws: to the sign-in page, back to this request's page,
@@ -418,6 +439,22 @@ answers `true` when the request carried one.
 { request, revokeOn? })` are the same redirects for a step that does not go
 through `signInStep` (a link a mail carries). `revokeOn` lists the statuses
 that end the browser's session; `['signedIn']` by default.
+
+### Which steps guard themselves
+
+Every step that signs in, out, spends or mails runs the same guard before it
+reads anything: a native form post is redirected back to its page, and a JSON
+post from another site is a 403. These guard themselves: `signInStep`,
+`readCodeInput`, `landReplacing`, `revokeSession`, `signOut` (through
+`readJson`), the step-up's `request` and `confirm`, and `linkArgs`,
+`spendToken`, `landByLink`, `afterReset` and `requestLink`. `landing`,
+`codeStep`, `codeRefusal`, `viewer` and `requireViewer` take no post and do not.
+
+An app's own step (a passkey's registration, say) calls `signIn.guard(request)`
+first, in a POST action, before it reads the body or calls the API. It throws
+the same redirect or 403. Do not call it in a GET callback (an OAuth return, a
+magic link's landing): a GET carries no JSON content type, so the guard would
+redirect it to itself.
 
 ### The viewer
 
@@ -455,9 +492,10 @@ password page.
 
 `readCodeInput` takes the page's JSON post, `{ kind, code }`: `kind` is
 `'code'` for an issued code (an authenticator app's, or the one mailed) and
-`'recovery'` for a recovery code (`SecondFactorMethod`); `code` is at most 40
+`'recovery'` for a recovery code (`SecondFactorKind`); `code` is at most 40
 characters. A native form post (before hydration) goes back to its page, a
-cross-site post is a 403, and a body of another shape is a 400.
+cross-site post is a 403 even when it is JSON, and a body of another shape is a
+400.
 
 `codeRefusal(error, language, whenNone?)` words a refused code:
 
@@ -480,7 +518,8 @@ reads janus's `extensions.attemptsLeft`.
 `signOut` reads the body as JSON first (same-origin only, a 403 or 415
 otherwise), so another site cannot sign anyone out, and a GET signs nobody
 out. It then ends the session at the API (a failure is ignored: the cookie
-goes anyway), removes the session cookie and the app's `clear()` cookies and
+goes anyway), removes the session cookie, the challenge cookie and the app's
+`clear()` cookies and
 redirects to `${paths.signIn}?signed-out=1` (`/sign-in?signed-out=1` by
 default). `signOut(request, { to })` redirects to `to` instead, after `safeNext`: a value that leaves the site goes to `/`.
 
@@ -496,11 +535,12 @@ is the server half: two steps for the route's action, whose answers
 ```ts
 // app/step-up.server.ts
 import { stepUpSteps } from '@alxia/react-router/session';
-import { errors } from './errors.server';
+import { signIn } from './session.server';
 
 export const stepUp = stepUpSteps({
-	errors,
-	attemptsLeft: (count, language) => t('code.attempts-left', { count }, language),
+	// The app's signInFlow: the step-up reads its errors, its json (a step runs
+	// for a same-site JSON post only) and its attemptsLeft.
+	signIn,
 	spent: (language) => t('step-up.spent', {}, language), // "Ask for a new code."
 	locked: (language) => t('step-up.locked', {}, language), // "Wait a few minutes."
 });
@@ -516,34 +556,40 @@ import { stepUp } from '~/step-up.server';
 
 export async function action({ context, request }: Route.ActionArgs) {
 	const { language } = alxiaOf(context);
+	json.requireJsonPost(request); // a native post goes back to its page
 	const caller = await sessionCaller(request);
 	const input = await json.readJson(request); // same-origin JSON only
 	if (input.intent === 'request-step-up') {
-		return stepUp.request(async () => {
-			const { requestStepUp } = await execute(RequestStepUpMutation, {}, caller);
-			return { challenge: requestStepUp.challenge, via: toVia(requestStepUp.method) };
-		}, language);
+		return stepUp.request(
+			async () => {
+				const { requestStepUp } = await execute(RequestStepUpMutation, {}, caller);
+				return { challenge: requestStepUp.challenge, via: toVia(requestStepUp.method) };
+			},
+			{ request, language },
+		);
 	}
 	const via = input.via === 'email' || input.via === 'secondFactor' ? input.via : undefined;
 	return stepUp.confirm(
 		() =>
 			execute(ConfirmStepUpMutation, { challenge: input.challenge, code: input.code }, caller),
-		via ? { via } : {},
-		language,
+		{ request, language, via },
 	);
 }
 ```
 
-`request(run, language)` answers `{ ok: true, intent: 'request-step-up',
-challenge, via }`. `confirm(run, { via }, language)` answers `{ ok: true,
-intent: 'confirm-step-up' }`. A refusal stays on the page, with the API's
-status, as `data(...)`:
+`request(run, { request, language })` answers `{ ok: true,
+intent: 'request-step-up', challenge, via }`. `confirm(run, { request,
+language, via? })` answers `{ ok: true, intent: 'confirm-step-up' }`. Both
+first run the same guard as `signInStep`: a form posted before hydration goes
+back to its page, and a JSON post from another site is a 403, before `run`
+is called. `via` may be `undefined`. A refusal stays on the page, with the
+API's status, as `data(...)`:
 
 ```ts no-check
-type StepUpError = 'invalid' | 'expired' | 'failed';
+type StepUpError = 'invalid' | 'expired' | 'failed' | 'throttled';
 
 // request, refused
-{ ok: false, intent: 'request-step-up', error: 'failed', message }
+{ ok: false, intent: 'request-step-up', error: StepUpError, message, retryAfter? }
 // confirm, refused
 { ok: false, intent: 'confirm-step-up', error: StepUpError, attemptsLeft?, locked, message }
 ```
@@ -551,9 +597,10 @@ type StepUpError = 'invalid' | 'expired' | 'failed';
 The answer must not be cached: `Cache-Control: private, no-store`, which
 `@alxia/secure-headers`' `pageHeaders` sets.
 
-A refused request (`error: 'failed'`) reaches the UI through
-`fetcher.data.message`: a throttled mail's wait is only there, since the
-reducer keeps `error` but not `message`.
+A refused request reaches the UI as `error` (`'failed'`, or `'throttled'` for a
+mail held back) with `message`, the refusal worded for the page. The reducer
+keeps both: `state.message` until the next step, and `state.retryAfter` for a
+throttle whose seconds the API gave.
 
 The `via` of `confirm` is the one `request` answered, which the page holds
 (the reducer's state has it). The `run` function of `confirm` takes nothing:
@@ -580,12 +627,19 @@ This is the table of `@nxgt/janus-graphql`'s `confirmStepUp`, with what
 | `SECOND_FACTOR_ACTIVE`, `SECOND_FACTOR_NOT_ENROLLED` | 409 | `error: 'expired'`: start over, the way to confirm changed |
 | `USER_INACTIVE`, anything else | 403 or other | `error: 'failed'`, in `wording`'s words or `errors`' |
 | an API it cannot reach | 503 | `error: 'failed'` |
+| `request` refused with `MAIL_THROTTLED` | 429 | `error: 'throttled'`, `retryAfter` in seconds when the API sent them, `message` in `wording`'s words or `errors`' |
 
-A request that the API refuses is `error: 'failed'`: a mail throttled
-(`MAIL_THROTTLED`, 429) is worded by the `wording` option, which sees the
-error before `errors` does, so it can say the wait:
+A request that the API refuses is `error: 'failed'`. A mail throttled
+(`MAIL_THROTTLED`, 429) is `error: 'throttled'` instead, with `retryAfter`, the
+whole seconds to wait, read from `extensions.params.retryAfter` or
+`extensions.retryAfter` (a number or a numeric string, rounded up; with none
+usable the answer is still `throttled`, without `retryAfter`). Its `message`
+is worded by the `wording` option, which sees the error before `errors` does,
+so it can say the wait:
 
 ```ts
+import { waitMinutes } from '@alxia/react-router/errors';
+
 stepUpSteps({
 	// …
 	wording: (error, language) =>
@@ -608,8 +662,10 @@ request for a challenge instead of the error page.
 ### The codes it tells apart
 
 `codes` takes `invalidCode` (`'CODE_INVALID'`), `challengeOver` (the table's
-codes that end a challenge; passing a list replaces it) and `stepUpRequired`
-(`'STEP_UP_REQUIRED'`). `invalidCode` in `challengeOver` is a
+codes that end a challenge; passing a list replaces it), `stepUpRequired`
+(`'STEP_UP_REQUIRED'`) and `mailThrottled` (`'MAIL_THROTTLED'`).
+`STEP_UP_OVER` is `[...CHALLENGE_OVER, …]`, so a list that adds a code of its
+own can spread either. `invalidCode` in `challengeOver` is a
 [`TypeError`](../troubleshooting.md#typeerror-stepupsteps-the-code--is-both-the-wrong-code-code-codesinvalidcode-and-in-codeschallengeover-a-wrong-code-that-leaves-tries-cannot-end-the-challenge).
 
 ### Call the step-up with a caller that does not sign out on a 401
@@ -626,10 +682,14 @@ A step-up asks for a code before a sensitive action. `stepUpReducer` holds
 its state on the page, with no React: `phase` (`idle`, `requesting`, `code`,
 `confirming`, `done`), the `via` that confirms it (`email` or
 `secondFactor`), the `challenge` held, `attemptsLeft`, `locked`, `error`
-(`invalid`, `expired` or `failed`), `pending` and `resent`.
+(`invalid`, `expired`, `failed` or `throttled`), `message` (the last refusal
+worded for the page), `retryAfter` (a throttle's seconds), `pending` and
+`resent`. `start`, `submit`, an accepted answer and `release` clear `message`
+and `retryAfter`.
 
 `stepUpProps(state)` gives the part a code form shows (not the challenge, a
-secret that stays out of the markup):
+secret that stays out of the markup, and not `message`: the dialog words its
+own texts from `error`, `attemptsLeft`, `locked` and `retryAfter`):
 
 ```ts
 import {
@@ -661,6 +721,7 @@ state = stepUpReducer(state, {
 
 stepUpProps(state);
 // { via: 'secondFactor', attemptsLeft: 0, locked: true, error: 'invalid', pending: false, resent: false }
+// A throttled request adds `retryAfter` (seconds) when the API said how long.
 ```
 
 With no try left, a mailed code is over (`error: 'expired'`: ask for a new
@@ -676,15 +737,12 @@ beside the app's `signInFlow`:
 ```ts
 // app/links.server.ts
 import { authLinks } from '@alxia/react-router/session';
-import { cookies } from './cookies.server';
-import { errors, json } from './errors.server';
 import { signIn } from './session.server';
 
 export const links = authLinks({
-	signIn, // the app's signInFlow
-	cookies, // the same sessionCookies
-	errors, // the same createApiErrors
-	json, // the same jsonActions({ origin }): every body is read with its CSRF check
+	// The app's signInFlow: the links use its cookies, its errors and its json
+	// (every body is read with the same CSRF check).
+	signIn,
 	start: async (token) => (await homeOf(token)) ?? '/', // optional
 });
 ```
@@ -716,6 +774,7 @@ export async function loader({ request }: Route.LoaderArgs) {
 export async function action({ request }: Route.ActionArgs) {
 	const { token } = await links.linkArgs(ConfirmArgs, request, PATH);
 	const spent = await links.spendToken(() => confirmMagicLink(token), {
+		request,
 		language: 'en',
 		path: PATH,
 		states: { 'auth.errors.invalid-token': 'invalid' },
@@ -735,8 +794,12 @@ Asking for the mail, and the reset's last step:
 ```ts
 // app/routes/auth/sign-in-link.tsx
 export async function action({ request }: Route.ActionArgs) {
+	json.requireJsonPost(request); // a native post goes back to its page
 	const { email } = await json.readInput(request, EmailArgs);
-	return links.requestLink(request, () => requestMagicLink(email), 'en');
+	return links.requestLink(() => requestMagicLink(email), {
+		request,
+		language: 'en',
+	});
 }
 
 // app/routes/auth/reset-password.tsx, once the new password is set
@@ -751,15 +814,16 @@ export async function action({ request }: Route.ActionArgs) {
   site (a font, an image), and no search engine keeps the page. Set them on
   the page's document and its `.data` responses. The redirects of `ended`,
   `landByLink` and `afterReset` carry them already.
-- `linkArgs(schema, request, path)` reads the request as JSON with
-  `json.readJson` (a cross-site post is a 403 and a body that is not JSON a
-  415, before anything is spent) and checks it against any Standard Schema
+- `linkArgs(schema, request, path)` first refuses a post that is not a
+  same-site JSON one (a form posted before hydration goes back to its page, a
+  cross-site post is a 403), reads the request as JSON with `json.readJson`
+  and checks it against any Standard Schema
   (Zod 4, Valibot, ArkType; async is fine). An issue on `token` (missing, or
   over the API's limit: a link cut or padded on its way) throws the redirect
   to the `invalid` end state, as an unknown token does; any other issue throws
   a 400. `invalidState` names another state.
-- `spendToken(run, { language, path, states, fields })` runs the API call that
-  spends the token. It returns `{ ok: true, value }`, or what the page answers:
+- `spendToken(run, { request, language, path, states, fields })` runs the API
+  call that spends the token, after the same guard on `request`. It returns `{ ok: true, value }`, or what the page answers:
   an API code in `states` ends the page on that state (the redirect replaces
   the token's history entry); refused `fields` stay under the form fields the
   page shows; any other refusal, a wait or an unreachable API, is the form's
@@ -781,27 +845,31 @@ export async function action({ request }: Route.ActionArgs) {
   session opened) passes the page and its state, and the answer ends there,
   keeping the browser's session.
 - `afterReset(request)` follows a password reset, which signs the account out
-  everywhere: the browser's session is revoked and its cookie cleared, then
+  everywhere: the browser's session is revoked and its session cookie, its
+  challenge cookie and the flow's `clear()` cookies are cleared, then
   the page replaces the token's entry with `resetDone` (`/sign-in?password-reset=1`
   by default).
-- `requestLink(request, run, language)` requests the mail. It answers
+- `requestLink(run, { request, language })` requests the mail. It answers
   `{ sent: true }` whoever the address is, so the page does not tell which
   addresses hold an account (`RequestLinkAnswer` is its shape). A wait is a
-  429 and a malformed address is the `email` field's refusal.
+  429 with the `formError`, `throttled: true` and, when the API gave the
+  seconds, a typed `retryAfter` beside it; a malformed address is the `email` field's refusal.
 
-`landByLink`, `afterReset` and `requestLink` first refuse a post that is not
-JSON (the redirect a native form post gets goes back to its page, which then
-posts JSON), before anything is spent, revoked or landed.
+`linkArgs`, `spendToken`, `landByLink`, `afterReset` and `requestLink` first
+refuse a post that is not a same-site JSON one: the redirect a native form
+post gets goes back to its page, which then posts JSON, and a JSON post from
+another site is a 403, before anything is read, spent, revoked or landed.
 
-The wait is recognised by the app's own throttle code, so pass it:
+The wait is recognised by the app's own throttle code, so pass it, as the
+step-up's `codes` and `wording` do (`AuthLinksCodes` is the type of `codes`).
+`wording` words every refusal of `requestLink` that is not a field's, the
+wait included; returning `undefined` keeps `errors`' words:
 
 ```ts
 authLinks({
-	signIn, cookies, errors, json,
-	throttled: {
-		code: 'auth.errors.too-many-attempts', // 'MAIL_THROTTLED' by default
-		wording: (error, language) => waitMessage(error, language), // else the catalogue's
-	},
+	signIn,
+	codes: { mailThrottled: 'auth.errors.too-many-attempts' }, // 'MAIL_THROTTLED' by default
+	wording: (error, language) => waitMessage(error, language), // else the catalogue's
 });
 ```
 
@@ -809,8 +877,16 @@ A token is never logged, worded in an error or put in a redirect built by the
 helpers: the end states and the sign-in's redirects carry a state or a path
 alone, and a `TypeError` about a path prints it only up to its `?` or `#`.
 `statePath`, `ended`, `linkArgs` and `spendToken` throw that `TypeError` for a
-page `path` with a query, a fragment or a host, and `authLinks` throws one for
-a `resetDone` that leaves the site.
+page `path` with a query, a fragment or a host (naming the call), and
+`authLinks` throws one for a `resetDone` that leaves the site.
+
+One redirect does carry the page's URL as it was: the native post (a form
+submitted before hydration) that `linkArgs`, `landByLink`, `afterReset`,
+`requestLink` and `spendToken` send back to the token page itself. It is
+harmless because it goes only to the URL the browser already holds, on this
+site, as a GET that spends nothing; the token is no further from the user than
+it was in the address bar, and the page's `TOKEN_PAGE_HEADERS` still keep it
+out of any `Referer`.
 
 ## The types and the rest of `/session/model`
 
@@ -820,11 +896,12 @@ The rest of `@alxia/react-router/session/model`, beside `safeNext`,
 ```ts
 import {
 	HOME,
-	phaseOf,
 	INITIAL_STEP_UP,
 	TOTP_CODE,
-	type SecondFactorMethod,
+	type SecondFactorKind,
 	type SignInStatus,
+	type SignInPaths,
+	SIGN_IN_PATHS,
 	type StepUpConfirmAnswer,
 	type StepUpProps,
 	type StepUpRequestAnswer,
@@ -833,22 +910,26 @@ import {
 
 TOTP_CODE.test('123456'); // true: six digits, nothing else
 HOME; // '/', where `safeNext` falls back to
-phaseOf(INITIAL_STEP_UP); // 'idle'
+INITIAL_STEP_UP.phase; // 'idle'
+SIGN_IN_PATHS.signIn; // '/sign-in'
 
-const method: SecondFactorMethod = 'recovery';
+const paths: SignInPaths = { ...SIGN_IN_PATHS, signIn: '/login' };
+const kind: SecondFactorKind = 'recovery';
 const status: SignInStatus = 'secondFactor';
 const via: StepUpVia = 'email';
 ```
 
 - `TOTP_CODE` is the regular expression of an authenticator app's code: six digits.
 - `HOME` is the path `safeNext` returns when a `next` value is unsafe or missing.
-- `phaseOf(state)` returns the `phase` of a step-up state.
-- `SecondFactorMethod` is what a second-factor form sends: `'code' | 'recovery'`.
+- `SIGN_IN_PATHS` and `SignInPaths` are the sign-in pages' paths and their
+  type: `{ signIn, secondFactor }`.
+- `SecondFactorKind` is what a second-factor form sends: `'code' | 'recovery'`.
 - `SignInStatus` is how a sign-in ended: `'signedIn' | 'secondFactor'`.
 - `StepUpVia` is how a step-up is confirmed, `'email' | 'secondFactor'`, matching janus's vocabulary.
-- `StepUpRequestAnswer` is what the server answers to a request for a challenge, with the `message` of a refusal.
+- `StepUpRequestAnswer` is what the server answers to a request for a challenge, with the `message` of a refusal and a throttle's `retryAfter`.
 - `StepUpConfirmAnswer` is what the server answers to a code, with the `message` `stepUpSteps` words.
-- `StepUpProps` is the shape `stepUpProps` returns; it spreads onto a step-up dialog's props.
+- `StepUpError` is `'invalid' | 'expired' | 'failed' | 'throttled'`.
+- `StepUpProps` is the shape `stepUpProps` returns (`via`, `attemptsLeft`, `locked`, `error`, `retryAfter`, `pending`, `resent`); it spreads onto a step-up dialog's props.
 
 The types of `/session`:
 
@@ -863,9 +944,12 @@ The types of `/session`:
 - `StepUpStepsOptions` is what `stepUpSteps` takes, `StepUpSteps` what it returns.
 - `StepUpCodes` is the `codes` option.
 - `StepUpStayed<T>` is a step's `data(...)` return for an answer that stays on the page.
-- `STEP_UP_OVER` and `STEP_UP_REQUIRED` are the default codes.
-- `AuthLinksOptions` is what `authLinks` takes: `signIn`, `cookies`, `errors`,
-  `json`, and the optional `throttled`, `start`, `resetDone` and `invalidState`.
-  `AuthLinks` is what it returns.
+- `StepUpCall<L>` is the `{ request, language }` each step-up step takes.
+- `INVALID_CODE`, `CHALLENGE_OVER`, `STEP_UP_OVER`, `STEP_UP_REQUIRED` and
+  `MAIL_THROTTLED` are the default codes, so an app can extend a list
+  (`challengeOver: [...CHALLENGE_OVER, 'auth.errors.gone']`).
+- `AuthLinksOptions` is what `authLinks` takes: `signIn`, and the optional
+  `codes` (`AuthLinksCodes`: `mailThrottled`), `wording`, `start`, `resetDone`
+  and `invalidState`. `AuthLinks` is what it returns.
 - `Spent<T>` is what `spendToken` returns, `LinkStayed` is the `data(...)` a
   refusal answers with, and `SpendOptions` is its second argument.

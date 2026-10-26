@@ -24,6 +24,10 @@ export interface StepUpState {
 	/** No try left on an app or recovery code: wait, asking again would fail too. */
 	readonly locked: boolean;
 	readonly error?: StepUpError | undefined;
+	/** The last refusal worded for the page, until the next step or the release. */
+	readonly message?: string | undefined;
+	/** The seconds a throttled request asks to wait before asking again. */
+	readonly retryAfter?: number | undefined;
 	/** A request or a code is in flight. */
 	readonly pending: boolean;
 	/** The last request replaced a challenge that was held. */
@@ -44,11 +48,6 @@ export const INITIAL_STEP_UP: StepUpState = {
 	resent: false,
 };
 
-/** The phase a state is in. */
-export function phaseOf(state: StepUpState): StepUpPhase {
-	return state.phase;
-}
-
 function requested(
 	state: StepUpState,
 	answer: StepUpRequestAnswer,
@@ -59,6 +58,8 @@ function requested(
 			...state,
 			phase: state.challenge ? 'code' : 'idle',
 			error: answer.error,
+			message: answer.message,
+			retryAfter: answer.retryAfter,
 			pending: false,
 			resent: false,
 		};
@@ -86,6 +87,7 @@ function refused(
 			...(state.via ? { via: state.via } : {}),
 			locked: false,
 			error: 'expired',
+			message: answer.message,
 			pending: false,
 			resent: false,
 		};
@@ -94,6 +96,8 @@ function refused(
 		...state,
 		phase: 'code',
 		error: answer.error,
+		message: answer.message,
+		retryAfter: undefined,
 		attemptsLeft: answer.attemptsLeft,
 		locked: answer.locked || none,
 		pending: false,
@@ -104,7 +108,8 @@ function refused(
 /**
  * The step-up's transitions, pure. `start` (a request in flight) forgets the
  * last error but keeps a challenge held, so a refused "Resend code" leaves
- * the code form up; a granted request replaces the challenge; a code accepted
+ * the code form up; a refusal keeps its `message` (and a throttle its
+ * `retryAfter`) until the next step; a granted request replaces the challenge; a code accepted
  * spends it; an expired or spent one leaves "ask again"; at 0 tries left a
  * mailed code is `expired` and an app or recovery code is `locked`.
  */
@@ -118,13 +123,22 @@ export function stepUpReducer(
 				...state,
 				phase: state.challenge ? 'code' : 'requesting',
 				error: undefined,
+				message: undefined,
+				retryAfter: undefined,
 				pending: true,
 				resent: false,
 			};
 		case 'requested':
 			return requested(state, action.answer);
 		case 'submit':
-			return { ...state, phase: 'confirming', error: undefined, pending: true };
+			return {
+				...state,
+				phase: 'confirming',
+				error: undefined,
+				message: undefined,
+				retryAfter: undefined,
+				pending: true,
+			};
 		case 'confirmed':
 			return action.answer.ok
 				? {

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { asking, END, flowFor, setCookies } from '../../test/session/flow';
+import { END, flowFor, posted, setCookies } from '../../test/session/flow';
 
 const signedIn = { status: 'signedIn', token: 'new', expiresAt: END } as const;
 const challenged = { status: 'secondFactor', challenge: 'c1' } as const;
@@ -63,7 +63,7 @@ describe('landReplacing', () => {
 	test('a new session revokes the browser’s once, and its own cookie replaces the old', async () => {
 		const { flow, revoked } = flowFor();
 		const response = await flow.landReplacing(signedIn, '/', {
-			request: asking('/sign-in', 'old'),
+			request: posted('/sign-in', 'old'),
 		});
 		expect(revoked).toEqual(['old']);
 		const cookies = setCookies(response as Response);
@@ -75,14 +75,14 @@ describe('landReplacing', () => {
 
 	test('with no session cookie there is nothing to revoke', async () => {
 		const { flow, revoked } = flowFor();
-		await flow.landReplacing(signedIn, '/', { request: asking('/sign-in') });
+		await flow.landReplacing(signedIn, '/', { request: posted('/sign-in') });
 		expect(revoked).toEqual([]);
 	});
 
 	test('a second factor revokes nothing by default, so a failed code keeps the session', async () => {
 		const { flow, revoked } = flowFor();
 		const response = await flow.landReplacing(challenged, '/', {
-			request: asking('/sign-in', 'old'),
+			request: posted('/sign-in', 'old'),
 		});
 		expect(revoked).toEqual([]);
 		expect(setCookies(response as Response)).toHaveLength(1);
@@ -91,7 +91,7 @@ describe('landReplacing', () => {
 	test('revokeOn adds the status: revoked once, and the cookie cleared', async () => {
 		const { flow, revoked } = flowFor();
 		const response = await flow.landReplacing(challenged, '/', {
-			request: asking('/sign-in', 'old'),
+			request: posted('/sign-in', 'old'),
 			revokeOn: ['signedIn', 'secondFactor'],
 		});
 		expect(revoked).toEqual(['old']);
@@ -103,7 +103,7 @@ describe('landReplacing', () => {
 	test('an answer that opens no session is null and revokes nothing', async () => {
 		const { flow, revoked } = flowFor();
 		const response = await flow.landReplacing({ status: 'other' }, '/', {
-			request: asking('/sign-in', 'old'),
+			request: posted('/sign-in', 'old'),
 			revokeOn: ['signedIn', 'secondFactor'],
 		});
 		expect(response).toBeNull();
@@ -115,7 +115,7 @@ describe('landReplacing', () => {
 			revoke: () => Promise.reject(new Error('down')),
 		});
 		const response = await flow.landReplacing(signedIn, '/', {
-			request: asking('/sign-in', 'old'),
+			request: posted('/sign-in', 'old'),
 		});
 		expect(response?.status).toBe(302);
 	});
@@ -124,8 +124,8 @@ describe('landReplacing', () => {
 describe('revokeSession', () => {
 	test('true when the request carried a session, false when not', async () => {
 		const { flow, revoked } = flowFor();
-		expect(await flow.revokeSession(asking('/', 'tok'))).toBe(true);
-		expect(await flow.revokeSession(asking('/'))).toBe(false);
+		expect(await flow.revokeSession(posted('/', 'tok'))).toBe(true);
+		expect(await flow.revokeSession(posted('/'))).toBe(false);
 		expect(revoked).toEqual(['tok']);
 	});
 
@@ -136,7 +136,7 @@ describe('revokeSession', () => {
 				seen.push(request);
 			},
 		});
-		const request = asking('/', 'tok');
+		const request = posted('/', 'tok');
 		await flow.revokeSession(request);
 		expect(seen).toEqual([request]);
 	});
@@ -157,7 +157,7 @@ describe('a signed-in answer with no live session to set', () => {
 			const answer = { status: 'signedIn', token: 'new', expiresAt } as never;
 			expect(flow.landing(answer, '/')).toBeNull();
 			const landed = await flow.landReplacing(answer, '/', {
-				request: asking('/sign-in', 'old'),
+				request: posted('/sign-in', 'old'),
 			});
 			expect(landed).toBeNull();
 			expect(revoked).toEqual([]);

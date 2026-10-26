@@ -1,14 +1,15 @@
 import { data, replace } from 'react-router';
 import type { FormErrors } from '../errors/form-errors';
 import type { SignInAnswer } from './flow-types';
+import { samesitePost } from './guard';
+import { isLive } from './land';
 import { stateRedirect, withTokenHeaders } from './link-token';
-import type { AuthLinks, AuthLinksOptions, LinkStayed } from './link-types';
+import type { AuthLinks, LinkStayed, LinksContext } from './link-types';
 import { HOME, safeNext } from './model';
-import { millisOf } from './serialize';
 
 /** Where a new session starts: the app's start page, else `/`; never an unsafe path. */
 async function startOf<L extends string>(
-	{ start }: AuthLinksOptions<L>,
+	{ start }: LinksContext<L>,
 	request: Request,
 	token: string,
 ): Promise<string> {
@@ -21,13 +22,6 @@ async function startOf<L extends string>(
 	}
 }
 
-/** The condition `landing` opens a session on: a token, and an end still to come. */
-const isLive = (answer: SignInAnswer): boolean =>
-	answer.status === 'signedIn' &&
-	Boolean(answer.token) &&
-	Boolean(answer.expiresAt) &&
-	millisOf(answer.expiresAt) > Date.now();
-
 /**
  * Where a link's sign-in leads, replacing the token's history entry. Signed
  * in: the start page, with the new session's cookie; a second factor: its
@@ -36,26 +30,25 @@ const isLive = (answer: SignInAnswer): boolean =>
  * anything is revoked or landed.
  */
 export async function landByLink<L extends string>(
-	options: AuthLinksOptions<L>,
+	options: LinksContext<L>,
 	answer: SignInAnswer,
 	{ request, language, other }: Parameters<AuthLinks<L>['landByLink']>[1],
 ): Promise<Response | LinkStayed> {
-	options.json.requireJsonPost(request);
+	samesitePost(options.json, request);
 	if (answer.status === 'other' && other) {
 		return stateRedirect(other.path, other.state);
 	}
 	// A dead session would be looked up with a token the API refuses.
-	const next =
-		answer.status === 'signedIn' && isLive(answer)
-			? await startOf(options, request, answer.token)
-			: HOME;
+	const next = isLive(answer)
+		? await startOf(options, request, answer.token)
+		: HOME;
 	const landed = await options.signIn.landReplacing(answer, next, {
 		request,
 		revokeOn: ['signedIn', 'secondFactor'],
 	});
 	if (!landed) {
 		return data<FormErrors>(
-			{ formError: options.errors.unavailableMessage(language) },
+			{ formError: options.signIn.unavailable(language) },
 			{ status: 503 },
 		);
 	}
@@ -65,18 +58,22 @@ export async function landByLink<L extends string>(
 
 /**
  * After a password reset, which signs the account out everywhere: the
- * browser's session is revoked (it may be another account's) and its cookie
- * cleared, then the sign-in page says the password changed. Only a JSON post
+ * browser's session is revoked (it may be another account's) and its cookies
+ * cleared (the session's, the challenge's, the flow's `clear()`), then the sign-in page says the password changed. Only a JSON post
  * goes on.
  */
 export async function afterReset<L extends string>(
-	options: AuthLinksOptions<L>,
+	options: LinksContext<L>,
 	resetDone: string,
 	request: Request,
 ): Promise<Response> {
-	options.json.requireJsonPost(request);
+	samesitePost(options.json, request);
 	await options.signIn.revokeSession(request);
-	return replace(resetDone, {
-		headers: withTokenHeaders({ 'Set-Cookie': options.cookies.destroy() }),
-	});
+	const headers = withTokenHeaders();
+	headers.append('Set-Cookie', options.cookies.destroy());
+	headers.append('Set-Cookie', options.cookies.destroyChallenge());
+	for (const cookie of options.signIn.clear()) {
+		headers.append('Set-Cookie', cookie);
+	}
+	return replace(resetDone, { headers });
 }

@@ -6,7 +6,7 @@ export const TOTP_CODE: RegExp = /^\d{6}$/;
  * the one mailed), `recovery` a recovery code. Janus has no name for it, only
  * `confirm` and `recover`.
  */
-export type SecondFactorMethod = 'code' | 'recovery';
+export type SecondFactorKind = 'code' | 'recovery';
 
 /** How a sign-in ended, in `@nxgt/janus`'s words (`SignInResult['status']`). */
 export type SignInStatus = 'signedIn' | 'secondFactor';

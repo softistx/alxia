@@ -4,6 +4,7 @@
  * cookie. The subpath may import `react-router` and `/errors`' files,
  * nothing else.
  */
+export { CHALLENGE_OVER, INVALID_CODE, MAIL_THROTTLED } from './codes';
 export {
 	type CookieSession,
 	type SessionCookies,
@@ -21,6 +22,7 @@ export type {
 export { TOKEN_PAGE_HEADERS } from './link-token';
 export type {
 	AuthLinks,
+	AuthLinksCodes,
 	AuthLinksOptions,
 	LinkStayed,
 	RequestLinkAnswer,
@@ -38,6 +40,7 @@ export { signInFlow } from './sign-in';
 export { stepUpSteps } from './step-up';
 export { STEP_UP_OVER, STEP_UP_REQUIRED } from './step-up-codes';
 export type {
+	StepUpCall,
 	StepUpCodes,
 	StepUpStayed,
 	StepUpSteps,
