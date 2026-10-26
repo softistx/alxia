@@ -9,6 +9,9 @@ nothing and is safe in a component as well as in a loader.
 - [Redirects that stay on the site](#redirects-that-stay-on-the-site)
 - [The sign-in pages' paths](#the-sign-in-pages-paths)
 - [Cookies](#cookies)
+- [Signing in](#signing-in)
+- [The second factor](#the-second-factor)
+- [Signing out](#signing-out)
 - [The step-up state](#the-step-up-state)
 - [Codes and types](#codes-and-types)
 
@@ -162,6 +165,178 @@ succeeds and the next request carries no session, so the app loops back to the
 sign-in page. Pass `secure: !import.meta.env.DEV`: development then sets no
 `Secure` and no prefix, since the prefixes require `Secure`. See
 [the troubleshooting entry](../troubleshooting.md#sign-in-loops-on-httplocalhost-in-safari).
+
+## Signing in
+
+`signInFlow` is the server side of the sign-in pages: where an answer leads,
+the form's refusals, the second factor, the viewer and sign-out. Build it once,
+beside the cookies, over the app's `createApiErrors` and `jsonActions` (the
+same instances its other actions use, so every body is read with the same
+same-origin check):
+
+```ts
+// app/session.server.ts
+import { signInFlow } from '@alxia/react-router/session';
+import { cookies } from './cookies.server';
+import { errors, json } from './errors.server';
+import { SignOutMutation, execute } from './api.server';
+
+export const signIn = signInFlow({
+	cookies,
+	errors,
+	json,
+	revoke: (token) => execute(SignOutMutation, {}, { token }),
+	attemptsLeft: (count, language) => t('auth.attempts-left', { count }, language),
+});
+```
+
+The flow speaks `@nxgt/janus`'s words, and the app maps its API's: a
+`SignInAnswer` is `{ status: 'signedIn', token, expiresAt }`,
+`{ status: 'secondFactor', challenge, expiresAt? }` or `{ status: 'other' }`
+(an API's `LINKED`, say, which opens no session). The default codes are
+janus's, `CODE_INVALID` for a wrong code and `TOKEN_UNKNOWN`, `TOKEN_SPENT`
+and `TOKEN_EXPIRED` for a challenge that is gone; an API with its own pass
+`codes: { invalidCode, challengeOver }`. `paths` replaces the pages' paths
+(`SIGN_IN_PATHS`), `clear` lists the `Set-Cookie` values a new session and a
+sign-out also remove (a per-account preference), `unavailable` words an API
+that cannot be reached (`errors.unavailableMessage` by default), and
+`endedParam` is a query key, such as `'expired'`, that `signInRedirect` adds
+when the request carried a session cookie, to say the session ended.
+
+A sign-in page's action runs the API's mutation inside `signInStep`:
+
+```ts
+// app/routes/sign-in.tsx
+import { signIn } from '~/session.server';
+
+export async function action({ context, request }: Route.ActionArgs) {
+	const { language } = alxiaOf(context);
+	const input = await json.readInput(request, SignInInput);
+	return signIn.signInStep(
+		async () => toAnswer((await execute(SignInMutation, input)).signIn),
+		{ request, language, next: signIn.nextParam(request), extra: {} },
+	);
+}
+```
+
+- A **signed-in** answer redirects to `next` (through `safeNext`) with the
+  session cookie set and the challenge and the app's `clear()` cookies removed.
+  The session the browser held is revoked first (`landReplacing`): one browser
+  holds one session. A revoke that fails is ignored, and the old session lives
+  until it expires.
+- A **second factor** answer redirects to the second-factor page with the
+  challenge in its own cookie. It is a secret: never in a URL, a log or the
+  loader's data.
+- An **API refusal** stays on the page: `{ ...extra, formError }`, worded by
+  `errors`, with the API's status. An API that cannot be reached says
+  `unavailable`, with 503. Anything else is thrown. `refused(error)` runs
+  first: it returns a `Response` (a redirect), a string (a richer message) or
+  `undefined`.
+- An **other** answer opens no session, so the step says `unavailable`. Check
+  an answer such as `LINKED` yourself, with `landing(answer, next)`, which is
+  `null` for it.
+
+`signIn.landing(answer, next)` and `signIn.landReplacing(answer, next,
+{ request, revokeOn? })` are the same redirects for a step that does not go
+through `signInStep` (a link a mail carries). `revokeOn` lists the statuses
+that end the browser's session; `['signedIn']` by default.
+
+### The viewer
+
+```ts
+// a page that needs a user
+const { viewer, headers } = await signIn.requireViewer(
+	request,
+	(token) => execute(ViewerQuery, {}, { token }).then((r) => r.viewer),
+	(viewer) => viewer.sessionExpiresAt,
+);
+return data({ viewer }, { headers });
+
+// the sign-in page itself: a live session goes home
+const viewer = await signIn.viewer(request, read); // the viewer, null, or undefined
+```
+
+`requireViewer` throws `signInRedirect(request)` without a cookie, on a 401
+and when `read` finds no viewer; any other failure is thrown through
+`routeError`. The redirect comes back to the page and clears the cookie, and
+adds `?<endedParam>=1` when the request carried one. `headers` set the cookie
+again when the API moved the session's end. `viewer` answers `null` for a
+401 (a dead session: send `cookies.signInPageHeaders(true)`), and `undefined`
+without a cookie or when the API cannot tell.
+
+## The second factor
+
+The sign-in page's answer `secondFactor` leads to the second-factor page,
+whose loader needs the challenge cookie (`cookies.challengeOf(request)`; back
+to the sign-in page without one) and whose action posts the code:
+
+```ts
+// app/routes/sign-in.second-factor.tsx
+export async function action({ context, request }: Route.ActionArgs) {
+	const { language } = alxiaOf(context);
+	const input = await signIn.readCodeInput(request);
+	const challenge = cookies.challengeOf(request);
+	if (!challenge) throw redirect(signInPath(signIn.nextParam(request)));
+	return signIn.signInStep(
+		() =>
+			signIn.codeStep(input, challenge, {
+				confirm: async (challenge, code) =>
+					toAnswer((await execute(ConfirmMutation, { challenge, code })).confirm),
+				recover: async (challenge, recoveryCode) =>
+					toAnswer((await execute(RecoverMutation, { challenge, recoveryCode })).recover),
+			}),
+		{
+			request,
+			language,
+			next: signIn.nextParam(request),
+			extra: { kind: input.kind },
+			refused: (error) =>
+				signIn.codeRefusal(error, language) ??
+				redirect(signInPath(signIn.nextParam(request), { query: { expired: '1' } }), {
+					headers: { 'Set-Cookie': cookies.destroyChallenge() },
+				}),
+		},
+	);
+}
+```
+
+`readCodeInput` takes the page's JSON post, `{ kind, code }`: `kind` is
+`'code'` for an issued code (an authenticator app's, or the one mailed) and
+`'recovery'` for a recovery code (`SecondFactorMethod`); `code` is at most 40
+characters. A native form post (before hydration) goes back to its page, a
+cross-site post is a 403, and a body of another shape is a 400.
+
+`codeRefusal(error, language, whenNone?)` words a refused code:
+
+| the API says | the form shows |
+| --- | --- |
+| `CODE_INVALID` with `attemptsLeft: 3` | the message and `attemptsLeft(3, language)` |
+| `CODE_INVALID` with `attemptsLeft: 0` | `undefined`: the challenge is over, sign in again (with `whenNone`, the message and `whenNone` instead) |
+| `CODE_INVALID` with no count | the message alone |
+| `TOKEN_UNKNOWN`, `TOKEN_SPENT`, `TOKEN_EXPIRED` | `undefined` |
+| anything else | the message `errors` words |
+
+The count is `attemptsLeftOf(error)` of
+[`@alxia/react-router/errors`](errors.md#the-tries-a-code-leaves), which
+reads janus's `extensions.attemptsLeft`.
+
+## Signing out
+
+```ts
+// app/routes/sign-out.tsx
+export const loader = () => redirect('/');
+
+export function action({ request }: Route.ActionArgs) {
+	return signIn.signOut(request);
+}
+```
+
+`signOut` reads the body as JSON first (same-origin only, a 403 or 415
+otherwise), so another site cannot sign anyone out, and a GET signs nobody
+out. It then ends the session at the API (a failure is ignored: the cookie
+goes anyway), removes the session cookie and the app's `clear()` cookies and
+redirects to `/sign-in?signed-out=1`. `signOut(request, { to })` redirects to
+`to` instead, after `safeNext`: a value that leaves the site goes to `/`.
 
 ## The step-up state
 

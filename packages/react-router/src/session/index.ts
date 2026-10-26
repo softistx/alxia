@@ -1,8 +1,8 @@
 /**
  * `@alxia/react-router/session`: the session of a BFF, the app that renders
  * pages over a GraphQL API and keeps the API's session token in its own
- * cookie. Today it imports its own files alone; the subpath may import
- * `react-router` and `/errors`' files, nothing else.
+ * cookie. The subpath may import `react-router` and `/errors`' files,
+ * nothing else.
  */
 export {
 	type CookieSession,
@@ -10,9 +10,18 @@ export {
 	type SessionCookiesOptions,
 	sessionCookies,
 } from './cookies';
+export type {
+	SignInAnswer,
+	SignInCodes,
+	SignInFlow,
+	SignInFlowOptions,
+	SignInFormError,
+	SignInStayed,
+} from './flow-types';
 export {
 	readCookie,
 	type SerializeOptions,
 	secondsUntil,
 	serializeCookie,
 } from './serialize';
+export { signInFlow } from './sign-in';

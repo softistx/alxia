@@ -4,6 +4,7 @@ export {
 	type ApiErrorLike,
 	type ApiErrorParamsLike,
 	type ApiFieldErrorLike,
+	attemptsLeftOf,
 	isApiErrorLike,
 	waitMinutes,
 } from './api-error';

@@ -1054,6 +1054,7 @@ From `@alxia/react-router/errors` (`react-router` is its only package import, an
 | `isApiErrorLike(error)` | whether `error` is an `@nxgt/graphql-client` `ApiError`, like the client's `isApiError`, plus a numeric `status`, which `ApiErrorLike` promises; it holds across two copies of the client |
 | `ApiErrorLike`, `ApiErrorEntryLike`, `ApiErrorExtensionsLike`, `ApiErrorParamsLike`, `ApiFieldErrorLike` | the shape of the refusal: `errors`, `code`, `status`, `requestId?`, and each error's `extensions` (`code`, `params`, `fields`, `field`, `minutes`, `retryAfter`) |
 | `waitMinutes(extensions)` | the minutes of a throttle's wait: `minutes` (at least one), else `retryAfter` rounded up |
+| `attemptsLeftOf(error)` | the tries a refused code leaves, as `@nxgt/janus` counts them: `extensions.attemptsLeft` of the first error, else `params.attemptsLeft`; `undefined` when it is not a whole number from 0 up |
 | `REQUEST_ID_HEADER`, `requestIdOf(response)` | `x-request-id`, and the id a response carries, if the API sent one |
 | `nextOf(url)` | the path and search of the page a request is for, without React Router's `.data`, `/_.data`, `_routes` and empty `index`; it never starts with two slashes, but an app still validates `next` before redirecting to it |
 | `FormErrors` | what a form action answers when the API refused the input: `fieldErrors` by field and a `formError` (`undefined` when every message sits under a field), already translated; `submitForm` answers it |
