@@ -206,7 +206,10 @@ as the bytes arrive:
   `ContentTooLargeError` again instead, so a client gets the 413 a plain
   route answers, in the app's error format (`application/problem+json` under
   `errors: 'problem'`), with a `Content-Length` or without one (a chunked
-  body). It carries the headers Yoga's plugins set, such as a
+  body). A declared `Content-Length` over the limit is refused by core
+  where `bodyLimit()` stands, before Yoga runs: that 413 carries no header
+  Yoga's plugins set. A chunked body is refused at the read, by the
+  endpoint, and that 413 carries the headers Yoga's plugins set, such as a
   `Cache-Control: no-store` from an `onResponse` hook. Headers merge by
   name: `Vary` is merged with the app's own, `Set-Cookie` is appended, and any
   other header Yoga sets overwrites the app's header of the same name (Yoga's
@@ -215,12 +218,15 @@ as the bytes arrive:
   `application/graphql` body past the limit is refused the same way and logs
   nothing. Whatever else Yoga cannot parse is still its 400, and its
   parser's own error is never sent (`extensions.originalError` is removed).
-- **Order.** The body is read by the endpoint, after every middleware
-  declared before it, `bodyLimit()` included: those still run for an
-  oversized body. Declare the cheap observers first and the costly
-  middlewares (a session lookup, a database call) as late as you can. A
-  refusal answered before Yoga runs cannot carry Yoga's headers: set the ones
-  every response needs in a middleware.
+- **Order.** A declared `Content-Length` over the limit is refused where
+  `bodyLimit()` stands: the middlewares declared before it run, the ones
+  after it do not. When the endpoint's own `bodyLimit` option sets the limit,
+  the check stands at the head of the endpoint's steps, after every
+  middleware declared before it. A chunked body is read by the endpoint, after
+  every middleware, `bodyLimit()` included. Declare the cheap observers
+  first and the costly middlewares (a session lookup, a database call) as
+  late as you can. A refusal answered before Yoga runs cannot carry Yoga's
+  headers: set the ones every response needs in a middleware.
 
 ```ts
 graphql(app, {

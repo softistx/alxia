@@ -497,8 +497,10 @@ const app = alxia()
 	});
 ```
 
-A `Content-Length` over the limit is refused without reading the body.
-Without one, the bytes are counted as they arrive, and reading stops once
+A `Content-Length` over the limit is refused without reading the body, at
+the last `bodyLimit()` in force: the middlewares before it run, the ones
+after it do not, so a middleware that answers a refusal in your own format
+goes before `bodyLimit()`. Without one, the bytes are counted as they arrive, and reading stops once
 they pass the limit, so a chunked upload is never buffered whole. The
 limit applies to JSON, forms, text, an app's own parsers, and a handler
 reading `request.body` as a stream. Either way the answer is a 413, which
@@ -510,8 +512,9 @@ the route's operation in the OpenAPI document declares:
 
 It is a refusal, as a 400 is: a `ContentTooLargeError`, which `refusalOf` reads as
 `{ kind: 'body_limit', limit }`, so the middleware above answers it in its own
-format, JMAP's `limit` problem there, sent with 413 by that app's choice. A
-route with no limit reads its body as before.
+format, JMAP's `limit` problem there, sent with 413 by that app's choice (given
+before `bodyLimit()`, or before the route for a `bodyLimit` option). A route
+with no limit reads its body as before.
 
 ## Replies
 

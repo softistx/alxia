@@ -123,6 +123,7 @@ a trap that prints nothing is headed by its symptom.
 - [`503 {"status":"down",…}`](#503-statusdown) on `/ready`
 - [A client generated with `@nxgt/openapi-codegen` refuses the 400 after `errors: 'problem'`](#a-client-generated-with-nxgtopenapi-codegen-refuses-the-400-after-errors-problem)
 - [A plugin's route reads a body past the app's `bodyLimit()`](#a-plugins-route-reads-a-body-past-the-apps-bodylimit)
+- [A middleware after `bodyLimit()` never runs, or my 413 format is ignored](#a-middleware-after-bodylimit-never-runs-or-my-413-format-is-ignored)
 
 **Middlewares**
 
@@ -2417,7 +2418,8 @@ const app = alxia().use(refusals).post('/users', validate({ body: NewUser }), ha
 
 A body past the route's `bodyLimit` still gets the default
 `413 {"error":"content_too_large","limit":…}` from that middleware, which
-rethrows a `body_limit` refusal. Answer it too to answer it in your format
+rethrows a `body_limit` refusal. Answer it too to answer it in your format,
+from a middleware given before `bodyLimit()`
 ([`413`](#413-errorcontent_too_largelimit)).
 
 ### `413 {"error":"content_too_large","limit":…}`
@@ -2426,8 +2428,11 @@ Under `alxia({ errors: 'problem' })` the same answer is an `application/problem+
 
 **When:** a request's body is larger than its route's `bodyLimit`: the
 route's own, or the one a `bodyLimit(bytes)` before it set. Either its
-`Content-Length` says so, and the body is not read, or the bytes counted as
-it was read passed the limit:
+`Content-Length` says so, and the body is not read: the refusal is thrown
+where the last `bodyLimit()` in force stands (at the head of the route's own
+middlewares for a `bodyLimit` option), so what stands after it never runs; or
+the bytes counted as it was read passed the limit, which is how a chunked
+body, or a `Content-Length` that is not plain digits, is held:
 
 ```json
 { "error": "content_too_large", "limit": 65536 }
@@ -2451,7 +2456,8 @@ app
 ```
 
 To answer in another format, such as an RFC 9457 problem, return it from a
-middleware given before the route that catches the `ContentTooLargeError`,
+middleware given **before `bodyLimit()`** (before the route, for a
+`bodyLimit` option) that catches the `ContentTooLargeError`,
 for the refusal of kind `body_limit`:
 
 ```ts
@@ -2754,6 +2760,38 @@ const app = alxia().bodyLimit(64 * 1024).plugin(uploads);
 A `bodyLimit()` the plugin calls instead also applies to the app's routes
 declared after `plugin`, as its middlewares do. Call the app's own after `plugin`
 to keep it.
+
+### A middleware after `bodyLimit()` never runs, or my 413 format is ignored
+
+**When:** a request whose `Content-Length` is over the limit is answered with
+the default 413, and a middleware given after `bodyLimit()` (a logger, a
+guard, a catcher that answers in your own format) shows no sign of having run:
+
+```ts
+const app = alxia()
+	.bodyLimit(64 * 1024)
+	.use(limits) // the catcher of the refusal: never runs on a declared oversize body
+	.post('/api', handler);
+```
+
+**Why:** since 0.16.0 a declared `Content-Length` over the limit is refused
+where the last `bodyLimit()` in force stands, not at the first read. The
+middlewares before it run; the ones after it, the route's own and the handler
+do not. A catcher after the step has nothing to catch. The route's own
+`bodyLimit` option refuses at the head of its own middlewares, after
+everything given to `use`. A chunked body, or a `Content-Length` that is not
+plain digits (`1e3`, `0x10`, `8, 8`), is still refused at the read, where a
+middleware after the limit does run.
+
+**Fix:** give the catcher before `bodyLimit()`, or before a route that has a
+`bodyLimit` option:
+
+```ts
+const app = alxia()
+	.use(limits)
+	.bodyLimit(64 * 1024)
+	.post('/api', handler);
+```
 
 ## Middlewares
 

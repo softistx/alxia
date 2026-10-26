@@ -416,15 +416,15 @@ throw createGraphQLError('Admins only', {
 `Content-Length` or chunked. The limit is **1 MiB** unless the `bodyLimit`
 option or a `bodyLimit()` declared before `graphql(...)` gives another.
 
-**Why:** core counts the bytes as they arrive and fails the read past the
+**Why:** a declared `Content-Length` over the limit is refused by core where
+`bodyLimit()` stands, before Yoga runs: the middlewares declared before it
+run, the ones after it do not, and the 413 carries no header Yoga's plugins
+set. A chunked body is counted as it arrives and the read fails past the
 limit; the endpoint answers it as any route does, in the app's error format
-(`application/problem+json` under `errors: 'problem'`). The 413 carries the
-headers Yoga's plugins set (`Cache-Control: no-store`…), and nothing is
-logged, whatever the content type (JSON, form-urlencoded,
-`application/graphql`). The body is read by the endpoint, after the
-middlewares declared before it: they still run for an oversized body, even
-when `bodyLimit()` stands above them. Put the costly ones (a session lookup,
-a database call) late.
+(`application/problem+json` under `errors: 'problem'`), with the headers
+Yoga's plugins set (`Cache-Control: no-store`…). Nothing is logged, whatever
+the content type (JSON, form-urlencoded, `application/graphql`). Put the
+costly middlewares (a session lookup, a database call) after `bodyLimit()`.
 
 **Fix:** a client sends less, or the endpoint takes a larger limit, for an
 upload by `multipart` for example:

@@ -4,6 +4,68 @@ This page lists what each release changes for an app built on
 `@alxia/core`, the newest first: what changed, the code before and
 after, and whether it can break yours.
 
+## 0.16.0
+
+`@alxia/core` 0.16.0 refuses a request whose declared `Content-Length` is over
+the limit where `bodyLimit()` stands in the chain, not at the first read of
+the body. It can break an app that answers a refusal in its own format, or
+that counts on a middleware after `bodyLimit()` running on every request.
+`@alxia/graphql` leaves an inherited limit at the app's `bodyLimit()`. Every
+package's `@alxia/core` peer moves to `^0.16.0`.
+
+| Change | Package | Can it break your code |
+| --- | --- | --- |
+| [A declared oversize body is refused where `bodyLimit()` stands](#a-declared-oversize-body-is-refused-where-bodylimit-stands) | core | yes: a middleware after `bodyLimit()` no longer runs on it |
+| [A route that never reads its body answers 413](#a-route-that-never-reads-its-body-answers-413) | core | yes: a webhook or an `all` proxy that ignored an oversize body |
+| [`1e3` and `0x10` are not lengths](#1e3-and-0x10-are-not-lengths) | core | only a client sending such a `Content-Length` |
+
+### A declared oversize body is refused where `bodyLimit()` stands
+
+Before, a `Content-Length` over the limit failed the first read of the body,
+so every middleware ran first, and one that caught the `ContentTooLargeError`
+could answer in its own format wherever it stood. Now the refusal is a step:
+
+- the last `bodyLimit()` in force for the route, or
+- the head of the route's own middlewares, for a `bodyLimit` option, or
+- where a plugin declared it, for its routes.
+
+The middlewares before that step run. The ones after it and the handler do
+not. A chunked body is unchanged: it is cut at the read.
+
+```ts
+// before: the catcher stood after bodyLimit() and still caught the refusal
+const app = alxia()
+	.bodyLimit(64 * 1024)
+	.use(limits)
+	.post('/api', handler);
+
+// after: move the catcher above bodyLimit()
+const app = alxia()
+	.use(limits)
+	.bodyLimit(64 * 1024)
+	.post('/api', handler);
+```
+
+The same goes for a logger or a metrics middleware that must see the
+refused request: give it before `bodyLimit()`. Nothing else changes: the
+answer is the same 413 `ContentTooLargeBody`, or the problem under
+`errors: 'problem'`.
+
+### A route that never reads its body answers 413
+
+A route that did not read its body (a webhook that only checks a header, an
+`all` route that proxies) used to answer as usual to a request declaring a
+body over its limit, since nothing read the body. It now answers 413. Raise the
+limit with a `bodyLimit` option on that route, or declare it before the
+`bodyLimit()` that sets the lower one.
+
+### `1e3` and `0x10` are not lengths
+
+`Content-Length` is plain digits. The read used to take `Number()` of the
+header, so `1e3` and `0x10` were refused unread as 1000 and 16 bytes. Both
+are now treated as no declared length: the body is counted as it arrives,
+as a chunked one is. A value that is not digits is not refused early.
+
 ## 0.14.2
 
 `@alxia/core` 0.14.2 documents `ctx.server`, the `Bun.Server` serving the request,

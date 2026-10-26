@@ -11,11 +11,7 @@ Nothing in progress.
 
 ## Next
 
-- **A declared oversize body refused where `bodyLimit()` stands.** Today the
-  body is read, and refused, by the endpoint, after every middleware declared
-  before it. Core would answer a `Content-Length` past the limit at the
-  `bodyLimit()` call, so the middlewares after it never run for such a
-  request. It lives in `@alxia/core`.
+Nothing scheduled yet.
 
 ## Later
 
@@ -28,6 +24,15 @@ Nothing in progress.
   for a `POST`.
 
 ## Shipped
+
+### 0.9.2
+
+- **A declared oversize body refused where `bodyLimit()` stands.** With
+  `@alxia/core` 0.16.0, a `Content-Length` past the limit is refused at the
+  app's `bodyLimit()`, before the middlewares after it, and the endpoint
+  leaves an inherited limit there. The endpoint's own `bodyLimit` option, or
+  the 1 MiB default, refuses at the head of the endpoint's steps. A chunked
+  body is still refused at the read, with Yoga's headers.
 
 ### 0.9.0
 

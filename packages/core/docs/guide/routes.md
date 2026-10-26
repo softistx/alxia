@@ -619,11 +619,25 @@ The limit is a whole number of bytes, 0 or more. Any other value throws a
 `TypeError` when the route is declared:
 `POST /upload: bodyLimit must be a whole number of bytes, 0 or more; got -1`.
 
-How a body is held to it, without reading it whole:
+How a body is held to it, without reading it whole, in three steps:
 
-1. **`Content-Length` first.** A declared length over the limit is refused
-   without reading a byte.
-2. **Then a count.** Without a `Content-Length`, as with a chunked upload,
+1. **Where it is refused.** The check of a declared `Content-Length` sits in
+   the chain, at one place per route:
+   - at the **last `bodyLimit()` in force** for a route that has none of its
+     own (the app's, or the group's inside a group): the middlewares given
+     to `use` before it run, the ones after it and the handler do not;
+   - at the **head of a route's own middlewares** when it has a `bodyLimit`
+     option, after everything given to `use`;
+   - for a **plugin's route**, where the plugin declared it: the app's
+     `bodyLimit()` never reaches it.
+
+   A request with no body, a `Content-Length` that is not plain digits
+   (`-1`, `1e3`, `0x10`, `8, 8`) or a chunked body is not refused there: the
+   count below decides. A length exactly at the limit passes.
+2. **`Content-Length` first.** A declared length over the limit is refused at
+   that place without reading a byte: it throws a `ContentTooLargeError`
+   there, so a middleware that stands **before** `bodyLimit()` catches it.
+3. **Then a count.** Without a `Content-Length`, as with a chunked upload,
    or with a false one, the bytes are counted as they arrive. The read fails
    at the first chunk that passes the limit and the rest is never pulled. A
    body of exactly `bodyLimit` bytes is read.
@@ -649,11 +663,15 @@ Its body is the exported `ContentTooLargeBody`. Every route under a limit
 may answer it: declare it there in the OpenAPI document. A route with no limit never answers it, and reads its body as it
 always has.
 
-What the read throws is a `ContentTooLargeError`, an `HttpError` with the
-route's `limit`. It is a refusal, as a 400 is: a middleware before the
-route catches it, `refusalOf(error)` reads `{ kind: 'body_limit', limit }`,
-and it may answer in another format, such as an RFC 9457 problem. Nobody
-catches it, and the answer is the default 413.
+What the check or the read throws is a `ContentTooLargeError`, an
+`HttpError` with the route's `limit`. It is a refusal, as a 400 is: a
+middleware that stands **before** `bodyLimit()` (or before the route, for a
+`bodyLimit` option) catches it, `refusalOf(error)` reads
+`{ kind: 'body_limit', limit }`, and it may answer in another format, such
+as an RFC 9457 problem. A middleware after `bodyLimit()` does not run on a
+declared oversize body, so it never catches that one (it still catches the
+counted refusal of a chunked body). Nobody catches it, and the answer is the
+default 413.
 
 ```ts
 import { alxia, defineMiddleware, problem, refusalOf, validate } from '@alxia/core';
@@ -670,7 +688,7 @@ const limits = defineMiddleware(async (_ctx, next) => {
 });
 
 const api = alxia()
-	.use(limits)
+	.use(limits) // before the limit, or it never sees a declared oversize body
 	.post('/api', { bodyLimit: 10_000_000 }, validate({ body: z.unknown() }), ({ reply }) => reply(200, 'ok'));
 // a body past 10 MB → 413, application/problem+json:
 // { "type": "urn:ietf:params:jmap:error:limit", "status": 413, "limit": "maxSizeRequest" }
