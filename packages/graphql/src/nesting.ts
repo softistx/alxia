@@ -6,20 +6,20 @@
  * nesting first, without recursing.
  */
 
-/** The most levels of `{`, `(` and `[` a document may nest, unless `maxDepth` says otherwise. */
-export const DEFAULT_MAX_DEPTH = 1000;
+/** The most levels of `{`, `(` and `[` a document may nest, unless `maxNesting` says otherwise. */
+export const DEFAULT_MAX_NESTING = 1000;
 
-/** `maxDepth` checked where `graphql()` is declared. */
-export function depthLimit(
-	maxDepth: number | false | undefined,
+/** `maxNesting` checked where `graphql()` is declared. */
+export function nestingLimit(
+	maxNesting: number | false | undefined,
 ): number | false {
-	if (maxDepth === undefined) return DEFAULT_MAX_DEPTH;
-	if (maxDepth === false) return false;
-	if (typeof maxDepth === 'number' && Number.isSafeInteger(maxDepth)) {
-		if (maxDepth > 0) return maxDepth;
+	if (maxNesting === undefined) return DEFAULT_MAX_NESTING;
+	if (maxNesting === false) return false;
+	if (typeof maxNesting === 'number' && Number.isSafeInteger(maxNesting)) {
+		if (maxNesting > 0) return maxNesting;
 	}
 	throw new TypeError(
-		`graphql(app, { maxDepth }): maxDepth is the most levels of { ( [ a document may nest, a positive whole number, or false for none; got ${String(maxDepth)}`,
+		`graphql(app, { maxNesting }): maxNesting is the most levels of { ( [ a document may nest, a positive whole number, or false for none; got ${String(maxNesting)}`,
 	);
 }
 

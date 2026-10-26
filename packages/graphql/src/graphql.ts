@@ -126,7 +126,7 @@ export interface GraphQLOptions<
 	 * `maxTokens`. A document that overflows it anyway is refused the same
 	 * way.
 	 */
-	readonly maxDepth?: number | false;
+	readonly maxNesting?: number | false;
 	/**
 	 * The cache of parsed documents, one per endpoint, weighed by its tokens and bytes:
 	 * `maxBytes` (64 MiB by default), `max` documents (1 024) and `ttl`
@@ -195,12 +195,12 @@ export function graphql<
 		sandbox,
 		ws = false,
 		maxTokens,
-		maxDepth,
+		maxNesting,
 		parseCache,
 		bodyLimit,
 		...yogaOptions
 	} = options;
-	const limits = resolveLimits(maxTokens, maxDepth, parseCache, yogaOptions);
+	const limits = resolveLimits(maxTokens, maxNesting, parseCache, yogaOptions);
 	const page = graphiql ?? true;
 	const yogaAt = yogaServers<UserCtx>(
 		{

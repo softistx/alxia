@@ -1,14 +1,14 @@
 /**
- * `maxDepth`: graphql-js parses by recursion and overflows the stack a few
+ * `maxNesting`: graphql-js parses by recursion and overflows the stack a few
  * thousand levels down, under `maxTokens`. A document nested past the limit
  * is refused as any document it cannot parse is (`GRAPHQL_PARSE_FAILED`),
  * over POST, GET and a batch, never logged and never a 500.
  */
-import { describe, expect, test } from 'bun:test';
+import { afterEach, describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
-import { createSchema } from 'graphql-yoga';
+import { createSchema, type Plugin } from 'graphql-yoga';
 import { type GraphQLOptions, graphql } from './graphql';
-import { DEFAULT_MAX_DEPTH, depthLimit, tooDeepAt } from './nesting';
+import { DEFAULT_MAX_NESTING, nestingLimit, tooDeepAt } from './nesting';
 
 const schema = createSchema({
 	typeDefs: /* GraphQL */ 'type Query { ping: String, a: Query }',
@@ -56,7 +56,7 @@ interface Answer {
 	errors?: { message: string; extensions: { code: string } }[];
 }
 
-describe('graphql({ maxDepth })', () => {
+describe('graphql({ maxNesting })', () => {
 	test('9 000 levels, under maxTokens, are a 400 parse failure, nothing logged', async () => {
 		const { app, errors } = serve();
 		const query = nested(9000);
@@ -83,7 +83,7 @@ describe('graphql({ maxDepth })', () => {
 	});
 
 	test('1 000 levels run, 1 001 are refused', async () => {
-		expect(DEFAULT_MAX_DEPTH).toBe(1000);
+		expect(DEFAULT_MAX_NESTING).toBe(1000);
 		const { app, errors } = serve();
 		const ran = await post(app, { query: nested(1000) });
 		expect(ran.status).toBe(200);
@@ -123,20 +123,20 @@ describe('graphql({ maxDepth })', () => {
 		expect(errors).toEqual([]);
 	});
 
-	test('maxDepth caps at the number given', async () => {
-		const { app } = serve({ maxDepth: 5 });
+	test('maxNesting caps at the number given', async () => {
+		const { app } = serve({ maxNesting: 5 });
 		expect((await post(app, { query: nested(5) })).status).toBe(200);
 		expect((await post(app, { query: nested(6) })).status).toBe(400);
 	});
 
-	test('maxDepth: false turns the scan off', async () => {
-		const { app, errors } = serve({ maxDepth: false });
+	test('maxNesting: false turns the scan off', async () => {
+		const { app, errors } = serve({ maxNesting: false });
 		expect((await post(app, { query: nested(1001) })).status).toBe(200);
 		expect(errors).toEqual([]);
 	});
 
 	test('a document that still overflows the stack is a 400, never a 500', async () => {
-		const { app, errors } = serve({ maxDepth: false, maxTokens: false });
+		const { app, errors } = serve({ maxNesting: false, maxTokens: false });
 		const refused = await post(app, { query: unclosed(30_000) });
 		expect(refused.status).toBe(400);
 		const body = (await refused.json()) as Answer;
@@ -148,7 +148,7 @@ describe('graphql({ maxDepth })', () => {
 	});
 
 	test('brackets in strings, block strings and comments do not count', async () => {
-		const { app } = serve({ maxDepth: 3 });
+		const { app } = serve({ maxNesting: 3 });
 		const text = '{{{{{{{{{{';
 		const queries = [
 			`{ a(x: "${text}") { ping } }`,
@@ -164,11 +164,26 @@ describe('graphql({ maxDepth })', () => {
 		}
 	});
 
+	test('a RangeError that is not the call stack is not turned into the nesting error', async () => {
+		const failing: Plugin = {
+			onParse({ setParseFn }) {
+				setParseFn(() => {
+					throw new RangeError('Invalid string length');
+				});
+			},
+		};
+		const { app } = serve({ plugins: [failing] });
+		const response = await post(app, { query: '{ ping }' });
+		const text = await response.text();
+		expect(text).not.toMatch(/nested/);
+		expect(text).not.toMatch(/GRAPHQL_PARSE_FAILED/);
+	});
+
 	for (const bad of [0, -1, 1.5, Number.NaN, '10']) {
-		test(`maxDepth: ${String(bad)} is refused at declaration`, () => {
-			expect(() => serve({ maxDepth: bad as never })).toThrow(
+		test(`maxNesting: ${String(bad)} is refused at declaration`, () => {
+			expect(() => serve({ maxNesting: bad as never })).toThrow(
 				new TypeError(
-					`graphql(app, { maxDepth }): maxDepth is the most levels of { ( [ a document may nest, a positive whole number, or false for none; got ${String(bad)}`,
+					`graphql(app, { maxNesting }): maxNesting is the most levels of { ( [ a document may nest, a positive whole number, or false for none; got ${String(bad)}`,
 				),
 			);
 		});
@@ -194,9 +209,70 @@ describe('tooDeepAt', () => {
 		expect(tooDeepAt('"{{{\n{ {', 1)).toBe(7);
 	});
 
-	test('depthLimit defaults to 1 000', () => {
-		expect(depthLimit(undefined)).toBe(1000);
-		expect(depthLimit(false)).toBe(false);
-		expect(depthLimit(7)).toBe(7);
+	test('nestingLimit defaults to 1 000', () => {
+		expect(nestingLimit(undefined)).toBe(1000);
+		expect(nestingLimit(false)).toBe(false);
+		expect(nestingLimit(7)).toBe(7);
+	});
+});
+
+describe('graphql({ maxNesting, ws })', () => {
+	let stop: (() => Promise<void>) | undefined;
+	afterEach(async () => {
+		await stop?.();
+		stop = undefined;
+	});
+
+	test('a too-deep subscribe is an error message, the socket stays open, nothing is logged', async () => {
+		const { errors, logging } = (() => {
+			const errors: unknown[][] = [];
+			return {
+				errors,
+				logging: {
+					debug() {},
+					info() {},
+					warn() {},
+					error: (...args: unknown[]) => void errors.push(args),
+				},
+			};
+		})();
+		const app = graphql(alxia(), {
+			schema,
+			ide: false,
+			ws: true,
+			logging,
+		} as never);
+		const server = app.listen({ port: 0, signals: false });
+		stop = () => app.stop(true);
+		const url = new URL('/graphql', server.url);
+		url.protocol = 'ws:';
+		const socket = new WebSocket(url, 'graphql-transport-ws');
+		const received: { type: string; id?: string; payload?: unknown }[] = [];
+		socket.onmessage = (event) => received.push(JSON.parse(String(event.data)));
+		await new Promise((resolve) => {
+			socket.onopen = resolve;
+		});
+		const next = async (type: string) => {
+			for (let i = 0; i < 200; i++) {
+				const found = received.find((message) => message.type === type);
+				if (found !== undefined) return found;
+				await Bun.sleep(10);
+			}
+			throw new Error(`no ${type} message`);
+		};
+		socket.send(JSON.stringify({ type: 'connection_init' }));
+		await next('connection_ack');
+		socket.send(
+			JSON.stringify({
+				id: '1',
+				type: 'subscribe',
+				payload: { query: nested(9000) },
+			}),
+		);
+		const error = await next('error');
+		expect(JSON.stringify(error.payload)).toMatch(/GRAPHQL_PARSE_FAILED/);
+		expect(socket.readyState).toBe(WebSocket.OPEN);
+		expect(errors).toEqual([]);
+		socket.close();
 	});
 });

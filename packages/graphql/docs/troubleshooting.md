@@ -345,25 +345,25 @@ message. A document that overflowed the stack anyway is worded `Syntax Error:
 Document is nested too deeply to parse.`
 
 **Why:** a document may nest 1 000 levels of `{`, `(` and `[` by default
-(`maxDepth`). graphql-js parses by recursion and overflows the stack a few
+(`maxNesting`). graphql-js parses by recursion and overflows the stack a few
 thousand levels down, under `maxTokens`; without the limit that was a 500
 `Unexpected error.`, logged. A real query nests a dozen levels, so this is
 a hostile or generated document.
 
 **Fix:** if a generated query really nests deeper, raise the limit, within
-what your runtime's stack parses (about 5 000 levels on Bun, fewer on
-Node), or turn it off:
+what your runtime's stack parses (several thousand levels: about 10 000 on
+Bun's main thread, fewer in a Worker), or turn it off:
 
 ```ts
-graphql(app, { schema, maxDepth: 2_000 }); // or false
+graphql(app, { schema, maxNesting: 2_000 }); // or false
 ```
 
-### `TypeError: graphql(app, { maxDepth }): maxDepth is the most levels of { ( [ a document may nest, a positive whole number, or false for none; got …`
+### `TypeError: graphql(app, { maxNesting }): maxNesting is the most levels of { ( [ a document may nest, a positive whole number, or false for none; got …`
 
-**When:** declaring `graphql(app, { maxDepth })` with `0`, a negative number,
+**When:** declaring `graphql(app, { maxNesting })` with `0`, a negative number,
 a fraction, `NaN` or a string.
 
-**Why:** `maxDepth` is a count of nesting levels.
+**Why:** `maxNesting` is a count of nesting levels.
 
 **Fix:** a positive whole number, or `false` for no limit.
 
