@@ -192,7 +192,10 @@ otherwise — and the subscription goes on or completes as over HTTP. A
 query that does not parse or validate is answered with an `error`
 message, the protocol's, and the socket stays open. `maxTokens` applies to
 each operation: a `subscribe` message holding a longer document gets that
-`error`, `Document contains more than 15000 tokens`.
+`error`, `Document contains more than 15000 tokens`. `maxNesting` applies to
+each `subscribe` operation the same way: a document nested deeper gets an
+`error` message carrying `GRAPHQL_PARSE_FAILED`, the socket stays open and
+nothing is logged.
 
 `bodyLimit` does not reach the socket: a `subscribe` message is bounded by
 Bun's `maxPayloadLength` (16 MiB by default), not by the 1 MiB a `POST` body
