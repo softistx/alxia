@@ -23,7 +23,14 @@ same<Equal<StepUpVia, StepUpByEmail<never>['via'] | StepUpByApp<never>['via']>>(
 	true,
 );
 
-const codes: readonly JanusErrorCode[] = [
+// `MAIL_THROTTLED` came after @nxgt/janus 0.17.1, the floor CI's "Floor peers"
+// job installs (the floor of `@alxia/janus`'s peer range): a janus without it is
+// let through here, so this one code is checked by the lock's janus alone.
+type Code =
+	| JanusErrorCode
+	| ('MAIL_THROTTLED' extends JanusErrorCode ? never : 'MAIL_THROTTLED');
+
+const codes: readonly Code[] = [
 	INVALID_CODE,
 	...CHALLENGE_OVER,
 	...STEP_UP_OVER,
