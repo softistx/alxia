@@ -1,5 +1,13 @@
 # @alxia/graphql
 
+## 0.9.2
+
+### Patch Changes
+
+- [#342](https://github.com/softistx/alxia/pull/342) [`10a27ed`](https://github.com/softistx/alxia/commit/10a27edf358bba5188a5ec59d37d5031a273b0df) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The endpoint leaves a limit inherited from the app's `bodyLimit()` where that call stands, so core refuses a declared oversize body there, before the middlewares after it. Only the `bodyLimit` option, or the 1 MiB default when nothing is inherited, gives the endpoint's `POST` a limit of its own. A declared oversize `POST` now gets core's 413, without the headers Yoga's plugins set (for example `Cache-Control: no-store`); a chunked body keeps them. Needs `@alxia/core` 0.16.0.
+- Updated dependencies [[`c327cfd`](https://github.com/softistx/alxia/commit/c327cfd802fc87fe6f5405c0531338b3ecff1a61)]:
+  - @alxia/core@0.16.0
+
 ## 0.9.1
 
 ### Patch Changes
