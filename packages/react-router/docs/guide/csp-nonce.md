@@ -64,11 +64,13 @@ export {
 It reads `nonceOf(loadContext)` by default; `createEntry({ nonce })`
 takes another source ([the entry](document.md#the-entry)).
 
-The root passes nothing: `<Links>`, `<Scripts>` and `<ScrollRestoration>`
-fall back to the nonce `<ServerRouter nonce>` put in React Router's
-framework context, so their `nonce` props are optional with this entry.
-`useNonce()` stays for what the app inserts itself: an `InlineScript`, a
-`CspNonceMeta`, any other script or style.
+`<Scripts>` and `<ScrollRestoration>` fall back to the nonce `<ServerRouter
+nonce>` put in React Router's framework context, so they need no `nonce` prop
+with this entry. `<Links>` needs `<Links nonce={useNonce()} />`: it does not
+suppress the hydration warning for its development critical-CSS `<style>`
+([why](document.md#what-react-router-renders)). `useNonce()` also serves what
+the app inserts itself: an `InlineScript`, a `CspNonceMeta`, any other script
+or style.
 
 ### An entry of your own
 
