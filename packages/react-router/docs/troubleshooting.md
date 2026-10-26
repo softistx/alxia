@@ -80,6 +80,8 @@ a loader, a message React Router or the browser prints, or an error from
 - [`TypeError: sessionCookies(): the … name "…" already carries a prefix. Pass the base name: the package adds __Host- (session) or __Secure- (challenge) when secure is true.`](#typeerror-sessioncookies-the--name--already-carries-a-prefix-pass-the-base-name-the-package-adds-__host--session-or-__secure--challenge-when-secure-is-true)
 - [`TypeError: sessionCookies(): challengeSeconds must be a positive integer; got ….`](#typeerror-sessioncookies-challengeseconds-must-be-a-positive-integer-got-)
 - [`TypeError: sessionCookies(): challengePath must start with "/" and hold no ";" or control character; got ….`](#typeerror-sessioncookies-challengepath-must-start-with--and-hold-no--or-control-character-got-)
+- [`TypeError: signInFlow(): paths.… must be a path of this site with no query or fragment, starting with a single "/"; got ….`](#typeerror-signinflow-paths-must-be-a-path-of-this-site-with-no-query-or-fragment-starting-with-a-single--got-)
+- [`TypeError: signInFlow(): the code "…" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`](#typeerror-signinflow-the-code--is-both-the-wrong-code-code-codesinvalidcode-and-in-codeschallengeover-a-wrong-code-that-leaves-tries-cannot-end-the-challenge)
 - [`TypeError: serializeCookie(): the name "…" is not a cookie name (an RFC 6265 token).`](#typeerror-serializecookie-the-name--is-not-a-cookie-name-an-rfc-6265-token)
 - [`TypeError: serializeCookie(): the path "…" is not a cookie path: it must start with "/" and hold no ";" or control character.`](#typeerror-serializecookie-the-path--is-not-a-cookie-path-it-must-start-with--and-hold-no--or-control-character)
 
@@ -1642,6 +1644,49 @@ TypeError: sessionCookies(): challengePath must start with "/" and hold no ";" o
 **Why:** `challengePath`, where the browser sends the challenge cookie, is a relative path such as `'sign-in'` (a cookie's `Path` must be absolute, or the browser ignores it), or it holds a `;` or a control character, which would open another attribute of the `Set-Cookie` header.
 
 **Fix:** pass the path of the sign-in pages with its leading slash. The default is `'/sign-in'`, which covers `/sign-in` and the pages under it; not `/sign-in/code` alone, since a client navigation fetches `/sign-in/code.data`, which that path would not match.
+
+### `TypeError: signInFlow(): paths.… must be a path of this site with no query or fragment, starting with a single "/"; got ….`
+
+```
+TypeError: signInFlow(): paths.secondFactor must be a path of this site with no query or fragment, starting with a single "/"; got "sign-in/code".
+```
+
+**When:** the server starts, or the module that calls `signInFlow` is imported.
+
+**Why:** `paths.signIn` or `paths.secondFactor` (the message names which) is relative, empty, starts with `//` or `/\`, which a redirect reads as another site, or holds a query (`?`) or a fragment (`#`), which the flow appends to (`?next=`, `?signed-out=1`). The flow redirects to these paths.
+
+**Fix:** pass the page's path with its leading slash, or leave `paths` out for `/sign-in` and `/sign-in/second-factor`:
+
+```ts
+import { signInFlow } from '@alxia/react-router/session';
+
+export const signIn = signInFlow({
+	// …
+	paths: { secondFactor: '/sign-in/code' },
+});
+```
+
+### `TypeError: signInFlow(): the code "…" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`
+
+```
+TypeError: signInFlow(): the code "auth.errors.invalid-code" is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.
+```
+
+**When:** the server starts, or the module that calls `signInFlow` is imported.
+
+**Why:** `codes.invalidCode`, the refusal of a wrong code, also appears in `codes.challengeOver`, the codes that end the challenge. The flow could not tell whether a refused code leaves tries or sends the user back to the password.
+
+**Fix:** list in `challengeOver` the codes of a challenge that is gone (unknown, spent, expired) and keep the wrong-code code out of it:
+
+```ts
+signInFlow({
+	// …
+	codes: {
+		invalidCode: 'auth.errors.invalid-code',
+		challengeOver: ['auth.errors.invalid-token'],
+	},
+});
+```
 
 ### `TypeError: serializeCookie(): the name "…" is not a cookie name (an RFC 6265 token).`
 

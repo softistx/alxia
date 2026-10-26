@@ -115,6 +115,7 @@
 		"@alxia/core": "workspace:^",
 		"@alxia/openapi": "workspace:^",
 		"@nxgt/graphql-client": "^0.4.0",
+		"@nxgt/janus": "^0.29.0",
 		"@react-router/dev": "^8.5.0",
 		"@types/bun": "^1.4.2",
 		"@types/react": "^19.3.0",

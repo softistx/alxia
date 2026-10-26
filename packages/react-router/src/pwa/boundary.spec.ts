@@ -251,4 +251,13 @@ describe('/session', () => {
 		const dts = await Bun.file(join(DIST, 'session/index.d.ts')).text();
 		expect(dts).not.toContain('@alxia/core');
 	});
+
+	test('never imports @nxgt/janus, a devDependency used by a spec alone', async () => {
+		const main = await filesOf(join(DIST, 'session/index.js'));
+		for (const file of main) {
+			expect(await Bun.file(file).text()).not.toContain('@nxgt/janus');
+		}
+		const dts = await Bun.file(join(DIST, 'session/index.d.ts')).text();
+		expect(dts).not.toContain('@nxgt/janus');
+	});
 });
