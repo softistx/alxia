@@ -1,7 +1,7 @@
 {
 	"name": "@alxia/react-router",
 	"version": "0.12.1",
-	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served; the code with no UI an installable app shares (`/pwa`), its hooks (`/pwa/react`), `noCache` for the worker's script (`/pwa/server`), the service worker on Workbox (`/pwa/worker`) and its build (`/pwa/build`), an API's refusals worded for the page (`/errors`), the page's CSP nonce and inline boot scripts (`/document`) and a streaming `entry.server` (`/entry`)",
+	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served; the code with no UI an installable app shares (`/pwa`), its hooks (`/pwa/react`), `noCache` for the worker's script (`/pwa/server`), the service worker on Workbox (`/pwa/worker`) and its build (`/pwa/build`), an API's refusals worded for the page (`/errors`), the cookies of a BFF's session (`/session`) and what it shares with the page (`/session/model`), the page's CSP nonce and inline boot scripts (`/document`) and a streaming `entry.server` (`/entry`)",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -57,6 +57,11 @@
 			"import": "./dist/errors/index.js",
 			"default": "./dist/errors/index.js"
 		},
+		"./session": {
+			"types": "./dist/session/index.d.ts",
+			"import": "./dist/session/index.js",
+			"default": "./dist/session/index.js"
+		},
 		"./pwa/build": {
 			"types": "./dist/pwa/build/index.d.ts",
 			"import": "./dist/pwa/build/index.js",
@@ -97,6 +102,7 @@
 			"src/pwa/server/index.ts",
 			"src/errors/index.ts",
 			"src/session/model/index.ts",
+			"src/session/index.ts",
 			"src/document/index.ts",
 			"src/entry/index.ts",
 			"src/pwa/worker/index.ts",
