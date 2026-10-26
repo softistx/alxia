@@ -14,7 +14,7 @@ import { declareEndpoint } from './endpoint';
 import { graphqlHandler, type YogaContext, yogaServers } from './handler';
 import { reportsOperations } from './operation';
 import {
-	limitsTokens,
+	limitsParsing,
 	type ParseCacheOptions,
 	parseCaches,
 	resolveLimits,
@@ -119,6 +119,15 @@ export interface GraphQLOptions<
 	 */
 	readonly maxTokens?: number | false;
 	/**
+	 * The most levels of `{`, `(` and `[` a document may nest, 1 000 by
+	 * default, or `false` for no limit. A deeper document is refused before
+	 * the parser recurses into it, as `GRAPHQL_PARSE_FAILED`: graphql-js
+	 * overflows the stack a few thousand levels down, well under
+	 * `maxTokens`. A document that overflows it anyway is refused the same
+	 * way.
+	 */
+	readonly maxDepth?: number | false;
+	/**
 	 * The cache of parsed documents, one per endpoint, weighed by its tokens and bytes:
 	 * `maxBytes` (64 MiB by default), `max` documents (1 024) and `ttl`
 	 * milliseconds (one hour). `false` parses every request. Yoga's own
@@ -186,17 +195,18 @@ export function graphql<
 		sandbox,
 		ws = false,
 		maxTokens,
+		maxDepth,
 		parseCache,
 		bodyLimit,
 		...yogaOptions
 	} = options;
-	const tokens = resolveLimits(maxTokens, parseCache, yogaOptions);
+	const limits = resolveLimits(maxTokens, maxDepth, parseCache, yogaOptions);
 	const page = graphiql ?? true;
 	const yogaAt = yogaServers<UserCtx>(
 		{
 			...(yogaOptions as YogaServerOptions<YogaContext, UserCtx>),
 			plugins: [
-				...(tokens === false ? [] : [limitsTokens(tokens)]),
+				limitsParsing(limits.tokens, limits.depth),
 				...(yogaOptions.plugins ?? []),
 				reportsOperations(),
 			],

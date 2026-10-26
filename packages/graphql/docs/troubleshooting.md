@@ -337,6 +337,36 @@ off. Persisted operations keep clients from sending large documents at all
 graphql(app, { schema, maxTokens: 30_000 }); // or false
 ```
 
+### `Syntax Error: Document is nested more than 1000 levels deep. Parsing aborted.`
+
+**When:** a query is answered with `GRAPHQL_PARSE_FAILED` (400 under
+`application/graphql-response+json`, 200 under `application/json`) and this
+message. A document that overflowed the stack anyway is worded `Syntax Error:
+Document is nested too deeply to parse.`
+
+**Why:** a document may nest 1 000 levels of `{`, `(` and `[` by default
+(`maxDepth`). graphql-js parses by recursion and overflows the stack a few
+thousand levels down, under `maxTokens`; without the limit that was a 500
+`Unexpected error.`, logged. A real query nests a dozen levels, so this is
+a hostile or generated document.
+
+**Fix:** if a generated query really nests deeper, raise the limit, within
+what your runtime's stack parses (about 5 000 levels on Bun, fewer on
+Node), or turn it off:
+
+```ts
+graphql(app, { schema, maxDepth: 2_000 }); // or false
+```
+
+### `TypeError: graphql(app, { maxDepth }): maxDepth is the most levels of { ( [ a document may nest, a positive whole number, or false for none; got …`
+
+**When:** declaring `graphql(app, { maxDepth })` with `0`, a negative number,
+a fraction, `NaN` or a string.
+
+**Why:** `maxDepth` is a count of nesting levels.
+
+**Fix:** a positive whole number, or `false` for no limit.
+
 ### `200 {"errors":[{"message":"Unexpected error.", … "code":"INTERNAL_SERVER_ERROR"}}]}`
 
 **When:** a resolver throws an `Error`, or rejects.
