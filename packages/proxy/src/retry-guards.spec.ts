@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { ContentTooLargeError } from '@alxia/core';
 import { watchBody } from './body';
 import type { Plan } from './options';
 import { acrossUpstreams, Unreached } from './retry';
@@ -88,5 +89,39 @@ describe('watchBody, whether the body is still whole', () => {
 		const body = watchBody(source(), undefined, null);
 		await body.stream.cancel();
 		expect(body.started()).toBe(true);
+	});
+
+	describe('watchBody, a declared Content-Length read as core reads it', () => {
+		/** A three-byte body that ends. */
+		const threeBytes = () =>
+			new ReadableStream<Uint8Array>({
+				start(controller) {
+					controller.enqueue(new Uint8Array([1, 2, 3]));
+					controller.close();
+				},
+			});
+
+		const drain = async (stream: ReadableStream<Uint8Array>) => {
+			let total = 0;
+			for await (const chunk of stream) total += chunk.byteLength;
+			return total;
+		};
+
+		test('a declared length past the limit throws before a byte is read', () => {
+			expect(() => watchBody(source(), 8, '9')).toThrow(ContentTooLargeError);
+		});
+
+		test('a declared length with leading zeros is read as its value', () => {
+			expect(() => watchBody(source(), 8, '0009')).toThrow(
+				ContentTooLargeError,
+			);
+		});
+
+		for (const malformed of ['1e3', '0x10', '-1', 'abc']) {
+			test(`a malformed Content-Length ${malformed} is no declaration: the body is counted`, async () => {
+				const body = watchBody(threeBytes(), 8, malformed);
+				expect(await drain(body.stream)).toBe(3);
+			});
+		}
 	});
 });

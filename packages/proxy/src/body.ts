@@ -19,6 +19,10 @@ export interface WatchedBody {
 	readonly started: () => boolean;
 }
 
+/** Mirrors core's parse: a declared length is digits only, anything else is no declaration. */
+const declaredLength = (value: string | null) =>
+	value !== null && /^\d+$/.test(value) ? Number(value) : undefined;
+
 /**
  * `source`, pulled as the upstream reads, failing past `limit` bytes; a
  * declared `Content-Length` past it fails before a byte is read.
@@ -31,7 +35,8 @@ export function watchBody(
 	onChunk: () => void = () => {},
 ): WatchedBody {
 	let failure: unknown;
-	if (limit !== undefined && Number(declared ?? Number.NaN) > limit) {
+	const length = declaredLength(declared);
+	if (limit !== undefined && length !== undefined && length > limit) {
 		source.cancel().catch(() => {});
 		throw new ContentTooLargeError(limit);
 	}
