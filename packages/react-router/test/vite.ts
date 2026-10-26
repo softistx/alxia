@@ -5,22 +5,38 @@
  */
 import { join } from 'node:path';
 import { $ } from 'bun';
-import { createServer, preview } from 'vite';
-import type { copyFixture } from './fixture';
+import { createServer, type InlineConfig, preview } from 'vite';
+import { copyFixture } from './fixture';
 
 export type Fixture = Awaited<ReturnType<typeof copyFixture>>;
 
-/** Vite's dev server on a copy of the fixture, in this process, on a free port. */
+/**
+ * Vite's dev server on a copy of the fixture, in this process, on a free port.
+ *
+ * Vite's own config files are ignored by its watcher: a test writes one just
+ * before the server starts, and the file system event of that write can reach
+ * the watcher after it started. Vite takes it for an edit of its config and
+ * restarts the server, which starts React Router's typegen watcher a second
+ * time on a root the test is about to remove.
+ */
 export async function devServer(
 	root: string,
-	config: Parameters<typeof createServer>[0] = {},
+	{ server: serverOptions, ...config }: InlineConfig = {},
 ) {
 	const server = await createServer({
 		root,
 		configFile: join(root, 'vite.alxia.config.ts'),
 		logLevel: 'silent',
-		server: { port: 0, host: '127.0.0.1' },
 		...config,
+		server: {
+			port: 0,
+			host: '127.0.0.1',
+			...serverOptions,
+			watch: {
+				...serverOptions?.watch,
+				ignored: ['**/vite*.config.ts'],
+			},
+		},
 	});
 	await server.listen();
 	const address = server.httpServer?.address();
@@ -42,6 +58,42 @@ export async function configFile(
 		edit(await Bun.file(join(root, 'vite.alxia.config.ts')).text()),
 	);
 	return file;
+}
+
+/**
+ * A dev server on a copy of the fixture of its own, with a Vite config edited
+ * by `edit`. React Router's typegen watcher empties and rewrites
+ * `.react-router/types` of its root when it starts, so two dev servers on one
+ * root race on those files; `close` closes the server, which awaits the
+ * watcher, and only then removes the copy.
+ */
+export async function isolatedServer(
+	edit: (source: string, root: string) => string,
+	prepare: (root: string) => Promise<void> = async () => {},
+) {
+	const fixture = await copyFixture();
+	try {
+		await prepare(fixture.root);
+		const config = await configFile(fixture.root, 'isolated', (source) =>
+			edit(source, fixture.root),
+		);
+		const { server, base } = await devServer(fixture.root, {
+			configFile: config,
+		});
+		return {
+			base,
+			close: async () => {
+				try {
+					await server.close();
+				} finally {
+					await fixture.remove();
+				}
+			},
+		};
+	} catch (error) {
+		await fixture.remove();
+		throw error;
+	}
 }
 
 /** Polls `check` until it holds, or fails after `ms`. */
