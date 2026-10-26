@@ -1,0 +1,109 @@
+import type { data } from 'react-router';
+import type { ApiErrorLike } from '../errors/api-error';
+import type { ApiErrors } from '../errors/api-errors';
+import type { FormErrors } from '../errors/form-errors';
+import type { InferOutput, StandardSchemaV1 } from '../errors/standard-schema';
+import type { SessionCookies } from './cookies';
+import type { SignInAnswer, SignInFlow } from './flow-types';
+
+export interface AuthLinksOptions<L extends string> {
+	/** The app's sign-in flow: it lands the sessions a link opens. */
+	readonly signIn: SignInFlow<L>;
+	/** The same cookies the flow was built with: a reset clears the session's. */
+	readonly cookies: SessionCookies;
+	readonly errors: ApiErrors<L>;
+	/** The API's wait on mailed links. */
+	readonly throttled?: {
+		/** `'MAIL_THROTTLED'`, `@nxgt/janus`'s code, by default. */
+		readonly code?: string;
+		/** The wait in the app's words; `errors.apiErrorMessage` by default. */
+		wording?(error: ApiErrorLike, language: L): string;
+	};
+	/**
+	 * Where a new session starts, from its token (the viewer's own page): read
+	 * after the token is spent, so the sign-in lands there at once instead of
+	 * on `/`, whose redirect would push a history entry after the token's.
+	 * `/` when it is missing, throws or answers an unsafe path.
+	 */
+	start?(token: string, request: Request): Promise<string>;
+	/** Where a password reset leads; `/sign-in?password-reset=1` by default. */
+	readonly resetDone?: string;
+	/** The state a token the API refuses ends on; `'invalid'` by default. */
+	readonly invalidState?: string;
+}
+
+/** What a token page answers when it stays on the page. */
+export type LinkStayed = ReturnType<typeof data<FormErrors>>;
+
+/** A link request's answer: always "sent", whoever the e-mail is. */
+export type RequestLinkAnswer = {
+	sent?: true;
+	formError?: string;
+	/** The address refused as malformed: under the field. */
+	fieldErrors?: { email?: string };
+};
+
+export type Spent<T> =
+	| { readonly ok: true; readonly value: T }
+	/** An end state of the page: the token no longer works. */
+	| { readonly ok: false; readonly response: Response }
+	/** The page stays, with the form's refusal. */
+	| {
+			readonly ok: false;
+			readonly refusal: FormErrors;
+			readonly status: number;
+	  };
+
+export interface SpendOptions<L extends string> {
+	readonly language: L;
+	/** The page's path, without its token. */
+	readonly path: string;
+	/** The API codes that end the page, and the state each one shows. */
+	readonly states: Readonly<Partial<Record<string, string>>>;
+	/** The fields the page shows a refusal under; any other is the form's message. */
+	readonly fields?: readonly string[];
+}
+
+export interface AuthLinks<L extends string> {
+	/** The token page in an end state, without its token: `path?state=…`. */
+	statePath(path: string, state: string): string;
+	/** A redirect to a token page's end state, replacing the token's history entry. */
+	ended(path: string, state: string, headers?: HeadersInit): Response;
+	/**
+	 * The arguments a token page posted, checked against a Standard Schema. A
+	 * token the schema refuses ends on the invalid state (thrown); any other
+	 * refusal is a 400.
+	 */
+	linkArgs<S extends StandardSchemaV1>(
+		schema: S,
+		body: unknown,
+		path: string,
+	): Promise<InferOutput<S>>;
+	/** Posts a link's token with `run`: its value, else what the page answers. */
+	spendToken<T>(
+		run: () => Promise<T>,
+		options: SpendOptions<L>,
+	): Promise<Spent<T>>;
+	/** What an action answers for a refused `Spent`. */
+	answerOf(spent: Exclude<Spent<unknown>, { ok: true }>): Response | LinkStayed;
+	/**
+	 * Where a link's sign-in leads, replacing the token's history entry. The
+	 * session the browser held is revoked first; an answer that leads nowhere
+	 * (`other` included: the app handles its own `LINKED` with `ended`) is
+	 * the form's "unavailable".
+	 */
+	landByLink(
+		answer: SignInAnswer,
+		options: {
+			readonly request: Request;
+			readonly language: L;
+		},
+	): Promise<Response | LinkStayed>;
+	/** After a password reset: the browser's session revoked and cleared, then the sign-in page. */
+	afterReset(request: Request): Promise<Response>;
+	/** Requests a mail's link with `run`. */
+	requestLink(
+		run: () => Promise<unknown>,
+		language: L,
+	): Promise<ReturnType<typeof data<RequestLinkAnswer>>>;
+}

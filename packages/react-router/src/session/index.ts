@@ -18,6 +18,16 @@ export type {
 	SignInFormError,
 	SignInStayed,
 } from './flow-types';
+export { TOKEN_PAGE_HEADERS } from './link-token';
+export type {
+	AuthLinks,
+	AuthLinksOptions,
+	LinkStayed,
+	RequestLinkAnswer,
+	SpendOptions,
+	Spent,
+} from './link-types';
+export { authLinks } from './links';
 export {
 	readCookie,
 	type SerializeOptions,

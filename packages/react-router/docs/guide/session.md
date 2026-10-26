@@ -14,6 +14,7 @@ nothing and is safe in a component as well as in a loader.
 - [Signing out](#signing-out)
 - [The step-up state](#the-step-up-state)
 - [Codes and types](#codes-and-types)
+- [Pages a mail's link opens](#pages-a-mails-link-opens)
 
 ## Redirects that stay on the site
 
@@ -453,3 +454,94 @@ const via: StepUpVia = 'email';
 - `StepUpRequestAnswer` is what the server answers to a request for a challenge.
 - `StepUpConfirmAnswer` is what the server answers to a code.
 - `StepUpProps` is the shape `stepUpProps` returns; it spreads onto a step-up dialog's props.
+
+## Pages a mail's link opens
+
+A magic link, a password reset or an invitation opens a page whose URL
+carries a token. `authLinks` is the server side of those pages, built once
+beside the app's `signInFlow`:
+
+```ts
+// app/session.server.ts
+import { authLinks } from '@alxia/react-router/session';
+
+export const links = authLinks({
+	signIn, // the app's signInFlow
+	cookies, // the same sessionCookies
+	errors, // the app's createApiErrors
+	start: async (token) => (await homeOf(token)) ?? '/', // optional
+});
+```
+
+```tsx
+// app/routes/auth/magic-link.tsx
+import { data } from 'react-router';
+import { TOKEN_PAGE_HEADERS } from '@alxia/react-router/session';
+
+const PATH = '/auth/magic-link';
+
+export async function loader({ request }: Route.LoaderArgs) {
+	// Spends nothing: a mail scanner opens links first.
+	return data({ signedInAs: (await viewerOf(request))?.name ?? null }, { headers: TOKEN_PAGE_HEADERS });
+}
+
+export const headers = () => TOKEN_PAGE_HEADERS;
+
+export async function action({ request }: Route.ActionArgs) {
+	const { token } = await links.linkArgs(ConfirmArgs, await json.readJson(request), PATH);
+	const spent = await links.spendToken(() => confirmMagicLink(token), {
+		language: 'en',
+		path: PATH,
+		states: { 'auth.errors.invalid-token': 'invalid' },
+	});
+	if (!spent.ok) return links.answerOf(spent);
+	if (spent.value.status === 'LINKED') return links.ended(PATH, 'linked');
+	return links.landByLink(toAnswer(spent.value), { request, language: 'en' });
+}
+```
+
+- `TOKEN_PAGE_HEADERS` is `Referrer-Policy: no-referrer` and
+  `X-Robots-Tag: noindex, nofollow`: no `Referer` carries the token to another
+  site (a font, an image), and no search engine keeps the page. Set them on
+  the page's document and its `.data` responses.
+- `linkArgs(schema, body, path)` checks what the page posted against any
+  Standard Schema (Zod 4, Valibot, ArkType; async is fine). An issue on
+  `token` (missing, or over the API's limit: a link cut or padded on its way)
+  throws the redirect to the `invalid` end state, as an unknown token does;
+  any other issue throws a 400. `invalidState` names another state.
+- `spendToken(run, { language, path, states, fields })` runs the API call that
+  spends the token. It returns `{ ok: true, value }`, or what the page answers:
+  an API code in `states` ends the page on that state (the redirect replaces
+  the token's history entry); refused `fields` stay under the form fields the
+  page shows; any other refusal, a wait or an unreachable API, is the form's
+  message with the API's status. `answerOf(spent)` turns the refusal into the
+  action's answer. Anything that is not an API refusal is rethrown.
+- `statePath(path, state)` is `path?state=…`: the token page in an end state,
+  with no token. `ended(path, state, headers?)` is the redirect to it, replacing
+  the token's history entry (React Router's `replace`), so Back never opens
+  the token's URL again.
+- `landByLink(answer, { request, language })` signs the link in. The session
+  the browser held, whoever's, is revoked first (one browser holds one
+  session), on a `secondFactor` answer as well as a `signedIn` one. A signed-in
+  answer goes to `start(token, request)`'s path (`/` when `start` is missing,
+  throws, or answers a path off the site), so the redirect lands at once
+  instead of pushing a history entry after `/`'s own redirect. An answer that
+  leads nowhere is the form's `unavailable` with a 503. An answer of
+  `other` is one too: an app whose API can answer "linked" (no session
+  opened) tests it first and answers `ended(path, 'linked')`, which keeps the
+  browser's session.
+- `afterReset(request)` follows a password reset, which signs the account out
+  everywhere: the browser's session is revoked and its cookie cleared, then
+  the page replaces the token's entry with `resetDone` (`/sign-in?password-reset=1`
+  by default).
+- `requestLink(run, language)` requests the mail. It answers `{ sent: true }`
+  whoever the address is, so the page does not tell which addresses hold an
+  account. A wait (`throttled.code`, `MAIL_THROTTLED` by default, worded by
+  `throttled.wording` or the catalogue) is a 429, and a malformed address is
+  the `email` field's refusal.
+
+A token is never logged, worded in an error or put in a redirect: the end
+states and the sign-in's redirects carry a state or a path alone. Every path
+the helpers redirect to is checked first: `statePath` throws a `TypeError` for a
+page `path` with a query, a fragment or a host, and `authLinks` throws one for
+a `resetDone` that leaves the site.

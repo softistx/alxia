@@ -2527,3 +2527,50 @@ The browser's cookie panel shows no `__Host-` session cookie after a sign-in, or
 - another `Set-Cookie` header of the same name, set by the app, overwrites it.
 
 **Fix:** serve the app over HTTPS, and keep `secure` `true` only there. Read `cookies.names.session` for the exact name, check the response header in the network panel, and make the proxy pass `Set-Cookie` as it is. In development over HTTP, `secure: !import.meta.env.DEV` sets an unprefixed cookie instead.
+
+### authLinks(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got …
+
+`statePath`, `ended`, `linkArgs` or `spendToken` throws while a token page
+handles a request.
+
+**Why:** the page's `path` is the page without its token: the helpers add
+`?state=…` to it, and a redirect must stay on the site. A path with a query
+(`/auth/magic-link?token=…`), a fragment, a host or a second leading `/` is
+refused, which also keeps the token out of the redirect.
+
+**Fix:** pass the route's own path, as a constant:
+
+```ts
+const PATH = '/auth/magic-link';
+await links.spendToken(run, { language, path: PATH, states });
+```
+
+### authLinks(): resetDone must be a path of this site, starting with a single "/"; got …
+
+`authLinks` throws when the app starts.
+
+**Why:** `resetDone` is where a password reset leads, so it goes through the
+same check as a sign-in's `next`: a URL, `//host` or a path without its
+leading `/` is refused.
+
+**Fix:** pass a path of the app, with a query if it needs one:
+
+```ts
+authLinks({ signIn, cookies, errors, resetDone: '/sign-in?password-reset=1' });
+```
+
+### A token page's token shows in a Referer or a search result
+
+The token page's URL appears in another site's logs, or a search engine lists
+it.
+
+**Why:** the page answered without `TOKEN_PAGE_HEADERS`, or only for its
+document and not its `.data` response.
+
+**Fix:** set the headers on the route:
+
+```ts
+import { TOKEN_PAGE_HEADERS } from '@alxia/react-router/session';
+
+export const headers = () => TOKEN_PAGE_HEADERS;
+```
