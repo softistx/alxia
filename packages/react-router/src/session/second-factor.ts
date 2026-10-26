@@ -15,8 +15,8 @@ function isMethod(value: unknown): value is SecondFactorKind {
  * native form post goes back to its page, which then posts JSON; a
  * cross-site post is a 403; a body of another shape is a 400.
  */
-export async function readCodeInput<L extends string>(
-	{ options }: FlowContext<L>,
+export async function readCodeInput<L extends string, C>(
+	{ options }: FlowContext<L, C>,
 	request: Request,
 ): Promise<{ kind: SecondFactorKind; code: string }> {
 	samesitePost(options.json, request);

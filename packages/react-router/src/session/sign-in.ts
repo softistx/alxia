@@ -15,9 +15,9 @@ import {
 	viewer,
 } from './viewer';
 
-function resolve<L extends string>(
-	options: SignInFlowOptions<L>,
-): FlowContext<L> {
+function resolve<L extends string, C>(
+	options: SignInFlowOptions<L, C>,
+): FlowContext<L, C> {
 	const paths: SignInPaths = { ...SIGN_IN_PATHS, ...options.paths };
 	for (const key of ['signIn', 'secondFactor'] as const) {
 		sitePath(paths[key], { label: `signInFlow(): paths.${key}` });
@@ -47,13 +47,14 @@ function resolve<L extends string>(
  * @example
  * export const signIn = signInFlow({
  * 	cookies, errors, json,
- * 	revoke: (token, request) => execute(SignOutMutation, {}, { token }),
+ * 	revoke: (token, request, caller?: Caller) =>
+ * 		execute(SignOutMutation, {}, { token, ...caller }),
  * 	attemptsLeft: (count, language) => t('auth.attempts-left', { count }, language),
  * });
  */
-export function signInFlow<L extends string>(
-	options: SignInFlowOptions<L>,
-): SignInFlow<L> {
+export function signInFlow<L extends string, C = undefined>(
+	options: SignInFlowOptions<L, C>,
+): SignInFlow<L, C> {
 	const context = resolve(options);
 	const { options: o } = context;
 	return {
@@ -73,7 +74,7 @@ export function signInFlow<L extends string>(
 			codeRefusal(context, error, language, whenNone),
 		readCodeInput: (request) => readCodeInput(context, request),
 		codeStep,
-		revokeSession: (request) => revokeSession(context, request),
+		revokeSession: (request, o) => revokeSession(context, request, o),
 		signOut: (request, o) => signOut(context, request, o),
 		viewer: (request, read, token) => viewer(context, request, read, token),
 		requireViewer: (request, read, expiresAt) =>

@@ -16,8 +16,8 @@ export const nextParam = (request: Request): string =>
  * request that carried a session cookie says it ended when `endedParam` is
  * set.
  */
-export function signInRedirect<L extends string>(
-	{ options, paths }: FlowContext<L>,
+export function signInRedirect<L extends string, C>(
+	{ options, paths }: FlowContext<L, C>,
 	request: Request,
 ): Response {
 	const { endedParam, cookies } = options;
@@ -37,8 +37,8 @@ export function signInRedirect<L extends string>(
  * `null` when the API refuses it (a 401), `undefined` without a cookie or
  * when the API cannot tell.
  */
-export async function viewer<L extends string, V>(
-	{ options }: FlowContext<L>,
+export async function viewer<L extends string, C, V>(
+	{ options }: FlowContext<L, C>,
 	request: Request,
 	read: (token: string) => Promise<V | null>,
 	token: string | null | undefined = options.cookies.token(request),
@@ -55,8 +55,8 @@ export async function viewer<L extends string, V>(
  * The signed-in viewer, else the sign-in redirect. Its `headers` move the
  * cookie's expiry to the session's when the API moved it.
  */
-export async function requireViewer<L extends string, V>(
-	context: FlowContext<L>,
+export async function requireViewer<L extends string, C, V>(
+	context: FlowContext<L, C>,
 	request: Request,
 	read: (token: string) => Promise<V | null>,
 	expiresAt: (viewer: V) => string | null,
@@ -84,14 +84,20 @@ export async function requireViewer<L extends string, V>(
  * `to`. The body is read as JSON first: JSON and same-origin only, so
  * another site cannot sign the user out.
  */
-export async function signOut<L extends string>(
-	context: FlowContext<L>,
+export async function signOut<L extends string, C>(
+	flow: FlowContext<L, C>,
 	request: Request,
-	{ to }: { readonly to?: string | undefined } = {},
+	{
+		to,
+		context,
+	}: {
+		readonly to?: string | undefined;
+		readonly context?: C | undefined;
+	} = {},
 ): Promise<Response> {
-	const { options, paths } = context;
+	const { options, paths } = flow;
 	await options.json.readJson(request);
-	await revokeSession(context, request);
+	await revokeSession(flow, request, { context });
 	const headers = new Headers();
 	headers.append('Set-Cookie', options.cookies.destroy());
 	headers.append('Set-Cookie', options.cookies.destroyChallenge());

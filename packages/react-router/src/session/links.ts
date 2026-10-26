@@ -31,17 +31,17 @@ const RESET_DONE = '/sign-in?password-reset=1';
  * address is the `email` field's.
  */
 /** The refusal's message: the app's own wording, else `errors`'. */
-const worded = <L extends string>(
-	{ wording, errors }: LinksContext<L>,
+const worded = <L extends string, C>(
+	{ wording, errors }: LinksContext<L, C>,
 	error: ApiErrorLike,
 	language: L,
 ): string =>
 	wording?.(error, language) ?? errors.apiErrorMessage(error, language);
 
-async function requestLink<L extends string>(
-	options: LinksContext<L>,
+async function requestLink<L extends string, C>(
+	options: LinksContext<L, C>,
 	run: () => Promise<unknown>,
-	{ request, language }: Parameters<AuthLinks<L>['requestLink']>[1],
+	{ request, language }: Parameters<AuthLinks<L, C>['requestLink']>[1],
 ) {
 	const { errors } = options;
 	samesitePost(options.json, request);
@@ -93,11 +93,11 @@ async function requestLink<L extends string>(
  * export const links = authLinks({ signIn });
  * // loader: return data({ ... }, { headers: TOKEN_PAGE_HEADERS });
  */
-export function authLinks<L extends string>(
-	links: AuthLinksOptions<L>,
-): AuthLinks<L> {
+export function authLinks<L extends string, C = undefined>(
+	links: AuthLinksOptions<L, C>,
+): AuthLinks<L, C> {
 	const { signIn } = links;
-	const options: LinksContext<L> = {
+	const options: LinksContext<L, C> = {
 		...links,
 		cookies: signIn.cookies,
 		errors: signIn.errors,
@@ -114,7 +114,7 @@ export function authLinks<L extends string>(
 		spendToken: (run, o) => spendToken(options, run, o),
 		answerOf,
 		landByLink: (answer, o) => landByLink(options, answer, o),
-		afterReset: (request) => afterReset(options, resetDone, request),
+		afterReset: (request, o) => afterReset(options, resetDone, request, o),
 		requestLink: (run, o) => requestLink(options, run, o),
 	};
 }

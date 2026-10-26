@@ -35,14 +35,23 @@ export interface SignInCodes {
 	readonly challengeOver?: readonly string[] | undefined;
 }
 
-export interface SignInFlowOptions<L extends string> {
+export interface SignInFlowOptions<L extends string, C = undefined> {
 	readonly cookies: SessionCookies;
 	/** The app's `createApiErrors` instance. */
 	readonly errors: ApiErrors<L>;
 	/** The app's `jsonActions({ origin })`, so a body is read with the same CSRF check. */
 	readonly json: JsonActions;
-	/** Ends a session at the API (the app's sign-out mutation); a failure is ignored. */
-	revoke(token: string, request: Request): Promise<unknown>;
+	/**
+	 * Ends a session at the API (the app's sign-out mutation); a failure is
+	 * ignored. `context` is the caller context the step was given (`C`): the
+	 * visitor's resolved address and language, say, which a bare `Request`
+	 * cannot carry. `undefined` when the step got none.
+	 */
+	revoke(
+		token: string,
+		request: Request,
+		context: C | undefined,
+	): Promise<unknown>;
 	/** A refused code's tries left, worded ("3 tries left"). */
 	attemptsLeft(count: number, language: L): string;
 	/** The sign-in pages' paths; `SIGN_IN_PATHS` by default. */
@@ -67,7 +76,7 @@ export type SignInStayed<T extends object> = ReturnType<
 	typeof data<SignInFormError<T>>
 >;
 
-export interface SignInFlow<L extends string> {
+export interface SignInFlow<L extends string, C = undefined> {
 	/** The cookies the flow was built with. */
 	readonly cookies: SessionCookies;
 	/** The `createApiErrors` instance the flow was built with. */
@@ -109,6 +118,8 @@ export interface SignInFlow<L extends string> {
 		options: {
 			readonly request: Request;
 			readonly revokeOn?: readonly SignInStatus[] | undefined;
+			/** The caller context handed to `revoke`. */
+			readonly context?: C | undefined;
 		},
 	): Promise<Response | null>;
 	/**
@@ -128,6 +139,8 @@ export interface SignInFlow<L extends string> {
 			readonly refused?:
 				| ((error: ApiErrorLike) => Response | string | undefined)
 				| undefined;
+			/** The caller context handed to `revoke` when the answer replaces a session. */
+			readonly context?: C | undefined;
 		},
 	): Promise<Response | SignInStayed<T>>;
 	/**
@@ -153,8 +166,14 @@ export interface SignInFlow<L extends string> {
 			recover(challenge: string, code: string): Promise<SignInAnswer>;
 		},
 	): Promise<SignInAnswer>;
-	/** Ends the request's session at the API; true when it carried one. */
-	revokeSession(request: Request): Promise<boolean>;
+	/**
+	 * Ends the request's session at the API; true when it carried one.
+	 * `context` is handed to `revoke`.
+	 */
+	revokeSession(
+		request: Request,
+		options?: { readonly context?: C | undefined },
+	): Promise<boolean>;
 	/**
 	 * Revokes the session, clears its cookies and redirects (to the sign-in
 	 * page with `?signed-out=1` by default; `to` goes through `safeNext`). It
@@ -162,7 +181,11 @@ export interface SignInFlow<L extends string> {
 	 */
 	signOut(
 		request: Request,
-		options?: { readonly to?: string | undefined },
+		options?: {
+			readonly to?: string | undefined;
+			/** The caller context handed to `revoke`. */
+			readonly context?: C | undefined;
+		},
 	): Promise<Response>;
 	/**
 	 * The viewer `read` finds for the session cookie's token (or `token`):
@@ -187,8 +210,8 @@ export interface SignInFlow<L extends string> {
 }
 
 /** The options once resolved, as the flow's functions take them. */
-export interface FlowContext<L extends string> {
-	readonly options: SignInFlowOptions<L>;
+export interface FlowContext<L extends string, C = undefined> {
+	readonly options: SignInFlowOptions<L, C>;
 	readonly paths: SignInPaths;
 	readonly invalidCode: string;
 	readonly challengeOver: readonly string[];

@@ -74,8 +74,8 @@ export async function linkArgs<S extends StandardSchemaV1>(
 	throw data('Bad link request', { status: 400 });
 }
 
-export async function spendToken<L extends string, T>(
-	options: LinksContext<L>,
+export async function spendToken<L extends string, C, T>(
+	options: LinksContext<L, C>,
 	run: () => Promise<T>,
 	{ request, language, path, states, fields: shown = [] }: SpendOptions<L>,
 ): Promise<Spent<T>> {
