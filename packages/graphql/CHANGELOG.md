@@ -1,5 +1,11 @@
 # @alxia/graphql
 
+## 0.10.0
+
+### Minor Changes
+
+- [#362](https://github.com/softistx/alxia/pull/362) [`399f4dc`](https://github.com/softistx/alxia/commit/399f4dc69d073b2d3bd7f1325aa9474119c7a7ad) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `oncePerRequest(request, key, load)` loads a value at most once per request object and key, and releases it with the object (a `WeakMap`): the category of twenty items, or one DataLoader per request and key, `oncePerRequest(context, 'categories', () => new DataLoader(load))`, with no dependency added. A `load` that throws or returns a rejected promise is not kept. Additive.
+
 ## 0.9.2
 
 ### Patch Changes
