@@ -1144,7 +1144,7 @@ From `@alxia/react-router/session/react` (`react` and `react-router` are its onl
 | --- | --- |
 | `useSignOut({ action?, before? })` | `{ signOut, busy }`: posts `{}` as JSON to `action` (default `/sign-out`) after `before()`, whose failure never keeps the user signed in; `busy` until the navigation ends |
 | `SIGN_OUT_PATH`, `SignOutOptions`, `signOutAfter(before, submit)` | `/sign-out`, the options, and the step `useSignOut` is built on |
-| `useLinkParam(name, { drop? }?)`, `LinkParamOptions` | a mail link's query parameter, read once (`null` when absent or empty); `drop: true` removes it from the address bar with `history.replaceState` |
+| `useLinkParam(name, { drop?, live? }?)`, `LinkParamOptions` | a mail link's query parameter, read once (`null` when absent or empty); `drop: true` removes it from the address bar with `history.replaceState`; `live: true` follows the URL, for a parameter a redirect adds to the same mounted route |
 | `useCodeField(schema, refusal)`, `CodeField`, `CodeSchema` | a one-code field with no form library: `{ code, setCode, ref, error, check() }` over a synchronous Standard Schema; each new `refusal` object clears the refused code and focuses the input |
 | `useOnRefusal(refusal, handler)` | the core under it, for any form library: `handler` runs once per new refusal, not for one present at mount |
 
@@ -1152,6 +1152,7 @@ From `@alxia/react-router/session/react` (`react` and `react-router` are its onl
 import { useLinkParam, useSignOut } from '@alxia/react-router/session/react';
 
 const token = useLinkParam('token', { drop: true });
+const linked = useLinkParam('state', { live: true }); // follows a redirect to this same route
 const { signOut, busy } = useSignOut();
 ```
 
