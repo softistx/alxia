@@ -7,7 +7,12 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
-Nothing planned.
+- **`@alxia/react-router/session/react`: the page's hooks around the session
+  flows.** `useSignOut`, `useLinkParam` (a mail link's parameter, read once and
+  optionally dropped from the address bar) and `useCodeField` /
+  `useOnRefusal` (a one-code field that clears and refocuses on each refusal),
+  so an app stops carrying its own copies. See the
+  [session guide](guide/session.md#the-pages-hooks).
 
 ## Next
 

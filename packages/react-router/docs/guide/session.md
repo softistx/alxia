@@ -6,12 +6,15 @@ holds the API's session token in an HttpOnly cookie of its own. The browser
 never sees the token; the app sends it to the API as a bearer, on the user's
 behalf.
 
-It covers two subpaths:
+It covers three subpaths:
 
 - `@alxia/react-router/session`, the server side: the cookies, the sign-in
   flow, the step-up and the pages a mail's link opens. It imports
   `react-router` and `/errors`' files, nothing else, knows no API client and
   adds no peer.
+- `@alxia/react-router/session/react`, the page's hooks around those flows:
+  signing out, a mail link's parameter and a one-code field. They import
+  `react` and `react-router`, both already peers.
 - `@alxia/react-router/session/model`, the part that imports nothing and is
   safe in a component as well as in a loader: redirects that stay on the
   site, the sign-in pages' paths, and the step-up's state.
@@ -31,6 +34,7 @@ instead.
 - [Signing out](#signing-out)
 - [Step-up](#step-up)
 - [Pages a mail's link opens](#pages-a-mails-link-opens)
+- [The page's hooks](#the-pages-hooks)
 - [The types and the rest of `/session/model`](#the-types-and-the-rest-of-sessionmodel)
 
 ## A complete sign-in
@@ -948,6 +952,131 @@ harmless because it goes only to the URL the browser already holds, on this
 site, as a GET that spends nothing; the token is no further from the user than
 it was in the address bar, and the page's `TOKEN_PAGE_HEADERS` still keep it
 out of any `Referer`.
+
+## The page's hooks
+
+`@alxia/react-router/session/react` holds the three client pieces every app
+writes around the flows above. It imports `react` and `react-router` (peers
+the package already has) and nothing else; every hook renders on the server.
+
+### `useSignOut`
+
+Posts `{}` as JSON to the sign-out route (the one `signIn.signOut` serves; JSON
+and same-origin only), wherever the control is. `busy` is true from the call
+until the navigation it starts has ended, so the button can show it.
+
+```tsx
+import { useSignOut } from '@alxia/react-router/session/react';
+
+export function SignOutButton() {
+	const { signOut, busy } = useSignOut();
+	return (
+		<button type="button" onClick={signOut} disabled={busy}>
+			{busy ? 'Signing out…' : 'Sign out'}
+		</button>
+	);
+}
+```
+
+Options: `action` (the route, default `/sign-out`) and `before`, run before the
+post, for what must be gone from a shared device first. A `before` that throws
+or rejects never keeps the user signed in: the sign-out goes on.
+
+```tsx
+const { signOut } = useSignOut({
+	action: '/account/sign-out',
+	before: () => caches.keys().then((keys) => Promise.all(keys.map((k) => caches.delete(k)))),
+});
+```
+
+### `useLinkParam`
+
+Reads the query parameter a mail's link carries, once: the first render's value
+is kept for the page's life. With `drop: true` the parameter is then removed
+from the address bar (`history.replaceState`, keeping the history state and the
+hash), so a token is not left in the history, a bookmark or a screenshot. It is
+`null` when the parameter is absent or empty.
+
+```tsx
+import { useLinkParam } from '@alxia/react-router/session/react';
+
+export default function ResetPassword() {
+	const token = useLinkParam('token', { drop: true });
+	if (!token) return <p>This link is not valid. Ask for a new one.</p>;
+	return (
+		<form method="post">
+			<input type="hidden" name="token" value={token} />
+			<input type="password" name="password" autoComplete="new-password" />
+			<button type="submit">Choose a new password</button>
+		</form>
+	);
+}
+```
+
+The router's own location is not updated by `replaceState`: a loader or
+`useSearchParams` elsewhere still sees the token until the next navigation.
+Read it with the hook once, and pass it down.
+
+### `useCodeField` and `useOnRefusal`
+
+A form that asks for one code (an authenticator app's, a recovery code) and
+whose action answers a refusal object when the code is wrong: on each new
+refusal the refused code goes and the field takes focus, for the next try. A
+refusal already there when the component mounted is the page's own and is
+ignored.
+
+`useCodeField(schema, refusal)` needs no form library. `schema` is any
+[Standard Schema](https://standardschema.dev) (Zod, Valibot, ArkType; a
+synchronous one). It returns `code`, `setCode`, `ref` (put it on the input),
+`error` (the first message of the last `check()`, cleared by typing) and
+`check()` (the parsed value, or `undefined` with `error` set).
+
+```tsx
+import { useCodeField } from '@alxia/react-router/session/react';
+import { TOTP_CODE } from '@alxia/react-router/session/model';
+import { Form, useActionData } from 'react-router';
+import { z } from 'zod';
+
+const schema = z.string().regex(TOTP_CODE, 'Six digits');
+
+export function CodeForm() {
+	const refusal = useActionData<object>(); // a new object on each refusal
+	const field = useCodeField(schema, refusal);
+	return (
+		<Form method="post" onSubmit={(event) => { if (field.check() === undefined) event.preventDefault(); }}>
+			<input
+				ref={field.ref}
+				name="code"
+				inputMode="numeric"
+				autoComplete="one-time-code"
+				value={field.code}
+				onChange={(event) => field.setCode(event.target.value)}
+			/>
+			{field.error ? <p role="alert">{field.error}</p> : null}
+			<button type="submit">Confirm</button>
+		</Form>
+	);
+}
+```
+
+An app on react-hook-form keeps its form and its resolver and uses the part
+underneath, `useOnRefusal(refusal, handler)`, which calls `handler` once per
+new refusal:
+
+```tsx
+import { useOnRefusal } from '@alxia/react-router/session/react';
+import { useForm } from 'react-hook-form';
+
+const form = useForm({ defaultValues: { code: '' } /* , resolver */ });
+useOnRefusal(refusal, () => {
+	form.setValue('code', '');
+	form.setFocus('code');
+});
+```
+
+The package takes no form library as a peer: react-hook-form would also need
+its resolver for the schema, and a library-agnostic core serves every form
+library at the price of three lines.
 
 ## The types and the rest of `/session/model`
 
