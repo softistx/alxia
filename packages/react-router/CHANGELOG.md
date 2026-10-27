@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.18.0
+
+### Minor Changes
+
+- [#359](https://github.com/softistx/alxia/pull/359) [`9ce17b0`](https://github.com/softistx/alxia/commit/9ce17b0c76880c637620a6226631ca2dd25353e3) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `useLinkParam(name, { live: true })` follows the URL instead of reading the parameter once, so a parameter that a redirect or a link adds to the same mounted route (`?state=linked` after a mail-link action) is seen. Without `drop` it returns the parameter of the current location. With `drop` the value is kept after the address bar loses it, until a location carries a new one, and each new location is dropped again. Additive: the default stays a single read of the first render. `LinkParamOptions` gains `live?: boolean`.
+
 ## 0.17.0
 
 ### Minor Changes
