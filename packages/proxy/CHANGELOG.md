@@ -1,5 +1,11 @@
 # @alxia/proxy
 
+## 0.4.7
+
+### Patch Changes
+
+- [#366](https://github.com/softistx/alxia/pull/366) [`a45c5e1`](https://github.com/softistx/alxia/commit/a45c5e12c4c0eecd6086a2d462871c38e8403b7e) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `proxy.ws()` fails over again on Bun 1.4.4: a refused or unresolved connect now goes to the next upstream. Bun 1.4.4 closes every failed WebSocket connect with 1006 and an empty reason, and names a failed connect in the `error` event's `error.code` (`ECONNREFUSED`, `ENOTFOUND`); the proxy reads that code, and still reads the `Failed to connect` reason of earlier Bun versions.
+
 ## 0.4.6
 
 ### Patch Changes
