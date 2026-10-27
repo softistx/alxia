@@ -16,7 +16,9 @@
  * The project resolves what a consumer's would: `.docs-check/node_modules`
  * links every `@alxia/*` package (its `exports`, so `dist/`: build first) and
  * the dependencies the workspace installed under `packages/*`, `zod`,
- * `graphql-yoga`, `@nxgt/*` among them. A doc that holds an
+ * `graphql-yoga`, `@nxgt/*` among them. A name installed at several copies
+ * links to the one of the package that takes it as a peer, so a doc shares
+ * that package's `graphql` (`linksOf`). A doc that holds an
  * `openapi-codegen.config.ts` or a `codegen.ts` has its code generated first,
  * as `bun run generate` does in the template. A doc with a `*.spec.ts` has
  * it run by `bun test`; one that needs Redis is skipped without `REDIS_URL`.
