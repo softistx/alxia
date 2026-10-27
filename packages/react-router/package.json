@@ -1,7 +1,7 @@
 {
 	"name": "@alxia/react-router",
 	"version": "0.16.0",
-	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served; the code with no UI an installable app shares (`/pwa`), its hooks (`/pwa/react`), `noCache` for the worker's script (`/pwa/server`), the service worker on Workbox (`/pwa/worker`) and its build (`/pwa/build`), an API's refusals worded for the page (`/errors`), the BFF session: cookies, sign-in, step-up and mail links (`/session`) and what it shares with the page (`/session/model`), the page's CSP nonce and inline boot scripts (`/document`) and a streaming `entry.server` (`/entry`)",
+	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served; the code with no UI an installable app shares (`/pwa`), its hooks (`/pwa/react`), `noCache` for the worker's script (`/pwa/server`), the service worker on Workbox (`/pwa/worker`) and its build (`/pwa/build`), an API's refusals worded for the page (`/errors`), the BFF session: cookies, sign-in, step-up and mail links (`/session`), its page hooks (`/session/react`) and what it shares with the page (`/session/model`), the page's CSP nonce and inline boot scripts (`/document`) and a streaming `entry.server` (`/entry`)",
 	"license": "MIT",
 	"type": "module",
 	"main": "./dist/index.js",
@@ -72,6 +72,11 @@
 			"import": "./dist/pwa/worker/index.js",
 			"default": "./dist/pwa/worker/index.js"
 		},
+		"./session/react": {
+			"types": "./dist/session/react/index.d.ts",
+			"import": "./dist/session/react/index.js",
+			"default": "./dist/session/react/index.js"
+		},
 		"./session/model": {
 			"types": "./dist/session/model/index.d.ts",
 			"import": "./dist/session/model/index.js",
@@ -103,6 +108,7 @@
 			"src/errors/index.ts",
 			"src/session/model/index.ts",
 			"src/session/index.ts",
+			"src/session/react/index.ts",
 			"src/document/index.ts",
 			"src/entry/index.ts",
 			"src/pwa/worker/index.ts",
@@ -121,6 +127,7 @@
 		"@types/react": "^19.3.0",
 		"@types/react-dom": "^19.3.0",
 		"graphql": "^17.0.2",
+		"happy-dom": "^20",
 		"intl-messageformat": "^12.1.4",
 		"isbot": "^5.2.2",
 		"react": "^19.3.1",

@@ -18,6 +18,11 @@ import {
 	signInFlow,
 	stepUpSteps,
 } from '@alxia/react-router/session';
+import {
+	useCodeField,
+	useLinkParam,
+	useSignOut,
+} from '@alxia/react-router/session/react';
 
 export const cookies = sessionCookies({
 	session: 'my-app_session',
@@ -48,3 +53,6 @@ export const stepUp = stepUpSteps({
 	spent: () => 'ask again',
 });
 export const links = authLinks({ signIn });
+
+// The page hooks: exported functions with inferred results.
+export const pageHooks = { useCodeField, useLinkParam, useSignOut };

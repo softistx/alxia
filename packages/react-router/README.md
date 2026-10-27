@@ -937,8 +937,9 @@ has the rest.
 An app that renders its pages and calls a GraphQL API that signs users in
 with `@nxgt/janus` keeps the API's token in its own HttpOnly cookie.
 `@alxia/react-router/session` holds that session's server side, built on
-`/errors`; `/session/model` imports nothing and is safe in a component.
-Neither adds a peer.
+`/errors`; `/session/react` holds the page's hooks around it (`useSignOut`, `useLinkParam`,
+`useCodeField`); `/session/model` imports nothing and is safe in a component.
+`/session` and `/session/model` add no peer; `/session/react` needs `react`, an optional peer.
 
 ```ts
 // app/session.server.ts
@@ -1136,6 +1137,23 @@ From `@alxia/react-router/session` (`react-router` and `/errors`' files are its 
 | `authLinks({ signIn, codes?, wording?, start?, resetDone?, invalidState? })`, `AuthLinks`, `AuthLinksOptions`, `AuthLinksCodes` | the pages a mail's link opens, over the flow's cookies, errors and json: `linkArgs`, `spendToken(run, { request, language, path, states, fields? })`, `answerOf`, `landByLink` (`context?`), `afterReset(request, { context? })` (clears the session, the challenge and the flow's cookies), `requestLink(run, { request, language })` (a wait answers `throttled: true` and `retryAfter` when the API gives the seconds; `wording` words every refusal that is not a field's), `statePath` and `ended` |
 | `Spent`, `SpendOptions`, `LinkStayed`, `RequestLinkAnswer` | their types |
 | `TOKEN_PAGE_HEADERS` | `Referrer-Policy: no-referrer` and `X-Robots-Tag: noindex, nofollow`, for a page whose URL carries a token |
+
+From `@alxia/react-router/session/react` (`react` and `react-router` are its only imports; every hook renders on the server):
+
+| export | |
+| --- | --- |
+| `useSignOut({ action?, before? })` | `{ signOut, busy }`: posts `{}` as JSON to `action` (default `/sign-out`) after `before()`, whose failure never keeps the user signed in; `busy` until the navigation ends |
+| `SIGN_OUT_PATH`, `SignOutOptions`, `signOutAfter(before, submit)` | `/sign-out`, the options, and the step `useSignOut` is built on |
+| `useLinkParam(name, { drop? }?)`, `LinkParamOptions` | a mail link's query parameter, read once (`null` when absent or empty); `drop: true` removes it from the address bar with `history.replaceState` |
+| `useCodeField(schema, refusal)`, `CodeField`, `CodeSchema` | a one-code field with no form library: `{ code, setCode, ref, error, check() }` over a synchronous Standard Schema; each new `refusal` object clears the refused code and focuses the input |
+| `useOnRefusal(refusal, handler)` | the core under it, for any form library: `handler` runs once per new refusal, not for one present at mount |
+
+```tsx
+import { useLinkParam, useSignOut } from '@alxia/react-router/session/react';
+
+const token = useLinkParam('token', { drop: true });
+const { signOut, busy } = useSignOut();
+```
 
 From `@alxia/react-router/session/model` (no import at all):
 
