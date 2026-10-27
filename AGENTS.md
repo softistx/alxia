@@ -226,7 +226,7 @@ nxgt package is a peer. Where the suite has a Hono adapter, the alxia one
 mirrors it — `@nxgt/telemetry-hono`, `@nxgt/janus-hono`, `@nxgt/di-hono` — and the table
 below records what is kept twice.
 
-- **Bun 1.4.3.** `@nxgt/redis` needs Bun 1.4's `RedisClient`; the
+- **Bun 1.4.4.** `@nxgt/redis` needs Bun 1.4's `RedisClient`; the
   repository pins the version nxgt does.
 - **A Container shared by forks.** A fork runs its base's `onStop` once of
   its own, so a base whose `onStop` disposes of a Container breaks every
