@@ -96,6 +96,28 @@ loads, so a shared one would serve stale records and hand one user's data
 to the next. Over WebSocket, `context` runs for each operation. See
 [Batching with DataLoader](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/context.md#batching-with-dataloader-n1).
 
+## One value per request
+
+A field that resolves the same value for many parents (the category of
+twenty items) should load it once. `oncePerRequest(context, key, load)`
+runs `load` the first time a request asks for `key` and returns that value
+to every later call of the same request. The cache is released with the
+context object, and a `load` that throws or rejects is not kept.
+
+```ts
+import DataLoader from 'dataloader';
+import { oncePerRequest } from '@alxia/graphql';
+
+const categories = (context: object) =>
+	oncePerRequest(context, 'categories', () => new DataLoader(loadCategories)); // one DataLoader per request and key
+
+const category = (item: { categoryId: string }, _args: unknown, context: object) =>
+	categories(context).load(item.categoryId);
+```
+
+It takes no dependency: `dataloader` stays yours. See
+[One value per request](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/context.md#one-value-per-request).
+
 ## Yoga's plugins
 
 Every Yoga option passes through, but `graphqlEndpoint`, which `path`
@@ -281,6 +303,7 @@ See
 | `renderSandbox(endpoint, options?)`, `SANDBOX_POLICY` | the Sandbox page, and the policy it loads under |
 | `SandboxOptions` | its options: `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
 | `GraphQLContext<App, UserContext?>` | what a resolver reads |
+| `oncePerRequest(request, key, load)` | `load()`'s value, computed at most once per request object and `key` (a `string`); returns `T`, a promise kept as the same promise, a throw or rejection not kept |
 | `ServerContext<Ctx>`, `GraphQLOptions` | its types |
 | `graphqlClient(app, { path?, headers?, method? })` (`@alxia/graphql/testing`) | `query(document, { variables?, operationName?, headers?, method?, extensions?, persisted? })`, or `query({ persisted })` with no document, in process: `{ status, data?, errors?, response }` |
 | `GraphQLClient`, `GraphQLResult`, `QueryDocument`, `QueryOptions`, `PersistedQueryOptions`, `HttpMethod`, `GraphQLClientOptions`, `ResponseError` (`@alxia/graphql/testing`) | its types |
