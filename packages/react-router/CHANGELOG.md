@@ -1,5 +1,15 @@
 # @alxia/react-router
 
+## 0.16.0
+
+### Minor Changes
+
+- [#354](https://github.com/softistx/alxia/pull/354) [`ca84d7a`](https://github.com/softistx/alxia/commit/ca84d7a0745a10e7d46cbbe4917db966b548e99a) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `stepUpSteps` maps a rate limit to `error: 'throttled'`: `request` answers it for any 429 (not only the `MAIL_THROTTLED` code), and `confirm` answers it too, with `retryAfter` in seconds when the API says. `StepUpConfirmAnswer` gains an optional `retryAfter`, and `stepUpReducer` keeps the challenge, the tries and the code form on a throttled code and holds `retryAfter` (`stepUpProps` already passes it on), so `@nxgt/material`'s `VerificationCode` and `StepUpDialog` make Resend wait without locking. Additive types: nothing existing changes shape. Behaviour: a 429 that used to answer `failed` (`request`) or `invalid` / `failed` (`confirm`, even under the wrong-code code) now answers `throttled`; a consumer that branches on those for a 429 must handle `throttled`. The second-factor kind is already `'code' | 'recovery'`.
+
+### Patch Changes
+
+- [#352](https://github.com/softistx/alxia/pull/352) [`998efb2`](https://github.com/softistx/alxia/commit/998efb2d5171a7561d500d696f7c20b9be737055) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `stepUpSteps` takes a `signInFlow` typed with a caller context (`signInFlow<Lang, Caller>`) without a cast: `StepUpStepsOptions` gains a second type parameter `C`, `undefined` by default, so a flow with no context is unchanged. Fixes [#351](https://github.com/softistx/alxia/issues/351).
+
 ## 0.15.1
 
 ### Patch Changes
