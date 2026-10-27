@@ -115,6 +115,17 @@ const category = (item: { categoryId: string }, _args: unknown, context: object)
 	categories(context).load(item.categoryId);
 ```
 
+A mutation runs its root fields one after another, and one may change what a
+later one reads. Wrap the resolvers with `freshPerMutation` so each root
+mutation field starts with an empty cache (its sub-fields share it); a query
+keeps one cache:
+
+```ts
+import { freshPerMutation } from '@alxia/graphql';
+
+const resolvers = freshPerMutation({ Query, Mutation, Ward });
+```
+
 It takes no dependency: `dataloader` stays yours. See
 [One value per request](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/context.md#one-value-per-request).
 
@@ -304,6 +315,8 @@ See
 | `SandboxOptions` | its options: `title`, `initialDocument`, `initialHeaders`, `pollForSchemaUpdates`, `includeCookies` |
 | `GraphQLContext<App, UserContext?>` | what a resolver reads |
 | `oncePerRequest(request, key, load)` | `load()`'s value, computed at most once per request object and `key` (a `string`); returns `T`, a promise kept as the same promise, a throw or rejection not kept |
+| `clearRequestCache(request)` | empties what `oncePerRequest` kept for that request object; the next call loads again; returns `void` |
+| `freshPerMutation(resolvers)` | the same resolvers (same type) with each function of `Mutation` wrapped to call `clearRequestCache(context)` first: each root mutation field starts empty, its sub-fields share, a query is untouched |
 | `ServerContext<Ctx>`, `GraphQLOptions` | its types |
 | `graphqlClient(app, { path?, headers?, method? })` (`@alxia/graphql/testing`) | `query(document, { variables?, operationName?, headers?, method?, extensions?, persisted? })`, or `query({ persisted })` with no document, in process: `{ status, data?, errors?, response }` |
 | `GraphQLClient`, `GraphQLResult`, `QueryDocument`, `QueryOptions`, `PersistedQueryOptions`, `HttpMethod`, `GraphQLClientOptions`, `ResponseError` (`@alxia/graphql/testing`) | its types |

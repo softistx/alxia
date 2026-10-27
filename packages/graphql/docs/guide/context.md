@@ -302,6 +302,40 @@ Points to know:
   `dataloader` is not a dependency, and the type of the loader is the type
   `load` returns, so `.load(id)` is typed.
 
+### A mutation's root fields
+
+A mutation operation runs its root fields one after another in one request,
+and one may change what a later one reads: `updateDepartment` then
+`updateWard { department { name } }` must show the new name, but the
+department read before the update is in the request's cache.
+`clearRequestCache(request)` forgets everything `oncePerRequest` kept for that
+request, and `freshPerMutation(resolvers)` calls it before every function of
+`Mutation`:
+
+```ts
+import { freshPerMutation } from '@alxia/graphql';
+
+const resolvers = freshPerMutation({
+	Query: { /* one cache for the whole request */ },
+	Mutation: {
+		updateDepartment: async (_p, args, context) => { /* … */ },
+		updateWard: async (_p, args, context) => { /* … */ },
+	},
+	Ward: {
+		// shares the cache of the root field that returned the ward
+		department: (ward, _args, context) => departmentLoader(context).load(ward.departmentId),
+	},
+});
+```
+
+- Each root mutation field starts with an empty cache; its sub-fields share
+  it. A query has no wrapped field, so it keeps one cache.
+- Only functions of `Mutation` are wrapped; other types and non-function
+  entries are returned as they are, and the wrapped field's result is
+  unchanged. The context must be an object (it always is).
+- A call to `oncePerRequest` already in flight when the cache is cleared keeps
+  its own value; only later calls load again.
+
 ## See also
 
 - [Mounting the endpoint](endpoint.md): which middlewares run before it.
