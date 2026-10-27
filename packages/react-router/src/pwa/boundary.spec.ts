@@ -23,6 +23,21 @@ describe('/pwa/react', () => {
 	});
 });
 
+describe('/session/react', () => {
+	test('imports react and react-router alone: no core, no node: module, no bun', async () => {
+		const imports = await importsOf(join(DIST, 'session/react/index.js'));
+		expect([...new Set(imports)].sort()).toEqual(['react', 'react-router']);
+	});
+
+	test('shares no chunk with the main entry or the server side of /session', async () => {
+		const hooks = await filesOf(join(DIST, 'session/react/index.js'));
+		for (const other of ['index.js', 'session/index.js']) {
+			const files = await filesOf(join(DIST, other));
+			expect([...hooks].filter((file) => files.has(file))).toEqual([]);
+		}
+	});
+});
+
 describe('/pwa/server', () => {
 	test('imports @alxia/core alone: no react, no node: module, no bun', async () => {
 		const imports = await importsOf(join(DIST, 'pwa/server/index.js'));

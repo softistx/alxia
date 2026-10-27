@@ -939,7 +939,7 @@ with `@nxgt/janus` keeps the API's token in its own HttpOnly cookie.
 `@alxia/react-router/session` holds that session's server side, built on
 `/errors`; `/session/react` holds the page's hooks around it (`useSignOut`, `useLinkParam`,
 `useCodeField`); `/session/model` imports nothing and is safe in a component.
-None adds a peer.
+`/session` and `/session/model` add no peer; `/session/react` needs `react`, an optional peer.
 
 ```ts
 // app/session.server.ts
