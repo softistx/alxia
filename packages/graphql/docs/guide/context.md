@@ -261,6 +261,47 @@ response, and the same user loaded twice in it is one lookup.
 The [GraphQL recipe](https://github.com/softistx/alxia/blob/develop/docs/recipes/graphql-api.md)
 builds this step by step, with a spec that counts the calls to the store: five notes, one batch.
 
+## One value per request
+
+Not every shared value is a loader built in `context`. A loader for a
+rarely used field, or any value that twenty resolvers of one response need
+(the category of each item, the viewer's permissions), is better built on
+first use. `oncePerRequest(request, key, load)` does that: the first call for
+a request and a `key` runs `load`, every later call returns the same value.
+
+```ts
+import DataLoader from 'dataloader';
+import { oncePerRequest } from '@alxia/graphql';
+
+const categoryLoader = (context: object) =>
+	oncePerRequest(
+		context,
+		'categories',
+		() => new DataLoader(async (ids: readonly string[]) => findCategories(ids)),
+	);
+
+const resolvers = {
+	Item: {
+		category: (item: { categoryId: string }, _args: unknown, context: Context) =>
+			categoryLoader(context).load(item.categoryId),
+	},
+};
+```
+
+Points to know:
+
+- `request` is any object that lives for one request: pass the resolvers'
+  context. The cache is a `WeakMap` keyed by it, so it is released when the
+  context is, and two requests never share a value. Over WebSocket, `context`
+  runs for each operation, so a value lasts one operation.
+- The key names the value inside a request. Two different values under one key
+  are one value: give each its own key.
+- `load` may return a promise. Concurrent callers share that one promise. If it
+  throws or rejects, nothing is kept and the next call loads again.
+- A `DataLoader` per request and key needs nothing from the package:
+  `dataloader` is not a dependency, and the type of the loader is the type
+  `load` returns, so `.load(id)` is typed.
+
 ## See also
 
 - [Mounting the endpoint](endpoint.md): which middlewares run before it.
