@@ -103,7 +103,7 @@
     },
     "packages/create": {
       "name": "@alxia/create",
-      "version": "0.5.10",
+      "version": "0.5.11",
       "bin": {
         "create-alxia": "./dist/index.js",
       },
@@ -273,7 +273,7 @@
     },
     "packages/proxy": {
       "name": "@alxia/proxy",
-      "version": "0.4.6",
+      "version": "0.4.7",
       "devDependencies": {
         "@alxia/core": "workspace:^",
         "@alxia/jwt": "workspace:^",

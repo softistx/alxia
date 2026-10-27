@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.5.11
+
+### Patch Changes
+
+- [#366](https://github.com/softistx/alxia/pull/366) [`a45c5e1`](https://github.com/softistx/alxia/commit/a45c5e12c4c0eecd6086a2d462871c38e8403b7e) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The generated projects start on `@types/bun` ^1.4.4 (Bun 1.4.4).
+
 ## 0.5.10
 
 ### Patch Changes
