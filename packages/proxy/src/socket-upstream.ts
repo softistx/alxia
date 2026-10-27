@@ -65,11 +65,17 @@ export function openUpstream<Ctx>(
 	upstream.addEventListener('message', hold);
 	const release = () => upstream.removeEventListener('message', hold);
 	return new Promise((resolve, reject) => {
+		// Bun fires it right before the close of a failed connect, with its code.
+		let failed: Event | undefined;
+		const failure = (event: Event) => {
+			failed = event;
+		};
 		const settle = (error?: unknown) => {
 			clearTimeout(late);
 			signal.removeEventListener('abort', gone);
 			upstream.removeEventListener('open', opened);
 			upstream.removeEventListener('close', refused);
+			upstream.removeEventListener('error', failure);
 			if (error === undefined) {
 				return resolve({ socket: upstream, early, release });
 			}
@@ -79,11 +85,13 @@ export function openUpstream<Ctx>(
 		};
 		const opened = () => settle();
 		const refused = (event: CloseEvent) => {
-			const failure = badGateway(
+			const answer = badGateway(
 				url,
 				`closed with ${event.code} (${event.reason}) before opening`,
 			);
-			settle(socketNeverReached(event) ? new Unreached(failure) : failure);
+			settle(
+				socketNeverReached(event, failed) ? new Unreached(answer) : answer,
+			);
 		};
 		const gone = () => settle(signal.reason);
 		const late = setTimeout(
@@ -92,6 +100,7 @@ export function openUpstream<Ctx>(
 		);
 		signal.addEventListener('abort', gone, { once: true });
 		upstream.addEventListener('open', opened, { once: true });
+		upstream.addEventListener('error', failure, { once: true });
 		upstream.addEventListener('close', refused, { once: true });
 	});
 }

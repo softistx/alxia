@@ -66,7 +66,7 @@ because it did.
 
 A socket route retries the same way, and only its connect: `proxy.ws()`
 opens the upstream socket before it upgrades the client, so while the
-connect fails (Bun closes the attempt with 1006 and `Failed to connect`),
+connect fails (Bun's `error` event names `ECONNREFUSED` or `ENOTFOUND`),
 the next upstream is tried, and the client is upgraded once one opens. An
 upstream that answered the handshake with anything but a `101` was reached,
 and is a 502.

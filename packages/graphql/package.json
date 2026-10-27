@@ -54,7 +54,7 @@
 		"@graphql-yoga/plugin-csrf-prevention": "^3.24.2",
 		"@graphql-yoga/plugin-persisted-operations": "^3.24.2",
 		"@nxgt/telemetry": "^0.2.2",
-		"@types/bun": "^1.4.2",
+		"@types/bun": "^1.4.4",
 		"dataloader": "^2.2.3",
 		"graphql": "^16.11.0",
 		"graphql-ws": "^6.3.0",

@@ -23,6 +23,17 @@ describe('proxy.ws over several upstreams', () => {
 		socket.close();
 	});
 
+	test('a host that does not resolve goes to the next upstream', async () => {
+		const { up, state } = socketUpstream();
+		const url = serve(
+			alxia().ws('/live', proxy.ws(['http://nowhere.invalid', up.url])),
+		);
+		const { socket, opened } = await client(url, '/live');
+		expect(opened).toBe(true);
+		expect(state.upgraded).toHaveLength(1);
+		socket.close();
+	});
+
 	test('sockets go round-robin', async () => {
 		const one = socketUpstream();
 		const two = socketUpstream();

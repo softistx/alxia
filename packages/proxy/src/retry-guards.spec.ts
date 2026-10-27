@@ -2,7 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { ContentTooLargeError } from '@alxia/core';
 import { watchBody } from './body';
 import type { Plan } from './options';
-import { acrossUpstreams, Unreached } from './retry';
+import { acrossUpstreams, socketNeverReached, Unreached } from './retry';
 import type { Pool } from './upstreams';
 
 /** A pool of `n` upstreams that never cool down, recording each attempt. */
@@ -66,6 +66,30 @@ describe('acrossUpstreams, the guards before a retry', () => {
 		);
 		await expect(sent).rejects.toBe('attempt 3');
 		expect(calls).toBe(3);
+	});
+});
+
+describe('socketNeverReached, a failed connect told from an upstream reached', () => {
+	const closed = (reason = '') =>
+		new CloseEvent('close', { code: 1006, reason });
+	const failed = (code?: string) =>
+		new ErrorEvent('error', { error: Object.assign(new Error('x'), { code }) });
+
+	test('from Bun 1.4.4: the error event names the failed connect', () => {
+		expect(socketNeverReached(closed(), failed('ECONNREFUSED'))).toBe(true);
+		expect(socketNeverReached(closed(), failed('ENOTFOUND'))).toBe(true);
+	});
+
+	test('up to Bun 1.4.3: the close reason says it', () => {
+		expect(socketNeverReached(closed('Failed to connect'))).toBe(true);
+	});
+
+	test('an upstream reached, or a close not 1006, is not retried', () => {
+		expect(socketNeverReached(closed(), failed())).toBe(false);
+		expect(socketNeverReached(closed('Expected 101 status code'))).toBe(false);
+		expect(socketNeverReached(closed())).toBe(false);
+		const clean = new CloseEvent('close', { code: 1000 });
+		expect(socketNeverReached(clean, failed('ECONNREFUSED'))).toBe(false);
 	});
 });
 
