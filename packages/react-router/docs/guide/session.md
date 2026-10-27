@@ -992,7 +992,7 @@ const { signOut } = useSignOut({
 ### `useLinkParam`
 
 Reads the query parameter a mail's link carries, once: the first render's value
-is kept for the page's life. With `drop: true` the parameter is then removed
+is kept for the page's life (unless `live: true`, below). With `drop: true` the parameter is then removed
 from the address bar (`history.replaceState`, keeping the history state and the
 hash), so a token is not left in the history, a bookmark or a screenshot. It is
 `null` when the parameter is absent or empty.
@@ -1013,6 +1013,10 @@ export default function ResetPassword() {
 }
 ```
 
+The router's own location is not updated by `replaceState`: a loader or
+`useSearchParams` elsewhere still sees the token until the next navigation.
+Read it with the hook once, and pass it down.
+
 #### `live: true`: a parameter set after the page mounted
 
 By default the value is read once. A route that stays mounted while an action
@@ -1029,10 +1033,6 @@ With `drop: true` too, the value is kept after the address bar loses the
 parameter, until a location carries a new one: a navigation that has no such
 parameter does not clear it, since the drop removed it. Without `drop` the
 value is exactly the current location's parameter, `null` when it is gone.
-
-The router's own location is not updated by `replaceState`: a loader or
-`useSearchParams` elsewhere still sees the token until the next navigation.
-Read it with the hook once, and pass it down.
 
 ### `useCodeField` and `useOnRefusal`
 
