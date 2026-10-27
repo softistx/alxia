@@ -31,13 +31,17 @@ export function neverReached(error: unknown): boolean {
 
 /**
  * Whether a WebSocket's close before its open says the connect itself
- * failed: Bun closes with 1006 and `Failed to connect` when the
- * connection is refused or the host does not resolve, and with another
- * reason once the upstream was reached (`Connection ended`, or `Expected
- * 101 status code` for an upstream that refused the upgrade).
+ * failed. Bun fires `error` then `close` with 1006 for any failure before
+ * the open; from 1.4.4 on the close has no reason, and the `error` event's
+ * `error.code` names a failed connect (`ECONNREFUSED`, `ENOTFOUND`) and
+ * nothing for an upstream reached (`Expected 101 status code` when it
+ * refused the upgrade). Up to 1.4.3 the close's reason said it: `Failed
+ * to connect`, and another once the upstream was reached.
  */
-export function socketNeverReached(event: CloseEvent): boolean {
-	return event.code === 1006 && event.reason === 'Failed to connect';
+export function socketNeverReached(close: CloseEvent, error?: Event): boolean {
+	if (close.code !== 1006) return false;
+	if (close.reason === 'Failed to connect') return true;
+	return neverReached((error as { error?: unknown } | undefined)?.error);
 }
 
 /** An attempt that failed without reaching its upstream: `failure` answers it if no other upstream may be tried. */
