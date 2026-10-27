@@ -29,7 +29,7 @@
     "@graphql-codegen/cli": "7.4.3",
     "@graphql-codegen/typescript": "6.1.0",
     "@graphql-codegen/typescript-resolvers": "6.1.0",
-    "@types/bun": "^1.4.2",
+    "@types/bun": "^1.4.4",
     "typescript": "^6.0.3"
   }
 }
