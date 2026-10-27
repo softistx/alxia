@@ -1013,6 +1013,23 @@ export default function ResetPassword() {
 }
 ```
 
+#### `live: true`: a parameter set after the page mounted
+
+By default the value is read once. A route that stays mounted while an action
+redirects back to it with a new parameter (`/settings` to
+`/settings?state=linked`) never sees it. `live: true` follows the URL: the
+value is the parameter of the current location, and each new location is read
+again.
+
+```tsx
+const state = useLinkParam('state', { live: true }); // 'linked' | 'invalid' | null
+```
+
+With `drop: true` too, the value is kept after the address bar loses the
+parameter, until a location carries a new one: a navigation that has no such
+parameter does not clear it, since the drop removed it. Without `drop` the
+value is exactly the current location's parameter, `null` when it is gone.
+
 The router's own location is not updated by `replaceState`: a loader or
 `useSearchParams` elsewhere still sees the token until the next navigation.
 Read it with the hook once, and pass it down.

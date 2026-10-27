@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
-import { act, createElement, type ReactNode } from 'react';
+import { act, createElement, type ReactNode, useEffect } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { createMemoryRouter, RouterProvider, redirect } from 'react-router';
@@ -62,7 +62,7 @@ async function mount(
 	await act(async () => {
 		root.render(createElement(RouterProvider, { router }));
 	});
-	return { container, root };
+	return { container, root, router };
 }
 
 type Probe<T> = { current?: T };
@@ -104,6 +104,71 @@ describe('useLinkParam', () => {
 		}
 		await mount(createElement(Page), { path: '/reset?token=' });
 		expect(seen.at(-1)).toBeNull();
+	});
+
+	test('live follows a parameter a redirect adds to the same mounted route', async () => {
+		const seen: Array<string | null> = [];
+		let mounts = 0;
+		function Page() {
+			useEffect(() => {
+				mounts += 1;
+			}, []);
+			seen.push(useLinkParam('state', { live: true }));
+			return null;
+		}
+		const { router } = await mount(createElement(Page), { path: '/reset' });
+		expect(seen.at(-1)).toBeNull();
+		await act(async () => {
+			await router.navigate('/reset?state=invalid');
+		});
+		expect(seen.at(-1)).toBe('invalid');
+		await act(async () => {
+			await router.navigate('/reset?state=linked');
+		});
+		expect(seen.at(-1)).toBe('linked');
+		await act(async () => {
+			await router.navigate('/reset');
+		});
+		expect(seen.at(-1)).toBeNull();
+		expect(mounts).toBe(1);
+	});
+
+	test('the default read stays on the first render across a same-route navigation', async () => {
+		const seen: Array<string | null> = [];
+		function Page() {
+			seen.push(useLinkParam('state'));
+			return null;
+		}
+		const { router } = await mount(createElement(Page), { path: '/reset' });
+		await act(async () => {
+			await router.navigate('/reset?state=linked');
+		});
+		expect(seen.at(-1)).toBeNull();
+	});
+
+	test('live with drop keeps the value after the drop and takes the next one', async () => {
+		const seen: Array<string | null> = [];
+		function Page() {
+			seen.push(useLinkParam('state', { live: true, drop: true }));
+			return null;
+		}
+		win.happyDOM.setURL('https://app.test/reset?state=invalid&keep=1');
+		const { router } = await mount(createElement(Page), {
+			path: '/reset?state=invalid&keep=1',
+		});
+		expect(seen.at(-1)).toBe('invalid');
+		expect(win.location.search).toBe('?keep=1');
+		await act(async () => {
+			await router.navigate('/reset?keep=2');
+		});
+		expect(seen.at(-1)).toBe('invalid');
+		// the memory router leaves the address bar alone: set it as a browser would
+		win.happyDOM.setURL('https://app.test/reset?keep=2&state=linked');
+		await act(async () => {
+			await router.navigate('/reset?keep=2&state=linked');
+		});
+		expect(seen.at(-1)).toBe('linked');
+		expect(win.location.search).toBe('?keep=2');
 	});
 
 	test('renders on the server', () => {
