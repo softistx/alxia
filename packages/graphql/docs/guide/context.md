@@ -282,7 +282,7 @@ const categoryLoader = (context: object) =>
 
 const resolvers = {
 	Item: {
-		category: (item: { categoryId: string }, _args: unknown, context: Context) =>
+		category: (item: { categoryId: string }, _args: unknown, context: object) =>
 			categoryLoader(context).load(item.categoryId),
 	},
 };

@@ -111,7 +111,7 @@ import { oncePerRequest } from '@alxia/graphql';
 const categories = (context: object) =>
 	oncePerRequest(context, 'categories', () => new DataLoader(loadCategories)); // one DataLoader per request and key
 
-const category = (item: { categoryId: string }, _args: unknown, context: Context) =>
+const category = (item: { categoryId: string }, _args: unknown, context: object) =>
 	categories(context).load(item.categoryId);
 ```
 
