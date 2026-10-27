@@ -1,5 +1,11 @@
 # @alxia/graphql
 
+## 0.11.0
+
+### Minor Changes
+
+- [#365](https://github.com/softistx/alxia/pull/365) [`fd257a5`](https://github.com/softistx/alxia/commit/fd257a56a968b04efcac012502e2dc01f3805cc5) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `clearRequestCache(request)` empties what `oncePerRequest` kept for a request, and `freshPerMutation(resolvers)` wraps every function of `Mutation` to call it first: each root mutation field of an operation starts with an empty cache (its sub-fields still share it), so `updateDepartment` then `updateWard { department { name } }` shows the new name, while a query keeps one cache for the whole request. Additive.
+
 ## 0.10.0
 
 ### Minor Changes
