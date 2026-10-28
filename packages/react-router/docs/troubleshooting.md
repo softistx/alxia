@@ -2714,3 +2714,69 @@ import { TOKEN_PAGE_HEADERS } from '@alxia/react-router/session';
 
 export const headers = () => TOKEN_PAGE_HEADERS;
 ```
+
+### A subscription answers 401
+
+`/events` answers `{"errors":[{"extensions":{"code":"UNAUTHENTICATED"}}]}`.
+
+**Why:** `getToken(request)` returned `null`, `undefined` or `''`: the browser
+sent no session cookie (signed out, expired, or a cross-site request with a
+`SameSite=Lax` cookie), or `getToken` reads another cookie than the one the
+sign-in wrote.
+
+**Fix:** return the same token the loaders use, and send the cookie with the
+request (`credentials: 'include'` for a cross-origin client):
+
+```ts
+getToken: (request) => cookies.token(request),
+```
+
+### A subscription answers 403 `This operation is not allowed.`
+
+The route refused the operation and the API never saw it.
+
+**Why:** the document holds something that is not a named `subscription` in
+`allow`: another name, an anonymous subscription, a query or a mutation (even
+beside an allowed one), or a persisted id that is not listed.
+
+**Fix:** name the subscription and list the name:
+
+```ts
+createSubscriptionProxy({ endpoint, allow: ['RoomEvents'], getToken });
+```
+
+### A subscription answers 400
+
+**Why:** the request is not a JSON object, `variables` or `extensions` is not an
+object, there is no `query` and no persisted id, `operationName` is not in the
+document, or several operations are in the document without an
+`operationName`.
+
+**Fix:** send one named subscription with `operationName`, and `variables` as
+an object.
+
+### A subscription answers 429 with `retryAfter`
+
+The API's rate limit answered. The proxy passes it on and never retries.
+
+**Fix:** have the client wait `Retry-After` seconds (also `retryAfter` in the
+body) before it subscribes again.
+
+### A subscription answers 502
+
+**Why:** the API is unreachable, answered 5xx, or answered something that is
+not `text/event-stream` (a proxy in front of it, or a wrong `endpoint`).
+
+**Fix:** open the `endpoint` with the same headers by hand; it must answer a
+subscription with `Content-Type: text/event-stream`.
+
+### Events arrive in bursts, or the stream closes after a few seconds
+
+**Why:** a proxy or CDN between the app and the browser buffers the response,
+or closes an idle connection (Bun's `idleTimeout`, a load balancer's timeout)
+because `heartbeatMs` is longer than it.
+
+**Fix:** keep `heartbeatMs` shorter than the shortest idle timeout on the
+path, turn response buffering off for the route (nginx `proxy_buffering off`;
+the route already sends `X-Accel-Buffering: no`), and do not compress the
+route's responses.

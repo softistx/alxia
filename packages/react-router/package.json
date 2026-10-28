@@ -82,6 +82,11 @@
 			"import": "./dist/session/model/index.js",
 			"default": "./dist/session/model/index.js"
 		},
+		"./subscription": {
+			"types": "./dist/subscription/index.d.ts",
+			"import": "./dist/subscription/index.js",
+			"default": "./dist/subscription/index.js"
+		},
 		"./package.json": "./package.json"
 	},
 	"repository": {
@@ -109,6 +114,7 @@
 			"src/session/model/index.ts",
 			"src/session/index.ts",
 			"src/session/react/index.ts",
+			"src/subscription/index.ts",
 			"src/document/index.ts",
 			"src/entry/index.ts",
 			"src/pwa/worker/index.ts",
