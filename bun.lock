@@ -308,7 +308,7 @@
         "@alxia/compress": "workspace:^",
         "@alxia/core": "workspace:^",
         "@alxia/openapi": "workspace:^",
-        "@nxgt/graphql-client": "^0.5.0",
+        "@nxgt/graphql-client": "^0.6.0",
         "@nxgt/janus": "^0.29.0",
         "@react-router/dev": "^8.5.0",
         "@types/bun": "^1.4.4",
@@ -782,7 +782,7 @@
 
     "@nxgt/di": ["@nxgt/di@0.2.0", "", { "peerDependencies": { "typescript": "^6.0.3" } }, "sha512-YMahwd8FoLRtVRm/RTtCTMRffGNk8swaRPuop/ysphLJcZ0WG8wFH0bFlhImGywL226fcMEdwfcFhE4FylfMXw=="],
 
-    "@nxgt/graphql-client": ["@nxgt/graphql-client@0.5.0", "", { "dependencies": { "@graphql-typed-document-node/core": "^3.2.0", "@nxgt/httpyz": "^0.5.0" }, "peerDependencies": { "@types/react": "^19.0.0", "graphql": "^16.11.0 || ^17.0.0", "react": "^19.0.0", "typescript": "^6.0.3 || ^7.0.0" }, "optionalPeers": ["@types/react", "react"] }, "sha512-WVs2DGWY1WRD0rYGqtCctd/DAXjmewQC9gZh+ioX9NFTiHJL88KqKxxOlQxDSIbEHQXjuoSV6hxlJ/lHr+WQcg=="],
+    "@nxgt/graphql-client": ["@nxgt/graphql-client@0.6.0", "", { "dependencies": { "@graphql-typed-document-node/core": "^3.2.0", "@nxgt/httpyz": "^0.5.0" }, "peerDependencies": { "@types/react": "^19.0.0", "graphql": "^16.11.0 || ^17.0.0", "react": "^19.0.0", "typescript": "^6.0.3 || ^7.0.0" }, "optionalPeers": ["@types/react", "react"] }, "sha512-ZPtdCRcI0xuia99rLjyGCjCStkvhFha1QqdWEI/OpLw5565aH2PrHlcN6P4ZEZg7cT7AaWxlpIYlr5YzfSOMwg=="],
 
     "@nxgt/httpyz": ["@nxgt/httpyz@0.5.0", "", { "peerDependencies": { "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-mEJofa6wB3s9FAPFlKO5FxHMIuZLTEIg3KafWMc7TDOBxy1LWKZiXI5O5LH7ISxgsCYoFekJlZe0fxlrPgQx8g=="],
 
