@@ -1,5 +1,11 @@
 # @alxia/core
 
+## 0.17.1
+
+### Patch Changes
+
+- [#406](https://github.com/softistx/alxia/pull/406) [`fa09b42`](https://github.com/softistx/alxia/commit/fa09b428690e74b3d3416aa08ec09e8ea5aa71ce) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Note in the `idleTimeout` option's docs that Bun's default is 10 s and an idle SSE stream needs more.
+
 ## 0.17.0
 
 ### Minor Changes
