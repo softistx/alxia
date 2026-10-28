@@ -1162,45 +1162,105 @@ A sensitive action the API refuses with `step-up-required` answers with
 `stepUp` set. `useStepUpReplay` opens the step-up on that answer, posts the
 `request-step-up` and `confirm-step-up` intents, and sends the refused action
 again once the session is confirmed. The dialog stays, saying so, until the
-replayed action is answered. It is generic over your own `post`s, so each
-intent keeps the fields your action types.
+replayed action is answered; an answer that asks for a step-up again reopens
+it. Cancelling forgets the step-up: a code accepted or a challenge granted
+after `cancel()` is ignored and replays nothing. It is generic over your own
+`post`s, so each intent keeps the fields your action types.
 
 An action that carries a one-time code (`spendsCode`) is not replayed after a
 step-up by the second factor: that code was just spent, so the dialog closes
 and `confirmedNotice` is true ("confirmed, type a new code").
 
+`route()` answers both intents from one action, so a fetcher on it has their
+union as data. `requestAnswerOf(data)` and `confirmAnswerOf(data)` narrow it on
+`intent` (and give `undefined` for any other answer), so each channel is typed
+from the one action.
+
 ```tsx
-import { useStepUpReplay } from '@alxia/react-router/session/react';
+import { useRef } from 'react';
+import { useFetcher } from 'react-router';
+import {
+	confirmAnswerOf,
+	requestAnswerOf,
+	useStepUpReplay,
+} from '@alxia/react-router/session/react';
+import type { action as stepUpAction } from './step-up'; // the route with `stepUp.route`
 
-const fetcher = useFetcher<typeof action>();
-const request = useFetcher<typeof stepUpAction>({ key: 'step-up-request' });
-const confirm = useFetcher<typeof stepUpAction>({ key: 'step-up-confirm' });
-const last = useRef<DeleteItem>();
+type DeleteItem = { intent: 'delete-item'; id: string };
 
-const { open, dialogProps, cancel, confirmedNotice } = useStepUpReplay({
-	answer: fetcher.state === 'idle' ? fetcher.data : undefined,
-	action: last.current,
-	spendsCode: (a) => a.code !== undefined,
-	replay: () => post(last.current!),
-	request: {
-		post: () => request.submit({ intent: 'request-step-up' }, { method: 'post', action: '/step-up', encType: 'application/json' }),
-		answer: request.data, // a StepUpRequestAnswer
-		busy: request.state !== 'idle',
-		reset: () => request.reset(),
-	},
-	confirm: {
-		post: (fields) => confirm.submit({ intent: 'confirm-step-up', ...fields }, { method: 'post', action: '/step-up', encType: 'application/json' }),
-		answer: confirm.data, // a StepUpConfirmAnswer
-		busy: confirm.state !== 'idle',
-		reset: () => confirm.reset(),
-	},
-});
-// Pass dialogProps to your step-up dialog: phase, via, props, message,
+export function useDeleteItem() {
+	const fetcher = useFetcher<{ ok: boolean; stepUp?: boolean }>();
+	const request = useFetcher<typeof stepUpAction>({ key: 'step-up-request' });
+	const confirm = useFetcher<typeof stepUpAction>({ key: 'step-up-confirm' });
+	const last = useRef<DeleteItem | null>(null);
+
+	const post = (action: DeleteItem) => {
+		last.current = action;
+		void fetcher.submit(action, { method: 'post', encType: 'application/json' });
+	};
+	const toStepUp = (body: Record<string, unknown>) =>
+		void request.submit(body, {
+			method: 'post',
+			action: '/step-up',
+			encType: 'application/json',
+		});
+
+	const stepUp = useStepUpReplay({
+		answer: fetcher.state === 'idle' ? fetcher.data : undefined,
+		action: last.current ?? undefined,
+		replay: () => {
+			if (last.current) post(last.current);
+		},
+		request: {
+			post: () => toStepUp({ intent: 'request-step-up' }),
+			answer: requestAnswerOf(request.data),
+			busy: request.state !== 'idle',
+			reset: () => request.reset(),
+		},
+		confirm: {
+			post: (fields) =>
+				void confirm.submit(
+					{ intent: 'confirm-step-up', ...fields },
+					{ method: 'post', action: '/step-up', encType: 'application/json' },
+				),
+			answer: confirmAnswerOf(confirm.data),
+			busy: confirm.state !== 'idle',
+			reset: () => confirm.reset(),
+		},
+	});
+	return { post, ...stepUp };
+}
+// Pass `dialogProps` to your step-up dialog: phase, via, props, message,
 // busy, confirming, onCancel, onRetry, onSubmit, onResend.
 ```
 
-`useStepUp({ request, confirm, onConfirmed })` is the part under it, for a
-host that decides itself what to do once the code is accepted.
+`dialogProps` is `dialogPropsOf(stepUp, open, cancel)`, which is plain and
+exported, for a host that builds them itself.
+
+### `useStepUp`, `asksStepUp` and `stepUpDialogPhase`
+
+`useStepUp({ request, confirm, onConfirmed })` is the part under it, for a host
+that decides itself what to do once the code is accepted. `start()` asks for a
+challenge, `submit(code)` posts it, `release()` forgets everything.
+
+```tsx
+import { useStepUp } from '@alxia/react-router/session/react';
+
+const stepUp = useStepUp({ request, confirm, onConfirmed: () => revalidate() });
+// stepUp.phase: 'asking' | 'failed' | 'code' | 'expired' | 'confirmed'
+```
+
+`asksStepUp(answer)` is true for a refusal carrying `stepUp` (what opens the
+dialog), and `stepUpDialogPhase(state)` is what the dialog shows for a
+`stepUpReducer` state:
+
+```ts
+import { asksStepUp, stepUpDialogPhase } from '@alxia/react-router/session/react';
+import { INITIAL_STEP_UP } from '@alxia/react-router/session/model';
+
+asksStepUp({ ok: false, stepUp: true }); // true
+stepUpDialogPhase(INITIAL_STEP_UP); // 'asking'
+```
 
 ## The types and the rest of `/session/model`
 

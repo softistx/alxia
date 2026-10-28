@@ -142,6 +142,24 @@ a loader, a message React Router or the browser prints, or an error from
 
 ## Thrown or printed
 
+### `Not a step-up intent` (a 400 from `stepUp.route`)
+
+**When:** a page posts to the route that serves `stepUpSteps().route` with an
+`intent` other than `request-step-up` or `confirm-step-up`, or a
+`confirm-step-up` whose `challenge` or `code` is not a string.
+
+**Why:** `route()` answers only those two intents and runs nothing else.
+
+**Fix:** post the intents with the fields `useStepUp` gives your `confirm.post`
+(`challenge`, `code`, `via`), as JSON:
+
+```ts
+confirm.submit(
+	{ intent: 'confirm-step-up', challenge, code, via },
+	{ method: 'post', action: '/step-up', encType: 'application/json' },
+);
+```
+
 ### `alxia-react-router: … is running on Node, and alxia's server runs on Bun. …`
 
 **When:** `bun run dev`, `vite preview`, or a `react-router build` that

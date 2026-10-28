@@ -2,8 +2,14 @@ import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
 import { act, createElement } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { StepUpConfirmAnswer, StepUpRequestAnswer } from '../model';
-import { asksStepUp, useStepUpReplay } from './use-step-up';
+import { INITIAL_STEP_UP, stepUpReducer } from '../../model/step-up';
+import type {
+	StepUpConfirmAnswer,
+	StepUpRequestAnswer,
+} from '../../model/step-up-answers';
+import { confirmAnswerOf, requestAnswerOf } from './answers';
+import { asksStepUp, stepUpDialogPhase } from './phase';
+import { useStepUpReplay } from './use-step-up-replay';
 
 const globals = globalThis as Record<string, unknown>;
 const KEYS = ['window', 'document', 'navigator', 'HTMLElement', 'Node'];
@@ -138,6 +144,7 @@ describe('useStepUpReplay', () => {
 	test('an action that carries a spent code is not replayed after a second-factor step-up', async () => {
 		const page = await mount({ intent: 'disable', code: '654321' });
 		page.state.answer = refused;
+		await page.rerender();
 		page.state.request = granted('secondFactor');
 		await page.rerender();
 		act(() => page.hook.dialogProps.onSubmit('123456'));
@@ -151,6 +158,7 @@ describe('useStepUpReplay', () => {
 	test('the same action is replayed after a mailed step-up', async () => {
 		const page = await mount({ intent: 'disable', code: '654321' });
 		page.state.answer = refused;
+		await page.rerender();
 		page.state.request = granted('email');
 		await page.rerender();
 		act(() => page.hook.dialogProps.onSubmit('123456'));
@@ -166,5 +174,127 @@ describe('useStepUpReplay', () => {
 		await act(async () => page.hook.cancel());
 		expect(page.hook.open).toBe(false);
 		expect(page.replays).toHaveLength(0);
+	});
+
+	test('a code accepted after cancel replays nothing', async () => {
+		const page = await mount({ intent: 'delete' });
+		page.state.answer = refused;
+		await page.rerender();
+		page.state.request = granted('email');
+		await page.rerender();
+		act(() => page.hook.dialogProps.onSubmit('123456'));
+		await act(async () => page.hook.cancel());
+		page.state.confirm = accepted;
+		await page.rerender();
+		expect(page.replays).toHaveLength(0);
+		expect(page.hook.open).toBe(false);
+	});
+
+	test('a challenge granted after cancel is forgotten: the next step-up asks again', async () => {
+		const page = await mount({ intent: 'delete' });
+		page.state.answer = refused;
+		await page.rerender();
+		await act(async () => page.hook.cancel());
+		page.state.request = granted('email');
+		await page.rerender();
+		page.state.answer = { ok: false, stepUp: true };
+		await page.rerender();
+		expect(page.hook.open).toBe(true);
+		expect(page.hook.dialogProps.phase).toBe('asking');
+		expect(page.posts.filter((p) => p === 'request')).toHaveLength(2);
+	});
+
+	test('a replayed action refused for a step-up again reopens the step-up', async () => {
+		const page = await mount({ intent: 'delete' });
+		page.state.answer = refused;
+		await page.rerender();
+		page.state.request = granted('email');
+		await page.rerender();
+		act(() => page.hook.dialogProps.onSubmit('123456'));
+		page.state.confirm = accepted;
+		await page.rerender();
+		page.state.answer = { ok: false, stepUp: true };
+		await page.rerender();
+		expect(page.hook.open).toBe(true);
+		expect(page.posts.filter((p) => p === 'request')).toHaveLength(2);
+	});
+
+	test('"Resend code" exists for a mailed code only', async () => {
+		const mailed = await mount();
+		mailed.state.answer = refused;
+		await mailed.rerender();
+		mailed.state.request = granted('email');
+		await mailed.rerender();
+		expect(mailed.hook.dialogProps.onResend).toBeDefined();
+		const app = await mount();
+		app.state.answer = refused;
+		await app.rerender();
+		app.state.request = granted('secondFactor');
+		await app.rerender();
+		expect(app.hook.dialogProps.onResend).toBeUndefined();
+	});
+
+	test('each channel keeps the fields of its own post', () => {
+		const channel = {
+			answer: undefined,
+			busy: false,
+		};
+		void (() =>
+			useStepUpReplay<Action>({
+				answer: undefined,
+				replay() {},
+				request: {
+					...channel,
+					// @ts-expect-error the request takes no field
+					post: (fields: { challenge: string }) => void fields,
+				},
+				confirm: {
+					...channel,
+					// @ts-expect-error the confirm posts a challenge, a code and a via
+					post: (fields: { code: number }) => void fields,
+				},
+			}));
+	});
+});
+
+describe('stepUpDialogPhase', () => {
+	const asked = stepUpReducer(INITIAL_STEP_UP, { type: 'start' });
+	test('asking, code, failed, expired and confirmed', () => {
+		expect(stepUpDialogPhase(INITIAL_STEP_UP)).toBe('asking');
+		const code = stepUpReducer(asked, {
+			type: 'requested',
+			answer: granted('email'),
+		});
+		expect(stepUpDialogPhase(code)).toBe('code');
+		const failed = stepUpReducer(asked, {
+			type: 'requested',
+			answer: { ok: false, intent: 'request-step-up', error: 'failed' },
+		});
+		expect(stepUpDialogPhase(failed)).toBe('failed');
+		const expired = stepUpReducer(code, {
+			type: 'confirmed',
+			answer: {
+				ok: false,
+				intent: 'confirm-step-up',
+				error: 'expired',
+				locked: false,
+			},
+		});
+		expect(stepUpDialogPhase(expired)).toBe('expired');
+		expect(
+			stepUpDialogPhase(
+				stepUpReducer(code, { type: 'confirmed', answer: accepted }),
+			),
+		).toBe('confirmed');
+	});
+});
+
+describe('requestAnswerOf and confirmAnswerOf', () => {
+	test('narrow the route’s union on the intent', () => {
+		expect(requestAnswerOf(granted('email'))).toEqual(granted('email'));
+		expect(requestAnswerOf(accepted)).toBeUndefined();
+		expect(confirmAnswerOf(accepted)).toEqual(accepted);
+		expect(confirmAnswerOf(granted('email'))).toBeUndefined();
+		expect(confirmAnswerOf(undefined)).toBeUndefined();
 	});
 });

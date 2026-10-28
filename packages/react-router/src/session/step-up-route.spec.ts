@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { body, jsonPost, thrown } from '../../test/session/flow';
+import { asking, body, jsonPost, thrown } from '../../test/session/flow';
 import { steps } from '../../test/session/step-up';
 
 const call = (payload: unknown) => ({
@@ -78,6 +78,33 @@ describe('route', () => {
 			)) as { init: { status: number } };
 			expect(error.init.status).toBe(400);
 		}
+		expect(log).toEqual([]);
+	});
+
+	test('a JSON post from another site is a 403, and a native form post goes back to its page', async () => {
+		const log: unknown[] = [];
+		const crossSite = asking('/step-up', undefined, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				origin: 'https://evil.test',
+			},
+			body: JSON.stringify({ intent: 'request-step-up' }),
+		});
+		const forbidden = (await thrown(() =>
+			steps().route(run(log), { request: crossSite, language: 'en' }),
+		)) as { init?: { status: number }; status?: number };
+		expect(forbidden.init?.status ?? forbidden.status).toBe(403);
+
+		const form = asking('/step-up', undefined, {
+			method: 'POST',
+			headers: { 'content-type': 'application/x-www-form-urlencoded' },
+			body: 'intent=request-step-up',
+		});
+		const back = (await thrown(() =>
+			steps().route(run(log), { request: form, language: 'en' }),
+		)) as Response;
+		expect(back.status).toBe(302);
 		expect(log).toEqual([]);
 	});
 });
