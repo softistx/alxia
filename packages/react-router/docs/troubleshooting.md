@@ -2936,3 +2936,12 @@ because `heartbeatMs` is longer than it.
 shortest idle timeout on the path, turn response buffering off for the
 route (nginx `proxy_buffering off`; the route already sends `X-Accel-Buffering: no`), and do not compress the
 route's responses.
+
+### The step-up dialog stays on "confirming" after the code was accepted
+
+**Why:** `useStepUpReplay` keeps the dialog open, confirming, until the answer
+of the replayed action arrives. A `replay()` that posts nothing (no pending
+action, a guard that returned early) produces no answer, so nothing ends it.
+
+**Fix:** make `replay` post the refused action, or call `cancel()` when it has
+nothing to send.
