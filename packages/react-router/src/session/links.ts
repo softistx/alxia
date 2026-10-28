@@ -16,6 +16,7 @@ import {
 } from './link-token';
 import type {
 	AuthLinks,
+	AuthLinksCodes,
 	AuthLinksOptions,
 	LinksContext,
 	RequestLinkAnswer,
@@ -38,6 +39,14 @@ const worded = <L extends string, C>(
 ): string =>
 	wording?.(error, language) ?? errors.apiErrorMessage(error, language);
 
+/** The codes that are a wait: the configured one or list, else janus's. */
+const throttleCodes = (
+	codes: AuthLinksCodes | undefined,
+): readonly string[] => {
+	const configured = codes?.mailThrottled ?? MAIL_THROTTLED;
+	return typeof configured === 'string' ? [configured] : configured;
+};
+
 async function requestLink<L extends string, C>(
 	options: LinksContext<L, C>,
 	run: () => Promise<unknown>,
@@ -50,10 +59,7 @@ async function requestLink<L extends string, C>(
 		return data<RequestLinkAnswer>({ sent: true });
 	} catch (error) {
 		const api = isApiErrorLike(error);
-		if (
-			api &&
-			error.code === (options.codes?.mailThrottled ?? MAIL_THROTTLED)
-		) {
+		if (api && throttleCodes(options.codes).includes(error.code ?? '')) {
 			const retryAfter = retryAfterOf(error);
 			return data<RequestLinkAnswer>(
 				{

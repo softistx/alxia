@@ -938,6 +938,17 @@ authLinks({
 });
 ```
 
+An API that refuses with several 429 codes (per address, per e-mail) gets a
+countdown on each: `mailThrottled` takes a list, and every listed code
+exposes its `retryAfter` to the page. The single string keeps working:
+
+```ts
+authLinks({
+	signIn,
+	codes: { mailThrottled: ['auth.errors.address-throttled', 'auth.errors.mail-throttled'] },
+});
+```
+
 A token is never logged, worded in an error or put in a redirect built by the
 helpers: the end states and the sign-in's redirects carry a state or a path
 alone, and a `TypeError` about a path prints it only up to its `?` or `#`.

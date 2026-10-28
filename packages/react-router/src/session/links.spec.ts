@@ -102,6 +102,40 @@ describe('requestLink', () => {
 		);
 	});
 
+	test('several throttle codes each count down', async () => {
+		const { links } = linksFor({
+			codes: { mailThrottled: ['auth.per-address', 'auth.per-mail'] },
+		});
+		for (const [code, wait] of [
+			['auth.per-address', 30],
+			['auth.per-mail', 90],
+		] as const) {
+			const answered = body(
+				await links.requestLink(
+					() => Promise.reject(api(code, 429, { retryAfter: wait })),
+					{ request: posting(), language: 'fr' },
+				),
+			);
+			expect(answered.init.status).toBe(429);
+			expect(answered.data['throttled']).toBe(true);
+			expect(answered.data['retryAfter']).toBe(wait);
+		}
+	});
+
+	test('a code outside the list is not a countdown', async () => {
+		const { links } = linksFor({
+			codes: { mailThrottled: ['auth.per-address', 'auth.per-mail'] },
+		});
+		const answered = body(
+			await links.requestLink(
+				() => Promise.reject(api('MAIL_THROTTLED', 429, { retryAfter: 5 })),
+				{ request: posting(), language: 'fr' },
+			),
+		);
+		expect(answered.data['throttled']).toBeUndefined();
+		expect(answered.data['retryAfter']).toBeUndefined();
+	});
+
 	test('a malformed address is the field’s refusal', async () => {
 		const { links } = linksFor();
 		const answered = body(
