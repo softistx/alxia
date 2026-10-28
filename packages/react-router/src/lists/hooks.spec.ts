@@ -298,6 +298,41 @@ describe('useSearchChange', () => {
 		expect(router.state.location.search).toBe('?k=1&q=');
 	});
 
+	test('a whole URLSearchParams replaces the search, keeping the replace behaviour', async () => {
+		let change: ReturnType<typeof useSearchChange> | undefined;
+		function Page() {
+			change = useSearchChange();
+			return null;
+		}
+		const { router } = await mount(Page, { path: '/rows?q=a&after=p2&old=1' });
+		await act(async () =>
+			change?.(new URLSearchParams({ status: 'open', after: 'p3' })),
+		);
+		await settle();
+		expect(router.state.location.search).toBe('?status=open&after=p3');
+		expect(String(router.state.historyAction)).toBe('REPLACE');
+	});
+
+	test('an updater gets the current search and returns the next one', async () => {
+		let change: ReturnType<typeof useSearchChange> | undefined;
+		function Page() {
+			change = useSearchChange();
+			return null;
+		}
+		const { router } = await mount(Page, { path: '/rows?q=a&old=1' });
+		await act(async () =>
+			change?.((prev) => {
+				const next = new URLSearchParams(prev);
+				next.delete('old');
+				next.set('page', '2');
+				return next;
+			}),
+		);
+		await settle();
+		expect(router.state.location.search).toBe('?q=a&page=2');
+		expect(String(router.state.historyAction)).toBe('REPLACE');
+	});
+
 	test('a search change reaches usePagedRows as a new first page (the cursor is gone)', async () => {
 		let change: ReturnType<typeof useSearchChange> | undefined;
 		let paged: PagedRows<string> | undefined;
