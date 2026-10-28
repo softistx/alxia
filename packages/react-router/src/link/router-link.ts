@@ -1,4 +1,4 @@
-import { createElement, type ReactElement } from 'react';
+import { createElement, type ReactElement, type RefAttributes } from 'react';
 import { Link, type LinkProps, type To } from 'react-router';
 
 /**
@@ -7,6 +7,7 @@ import { Link, type LinkProps, type To } from 'react-router';
  * over) or as `to` (React Router's own name), never both.
  */
 export type RouterLinkProps = Omit<LinkProps, 'to'> &
+	RefAttributes<HTMLAnchorElement> &
 	({ href: To; to?: undefined } | { to: To; href?: undefined });
 
 /**
@@ -25,5 +26,7 @@ export function RouterLink({
 	to,
 	...props
 }: RouterLinkProps): ReactElement {
+	// The union guarantees one of the two is set; TypeScript cannot see it
+	// through the destructuring, hence the cast.
 	return createElement(Link, { ...props, to: (href ?? to) as To });
 }

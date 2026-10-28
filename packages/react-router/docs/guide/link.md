@@ -23,6 +23,7 @@ export default function App() {
 
 - `href` (or `to`, React Router's own name, never both) is the destination: a
   string or a `To` object.
+- An external target (`https://…`, `mailto:`, `//host`) renders a plain anchor with that `href`; React Router's `Link` already handles it.
 - `className`, `children`, `ref`, `aria-*`, `target` and every other anchor prop
   reach the `<a>`.
 - `Link`'s own props (`replace`, `prefetch`, `reloadDocument`, `state`, ...) still
