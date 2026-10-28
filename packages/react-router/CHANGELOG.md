@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.28.1
+
+### Patch Changes
+
+- [#412](https://github.com/softistx/alxia/pull/412) [`3c5f877`](https://github.com/softistx/alxia/commit/3c5f87798b62632f0cd411c030af3f60bd770938) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `dialogPropsOf` and `useStepUpReplay`'s `dialogProps` keep `via` in every phase once a challenge was granted (`code`, `expired`, `failed`, `confirmed`), not only in `code`, so a dialog can tell a mailed code from an authenticator-app code to offer "send a new code" or "retry".
+
 ## 0.28.0
 
 ### Minor Changes
