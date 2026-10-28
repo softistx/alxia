@@ -54,6 +54,20 @@ export interface StepUpCall<L extends string> {
 	readonly language: L;
 }
 
+/**
+ * What `StepUpSteps.route` calls for each intent: the app's own API calls,
+ * with the fields the page posted.
+ */
+export interface StepUpRun {
+	/** Asks the API for a challenge (`requestStepUp`). */
+	request(): Promise<{ readonly challenge: string; readonly via: StepUpVia }>;
+	/** Confirms the code of the challenge (`confirmStepUp`). */
+	confirm(input: {
+		readonly challenge: string;
+		readonly code: string;
+	}): Promise<unknown>;
+}
+
 export interface StepUpSteps<L extends string> {
 	/**
 	 * Starts a step-up (`requestStepUp`): the challenge and how it is
@@ -78,6 +92,23 @@ export interface StepUpSteps<L extends string> {
 		run: () => Promise<unknown>,
 		options: StepUpCall<L> & { readonly via?: StepUpVia | undefined },
 	): Promise<StepUpConfirmAnswer | StepUpStayed<StepUpConfirmAnswer>>;
+	/**
+	 * The whole action of a resource route that serves the step-up to any
+	 * page: reads the same-site JSON body, runs `request` for
+	 * `{ intent: 'request-step-up' }` and `confirm` for
+	 * `{ intent: 'confirm-step-up', challenge, code, via? }`, and answers what
+	 * those steps answer. Any other intent, or a confirm with no challenge or
+	 * code, is a 400.
+	 */
+	route(
+		run: StepUpRun,
+		options: StepUpCall<L>,
+	): Promise<
+		| StepUpRequestAnswer
+		| StepUpConfirmAnswer
+		| StepUpStayed<StepUpRequestAnswer>
+		| StepUpStayed<StepUpConfirmAnswer>
+	>;
 	/** Whether `error` is the API asking for a step-up first. */
 	isStepUpRequired(error: unknown): boolean;
 }

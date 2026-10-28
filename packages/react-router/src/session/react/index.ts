@@ -1,9 +1,24 @@
 /**
  * `@alxia/react-router/session/react`: the hooks of a page around the
- * session flows `/session` serves: signing out, a mail link's parameter and
- * a one-code field. `react` and `react-router` are its only imports; it
+ * session flows `/session` serves: signing out, a mail link's parameter,
+ * a one-code field and the step-up with the replay of the refused action. `react` and `react-router` are its only imports; it
  * shares nothing with the server side of `/session`.
  */
+
+export {
+	asksStepUp,
+	confirmAnswerOf,
+	dialogPropsOf,
+	requestAnswerOf,
+	type StepUpChannel,
+	type StepUpDialogPhase,
+	type StepUpDialogProps,
+	type StepUpOptions,
+	type StepUpReplayOptions,
+	stepUpDialogPhase,
+	useStepUp,
+	useStepUpReplay,
+} from './step-up';
 export {
 	type CodeField,
 	type CodeSchema,
