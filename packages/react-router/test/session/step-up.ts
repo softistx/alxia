@@ -13,6 +13,7 @@ export const errors = createApiErrors<Lang>({
 export const steps = (
 	overrides: Partial<Omit<StepUpStepsOptions<Lang>, 'signIn'>> = {},
 	omit: readonly (keyof StepUpStepsOptions<Lang>)[] = [],
+	onSignedOut?: 'sign-in',
 ) => {
 	const { flow } = flowFor({
 		errors,
@@ -23,6 +24,7 @@ export const steps = (
 		spent: (language) => `ask again (${language})`,
 		locked: (language) => `wait (${language})`,
 		...overrides,
+		...(onSignedOut && { onSignedOut }),
 	};
 	for (const key of omit)
 		delete (options as unknown as Record<string, unknown>)[key];

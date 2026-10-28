@@ -13,6 +13,8 @@ export interface StepUpCodes extends SignInCodes {
 	readonly stepUpRequired?: string | undefined;
 	/** The code of a mail the API holds back (`'MAIL_THROTTLED'`): `request` answers `error: 'throttled'`. Any 429 is throttled too, whatever its code. */
 	readonly mailThrottled?: string | undefined;
+	/** The code of an API answer for no session or a dead one (`'UNAUTHENTICATED'`): what `onSignedOut` redirects on. */
+	readonly unauthenticated?: string | undefined;
 }
 
 export interface StepUpStepsOptions<L extends string, C = undefined> {
@@ -39,6 +41,17 @@ export interface StepUpStepsOptions<L extends string, C = undefined> {
 		| ((error: ApiErrorLike, language: L) => string | undefined)
 		| undefined;
 	readonly codes?: StepUpCodes | undefined;
+	/**
+	 * What `route` does when the user is signed out. `'sign-in'` redirects to
+	 * the flow's sign-in page (clearing the session cookie) when `run` fails
+	 * with `codes.unauthenticated` (`UNAUTHENTICATED`) or a bare 401 response;
+	 * `next` is the page the request came from (a same-site `Referer`, else the
+	 * route's own path). A wrong or expired code (also a 401 from the API)
+	 * stays a refusal for the dialog, and a second-factor-required answer is a
+	 * refusal too, never a redirect of the fetcher. Unset keeps `route` as it
+	 * was: `run`'s failures are the app's to read.
+	 */
+	readonly onSignedOut?: 'sign-in' | undefined;
 }
 
 /** An answer that stays on the page: the answer, with the API's status. */
@@ -98,7 +111,8 @@ export interface StepUpSteps<L extends string> {
 	 * `{ intent: 'request-step-up' }` and `confirm` for
 	 * `{ intent: 'confirm-step-up', challenge, code, via? }`, and answers what
 	 * those steps answer. Any other intent, or a confirm with no challenge or
-	 * code, is a 400.
+	 * code, is a 400. With `onSignedOut: 'sign-in'` a signed-out user is
+	 * redirected to sign-in (thrown) instead of answered.
 	 */
 	route(
 		run: StepUpRun,

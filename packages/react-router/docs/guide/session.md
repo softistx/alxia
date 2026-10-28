@@ -689,6 +689,21 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 ```
 
+A signed-out user has no page to come back to on that route. Set
+`onSignedOut: 'sign-in'` on `stepUpSteps` and `route` throws the flow's
+sign-in redirect (clearing the session cookie) when `run` fails with
+`UNAUTHENTICATED` (`codes.unauthenticated` renames it) or a bare 401
+response. `next` is the page of a same-site `Referer`; a `Referer` of
+another origin is ignored and `next` is the route's own path. A wrong or
+expired code is a 401 too but stays a refusal for the dialog, and a
+second-factor-required answer is a refusal, never a redirect of the
+fetcher. Your caller must therefore not redirect on 401 or
+second-factor-required itself.
+
+```ts
+export const stepUp = stepUpSteps({ signIn, spent, onSignedOut: 'sign-in' });
+```
+
 `request(run, { request, language })` answers `{ ok: true,
 intent: 'request-step-up', challenge, via }`. `confirm(run, { request,
 language, via? })` answers `{ ok: true, intent: 'confirm-step-up' }`. Both

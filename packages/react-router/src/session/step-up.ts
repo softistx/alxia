@@ -5,7 +5,7 @@ import {
 	isApiErrorLike,
 	retryAfterOf,
 } from '../errors/api-error';
-import { INVALID_CODE, MAIL_THROTTLED } from './codes';
+import { INVALID_CODE, MAIL_THROTTLED, UNAUTHENTICATED } from './codes';
 import type { CodeWording } from './flow-types';
 import { samesitePost } from './guard';
 import type {
@@ -29,6 +29,7 @@ interface StepUpContext<L extends string, C> extends CodeWording<L> {
 	readonly steps: StepUpStepsOptions<L, C>;
 	readonly stepUpRequired: string;
 	readonly mailThrottled: string;
+	readonly unauthenticated: string;
 }
 
 function resolve<L extends string, C>(
@@ -48,6 +49,7 @@ function resolve<L extends string, C>(
 		challengeOver,
 		stepUpRequired: steps.codes?.stepUpRequired ?? STEP_UP_REQUIRED,
 		mailThrottled: steps.codes?.mailThrottled ?? MAIL_THROTTLED,
+		unauthenticated: steps.codes?.unauthenticated ?? UNAUTHENTICATED,
 	};
 }
 
@@ -180,6 +182,35 @@ async function confirmStep<L extends string, C>(
 	}
 }
 
+/** A signed-out user's failure: the API's no-session code, or a bare 401 response. */
+function isSignedOut<L extends string, C>(
+	context: StepUpContext<L, C>,
+	error: unknown,
+): boolean {
+	if (error instanceof Response) return error.status === 401;
+	return isApiErrorLike(error) && error.code === context.unauthenticated;
+}
+
+/**
+ * The request the sign-in redirect comes back to: the same-site `Referer`'s
+ * page (the step-up route has none of its own), else the request's own URL.
+ * A `Referer` of another origin, or one that is not a URL, is ignored.
+ */
+function cameFrom(request: Request): Request {
+	const referer = request.headers.get('referer');
+	if (referer) {
+		try {
+			const from = new URL(referer);
+			if (from.origin === new URL(request.url).origin) {
+				return new Request(from, { headers: request.headers });
+			}
+		} catch {
+			// Not a URL: the request's own path.
+		}
+	}
+	return request;
+}
+
 async function routeStep<L extends string, C>(
 	context: StepUpContext<L, C>,
 	run: StepUpRun,
@@ -187,6 +218,44 @@ async function routeStep<L extends string, C>(
 ) {
 	const { json } = context.steps.signIn;
 	samesitePost(json, call.request);
+	if (context.steps.onSignedOut !== 'sign-in')
+		return routeIntent(context, run, call);
+	let signedOut = false;
+	const watch =
+		<A extends unknown[], R>(step: (...args: A) => Promise<R>) =>
+		async (...args: A): Promise<R> => {
+			try {
+				return await step(...args);
+			} catch (error) {
+				signedOut ||= isSignedOut(context, error);
+				throw error;
+			}
+		};
+	const redirect = () =>
+		context.steps.signIn.signInRedirect(cameFrom(call.request));
+	let answer: Awaited<ReturnType<typeof routeIntent>>;
+	try {
+		answer = await routeIntent(
+			context,
+			{
+				request: watch(() => run.request()),
+				confirm: watch((input) => run.confirm(input)),
+			},
+			call,
+		);
+	} catch (error) {
+		throw signedOut ? redirect() : error;
+	}
+	if (signedOut) throw redirect();
+	return answer;
+}
+
+async function routeIntent<L extends string, C>(
+	context: StepUpContext<L, C>,
+	run: StepUpRun,
+	call: Parameters<StepUpSteps<L>['request']>[1],
+) {
+	const { json } = context.steps.signIn;
 	const body = (await json.readJson(call.request)) as {
 		intent?: unknown;
 		challenge?: unknown;
