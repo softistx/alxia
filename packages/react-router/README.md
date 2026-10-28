@@ -92,7 +92,7 @@ Vite's preview server, as `bun run start` would: the pages, `/api`, the
 client's files and the app's middlewares. So does React Router's prerendering.
 
 `@alxia/core` and `react-router` 8 are peers, and `vite` 7 or 8 is an
-optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react`. The six `workbox-*`
+optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react` and `/lists`. The six `workbox-*`
 packages (`workbox-core`, `workbox-expiration`, `workbox-navigation-preload`,
 `workbox-precaching`, `workbox-routing`, `workbox-strategies`) are optional
 peers too, for `/pwa/worker` (the [PWA section](#installable-and-offline-pwa) has the install line). `/errors` imports `react-router`, a required peer that is already installed. The package declares no dependency.
@@ -1019,6 +1019,26 @@ export const action = events.action; // POST
 See the [subscription guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/subscriptions.md)
 for the rules, the options and the errors.
 
+## A list whose state is the URL
+
+`@alxia/react-router/lists` (`react` and `react-router` are its only imports; every hook renders on the server)
+holds the three hooks a search, filters and a "load more" button need.
+
+```tsx
+import { usePagedRows, useSameRouteLoading, useSearchChange } from '@alxia/react-router/lists';
+
+export default function Users({ loaderData }: Route.ComponentProps) {
+	const change = useSearchChange(); // drops ?after on every change
+	const reloading = useSameRouteLoading(); // another search of this page: show the skeleton
+	const { rows, next, loading, error, loadMore } = usePagedRows(loaderData.page, (page) => page.items);
+	// <input onChange={(e) => change({ q: e.target.value || null })} />
+	// <Button disabled={!next || loading} onClick={loadMore}>{error ? 'Retry' : 'Load more'}</Button>
+}
+```
+
+The loader answers `?after=<cursor>` with the next `{ items, next }`. See the
+[lists guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/lists.md).
+
 ## Traps
 
 - **A context key made in `app/` reaches the loaders only through the
@@ -1223,6 +1243,14 @@ From `@alxia/react-router/entry`:
 | `createEntry({ streamTimeout?, nonce?, isBot?, onError? })`, `EntryOptions`, `Entry` | `/entry`: `{ handleRequest, streamTimeout }` (`Entry`), `entry.server.tsx` for Bun on the web stream renderer |
 | `handleRequest`, `streamTimeout`, `HandleRequest` | `/entry`: the default entry (`createEntry()`), its `5_000` and the type of `handleRequest` (assignable to React Router's `ServerEntryModule['default']`) |
 
+From `@alxia/react-router/lists` (`react` and `react-router` are its only imports; every hook renders on the server):
+
+| export | |
+| --- | --- |
+| `useSearchChange({ resetKeys? })`, `SearchChangeOptions` | `(changes) => void`: sets a parameter given a string, deletes one given `null` or `undefined`, and deletes `resetKeys` (default `['after']`); the history entry is replaced and the scroll position kept |
+| `useSameRouteLoading()` | `true` while a navigation is loading and its pathname is the current one (another search of the list), `false` for any other page |
+| `usePagedRows(firstPage, rowsOf, { cursorParam?, nextOf? }?)`, `PagedRows`, `PagedRowsOptions` | `{ rows, next, loading, error, loadMore }`: appends the pages the same route answers to `?<cursorParam>=<next>` (default `after`, `nextOf` default `page.next`) through `useFetcher`; starts over when `firstPage` is another object; a failure keeps the rows and sets `error` (an answer that is not a page), and data that is not a page is ignored |
+
 From `@alxia/react-router/subscription` (no import, no peer):
 
 | export | |
@@ -1247,6 +1275,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what the subpaths hold, the worker's contract, the worker, what it caches, the offline page, building the worker with `alxia()` or `buildWorker`, the hooks in React, registering the worker and offering an update, serving the worker's script, the web app manifest, and clearing at sign-out.
 - [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, the page a request is for, the catalogue store, the form checks in the API's words, the provider, wording a refusal, loaders and the error page, actions, JSON actions and CSRF, and keeping the catalogue fresh.
 - [A BFF session](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/session.md): redirects that stay on the site, the cookies, the sign-in route, the second factor, the viewer and sign-out, the step-up, and the pages a mail's link opens.
+- [Lists whose state is the URL](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/lists.md): `useSearchChange`, `useSameRouteLoading`, `usePagedRows`: a search that drops the cursor, a skeleton for the same page reloading, a load-more button.
 - [Subscriptions for a BFF](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/subscriptions.md): exposing a GraphQL subscription to the browser through a resource route: the allow-list, the session's bearer, the headers, the heartbeat, abort and rate limits.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
