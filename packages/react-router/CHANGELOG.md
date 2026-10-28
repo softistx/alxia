@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.21.0
+
+### Minor Changes
+
+- [#381](https://github.com/softistx/alxia/pull/381) [`1d2afb3`](https://github.com/softistx/alxia/commit/1d2afb36226339d3a933316b6b8dd371af486b70) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `@alxia/react-router/errors` exports `retryAfterOf(error)`, the seconds a 429 asks to wait, so a page can show a countdown on its own rate-limited forms instead of copying the helper.
+
 ## 0.20.0
 
 ### Minor Changes
