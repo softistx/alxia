@@ -106,4 +106,18 @@ describe('RouterLink', () => {
 		}
 		await win.happyDOM.close();
 	});
+
+	// Compiled by `typecheck`, never run.
+	test('types: href or to, never both nor neither, and a ref', () => {
+		const types = () => {
+			const ref = createRef<HTMLAnchorElement>();
+			createElement(RouterLink, { href: '/a', ref });
+			createElement(RouterLink, { to: { pathname: '/a' } });
+			// @ts-expect-error both destinations
+			createElement(RouterLink, { href: '/a', to: '/b' });
+			// @ts-expect-error no destination
+			createElement(RouterLink, { className: 'x' });
+		};
+		expect(typeof types).toBe('function');
+	});
 });
