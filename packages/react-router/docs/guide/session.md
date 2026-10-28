@@ -689,6 +689,32 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 ```
 
+A signed-out user has no page to come back to on that route. Set
+`onSignedOut: 'sign-in'` on `stepUpSteps` and `route` throws the flow's
+sign-in redirect (clearing the session cookie) when `run` fails with an
+`ApiError` whose code is `UNAUTHENTICATED` (`codes.unauthenticated` renames
+it). From `run.request` a bare 401 `Response` counts too; from `run.confirm`
+it does not, since a wrong code is a 401 as well: `run.confirm` must throw an
+`ApiError` for the API's code refusals. `next` is the page of a same-site
+`Referer`; a `Referer` of another origin (port and protocol count) or one
+that is not a URL is ignored and `next` is the route's own path. Behind a
+TLS-terminating proxy an `http` `request.url` never matches an `https`
+`Referer`, so `next` falls back to the route's own path there. A wrong or
+expired code stays a refusal for the dialog, and a second-factor-required
+answer is a refusal, never a redirect of the fetcher. Your caller must
+therefore not redirect on 401 or second-factor-required itself.
+
+This replaces the `stepUpSteps({ signIn, spent, locked })` definition above
+and applies to the `stepUp.route(...)` call of the resource route:
+
+```ts
+export const stepUp = stepUpSteps({ signIn, spent, locked, onSignedOut: 'sign-in' });
+
+// app/routes/step-up.tsx: a signed-out user is redirected, never answered
+export const action = ({ request }: Route.ActionArgs) =>
+	stepUp.route({ request: runRequest, confirm: runConfirm }, { request, language: 'en' });
+```
+
 `request(run, { request, language })` answers `{ ok: true,
 intent: 'request-step-up', challenge, via }`. `confirm(run, { request,
 language, via? })` answers `{ ok: true, intent: 'confirm-step-up' }`. Both
@@ -788,7 +814,9 @@ own can spread either. `invalidCode` in `challengeOver` is a
 caller that treats every 401 as "the session is dead" and redirects to the
 sign-in page would sign the user out on the first typo. Make the caller of the
 step-up's two operations leave a 401 alone, or have it redirect only when the
-error's code is `UNAUTHENTICATED`.
+error's code is `UNAUTHENTICATED`. This applies when `onSignedOut` is unset;
+with `onSignedOut: 'sign-in'`, `route()` does it
+([a signed-out user](#step-up)).
 
 ### The state on the page
 

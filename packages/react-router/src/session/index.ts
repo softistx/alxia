@@ -4,7 +4,12 @@
  * cookie. The subpath may import `react-router` and `/errors`' files,
  * nothing else.
  */
-export { CHALLENGE_OVER, INVALID_CODE, MAIL_THROTTLED } from './codes';
+export {
+	CHALLENGE_OVER,
+	INVALID_CODE,
+	MAIL_THROTTLED,
+	UNAUTHENTICATED,
+} from './codes';
 export {
 	type ChallengeCookies,
 	type CookieSession,

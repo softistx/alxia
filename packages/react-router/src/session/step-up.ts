@@ -5,7 +5,7 @@ import {
 	isApiErrorLike,
 	retryAfterOf,
 } from '../errors/api-error';
-import { INVALID_CODE, MAIL_THROTTLED } from './codes';
+import { INVALID_CODE, MAIL_THROTTLED, UNAUTHENTICATED } from './codes';
 import type { CodeWording } from './flow-types';
 import { samesitePost } from './guard';
 import type {
@@ -16,6 +16,7 @@ import type {
 } from './model';
 import { codeRefusal } from './step';
 import { STEP_UP_OVER, STEP_UP_REQUIRED } from './step-up-codes';
+import { signingOut } from './step-up-signed-out';
 import type {
 	StepUpRun,
 	StepUpStayed,
@@ -29,6 +30,7 @@ interface StepUpContext<L extends string, C> extends CodeWording<L> {
 	readonly steps: StepUpStepsOptions<L, C>;
 	readonly stepUpRequired: string;
 	readonly mailThrottled: string;
+	readonly unauthenticated: string;
 }
 
 function resolve<L extends string, C>(
@@ -48,6 +50,7 @@ function resolve<L extends string, C>(
 		challengeOver,
 		stepUpRequired: steps.codes?.stepUpRequired ?? STEP_UP_REQUIRED,
 		mailThrottled: steps.codes?.mailThrottled ?? MAIL_THROTTLED,
+		unauthenticated: steps.codes?.unauthenticated ?? UNAUTHENTICATED,
 	};
 }
 
@@ -187,6 +190,25 @@ async function routeStep<L extends string, C>(
 ) {
 	const { json } = context.steps.signIn;
 	samesitePost(json, call.request);
+	if (context.steps.onSignedOut !== 'sign-in')
+		return routeIntent(context, run, call);
+	return signingOut(
+		{
+			signIn: context.steps.signIn,
+			unauthenticated: context.unauthenticated,
+			run,
+			request: call.request,
+		},
+		(watched) => routeIntent(context, watched, call),
+	);
+}
+
+async function routeIntent<L extends string, C>(
+	context: StepUpContext<L, C>,
+	run: StepUpRun,
+	call: Parameters<StepUpSteps<L>['request']>[1],
+) {
+	const { json } = context.steps.signIn;
 	const body = (await json.readJson(call.request)) as {
 		intent?: unknown;
 		challenge?: unknown;

@@ -1,6 +1,16 @@
 import { describe, expect, test } from 'bun:test';
-import { asking, body, jsonPost, thrown } from '../../test/session/flow';
-import { steps } from '../../test/session/step-up';
+import type { Lang } from '../../test/errors/format';
+import { refusal } from '../../test/errors/refusal';
+import {
+	asking,
+	body,
+	END,
+	flowFor,
+	jsonPost,
+	thrown,
+} from '../../test/session/flow';
+import { errors, steps, wrong } from '../../test/session/step-up';
+import { stepUpSteps } from './index';
 
 const call = (payload: unknown) => ({
 	request: jsonPost('/step-up', payload),
@@ -106,5 +116,180 @@ describe('route', () => {
 		)) as Response;
 		expect(back.status).toBe(302);
 		expect(log).toEqual([]);
+	});
+});
+
+describe('route, onSignedOut: sign-in', () => {
+	const confirmPayload = {
+		intent: 'confirm-step-up',
+		challenge: 'c',
+		code: '1',
+	};
+	const callFrom = (payload: unknown, referer?: string) => ({
+		request: asking('/step-up', undefined, {
+			method: 'POST',
+			headers: {
+				'content-type': 'application/json',
+				...(referer ? { referer } : {}),
+			},
+			body: JSON.stringify(payload),
+		}),
+		language: 'en' as const,
+	});
+	const failing = (error: unknown) => ({
+		request: () => Promise.reject(error),
+		confirm: () => Promise.reject(error),
+	});
+	const signedOut = () => refusal('UNAUTHENTICATED', 'No session', {}, 401);
+	const to = async (call: ReturnType<typeof callFrom>, error: unknown) =>
+		(await thrown(() =>
+			steps({}, [], 'sign-in').route(failing(error), call),
+		)) as Response;
+
+	test('a wrong code stays a refusal for the dialog', async () => {
+		const answer = body(
+			await steps({}, [], 'sign-in').route(
+				failing(wrong(2)),
+				callFrom(confirmPayload),
+			),
+		);
+		expect(answer.data).toMatchObject({ ok: false, error: 'invalid' });
+		expect(answer.init.status).toBe(401);
+	});
+
+	test('an UNAUTHENTICATED answer redirects to sign-in with the same-site Referer as next', async () => {
+		for (const payload of [{ intent: 'request-step-up' }, confirmPayload]) {
+			const res = await to(
+				callFrom(payload, 'http://my-app.test/orders?page=2'),
+				signedOut(),
+			);
+			expect(res.status).toBe(302);
+			const location = new URL(res.headers.get('location') ?? '', 'http://h');
+			expect(location.searchParams.get('next')).toBe('/orders?page=2');
+		}
+	});
+
+	test('a bare 401 response redirects too', async () => {
+		const res = await to(
+			callFrom({ intent: 'request-step-up' }, 'http://my-app.test/a'),
+			new Response('no', { status: 401 }),
+		);
+		expect(res.status).toBe(302);
+	});
+
+	test('a foreign Referer is ignored: next is the route’s own path', async () => {
+		const res = await to(
+			callFrom(confirmPayload, 'https://evil.test/orders'),
+			signedOut(),
+		);
+		const location = new URL(res.headers.get('location') ?? '', 'http://h');
+		expect(location.searchParams.get('next')).toBe('/step-up');
+	});
+
+	test('a second-factor-required answer is a refusal, never a redirect', async () => {
+		const answer = body(
+			await steps({}, [], 'sign-in').route(
+				failing(refusal('SECOND_FACTOR_REQUIRED', 'Enrol', {}, 403)),
+				callFrom({ intent: 'request-step-up' }, 'http://my-app.test/orders'),
+			),
+		);
+		expect(answer.data).toMatchObject({ ok: false, error: 'failed' });
+	});
+
+	test('without the option, an UNAUTHENTICATED answer is not redirected', async () => {
+		const answer = body(
+			await steps().route(failing(signedOut()), callFrom(confirmPayload)),
+		);
+		expect(answer.data).toMatchObject({ ok: false });
+	});
+
+	const next = (res: Response) =>
+		new URL(res.headers.get('location') ?? '', 'http://h').searchParams.get(
+			'next',
+		);
+
+	test('a bare 401 from request-step-up signs out, from confirm it stays a refusal', async () => {
+		const bare = () => new Response('no', { status: 401 });
+		expect(
+			(await to(callFrom({ intent: 'request-step-up' }), bare())).status,
+		).toBe(302);
+		const kept = (await thrown(() =>
+			steps({}, [], 'sign-in').route(failing(bare()), callFrom(confirmPayload)),
+		)) as Response;
+		expect(kept.status).toBe(401);
+	});
+
+	test('a custom codes.unauthenticated is the sign-out code', async () => {
+		const custom = steps(
+			{ codes: { unauthenticated: 'auth.errors.unauthenticated' } },
+			[],
+			'sign-in',
+		);
+		const res = (await thrown(() =>
+			custom.route(
+				failing(refusal('auth.errors.unauthenticated', 'No', {}, 401)),
+				callFrom(confirmPayload, 'http://my-app.test/x'),
+			),
+		)) as Response;
+		expect(next(res)).toBe('/x');
+		const plain = body(
+			await custom.route(failing(signedOut()), callFrom(confirmPayload)),
+		);
+		expect(plain.data).toMatchObject({ ok: false });
+	});
+
+	test('next falls back to the route path for an odd Referer', async () => {
+		for (const referer of [
+			'http://my-app.test:3000/orders',
+			'https://my-app.test/orders',
+			'//evil.test/x',
+			'not a url',
+		]) {
+			const res = await to(callFrom(confirmPayload, referer), signedOut());
+			expect(next(res)).toBe('/step-up');
+		}
+	});
+
+	test('a bare-origin Referer comes back to /', async () => {
+		const res = await to(
+			callFrom(confirmPayload, 'http://my-app.test'),
+			signedOut(),
+		);
+		expect(res.status).toBe(302);
+		expect(next(res) ?? '/').toBe('/');
+	});
+
+	test('the redirect clears the session cookie', async () => {
+		const res = await to(callFrom(confirmPayload), signedOut());
+		expect(res.headers.getSetCookie().length).toBeGreaterThan(0);
+		expect(res.headers.getSetCookie()[0]).toMatch(/Max-Age=0|Expires=/i);
+	});
+
+	test('a Referer on the sign-in page yields a safe next', async () => {
+		const res = await to(
+			callFrom(confirmPayload, 'http://my-app.test/sign-in?next=%2Fa'),
+			signedOut(),
+		);
+		expect(res.status).toBe(302);
+		expect(next(res)?.startsWith('/')).toBe(true);
+		expect(next(res)?.startsWith('//')).toBe(false);
+	});
+
+	test('endedParam marks the redirect when the request carried a session', async () => {
+		const { flow, cookies } = flowFor({ errors, endedParam: 'ended' });
+		const cookie = cookies.commit('tok', END).split(';')[0] ?? '';
+		const request = asking('/step-up', undefined, {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', cookie },
+			body: JSON.stringify(confirmPayload),
+		});
+		const res = (await thrown(() =>
+			stepUpSteps<Lang>({
+				signIn: flow,
+				spent: () => 'again',
+				onSignedOut: 'sign-in',
+			}).route(failing(signedOut()), { request, language: 'en' }),
+		)) as Response;
+		expect(res.headers.get('location')).toContain('ended=1');
 	});
 });

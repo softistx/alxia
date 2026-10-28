@@ -10,3 +10,6 @@ export const CHALLENGE_OVER = [
 
 /** `@nxgt/janus`'s code for a mail the API holds back: a link or a code asked for too often. */
 export const MAIL_THROTTLED = 'MAIL_THROTTLED';
+
+/** The code of an API answer for no session, or a dead one. */
+export const UNAUTHENTICATED = 'UNAUTHENTICATED';
