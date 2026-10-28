@@ -33,7 +33,7 @@ a `Bun.serve` given [`websocket`](#websocket).
 | `port` | `number \| string` | Bun's | the port; `0` picks a free one |
 | `hostname` | `string` | Bun's | the interface to listen on |
 | `development` | `boolean` | Bun's | Bun's development mode, which hot-reloads `page` bundles |
-| `idleTimeout` | `number` | Bun's | seconds before an idle connection is closed |
+| `idleTimeout` | `number` | Bun's | seconds before an idle connection is closed (Bun's default is 10; a stream that stays quiet longer, such as an SSE subscription, needs more: [GraphQL subscriptions](../../../graphql/docs/guide/yoga.md#keep-an-idle-subscription-open)) |
 | `maxRequestBodySize` | `number` | Bun's | the largest body the server accepts, in bytes; a route's [`bodyLimit`](routes.md#body-size-bodylimit) caps its own below it |
 | `tls` | `Bun.TLSOptions` | none | serve HTTPS |
 | `shutdownTimeout` | `number` | `10000` | how long the requests in flight have to finish once shutdown starts, in milliseconds ([Health and shutdown](health-and-shutdown.md#graceful-shutdown)) |
