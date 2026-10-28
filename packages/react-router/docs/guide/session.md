@@ -1237,6 +1237,10 @@ export function useDeleteItem() {
 `dialogProps` is `dialogPropsOf(stepUp, open, cancel)`, which is plain and
 exported, for a host that builds them itself.
 
+`via` is kept in every phase once a challenge was granted (`code`, `expired`,
+`failed`, `confirmed`) and is `undefined` before, so a dialog can tell a mailed
+code from an authenticator-app code.
+
 ### `useStepUp`, `asksStepUp` and `stepUpDialogPhase`
 
 `useStepUp({ request, confirm, onConfirmed })` is the part under it, for a host
