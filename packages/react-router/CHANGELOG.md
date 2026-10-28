@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.24.1
+
+### Patch Changes
+
+- [#393](https://github.com/softistx/alxia/pull/393) [`86cea04`](https://github.com/softistx/alxia/commit/86cea0443db43d63275a882b86f18792d33ba978) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The default API-code pattern (`API_CODE`, used by `createApiErrors` and `apiCodeResolver` when no `isApiCode` is given) accepts a camelCase module, such as `userProfiles.errors.slug-taken`. Before, such a code fell back to the generic refusal. A module must still start with a lowercase letter.
+
 ## 0.24.0
 
 ### Minor Changes
