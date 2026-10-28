@@ -6,8 +6,12 @@ import type { SignInAnswer, SignInFlow } from './flow-types';
 
 /** The codes the links tell apart; `@nxgt/janus`'s by default. */
 export interface AuthLinksCodes {
-	/** The API's wait on mailed links; `MAIL_THROTTLED` by default. */
-	readonly mailThrottled?: string | undefined;
+	/**
+	 * The API's wait on mailed links; `MAIL_THROTTLED` by default. A list when
+	 * the API refuses with several codes (per address, per e-mail): each
+	 * carries `retryAfter` to the page.
+	 */
+	readonly mailThrottled?: string | readonly string[] | undefined;
 }
 
 export interface AuthLinksOptions<L extends string, C = undefined> {
