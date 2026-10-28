@@ -1,5 +1,13 @@
 # @alxia/graphql
 
+## 0.11.2
+
+### Patch Changes
+
+- [#406](https://github.com/softistx/alxia/pull/406) [`fa09b42`](https://github.com/softistx/alxia/commit/fa09b428690e74b3d3416aa08ec09e8ea5aa71ce) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Document that Bun's default `idleTimeout` (10 s) resets an idle SSE subscription before Yoga's first 12 s ping, and the `idleTimeout: 30` fix, in the subscriptions guide and troubleshooting.
+- Updated dependencies [[`fa09b42`](https://github.com/softistx/alxia/commit/fa09b428690e74b3d3416aa08ec09e8ea5aa71ce)]:
+  - @alxia/core@0.17.1
+
 ## 0.11.1
 
 ### Patch Changes

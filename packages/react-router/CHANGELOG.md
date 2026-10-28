@@ -1,5 +1,17 @@
 # @alxia/react-router
 
+## 0.28.0
+
+### Minor Changes
+
+- [#410](https://github.com/softistx/alxia/pull/410) [`146ba2b`](https://github.com/softistx/alxia/commit/146ba2b4779781145d3f32df67c6de2f07d8a0e8) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Add `useStepUpReplay` and `useStepUp` to `@alxia/react-router/session/react`: open a step-up dialog when an action's answer carries `stepUp`, post the `request-step-up` and `confirm-step-up` intents through the host's own typed `post`s, and send the refused action again once the session is confirmed (not when it carries a one-time code the step-up just spent: `confirmedNotice` then says to type a new one). `stepUpSteps` gains `route(run, { request, language })`, the whole action of one resource route any page can post the step-up intents to.
+
+### Patch Changes
+
+- [#406](https://github.com/softistx/alxia/pull/406) [`fa09b42`](https://github.com/softistx/alxia/commit/fa09b428690e74b3d3416aa08ec09e8ea5aa71ce) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Correct the subscription proxy docs: Bun's default `idleTimeout` (10 s) is shorter than the 15 s heartbeat, so set `listen: { idleTimeout: 30 }`.
+- Updated dependencies [[`fa09b42`](https://github.com/softistx/alxia/commit/fa09b428690e74b3d3416aa08ec09e8ea5aa71ce)]:
+  - @alxia/core@0.17.1
+
 ## 0.27.0
 
 ### Minor Changes
