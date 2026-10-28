@@ -17,6 +17,7 @@ import type {
 import { codeRefusal } from './step';
 import { STEP_UP_OVER, STEP_UP_REQUIRED } from './step-up-codes';
 import type {
+	StepUpRun,
 	StepUpStayed,
 	StepUpSteps,
 	StepUpStepsOptions,
@@ -179,6 +180,40 @@ async function confirmStep<L extends string, C>(
 	}
 }
 
+async function routeStep<L extends string, C>(
+	context: StepUpContext<L, C>,
+	run: StepUpRun,
+	call: Parameters<StepUpSteps<L>['request']>[1],
+) {
+	const { json } = context.steps.signIn;
+	samesitePost(json, call.request);
+	const body = (await json.readJson(call.request)) as {
+		intent?: unknown;
+		challenge?: unknown;
+		code?: unknown;
+		via?: unknown;
+	} | null;
+	if (body?.intent === 'request-step-up') {
+		return requestStep(context, () => run.request(), call);
+	}
+	if (
+		body?.intent === 'confirm-step-up' &&
+		typeof body.challenge === 'string' &&
+		typeof body.code === 'string'
+	) {
+		const { challenge, code } = body;
+		const via =
+			body.via === 'email' || body.via === 'secondFactor'
+				? body.via
+				: undefined;
+		return confirmStep(context, () => run.confirm({ challenge, code }), {
+			...call,
+			via,
+		});
+	}
+	throw data('Not a step-up intent', { status: 400 });
+}
+
 /**
  * The server side of a BFF's step-up: `request` and `confirm` answer the
  * page's fetcher with `StepUpRequestAnswer` and `StepUpConfirmAnswer`, which
@@ -200,6 +235,7 @@ export function stepUpSteps<L extends string, C = undefined>(
 	return {
 		request: (run, o) => requestStep(context, run, o),
 		confirm: (run, o) => confirmStep(context, run, o),
+		route: (run, o) => routeStep(context, run, o),
 		isStepUpRequired: (error) =>
 			isApiErrorLike(error) && error.code === context.stepUpRequired,
 	};

@@ -49,6 +49,7 @@ export { STEP_UP_OVER, STEP_UP_REQUIRED } from './step-up-codes';
 export type {
 	StepUpCall,
 	StepUpCodes,
+	StepUpRun,
 	StepUpStayed,
 	StepUpSteps,
 	StepUpStepsOptions,

@@ -13,7 +13,8 @@ It covers three subpaths:
   `react-router` and `/errors`' files, nothing else, knows no API client and
   adds no peer.
 - `@alxia/react-router/session/react`, the page's hooks around those flows:
-  signing out, a mail link's parameter and a one-code field. They import
+  signing out, a mail link's parameter, a one-code field and the step-up
+  with the replay of the refused action. They import
   `react` and `react-router`, both already peers.
 - `@alxia/react-router/session/model`, the part that imports nothing and is
   safe in a component as well as in a loader: redirects that stay on the
@@ -664,6 +665,30 @@ export async function action({ context, request }: Route.ActionArgs) {
 }
 ```
 
+To serve the step-up to every page from one resource route, `route(run, {
+request, language })` is that whole action: it reads the same-site JSON body
+and runs `run.request()` for `{ intent: 'request-step-up' }` or
+`run.confirm({ challenge, code })` for `{ intent: 'confirm-step-up',
+challenge, code, via? }`. Any other intent is a 400.
+
+```ts
+// app/routes/step-up.tsx: any page posts the step-up intents here
+export async function action({ context, request }: Route.ActionArgs) {
+	const { language } = alxiaOf(context);
+	const caller = await sessionCaller(request);
+	return stepUp.route(
+		{
+			request: async () => {
+				const { requestStepUp } = await execute(RequestStepUpMutation, {}, caller);
+				return { challenge: requestStepUp.challenge, via: toVia(requestStepUp.method) };
+			},
+			confirm: (input) => execute(ConfirmStepUpMutation, input, caller),
+		},
+		{ request, language },
+	);
+}
+```
+
 `request(run, { request, language })` answers `{ ok: true,
 intent: 'request-step-up', challenge, via }`. `confirm(run, { request,
 language, via? })` answers `{ ok: true, intent: 'confirm-step-up' }`. Both
@@ -991,7 +1016,7 @@ out of any `Referer`.
 
 ## The page's hooks
 
-`@alxia/react-router/session/react` holds the three client pieces every app
+`@alxia/react-router/session/react` holds the client pieces every app
 writes around the flows above. It imports `react` and `react-router` (peers
 the package already has) and nothing else; every hook renders on the server.
 
@@ -1130,6 +1155,52 @@ useOnRefusal(refusal, () => {
 The package takes no form library as a peer: react-hook-form would also need
 its resolver for the schema, and a library-agnostic core serves every form
 library at the price of three lines.
+
+### `useStepUpReplay`
+
+A sensitive action the API refuses with `step-up-required` answers with
+`stepUp` set. `useStepUpReplay` opens the step-up on that answer, posts the
+`request-step-up` and `confirm-step-up` intents, and sends the refused action
+again once the session is confirmed. The dialog stays, saying so, until the
+replayed action is answered. It is generic over your own `post`s, so each
+intent keeps the fields your action types.
+
+An action that carries a one-time code (`spendsCode`) is not replayed after a
+step-up by the second factor: that code was just spent, so the dialog closes
+and `confirmedNotice` is true ("confirmed, type a new code").
+
+```tsx
+import { useStepUpReplay } from '@alxia/react-router/session/react';
+
+const fetcher = useFetcher<typeof action>();
+const request = useFetcher<typeof stepUpAction>({ key: 'step-up-request' });
+const confirm = useFetcher<typeof stepUpAction>({ key: 'step-up-confirm' });
+const last = useRef<DeleteItem>();
+
+const { open, dialogProps, cancel, confirmedNotice } = useStepUpReplay({
+	answer: fetcher.state === 'idle' ? fetcher.data : undefined,
+	action: last.current,
+	spendsCode: (a) => a.code !== undefined,
+	replay: () => post(last.current!),
+	request: {
+		post: () => request.submit({ intent: 'request-step-up' }, { method: 'post', action: '/step-up', encType: 'application/json' }),
+		answer: request.data, // a StepUpRequestAnswer
+		busy: request.state !== 'idle',
+		reset: () => request.reset(),
+	},
+	confirm: {
+		post: (fields) => confirm.submit({ intent: 'confirm-step-up', ...fields }, { method: 'post', action: '/step-up', encType: 'application/json' }),
+		answer: confirm.data, // a StepUpConfirmAnswer
+		busy: confirm.state !== 'idle',
+		reset: () => confirm.reset(),
+	},
+});
+// Pass dialogProps to your step-up dialog: phase, via, props, message,
+// busy, confirming, onCancel, onRetry, onSubmit, onResend.
+```
+
+`useStepUp({ request, confirm, onConfirmed })` is the part under it, for a
+host that decides itself what to do once the code is accepted.
 
 ## The types and the rest of `/session/model`
 
