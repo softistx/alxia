@@ -5,6 +5,7 @@
  */
 
 export {
+	DEFAULT_CURSOR_PARAM,
 	type PagedRows,
 	type PagedRowsOptions,
 	usePagedRows,

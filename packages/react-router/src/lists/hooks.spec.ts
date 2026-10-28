@@ -196,7 +196,7 @@ describe('usePagedRows', () => {
 		expect(paged?.rows).toEqual(['a1', 'a2', 'a3', 'a4']);
 	});
 
-	test('data that is not a page is ignored (null)', async () => {
+	test('data that is not a page sets error and keeps the rows (null)', async () => {
 		let paged: PagedRows<string> | undefined;
 		function Rows() {
 			paged = usePagedRows(useLoaderData() as Page, (p) => p.items);

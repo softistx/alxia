@@ -1025,18 +1025,50 @@ for the rules, the options and the errors.
 holds the three hooks a search, filters and a "load more" button need.
 
 ```tsx
+// app/routes/users.tsx
 import { usePagedRows, useSameRouteLoading, useSearchChange } from '@alxia/react-router/lists';
+import type { Route } from './+types/users';
+
+const USERS = Array.from({ length: 45 }, (_, i) => `user ${i + 1}`);
+
+// ?q=<search>&after=<cursor>: 20 rows a page, `next` is null on the last one
+export function loader({ request }: Route.LoaderArgs) {
+	const url = new URL(request.url);
+	const q = url.searchParams.get('q') ?? '';
+	const start = Number(url.searchParams.get('after') ?? 0);
+	const found = USERS.filter((name) => name.includes(q));
+	const rows = found.slice(start, start + 20);
+	return { rows, next: start + 20 < found.length ? String(start + 20) : null };
+}
 
 export default function Users({ loaderData }: Route.ComponentProps) {
 	const change = useSearchChange(); // drops ?after on every change
 	const reloading = useSameRouteLoading(); // another search of this page: show the skeleton
-	const { rows, next, loading, error, loadMore } = usePagedRows(loaderData.page, (page) => page.items);
-	// <input onChange={(e) => change({ q: e.target.value || null })} />
-	// <Button disabled={!next || loading} onClick={loadMore}>{error ? 'Retry' : 'Load more'}</Button>
+	const { rows, next, loading, error, loadMore } = usePagedRows(loaderData, (page) => page.rows);
+	return (
+		<main>
+			<input type="search" placeholder="Search" onChange={(event) => change({ q: event.target.value || null })} />
+			{reloading ? (
+				<p>Loading…</p>
+			) : (
+				<ul>
+					{rows.map((name) => (
+						<li key={name}>{name}</li>
+					))}
+				</ul>
+			)}
+			{error ? <p role="alert">The next rows could not be loaded.</p> : null}
+			{next ? (
+				<button type="button" disabled={loading} onClick={loadMore}>
+					{error ? 'Retry' : 'Load more'}
+				</button>
+			) : null}
+		</main>
+	);
 }
 ```
 
-The loader answers `?after=<cursor>` with the next `{ items, next }`. See the
+The loader answers `?after=<cursor>` with the next page. A loader that throws on a cursor request lands on the route's `ErrorBoundary`: see [troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md). See the
 [lists guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/lists.md).
 
 ## Traps

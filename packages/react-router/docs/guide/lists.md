@@ -87,7 +87,23 @@ const { rows, next, loading, error, loadMore } = usePagedRows(
 - **A failure keeps the rows.** When the route answers something that is not a
   page (`null`, or `data({ message }, { status: 503 })`), `error` is `true` and
   `next` is unchanged, so the same button retries. The next `loadMore` clears
-  it. Fetcher data that is not a page (no rows, or a `next` that is neither a string nor `null`) is ignored.
+  it. Fetcher data that is not a page (no rows, or a `next` that is neither a string nor `null`) sets `error`, like a failed page.
+
+### Another cursor parameter
+
+```ts
+// the loader answers { items, cursor } for ?q=&page=<cursor>
+const { rows, next, loadMore } = usePagedRows(
+	loaderData.page,
+	(page) => page.items,
+	{ cursorParam: 'page', nextOf: (page) => page.cursor },
+);
+const change = useSearchChange({ resetKeys: ['page'] });
+```
+
+`cursorParam` and `useSearchChange`'s `resetKeys` must name the same
+parameter: with the defaults both are `after` (`DEFAULT_CURSOR_PARAM`), and
+with another one a search that keeps the old cursor shows the wrong page.
 
 A loader that **throws** on a cursor request is not an `error` here: React
 Router sends a fetcher's thrown error to the route's `ErrorBoundary`. To offer

@@ -533,6 +533,28 @@ them.
 inside a folder is served by that folder's `static` route, whatever its
 name.
 
+### A "load more" lands on the route's `ErrorBoundary`
+
+**When:** the loader throws (or throws a `Response`) for a request that has the cursor, and the page used `usePagedRows`: the whole route is replaced by its `ErrorBoundary` instead of showing the rows with a retry button.
+
+**Why:** React Router sends the error of a fetcher's load to the route's boundary. `usePagedRows` only sees what the fetcher answers, so its `error` is `true` for an answer that is not a page, not for a throw.
+
+**Fix:** catch in the loader for a request that has the cursor and answer a value that is not a page:
+
+```ts
+export async function loader({ request }: Route.LoaderArgs) {
+	const url = new URL(request.url);
+	try {
+		return await listUsers(url.searchParams);
+	} catch (error) {
+		if (url.searchParams.has('after')) return { message: 'unavailable' };
+		throw error;
+	}
+}
+```
+
+The rows stay, `error` is `true`, and `loadMore` retries.
+
 ### `Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`
 
 The browser's console prints it; the page renders on the server, then

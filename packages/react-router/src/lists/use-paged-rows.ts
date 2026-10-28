@@ -25,11 +25,63 @@ export interface PagedRows<Row> {
 	readonly loadMore: () => void;
 }
 
+/** The default cursor parameter, shared with `useSearchChange`'s default `resetKeys`. */
+export const DEFAULT_CURSOR_PARAM = 'after';
+
 interface Loaded<Page, Row> {
 	readonly first: Page;
 	readonly extra: readonly Row[];
 	readonly next: string | null;
 	readonly error: boolean;
+}
+
+type NextOf<Page> = (page: Page) => string | null;
+
+/** The state for a first page: nothing loaded after it yet. */
+function restart<Page, Row>(
+	first: Page,
+	nextOf: NextOf<Page>,
+): Loaded<Page, Row> {
+	return { first, extra: [], next: nextOf(first) ?? null, error: false };
+}
+
+/**
+ * The rows and cursor of `value` when it is a page (an object whose rows are
+ * an array and whose cursor is a string or `null`), else `undefined`.
+ */
+function readPage<Page, Row>(
+	value: unknown,
+	rowsOf: (page: Page) => readonly Row[],
+	nextOf: NextOf<Page>,
+): { rows: readonly Row[]; next: string | null } | undefined {
+	if (typeof value !== 'object' || value === null) return undefined;
+	try {
+		const rows = rowsOf(value as Page);
+		const next = nextOf(value as Page);
+		if (!Array.isArray(rows)) return undefined;
+		if (next !== null && typeof next !== 'string') return undefined;
+		return { rows, next };
+	} catch {
+		return undefined;
+	}
+}
+
+/** The state after an answer: its rows appended, or `error` when it was not a page. */
+function settle<Page, Row>(
+	previous: Loaded<Page, Row>,
+	first: Page,
+	more: { rows: readonly Row[]; next: string | null } | undefined,
+	nextOf: NextOf<Page>,
+): Loaded<Page, Row> {
+	const base =
+		previous.first === first ? previous : restart<Page, Row>(first, nextOf);
+	if (more === undefined) return { ...base, error: true };
+	return {
+		...base,
+		extra: [...base.extra, ...more.rows],
+		next: more.next,
+		error: false,
+	};
 }
 
 /**
@@ -51,32 +103,25 @@ export function usePagedRows<Page, Row>(
 	rowsOf: (page: Page) => readonly Row[],
 	options: PagedRowsOptions<Page> = {},
 ): PagedRows<Row> {
-	const cursorParam = options.cursorParam ?? 'after';
-	const nextOf =
+	const cursorParam = options.cursorParam ?? DEFAULT_CURSOR_PARAM;
+	const nextOf: NextOf<Page> =
 		options.nextOf ??
-		((page: Page) => (page as { next?: string | null }).next as string | null);
+		((page) => (page as { next?: string | null }).next as string | null);
 	const fetcher = useFetcher();
 	const { pathname, search } = useLocation();
-	const [loaded, setLoaded] = useState<Loaded<Page, Row>>({
-		first: firstPage,
-		extra: [],
-		next: nextOf(firstPage) ?? null,
-		error: false,
-	});
+	const [loaded, setLoaded] = useState(() =>
+		restart<Page, Row>(firstPage, nextOf),
+	);
 	// What was asked, and for which first page, so an answer that comes after a restart is dropped.
 	const asked = useRef<{ first: Page; seen: unknown; started: boolean } | null>(
 		null,
 	);
-	const current: Loaded<Page, Row> =
-		loaded.first === firstPage
-			? loaded
-			: {
-					first: firstPage,
-					extra: [],
-					next: nextOf(firstPage) ?? null,
-					error: false,
-				};
+	const current =
+		loaded.first === firstPage ? loaded : restart<Page, Row>(firstPage, nextOf);
 
+	// Deliberate deps: rowsOf and nextOf are usually inline functions, new on
+	// every render, and are read at the time of the answer; the effect must run
+	// on the fetcher's settling, not on each render.
 	useEffect(() => {
 		const request = asked.current;
 		if (request === null) return;
@@ -84,43 +129,16 @@ export function usePagedRows<Page, Row>(
 			request.started = true;
 			return;
 		}
-		if (!request.started) return;
+		// Idle: the answer is in when the fetcher was seen busy, or when its data
+		// is no longer the one it had at the call (an answer within one batch).
+		if (!request.started && fetcher.data === request.seen) return;
 		asked.current = null;
 		if (request.first !== firstPage) return;
-		const data = fetcher.data;
-		// A page has rows and a cursor (a string, or null at the end); anything else is not one.
-		const read = (value: unknown) => {
-			if (typeof value !== 'object' || value === null) return undefined;
-			try {
-				const page = value as Page;
-				const rows = rowsOf(page);
-				const next = nextOf(page);
-				if (!Array.isArray(rows)) return undefined;
-				if (next !== null && typeof next !== 'string') return undefined;
-				return { rows: rows as readonly Row[], next };
-			} catch {
-				return undefined;
-			}
-		};
-		const more = data === request.seen ? undefined : read(data);
-		setLoaded((previous) => {
-			const base =
-				previous.first === firstPage
-					? previous
-					: {
-							first: firstPage,
-							extra: [],
-							next: nextOf(firstPage) ?? null,
-							error: false,
-						};
-			if (more === undefined) return { ...base, error: true };
-			return {
-				...base,
-				extra: [...base.extra, ...more.rows],
-				next: more.next,
-				error: false,
-			};
-		});
+		const more =
+			fetcher.data === request.seen
+				? undefined
+				: readPage(fetcher.data, rowsOf, nextOf);
+		setLoaded((previous) => settle(previous, firstPage, more, nextOf));
 	}, [fetcher.state, fetcher.data, firstPage]);
 
 	const next = current.next;

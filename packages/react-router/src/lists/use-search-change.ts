@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { useSearchParams } from 'react-router';
+import { DEFAULT_CURSOR_PARAM } from './use-paged-rows';
 
 export interface SearchChangeOptions {
 	/**
@@ -9,7 +10,7 @@ export interface SearchChangeOptions {
 	readonly resetKeys?: readonly string[];
 }
 
-const RESET_KEYS: readonly string[] = ['after'];
+const RESET_KEYS: readonly string[] = [DEFAULT_CURSOR_PARAM];
 
 /**
  * Returns `(changes) => void`: sets the parameters it is given a value for,
