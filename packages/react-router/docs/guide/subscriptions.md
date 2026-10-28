@@ -113,10 +113,24 @@ adapter or reverse proxy needs to buffer it.
 
 ## Keep the stream alive
 
-Bun closes an idle connection after `idleTimeout` seconds (10 by default).
-The heartbeat covers it as long as `heartbeatMs` is shorter, and so is a proxy's
-read timeout. Behind nginx, keep `proxy_buffering off` for the route (the
-`X-Accel-Buffering: no` header does it per response).
+Bun closes a connection that has been idle for `idleTimeout` seconds, 10 by
+default, which is shorter than the proxy's 15 second heartbeat (`heartbeatMs`)
+and than the API's own 12 second ping. Left alone, an idle subscription is
+reset at about 8 to 10 seconds, before the first heartbeat. Set `idleTimeout`
+above both in the server's `listen` options:
+
+```ts
+// app/server.ts
+export default createServer({
+	listen: { idleTimeout: 30 }, // seconds
+});
+```
+
+The same goes for the API's server (`app.listen({ idleTimeout: 30 })` with
+`@alxia/graphql`), and for a proxy's read timeout, which must be longer than
+`heartbeatMs` too. Calling `server.timeout(request, 0)` from a resolver did
+not lift it for the stream. Behind nginx, keep `proxy_buffering off` for the
+route (the `X-Accel-Buffering: no` header does it per response).
 
 ## Cross-site requests
 

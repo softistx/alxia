@@ -2909,10 +2909,12 @@ blank line.
 ### Events arrive in bursts, or the stream closes after a few seconds
 
 **Why:** a proxy or CDN between the app and the browser buffers the response,
-or closes an idle connection (Bun's `idleTimeout`, a load balancer's timeout)
+or closes an idle connection (Bun's `idleTimeout`, 10 seconds by default,
+shorter than the 15 second `heartbeatMs`; a load balancer's timeout)
 because `heartbeatMs` is longer than it.
 
-**Fix:** keep `heartbeatMs` shorter than the shortest idle timeout on the
-path, turn response buffering off for the route (nginx `proxy_buffering off`;
+**Fix:** set `listen: { idleTimeout: 30 }` in `createServer` (and
+`idleTimeout: 30` on the API's `listen`), keep `heartbeatMs` shorter than the
+shortest idle timeout on the path, turn response buffering off for the route (nginx `proxy_buffering off`;
 the route already sends `X-Accel-Buffering: no`), and do not compress the
 route's responses.

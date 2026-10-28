@@ -203,6 +203,24 @@ process; across several, give it an event target backed by a broker, as
 [Yoga's subscriptions guide](https://the-guild.dev/graphql/yoga-server/docs/features/subscriptions)
 describes.
 
+### Keep an idle subscription open
+
+Yoga sends a keep-alive ping on an open stream every 12 seconds. `Bun.serve`
+closes a connection that has been idle for `idleTimeout` seconds, 10 by
+default, so on a real server a subscription that has nothing to send is reset
+at about 8 to 10 seconds, before the first ping. `app.request(…)` in a spec
+goes through no socket and never shows it. Give `listen` an `idleTimeout`
+above the ping interval:
+
+```ts
+app.listen({ port: 3000, idleTimeout: 30 }); // seconds, longer than the 12 s ping
+```
+
+Calling `server.timeout(request, 0)` from a resolver does not lift it for the
+stream. Behind a proxy or load balancer, its own read timeout must be longer
+than 12 seconds too. See
+[the troubleshooting entry](../troubleshooting.md#an-idle-subscription-over-sse-is-reset-after-about-10-seconds).
+
 `@alxia/compress` leaves a `text/event-stream` alone by default, so results
 are sent as they are produced. A `compressible` that lets event streams in
 still sends each result at once: a streamed body is flushed as it comes.

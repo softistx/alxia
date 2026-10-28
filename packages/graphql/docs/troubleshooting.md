@@ -47,6 +47,7 @@ symptom.
 - [The logger, CORS or secure headers miss the endpoint](#the-logger-cors-or-secure-headers-miss-the-endpoint)
 - [An anonymous request to a missing path is a 401](#an-anonymous-request-to-a-missing-path-is-a-401)
 - [A WebSocket client cannot connect: `Expected 101 status code`](#a-websocket-client-cannot-connect-expected-101-status-code)
+- [An idle subscription over SSE is reset after about 10 seconds](#an-idle-subscription-over-sse-is-reset-after-about-10-seconds)
 - [The IDE page is blank](#the-ide-page-is-blank)
 - [GraphiQL is served in production](#graphiql-is-served-in-production)
 - [GraphiQL does not open in development, or in a test](#graphiql-does-not-open-in-development-or-in-a-test)
@@ -678,6 +679,27 @@ SSE:
 ```ts
 graphql(app, { schema, graphiql: { subscriptionsProtocol: 'SSE' } });
 ```
+
+### An idle subscription over SSE is reset after about 10 seconds
+
+**When:** a subscription over server-sent events that has nothing to send
+for a few seconds, on a real server: the client sees the connection reset at
+8 to 10 seconds, before any event. A spec using `app.request` never shows it.
+
+**Why:** Yoga pings an open stream every 12 seconds, but `Bun.serve` closes a
+connection idle for `idleTimeout` seconds, 10 by default, before the first
+ping. `server.timeout(request, 0)` called from a resolver does not change it
+for the stream.
+
+**Fix:** set `idleTimeout` above the ping interval in `listen`'s options:
+
+```ts
+app.listen({ port: 3000, idleTimeout: 30 });
+```
+
+The same holds behind a proxy or load balancer: its read timeout must be
+longer than the ping. For a React Router app, see
+[Subscriptions for a BFF](../../react-router/docs/guide/subscriptions.md#keep-the-stream-alive).
 
 ### The IDE page is blank
 
