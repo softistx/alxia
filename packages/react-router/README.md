@@ -527,6 +527,16 @@ In a build, `build/client` is served before `configure`'s middlewares:
 A missing asset gets alxia's JSON 404, not a page. In dev, Vite serves
 these files.
 
+`react-router build` also writes `.br` and `.gz` copies beside every
+compressible file of the client build (JavaScript, CSS, HTML, SVG, JSON,
+text, WebAssembly, fonts) of at least 1 kB, and the server sends the one a
+browser accepts, with `Content-Encoding` and `Vary: Accept-Encoding`, the
+`Cache-Control` above unchanged. `alxia({ precompress: false })` writes none,
+`alxia({ precompress: { minSize: 4096 } })` moves the threshold, and
+`createServer({ precompressed: false })` (or `reactRouter(app, {
+precompressed: false })`) serves the files as they are, behind a proxy that
+compresses. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md#compressed)
+
 ## Leaving the pages out of `matchesSpec`
 
 An API under `/api`, spec first, is checked against its OpenAPI document

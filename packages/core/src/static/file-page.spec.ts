@@ -9,7 +9,8 @@ let root: string;
 
 beforeAll(async () => {
 	root = await mkdtemp(join(tmpdir(), 'alxia-file-'));
-	await writeFile(join(root, 'hello.txt'), 'hello');
+	await writeFile(join(root, 'hello.txt'), 'hello'.repeat(50));
+	await writeFile(join(root, 'hello.txt.br'), 'brotli copy');
 });
 afterAll(() => rm(root, { recursive: true, force: true }));
 
@@ -22,7 +23,7 @@ describe('app.file', () => {
 				request.headers.get('x-want') === 'yes' ? new Blob(['yes']) : null,
 			)
 			.file('/missing', join(root, 'nope.txt'));
-		expect(await (await app.request('/hello')).text()).toBe('hello');
+		expect(await (await app.request('/hello')).text()).toBe('hello'.repeat(50));
 		expect(await (await app.request('/robots.txt')).text()).toBe(
 			'User-agent: *',
 		);
@@ -33,6 +34,40 @@ describe('app.file', () => {
 			).text(),
 		).toBe('yes');
 		expect((await app.request('/missing')).status).toBe(404);
+	});
+});
+
+describe('app.file, precompressed copies', () => {
+	const file = () =>
+		alxia().file('/hello', join(root, 'hello.txt'), {
+			precompressed: ['br', 'gzip'],
+		});
+	const get = (accept: string) =>
+		file().request('/hello', { headers: { 'accept-encoding': accept } });
+
+	test('the copy a client accepts is served, with Content-Encoding and Vary', async () => {
+		const response = await get('br, gzip');
+		expect(response.headers.get('content-encoding')).toBe('br');
+		expect(response.headers.get('vary')).toContain('Accept-Encoding');
+		expect(response.headers.get('content-type')).toContain('text/plain');
+		expect(await response.text()).toBe('brotli copy');
+	});
+
+	test('no copy for the coding asked, or a client that takes none, gets the file', async () => {
+		for (const accept of ['gzip', 'identity']) {
+			const response = await get(accept);
+			expect(response.headers.get('content-encoding')).toBeNull();
+			expect(response.headers.get('vary')).toContain('Accept-Encoding');
+			expect(await response.text()).toBe('hello'.repeat(50));
+		}
+	});
+
+	test('without the option the file varies by nothing', async () => {
+		const response = await alxia()
+			.file('/hello', join(root, 'hello.txt'))
+			.request('/hello', { headers: { 'accept-encoding': 'br' } });
+		expect(response.headers.get('content-encoding')).toBeNull();
+		expect(response.headers.get('vary')).toBeNull();
 	});
 });
 

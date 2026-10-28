@@ -140,9 +140,11 @@ app
 ```
 
 It takes the options shared with `static` — `cacheControl`, `headers`,
-`types`, `etag`, `lastModified`, `ranges` (`FileOptions`) — not `index`,
-`extensions`, `fallback`, `dotfiles` or `precompressed`. A path on disk
-that does not exist is a 404.
+`types`, `etag`, `lastModified`, `ranges` and `precompressed`
+(`FileOptions`) — not `index`, `extensions`, `fallback` or `dotfiles`.
+`precompressed` looks for `<file>.br`, `<file>.gz` beside a file given as a
+path on disk (not for a `Blob` or a function). A path on disk that does not
+exist is a 404.
 
 ## What a file route answers
 

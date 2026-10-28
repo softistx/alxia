@@ -45,6 +45,13 @@ export interface ReactRouterOptions<Ctx> {
 	 * catch-all. Ignored in `development`, where Vite serves them.
 	 */
 	readonly client?: string | URL;
+	/**
+	 * Serves the `.br` and `.gz` copies `alxia()` writes beside the client
+	 * build's files to a browser that accepts them, with `Vary:
+	 * Accept-Encoding`: `true` by default. `false` serves the files as they
+	 * are.
+	 */
+	readonly precompressed?: boolean;
 }
 
 /** The methods the catch-all takes. A `HEAD` reaches its `GET`. */
@@ -103,7 +110,9 @@ export function reactRouter<Ctx extends object, Prefix extends string>(
 	const routes = asRoutes(app);
 	declaring(app, () => {
 		if (options.client !== undefined && mode === 'production') {
-			serveClient(routes, pathOf(options.client));
+			serveClient(routes, pathOf(options.client), {
+				precompressed: options.precompressed ?? true,
+			});
 		}
 		for (const method of METHODS) routes[method]('/*', handler);
 	});
@@ -130,8 +139,14 @@ function routerRequest(ctx: BaseContext): Request {
  * `isReactRouterRoute`: what `reactRouter()` does with `client`, apart, so
  * that `createServer()` serves them before the middlewares of `configure`.
  */
-export function declareClient(app: AnyAlxia, client: string | URL): void {
-	declaring(app, () => serveClient(asRoutes(app), pathOf(client)));
+export function declareClient(
+	app: AnyAlxia,
+	client: string | URL,
+	precompressed = true,
+): void {
+	declaring(app, () =>
+		serveClient(asRoutes(app), pathOf(client), { precompressed }),
+	);
 }
 
 /** Runs `declare`, and marks every route it added to `app` as ours. */

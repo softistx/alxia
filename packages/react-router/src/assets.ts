@@ -11,13 +11,22 @@ export const IMMUTABLE = 'public, max-age=31536000, immutable';
 /** A public file keeps its name across builds: revalidated after an hour. */
 export const AN_HOUR = 'public, max-age=3600';
 
+/** The copies the plugin writes, best first. */
+const CODINGS = ['br', 'gzip'] as const;
+
 interface Serving {
 	static(path: string, source: string, options: object): unknown;
 	file(path: string, file: string, options: object): unknown;
 }
 
 /** Declares the client build's routes on `app`. */
-export function serveClient(app: Serving, client: string): void {
+export function serveClient(
+	app: Serving,
+	client: string,
+	options: { readonly precompressed?: boolean } = {},
+): void {
+	const precompressed =
+		options.precompressed === false ? {} : { precompressed: CODINGS };
 	if (!isDirectory(client)) {
 		throw new TypeError(
 			`reactRouter(): client is ${client}, which is not a directory. Pass the client build, build/client by default.`,
@@ -31,8 +40,9 @@ export function serveClient(app: Serving, client: string): void {
 		// `/my%20file.pdf`, `café.png` is `/caf%C3%A9.png`.
 		const route = new URL(`/${name}`, 'http://localhost').pathname;
 		try {
-			if (isDirectory(path)) app.static(route, path, { cacheControl });
-			else app.file(route, path, { cacheControl });
+			if (isDirectory(path))
+				app.static(route, path, { cacheControl, ...precompressed });
+			else app.file(route, path, { cacheControl, ...precompressed });
 		} catch (error) {
 			throw new TypeError(
 				`reactRouter(): ${path} cannot be served at a path of its own name; rename it. ${(error as Error).message}`,

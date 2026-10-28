@@ -25,6 +25,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [``You made a POST request to "/" but did not provide an `action` for route "root", so there is no way to handle the request.``](#you-made-a-post-request-to--but-did-not-provide-an-action-for-route-root-so-there-is-no-way-to-handle-the-request)
 - [`TypeError: reactRouter(): client is …, which is not a directory. …`](#typeerror-reactrouter-client-is--which-is-not-a-directory-)
 - [`TypeError: reactRouter(): … cannot be served at a path of its own name; rename it. …`](#typeerror-reactrouter--cannot-be-served-at-a-path-of-its-own-name-rename-it-)
+- [The client's files are served uncompressed](#the-clients-files-are-served-uncompressed)
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-default-src-none)
 - [`Refused to execute inline script because it violates the following Content Security Policy directive: "script-src 'self' 'nonce-…'"`](#refused-to-execute-inline-script-because-it-violates-the-following-content-security-policy-directive-script-src-self-nonce-)
 - [`A tree hydrated but some attributes of the server rendered HTML didn't match the client properties`](#a-tree-hydrated-but-some-attributes-of-the-server-rendered-html-didnt-match-the-client-properties)
@@ -564,6 +565,29 @@ export async function loader({ request }: Route.LoaderArgs) {
 ```
 
 The rows stay, `error` is `true`, and `loadMore` retries.
+
+### The client's files are served uncompressed
+
+A response for a script, a stylesheet or an SVG has no `Content-Encoding`,
+though the request sent `Accept-Encoding: br, gzip`.
+
+**When:** the server answers from `build/client`, and no `.br` or `.gz`
+sits beside the file.
+
+**Why:** the server never compresses on a request: it serves the copies
+`react-router build` writes. They are missing when `alxia({ precompress:
+false })` is set, when the build did not go through `alxia()` (a
+`build/client` copied from a build before the option, or made by another
+tool), when the file is under 1 kB or not compressible (an image, say), or
+when `createServer({ precompressed: false })` is set. A compressed copy that
+is not smaller than the file is not written.
+
+**Fix:** build with the plugin, and check the copies exist:
+
+```sh
+bun run build && ls build/client/assets | grep -E '\.(br|gz)$'
+curl -sI -H 'Accept-Encoding: br' http://localhost:3000/assets/entry.js | grep -i content-encoding
+```
 
 ### `Refused to execute inline script because it violates the following Content Security Policy directive: "default-src 'none'"`
 

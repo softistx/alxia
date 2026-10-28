@@ -7,6 +7,12 @@ number on it. Every release, with each change it made, is in
 
 ## Now
 
+- **The client build, served compressed.** `react-router build` writes `.br`
+  and `.gz` copies beside the compressible files of `build/client`, and the
+  server sends the one a browser accepts, with `Vary: Accept-Encoding` and
+  the same cache headers. See [the client's
+  files](guide/beside-the-pages.md#compressed).
+
 - **`@alxia/react-router/session/react`: the page's hooks around the session
   flows.** `useSignOut`, `useLinkParam` (a mail link's parameter, read once and optionally dropped
   from the address bar, or with `live: true` following the URL) and `useCodeField` /

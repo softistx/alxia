@@ -3,11 +3,12 @@
  * the server of a React Router app, under `react-router dev` and in
  * `react-router build`, with or without an `app/server.ts`.
  */
-import { relative } from 'node:path';
+import { join, relative } from 'node:path';
 // Types only: the plugin runs on whichever Vite the app has, never on a
 // copy of this package's own.
 import type { Plugin, ResolvedConfig } from 'vite';
 import { ssrEnvironment } from './bundle';
+import { type PrecompressOptions, precompressClient } from './compress';
 import {
 	clientPath,
 	contextOf,
@@ -24,6 +25,7 @@ import { servePreview } from './preview';
 import { requireBun } from './runtime';
 import { type AlxiaWorkerOptions, buildAppWorker } from './worker';
 
+export type { PrecompressOptions } from './compress';
 export type { AlxiaWorkerOptions } from './worker';
 
 export interface AlxiaOptions {
@@ -42,6 +44,14 @@ export interface AlxiaOptions {
 	 * nothing without it; `false` builds none. Needs Bun.
 	 */
 	readonly worker?: false | string | AlxiaWorkerOptions;
+	/**
+	 * Writes `.br` and `.gz` copies beside the client build's compressible
+	 * files (JavaScript, CSS, HTML, SVG, JSON, text, WebAssembly, source
+	 * maps, fonts) of at least `minSize` bytes (1024), after the service
+	 * worker is built: the server sends them to a browser that accepts them.
+	 * On by default; `false` writes none.
+	 */
+	readonly precompress?: false | PrecompressOptions;
 }
 
 const RESOLVED_SERVER = `\0${SERVER}`;
@@ -150,7 +160,16 @@ export function alxia(options: AlxiaOptions = {}): Plugin {
 			// After React Router's builder: its client build, the one the worker reads.
 			order: 'post',
 			async handler() {
-				if (config !== undefined) await buildAppWorker(config, options.worker);
+				if (config === undefined) return;
+				await buildAppWorker(config, options.worker);
+				if (!enabled || options.precompress === false) return;
+				const done = await precompressClient(
+					join(contextOf(config).buildDirectory, 'client'),
+					options.precompress,
+				);
+				config.logger.info(
+					`✓ ${done.files} client files precompressed (${(done.bytes / 1024).toFixed(0)} kB → ${(done.brotliBytes / 1024).toFixed(0)} kB brotli)`,
+				);
 			},
 		},
 		configureServer(server) {

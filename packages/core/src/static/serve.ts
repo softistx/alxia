@@ -127,8 +127,28 @@ export function fileHandler(
 			typeof file === 'string'
 				? file
 				: ((isBunFile(blob) ? blob.name : undefined) ?? ctx.route ?? '');
-		return send(ctx, { file: blob, path }, options, undefined, false);
+		const codings =
+			typeof file === 'string' ? (options.precompressed ?? []) : [];
+		const encoded = await precompressed(
+			{ file: blob, path },
+			codings,
+			ctx,
+			copy,
+		);
+		return send(
+			ctx,
+			{ file: blob, path },
+			options,
+			encoded,
+			codings.length > 0,
+		);
 	};
+}
+
+/** A copy beside a file on disk, or none. */
+async function copy(path: string): Promise<Blob | undefined> {
+	const file = Bun.file(path);
+	return (await file.exists()) ? file : undefined;
 }
 
 function isBunFile(blob: Blob): blob is Bun.BunFile {

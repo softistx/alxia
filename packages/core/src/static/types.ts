@@ -34,6 +34,12 @@ export interface FileOptions {
 	readonly ranges?: boolean;
 	/** Content types by extension, over the ones Bun knows: `{ '.wasm': 'application/wasm' }`. */
 	readonly types?: Readonly<Record<string, string>>;
+	/**
+	 * Codings stored beside each file, served to a client that accepts them:
+	 * `app.js.br` for `app.js`. None by default. For `app.file`, only a file
+	 * given as a path on disk has copies to look for.
+	 */
+	readonly precompressed?: readonly Precompressed[];
 }
 
 export interface StaticOptions extends FileOptions {
@@ -48,11 +54,6 @@ export interface StaticOptions extends FileOptions {
 	readonly fallback?: string;
 	/** Whether a file or directory starting with `.` is served. Never, by default: a 404. */
 	readonly dotfiles?: boolean;
-	/**
-	 * Codings stored beside each file, served to a client that accepts them:
-	 * `app.js.br` for `app.js`. None by default.
-	 */
-	readonly precompressed?: readonly Precompressed[];
 }
 
 /** The body of the 404. */
