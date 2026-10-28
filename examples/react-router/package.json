@@ -10,11 +10,11 @@
     "typecheck": "react-router typegen && tsc"
   },
   "dependencies": {
-    "@alxia/compress": "^0.3.11",
-    "@alxia/core": "^0.16.0",
-    "@alxia/logger": "^0.6.8",
-    "@alxia/react-router": "^0.26.0",
-    "@alxia/secure-headers": "^0.5.1",
+    "@alxia/compress": "^0.3.12",
+    "@alxia/core": "^0.17.0",
+    "@alxia/logger": "^0.6.9",
+    "@alxia/react-router": "^0.27.0",
+    "@alxia/secure-headers": "^0.5.2",
     "@react-router/serve": "^8.5.0",
     "isbot": "^5.2.2",
     "react": "^19.3.1",

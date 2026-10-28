@@ -1,5 +1,12 @@
 # @alxia/janus
 
+## 0.3.16
+
+### Patch Changes
+
+- Updated dependencies [[`e4ff32c`](https://github.com/softistx/alxia/commit/e4ff32c1746581a5b52a50a5b6fdfb3e556e2e79)]:
+  - @alxia/core@0.17.0
+
 ## 0.3.15
 
 ### Patch Changes

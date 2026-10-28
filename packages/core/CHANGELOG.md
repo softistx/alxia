@@ -1,5 +1,11 @@
 # @alxia/core
 
+## 0.17.0
+
+### Minor Changes
+
+- [#403](https://github.com/softistx/alxia/pull/403) [`e4ff32c`](https://github.com/softistx/alxia/commit/e4ff32c1746581a5b52a50a5b6fdfb3e556e2e79) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `app.file(path, file, { precompressed })` serves the `.br`, `.zst` or `.gz` copy beside a file given as a path on disk to a client that accepts it, as `app.static` does, with `Content-Encoding` and `Vary: Accept-Encoding`. `precompressed` moves from `StaticOptions` to `FileOptions`, which it extends: nothing changes for `static`.
+
 ## 0.16.0
 
 ### Minor Changes

@@ -1,5 +1,13 @@
 # @alxia/i18n
 
+## 0.4.5
+
+### Patch Changes
+
+- Updated dependencies [[`e4ff32c`](https://github.com/softistx/alxia/commit/e4ff32c1746581a5b52a50a5b6fdfb3e556e2e79)]:
+  - @alxia/core@0.17.0
+  - @alxia/language@0.3.13
+
 ## 0.4.4
 
 ### Patch Changes
