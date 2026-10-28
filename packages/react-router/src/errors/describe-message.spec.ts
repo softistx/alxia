@@ -8,6 +8,7 @@ import {
 	strictErrors,
 } from '../../test/errors/refusal';
 import { createApiErrors } from './api-errors';
+import { API_CODE } from './code-resolver';
 
 describe('apiErrorMessage', () => {
 	const errors = strictErrors();
@@ -126,6 +127,36 @@ describe('isApiCode', () => {
 		});
 		const rejected = refusal('todos.errors.title-taken', 'x');
 		expect(errors.apiErrorMessage(rejected, 'en')).toBe('refused');
+	});
+});
+
+describe('the default API-code pattern', () => {
+	test.each([
+		'todos.errors.title-taken',
+		'nightActions.errors.already-acted',
+		'dayVotes.errors.voter-not-alive',
+	])('%s is an API code', (code) => {
+		expect(API_CODE.test(code)).toBe(true);
+	});
+
+	test.each([
+		'BAD_USER_INPUT',
+		'Todos.errors.title-taken',
+		'1todos.errors.title-taken',
+		'todos.errors.Title-Taken',
+		'todos.error.title-taken',
+	])('%s is not', (code) => {
+		expect(API_CODE.test(code)).toBe(false);
+	});
+
+	test('a camelCase domain is not refused as a non-code', () => {
+		const errors = createApiErrors<Lang>({
+			messages: filledMessages(),
+			unavailable: () => '',
+			refused: () => 'refused',
+		});
+		const error = refusal('nightActions.errors.already-acted', 'Raw');
+		expect(errors.apiErrorMessage(error, 'en')).toBe('Raw');
 	});
 });
 

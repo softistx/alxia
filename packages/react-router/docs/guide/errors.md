@@ -62,7 +62,8 @@ export function codeOf(error: unknown) {
 ```
 
 An `ApiError` is assignable to `ApiErrorLike` as it is. The shape's code is
-the API's own `<module>.errors.<slug>`, such as `todos.errors.title-taken`.
+the API's own `<module>.errors.<slug>`, such as `todos.errors.title-taken`
+or `nightActions.errors.already-acted` (the module is kebab-case or camelCase).
 
 `waitMinutes` reads a throttle's wait the way the API words it: the
 `minutes` of `extensions.params` or beside it, at least one, else the
@@ -397,7 +398,7 @@ code), `translateCode`'s, nor the entries of `extensions.fields`, which go
 straight to the catalogue.
 
 `isApiCode` changes what counts as an API code (`<module>.errors.<slug>` by
-default). Here only the codes of the `todos` module are the catalogue's; any
+default, the module in kebab-case or camelCase). Here only the codes of the `todos` module are the catalogue's; any
 other code, even one shaped like a catalogue code, says `refused`:
 
 ```ts
