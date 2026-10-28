@@ -16,6 +16,7 @@ import type {
 } from './model';
 import { codeRefusal } from './step';
 import { STEP_UP_OVER, STEP_UP_REQUIRED } from './step-up-codes';
+import { signingOut } from './step-up-signed-out';
 import type {
 	StepUpRun,
 	StepUpStayed,
@@ -182,35 +183,6 @@ async function confirmStep<L extends string, C>(
 	}
 }
 
-/** A signed-out user's failure: the API's no-session code, or a bare 401 response. */
-function isSignedOut<L extends string, C>(
-	context: StepUpContext<L, C>,
-	error: unknown,
-): boolean {
-	if (error instanceof Response) return error.status === 401;
-	return isApiErrorLike(error) && error.code === context.unauthenticated;
-}
-
-/**
- * The request the sign-in redirect comes back to: the same-site `Referer`'s
- * page (the step-up route has none of its own), else the request's own URL.
- * A `Referer` of another origin, or one that is not a URL, is ignored.
- */
-function cameFrom(request: Request): Request {
-	const referer = request.headers.get('referer');
-	if (referer) {
-		try {
-			const from = new URL(referer);
-			if (from.origin === new URL(request.url).origin) {
-				return new Request(from, { headers: request.headers });
-			}
-		} catch {
-			// Not a URL: the request's own path.
-		}
-	}
-	return request;
-}
-
 async function routeStep<L extends string, C>(
 	context: StepUpContext<L, C>,
 	run: StepUpRun,
@@ -220,34 +192,15 @@ async function routeStep<L extends string, C>(
 	samesitePost(json, call.request);
 	if (context.steps.onSignedOut !== 'sign-in')
 		return routeIntent(context, run, call);
-	let signedOut = false;
-	const watch =
-		<A extends unknown[], R>(step: (...args: A) => Promise<R>) =>
-		async (...args: A): Promise<R> => {
-			try {
-				return await step(...args);
-			} catch (error) {
-				signedOut ||= isSignedOut(context, error);
-				throw error;
-			}
-		};
-	const redirect = () =>
-		context.steps.signIn.signInRedirect(cameFrom(call.request));
-	let answer: Awaited<ReturnType<typeof routeIntent>>;
-	try {
-		answer = await routeIntent(
-			context,
-			{
-				request: watch(() => run.request()),
-				confirm: watch((input) => run.confirm(input)),
-			},
-			call,
-		);
-	} catch (error) {
-		throw signedOut ? redirect() : error;
-	}
-	if (signedOut) throw redirect();
-	return answer;
+	return signingOut(
+		{
+			signIn: context.steps.signIn,
+			unauthenticated: context.unauthenticated,
+			run,
+			request: call.request,
+		},
+		(watched) => routeIntent(context, watched, call),
+	);
 }
 
 async function routeIntent<L extends string, C>(

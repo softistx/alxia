@@ -2710,7 +2710,7 @@ The user types a wrong code in the step-up dialog and lands on the sign-in page,
 
 **Why:** `@nxgt/janus-graphql` answers `CODE_INVALID` with HTTP 401. A caller that redirects to the sign-in page on any 401 takes the wrong code for a dead session, before `stepUp.confirm` sees the error.
 
-**Fix:** in the app's caller, redirect to sign-in only for a session 401 (`UNAUTHENTICATED`), never for a step-up's `CODE_INVALID`. [Step-up](guide/session.md#call-the-step-up-with-a-caller-that-does-not-sign-out-on-a-401) has the full section.
+**Fix:** in the app's caller, redirect to sign-in only for a session 401 (`UNAUTHENTICATED`), never for a step-up's `CODE_INVALID`. Or set `onSignedOut: 'sign-in'` on `stepUpSteps`: `route()` then redirects only a signed-out user. [Step-up](guide/session.md#call-the-step-up-with-a-caller-that-does-not-sign-out-on-a-401) has the full section.
 
 
 ### `TypeError: statePath(): a token page's path must be a path of this site with no query or fragment, starting with a single "/"; got ….`

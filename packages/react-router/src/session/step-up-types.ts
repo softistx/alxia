@@ -44,7 +44,7 @@ export interface StepUpStepsOptions<L extends string, C = undefined> {
 	/**
 	 * What `route` does when the user is signed out. `'sign-in'` redirects to
 	 * the flow's sign-in page (clearing the session cookie) when `run` fails
-	 * with `codes.unauthenticated` (`UNAUTHENTICATED`) or a bare 401 response;
+	 * with `codes.unauthenticated` (`UNAUTHENTICATED`) as an `ApiError`, or, from `request` only, a bare 401 response (from `confirm` a bare 401 stays a refusal, since a wrong code is a 401 too: `run.confirm` must throw an `ApiError` for the API's code refusals);
 	 * `next` is the page the request came from (a same-site `Referer`, else the
 	 * route's own path). A wrong or expired code (also a 401 from the API)
 	 * stays a refusal for the dialog, and a second-factor-required answer is a
