@@ -1169,7 +1169,14 @@ after `cancel()` is ignored and replays nothing. It is generic over your own
 
 An action that carries a one-time code (`spendsCode`) is not replayed after a
 step-up by the second factor: that code was just spent, so the dialog closes
-and `confirmedNotice` is true ("confirmed, type a new code").
+and `confirmedNotice` is true ("confirmed, type a new code"). The notice
+clears as soon as `action` becomes another value, that is when the user posts
+a new action, not when its answer arrives; pass a new object for each post
+(`last.current = action`), since an identical reference is not a new action.
+`cancel()` clears it too.
+
+If `replay()` posts nothing, no answer ever ends the confirming phase
+(`dialogProps.confirming` stays true): have `replay` post, or call `cancel()`.
 
 `route()` answers both intents from one action, so a fetcher on it has their
 union as data. `requestAnswerOf(data)` and `confirmAnswerOf(data)` narrow it on
