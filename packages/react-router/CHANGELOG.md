@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.22.0
+
+### Minor Changes
+
+- [#383](https://github.com/softistx/alxia/pull/383) [`4d864fe`](https://github.com/softistx/alxia/commit/4d864feac30fc87ca76e563af56d3c408fcc253b) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `authLinks`' `codes.mailThrottled` accepts a list of codes as well as one: each listed 429 code exposes its `retryAfter` to the page, so an API that throttles per address and per e-mail gets a countdown on both. The single code keeps working.
+
 ## 0.21.0
 
 ### Minor Changes

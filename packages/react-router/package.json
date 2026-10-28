@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/react-router",
-	"version": "0.21.0",
+	"version": "0.22.0",
 	"description": "alxia as the server of a React Router framework app: server rendering behind the app's hooks, loaders reading its typed context, the client's assets served; the code with no UI an installable app shares (`/pwa`), its hooks (`/pwa/react`), `noCache` for the worker's script (`/pwa/server`), the service worker on Workbox (`/pwa/worker`) and its build (`/pwa/build`), an API's refusals worded for the page (`/errors`), the BFF session: cookies, sign-in, step-up and mail links (`/session`), its page hooks (`/session/react`) and what it shares with the page (`/session/model`), a GraphQL subscription relayed to the browser over SSE (`/subscription`), the page's CSP nonce and inline boot scripts (`/document`) and a streaming `entry.server` (`/entry`)",
 	"license": "MIT",
 	"type": "module",
