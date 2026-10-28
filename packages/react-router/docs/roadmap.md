@@ -14,6 +14,14 @@ number on it. Every release, with each change it made, is in
   so an app stops carrying its own copies. See the
   [session guide](guide/session.md#the-pages-hooks).
 
+- **`@alxia/react-router/subscription`: GraphQL subscriptions for the
+  browser of a BFF.** `createSubscriptionProxy` gives a resource route's
+  `loader` and `action` that relay a subscription over SSE: the server holds
+  each allowed document, the bearer comes from the session, the route refuses
+  cross-site requests, keeps the stream alive with a heartbeat, aborts the
+  upstream with the client and passes a 429 on with `retryAfter`. See the
+  [subscriptions guide](guide/subscriptions.md).
+
 ## Next
 
 Nothing planned.

@@ -983,6 +983,42 @@ on the form. `stepUpSteps` asks for a code before a sensitive action, and
 [session guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/session.md)
 has a complete sign-in route and the rest.
 
+## A GraphQL subscription for the browser
+
+`@alxia/react-router/subscription` exposes subscriptions of your API to the
+browser through a resource route, without giving it the token or a way to
+write its own document. `allow` maps each operation name to the document the
+server sends for it; the client names an operation and sends variables, and
+its own `query` and `extensions` are ignored. The bearer comes from the
+session, both methods refuse a cross-site request, a heartbeat keeps the
+stream open, the browser leaving aborts the upstream request, and an upstream
+429 is passed on with its `retryAfter`. It speaks GraphQL over SSE in distinct
+connections mode, so `graphql-sse` works against it. It imports nothing and adds no peer.
+
+```ts
+// app/routes/events.ts
+import { createSubscriptionProxy } from '@alxia/react-router/subscription';
+import { print } from 'graphql';
+import { RoomEventsDocument } from '../generated/graphql';
+import { cookies } from '../session.server';
+
+const events = createSubscriptionProxy({
+	endpoint: 'https://api.example.com/graphql',
+	allow: { RoomEvents: print(RoomEventsDocument) },
+	getToken: (request) => cookies.token(request),
+	headers: (request) => ({
+		'x-forwarded-for': request.headers.get('x-forwarded-for'),
+		'accept-language': request.headers.get('accept-language'),
+	}),
+});
+
+export const loader = events.loader; // GET
+export const action = events.action; // POST
+```
+
+See the [subscription guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/subscriptions.md)
+for the rules, the options and the errors.
+
 ## Traps
 
 - **A context key made in `app/` reaches the loaders only through the
@@ -1187,6 +1223,12 @@ From `@alxia/react-router/entry`:
 | `createEntry({ streamTimeout?, nonce?, isBot?, onError? })`, `EntryOptions`, `Entry` | `/entry`: `{ handleRequest, streamTimeout }` (`Entry`), `entry.server.tsx` for Bun on the web stream renderer |
 | `handleRequest`, `streamTimeout`, `HandleRequest` | `/entry`: the default entry (`createEntry()`), its `5_000` and the type of `handleRequest` (assignable to React Router's `ServerEntryModule['default']`) |
 
+From `@alxia/react-router/subscription` (no import, no peer):
+
+| export | |
+| --- | --- |
+| `createSubscriptionProxy({ endpoint, allow, getToken, headers?, origin?, heartbeatMs?, fetch? })`, `SubscriptionProxy`, `SubscriptionProxyOptions` | a resource route's `loader` (GET) and `action` (POST) relaying GraphQL subscriptions over SSE (graphql-sse's distinct connections mode). `allow` is `{ [operationName]: document }`: the proxy sends its own document, the client's `query` and `extensions` are ignored and an unknown name is a 403. Both methods refuse a cross-site request (403) and a POST that is not JSON (415); 401 without a token; 400 for a malformed or oversize request (body 64 KiB, query string and variables 16 KiB); the bearer and `headers` upstream, a heartbeat comment every `heartbeatMs` (15000), the upstream aborted with the client, a pulled relay with a 1 MiB cap per event, an upstream 429 passed on with `Retry-After` and `retryAfter`, 502 for an upstream failure |
+
 The `alxia-react-router` bin, run with `bunx`:
 
 | command | |
@@ -1205,6 +1247,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what the subpaths hold, the worker's contract, the worker, what it caches, the offline page, building the worker with `alxia()` or `buildWorker`, the hooks in React, registering the worker and offering an update, serving the worker's script, the web app manifest, and clearing at sign-out.
 - [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, the page a request is for, the catalogue store, the form checks in the API's words, the provider, wording a refusal, loaders and the error page, actions, JSON actions and CSRF, and keeping the catalogue fresh.
 - [A BFF session](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/session.md): redirects that stay on the site, the cookies, the sign-in route, the second factor, the viewer and sign-out, the step-up, and the pages a mail's link opens.
+- [Subscriptions for a BFF](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/subscriptions.md): exposing a GraphQL subscription to the browser through a resource route: the allow-list, the session's bearer, the headers, the heartbeat, abort and rate limits.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.
 - [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/roadmap.md): what is coming, and what is not planned.
 - [Example](https://github.com/softistx/alxia/tree/develop/examples/react-router): the official template, these four changes, then an `app/server.ts` with a session, an `/api`, secure headers with a nonce and a streamed page.

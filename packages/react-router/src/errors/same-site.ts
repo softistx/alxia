@@ -1,4 +1,5 @@
 import { data } from 'react-router';
+import { isCrossSite } from './cross-site';
 
 /** Refuses a request from another site with a 403; reads headers only. */
 export type SiteCheck = (request: Request) => void;
@@ -13,13 +14,7 @@ export function siteCheck(
 ): SiteCheck {
 	return (request) => {
 		const set = typeof origin === 'function' ? origin() : origin;
-		const own = set ?? new URL(request.url).origin;
-		const from = request.headers.get('origin');
-		const site = request.headers.get('sec-fetch-site');
-		if (
-			(from && from !== own) ||
-			(site && site !== 'same-origin' && site !== 'none')
-		) {
+		if (isCrossSite(request, set)) {
 			throw data('Cross-site request refused', { status: 403 });
 		}
 	};
