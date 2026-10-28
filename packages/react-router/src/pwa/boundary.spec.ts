@@ -51,6 +51,19 @@ describe('/lists', () => {
 	});
 });
 
+describe('/link', () => {
+	test('imports react and react-router alone: no core, no node: module, no bun', async () => {
+		const imports = await importsOf(join(DIST, 'link/index.js'));
+		expect([...new Set(imports)].sort()).toEqual(['react', 'react-router']);
+	});
+
+	test('shares no chunk with the main entry', async () => {
+		const link = await filesOf(join(DIST, 'link/index.js'));
+		const main = await filesOf(join(DIST, 'index.js'));
+		expect([...link].filter((file) => main.has(file))).toEqual([]);
+	});
+});
+
 describe('/pwa/server', () => {
 	test('imports @alxia/core alone: no react, no node: module, no bun', async () => {
 		const imports = await importsOf(join(DIST, 'pwa/server/index.js'));

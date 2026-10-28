@@ -1028,6 +1028,22 @@ export const action = events.action; // POST
 See the [subscription guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/subscriptions.md)
 for the rules, the options and the errors.
 
+## A UI library's links through React Router
+
+A design system that renders its links through a component of its own (a
+`LinkComponentProvider`) hands it an `href`, while React Router's `Link` takes
+`to`. `@alxia/react-router/link` (`react` and `react-router` are its only
+imports) exports the adapter, so no app copies it:
+
+```tsx
+// app/root.tsx
+import { RouterLink } from '@alxia/react-router/link';
+
+<LinkComponentProvider component={RouterLink}>
+	<Outlet />
+</LinkComponentProvider>
+```
+
 ## A list whose state is the URL
 
 `@alxia/react-router/lists` (`react` and `react-router` are its only imports; every hook renders on the server)
@@ -1305,6 +1321,12 @@ From `@alxia/react-router/lists` (`react` and `react-router` are its only import
 | `useSameRouteLoading()` | `true` while a navigation is loading and its pathname is the current one (another search of the list), `false` for any other page |
 | `usePagedRows(firstPage, rowsOf, { cursorParam?, nextOf? }?)`, `PagedRows`, `PagedRowsOptions` | `{ rows, next, loading, error, loadMore }`: appends the pages the same route answers to `?<cursorParam>=<next>` (default `after`, `nextOf` default `page.next`) through `useFetcher`; starts over when `firstPage` is another object; a failure keeps the rows and sets `error` (an answer that is not a page), and data that is not a page is ignored |
 | `orFailed(after, run)`, `FAILED`, `isFailedPage(value)`, `FailedPage` | the loader half of `usePagedRows`: `run()`'s answer; an error is rethrown when `after` is empty, and with an `after` it answers `FAILED` (`{ failed: true }`, typed `Promise<T \| FailedPage>`), except a 3xx `Response`, which is rethrown. `isFailedPage` narrows an answer |
+
+From `@alxia/react-router/link` (`react` and `react-router` are its only imports; it renders on the server):
+
+| export | |
+| --- | --- |
+| `RouterLink`, `RouterLinkProps` | React Router's `Link` as a UI library's link component: takes `href` (or `to`), spreads `className`, `children`, `ref` and every anchor prop onto the `<a>`, keeps `Link`'s own props (`replace`, `prefetch`, `reloadDocument`, ...) |
 
 From `@alxia/react-router/subscription` (no import, no peer):
 
