@@ -1,5 +1,13 @@
 # @alxia/react-router
 
+## 0.24.0
+
+### Minor Changes
+
+- [#391](https://github.com/softistx/alxia/pull/391) [`7b42bc2`](https://github.com/softistx/alxia/commit/7b42bc2cebac0b3ba4ae8316a25d89f02a827faa) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `@alxia/react-router/lists` exports the loader half of `usePagedRows`: `orFailed(after, run)`, `FAILED` (`{ failed: true }`), `isFailedPage` and `FailedPage`. With no `after` an error is rethrown; with an `after` it answers `FAILED`, so the rows stay with a retry, except a 3xx `Response`, which is rethrown. Additive.
+
+- [#388](https://github.com/softistx/alxia/pull/388) [`8734d1f`](https://github.com/softistx/alxia/commit/8734d1f4705a7a86485fc89584221c0142cd3c66) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `useSearchChange` (`/lists`) accepts, besides its record of changes, a whole `URLSearchParams` that replaces the search or an updater `(prev) => URLSearchParams`, with the same `replace` and `preventScrollReset` behaviour. `resetKeys` applies to the record form only. Additive.
+
 ## 0.23.0
 
 ### Minor Changes
