@@ -85,8 +85,8 @@ Nothing planned.
 - **`@alxia/react-router/session` and `/session/model`: a BFF session for a
   janus API.** An app that is the backend of its own pages and calls a GraphQL
   API that signs users in with `@nxgt/janus` gets its session from one place:
-  `sessionCookies` (the session and the second-factor challenge, in an
-  HttpOnly cookie), `signInFlow` (where a sign-in lands, the second factor,
+  `sessionCookies` (the session and, when the API has one, the second-factor
+  challenge, in an HttpOnly cookie), `signInFlow` (where a sign-in lands, the second factor,
   the viewer, sign-out), `stepUpSteps` (the code asked before a sensitive
   action), `authLinks` and `TOKEN_PAGE_HEADERS` (the pages a mail's link
   opens). `/session/model` imports nothing and is safe in a component: `safeNext`

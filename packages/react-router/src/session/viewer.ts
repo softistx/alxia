@@ -2,6 +2,7 @@ import { redirect } from 'react-router';
 import { isApiErrorLike } from '../errors/api-error';
 import { nextOf } from '../errors/page-path';
 import { routeError } from '../errors/route-error';
+import { challengeCleared } from './cookies';
 import type { FlowContext } from './flow-types';
 import { revokeSession } from './land';
 import { safeNext, signInPath } from './model';
@@ -100,7 +101,9 @@ export async function signOut<L extends string, C>(
 	await revokeSession(flow, request, { context });
 	const headers = new Headers();
 	headers.append('Set-Cookie', options.cookies.destroy());
-	headers.append('Set-Cookie', options.cookies.destroyChallenge());
+	for (const cookie of challengeCleared(options.cookies)) {
+		headers.append('Set-Cookie', cookie);
+	}
 	for (const cookie of options.clear?.() ?? []) {
 		headers.append('Set-Cookie', cookie);
 	}

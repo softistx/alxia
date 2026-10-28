@@ -1,5 +1,6 @@
 import { data, replace } from 'react-router';
 import type { FormErrors } from '../errors/form-errors';
+import { challengeCleared } from './cookies';
 import type { SignInAnswer } from './flow-types';
 import { samesitePost } from './guard';
 import { isLive } from './land';
@@ -78,7 +79,9 @@ export async function afterReset<L extends string, C>(
 	await options.signIn.revokeSession(request, { context });
 	const headers = withTokenHeaders();
 	headers.append('Set-Cookie', options.cookies.destroy());
-	headers.append('Set-Cookie', options.cookies.destroyChallenge());
+	for (const cookie of challengeCleared(options.cookies)) {
+		headers.append('Set-Cookie', cookie);
+	}
 	for (const cookie of options.signIn.clear()) {
 		headers.append('Set-Cookie', cookie);
 	}

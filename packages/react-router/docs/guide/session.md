@@ -342,7 +342,8 @@ decides when a session is over.
 `commit` takes the expiry as an ISO string or a `Date`, and sets `Max-Age`
 to the seconds left: floored, and 0 for a past or unreadable date.
 
-The challenge has its own three: `commitChallenge(challenge, expiresAt?)`,
+With no `challenge` option the cookies have no challenge helpers, and `names`
+holds the session alone (`SessionCookies<false>`). The challenge has its own three: `commitChallenge(challenge, expiresAt?)`,
 `challengeOf(request)`, `destroyChallenge()`.
 
 `cookies.names` holds the names as sent, prefixes included
@@ -542,6 +543,21 @@ again when the API moved the session's end. `viewer` answers `null` for a
 without a cookie or when the API cannot tell.
 
 ## The second factor
+
+A second factor is optional. An API with none builds the cookies without
+`challenge` and the flow without `attemptsLeft`; neither carries a
+second-factor member on its type, a `secondFactor` answer lands nowhere
+(`landing` returns `null`), and no challenge cookie is set or cleared:
+
+```ts
+export const cookies = sessionCookies({ session: 'my-app_session', secure: true });
+export const signIn = signInFlow({ cookies, errors, json, revoke });
+// signIn.codeStep, signIn.readCodeInput and cookies.challengeOf do not exist.
+```
+
+Give both or neither: `signInFlow` throws when the cookies have a challenge
+and `attemptsLeft` is missing, or the other way round. `stepUpSteps` takes a flow with a second factor; `authLinks`
+takes either. The rest of this section is for an app that has one.
 
 The sign-in page's answer `secondFactor` leads to the second-factor page,
 whose loader needs the challenge cookie (`cookies.challengeOf(request)`; back

@@ -19,7 +19,7 @@ export interface AuthLinksOptions<L extends string, C = undefined> {
 	 * The app's sign-in flow: it lands the sessions a link opens, and its
 	 * `cookies`, `errors` and `json` are the ones the links use.
 	 */
-	readonly signIn: SignInFlow<L, C>;
+	readonly signIn: SignInFlow<L, C, boolean>;
 	/** The codes the links tell apart; `@nxgt/janus`'s by default. */
 	readonly codes?: AuthLinksCodes | undefined;
 	/**
@@ -50,7 +50,7 @@ export type LinksContext<L extends string, C = undefined> = AuthLinksOptions<
 	L,
 	C
 > &
-	Pick<SignInFlow<L, C>, 'cookies' | 'errors' | 'json'>;
+	Pick<SignInFlow<L, C, boolean>, 'cookies' | 'errors' | 'json'>;
 
 /** What a token page answers when it stays on the page. */
 export type LinkStayed = ReturnType<typeof data<FormErrors>>;
