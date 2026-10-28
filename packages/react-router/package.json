@@ -87,6 +87,11 @@
 			"import": "./dist/lists/index.js",
 			"default": "./dist/lists/index.js"
 		},
+		"./link": {
+			"types": "./dist/link/index.d.ts",
+			"import": "./dist/link/index.js",
+			"default": "./dist/link/index.js"
+		},
 		"./subscription": {
 			"types": "./dist/subscription/index.d.ts",
 			"import": "./dist/subscription/index.js",
@@ -121,6 +126,7 @@
 			"src/session/react/index.ts",
 			"src/subscription/index.ts",
 			"src/lists/index.ts",
+			"src/link/index.ts",
 			"src/document/index.ts",
 			"src/entry/index.ts",
 			"src/pwa/worker/index.ts",
