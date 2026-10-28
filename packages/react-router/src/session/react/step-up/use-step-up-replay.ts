@@ -18,6 +18,9 @@ export interface StepUpReplayOptions<Action>
 	 * Whether the action carries a one-time code that a step-up by the
 	 * second factor just spent. Such an action is not replayed: the dialog
 	 * closes and `confirmedNotice` is true ("confirmed, type a new code").
+	 * The notice clears when `action` becomes another value (a new action was
+	 * posted), at once and not at its answer, so pass the action as you post
+	 * it, a new object for each post.
 	 */
 	spendsCode?(action: Action): boolean;
 }
@@ -29,6 +32,7 @@ export interface StepUpReplayOptions<Action>
  * second factor, whose code was just spent: the user types the next one
  * (`confirmedNotice`). The dialog stays, saying so, until the replayed
  * action is answered; if that is refused for a step-up again, it asks again.
+ * If `replay` posts nothing, no answer ends that wait: call `cancel()`.
  * Generic over the host's `post`s, so each intent keeps its typed fields.
  *
  * @example
@@ -58,6 +62,15 @@ export function useStepUpReplay<Action = never>({
 		isOpen.current = value;
 		setOpen(value);
 	}
+
+	// The notice belongs to the action it was shown for: another action
+	// posted clears it at once, not at that action's answer.
+	const noticeFor = useRef(action);
+	useEffect(() => {
+		if (noticeFor.current === action) return;
+		noticeFor.current = action;
+		setConfirmedNotice(false);
+	}, [action]);
 
 	const stepUp = useStepUp({
 		request,

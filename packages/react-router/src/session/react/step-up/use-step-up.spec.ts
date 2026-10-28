@@ -57,6 +57,7 @@ async function mount(action?: Action) {
 	const posts: unknown[] = [];
 	const replays: number[] = [];
 	const state = {
+		action,
 		answer: undefined as unknown,
 		request: undefined as StepUpRequestAnswer | undefined,
 		confirm: undefined as StepUpConfirmAnswer | undefined,
@@ -66,7 +67,7 @@ async function mount(action?: Action) {
 		hook = useStepUpReplay<Action>({
 			answer: state.answer,
 			replay: () => replays.push(1),
-			action,
+			action: state.action,
 			spendsCode: (a) => a.code !== undefined,
 			request: {
 				post: () => posts.push('request'),
@@ -153,6 +154,24 @@ describe('useStepUpReplay', () => {
 		expect(page.replays).toHaveLength(0);
 		expect(page.hook.open).toBe(false);
 		expect(page.hook.confirmedNotice).toBe(true);
+	});
+
+	test('confirmedNotice clears as soon as a new action is posted, before its answer', async () => {
+		const page = await mount({ intent: 'disable', code: '654321' });
+		page.state.answer = refused;
+		await page.rerender();
+		page.state.request = granted('secondFactor');
+		await page.rerender();
+		act(() => page.hook.dialogProps.onSubmit('123456'));
+		page.state.confirm = accepted;
+		await page.rerender();
+		expect(page.hook.confirmedNotice).toBe(true);
+		await page.rerender();
+		expect(page.hook.confirmedNotice).toBe(true);
+
+		page.state.action = { intent: 'disable', code: '111111' };
+		await page.rerender();
+		expect(page.hook.confirmedNotice).toBe(false);
 	});
 
 	test('the same action is replayed after a mailed step-up', async () => {
