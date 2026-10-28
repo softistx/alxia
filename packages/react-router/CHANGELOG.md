@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.26.0
+
+### Minor Changes
+
+- [#398](https://github.com/softistx/alxia/pull/398) [`67632b9`](https://github.com/softistx/alxia/commit/67632b99ea13e39cf789b5956acc1292b408e1a8) Thanks [@SteveGT96](https://github.com/SteveGT96)! - New subpath `@alxia/react-router/link`: `RouterLink` and `RouterLinkProps`, React Router's `Link` as the link component of a UI library that hands an `href` and spreads anchor props (a `LinkComponentProvider`). It takes `href` (or `to`) and passes `className`, `children`, `ref` and every other prop on; imports `react` and `react-router` alone. Additive.
+
 ## 0.25.0
 
 ### Minor Changes
