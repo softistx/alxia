@@ -1,8 +1,10 @@
 import { describe, expect, test } from 'bun:test';
 import { plainErrors } from '../../test/errors/refusal';
 import { asking, END, setCookies } from '../../test/session/flow';
+import { posting } from '../../test/session/links';
 import { jsonActions } from '../errors';
 import { sessionCookies } from './cookies';
+import { authLinks } from './links';
 import { signInFlow } from './sign-in';
 
 const cookies = (secure = false) =>
@@ -26,8 +28,10 @@ describe('sessionCookies without a challenge', () => {
 		expect('challengeOf' in plain).toBe(false);
 		expect('commitChallenge' in plain).toBe(false);
 		expect('destroyChallenge' in plain).toBe(false);
-		// @ts-expect-error a cookie set built without `challenge` has no challengeOf
+		// Typed `undefined`, so a call is a compile error.
 		expect(plain.challengeOf).toBeUndefined();
+		// @ts-expect-error a cookie set built without `challenge` has no challengeOf to call
+		expect(() => plain.challengeOf(new Request('http://a.test/'))).toThrow();
 	});
 
 	test('the session cookie works as before', () => {
@@ -46,6 +50,24 @@ describe('sessionCookies without a challenge', () => {
 		expect(plain.signInPageHeaders(true).getSetCookie()).toEqual([
 			plain.destroy(),
 		]);
+	});
+
+	test('challenge: string | undefined gives SessionCookies<boolean>, which signInFlow refuses until narrowed', () => {
+		const name = Math.random() > 2 ? 'c' : undefined;
+		const either = sessionCookies({
+			session: 's',
+			challenge: name,
+			secure: false,
+		});
+		expect('challengeOf' in either).toBe(false);
+		const base = {
+			errors: plainErrors(),
+			json: jsonActions(),
+			revoke: async () => {},
+		};
+		// @ts-expect-error neither overload takes a set that may or may not have a challenge
+		signInFlow<'en'>({ ...base, cookies: either });
+		expect(either.challengeOf ? 'with' : 'without').toBe('without');
 	});
 
 	test('with a challenge the helpers are on the type', () => {
@@ -114,8 +136,7 @@ describe('signInFlow without a second factor', () => {
 			revoke: async () => {},
 		};
 		expect(() =>
-			// Typed as a flow without a second factor (the cookies are a superset),
-			// refused when it is built.
+			// @ts-expect-error cookies with a challenge need attemptsLeft
 			signInFlow<'en'>({ ...base, cookies: full }),
 		).toThrow(/second factor needs both/);
 		expect(() =>
@@ -126,5 +147,30 @@ describe('signInFlow without a second factor', () => {
 				attemptsLeft: () => '',
 			}),
 		).toThrow(/second factor needs both/);
+	});
+});
+
+describe('authLinks over a flow without a second factor', () => {
+	test('afterReset clears the session cookie and the app’s, and no challenge', async () => {
+		const revoked: string[] = [];
+		const plain = cookies();
+		const links = authLinks<'en'>({
+			signIn: signInFlow<'en'>({
+				cookies: plain,
+				errors: plainErrors(),
+				json: jsonActions(),
+				revoke: async (token) => {
+					revoked.push(token);
+				},
+				clear: () => ['recent=; Max-Age=0'],
+			}),
+		});
+		const response = await links.afterReset(posting('old'));
+		expect(response.headers.get('location')).toBe('/sign-in?password-reset=1');
+		expect(setCookies(response)).toEqual([
+			plain.destroy(),
+			'recent=; Max-Age=0',
+		]);
+		expect(revoked).toEqual(['old']);
 	});
 });

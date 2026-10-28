@@ -32,6 +32,7 @@ a loader, a message React Router or the browser prints, or an error from
 - [`useNonce()` is undefined on the server](#usenonce-is-undefined-on-the-server)
 - [`TypeError: InlineScript(): the code contains "</script" or "<!--", which ends or confuses the script element; escape it, such as "<\/script" inside a string`](#typeerror-inlinescript-the-code-contains-script-or----which-ends-or-confuses-the-script-element-escape-it-such-as-script-inside-a-string)
 - [`TypeError: createPageLanguage(): the fallback … is not one of the languages; got ….`](#typeerror-createpagelanguage-the-fallback--is-not-one-of-the-languages-got-)
+- [`TypeError: signInFlow(): a second factor needs both the challenge cookie (sessionCookies({ challenge })) and attemptsLeft; without one, give neither.`](#typeerror-signinflow-a-second-factor-needs-both-the-challenge-cookie-sessioncookies-challenge--and-attemptsleft-without-one-give-neither)
 - [The error page shows in the fallback language](#the-error-page-shows-in-the-fallback-language)
 - [`Error: You must render this element inside a <HydratedRouter> element`](#error-you-must-render-this-element-inside-a-hydratedrouter-element)
 - [`alxia-react-router: … already exists, and reveal leaves it as it is. Run alxia-react-router reveal --force to overwrite it.`](#alxia-react-router--already-exists-and-reveal-leaves-it-as-it-is-run-alxia-react-router-reveal---force-to-overwrite-it)
@@ -762,6 +763,33 @@ source than the fallback.
 
 ```ts
 createPageLanguage({ languages: ['en', 'fr'], fallback: 'en' });
+```
+
+### `TypeError: signInFlow(): a second factor needs both the challenge cookie (sessionCookies({ challenge })) and attemptsLeft; without one, give neither.`
+
+```text
+TypeError: signInFlow(): a second factor needs both the challenge cookie (sessionCookies({ challenge })) and attemptsLeft; without one, give neither.
+```
+
+**When:** the module that calls `signInFlow` loads.
+
+**Why:** a second factor is the challenge cookie (`sessionCookies({ challenge })`)
+and the `attemptsLeft` wording together. The flow got only one: cookies with
+a challenge and no `attemptsLeft`, or an `attemptsLeft` and cookies built
+without `challenge`. TypeScript refuses the first when the cookies are typed
+`SessionCookies<true>`; a set typed `SessionCookies<boolean>` (a `challenge`
+that may be `undefined`) or a call from JavaScript reaches this check.
+
+**Fix:** give both, or neither:
+
+```ts
+// with a second factor
+const cookies = sessionCookies({ session: 'my-app_session', challenge: 'my-app_challenge', secure });
+signInFlow({ cookies, errors, json, revoke, attemptsLeft });
+
+// without one
+const plain = sessionCookies({ session: 'my-app_session', secure });
+signInFlow({ cookies: plain, errors, json, revoke });
 ```
 
 ### The error page shows in the fallback language

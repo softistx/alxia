@@ -26,7 +26,7 @@ function resolve<L extends string, C>(
 ): FlowContext<L, C> {
 	if (
 		(options.attemptsLeft === undefined) !==
-		!('commitChallenge' in options.cookies)
+		!options.cookies.commitChallenge
 	) {
 		throw new TypeError(
 			'signInFlow(): a second factor needs both the challenge cookie (sessionCookies({ challenge })) and attemptsLeft; without one, give neither.',

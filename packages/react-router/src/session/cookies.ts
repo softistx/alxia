@@ -97,7 +97,18 @@ export interface ChallengeCookies {
 export type SessionCookies<WithChallenge extends boolean = true> =
 	WithChallenge extends true
 		? SessionCookiesBase & ChallengeCookies
-		: SessionCookiesBase;
+		: SessionCookiesBase & NoChallengeCookies;
+
+/**
+ * What `SessionCookies<false>` says of the challenge helpers: they are
+ * absent. Declared as `undefined` so that a set with a challenge is not
+ * assignable to it (a flow with no second factor refuses one at compile time).
+ */
+export interface NoChallengeCookies {
+	readonly challengeOf?: undefined;
+	readonly commitChallenge?: undefined;
+	readonly destroyChallenge?: undefined;
+}
 
 const PREFIX = /^__(?:Host|Secure)-/;
 
@@ -129,7 +140,18 @@ export function sessionCookies(
 	options: SessionCookiesWithoutChallengeOptions,
 ): SessionCookies<false>;
 export function sessionCookies(
-	options: SessionCookiesOptions | SessionCookiesWithoutChallengeOptions,
+	options: SessionCookiesBaseOptions & {
+		readonly challenge?: string | undefined;
+		readonly challengePath?: string | undefined;
+		readonly challengeSeconds?: number | undefined;
+	},
+): SessionCookies<boolean>;
+export function sessionCookies(
+	options: SessionCookiesBaseOptions & {
+		readonly challenge?: string | undefined;
+		readonly challengePath?: string | undefined;
+		readonly challengeSeconds?: number | undefined;
+	},
 ): SessionCookies<boolean> {
 	const {
 		secure,
@@ -226,5 +248,5 @@ export function sessionCookies(
 
 /** The `Set-Cookie` values that clear the challenge: none without a second factor. */
 export function challengeCleared(cookies: SessionCookies<boolean>): string[] {
-	return 'destroyChallenge' in cookies ? [cookies.destroyChallenge()] : [];
+	return cookies.destroyChallenge ? [cookies.destroyChallenge()] : [];
 }

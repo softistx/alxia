@@ -545,7 +545,7 @@ without a cookie or when the API cannot tell.
 ## The second factor
 
 A second factor is optional. An API with none builds the cookies without
-`challenge` and the flow without `attemptsLeft`; neither carries a
+`challenge` and the flow without `attemptsLeft`. Neither carries a
 second-factor member on its type, a `secondFactor` answer lands nowhere
 (`landing` returns `null`), and no challenge cookie is set or cleared:
 
@@ -555,8 +555,17 @@ export const signIn = signInFlow({ cookies, errors, json, revoke });
 // signIn.codeStep, signIn.readCodeInput and cookies.challengeOf do not exist.
 ```
 
-Give both or neither: `signInFlow` throws when the cookies have a challenge
-and `attemptsLeft` is missing, or the other way round. `stepUpSteps` takes a flow with a second factor; `authLinks`
+Give both or neither: `signInFlow` refuses cookies with a challenge and no
+`attemptsLeft` at compile time, and throws a TypeError at runtime when only
+one is given ([troubleshooting](../troubleshooting.md)). To type a helper
+that takes the flow or the cookies, use `SignInFlow<L, C, false>` and
+`SessionCookies<false>` (no second factor), `SignInFlow<L, C>` and
+`SessionCookies` (one), or `SignInFlow<L, C, boolean>` and
+`SessionCookies<boolean>` for either. `signInFlow` itself takes
+`SessionCookies<true>` or `SessionCookies<false>`, not the union: when
+`challenge` may be `undefined`, `sessionCookies` returns
+`SessionCookies<boolean>`, so branch on `challenge` and call `sessionCookies`
+in each branch. `stepUpSteps` takes a flow with a second factor; `authLinks`
 takes either. The rest of this section is for an app that has one.
 
 The sign-in page's answer `secondFactor` leads to the second-factor page,

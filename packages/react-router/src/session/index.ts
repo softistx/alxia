@@ -8,6 +8,7 @@ export { CHALLENGE_OVER, INVALID_CODE, MAIL_THROTTLED } from './codes';
 export {
 	type ChallengeCookies,
 	type CookieSession,
+	type NoChallengeCookies,
 	type SessionCookies,
 	type SessionCookiesBase,
 	type SessionCookiesOptions,

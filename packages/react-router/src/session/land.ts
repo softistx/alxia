@@ -66,7 +66,7 @@ export function landing<L extends string, C>(
 	if (
 		answer.status === 'secondFactor' &&
 		answer.challenge &&
-		'commitChallenge' in cookies
+		cookies.commitChallenge
 	) {
 		return redirect(secondFactorPath(next, paths.secondFactor), {
 			headers: {
