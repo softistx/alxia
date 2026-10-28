@@ -6,7 +6,19 @@ import { relay } from './relay';
 
 type HeaderValues = Record<string, string | null | undefined> | Headers;
 
-export interface SubscriptionProxyOptions {
+/**
+ * What React Router gives the resource route's `loader` and `action`, and what
+ * `headers` receives beside the request: the route's `context` (the app's
+ * `getLoadContext` value, `RouterContextProvider`) and `params`. Both are
+ * optional so a call with the request alone, as in a spec, still type-checks.
+ */
+export interface SubscriptionArgs<Context = unknown> {
+	readonly request: Request;
+	readonly context?: Context;
+	readonly params?: Readonly<Record<string, string | undefined>>;
+}
+
+export interface SubscriptionProxyOptions<Context = unknown> {
 	/** The API's GraphQL endpoint, which serves subscriptions over SSE. */
 	readonly endpoint: string | URL;
 	/**
@@ -20,10 +32,21 @@ export interface SubscriptionProxyOptions {
 	readonly getToken: (
 		request: Request,
 	) => string | null | undefined | Promise<string | null | undefined>;
-	/** Extra upstream headers (client name, proxy secret, `X-Forwarded-For`, `Accept-Language`), fixed or built per request. A `null` or `undefined` value is left out. */
+	/**
+	 * Extra upstream headers (client name, proxy secret, `X-Forwarded-For`,
+	 * `Accept-Language`), fixed or built per request. A `null` or `undefined`
+	 * value is left out. A function gets the request and, as its second
+	 * argument, the route's loader or action arguments (`context`, `params`), so
+	 * it can send the trusted client address from the app's context instead of
+	 * copying a header the browser could forge. They reach this function only,
+	 * never the browser.
+	 */
 	readonly headers?:
 		| HeaderValues
-		| ((request: Request) => HeaderValues | Promise<HeaderValues>);
+		| ((
+				request: Request,
+				args: SubscriptionArgs<Context>,
+		  ) => HeaderValues | Promise<HeaderValues>);
 	/** The app's own origin for the cross-site check, as `jsonActions` takes it; the request's own by default. */
 	readonly origin?: string | (() => string | undefined);
 	/** A comment line sent this often so a proxy or Bun's `idleTimeout` keeps the stream open. 15000 by default; `0` turns it off. */
@@ -32,17 +55,17 @@ export interface SubscriptionProxyOptions {
 	readonly fetch?: (request: Request) => Promise<Response>;
 }
 
-export interface SubscriptionProxy {
+export interface SubscriptionProxy<Context = unknown> {
 	/** A GET: graphql-sse's distinct connections mode, the operation in the search params. */
-	loader(args: { request: Request }): Promise<Response>;
+	loader(args: SubscriptionArgs<Context>): Promise<Response>;
 	/** A POST: the operation in a JSON body. */
-	action(args: { request: Request }): Promise<Response>;
+	action(args: SubscriptionArgs<Context>): Promise<Response>;
 }
 
 interface Config {
 	readonly endpoint: URL;
 	readonly documents: ReadonlyMap<string, string>;
-	readonly options: SubscriptionProxyOptions;
+	readonly options: SubscriptionProxyOptions<never>;
 	readonly origin: () => string | undefined;
 	readonly heartbeatMs: number;
 	readonly upstreamFetch: (request: Request) => Promise<Response>;
@@ -52,12 +75,14 @@ const UNSAFE = /[\r\n\0]/;
 
 async function upstreamHeaders(
 	config: Config,
-	request: Request,
+	args: SubscriptionArgs,
 	token: string,
 ): Promise<Headers> {
 	const { headers } = config.options;
 	const extra =
-		typeof headers === 'function' ? await headers(request) : headers;
+		typeof headers === 'function'
+			? await headers(args.request, args as SubscriptionArgs<never>)
+			: headers;
 	const out = new Headers();
 	for (const [name, value] of extra instanceof Headers
 		? extra.entries()
@@ -69,7 +94,11 @@ async function upstreamHeaders(
 	return out;
 }
 
-async function handle(config: Config, request: Request): Promise<Response> {
+async function handle(
+	config: Config,
+	args: SubscriptionArgs,
+): Promise<Response> {
+	const { request } = args;
 	if (isCrossSite(request, config.origin()))
 		return problem(403, 'Cross-site request refused.', 'FORBIDDEN');
 	const token = await config.options.getToken(request);
@@ -89,7 +118,7 @@ async function handle(config: Config, request: Request): Promise<Response> {
 
 	let headers: Headers;
 	try {
-		headers = await upstreamHeaders(config, request, token);
+		headers = await upstreamHeaders(config, args, token);
 	} catch {
 		return problem(
 			500,
@@ -145,11 +174,11 @@ async function handle(config: Config, request: Request): Promise<Response> {
 
 function only(
 	method: string,
-	run: (request: Request) => Promise<Response>,
-): (args: { request: Request }) => Promise<Response> {
-	return async ({ request }) =>
-		request.method === method
-			? run(request)
+	run: (args: SubscriptionArgs) => Promise<Response>,
+): (args: SubscriptionArgs) => Promise<Response> {
+	return async (args) =>
+		args.request.method === method
+			? run(args)
 			: problem(
 					405,
 					`Use ${method}.`,
@@ -164,21 +193,21 @@ function only(
  * giving it the API's token or a way to write its own document. See the
  * subscription guide.
  */
-export function createSubscriptionProxy(
-	options: SubscriptionProxyOptions,
-): SubscriptionProxy {
+export function createSubscriptionProxy<Context = unknown>(
+	options: SubscriptionProxyOptions<Context>,
+): SubscriptionProxy<Context> {
 	checkDocuments(options.allow);
 	const config: Config = {
 		endpoint: new URL(options.endpoint),
 		documents: new Map(Object.entries(options.allow)),
-		options,
+		options: options as SubscriptionProxyOptions<never>,
 		origin: () =>
 			typeof options.origin === 'function' ? options.origin() : options.origin,
 		heartbeatMs: options.heartbeatMs ?? 15000,
 		upstreamFetch: options.fetch ?? ((request) => fetch(request)),
 	};
 	return {
-		loader: only('GET', (request) => handle(config, request)),
-		action: only('POST', (request) => handle(config, request)),
+		loader: only('GET', (args) => handle(config, args)),
+		action: only('POST', (args) => handle(config, args)),
 	};
 }

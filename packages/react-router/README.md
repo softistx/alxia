@@ -997,6 +997,7 @@ connections mode, so `graphql-sse` works against it. It imports nothing and adds
 
 ```ts
 // app/routes/events.ts
+import { alxiaOf } from '@alxia/react-router';
 import { createSubscriptionProxy } from '@alxia/react-router/subscription';
 import { print } from 'graphql';
 import { RoomEventsDocument } from '../generated/graphql';
@@ -1006,8 +1007,9 @@ const events = createSubscriptionProxy({
 	endpoint: 'https://api.example.com/graphql',
 	allow: { RoomEvents: print(RoomEventsDocument) },
 	getToken: (request) => cookies.token(request),
-	headers: (request) => ({
-		'x-forwarded-for': request.headers.get('x-forwarded-for'),
+	// the route's context is the second argument: send the trusted client address
+	headers: (request, { context }) => ({
+		'x-forwarded-for': alxiaOf(context).ip,
 		'accept-language': request.headers.get('accept-language'),
 	}),
 });
@@ -1288,7 +1290,7 @@ From `@alxia/react-router/subscription` (no import, no peer):
 
 | export | |
 | --- | --- |
-| `createSubscriptionProxy({ endpoint, allow, getToken, headers?, origin?, heartbeatMs?, fetch? })`, `SubscriptionProxy`, `SubscriptionProxyOptions` | a resource route's `loader` (GET) and `action` (POST) relaying GraphQL subscriptions over SSE (graphql-sse's distinct connections mode). `allow` is `{ [operationName]: document }`: the proxy sends its own document, the client's `query` and `extensions` are ignored and an unknown name is a 403. Both methods refuse a cross-site request (403) and a POST that is not JSON (415); 401 without a token; 400 for a malformed or oversize request (body 64 KiB, query string and variables 16 KiB); the bearer and `headers` upstream, a heartbeat comment every `heartbeatMs` (15000), the upstream aborted with the client, a pulled relay with a 1 MiB cap per event, an upstream 429 passed on with `Retry-After` and `retryAfter`, 502 for an upstream failure |
+| `createSubscriptionProxy({ endpoint, allow, getToken, headers?, origin?, heartbeatMs?, fetch? })`, `SubscriptionProxy`, `SubscriptionProxyOptions`, `SubscriptionArgs` | a resource route's `loader` (GET) and `action` (POST) relaying GraphQL subscriptions over SSE (graphql-sse's distinct connections mode). `allow` is `{ [operationName]: document }`: the proxy sends its own document, the client's `query` and `extensions` are ignored and an unknown name is a 403. Both methods refuse a cross-site request (403) and a POST that is not JSON (415); 401 without a token; 400 for a malformed or oversize request (body 64 KiB, query string and variables 16 KiB); the bearer and `headers` upstream (`headers(request, { request, context, params })`: a function gets the route's context, which never leaves it), a heartbeat comment every `heartbeatMs` (15000), the upstream aborted with the client, a pulled relay with a 1 MiB cap per event, an upstream 429 passed on with `Retry-After` and `retryAfter`, 502 for an upstream failure |
 
 The `alxia-react-router` bin, run with `bunx`:
 

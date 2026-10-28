@@ -5,6 +5,7 @@
  */
 export {
 	createSubscriptionProxy,
+	type SubscriptionArgs,
 	type SubscriptionProxy,
 	type SubscriptionProxyOptions,
 } from './proxy';

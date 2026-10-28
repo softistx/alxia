@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, test } from 'bun:test';
 import {
 	createSubscriptionProxy,
+	type SubscriptionProxy,
 	type SubscriptionProxyOptions,
 } from './index';
 
@@ -399,6 +400,121 @@ describe('createSubscriptionProxy', () => {
 		expect(got?.get('x-dropped')).toBeNull();
 		expect(got?.get('accept')).toBe('text/event-stream');
 		expect(got?.get('x-session')).toBeNull();
+	});
+
+	test("hands the route's context and params to the headers function", async () => {
+		const api = upstream(() => sse([]));
+		const context = { ip: '203.0.113.7', language: 'fr' };
+		const calls: unknown[] = [];
+		const p = createSubscriptionProxy<typeof context>({
+			endpoint: api.url,
+			allow: { RoomEvents: SUB },
+			getToken: (request) => request.headers.get('x-session'),
+			heartbeatMs: 0,
+			headers: (request, args) => {
+				calls.push(args.request === request);
+				return {
+					'x-forwarded-for': args.context?.ip,
+					'accept-language': args.context?.language,
+					'x-room': args.params?.['room'],
+				};
+			},
+		});
+		const typed: SubscriptionProxy<typeof context> = p;
+		const response = await typed.action({
+			request: post({ query: SUB }),
+			context,
+			params: { room: 'r1' },
+		});
+		await response.text();
+		const got = api.seen[0]?.headers;
+		expect(calls).toEqual([true]);
+		expect(got?.get('x-forwarded-for')).toBe('203.0.113.7');
+		expect(got?.get('accept-language')).toBe('fr');
+		expect(got?.get('x-room')).toBe('r1');
+		expect(got?.get('authorization')).toBe('Bearer tok');
+	});
+
+	test('the loader hands the context to headers too', async () => {
+		const api = upstream(() => sse([]));
+		const response = await proxy(api.url, {
+			headers: (_request, args) => ({
+				'x-forwarded-for': (args.context as { ip: string }).ip,
+			}),
+		}).loader({
+			request: new Request(`http://app.test/events?operationName=RoomEvents`, {
+				headers: { 'x-session': 'tok' },
+			}),
+			context: { ip: '198.51.100.9' },
+		});
+		await response.text();
+		expect(api.seen[0]?.headers.get('x-forwarded-for')).toBe('198.51.100.9');
+	});
+
+	test('a request-only headers function and a call without context still work', async () => {
+		const api = upstream(() => sse([]));
+		const response = await proxy(api.url, {
+			headers: (request) => ({ 'x-lang': request.headers.get('x-lang') }),
+		}).action({
+			request: post({ query: SUB }, { 'x-session': 'tok', 'x-lang': 'de' }),
+		});
+		await response.text();
+		expect(api.seen[0]?.headers.get('x-lang')).toBe('de');
+	});
+
+	test('the context is never forwarded upstream nor echoed to the browser', async () => {
+		const api = upstream(() => sse(['event: next\ndata: {}\n\n']));
+		const secret = 'ctx-secret-value';
+		const response = await proxy(api.url, {
+			headers: { 'x-client': 'bff' },
+		}).action({
+			request: post({ query: SUB }),
+			context: { secret },
+			params: { secret },
+		});
+		const text = await response.text();
+		expect(text).not.toContain(secret);
+		expect(JSON.stringify(api.seen[0]?.body)).not.toContain(secret);
+		expect([...(api.seen[0]?.headers.values() ?? [])].join('\n')).not.toContain(
+			secret,
+		);
+		expect(JSON.stringify([...response.headers])).not.toContain(secret);
+	});
+
+	test('a headers function that gets the context still meets the site check, the JSON-only POST and the allow-list', async () => {
+		const api = upstream(() => sse([]));
+		let called = 0;
+		const p = proxy(api.url, {
+			headers: () => {
+				called++;
+				return {};
+			},
+		});
+		const context = { ip: '1.1.1.1' };
+		const cross = await p.action({
+			request: post(
+				{ query: SUB },
+				{ 'x-session': 't', 'sec-fetch-site': 'cross-site' },
+			),
+			context,
+		});
+		const notJson = await p.action({
+			request: new Request('http://app.test/events', {
+				method: 'POST',
+				headers: { 'content-type': 'text/plain', 'x-session': 't' },
+				body: '{}',
+			}),
+			context,
+		});
+		const unknown = await p.action({
+			request: post({ operationName: 'Nope' }),
+			context,
+		});
+		expect([cross.status, notJson.status, unknown.status]).toEqual([
+			403, 415, 403,
+		]);
+		expect(called).toBe(0);
+		expect(api.seen).toHaveLength(0);
 	});
 
 	test('sends a heartbeat comment while upstream is quiet', async () => {
