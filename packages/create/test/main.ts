@@ -18,7 +18,7 @@ export const VERSIONS = {
 	typescript: ['6.0.3', '7.0.2'],
 	'@types/bun': ['1.4.2'],
 	'@nxgt/httpyz': ['0.3.3', '0.4.1', '0.5.0'],
-	'@nxgt/openapi-httpyz': ['0.3.1', '0.3.2'],
+	'@nxgt/openapi-httpyz': ['0.3.1', '0.3.2', '0.3.3'],
 	'@biomejs/biome': ['2.5.15', '2.5.16', '2.6.0', '3.0.0'],
 	'@nxgt/openapi-codegen': ['0.10.0', '0.11.0', '0.11.1', '0.12.0'],
 	dataloader: ['2.2.2', '2.2.3'],

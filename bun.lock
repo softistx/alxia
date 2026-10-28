@@ -118,7 +118,7 @@
         "@graphql-codegen/typescript-resolvers": "6.1.0",
         "@nxgt/httpyz": "^0.5.0",
         "@nxgt/openapi-codegen": "0.11.0",
-        "@nxgt/openapi-httpyz": "^0.3.2",
+        "@nxgt/openapi-httpyz": "^0.3.3",
         "@types/bun": "^1.4.4",
         "dataloader": "^2.2.3",
         "graphql": "^16.11.0 || ^17.0.0",
@@ -792,7 +792,7 @@
 
     "@nxgt/openapi-codegen": ["@nxgt/openapi-codegen@0.11.0", "", { "peerDependencies": { "@nxgt/zod": "^0.1.3", "@redocly/openapi-core": "^2.52.1", "typescript": "^6.0.3 || ^7.0.0", "zod": "^4.5.4" }, "optionalPeers": ["@nxgt/zod", "@redocly/openapi-core"], "bin": { "nxgt-openapi": "dist/cli.js" } }, "sha512-/WwsXNkKO3QxEP6hAWk+mcnh3eIqG88xqO5UU8a+6j3gFTwnbNHzPRS8SuwpyVc6YWqo/zg5oshtQ7iNsO4FGg=="],
 
-    "@nxgt/openapi-httpyz": ["@nxgt/openapi-httpyz@0.3.2", "", { "peerDependencies": { "@nxgt/httpyz": "^0.4.0", "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-lfNqnvL2EkbTd98334tbnVYqyDs1zNyhyah1vbiaLvgB3AIXuYz5FtfoGHRZQ2Bf4PsHhttGvdrgkgYMv/uu9A=="],
+    "@nxgt/openapi-httpyz": ["@nxgt/openapi-httpyz@0.3.3", "", { "peerDependencies": { "@nxgt/httpyz": "^0.5.0", "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-VzMGAXIf/uUpYPZhgfrKE+L0qyQrNA9aGAeUTYDdlVhiMa6I1La3sTuv6/f7mzsIN3wxdxk+I79Oh26YD+0A/A=="],
 
     "@nxgt/redis": ["@nxgt/redis@0.9.2", "", { "peerDependencies": { "redis-memory-server": ">=0.17.1 <0.18", "typescript": "^6.0.3 || ^7.0.0", "zod": ">=4.6.5 <5" }, "optionalPeers": ["redis-memory-server"] }, "sha512-kP4+RfI4FBxpMIGLEf6m8WnkO4ih8PEVpABxwR8qIsSx5UwU3Xkv8sAAiaLZQ/pAhLTAZtqhGGNrBTQf+Gb3yg=="],
 
@@ -1621,8 +1621,6 @@
     "@graphql-tools/wrap/@graphql-tools/utils": ["@graphql-tools/utils@12.0.3", "", { "dependencies": { "@graphql-typed-document-node/core": "^3.1.1", "@whatwg-node/promise-helpers": "^2.0.0", "cross-inspect": "1.0.1", "tslib": "^2.4.0" }, "peerDependencies": { "graphql": "^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0" } }, "sha512-M+04bHvI1SKoug7W2EkwfKjig2mdtgIIlFY8p2jLHmxPNVs5bC/3R+58JrD+7ZXWgPILWTwuqJ9AqTjPlahroA=="],
 
     "@nxgt/i18n/intl-messageformat": ["intl-messageformat@12.1.2", "", { "dependencies": { "@formatjs/fast-memoize": "3.1.7", "@formatjs/icu-messageformat-parser": "3.5.20" } }, "sha512-Y7ZnMtT/04nVJnjf1/x/AkfP5we/iN0AhckDdlFPtnetk6/VTuj2OPW5SE7steMd3UNaOtky4KJJY6jwyvWfJg=="],
-
-    "@nxgt/openapi-httpyz/@nxgt/httpyz": ["@nxgt/httpyz@0.4.1", "", { "peerDependencies": { "typescript": "^6.0.3 || ^7.0.0" } }, "sha512-M6D6v6MznKDhM6eObKK+LsPoOYoJwRbJKRSvB2ONDV7lC0xWAe7grHH7C8qELCoNndVAYD94iyUTRVp7wrkQzw=="],
 
     "@tailwindcss/node/lightningcss": ["lightningcss@1.32.0", "", { "dependencies": { "detect-libc": "^2.0.3" }, "optionalDependencies": { "lightningcss-android-arm64": "1.32.0", "lightningcss-darwin-arm64": "1.32.0", "lightningcss-darwin-x64": "1.32.0", "lightningcss-freebsd-x64": "1.32.0", "lightningcss-linux-arm-gnueabihf": "1.32.0", "lightningcss-linux-arm64-gnu": "1.32.0", "lightningcss-linux-arm64-musl": "1.32.0", "lightningcss-linux-x64-gnu": "1.32.0", "lightningcss-linux-x64-musl": "1.32.0", "lightningcss-win32-arm64-msvc": "1.32.0", "lightningcss-win32-x64-msvc": "1.32.0" } }, "sha512-NXYBzinNrblfraPGyrbPoD19C1h9lfI/1mzgWYvXUTe414Gz/X1FD2XBZSZM7rRTrMA8JL3OtAaGifrIKhQ5yQ=="],
 
