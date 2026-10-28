@@ -1,5 +1,0 @@
----
-"@alxia/react-router": minor
----
-
-`/session`: the second factor is optional. `sessionCookies` takes no `challenge` (and returns `SessionCookies<false>`, with no `challengeOf`, `commitChallenge` or `destroyChallenge` on the type), and `signInFlow` takes no `attemptsLeft` (and returns `SignInFlow<L, C, false>`, with no `attemptsLeft`, `codeRefusal`, `readCodeInput` or `codeStep`). Without one, a `secondFactor` answer lands nowhere (`landing` returns `null`) and no challenge cookie is set or cleared. The two go together: a cookies set with a challenge and no `attemptsLeft` is a compile error, and `signInFlow` throws a TypeError when only one is given. `sessionCookies` with `challenge: string | undefined` returns `SessionCookies<boolean>`, which `signInFlow` does not take until it is narrowed. New types: `SessionCookiesWithoutChallengeOptions`, `SignInFlowWithoutSecondFactorOptions`, `SecondFactorSteps`, `ChallengeCookies`, `NoChallengeCookies`, `SessionCookiesBase`, `SignInFlowBase`. An app with a second factor is unchanged. Additive.
