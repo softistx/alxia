@@ -29,6 +29,7 @@ import is `react-router`, never `@alxia/core`, so a page can import it
 | `ApiErrorLike`, `isApiErrorLike(error)` | the shape of `@nxgt/graphql-client`'s `ApiError`, and the test for it |
 | `ApiErrorEntryLike`, `ApiErrorExtensionsLike`, `ApiErrorParamsLike`, `ApiFieldErrorLike` | one error of the response, its `extensions`, their `params`, and one refused field |
 | `waitMinutes(extensions)` | the minutes of a throttle's wait: `minutes` (at least one), else `retryAfter` rounded up to minutes |
+| `retryAfterOf(error)` | the seconds a 429 asks to wait, for a countdown on your own forms: `retryAfter` of the first error's `params`, else of its `extensions`, rounded up and held at a day; `undefined` when none is usable |
 | `attemptsLeftOf(error)` | the tries a refused code leaves, as `@nxgt/janus` counts them: `extensions.attemptsLeft` of the first error, else `params.attemptsLeft`; `undefined` when it is not a whole number from 0 up |
 | `REQUEST_ID_HEADER`, `requestIdOf(response)` | the header an API echoes on every response, and its value |
 | `nextOf(url)` | the page a request is for, as `next` carries it back after sign-in |
@@ -72,6 +73,33 @@ import { waitMinutes } from '@alxia/react-router/errors';
 
 waitMinutes({ retryAfter: 90 }); // 2
 waitMinutes({ params: { minutes: 4 } }); // 4
+```
+
+### The seconds a 429 asks to wait
+
+`retryAfterOf(error)` reads the wait of a rate-limited call in seconds, from
+`retryAfter` in the first error's `extensions.params`, else in its
+`extensions`. Only a finite number from 0 or a decimal string counts; it is
+rounded up and held at a day (86 400). It answers `undefined` when the API sent
+no usable value, so a form can fall back to `waitMinutes` or to no countdown.
+`/session`'s flows return the same value as `retryAfter` on a `throttled`
+answer; use `retryAfterOf` on your own actions (sign-up, set password, any
+rate-limited mutation).
+
+```ts
+import { data } from 'react-router';
+import { isApiErrorLike, retryAfterOf } from '@alxia/react-router/errors';
+
+export async function action({ request }: { request: Request }) {
+  try {
+    await signUp(await request.json());
+  } catch (error) {
+    if (isApiErrorLike(error) && error.status === 429) {
+      return data({ retryAfter: retryAfterOf(error) }, { status: 429 });
+    }
+    throw error;
+  }
+}
 ```
 
 ### The tries a code leaves
