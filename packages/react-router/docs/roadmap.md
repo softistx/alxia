@@ -22,6 +22,13 @@ number on it. Every release, with each change it made, is in
   upstream with the client and passes a 429 on with `retryAfter`. See the
   [subscriptions guide](guide/subscriptions.md).
 
+- **`@alxia/react-router/lists`: hooks for lists whose state is the URL.**
+  `useSearchChange` (set or delete search parameters and drop the cursor),
+  `useSameRouteLoading` (another search of the same page is loading) and
+  `usePagedRows` (append the pages a load-more asks of the same loader, start
+  over on a new first page, keep the rows when a page fails). See the
+  [lists guide](guide/lists.md).
+
 ## Next
 
 Nothing planned.
