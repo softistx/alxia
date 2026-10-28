@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, test } from 'bun:test';
+import type { RouterContextProvider } from 'react-router';
+import { alxiaOf } from '../context';
 import {
 	createSubscriptionProxy,
+	type SubscriptionArgs,
 	type SubscriptionProxy,
 	type SubscriptionProxyOptions,
 } from './index';
@@ -514,6 +517,99 @@ describe('createSubscriptionProxy', () => {
 			403, 415, 403,
 		]);
 		expect(called).toBe(0);
+		expect(api.seen).toHaveLength(0);
+	});
+
+	test('the documented headers form type-checks', async () => {
+		const api = upstream(() => sse([]));
+		const p = createSubscriptionProxy({
+			endpoint: api.url,
+			allow: { RoomEvents: SUB },
+			getToken: (request) => request.headers.get('x-session'),
+			heartbeatMs: 0,
+			headers: (
+				request,
+				{ context }: SubscriptionArgs<Readonly<RouterContextProvider>>,
+			) => ({
+				'x-forwarded-for': context ? alxiaOf(context).ip : null,
+				'accept-language': request.headers.get('accept-language'),
+			}),
+		});
+		const response = await p.action({ request: post({ query: SUB }) });
+		await response.text();
+		expect(response.status).toBe(200);
+		expect(api.seen[0]?.headers.get('x-forwarded-for')).toBeNull();
+	});
+
+	test('the generic types the context', () => {
+		const p = createSubscriptionProxy<{ ip: string }>({
+			endpoint: 'http://api.test/graphql',
+			allow: { RoomEvents: SUB },
+			getToken: () => 't',
+		});
+		const bad = () =>
+			p.loader({
+				request: new Request('http://app.test/events'),
+				// @ts-expect-error ip is a string
+				context: { ip: 1 },
+			});
+		expect(typeof bad).toBe('function');
+	});
+
+	test('refusals come before headers: 405, 401 and 400 call neither it nor the API', async () => {
+		const api = upstream(() => sse([]));
+		let called = 0;
+		const p = proxy(api.url, {
+			headers: () => {
+				called++;
+				return {};
+			},
+		});
+		const context = { ip: '1.1.1.1' };
+		const wrongMethod = await p.action({
+			request: new Request('http://app.test/events', {
+				method: 'PUT',
+				headers: { 'x-session': 'tok' },
+			}),
+			context,
+		});
+		const noToken = await p.action({
+			request: post({ query: SUB }, {}),
+			context,
+		});
+		const malformed = await p.action({
+			request: new Request('http://app.test/events', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json', 'x-session': 'tok' },
+				body: '{not json',
+			}),
+			context,
+		});
+		const oversize = await p.action({
+			request: post({ variables: { big: 'x'.repeat(200_000) } }),
+			context,
+		});
+		expect(wrongMethod.status).toBe(405);
+		expect(noToken.status).toBe(401);
+		expect(malformed.status).toBe(400);
+		expect([400, 413]).toContain(oversize.status);
+		expect(called).toBe(0);
+		expect(api.seen).toHaveLength(0);
+	});
+
+	test('a headers function that throws with the context gives a fixed 500 that leaks nothing', async () => {
+		const api = upstream(() => sse([]));
+		const secret = 'ctx-throw-secret';
+		const response = await proxy(api.url, {
+			headers: (_request, args) => {
+				throw new Error(`${(args.context as { secret: string }).secret}`);
+			},
+		}).action({ request: post({ query: SUB }), context: { secret } });
+		const text = await response.text();
+		expect(response.status).toBe(500);
+		expect(text).toContain('headers function threw');
+		expect(text).not.toContain(secret);
+		expect(JSON.stringify([...response.headers])).not.toContain(secret);
 		expect(api.seen).toHaveLength(0);
 	});
 

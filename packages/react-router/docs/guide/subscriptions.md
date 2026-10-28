@@ -18,8 +18,12 @@ client was generated from:
 ```ts
 // app/routes/events.ts: a resource route, served at /events
 import { alxiaOf } from '@alxia/react-router';
-import { createSubscriptionProxy } from '@alxia/react-router/subscription';
+import {
+	createSubscriptionProxy,
+	type SubscriptionArgs,
+} from '@alxia/react-router/subscription';
 import { print } from 'graphql';
+import type { RouterContextProvider } from 'react-router';
 import { ChatMessagesDocument, RoomEventsDocument } from '../generated/graphql';
 import { cookies } from '../session.server';
 
@@ -31,14 +35,16 @@ const events = createSubscriptionProxy({
 		// or the document string codegen exports, or a literal
 	},
 	getToken: (request) => cookies.token(request),
-	headers: (request, { context }) => ({
+	headers: (
+		request,
+		{ context }: SubscriptionArgs<Readonly<RouterContextProvider>>,
+	) => ({
 		'x-client-name': 'my-bff',
 		'x-proxy-secret': process.env.PROXY_SECRET,
-		// the trusted client address (behind `proxy: trustProxy(...)`), not the browser's own header
-		'x-forwarded-for': alxiaOf(context).ip,
+		// the trusted client address (behind `proxy: trustProxy(...)`), not the browser's own header; null leaves it out
+		'x-forwarded-for': context ? alxiaOf(context).ip : null,
 		'accept-language': request.headers.get('accept-language'),
-	}),
-});
+	}),});
 
 export const loader = events.loader; // GET: operationName and variables in the query string
 export const action = events.action; // POST: the same in a JSON body

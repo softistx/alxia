@@ -2808,9 +2808,14 @@ string, or `variables` is not an object.
 ### A subscription answers 500 `The proxy's upstream headers are not valid …`
 
 **Why:** a value of `headers` (a forwarded `Accept-Language`, a secret from the
-environment) holds a line break, or a name is not a header name.
+environment) holds a line break, or a name is not a header name, or the
+`headers` function threw (for example `alxiaOf(context)` on a request served
+without alxia's context). The answer's text is fixed: nothing from the error
+reaches the browser.
 
-**Fix:** trim or validate the value before it goes in `headers`.
+**Fix:** trim or validate the value before it goes in `headers`, and guard the
+context (`context ? alxiaOf(context).ip : null`); read the error in your own
+log by catching inside the function.
 
 ### A subscription answers 429 with `retryAfter`
 

@@ -65,6 +65,7 @@ export interface SubscriptionProxy<Context = unknown> {
 interface Config {
 	readonly endpoint: URL;
 	readonly documents: ReadonlyMap<string, string>;
+	// `Context` is the caller's own claim about what its route passes and is never checked; `never` lets any typed `headers` function be stored.
 	readonly options: SubscriptionProxyOptions<never>;
 	readonly origin: () => string | undefined;
 	readonly heartbeatMs: number;
@@ -122,7 +123,7 @@ async function handle(
 	} catch {
 		return problem(
 			500,
-			"The proxy's upstream headers are not valid (a name or a value no header can hold).",
+			"The proxy's upstream headers are not valid (a name or a value no header can hold, or the headers function threw).",
 			'PROXY_MISCONFIGURED',
 		);
 	}

@@ -998,8 +998,12 @@ connections mode, so `graphql-sse` works against it. It imports nothing and adds
 ```ts
 // app/routes/events.ts
 import { alxiaOf } from '@alxia/react-router';
-import { createSubscriptionProxy } from '@alxia/react-router/subscription';
+import {
+	createSubscriptionProxy,
+	type SubscriptionArgs,
+} from '@alxia/react-router/subscription';
 import { print } from 'graphql';
+import type { RouterContextProvider } from 'react-router';
 import { RoomEventsDocument } from '../generated/graphql';
 import { cookies } from '../session.server';
 
@@ -1008,8 +1012,11 @@ const events = createSubscriptionProxy({
 	allow: { RoomEvents: print(RoomEventsDocument) },
 	getToken: (request) => cookies.token(request),
 	// the route's context is the second argument: send the trusted client address
-	headers: (request, { context }) => ({
-		'x-forwarded-for': alxiaOf(context).ip,
+	headers: (
+		request,
+		{ context }: SubscriptionArgs<Readonly<RouterContextProvider>>,
+	) => ({
+		'x-forwarded-for': context ? alxiaOf(context).ip : null,
 		'accept-language': request.headers.get('accept-language'),
 	}),
 });
