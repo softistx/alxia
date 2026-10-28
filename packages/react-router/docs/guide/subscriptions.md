@@ -17,8 +17,13 @@ client was generated from:
 
 ```ts
 // app/routes/events.ts: a resource route, served at /events
-import { createSubscriptionProxy } from '@alxia/react-router/subscription';
+import { alxiaOf } from '@alxia/react-router';
+import {
+	createSubscriptionProxy,
+	type SubscriptionArgs,
+} from '@alxia/react-router/subscription';
 import { print } from 'graphql';
+import type { RouterContextProvider } from 'react-router';
 import { ChatMessagesDocument, RoomEventsDocument } from '../generated/graphql';
 import { cookies } from '../session.server';
 
@@ -30,13 +35,16 @@ const events = createSubscriptionProxy({
 		// or the document string codegen exports, or a literal
 	},
 	getToken: (request) => cookies.token(request),
-	headers: (request) => ({
+	headers: (
+		request,
+		{ context }: SubscriptionArgs<Readonly<RouterContextProvider>>,
+	) => ({
 		'x-client-name': 'my-bff',
 		'x-proxy-secret': process.env.PROXY_SECRET,
-		'x-forwarded-for': request.headers.get('x-forwarded-for'),
+		// the trusted client address (behind `proxy: trustProxy(...)`), not the browser's own header; null leaves it out
+		'x-forwarded-for': context ? alxiaOf(context).ip : null,
 		'accept-language': request.headers.get('accept-language'),
-	}),
-});
+	}),});
 
 export const loader = events.loader; // GET: operationName and variables in the query string
 export const action = events.action; // POST: the same in a JSON body
@@ -98,7 +106,7 @@ adapter or reverse proxy needs to buffer it.
 | `endpoint` | the API's GraphQL URL (required) |
 | `allow` | operation name to the document sent upstream (required); each document must define `subscription <name>`, that operation alone, checked when the proxy is created |
 | `getToken(request)` | the session's token, sync or async (required) |
-| `headers` | a record, `Headers`, or `(request) => record`; a `null` or `undefined` value is left out |
+| `headers` | a record, `Headers`, or `(request, args) => record`, sync or async; `args` is what React Router gave the route (`request`, `context`, `params`), so a header can come from the app's context; a `null` or `undefined` value is left out. A `(request) => record` function keeps working |
 | `origin` | the app's origin for the same-site check, a string or a getter; the request's own by default |
 | `heartbeatMs` | 15000 |
 | `fetch` | the `fetch` used upstream (the global one); useful in specs |
