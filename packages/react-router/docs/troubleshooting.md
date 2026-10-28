@@ -2745,7 +2745,7 @@ createSubscriptionProxy({ endpoint, allow: { RoomEvents: document }, getToken })
 ### A subscription answers 403 `Cross-site request refused.`
 
 **Why:** the request's `Origin` is not the app's own, or its `Sec-Fetch-Site` is
-`cross-site` or `same-site` (another subdomain). Behind a TLS-terminating proxy
+`cross-site`, or `same-site` (another subdomain of the same site: only `same-origin` and `none` pass). Behind a TLS-terminating proxy
 the request's own origin can read `http://`.
 
 **Fix:** call the route from the app's own pages, or give the proxy the public

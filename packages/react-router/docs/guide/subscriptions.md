@@ -7,8 +7,7 @@ must not be able to send the API a document of its own, so the app exposes
 **one resource route** that checks the user's session, looks the operation up
 in a list the server holds, and relays the API's server-sent events.
 
-`@alxia/react-router/subscription` is that route. It imports `react-router`
-(through `/errors`' same-site check) and nothing else, so it adds no peer.
+`@alxia/react-router/subscription` is that route. It imports nothing (web APIs only), so it adds no peer.
 
 ## Expose a subscription
 
@@ -79,8 +78,8 @@ work, each through the matching export.
 | --- | --- |
 | Same site | Both methods run the rule of `jsonActions`: an `Origin` that is not the app's own, or a `Sec-Fetch-Site` other than `same-origin` or `none`, is a **403** (`origin` sets the app's origin; the request's own by default). It reads headers only. A POST must be `application/json`, else **415**. |
 | Session | `getToken(request)` gives the token, read on the server from the HttpOnly cookie. Empty, `null`, `undefined` or a token holding a line break is a **401**; nothing goes upstream. |
-| Request | The client's `operationName` and `variables` are read. A body past 64 KiB (`Content-Length` first, then the bytes read), a query string past 16 KiB or `variables` past 16 KiB is a **400**, as is malformed input. Its `query` and `extensions` are ignored. |
-| Allow-list | `operationName` must be a key of `allow`, else **403**. The proxy sends **its own document** for it, with the client's variables: no document, fragment, extension or persisted id of the client's reaches the API. |
+| Request | The client's `operationName` and `variables` are read. A body that cannot be read (the client left) is a **400**; a body past 64 KiB (`Content-Length` first, then the bytes read), a query string past 16 KiB or `variables` past 16 KiB is a **400**, as is malformed input. Its `query` and `extensions` are ignored. |
+| Allow-list | Each document of `allow` must define `subscription <key>` and no other operation (fragments are fine), or `createSubscriptionProxy` throws a `TypeError` when it is created. `operationName` must be a key of `allow`, else **403**. The proxy sends **its own document** for it, with the client's variables: no document, fragment, extension or persisted id of the client's reaches the API. |
 | Upstream request | A `POST` to `endpoint` with `Accept: text/event-stream`, `Authorization: Bearer <token>` and your `headers`. The browser's own headers and cookies are never forwarded. A header name or value no header can hold (a line break) is a worded **500**. |
 | Relay | Whole events are relayed in order, as the client takes them: a slow client holds the upstream back instead of growing a buffer, and a heartbeat is skipped while one is waiting. A heartbeat comment (`:`) goes out every `heartbeatMs` (15000 by default, `0` turns it off), never inside an event. An event of more than 1 MiB with no end cuts the stream with an `UPSTREAM_ERROR`. |
 | End | The upstream's `complete`, or the end of its stream, closes the client's stream. A stream that breaks sends a `next` with an `UPSTREAM_ERROR` and a `complete`. |
@@ -97,7 +96,7 @@ adapter or reverse proxy needs to buffer it.
 | Option | |
 | --- | --- |
 | `endpoint` | the API's GraphQL URL (required) |
-| `allow` | operation name to the document sent upstream (required) |
+| `allow` | operation name to the document sent upstream (required); each document must define `subscription <name>`, that operation alone, checked when the proxy is created |
 | `getToken(request)` | the session's token, sync or async (required) |
 | `headers` | a record, `Headers`, or `(request) => record`; a `null` or `undefined` value is left out |
 | `origin` | the app's origin for the same-site check, a string or a getter; the request's own by default |

@@ -559,4 +559,57 @@ describe('createSubscriptionProxy', () => {
 			(await p.action({ request: new Request('http://app.test/e') })).status,
 		).toBe(405);
 	});
+
+	test('refuses a document that is not exactly its own subscription, when it is created', () => {
+		const make = (allow: Record<string, string>) => () =>
+			createSubscriptionProxy({
+				endpoint: 'http://localhost/graphql',
+				allow,
+				getToken: () => 't',
+			});
+		expect(make({ RoomEvents: 'mutation RoomEvents { drop }' })).toThrow(
+			/subscription RoomEvents/,
+		);
+		expect(make({ RoomEvents: 'subscription Other { x }' })).toThrow(
+			/defines subscription Other/,
+		);
+		expect(make({ RoomEvents: `${SUB} query Q { x }` })).toThrow(
+			/subscription RoomEvents, query Q/,
+		);
+		expect(make({ RoomEvents: '{ x }' })).toThrow(/\{/);
+		expect(make({ RoomEvents: 'subscription { x }' })).toThrow(
+			/subscription RoomEvents/,
+		);
+		expect(make({ RoomEvents: 'fragment F on E { id }' })).toThrow(
+			/defines none/,
+		);
+		expect(
+			make({
+				RoomEvents: `# comment mutation X {}\nsubscription RoomEvents($t: String = "query Q {") { roomEvents { ...F } }\nfragment F on Event { id }`,
+			}),
+		).not.toThrow();
+		expect(make({ RoomEvents: SUB })).not.toThrow();
+	});
+
+	test('a body that fails to read is a worded 400, not an unworded error', async () => {
+		const api = upstream(() => sse([]));
+		const body = new ReadableStream({
+			pull(controller) {
+				controller.error(new Error('client aborted'));
+			},
+		});
+		const request = new Request('http://app.test/events', {
+			method: 'POST',
+			headers: { 'content-type': 'application/json', 'x-session': 'tok' },
+			body,
+			duplex: 'half',
+		} as RequestInit);
+		const response = await proxy(api.url).action({ request });
+		expect(response.status).toBe(400);
+		expect(
+			((await response.json()) as { errors: Array<{ message: string }> })
+				.errors[0]?.message,
+		).toBe('The request body could not be read.');
+		expect(api.seen).toHaveLength(0);
+	});
 });

@@ -993,8 +993,7 @@ its own `query` and `extensions` are ignored. The bearer comes from the
 session, both methods refuse a cross-site request, a heartbeat keeps the
 stream open, the browser leaving aborts the upstream request, and an upstream
 429 is passed on with its `retryAfter`. It speaks GraphQL over SSE in distinct
-connections mode, so `graphql-sse` works against it. It imports `react-router`
-alone and adds no peer.
+connections mode, so `graphql-sse` works against it. It imports nothing and adds no peer.
 
 ```ts
 // app/routes/events.ts
@@ -1224,7 +1223,7 @@ From `@alxia/react-router/entry`:
 | `createEntry({ streamTimeout?, nonce?, isBot?, onError? })`, `EntryOptions`, `Entry` | `/entry`: `{ handleRequest, streamTimeout }` (`Entry`), `entry.server.tsx` for Bun on the web stream renderer |
 | `handleRequest`, `streamTimeout`, `HandleRequest` | `/entry`: the default entry (`createEntry()`), its `5_000` and the type of `handleRequest` (assignable to React Router's `ServerEntryModule['default']`) |
 
-From `@alxia/react-router/subscription` (`react-router` is its only import, no peer):
+From `@alxia/react-router/subscription` (no import, no peer):
 
 | export | |
 | --- | --- |

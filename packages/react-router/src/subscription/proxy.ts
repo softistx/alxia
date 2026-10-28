@@ -1,4 +1,5 @@
-import { siteCheck } from '../errors/same-site';
+import { isCrossSite } from '../errors/cross-site';
+import { checkDocuments } from './documents';
 import { readAsked } from './read';
 import { problem, Refusal, refusalResponse, refusedUpstream } from './refusal';
 import { relay } from './relay';
@@ -42,7 +43,7 @@ interface Config {
 	readonly endpoint: URL;
 	readonly documents: ReadonlyMap<string, string>;
 	readonly options: SubscriptionProxyOptions;
-	readonly sameSite: (request: Request) => void;
+	readonly origin: () => string | undefined;
 	readonly heartbeatMs: number;
 	readonly upstreamFetch: (request: Request) => Promise<Response>;
 }
@@ -69,11 +70,8 @@ async function upstreamHeaders(
 }
 
 async function handle(config: Config, request: Request): Promise<Response> {
-	try {
-		config.sameSite(request);
-	} catch {
+	if (isCrossSite(request, config.origin()))
 		return problem(403, 'Cross-site request refused.', 'FORBIDDEN');
-	}
 	const token = await config.options.getToken(request);
 	if (!token || UNSAFE.test(token))
 		return problem(401, 'Sign in to continue.', 'UNAUTHENTICATED');
@@ -83,7 +81,7 @@ async function handle(config: Config, request: Request): Promise<Response> {
 		asked = await readAsked(request);
 	} catch (error) {
 		if (error instanceof Refusal) return refusalResponse(error);
-		throw error;
+		return problem(400, 'The request body could not be read.', 'BAD_REQUEST');
 	}
 	const query = config.documents.get(asked.operationName);
 	if (query === undefined)
@@ -169,11 +167,13 @@ function only(
 export function createSubscriptionProxy(
 	options: SubscriptionProxyOptions,
 ): SubscriptionProxy {
+	checkDocuments(options.allow);
 	const config: Config = {
 		endpoint: new URL(options.endpoint),
 		documents: new Map(Object.entries(options.allow)),
 		options,
-		sameSite: siteCheck(options.origin),
+		origin: () =>
+			typeof options.origin === 'function' ? options.origin() : options.origin,
 		heartbeatMs: options.heartbeatMs ?? 15000,
 		upstreamFetch: options.fetch ?? ((request) => fetch(request)),
 	};
