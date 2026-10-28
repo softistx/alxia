@@ -62,7 +62,8 @@ export function codeOf(error: unknown) {
 ```
 
 An `ApiError` is assignable to `ApiErrorLike` as it is. The shape's code is
-the API's own `<module>.errors.<slug>`, such as `todos.errors.title-taken`.
+the API's own `<module>.errors.<slug>`, such as `todos.errors.title-taken`
+or `userProfiles.errors.slug-taken` (the module is kebab-case or camelCase).
 
 `waitMinutes` reads a throttle's wait the way the API words it: the
 `minutes` of `extensions.params` or beside it, at least one, else the
@@ -261,7 +262,8 @@ it once, at module scope: a new function re-creates the resolver.
 Two options adapt it. `codeOf(issue)` says which code an issue carries (the
 refinement's `params.code` by default); an app that also words an empty field
 as the API's `validation.errors.required` passes its own. `isApiCode(key)`
-says which keys are API codes (`<module>.errors.<slug>` by default).
+says which keys are API codes (`<module>.errors.<slug>` by default, the
+module in kebab-case or camelCase).
 
 ```ts
 import { apiCodeResolver } from '@alxia/react-router/errors';
@@ -397,8 +399,9 @@ code), `translateCode`'s, nor the entries of `extensions.fields`, which go
 straight to the catalogue.
 
 `isApiCode` changes what counts as an API code (`<module>.errors.<slug>` by
-default). Here only the codes of the `todos` module are the catalogue's; any
-other code, even one shaped like a catalogue code, says `refused`:
+default, the module in kebab-case or camelCase). Here only the codes of the
+`todos` module are the catalogue's; any other code, even one shaped like a
+catalogue code, says `refused`:
 
 ```ts
 export const apiErrors = createApiErrors<'en' | 'fr'>({

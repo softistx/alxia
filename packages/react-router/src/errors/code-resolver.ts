@@ -13,8 +13,8 @@ export type CodeIssueLike = {
 	readonly message?: string | undefined;
 };
 
-/** An API error code (`<module>.errors.<slug>`), as opposed to a GraphQL one (`BAD_USER_INPUT`). */
-export const API_CODE = /^[a-z-]+\.errors\.[a-z0-9-]+$/;
+/** An API error code (`<module>.errors.<slug>`, the module in kebab-case or camelCase), as opposed to a GraphQL one (`BAD_USER_INPUT`). */
+export const API_CODE = /^[a-z][a-zA-Z0-9-]*\.errors\.[a-z0-9-]+$/;
 
 export interface ApiCodeResolverOptions<L extends string> {
 	/**
