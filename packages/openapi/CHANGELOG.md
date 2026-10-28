@@ -6,6 +6,13 @@ under that name. The `@alxia/openapi` of 0.1.0 to 0.3.0, which wrote an OpenAPI
 document from an app's route schemas, is retired; its changelog is
 [in the repository's history](https://github.com/softistx/alxia/blob/3f80253/packages/openapi/CHANGELOG.md).
 
+## 0.6.12
+
+### Patch Changes
+
+- Updated dependencies [[`e4ff32c`](https://github.com/softistx/alxia/commit/e4ff32c1746581a5b52a50a5b6fdfb3e556e2e79)]:
+  - @alxia/core@0.17.0
+
 ## 0.6.11
 
 ### Patch Changes

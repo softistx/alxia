@@ -1,5 +1,16 @@
 # @alxia/react-router
 
+## 0.27.0
+
+### Minor Changes
+
+- [#403](https://github.com/softistx/alxia/pull/403) [`e4ff32c`](https://github.com/softistx/alxia/commit/e4ff32c1746581a5b52a50a5b6fdfb3e556e2e79) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The production server serves the client build compressed. `react-router build` writes `.br` and `.gz` copies beside every compressible file of `build/client` (1 kB and over; `alxia({ precompress: false })` writes none, `precompress: { minSize }` moves the threshold), and the server sends the copy a browser accepts, with `Content-Encoding`, `Vary: Accept-Encoding` and the same `Cache-Control`, for `assets/` and for the files at the top of the build alike. `createServer({ precompressed: false })` and `reactRouter(app, { precompressed: false })` serve the files as they are.
+
+### Patch Changes
+
+- Updated dependencies [[`e4ff32c`](https://github.com/softistx/alxia/commit/e4ff32c1746581a5b52a50a5b6fdfb3e556e2e79)]:
+  - @alxia/core@0.17.0
+
 ## 0.26.0
 
 ### Minor Changes
