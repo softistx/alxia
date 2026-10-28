@@ -173,6 +173,10 @@ of those folders gets alxia's JSON 404, `{ "error": "not_found" }`, not a
 page, so a folder of `public/` shadows any page path under the same name.
 Dotfiles are skipped. In dev, Vite serves them.
 
+A folder that is not one, or a file whose name no route can carry, is
+refused when the server starts: see
+[the troubleshooting entries](../troubleshooting.md#typeerror-reactrouter-client-is--which-is-not-a-directory-).
+
 ### Compressed
 
 `react-router build` writes a `.br` and a `.gz` copy beside each
@@ -194,7 +198,3 @@ alxia({ precompress: false });
 // app/server.ts: serve the files as they are, such as behind a proxy that compresses
 export default createServer({ precompressed: false });
 ```
-
-A folder that is not one, or a file whose name no route can carry, is
-refused when the server starts: see
-[the troubleshooting entries](../troubleshooting.md#typeerror-reactrouter-client-is--which-is-not-a-directory-).

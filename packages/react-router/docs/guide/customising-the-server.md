@@ -283,6 +283,7 @@ bun run build && bun server.ts
 | `mode` | React Router's server mode, `production` by default |
 | `getLoadContext(ctx, context)` | as `createServer`'s |
 | `client` | the client build's folder, a path or a `file:` URL, served before the catch-all in `production` |
+| `precompressed` | `true` by default: serves the client's `.br` and `.gz` copies to a browser that accepts them; `false` serves the files as they are |
 
 `reactRouter()` goes through `app.plugin`, as `@alxia/graphql`'s `graphql(app, …)`
 does: that is how it knows the app's context type. A `HEAD` is handed to

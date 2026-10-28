@@ -567,7 +567,7 @@ file, options?)` serves one file. Both answer:
 | `index` | `'index.html'` | the file a directory serves: one, a list tried in order, or `false` |
 | `extensions` | none | tried for a path without one: `['html']` serves `/about` from `about.html` |
 | `fallback` | none | served with a 200 for a path that matches no file: a single-page app |
-| `precompressed` | none | `br`, `zstd`, `gzip`: a file stored compressed beside itself, to a client that accepts it |
+| `precompressed` | none | `br`, `zstd`, `gzip`: a file stored compressed beside itself, to a client that accepts it; `app.file` takes it too, for a path on disk only |
 | `cacheControl` | `public, max-age=0` | a value, `false`, or one per path |
 | `headers` | none | headers, or `(path, file) => headers` |
 | `types` | Bun's | content types by extension: `{ '.wasm': 'application/wasm' }` |

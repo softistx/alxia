@@ -3,7 +3,7 @@
  * every compressible file, which `app.static(…, { precompressed })` serves
  * to a browser that accepts them, so the server never compresses on a request.
  */
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { extname, join } from 'node:path';
 import { promisify } from 'node:util';
 import { brotliCompress, constants, gzip } from 'node:zlib';
@@ -80,13 +80,17 @@ export async function precompressClient(
 			deflate(body, { level: 9 }),
 		]);
 		let written = false;
-		if (br.length < body.length) {
-			await writeFile(`${path}.br`, br);
-			written = true;
-		}
-		if (gz.length < body.length) {
-			await writeFile(`${path}.gz`, gz);
-			written = true;
+		for (const [extension, copy] of [
+			['br', br],
+			['gz', gz],
+		] as const) {
+			if (copy.length < body.length) {
+				await writeFile(`${path}.${extension}`, copy);
+				written = true;
+			} else {
+				// A copy left by an earlier build would be stale.
+				await rm(`${path}.${extension}`, { force: true });
+			}
 		}
 		if (!written) continue;
 		files += 1;

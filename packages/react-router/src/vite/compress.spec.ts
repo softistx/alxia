@@ -62,4 +62,11 @@ describe('precompressClient', () => {
 		await precompressClient(dir);
 		expect(existsSync(join(dir, 'assets/app.js.br.br'))).toBe(false);
 	});
+
+	test('removes a stale copy it does not replace', async () => {
+		const dir = build();
+		writeFileSync(join(dir, 'tiny.js.br'), 'stale');
+		await precompressClient(dir, { minSize: 1 });
+		expect(existsSync(join(dir, 'tiny.js.br'))).toBe(false);
+	});
 });

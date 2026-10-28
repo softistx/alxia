@@ -582,6 +582,8 @@ tool), when the file is under 1 kB or not compressible (an image, say), or
 when `createServer({ precompressed: false })` is set. A compressed copy that
 is not smaller than the file is not written.
 
+A single-page app (`ssr: false` in `react-router.config.ts`) has no alxia server: the plugin builds the service worker only and writes no copies, so whatever serves `build/client` has to compress it.
+
 **Fix:** build with the plugin, and check the copies exist:
 
 ```sh

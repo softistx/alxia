@@ -1,6 +1,6 @@
 /** `app.file` and `app.page`: one path served by a file, or by a bundled page. */
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { alxia } from '../app/alxia';
@@ -60,6 +60,20 @@ describe('app.file, precompressed copies', () => {
 			expect(response.headers.get('vary')).toContain('Accept-Encoding');
 			expect(await response.text()).toBe('hello'.repeat(50));
 		}
+	});
+
+	test('a copy older than its file is not served', async () => {
+		const path = join(root, 'changed.txt');
+		await writeFile(path, 'old'.repeat(50));
+		await writeFile(`${path}.br`, 'old copy');
+		const past = new Date(Date.now() - 60_000);
+		await utimes(`${path}.br`, past, past);
+		const app = alxia().file('/changed', path, { precompressed: ['br'] });
+		const response = await app.request('/changed', {
+			headers: { 'accept-encoding': 'br' },
+		});
+		expect(response.headers.get('content-encoding')).toBeNull();
+		expect(await response.text()).toBe('old'.repeat(50));
 	});
 
 	test('without the option the file varies by nothing', async () => {
