@@ -113,6 +113,7 @@ Every option is optional:
 | `beforeAll(app)` | runs first, on a new app. What it declares applies to the client's files too: a rate limit, a guard on everything, a logger that should see every asset. It returns the app, which `configure` then receives |
 | `getLoadContext(ctx, context)` | sets the app's own keys on React Router's provider, `ctx` typed by `configure`'s app |
 | `build`, `mode`, `client` | override what the plugin wires; see [Escape hatches](#escape-hatches) |
+| `precompressed` | `false` serves the client's files as they are, without their `.br` and `.gz` copies; see [Compressed](beside-the-pages.md#compressed) |
 | `listen` | `listen`'s options for `bun build/server/index.js`: `port`, `hostname`, `idleTimeout`, `maxRequestBodySize`, `tls`, `onListen`. A `port` or `hostname` given here wins over `PORT` and `HOST`; an `onListen` here, told `@alxia/core`'s `ListenInfo` — `url`, `routes`, `table`, `dev` — wins over the option below |
 | `onListen(server)` | called once the built server listens and its `SIGINT` and `SIGTERM` handlers are in place, in place of the `alxia listening on …` line (and, in dev, of the route table); a signal sent from then on runs the `onStop` hooks |
 
@@ -282,6 +283,7 @@ bun run build && bun server.ts
 | `mode` | React Router's server mode, `production` by default |
 | `getLoadContext(ctx, context)` | as `createServer`'s |
 | `client` | the client build's folder, a path or a `file:` URL, served before the catch-all in `production` |
+| `precompressed` | `true` by default: serves the client's `.br` and `.gz` copies to a browser that accepts them; `false` serves the files as they are |
 
 `reactRouter()` goes through `app.plugin`, as `@alxia/graphql`'s `graphql(app, …)`
 does: that is how it knows the app's context type. A `HEAD` is handed to

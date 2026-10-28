@@ -75,6 +75,12 @@ export interface ServerOptions<Before extends AnyAlxia, App extends AnyAlxia> {
 	 */
 	readonly client?: string | URL | false;
 	/**
+	 * Serves the client's `.br` and `.gz` copies, which `alxia()` writes at
+	 * build time, to a browser that accepts them: `true` by default.
+	 * `false` serves the files as they are.
+	 */
+	readonly precompressed?: boolean;
+	/**
 	 * `listen`'s options for `bun build/server/index.js` — `shutdownTimeout`,
 	 * `signals` among them; a `port` or `hostname` here wins over `PORT` (3000)
 	 * and `HOST` (`0.0.0.0`) from the environment.
@@ -147,7 +153,7 @@ export function createServer<
 			// the app passed through: a type argument given by hand is believed.
 			const before = (options.beforeAll?.(fresh) ?? fresh) as Before;
 			if (client !== undefined && mode === 'production') {
-				declareClient(before, client);
+				declareClient(before, client, options.precompressed ?? true);
 			}
 			const app = (options.configure?.(before) ?? before) as App;
 			const getLoadContext = options.getLoadContext;

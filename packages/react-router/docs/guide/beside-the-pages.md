@@ -176,3 +176,25 @@ Dotfiles are skipped. In dev, Vite serves them.
 A folder that is not one, or a file whose name no route can carry, is
 refused when the server starts: see
 [the troubleshooting entries](../troubleshooting.md#typeerror-reactrouter-client-is--which-is-not-a-directory-).
+
+### Compressed
+
+`react-router build` writes a `.br` and a `.gz` copy beside each
+compressible file of `build/client` (JavaScript, CSS, HTML, SVG, JSON,
+text, XML, WebAssembly, source maps, fonts) of at least 1 kB, and the
+server sends the copy a browser's `Accept-Encoding` asks for, with
+`Content-Encoding`, `Vary: Accept-Encoding` and the same `Cache-Control`.
+The files are read from disk as they are, never compressed on a request.
+Files at the top of `build/client`, such as a large `sprite.svg`, get it
+too. A file with no copy, or a client that accepts none, gets the file.
+
+```ts
+// vite.config.ts: the threshold, or no copies at all
+alxia({ precompress: { minSize: 4096 } });
+alxia({ precompress: false });
+```
+
+```ts
+// app/server.ts: serve the files as they are, such as behind a proxy that compresses
+export default createServer({ precompressed: false });
+```

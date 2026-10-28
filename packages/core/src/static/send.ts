@@ -43,7 +43,14 @@ export async function precompressed(
 		const extension =
 			coding === 'gzip' ? 'gz' : coding === 'zstd' ? 'zst' : 'br';
 		const file = await find(`${found.path}.${extension}`, ctx);
-		if (file !== undefined) return { file, coding };
+		if (file === undefined) continue;
+		// A copy older than its file is stale: the file was changed after it.
+		const copied = (file as File).lastModified;
+		const changed = (found.file as File).lastModified;
+		if (copied !== undefined && changed !== undefined && copied < changed) {
+			continue;
+		}
+		return { file, coding };
 	}
 	return undefined;
 }

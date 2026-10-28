@@ -527,6 +527,16 @@ In a build, `build/client` is served before `configure`'s middlewares:
 A missing asset gets alxia's JSON 404, not a page. In dev, Vite serves
 these files.
 
+`react-router build` also writes `.br` and `.gz` copies beside every
+compressible file of the client build (JavaScript, CSS, HTML, SVG, JSON,
+text, XML, web manifests, source maps, WebAssembly, icons, fonts) of at least 1 kB, and the server sends the one a
+browser accepts, with `Content-Encoding` and `Vary: Accept-Encoding`, the
+`Cache-Control` above unchanged. `alxia({ precompress: false })` writes none,
+`alxia({ precompress: { minSize: 4096 } })` moves the threshold, and
+`createServer({ precompressed: false })` (or `reactRouter(app, {
+precompressed: false })`) serves the files as they are, behind a proxy that
+compresses. [More](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/beside-the-pages.md#compressed)
+
 ## Leaving the pages out of `matchesSpec`
 
 An API under `/api`, spec first, is checked against its OpenAPI document
@@ -1132,7 +1142,7 @@ export function loader({ request }: Route.LoaderArgs) {
 
 | export | |
 | --- | --- |
-| `createServer(options?)` | the server of `app/server.ts`. `beforeAll`, `configure`, `getLoadContext`, `proxy` (`alxia({ proxy })`'s, `trustProxy(…)` from `@alxia/core`), `build`, `mode`, `client`, `listen`, `onListen` |
+| `createServer(options?)` | the server of `app/server.ts`. `beforeAll`, `configure`, `getLoadContext`, `proxy` (`alxia({ proxy })`'s, `trustProxy(…)` from `@alxia/core`), `build`, `mode`, `client`, `precompressed`, `listen`, `onListen` |
 | `ServerOptions<Before, App>` | its options |
 | `ReactRouterServer<App>` | what it returns: `create(wiring)` makes the app, `start(app)` listens |
 | `ServerWiring` | what `create` takes: `build`, `mode`, `client` |
@@ -1150,7 +1160,7 @@ export function loader({ request }: Route.LoaderArgs) {
 | `AppOf<Server>` | the app a server makes |
 | `alxiaContext` | the React Router context key `alxiaOf` and `context.alxia` read, set on every request |
 | `nonceOf(context)` | the request's CSP nonce, for `entry.server.tsx`: the context's `nonce` when a middleware set one, such as `secureHeaders({ nonce: true })`, else `undefined` |
-| `reactRouter(app, options)` | the catch-all and the client's files, for a server of your own. `build`, `mode`, `getLoadContext`, `client` |
+| `reactRouter(app, options)` | the catch-all and the client's files, for a server of your own. `build`, `mode`, `getLoadContext`, `client`, `precompressed` |
 | `ReactRouterOptions<Ctx>` | its options |
 | `isReactRouterRoute(route)` | whether this package declared a route, for `matchesSpec`'s `exclude` |
 
@@ -1158,8 +1168,8 @@ From `@alxia/react-router/vite`:
 
 | export | |
 | --- | --- |
-| `alxia(options?)` | the Vite plugin, for `react-router dev`, `react-router build` and `vite preview`, building the server for Bun. `entry` is the server file: `app/server.ts` by default, or the default server when there is none. `worker` is the service worker built after `react-router build`: `app/service-worker.ts` by default when it exists, a file, `AlxiaWorkerOptions`, or `false` |
-| `AlxiaOptions`, `AlxiaWorkerOptions` | its options, and the worker's (`buildWorker()`'s but `root`, `client` and `file`, which is optional) |
+| `alxia(options?)` | the Vite plugin, for `react-router dev`, `react-router build` and `vite preview`, building the server for Bun. `entry` is the server file: `app/server.ts` by default, or the default server when there is none. `worker` is the service worker built after `react-router build`: `app/service-worker.ts` by default when it exists, a file, `AlxiaWorkerOptions`, or `false`. `precompress` writes the `.br` and `.gz` copies of the client build: on by default, `false`, or `PrecompressOptions` (`minSize`) |
+| `AlxiaOptions`, `AlxiaWorkerOptions`, `PrecompressOptions` | its options, the worker's (`buildWorker()`'s but `root`, `client` and `file`, which is optional) |
 
 From `@alxia/react-router/pwa`:
 

@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
+import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { browser, copyFixture, text } from '../../test/fixture';
 import { build, type Fixture, start } from '../../test/vite';
@@ -96,6 +97,22 @@ describe('react-router build, with no server file', () => {
 			);
 			const robots = await fetch(new URL('/robots.txt', url));
 			expect(robots.headers.get('cache-control')).toBe('public, max-age=3600');
+			// The build wrote the compressed copies, and the server sends them.
+			const name = (asset as string).split('/').pop() as string;
+			const copy = join(fixture.root, 'build/client/assets', `${name}.br`);
+			expect(existsSync(copy)).toBe(true);
+			const coded = await fetch(new URL(asset as string, url), {
+				headers: { 'accept-encoding': 'br' },
+				decompress: false,
+			});
+			expect(coded.headers.get('content-encoding')).toBe('br');
+			expect(coded.headers.get('vary')).toContain('Accept-Encoding');
+			expect(coded.headers.get('cache-control')).toBe(
+				'public, max-age=31536000, immutable',
+			);
+			expect(new Uint8Array(await coded.arrayBuffer())).toEqual(
+				new Uint8Array(readFileSync(copy)),
+			);
 			child.kill('SIGTERM');
 			expect(await child.exited).toBe(0);
 		} finally {

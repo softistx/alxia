@@ -77,6 +77,12 @@ service worker when the app has an `app/service-worker.ts` (`worker: false`
 turns it off): `build/client/service-worker.js`, with the precache list read
 from the client build ([the PWA guide](pwa.md#zero-config-alxia-builds-it)).
 
+Then it writes the compressed copies of the client build, `.br` and `.gz`
+beside each compressible file, which the server serves to a browser that
+accepts them ([the client's files](beside-the-pages.md#compressed)).
+`precompress: false` turns it off, `precompress: { minSize }` moves the 1 kB
+threshold.
+
 React Router's `serverBundles` split the server build in several, and
 alxia serves one: the plugin refuses them. With `ssr: false`, a
 single-page app, the plugin does nothing but build the service worker (when
