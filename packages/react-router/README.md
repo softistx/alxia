@@ -1289,7 +1289,7 @@ From `@alxia/react-router/lists` (`react` and `react-router` are its only import
 
 | export | |
 | --- | --- |
-| `useSearchChange({ resetKeys? })`, `SearchChangeOptions` | `(changes) => void`: sets a parameter given a string, deletes one given `null` or `undefined`, and deletes `resetKeys` (default `['after']`); the history entry is replaced and the scroll position kept |
+| `useSearchChange({ resetKeys? })`, `SearchChange`, `SearchChangeOptions` | `(changes: SearchChange) => void`: a record sets a parameter given a string, deletes one given `null` or `undefined`, and deletes `resetKeys` (default `['after']`); a `URLSearchParams` replaces the whole search, and an updater `(prev) => URLSearchParams` computes it (`resetKeys` does not apply to these two); the history entry is replaced and the scroll position kept |
 | `useSameRouteLoading()` | `true` while a navigation is loading and its pathname is the current one (another search of the list), `false` for any other page |
 | `usePagedRows(firstPage, rowsOf, { cursorParam?, nextOf? }?)`, `PagedRows`, `PagedRowsOptions` | `{ rows, next, loading, error, loadMore }`: appends the pages the same route answers to `?<cursorParam>=<next>` (default `after`, `nextOf` default `page.next`) through `useFetcher`; starts over when `firstPage` is another object; a failure keeps the rows and sets `error` (an answer that is not a page), and data that is not a page is ignored |
 
