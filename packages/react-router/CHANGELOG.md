@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.23.0
+
+### Minor Changes
+
+- [#385](https://github.com/softistx/alxia/pull/385) [`f762f39`](https://github.com/softistx/alxia/commit/f762f39b4dacba9d490d3c7f96f3fd636fb730b1) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `createSubscriptionProxy`'s `headers` function now receives the route's loader or action arguments as a second argument, `headers(request, { request, context, params })`, so a BFF can send the trusted client address from its context (`X-Forwarded-For` from `context ? alxiaOf(context).ip : null`, the argument annotated `SubscriptionArgs<Readonly<RouterContextProvider>>`) and the language its session chose, instead of copying a header the browser could forge. `createSubscriptionProxy<Context>`, `SubscriptionProxy<Context>` and the new `SubscriptionArgs` type carry the context's type. A `(request) => headers` function, a record and `Headers` keep working, a `headers` function that throws is a 500 with fixed text, and the context never reaches the browser or the API.
+
 ## 0.22.0
 
 ### Minor Changes
