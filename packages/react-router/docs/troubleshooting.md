@@ -2915,6 +2915,6 @@ because `heartbeatMs` is longer than it.
 
 **Fix:** set `listen: { idleTimeout: 30 }` in `createServer` (and
 `idleTimeout: 30` on the API's `listen`), keep `heartbeatMs` shorter than the
-shortest idle timeout on the path, turn response buffering off for the route (nginx `proxy_buffering off`;
-the route already sends `X-Accel-Buffering: no`), and do not compress the
+shortest idle timeout on the path, turn response buffering off for the
+route (nginx `proxy_buffering off`; the route already sends `X-Accel-Buffering: no`), and do not compress the
 route's responses.

@@ -128,7 +128,7 @@ export default createServer({
 
 The same goes for the API's server (`app.listen({ idleTimeout: 30 })` with
 `@alxia/graphql`), and for a proxy's read timeout, which must be longer than
-`heartbeatMs` too. Calling `server.timeout(request, 0)` from a resolver did
+`heartbeatMs` too. Calling `server.timeout(request, 0)` from a resolver does
 not lift it for the stream. Behind nginx, keep `proxy_buffering off` for the
 route (the `X-Accel-Buffering: no` header does it per response).
 
