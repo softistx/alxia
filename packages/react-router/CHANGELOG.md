@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.28.2
+
+### Patch Changes
+
+- [#415](https://github.com/softistx/alxia/pull/415) [`ed17a6b`](https://github.com/softistx/alxia/commit/ed17a6bf0e015ddba15d9e17bd32cff9abcb9350) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `useStepUpReplay`'s `confirmedNotice` now clears as soon as `action` becomes another value (the user posted a new action), instead of lingering until that action's answer or `cancel()`. Behaviour change, on by default: a host that passes the same `action` reference for different posts must pass a new object for each. Documented that a `replay()` that posts nothing leaves the dialog confirming, so the host must call `cancel()`.
+
 ## 0.28.1
 
 ### Patch Changes
