@@ -135,18 +135,14 @@ describe('signInFlow without a second factor', () => {
 			json: jsonActions(),
 			revoke: async () => {},
 		};
-		expect(() =>
-			// @ts-expect-error cookies with a challenge need attemptsLeft
-			signInFlow<'en'>({ ...base, cookies: full }),
-		).toThrow(/second factor needs both/);
-		expect(() =>
-			// @ts-expect-error attemptsLeft needs the challenge cookie
-			signInFlow<'en'>({
-				...base,
-				cookies: cookies(),
-				attemptsLeft: () => '',
-			}),
-		).toThrow(/second factor needs both/);
+		const halfOpen = { ...base, cookies: full };
+		// @ts-expect-error cookies with a challenge need attemptsLeft
+		const buildHalf = () => signInFlow<'en'>(halfOpen);
+		expect(buildHalf).toThrow(/second factor needs both/);
+		const orphan = { ...base, cookies: cookies(), attemptsLeft: () => '' };
+		// @ts-expect-error attemptsLeft needs the challenge cookie
+		const build = () => signInFlow<'en'>(orphan);
+		expect(build).toThrow(/second factor needs both/);
 	});
 });
 
