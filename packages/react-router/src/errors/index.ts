@@ -6,6 +6,7 @@ export {
 	type ApiFieldErrorLike,
 	attemptsLeftOf,
 	isApiErrorLike,
+	retryAfterOf,
 	waitMinutes,
 } from './api-error';
 export {

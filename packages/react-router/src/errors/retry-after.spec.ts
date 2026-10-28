@@ -1,11 +1,15 @@
 import { describe, expect, test } from 'bun:test';
 import { refusal } from '../../test/errors/refusal';
-import { retryAfterOf } from './api-error';
+import { retryAfterOf } from './index';
 
 const wait = (extensions: Record<string, unknown>) =>
 	retryAfterOf(refusal('MAIL_THROTTLED', 'Slow down', extensions, 429));
 
 describe('retryAfterOf', () => {
+	test('is exported from the errors subpath', () => {
+		expect(typeof retryAfterOf).toBe('function');
+	});
+
 	test('a finite number from 0, rounded up', () => {
 		expect(wait({ retryAfter: 90 })).toBe(90);
 		expect(wait({ retryAfter: 1.2 })).toBe(2);

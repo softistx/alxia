@@ -110,7 +110,8 @@ function secondsOf(value: unknown): number | undefined {
  * `extensions.params`, else (when that is unusable) of its `extensions`.
  * Only a finite number from 0, or a decimal string, counts; it is rounded up
  * and held at a day (86 400), and `-0` is 0. `undefined` when the API sent
- * none usable. Internal: `/session` words it as a typed `retryAfter`.
+ * none usable. Exported from `/errors`; `/session` words it as a typed
+ * `retryAfter`.
  */
 export function retryAfterOf(error: ApiErrorLike): number | undefined {
 	const extensions = error.errors[0]?.extensions;
