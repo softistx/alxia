@@ -7,7 +7,7 @@ import type { useStepUp } from './use-step-up';
 export interface StepUpDialogProps {
 	open: boolean;
 	phase: StepUpDialogPhase;
-	/** How the code is confirmed, once there is a challenge. */
+	/** How the code is confirmed, in every phase once a challenge was granted (`undefined` before). */
 	via: StepUpVia | undefined;
 	/** The words of the code form (`stepUpProps`). */
 	props: StepUpProps;
@@ -33,7 +33,7 @@ export function dialogPropsOf(
 	return {
 		open,
 		phase: stepUp.phase,
-		via: stepUp.phase === 'code' ? stepUp.via : undefined,
+		via: stepUp.via,
 		props: stepUp.props,
 		message: stepUp.message,
 		busy: stepUp.busy,
