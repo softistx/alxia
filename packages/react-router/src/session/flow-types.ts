@@ -35,8 +35,7 @@ export interface SignInCodes {
 	readonly challengeOver?: readonly string[] | undefined;
 }
 
-export interface SignInFlowOptions<L extends string, C = undefined> {
-	readonly cookies: SessionCookies;
+export interface SignInFlowBaseOptions<L extends string, C = undefined> {
 	/** The app's `createApiErrors` instance. */
 	readonly errors: ApiErrors<L>;
 	/** The app's `jsonActions({ origin })`, so a body is read with the same CSRF check. */
@@ -52,8 +51,6 @@ export interface SignInFlowOptions<L extends string, C = undefined> {
 		request: Request,
 		context: C | undefined,
 	): Promise<unknown>;
-	/** A refused code's tries left, worded ("3 tries left"). */
-	attemptsLeft(count: number, language: L): string;
 	/** The sign-in pages' paths; `SIGN_IN_PATHS` by default. */
 	readonly paths?: Partial<SignInPaths> | undefined;
 	/**
@@ -71,20 +68,89 @@ export interface SignInFlowOptions<L extends string, C = undefined> {
 	readonly endedParam?: string | undefined;
 }
 
+/**
+ * The options of a flow with a second factor: the cookies carry the
+ * challenge (`sessionCookies({ challenge })`) and `attemptsLeft` words the
+ * tries left.
+ */
+export interface SignInFlowOptions<L extends string, C = undefined>
+	extends SignInFlowBaseOptions<L, C> {
+	readonly cookies: SessionCookies<true>;
+	/** A refused code's tries left, worded ("3 tries left"). */
+	attemptsLeft(count: number, language: L): string;
+}
+
+/**
+ * The options of a flow with no second factor: cookies built without
+ * `challenge` and no `attemptsLeft`. The flow then offers no second-factor
+ * step.
+ */
+export interface SignInFlowWithoutSecondFactorOptions<
+	L extends string,
+	C = undefined,
+> extends SignInFlowBaseOptions<L, C> {
+	readonly cookies: SessionCookies<false>;
+	readonly attemptsLeft?: undefined;
+}
+
 /** A form step's answer when it stays on the page: the form's message, with a status. */
 export type SignInStayed<T extends object> = ReturnType<
 	typeof data<SignInFormError<T>>
 >;
 
-export interface SignInFlow<L extends string, C = undefined> {
+/** The members of a flow built with a second factor, on top of the common ones. */
+export interface SecondFactorSteps<L extends string> {
+	/** A refused code's tries left, worded (the `attemptsLeft` option). */
+	attemptsLeft(count: number, language: L): string;
+	/**
+	 * A refused code's message with the tries left; `undefined` when the
+	 * challenge is over (sign in again). With no try left, `whenNone` is
+	 * added to the message instead, when given.
+	 */
+	codeRefusal(
+		error: ApiErrorLike,
+		language: L,
+		whenNone?: string,
+	): string | undefined;
+	/** The code a second-factor page posted, with how it is given; a 400 otherwise. */
+	readCodeInput(
+		request: Request,
+	): Promise<{ kind: SecondFactorKind; code: string }>;
+	/** The code against the challenge: `confirm` for an issued code, `recover` for a recovery code. */
+	codeStep(
+		input: { readonly kind: SecondFactorKind; readonly code: string },
+		challenge: string,
+		steps: {
+			confirm(challenge: string, code: string): Promise<SignInAnswer>;
+			recover(challenge: string, code: string): Promise<SignInAnswer>;
+		},
+	): Promise<SignInAnswer>;
+}
+
+/**
+ * The flow `signInFlow` returns. `SignInFlow<L, C>` has a second factor (the
+ * default, as before); `SignInFlow<L, C, false>` has none, and no
+ * second-factor member (`attemptsLeft`, `codeRefusal`, `readCodeInput`,
+ * `codeStep`) is on its type.
+ */
+export type SignInFlow<
+	L extends string,
+	C = undefined,
+	WithSecondFactor extends boolean = true,
+> = SignInFlowBase<L, C, WithSecondFactor> &
+	(WithSecondFactor extends true ? SecondFactorSteps<L> : unknown);
+
+export interface SignInFlowBase<
+	L extends string,
+	C = undefined,
+	WithSecondFactor extends boolean = true,
+> {
 	/** The cookies the flow was built with. */
-	readonly cookies: SessionCookies;
+	readonly cookies: SessionCookies<WithSecondFactor>;
 	/** The `createApiErrors` instance the flow was built with. */
 	readonly errors: ApiErrors<L>;
 	/** The `jsonActions` instance the flow was built with. */
 	readonly json: JsonActions;
-	/** A refused code's tries left, worded (the `attemptsLeft` option). */
-	attemptsLeft(count: number, language: L): string;
 	/**
 	 * The guard every step of the flow that signs in, out, spends or mails
 	 * runs first, for an app's own step (a passkey's): a native form post is
@@ -144,29 +210,6 @@ export interface SignInFlow<L extends string, C = undefined> {
 		},
 	): Promise<Response | SignInStayed<T>>;
 	/**
-	 * A refused code's message with the tries left; `undefined` when the
-	 * challenge is over (sign in again). With no try left, `whenNone` is
-	 * added to the message instead, when given.
-	 */
-	codeRefusal(
-		error: ApiErrorLike,
-		language: L,
-		whenNone?: string,
-	): string | undefined;
-	/** The code a second-factor page posted, with how it is given; a 400 otherwise. */
-	readCodeInput(
-		request: Request,
-	): Promise<{ kind: SecondFactorKind; code: string }>;
-	/** The code against the challenge: `confirm` for an issued code, `recover` for a recovery code. */
-	codeStep(
-		input: { readonly kind: SecondFactorKind; readonly code: string },
-		challenge: string,
-		steps: {
-			confirm(challenge: string, code: string): Promise<SignInAnswer>;
-			recover(challenge: string, code: string): Promise<SignInAnswer>;
-		},
-	): Promise<SignInAnswer>;
-	/**
 	 * Ends the request's session at the API; true when it carried one.
 	 * `context` is handed to `revoke`.
 	 */
@@ -211,7 +254,9 @@ export interface SignInFlow<L extends string, C = undefined> {
 
 /** The options once resolved, as the flow's functions take them. */
 export interface FlowContext<L extends string, C = undefined> {
-	readonly options: SignInFlowOptions<L, C>;
+	readonly options:
+		| SignInFlowOptions<L, C>
+		| SignInFlowWithoutSecondFactorOptions<L, C>;
 	readonly paths: SignInPaths;
 	readonly invalidCode: string;
 	readonly challengeOver: readonly string[];

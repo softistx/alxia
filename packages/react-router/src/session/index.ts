@@ -6,16 +6,23 @@
  */
 export { CHALLENGE_OVER, INVALID_CODE, MAIL_THROTTLED } from './codes';
 export {
+	type ChallengeCookies,
 	type CookieSession,
+	type NoChallengeCookies,
 	type SessionCookies,
+	type SessionCookiesBase,
 	type SessionCookiesOptions,
+	type SessionCookiesWithoutChallengeOptions,
 	sessionCookies,
 } from './cookies';
 export type {
+	SecondFactorSteps,
 	SignInAnswer,
 	SignInCodes,
 	SignInFlow,
+	SignInFlowBase,
 	SignInFlowOptions,
+	SignInFlowWithoutSecondFactorOptions,
 	SignInFormError,
 	SignInStayed,
 } from './flow-types';

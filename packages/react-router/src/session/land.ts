@@ -1,4 +1,5 @@
 import { redirect } from 'react-router';
+import { challengeCleared } from './cookies';
 import type { FlowContext, SignInAnswer, SignInFlow } from './flow-types';
 import { samesitePost } from './guard';
 import { safeNext, secondFactorPath } from './model';
@@ -53,13 +54,20 @@ export function landing<L extends string, C>(
 			'Set-Cookie',
 			cookies.commit(answer.token, answer.expiresAt),
 		);
-		headers.append('Set-Cookie', cookies.destroyChallenge());
+		for (const cookie of challengeCleared(cookies)) {
+			headers.append('Set-Cookie', cookie);
+		}
 		for (const cookie of options.clear?.() ?? []) {
 			headers.append('Set-Cookie', cookie);
 		}
 		return redirect(safeNext(next), { headers });
 	}
-	if (answer.status === 'secondFactor' && answer.challenge) {
+	// An app with no second factor has no challenge cookie: nothing to land on.
+	if (
+		answer.status === 'secondFactor' &&
+		answer.challenge &&
+		cookies.commitChallenge
+	) {
 		return redirect(secondFactorPath(next, paths.secondFactor), {
 			headers: {
 				'Set-Cookie': cookies.commitChallenge(

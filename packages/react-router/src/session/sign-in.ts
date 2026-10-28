@@ -1,6 +1,12 @@
 import { hasSiteCheck } from '../errors/same-site';
 import { CHALLENGE_OVER, INVALID_CODE } from './codes';
-import type { FlowContext, SignInFlow, SignInFlowOptions } from './flow-types';
+import type {
+	FlowContext,
+	SignInFlow,
+	SignInFlowBase,
+	SignInFlowOptions,
+	SignInFlowWithoutSecondFactorOptions,
+} from './flow-types';
 import { samesitePost } from './guard';
 import { landing, landReplacing, revokeSession } from './land';
 import { SIGN_IN_PATHS, type SignInPaths } from './model';
@@ -16,8 +22,16 @@ import {
 } from './viewer';
 
 function resolve<L extends string, C>(
-	options: SignInFlowOptions<L, C>,
+	options: SignInFlowOptions<L, C> | SignInFlowWithoutSecondFactorOptions<L, C>,
 ): FlowContext<L, C> {
+	if (
+		(options.attemptsLeft === undefined) !==
+		!options.cookies.commitChallenge
+	) {
+		throw new TypeError(
+			'signInFlow(): a second factor needs both the challenge cookie (sessionCookies({ challenge })) and attemptsLeft; without one, give neither.',
+		);
+	}
 	const paths: SignInPaths = { ...SIGN_IN_PATHS, ...options.paths };
 	for (const key of ['signIn', 'secondFactor'] as const) {
 		sitePath(paths[key], { label: `signInFlow(): paths.${key}` });
@@ -54,30 +68,41 @@ function resolve<L extends string, C>(
  */
 export function signInFlow<L extends string, C = undefined>(
 	options: SignInFlowOptions<L, C>,
-): SignInFlow<L, C> {
+): SignInFlow<L, C, true>;
+export function signInFlow<L extends string, C = undefined>(
+	options: SignInFlowWithoutSecondFactorOptions<L, C>,
+): SignInFlow<L, C, false>;
+export function signInFlow<L extends string, C = undefined>(
+	options: SignInFlowOptions<L, C> | SignInFlowWithoutSecondFactorOptions<L, C>,
+): SignInFlow<L, C, boolean> {
 	const context = resolve(options);
 	const { options: o } = context;
-	return {
+	const base: SignInFlowBase<L, C, boolean> = {
 		cookies: o.cookies,
 		errors: o.errors,
 		json: o.json,
 		unavailable: (language) => unavailableMessage(o, language),
 		clear: () => o.clear?.() ?? [],
-		attemptsLeft: o.attemptsLeft,
 		guard: (request) => samesitePost(o.json, request),
 		nextParam,
 		signInRedirect: (request) => signInRedirect(context, request),
 		landing: (answer, next) => landing(context, answer, next),
 		landReplacing: (answer, next, o) => landReplacing(context, answer, next, o),
 		signInStep: (run, o) => signInStep(context, run, o),
-		codeRefusal: (error, language, whenNone) =>
-			codeRefusal(context, error, language, whenNone),
-		readCodeInput: (request) => readCodeInput(context, request),
-		codeStep,
 		revokeSession: (request, o) => revokeSession(context, request, o),
 		signOut: (request, o) => signOut(context, request, o),
 		viewer: (request, read, token) => viewer(context, request, read, token),
 		requireViewer: (request, read, expiresAt) =>
 			requireViewer(context, request, read, expiresAt),
 	};
+	if (!o.attemptsLeft) return base as SignInFlow<L, C, false>;
+	const wording = { ...context, options: o };
+	return {
+		...base,
+		attemptsLeft: o.attemptsLeft,
+		codeRefusal: (error, language, whenNone) =>
+			codeRefusal(wording, error, language, whenNone),
+		readCodeInput: (request) => readCodeInput(context, request),
+		codeStep,
+	} as SignInFlow<L, C, true>;
 }
