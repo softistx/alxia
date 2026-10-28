@@ -11,4 +11,8 @@ export {
 	usePagedRows,
 } from './use-paged-rows';
 export { useSameRouteLoading } from './use-same-route-loading';
-export { type SearchChangeOptions, useSearchChange } from './use-search-change';
+export {
+	type SearchChange,
+	type SearchChangeOptions,
+	useSearchChange,
+} from './use-search-change';

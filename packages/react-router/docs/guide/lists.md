@@ -47,6 +47,18 @@ meaningless. It navigates with `replace: true` and `preventScrollReset: true`,
 so typing does not fill the history nor jump the page. Pass
 `{ resetKeys: ['after', 'page'] }` to drop more.
 
+`change` also takes a whole `URLSearchParams`, which replaces the search, or an
+updater `(prev) => URLSearchParams`, for a filter bar or a server table that
+hands back its next parameters. Both navigate exactly as the record form does
+(`replace: true`, `preventScrollReset: true`), and since they are the whole
+search, `resetKeys` does not apply to them: drop the cursor yourself if the
+new search needs it gone.
+
+```tsx
+<Table onParamsChange={(next: URLSearchParams) => change(next)} />;
+change((prev) => new URLSearchParams([...prev].filter(([key]) => key !== 'status')));
+```
+
 ## `useSameRouteLoading`
 
 ```tsx
