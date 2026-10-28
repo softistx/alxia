@@ -1286,7 +1286,7 @@ From `@alxia/react-router/session/react` (`react` and `react-router` are its onl
 | `useStepUp({ request, confirm, onConfirmed })`, `StepUpOptions`, `StepUpChannel` | the step-up under it: `{ phase, via, props, message, busy, start(), submit(code), release() }` |
 | `asksStepUp(answer)`, `stepUpDialogPhase(state)`, `StepUpDialogPhase` | whether an answer asks for a step-up, and the dialog's phase (`'asking' \| 'failed' \| 'code' \| 'expired' \| 'confirmed'`) |
 | `requestAnswerOf(data)`, `confirmAnswerOf(data)` | narrow the data of `route()`'s union to one intent's answer, to type each channel |
-| `dialogPropsOf(stepUp, open, cancel)`, `StepUpDialogProps` | the props a step-up dialog is given: `open`, `phase`, `via`, `props`, `message`, `busy`, `confirming` and the handlers |
+| `dialogPropsOf(stepUp, open, cancel)`, `StepUpDialogProps` | the props a step-up dialog is given: `open`, `phase`, `via` (kept in every phase once a challenge was granted), `props`, `message`, `busy`, `confirming` and the handlers |
 | `useOnRefusal(refusal, handler)` | the core under it, for any form library: `handler` runs once per new refusal, not for one present at mount |
 
 ```tsx

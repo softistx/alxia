@@ -234,6 +234,37 @@ describe('useStepUpReplay', () => {
 		expect(app.hook.dialogProps.onResend).toBeUndefined();
 	});
 
+	test('the dialog keeps the via in every phase once a challenge was granted', async () => {
+		const page = await mount();
+		page.state.answer = refused;
+		await page.rerender();
+		expect(page.hook.dialogProps.via).toBeUndefined();
+		page.state.request = granted('email');
+		await page.rerender();
+		expect(page.hook.dialogProps.phase).toBe('code');
+		expect(page.hook.dialogProps.via).toBe('email');
+
+		act(() => page.hook.dialogProps.onSubmit('123456'));
+		page.state.confirm = {
+			ok: false,
+			intent: 'confirm-step-up',
+			error: 'expired',
+		} as StepUpConfirmAnswer;
+		await page.rerender();
+		expect(page.hook.dialogProps.phase).toBe('expired');
+		expect(page.hook.dialogProps.via).toBe('email');
+
+		act(() => page.hook.dialogProps.onRetry());
+		page.state.request = {
+			ok: false,
+			intent: 'request-step-up',
+			error: 'failed',
+		} as StepUpRequestAnswer;
+		await page.rerender();
+		expect(page.hook.dialogProps.phase).toBe('failed');
+		expect(page.hook.dialogProps.via).toBe('email');
+	});
+
 	test('each channel keeps the fields of its own post', () => {
 		const channel = {
 			answer: undefined,
