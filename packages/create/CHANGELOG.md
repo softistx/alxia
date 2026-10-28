@@ -1,5 +1,11 @@
 # @alxia/create
 
+## 0.5.12
+
+### Patch Changes
+
+- [#400](https://github.com/softistx/alxia/pull/400) [`8f6f17e`](https://github.com/softistx/alxia/commit/8f6f17e1722c99a7a348b74f4b0201bd859e9263) Thanks [@SteveGT96](https://github.com/SteveGT96)! - The `api` template's `@nxgt/httpyz` devDependency moves to `^0.5.0` (additive: `onOpen`) and its `@nxgt/openapi-httpyz` devDependency to `^0.3.3` (whose peer is `@nxgt/httpyz` `^0.5.0`). Nothing to adapt.
+
 ## 0.5.11
 
 ### Patch Changes
