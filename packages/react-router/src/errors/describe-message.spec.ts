@@ -133,8 +133,8 @@ describe('isApiCode', () => {
 describe('the default API-code pattern', () => {
 	test.each([
 		'todos.errors.title-taken',
-		'nightActions.errors.already-acted',
-		'dayVotes.errors.voter-not-alive',
+		'userProfiles.errors.slug-taken',
+		'orderItems.errors.out-of-stock',
 	])('%s is an API code', (code) => {
 		expect(API_CODE.test(code)).toBe(true);
 	});
@@ -155,7 +155,7 @@ describe('the default API-code pattern', () => {
 			unavailable: () => '',
 			refused: () => 'refused',
 		});
-		const error = refusal('nightActions.errors.already-acted', 'Raw');
+		const error = refusal('userProfiles.errors.slug-taken', 'Raw');
 		expect(errors.apiErrorMessage(error, 'en')).toBe('Raw');
 	});
 });

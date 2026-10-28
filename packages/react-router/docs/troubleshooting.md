@@ -2428,6 +2428,9 @@ failed before the API's validation layer), or a code that `isApiCode`
 rejects. Without `refused`, `createApiErrors` says the API's own message for
 such an error.
 
+Versions before the camelCase patch also rejected a camelCase module
+(`userProfiles.errors.slug-taken`): upgrade, or pass `isApiCode`.
+
 **Fix:** pass `refused`, the app's generic refusal; it replaces the raw
 message for every error that is not an API code
 ([wording a refusal](guide/errors.md#wording-a-refusal)):
