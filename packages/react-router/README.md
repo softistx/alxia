@@ -1077,7 +1077,19 @@ export default function Users({ loaderData }: Route.ComponentProps) {
 }
 ```
 
-The loader answers `?after=<cursor>` with the next page. A loader that throws on a cursor request lands on the route's `ErrorBoundary`: see [troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md). See the
+The loader answers `?after=<cursor>` with the next page. A loader that throws on a cursor request lands on the route's `ErrorBoundary`; wrap the read in `orFailed(after, run)` to keep the rows and offer a retry instead:
+
+```ts
+import { orFailed } from '@alxia/react-router/lists';
+
+export function loader({ request }: Route.LoaderArgs) {
+	const url = new URL(request.url);
+	// no ?after: a failure throws (ErrorBoundary); with ?after: it answers { failed: true }
+	return orFailed(url.searchParams.get('after'), () => listUsers(url.searchParams));
+}
+```
+
+`usePagedRows` reads `{ failed: true }` as a page without rows, so it sets `error` and keeps the rows. See [troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md). See the
 [lists guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/lists.md).
 
 ## Traps
@@ -1292,6 +1304,7 @@ From `@alxia/react-router/lists` (`react` and `react-router` are its only import
 | `useSearchChange({ resetKeys? })`, `SearchChange`, `SearchChangeOptions` | `(changes: SearchChange) => void`: a record sets a parameter given a string, deletes one given `null` or `undefined`, and deletes `resetKeys` (default `['after']`); a `URLSearchParams` replaces the whole search, and an updater `(prev) => URLSearchParams` computes it (`resetKeys` does not apply to these two); the history entry is replaced and the scroll position kept |
 | `useSameRouteLoading()` | `true` while a navigation is loading and its pathname is the current one (another search of the list), `false` for any other page |
 | `usePagedRows(firstPage, rowsOf, { cursorParam?, nextOf? }?)`, `PagedRows`, `PagedRowsOptions` | `{ rows, next, loading, error, loadMore }`: appends the pages the same route answers to `?<cursorParam>=<next>` (default `after`, `nextOf` default `page.next`) through `useFetcher`; starts over when `firstPage` is another object; a failure keeps the rows and sets `error` (an answer that is not a page), and data that is not a page is ignored |
+| `orFailed(after, run)`, `FAILED`, `isFailedPage(value)`, `FailedPage` | the loader half of `usePagedRows`: `run()`'s answer; an error is rethrown when `after` is empty, and with an `after` it answers `FAILED` (`{ failed: true }`, typed `Promise<T \| FailedPage>`), except a 3xx `Response`, which is rethrown. `isFailedPage` narrows an answer |
 
 From `@alxia/react-router/subscription` (no import, no peer):
 

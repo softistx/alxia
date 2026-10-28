@@ -119,5 +119,22 @@ with another one a search that keeps the old cursor shows the wrong page.
 
 A loader that **throws** on a cursor request is not an `error` here: React
 Router sends a fetcher's thrown error to the route's `ErrorBoundary`. To offer
-a retry instead, catch in the loader for a request that has the cursor and
-answer a value that is not a page.
+a retry instead, wrap the read in `orFailed(after, run)`: it answers
+`FAILED` (`{ failed: true }`, a value that is not a page) for a request that
+has the cursor, rethrows when there is none and rethrows a 3xx `Response`.
+
+```ts
+import { orFailed } from '@alxia/react-router/lists';
+
+export function loader({ request }: Route.LoaderArgs) {
+	const url = new URL(request.url);
+	return orFailed(url.searchParams.get('after'), async () => ({
+		page: await listUsers({
+			q: url.searchParams.get('q') ?? '',
+			after: url.searchParams.get('after'),
+		}),
+	}));
+}
+```
+
+`isFailedPage(loaderData)` narrows the answer when a component reads it.

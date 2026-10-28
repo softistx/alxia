@@ -539,7 +539,16 @@ name.
 
 **Why:** React Router sends the error of a fetcher's load to the route's boundary. `usePagedRows` only sees what the fetcher answers, so its `error` is `true` for an answer that is not a page, not for a throw.
 
-**Fix:** catch in the loader for a request that has the cursor and answer a value that is not a page:
+**Fix:** wrap the read in `orFailed(after, run)` from `@alxia/react-router/lists`, which answers `{ failed: true }` for a request that has the cursor and rethrows otherwise (and rethrows a redirect):
+
+```ts
+export function loader({ request }: Route.LoaderArgs) {
+	const url = new URL(request.url);
+	return orFailed(url.searchParams.get('after'), () => listUsers(url.searchParams));
+}
+```
+
+By hand, that is:
 
 ```ts
 export async function loader({ request }: Route.LoaderArgs) {

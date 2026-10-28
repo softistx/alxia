@@ -5,6 +5,12 @@
  */
 
 export {
+	FAILED,
+	type FailedPage,
+	isFailedPage,
+	orFailed,
+} from './or-failed';
+export {
 	DEFAULT_CURSOR_PARAM,
 	type PagedRows,
 	type PagedRowsOptions,

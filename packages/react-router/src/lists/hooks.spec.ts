@@ -9,6 +9,7 @@ import {
 	RouterProvider,
 	useLoaderData,
 } from 'react-router';
+import { orFailed } from './or-failed';
 import { type PagedRows, usePagedRows } from './use-paged-rows';
 import { useSameRouteLoading } from './use-same-route-loading';
 import { useSearchChange } from './use-search-change';
@@ -210,6 +211,27 @@ describe('usePagedRows', () => {
 		await settle();
 		expect(paged?.rows).toEqual(['a1', 'a2']);
 		expect(paged?.error).toBe(true);
+	});
+
+	test('a loader wrapped in orFailed that throws on a cursor sets error and keeps the rows', async () => {
+		let paged: PagedRows<string> | undefined;
+		function Rows() {
+			paged = usePagedRows(useLoaderData() as Page, (p) => p.items);
+			return null;
+		}
+		await mount(Rows, {
+			loader: (url) =>
+				orFailed(url.searchParams.get('after'), async () => {
+					if (url.searchParams.has('after')) throw new Error('down');
+					return pageOf(url);
+				}),
+		});
+		expect(paged?.rows).toEqual(['a1', 'a2']);
+		await act(async () => paged?.loadMore());
+		await settle();
+		expect(paged?.rows).toEqual(['a1', 'a2']);
+		expect(paged?.error).toBe(true);
+		expect(paged?.next).toBe('p2');
 	});
 
 	test('cursorParam and nextOf are honoured', async () => {
