@@ -18,7 +18,7 @@
         "@alxia/compress": "^0.3.11",
         "@alxia/core": "^0.16.0",
         "@alxia/logger": "^0.6.8",
-        "@alxia/react-router": "^0.22.0",
+        "@alxia/react-router": "^0.23.0",
         "@alxia/secure-headers": "^0.5.1",
         "@react-router/serve": "^8.5.0",
         "isbot": "^5.2.2",
@@ -300,7 +300,7 @@
     },
     "packages/react-router": {
       "name": "@alxia/react-router",
-      "version": "0.22.0",
+      "version": "0.23.0",
       "bin": {
         "alxia-react-router": "./dist/cli/index.js",
       },
