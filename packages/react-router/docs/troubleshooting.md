@@ -2717,15 +2717,15 @@ export const headers = () => TOKEN_PAGE_HEADERS;
 
 ### A subscription answers 401
 
-`/events` answers `{"errors":[{"extensions":{"code":"UNAUTHENTICATED"}}]}`.
+`{"errors":[{"message":"Sign in to continue.","extensions":{"code":"UNAUTHENTICATED"}}]}`
 
-**Why:** `getToken(request)` returned `null`, `undefined` or `''`: the browser
-sent no session cookie (signed out, expired, or a cross-site request with a
-`SameSite=Lax` cookie), or `getToken` reads another cookie than the one the
-sign-in wrote.
+**Why:** `getToken(request)` returned `null`, `undefined`, `''` or a token with a
+line break: the browser sent no session cookie (signed out, expired, or a
+cross-site request with a `SameSite=Lax` cookie), or `getToken` reads another
+cookie than the one the sign-in wrote.
 
-**Fix:** return the same token the loaders use, and send the cookie with the
-request (`credentials: 'include'` for a cross-origin client):
+**Fix:** return the token the loaders use, and send the cookie with the request
+(`credentials: 'include'` for a cross-origin client):
 
 ```ts
 getToken: (request) => cookies.token(request),
@@ -2733,27 +2733,62 @@ getToken: (request) => cookies.token(request),
 
 ### A subscription answers 403 `This operation is not allowed.`
 
-The route refused the operation and the API never saw it.
+**Why:** `operationName` is not a key of `allow`. The proxy runs only the
+documents the server holds; a `query` the client sends is ignored.
 
-**Why:** the document holds something that is not a named `subscription` in
-`allow`: another name, an anonymous subscription, a query or a mutation (even
-beside an allowed one), or a persisted id that is not listed.
-
-**Fix:** name the subscription and list the name:
+**Fix:** list the name with its document, and send that name:
 
 ```ts
-createSubscriptionProxy({ endpoint, allow: ['RoomEvents'], getToken });
+createSubscriptionProxy({ endpoint, allow: { RoomEvents: document }, getToken });
 ```
 
-### A subscription answers 400
+### A subscription answers 403 `Cross-site request refused.`
 
-**Why:** the request is not a JSON object, `variables` or `extensions` is not an
-object, there is no `query` and no persisted id, `operationName` is not in the
-document, or several operations are in the document without an
-`operationName`.
+**Why:** the request's `Origin` is not the app's own, or its `Sec-Fetch-Site` is
+`cross-site` or `same-site` (another subdomain). Behind a TLS-terminating proxy
+the request's own origin can read `http://`.
 
-**Fix:** send one named subscription with `operationName`, and `variables` as
-an object.
+**Fix:** call the route from the app's own pages, or give the proxy the public
+origin:
+
+```ts
+createSubscriptionProxy({ endpoint, allow, getToken, origin: 'https://app.example.com' });
+```
+
+### A subscription answers 415 `Send the request as application/json.`
+
+**Why:** a POST with another `Content-Type`, or none.
+
+**Fix:** send `Content-Type: application/json` (`graphql-sse` does), or use GET.
+
+### A subscription answers 400 `The request is too large.`
+
+**Why:** the body is over 64 KiB, the query string over 16 KiB, or `variables`
+over 16 KiB.
+
+**Fix:** send less in `variables`; a document does not belong in the request,
+the server holds it.
+
+### A subscription answers 400 `The request is not valid JSON.`
+
+**Why:** the POST body, or the `variables` parameter of a GET, is not JSON.
+
+**Fix:** send `JSON.stringify({ operationName, variables })`, and `variables`
+JSON-encoded in a GET.
+
+### A subscription answers 400 `The request must be a JSON object.`, `Send an "operationName".`, `"operationName" must be a string.` or `"variables" must be an object.`
+
+**Why:** the body is an array or a scalar, `operationName` is missing or not a
+string, or `variables` is not an object.
+
+**Fix:** send `{ "operationName": "RoomEvents", "variables": { … } }`.
+
+### A subscription answers 500 `The proxy's upstream headers are not valid …`
+
+**Why:** a value of `headers` (a forwarded `Accept-Language`, a secret from the
+environment) holds a line break, or a name is not a header name.
+
+**Fix:** trim or validate the value before it goes in `headers`.
 
 ### A subscription answers 429 with `retryAfter`
 
@@ -2767,8 +2802,16 @@ body) before it subscribes again.
 **Why:** the API is unreachable, answered 5xx, or answered something that is
 not `text/event-stream` (a proxy in front of it, or a wrong `endpoint`).
 
-**Fix:** open the `endpoint` with the same headers by hand; it must answer a
-subscription with `Content-Type: text/event-stream`.
+**Fix:** post the document to the `endpoint` by hand with the same headers; it
+must answer with `Content-Type: text/event-stream`.
+
+### The stream ends with `The API stream failed.`
+
+**Why:** the upstream stream broke, or sent an event of more than 1 MiB with
+no blank line ending it.
+
+**Fix:** read the API's logs; a subscription's events are small and end with a
+blank line.
 
 ### Events arrive in bursts, or the stream closes after a few seconds
 

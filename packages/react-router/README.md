@@ -985,22 +985,27 @@ has a complete sign-in route and the rest.
 
 ## A GraphQL subscription for the browser
 
-`@alxia/react-router/subscription` exposes a subscription of your API to the
-browser through a resource route, without giving it the token or an open
-pass-through: only the named subscriptions you list are forwarded, the bearer
-comes from the session, a heartbeat keeps the stream open, the browser leaving
-aborts the upstream request, and an upstream 429 is passed on with its
-`retryAfter`. It speaks GraphQL over SSE in distinct connections mode, so
-`graphql-sse` works against it. It imports nothing and adds no peer.
+`@alxia/react-router/subscription` exposes subscriptions of your API to the
+browser through a resource route, without giving it the token or a way to
+write its own document. `allow` maps each operation name to the document the
+server sends for it; the client names an operation and sends variables, and
+its own `query` and `extensions` are ignored. The bearer comes from the
+session, both methods refuse a cross-site request, a heartbeat keeps the
+stream open, the browser leaving aborts the upstream request, and an upstream
+429 is passed on with its `retryAfter`. It speaks GraphQL over SSE in distinct
+connections mode, so `graphql-sse` works against it. It imports `react-router`
+alone and adds no peer.
 
 ```ts
 // app/routes/events.ts
 import { createSubscriptionProxy } from '@alxia/react-router/subscription';
+import { print } from 'graphql';
+import { RoomEventsDocument } from '../generated/graphql';
 import { cookies } from '../session.server';
 
 const events = createSubscriptionProxy({
 	endpoint: 'https://api.example.com/graphql',
-	allow: ['RoomEvents'],
+	allow: { RoomEvents: print(RoomEventsDocument) },
 	getToken: (request) => cookies.token(request),
 	headers: (request) => ({
 		'x-forwarded-for': request.headers.get('x-forwarded-for'),
@@ -1219,11 +1224,11 @@ From `@alxia/react-router/entry`:
 | `createEntry({ streamTimeout?, nonce?, isBot?, onError? })`, `EntryOptions`, `Entry` | `/entry`: `{ handleRequest, streamTimeout }` (`Entry`), `entry.server.tsx` for Bun on the web stream renderer |
 | `handleRequest`, `streamTimeout`, `HandleRequest` | `/entry`: the default entry (`createEntry()`), its `5_000` and the type of `handleRequest` (assignable to React Router's `ServerEntryModule['default']`) |
 
-From `@alxia/react-router/subscription` (no import, no peer):
+From `@alxia/react-router/subscription` (`react-router` is its only import, no peer):
 
 | export | |
 | --- | --- |
-| `createSubscriptionProxy({ endpoint, allow, getToken, headers?, heartbeatMs?, fetch? })`, `SubscriptionProxy`, `SubscriptionProxyOptions` | a resource route's `loader` (GET) and `action` (POST) that relay one GraphQL subscription over SSE (graphql-sse's distinct connections mode): 401 without a token, 403 for anything but a named subscription of `allow` (or a listed persisted id), the bearer and `headers` upstream, a heartbeat comment every `heartbeatMs` (15000), the upstream aborted with the client, an upstream 429 passed on with `Retry-After` and `retryAfter`, 502 for an upstream failure |
+| `createSubscriptionProxy({ endpoint, allow, getToken, headers?, origin?, heartbeatMs?, fetch? })`, `SubscriptionProxy`, `SubscriptionProxyOptions` | a resource route's `loader` (GET) and `action` (POST) relaying GraphQL subscriptions over SSE (graphql-sse's distinct connections mode). `allow` is `{ [operationName]: document }`: the proxy sends its own document, the client's `query` and `extensions` are ignored and an unknown name is a 403. Both methods refuse a cross-site request (403) and a POST that is not JSON (415); 401 without a token; 400 for a malformed or oversize request (body 64 KiB, query string and variables 16 KiB); the bearer and `headers` upstream, a heartbeat comment every `heartbeatMs` (15000), the upstream aborted with the client, a pulled relay with a 1 MiB cap per event, an upstream 429 passed on with `Retry-After` and `retryAfter`, 502 for an upstream failure |
 
 The `alxia-react-router` bin, run with `bunx`:
 

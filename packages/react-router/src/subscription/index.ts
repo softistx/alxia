@@ -1,7 +1,7 @@
 /**
- * `@alxia/react-router/subscription`: a GraphQL subscription over SSE for a
- * BFF, as a resource route. It imports nothing (web APIs only), so it adds no
- * peer.
+ * `@alxia/react-router/subscription`: GraphQL subscriptions over SSE for a
+ * BFF, as a resource route. It imports `react-router` (through `/errors`'
+ * same-site check) and nothing else, so it adds no peer.
  */
 export {
 	createSubscriptionProxy,

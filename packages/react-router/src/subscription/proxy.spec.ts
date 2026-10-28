@@ -60,7 +60,7 @@ function proxy(
 ) {
 	return createSubscriptionProxy({
 		endpoint,
-		allow: ['RoomEvents'],
+		allow: { RoomEvents: SUB },
 		getToken: (request) => request.headers.get('x-session'),
 		heartbeatMs: 0,
 		...extra,
@@ -68,13 +68,13 @@ function proxy(
 }
 
 function post(
-	body: unknown,
+	body: Record<string, unknown>,
 	headers: HeadersInit = { 'x-session': 'tok' },
 ): Request {
 	return new Request('http://app.test/events', {
 		method: 'POST',
 		headers: { 'content-type': 'application/json', ...headers },
-		body: JSON.stringify(body),
+		body: JSON.stringify({ operationName: 'RoomEvents', ...body }),
 	});
 }
 
@@ -120,100 +120,246 @@ describe('createSubscriptionProxy', () => {
 	test('serves a GET with the operation in the search params', async () => {
 		const api = upstream(() => sse(['event: complete\ndata:\n\n']));
 		const url = new URL('http://app.test/events');
-		url.searchParams.set('query', SUB);
+		url.searchParams.set('operationName', 'RoomEvents');
 		url.searchParams.set('variables', '{"id":"1"}');
 		const response = await proxy(api.url).loader({
 			request: new Request(url, { headers: { 'x-session': 'tok' } }),
 		});
 		expect(response.status).toBe(200);
 		await response.text();
-		expect(api.seen[0]?.body).toEqual({ query: SUB, variables: { id: '1' } });
+		expect(api.seen[0]?.body).toEqual({
+			query: SUB,
+			operationName: 'RoomEvents',
+			variables: { id: '1' },
+		});
 	});
 
-	test('refuses an operation that is not allow-listed, without calling upstream', async () => {
+	test("sends the server-held document, never the client's query or extensions", async () => {
 		const api = upstream(() => sse([]));
-		const p = proxy(api.url);
-		const named = await p.action({
-			request: post({
-				query: 'subscription Other { x }',
-				operationName: 'Other',
-			}),
-		});
-		expect(named.status).toBe(403);
-		const mutation = await p.action({
-			request: post({ query: 'mutation RoomEvents { x }' }),
-		});
-		expect(mutation.status).toBe(403);
-		const shorthand = await p.action({
-			request: post({ query: '{ me { id } }' }),
-		});
-		expect(shorthand.status).toBe(403);
-		const smuggled = await p.action({
-			request: post({
-				query: `${SUB} mutation Evil { drop }`,
-				operationName: 'RoomEvents',
-			}),
-		});
-		expect(smuggled.status).toBe(403);
-		const anonymous = await p.action({
-			request: post({ query: 'subscription { x }' }),
-		});
-		expect(anonymous.status).toBe(403);
-		expect(api.seen).toHaveLength(0);
-		const body = (await named.json()) as {
-			errors: Array<{ extensions: { code: string } }>;
-		};
-		expect(body.errors[0]?.extensions.code).toBe('FORBIDDEN');
-	});
-
-	test('ignores comments, strings and fragments when reading the document', async () => {
-		const api = upstream(() => sse([]));
-		const doc = `# mutation Evil { x }\nsubscription RoomEvents($t: String = "query Evil {") { roomEvents { ...F } }\nfragment F on Event { id }`;
 		const response = await proxy(api.url).action({
-			request: post({ query: doc }),
+			request: post({
+				query: 'mutation Evil { drop }',
+				extensions: { persistedQuery: { sha256Hash: 'x' } },
+				variables: { id: '7' },
+			}),
 		});
 		expect(response.status).toBe(200);
 		await response.text();
-		expect(api.seen).toHaveLength(1);
+		expect(api.seen[0]?.body).toEqual({
+			query: SUB,
+			operationName: 'RoomEvents',
+			variables: { id: '7' },
+		});
 	});
 
-	test('400 for a malformed request or an operationName outside the document', async () => {
+	test('403 for an operation name that is not a key, without calling upstream', async () => {
 		const api = upstream(() => sse([]));
 		const p = proxy(api.url);
+		for (const name of ['Other', 'toString', '__proto__', 'constructor']) {
+			const response = await p.action({
+				request: post({ operationName: name }),
+			});
+			expect(response.status).toBe(403);
+		}
+		expect(api.seen).toHaveLength(0);
+	});
+
+	test('400 for a malformed request', async () => {
+		const api = upstream(() => sse([]));
+		const p = proxy(api.url);
+		const json = { 'content-type': 'application/json', 'x-session': 't' };
 		const bad = await p.action({
 			request: new Request('http://app.test/e', {
 				method: 'POST',
-				headers: { 'x-session': 't' },
+				headers: json,
 				body: 'nope',
 			}),
 		});
 		expect(bad.status).toBe(400);
-		const missing = await p.action({ request: post({}) });
-		expect(missing.status).toBe(400);
-		const wrongName = await p.action({
-			request: post({ query: SUB, operationName: 'Other' }),
+		expect(
+			((await bad.json()) as { errors: Array<{ message: string }> }).errors[0]
+				?.message,
+		).toBe('The request is not valid JSON.');
+		const array = await p.action({
+			request: new Request('http://app.test/e', {
+				method: 'POST',
+				headers: json,
+				body: '[]',
+			}),
 		});
-		expect(wrongName.status).toBe(400);
+		expect(array.status).toBe(400);
+		const noName = await p.action({
+			request: new Request('http://app.test/e', {
+				method: 'POST',
+				headers: json,
+				body: '{}',
+			}),
+		});
+		expect(noName.status).toBe(400);
+		expect(
+			(await p.action({ request: post({ operationName: 3 }) })).status,
+		).toBe(400);
+		expect((await p.action({ request: post({ variables: [] }) })).status).toBe(
+			400,
+		);
 		expect(api.seen).toHaveLength(0);
 	});
 
-	test('allows a persisted id when listed', async () => {
+	test('400 when the body, the query string or the variables are too large', async () => {
 		const api = upstream(() => sse([]));
-		const p = proxy(api.url, { allow: ['abc123'] });
-		const ok = await p.action({
-			request: post({
-				extensions: { persistedQuery: { version: 1, sha256Hash: 'abc123' } },
+		const p = proxy(api.url);
+		const big = 'x'.repeat(70 * 1024);
+		const body = await p.action({ request: post({ variables: { big } }) });
+		expect(body.status).toBe(400);
+		expect(
+			((await body.json()) as { errors: Array<{ message: string }> }).errors[0]
+				?.message,
+		).toBe('The request is too large.');
+		const declared = await p.action({
+			request: new Request('http://app.test/e', {
+				method: 'POST',
+				headers: {
+					'content-type': 'application/json',
+					'x-session': 't',
+					'content-length': '999999',
+				},
+				body: '{}',
 			}),
 		});
-		expect(ok.status).toBe(200);
-		await ok.text();
-		const no = await p.action({
-			request: post({
-				extensions: { persistedQuery: { version: 1, sha256Hash: 'zzz' } },
+		expect(declared.status).toBe(400);
+		const url = new URL('http://app.test/events');
+		url.searchParams.set('operationName', 'RoomEvents');
+		url.searchParams.set(
+			'variables',
+			JSON.stringify({ big: 'x'.repeat(20 * 1024) }),
+		);
+		const get = await p.loader({
+			request: new Request(url, { headers: { 'x-session': 't' } }),
+		});
+		expect(get.status).toBe(400);
+		const variables = await p.action({
+			request: post({ variables: { big: 'x'.repeat(17 * 1024) } }),
+		});
+		expect(variables.status).toBe(400);
+		expect(api.seen).toHaveLength(0);
+	});
+
+	test('refuses a cross-site GET and POST, and a POST that is not JSON', async () => {
+		const api = upstream(() => sse([]));
+		const p = proxy(api.url);
+		const evil = { origin: 'https://evil.test', 'x-session': 't' };
+		expect((await p.action({ request: post({}, evil) })).status).toBe(403);
+		expect(
+			(
+				await p.action({
+					request: post(
+						{},
+						{ 'sec-fetch-site': 'cross-site', 'x-session': 't' },
+					),
+				})
+			).status,
+		).toBe(403);
+		const url = new URL('http://app.test/events?operationName=RoomEvents');
+		expect(
+			(await p.loader({ request: new Request(url, { headers: evil }) })).status,
+		).toBe(403);
+		expect(
+			(
+				await p.loader({
+					request: new Request(url, {
+						headers: { 'sec-fetch-site': 'same-site', 'x-session': 't' },
+					}),
+				})
+			).status,
+		).toBe(403);
+		const plain = await p.action({
+			request: new Request('http://app.test/e', {
+				method: 'POST',
+				headers: { 'content-type': 'text/plain', 'x-session': 't' },
+				body: '{"operationName":"RoomEvents"}',
 			}),
 		});
-		expect(no.status).toBe(403);
-		expect(api.seen).toHaveLength(1);
+		expect(plain.status).toBe(415);
+		expect(api.seen).toHaveLength(0);
+	});
+
+	test('accepts a same-origin request', async () => {
+		const api = upstream(() => sse([]));
+		const response = await proxy(api.url).action({
+			request: post(
+				{},
+				{
+					origin: 'http://app.test',
+					'sec-fetch-site': 'same-origin',
+					'x-session': 't',
+				},
+			),
+		});
+		expect(response.status).toBe(200);
+		await response.text();
+	});
+
+	test('a header value with a line break is a worded 500, a token with one a 401', async () => {
+		const api = upstream(() => sse([]));
+		const broken = await proxy(api.url, {
+			headers: { 'x-a': 'a\r\nb: c' },
+		}).action({
+			request: post({}),
+		});
+		expect(broken.status).toBe(500);
+		expect(
+			(
+				(await broken.json()) as {
+					errors: Array<{ extensions: { code: string } }>;
+				}
+			).errors[0]?.extensions.code,
+		).toBe('PROXY_MISCONFIGURED');
+		const token = await proxy(api.url, {
+			getToken: () => 'a\r\nb',
+		}).action({ request: post({}) });
+		expect(token.status).toBe(401);
+		expect(api.seen).toHaveLength(0);
+	});
+
+	test('an already aborted request still aborts upstream and is not leaked', async () => {
+		const api = upstream(() =>
+			sse(['event: next\ndata: {}\n\n'], { keepOpen: true }),
+		);
+		const client = new AbortController();
+		client.abort();
+		const response = await proxy(api.url)
+			.action({
+				request: new Request('http://app.test/events', {
+					method: 'POST',
+					headers: { 'content-type': 'application/json', 'x-session': 'tok' },
+					body: JSON.stringify({ operationName: 'RoomEvents' }),
+					signal: client.signal,
+				}),
+			})
+			.catch(() => undefined);
+		expect(response === undefined || response.status >= 200).toBe(true);
+	});
+
+	test('cuts an upstream that never ends an event, instead of buffering it', async () => {
+		const api = upstream(
+			() =>
+				new Response(
+					new ReadableStream({
+						async pull(controller) {
+							controller.enqueue(
+								new TextEncoder().encode('data: '.padEnd(256 * 1024, 'x')),
+							);
+							await Bun.sleep(1);
+						},
+					}),
+					{ headers: { 'content-type': 'text/event-stream' } },
+				),
+		);
+		const text = await (
+			await proxy(api.url).action({ request: post({}) })
+		).text();
+		expect(text).toContain('UPSTREAM_ERROR');
+		expect(text).toEndWith('event: complete\ndata:\n\n');
 	});
 
 	test('401 without a session, never calling upstream', async () => {
@@ -281,8 +427,8 @@ describe('createSubscriptionProxy', () => {
 		const client = new AbortController();
 		const request = new Request('http://app.test/events', {
 			method: 'POST',
-			headers: { 'x-session': 'tok' },
-			body: JSON.stringify({ query: SUB }),
+			headers: { 'content-type': 'application/json', 'x-session': 'tok' },
+			body: JSON.stringify({ operationName: 'RoomEvents' }),
 			signal: client.signal,
 		});
 		const response = await proxy(api.url).action({ request });
@@ -303,8 +449,8 @@ describe('createSubscriptionProxy', () => {
 		const response = await proxy(api.url).action({
 			request: new Request('http://app.test/events', {
 				method: 'POST',
-				headers: { 'x-session': 'tok' },
-				body: JSON.stringify({ query: SUB }),
+				headers: { 'content-type': 'application/json', 'x-session': 'tok' },
+				body: JSON.stringify({ operationName: 'RoomEvents' }),
 				signal: client.signal,
 			}),
 		});
@@ -389,7 +535,11 @@ describe('createSubscriptionProxy', () => {
 							controller.enqueue(
 								new TextEncoder().encode('event: next\ndata: {}\n\n'),
 							);
-							setTimeout(() => controller.error(new Error('reset')), 20);
+							setTimeout(() => {
+								try {
+									controller.error(new Error('reset'));
+								} catch {}
+							}, 20);
 						},
 					}),
 					{ headers: { 'content-type': 'text/event-stream' } },
