@@ -42,13 +42,7 @@ const removed = await purge(ports, {
 });
 ```
 
-A purge finds the record, runs your `guard` and `before`, refuses while a
-referrer holds it, deletes it, writes a `delete` line in the audit trail, and
-runs your `after` cascade, all in the one transaction: a failure anywhere,
-the audit line included, takes the delete back.
-
-See [the documentation](docs/README.md): the [guide](docs/guide.md), the
-[troubleshooting](docs/troubleshooting.md) and the [roadmap](docs/roadmap.md).
+A failure anywhere in the purge, the audit line included, takes the delete back.
 
 ## API
 
@@ -59,5 +53,12 @@ See [the documentation](docs/README.md): the [guide](docs/guide.md), the
 | `kindOf(referrer)`, `kindsOf(referrers)` | the stable snake_case code of a referring collection, and the sorted comma-joined list for a refusal's params |
 | `PurgePorts`, `PurgeInput`, `PurgeEntry`, `RemoveRecord`, `Referrer`, `Exists`, `Named`, `References` | the types |
 
-The permission check, the parsing of the id and the refusal of an entity that
+`typescript` is the only peer, for the declarations. The permission check, the parsing of the id and the refusal of an entity that
 soft deletes stay yours, before the call.
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/tree/develop/packages/records/docs): registering references, wiring the ports, `guard`, `before` and `after`, logging against a subject, testing a purge.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/records/docs/troubleshooting.md): an error message, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/records/docs/roadmap.md): what is coming, and what is not planned.
+- [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [Start in 5 minutes](https://github.com/softistx/alxia/blob/develop/docs/start.md).

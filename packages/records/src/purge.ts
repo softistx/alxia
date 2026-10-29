@@ -17,7 +17,10 @@ export interface PurgeEntry<E, Id, S> {
 export interface PurgePorts<Tx, E, Id, Doc, S> {
 	/**
 	 * Runs `run` in ONE transaction: committed when it resolves, rolled back
-	 * when it throws (and retried by the driver when it says so).
+	 * when it throws. The driver may run `run` again on a transient error, so
+	 * the `guard`, `before`, `after` and `subject` callbacks must be safe to
+	 * run twice. It should rethrow the error `run` threw; one that wraps it
+	 * keeps the refusal's `read` line when the wrapper has it as `cause`.
 	 */
 	transaction<R>(run: (tx: Tx) => Promise<R>): Promise<R>;
 	/** The record as the transaction reads it. */
@@ -90,7 +93,10 @@ export interface PurgeInput<Tx, E, Id, Doc, S> {
  * A refusal for a referrer names the collection that points at the record: a
  * fact about its subject. When the record has one, a `read` line is written
  * after the abort (the refusal cannot roll it back); if that write fails, its
- * error replaces the refusal.
+ * error replaces the refusal. A refusal for a record whose `subject` returns
+ * nothing writes no `read` line, since there is no one to log it against. A
+ * record removed by `after` has its own referrers unchecked: the check covers
+ * the record purged.
  */
 export async function purge<Tx, E, Id, Doc, S = never>(
 	ports: PurgePorts<Tx, E, Id, Doc, S>,
@@ -135,14 +141,14 @@ export async function purge<Tx, E, Id, Doc, S = never>(
 						action: 'delete',
 						entity: other,
 						id: otherId,
-						...(who !== undefined && { subject: who }),
+						...(who != null && { subject: who }),
 					});
 				});
 			}
 			return record;
 		});
 	} catch (error) {
-		if (revealing && error === revealing.refusal) {
+		if (revealing && causedBy(error, revealing.refusal)) {
 			await ports.log(undefined, {
 				action: 'read',
 				entity: input.entity,
@@ -152,4 +158,13 @@ export async function purge<Tx, E, Id, Doc, S = never>(
 		}
 		throw error;
 	}
+}
+
+// The error is the refusal, or wraps it as a `cause`.
+function causedBy(error: unknown, refusal: Error): boolean {
+	for (let e: unknown = error, depth = 0; e != null && depth < 8; depth++) {
+		if (e === refusal) return true;
+		e = typeof e === 'object' ? (e as { cause?: unknown }).cause : undefined;
+	}
+	return false;
 }

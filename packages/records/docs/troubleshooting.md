@@ -3,6 +3,7 @@
 - [`referencedBy: posts.authorId already references users`](#referencedby-postsauthorid-already-references-users)
 - [`labelledBy: posts.ownerId already has a label target`](#labelledby-postsownerid-already-has-a-label-target)
 - [`purge: <label> <id> has no subject to log the delete against`](#purge-label-id-has-no-subject-to-log-the-delete-against)
+- [A record that references itself can never be purged](#a-record-that-references-itself-can-never-be-purged)
 - [My `referenced` refusal never reaches the caller](#my-referenced-refusal-never-reaches-the-caller)
 
 ## `referencedBy: posts.authorId already references users`
@@ -28,3 +29,7 @@ option.
 With `subject`, a refusal is followed by a `read` line written with
 `log(undefined, …)`. If that write throws, its error replaces yours. Check
 your audit log's availability.
+
+## A record that references itself can never be purged
+
+A self-referencing collection registered with `referencedBy(nodes, nodes, 'parentId')` finds a referrer whenever a child exists, which is the intended refusal, but a record whose own field points at itself refuses its own purge. Clear the pointer first, in `before`.

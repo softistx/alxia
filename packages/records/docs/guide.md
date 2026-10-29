@@ -59,10 +59,12 @@ await purge(ports, {
 	guard: (record) => { if (record.status === 'active') throw new Conflict('active'); },
 	before: async (tx, record) => { /* an async rule; throw to refuse */ },
 	after: async (tx, record, remove) => {
-		// what existed only for the record, in the same transaction
-		await remove(newborns, record.newbornId, subject);
+		// what existed only for the record, in the same transaction;
+		// the third argument is the subject of the extra line
+		await remove(notes, record.noteId, { kind: 'patient', id: record.patientId });
 	},
 	subject: (record) => record.patientId && { kind: 'patient', id: record.patientId },
+	label: 'patient', // names the entity in the errors the purge throws
 });
 ```
 
@@ -82,6 +84,10 @@ names who the audit line is against. It has two consequences:
 - **A refusal is a read.** Saying that a collection still points at the record
   is a fact about its subject, so after the abort a `read` line is written with
   `log(undefined, …)`. If that write fails, its error replaces your refusal.
+
+A refusal for a record whose `subject` returns nothing writes no `read` line: there is no one to log it against.
+
+The driver may run the transaction's callback again on a transient error, so `guard`, `before`, `after` and `subject` must be safe to run twice. The referrers of a record removed by `after` are not checked, only those of the record purged.
 
 A record with no `subject` option is logged without one: your `log` names it
 by `entry.entity` and `entry.id`.

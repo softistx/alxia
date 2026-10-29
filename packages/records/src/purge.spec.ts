@@ -248,4 +248,58 @@ describe('purge', () => {
 		expect(w.has(notes, 'n1')).toBe(true);
 		expect(w.trail()).toEqual([]);
 	});
+
+	test('a transaction that runs the callback again leaves no read line from the first attempt', async () => {
+		const w = world();
+		w.put(users, { _id: 'u1', ownerId: 'o1' });
+		let reads = 0;
+		const retrying: typeof w.ports = {
+			...w.ports,
+			// The driver retries once on a transient error: the callback runs twice.
+			async transaction(run) {
+				try {
+					return await w.ports.transaction(run);
+				} catch {
+					return w.ports.transaction(run);
+				}
+			},
+			// The first attempt sees a referrer (and refuses); the second does not.
+			referrers: async () =>
+				reads++ === 0 ? [{ collection: 'posts', field: 'authorId' }] : [],
+		};
+		const record = await purge(retrying, { ...base('u1'), subject: ownedBy });
+		expect(record._id).toBe('u1');
+		expect(w.has(users, 'u1')).toBe(false);
+		expect(w.trail().some((l) => l.startsWith('read'))).toBe(false);
+	});
+
+	test('a transaction that wraps the refusal as a cause still gets the read line', async () => {
+		const w = world();
+		w.put(users, { _id: 'u1', ownerId: 'o1' });
+		w.put(posts, { _id: 'p1', authorId: 'u1' } as Doc);
+		const wrapping: typeof w.ports = {
+			...w.ports,
+			async transaction(run) {
+				try {
+					return await w.ports.transaction(run);
+				} catch (error) {
+					throw new Error('aborted', { cause: error });
+				}
+			},
+		};
+		await expect(
+			purge(wrapping, { ...base('u1'), subject: ownedBy }),
+		).rejects.toThrow('aborted');
+		expect(w.trail()).toEqual(['read users:u1 after o1']);
+	});
+
+	test('a refusal of a record whose subject resolves to nothing writes no read line', async () => {
+		const w = world();
+		w.put(users, { _id: 'u1' });
+		w.put(posts, { _id: 'p1', authorId: 'u1' } as Doc);
+		await expect(
+			purge(w.ports, { ...base('u1'), subject: () => null }),
+		).rejects.toThrow('referenced');
+		expect(w.trail()).toEqual([]);
+	});
 });
