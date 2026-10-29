@@ -1,5 +1,5 @@
 import { data } from 'react-router';
-import { isApiErrorLike } from './api-error';
+import { type ApiErrorLike, isApiErrorLike } from './api-error';
 import type { ApiErrors, ApiRefusal } from './api-errors';
 import { type RouteErrorOptions, routeError } from './route-error';
 
@@ -27,9 +27,11 @@ export interface FetcherResultOptions extends RouteErrorOptions {
 	/**
 	 * Words the refusal of this call: given the caught API error, the message
 	 * to answer, or `undefined` to keep the worded one. The status is the
-	 * refusal's. Not called for what is thrown to the error page.
+	 * refusal's. Called for an API's own refusal only: not for an API it
+	 * cannot reach or any other failure, nor for what is thrown to the error
+	 * page.
 	 */
-	reword?: (error: unknown) => string | undefined;
+	reword?: (error: ApiErrorLike) => string | undefined;
 }
 
 /**
@@ -61,7 +63,9 @@ export async function fetcherResult<
 			{
 				ok: false as const,
 				...about,
-				error: options?.reword?.(error) ?? message,
+				error:
+					(isApiErrorLike(error) ? options?.reword?.(error) : undefined) ??
+					message,
 			},
 			{ status },
 		);
