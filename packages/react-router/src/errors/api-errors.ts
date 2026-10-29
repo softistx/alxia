@@ -1,6 +1,7 @@
 import type { data } from 'react-router';
 import type { ApiErrorLike } from './api-error';
 import { describeApiErrors } from './describe';
+import type { FetcherResultOptions } from './fetcher-result';
 import type { FormErrors } from './form-errors';
 import type { ApiMessages } from './messages';
 import type { RouteErrorOptions } from './route-error';
@@ -100,7 +101,9 @@ export interface ApiErrors<L extends string> {
 	/**
 	 * Runs the mutation of an action a fetcher posted to: `{ ok: true }` with
 	 * `about` and the mutation's value, or `{ ok: false, error }` with `about`
-	 * and the refusal's message, answered with its HTTP status.
+	 * and the refusal's message, answered with its HTTP status. `options.reword`
+	 * words the refusal of this call from the caught error (`undefined` keeps
+	 * the worded message).
 	 */
 	fetcherResult<
 		About extends object,
@@ -109,7 +112,7 @@ export interface ApiErrors<L extends string> {
 		language: L,
 		about: About,
 		run: () => Promise<Value>,
-		route?: RouteErrorOptions,
+		options?: FetcherResultOptions,
 	): Promise<
 		| ({ ok: true } & About & Value)
 		| ReturnType<typeof data<{ ok: false; error: string } & About>>

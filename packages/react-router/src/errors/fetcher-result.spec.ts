@@ -102,4 +102,50 @@ describe('the route option', () => {
 			.catch((error) => error);
 		expect(plain).toBeInstanceOf(Response);
 	});
+
+	test("a per-call reword replaces the refusal's message, keeping its status", async () => {
+		const result = body(
+			await errors.fetcherResult(
+				'en',
+				{ intent: 'x' },
+				() => Promise.reject(apiError('todos.errors.title-taken', 409)),
+				{ reword: () => 'Pick another title.' },
+			),
+		);
+		expect(result.data).toEqual({
+			ok: false,
+			intent: 'x',
+			error: 'Pick another title.',
+		});
+		expect(result.init.status).toBe(409);
+	});
+
+	test('a reword that returns undefined keeps the worded message and sees the caught error', async () => {
+		const failure = apiError('todos.errors.title-taken', 409);
+		const seen: unknown[] = [];
+		const result = body(
+			await errors.fetcherResult('en', {}, () => Promise.reject(failure), {
+				reword: (error) => {
+					seen.push(error);
+					return undefined;
+				},
+			}),
+		);
+		expect(result.data['error']).toBe('Another todo already has this title.');
+		expect(seen).toEqual([failure]);
+	});
+
+	test('reword is not called for a failure that goes to the error page', async () => {
+		let called = false;
+		const boom = new Error('boom');
+		await expect(
+			errors.fetcherResult('en', {}, () => Promise.reject(boom), {
+				reword: () => {
+					called = true;
+					return 'x';
+				},
+			}),
+		).rejects.toBe(boom);
+		expect(called).toBe(false);
+	});
 });
