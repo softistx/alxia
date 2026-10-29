@@ -293,13 +293,13 @@ describe('purge', () => {
 		expect(w.trail()).toEqual(['read users:u1 after o1']);
 	});
 
-	test('a refusal of a record whose subject resolves to nothing writes no read line', async () => {
+	test('a refusal of a record whose subject resolves to nothing fails closed', async () => {
 		const w = world();
 		w.put(users, { _id: 'u1' });
 		w.put(posts, { _id: 'p1', authorId: 'u1' } as Doc);
 		await expect(
 			purge(w.ports, { ...base('u1'), subject: () => null }),
-		).rejects.toThrow('referenced');
+		).rejects.toThrow('no subject');
 		expect(w.trail()).toEqual([]);
 	});
 });

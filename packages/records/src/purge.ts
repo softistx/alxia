@@ -93,8 +93,8 @@ export interface PurgeInput<Tx, E, Id, Doc, S> {
  * A refusal for a referrer names the collection that points at the record: a
  * fact about its subject. When the record has one, a `read` line is written
  * after the abort (the refusal cannot roll it back); if that write fails, its
- * error replaces the refusal. A refusal for a record whose `subject` returns
- * nothing writes no `read` line, since there is no one to log it against. A
+ * error replaces the refusal. A record whose `subject` returns nothing
+ * fails closed on the refusal path too (the same error as the delete's). A
  * record removed by `after` has its own referrers unchecked: the check covers
  * the record purged.
  */
@@ -116,6 +116,13 @@ export async function purge<Tx, E, Id, Doc, S = never>(
 			if (referrers.length > 0) {
 				const refusal = input.refuse.referenced(referrers);
 				const found = input.subject?.(record);
+				if (input.subject && found == null) {
+					// Fail closed, as the delete path does: a refusal that names the
+					// referrers of a record whose subject is unknown could not be logged.
+					throw new Error(
+						`purge: ${label} ${String(id)} has no subject to log the delete against`,
+					);
+				}
 				if (found != null) revealing = { refusal, subject: found };
 				throw refusal;
 			}

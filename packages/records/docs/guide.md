@@ -85,7 +85,7 @@ names who the audit line is against. It has two consequences:
   is a fact about its subject, so after the abort a `read` line is written with
   `log(undefined, …)`. If that write fails, its error replaces your refusal.
 
-A refusal for a record whose `subject` returns nothing writes no `read` line: there is no one to log it against.
+A refusal for a record whose `subject` returns nothing fails closed too, with the same error as the delete.
 
 The driver may run the transaction's callback again on a transient error, so `guard`, `before`, `after` and `subject` must be safe to run twice. The referrers of a record removed by `after` are not checked, only those of the record purged.
 

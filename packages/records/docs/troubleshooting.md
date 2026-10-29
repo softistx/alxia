@@ -18,8 +18,8 @@ A field takes one label target. Remove the duplicate call.
 
 ## `purge: <label> <id> has no subject to log the delete against`
 
-You passed `subject`, and it returned nothing for this record, so the purge
-would have committed with no audit line. The transaction was aborted and the
+You passed `subject`, and it returned nothing for this record (on a refusal
+or on a delete), so the purge would have committed with no audit line. The transaction was aborted and the
 record is still there. Fix the record's data, or make `subject` read the right
 field. A record that belongs to no one should be purged with no `subject`
 option.
