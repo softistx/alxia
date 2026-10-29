@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.32.0
+
+### Minor Changes
+
+- [#438](https://github.com/softistx/alxia/pull/438) [`6747a0f`](https://github.com/softistx/alxia/commit/6747a0fcd4b1495a88dc08978b0ae91d9f040c80) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Add `useDebouncedFetcher` to `@alxia/react-router/fetcher`: a resource route loaded through a fetcher for what is typed, after a pause and from a minimum length, with the previous answer kept (`stale`, filtered by an optional `keep`) until the new one lands, and a stable `retry`. `/fetcher` now imports `react-router` as well as `react`.
+
 ## 0.31.1
 
 ### Patch Changes
