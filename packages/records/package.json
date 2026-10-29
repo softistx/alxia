@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/records",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "Referential integrity and hard delete for records: a registry of what points at what, and a one-transaction purge that refuses while a referrer holds the record, over ports for the database and the audit log",
 	"license": "MIT",
 	"type": "module",
