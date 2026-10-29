@@ -715,6 +715,9 @@ and a check done once at connection is never repeated.
 source.
 
 ```ts
+declare const source: AsyncIterable<unknown>;
+declare function check(): Promise<void>;
+
 subscribe: () => boundedStream(source, { idleMs: 90_000, totalMs: 600_000, checkEveryMs: 30_000, check })
 ```
 

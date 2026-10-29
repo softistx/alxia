@@ -216,6 +216,9 @@ the source of a `subscribe` and declares the limits:
 ```ts
 import { boundedStream } from '@alxia/graphql';
 
+declare function subscribeToTopic(topicId: string): AsyncIterable<unknown>;
+declare function toGraphQLError(e: unknown): Error;
+
 const resolvers = {
 	Subscription: {
 		events: {
@@ -238,8 +241,9 @@ const resolvers = {
   wants more) on the idle bound, on the total bound and when the source ends.
 - `check` runs every `checkEveryMs`, also while no event comes, and before an
   event is yielded when the last check is at least `checkDebounceMs` old
-  (default `0`: every event). When it throws, the stream throws
-  `mapError(error)` (the error itself by default) and ends.
+  (default `0`: every event). When it throws, or when the source itself
+  throws, the stream throws `mapError(error)` (the error itself by default)
+  and ends.
 - The source's `return()` is called at once when the consumer leaves (the
   client disconnected) and on any end, even while a read is pending, so a
   pub/sub reader is released. Pass `signal` (an `AbortSignal`) to end it on an
