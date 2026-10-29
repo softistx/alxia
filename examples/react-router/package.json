@@ -13,7 +13,7 @@
     "@alxia/compress": "^0.3.12",
     "@alxia/core": "^0.17.1",
     "@alxia/logger": "^0.6.9",
-    "@alxia/react-router": "^0.29.0",
+    "@alxia/react-router": "^0.30.0",
     "@alxia/secure-headers": "^0.5.2",
     "@react-router/serve": "^8.5.0",
     "isbot": "^5.2.2",
