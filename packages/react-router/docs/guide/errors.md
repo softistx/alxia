@@ -505,6 +505,26 @@ with `about` and the value `run` resolved, or `{ ok: false, error }` with
 `about` and the worded message, answered with the refusal's HTTP status. An
 unreachable API (a 503 `Response`) is worded too.
 
+A module that words one of its API errors its own way passes `reword` as the
+last argument: it receives the caught error and returns the message to answer,
+or `undefined` to keep the worded one. The status stays the refusal's, and
+`reword` is not called for what goes to the error page.
+
+```ts
+import { apiErrors } from './api-errors';
+
+// Your own call to the API, declared here as a stub.
+declare function renameTodo(input: unknown): Promise<{ title: string }>;
+
+export const rename = (input: unknown) =>
+	apiErrors.fetcherResult('en', { intent: 'rename' }, () => renameTodo(input), {
+		reword: (error) =>
+			error instanceof Error && error.message.includes('taken')
+				? 'Pick another title.'
+				: undefined,
+	});
+```
+
 ```ts
 import { apiErrors } from './api-errors';
 import type { Route } from './+types/todos';
@@ -571,7 +591,7 @@ export async function action({ request }: Route.ActionArgs) {
 The helpers route with `routeError`'s defaults (401, 403, 404 and 503). Each
 takes an optional last argument, `route?: RouteErrorOptions`, passed to
 `routeError` for what it throws: `apiErrors.fetcherRefusal(error, 'en', {
-statuses })`, `fetcherResult(language, about, run, { statuses })` and
+statuses })`, `fetcherResult(language, about, run, { statuses, reword })` and
 `submitForm(language, run, fieldOf, { statuses })`.
 
 ## JSON actions and CSRF

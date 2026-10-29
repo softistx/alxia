@@ -22,6 +22,16 @@ export function fetcherRefusal<L extends string>(
 	return refusal;
 }
 
+/** What `fetcherResult` takes after `run`: `routeError`'s options, and a rewording. */
+export interface FetcherResultOptions extends RouteErrorOptions {
+	/**
+	 * Words the refusal of this call: given the caught API error, the message
+	 * to answer, or `undefined` to keep the worded one. The status is the
+	 * refusal's. Not called for what is thrown to the error page.
+	 */
+	reword?: (error: unknown) => string | undefined;
+}
+
 /**
  * Runs the mutation of an action a fetcher posted to: `{ ok: true }` with
  * `about` and the mutation's value, or the refusal (`fetcherRefusal`) as a
@@ -36,12 +46,24 @@ export async function fetcherResult<
 	language: L,
 	about: About,
 	run: () => Promise<Value>,
-	route?: RouteErrorOptions,
+	options?: FetcherResultOptions,
 ) {
 	try {
 		return { ok: true as const, ...about, ...(await run()) };
 	} catch (error) {
-		const { message, status } = fetcherRefusal(errors, error, language, route);
-		return data({ ok: false as const, ...about, error: message }, { status });
+		const { message, status } = fetcherRefusal(
+			errors,
+			error,
+			language,
+			options,
+		);
+		return data(
+			{
+				ok: false as const,
+				...about,
+				error: options?.reword?.(error) ?? message,
+			},
+			{ status },
+		);
 	}
 }

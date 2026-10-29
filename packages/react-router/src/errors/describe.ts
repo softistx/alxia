@@ -58,8 +58,8 @@ export function describeApiErrors<L extends string>({
 		apiRefusal,
 		fetcherRefusal: (error, language, route) =>
 			fetcherRefusal(parts, error, language, route),
-		fetcherResult: (language, about, run, route) =>
-			fetcherResult(parts, language, about, run, route),
+		fetcherResult: (language, about, run, options) =>
+			fetcherResult(parts, language, about, run, options),
 		submitForm: (language, run, fieldOf, route) =>
 			submitForm(parts, language, run, fieldOf, route),
 	};

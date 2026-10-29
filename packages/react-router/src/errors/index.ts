@@ -33,6 +33,7 @@ export {
 	apiCodeResolver,
 	type CodeIssueLike,
 } from './code-resolver';
+export type { FetcherResultOptions } from './fetcher-result';
 export type { FormErrors } from './form-errors';
 export {
 	type JsonActions,
