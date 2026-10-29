@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.31.0
+
+### Minor Changes
+
+- [#429](https://github.com/softistx/alxia/pull/429) [`573cf21`](https://github.com/softistx/alxia/commit/573cf218f42b0ce5d56aba17f99382c0a994a90a) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `apiErrors.fetcherResult(language, about, run, options?)` takes `reword(error)` in its last argument (`FetcherResultOptions`, exported from `@alxia/react-router/errors`, which extends `RouteErrorOptions`): it receives the caught API error and returns the message to answer, or `undefined` to keep the worded one. The status stays the refusal's.
+
 ## 0.30.0
 
 ### Minor Changes
