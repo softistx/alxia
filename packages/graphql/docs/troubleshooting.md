@@ -701,6 +701,23 @@ The same holds behind a proxy or load balancer: its read timeout must be
 longer than the ping. For a React Router app, see
 [Subscriptions for a BFF](../../react-router/docs/guide/subscriptions.md#keep-the-stream-alive).
 
+### A subscription is dropped after a while, or outlives a revoked session
+
+**When:** an SSE subscription stays open for hours after the client stopped
+reading, or keeps delivering after the viewer's session ended.
+
+**Why:** an async iterable returned by `subscribe` has no bound of its own,
+and a check done once at connection is never repeated.
+
+**Fix:** wrap the source in `boundedStream` with `idleMs`, `totalMs` and a
+`check` ([guide](guide/yoga.md#bound-a-subscription)). A stream that ends at
+`idleMs` while pings still flow is expected: pings are not events of the
+source.
+
+```ts
+subscribe: () => boundedStream(source, { idleMs: 90_000, totalMs: 600_000, checkEveryMs: 30_000, check })
+```
+
 ### The IDE page is blank
 
 **When:** GraphiQL or Apollo Sandbox loads an empty page, and the browser

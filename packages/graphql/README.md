@@ -219,6 +219,24 @@ their subscriptions. `ws: { path, keepAlive }` moves the socket or spaces
 its pings. See [the WebSocket guide](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/websockets.md),
 Apollo Client's and urql's setup included.
 
+## Bound a subscription
+
+```ts
+import { boundedStream } from '@alxia/graphql';
+
+const subscribe = (_: unknown, args: { topicId: string }, ctx: { assertSession(): Promise<void> }) =>
+	boundedStream(subscribeToTopic(args.topicId), {
+		idleMs: 90_000,
+		totalMs: 10 * 60_000,
+		checkEveryMs: 30_000,
+		check: () => ctx.assertSession(),
+	});
+```
+
+The stream ends cleanly when idle or old, throws when `check` throws, and
+releases the source as soon as the client leaves. See
+[Yoga's plugins and options](https://github.com/softistx/alxia/blob/develop/packages/graphql/docs/guide/yoga.md#bound-a-subscription).
+
 ## Limits
 
 Four limits bound what a request costs before any resolver runs. A document
@@ -317,6 +335,8 @@ See
 | `oncePerRequest(request, key, load)` | `load()`'s value, computed at most once per request object and `key` (a `string`); returns `T`, a promise kept as the same promise, a throw or rejection not kept |
 | `clearRequestCache(request)` | empties what `oncePerRequest` kept for that request object; the next call loads again; returns `void` |
 | `freshPerMutation(resolvers)` | the same resolvers (same type) with each function of `Mutation` wrapped to call `clearRequestCache(context)` first: each root mutation field starts empty, its sub-fields share, a query is untouched |
+| `boundedStream(source, options)` | `source` (an `AsyncIterable` or `AsyncIterator`) as an `AsyncIterableIterator<T>` for a subscription's `subscribe`: ends cleanly after `idleMs` without an event and `totalMs` in all, runs `check` every `checkEveryMs` and before an event when the last check is `checkDebounceMs` old, throws `mapError(error)` when `check` fails, and calls the source's `return()` on disconnect or any end |
+| `BoundedStreamOptions` | its options: `idleMs`, `totalMs`, `checkEveryMs`, `checkDebounceMs?`, `check`, `mapError?`, `signal?` |
 | `ServerContext<Ctx>`, `GraphQLOptions` | its types |
 | `graphqlClient(app, { path?, headers?, method? })` (`@alxia/graphql/testing`) | `query(document, { variables?, operationName?, headers?, method?, extensions?, persisted? })`, or `query({ persisted })` with no document, in process: `{ status, data?, errors?, response }` |
 | `GraphQLClient`, `GraphQLResult`, `QueryDocument`, `QueryOptions`, `PersistedQueryOptions`, `HttpMethod`, `GraphQLClientOptions`, `ResponseError` (`@alxia/graphql/testing`) | its types |
