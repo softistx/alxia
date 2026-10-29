@@ -358,6 +358,16 @@
         "workbox-strategies",
       ],
     },
+    "packages/records": {
+      "name": "@alxia/records",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@types/bun": "^1.4.4",
+      },
+      "peerDependencies": {
+        "typescript": "^6.0.3 || ^7.0.0",
+      },
+    },
     "packages/redis": {
       "name": "@alxia/redis",
       "version": "0.5.13",
@@ -463,6 +473,8 @@
     "@alxia/rate-limit": ["@alxia/rate-limit@workspace:packages/rate-limit"],
 
     "@alxia/react-router": ["@alxia/react-router@workspace:packages/react-router"],
+
+    "@alxia/records": ["@alxia/records@workspace:packages/records"],
 
     "@alxia/redis": ["@alxia/redis@workspace:packages/redis"],
 

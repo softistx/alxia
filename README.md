@@ -82,6 +82,7 @@ app.listen(3000); // in a test, in process: await app.request('/users/1')
 | [`@alxia/jwt`](packages/jwt) | JWTs on Web Crypto, and a typed bearer guard |
 | [`@alxia/logger`](packages/logger) | a request id, structured logs, `Server-Timing` |
 | [`@alxia/env`](packages/env) | environment variables, validated and typed at startup |
+| [`@alxia/records`](packages/records) | referential integrity and hard delete: a registry of what points at what, and a one-transaction purge that refuses while a referrer holds the record, over ports for the database and the audit log |
 | [`@alxia/context-storage`](packages/context-storage) | the request's context anywhere it runs, typed by the app: `hono/context-storage` for alxia |
 | [`@alxia/di`](packages/di) | dependency injection on `@nxgt/di`: typed Tokens, a lazy Scope per request disposed when it ends, values exposed by name to the routes that read them |
 | [`@alxia/create`](packages/create) | `bun create @alxia`: a new app from a template (`minimal`, `api`, `graphql` or `react-router`), its dependencies at the newest versions alxia accepts |
