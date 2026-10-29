@@ -207,6 +207,53 @@ describes.
 are sent as they are produced. A `compressible` that lets event streams in
 still sends each result at once: a streamed body is flushed as it comes.
 
+### Bound a subscription
+
+A long-lived stream should not outlive its welcome: a client that went quiet,
+a session that was revoked, a reader nobody releases. `boundedStream` wraps
+the source of a `subscribe` and declares the limits:
+
+```ts
+import { boundedStream } from '@alxia/graphql';
+
+declare function subscribeToTopic(topicId: string): AsyncIterable<unknown>;
+declare function toGraphQLError(e: unknown): Error;
+
+const resolvers = {
+	Subscription: {
+		events: {
+			subscribe: (_: unknown, args: { topicId: string }, ctx: { assertSession(): Promise<void> }) =>
+				boundedStream(subscribeToTopic(args.topicId), {
+					idleMs: 90_000, // ends after 90 s without an event
+					totalMs: 10 * 60_000, // and 10 minutes after it began
+					checkEveryMs: 30_000, // re-checks the session, also while idle
+					checkDebounceMs: 1_000, // and before an event if the last check is 1 s old
+					check: () => ctx.assertSession(), // throws to refuse
+					mapError: (error) => toGraphQLError(error), // optional
+				}),
+			resolve: (event: unknown) => event,
+		},
+	},
+};
+```
+
+- It ends **cleanly** (the client sees a complete stream, and reconnects if it
+  wants more) on the idle bound, on the total bound and when the source ends.
+- `check` runs every `checkEveryMs`, also while no event comes, and before an
+  event is yielded when the last check is at least `checkDebounceMs` old
+  (default `0`: every event). When it throws, or when the source itself
+  throws, the stream throws `mapError(error)` (the error itself by default)
+  and ends.
+- The source's `return()` is called at once when the consumer leaves (the
+  client disconnected) and on any end, even while a read is pending, so a
+  pub/sub reader is released. Pass `signal` (an `AbortSignal`) to end it on an
+  abort too.
+- `source` is any `AsyncIterable` or `AsyncIterator`. No timer is left behind
+  once the stream has ended.
+
+Yoga's keep-alive pings are not events of the source, so they do not reset
+`idleMs`.
+
 ### Keep an idle subscription open
 
 Yoga sends a keep-alive ping on an open stream every 12 seconds. `Bun.serve`

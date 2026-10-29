@@ -1,3 +1,4 @@
+export { type BoundedStreamOptions, boundedStream } from './bounded-stream';
 export {
 	type GraphQLContext,
 	type GraphQLOptions,
