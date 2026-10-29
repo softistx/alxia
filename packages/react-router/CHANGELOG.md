@@ -4,7 +4,7 @@
 
 ### Minor Changes
 
-- [#418](https://github.com/softistx/alxia/pull/418) [`a7f95ef`](https://github.com/softistx/alxia/commit/a7f95effb830b8457554b5c0fb793d4f95a48a14) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `stepUpSteps({ onSignedOut: 'sign-in' })`: `route` now owns a signed-out user. An `UNAUTHENTICATED` answer (`codes.unauthenticated`) or a bare 401 redirects to sign-in with `next` from a same-site `Referer` (else the route's own path), while a wrong code stays a refusal and a second-factor-required answer is never a redirect.
+- [#418](https://github.com/softistx/alxia/pull/418) [`a7f95ef`](https://github.com/softistx/alxia/commit/a7f95effb830b8457554b5c0fb793d4f95a48a14) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `stepUpSteps({ onSignedOut: 'sign-in' })`: `route` now owns a signed-out user. An `UNAUTHENTICATED` answer (`codes.unauthenticated`) redirects from either step, and a bare 401 only from `request`, to sign-in with `next` from a same-site `Referer` (else the route's own path), while a wrong code stays a refusal and a second-factor-required answer is never a redirect.
 
 ## 0.28.2
 
