@@ -51,17 +51,19 @@ keep the previous answer on screen while the next one loads, offer a retry.
 ```tsx
 import { useDebouncedFetcher } from '@alxia/react-router/fetcher';
 
+type SuggestAnswer = { items: string[] } | { failed: true };
+
 export function Suggestions({ typed }: { typed: string }) {
 	const { data, stale, state, retry } = useDebouncedFetcher<SuggestAnswer>(
 		typed,
 		(q) => `/suggest?${new URLSearchParams({ q })}`,
-		{ minLength: 2, delayMs: 250, keep: (answer) => !answer.failed },
+		{ minLength: 2, delayMs: 250, keep: (answer) => !('failed' in answer) },
 	);
 	if (state === 'idle') return null;
 	return (
 		<div aria-busy={state !== 'done'} style={{ opacity: stale ? 0.5 : 1 }}>
-			{data ? <List items={data.items} /> : <Spinner />}
-			{data?.failed ? <button onClick={retry}>Try again</button> : null}
+			{data && 'items' in data ? <List items={data.items} /> : <Spinner />}
+			{data && 'failed' in data ? <button onClick={retry}>Try again</button> : null}
 		</div>
 	);
 }
@@ -87,7 +89,8 @@ export function Suggestions({ typed }: { typed: string }) {
 - `keep(answer)` (default: keep all) decides which answers may stay as the
   stale `data` while the next value waits or loads; refuse the failed ones so
   a failure is shown once, as the current answer, never dimmed as a previous
-  one.
+  one. After a refused answer, the stale data is the last *kept* answer, not
+  the refused one.
 - A refusal the route answers as data (`{ failed: true }`) is `data` like any
   answer. A route that throws goes to the route's error boundary, as with any
   fetcher.

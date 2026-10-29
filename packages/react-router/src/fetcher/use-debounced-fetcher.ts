@@ -27,7 +27,8 @@ export interface DebouncedFetcherOptions<Data = unknown> {
 	/**
 	 * Which answers may be kept as the stale `data` while the next value waits
 	 * or loads. Default: all. An answer it refuses (a failure) is still `data`
-	 * while it is the current one, but is never shown as the previous one.
+	 * while it is the current one, but is never shown as the previous one: after a refused answer, the stale
+	 * data is the last *kept* answer, not the refused one.
 	 */
 	readonly keep?: (data: NonNullable<FetcherData<Data>>) => boolean;
 }
