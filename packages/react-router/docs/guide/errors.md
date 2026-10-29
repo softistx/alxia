@@ -506,9 +506,10 @@ with `about` and the value `run` resolved, or `{ ok: false, error }` with
 unreachable API (a 503 `Response`) is worded too.
 
 A module that words one of its API errors its own way passes `reword` as the
-last argument: it receives the caught error and returns the message to answer,
-or `undefined` to keep the worded one. The status stays the refusal's, and
-`reword` is not called for what goes to the error page.
+last argument: it receives the caught API error (an `ApiErrorLike`) and returns
+the message to answer, or `undefined` to keep the worded one. The status stays
+the refusal's. `reword` is called for the API's own refusals only: not for an
+unreachable API or another failure, and not for what goes to the error page.
 
 ```ts
 import { apiErrors } from './api-errors';
@@ -519,7 +520,7 @@ declare function renameTodo(input: unknown): Promise<{ title: string }>;
 export const rename = (input: unknown) =>
 	apiErrors.fetcherResult('en', { intent: 'rename' }, () => renameTodo(input), {
 		reword: (error) =>
-			error instanceof Error && error.message.includes('taken')
+			error.code === 'todos.errors.title-taken'
 				? 'Pick another title.'
 				: undefined,
 	});

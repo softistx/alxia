@@ -61,6 +61,85 @@ describe('fetcherResult', () => {
 	});
 });
 
+describe('fetcherResult reword', () => {
+	const failing = (error: unknown) => () => Promise.reject(error);
+
+	test("a module's words replace the catalogue's, the status stays", async () => {
+		const seen: unknown[] = [];
+		const result = body(
+			await errors.fetcherResult(
+				'en',
+				{ intent: 'x' },
+				failing(apiError('todos.errors.title-taken', 409)),
+				{
+					reword: (error) => {
+						seen.push(error.code);
+						return 'This title is already used here.';
+					},
+				},
+			),
+		);
+		expect(seen).toEqual(['todos.errors.title-taken']);
+		expect(result.data).toEqual({
+			ok: false,
+			intent: 'x',
+			error: 'This title is already used here.',
+		});
+		expect(result.init.status).toBe(409);
+	});
+
+	test("undefined keeps the API's own worded message", async () => {
+		const result = body(
+			await errors.fetcherResult(
+				'en',
+				{},
+				failing(apiError('todos.errors.title-taken', 409)),
+				{ reword: () => undefined },
+			),
+		);
+		expect(result.data['error']).toBe('Another todo already has this title.');
+		expect(result.init.status).toBe(409);
+	});
+
+	test('is not applied to an unreachable API', async () => {
+		let called = false;
+		const result = body(
+			await errors.fetcherResult(
+				'en',
+				{},
+				failing(new Response('unreachable', { status: 503 })),
+				{
+					reword: () => {
+						called = true;
+						return 'reworded';
+					},
+				},
+			),
+		);
+		expect(called).toBe(false);
+		expect(result.data['error']).toBe('The service is unavailable.');
+		expect(result.init.status).toBe(503);
+	});
+
+	test('is not applied to a 401, which goes to the error page', async () => {
+		let called = false;
+		await expect(
+			errors.fetcherResult(
+				'en',
+				{},
+				failing(apiError('todos.errors.unauthenticated', 401)),
+				{
+					reword: () => {
+						called = true;
+						return 'reworded';
+					},
+				},
+			),
+		).rejects.toMatchObject({ init: { status: 401 } });
+		expect(called).toBe(false);
+	});
+});
+
 describe('fetcherRefusal', () => {
 	test("is apiRefusal's, and throws what it does not word", () => {
 		const error = apiError('todos.errors.title-taken', 409);

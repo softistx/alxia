@@ -102,8 +102,8 @@ export interface ApiErrors<L extends string> {
 	 * Runs the mutation of an action a fetcher posted to: `{ ok: true }` with
 	 * `about` and the mutation's value, or `{ ok: false, error }` with `about`
 	 * and the refusal's message, answered with its HTTP status. `options.reword`
-	 * words the refusal of this call from the caught error (`undefined` keeps
-	 * the worded message).
+	 * words the refusal of this call from the caught API error (`undefined`
+	 * keeps the worded message); it is not called for an unreachable API.
 	 */
 	fetcherResult<
 		About extends object,
