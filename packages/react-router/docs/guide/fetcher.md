@@ -55,7 +55,7 @@ export function Suggestions({ typed }: { typed: string }) {
 	const { data, stale, state, retry } = useDebouncedFetcher<SuggestAnswer>(
 		typed,
 		(q) => `/suggest?${new URLSearchParams({ q })}`,
-		{ minLength: 2, delayMs: 250 },
+		{ minLength: 2, delayMs: 250, keep: (answer) => !answer.failed },
 	);
 	if (state === 'idle') return null;
 	return (
@@ -79,7 +79,15 @@ export function Suggestions({ typed }: { typed: string }) {
   the first answer and again once the hook is `idle`.
 - `state` is `'idle'` (disabled or too short), `'waiting'` (the pause is
   running), `'loading'` or `'done'`.
-- `retry()` asks again for the value as it stands, without the pause.
+- `retry()` asks again for the value as it stands, without the pause; it is
+  the same function on every render. The route answers `{ failed: true }` on a
+  failure (for example with `orFailed` from `/lists`) rather than throwing,
+  which is what gives the retry button something to show (see
+  [troubleshooting](../troubleshooting.md)).
+- `keep(answer)` (default: keep all) decides which answers may stay as the
+  stale `data` while the next value waits or loads; refuse the failed ones so
+  a failure is shown once, as the current answer, never dimmed as a previous
+  one.
 - A refusal the route answers as data (`{ failed: true }`) is `data` like any
   answer. A route that throws goes to the route's error boundary, as with any
   fetcher.

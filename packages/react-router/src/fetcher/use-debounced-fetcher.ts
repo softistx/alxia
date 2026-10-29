@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFetcher } from 'react-router';
 
 /** What `useFetcher<Data>` hands back as `data` (`Data` may be `typeof loader`). */
@@ -15,7 +15,7 @@ export type DebouncedFetcherState =
 	/** The route answered for the value as it stands. */
 	| 'done';
 
-export interface DebouncedFetcherOptions {
+export interface DebouncedFetcherOptions<Data = unknown> {
 	/** Pause after the last change before the route is asked. Default 250. */
 	readonly delayMs?: number;
 	/** The trimmed value must have this many characters. Default 1. */
@@ -24,6 +24,12 @@ export interface DebouncedFetcherOptions {
 	readonly enabled?: boolean;
 	/** The fetcher's key, to share it with another component. */
 	readonly key?: string;
+	/**
+	 * Which answers may be kept as the stale `data` while the next value waits
+	 * or loads. Default: all. An answer it refuses (a failure) is still `data`
+	 * while it is the current one, but is never shown as the previous one.
+	 */
+	readonly keep?: (data: NonNullable<FetcherData<Data>>) => boolean;
 }
 
 export interface DebouncedFetcher<Data> {
@@ -54,9 +60,11 @@ export interface DebouncedFetcher<Data> {
 export function useDebouncedFetcher<Data>(
 	value: string,
 	to: string | ((value: string) => string),
-	options: DebouncedFetcherOptions = {},
+	options: DebouncedFetcherOptions<Data> = {},
 ): DebouncedFetcher<Data> {
-	const { delayMs = 250, minLength = 1, enabled = true, key } = options;
+	const { delayMs = 250, minLength = 1, enabled = true, key, keep } = options;
+	const keepRef = useRef(keep);
+	keepRef.current = keep;
 	const fetcher = useFetcher<Data>(key === undefined ? undefined : { key });
 	const load = useRef(fetcher.load);
 	load.current = fetcher.load;
@@ -92,7 +100,8 @@ export function useDebouncedFetcher<Data>(
 		fetcher.data !== undefined;
 	const answer = current ? fetcher.data : undefined;
 	useEffect(() => {
-		if (answer !== undefined) previous.current = answer;
+		if (answer === undefined || answer === null) return;
+		if (keepRef.current?.(answer) ?? true) previous.current = answer;
 	}, [answer]);
 
 	const data = current ? answer : url === null ? undefined : previous.current;
@@ -101,10 +110,13 @@ export function useDebouncedFetcher<Data>(
 	else if (loaded !== url) state = 'waiting';
 	else state = fetcher.state === 'idle' ? 'done' : 'loading';
 
-	const retry = () => {
-		if (url === null) return;
-		setLoaded(url);
-		void load.current(url);
-	};
+	const urlRef = useRef(url);
+	urlRef.current = url;
+	const retry = useCallback(() => {
+		const now = urlRef.current;
+		if (now === null) return;
+		setLoaded(now);
+		void load.current(now);
+	}, []);
 	return { data, stale: state !== 'done' && data !== undefined, state, retry };
 }

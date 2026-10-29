@@ -1057,8 +1057,8 @@ import { RouterLink } from '@alxia/react-router/link';
 ## A fetcher's fresh answer
 
 A keyed fetcher outlives its page, so a `useEffect` on its data replays an
-earlier visit's answer on remount. `@alxia/react-router/fetcher` (`react` is
-its only import, plus `react-router` for the second hook) calls your handler once per new answer:
+earlier visit's answer on remount. `@alxia/react-router/fetcher` (`react` and
+`react-router` are its imports) calls your handler once per new answer:
 
 ```tsx
 import { useJsonFetcher } from '@alxia/react-router/errors';
@@ -1378,7 +1378,7 @@ From `@alxia/react-router/fetcher` (`react` and `react-router` are its imports; 
 | export | |
 | --- | --- |
 | `useFetcherAnswer(fetcher, onAnswer?)`, `AnswerSource` | `onAnswer(answer)` once per answer that arrives while the fetcher is idle and differs from the last one seen (the data present at mount counts as seen); the handler is read from a ref; returns the latest answer handed over, `undefined` before the first |
-| `useDebouncedFetcher(value, to, { delayMs?, minLength?, enabled?, key? }?)`, `DebouncedFetcher`, `DebouncedFetcherOptions`, `DebouncedFetcherState` | a resource route loaded for what is typed: one `fetcher.load` after `delayMs` (250) without a change and from `minLength` (1) trimmed characters; `to` is a URL or `(value) => url`; returns `{ data, stale, state, retry }`: `data` is the answer for the value as it stands, else the previous one with `stale` set; `state` is `'idle' \| 'waiting' \| 'loading' \| 'done'`; `retry()` asks again at once |
+| `useDebouncedFetcher(value, to, { delayMs?, minLength?, enabled?, key?, keep? }?)`, `DebouncedFetcher`, `DebouncedFetcherOptions`, `DebouncedFetcherState` | a resource route loaded for what is typed: one `fetcher.load` after `delayMs` (250) without a change and from `minLength` (1) trimmed characters; `to` is a URL or `(value) => url`; returns `{ data, stale, state, retry }`: `data` is the answer for the value as it stands, else the previous one with `stale` set; `state` is `'idle' \| 'waiting' \| 'loading' \| 'done'`; `keep(answer)` filters what may stay as the stale answer; `retry()` (stable) asks again at once |
 
 From `@alxia/react-router/subscription` (no import, no peer):
 
