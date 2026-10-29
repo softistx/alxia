@@ -97,7 +97,7 @@ describe('fetcherResult reword', () => {
 				{ reword: () => undefined },
 			),
 		);
-		expect(result.data.error).toBe('Another todo already has this title.');
+		expect(result.data['error']).toBe('Another todo already has this title.');
 		expect(result.init.status).toBe(409);
 	});
 
@@ -117,7 +117,7 @@ describe('fetcherResult reword', () => {
 			),
 		);
 		expect(called).toBe(false);
-		expect(result.data.error).toBe('The service is unavailable.');
+		expect(result.data['error']).toBe('The service is unavailable.');
 		expect(result.init.status).toBe(503);
 	});
 
