@@ -584,6 +584,25 @@ export async function loader({ request }: Route.LoaderArgs) {
 
 The rows stay, `error` is `true`, and `loadMore` retries.
 
+### A debounced load lands on the route's `ErrorBoundary`
+
+**When:** the resource route behind `useDebouncedFetcher` throws (or throws a `Response`) and the whole page is replaced by its `ErrorBoundary` instead of showing the previous suggestions with a retry.
+
+**Why:** React Router sends the error of a fetcher's load to the route's boundary. `useDebouncedFetcher` only sees what the fetcher answers, so a failure it can show with `retry` has to be an answer.
+
+**Fix:** answer `{ failed: true }` instead of throwing, for example with `orFailed(q, run)` from `@alxia/react-router/lists` (any non-empty value as its first argument makes it answer `{ failed: true }` on an error), and pass `keep` so a failure is never shown as the previous answer:
+
+```ts
+export function loader({ request }: Route.LoaderArgs) {
+	const q = new URL(request.url).searchParams.get('q');
+	return orFailed(q, () => suggest(q));
+}
+// in the component
+const { data, retry } = useDebouncedFetcher<typeof loader>(typed, toUrl, {
+	keep: (answer) => !('failed' in answer),
+});
+```
+
 ### The client's files are served uncompressed
 
 A response for a script, a stylesheet or an SVG has no `Content-Encoding`,

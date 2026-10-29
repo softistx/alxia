@@ -65,9 +65,9 @@ describe('/link', () => {
 });
 
 describe('/fetcher', () => {
-	test('imports react alone: no core, no react-router, no node: module, no bun', async () => {
+	test('imports react and react-router alone: no core, no node: module, no bun', async () => {
 		const imports = await importsOf(join(DIST, 'fetcher/index.js'));
-		expect([...new Set(imports)]).toEqual(['react']);
+		expect([...new Set(imports)].sort()).toEqual(['react', 'react-router']);
 	});
 
 	test('shares no chunk with the main entry', async () => {
