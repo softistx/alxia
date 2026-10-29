@@ -14,10 +14,13 @@ import { useFetcherAnswer } from '@alxia/react-router/fetcher';
 
 export function SaveForm() {
 	const { fetcher, post } = useJsonFetcher<typeof action>('save');
-	const answer = useFetcherAnswer(fetcher, (result) => {
-		if (result.ok) toast('Saved');
-	});
-	return <button onClick={() => post({ name: 'Ana' })}>Save</button>;
+	const answer = useFetcherAnswer(fetcher, (result) => toast(result.message));
+	return (
+		<>
+			<button onClick={() => post({ name: 'Ana' })}>Save</button>
+			{answer ? <p>{answer.message}</p> : null}
+		</>
+	);
 }
 ```
 
@@ -31,4 +34,7 @@ export function SaveForm() {
   again, and it always runs the latest one.
 - It returns the latest answer handed over (`undefined` until one arrives),
   typed as the action's data, for a screen that reads it as well.
-- Two answers equal in value but returned as two objects are two answers.
+- The comparison is by identity: two answers equal in value but returned as
+  two objects are two answers, and so is a reloading `fetcher.load`, which
+  hands a new object each time. An answer that comes back as the object seen
+  before (A, B, then A again) is a new answer once B was seen.

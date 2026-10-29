@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, test } from 'bun:test';
 import { Window } from 'happy-dom';
-import { act, createElement } from 'react';
+import { act, createElement, StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { renderToString } from 'react-dom/server';
 import { type AnswerSource, useFetcherAnswer } from './use-fetcher-answer';
@@ -128,5 +128,40 @@ describe('useFetcherAnswer', () => {
 				String(useFetcherAnswer({ state: 'idle', data: { ok: true, n: 1 } })),
 			);
 		expect(renderToString(createElement(Probe))).toContain('undefined');
+	});
+
+	test('A, B, A: an object seen before is new again once another came between', async () => {
+		const calls: Answer[] = [];
+		const { render } = harness((answer) => calls.push(answer));
+		const a = { ok: true, n: 1 };
+		const b = { ok: true, n: 2 };
+		await render();
+		await render({ state: 'idle', data: a });
+		await render({ state: 'idle', data: b });
+		await render({ state: 'idle', data: a });
+		expect(calls).toEqual([a, b, a]);
+	});
+
+	test('under StrictMode: once for a new answer, never for the data at mount', async () => {
+		const calls: Answer[] = [];
+		const old = { ok: true, n: 0 };
+		let source: AnswerSource<Answer> = { state: 'idle', data: old };
+		const Probe = () => {
+			useFetcherAnswer(source, (answer) => calls.push(answer));
+			return null;
+		};
+		const root = createRoot(
+			win.document.createElement('div') as unknown as Element,
+		);
+		const render = () =>
+			act(async () => {
+				root.render(createElement(StrictMode, null, createElement(Probe)));
+			});
+		await render();
+		expect(calls).toEqual([]);
+		const fresh = { ok: true, n: 1 };
+		source = { state: 'idle', data: fresh };
+		await render();
+		expect(calls).toEqual([fresh]);
 	});
 });
