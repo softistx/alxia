@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.30.0
+
+### Minor Changes
+
+- [#423](https://github.com/softistx/alxia/pull/423) [`468cd5d`](https://github.com/softistx/alxia/commit/468cd5d81fdee4dc745cfa28a85c26071e1d366a) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Add `@alxia/react-router/fetcher` with `useFetcherAnswer(fetcher, onAnswer?)`: calls `onAnswer` once per answer a fetcher gives while idle, ignoring the data it already held at mount (a keyed fetcher outlives its page), reads the handler from a ref, and returns the latest answer handed over.
+
 ## 0.29.0
 
 ### Minor Changes
