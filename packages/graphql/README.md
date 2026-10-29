@@ -224,7 +224,14 @@ Apollo Client's and urql's setup included.
 ```ts
 import { boundedStream } from '@alxia/graphql';
 
-const subscribe = (_: unknown, args: { topicId: string }, ctx: { assertSession(): Promise<void> }) =>
+// Your pub/sub reader and your session check.
+declare function subscribeToTopic(topicId: string): AsyncIterable<unknown>;
+
+const subscribe = (
+	_: unknown,
+	args: { topicId: string },
+	ctx: { assertSession(): Promise<void> },
+) =>
 	boundedStream(subscribeToTopic(args.topicId), {
 		idleMs: 90_000,
 		totalMs: 10 * 60_000,
