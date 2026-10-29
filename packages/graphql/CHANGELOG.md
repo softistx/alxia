@@ -1,5 +1,11 @@
 # @alxia/graphql
 
+## 0.12.0
+
+### Minor Changes
+
+- [#426](https://github.com/softistx/alxia/pull/426) [`95141cc`](https://github.com/softistx/alxia/commit/95141cc10548abf824928f43b13831d15b82ae8a) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Add `boundedStream(source, { idleMs, totalMs, checkEveryMs, checkDebounceMs?, check, mapError?, signal? })`: wraps a subscription's async iterable so it ends cleanly after an idle period and after a total lifetime, re-runs `check` every `checkEveryMs` (also while idle) and before an event when the last check is old enough, throws `mapError(error)` when `check` fails or the source itself throws, and calls the source's `return()` at once on disconnect or any end.
+
 ## 0.11.2
 
 ### Patch Changes
