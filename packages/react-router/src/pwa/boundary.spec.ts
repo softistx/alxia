@@ -64,6 +64,19 @@ describe('/link', () => {
 	});
 });
 
+describe('/fetcher', () => {
+	test('imports react alone: no core, no react-router, no node: module, no bun', async () => {
+		const imports = await importsOf(join(DIST, 'fetcher/index.js'));
+		expect([...new Set(imports)]).toEqual(['react']);
+	});
+
+	test('shares no chunk with the main entry', async () => {
+		const hooks = await filesOf(join(DIST, 'fetcher/index.js'));
+		const main = await filesOf(join(DIST, 'index.js'));
+		expect([...hooks].filter((file) => main.has(file))).toEqual([]);
+	});
+});
+
 describe('/pwa/server', () => {
 	test('imports @alxia/core alone: no react, no node: module, no bun', async () => {
 		const imports = await importsOf(join(DIST, 'pwa/server/index.js'));

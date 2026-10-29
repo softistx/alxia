@@ -92,7 +92,7 @@ Vite's preview server, as `bun run start` would: the pages, `/api`, the
 client's files and the app's middlewares. So does React Router's prerendering.
 
 `@alxia/core` and `react-router` 8 are peers, and `vite` 7 or 8 is an
-optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react` and `/lists`. The six `workbox-*`
+optional peer, for `/vite`; `react` 19 is an optional peer, for `/pwa/react`, `/fetcher` and `/lists`. The six `workbox-*`
 packages (`workbox-core`, `workbox-expiration`, `workbox-navigation-preload`,
 `workbox-precaching`, `workbox-routing`, `workbox-strategies`) are optional
 peers too, for `/pwa/worker` (the [PWA section](#installable-and-offline-pwa) has the install line). `/errors` imports `react-router`, a required peer that is already installed. The package declares no dependency.
@@ -1054,6 +1054,22 @@ import { RouterLink } from '@alxia/react-router/link';
 </LinkComponentProvider>
 ```
 
+## A fetcher's fresh answer
+
+A keyed fetcher outlives its page, so a `useEffect` on its data replays an
+earlier visit's answer on remount. `@alxia/react-router/fetcher` (`react` is
+its only import) calls your handler once per new answer:
+
+```tsx
+import { useJsonFetcher } from '@alxia/react-router/errors';
+import { useFetcherAnswer } from '@alxia/react-router/fetcher';
+
+const { fetcher } = useJsonFetcher<typeof action>('save');
+const answer = useFetcherAnswer(fetcher, (result) => toast(result.message));
+```
+
+See the [fetcher guide](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/fetcher.md).
+
 ## A list whose state is the URL
 
 `@alxia/react-router/lists` (`react` and `react-router` are its only imports; every hook renders on the server)
@@ -1343,6 +1359,12 @@ From `@alxia/react-router/link` (`react` and `react-router` are its only imports
 | --- | --- |
 | `RouterLink`, `RouterLinkProps` | React Router's `Link` as a UI library's link component: takes `href` (or `to`), spreads `className`, `children`, `ref` and every anchor prop onto the `<a>`, keeps `Link`'s own props (`replace`, `prefetch`, `reloadDocument`, ...) |
 
+From `@alxia/react-router/fetcher` (`react` is its only import; it renders on the server):
+
+| export | |
+| --- | --- |
+| `useFetcherAnswer(fetcher, onAnswer?)`, `AnswerSource` | `onAnswer(answer)` once per answer that arrives while the fetcher is idle and differs from the last one seen (the data present at mount counts as seen); the handler is read from a ref; returns the latest answer handed over, `undefined` before the first |
+
 From `@alxia/react-router/subscription` (no import, no peer):
 
 | export | |
@@ -1367,6 +1389,7 @@ The `alxia-react-router` bin, run with `bunx`:
 - [Installable and offline](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/pwa.md): what the subpaths hold, the worker's contract, the worker, what it caches, the offline page, building the worker with `alxia()` or `buildWorker`, the hooks in React, registering the worker and offering an update, serving the worker's script, the web app manifest, and clearing at sign-out.
 - [An API's refusals](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/errors.md): what `/errors` holds, recognising an API error, the request id, the page a request is for, the catalogue store, the form checks in the API's words, the provider, wording a refusal, loaders and the error page, actions, JSON actions and CSRF, and keeping the catalogue fresh.
 - [A BFF session](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/session.md): redirects that stay on the site, the cookies, the sign-in route, the second factor, the viewer and sign-out, the step-up, and the pages a mail's link opens.
+- [A fetcher's fresh answer](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/fetcher.md): `useFetcherAnswer`: a handler called once per new answer of a keyed fetcher, not for the data it held at mount.
 - [Lists whose state is the URL](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/lists.md): `useSearchChange`, `useSameRouteLoading`, `usePagedRows`: a search that drops the cursor, a skeleton for the same page reloading, a load-more button.
 - [Subscriptions for a BFF](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/guide/subscriptions.md): exposing a GraphQL subscription to the browser through a resource route: the allow-list, the session's bearer, the headers, the heartbeat, abort and rate limits.
 - [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/react-router/docs/troubleshooting.md): each message, and the traps that print none.

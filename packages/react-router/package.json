@@ -87,6 +87,11 @@
 			"import": "./dist/lists/index.js",
 			"default": "./dist/lists/index.js"
 		},
+		"./fetcher": {
+			"types": "./dist/fetcher/index.d.ts",
+			"import": "./dist/fetcher/index.js",
+			"default": "./dist/fetcher/index.js"
+		},
 		"./link": {
 			"types": "./dist/link/index.d.ts",
 			"import": "./dist/link/index.js",
@@ -127,6 +132,7 @@
 			"src/subscription/index.ts",
 			"src/lists/index.ts",
 			"src/link/index.ts",
+			"src/fetcher/index.ts",
 			"src/document/index.ts",
 			"src/entry/index.ts",
 			"src/pwa/worker/index.ts",
