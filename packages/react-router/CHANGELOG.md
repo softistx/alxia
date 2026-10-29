@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.31.1
+
+### Patch Changes
+
+- [#432](https://github.com/softistx/alxia/pull/432) [`0bd0675`](https://github.com/softistx/alxia/commit/0bd0675d3a09cb34edb67035d5f8ee1e44f60e8a) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `FetcherResultOptions.reword` is typed `(error: ApiErrorLike) => string | undefined` and is called for an API's own refusal only, no longer for an API it cannot reach or another failure that `fetcherResult` words. A callback typed `(error: unknown)` still compiles.
+
 ## 0.31.0
 
 ### Minor Changes
