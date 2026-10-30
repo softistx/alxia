@@ -634,6 +634,25 @@ export const stepUp = stepUpSteps({
 });
 ```
 
+`signIn` need not be a `signInFlow(...)`. An app with a hand-written sign-in
+passes an object with the members the step-up reads, typed `StepUpSignIn`, with
+no cast:
+
+```ts
+import { type StepUpSignIn, stepUpSteps } from '@alxia/react-router/session';
+
+const signIn: StepUpSignIn<'en' | 'fr'> = {
+	errors, // createApiErrors(...)
+	json, // jsonActions(...)
+	attemptsLeft: (count, language) => t('step-up.tries', { count }, language),
+	// signInRedirect: (request) => redirect('/sign-in'), // needed with onSignedOut: 'sign-in'
+};
+export const stepUp = stepUpSteps({ signIn, spent: (language) => t('step-up.spent', {}, language) });
+```
+
+`onSignedOut: 'sign-in'` also needs `signInRedirect`; without it `stepUpSteps`
+throws a `TypeError` when it is called.
+
 `json.readJson`, `toVia`, `execute` and `sessionCaller` below are the app's
 own helpers (its `jsonActions`, its mapping of the API's method to `via`, its
 GraphQL call and its session caller), not this package's.

@@ -1913,6 +1913,26 @@ stepUpSteps({
 });
 ```
 
+### `TypeError: stepUpSteps(): onSignedOut: 'sign-in' needs signIn.signInRedirect, which the sign-in given has not.`
+
+```
+TypeError: stepUpSteps(): onSignedOut: 'sign-in' needs signIn.signInRedirect, which the sign-in given has not.
+```
+
+**When:** the server starts, or the module that calls `stepUpSteps` is imported.
+
+**Why:** `onSignedOut: 'sign-in'` redirects a signed-out user through the sign-in's `signInRedirect`, and the `signIn` given, a hand-written `StepUpSignIn`, does not have it. A `signInFlow(...)` always does.
+
+**Fix:** add `signInRedirect` to the object, or leave `onSignedOut` out and handle the signed-out failure in the app:
+
+```ts
+stepUpSteps({
+	signIn: { errors, json, attemptsLeft, signInRedirect: (request) => redirect('/sign-in') },
+	spent: (language) => t('step-up.spent', {}, language),
+	onSignedOut: 'sign-in',
+});
+```
+
 ## Types
 
 ### `Property 'alxia' does not exist on type 'Readonly<RouterContextProvider>'`

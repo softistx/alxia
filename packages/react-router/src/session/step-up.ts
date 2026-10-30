@@ -28,6 +28,8 @@ type Refused = Extract<StepUpConfirmAnswer, { ok: false }>;
 
 interface StepUpContext<L extends string, C> extends CodeWording<L> {
 	readonly steps: StepUpStepsOptions<L, C>;
+	/** The sign-in's redirect, bound; `resolve` makes sure `onSignedOut` has one. */
+	readonly signInRedirect: ((request: Request) => Response) | undefined;
 	readonly stepUpRequired: string;
 	readonly mailThrottled: string;
 	readonly unauthenticated: string;
@@ -43,8 +45,15 @@ function resolve<L extends string, C>(
 			`stepUpSteps(): the code ${JSON.stringify(invalidCode)} is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`,
 		);
 	}
+	if (steps.onSignedOut === 'sign-in' && !steps.signIn.signInRedirect) {
+		throw new TypeError(
+			"stepUpSteps(): onSignedOut: 'sign-in' needs signIn.signInRedirect, which the sign-in given has not.",
+		);
+	}
+	const { signIn } = steps;
 	return {
-		options: steps.signIn,
+		options: signIn,
+		signInRedirect: signIn.signInRedirect?.bind(signIn),
 		steps,
 		invalidCode,
 		challengeOver,
@@ -192,9 +201,11 @@ async function routeStep<L extends string, C>(
 	samesitePost(json, call.request);
 	if (context.steps.onSignedOut !== 'sign-in')
 		return routeIntent(context, run, call);
+	const redirect = context.signInRedirect;
+	if (!redirect) return routeIntent(context, run, call);
 	return signingOut(
 		{
-			signIn: context.steps.signIn,
+			signIn: { signInRedirect: redirect },
 			unauthenticated: context.unauthenticated,
 			run,
 			request: call.request,
