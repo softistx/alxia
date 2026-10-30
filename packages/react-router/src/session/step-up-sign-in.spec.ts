@@ -23,6 +23,11 @@ function handWritten(): StepUpSignIn<Lang> {
 	};
 }
 
+// Type-level: a sign-in missing a member the step-up reads is refused.
+// @ts-expect-error `json` is missing
+const noJson: StepUpSignIn<Lang> = { errors, attemptsLeft: () => '' };
+void noJson;
+
 describe('stepUpSteps with a hand-written sign-in', () => {
 	test('accepts errors, json and attemptsLeft alone, no signInFlow', async () => {
 		const steps = stepUpSteps<Lang>({
