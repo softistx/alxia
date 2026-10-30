@@ -88,20 +88,19 @@ export function useDebouncedFetcher<Data>(
 	const previous = useRef<FetcherData<Data>>(undefined);
 	// React Router applies the fetcher's `loading` state in a transition, so
 	// right after `load()` a render can still show `idle` and the previous
-	// answer. A load has landed only once the fetcher was seen busy for it, or
+	// answer. A load has landed only once the fetcher was seen busy for that very load (the load number is kept, so a busy render of a superseded load does not count), or
 	// its `load()` promise settled and a transition queued after it committed
 	// (a fast load whose busy state was never rendered, or a route answering
 	// the very same object twice). `seq` numbers the loads, so a superseded
 	// one never counts.
 	const seq = useRef(0);
 	const [settled, setSettled] = useState(0);
-	const sawBusy = useRef(false);
+	const busySeq = useRef(0);
 	useLayoutEffect(() => {
-		if (fetcher.state !== 'idle') sawBusy.current = true;
+		if (fetcher.state !== 'idle') busySeq.current = seq.current;
 	}, [fetcher.state]);
 	const ask = (target: string) => {
 		const mine = ++seq.current;
-		sawBusy.current = false;
 		setLoaded(target);
 		void Promise.resolve(load.current(target)).then(() => {
 			if (mine === seq.current) startTransition(() => setSettled(mine));
@@ -123,7 +122,8 @@ export function useDebouncedFetcher<Data>(
 	}, [url, text, delayMs]);
 
 	const landed =
-		fetcher.state === 'idle' && (sawBusy.current || settled === seq.current);
+		fetcher.state === 'idle' &&
+		(busySeq.current === seq.current || settled === seq.current);
 	const current =
 		url !== null && loaded === url && landed && fetcher.data !== undefined;
 	const answer = current ? fetcher.data : undefined;
