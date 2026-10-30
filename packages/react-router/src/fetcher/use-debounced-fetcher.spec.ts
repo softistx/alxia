@@ -280,6 +280,69 @@ describe('useDebouncedFetcher', () => {
 		expect(asked).toEqual(['?x=1']);
 	});
 
+	test('never reports the previous answer as done/current while the next load starts', async () => {
+		const frames: Array<{
+			state: string;
+			stale: boolean;
+			q: string | undefined;
+		}> = [];
+		let setTyped: (value: string) => void = () => {};
+		let calls = 0;
+		const Page = () => {
+			const [typed, set] = useState('');
+			setTyped = set;
+			const r = useDebouncedFetcher<Answer>(
+				typed,
+				(q) => `/suggest?q=${encodeURIComponent(q)}`,
+				{ delayMs: DELAY },
+			);
+			frames.push({ state: r.state, stale: r.stale, q: r.data?.q });
+			return null;
+		};
+		const router = createMemoryRouter(
+			[
+				{ path: '/', Component: Page },
+				{
+					path: '/suggest',
+					loader: ({ request }) => {
+						calls += 1;
+						const q = new URL(request.url).searchParams.get('q') ?? '';
+						// The second answer never lands.
+						return calls === 1 ? { q } : new Promise<Answer>(() => {});
+					},
+				},
+			],
+			{ initialEntries: ['/'] },
+		);
+		const root = createRoot(
+			win.document.createElement('div') as unknown as Element,
+		);
+		roots.push(root);
+		await act(async () =>
+			root.render(createElement(RouterProvider, { router })),
+		);
+		await act(async () => setTyped('ab'));
+		await act(async () => sleep(DELAY * 4));
+		expect(frames[frames.length - 1]).toEqual({
+			state: 'done',
+			stale: false,
+			q: 'ab',
+		});
+		const from = frames.length;
+		await act(async () => setTyped('abc'));
+		await act(async () => sleep(DELAY * 4));
+		const after = frames.slice(from);
+		expect(after.some((f) => f.state === 'loading')).toBe(true);
+		expect(
+			after.filter((f) => f.state === 'done' || f.stale === false),
+		).toEqual([]);
+		expect(after[after.length - 1]).toEqual({
+			state: 'loading',
+			stale: true,
+			q: 'ab',
+		});
+	});
+
 	test('renders without loading on the server (waiting, no data)', () => {
 		let result: DebouncedFetcher<Answer> | undefined;
 		const router = createMemoryRouter([
