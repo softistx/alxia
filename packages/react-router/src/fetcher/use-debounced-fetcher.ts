@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+	startTransition,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from 'react';
 import { useFetcher } from 'react-router';
 
 /** What `useFetcher<Data>` hands back as `data` (`Data` may be `typeof loader`). */
@@ -81,19 +88,24 @@ export function useDebouncedFetcher<Data>(
 	const previous = useRef<FetcherData<Data>>(undefined);
 	// React Router applies the fetcher's `loading` state in a transition, so
 	// right after `load()` a render can still show `idle` and the previous
-	// answer. A load has landed only once `data` changed since it was asked,
-	// or the fetcher was seen busy for it (a route that answers the very same
-	// object twice).
-	const latestData = useRef(fetcher.data);
-	latestData.current = fetcher.data;
-	const dataAtLoad = useRef<FetcherData<Data>>(undefined);
+	// answer. A load has landed only once the fetcher was seen busy for it, or
+	// its `load()` promise settled and a transition queued after it committed
+	// (a fast load whose busy state was never rendered, or a route answering
+	// the very same object twice). `seq` numbers the loads, so a superseded
+	// one never counts.
+	const seq = useRef(0);
+	const [settled, setSettled] = useState(0);
 	const sawBusy = useRef(false);
-	if (fetcher.state !== 'idle') sawBusy.current = true;
+	useLayoutEffect(() => {
+		if (fetcher.state !== 'idle') sawBusy.current = true;
+	}, [fetcher.state]);
 	const ask = (target: string) => {
-		dataAtLoad.current = latestData.current;
+		const mine = ++seq.current;
 		sawBusy.current = false;
 		setLoaded(target);
-		void load.current(target);
+		void Promise.resolve(load.current(target)).then(() => {
+			if (mine === seq.current) startTransition(() => setSettled(mine));
+		});
 	};
 	const askRef = useRef(ask);
 	askRef.current = ask;
@@ -111,8 +123,7 @@ export function useDebouncedFetcher<Data>(
 	}, [url, text, delayMs]);
 
 	const landed =
-		fetcher.state === 'idle' &&
-		(fetcher.data !== dataAtLoad.current || sawBusy.current);
+		fetcher.state === 'idle' && (sawBusy.current || settled === seq.current);
 	const current =
 		url !== null && loaded === url && landed && fetcher.data !== undefined;
 	const answer = current ? fetcher.data : undefined;
