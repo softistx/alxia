@@ -280,6 +280,159 @@ describe('useDebouncedFetcher', () => {
 		expect(asked).toEqual(['?x=1']);
 	});
 
+	test('never reports the previous answer as done/current while the next load starts', async () => {
+		const frames: Array<{
+			state: string;
+			stale: boolean;
+			q: string | undefined;
+		}> = [];
+		let setTyped: (value: string) => void = () => {};
+		let calls = 0;
+		const Page = () => {
+			const [typed, set] = useState('');
+			setTyped = set;
+			const r = useDebouncedFetcher<Answer>(
+				typed,
+				(q) => `/suggest?q=${encodeURIComponent(q)}`,
+				{ delayMs: DELAY },
+			);
+			frames.push({ state: r.state, stale: r.stale, q: r.data?.q });
+			return null;
+		};
+		const router = createMemoryRouter(
+			[
+				{ path: '/', Component: Page },
+				{
+					path: '/suggest',
+					loader: ({ request }) => {
+						calls += 1;
+						const q = new URL(request.url).searchParams.get('q') ?? '';
+						// The second answer never lands.
+						return calls === 1 ? { q } : new Promise<Answer>(() => {});
+					},
+				},
+			],
+			{ initialEntries: ['/'] },
+		);
+		const root = createRoot(
+			win.document.createElement('div') as unknown as Element,
+		);
+		roots.push(root);
+		await act(async () =>
+			root.render(createElement(RouterProvider, { router })),
+		);
+		await act(async () => setTyped('ab'));
+		await act(async () => sleep(DELAY * 4));
+		expect(frames[frames.length - 1]).toEqual({
+			state: 'done',
+			stale: false,
+			q: 'ab',
+		});
+		const from = frames.length;
+		await act(async () => setTyped('abc'));
+		await act(async () => sleep(DELAY * 4));
+		const after = frames.slice(from);
+		expect(after.some((f) => f.state === 'loading')).toBe(true);
+		expect(
+			after.filter((f) => f.state === 'done' || f.stale === false),
+		).toEqual([]);
+		expect(after[after.length - 1]).toEqual({
+			state: 'loading',
+			stale: true,
+			q: 'ab',
+		});
+	});
+
+	test('answers done when the route returns the very same object for both values', async () => {
+		const same: Answer = { q: 'same' };
+		const frames: Array<{ state: string; stale: boolean }> = [];
+		let setTyped: (value: string) => void = () => {};
+		const Page = () => {
+			const [typed, set] = useState('');
+			setTyped = set;
+			const r = useDebouncedFetcher<Answer>(
+				typed,
+				(q) => `/suggest?q=${encodeURIComponent(q)}`,
+				{ delayMs: DELAY },
+			);
+			frames.push({ state: r.state, stale: r.stale });
+			return null;
+		};
+		const router = createMemoryRouter(
+			[
+				{ path: '/', Component: Page },
+				{ path: '/suggest', loader: () => same },
+			],
+			{ initialEntries: ['/'] },
+		);
+		const root = createRoot(
+			win.document.createElement('div') as unknown as Element,
+		);
+		roots.push(root);
+		await act(async () =>
+			root.render(createElement(RouterProvider, { router })),
+		);
+		for (const typed of ['ab', 'abc']) {
+			const from = frames.length;
+			await act(async () => setTyped(typed));
+			await act(async () => sleep(DELAY * 4));
+			expect(frames[frames.length - 1]).toEqual({
+				state: 'done',
+				stale: false,
+			});
+			// Never done before the load was asked, whatever the batching.
+			const waiting = frames
+				.slice(from)
+				.findIndex((f) => f.state === 'waiting');
+			expect(waiting).toBeGreaterThanOrEqual(0);
+		}
+	});
+
+	test('a superseded load never makes the newer value done with the older answer', async () => {
+		const frames: Array<{ state: string; q: string | undefined }> = [];
+		let setTyped: (value: string) => void = () => {};
+		const Page = () => {
+			const [typed, set] = useState('');
+			setTyped = set;
+			const r = useDebouncedFetcher<Answer>(
+				typed,
+				(q) => `/suggest?q=${encodeURIComponent(q)}`,
+				{ delayMs: DELAY },
+			);
+			frames.push({ state: r.state, q: r.data?.q });
+			return null;
+		};
+		const router = createMemoryRouter(
+			[
+				{ path: '/', Component: Page },
+				{
+					path: '/suggest',
+					loader: async ({ request }) => {
+						const q = new URL(request.url).searchParams.get('q') ?? '';
+						if (q === 'abc') return new Promise<Answer>(() => {});
+						await sleep(q === 'a' ? DELAY * 2 : 0);
+						return { q };
+					},
+				},
+			],
+			{ initialEntries: ['/'] },
+		);
+		const root = createRoot(
+			win.document.createElement('div') as unknown as Element,
+		);
+		roots.push(root);
+		await act(async () =>
+			root.render(createElement(RouterProvider, { router })),
+		);
+		await act(async () => setTyped('a'));
+		// 'a' is asked, then 'abc' replaces it while 'a' is still loading.
+		await act(async () => sleep(DELAY + 5));
+		await act(async () => setTyped('abc'));
+		await act(async () => sleep(DELAY * 8));
+		expect(frames.filter((f) => f.state === 'done' && f.q !== 'a')).toEqual([]);
+		expect(frames[frames.length - 1]?.state).toBe('loading');
+	});
+
 	test('renders without loading on the server (waiting, no data)', () => {
 		let result: DebouncedFetcher<Answer> | undefined;
 		const router = createMemoryRouter([

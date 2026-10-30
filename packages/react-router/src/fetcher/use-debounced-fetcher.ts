@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+	startTransition,
+	useCallback,
+	useEffect,
+	useLayoutEffect,
+	useRef,
+	useState,
+} from 'react';
 import { useFetcher } from 'react-router';
 
 /** What `useFetcher<Data>` hands back as `data` (`Data` may be `typeof loader`). */
@@ -79,8 +86,29 @@ export function useDebouncedFetcher<Data>(
 	// The URL the fetcher was last told to load.
 	const [loaded, setLoaded] = useState<string | null>(null);
 	const previous = useRef<FetcherData<Data>>(undefined);
+	// React Router applies the fetcher's `loading` state in a transition, so
+	// right after `load()` a render can still show `idle` and the previous
+	// answer. A load has landed only once the fetcher was seen busy for that very load (the load number is kept, so a busy render of a superseded load does not count), or
+	// its `load()` promise settled and a transition queued after it committed
+	// (a fast load whose busy state was never rendered, or a route answering
+	// the very same object twice). `seq` numbers the loads, so a superseded
+	// one never counts.
+	const seq = useRef(0);
+	const [settled, setSettled] = useState(0);
+	const busySeq = useRef(0);
+	useLayoutEffect(() => {
+		if (fetcher.state !== 'idle') busySeq.current = seq.current;
+	}, [fetcher.state]);
+	const ask = (target: string) => {
+		const mine = ++seq.current;
+		setLoaded(target);
+		void Promise.resolve(load.current(target)).then(() => {
+			if (mine === seq.current) startTransition(() => setSettled(mine));
+		});
+	};
+	const askRef = useRef(ask);
+	askRef.current = ask;
 
-	// biome-ignore lint/correctness/useExhaustiveDependencies: the URL and the value are the trigger; `load` is read from a ref
 	useEffect(() => {
 		if (url === null) {
 			previous.current = undefined;
@@ -88,17 +116,16 @@ export function useDebouncedFetcher<Data>(
 			return;
 		}
 		const timer = setTimeout(() => {
-			setLoaded(url);
-			void load.current(url);
+			askRef.current(url);
 		}, delayMs);
 		return () => clearTimeout(timer);
 	}, [url, text, delayMs]);
 
-	const current =
-		url !== null &&
-		loaded === url &&
+	const landed =
 		fetcher.state === 'idle' &&
-		fetcher.data !== undefined;
+		(busySeq.current === seq.current || settled === seq.current);
+	const current =
+		url !== null && loaded === url && landed && fetcher.data !== undefined;
 	const answer = current ? fetcher.data : undefined;
 	useEffect(() => {
 		if (answer === undefined || answer === null) return;
@@ -109,15 +136,14 @@ export function useDebouncedFetcher<Data>(
 	let state: DebouncedFetcherState;
 	if (url === null) state = 'idle';
 	else if (loaded !== url) state = 'waiting';
-	else state = fetcher.state === 'idle' ? 'done' : 'loading';
+	else state = landed ? 'done' : 'loading';
 
 	const urlRef = useRef(url);
 	urlRef.current = url;
 	const retry = useCallback(() => {
 		const now = urlRef.current;
 		if (now === null) return;
-		setLoaded(now);
-		void load.current(now);
+		askRef.current(now);
 	}, []);
 	return { data, stale: state !== 'done' && data !== undefined, state, retry };
 }
