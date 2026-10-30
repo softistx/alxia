@@ -129,6 +129,31 @@ describe('confirm', () => {
 		expect(result.init.status).toBe(400);
 	});
 
+	test('wording words a challenge that is gone; spent stays for the tries running out and as fallback', async () => {
+		const wording = (error: { code?: string | undefined }) =>
+			error.code === 'TOKEN_EXPIRED' ? 'catalogue words' : undefined;
+		const gone = await confirm(
+			refusal('TOKEN_EXPIRED', 'x', {}, 400),
+			'email',
+			{
+				wording,
+			},
+		);
+		expect(gone.data).toMatchObject({
+			error: 'expired',
+			message: 'catalogue words',
+		});
+		const other = await confirm(refusal('TOKEN_SPENT', 'x', {}, 400), 'email', {
+			wording,
+		});
+		expect(other.data).toMatchObject({ message: 'ask again (en)' });
+		const none = await confirm(wrong(0), 'email', { wording: () => 'nope' });
+		expect(none.data).toMatchObject({
+			error: 'expired',
+			message: 'ask again (en)',
+		});
+	});
+
 	test('codes.challengeOver replaces the default list', async () => {
 		const own = { codes: { challengeOver: ['my.errors.gone'] } };
 		expect(

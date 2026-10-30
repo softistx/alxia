@@ -634,6 +634,21 @@ export const stepUp = stepUpSteps({
 });
 ```
 
+`spent` is the text for a challenge that ended because the tries ran out. A
+challenge that is gone (unknown, expired, stale: `codes.challengeOver`) is
+worded by `wording(error, language)` when you pass it and it returns a string
+(the API's own words, say); when it returns `undefined`, or is not given, that
+challenge is worded with `spent` too.
+
+```ts
+stepUpSteps({
+	signIn,
+	spent: (language) => t('step-up.spent', {}, language),
+	wording: (error, language) =>
+		error.code === 'TOKEN_EXPIRED' ? t('step-up.expired', {}, language) : undefined,
+});
+```
+
 `signIn` need not be a `signInFlow(...)`. An app with a hand-written sign-in
 passes an object with the members the step-up reads, typed `StepUpSignIn`, with
 no cast:
