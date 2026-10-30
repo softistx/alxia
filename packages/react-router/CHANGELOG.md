@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.34.0
+
+### Minor Changes
+
+- [#447](https://github.com/softistx/alxia/pull/447) [`0b390cf`](https://github.com/softistx/alxia/commit/0b390cf49e162a27d6970bb7ec455e38af2bb1fa) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `stepUpSteps` now asks `wording(error, language)` for a refusal whose code is in `codes.challengeOver` (an unknown or expired challenge) before falling back to `spent`, so an app can show the API's own words for a challenge that is gone and keep `spent` for the tries running out. Apps that pass no `wording`, or one that returns `undefined` there, behave as before. Behaviour change: an app whose `wording` already returns a string for these codes (the default `STEP_UP_OVER` list, or its own `codes.challengeOver`) now shows that text instead of `spent`; return `undefined` for them to keep `spent`.
+
 ## 0.33.0
 
 ### Minor Changes
