@@ -38,7 +38,11 @@ export interface StepUpStepsOptions<L extends string, C = undefined> {
 	 * revokes, so it never reads one.
 	 */
 	readonly signIn: StepUpSignIn<L, C>;
-	/** A challenge that is over, worded ("ask for a new code"). */
+	/**
+	 * A challenge that is over, worded ("ask for a new code"): the text when
+	 * the tries ran out, and the fallback for a challenge that is gone when
+	 * `wording` has nothing to say about its code.
+	 */
 	spent(language: L): string;
 	/**
 	 * What an app or recovery code with no try left adds to its message: the
@@ -48,7 +52,9 @@ export interface StepUpStepsOptions<L extends string, C = undefined> {
 	/**
 	 * The app's own words for a refusal that is not a code's (a mail
 	 * throttle's wait, say), before `errors`' default. `undefined` keeps the
-	 * default.
+	 * default. It is also asked for a refusal whose code is in
+	 * `codes.challengeOver` (an unknown or expired challenge), where `undefined`
+	 * falls back to `spent`; the tries running out is always `spent`.
 	 */
 	readonly wording?:
 		| ((error: ApiErrorLike, language: L) => string | undefined)

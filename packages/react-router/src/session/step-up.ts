@@ -185,7 +185,9 @@ async function confirmStep<L extends string, C>(
 			return stay({
 				error: 'expired',
 				locked: false,
-				message: context.steps.spent(language),
+				message:
+					context.steps.wording?.(error, language) ??
+					context.steps.spent(language),
 			});
 		}
 		return failed(worded(context, error, language));
