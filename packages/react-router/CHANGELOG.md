@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.32.1
+
+### Patch Changes
+
+- [#441](https://github.com/softistx/alxia/pull/441) [`583b0a4`](https://github.com/softistx/alxia/commit/583b0a4d9765461a895f6110d36b05adb7272af3) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `useDebouncedFetcher` stays `loading` (stale) from the end of the pause until the route has answered for the current value. It no longer reports the previous answer as `done` and not stale for one render, which re-enabled stale results for a frame.
+
 ## 0.32.0
 
 ### Minor Changes
