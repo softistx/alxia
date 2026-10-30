@@ -1,5 +1,11 @@
 # @alxia/react-router
 
+## 0.33.0
+
+### Minor Changes
+
+- [#444](https://github.com/softistx/alxia/pull/444) [`e3c8298`](https://github.com/softistx/alxia/commit/e3c829879033525943c32e8b7fffa616c4a60f6b) Thanks [@SteveGT96](https://github.com/SteveGT96)! - `stepUpSteps` takes the sign-in shape it reads: `options.signIn` is typed `StepUpSignIn` (`errors`, `json`, `attemptsLeft`, and `signInRedirect` for `onSignedOut: 'sign-in'`) instead of a full `SignInFlow`, so an app with a hand-written sign-in needs no `as unknown as SignInFlow` cast. A `signInFlow(...)` still fits. `onSignedOut: 'sign-in'` without `signInRedirect` throws a `TypeError` when `stepUpSteps` is called. `StepUpSignIn` is exported.
+
 ## 0.32.1
 
 ### Patch Changes
