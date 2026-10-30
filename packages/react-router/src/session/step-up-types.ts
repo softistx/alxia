@@ -17,14 +17,27 @@ export interface StepUpCodes extends SignInCodes {
 	readonly unauthenticated?: string | undefined;
 }
 
+/**
+ * What the step-up reads of the app's sign-in: `errors`, `json` (a step runs
+ * only for a same-site JSON post) and `attemptsLeft`, and `signInRedirect`
+ * when `onSignedOut` is `'sign-in'`. A `signInFlow(...)` fits, and so does a
+ * hand-written sign-in that offers those members.
+ */
+export type StepUpSignIn<L extends string, C = undefined> = Pick<
+	SignInFlow<L, C>,
+	'errors' | 'json' | 'attemptsLeft'
+> &
+	Partial<Pick<SignInFlow<L, C>, 'signInRedirect'>>;
+
 export interface StepUpStepsOptions<L extends string, C = undefined> {
 	/**
-	 * The app's sign-in flow: the step-up reads its `errors`, its `json` (a
-	 * step runs only for a same-site JSON post) and its `attemptsLeft`. A flow
-	 * typed with a caller context (`C`) is as good: the step-up never revokes,
-	 * so it never reads one.
+	 * The app's sign-in: a `signInFlow(...)`, or any object with the members
+	 * the step-up reads (`StepUpSignIn`). With `onSignedOut: 'sign-in'` it
+	 * must have `signInRedirect` too, or `stepUpSteps` throws a `TypeError`.
+	 * A flow typed with a caller context (`C`) is as good: the step-up never
+	 * revokes, so it never reads one.
 	 */
-	readonly signIn: SignInFlow<L, C>;
+	readonly signIn: StepUpSignIn<L, C>;
 	/** A challenge that is over, worded ("ask for a new code"). */
 	spent(language: L): string;
 	/**

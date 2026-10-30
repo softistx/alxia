@@ -43,6 +43,11 @@ function resolve<L extends string, C>(
 			`stepUpSteps(): the code ${JSON.stringify(invalidCode)} is both the wrong-code code (codes.invalidCode) and in codes.challengeOver. A wrong code that leaves tries cannot end the challenge.`,
 		);
 	}
+	if (steps.onSignedOut === 'sign-in' && !steps.signIn.signInRedirect) {
+		throw new TypeError(
+			"stepUpSteps(): onSignedOut: 'sign-in' needs signIn.signInRedirect, which the sign-in given has not.",
+		);
+	}
 	return {
 		options: steps.signIn,
 		steps,
@@ -192,9 +197,17 @@ async function routeStep<L extends string, C>(
 	samesitePost(json, call.request);
 	if (context.steps.onSignedOut !== 'sign-in')
 		return routeIntent(context, run, call);
+	const { signIn } = context.steps;
 	return signingOut(
 		{
-			signIn: context.steps.signIn,
+			// `resolve` checked that `signInRedirect` is there.
+			signIn: {
+				signInRedirect: (request) =>
+					(signIn.signInRedirect as (request: Request) => Response).call(
+						signIn,
+						request,
+					),
+			},
 			unauthenticated: context.unauthenticated,
 			run,
 			request: call.request,

@@ -55,6 +55,7 @@ export type {
 	StepUpCall,
 	StepUpCodes,
 	StepUpRun,
+	StepUpSignIn,
 	StepUpStayed,
 	StepUpSteps,
 	StepUpStepsOptions,
