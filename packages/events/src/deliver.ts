@@ -16,10 +16,7 @@ export type Delivery = 'applied' | 'duplicate';
  * clean. This is what turns at-least-once delivery into one effect.
  */
 export async function deliver(
-	store: Pick<
-		TenantStore<unknown, unknown, Tenant, unknown>,
-		'core' | 'forModule'
-	>,
+	store: Pick<TenantStore<unknown, any, Tenant, unknown>, 'core' | 'forModule'>,
 	mongo: EventsMongo,
 	tenant: string,
 	event: EventEnvelope,
@@ -35,11 +32,12 @@ export async function deliver(
 				{ mongo: tx as never, core: store.core },
 				subscription.module as never,
 			);
-			const context: SubscriberContext = {
+			// Safe: the handles are typed by the erased registry, as above.
+			const context = {
 				...scope,
 				tenant,
 				module: subscription.module,
-			};
+			} as unknown as SubscriberContext;
 			await subscription.handler(event, context);
 			return 'applied';
 		});

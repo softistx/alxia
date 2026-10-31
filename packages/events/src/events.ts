@@ -12,7 +12,7 @@ import type { EmitSource, EventsMongo } from './types';
 
 export interface EventsOptions {
 	/** The tenant store: its registry must include `eventsModule`. */
-	store: TenantStore<unknown, unknown, Tenant, unknown>;
+	store: TenantStore<unknown, any, Tenant, unknown>;
 	/**
 	 * The bound `events.<module>` queue of each module that has subscribers
 	 * (see `eventsQueue`). Without them `drain` still works; the relay and the

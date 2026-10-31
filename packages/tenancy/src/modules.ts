@@ -99,7 +99,7 @@ export function bindModules(
 			for (const owner of reach) {
 				for (const key of keysOf(owner.collections)) {
 					// Safe: only `db`'s keys are read, whatever the wiring's type.
-					if (!wired(source.mongo as Mongo<never>, key)) {
+					if (!wired(source.mongo as unknown as Mongo<never>, key)) {
 						throw new ModuleWiringError(
 							`collection "${key}" of module "${owner.name}" is not wired in the tenant database`,
 						);
@@ -107,7 +107,7 @@ export function bindModules(
 				}
 				for (const key of keysOf(owner.coreCollections)) {
 					// Safe: same as above, for the core handle.
-					if (!wired(source.core as Mongo<never>, key)) {
+					if (!wired(source.core as unknown as Mongo<never>, key)) {
 						throw new ModuleWiringError(
 							`core collection "${key}" of module "${owner.name}" is not wired in the core database`,
 						);
