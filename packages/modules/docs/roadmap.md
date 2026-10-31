@@ -11,6 +11,8 @@ direction, not a commitment.
 
 ## Next
 
+These integrations are with packages that are planned and not published yet.
+
 - **Tenancy.** Integration with `@alxia/tenancy`: the scope a module's
   services and jobs receive, and collections split between shared and
   per-tenant databases.

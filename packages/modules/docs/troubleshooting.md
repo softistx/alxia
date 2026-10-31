@@ -7,6 +7,8 @@
 - [`text (en) "k" is declared by two modules`](#text-en-k-is-declared-by-two-modules)
 - [`module boundaries broken`](#module-boundaries-broken)
 - [`Property 'x' does not exist on type ModuleMongo`](#property-x-does-not-exist-on-type-modulemongo)
+- [`Type '"x"' does not satisfy the constraint` on `ModuleMongo<'x'>`](#type-x-does-not-satisfy-the-constraint-on-modulemongox)
+- [`ModuleHandle` rejects my handle](#modulehandle-rejects-my-handle)
 
 ## `module "x" is registered twice`
 
@@ -25,12 +27,12 @@ into infrastructure outside the modules, and have both depend on it.
 
 ## `collection "x" is declared by two modules`
 
-(also `core collection "x"`.) Two modules declare the same collection name.
+The message ends with the two modules, `("a" and "b")`. (Also `core collection "x"`.) Two modules declare the same collection name.
 Rename one; prefixing names with their module (`notes_items`) avoids it.
 
 ## `text (en) "k" is declared by two modules`
 
-Two modules give the same key for a locale. Prefix keys with the module name.
+Two modules give the same key for a locale; the message ends with them, `("x" and "y")`. Prefix keys with the module name.
 
 ## `module boundaries broken`
 
@@ -48,3 +50,14 @@ The module neither owns collection `x` nor lists its owner in `dependsOn`.
 Add the owner to `dependsOn` (and to the manifest's list) or stop using it.
 If every collection is accepted instead, the `Register` augmentation is
 missing: see the [guide](guide.md#the-registry).
+
+## `Type '"x"' does not satisfy the constraint` on `ModuleMongo<'x'>`
+
+With a `Register` augmentation, the name must be a registered module. Fix the
+spelling, or add the module to the `as const` list.
+
+## `ModuleHandle` rejects my handle
+
+`ModuleHandle<Name, Handle>` needs `Handle` to have a readonly `db` object and
+a `transaction` method. Add the missing member to the handle type; see the
+[guide](guide.md#typing-collection-access).

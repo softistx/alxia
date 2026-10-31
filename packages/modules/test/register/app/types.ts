@@ -9,7 +9,9 @@ import type {
 import type { registered } from './registry';
 
 // The names are the registered ones.
-expectTypeOf<ModuleName>().toEqualTypeOf<'base' | 'notes' | 'audit'>();
+expectTypeOf<ModuleName>().toEqualTypeOf<
+	'base' | 'notes' | 'audit' | 'comments'
+>();
 // @ts-expect-error not a registered module
 type _Unknown = ModuleMongo<'billing'>;
 
@@ -17,7 +19,9 @@ type _Unknown = ModuleMongo<'billing'>;
 expectTypeOf<keyof ModuleMongo<'notes'>>().toEqualTypeOf<'notes' | 'tags'>();
 expectTypeOf<keyof ModuleMongo<'base'>>().toEqualTypeOf<'tags'>();
 expectTypeOf<keyof ModuleMongo<'audit'>>().toEqualTypeOf<'audit'>();
-expectTypeOf<keyof CollectionsOf>().toEqualTypeOf<'notes' | 'tags' | 'audit'>();
+expectTypeOf<keyof CollectionsOf>().toEqualTypeOf<
+	'notes' | 'tags' | 'audit' | 'comments'
+>();
 expectTypeOf<ViewOf<typeof registered, 'notes'>['name']>().toEqualTypeOf<
 	'notes' | 'base'
 >();
@@ -28,6 +32,13 @@ mongo.notes;
 mongo.tags;
 // @ts-expect-error audit belongs to a module notes does not depend on
 mongo.audit;
+
+// Direct dependencies only: comments depends on notes, notes on base.
+declare const chained: ModuleMongo<'comments'>;
+chained.comments;
+chained.notes;
+// @ts-expect-error tags is base's, two steps away
+chained.tags;
 
 // A host's handle narrowed the same way.
 interface Handle {

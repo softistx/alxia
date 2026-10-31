@@ -11,9 +11,7 @@ export class ModuleGraphError extends Error {
 
 // Checks the list and returns it in dependency order (a module after
 // everything it depends on, ties in list order).
-export function resolveModules<const List extends readonly Module[]>(
-	list: List,
-): readonly Module[] {
+export function resolveModules(list: readonly Module[]): readonly Module[] {
 	const byName = new Map<string, Module>();
 	for (const module of list) {
 		if (byName.has(module.name)) {

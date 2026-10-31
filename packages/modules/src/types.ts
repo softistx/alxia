@@ -6,8 +6,8 @@ import type { Module } from './module';
 //     interface Register { modules: typeof registered }
 //   }
 //
-// where `registered` is the list given to `resolveModules`, declared
-// `as const`.
+// where `registered` is your own list, declared `as const`: not the value
+// `resolveModules` returns, whose type is the plain `readonly Module[]`.
 // biome-ignore lint/suspicious/noEmptyInterface: an interface, to be merged
 export interface Register {}
 

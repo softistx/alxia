@@ -70,7 +70,9 @@ declare module '@alxia/modules' {
 }
 ```
 
-Without it, `ModuleMongo<Name>` accepts any name and any collection.
+`Register` takes your own `as const` list (`registered`), not the value
+`resolveModules` returns, whose type is the plain `readonly Module[]`. Without
+it, `ModuleMongo<Name>` accepts any name and any collection.
 
 ## Readers
 
@@ -103,7 +105,7 @@ each `name`. The package schedules nothing.
 ## Typing collection access
 
 `ModuleMongo<'notes'>` is the record of collections `notes` owns plus those of
-the modules in its `dependsOn` (one level, not transitive). A name outside it
+the modules in its `dependsOn` (direct dependencies only, not transitive: if `comments` depends on `notes` and `notes` on `accounts`, `comments` does not see `accounts`' collections). A name outside it
 is a compile error:
 
 ```ts
@@ -113,21 +115,71 @@ mongo.accounts; // ok, accounts is in dependsOn
 mongo.billing; // error: Property 'billing' does not exist
 ```
 
-To narrow a host handle that has a `db` keyed by collection name and a
-`transaction`, use `ModuleHandle<'notes', MyHandle>`; `tx` inside a
-transaction is narrowed too.
+To narrow a host handle, use `ModuleHandle<Name, Handle>`. `Handle` must have
+a `db` keyed by collection name and a `transaction` taking a callback:
+
+```ts
+interface Handle {
+	readonly db: { notes: Notes; accounts: Accounts; billing: Billing };
+	transaction<T>(fn: (tx: Handle) => Promise<T>): Promise<T>;
+}
+
+declare const handle: ModuleHandle<'notes', Handle>;
+handle.db.notes; // ok
+handle.db.billing; // error: not owned by notes nor in its dependsOn
+await handle.transaction(async (tx) => {
+	tx.db.accounts; // ok
+	tx.db.billing; // error: tx is narrowed too
+});
+```
 
 ## Testing boundaries
 
+`assertBoundaries` needs Bun: it reads files with `Bun.Glob` and `Bun.file`.
+
 ```ts
 await assertBoundaries(modules, 'src/modules/**/*.ts', {
+	root: process.cwd(), // the folder the glob is relative to (default)
+	modulesDir: 'src/modules', // default: the glob's literal prefix
 	surface: 'public', // default
 });
 ```
 
-It reads the matched files and throws one error listing every violation:
-a module importing a file of another module other than its `public` surface,
-or importing its surface without naming it in `dependsOn`. Only relative
-imports are followed; spec files and folders that are not a registered module
-are skipped. `boundaryViolations(files, registry, options)` is the pure
-version for your own fixtures.
+- `root`: the folder the glob is relative to. Default: the working directory.
+- `modulesDir`: the folder holding one folder per module, relative to `root`.
+  Default: the literal prefix of the glob (`src/modules/` above).
+- `surface`: the one thing another module may import. `'public'` accepts
+  `public.ts`, `public/index` and the `public` folder itself.
+
+It throws one error listing every violation: a module importing a file of
+another module other than its surface, or importing its surface without
+naming it in `dependsOn`. Only relative imports are followed; spec files and
+folders that are not a registered module are skipped.
+
+### Without the filesystem
+
+`boundaryViolations(files, registry, { surface, modulesRoot })` is the pure
+version, for your own fixtures. `files` is `Record<absolutePath, sourceText>`,
+`modulesRoot` the absolute path of the modules folder:
+
+```ts
+const found = boundaryViolations(
+	{ '/app/src/modules/notes/a.ts': 'import "../billing/prices";' },
+	modules,
+	{ modulesRoot: '/app/src/modules', surface: 'public' },
+);
+// [{ file: '/app/src/modules/notes/a.ts', imported: '../billing/prices', rule: 'only via public.ts' }]
+```
+
+`importsOf(text)` returns the import specifiers of a source text, type-only
+imports, re-exports and dynamic imports included.
+
+## Types
+
+`Module` and `ModuleDefinition` (the manifest as read and as declared),
+`ModuleJob` and `NamedJob` (a job, and a job with its `<module>.<job>` name),
+`ModuleName` (the registered names), `Registered` (the registered list),
+`CollectionsOf` and `CoreCollectionsOf` (every collection, by name),
+`ViewOf` (the manifest of a module and of its direct dependencies),
+`ModuleMongo` and `ModuleHandle` (above), `BoundaryOptions` and
+`BoundaryViolation` (the boundary test).

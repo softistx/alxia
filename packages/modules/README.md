@@ -69,5 +69,28 @@ test('modules only meet through public.ts', async () => {
 });
 ```
 
-More in [docs/](docs/README.md): the [guide](docs/guide.md), the
-[troubleshooting](docs/troubleshooting.md) page and the [roadmap](docs/roadmap.md).
+`assertBoundaries` needs Bun (it reads files with `Bun.Glob` and `Bun.file`); the
+rest of the package is plain TypeScript.
+
+## API
+
+| Export | What it does |
+| --- | --- |
+| `defineModule(definition)` | the manifest, frozen, with its literal type kept |
+| `resolveModules(list)` | checks the list and returns it in dependency order; throws `ModuleGraphError` |
+| `typeDefsOf`, `codesOf`, `permissionsOf`, `defaultGrantsOf`, `collectionsOf`, `coreCollectionsOf`, `migrationsOf`, `coreMigrationsOf`, `jobsOf`, `textsOf` | what the host reads from a resolved list |
+| `assertBoundaries(registry, glob, options)` | a test helper: throws listing every import that breaks the boundaries (Bun only) |
+| `boundaryViolations(files, registry, options)`, `importsOf(text)` | the pure checker, and the import scanner it uses |
+| `ModuleGraphError` | the error `resolveModules` and the readers throw |
+| `Register` | merged by the app to name its registry |
+| `ModuleMongo`, `ModuleHandle`, `ModuleName`, `CollectionsOf`, `CoreCollectionsOf`, `ViewOf`, `Registered` | the types derived from the registry |
+| `Module`, `ModuleDefinition`, `ModuleJob`, `NamedJob`, `BoundaryOptions`, `BoundaryViolation` | the other types |
+
+`typescript` is the only peer, for the declarations.
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/modules/docs/guide.md): declaring a module, the registry and its readers, jobs, typed collection access, testing boundaries.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/modules/docs/troubleshooting.md): an error message, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/modules/docs/roadmap.md): what is coming, and what is not planned.
+- [Recipes](https://github.com/softistx/alxia/blob/develop/docs/recipes/README.md): [Start in 5 minutes](https://github.com/softistx/alxia/blob/develop/docs/start.md).
