@@ -1,9 +1,11 @@
 import type { Mongo, MongoActor } from '@nxgt/mongo';
+import type { Migration } from '@nxgt/mongo/migrations';
 import { migrate } from '@nxgt/mongo/migrations';
 import { unknownOrganization } from './errors';
 import { dbOf, migrateTargets } from './migrate';
 import { bindModules } from './modules';
 import type {
+	MigrateMode,
 	MigrationLists,
 	Resolution,
 	Tenant,
@@ -28,6 +30,41 @@ export interface SingleStore<C, K, T extends Tenant>
 	readonly kind: 'single';
 }
 
+interface Wiring<C, K> {
+	mongo: Mongo<C>;
+	core: Mongo<K>;
+	apart: boolean;
+	migrations: Migration[];
+	coreMigrations: Migration[];
+}
+
+// The core list has its own target only when the core database is apart;
+// otherwise the one database runs it first.
+function migrateOne<C, K>(
+	{ mongo, core, apart, migrations, coreMigrations }: Wiring<C, K>,
+	mode: MigrateMode,
+) {
+	if (apart) {
+		return migrateTargets(
+			{ db: dbOf(core), migrations: coreMigrations },
+			migrations,
+			async function* () {
+				yield { db: dbOf(mongo), migrations };
+			},
+			mode,
+		);
+	}
+	const all = [...coreMigrations, ...migrations];
+	return migrateTargets(
+		undefined,
+		all,
+		async function* () {
+			yield { db: dbOf(mongo), migrations: all };
+		},
+		mode,
+	);
+}
+
 /**
  * One database and one fixed tenant, for a host that serves a single
  * organisation. No header and no membership check: the scope always carries the
@@ -39,7 +76,9 @@ export function single<C, K = C, T extends Tenant = Tenant>(
 ): SingleStore<C, K, T> {
 	const { mongo } = options;
 	const core = (options.core ?? mongo) as unknown as Mongo<K>;
-	const apart = options.core !== undefined && dbOf(core) !== dbOf(mongo);
+	const apart =
+		options.core !== undefined &&
+		dbOf(core).databaseName !== dbOf(mongo).databaseName;
 	const tenant = { ...options.tenant, status: 'active' } as unknown as T;
 	const { modules, forModule, migrations, coreMigrations } = bindModules(
 		options.modules ?? [],
@@ -112,26 +151,7 @@ export function single<C, K = C, T extends Tenant = Tenant>(
 			return names;
 		},
 		migrate: (mode) =>
-			apart
-				? migrateTargets(
-						{ db: dbOf(core), migrations: coreMigrations },
-						migrations,
-						async function* () {
-							yield { db: dbOf(mongo), migrations };
-						},
-						mode,
-					)
-				: migrateTargets(
-						undefined,
-						[...coreMigrations, ...migrations],
-						async function* () {
-							yield {
-								db: dbOf(mongo),
-								migrations: [...coreMigrations, ...migrations],
-							};
-						},
-						mode,
-					),
+			migrateOne({ mongo, core, apart, migrations, coreMigrations }, mode),
 		async close() {},
 	};
 }

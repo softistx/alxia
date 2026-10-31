@@ -6,6 +6,7 @@ import {
 	coreCollectionsOf,
 	coreMigrationsOf,
 	defaultGrantsOf,
+	emitsOf,
 	jobsOf,
 	ModuleGraphError,
 	migrationsOf,
@@ -91,7 +92,7 @@ describe('the readers', () => {
 			dependsOn: ['a'],
 			typeDefs: ['type B'],
 			codes: ['b.errors.y'],
-			permissions: ['b:read', 'a:read'],
+			permissions: ['b:read'],
 			defaultGrants: { admin: ['b:read'], viewer: ['b:read'] },
 			texts: { en: { 'b.title': 'B' }, fr: { 'b.title': 'Bé' } },
 			migrations: ['b1'],
@@ -118,7 +119,7 @@ describe('the readers', () => {
 		expect(codesOf(list)).toEqual(['a.errors.x', 'b.errors.y']);
 	});
 
-	test('permissions are listed once, grants merged by role', () => {
+	test('permissions are listed in order, grants merged by role', () => {
 		expect(permissionsOf(list)).toEqual(['a:read', 'b:read']);
 		expect(defaultGrantsOf(list)).toEqual({
 			admin: ['a:read', 'b:read'],
@@ -155,5 +156,81 @@ describe('the readers', () => {
 	test('collections merge across modules', () => {
 		expect(Object.keys(collectionsOf(list))).toEqual(['as', 'bs']);
 		expect(Object.keys(coreCollectionsOf(list))).toEqual(['cores']);
+	});
+});
+
+describe('boot errors share one shape: a namespaced code and a message', () => {
+	const refusal = (fn: () => unknown) => {
+		try {
+			fn();
+		} catch (error) {
+			return error as ModuleGraphError;
+		}
+		throw new Error('did not throw');
+	};
+
+	test('each graph failure has its code', () => {
+		expect(refusal(() => resolveModules([m('a'), m('a')])).code).toBe(
+			'modules.duplicate-module',
+		);
+		expect(refusal(() => resolveModules([m('a', ['x'])])).code).toBe(
+			'modules.unknown-dependency',
+		);
+		expect(
+			refusal(() => resolveModules([m('a', ['b']), m('b', ['a'])])).code,
+		).toBe('modules.dependency-cycle');
+	});
+
+	test('a permission two modules declare is refused, never merged', () => {
+		const twice = [
+			defineModule({ name: 'x', permissions: ['k:read'] }),
+			defineModule({ name: 'y', permissions: ['k:read'] }),
+		];
+		const error = refusal(() => permissionsOf(twice));
+		expect(error).toBeInstanceOf(ModuleGraphError);
+		expect(error.code).toBe('modules.duplicate-declaration');
+		expect(error.message).toBe(
+			'permission "k:read" is declared by two modules ("x" and "y")',
+		);
+		expect(refusal(() => resolveModules(twice)).code).toBe(
+			'modules.duplicate-declaration',
+		);
+	});
+
+	test('a module listing a name twice is worded as such', () => {
+		const error = refusal(() =>
+			permissionsOf([
+				defineModule({ name: 'x', permissions: ['k:read', 'k:read'] }),
+			]),
+		);
+		expect(error.code).toBe('modules.duplicate-declaration');
+		expect(error.message).toBe('module "x" lists permission "k:read" twice');
+	});
+
+	test('an event type two modules emit is refused', () => {
+		const twice = [
+			defineModule({ name: 'x', emits: ['x.a.b'] }),
+			defineModule({ name: 'y', emits: ['x.a.b'] }),
+		];
+		const error = refusal(() => emitsOf(twice));
+		expect(error.code).toBe('modules.duplicate-declaration');
+		expect(error.message).toBe(
+			'event type "x.a.b" is declared by two modules ("x" and "y")',
+		);
+		expect(refusal(() => resolveModules(twice)).code).toBe(
+			'modules.duplicate-declaration',
+		);
+	});
+
+	test('emitsOf lists each type with its module, in declaration order', () => {
+		const owners = emitsOf([
+			defineModule({ name: 'x', emits: ['x.a.b', 'x.a.c'] }),
+			defineModule({ name: 'y', emits: ['y.a.b'] }),
+		]);
+		expect([...owners]).toEqual([
+			['x.a.b', 'x'],
+			['x.a.c', 'x'],
+			['y.a.b', 'y'],
+		]);
 	});
 });

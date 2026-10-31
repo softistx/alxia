@@ -38,7 +38,7 @@ export async function drain(
 	for (let round = 0; ; round++) {
 		if (round === 100) {
 			throw new EventsError(
-				'drain-diverged',
+				'events.drain-diverged',
 				'drain still found events after 100 rounds: a subscriber emits an event that makes it emit again',
 			);
 		}
@@ -97,13 +97,13 @@ export function work(rt: Runtime, options?: WorkOptions): EventWorkers {
 					?.find((s) => s.module === data.module);
 				if (!subscription) {
 					throw new EventsError(
-						'unknown-subscription',
+						'events.unknown-subscription',
 						`module "${module}" has no subscriber for "${event.type}" in this process's registry`,
 					);
 				}
 				if (event.tenant !== data.tenant) {
 					throw new EventsError(
-						'tenant-mismatch',
+						'events.tenant-mismatch',
 						`job ${event.id} is for tenant "${data.tenant}" but carries an event of tenant "${event.tenant}"`,
 					);
 				}

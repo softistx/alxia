@@ -86,6 +86,30 @@ describe('the single store', () => {
 		expect(done[0]?.ids).toEqual(['t1']);
 	});
 
+	test('the core is apart by database name, not by handle', async () => {
+		const name = `same_${Date.now()}`;
+		const mongo = await openTenantDb(name);
+		const core = await openTenantDb(name);
+		expect(core).not.toBe(mongo);
+		const migrations = {
+			coreMigrations: markers('c1'),
+			migrations: markers('t1'),
+		};
+		const same = single({ mongo, core, tenant, ...migrations });
+		expect(await same.migrate({ kind: 'apply', dryRun: false })).toHaveLength(
+			1,
+		);
+		const other = single({
+			mongo: await openTenantDb(),
+			core: await openTenantDb(),
+			tenant,
+			...migrations,
+		});
+		expect(await other.migrate({ kind: 'apply', dryRun: false })).toHaveLength(
+			2,
+		);
+	});
+
 	test('with a core apart each list runs on its own database', async () => {
 		const mongo = await openTenantDb();
 		const core = await openCore();

@@ -1,4 +1,4 @@
-import { type BoundQueue, defineQueue } from '@nxgt/redis';
+import { type BoundQueue, type Duration, defineQueue } from '@nxgt/redis';
 import { z } from 'zod';
 import { wireEnvelope } from './envelope';
 
@@ -20,7 +20,7 @@ export interface EventsQueueOptions {
 	/** Runs of one job before it lands in the dead letters. Default 5. */
 	attempts?: number;
 	/** Wait before the first retry, doubling. Default `5s`. */
-	backoff?: string;
+	backoff?: Duration;
 }
 
 /**
@@ -32,7 +32,7 @@ export function eventsQueue(module: string, options: EventsQueueOptions = {}) {
 		name: queueName(module),
 		schema: eventJob,
 		attempts: options.attempts ?? 5,
-		backoff: { base: (options.backoff ?? '5s') as '5s', max: '1h' },
+		backoff: { base: options.backoff ?? '5s', max: '1h' },
 		// Failed jobs are the dead letters: keep them long enough to be looked at.
 		keepFailed: '30d',
 	});

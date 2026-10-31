@@ -1,8 +1,12 @@
-import type { Module } from '@alxia/modules';
+import { type Module, permissionsOf } from '@alxia/modules';
 import { AccessCatalogueError } from './errors';
 import { isPermission, type Permission } from './permission';
 
-/** The account a request is made by. */
+/**
+ * The account a request is made by. `@alxia/tenancy` has its own `Viewer` of
+ * the same shape (`{ id }`), so neither package needs the other: a value of
+ * one is accepted where the other is asked for.
+ */
 export interface Viewer {
 	readonly id: string;
 }
@@ -43,43 +47,35 @@ export interface Access<R extends string = string, M = R> {
 	holds(member: M, viewer: Viewer, permission: string): Promise<boolean>;
 }
 
-/**
- * Builds the catalogue from the module registry; throws an
- * `AccessCatalogueError` at boot for:
- *
- * - a permission that is not `<area>:read|manage`;
- * - a permission declared by two modules;
- * - a grant to a role the host did not supply;
- * - a grant of a permission the granting module does not declare.
- */
-export function createAccess<R extends string, M = R>(
-	modules: readonly Module[],
-	options: AccessOptions<R, M>,
-): Access<R, M> {
-	const { roles, all } = options;
-	if (all !== undefined && !roles.includes(all)) {
-		throw new AccessCatalogueError(
-			`the role "${all}" that holds every permission is not one of the roles`,
-		);
-	}
-	const declaredBy = new Map<string, string>();
+/** The permissions of the registry, each in shape and once; `declaredBy` names the owner. */
+function declaredPermissions(modules: readonly Module[]) {
 	for (const module of modules) {
 		for (const permission of module.permissions ?? []) {
 			if (!isPermission(permission)) {
 				throw new AccessCatalogueError(
+					'access.invalid-permission',
 					`module "${module.name}" declares "${permission}", which is not <area>:read or <area>:manage`,
 				);
 			}
-			const first = declaredBy.get(permission);
-			if (first !== undefined) {
-				throw new AccessCatalogueError(
-					`permission "${permission}" is declared by two modules ("${first}" and "${module.name}")`,
-				);
-			}
+		}
+	}
+	// Throws a ModuleGraphError for a permission two modules declare.
+	const permissions = permissionsOf(modules) as Permission[];
+	const declaredBy = new Map<string, string>();
+	for (const module of modules) {
+		for (const permission of module.permissions ?? []) {
 			declaredBy.set(permission, module.name);
 		}
 	}
-	const permissions = [...declaredBy.keys()] as Permission[];
+	return { permissions, declaredBy };
+}
+
+/** What each role is granted by the modules' `defaultGrants`, checked. */
+function grantsByRole(
+	modules: readonly Module[],
+	roles: readonly string[],
+	declaredBy: ReadonlyMap<string, string>,
+): Map<string, Set<string>> {
 	const granted = new Map<string, Set<string>>(
 		roles.map((role) => [role, new Set<string>()]),
 	);
@@ -91,12 +87,14 @@ export function createAccess<R extends string, M = R>(
 			const row = granted.get(role);
 			if (!row) {
 				throw new AccessCatalogueError(
+					'access.unknown-role',
 					`module "${module.name}" grants to "${role}", which is not one of the host's roles`,
 				);
 			}
 			for (const permission of held) {
 				if (declaredBy.get(permission) !== module.name) {
 					throw new AccessCatalogueError(
+						'access.undeclared-grant',
 						`module "${module.name}" grants "${permission}", which it does not declare`,
 					);
 				}
@@ -104,6 +102,32 @@ export function createAccess<R extends string, M = R>(
 			}
 		}
 	}
+	return granted;
+}
+
+/**
+ * Builds the catalogue from the module registry; throws an
+ * `AccessCatalogueError` at boot for:
+ *
+ * - a permission that is not `<area>:read|manage`;
+ * - a permission declared by two modules (a `ModuleGraphError`, thrown by
+ *   `@alxia/modules`' `permissionsOf`);
+ * - a grant to a role the host did not supply;
+ * - a grant of a permission the granting module does not declare.
+ */
+export function createAccess<R extends string, M = R>(
+	modules: readonly Module[],
+	options: AccessOptions<R, M>,
+): Access<R, M> {
+	const { roles, all } = options;
+	if (all !== undefined && !roles.includes(all)) {
+		throw new AccessCatalogueError(
+			'access.unknown-role',
+			`the role "${all}" that holds every permission is not one of the roles`,
+		);
+	}
+	const { permissions, declaredBy } = declaredPermissions(modules);
+	const granted = grantsByRole(modules, roles, declaredBy);
 	const matrix = Object.freeze(
 		Object.fromEntries(
 			roles.map((role) => [

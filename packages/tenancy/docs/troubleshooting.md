@@ -54,7 +54,7 @@ A `RangeError`: `size` must be an integer of 1 or more.
 
 ## `rollback: "x" is in no migration list`
 
-An `UnknownMigrationError`: neither the core list nor the tenant list holds
+An `UnknownMigrationError` (`tenancy.unknown-migration`): neither the core list nor the tenant list holds
 that id, so nothing was reverted. Check the id with
 `tenancy.migrate({ kind: 'status' })`.
 
@@ -81,7 +81,7 @@ hide it (soft delete).
 
 ## `module "x" is not registered`
 
-A `ModuleWiringError` from `forModule`. The store was built without `modules`,
+A `ModuleWiringError` (`tenancy.module-wiring`) from `forModule`. The store was built without `modules`,
 or without that module. Pass the registry, resolved:
 
 ```ts
@@ -90,7 +90,7 @@ perOrganization({ /* … */ modules: resolveModules(registered) });
 
 ## `collection "y" of module "x" is not wired in the tenant database`
 
-A `ModuleWiringError` from `forModule`. The module, or one of its `dependsOn`,
+A `ModuleWiringError` (`tenancy.module-wiring`) from `forModule`. The module, or one of its `dependsOn`,
 declares a collection the tenant database's `defineMongo` wiring lacks. Wire
 the registry's:
 
@@ -103,7 +103,7 @@ database.
 
 ## `core collection "y" of module "x" is not wired in the core database`
 
-A `ModuleWiringError` from `forModule`. A `coreCollections` entry is missing
+A `ModuleWiringError` (`tenancy.module-wiring`) from `forModule`. A `coreCollections` entry is missing
 from the core database's wiring:
 
 ```ts
@@ -112,6 +112,6 @@ defineMongo({ client, database: 'app_core', collections: coreCollectionsOf(modul
 
 ## `collection "y" is a tenant collection of "x" and a core collection of "z"`
 
-A `ModuleWiringError` when the store is built. A name is in one module's
+A `ModuleWiringError` (`tenancy.module-wiring`) when the store is built. A name is in one module's
 `collections` and another's `coreCollections`; on a `single` store both would
 be one collection. Rename one, or declare it on one side only.

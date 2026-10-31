@@ -57,6 +57,15 @@ describe('forModule', () => {
 		expect(() => store.forModule({ mongo, core: mongo }, 'a')).toThrow(
 			/not registered/,
 		);
+		const code = () => {
+			try {
+				store.forModule({ mongo, core: mongo }, 'a');
+			} catch (error) {
+				return (error as ModuleWiringError).code;
+			}
+			return undefined;
+		};
+		expect(code()).toBe('tenancy.module-wiring');
 	});
 });
 

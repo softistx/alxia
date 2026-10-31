@@ -6,6 +6,7 @@ export {
 } from './catalogue';
 export {
 	AccessCatalogueError,
+	type AccessCatalogueErrorCode,
 	AccessError,
 	type AccessErrorCode,
 	forbidden,

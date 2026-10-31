@@ -73,7 +73,7 @@ export function createEvents(options: EventsOptions): Events {
 	const batchSize = options.batchSize ?? 100;
 	if (!modules.some((module) => module.name === 'events')) {
 		throw new EventsError(
-			'module-missing',
+			'events.module-missing',
 			'the registry lacks eventsModule: it owns _outbox and _inbox',
 		);
 	}
@@ -88,14 +88,14 @@ export function createEvents(options: EventsOptions): Events {
 	const need = () => {
 		if (!queues) {
 			throw new EventsError(
-				'missing-queue',
+				'events.missing-queue',
 				'this needs the bound events.<module> queues (createEvents({ queues }))',
 			);
 		}
 		for (const module of subscribing) {
 			if (!queues[module]) {
 				throw new EventsError(
-					'missing-queue',
+					'events.missing-queue',
 					`module "${module}" has subscribers but no queue "${queueName(module)}"`,
 				);
 			}
@@ -107,6 +107,9 @@ export function createEvents(options: EventsOptions): Events {
 	// `forModule` fails with a ModuleWiringError when the databases are not
 	// wired with the events collections.
 	const handle = (mongo: unknown) => {
+		// `as never`: only the check matters. `forModule` reads `mongo`'s keys and
+		// ignores the typed narrowing, and `mongo` is untyped here (a tenant's
+		// handle, whatever collections its host wired).
 		store.forModule({ mongo, core: store.core } as never, 'events' as never);
 		return mongo as EventsMongo;
 	};

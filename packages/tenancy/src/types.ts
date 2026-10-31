@@ -18,7 +18,11 @@ export interface Tenant {
 	readonly status: TenantStatus;
 }
 
-/** The account a request is made by. Anonymous: `null`. */
+/**
+ * The account a request is made by. Anonymous: `null`. `@alxia/access` has its
+ * own `Viewer` of the same shape (`{ id }`), so neither package needs the
+ * other: a value of one is accepted where the other is asked for.
+ */
 export interface Viewer {
 	readonly id: string;
 }

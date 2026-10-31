@@ -24,7 +24,8 @@ export function scopeOf<C extends { viewer: unknown }, S extends Held, T = S>(
 
 /**
  * The usual guards: the `read` permission reads, the `write` one writes. Both
- * are permissions a module declares (`sales:read`, `sales:manage`).
+ * are permissions a module declares, `<area>:read` and `<area>:manage`
+ * (`notes:read`, `notes:manage`).
  */
 export function permissionsReadWrite<S extends Held, T = S>(
 	read: Permission,

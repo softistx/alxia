@@ -89,9 +89,39 @@ const resolve = withRefusals((r) => new HostError(r.code, r.status, r.params), a
 `auth.errors.*` or `tenancy.errors.*` code and a numeric `status`, so
 `@alxia/tenancy`'s refusals map the same way.
 
-See [the docs](docs/README.md): the [guide](docs/guide.md), the
-[troubleshooting](docs/troubleshooting.md) page for the boot errors, and the
-[roadmap](docs/roadmap.md).
+### Refusal codes
+
+`AccessError` carries `auth.errors.unauthenticated` (401) or `auth.errors.forbidden`
+(403). They keep their `auth.errors.` namespace on purpose, like `@alxia/tenancy`'s
+`tenancy.errors.*`: they are the keys an existing host's i18n catalogue already
+translates, and they stay consistent with the `perOrganization` store and its
+`x-organization-id` header. Renaming them would break every translation for no gain.
+The boot errors are a different kind, a developer's and never shown to a user, and use
+the kernel's shape: `access.invalid-permission`, `access.unknown-role`,
+`access.undeclared-grant` and a message, on `AccessCatalogueError`. A permission two
+modules declare is `@alxia/modules`' `ModuleGraphError`
+(`modules.duplicate-declaration`).
+
+## API
+
+| Export | What it does |
+| --- | --- |
+| `createAccess(modules, options)`, `Access`, `AccessOptions` | the role catalogue built from the registry: `roles`, `permissions`, `matrix`, `roleCan`, `permissionsOf`, `holds` |
+| `Viewer` | `{ id }`, the account a request is made by (`@alxia/tenancy` has its own of the same shape) |
+| `Permission`, `isPermission(value)` | the `<area>:read` or `<area>:manage` type, and its check |
+| `requireViewer`, `requireMember`, `requirePermission`, `requireAnyPermission`, `requireSelf`, `can`, `GuardContext` | the request guards, and the context they read (`viewer`, `access`, `scope`) |
+| `permissionsReadWrite(read, write, select?)`, `membersReadPermissionWrites(write, select?)`, `scopeOf({ read, write }, select?)` | a module's two guards, `{ reading, writing }` |
+| `refusalMapper(map)`, `withRefusals(map, fn)`, `refusalOf(error)`, `Refusal` | map refusals to the host's error type |
+| `AccessError`, `AccessErrorCode`, `unauthenticated()`, `forbidden(permission)` | the refusals, and their constructors |
+| `AccessCatalogueError`, `AccessCatalogueErrorCode` | the boot error of `createAccess`, with a namespaced `code` |
+
+Peer: `@alxia/modules`, `typescript`.
+
+## Documentation
+
+- [Guide](https://github.com/softistx/alxia/blob/develop/packages/access/docs/guide.md): the catalogue, the guards, scopes, refusals.
+- [Troubleshooting](https://github.com/softistx/alxia/blob/develop/packages/access/docs/troubleshooting.md): an error message, and what to do about it.
+- [Roadmap](https://github.com/softistx/alxia/blob/develop/packages/access/docs/roadmap.md): what is coming, and what is not planned.
 
 ## License
 

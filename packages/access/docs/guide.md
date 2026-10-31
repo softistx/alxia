@@ -83,6 +83,12 @@ viewer (before the scope is read), then the scope's own (400
 non-member so existence is never probed), then 403 `auth.errors.forbidden`
 with `params.permission`.
 
+The refusal codes keep the `auth.errors.` and `tenancy.errors.` namespaces
+rather than `access.` or `tenancy.`: they are the keys an existing host's i18n
+catalogue already translates, and they stay consistent with `perOrganization` and
+its `x-organization-id` header. Only the boot errors (a developer's, never shown
+to a user) are namespaced by package: `access.*`, `modules.*`.
+
 The scope's `member` is the role by default (`Membership<Role>`). When the
 membership answers a record, give `roleOf`:
 

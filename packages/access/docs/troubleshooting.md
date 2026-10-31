@@ -9,8 +9,11 @@
 - [A guard answers 403 for a role that should hold the permission](#a-guard-answers-403-for-a-role-that-should-hold-the-permission)
 - [A guard answers 404 or 400 instead of 403](#a-guard-answers-404-or-400-instead-of-403)
 
-All the boot errors are `AccessCatalogueError`s thrown by `createAccess`; the
-message names the module.
+The boot errors are thrown by `createAccess`; the message names the module.
+Each has a namespaced `code`: `access.invalid-permission`, `access.unknown-role`
+and `access.undeclared-grant` on an `AccessCatalogueError`, and
+`modules.duplicate-declaration` on the `ModuleGraphError` of `@alxia/modules`
+for a permission two modules declare.
 
 ## `declares "x", which is not <area>:read or <area>:manage`
 

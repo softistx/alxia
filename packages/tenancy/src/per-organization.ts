@@ -51,6 +51,40 @@ export interface PerOrganizationStore<C, K, T extends Tenant, M>
 	readonly databases: TenantDatabases<C>;
 }
 
+// `fn` for every active tenant, or every one with `withDeleted`.
+async function eachOf<C, T extends Tenant, R>(
+	registry: TenantRegistry<T>,
+	databases: TenantDatabases<C>,
+	fn: (tenant: T, mongo: Mongo<C>) => Promise<R>,
+	{ withDeleted = false }: EachTenantOptions = {},
+): Promise<R[]> {
+	const all = await registry.list({ withDeleted });
+	const visited = withDeleted
+		? all
+		: all.filter((tenant) => tenant.status === 'active');
+	const results: R[] = [];
+	for (const tenant of visited) {
+		results.push(await fn(tenant, await databases.open(tenant.id)));
+	}
+	return results;
+}
+
+// `db:sync`: the core, then every organisation's database; their names.
+async function syncAll<C, K, T extends Tenant, M>(
+	options: PerOrganizationOptions<C, K, T, M>,
+	databases: TenantDatabases<C>,
+): Promise<string[]> {
+	const { core, registry } = options;
+	await core.sync();
+	await options.syncCore?.(core);
+	const names = [dbOf(core).databaseName];
+	for (const tenant of await registry.list({ withDeleted: true })) {
+		await (await databases.open(tenant.id)).sync();
+		names.push(databases.nameOf(tenant.id));
+	}
+	return names;
+}
+
 /**
  * One database per organisation next to the host's core database, as
  * `<prefix><id>` on the one `MongoClient` the application connected. A request
@@ -75,9 +109,10 @@ export function perOrganization<C, K, T extends Tenant, M>(
 	async function resolve(ref: string): Promise<T | undefined> {
 		const text = ref.trim();
 		if (!text) return undefined;
-		const tenant = (isObjectIdString(text) as boolean)
+		const slug = text.toLowerCase();
+		const tenant = isObjectIdString(text)
 			? await registry.findById(text)
-			: await registry.findBySlug(text.toLowerCase());
+			: await registry.findBySlug(slug);
 		// `provisioning` and `archived` tenants are not resolved: a request never
 		// reaches a database that is not ready or that was retired.
 		return tenant?.status === 'active' ? tenant : undefined;
@@ -135,20 +170,7 @@ export function perOrganization<C, K, T extends Tenant, M>(
 				member,
 			};
 		},
-		async eachTenant<R>(
-			fn: (tenant: T, mongo: Mongo<C>) => Promise<R>,
-			{ withDeleted = false }: EachTenantOptions = {},
-		) {
-			const all = await registry.list({ withDeleted });
-			const visited = withDeleted
-				? all
-				: all.filter((tenant) => tenant.status === 'active');
-			const results: R[] = [];
-			for (const tenant of visited) {
-				results.push(await fn(tenant, await databases.open(tenant.id)));
-			}
-			return results;
-		},
+		eachTenant: (fn, scope) => eachOf(registry, databases, fn, scope),
 		async provision(input, actor) {
 			let created: T;
 			try {
@@ -163,16 +185,7 @@ export function perOrganization<C, K, T extends Tenant, M>(
 			return registry.activate(created, actor);
 		},
 		prepare,
-		async sync() {
-			await core.sync();
-			await options.syncCore?.(core);
-			const names = [dbOf(core).databaseName];
-			for (const tenant of await registry.list({ withDeleted: true })) {
-				await (await databases.open(tenant.id)).sync();
-				names.push(databases.nameOf(tenant.id));
-			}
-			return names;
-		},
+		sync: () => syncAll(options, databases),
 		migrate: (mode) =>
 			migrateTargets(
 				{ db: dbOf(core), migrations: coreMigrations },

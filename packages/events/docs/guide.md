@@ -41,17 +41,22 @@ export const notifications = defineModule({
 
 | `code` | The registry has |
 | --- | --- |
-| `invalid-type` | an `emits` entry that is not `<module>.<entity>.<verb>` |
-| `duplicate-emit` | one type declared by two modules |
-| `foreign-type` | an `emits` entry whose first segment is not the declaring module's name |
-| `unknown-subscription` | a subscriber of a type no module emits |
-| `module-missing` | no `eventsModule` |
-| `missing-queue` | a module with subscribers and no `events.<module>` queue, once `queues` is given |
+| `events.invalid-type` | an `emits` entry that is not `<module>.<entity>.<verb>` |
+| `events.foreign-type` | an `emits` entry whose first segment is not the declaring module's name |
+| `events.unknown-subscription` | a subscriber of a type no module emits |
+| `events.module-missing` | no `eventsModule` |
+| `events.missing-queue` | a module with subscribers and no `events.<module>` queue, once `queues` is given |
 
-One more code is thrown at run time, not at boot: `tenant-mismatch`, when an
+One more code is thrown at run time, not at boot: `events.tenant-mismatch`, when an
 `_outbox` row or a job names a tenant other than the one it was found in. The
 row is refused and stays pending, which holds back that tenant's later events;
 see [troubleshooting](troubleshooting.md#tenant-mismatch).
+
+A type two modules declare is not an `EventsError`: `@alxia/modules` refuses it
+when the registry is resolved, with a `ModuleGraphError` of code
+`modules.duplicate-declaration`. Every boot error of the kernel has a `code`
+and a message, namespaced by its package (`modules.`, `tenancy.`, `access.`,
+`events.`).
 
 ## Register the kernel module
 

@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { defineModule } from '@alxia/modules';
+import { defineModule, type ModuleGraphError } from '@alxia/modules';
 import { openSingle, registry } from '../test/harness';
 import { createEvents, type EventsError, eventsModule } from '.';
 
@@ -25,7 +25,7 @@ describe('boot checks', () => {
 	test('a subscriber of a type no module emits is refused, with both names', async () => {
 		const { modules, billing } = registry({ 'shop.order.shipped': () => {} });
 		const error = refusal(() => createEvents({ store: { modules } as never }));
-		expect(error.code).toBe('unknown-subscription');
+		expect(error.code).toBe('events.unknown-subscription');
 		expect(error.message).toContain(billing);
 		expect(error.message).toContain('shop.order.shipped');
 	});
@@ -40,14 +40,16 @@ describe('boot checks', () => {
 			refusal(() =>
 				createEvents({ store: { modules: bad(['Order']) } as never }),
 			).code,
-		).toBe('invalid-type');
-		expect(
-			refusal(() =>
-				createEvents({
-					store: { modules: bad(['a.x.y'], ['a.x.y']) } as never,
-				}),
-			).code,
-		).toBe('duplicate-emit');
+		).toBe('events.invalid-type');
+		// A type two modules declare is the registry's error, not the bus's.
+		const twice = refusal(() =>
+			createEvents({
+				store: { modules: bad(['a.x.y'], ['a.x.y']) } as never,
+			}),
+		) as unknown as ModuleGraphError;
+		expect(twice.name).toBe('ModuleGraphError');
+		expect(twice.code).toBe('modules.duplicate-declaration');
+		expect(twice.message).toContain('"a.x.y" is declared by two modules');
 	});
 
 	test("a module emitting a type that is not its own name's is refused", async () => {
@@ -57,7 +59,7 @@ describe('boot checks', () => {
 			defineModule({ name: 'b' }),
 		];
 		const error = refusal(() => createEvents({ store: { modules } as never }));
-		expect(error.code).toBe('foreign-type');
+		expect(error.code).toBe('events.foreign-type');
 		expect(error.message).toContain('"a"');
 		expect(error.message).toContain('b.order.placed');
 	});
@@ -66,7 +68,7 @@ describe('boot checks', () => {
 		const modules = [defineModule({ name: 'a', emits: ['a.x.y'] })];
 		expect(
 			refusal(() => createEvents({ store: { modules } as never })).code,
-		).toBe('module-missing');
+		).toBe('events.module-missing');
 	});
 
 	test('a module with subscribers needs its queue once queues are given', async () => {
@@ -74,6 +76,6 @@ describe('boot checks', () => {
 		const error = refusal(() =>
 			createEvents({ store: { modules } as never, queues: {} }),
 		);
-		expect(error.code).toBe('missing-queue');
+		expect(error.code).toBe('events.missing-queue');
 	});
 });
