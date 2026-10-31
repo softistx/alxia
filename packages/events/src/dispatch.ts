@@ -33,7 +33,7 @@ const envelopeOf = (row: PendingRow): EventEnvelope => ({
 /**
  * Sends the tenant's pending events, oldest `_id` first, to each subscriber of
  * their type through `send`, and marks each one dispatched once all its
- * subscribers have been sent. The first failure stops the pass and is thrown:
+ * subscribers have been sent. Order is by `_id` among the events committed when the scan runs: a transaction that commits late can be sent after a later one. The first failure stops the pass and is thrown:
  * the event stays pending, so order holds and the next pass starts from it.
  * Returns how many events it dispatched.
  */

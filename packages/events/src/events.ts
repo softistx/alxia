@@ -1,19 +1,13 @@
 import type { Module } from '@alxia/modules';
 import type { Tenant, TenantStore } from '@alxia/tenancy';
 import type { WorkOptions } from '@nxgt/redis';
-import { deliver } from './deliver';
-import { dispatchPending, type Send } from './dispatch';
 import { type EmitOptions, emitEvent } from './emit';
-import {
-	type EventEnvelope,
-	type EventInput,
-	fromWire,
-	toWire,
-} from './envelope';
+import type { EventEnvelope, EventInput } from './envelope';
 import { EventsError } from './errors';
 import { type EventQueue, queueName } from './queues';
 import { emittedTypes, subscriptionsOf } from './registry';
-import { makeRelay, type Relay, type RelayOptions } from './relay';
+import type { Relay, RelayOptions } from './relay';
+import { deadLetters, drain, type Runtime, relay, work } from './runtime';
 import type { EmitSource, EventsMongo } from './types';
 
 export interface EventsOptions {
@@ -117,112 +111,30 @@ export function createEvents(options: EventsOptions): Events {
 		return mongo as EventsMongo;
 	};
 
-	const tenantsOf = async <R>(
-		tenant: string | { readonly id: string } | undefined,
-		fn: (id: string, mongo: EventsMongo) => Promise<R>,
-	): Promise<R[]> => {
+	const tenantsOf: Runtime['tenantsOf'] = async (tenant, fn) => {
 		if (tenant === undefined) {
 			return store.eachTenant((t, mongo) => fn(t.id, handle(mongo)));
 		}
 		const id = typeof tenant === 'string' ? tenant : tenant.id;
 		return [await fn(id, handle(await store.databaseOf(id)))];
 	};
+	const rt: Runtime = {
+		store,
+		subscriptions,
+		subscribing,
+		batchSize,
+		queues: need,
+		tenantsOf,
+		handle,
+	};
 
 	return {
 		types: declared,
 		emit: (source, event, emitOptions) =>
 			emitEvent(declared, source, event, emitOptions),
-
-		async drain(tenant) {
-			let total = 0;
-			for (let round = 0; ; round++) {
-				if (round === 100) {
-					throw new EventsError(
-						'drain-diverged',
-						'drain still found events after 100 rounds: a subscriber emits an event that makes it emit again',
-					);
-				}
-				const counts = await tenantsOf(tenant, (_id, mongo) => {
-					const send: Send = (event, subscription) =>
-						deliver(mongo, store.core, event, subscription);
-					return dispatchPending(mongo, subscriptions, send, batchSize);
-				});
-				const found = counts.reduce((sum, n) => sum + n, 0);
-				total += found;
-				if (found === 0) return total;
-			}
-		},
-
-		relay(relayOptions) {
-			const bound = need();
-			return makeRelay(relayOptions, async (onError) => {
-				const counts = await tenantsOf(undefined, async (id, mongo) => {
-					const send: Send = (event, subscription) =>
-						(bound[subscription.module] as EventQueue).add(
-							{
-								tenant: id,
-								module: subscription.module,
-								event: toWire(event),
-							},
-							{ id: `${event.id}:${subscription.id}` },
-						);
-					try {
-						return await dispatchPending(mongo, subscriptions, send, batchSize);
-					} catch (error) {
-						// One tenant's failure leaves its events pending and spares the rest.
-						onError(error);
-						return 0;
-					}
-				});
-				return counts.reduce((sum, n) => sum + n, 0);
-			});
-		},
-
-		work(workOptions) {
-			const bound = need();
-			const workers = Object.entries(bound)
-				.filter(([module]) => subscribing.has(module))
-				.map(([module, queue]) =>
-					queue.work(async ({ data }) => {
-						const event = fromWire(data.event);
-						const subscription = subscriptions
-							.get(event.type)
-							?.find((s) => s.module === data.module);
-						if (!subscription) {
-							throw new EventsError(
-								'unknown-subscription',
-								`module "${module}" has no subscriber for "${event.type}" in this process's registry`,
-							);
-						}
-						const mongo = handle(await store.databaseOf(data.tenant));
-						await deliver(mongo, store.core, event, subscription);
-					}, workOptions),
-				);
-			return {
-				async stop() {
-					await Promise.all(workers.map((worker) => worker.close()));
-				},
-			};
-		},
-
-		async deadLetters({ limit = 100 } = {}) {
-			const bound = need();
-			const letters: DeadLetter[] = [];
-			for (const [module, queue] of Object.entries(bound)) {
-				for (const job of await queue.list('failed', { limit })) {
-					if (!job.data) continue;
-					letters.push({
-						queue: queueName(module),
-						module,
-						jobId: job.id,
-						event: fromWire(job.data.event),
-						attempts: job.attempt,
-						error: job.error,
-						failedAt: job.finished,
-					});
-				}
-			}
-			return letters;
-		},
+		drain: (tenant) => drain(rt, tenant),
+		relay: (relayOptions) => relay(rt, relayOptions),
+		work: (workOptions) => work(rt, workOptions),
+		deadLetters: ({ limit = 100 } = {}) => deadLetters(rt, limit),
 	};
 }

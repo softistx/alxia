@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'bun:test';
+import { ObjectId } from 'mongodb';
 import {
 	databaseOf,
 	handleOf,
@@ -158,6 +159,26 @@ describe('drain', () => {
 		fail = false;
 		expect(await events.drain('only')).toBe(1);
 		expect(await mongo.db.invoices.raw.countDocuments({})).toBe(1);
+	});
+
+	test("a handler's own unique-index conflict fails the delivery instead of being taken for a duplicate", async () => {
+		const handler: Subscriber = async (_event, context) => {
+			const { mongo } = { mongo: handleOf(context) };
+			const _id = new ObjectId();
+			await mongo.db.orders.create({ _id, label: 'x' } as never);
+			await mongo.db.orders.create({ _id, label: 'x' } as never);
+		};
+		const store = await openSingle(
+			registry({ 'shop.order.placed': handler }).modules,
+		);
+		const events = createEvents({ store });
+		const { tenant, mongo } = await soleTenant(store);
+		await place(events, tenant, mongo, 'a');
+		await expect(events.drain('only')).rejects.toThrow();
+		expect(
+			await mongo.db._outbox.raw.countDocuments({ dispatchedAt: null }),
+		).toBe(1);
+		expect(await mongo.db._inbox.raw.countDocuments({})).toBe(0);
 	});
 
 	test('an event nobody subscribes to is dispatched at once', async () => {

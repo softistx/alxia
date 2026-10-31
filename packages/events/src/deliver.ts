@@ -35,7 +35,15 @@ export async function deliver(
 	} catch (error) {
 		// Two deliveries raced past the check: the unique index let one through,
 		// and that one's effects stand.
-		if (error instanceof ConflictError) {
+		// Only the inbox race is a duplicate: a handler's own unique-index
+		// conflict must fail the delivery, or the event would be acked and lost.
+		if (
+			error instanceof ConflictError &&
+			(await mongo.db._inbox.findFirst({
+				eventId: event.id,
+				subscriber: subscription.id,
+			}))
+		) {
 			return 'duplicate';
 		}
 		throw error;

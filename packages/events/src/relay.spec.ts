@@ -1,4 +1,11 @@
-import { afterEach, describe, expect, test } from 'bun:test';
+import {
+	afterAll,
+	afterEach,
+	beforeAll,
+	describe,
+	expect,
+	test,
+} from 'bun:test';
 import { bindQueue } from '@nxgt/redis';
 import { RedisClient } from 'bun';
 import {
@@ -13,11 +20,39 @@ import {
 } from '../test/harness';
 import { createEvents, type EventsQueueOptions, eventsQueue } from '.';
 
-// These specs need Redis (CI's service container): set REDIS_URL to run them.
+// These specs need Redis: `$REDIS_URL` (CI's service container), else a
+// `redis-server` on PATH started on a free port. With neither they fail.
 // Every module, queue and lock name is unique per test, and each test deletes
 // its own keys, so a shared Redis is never flushed.
-const url = process.env['REDIS_URL'];
-const suite = url ? describe : describe.skip;
+let url = process.env['REDIS_URL'];
+let server: Bun.Subprocess | undefined;
+beforeAll(async () => {
+	if (url !== undefined) return;
+	const binary = Bun.which('redis-server');
+	if (binary === null) {
+		throw new Error(
+			'These specs need Redis: set REDIS_URL, or put redis-server on PATH',
+		);
+	}
+	const port = 20_000 + Math.floor(Math.random() * 20_000);
+	server = Bun.spawn(
+		[binary, '--port', String(port), '--save', '', '--appendonly', 'no'],
+		{ stdout: 'ignore', stderr: 'ignore' },
+	);
+	url = `redis://127.0.0.1:${port}`;
+	for (let attempt = 0; ; attempt++) {
+		try {
+			const probe = new RedisClient(url);
+			await probe.connect();
+			probe.close();
+			return;
+		} catch (error) {
+			if (attempt > 50) throw error;
+			await Bun.sleep(20);
+		}
+	}
+});
+afterAll(() => server?.kill());
 
 const until = async (check: () => Promise<boolean>, ms = 8_000) => {
 	const deadline = Date.now() + ms;
@@ -77,7 +112,7 @@ async function setup(queueOptions: EventsQueueOptions = {}) {
 const invoiceCount = (mongo: TestMongo) =>
 	mongo.db.invoices.raw.countDocuments({});
 
-suite('relay', () => {
+describe('relay', () => {
 	test('enqueues one job per (event, subscriber) in _id order, then marks the events dispatched', async () => {
 		const s = await setup();
 		const store = await openSingle(s.modules);

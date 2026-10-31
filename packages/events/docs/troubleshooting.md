@@ -6,6 +6,9 @@
 - [`the payload of "x" is not JSON data`](#the-payload-of-x-is-not-json-data)
 - [`module "m" subscribes to "x", which no module in the registry emits`](#module-m-subscribes-to-x-which-no-module-in-the-registry-emits)
 - [`the registry lacks eventsModule`](#the-registry-lacks-eventsmodule)
+- [`invalid-type` and `duplicate-emit`](#invalid-type-and-duplicate-emit)
+- [`this needs the bound events.<module> queues`](#this-needs-the-bound-eventsmodule-queues)
+- [`module "m" has no subscriber for "x" in this process's registry`](#module-m-has-no-subscriber-for-x-in-this-processs-registry)
 - [`module "m" has subscribers but no queue`](#module-m-has-subscribers-but-no-queue)
 - [`collection "_outbox" of module "events" is not wired in the tenant database`](#collection-_outbox-of-module-events-is-not-wired-in-the-tenant-database)
 - [`drain still found events after 100 rounds`](#drain-still-found-events-after-100-rounds)
@@ -62,6 +65,10 @@ owns it, in the registry the store and `createEvents` share.
 emitting module is not in the registry. Register it, or fix the key of
 `subscribers`.
 
+## `invalid-type` and `duplicate-emit`
+
+`EventsError`, at boot. `module "m" emits "x", which is not <module>.<entity>.<verb> in lower case`: rename the type (`shop.order.placed`). `event type "x" is declared by two modules`: a type has one owner; keep it in one module's `emits`.
+
 ## `the registry lacks eventsModule`
 
 `EventsError` `module-missing`. Add `eventsModule` to the list given to the
@@ -73,6 +80,14 @@ tenant store (`modules`): it owns `_outbox` and `_inbox`.
 that subscribes. Add `{ m: bindQueue(client, eventsQueue('m')) }`. The error
 is also thrown by `relay()`, `work()` and `deadLetters()` when `queues` was not
 given at all; `drain()` needs none.
+
+## `this needs the bound events.<module> queues`
+
+`EventsError` `missing-queue`, from `relay()`, `work()` or `deadLetters()` when `createEvents` was built without `queues`. Pass `{ queues }` (see the entry below). `drain()` needs none.
+
+## `module "m" has no subscriber for "x" in this process's registry`
+
+`EventsError` `unknown-subscription`, thrown in a worker. The job came from a process whose registry has a subscriber the worker's registry lacks (an older or different deploy). Deploy workers with the registry of the emitter; the job is retried and lands in the dead letters until then.
 
 ## `collection "_outbox" of module "events" is not wired in the tenant database`
 
@@ -93,7 +108,7 @@ a relay is started in some process (`relay.start()`, or a worker calling
 `relay.tick()`); Redis is reachable; the `onError` of the relay, which reports
 a failed `queue.add` (the tenant's pass stops at the failing event, so later
 events wait behind it); and that `tick()` returns `leader: true` in one
-process, since a stale `lock:events:relay` key holds the lock for at most the
+process, since a stale `lock:events:relay` Redis key (the `lockKey` option, prefixed with `lock:`) holds the lock for at most the
 `lockTtl`.
 
 ## A subscriber ran twice

@@ -41,7 +41,9 @@ export const billing = defineModule({
 // 2. Put the kernel module in the registry you give the tenant store,
 //    then build the bus from that store.
 const modules = [eventsModule, shop, billing];
-const events = createEvents({ store: tenancy /* built with `modules` */ });
+// `tenancy` is a `single(...)` or `perOrganization(...)` store of
+// @alxia/tenancy built with `modules`; `scope` is a request's scope.
+const events = createEvents({ store: tenancy });
 
 // 3. Emit inside the transaction of the change.
 await scope.mongo.transaction(async (tx) => {

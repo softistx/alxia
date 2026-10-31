@@ -44,9 +44,11 @@ export async function emitEvent(
 	const actor =
 		input.actor !== undefined
 			? input.actor
-			: mongo.actor === undefined || mongo.actor === null
-				? null
-				: String(mongo.actor);
+			: typeof mongo.actor === 'string'
+				? mongo.actor
+				: mongo.actor === undefined || mongo.actor === null
+					? null
+					: String(mongo.actor);
 	const _id = new ObjectId();
 	const envelope: EventEnvelope = {
 		id: _id.toHexString(),

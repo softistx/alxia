@@ -181,7 +181,7 @@ to `onError`; the other tenants go on.
 | `redis` | required | the Bun client the lock lives on |
 | `interval` | 1000 ms | wait between passes while events keep coming |
 | `maxInterval` | 10 000 ms | the wait doubles up to this while the outbox is idle |
-| `lockKey` | `events:relay` | the lock; change it to run independent buses on one Redis |
+| `lockKey` | `events:relay` | the lock (stored as `lock:<lockKey>`); change it to run independent buses on one Redis |
 | `lockTtl` | 30 000 ms | how long a crashed leader holds the lock |
 | `onError` | ignore | a failed pass |
 
@@ -239,7 +239,7 @@ same code, the same collections, `tenant` being the fixed id.
 | --- | --- |
 | the domain transaction rolls back | no `_outbox` row |
 | the relay crashes after enqueueing, before `dispatchedAt` | the next pass adds the same job ids; the queue keeps one job |
-| the queue forgot the id (kept 1 h by default) and the job is added again | the `_inbox` row makes the second run a no-op |
+| the queue forgot the id (completed jobs are kept 1 h by default, `keepCompleted`) and the job is added again | the `_inbox` row makes the second run a no-op |
 | a subscriber throws | its effects and inbox row roll back; the queue retries with backoff, then the job is a dead letter |
 | two workers get the same event | one inbox insert wins; the other is a no-op |
 | a lock holder overruns its TTL | two relays may add the same ids; the queue and the inbox absorb it |
