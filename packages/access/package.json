@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/access",
-	"version": "0.1.0",
+	"version": "0.2.0",
 	"description": "Permissions, roles and guards for an application: a role catalogue built from the modules' permissions and default grants, boot errors for an unknown or duplicate permission, request guards over a tenant scope and a hook mapping refusals to the host's error codes",
 	"license": "MIT",
 	"type": "module",

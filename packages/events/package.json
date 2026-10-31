@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/events",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "An event bus for an application on @nxgt/mongo and @nxgt/redis: events written to a transactional outbox with the domain change, relayed to queues, delivered at least once and applied once through an inbox",
 	"license": "MIT",
 	"type": "module",
