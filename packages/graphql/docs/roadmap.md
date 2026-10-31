@@ -27,6 +27,7 @@ Nothing scheduled yet.
 
 ### Unreleased
 
+- **A client's `x-request-id` is never believed on Yoga 6.** The endpoint turns Yoga's request id off (`requestId: false`), so the header is neither echoed nor logged; an app that turns it on keeps `trustHeader: false`. Yoga 6's per-request "Request processed" INFO line is off by default too: `logging` defaults to `'warn'` ([troubleshooting](troubleshooting.md#x-request-id-echoed-or-request-processed-logged-on-yoga-6)).
 - **`graphql-yoga` 6 accepted as a peer.** The range is `^5.16.0 || ^6.0.0`; CI runs the specs on both majors. A custom `logging` on Yoga 6 must be a `@graphql-hive/logger` `Logger` ([troubleshooting](troubleshooting.md#logchild-is-not-a-function)).
 
 ### 0.9.2

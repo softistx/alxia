@@ -60,7 +60,9 @@ routes on `base` and returns it.
 | `parseCache` | `false \| { maxBytes?, max?, ttl? }` | 64 MiB, 1 024 documents, 3 600 000 ms | The cache of parsed documents, one per endpoint, bounded by estimated bytes. `false` parses every request. Cannot be given with Yoga's `parserAndValidationCache`, which replaces it. |
 | `bodyLimit` | `number` | the app's earlier `bodyLimit()`, else `1_048_576` (1 MiB) | The most bytes a `POST` body may hold; past it core answers a 413, in the app's error format. A whole number of bytes, else core's `TypeError` where `graphql()` is declared. A `multipart` upload needs a larger one: see [Cap what a request costs](production.md#cap-what-a-request-costs). |
 | `cors` | Yoga's `cors` | `false` | Yoga's own CORS. Off: use `@alxia/cors` for the whole app instead ([Yoga's plugins and options](yoga.md#cors)). |
-| every other Yoga option | | Yoga's | `plugins`, `context`, `maskedErrors`, `batching`, `logging`… passed to `createYoga` as they are: see [Yoga's plugins and options](yoga.md). On Yoga 6 a custom `logging` must be a `@graphql-hive/logger` `Logger`: see [`log.child is not a function`](../troubleshooting.md#logchild-is-not-a-function). |
+| `logging` | Yoga's `logging` | `'warn'` | Yoga's info lines (on Yoga 6, one "Request processed" per request) are off unless you pass `true` or `'info'`: see [troubleshooting](../troubleshooting.md#x-request-id-echoed-or-request-processed-logged-on-yoga-6). |
+| `requestId` | Yoga 6's `requestId` | `false` | Off, so a client's `x-request-id` is never echoed or logged; `true` or an object keeps `trustHeader: false` unless you set it. Yoga 5 ignores it: see [troubleshooting](../troubleshooting.md#x-request-id-echoed-or-request-processed-logged-on-yoga-6). |
+| every other Yoga option | | Yoga's | `plugins`, `context`, `maskedErrors`, `batching`… passed to `createYoga` as they are: see [Yoga's plugins and options](yoga.md). On Yoga 6 a custom `logging` must be a `@graphql-hive/logger` `Logger`: see [`log.child is not a function`](../troubleshooting.md#logchild-is-not-a-function). |
 
 `graphqlEndpoint` is not an option: `path` sets it.
 

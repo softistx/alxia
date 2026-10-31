@@ -18,6 +18,13 @@ later, the first to accept it. `graphql-yoga` 5 (from 5.16) and 6 both work;
 the specs run on 6. Yoga 6 takes a `@graphql-hive/logger` `Logger` as a custom
 `logging` value, and its `@graphql-yoga/plugin-*` 4.x need Yoga 6.
 
+Yoga's own request id is off (`requestId: false`): a client-sent `x-request-id`
+is never echoed or logged, so the app's own id is the only one. Passing
+`requestId: true` or an object keeps `trustHeader: false` unless you set it.
+Yoga 5 ignores `requestId`. `logging` defaults to `'warn'` on both majors, so
+Yoga 6's per-request INFO line is off and an app that never set `logging` no
+longer sees Yoga's info lines; pass `logging: true` or `'info'` to get them.
+
 ## Usage
 
 ```ts
