@@ -42,7 +42,7 @@
 	},
 	"devDependencies": {
 		"@alxia/modules": "workspace:^",
-		"@nxgt/mongo": "^0.24.0",
+		"@nxgt/mongo": "^0.25.1",
 		"@types/bun": "^1.4.4",
 		"mongodb": "^7.7.0",
 		"mongodb-memory-server-core": "^11.3.0",
@@ -50,7 +50,7 @@
 	},
 	"peerDependencies": {
 		"@alxia/modules": "workspace:^",
-		"@nxgt/mongo": "^0.24.0",
+		"@nxgt/mongo": "^0.25.1",
 		"mongodb": "^7.7.0",
 		"typescript": "^6.0.3 || ^7.0.0"
 	}
