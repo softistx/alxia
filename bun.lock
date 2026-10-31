@@ -258,6 +258,16 @@
         "typescript": "^6.0.3 || ^7.0.0",
       },
     },
+    "packages/modules": {
+      "name": "@alxia/modules",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@types/bun": "^1.4.4",
+      },
+      "peerDependencies": {
+        "typescript": "^6.0.3 || ^7.0.0",
+      },
+    },
     "packages/openapi": {
       "name": "@alxia/openapi",
       "version": "0.6.12",
@@ -466,6 +476,8 @@
     "@alxia/language": ["@alxia/language@workspace:packages/language"],
 
     "@alxia/logger": ["@alxia/logger@workspace:packages/logger"],
+
+    "@alxia/modules": ["@alxia/modules@workspace:packages/modules"],
 
     "@alxia/openapi": ["@alxia/openapi@workspace:packages/openapi"],
 
