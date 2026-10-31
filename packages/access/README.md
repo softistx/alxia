@@ -4,7 +4,9 @@ Permissions, roles and guards for an application: a role catalogue built from
 the permissions and default grants the modules declare, boot errors for an
 unknown or duplicate permission, request guards over a tenant scope, and a
 hook that maps refusals to the host's error codes. The only peer is
-`@alxia/modules`; no database, no GraphQL server.
+`@alxia/modules`; no database, no GraphQL server. The scope the guards read
+comes from `@alxia/tenancy` (`lazyScope`), which this package does not
+require: any `{ member }` scope works.
 
 ```sh
 bun add @alxia/access
@@ -48,6 +50,7 @@ refusal through):
 ```ts
 import { requirePermission, requireSelf } from '@alxia/access';
 
+// viewer: { id: string } | null, the signed-in account (the `Viewer` type)
 const ctx = { viewer, access, scope: lazyScope(store, request, viewer) };
 
 const scope = await requirePermission(ctx, 'notes:manage'); // 401, 400, 404, 403
@@ -72,6 +75,7 @@ the same pair from guards of your own.
 ```ts
 import { refusalMapper, withRefusals } from '@alxia/access';
 
+// HostError is the host's own error class
 const mapped = refusalMapper((refusal) => new HostError(refusal.code, refusal.status, refusal.params));
 const resolve = withRefusals((r) => new HostError(r.code, r.status, r.params), async () => 'ok');
 ```

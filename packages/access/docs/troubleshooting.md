@@ -5,6 +5,7 @@
 - [`grants to "r", which is not one of the host's roles`](#grants-to-r-which-is-not-one-of-the-hosts-roles)
 - [`grants "x", which it does not declare`](#grants-x-which-it-does-not-declare)
 - [`the role "r" that holds every permission is not one of the roles`](#the-role-r-that-holds-every-permission-is-not-one-of-the-roles)
+- [A guard answers 401](#a-guard-answers-401)
 - [A guard answers 403 for a role that should hold the permission](#a-guard-answers-403-for-a-role-that-should-hold-the-permission)
 - [A guard answers 404 or 400 instead of 403](#a-guard-answers-404-or-400-instead-of-403)
 
@@ -51,10 +52,17 @@ or move the grant to the module that owns the permission.
 The matrix only holds what a module grants. Check `access.permissionsOf(role)`.
 Without `all`, no role holds everything. With a record membership or a
 `single` store, the role comes from `roleOf`; without it the scope's `member`
-must be the role name itself, and `undefined` holds nothing.
+must be the role name itself, and `undefined` holds nothing. A role
+`roleOf` returns that is not in `roles` holds nothing either.
 
 ## A guard answers 404 or 400 instead of 403
 
 The scope refuses first: 400 when the request names no tenant (the header
 `@alxia/tenancy` reads), 404 when the tenant is unknown or the viewer is no
 member. Both are the tenancy layer's refusals, passed through.
+
+## A guard answers 401
+
+`auth.errors.unauthenticated`: the context's `viewer` is `null`. Put the
+signed-in account in the context before the guard runs. `can` answers
+`false` instead of throwing.

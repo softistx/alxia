@@ -71,6 +71,11 @@ export async function createInvoice() {
 }
 ```
 
+`ctx` is a `GuardContext<Scope>`; its `viewer` is a `Viewer`, `{ id: string }`
+or `null`. A guard of your own throws the same refusals with
+`unauthenticated()` and `forbidden(permission)`, the factories the built-in
+guards use.
+
 Refusals come in a fixed order: 401 `auth.errors.unauthenticated` without a
 viewer (before the scope is read), then the scope's own (400
 `tenancy.errors.organization-required`, 404
@@ -147,9 +152,10 @@ Both carry `code`, `status` and `params`. Map them once to the host's error
 type:
 
 ```ts
-import { refusalMapper, withRefusals } from '@alxia/access';
+import { type Refusal, refusalMapper, withRefusals } from '@alxia/access';
 
-const toHost = (refusal: { code: string; status: number; params: Readonly<Record<string, string>> }) =>
+// HostError is the host's own error class
+const toHost = (refusal: Refusal) =>
 	new HostError(refusal.code, refusal.status, refusal.params);
 
 // as the GraphQL server's error hook

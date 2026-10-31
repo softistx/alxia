@@ -11,8 +11,8 @@ direction, not a commitment.
 
 ## Next
 
-- **Guards for plugin hosts.** The permissions of a viewer exposed for a
-  shell that filters its menus.
+- **Viewer permissions for a shell.** The permissions a viewer holds in a
+  tenant, exposed so a UI shell can filter its menus.
 
 ## Later
 
