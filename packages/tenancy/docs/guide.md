@@ -41,7 +41,7 @@ export const tenancy = perOrganization({
 	registry,
 	database: 'app_org_',
 	size: 20, // open tenant databases kept, least recently used leaves first
-	header: 'x-school-id', // default: 'x-organization-id'
+	header: 'x-tenant-id', // default: 'x-organization-id'
 	configure: (database) =>
 		defineMongo({ client, database, collections: tenantCollections }),
 	membership: async (organizationId, accountId) =>
@@ -53,6 +53,8 @@ export const tenancy = perOrganization({
 	},
 });
 ```
+
+`size` is the number of open tenant `Mongo`s kept (default 10, least recently used leaves first). `sync()` and `migrate()` open every registered tenant in turn, so with many more tenants than `size` they churn the cache: that is harmless (the client is shared) but each open is rebuilt; raise `size` if it matters.
 
 A tenant database is named `<prefix><id>`, where the id is the 24 hex digits of
 the registry's `ObjectId`. Nothing else ever reaches a name: a header or a slug
@@ -122,6 +124,8 @@ about which organisations exist). `scope.mongo` writes with the viewer's id as
 actor. The host's core database comes along as `scope.core`, for the data the
 host keeps there; plugin code touches `scope.mongo` only.
 
+`DEFAULT_HEADER` is the default header name. `noMembers` is a `Membership` that admits nobody, for a spec or a host that must refuse every scope. The stores throw their refusals with `organizationRequired(header)`, `unknownOrganization()` and `slugTaken(slug)`; a host's own store, registry or spec can throw the same `TenancyError`s.
+
 To map the refusals to your errors:
 
 ```ts
@@ -175,7 +179,7 @@ const school = await tenancy.provision({ slug: 'north', name: 'North' }, actorId
 runs the tenant migrations, then activates it. It needs the `dbAdmin` role: it
 is a deployment step, never a request. A taken slug is a `TenancyError`
 `tenancy.errors.slug-taken`. If the database step fails the tenant stays
-`provisioning`; fix the cause and call `tenancy.prepare(id)`.
+`provisioning`. The retry is the host's: fix the cause, call `tenancy.prepare(id)`, then `registry.activate(tenant, actor)`.
 
 ## Sync and migrations
 

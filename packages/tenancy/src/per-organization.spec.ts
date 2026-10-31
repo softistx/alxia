@@ -67,10 +67,10 @@ describe('scope', () => {
 	});
 
 	test('the header name is an option', async () => {
-		const { core, store } = await setup({ header: 'x-school-id' });
+		const { core, store } = await setup({ header: 'x-tenant-id' });
 		const org = await register(core);
-		expect(store.header).toBe('x-school-id');
-		const scope = await store.scope(request({ 'x-school-id': org.slug }), {
+		expect(store.header).toBe('x-tenant-id');
+		const scope = await store.scope(request({ 'x-tenant-id': org.slug }), {
 			id: ACCOUNT_A,
 		});
 		expect(scope.tenant.id).toBe(org.id);
@@ -82,7 +82,7 @@ describe('scope', () => {
 		expect(error).toMatchObject({
 			code: 'tenancy.errors.organization-required',
 			status: 400,
-			params: { header: 'x-school-id' },
+			params: { header: 'x-tenant-id' },
 		});
 	});
 

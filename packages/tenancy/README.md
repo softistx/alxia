@@ -68,10 +68,10 @@ The header is `x-organization-id` by default and names the organisation by id
 or by slug, in any case. Change it with `header`:
 
 ```ts
-perOrganization({ /* … */ header: 'x-school-id' });
+perOrganization({ /* … */ header: 'x-tenant-id' });
 ```
 
-Only an `active` organisation resolves. Outside a request,
+The default is exported as `DEFAULT_HEADER`. Only an `active` organisation resolves. Outside a request,
 `tenancy.resolve(ref)` does the same lookup.
 
 ## Every tenant, for a job
@@ -89,6 +89,8 @@ await tenancy.eachTenant(visit, { withDeleted: true }); // every registered one
 ```ts
 const school = await tenancy.provision({ slug: 'north', name: 'North' }, actorId);
 // registered as `provisioning`, database synced and migrated, then `active`
+
+// throws a TenancyError `tenancy.errors.slug-taken` (409) when the slug is taken
 
 await tenancy.sync(); // `db:sync`: the core, then every organisation
 await tenancy.migrate({ kind: 'apply', dryRun: false }); // `db:migrate`
@@ -137,6 +139,9 @@ database.reset(); // between tests
 | `slotNaming(prefix, slots)` | `<prefix>_slot<n>` database names for tests |
 | `createTenantDatabases(options)`, `isTenantId`, `dbOf` | the bounded cache of tenant `Mongo`s, the check on ids that reach a database name, the driver's `Db` under a `Mongo` |
 | `TenancyError`, `UnknownMigrationError` | the refusals |
+| `organizationRequired(header)`, `unknownOrganization()`, `slugTaken(slug)` | the `TenancyError`s the stores throw, for a host's own store or spec to throw the same ones |
+| `DEFAULT_HEADER` | `'x-organization-id'`, the header when `header` is not given |
+| `noMembers` | a `Membership` that admits nobody, for a spec or a locked-down host |
 | `Tenant`, `TenantRegistry`, `Membership`, `TenantScope`, `Viewer`, `Resolution`, `MigrateMode`, `MigrationOutcome` | the types |
 
 Peers: `@nxgt/mongo`, `mongodb`, `typescript`.

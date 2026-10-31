@@ -50,12 +50,6 @@
 	"peerDependencies": {
 		"@nxgt/mongo": "^0.24.0",
 		"mongodb": "^7.7.0",
-		"typescript": "^6.0.3 || ^7.0.0",
-		"zod": "^4.6.5"
-	},
-	"peerDependenciesMeta": {
-		"zod": {
-			"optional": true
-		}
+		"typescript": "^6.0.3 || ^7.0.0"
 	}
 }
