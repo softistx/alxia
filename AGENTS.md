@@ -317,7 +317,11 @@ installed tarball with `--help`.
   floor, the lowest published version its range admits, in either form
   (`||` alternatives or `>=a <b`), in every package that installs it, then
   the same build, typecheck, tests and `verify:artifacts`. The lock and the
-  weekly `nxgt-versions` check hold the top of those ranges. Informational
+  weekly `nxgt-versions` check hold the top of those ranges. It also runs
+  `graphql-yoga`'s first major: `yogaFirstMajor` pins `graphql-yoga` to the
+  floor of the first alternative of its peer range (5.16.0) and the
+  `@graphql-yoga/plugin-*` devDependencies to their newest 3.x, so
+  `@alxia/graphql`'s specs run on Yoga 5 here and on Yoga 6 in CI. Informational
   like its siblings; never commit what it writes.
 - **Newest majors**: `scripts/newest-majors.ts` pins each widened peer to
   npm's `latest`, without `bun.lock`, then build, typecheck and

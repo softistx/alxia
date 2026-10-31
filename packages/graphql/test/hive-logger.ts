@@ -1,9 +1,9 @@
 import { Logger } from '@graphql-hive/logger';
 
 /**
- * A Yoga 6 `logging` value that records what is written by level. Yoga 6
- * takes a `@graphql-hive/logger` `Logger` (it calls `child` on it), no longer
- * a bare `{ debug, info, warn, error }` object.
+ * A `logging` value that records what is written by level. A hive `Logger`
+ * serves both majors: Yoga 6 requires one (it calls `child` on it), and
+ * Yoga 5 only calls its `debug`, `info`, `warn` and `error`.
  */
 export function spyLogger() {
 	const calls: Record<string, unknown[][]> = {
