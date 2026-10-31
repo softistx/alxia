@@ -91,11 +91,14 @@ export function bindModules(
 			const reach = [
 				module,
 				...(module.dependsOn ?? []).map(
-					(dependency) => byName.get(dependency) as Module,
+					(dependency) =>
+						// resolveModules guarantees every dependsOn name is registered.
+						byName.get(dependency) as Module,
 				),
 			];
 			for (const owner of reach) {
 				for (const key of keysOf(owner.collections)) {
+					// Safe: only `db`'s keys are read, whatever the wiring's type.
 					if (!wired(source.mongo as Mongo<never>, key)) {
 						throw new ModuleWiringError(
 							`collection "${key}" of module "${owner.name}" is not wired in the tenant database`,
@@ -103,6 +106,7 @@ export function bindModules(
 					}
 				}
 				for (const key of keysOf(owner.coreCollections)) {
+					// Safe: same as above, for the core handle.
 					if (!wired(source.core as Mongo<never>, key)) {
 						throw new ModuleWiringError(
 							`core collection "${key}" of module "${owner.name}" is not wired in the core database`,
@@ -110,6 +114,7 @@ export function bindModules(
 					}
 				}
 			}
+			// Safe: the narrowing is type-level; the handles are the same objects.
 			return source as never;
 		},
 	};

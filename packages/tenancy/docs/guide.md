@@ -14,7 +14,7 @@ plugin, runs on either store and never names a database.
 | `tenantOf(request)` | `found`, `none` or `unknown`, from the request's header |
 | `databaseOf(tenant)` | the tenant's database, no actor |
 | `scope(request, viewer)` | `{ tenant, mongo, core, member }`, or a `TenancyError` |
-| `forModule(source, name)` | a module's `{ mongo, core }` handles, typed to its collections and its `dependsOn` ones |
+| `forModule(source, name)` | a module's `{ mongo, core }` handles, typed to its collections and its `dependsOn` ones; `source` is a scope, or `{ mongo, core: store.core }` for a tenant `eachTenant` visits |
 | `modules` | the registry the store was given |
 | `eachTenant(fn, { withDeleted })` | `fn(tenant, mongo)` on each tenant in turn |
 | `provision(input, actor)` | registers, prepares the database, activates |
@@ -25,7 +25,7 @@ plugin, runs on either store and never names a database.
 
 ## Module handles
 
-Pass the registry as `modules` (to `perOrganization` or `single`) and the store
+`@alxia/modules` is a required peer. Pass the registry as `modules` (optional; without it `forModule` throws `module "x" is not registered`, and the store runs only the explicit migrations) to `perOrganization` or `single`) and the store
 reads the migrations from it: `migrationsOf` for each tenant database,
 `coreMigrationsOf` for the core one, in dependency order, before the explicit
 `migrations` and `coreMigrations`. Indexes come from the collections your

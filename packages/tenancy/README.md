@@ -64,7 +64,7 @@ const { mongo } = await getScope(); // the same promise every time
 
 ## A module's handles
 
-Give the store your registry and plugin code touches only the handles of its
+`@alxia/modules` is a required peer. The `modules` option is optional; without it `forModule` throws `module "x" is not registered`. Give the store your registry and plugin code touches only the handles of its
 module, typed through `Register`; it never names a database:
 
 ```ts
@@ -164,7 +164,7 @@ database.reset(); // between tests
 | `viewerMemberships(membership, viewer)` | the viewer's membership in any tenant, read once per request |
 | `slotNaming(prefix, slots)` | `<prefix>_slot<n>` database names for tests |
 | `createTenantDatabases(options)`, `isTenantId`, `dbOf` | the bounded cache of tenant `Mongo`s, the check on ids that reach a database name, the driver's `Db` under a `Mongo` |
-| `ModuleScope`, `ModuleSource` | what `forModule` returns (`mongo`, `core`) and takes |
+| `ModuleScope`, `ModuleSource` | what `forModule` returns (`mongo`, `core`) and takes: a scope, or `{ mongo, core: store.core }` for the tenant `eachTenant` visits |
 | `TenancyError`, `UnknownMigrationError`, `ModuleWiringError` | the refusals |
 | `organizationRequired(header)`, `unknownOrganization()`, `slugTaken(slug)` | the `TenancyError`s the stores throw, for a host's own store or spec to throw the same ones |
 | `DEFAULT_HEADER` | `'x-organization-id'`, the header when `header` is not given |

@@ -183,6 +183,12 @@ export function describeTenantStore(
 			expect(done.some((o) => o.ids.includes(second))).toBe(true);
 			expect(await markers()).toBe(2);
 
+			// The registry's core migration ran on the core database, once (on the
+			// single store the core is the tenant database).
+			expect(
+				await dbOf(h.store.core).collection('core_markers').countDocuments(),
+			).toBe(1);
+
 			const status = await h.store.migrate({ kind: 'status' });
 			expect(
 				status.every((o) => o.status.every((s) => s.state === 'applied')),

@@ -13,9 +13,6 @@ direction, not a commitment.
 
 These integrations are with packages that are planned and not published yet.
 
-- **Tenancy.** Integration with `@alxia/tenancy`: the scope a module's
-  services and jobs receive, and collections split between shared and
-  per-tenant databases.
 - **Access.** Integration with `@alxia/access`: permissions and default
   grants feeding the access catalogue directly.
 - **Events.** Integration with `@alxia/events`: `emits` and `subscribers`
@@ -32,5 +29,9 @@ Nothing scheduled yet.
 - **A runtime dependency.** Its only peer is `typescript`.
 
 ## Shipped
+
+- **Tenancy.** `@alxia/tenancy`'s `forModule` hands a module its
+  `ModuleMongo` and `ModuleCoreMongo` handles from a request's scope, split
+  between the tenant and the core database.
 
 Nothing published yet.

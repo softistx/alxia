@@ -41,6 +41,22 @@ export const organizations = defineCollection({
 	indexes: [{ key: { slug: 1 }, unique: true, name: 'organizations_slug' }],
 });
 
+/** A core migration: marks the core database in its own collection. */
+export const coreMarker = (id: string): Migration =>
+	defineMigration({
+		id,
+		async up({ db, session }) {
+			await db
+				.collection('core_markers')
+				.insertOne({ _id: id as never }, session ? { session } : {});
+		},
+		async down({ db, session }) {
+			await db
+				.collection('core_markers')
+				.deleteOne({ _id: id as never }, session ? { session } : {});
+		},
+	});
+
 export const marker = (id: string): Migration =>
 	defineMigration({
 		id,
@@ -184,7 +200,11 @@ export function testModules(ids: [string, string]) {
 			migrations: ids.map((id) => marker(id)),
 		}),
 		defineModule({ name: 'tags', dependsOn: ['notes'], collections: { tags } }),
-		defineModule({ name: 'orgs', coreCollections: { organizations } }),
+		defineModule({
+			name: 'orgs',
+			coreCollections: { organizations },
+			coreMigrations: [coreMarker('2026-10-26-core')],
+		}),
 	] as const;
 }
 

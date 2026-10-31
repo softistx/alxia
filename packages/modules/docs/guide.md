@@ -137,6 +137,17 @@ await handle.transaction(async (tx) => {
 `coreCollections`, the core database's. `@alxia/tenancy`'s `forModule` hands
 both from a request's scope.
 
+```ts
+interface CoreHandle {
+	readonly db: { accounts: Accounts; audit: Audit };
+	transaction<T>(fn: (tx: CoreHandle) => Promise<T>): Promise<T>;
+}
+
+declare const core: ModuleCoreHandle<'notes', CoreHandle>;
+core.db.accounts; // ok, a core collection of notes or its dependsOn
+core.db.audit; // error: not one of notes' core collections
+```
+
 ## Testing boundaries
 
 `assertBoundaries` needs Bun: it reads files with `Bun.Glob` and `Bun.file`.
