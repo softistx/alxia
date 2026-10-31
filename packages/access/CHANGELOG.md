@@ -1,5 +1,11 @@
 # @alxia/access
 
+## 0.2.0
+
+### Minor Changes
+
+- [#479](https://github.com/softistx/alxia/pull/479) [`a8b4780`](https://github.com/softistx/alxia/commit/a8b4780f253524fb688a8e4ebb8a0551a9eb82bf) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Let a host declare actions beyond `read` and `manage`: `createAccess` takes `actions: ['receive']`, so a module can declare `orders:receive`. The `Permission` type is now `<area>:<action>`, `isPermission` takes the extra actions, and an undeclared action is still an `access.invalid-permission` boot error.
+
 ## 0.1.0
 
 ### Minor Changes

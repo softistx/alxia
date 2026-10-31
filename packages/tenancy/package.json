@@ -1,6 +1,6 @@
 {
 	"name": "@alxia/tenancy",
-	"version": "0.1.0",
+	"version": "0.1.1",
 	"description": "Tenancy for an application on @nxgt/mongo: one contract, two stores (a database per organisation next to a core database, or a single database), a request scope resolved from a header, provisioning and a loop over every tenant",
 	"license": "MIT",
 	"type": "module",

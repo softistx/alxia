@@ -1,5 +1,11 @@
 # @alxia/tenancy
 
+## 0.1.1
+
+### Patch Changes
+
+- [#474](https://github.com/softistx/alxia/pull/474) [`10c041d`](https://github.com/softistx/alxia/commit/10c041d68a4d1ba4ec55d1244149a56c951489f6) Thanks [@SteveGT96](https://github.com/SteveGT96)! - Accept `@nxgt/mongo` 0.25 (`^0.25.1` peer range).
+
 ## 0.1.0
 
 ### Minor Changes
