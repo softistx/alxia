@@ -214,6 +214,7 @@ env             (standalone; dev: core for its Register spec)
 records         (standalone; no peer, no dependency)
 modules         (standalone; no peer, no dependency)
 tenancy         (peers: @alxia/modules, @nxgt/mongo, mongodb; dev: zod, mongodb-memory-server-core for its specs)
+access          (peer: @alxia/modules)
 create          (no peer; dev: core, env, graphql, openapi, react-router: the versions its projects install;
                  @nxgt/openapi-codegen and @graphql-codegen/*, the versions the api and graphql templates pin;
                  @nxgt/httpyz and @nxgt/openapi-httpyz, the api template's test client)

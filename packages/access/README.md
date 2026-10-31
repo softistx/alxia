@@ -67,8 +67,11 @@ await requireSelf(ctx, userId); // the viewer is that account, else 403
 | `can(ctx, p)` | never throws for a missing viewer: `false`, for a flag or a field |
 
 A module's two guards: `permissionsReadWrite('notes:read', 'notes:manage')`
-returns `{ reading, writing }`, and `scopeOf({ read, write }, select)` builds
+returns `{ reading, writing }`, `membersReadPermissionWrites('notes:manage')` lets any member read, and `scopeOf({ read, write }, select)` builds
 the same pair from guards of your own.
+
+The codes (`auth.errors.unauthenticated`, `auth.errors.forbidden`, and the
+`tenancy.errors.*` ones passed through) are fixed strings for the host to translate.
 
 ## Refusals to the host's error codes
 
