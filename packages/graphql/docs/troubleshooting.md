@@ -28,6 +28,7 @@ symptom.
 
 **Responses**
 
+- [`x-request-id` echoed, or `Request processed` logged, on Yoga 6](#x-request-id-echoed-or-request-processed-logged-on-yoga-6)
 - [`log.child is not a function`](#logchild-is-not-a-function)
 - [`200 {"errors":[{"message":"Unexpected error.", … "code":"INTERNAL_SERVER_ERROR"}}]}`](#200-errorsmessageunexpected-error--codeinternal_server_error)
 - [`403 Required CSRF header(s) not present` from the test client](#403-required-csrf-headers-not-present-from-the-test-client)
@@ -392,15 +393,16 @@ a fraction, `NaN` or a string.
 
 ### `x-request-id` echoed, or `Request processed` logged, on Yoga 6
 
-**When:** with `@alxia/graphql` before this fix on `graphql-yoga` 6, a request
+**When:** with `@alxia/graphql` 0.13.0 and below on `graphql-yoga` 6, a request
 carrying `x-request-id: forged` is answered with that header and logged with
 `requestId: "forged"`, and every request logs an INFO `Request processed` line.
 
 **Why:** Yoga 6 trusts the incoming header by default and logs at INFO when
-`logging` is not set. Yoga 5 does neither.
+`logging` is not set. Yoga 5 has no request id option, and logs no such line.
 
 **Fix:** upgrade `@alxia/graphql`. The endpoint passes `requestId: false` (the
-app issues its own id) and defaults `logging` to `'warn'`. To get Yoga's id
+app issues its own id) and defaults `logging` to `'warn'` on both majors (Yoga 5 ignores `requestId`;
+on either, Yoga's info lines are gone unless asked for). To get Yoga's id
 back, pass `requestId: true` (the header stays untrusted) or an object; to get
 the INFO line, pass `logging: true` or `'info'`.
 

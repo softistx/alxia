@@ -204,10 +204,11 @@ export function graphql<
 	const page = graphiql ?? true;
 	const yogaAt = yogaServers<UserCtx>(
 		{
-			// Yoga 6 only: the options are unknown to Yoga 5 and ignored there.
+			// Yoga 5 ignores `requestId`; the `'warn'` logging default applies on both majors.
 			// The app issues its own request id, so a client-sent `x-request-id`
 			// is never echoed nor logged; and Yoga 6's per-request INFO line
-			// stays off unless the app asks for `logging: true` or 'info'.
+			// stays off unless the app asks for `logging: true` or 'info' (on both
+			// majors, an app that never set `logging` stops seeing Yoga's info lines).
 			...(yogaOptions as YogaServerOptions<YogaContext, UserCtx>),
 			...(yogaOptions.logging === undefined ? { logging: 'warn' } : {}),
 			...untrustedRequestId(yogaOptions),
