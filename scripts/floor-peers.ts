@@ -193,14 +193,16 @@ if (import.meta.main) {
 			}
 		}
 		for (const name of yogaNames) {
-			if (!published.has(name)) published.set(name, await publishedVersions(name));
+			if (!published.has(name))
+				published.set(name, await publishedVersions(name));
 		}
 		const yoga = yogaFirstMajor(
 			result.packages,
 			(name) => published.get(name) ?? [],
 		);
-		const followed = followPins(await readExamples(), (name) =>
-			result.floors.get(name) ?? yoga.get(name),
+		const followed = followPins(
+			await readExamples(),
+			(name) => result.floors.get(name) ?? yoga.get(name),
 		);
 		for (const [path, manifest] of result.packages) await write(path, manifest);
 		for (const [path, manifest] of followed.examples)

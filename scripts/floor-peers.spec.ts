@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { floorOf, refuseRootPins, rewrite, yogaFirstMajor } from './floor-peers';
+import {
+	floorOf,
+	refuseRootPins,
+	rewrite,
+	yogaFirstMajor,
+} from './floor-peers';
 import type { Manifest } from './newest-peers';
 
 const versions = ['0.6.9', '0.7.0-beta.1', '0.7.0', '0.7.1', '0.8.0', '0.9.2'];
