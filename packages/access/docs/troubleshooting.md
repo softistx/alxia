@@ -66,3 +66,9 @@ member. Both are the tenancy layer's refusals, passed through.
 `auth.errors.unauthenticated`: the context's `viewer` is `null`. Put the
 signed-in account in the context before the guard runs. `can` answers
 `false` instead of throwing.
+
+## `Argument of type 'string' is not assignable to parameter of type 'Permission'`
+
+The guards take a `Permission` (`<area>:read` or `<area>:manage`), not any
+`string`. Check the variable with `isPermission(name)` before the call, or
+declare the list `as const` so its members keep their literal types.

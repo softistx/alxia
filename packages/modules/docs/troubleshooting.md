@@ -61,3 +61,10 @@ spelling, or add the module to the `as const` list.
 `ModuleHandle<Name, Handle>` needs `Handle` to have a readonly `db` object and
 a `transaction` method. Add the missing member to the handle type; see the
 [guide](guide.md#typing-collection-access).
+
+## `Property 'databases' does not exist` (or `'clients'`)
+
+`ModuleHandle` and `ModuleCoreHandle` omit `databases` and `clients` on purpose:
+they are the host's way to reach other modules' collections. A module works
+through `db` and `transaction` only. If the host needs them, use its own
+unnarrowed handle outside the module.

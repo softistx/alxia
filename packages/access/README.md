@@ -66,6 +66,8 @@ await requireSelf(ctx, userId); // the viewer is that account, else 403
 | `requireSelf(ctx, userId, { or })` | the account itself, or a holder of `or` |
 | `can(ctx, p)` | never throws for a missing viewer: `false`, for a flag or a field |
 
+Every `p` is a `Permission` (`<area>:read` or `<area>:manage`), not a `string`: a plain `string` variable needs an `isPermission` check, or an `as const` list.
+
 A module's two guards: `permissionsReadWrite('notes:read', 'notes:manage')`
 returns `{ reading, writing }`, `membersReadPermissionWrites('notes:manage')` lets any member read, and `scopeOf({ read, write }, select)` builds
 the same pair from guards of your own.

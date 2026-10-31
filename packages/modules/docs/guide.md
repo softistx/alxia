@@ -133,6 +133,10 @@ await handle.transaction(async (tx) => {
 });
 ```
 
+`ModuleHandle` and `ModuleCoreHandle` also drop `databases` and `clients`, so a
+module cannot reach past its boundary through them, and they rebind `as` and
+`withSession` so they answer the narrowed handle too.
+
 `ModuleCoreMongo<Name>` and `ModuleCoreHandle<Name, Handle>` do the same for
 `coreCollections`, the core database's. `@alxia/tenancy`'s `forModule` hands
 both from a request's scope.

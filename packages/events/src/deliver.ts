@@ -30,6 +30,7 @@ export async function deliver(
 			const key = { eventId: event.id, subscriber: subscription.id };
 			if (await tx.db._inbox.findFirst(key)) return 'duplicate';
 			await tx.db._inbox.create(key);
+			// The registry is erased at this layer, so the module and handle types are cast.
 			const scope = store.forModule(
 				{ mongo: tx as never, core: store.core },
 				subscription.module as never,

@@ -48,6 +48,11 @@ export const notifications = defineModule({
 | `module-missing` | no `eventsModule` |
 | `missing-queue` | a module with subscribers and no `events.<module>` queue, once `queues` is given |
 
+One more code is thrown at run time, not at boot: `tenant-mismatch`, when an
+`_outbox` row or a job names a tenant other than the one it was found in. The
+row is refused and stays pending, which holds back that tenant's later events;
+see [troubleshooting](troubleshooting.md#tenant-mismatch).
+
 ## Register the kernel module
 
 `eventsModule` owns `_outbox` and `_inbox`. Put it in the registry you give
@@ -127,6 +132,8 @@ export const onOverdue = async (
 	event: EventEnvelope,
 	context: SubscriberContext<'notifications', Tenant, Core>,
 ) => {
+	// Tenant and Core are the host's own wirings: its tenant and core collection
+	// types (what it passes to createTenantStore).
 	// Already narrowed to notifications' collections and its dependsOn ones.
 	const { mongo } = context;
 	await mongo.db.items.create({
