@@ -1,0 +1,61 @@
+{
+	"name": "@alxia/tenancy",
+	"version": "0.0.0",
+	"description": "Tenancy for an application on @nxgt/mongo: one contract, two stores (a database per organisation next to a core database, or a single database), a request scope resolved from a header, provisioning and a loop over every tenant",
+	"license": "MIT",
+	"type": "module",
+	"main": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"files": [
+		"dist",
+		"docs",
+		"README.md",
+		"package.json",
+		"LICENSE"
+	],
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"default": "./dist/index.js"
+		},
+		"./package.json": "./package.json"
+	},
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/softistx/alxia.git",
+		"directory": "packages/tenancy"
+	},
+	"publishConfig": {
+		"registry": "https://registry.npmjs.org",
+		"access": "public"
+	},
+	"scripts": {
+		"build": "bun run ../../build.ts",
+		"test": "bun test src",
+		"typecheck": "tsc --noEmit"
+	},
+	"alxia": {
+		"entrypoints": [
+			"src/index.ts"
+		]
+	},
+	"devDependencies": {
+		"@nxgt/mongo": "^0.24.0",
+		"@types/bun": "^1.4.4",
+		"mongodb": "^7.7.0",
+		"mongodb-memory-server-core": "^11.3.0",
+		"zod": "^4.6.5"
+	},
+	"peerDependencies": {
+		"@nxgt/mongo": "^0.24.0",
+		"mongodb": "^7.7.0",
+		"typescript": "^6.0.3 || ^7.0.0",
+		"zod": "^4.6.5"
+	},
+	"peerDependenciesMeta": {
+		"zod": {
+			"optional": true
+		}
+	}
+}
