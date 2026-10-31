@@ -14,7 +14,9 @@ bun add -d typescript
 `graphql-yoga` and `graphql` are peers: the package declares no dependency.
 `graphql-ws` is an optional one, for [`ws`](#websocket) alone.
 `graphql` 16 and 17 both work; with 17, `graphql-yoga` must be 5.22 or
-later, the first to accept it.
+later, the first to accept it. `graphql-yoga` 5 (from 5.16) and 6 both work;
+the specs run on 6. Yoga 6 takes a `@graphql-hive/logger` `Logger` as a custom
+`logging` value, and its `@graphql-yoga/plugin-*` 4.x need Yoga 6.
 
 ## Usage
 

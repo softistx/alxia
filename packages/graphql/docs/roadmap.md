@@ -25,6 +25,10 @@ Nothing scheduled yet.
 
 ## Shipped
 
+### Unreleased
+
+- **`graphql-yoga` 6 accepted as a peer.** The range is `^5.16.0 || ^6.0.0`; CI runs the specs on both majors. A custom `logging` on Yoga 6 must be a `@graphql-hive/logger` `Logger` ([troubleshooting](troubleshooting.md#logchild-is-not-a-function)).
+
 ### 0.9.2
 
 - **A declared oversize body refused where `bodyLimit()` stands.** With

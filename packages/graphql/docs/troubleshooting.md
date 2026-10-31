@@ -28,6 +28,7 @@ symptom.
 
 **Responses**
 
+- [`log.child is not a function`](#logchild-is-not-a-function)
 - [`200 {"errors":[{"message":"Unexpected error.", … "code":"INTERNAL_SERVER_ERROR"}}]}`](#200-errorsmessageunexpected-error--codeinternal_server_error)
 - [`403 Required CSRF header(s) not present` from the test client](#403-required-csrf-headers-not-present-from-the-test-client)
 - [`PersistedQueryNotFound` or `PersistedQueryOnly`](#persistedquerynotfound-or-persistedqueryonly)
@@ -388,6 +389,27 @@ a fraction, `NaN` or a string.
 **Why:** `maxNesting` is a count of nesting levels.
 
 **Fix:** a positive whole number, or `false` for no limit.
+
+### `log.child is not a function`
+
+**When:** every request answers 500 with `TypeError: serverContext.log.child is
+not a function`, on `graphql-yoga` 6, with a custom `logging` such as
+`{ debug() {}, info() {}, warn() {}, error() {} }`.
+
+**Why:** Yoga 6 scopes a logger to each request with `log.child(...)`, so a
+custom `logging` must be a `@graphql-hive/logger` `Logger`. Yoga 5 took any
+object with `debug`, `info`, `warn` and `error`. `logging: false`, a level
+and `true` work on both.
+
+**Fix:** give a `Logger` (it also works on Yoga 5):
+
+```ts
+import { Logger } from '@graphql-hive/logger';
+
+graphql(app, { schema, logging: new Logger({ level: 'warn' }) });
+```
+
+Or turn Yoga's logger off: `graphql(app, { schema, logging: false })`.
 
 ### `200 {"errors":[{"message":"Unexpected error.", … "code":"INTERNAL_SERVER_ERROR"}}]}`
 

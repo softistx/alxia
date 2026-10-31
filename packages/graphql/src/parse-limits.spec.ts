@@ -7,6 +7,7 @@ import { afterEach, describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { parse } from 'graphql';
 import { createSchema, type Plugin } from 'graphql-yoga';
+import { spyLogger } from '../test/hive-logger';
 import { queryOf } from '../test/queries';
 import { type GraphQLOptions, graphql } from './graphql';
 
@@ -16,16 +17,8 @@ const schema = createSchema({
 });
 
 function logs() {
-	const errors: unknown[][] = [];
-	return {
-		errors,
-		logging: {
-			debug() {},
-			info() {},
-			warn() {},
-			error: (...args: unknown[]) => void errors.push(args),
-		},
-	};
+	const { logger, calls } = spyLogger();
+	return { errors: calls['error'] as unknown[][], logging: logger };
 }
 
 const serve = (

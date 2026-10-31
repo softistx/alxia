@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test';
 import { alxia } from '@alxia/core';
 import { createSchema } from 'graphql-yoga';
 import { chunked, send } from '../test/body';
+import { spyLogger } from '../test/hive-logger';
 import { graphql } from './graphql';
 
 const schema = createSchema({
@@ -129,22 +130,6 @@ const noStore = {
 };
 
 /** A logger that records what Yoga printed, by level. */
-function spyLogger() {
-	const calls: Record<string, unknown[][]> = {
-		debug: [],
-		info: [],
-		warn: [],
-		error: [],
-	};
-	const logger = {
-		debug: (...a: unknown[]) => calls['debug']?.push(a),
-		info: (...a: unknown[]) => calls['info']?.push(a),
-		warn: (...a: unknown[]) => calls['warn']?.push(a),
-		error: (...a: unknown[]) => calls['error']?.push(a),
-	};
-	return { logger, calls };
-}
-
 describe('graphql(), the headers of a 413', () => {
 	const marked = (errors?: 'problem') =>
 		graphql(alxia(errors === undefined ? {} : { errors }).bodyLimit(LIMIT), {

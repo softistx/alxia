@@ -13,6 +13,11 @@
  * installs the peer (`@alxia/janus` installs `@nxgt/i18n` beside its own
  * peer): one copy then sits in the workspace.
  *
+ * The same job also runs the other major of `graphql-yoga`: the lockfile
+ * installs the newest alternative of its range (6), so `yogaFirstMajor` pins
+ * the first alternative's floor (5.16.0) and the 3.x `@graphql-yoga/plugin-*`
+ * that peer on Yoga 5, and the specs run on Yoga 5.
+ *
  * It edits each package's `devDependencies` and the examples' dependencies
  * in place: run it on a throwaway checkout, never commit what it writes.
  *
@@ -114,6 +119,44 @@ export function rewrite(
 	return { packages: next, floors };
 }
 
+const YOGA = 'graphql-yoga';
+const YOGA_PLUGINS = '@graphql-yoga/plugin-';
+
+/**
+ * Pins `graphql-yoga` to the floor of the first alternative of its peer range
+ * and each `@graphql-yoga/plugin-*` devDependency to its newest 3.x, the line
+ * that peers on Yoga 5, in every package that installs them. Pure: edits the
+ * clones `rewrite` returned.
+ */
+export function yogaFirstMajor(
+	packages: ReadonlyMap<string, Manifest>,
+	versionsOf: (name: string) => readonly string[],
+): Map<string, string> {
+	const pins = new Map<string, string>();
+	for (const manifest of packages.values()) {
+		const dev = manifest.devDependencies;
+		const peer = manifest.peerDependencies?.[YOGA];
+		if (dev === undefined || peer === undefined) continue;
+		const first = peer.split('||')[0]?.trim() as string;
+		if (dev[YOGA] === undefined) continue;
+		dev[YOGA] = floorOf(first, versionsOf(YOGA));
+		pins.set(YOGA, dev[YOGA]);
+		for (const name of Object.keys(dev)) {
+			if (!name.startsWith(YOGA_PLUGINS)) continue;
+			const [newest3] = versionsOf(name)
+				.filter((v) => !v.includes('-') && Bun.semver.satisfies(v, '^3.0.0'))
+				.sort(Bun.semver.order)
+				.reverse();
+			if (newest3 === undefined) {
+				throw new Error(`No 3.x of ${name} is published.`);
+			}
+			dev[name] = newest3;
+			pins.set(name, newest3);
+		}
+	}
+	return pins;
+}
+
 /**
  * Refuses a root `package.json` that names a pinned peer: its override or
  * devDependency would win over the floor and the job would test the top.
@@ -143,13 +186,31 @@ if (import.meta.main) {
 		for (const name of names)
 			published.set(name, await publishedVersions(name));
 		const result = rewrite(packages, (name) => published.get(name) ?? []);
-		const followed = followPins(await readExamples(), (name) =>
-			result.floors.get(name),
+		const yogaNames = new Set([YOGA]);
+		for (const manifest of result.packages.values()) {
+			for (const name of Object.keys(manifest.devDependencies ?? {})) {
+				if (name.startsWith(YOGA_PLUGINS)) yogaNames.add(name);
+			}
+		}
+		for (const name of yogaNames) {
+			if (!published.has(name))
+				published.set(name, await publishedVersions(name));
+		}
+		const yoga = yogaFirstMajor(
+			result.packages,
+			(name) => published.get(name) ?? [],
+		);
+		const followed = followPins(
+			await readExamples(),
+			(name) => result.floors.get(name) ?? yoga.get(name),
 		);
 		for (const [path, manifest] of result.packages) await write(path, manifest);
 		for (const [path, manifest] of followed.examples)
 			await write(path, manifest);
 		for (const [name, version] of result.floors) {
+			console.log(`pinned ${name} ${version}`);
+		}
+		for (const [name, version] of yoga) {
 			console.log(`pinned ${name} ${version}`);
 		}
 	} catch (error) {

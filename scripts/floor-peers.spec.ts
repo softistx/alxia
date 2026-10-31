@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test';
-import { floorOf, refuseRootPins, rewrite } from './floor-peers';
+import {
+	floorOf,
+	refuseRootPins,
+	rewrite,
+	yogaFirstMajor,
+} from './floor-peers';
 import type { Manifest } from './newest-peers';
 
 const versions = ['0.6.9', '0.7.0-beta.1', '0.7.0', '0.7.1', '0.8.0', '0.9.2'];
@@ -121,5 +126,29 @@ describe('refuseRootPins', () => {
 				'@nxgt/redis',
 			]),
 		).not.toThrow();
+	});
+});
+
+describe('yogaFirstMajor', () => {
+	const yoga = (name: string) =>
+		name === 'graphql-yoga'
+			? ['5.15.0', '5.16.0', '5.22.0', '6.0.1']
+			: ['3.24.2', '3.25.0', '4.0.1'];
+	test('pins Yoga 5 at its floor and the plugins at their newest 3.x', () => {
+		const packages = new Map([
+			manifest('graphql', {
+				peerDependencies: { 'graphql-yoga': '^5.16.0 || ^6.0.0' },
+				devDependencies: {
+					'graphql-yoga': '^6.0.1',
+					'@graphql-yoga/plugin-csrf-prevention': '^4.0.1',
+				},
+			}),
+			manifest('core', { devDependencies: { zod: '^4' } }),
+		]);
+		const pins = yogaFirstMajor(packages, yoga);
+		const dev = packages.get('packages/graphql/package.json')?.devDependencies;
+		expect(dev?.['graphql-yoga']).toBe('5.16.0');
+		expect(dev?.['@graphql-yoga/plugin-csrf-prevention']).toBe('3.25.0');
+		expect(pins.size).toBe(2);
 	});
 });

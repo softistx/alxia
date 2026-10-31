@@ -37,7 +37,7 @@ export const PEER_RANGES = {
 	'react-router': '^8.0.0',
 	vite: '^7.0.0 || ^8.0.0',
 	graphql: '^16.11.0 || ^17.0.0',
-	'graphql-yoga': '^5.16.0',
+	'graphql-yoga': '^5.16.0 || ^6.0.0',
 } as const;
 
 /**
