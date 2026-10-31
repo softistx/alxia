@@ -1,6 +1,3 @@
-/** The actions every area has: `read` sees, `manage` changes. */
-export type DefaultAction = 'read' | 'manage';
-
 /**
  * `<area>:<action>`: `notes:read` reads, `notes:manage` changes, and an action
  * the host declares through `createAccess`' `actions` (`orders:receive`) does

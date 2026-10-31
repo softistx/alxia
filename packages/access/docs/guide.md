@@ -2,8 +2,9 @@
 
 ## Permissions
 
-A permission is `<area>:read` or `<area>:manage`: the area in lower case,
-digits and `_`, then `read` (see) or `manage` (change). The `Permission` type
+A permission is `<area>:read` or `<area>:manage`, or an action the host
+declares: the area in lower case, digits and `_`, then `read` (see) or
+`manage` (change). The `Permission` type
 is that shape, and `isPermission(value)` checks a string. A module declares
 the ones it guards in `permissions` and says which roles hold them by default
 in `defaultGrants`. `read` and `manage` are always allowed; for a narrower
