@@ -39,6 +39,18 @@
         "vite": "^8.3.2",
       },
     },
+    "packages/access": {
+      "name": "@alxia/access",
+      "version": "0.0.0",
+      "devDependencies": {
+        "@alxia/modules": "workspace:^",
+        "@types/bun": "^1.4.4",
+      },
+      "peerDependencies": {
+        "@alxia/modules": "workspace:^",
+        "typescript": "^6.0.3 || ^7.0.0",
+      },
+    },
     "packages/cache": {
       "name": "@alxia/cache",
       "version": "0.3.12",
@@ -467,6 +479,8 @@
     "typescript": "~6.0.3",
   },
   "packages": {
+    "@alxia/access": ["@alxia/access@workspace:packages/access"],
+
     "@alxia/cache": ["@alxia/cache@workspace:packages/cache"],
 
     "@alxia/compress": ["@alxia/compress@workspace:packages/compress"],
