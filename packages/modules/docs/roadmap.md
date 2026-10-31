@@ -34,4 +34,3 @@ Nothing scheduled yet.
   `ModuleMongo` and `ModuleCoreMongo` handles from a request's scope, split
   between the tenant and the core database.
 
-Nothing published yet.

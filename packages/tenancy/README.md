@@ -64,7 +64,10 @@ const { mongo } = await getScope(); // the same promise every time
 
 ## A module's handles
 
-`@alxia/modules` is a required peer. The `modules` option is optional; without it `forModule` throws `module "x" is not registered`. Give the store your registry and plugin code touches only the handles of its
+`@alxia/modules` is a required peer. The `modules` option is optional:
+without it, `forModule` throws `module "x" is not registered`.
+
+Give the store your registry and plugin code touches only the handles of its
 module, typed through `Register`; it never names a database:
 
 ```ts
